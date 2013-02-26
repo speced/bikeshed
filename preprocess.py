@@ -15,7 +15,7 @@ import sys
 
 
 
-def textualFixups(doc):
+def markdownParagraphs(doc):
 	# This converts Markdown-style paragraphs into actual paragraphs.
 	# Any line that is preceded by a blank line,
 	# and which starts with either text or an inline element,
@@ -33,7 +33,6 @@ def textualFixups(doc):
 			doc['lines'][i] = "<p>" + line
 
 		previousLineBlank = re.match("^\s*$", line)
-	return doc
 
 
 
@@ -435,7 +434,6 @@ Property index</h2>
 
 	doc['lines'].insert(0, header)
 	doc['lines'].append(footer)
-	return doc
 
 
 
@@ -458,7 +456,7 @@ doc['at-risk'] = []
 doc['otherData'] = defaultdict(list)
 
 processDataBlocks(doc)
-textualFixups(doc)
+markdownParagraphs(doc)
 fillInBoilerplate(doc)
 
 try:
