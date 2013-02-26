@@ -172,6 +172,6 @@ A few assumptions are made to aid with this:
    but the contents are deeply nested (long whitespace prefix),
    it's possible that a second run-through would strip more whitespace in error.
    If you always indent with tabs, this is automatically avoided,
-   as tabs in the whitespace prefix of `<pre>` contents are auto-converted into two spaces
+   as tabs `<pre>` contents (after removing the prefix) are auto-converted into two spaces
    (because tabs are enormous by default in HTML - 8 spaces wide!),
-   and so the leftover prefix will never match the `<pre>` tag's prefix.
+   and so the leftover leading whitespace will never match the `<pre>` tag's prefix.
