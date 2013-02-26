@@ -6,7 +6,8 @@ from collections import defaultdict
 import subprocess
 import os
 import sys
-
+import html5lib
+from lxml import html
 
 
 
@@ -459,13 +460,15 @@ processDataBlocks(doc)
 markdownParagraphs(doc)
 fillInBoilerplate(doc)
 
+doc['document'] = html5lib.parse(''.join(doc['lines']), treebuilder='lxml', namespaceHTMLElements=False)
+
 try:
 	outputFile = open("~temp-generated-source.html", mode='w')
 except:
 	print "Something prevented me from writing out a temp file in this directory."
 	sys.exit(1)
 else:
-	outputFile.writelines(doc['lines'])
+	outputFile.write(html.tostring(doc['document']))
 	outputFile.close()
 
 try:
