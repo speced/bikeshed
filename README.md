@@ -26,7 +26,7 @@ so there's no final blank line in the content.
 
 In other words, you can now write:
 
-~~~~
+~~~~html
 <div class='example'>
 	<p>
 		An example:
@@ -37,11 +37,12 @@ In other words, you can now write:
 		&lt;li>two
 	&lt;</ul>
 	</pre>
+</div>
 ~~~~
 
 The preprocessor will automatically convert it into:
 
-~~~~
+~~~~html
 <div class='example'>
 	<p>
 		An example:
@@ -51,6 +52,7 @@ The preprocessor will automatically convert it into:
 	&lt;li>one
 	&lt;li>two
 &lt;</ul></pre>
+</div>
 ~~~~
 
 
@@ -60,7 +62,7 @@ Propdef table expansion
 Propdef tables are rather large, even when correctly formatted.
 Instead, you can write a propdef table as a data block, like:
 
-~~~~
+~~~~html
 	<xmp class='propdef'>
 	Name: var-*
 	Values: [ <value> | <CDO> | <CDC> ]
@@ -127,7 +129,7 @@ Any HTML used in a value in a metadata block will be put directly into the docum
 
 An example metadata block:
 
-~~~~
+~~~~html
 <pre class='metadata'>
 Status: ED
 TR: http://www.w3.org/TR/css-variables/
