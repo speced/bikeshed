@@ -1,16 +1,30 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+# Dependencies:
+# * html5lib
+# * lxml - "pip install lxml"
+# * cssselect "pip install cssselect"
+
 import re
 from collections import defaultdict
 import subprocess
 import os
 import sys
 import html5lib
+import lxml
 from lxml import html
+from lxml import etree
+from lxml.cssselect import CSSSelector
 
 
 
+
+
+
+def die(msg):
+	print msg
+	sys.exit(1)
 
 
 
@@ -437,6 +451,46 @@ Property index</h2>
 	doc['lines'].append(footer)
 
 
+def autogenerateId(fromText):
+	return re.sub("[^a-zA-Z0-9_-]", "", fromText.replace(" ", "-"))
+
+def textContent(el):
+	return etree.tostring(el, method='text', with_tail=False)
+
+def processAutolinks(doc):
+	links = {}
+	ids = set()
+	linkTargets = CSSSelector("dfn")(doc['document'])
+	for el in linkTargets:
+		if el.get('id') != None:
+			id = el.get('id')
+			if id in ids:
+				die("Found a duplicate explictly-specified id:" + id)
+		else:
+			id = autogenerateId(textContent(el))
+			if id in ids:
+				# De-dup the id by appending an integer after it.
+				for x in range(10):
+					if (id+str(x)) not in ids:
+						id = id + str(x)
+						break
+				else:
+					die("More than 10 link-targets with the same id: " + id)
+			el.set('id', id)
+		ids.add(id)
+
+		if el.get("title") != None:
+			linkTexts = el.get("title").split("|")
+		else:
+			linkTexts = [textContent(el)]
+		for linkText in linkTexts:
+			if linkText in links:
+				die("Two link-targets have the same linking text: " + linkText)
+			else:
+				links[linkText] = id
+	print links
+
+
 
 
 
@@ -461,6 +515,7 @@ markdownParagraphs(doc)
 fillInBoilerplate(doc)
 
 doc['document'] = html5lib.parse(''.join(doc['lines']), treebuilder='lxml', namespaceHTMLElements=False)
+processAutolinks(doc)
 
 try:
 	outputFile = open("~temp-generated-source.html", mode='w')
