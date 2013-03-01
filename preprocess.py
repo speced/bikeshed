@@ -184,8 +184,8 @@ def fillInBoilerplate(doc):
 <div class="head">
 <!--logo-->
 """
-	header += '<h1>'+doc['title']+'</h1>'
-	header += '<h2 class="no-num no-toc">[LONGSTATUS] [DATE]</h2>'
+	header += '<h1 id="title">'+doc['title']+'</h1>'
+	header += '<h2 id="subtitle" class="no-num no-toc">[LONGSTATUS] [DATE]</h2>'
 	header += "<dl>"
 	if doc['status'] != "ED" and doc['TR'] != "":
 		header += "<dt>This version:\n<dd><a href='"+doc['TR']+"'>"+doc['TR']+"</a>\n"
