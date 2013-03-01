@@ -465,17 +465,17 @@ def processAutolinks(doc):
 		if el.get('id') != None:
 			id = el.get('id')
 			if id in ids:
-				die("Found a duplicate explictly-specified id:" + id)
+				die("Found a duplicate explicitly-specified id:" + id)
 		else:
 			id = autogenerateId(textContent(el))
 			if id in ids:
-				# De-dup the id by appending an integer after it.
+				# Try to de-dup the id by appending an integer after it.
 				for x in range(10):
 					if (id+str(x)) not in ids:
 						id = id + str(x)
 						break
 				else:
-					die("More than 10 link-targets with the same id: " + id)
+					die("More than 10 link-targets with the same id, giving up: " + id)
 			el.set('id', id)
 		ids.add(id)
 
