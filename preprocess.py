@@ -452,7 +452,7 @@ Property index</h2>
 
 
 def autogenerateId(fromText):
-	return re.sub("[^a-zA-Z0-9_-]", "", fromText.replace(" ", "-"))
+	return re.sub("[^a-z0-9_-]", "", fromText.replace(" ", "-").lower())
 
 def textContent(el):
 	return etree.tostring(el, method='text', with_tail=False)
@@ -487,18 +487,41 @@ def setupAutorefs(doc):
 			if el.get("title") != None:
 				linkTexts = [x.strip() for x in el.get("title").split("|")]
 			else:
-				linkTexts = [textContent(el).strip()]
+				linkTexts = [textContent(el).strip().lower()]
 			for linkText in linkTexts:
 				if linkText in links:
 					die("Two link-targets have the same linking text: " + linkText)
 				else:
-					links[linkText] = id
+					links[linkText] = el.get('id')
 	doc['links'] = links
 
 def processAutolinks(doc):
-	pass
+	autolinks = CSSSelector("a:not([href])")(doc['document'])
+	for el in autolinks:
+		if el.get('title') != None:
+			if el.get('title') == '':
+				break
+			linkText = el.get('title')
+		else:
+			linkText = textContent(el).lower()
 
+		for variation in linkTextVariations(linkText):
+			if variation in doc['links']:
+				el.set('href', '#'+doc['links'][variation])
+				break
+		else:
+			die("Couldn't link up a ref: " + etree.tostring(el, with_tail=False))
 
+def linkTextVariations(str):
+	# Generate intelligent variations of the provided link text,
+	# so explicitly adding a title attr isn't usually necessary.
+	yield str
+	if str[-3:] == "ies":
+		yield str[:-3]+"y"
+	elif str[-2:] == "'s":
+		yield str[:-2]
+	elif str[-1] == "s":
+		yield str[:-1]
 
 
 
