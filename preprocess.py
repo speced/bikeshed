@@ -460,7 +460,7 @@ def textContent(el):
 def processAutolinks(doc):
 	links = {}
 	ids = set()
-	linkTargets = CSSSelector("dfn")(doc['document'])
+	linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6")(doc['document'])
 	for el in linkTargets:
 		if el.get('id') != None:
 			id = el.get('id')
