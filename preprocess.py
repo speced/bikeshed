@@ -457,8 +457,7 @@ def autogenerateId(fromText):
 def textContent(el):
 	return etree.tostring(el, method='text', with_tail=False)
 
-def processAutolinks(doc):
-	links = {}
+def autocreateIds(doc):
 	ids = set()
 	linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6")(doc['document'])
 	for el in linkTargets:
@@ -478,7 +477,12 @@ def processAutolinks(doc):
 					die("More than 10 link-targets with the same id, giving up: " + id)
 			el.set('id', id)
 		ids.add(id)
+	doc['ids'] = ids
 
+def setupAutorefs(doc):
+	links = {}
+	linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6")(doc['document'])
+	for el in linkTargets:
 		if not re.search("no-ref", el.get('class') or ""):
 			if el.get("title") != None:
 				linkTexts = [x.strip() for x in el.get("title").split("|")]
@@ -489,7 +493,10 @@ def processAutolinks(doc):
 					die("Two link-targets have the same linking text: " + linkText)
 				else:
 					links[linkText] = id
-	print links
+	doc['links'] = links
+
+def processAutolinks(doc):
+	pass
 
 
 
@@ -516,6 +523,8 @@ markdownParagraphs(doc)
 fillInBoilerplate(doc)
 
 doc['document'] = html5lib.parse(''.join(doc['lines']), treebuilder='lxml', namespaceHTMLElements=False)
+autocreateIds(doc)
+setupAutorefs(doc)
 processAutolinks(doc)
 
 try:
