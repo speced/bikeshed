@@ -198,8 +198,8 @@ def fillInBoilerplate(doc):
 <div class="head">
 <!--logo-->
 """
-	header += '<h1 id="title">'+doc['title']+'</h1>'
-	header += '<h2 id="subtitle" class="no-num no-toc">[LONGSTATUS] [DATE]</h2>'
+	header += '<h1 id="title" class="no-ref">'+doc['title']+'</h1>'
+	header += '<h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS] [DATE]</h2>'
 	header += "<dl>"
 	if doc['status'] != "ED" and doc['TR'] != "":
 		header += "<dt>This version:\n<dd><a href='"+doc['TR']+"'>"+doc['TR']+"</a>\n"
@@ -232,28 +232,28 @@ def fillInBoilerplate(doc):
 
 <hr title="Separator for header">
 </div>
-<h2 class='no-num no-toc' id='abstract'>Abstract</h2>
+<h2 class='no-num no-toc no-ref' id='abstract'>Abstract</h2>
 <p>
 """
 	header += doc['abstract']
-	header += """<h2 class='no-num no-toc' id='status'>Status of this document</h2>
+	header += """<h2 class='no-num no-toc no-ref' id='status'>Status of this document</h2>
 	<!--status-->"""
 	if 'at-risk' in doc:
 		header += "<p>The following features are at risk:\n<ul>"
 		for feature in doc['at-risk']:
 			header += "<li>"+feature
 		header += "</ul>"
-	header += """<h2 class="no-num no-toc" id="contents">
+	header += """<h2 class="no-num no-toc no-ref" id="contents">
 Table of contents</h2>
 
 <!--toc-->
 """
 	footer = """
 
-<h2 id="conformance">
+<h2 id="conformance" class="no-ref">
 Conformance</h2>
 
-<h3 id="conventions">
+<h3 id="conventions" class="no-ref">
 Document conventions</h3>
 
 	<p>Conformance requirements are expressed with a combination of
@@ -280,7 +280,7 @@ Document conventions</h3>
 	
 	<p class="note">Note, this is an informative note.</p>
 
-<h3 id="conformance-classes">
+<h3 id="conformance-classes" class="no-ref">
 Conformance classes</h3>
 
 	<p>Conformance to this specification
@@ -318,7 +318,7 @@ Conformance classes</h3>
 	this module, and meet all other conformance requirements of style sheets
 	as described in this module.
 
-<h3 id="partial">
+<h3 id="partial" class="no-ref">
 Partial implementations</h3>
 
 	<p>So that authors can exploit the forward-compatible parsing rules to
@@ -332,7 +332,7 @@ Partial implementations</h3>
 	(as unsupported values must be), CSS requires that the entire declaration
 	be ignored.</p>
 	
-<h3 id="experimental">
+<h3 id="experimental" class="no-ref">
 Experimental implementations</h3>
 
 	<p>To avoid clashes with future CSS features, the CSS2.1 specification
@@ -347,7 +347,7 @@ Experimental implementations</h3>
 	in the draft.
 	</p>
  
-<h3 id="testing">
+<h3 id="testing" class="no-ref">
 Non-experimental implementations</h3>
 
 	<p>Once a specification reaches the Candidate Recommendation stage,
@@ -372,7 +372,7 @@ Non-experimental implementations</h3>
 
 	if doc['status'] == "CR":
 		footer += """
-<h3 id="cr-exit-criteria">
+<h3 id="cr-exit-criteria" class="no-ref">
 CR exit criteria</h3>
 
 	<p>
@@ -424,22 +424,22 @@ CR exit criteria</h3>
 """
 
 	footer += """
-<h2 class=no-num id="references">
+<h2 class="no-num no-ref" id="references">
 References</h2>
 
-<h3 class="no-num" id="normative-references">
+<h3 class="no-num no-ref" id="normative-references">
 Normative references</h3>
 <!--normative-->
 
-<h3 class="no-num" id="other-references">
+<h3 class="no-num no-ref" id="other-references">
 Other references</h3>
 <!--informative-->
 
-<h2 class="no-num" id="index">
+<h2 class="no-num no-ref" id="index">
 Index</h2>
 <!--index-->
 
-<h2 class="no-num" id="property-index">
+<h2 class="no-num no-ref" id="property-index">
 Property index</h2>
 <!-- properties -->
 
@@ -479,15 +479,16 @@ def processAutolinks(doc):
 			el.set('id', id)
 		ids.add(id)
 
-		if el.get("title") != None:
-			linkTexts = el.get("title").split("|")
-		else:
-			linkTexts = [textContent(el)]
-		for linkText in linkTexts:
-			if linkText in links:
-				die("Two link-targets have the same linking text: " + linkText)
+		if not re.search("no-ref", el.get('class') or ""):
+			if el.get("title") != None:
+				linkTexts = [x.strip() for x in el.get("title").split("|")]
 			else:
-				links[linkText] = id
+				linkTexts = [textContent(el).strip()]
+			for linkText in linkTexts:
+				if linkText in links:
+					die("Two link-targets have the same linking text: " + linkText)
+				else:
+					links[linkText] = id
 	print links
 
 
