@@ -142,6 +142,35 @@ Abstract: This module introduces cascading variables as a new primitive value ty
 ~~~~
 
 
+Automatic Linking
+-----------------
+
+The preprocessor will now automatically link terms to their definitions within a single document.
+
+Every heading or `<dfn>` element automatically defines an autolink target.
+(Add `class=no-ref` to avoid this.)
+If the target doesn't have an `id` attribute,
+one is auto-generated for it out of the element's text content
+by stripping out everything but alphanumerics, dashes, and underscores.
+
+If the text content looks like a function (ends in "()"), "-function" is appended to the id.
+If the text content looks like a grammar production (start with "<", ends with ">"), "-production" is appended to the id.
+These corrections help reduce id collisions between function/productions and normal terms.
+
+If there is a collision, the processer attempts to fix it by trying to append the digits 0-9 to the id.
+If for some reason you have so many collisions that 0-9 doesn't work, it'll fail noisily.
+
+Every `<a>` element *without* an `href` attribute defines an autolink.
+Autolinking is accomplished by matching up the text content of the autolink target and the autolink.
+You can override this behavior on either by providing a `title` attribute, which is used instead.
+On autolink targets, multiple match targets can be provided by using a pipe character (|) to separate each.
+
+If the text of an autolink doesn't match any target,
+the processor tries a few simple manipulations to accommodate common English variations:
+* if the text ends with an "s" or "'s", tries to match without it
+* if the text ends with an "ies", tries to match with that replaced by "y"
+
+
 Further Preprocessing
 ---------------------
 
