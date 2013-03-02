@@ -139,7 +139,7 @@ def processPropdef(lines, doc, **kwargs):
 		if key == "Name":
 			val = ', '.join("<dfn>"+x.strip()+"</dfn>" for x in val.split(","))
 		if key == "Values":
-			val = re.sub("<([^>]+)>", r"<var>&lt;\1></var>", val)
+			val = re.sub("<([^>]+)>", r"<a>&lt;\1></a>", val)
 		ret.append("<tr><th>" + key + ":<td>" + val)
 	ret.append("</table>")
 	return ret
@@ -451,8 +451,6 @@ Property index</h2>
 	doc['lines'].append(footer)
 
 
-def autogenerateId(fromText):
-	return re.sub("[^a-z0-9_-]", "", fromText.replace(" ", "-").lower())
 
 def textContent(el):
 	return etree.tostring(el, method='text', with_tail=False)
@@ -479,6 +477,17 @@ def autocreateIds(doc):
 		ids.add(id)
 	doc['ids'] = ids
 
+def autogenerateId(id):
+	if id[-2:] == "()":
+		id = id[:-2]
+		suffix = "-function"
+	elif id[0] == "<" and id[-1] == ">":
+		id = id[1:-1]
+		suffix = "-production"
+	else:
+		suffix = ""
+	return re.sub("[^a-z0-9_-]", "", id.replace(" ", "-").lower()) + suffix
+
 def setupAutorefs(doc):
 	links = {}
 	linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6")(doc['document'])
@@ -487,13 +496,16 @@ def setupAutorefs(doc):
 			if el.get("title") != None:
 				linkTexts = [x.strip() for x in el.get("title").split("|")]
 			else:
-				linkTexts = [textContent(el).strip().lower()]
+				linkTexts = [autogenerateLinkText(textContent(el))]
 			for linkText in linkTexts:
 				if linkText in links:
 					die("Two link-targets have the same linking text: " + linkText)
 				else:
 					links[linkText] = el.get('id')
 	doc['links'] = links
+
+def autogenerateLinkText(str):
+	return str.strip().lower()
 
 def processAutolinks(doc):
 	autolinks = CSSSelector("a:not([href])")(doc['document'])
@@ -516,6 +528,7 @@ def linkTextVariations(str):
 	# Generate intelligent variations of the provided link text,
 	# so explicitly adding a title attr isn't usually necessary.
 	yield str
+	
 	if str[-3:] == "ies":
 		yield str[:-3]+"y"
 	elif str[-2:] == "'s":
