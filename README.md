@@ -114,9 +114,12 @@ The relevant keys are:
 * "ED" must contain a link that points to the editor's draft.
 * "TR" may contain a link that points to the latest version on /TR.
 * "Editor" must contain an editor's information.
-	This has a special format: the name comes first,
-	followed by the editor's affiliation in parentheses,
-	followed by either an email address or a link to their contact page.
+	This has a special format:
+	it must contain the editor's name,
+	followed by the editor's affiliation,
+	followed by either an email address or a link to their contact page,
+	all comma-separated.
+	(There is not currently any way to put a comma *in* one of these values.)
 	Multiple "Editor" lines can be used to supply multiple editors.
 * "Abstract" must contain an abstract for the spec, a 1-2 sentence description of what the spec is about.
 
@@ -134,8 +137,8 @@ An example metadata block:
 Status: ED
 TR: http://www.w3.org/TR/css-variables/
 ED: http://dev.w3.org/csswg/css-variables/
-Editor: Tab Atkins Jr. (Google, Inc.) http://xanthir.com/contact
-Editor: Luke Macpherson (Google, Inc.) macpherson@google.com
+Editor: Tab Atkins Jr., Google, http://xanthir.com/contact
+Editor: Luke Macpherson, Google, macpherson@google.com
 Editor: Daniel Glazman (Disruptive Innovations) daniel.glazman@disruptive-innovations.com
 Abstract: This module introduces cascading variables as a new primitive value type that is accepted by all CSS properties, and custom properties for defining them.
 </pre>
