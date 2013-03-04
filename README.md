@@ -93,6 +93,9 @@ That is, any block of text that either starts with an inline element or no eleme
 and is preceded by a blank line,
 will have a `<p>` tag automatically inserted before it.
 
+Any Markdown-style paragraphs starting with "Note: " or "Note, "
+will instead get a `<p class='note'>`.
+
 
 Metadata and Boilerplate Generation
 -----------------------------------

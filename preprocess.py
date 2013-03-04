@@ -35,6 +35,9 @@ def markdownParagraphs(doc):
 	# Any line that is preceded by a blank line,
 	# and which starts with either text or an inline element,
 	# will have a <p> inserted at its beginning.
+	#
+	# It also auto-recognizes paragraphs that start with "Note: " or "Note, "
+	# and instead inserts a "<p class='note'>".
 	inDataBlock = False
 	previousLineBlank = False
 	for (i, line) in enumerate(doc['lines']):
@@ -45,7 +48,10 @@ def markdownParagraphs(doc):
 			inDataBlock = False
 			continue
 		if (re.match("\s*[^<\s]", line) or re.match("\s*<(em|strong|i|b|u|dfn|a|code|var)", line)) and previousLineBlank and not inDataBlock:
-			doc['lines'][i] = "<p>" + line
+			if re.match("\s*Note(:|,) ", line):
+				doc['lines'][i] = "<p class='note'>" + line
+			else:
+				doc['lines'][i] = "<p>" + line
 
 		previousLineBlank = re.match("^\s*$", line)
 
