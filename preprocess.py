@@ -538,47 +538,48 @@ def linkTextVariations(str):
 
 
 
+if __name__ == "__main__":
 
-try:
-	doc = {'lines': open("Overview.src.html", 'r').readlines()}
-except OSError:
-	print "Couldn't find Overview.src.html in this directory."
-	sys.exit(1)
+	try:
+		doc = {'lines': open("Overview.src.html", 'r').readlines()}
+	except OSError:
+		print "Couldn't find Overview.src.html in this directory."
+		sys.exit(1)
 
-doc['title'] = "???"
-doc['status'] = "???"
-doc['TR'] = "???"
-doc['ED'] = "???"
-doc['editors'] = []
-doc['abstract'] = "???"
-doc['at-risk'] = []
-doc['otherData'] = defaultdict(list)
+	doc['title'] = "???"
+	doc['status'] = "???"
+	doc['TR'] = "???"
+	doc['ED'] = "???"
+	doc['editors'] = []
+	doc['abstract'] = "???"
+	doc['at-risk'] = []
+	doc['otherData'] = defaultdict(list)
 
-processDataBlocks(doc)
-markdownParagraphs(doc)
-fillInBoilerplate(doc)
+	processDataBlocks(doc)
+	markdownParagraphs(doc)
+	fillInBoilerplate(doc)
 
-doc['document'] = html5lib.parse(''.join(doc['lines']), treebuilder='lxml', namespaceHTMLElements=False)
-autocreateIds(doc)
-setupAutorefs(doc)
-processAutolinks(doc)
+	doc['document'] = html5lib.parse(''.join(doc['lines']), treebuilder='lxml', namespaceHTMLElements=False)
+	autocreateIds(doc)
+	setupAutorefs(doc)
+	processAutolinks(doc)
 
-try:
-	outputFile = open("~temp-generated-source.html", mode='w')
-except:
-	print "Something prevented me from writing out a temp file in this directory."
-	sys.exit(1)
-else:
-	outputFile.write(html.tostring(doc['document']))
-	outputFile.close()
+	try:
+		outputFile = open("~temp-generated-source.html", mode='w')
+	except:
+		print "Something prevented me from writing out a temp file in this directory."
+		sys.exit(1)
+	else:
+		outputFile.write(html.tostring(doc['document']))
+		outputFile.close()
 
-try:
-	subprocess.call("curl -# -n -F file=@~temp-generated-source.html -F group=CSS -F output=html -F method=file https://www.w3.org/Style/Group/process.cgi -o Overview.html", shell=True)
-except subprocess.CalledProcessError as e:
-	print "Some error occurred in the curl call."
-	print "Error code ", e.returncode
-	print "Error message:"
-	print e.output
-	sys.exit(1)
-else:
-	os.remove("~temp-generated-source.html")
+	try:
+		subprocess.call("curl -# -n -F file=@~temp-generated-source.html -F group=CSS -F output=html -F method=file https://www.w3.org/Style/Group/process.cgi -o Overview.html", shell=True)
+	except subprocess.CalledProcessError as e:
+		print "Some error occurred in the curl call."
+		print "Error code ", e.returncode
+		print "Error message:"
+		print e.output
+		sys.exit(1)
+	else:
+		os.remove("~temp-generated-source.html")
