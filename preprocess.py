@@ -40,7 +40,7 @@ def markdownParagraphs(doc):
 	# and instead inserts a "<p class='note'>".
 	inDataBlock = False
 	previousLineBlank = False
-	for (i, line) in enumerate(doc['lines']):
+	for (i, line) in enumerate(doc.lines):
 		if not inDataBlock and re.match("\s*<(pre|xmp)", line):
 			inDataBlock = True
 			continue
@@ -49,9 +49,9 @@ def markdownParagraphs(doc):
 			continue
 		if (re.match("\s*[^<\s]", line) or re.match("\s*<(em|strong|i|b|u|dfn|a|code|var)", line)) and previousLineBlank and not inDataBlock:
 			if re.match("\s*Note(:|,) ", line):
-				doc['lines'][i] = "<p class='note'>" + line
+				doc.lines[i] = "<p class='note'>" + line
 			else:
-				doc['lines'][i] = "<p>" + line
+				doc.lines[i] = "<p>" + line
 
 		previousLineBlank = re.match("^\s*$", line)
 
@@ -84,7 +84,7 @@ def processDataBlocks(doc):
 	tagName = ""
 	startLine = 0
 	replacements = []
-	for (i, line) in enumerate(doc['lines']):
+	for (i, line) in enumerate(doc.lines):
 		match = re.match("\s*<(pre|xmp)(.*)", line, re.I)
 		if match and not inBlock:
 			inBlock = True
@@ -103,21 +103,21 @@ def processDataBlocks(doc):
 				replacements.append({
 					'start':startLine, 
 					'end':i+1, 
-					'value': blockTypes[blockType](lines=doc['lines'][startLine+1:i], tagName=tagName, firstLine=doc['lines'][startLine], doc=doc)})
+					'value': blockTypes[blockType](lines=doc.lines[startLine+1:i], tagName=tagName, firstLine=doc.lines[startLine], doc=doc)})
 			else:
 				# End tag was at the end of line of useful content.
-				doc['lines'][i] = match.group(1)
+				doc.lines[i] = match.group(1)
 				replacements.append({
 					'start':startLine, 
 					'end':i, 
-					'value': blockTypes[blockType](lines=doc['lines'][startLine+1:i+1], tagName=tagName, firstLine=doc['lines'][startLine], doc=doc)})
+					'value': blockTypes[blockType](lines=doc.lines[startLine+1:i+1], tagName=tagName, firstLine=doc.lines[startLine], doc=doc)})
 			tagName = ""
 			blockType = ""
 
 	# Make the replacements, starting from the bottom up so I
 	# don't have to worry about offsets becoming invalid.
 	for rep in reversed(replacements):
-		doc['lines'][rep['start']:rep['end']] = rep['value']
+		doc.lines[rep['start']:rep['end']] = rep['value']
 
 
 def processPre(lines, tagName, firstLine, **kwargs):
@@ -156,22 +156,22 @@ def processMetadata(lines, doc, **kwargs):
 		key = match.group(1)
 		val = match.group(2)
 		if key == "Status":
-			doc['status'] = val
+			doc.status = val
 		elif key == "TR":
-			doc['TR'] = val
+			doc.TR = val
 		elif key == "ED":
-			doc['ED'] = val
+			doc.ED = val
 		elif key == "Abstract":
-			doc['abstract'] = val
+			doc.abstract = val
 		elif key == "Editor":
 			match = re.match("([^,]+) ,\s* ([^,]+) ,?\s* (.*)", val, re.X)
 			if match:
-				doc['editors'].append({'name': match.group(1), 'org':match.group(2), 'link':match.group(3)})
+				doc.editors.append({'name': match.group(1), 'org':match.group(2), 'link':match.group(3)})
 			else:
 				print "Error: one of the editors didn't match the format '<name>, <company>, <email-or-contact-page>"
 				sys.exit(1)
 		else:
-			doc['otherData'][key].append(val)
+			doc.otherMetadata[key].append(val)
 	return []
 
 
@@ -185,41 +185,41 @@ def fillInBoilerplate(doc):
 	# Arbitrarily, I choose to use whether the first line in the doc
 	# is an <h1> with the document's title.
 
-	if re.match("<h1>[^<]+</h1>", doc['lines'][0]):
-		doc['title'] = re.match("<h1>([^<]+)</h1>", doc['lines'][0]).group(1)
-		doc['lines'] = doc['lines'][1:]
+	if re.match("<h1>[^<]+</h1>", doc.lines[0]):
+		doc.title = re.match("<h1>([^<]+)</h1>", doc.lines[0]).group(1)
+		doc.lines = doc.lines[1:]
 
 	header = """
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html lang="en">
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">"""
-	header += "<title>"+doc['title']+"</title>"
+	header += "<title>"+doc.title+"</title>"
 	header += """	<link href="../default.css" rel=stylesheet type="text/css">
 	<link href="../csslogo.ico" rel="shortcut icon" type="image/x-icon">"""
-	header += '<link href="https://www.w3.org/StyleSheets/TR/W3C-'+doc['status']+'.css" rel=stylesheet type="text/css">'
+	header += '<link href="https://www.w3.org/StyleSheets/TR/W3C-'+doc.status+'.css" rel=stylesheet type="text/css">'
 	header += """
 </head>
 <body>
 <div class="head">
 <!--logo-->
 """
-	header += '<h1 id="title" class="no-ref">'+doc['title']+'</h1>'
+	header += '<h1 id="title" class="no-ref">'+doc.title+'</h1>'
 	header += '<h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS] [DATE]</h2>'
 	header += "<dl>"
-	if doc['status'] != "ED" and doc['TR'] != "":
-		header += "<dt>This version:\n<dd><a href='"+doc['TR']+"'>"+doc['TR']+"</a>\n"
-	elif doc['status'] == "ED" and doc['ED'] != "":
-		header += "<dt>This version:\n<dd><a href='"+doc['ED']+"'>"+doc['ED']+"</a>\n"
+	if doc.status != "ED" and doc.TR != "":
+		header += "<dt>This version:\n<dd><a href='"+doc.TR+"'>"+doc.TR+"</a>\n"
+	elif doc.status == "ED" and doc.ED != "":
+		header += "<dt>This version:\n<dd><a href='"+doc.ED+"'>"+doc.ED+"</a>\n"
 	else:
 		header += "<dt>This version:\n<dd>???\n"
-	if doc['TR'] != "":
-		header += "<dt>Latest version:\n<dd><a href='"+doc['TR']+"'>"+doc['TR']+"</a>\n"
-	if doc['ED'] != "":
-		header += "<dt>Editor's Draft\n<dd><a href='"+doc['ED']+"'>"+doc['ED']+"</a>\n"
-	if len(doc['editors']):
+	if doc.TR != "":
+		header += "<dt>Latest version:\n<dd><a href='"+doc.TR+"'>"+doc.TR+"</a>\n"
+	if doc.ED != "":
+		header += "<dt>Editor's Draft\n<dd><a href='"+doc.ED+"'>"+doc.ED+"</a>\n"
+	if len(doc.editors):
 		header += "<dt>Editors:\n"
-		for editor in doc['editors']:
+		for editor in doc.editors:
 			header += "<dd class='hcard'>"
 			if(editor['link'][0:4] == "http"):
 				header += "<a class='fn url' href='"+editor['link']+"'>"+editor['name']+"</a> (<span class='org'>"+editor['org']+"</span>)\n"
@@ -228,8 +228,8 @@ def fillInBoilerplate(doc):
 				header += "<span class='fn'>"+editor['name']+"</span> (<span class='org'>"+editor['org']+"</span>), <a class='email' href='"+ editor['link'] +"'>"+editor['link']+"</span>\n"
 	else:
 		header += "<dt>Editors:\n<dd>???\n"
-	if len(doc['otherData']):
-		for (key, vals) in otherData.items():
+	if len(doc.otherMetadata):
+		for (key, vals) in otherMetadata.items():
 			header += "<dt>"+key+":\n"
 			for val in vals:
 				header += "<dd>"+val+"\n"
@@ -241,12 +241,12 @@ def fillInBoilerplate(doc):
 <h2 class='no-num no-toc no-ref' id='abstract'>Abstract</h2>
 <p>
 """
-	header += doc['abstract']
+	header += doc.abstract
 	header += """<h2 class='no-num no-toc no-ref' id='status'>Status of this document</h2>
 	<!--status-->"""
-	if 'at-risk' in doc:
+	if doc.atRisk:
 		header += "<p>The following features are at risk:\n<ul>"
-		for feature in doc['at-risk']:
+		for feature in doc.atRisk:
 			header += "<li>"+feature
 		header += "</ul>"
 	header += """<h2 class="no-num no-toc no-ref" id="contents">
@@ -376,7 +376,7 @@ Non-experimental implementations</h3>
 	<a href="http://lists.w3.org/Archives/Public/public-css-testsuite">public-css-testsuite@w3.org</a>
 	mailing list."""
 
-	if doc['status'] == "CR":
+	if doc.status == "CR":
 		footer += """
 <h3 id="cr-exit-criteria" class="no-ref">
 CR exit criteria</h3>
@@ -453,8 +453,8 @@ Property index</h2>
 </html>
 """
 
-	doc['lines'].insert(0, header)
-	doc['lines'].append(footer)
+	doc.lines.insert(0, header)
+	doc.lines.append(footer)
 
 
 
@@ -463,7 +463,7 @@ def textContent(el):
 
 def autocreateIds(doc):
 	ids = set()
-	linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6")(doc['document'])
+	linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6")(doc.document)
 	for el in linkTargets:
 		if el.get('id') != None:
 			id = el.get('id')
@@ -481,7 +481,7 @@ def autocreateIds(doc):
 					die("More than 10 link-targets with the same id, giving up: " + id)
 			el.set('id', id)
 		ids.add(id)
-	doc['ids'] = ids
+	doc.ids = ids
 
 def autogenerateId(id):
 	if id[-2:] == "()":
@@ -496,7 +496,7 @@ def autogenerateId(id):
 
 def setupAutorefs(doc):
 	links = {}
-	linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6")(doc['document'])
+	linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6")(doc.document)
 	for el in linkTargets:
 		if not re.search("no-ref", el.get('class') or ""):
 			if el.get("title") != None:
@@ -508,13 +508,13 @@ def setupAutorefs(doc):
 					die("Two link-targets have the same linking text: " + linkText)
 				else:
 					links[linkText] = el.get('id')
-	doc['links'] = links
+	doc.links = links
 
 def autogenerateLinkText(str):
 	return str.strip().lower()
 
 def processAutolinks(doc):
-	autolinks = CSSSelector("a:not([href])")(doc['document'])
+	autolinks = CSSSelector("a:not([href])")(doc.document)
 	for el in autolinks:
 		if el.get('title') != None:
 			if el.get('title') == '':
@@ -524,8 +524,8 @@ def processAutolinks(doc):
 			linkText = textContent(el).lower()
 
 		for variation in linkTextVariations(linkText):
-			if variation in doc['links']:
-				el.set('href', '#'+doc['links'][variation])
+			if variation in doc.links:
+				el.set('href', '#'+doc.links[variation])
 				break
 		else:
 			die("Couldn't link up a ref: " + etree.tostring(el, with_tail=False))
@@ -542,50 +542,67 @@ def linkTextVariations(str):
 	elif str[-1] == "s":
 		yield str[:-1]
 
+class CSSSpec(object):
+	title = "???"
+	status = "???"
+	TR = "???"
+	ED = "???"
+	editors = []
+	abstract = "???"
+	atRisk = []
+	otherMetadata = defaultdict(list)
+	lines = []
+	document = None
+	ids = set()
+	links = {}
+
+	def __init__(self, inputFilename):
+		try:
+			self.lines = open(inputFilename, 'r').readlines()
+		except OSError:
+			print "Couldn't find Overview.src.html in this directory."
+			sys.exit(1)
+
+	def preprocess(self):
+		# Textual hacks
+		processDataBlocks(self)
+		markdownParagraphs(self)
+		fillInBoilerplate(self)
+
+		# Document-based preprocessing
+		self.document = html5lib.parse(''.join(self.lines), treebuilder='lxml', namespaceHTMLElements=False)
+		autocreateIds(self)
+		setupAutorefs(self)
+		processAutolinks(self)
+		return self
+
+	def finish(self):
+		try:
+			outputFile = open("~temp-generated-source.html", mode='w')
+		except:
+			print "Something prevented me from writing out a temp file in this directory."
+			sys.exit(1)
+		else:
+			outputFile.write(html.tostring(doc.document))
+			outputFile.close()
+
+		try:
+			subprocess.call("curl -# -n -F file=@~temp-generated-source.html -F group=CSS -F output=html -F method=file https://www.w3.org/Style/Group/process.cgi -o Overview.html", shell=True)
+		except subprocess.CalledProcessError as e:
+			print "Some error occurred in the curl call."
+			print "Error code ", e.returncode
+			print "Error message:"
+			print e.output
+			sys.exit(1)
+		else:
+			os.remove("~temp-generated-source.html")
+		
+		
+		
+
 
 
 if __name__ == "__main__":
-
-	try:
-		doc = {'lines': open("Overview.src.html", 'r').readlines()}
-	except OSError:
-		print "Couldn't find Overview.src.html in this directory."
-		sys.exit(1)
-
-	doc['title'] = "???"
-	doc['status'] = "???"
-	doc['TR'] = "???"
-	doc['ED'] = "???"
-	doc['editors'] = []
-	doc['abstract'] = "???"
-	doc['at-risk'] = []
-	doc['otherData'] = defaultdict(list)
-
-	processDataBlocks(doc)
-	markdownParagraphs(doc)
-	fillInBoilerplate(doc)
-
-	doc['document'] = html5lib.parse(''.join(doc['lines']), treebuilder='lxml', namespaceHTMLElements=False)
-	autocreateIds(doc)
-	setupAutorefs(doc)
-	processAutolinks(doc)
-
-	try:
-		outputFile = open("~temp-generated-source.html", mode='w')
-	except:
-		print "Something prevented me from writing out a temp file in this directory."
-		sys.exit(1)
-	else:
-		outputFile.write(html.tostring(doc['document']))
-		outputFile.close()
-
-	try:
-		subprocess.call("curl -# -n -F file=@~temp-generated-source.html -F group=CSS -F output=html -F method=file https://www.w3.org/Style/Group/process.cgi -o Overview.html", shell=True)
-	except subprocess.CalledProcessError as e:
-		print "Some error occurred in the curl call."
-		print "Error code ", e.returncode
-		print "Error message:"
-		print e.output
-		sys.exit(1)
-	else:
-		os.remove("~temp-generated-source.html")
+	doc = CSSSpec("Overview.src.html")
+	doc.preprocess()
+	doc.finish()
