@@ -16,6 +16,17 @@ import lxml
 from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
+from optparse import OptionParser
+
+def main():
+	optparser = OptionParser()
+	optparser.add_option("-i", "--in", dest="inputFile", default="Overview.src.html", help="Path to the source file. [default: %default]")
+	optparser.add_option("-o", "--out", dest="outputFile", default="Overview.html", help="Path to the output file. [default: %default]")
+	(options,posargs) = optparser.parse_args()
+
+	doc = CSSSpec(options.inputFile)
+	doc.preprocess()
+	doc.finish(outputFilename=options.outputFile)
 
 
 
@@ -576,18 +587,18 @@ class CSSSpec(object):
 		processAutolinks(self)
 		return self
 
-	def finish(self):
+	def finish(self, outputFilename):
 		try:
 			outputFile = open("~temp-generated-source.html", mode='w')
 		except:
 			print "Something prevented me from writing out a temp file in this directory."
 			sys.exit(1)
 		else:
-			outputFile.write(html.tostring(doc.document))
+			outputFile.write(html.tostring(self.document))
 			outputFile.close()
 
 		try:
-			subprocess.call("curl -# -n -F file=@~temp-generated-source.html -F group=CSS -F output=html -F method=file https://www.w3.org/Style/Group/process.cgi -o Overview.html", shell=True)
+			subprocess.call("curl -# -n -F file=@~temp-generated-source.html -F group=CSS -F output=html -F method=file https://www.w3.org/Style/Group/process.cgi -o "+outputFilename, shell=True)
 		except subprocess.CalledProcessError as e:
 			print "Some error occurred in the curl call."
 			print "Error code ", e.returncode
@@ -603,6 +614,4 @@ class CSSSpec(object):
 
 
 if __name__ == "__main__":
-	doc = CSSSpec("Overview.src.html")
-	doc.preprocess()
-	doc.finish()
+	main()
