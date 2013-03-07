@@ -17,14 +17,19 @@ from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
 from optparse import OptionParser
+from urllib import urlopen
 
 def main():
 	optparser = OptionParser()
-	optparser.add_option("-i", "--in", dest="inputFile", default="Overview.src.html", help="Path to the source file. [default: %default]")
-	optparser.add_option("-o", "--out", dest="outputFile", default="Overview.html", help="Path to the output file. [default: %default]")
+	optparser.add_option("-i", "--in", dest="inputFile", default="Overview.src.html", 
+		help="Path to the source file. [default: %default]")
+	optparser.add_option("-o", "--out", dest="outputFile", default="Overview.html", 
+		help="Path to the output file. [default: %default]")
+	optparser.add_option("-b", "--biblio", dest="biblioFile", 
+		help="Path to a local bibliography file. By default, the processor uses the remote file at <https://www.w3.org/Style/Group/css3-src/biblio.ref>.")
 	(options,posargs) = optparser.parse_args()
 
-	doc = CSSSpec(options.inputFile)
+	doc = CSSSpec(inputFilename=options.inputFile, biblioFilename=options.biblioFile)
 	doc.preprocess()
 	doc.finish(outputFilename=options.outputFile)
 
@@ -566,13 +571,25 @@ class CSSSpec(object):
 	document = None
 	ids = set()
 	links = {}
+	biblio = []
 
-	def __init__(self, inputFilename):
+	def __init__(self, inputFilename, biblioFilename):
 		try:
 			self.lines = open(inputFilename, 'r').readlines()
 		except OSError:
-			print "Couldn't find Overview.src.html in this directory."
-			sys.exit(1)
+			die("Couldn't find the input file at the specified location \""+inputFilename+"\".")
+
+		if biblioFilename:
+			try:
+				biblioFile = open(biblioFilename, 'r')
+			except OSError:
+				die("Couldn't find the biblio file at the specified location \""+inputFilename+"\".")
+		else:
+			try:
+				biblioFile = urlopen("https://www.w3.org/Style/Group/css3-src/biblio.ref")
+			except:
+				die("Something prevented me from retrieving the bibliography file.")
+		self.biblio = processBiblioFile(biblioFile)
 
 	def preprocess(self):
 		# Textual hacks
@@ -608,8 +625,100 @@ class CSSSpec(object):
 		else:
 			os.remove("~temp-generated-source.html")
 		
+
+
+
+
+class BiblioEntry(object):
+	linkText = None
+	title = None
+	authors = []
+	foreignAuthors = []
+	status = None
+	date = None
+	url = None
+	other = None
+	bookName = None
+	city = None
+	issuer = None
+	journal = None
+	volumeNumber = None
+	numberInVolume = None
+	pageNumber = None
+	reportNumber = None
+	abstract = None
+
+	def __init__(self, **kwargs):
+		for key,val in kwargs.items():
+			setattr(self, key, val)
+
+	def __str__(self):
+		str = ""
+		authors = self.authors + self.foreignAuthors
+
+		if len(authors) == 0:
+			str += "???. "
+		elif len(authors) == 1:
+			str += authors[0] + ". "
+		elif len(authors) < 4:
+			str += "; ".join(authors) + ". "
+		else:
+			str += authors[0] + "; et al. "
+
+		str += "<a href='{0}'>{1}</a>".format(self.url, self.title)
+
+		if self.date:
+			str += self.date + ". "
+
+		if self.status:
+			str += self.status + ". "
+
+		if self.other:
+			str += self.other + " "
+
+		str += "URL: <a href='{0}'>{0}</a>".format(self.url)
 		
-		
+def processBiblioFile(file):
+	biblios = []
+	biblio = None
+	singularReferCodes = {
+		"B": "bookName",
+		"C": "city",
+		"D": "date",
+		"I": "issuer",
+		"J": "journal",
+		"L": "linkText",
+		"N": "numberInVolume",
+		"O": "other",
+		"P": "pageNumber",
+		"R": "reportNumber",
+		"S": "status",
+		"T": "title",
+		"U": "url",
+		"V": "volumeNumber",
+		"X": "abstract"
+	}
+	pluralReferCodes = {
+		"A": "authors",
+		"Q": "foreignAuthors",
+	}
+	for line in file:
+		if re.match("\s*#", line) or re.match("\s*$", line):
+			# Comment or empty line
+			if biblio != None:
+				biblios.append(biblio)
+			biblio = BiblioEntry()
+		else:
+			if biblio == None:
+				biblio = BiblioEntry()
+
+		for (letter, name) in singularReferCodes.items():
+			if re.match("\s*%"+letter+"\s+[^\s]", line):
+				setattr(biblio, name, re.match("\s*%"+letter+"\s+(.*)", line).group(1))
+		for (letter, name) in pluralReferCodes.items():
+			if re.match("\s*%"+letter+"\s+[^\s]", line):
+				getattr(biblio, name).append(re.match("\s*%"+letter+"\s+(.*)", line).group(1))
+	return biblios
 
 
 
