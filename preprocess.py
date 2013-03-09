@@ -236,45 +236,7 @@ def fillInBoilerplate(doc):
 """
     header += '<h1 id="title" class="no-ref">'+doc.title+'</h1>'
     header += '<h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS] [DATE]</h2>'
-    header += "<dl>"
-    if doc.status != "ED" and doc.TR:
-        header += "<dt>This version:\n<dd><a href='"+doc.TR+"'>"+doc.TR+"</a>\n"
-    elif doc.status == "ED" and doc.ED:
-        header += "<dt>This version:\n<dd><a href='"+doc.ED+"'>"+doc.ED+"</a>\n"
-    else:
-        header += "<dt>This version:\n<dd>???\n"
-    if doc.TR:
-        header += "<dt>Latest version:\n<dd><a href='"+doc.TR+"'>"+doc.TR+"</a>\n"
-    if doc.ED:
-        header += "<dt>Editor's Draft\n<dd><a href='"+doc.ED+"'>"+doc.ED+"</a>\n"
-    if len(doc.previousVersions):
-        header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}'>{0}</a>".format, doc.previousVersions))
-    if len(doc.editors):
-        header += "<dt>Editors:\n"
-        for editor in doc.editors:
-            header += "<dd class='hcard'>"
-            if(editor['link'][0:4] == "http"):
-                header += "<a class='fn url' href='{0}'>{1}</a> \
-(<span class='org'>{2}</span>".format(
-                    editor['link'],
-                    editor['name'],
-                    editor['org'])
-            else:
-                # Link is assumed to be an email address
-                header += "<span class='fn'>{0}</span> \
-(<span class='org'>{1}</span>), \
-<a class='email' href='mailto:{2}'>{2}</a>".format(
-                    editor['name'],
-                    editor['org'],
-                    editor['link'])
-    else:
-        header += "<dt>Editors:\n<dd>???\n"
-    if len(doc.otherMetadata):
-        for (key, vals) in doc.otherMetadata.items():
-            header += "<dt>"+key+":\n"
-            for val in vals:
-                header += "<dd>"+val+"\n"
-    header += "</dl>"
+    header += generateHeaderDL(doc)
     header += """<!--copyright-->
 
 <hr title="Separator for header">
@@ -493,9 +455,51 @@ Property index</h2>
 </body>
 </html>
 """
-
     doc.lines.insert(0, header)
     doc.lines.append(footer)
+
+
+def generateHeaderDL(doc):
+    header = "<dl>"
+    if doc.status != "ED" and doc.TR:
+        header += "<dt>This version:\n<dd><a href='"+doc.TR+"'>"+doc.TR+"</a>\n"
+    elif doc.status == "ED" and doc.ED:
+        header += "<dt>This version:\n<dd><a href='"+doc.ED+"'>"+doc.ED+"</a>\n"
+    else:
+        header += "<dt>This version:\n<dd>???\n"
+    if doc.TR:
+        header += "<dt>Latest version:\n<dd><a href='"+doc.TR+"'>"+doc.TR+"</a>\n"
+    if doc.ED:
+        header += "<dt>Editor's Draft\n<dd><a href='"+doc.ED+"'>"+doc.ED+"</a>\n"
+    if len(doc.previousVersions):
+        header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}'>{0}</a>".format, doc.previousVersions))
+    if len(doc.editors):
+        header += "<dt>Editors:\n"
+        for editor in doc.editors:
+            header += "<dd class='hcard'>"
+            if(editor['link'][0:4] == "http"):
+                header += "<a class='fn url' href='{0}'>{1}</a> \
+(<span class='org'>{2}</span>".format(
+                    editor['link'],
+                    editor['name'],
+                    editor['org'])
+            else:
+                # Link is assumed to be an email address
+                header += "<span class='fn'>{0}</span> \
+(<span class='org'>{1}</span>), \
+<a class='email' href='mailto:{2}'>{2}</a>".format(
+                    editor['name'],
+                    editor['org'],
+                    editor['link'])
+    else:
+        header += "<dt>Editors:\n<dd>???\n"
+    if len(doc.otherMetadata):
+        for (key, vals) in doc.otherMetadata.items():
+            header += "<dt>"+key+":\n"
+            for val in vals:
+                header += "<dd>"+val+"\n"
+    header += "</dl>"
+    return header
 
 
 def textContent(el):
