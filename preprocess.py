@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 # Dependencies:
-# * html5lib
+# * python 2.6 or 2.7
+# * python-dev, libxml2-dev, libxslt1-dev
+# * html5lib - "pip install html5lib"
 # * lxml - "pip install lxml"
 # * cssselect "pip install cssselect"
 
@@ -27,9 +29,11 @@ def main():
 		help="Path to the output file. [default: %default]")
 	optparser.add_option("-b", "--biblio", dest="biblioFile", 
 		help="Path to a local bibliography file. By default, the processor uses the remote file at <https://www.w3.org/Style/Group/css3-src/biblio.ref>.")
+	optparser.add_option("--login", dest="loginInfo",
+		help="W3C username/password combo, separated by a colon, like 'un:pw'.")
 	(options,posargs) = optparser.parse_args()
 
-	doc = CSSSpec(inputFilename=options.inputFile, biblioFilename=options.biblioFile)
+	doc = CSSSpec(inputFilename=options.inputFile, biblioFilename=options.biblioFile, loginInfo=options.loginInfo)
 	doc.preprocess()
 	doc.finish(outputFilename=options.outputFile)
 
@@ -572,8 +576,11 @@ class CSSSpec(object):
 	ids = set()
 	links = {}
 	biblio = []
+	loginInfo=None
 
-	def __init__(self, inputFilename, biblioFilename):
+	def __init__(self, inputFilename, biblioFilename=None, loginInfo=None):
+		self.loginInfo = loginInfo
+
 		try:
 			self.lines = open(inputFilename, 'r').readlines()
 		except OSError:
@@ -589,7 +596,7 @@ class CSSSpec(object):
 				biblioFile = urlopen("https://www.w3.org/Style/Group/css3-src/biblio.ref")
 			except:
 				die("Something prevented me from retrieving the bibliography file.")
-		self.biblio = processBiblioFile(biblioFile)
+		self.biblio = processReferBiblioFile(biblioFile)
 
 	def preprocess(self):
 		# Textual hacks
@@ -615,7 +622,11 @@ class CSSSpec(object):
 			outputFile.close()
 
 		try:
-			subprocess.call("curl -# -n -F file=@~temp-generated-source.html -F group=CSS -F output=html -F method=file https://www.w3.org/Style/Group/process.cgi -o "+outputFilename, shell=True)
+			if self.loginInfo:
+				credentials = "-u " + self.loginInfo
+			else:
+				creditials = "-n"
+			subprocess.call("curl -# " + credentials + " -F file=@~temp-generated-source.html -F group=CSS -F output=html -F method=file https://www.w3.org/Style/Group/process.cgi -o "+outputFilename, shell=True)
 		except subprocess.CalledProcessError as e:
 			print "Some error occurred in the curl call."
 			print "Error code ", e.returncode
@@ -678,7 +689,7 @@ class BiblioEntry(object):
 
 		str += "URL: <a href='{0}'>{0}</a>".format(self.url)
 		
-def processBiblioFile(file):
+def processReferBiblioFile(file):
 	biblios = []
 	biblio = None
 	singularReferCodes = {
