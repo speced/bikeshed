@@ -183,6 +183,8 @@ def processMetadata(lines, doc, **kwargs):
 			doc.ED = val
 		elif key == "Abstract":
 			doc.abstract = val
+		elif key == "Previous Version":
+			doc.previousVersions.append(val)
 		elif key == "Editor":
 			match = re.match("([^,]+) ,\s* ([^,]+) ,?\s* (.*)", val, re.X)
 			if match:
@@ -227,16 +229,18 @@ def fillInBoilerplate(doc):
 	header += '<h1 id="title" class="no-ref">'+doc.title+'</h1>'
 	header += '<h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS] [DATE]</h2>'
 	header += "<dl>"
-	if doc.status != "ED" and doc.TR != "":
+	if doc.status != "ED" and doc.TR:
 		header += "<dt>This version:\n<dd><a href='"+doc.TR+"'>"+doc.TR+"</a>\n"
-	elif doc.status == "ED" and doc.ED != "":
+	elif doc.status == "ED" and doc.ED:
 		header += "<dt>This version:\n<dd><a href='"+doc.ED+"'>"+doc.ED+"</a>\n"
 	else:
 		header += "<dt>This version:\n<dd>???\n"
-	if doc.TR != "":
+	if doc.TR:
 		header += "<dt>Latest version:\n<dd><a href='"+doc.TR+"'>"+doc.TR+"</a>\n"
-	if doc.ED != "":
+	if doc.ED:
 		header += "<dt>Editor's Draft\n<dd><a href='"+doc.ED+"'>"+doc.ED+"</a>\n"
+	if len(doc.previousVersions):
+		header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}'>{0}</a>".format, doc.previousVersions))
 	if len(doc.editors):
 		header += "<dt>Editors:\n"
 		for editor in doc.editors:
@@ -249,7 +253,7 @@ def fillInBoilerplate(doc):
 	else:
 		header += "<dt>Editors:\n<dd>???\n"
 	if len(doc.otherMetadata):
-		for (key, vals) in otherMetadata.items():
+		for (key, vals) in doc.otherMetadata.items():
 			header += "<dt>"+key+":\n"
 			for val in vals:
 				header += "<dd>"+val+"\n"
@@ -568,6 +572,7 @@ class CSSSpec(object):
 	TR = "???"
 	ED = "???"
 	editors = []
+	previousVersions = []
 	abstract = "???"
 	atRisk = []
 	otherMetadata = defaultdict(list)
