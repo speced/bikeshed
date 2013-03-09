@@ -565,6 +565,18 @@ def autogenerateLinkText(str):
 def processAutolinks(doc):
     autolinks = CSSSelector("a:not([href])")(doc.document)
     for el in autolinks:
+        if el.get('data-biblio') is not None:
+            biblioLink = el.get('data-biblio')
+            if biblioLink not in doc.biblios:
+                die("Couldn't find '{0}' in biblio database.".format(biblioLink))
+            biblioEntry = doc.biblios[biblioLink]
+            el.set('href', biblioEntry.url)
+            if el.get('data-biblio-type') == "normative":
+                doc.normativeRefs.append(biblioLink)
+            else:
+                doc.informativeRefs.append(biblioLink)
+            continue
+
         if el.get('title') is not None:
             if el.get('title') == '':
                 break
@@ -593,6 +605,16 @@ def linkTextVariations(str):
         yield str[:-1]
 
 
+def transformBiblioLinks(doc):
+    for i in range(len(doc.lines)):
+        doc.lines[i] = re.sub(r"\[\[!([^\]]+)\]\]",
+                              r"<a data-biblio='\1' data-biblio-type='normative'>[\1]</a>", 
+                              doc.lines[i])
+        doc.lines[i] = re.sub(r"\[\[([^\]]+)\]\]",
+                              r"<a data-biblio='\1' data-biblio-type='informative'>[\1]</a>", 
+                              doc.lines[i])
+
+
 class CSSSpec(object):
     title = "???"
     status = "???"
@@ -607,7 +629,9 @@ class CSSSpec(object):
     document = None
     ids = set()
     links = {}
-    biblio = []
+    biblios = {}
+    normativeRefs = []
+    informativeRefs = []
     loginInfo = None
 
     def __init__(self, inputFilename, biblioFilename=None, loginInfo=None):
@@ -628,13 +652,14 @@ class CSSSpec(object):
                 biblioFile = urlopen("https://www.w3.org/Style/Group/css3-src/biblio.ref")
             except:
                 die("Something prevented me from retrieving the bibliography file.")
-        self.biblio = processReferBiblioFile(biblioFile)
+        self.biblios = processReferBiblioFile(biblioFile)
 
     def preprocess(self):
         # Textual hacks
         processDataBlocks(self)
         markdownParagraphs(self)
         fillInBoilerplate(self)
+        transformBiblioLinks(self)
 
         # Document-based preprocessing
         self.document = html5lib.parse(
@@ -729,7 +754,7 @@ class BiblioEntry(object):
 
 
 def processReferBiblioFile(file):
-    biblios = []
+    biblios = {}
     biblio = None
     singularReferCodes = {
         "B": "bookName",
@@ -756,7 +781,7 @@ def processReferBiblioFile(file):
         if re.match("\s*#", line) or re.match("\s*$", line):
             # Comment or empty line
             if biblio is not None:
-                biblios.append(biblio)
+                biblios[biblio.linkText] = biblio
             biblio = BiblioEntry()
         else:
             if biblio is None:
