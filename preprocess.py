@@ -249,7 +249,7 @@ def fillInBoilerplate(doc):
 				header += "<a class='fn url' href='"+editor['link']+"'>"+editor['name']+"</a> (<span class='org'>"+editor['org']+"</span>)\n"
 			else:
 				# Link is assumed to be an email address
-				header += "<span class='fn'>"+editor['name']+"</span> (<span class='org'>"+editor['org']+"</span>), <a class='email' href='"+ editor['link'] +"'>"+editor['link']+"</span>\n"
+				header += "<span class='fn'>"+editor['name']+"</span> (<span class='org'>"+editor['org']+"</span>), <a class='email' href='"+ editor['link'] +"'>"+editor['link']+"</a>\n"
 	else:
 		header += "<dt>Editors:\n<dd>???\n"
 	if len(doc.otherMetadata):
