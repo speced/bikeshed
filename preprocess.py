@@ -433,6 +433,19 @@ CR exit criteria</h3>
 """
 
     footer += """
+<h2 class="no-num no-ref" id="references">
+References</h2>
+
+<h3 class="no-num no-ref" id="normative">
+Normative References</h3>
+
+<div></div>
+
+<h3 class="no-num no-ref" id="informative">
+Informative References</h3>
+
+<div></div>
+
 <h2 class="no-num no-ref" id="index">
 Index</h2>
 <!--index-->
@@ -492,20 +505,18 @@ def generateHeaderDL(doc):
 
 
 def addReferencesSection(doc):
-    text = "<div><h2 id='references' class='no-ref no-num'>References</h2>"
-    text += "<h3 id='normative' class='no-ref no-num'>Normative References</h3>"
-    text += "<dl>"
+    text = "<dl>"
     for ref in doc.normativeRefs:
-        text += "<dt>[{0}]</dt>".format(ref.linkText)
+        text += "<dt>[<dfn>{0}</dfn>]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
-    text += "<h3 id='informative' class='no-ref no-num'>Informative References</h3>"
-    text += "<dl>"
+    CSSSelector("#normative + div")(doc.document)[0].append(etree.fromstring(text))
+    text = "<dl>"
     for ref in doc.informativeRefs:
-        text += "<dt>[{0}]</dt>".format(ref.linkText)
+        text += "<dt>[<dfn>{0}</dfn>]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
-    text += "</dl></div>"
-    doc.document.getroot().find('body').append(etree.fromstring(text))
+    text += "</dl>"
+    CSSSelector("#informative + div")(doc.document)[0].append(etree.fromstring(text))
 
 
 def textContent(el):
@@ -667,15 +678,18 @@ class CSSSpec(object):
         fillInBoilerplate(self)
         transformBiblioLinks(self)
 
-        # Document-based preprocessing
+        # Build the document
         self.document = html5lib.parse(
             ''.join(self.lines),
             treebuilder='lxml',
             namespaceHTMLElements=False)
+        addReferencesSection(self)
+
+        # All the linking.
         autocreateIds(self)
         setupAutorefs(self)
         processAutolinks(self)
-        addReferencesSection(self)
+        
         return self
 
     def finish(self, outputFilename):
@@ -746,7 +760,7 @@ class BiblioEntry(object):
         else:
             str += authors[0] + "; et al. "
 
-        str += "<a href='{0}'>{1}</a>".format(self.url, self.title)
+        str += "<a href='{0}'>{1}</a>. ".format(self.url, self.title)
 
         if self.date:
             str += self.date + ". "
