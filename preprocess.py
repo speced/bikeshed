@@ -49,7 +49,7 @@ don't run it through Bert's preprocessor afterwards.")
 
 
 def die(msg):
-    print msg
+    print "FATAL ERROR: "+msg
     sys.exit(1)
 
 
@@ -441,21 +441,19 @@ References</h2>
 
 <h3 class="no-num no-ref" id="normative">
 Normative References</h3>
-
 <div></div>
 
 <h3 class="no-num no-ref" id="informative">
 Informative References</h3>
-
 <div></div>
 
 <h2 class="no-num no-ref" id="index">
 Index</h2>
-<!--index-->
+<div></div>
 
 <h2 class="no-num no-ref" id="property-index">
 Property index</h2>
-<!-- properties -->
+<div></div>
 
 </body>
 </html>
@@ -510,13 +508,13 @@ def generateHeaderDL(doc):
 def addReferencesSection(doc):
     text = "<dl>"
     for ref in doc.normativeRefs:
-        text += "<dt>[<dfn>{0}</dfn>]</dt>".format(ref.linkText)
+        text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
     CSSSelector("#normative + div")(doc.document)[0].append(etree.fromstring(text))
     text = "<dl>"
     for ref in doc.informativeRefs:
-        text += "<dt>[<dfn>{0}</dfn>]</dt>".format(ref.linkText)
+        text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
     CSSSelector("#informative + div")(doc.document)[0].append(etree.fromstring(text))
@@ -563,7 +561,8 @@ def autogenerateId(id):
 
 def setupAutorefs(doc):
     links = {}
-    linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6")(doc.document)
+    linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6, \
+                              #normative + div dt, #informative + div dt")(doc.document)
     for el in linkTargets:
         if not re.search("no-ref", el.get('class') or ""):
             if el.get("title") is not None:
@@ -585,18 +584,6 @@ def autogenerateLinkText(str):
 def processAutolinks(doc):
     autolinks = CSSSelector("a:not([href])")(doc.document)
     for el in autolinks:
-        if el.get('data-biblio') is not None:
-            biblioLink = el.get('data-biblio')
-            if biblioLink not in doc.biblios:
-                die("Couldn't find '{0}' in biblio database.".format(biblioLink))
-            biblioEntry = doc.biblios[biblioLink]
-            el.set('href', biblioEntry.url)
-            if el.get('data-biblio-type') == "normative":
-                doc.normativeRefs.append(biblioEntry)
-            else:
-                doc.informativeRefs.append(biblioEntry)
-            continue
-
         if el.get('title') is not None:
             if el.get('title') == '':
                 break
@@ -627,12 +614,25 @@ def linkTextVariations(str):
 
 def transformBiblioLinks(doc):
     for i in range(len(doc.lines)):
-        doc.lines[i] = re.sub(r"\[\[!([^\]]+)\]\]",
-                              r"<a data-biblio='\1' data-biblio-type='normative'>[\1]</a>", 
-                              doc.lines[i])
-        doc.lines[i] = re.sub(r"\[\[([^\]]+)\]\]",
-                              r"<a data-biblio='\1' data-biblio-type='informative'>[\1]</a>", 
-                              doc.lines[i])
+        while re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i]):
+            match = re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i])
+            
+            if match.group(2) not in doc.biblios:
+                die("Couldn't find '{0}' in biblio database.".format(match.group(2)))
+            biblioEntry = doc.biblios[match.group(2)]
+
+            if match.group(1) == "!":
+                biblioType = "normative"
+                doc.normativeRefs.add(biblioEntry)
+            else:
+                biblioType = "informative"
+                doc.informativeRefs.add(biblioEntry)
+            
+            doc.lines[i] = doc.lines[i].replace(
+                match.group(0),
+                "<a title='{0}' data-biblio-type='{1}'>[{0}]</a>".format(
+                    match.group(2), 
+                    biblioType,))
 
 
 class CSSSpec(object):
@@ -650,8 +650,8 @@ class CSSSpec(object):
     ids = set()
     links = {}
     biblios = {}
-    normativeRefs = []
-    informativeRefs = []
+    normativeRefs = set()
+    informativeRefs = set()
     loginInfo = None
 
     def __init__(self, inputFilename, biblioFilename=None, loginInfo=None):
