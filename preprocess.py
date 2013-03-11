@@ -736,8 +736,8 @@ class CSSSpec(object):
 class BiblioEntry(object):
     linkText = None
     title = None
-    authors = []
-    foreignAuthors = []
+    authors = None
+    foreignAuthors = None
     status = None
     date = None
     url = None
@@ -753,6 +753,8 @@ class BiblioEntry(object):
     abstract = None
 
     def __init__(self, **kwargs):
+        self.authors = []
+        self.foreignAuthors = []
         for key, val in kwargs.items():
             setattr(self, key, val)
 
