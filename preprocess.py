@@ -36,13 +36,16 @@ the processor uses the remote file at \
     optparser.add_option("--login", dest="loginInfo",
                          help="W3C username/password combo, separated by a \
 colon, like 'un:pw'.")
+    optparser.add_option("--no-bert", dest="noBert", default=False, action="store_true",
+                         help="Use this preprocessor only; \
+don't run it through Bert's preprocessor afterwards.")
     (options, posargs) = optparser.parse_args()
 
     doc = CSSSpec(inputFilename=options.inputFile,
                   biblioFilename=options.biblioFile,
                   loginInfo=options.loginInfo)
     doc.preprocess()
-    doc.finish(outputFilename=options.outputFile)
+    doc.finish(outputFilename=options.outputFile, noBert=options.noBert)
 
 
 def die(msg):
@@ -689,39 +692,45 @@ class CSSSpec(object):
         autocreateIds(self)
         setupAutorefs(self)
         processAutolinks(self)
-        
+
         return self
 
-    def finish(self, outputFilename):
-        try:
-            outputFile = open("~temp-generated-source.html", mode='w')
-        except:
-            die("Something prevented me from writing out a temp file in this directory.")
+    def finish(self, outputFilename, noBert=False):
+        if noBert:
+            try:
+                open(outputFilename, mode='w').write(html.tostring(self.document))
+            except:
+                die("Something prevented me from saving the output document.")
         else:
-            outputFile.write(html.tostring(self.document))
-            outputFile.close()
-
-        try:
-            if self.loginInfo:
-                credentials = "-u " + self.loginInfo
+            try:
+                outputFile = open("~temp-generated-source.html", mode='w')
+            except:
+                die("Something prevented me from writing out a temp file in this directory.")
             else:
-                credentials = "-n"
-            subprocess.call("curl -# " + credentials + " \
-                -F file=@~temp-generated-source.html \
-                -F group=CSS \
-                -F output=html \
-                -F method=file \
-                https://www.w3.org/Style/Group/process.cgi \
-                -o "+outputFilename,
-                            shell=True)
-        except subprocess.CalledProcessError as e:
-            print "Some error occurred in the curl call."
-            print "Error code ", e.returncode
-            print "Error message:"
-            print e.output
-            sys.exit(1)
-        else:
-            os.remove("~temp-generated-source.html")
+                outputFile.write(html.tostring(self.document))
+                outputFile.close()
+
+            try:
+                if self.loginInfo:
+                    credentials = "-u " + self.loginInfo
+                else:
+                    credentials = "-n"
+                subprocess.call("curl -# " + credentials + " \
+                    -F file=@~temp-generated-source.html \
+                    -F group=CSS \
+                    -F output=html \
+                    -F method=file \
+                    https://www.w3.org/Style/Group/process.cgi \
+                    -o "+outputFilename,
+                                shell=True)
+            except subprocess.CalledProcessError as e:
+                print "Some error occurred in the curl call."
+                print "Error code ", e.returncode
+                print "Error message:"
+                print e.output
+                sys.exit(1)
+            else:
+                os.remove("~temp-generated-source.html")
 
 
 class BiblioEntry(object):
