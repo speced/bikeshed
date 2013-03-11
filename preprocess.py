@@ -53,7 +53,7 @@ def die(msg):
     sys.exit(1)
 
 
-def markdownParagraphs(doc):
+def transformMarkdownParagraphs(doc):
     # This converts Markdown-style paragraphs into actual paragraphs.
     # Any line that is preceded by a blank line,
     # and which starts with either text or an inline element,
@@ -505,6 +505,29 @@ def generateHeaderDL(doc):
     return header
 
 
+def transformBiblioLinks(doc):
+    for i in range(len(doc.lines)):
+        while re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i]):
+            match = re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i])
+            
+            if match.group(2) not in doc.biblios:
+                die("Couldn't find '{0}' in biblio database.".format(match.group(2)))
+            biblioEntry = doc.biblios[match.group(2)]
+
+            if match.group(1) == "!":
+                biblioType = "normative"
+                doc.normativeRefs.add(biblioEntry)
+            else:
+                biblioType = "informative"
+                doc.informativeRefs.add(biblioEntry)
+            
+            doc.lines[i] = doc.lines[i].replace(
+                match.group(0),
+                "<a title='{0}' data-biblio-type='{1}'>[{0}]</a>".format(
+                    match.group(2), 
+                    biblioType,))
+
+
 def addReferencesSection(doc):
     text = "<dl>"
     for ref in doc.normativeRefs:
@@ -524,7 +547,7 @@ def textContent(el):
     return etree.tostring(el, method='text', with_tail=False)
 
 
-def autocreateIds(doc):
+def genIdsForAutolinkTargets(doc):
     ids = set()
     linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6")(doc.document)
     for el in linkTargets:
@@ -533,7 +556,7 @@ def autocreateIds(doc):
             if id in ids:
                 die("Found a duplicate explicitly-specified id:" + id)
         else:
-            id = autogenerateId(textContent(el))
+            id = idFromText(textContent(el))
             if id in ids:
                 # Try to de-dup the id by appending an integer after it.
                 for x in range(10):
@@ -547,7 +570,7 @@ def autocreateIds(doc):
     doc.ids = ids
 
 
-def autogenerateId(id):
+def idFromText(id):
     if id[-2:] == "()":
         id = id[:-2]
         suffix = "-function"
@@ -559,7 +582,7 @@ def autogenerateId(id):
     return re.sub("[^a-z0-9_-]", "", id.replace(" ", "-").lower()) + suffix
 
 
-def setupAutorefs(doc):
+def initializeAutolinkTargets(doc):
     links = {}
     linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6, \
                               #normative + div dt, #informative + div dt")(doc.document)
@@ -568,7 +591,7 @@ def setupAutorefs(doc):
             if el.get("title") is not None:
                 linkTexts = [x.strip() for x in el.get("title").split("|")]
             else:
-                linkTexts = [autogenerateLinkText(textContent(el))]
+                linkTexts = [autolinkTitleFromText(textContent(el))]
             for linkText in linkTexts:
                 if linkText in links:
                     die("Two link-targets have the same linking text: " + linkText)
@@ -577,7 +600,7 @@ def setupAutorefs(doc):
     doc.links = links
 
 
-def autogenerateLinkText(str):
+def autolinkTitleFromText(str):
     return str.strip().lower()
 
 
@@ -610,29 +633,6 @@ def linkTextVariations(str):
         yield str[:-2]
     elif str[-1] == "s":
         yield str[:-1]
-
-
-def transformBiblioLinks(doc):
-    for i in range(len(doc.lines)):
-        while re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i]):
-            match = re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i])
-            
-            if match.group(2) not in doc.biblios:
-                die("Couldn't find '{0}' in biblio database.".format(match.group(2)))
-            biblioEntry = doc.biblios[match.group(2)]
-
-            if match.group(1) == "!":
-                biblioType = "normative"
-                doc.normativeRefs.add(biblioEntry)
-            else:
-                biblioType = "informative"
-                doc.informativeRefs.add(biblioEntry)
-            
-            doc.lines[i] = doc.lines[i].replace(
-                match.group(0),
-                "<a title='{0}' data-biblio-type='{1}'>[{0}]</a>".format(
-                    match.group(2), 
-                    biblioType,))
 
 
 class CSSSpec(object):
@@ -677,7 +677,7 @@ class CSSSpec(object):
     def preprocess(self):
         # Textual hacks
         processDataBlocks(self)
-        markdownParagraphs(self)
+        transformMarkdownParagraphs(self)
         fillInBoilerplate(self)
         transformBiblioLinks(self)
 
@@ -689,8 +689,8 @@ class CSSSpec(object):
         addReferencesSection(self)
 
         # All the linking.
-        autocreateIds(self)
-        setupAutorefs(self)
+        genIdsForAutolinkTargets(self)
+        initializeAutolinkTargets(self)
         processAutolinks(self)
 
         return self
