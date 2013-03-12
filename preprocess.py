@@ -73,6 +73,14 @@ def parseHTML(str):
     return doc.getroot()[1][0]
 
 
+def findAll(sel, doc):
+    return CSSSelector(sel)(doc)
+
+
+def find(sel, doc):
+    return findAll(sel, doc)[0]
+
+
 def transformMarkdownParagraphs(doc):
     # This converts Markdown-style paragraphs into actual paragraphs.
     # Any line that is preceded by a blank line,
@@ -554,17 +562,17 @@ def addReferencesSection(doc):
         text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
-    CSSSelector("#normative + div")(doc.document)[0].append(etree.fromstring(text))
+    find("#normative + div", doc.document).append(parseHTML(text))
     text = "<dl>"
     for ref in doc.informativeRefs:
         text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
-    CSSSelector("#informative + div")(doc.document)[0].append(etree.fromstring(text))
+    find("#informative + div", doc.document).append(parseHTML(text))
 
 
 def addTOCSection(doc):
-    headers = CSSSelector("h2,h3,h4,h5,h6")(doc.document)
+    headers = findAll("h2,h3,h4,h5,h6", doc.document)
     headerLevel = [0,0,0,0,0]
     def incrementLevel(level):
         headerLevel[level-2] += 1
@@ -618,12 +626,12 @@ def addTOCSection(doc):
         html += "<li><a href='#{0}'>{1}<a>".format(header.get('id'),
                                                    innerHTML(header))
         previousLevel = level
-    CSSSelector("#contents + div")(doc.document)[0].append(parseHTML(html))
+    find("#contents + div", doc.document).append(parseHTML(html))
 
 
 def genIdsForAutolinkTargets(doc):
     ids = set()
-    linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6")(doc.document)
+    linkTargets = findAll("dfn, h1, h2, h3, h4, h5, h6", doc.document)
     for el in linkTargets:
         if el.get('id') is not None:
             id = el.get('id')
@@ -658,8 +666,9 @@ def idFromText(id):
 
 def initializeAutolinkTargets(doc):
     links = {}
-    linkTargets = CSSSelector("dfn, h1, h2, h3, h4, h5, h6, \
-                              #normative + div dt, #informative + div dt")(doc.document)
+    linkTargets = findAll("dfn, h1, h2, h3, h4, h5, h6, \
+                           #normative + div dt, #informative + div dt",
+                           doc.document)
     for el in linkTargets:
         if not re.search("no-ref", el.get('class') or ""):
             if el.get("title") is not None:
@@ -679,7 +688,7 @@ def autolinkTitleFromText(str):
 
 
 def processAutolinks(doc):
-    autolinks = CSSSelector("a:not([href])")(doc.document)
+    autolinks = findAll("a:not([href])", doc.document)
     for el in autolinks:
         if el.get('title') is not None:
             if el.get('title') == '':
