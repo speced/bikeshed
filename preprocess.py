@@ -53,6 +53,26 @@ def die(msg):
     sys.exit(1)
 
 
+def textContent(el):
+    return etree.tostring(el, method='text', with_tail=False)
+
+
+def innerHTML(el):
+    return el.text + ''.join(etree.tostring(x) for x in el)
+
+
+def outerHTML(el):
+    return etree.tostring(el, with_tail=False)
+
+
+def parseHTML(str):
+    doc = html5lib.parse(
+        str,
+        treebuilder='lxml',
+        namespaceHTMLElements=False)
+    return doc.getroot()[1][0]
+
+
 def transformMarkdownParagraphs(doc):
     # This converts Markdown-style paragraphs into actual paragraphs.
     # Any line that is preceded by a blank line,
@@ -257,8 +277,8 @@ def fillInBoilerplate(doc):
         header += "</ul>"
     header += """<h2 class="no-num no-toc no-ref" id="contents">
 Table of contents</h2>
+<div></div>
 
-<!--toc-->
 """
     footer = """
 
@@ -543,8 +563,62 @@ def addReferencesSection(doc):
     CSSSelector("#informative + div")(doc.document)[0].append(etree.fromstring(text))
 
 
-def textContent(el):
-    return etree.tostring(el, method='text', with_tail=False)
+def addTOCSection(doc):
+    headers = CSSSelector("h2,h3,h4,h5,h6")(doc.document)
+    headerLevel = [0,0,0,0,0]
+    def incrementLevel(level):
+        headerLevel[level-2] += 1
+        for i in range(level-1, 5):
+            headerLevel[i] = 0
+    def printLevel():
+        return '.'.join(str(x) for x in headerLevel if x > 0)
+
+    # Number all the sections.
+    skipLevel = float('inf')
+    for header in headers:
+        level = int(header.tag[-1])
+
+        # If we encounter a no-num, don't number it or any in the same section. 
+        if re.search("no-num", header.get('class') or ''):
+            skipLevel = min(level, skipLevel)
+            continue
+        if skipLevel < level:
+            continue
+        else:
+            skipLevel = float('inf')
+
+        incrementLevel(level)
+        header.set('data-level', printLevel())
+        secno = etree.Element('span', {"class":"secno"})
+        secno.text = printLevel()
+        header.insert(0, secno)
+        secno.tail = header.text
+        header.text = ''
+
+    # Build the ToC
+    skipLevel = float('inf')
+    previousLevel = 0
+    html = ''
+    for header in headers:
+        level = int(header.tag[-1])
+
+        # Same deal - hit a no-toc, suppress the entire section.
+        if re.search("no-toc", header.get('class') or ''):
+            skipLevel = min(level, skipLevel)
+            continue
+        if skipLevel < level:
+            continue
+        else:
+            skipLevel = float('inf')
+
+        if level > previousLevel:
+            html += "<ul class='toc'>"
+        elif level < previousLevel:
+            html += "</ul>"
+        html += "<li><a href='#{0}'>{1}<a>".format(header.get('id'),
+                                                   innerHTML(header))
+        previousLevel = level
+    CSSSelector("#contents + div")(doc.document)[0].append(parseHTML(html))
 
 
 def genIdsForAutolinkTargets(doc):
@@ -692,6 +766,9 @@ class CSSSpec(object):
         genIdsForAutolinkTargets(self)
         initializeAutolinkTargets(self)
         processAutolinks(self)
+
+        #ToC
+        addTOCSection(self)
 
         return self
 
