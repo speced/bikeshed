@@ -254,9 +254,9 @@ def processMetadata(lines, doc, **kwargs):
 def generateHeaderDL(doc):
     header = "<dl>"
     if doc.status != "ED" and doc.TR:
-        header += "<dt>This version:\n<dd><a href='"+doc.TR+"'>"+doc.TR+"</a>\n"
+        header += "<dt>This version:\n<dd><a href='"+doc.TR+"' class='u-url'>"+doc.TR+"</a>\n"
     elif doc.status == "ED" and doc.ED:
-        header += "<dt>This version:\n<dd><a href='"+doc.ED+"'>"+doc.ED+"</a>\n"
+        header += "<dt>This version:\n<dd><a href='"+doc.ED+"' class='u-url'>"+doc.ED+"</a>\n"
     else:
         header += "<dt>This version:\n<dd>???\n"
     if doc.TR:
@@ -264,22 +264,22 @@ def generateHeaderDL(doc):
     if doc.ED:
         header += "<dt>Editor's Draft\n<dd><a href='"+doc.ED+"'>"+doc.ED+"</a>\n"
     if len(doc.previousVersions):
-        header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}'>{0}</a>".format, doc.previousVersions))
+        header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.previousVersions))
     if len(doc.editors):
         header += "<dt>Editors:\n"
         for editor in doc.editors:
-            header += "<dd class='hcard'>"
+            header += "<dd class='p-author h-card vcard'>"
             if(editor['link'][0:4] == "http"):
-                header += "<a class='fn url' href='{0}'>{1}</a> \
-(<span class='org'>{2}</span>".format(
+                header += "<a class='p-name fn u-url url' href='{0}'>{1}</a> \
+(<span class='p-org org'>{2}</span>".format(
                     editor['link'],
                     editor['name'],
                     editor['org'])
             else:
                 # Link is assumed to be an email address
-                header += "<span class='fn'>{0}</span> \
-(<span class='org'>{1}</span>), \
-<a class='email' href='mailto:{2}'>{2}</a>".format(
+                header += "<span class='p-name fn'>{0}</span> \
+(<span class='p-org org'>{1}</span>), \
+<a class='u-email email' href='mailto:{2}'>{2}</a>".format(
                     editor['name'],
                     editor['org'],
                     editor['link'])
@@ -717,19 +717,19 @@ def fillInBoilerplate(doc):
     header += '<link href="https://www.w3.org/StyleSheets/TR/W3C-'+doc.status+'.css" rel=stylesheet type="text/css">'
     header += """
 </head>
-<body>
+<body class="h-entry">
 <div class="head">
 <!--logo-->
 """
-    header += '<h1 id="title" class="no-ref">'+doc.title+'</h1>'
-    header += '<h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS] [DATE]</h2>'
+    header += '<h1 id="title" class="p-name no-ref">'+doc.title+'</h1>'
+    header += '<h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS] <span class="dt-updated"><span class="value-title" title="[CDATE]">[DATE]</span></h2>'
     header += generateHeaderDL(doc)
     header += """<!--copyright-->
 
 <hr title="Separator for header">
 </div>
 <h2 class='no-num no-toc no-ref' id='abstract'>Abstract</h2>
-<p>
+<p class="p-summary">
 """
     header += doc.abstract
     header += """<h2 class='no-num no-toc no-ref' id='status'>Status of this document</h2>
