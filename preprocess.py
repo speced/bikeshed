@@ -398,7 +398,7 @@ def addTOCSection(doc):
             html += "<ul class='toc'>"
         elif level < previousLevel:
             html += "</ul>"
-        html += "<li><a href='#{0}'>{1}<a>".format(header.get('id'),
+        html += "<li><a href='#{0}'>{1}</a>".format(header.get('id'),
                                                    innerHTML(header))
         previousLevel = level
     find("#contents + div", doc.document).append(parseHTML(html))
@@ -508,19 +508,22 @@ def autolinkTitleFromText(str):
 def processAutolinks(doc):
     autolinks = findAll("a:not([href])", doc.document)
     for el in autolinks:
-        if el.get('title') is not None:
-            if el.get('title') == '':
-                break
+        if el.get('title') == '':
+            break
+        if el.get('title'):
             linkText = el.get('title')
         else:
             linkText = textContent(el).lower()
+
+        if len(linkText) == 0:
+            die("Empty autolink {0}, probable authoring error.".format(outerHTML(el)))
 
         for variation in linkTextVariations(linkText):
             if variation in doc.links:
                 el.set('href', '#'+doc.links[variation])
                 break
         else:
-            die("Couldn't link up a ref: " + etree.tostring(el, with_tail=False))
+            die("Couldn't find the target for an autolink: " + outerHTML(el))
 
 
 def linkTextVariations(str):
@@ -532,7 +535,7 @@ def linkTextVariations(str):
         yield str[:-3]+"y"
     elif str[-2:] == "'s":
         yield str[:-2]
-    elif str[-1] == "s":
+    elif str[-1:] == "s":
         yield str[:-1]
 
 
