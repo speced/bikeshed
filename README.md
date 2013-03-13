@@ -239,16 +239,15 @@ Further Preprocessing
 ---------------------
 
 After the fixups described above, 
-the preprocessor automatically passes the result through Bert's preprocessor as well,
-so anything provided by that processor,
-like automatic in-document cross-refs, TOC generation, and the like.
-I plan to eventually subsume that into this processor as well,
-but for now just chaining it is sufficient.
+the preprocessor automatically passes the result through Bert's preprocessor as well.
+This can be turned off by passing the `--no-bert` option.
+The preprocessor is rapidly subsuming all the functionality of Bert's,
+so this option will soon become standard behavior.
 
 As is CSSWG tradition,
 the preprocessor assumes that the source file is called "Overview.src.html",
 and the desired output file is called "Overview.html".
-I'll add some controls for this later.
+These can be overridden with the `-i` and `-o` options.
 
 
 Additional Notes
