@@ -549,6 +549,7 @@ class CSSSpec(object):
         self.document = html5lib.parse(
             ''.join(self.lines),
             treebuilder='lxml',
+            charset='utf-8',
             namespaceHTMLElements=False)
         addReferencesSection(self)
 
