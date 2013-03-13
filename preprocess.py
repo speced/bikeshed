@@ -272,7 +272,7 @@ def generateHeaderDL(doc):
             header += "<dd class='p-author h-card vcard'>"
             if(editor['link'][0:4] == "http"):
                 header += "<a class='p-name fn u-url url' href='{0}'>{1}</a> \
-(<span class='p-org org'>{2}</span>".format(
+(<span class='p-org org'>{2}</span>)".format(
                     editor['link'],
                     editor['name'],
                     editor['org'])
