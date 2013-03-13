@@ -21,6 +21,7 @@ from optparse import OptionParser
 from urllib import urlopen
 
 debugQuiet = False
+debug = False
 
 def main():
     optparser = OptionParser()
@@ -42,10 +43,14 @@ colon, like 'un:pw'.")
 don't run it through Bert's preprocessor afterwards.")
     optparser.add_option("-q", "--quiet", dest="quiet", default=False, action="store_true",
                          help="Suppresses everything but fatal errors from printing.")
+    optparser.add_option("--debug", dest="debug", default=False, action="store_true",
+                         help="Turns on some debug features.")
     (options, posargs) = optparser.parse_args()
 
     global debugQuiet
     debugQuiet = options.quiet
+    global debug
+    debug = options.debug
 
     doc = CSSSpec(inputFilename=options.inputFile,
                   biblioFilename=options.biblioFile,
@@ -55,8 +60,10 @@ don't run it through Bert's preprocessor afterwards.")
 
 
 def die(msg):
+    global debug
     print "FATAL ERROR: "+msg
-    sys.exit(1)
+    if not debug:
+        sys.exit(1)
 
 
 def warn(msg):
