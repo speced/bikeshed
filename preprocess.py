@@ -81,6 +81,7 @@ def parseHTML(str):
     doc = html5lib.parse(
         str,
         treebuilder='lxml',
+        encoding='utf-8',
         namespaceHTMLElements=False)
     return doc.getroot()[1][0]
 
