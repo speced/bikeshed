@@ -467,6 +467,31 @@ def linkTextVariations(str):
         yield str[:-1]
 
 
+def retrieveCachedFile(cacheLocation, url, type, forceCached=False):
+    try:
+        fh = open(cacheLocation, 'r')
+    except IOError:
+        if forceCached:
+            die("Couldn't find the {0} cache file at the specified location '{1}'.".format(type, cacheLocation))
+        else:
+            print "Couldn't find the {0} cache file at the specified location '{1}'.".format(type, cacheLocation)
+            print "Attempting to download it from '{0}'...".format(url)
+            try:
+                fh = urlopen(url)
+            except:
+                die("Couldn't retrieve the {0} file from '{1}'.".format(type, url))
+            try:
+                print "Attempting to save the {0} file to cache...".format(type)
+                outfh = open(cacheLocation, 'w')
+                outfh.write(fh.read())
+                fh.close()
+                fh = open(cacheLocation, 'r')
+                print "Successfully saved the {0} file to cache.".format(type)
+            except:
+                print "Couldn't save the {0} file to cache. Proceeding...".format(type)
+    return fh
+
+
 class CSSSpec(object):
     title = "???"
     status = "???"
@@ -494,17 +519,11 @@ class CSSSpec(object):
         except OSError:
             die("Couldn't find the input file at the specified location \""+inputFilename+"\".")
 
-        if biblioFilename:
-            try:
-                biblioFile = open(biblioFilename, 'r')
-            except OSError:
-                die("Couldn't find the biblio file at the specified location \""+inputFilename+"\".")
-        else:
-            try:
-                biblioFile = urlopen("https://www.w3.org/Style/Group/css3-src/biblio.ref")
-            except:
-                die("Something prevented me from retrieving the bibliography file.")
-        self.biblios = processReferBiblioFile(biblioFile)
+        bibliofh = retrieveCachedFile(cacheLocation=(biblioFilename or os.path.dirname(os.path.realpath(__file__)) + "/biblio.refer"),
+                                      url="https://www.w3.org/Style/Group/css3-src/biblio.ref",
+                                      type="bibliography")
+
+        self.biblios = processReferBiblioFile(bibliofh)
 
     def preprocess(self):
         # Textual hacks
