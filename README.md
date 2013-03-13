@@ -147,6 +147,37 @@ Abstract: This module introduces cascading variables as a new primitive value ty
 </pre>
 ~~~~
 
+Some pieces of the boilerplate are generated specially, after the rest,
+and have a special syntax to indicate that -
+an element with a specially chosen id,
+followed by an empty `<div>`.
+Here are the current special ids currently recognized:
+
+* The Table of Contents is indicated by `id=contents`.
+* The Normative and Informative References sections are indicated, respectively, by `id=normative` and `id=informative`.
+
+
+Table of Contents
+-----------------
+
+The headings in the spec are automatically numbered,
+and a table of contents automatically generated.
+
+Any heading `<h2>` to `<h6>`
+(that is, skipping only the document-titling `<h1>`)
+is automatically numbered by having a `<span class='secno'>...</span>`
+prepended to its contents.
+You can avoid this behavior for a heading and all of its subsequent subheadings
+by adding `class='no-num'` to the heading.
+
+Similarly, a ToC is generated to match.
+Headings and their subheadings can be omitted from the ToC
+by adding `class='no-toc'` to them.
+
+The processor assumes that your headings are numbered correctly.
+It does not yet pay attention to the HTML outline algorithm,
+so using a bunch of `<h1>s` nested in `<section>s` will have very wrong effects.
+
 
 Automatic Linking
 -----------------
@@ -175,6 +206,33 @@ If the text of an autolink doesn't match any target,
 the processor tries a few simple manipulations to accommodate common English variations:
 * if the text ends with an "s" or "'s", tries to match without it
 * if the text ends with an "ies", tries to match with that replaced by "y"
+
+
+Bibliography and References
+---------------------------
+
+External document references have a special syntax,
+copying the syntax used in Bert's preprocessor,
+which are driven by a bibliography file.
+
+By default, the bibliography file is retrieved from the internet
+(behind a W3C member-only page, so you'll need W3C credentials to retrieve it)
+and stored in the same directory as the preprocess.py file.
+You can force it to look in a different location by passing the --biblio flag.
+You can regenerate the cached file by deleting the cache and running the script again.
+
+Currently, the biblio file must be in REFER format.
+The default biblio file retrieved from the internet is already in this format,
+so you shouldn't have to do anything.
+
+Any occurence of "[[NAME]]" or "[[!NAME]]" will be assumed to be a bibliographic reference.
+Similar to autolinks, the text is automatically converted into a link,
+pointing to the auto-generated References section.
+The former syntax is for informative references,
+the latter is for normative ones.
+
+The References section is generated automatically,
+and filled with full bibliographic lines for all the documents referenced by your spec.
 
 
 Further Preprocessing
