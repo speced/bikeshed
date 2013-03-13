@@ -134,12 +134,12 @@ def transformMarkdownParagraphs(doc):
 #
 # Additionally, we pass in the tag-name used (pre or xmp)
 # and the line with the content, in case it has useful data in it.
-def processDataBlocks(doc):
+def transformDataBlocks(doc):
     inBlock = False
     blockTypes = {
-        'propdef': processPropdef,
-        'metadata': processMetadata,
-        'pre': processPre
+        'propdef': transformPropdef,
+        'metadata': transformMetadata,
+        'pre': transformPre
     }
     blockType = ""
     tagName = ""
@@ -189,7 +189,7 @@ def processDataBlocks(doc):
         doc.lines[rep['start']:rep['end']] = rep['value']
 
 
-def processPre(lines, tagName, firstLine, **kwargs):
+def transformPre(lines, tagName, firstLine, **kwargs):
     prefix = re.match("\s*", firstLine).group(0)
     for (i, line) in enumerate(lines):
         # Remove the whitespace prefix from each line.
@@ -206,7 +206,7 @@ def processPre(lines, tagName, firstLine, **kwargs):
     return lines
 
 
-def processPropdef(lines, doc, **kwargs):
+def transformPropdef(lines, doc, **kwargs):
     ret = ["<table class='propdef'>"]
     for (i, line) in enumerate(lines):
         match = re.match("\s*([^:]+):\s*(.*)", line)
@@ -221,7 +221,7 @@ def processPropdef(lines, doc, **kwargs):
     return ret
 
 
-def processMetadata(lines, doc, **kwargs):
+def transformMetadata(lines, doc, **kwargs):
     for line in lines:
         match = re.match("\s*([^:]+):\s*(.*)", line)
         key = match.group(1)
@@ -584,7 +584,7 @@ class CSSSpec(object):
 
     def preprocess(self):
         # Textual hacks
-        processDataBlocks(self)
+        transformDataBlocks(self)
         transformMarkdownParagraphs(self)
         fillInBoilerplate(self)
         transformBiblioLinks(self)
