@@ -391,6 +391,49 @@ def addTOCSection(doc):
     find("#contents + div", doc.document).append(parseHTML(html))
 
 
+def initializePropdefs(doc):
+    propdefTables = findAll('table.propdef', doc.document)
+    for propdefTable in propdefTables:
+        propdef = {}
+        names = []
+        rows = findAll('tr', propdefTable)
+        for row in rows:
+            # Extract the key, minus the trailing :
+            key = re.match('(.*):', textContent(row[0])).group(1).strip()
+            # Extract the value from the second cell
+            if key == "Name":
+                names = [x.strip() for x in textContent(row[1]).split(',')]
+            else:
+                propdef[key] = innerHTML(row[1])
+        for name in names:
+            doc.propdefs[name] = propdef
+
+
+def addPropertyIndex(doc):
+    # Set up the initial table columns
+    columns = ["Values", "Initial", "Applies To", "Inherited", "Percentages", "Media"]
+    # Add any additional keys used in the document.
+    allKeys = set()
+    for propdef in doc.propdefs.values():
+        allKeys |= set(propdef.keys())
+    columns.extend(allKeys - set(columns))
+    # Create the table
+    html = "<table class=proptable><thead><tr><th scope=col>Name"
+    for column in columns:
+        if column == "Inherited":
+            html += "<th scope=col>Inh."
+        elif column == "Percentages":
+            html += "<th scope=col>%ages"
+        else:
+            html += "<th scope=col>"+column
+    for name, propdef in doc.propdefs.items():
+        html += "<tr><th scope=row><a data-property>{0}</a>".format(name)
+        for column in columns:
+            html += "<td>" + propdef.get(column, "")
+    html += "</table>"
+    find("#property-index + div", doc.document).append(parseHTML(html))
+
+
 def genIdsForAutolinkTargets(doc):
     ids = set()
     linkTargets = findAll("dfn, h1, h2, h3, h4, h5, h6", doc.document)
@@ -523,6 +566,7 @@ class CSSSpec(object):
     normativeRefs = set()
     informativeRefs = set()
     loginInfo = None
+    propdefs = {}
 
     def __init__(self, inputFilename, biblioFilename=None, loginInfo=None):
         self.loginInfo = loginInfo
@@ -558,8 +602,12 @@ class CSSSpec(object):
         initializeAutolinkTargets(self)
         processAutolinks(self)
 
-        #ToC
+        # ToC
         addTOCSection(self)
+
+        # Property index
+        initializePropdefs(self)
+        addPropertyIndex(self)
 
         return self
 
