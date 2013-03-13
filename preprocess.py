@@ -256,21 +256,15 @@ def transformBiblioLinks(doc):
     for i in range(len(doc.lines)):
         while re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i]):
             match = re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i])
-            
-            if match.group(2) not in doc.biblios:
-                die("Couldn't find '{0}' in biblio database.".format(match.group(2)))
-            biblioEntry = doc.biblios[match.group(2)]
 
             if match.group(1) == "!":
                 biblioType = "normative"
-                doc.normativeRefs.add(biblioEntry)
             else:
                 biblioType = "informative"
-                doc.informativeRefs.add(biblioEntry)
             
             doc.lines[i] = doc.lines[i].replace(
                 match.group(0),
-                "<a title='{0}' data-biblio-type='{1}'>[{0}]</a>".format(
+                "<a title='{0}' data-biblio='{1}'>[{0}]</a>".format(
                     match.group(2), 
                     biblioType,))
 
@@ -316,6 +310,25 @@ def generateHeaderDL(doc):
                 header += "<dd>"+val+"\n"
     header += "</dl>"
     return header
+
+def initializeBiblioLinks(doc):
+    biblioLinks = findAll("a[data-biblio]")
+    for el in biblioLinks:
+        if el.get('title'):
+            linkText = el.get('title')
+        else:
+            # Assume the text is of the form "[NAME]"
+            linkText = textContent(el)[1:-1]
+        if linkText not in doc.biblios:
+            die("Couldn't find '{0}' in biblio database.".format(linkText))
+        biblioEntry = doc.biblios[linkText]
+        if el.get('data-biblio') == "normative":
+            doc.normativeRefs = biblioEntry
+        elif el.get('data-biblio') == "informative":
+            doc.informativeRefs = biblioEntry
+        else:
+            die("Unknown data-biblio value '{0}' on {1}. \
+Only 'normative' and 'informative' allowed.".format(el.get('data-biblio'), outerHTML(el)))
 
 
 def addReferencesSection(doc):
@@ -595,12 +608,9 @@ class CSSSpec(object):
             treebuilder='lxml',
             encoding='utf-8',
             namespaceHTMLElements=False)
-        addReferencesSection(self)
 
-        # All the linking.
-        genIdsForAutolinkTargets(self)
-        initializeAutolinkTargets(self)
-        processAutolinks(self)
+        # Normative/informative references
+        addReferencesSection(self)
 
         # ToC
         addTOCSection(self)
@@ -608,6 +618,11 @@ class CSSSpec(object):
         # Property index
         initializePropdefs(self)
         addPropertyIndex(self)
+
+        # Autolinks
+        genIdsForAutolinkTargets(self)
+        initializeAutolinkTargets(self)
+        processAutolinks(self)
 
         return self
 
