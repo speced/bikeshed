@@ -252,6 +252,29 @@ def transformMetadata(lines, doc, **kwargs):
     return []
 
 
+def transformBiblioLinks(doc):
+    for i in range(len(doc.lines)):
+        while re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i]):
+            match = re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i])
+            
+            if match.group(2) not in doc.biblios:
+                die("Couldn't find '{0}' in biblio database.".format(match.group(2)))
+            biblioEntry = doc.biblios[match.group(2)]
+
+            if match.group(1) == "!":
+                biblioType = "normative"
+                doc.normativeRefs.add(biblioEntry)
+            else:
+                biblioType = "informative"
+                doc.informativeRefs.add(biblioEntry)
+            
+            doc.lines[i] = doc.lines[i].replace(
+                match.group(0),
+                "<a title='{0}' data-biblio-type='{1}'>[{0}]</a>".format(
+                    match.group(2), 
+                    biblioType,))
+
+
 def generateHeaderDL(doc):
     header = "<dl>"
     if doc.status != "ED" and doc.TR:
@@ -293,29 +316,6 @@ def generateHeaderDL(doc):
                 header += "<dd>"+val+"\n"
     header += "</dl>"
     return header
-
-
-def transformBiblioLinks(doc):
-    for i in range(len(doc.lines)):
-        while re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i]):
-            match = re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i])
-            
-            if match.group(2) not in doc.biblios:
-                die("Couldn't find '{0}' in biblio database.".format(match.group(2)))
-            biblioEntry = doc.biblios[match.group(2)]
-
-            if match.group(1) == "!":
-                biblioType = "normative"
-                doc.normativeRefs.add(biblioEntry)
-            else:
-                biblioType = "informative"
-                doc.informativeRefs.add(biblioEntry)
-            
-            doc.lines[i] = doc.lines[i].replace(
-                match.group(0),
-                "<a title='{0}' data-biblio-type='{1}'>[{0}]</a>".format(
-                    match.group(2), 
-                    biblioType,))
 
 
 def addReferencesSection(doc):
