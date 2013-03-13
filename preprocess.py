@@ -20,6 +20,7 @@ from lxml.cssselect import CSSSelector
 from optparse import OptionParser
 from urllib import urlopen
 
+debugQuiet = False
 
 def main():
     optparser = OptionParser()
@@ -39,7 +40,12 @@ colon, like 'un:pw'.")
     optparser.add_option("--no-bert", dest="noBert", default=False, action="store_true",
                          help="Use this preprocessor only; \
 don't run it through Bert's preprocessor afterwards.")
+    optparser.add_option("-q", "--quiet", dest="quiet", default=False, action="store_true",
+                         help="Suppresses everything but fatal errors from printing.")
     (options, posargs) = optparser.parse_args()
+
+    global debugQuiet
+    debugQuiet = options.quiet
 
     doc = CSSSpec(inputFilename=options.inputFile,
                   biblioFilename=options.biblioFile,
@@ -51,6 +57,12 @@ don't run it through Bert's preprocessor afterwards.")
 def die(msg):
     print "FATAL ERROR: "+msg
     sys.exit(1)
+
+
+def warn(msg):
+    global debugQuiet
+    if not debugQuiet:
+        print "WARNING: "+msg
 
 
 def textContent(el):
@@ -474,21 +486,21 @@ def retrieveCachedFile(cacheLocation, url, type, forceCached=False):
         if forceCached:
             die("Couldn't find the {0} cache file at the specified location '{1}'.".format(type, cacheLocation))
         else:
-            print "Couldn't find the {0} cache file at the specified location '{1}'.".format(type, cacheLocation)
-            print "Attempting to download it from '{0}'...".format(url)
+            warn("Couldn't find the {0} cache file at the specified location '{1}'.".format(type, cacheLocation))
+            warn("Attempting to download it from '{0}'...".format(url))
             try:
                 fh = urlopen(url)
             except:
                 die("Couldn't retrieve the {0} file from '{1}'.".format(type, url))
             try:
-                print "Attempting to save the {0} file to cache...".format(type)
+                warn("Attempting to save the {0} file to cache...".format(type))
                 outfh = open(cacheLocation, 'w')
                 outfh.write(fh.read())
                 fh.close()
                 fh = open(cacheLocation, 'r')
-                print "Successfully saved the {0} file to cache.".format(type)
+                warn("Successfully saved the {0} file to cache.".format(type))
             except:
-                print "Couldn't save the {0} file to cache. Proceeding...".format(type)
+                warn("Couldn't save the {0} file to cache. Proceeding...".format(type))
     return fh
 
 
