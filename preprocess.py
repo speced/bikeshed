@@ -319,7 +319,7 @@ def generateHeaderDL(doc):
     return header
 
 def initializeBiblioLinks(doc):
-    biblioLinks = findAll("a[data-biblio]")
+    biblioLinks = findAll("a[data-biblio]", doc.document)
     for el in biblioLinks:
         if el.get('title'):
             linkText = el.get('title')
@@ -330,9 +330,9 @@ def initializeBiblioLinks(doc):
             die("Couldn't find '{0}' in biblio database.".format(linkText))
         biblioEntry = doc.biblios[linkText]
         if el.get('data-biblio') == "normative":
-            doc.normativeRefs = biblioEntry
+            doc.normativeRefs.add(biblioEntry)
         elif el.get('data-biblio') == "informative":
-            doc.informativeRefs = biblioEntry
+            doc.informativeRefs.add(biblioEntry)
         else:
             die("Unknown data-biblio value '{0}' on {1}. \
 Only 'normative' and 'informative' allowed.".format(el.get('data-biblio'), outerHTML(el)))
@@ -620,6 +620,7 @@ class CSSSpec(object):
             namespaceHTMLElements=False)
 
         # Normative/informative references
+        initializeBiblioLinks(self)
         addReferencesSection(self)
 
         # ToC
