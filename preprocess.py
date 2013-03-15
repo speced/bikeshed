@@ -822,7 +822,7 @@ Table of contents</h2>
 """
     footer = """
 
-<h2 id="conformance" class="no-ref">
+<h2 id="conformance" class="no-ref no-num">
 Conformance</h2>
 
 <h3 id="conventions" class="no-ref">
