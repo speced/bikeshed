@@ -73,15 +73,15 @@ def warn(msg):
 
 
 def textContent(el):
-    return etree.tostring(el, method='text', with_tail=False)
+    return html.tostring(el, method='text', with_tail=False)
 
 
 def innerHTML(el):
-    return el.text + ''.join(etree.tostring(x) for x in el)
+    return el.text + ''.join(html.tostring(x) for x in el)
 
 
 def outerHTML(el):
-    return etree.tostring(el, with_tail=False)
+    return html.tostring(el, with_tail=False)
 
 
 def parseHTML(str):
