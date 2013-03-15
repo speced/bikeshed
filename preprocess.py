@@ -539,7 +539,7 @@ def autolinkTitleFromText(str):
 
 
 def processAutolinks(doc):
-    autolinks = findAll("a:not([href])", doc.document)
+    autolinks = findAll("a:not([href]), a[data-autolink]", doc.document)
     for el in autolinks:
         if el.get('title') == '':
             break
@@ -554,6 +554,8 @@ def processAutolinks(doc):
         for variation in linkTextVariations(linkText):
             if variation in doc.links:
                 el.set('href', '#'+doc.links[variation])
+                if not el.get('data-autolink'):
+                    el.set('data-autolink', 'internal-ref')
                 break
         else:
             die("Couldn't find the target for an autolink: " + outerHTML(el))
