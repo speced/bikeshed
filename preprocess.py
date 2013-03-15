@@ -568,9 +568,13 @@ def linkTextVariations(str):
 
     if str[-3:] == "ies":
         yield str[:-3]+"y"
-    elif str[-2:] == "'s":
+    if str[-2:] == "es":
         yield str[:-2]
-    elif str[-1:] == "s":
+    if str[-2:] == "'s":
+        yield str[:-2]
+    if str[-1:] == "s":
+        yield str[:-1]
+    if str[-1:] == "'":
         yield str[:-1]
 
 
