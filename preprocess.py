@@ -354,7 +354,6 @@ def addReferencesSection(doc):
 
 
 def addTOCSection(doc):
-    headers = findAll("h2,h3,h4,h5,h6", doc.document)
     headerLevel = [0,0,0,0,0]
     def incrementLevel(level):
         headerLevel[level-2] += 1
@@ -365,7 +364,7 @@ def addTOCSection(doc):
 
     # Number all the sections.
     skipLevel = float('inf')
-    for header in headers:
+    for header in doc.document.iter('h2', 'h3', 'h4', 'h5', 'h6'):
         level = int(header.tag[-1])
 
         # If we encounter a no-num, don't number it or any in the same section. 
@@ -389,7 +388,7 @@ def addTOCSection(doc):
     skipLevel = float('inf')
     previousLevel = 0
     html = ''
-    for header in headers:
+    for header in doc.document.iter('h2', 'h3', 'h4', 'h5', 'h6'):
         level = int(header.tag[-1])
 
         # Same deal - hit a no-toc, suppress the entire section.
