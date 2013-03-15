@@ -467,7 +467,7 @@ def genIdsForAutolinkTargets(doc):
         if el.get('id') is not None:
             id = el.get('id')
             if id in ids:
-                die("Found a duplicate explicitly-specified id:" + id)
+                die("Found a duplicate explicitly-specified id '{0}' in {1}".format(id, outerHTML(el)))
         else:
             id = idFromText(textContent(el))
             if id in ids:
@@ -477,7 +477,7 @@ def genIdsForAutolinkTargets(doc):
                         id = id + str(x)
                         break
                 else:
-                    die("More than 10 link-targets with the same id, giving up: " + id)
+                    die("More than 10 link-targets with the same id '{0}'.".format(id))
             el.set('id', id)
         ids.add(id)
     doc.ids = ids
