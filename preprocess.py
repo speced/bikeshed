@@ -367,6 +367,13 @@ def addTOCSection(doc):
     for header in doc.document.iter('h2', 'h3', 'h4', 'h5', 'h6'):
         level = int(header.tag[-1])
 
+        # Reset, if this is a re-run.
+        if(header.get('level')):
+            del header.attrib['level']
+        if(len(header) > 0 and header[0].tag == 'span' and header[0].get('class') == "secno"):
+            header.text = header[0].tail
+            del header[0]
+
         # If we encounter a no-num, don't number it or any in the same section. 
         if re.search("no-num", header.get('class') or ''):
             skipLevel = min(level, skipLevel)
