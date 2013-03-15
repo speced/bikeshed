@@ -784,9 +784,11 @@ def fillInBoilerplate(doc):
     # Arbitrarily, I choose to use whether the first line in the doc
     # is an <h1> with the document's title.
 
-    if re.match("<h1>[^<]+</h1>", doc.lines[0]):
-        doc.title = re.match("<h1>([^<]+)</h1>", doc.lines[0]).group(1)
-        doc.lines = doc.lines[1:]
+    if not re.match("<h1>[^<]+</h1>", doc.lines[0]):
+        return
+
+    doc.title = re.match("<h1>([^<]+)</h1>", doc.lines[0]).group(1)
+    doc.lines = doc.lines[1:]
 
     header = """
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
