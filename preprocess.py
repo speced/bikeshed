@@ -101,6 +101,17 @@ def find(sel, doc):
     return findAll(sel, doc)[0]
 
 
+def clearContents(el):
+    for child in el.iterchildren():
+        el.remove(child)
+    return el
+
+
+def replaceContents(el, new):
+    clearContents(el).append(new)
+    return el
+
+
 def transformMarkdownParagraphs(doc):
     # This converts Markdown-style paragraphs into actual paragraphs.
     # Any line that is preceded by a blank line,
@@ -351,13 +362,14 @@ def addReferencesSection(doc):
         text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
-    find("#normative + div", doc.document).append(parseHTML(text))
+    replaceContents(find("#normative + div", doc.document), parseHTML(text))
+
     text = "<dl>"
     for ref in doc.informativeRefs:
         text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
-    find("#informative + div", doc.document).append(parseHTML(text))
+    replaceContents(find("#informative + div", doc.document), parseHTML(text))
 
 
 def addTOCSection(doc):
@@ -421,7 +433,7 @@ def addTOCSection(doc):
         html += "<li><a href='#{0}'>{1}</a>".format(header.get('id'),
                                                    innerHTML(header))
         previousLevel = level
-    find("#contents + div", doc.document).append(parseHTML(html))
+    replaceContents(find("#contents + div", doc.document), parseHTML(html))
 
 
 def initializePropdefs(doc):
@@ -464,7 +476,7 @@ def addPropertyIndex(doc):
         for column in columns:
             html += "<td>" + propdef.get(column, "")
     html += "</table>"
-    find("#property-index + div", doc.document).append(parseHTML(html))
+    replaceContents(find("#property-index + div", doc.document), parseHTML(html))
 
 
 def genIdsForAutolinkTargets(doc):
