@@ -153,6 +153,7 @@ def transformDataBlocks(doc):
     startLine = 0
     replacements = []
     for (i, line) in enumerate(doc.lines):
+        # Look for the start of a block.
         match = re.match("\s*<(pre|xmp)(.*)", line, re.I)
         if match and not inBlock:
             inBlock = True
@@ -163,14 +164,17 @@ def transformDataBlocks(doc):
                 blockType = typeMatch.group(0)
             else:
                 blockType = "pre"
-        match = re.match("(.*)</"+tagName+">", line, re.I)
+        # Look for the end of a block.
+        match = re.match("(.*)</"+tagName+">(.*)", line, re.I)
         if match and inBlock:
             inBlock = False
             if re.match("^\s*$", match.group(1)):
-                # End tag was on a line by itself
+                # End tag was the first tag on the line.
+                # Remove the tag from the line.
+                doc.lines[i] = match.group(2)
                 replacements.append({
                     'start': startLine,
-                    'end': i+1,
+                    'end': i,
                     'value': blockTypes[blockType](
                         lines=doc.lines[startLine+1:i],
                         tagName=tagName,
@@ -178,7 +182,10 @@ def transformDataBlocks(doc):
                         doc=doc)})
             else:
                 # End tag was at the end of line of useful content.
+                # Trim this line to be only the block content.
                 doc.lines[i] = match.group(1)
+                # Put the after-tag content on the next line.
+                doc.lines.insert(i+1, match.group(2))
                 replacements.append({
                     'start': startLine,
                     'end': i,
