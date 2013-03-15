@@ -289,7 +289,7 @@ def transformBiblioLinks(doc):
             
             doc.lines[i] = doc.lines[i].replace(
                 match.group(0),
-                "<a title='{0}' data-biblio='{1}'>[{0}]</a>".format(
+                "<a title='{0}' data-autolink='biblio' data-biblio-type='{1}'>[{0}]</a>".format(
                     match.group(2), 
                     biblioType,))
 
@@ -337,8 +337,9 @@ def generateHeaderDL(doc):
     return header
 
 def initializeBiblioLinks(doc):
-    biblioLinks = findAll("a[data-biblio]", doc.document)
+    biblioLinks = findAll("a[data-autolink='biblio']", doc.document)
     for el in biblioLinks:
+
         if el.get('title'):
             linkText = el.get('title')
         else:
@@ -347,13 +348,13 @@ def initializeBiblioLinks(doc):
         if linkText not in doc.biblios:
             die("Couldn't find '{0}' in biblio database.".format(linkText))
         biblioEntry = doc.biblios[linkText]
-        if el.get('data-biblio') == "normative":
+        if el.get('data-biblio-type') == "normative":
             doc.normativeRefs.add(biblioEntry)
-        elif el.get('data-biblio') == "informative":
+        elif el.get('data-biblio-type') == "informative":
             doc.informativeRefs.add(biblioEntry)
         else:
-            die("Unknown data-biblio value '{0}' on {1}. \
-Only 'normative' and 'informative' allowed.".format(el.get('data-biblio'), outerHTML(el)))
+            die("Unknown data-biblio-type value '{0}' on {1}. \
+Only 'normative' and 'informative' allowed.".format(el.get('data-biblio-type'), outerHTML(el)))
 
 
 def addReferencesSection(doc):
