@@ -38,12 +38,6 @@ def main():
                          help="Path to a local bibliography file. By default,\
 the processor uses the remote file at \
 <https://www.w3.org/Style/Group/css3-src/biblio.ref>.")
-    optparser.add_option("--login", dest="loginInfo",
-                         help="W3C username/password combo, separated by a \
-colon, like 'un:pw'.")
-    optparser.add_option("--no-bert", dest="noBert", default=False, action="store_true",
-                         help="Use this preprocessor only; \
-don't run it through Bert's preprocessor afterwards.")
     optparser.add_option("-q", "--quiet", dest="quiet", default=False, action="store_true",
                          help="Suppresses everything but fatal errors from printing.")
     optparser.add_option("--debug", dest="debug", default=False, action="store_true",
@@ -799,42 +793,11 @@ class CSSSpec(object):
 
         return self
 
-    def finish(self, outputFilename, noBert=False):
-        if noBert:
-            try:
-                open(outputFilename, mode='w').write(html.tostring(self.document))
-            except:
-                die("Something prevented me from saving the output document.")
-        else:
-            try:
-                outputFile = open("~temp-generated-source.html", mode='w')
-            except:
-                die("Something prevented me from writing out a temp file in this directory.")
-            else:
-                outputFile.write(html.tostring(self.document))
-                outputFile.close()
-
-            try:
-                if self.loginInfo:
-                    credentials = "-u " + self.loginInfo
-                else:
-                    credentials = "-n"
-                subprocess.call("curl -# " + credentials + " \
-                    -F file=@~temp-generated-source.html \
-                    -F group=CSS \
-                    -F output=html \
-                    -F method=file \
-                    https://www.w3.org/Style/Group/process.cgi \
-                    -o "+outputFilename,
-                                shell=True)
-            except subprocess.CalledProcessError as e:
-                print "Some error occurred in the curl call."
-                print "Error code ", e.returncode
-                print "Error message:"
-                print e.output
-                sys.exit(1)
-            else:
-                os.remove("~temp-generated-source.html")
+    def finish(self, outputFilename):
+        try:
+            open(outputFilename, mode='w').write(html.tostring(self.document))
+        except:
+            die("Something prevented me from saving the output document to {0}.".format(outputFilename))
 
 
 class BiblioEntry(object):
