@@ -93,6 +93,15 @@ def parseHTML(str):
     return doc.getroot()[1][0]
 
 
+def escapeHTML(str):
+    # Escape HTML
+    return str.replace('&', '&amp;').replace('<', '&lt;')
+
+
+def escapeAttr(str):
+    return str.replace('&', '&amp;').replace("'", '&apos;').replace('"', '&quot;')
+
+
 def findAll(sel, doc):
     return CSSSelector(sel)(doc)
 
@@ -515,6 +524,17 @@ def idFromText(id):
     return re.sub("[^a-z0-9_-]", "", id.replace(" ", "-").lower()) + suffix
 
 
+def linkTextsFromElement(el, preserveCasing=False):
+    if el.get('title') == '':
+        return []
+    elif el.get('title'):
+        return [x.strip() for x in el.get('title').split('|')]
+    elif preserveCasing:
+        return [textContent(el).strip()]
+    else:
+        return [textContent(el).strip().lower()]       
+
+
 def initializeAutolinkTargets(doc):
     links = {}
     linkTargets = findAll("dfn, h1, h2, h3, h4, h5, h6, \
@@ -522,20 +542,13 @@ def initializeAutolinkTargets(doc):
                            doc.document)
     for el in linkTargets:
         if not re.search("no-ref", el.get('class') or ""):
-            if el.get("title") is not None:
-                linkTexts = [x.strip() for x in el.get("title").split("|")]
-            else:
-                linkTexts = [autolinkTitleFromText(textContent(el))]
+            linkTexts = linkTextsFromElement(el)
             for linkText in linkTexts:
                 if linkText in links:
                     die("Two link-targets have the same linking text: " + linkText)
                 else:
                     links[linkText] = el.get('id')
     doc.links = links
-
-
-def autolinkTitleFromText(str):
-    return str.strip().lower()
 
 
 def processAutolinks(doc):
@@ -576,6 +589,33 @@ def linkTextVariations(str):
         yield str[:-1]
     if str[-1:] == "'":
         yield str[:-1]
+
+
+def headingLevelOfElement(el):
+    while el.getparent().tag != "body":
+        el = el.getparent()
+    while not re.match(r"h\d", el.tag):
+        el = el.getprevious()
+    return el.get('data-level') or '??'
+
+
+def addIndexSection(doc):
+    indexElements = findAll("dfn", doc.document)
+    indexEntries = {}
+    for el in indexElements:
+        linkTexts = linkTextsFromElement(el, preserveCasing=True)
+        headingLevel = headingLevelOfElement(el)
+        id = el.get('id')
+        for linkText in linkTexts:
+            if linkText in indexEntries:
+                die("Multiple declarations with the same linktext '{0}'".format(linkText))
+            indexEntries[linkText] = (linkText, id, headingLevel)
+    sortedEntries = sorted(indexEntries.values(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower()))
+    html = "<ul class='indexlist'>"
+    for text, id, level in sortedEntries:
+        html += "<li>{0}, <a href='#{1}' title='section {2}'>{2}</a>".format(escapeHTML(text), id, level)
+    html += "</ul>"
+    replaceContents(find("#index + div", doc.document), parseHTML(html))
 
 
 def retrieveCachedFile(cacheLocation, url, type, forceCached=False):
@@ -668,6 +708,9 @@ class CSSSpec(object):
         genIdsForAutolinkTargets(self)
         initializeAutolinkTargets(self)
         processAutolinks(self)
+
+        # Index
+        addIndexSection(self)
 
         return self
 
