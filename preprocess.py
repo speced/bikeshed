@@ -313,33 +313,31 @@ def transformTextReplacements(doc):
         version = doc.ED
     else:
         version = "http://www.w3.org/TR/{3}/{0}-{1}-{2}".format(status, shortname, cdate, year)
-    for i in range(len(doc.lines)):
-        doc.lines[i] = doc.lines[i].replace("[SHORTNAME]", shortname)
-        doc.lines[i] = doc.lines[i].replace("[LONGSTATUS]", longstatus)
-        doc.lines[i] = doc.lines[i].replace("[STATUS]", status)
-        doc.lines[i] = doc.lines[i].replace("[LATEST]", latest)
-        doc.lines[i] = doc.lines[i].replace("[VERSION]", version)
-        doc.lines[i] = doc.lines[i].replace("[YEAR]", year)
-        doc.lines[i] = doc.lines[i].replace("[DATE]", date)
-        doc.lines[i] = doc.lines[i].replace("[CDATE]", cdate)
-        doc.lines[i] = doc.lines[i].replace("[ISODATE]", isodate)
+    doc.html = doc.html.replace("[SHORTNAME]", shortname)
+    doc.html = doc.html.replace("[LONGSTATUS]", longstatus)
+    doc.html = doc.html.replace("[STATUS]", status)
+    doc.html = doc.html.replace("[LATEST]", latest)
+    doc.html = doc.html.replace("[VERSION]", version)
+    doc.html = doc.html.replace("[YEAR]", year)
+    doc.html = doc.html.replace("[DATE]", date)
+    doc.html = doc.html.replace("[CDATE]", cdate)
+    doc.html = doc.html.replace("[ISODATE]", isodate)
 
 
 def transformBiblioLinks(doc):
-    for i in range(len(doc.lines)):
-        while re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i]):
-            match = re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i])
+    while re.search(r"\[\[(!?)([^\]]+)\]\]", doc.html):
+        match = re.search(r"\[\[(!?)([^\]]+)\]\]", doc.html)
 
-            if match.group(1) == "!":
-                biblioType = "normative"
-            else:
-                biblioType = "informative"
-            
-            doc.lines[i] = doc.lines[i].replace(
-                match.group(0),
-                "<a title='{0}' data-autolink='biblio' data-biblio-type='{1}'>[{0}]</a>".format(
-                    match.group(2), 
-                    biblioType,))
+        if match.group(1) == "!":
+            biblioType = "normative"
+        else:
+            biblioType = "informative"
+        
+        doc.html = doc.html.replace(
+            match.group(0),
+            "<a title='{0}' data-autolink='biblio' data-biblio-type='{1}'>[{0}]</a>".format(
+                match.group(2), 
+                biblioType,))
 
 
 def generateHeaderDL(doc):
@@ -730,13 +728,14 @@ class CSSSpec(object):
         # Textual hacks
         transformDataBlocks(self)
         transformMarkdownParagraphs(self)
+        self.html = '\n'.join(self.lines)
         fillInBoilerplate(self)
         transformTextReplacements(self)
         transformBiblioLinks(self)
 
         # Build the document
         self.document = html5lib.parse(
-            ''.join(self.lines),
+            self.html,
             treebuilder='lxml',
             encoding='utf-8',
             namespaceHTMLElements=False)
@@ -906,11 +905,12 @@ def fillInBoilerplate(doc):
     # Arbitrarily, I choose to use whether the first line in the doc
     # is an <h1> with the document's title.
 
-    if not re.match("<h1>[^<]+</h1>", doc.lines[0]):
+    if not re.match("<h1>[^<]+</h1>", doc.html):
         return
 
-    doc.title = re.match("<h1>([^<]+)</h1>", doc.lines[0]).group(1)
-    doc.lines = doc.lines[1:]
+    match = re.match("<h1>([^<]+)</h1>", doc.html)
+    doc.title = match.group(1)
+    doc.html = doc.html[len(match.group(0)):]
 
     header = """
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
@@ -1149,8 +1149,7 @@ Property index</h2>
 </body>
 </html>
 """
-    doc.lines.insert(0, header)
-    doc.lines.append(footer)
+    doc.html = '\n'.join([header, doc.html, footer])
 
 
 if __name__ == "__main__":
