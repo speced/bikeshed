@@ -24,6 +24,7 @@ from datetime import date
 debugQuiet = False
 debug = False
 doc = None
+textMacros = {}
 
 def main():
     optparser = OptionParser()
@@ -93,7 +94,7 @@ def parseHTML(str):
         treebuilder='lxml',
         encoding='utf-8',
         namespaceHTMLElements=False)
-    return doc.getroot()[1][0]
+    return find('body', doc)[0]
 
 
 def escapeHTML(str):
@@ -137,6 +138,13 @@ def replaceContents(el, new):
 def fillWith(tag, new):
     for el in findAll("[data-fill-with='{0}']".format(tag)):
         replaceContents(el, new)
+
+
+def replaceTextMacros(text):
+    global textMacros
+    for tag, replacement in textMacros.items():
+        text = text.replace("[{0}]".format(tag.upper()), replacement)
+    return text
 
 
 def transformMarkdownParagraphs(doc):
@@ -303,10 +311,9 @@ def transformMetadata(lines, doc, **kwargs):
 '<name>, <company>, <email-or-contact-page>")
         else:
             doc.otherMetadata[key].append(val)
-    return []
 
-
-def transformTextReplacements(doc):
+    # Fill in text macros. 
+    global textMacros
     longstatuses = {
         "ED": "Editor's Draft",
         "WD": "W3C Working Draft",
@@ -318,27 +325,19 @@ def transformTextReplacements(doc):
         "MO": "W3C Member-only Draft",
         "UD": "Unofficial Draft"
     }
-    shortname = doc.shortname
-    longstatus = longstatuses[doc.status]
-    status = doc.status
-    latest = doc.TR
-    year = str(doc.date.year)
-    date = doc.date.strftime("{0} %B %Y".format(doc.date.day))
-    cdate = doc.date.strftime("%Y%m%d")
-    isodate = doc.date.strftime("%Y-%m-%d")
+    textMacros["shortname"] = doc.shortname
+    textMacros["longstatus"] = longstatuses[doc.status]
+    textMacros["status"] = doc.status
+    textMacros["latest"] = doc.TR
+    textMacros["year"] = str(doc.date.year)
+    textMacros["date"] = doc.date.strftime("{0} %B %Y".format(doc.date.day))
+    textMacros["cdate"] = doc.date.strftime("%Y%m%d")
+    textMacros["isodate"] = doc.date.strftime("%Y-%m-%d")
     if doc.status == "ED":
-        version = doc.ED
+        textMacros["version"] = doc.ED
     else:
-        version = "http://www.w3.org/TR/{3}/{0}-{1}-{2}".format(status, shortname, cdate, year)
-    doc.html = doc.html.replace("[SHORTNAME]", shortname)
-    doc.html = doc.html.replace("[LONGSTATUS]", longstatus)
-    doc.html = doc.html.replace("[STATUS]", status)
-    doc.html = doc.html.replace("[LATEST]", latest)
-    doc.html = doc.html.replace("[VERSION]", version)
-    doc.html = doc.html.replace("[YEAR]", year)
-    doc.html = doc.html.replace("[DATE]", date)
-    doc.html = doc.html.replace("[CDATE]", cdate)
-    doc.html = doc.html.replace("[ISODATE]", isodate)
+        textMacros["version"] = "http://www.w3.org/TR/{3}/{0}-{1}-{2}".format(status, shortname, cdate, year)
+    return []
 
 
 def transformBiblioLinks(doc):
@@ -747,9 +746,11 @@ class CSSSpec(object):
         # Textual hacks
         transformDataBlocks(self)
         transformMarkdownParagraphs(self)
+
+        # Convert to a single string of html now, for convenience.
         self.html = '\n'.join(self.lines)
         fillInBoilerplate(self)
-        transformTextReplacements(self)
+        self.html = replaceTextMacros(self.html)
         transformBiblioLinks(self)
 
         # Build the document
@@ -759,6 +760,7 @@ class CSSSpec(object):
             encoding='utf-8',
             namespaceHTMLElements=False)
 
+        addStatusSection(self)
         addHeadingNumbers(self)
         formatPropertyNames(self)
 
@@ -962,41 +964,8 @@ def fillInBoilerplate(doc):
 <p class="p-summary">
 """
     header += doc.abstract
-    header += """<h2 class='no-num no-toc no-ref' id='status'>Status of this document</h2>"""
-    if doc.status == "ED":
-        header += """
-  <p>This is a public copy of the editors' draft. It is provided for
-   discussion only and may change at any moment. Its publication here does
-   not imply endorsement of its contents by W3C. Don't cite this document
-   other than as work in progress.
-
-  <p>The (<a href="http://lists.w3.org/Archives/Public/www-style/">archived</a>) 
-   public mailing list 
-   <a href="mailto:www-style@w3.org?Subject=%5B[SHORTNAME]%5D%20PUT%20SUBJECT%20HERE">www-style@w3.org</a> 
-   (see <a href="http://www.w3.org/Mail/Request">instructions</a>) 
-   is preferred for discussion of this specification. 
-   When sending e-mail, please put the text
-   “[SHORTNAME]” in the subject, preferably like this:
-   “[<!---->[SHORTNAME]<!---->] <em>…summary of comment…</em>”
-
-  <p>This document was produced by the <a href="/Style/CSS/members">CSS
-   Working Group</a> (part of the <a href="/Style/">Style Activity</a>).
-
-  <p>This document was produced by a group operating under the 
-   <a href="/Consortium/Patent-Policy-20040205/">5 February 2004 W3C Patent Policy</a>. 
-   W3C maintains a 
-   <a href="/2004/01/pp-impl/32061/status"rel=disclosure>public list of any patent disclosures</a> 
-   made in connection with the deliverables of the group; that page also includes
-   instructions for disclosing a patent. An individual who has actual
-   knowledge of a patent which the individual believes contains 
-   <a href="/Consortium/Patent-Policy-20040205/#def-essential">Essential Claim(s)</a> 
-   must disclose the information in accordance with 
-   <a href="/Consortium/Patent-Policy-20040205/#sec-Disclosure">section 6 of the W3C Patent Policy</a>.</p>"""
-    if doc.atRisk:
-        header += "<p>The following features are at risk:\n<ul>"
-        for feature in doc.atRisk:
-            header += "<li>"+feature
-        header += "</ul>"
+    header += """<h2 class='no-num no-toc no-ref' id='status'>Status of this document</h2>
+<div data-fill-with="status"></div>"""
     header += """<h2 class="no-num no-toc no-ref" id="contents">Table of contents</h2>
 <div data-fill-with="table-of-contents"></div>
 
@@ -1200,6 +1169,48 @@ Property index</h2>
 </html>
 """
     doc.html = '\n'.join([header, doc.html, footer])
+
+
+def addStatusSection(doc):
+    if doc.status == "ED":
+        html = """
+  <p>This is a public copy of the editors' draft. It is provided for
+   discussion only and may change at any moment. Its publication here does
+   not imply endorsement of its contents by W3C. Don't cite this document
+   other than as work in progress.
+
+  <p>The (<a href="http://lists.w3.org/Archives/Public/www-style/">archived</a>) 
+   public mailing list 
+   <a href="mailto:www-style@w3.org?Subject=%5B[SHORTNAME]%5D%20PUT%20SUBJECT%20HERE">www-style@w3.org</a> 
+   (see <a href="http://www.w3.org/Mail/Request">instructions</a>) 
+   is preferred for discussion of this specification. 
+   When sending e-mail, please put the text
+   “[SHORTNAME]” in the subject, preferably like this:
+   “[<!---->[SHORTNAME]<!---->] <em>…summary of comment…</em>”
+
+  <p>This document was produced by the <a href="/Style/CSS/members">CSS
+   Working Group</a> (part of the <a href="/Style/">Style Activity</a>).
+
+  <p>This document was produced by a group operating under the 
+   <a href="/Consortium/Patent-Policy-20040205/">5 February 2004 W3C Patent Policy</a>. 
+   W3C maintains a 
+   <a href="/2004/01/pp-impl/32061/status" rel=disclosure>public list of any patent disclosures</a> 
+   made in connection with the deliverables of the group; that page also includes
+   instructions for disclosing a patent. An individual who has actual
+   knowledge of a patent which the individual believes contains 
+   <a href="/Consortium/Patent-Policy-20040205/#def-essential">Essential Claim(s)</a> 
+   must disclose the information in accordance with 
+   <a href="/Consortium/Patent-Policy-20040205/#sec-Disclosure">section 6 of the W3C Patent Policy</a>.</p>"""
+    else:
+        die("Don't have a status section for {0} document yet.".format(doc.status))
+    if len(doc.atRisk):
+        html += "<p>The following features are at risk:\n<ul>"
+        for feature in doc.atRisk:
+            html += "<li>"+feature
+        html += "</ul>"
+    html = replaceTextMacros(html)
+    fillWith('status', parseHTML(html))
+
 
 
 if __name__ == "__main__":
