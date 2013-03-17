@@ -925,7 +925,11 @@ def fillInBoilerplate(doc):
 </head>
 <body class="h-entry">
 <div class="head">
-<!--logo-->
+<p>
+    <a href="http://www.w3.org/">
+        <img alt="W3C" height="48" src="http://www.w3.org/Icons/w3c_home" width="72">
+    </a>
+</p>
 """
     header += '<h1 id="title" class="p-name no-ref">'+doc.title+'</h1>'
     header += '<h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS] \
@@ -939,8 +943,36 @@ def fillInBoilerplate(doc):
 <p class="p-summary">
 """
     header += doc.abstract
-    header += """<h2 class='no-num no-toc no-ref' id='status'>Status of this document</h2>
-    <!--status-->"""
+    header += """<h2 class='no-num no-toc no-ref' id='status'>Status of this document</h2>"""
+    if doc.status == "ED":
+        header += """
+  <p>This is a public copy of the editors' draft. It is provided for
+   discussion only and may change at any moment. Its publication here does
+   not imply endorsement of its contents by W3C. Don't cite this document
+   other than as work in progress.
+
+  <p>The (<a href="http://lists.w3.org/Archives/Public/www-style/">archived</a>) 
+   public mailing list 
+   <a href="mailto:www-style@w3.org?Subject=%5B[SHORTNAME]%5D%20PUT%20SUBJECT%20HERE">www-style@w3.org</a> 
+   (see <a href="http://www.w3.org/Mail/Request">instructions</a>) 
+   is preferred for discussion of this specification. 
+   When sending e-mail, please put the text
+   “[SHORTNAME]” in the subject, preferably like this:
+   “[<!---->[SHORTNAME]<!---->] <em>…summary of comment…</em>”
+
+  <p>This document was produced by the <a href="/Style/CSS/members">CSS
+   Working Group</a> (part of the <a href="/Style/">Style Activity</a>).
+
+  <p>This document was produced by a group operating under the 
+   <a href="/Consortium/Patent-Policy-20040205/">5 February 2004 W3C Patent Policy</a>. 
+   W3C maintains a 
+   <a href="/2004/01/pp-impl/32061/status"rel=disclosure>public list of any patent disclosures</a> 
+   made in connection with the deliverables of the group; that page also includes
+   instructions for disclosing a patent. An individual who has actual
+   knowledge of a patent which the individual believes contains 
+   <a href="/Consortium/Patent-Policy-20040205/#def-essential">Essential Claim(s)</a> 
+   must disclose the information in accordance with 
+   <a href="/Consortium/Patent-Policy-20040205/#sec-Disclosure">section 6 of the W3C Patent Policy</a>.</p>"""
     if doc.atRisk:
         header += "<p>The following features are at risk:\n<ul>"
         for feature in doc.atRisk:
