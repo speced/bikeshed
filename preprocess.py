@@ -134,6 +134,11 @@ def replaceContents(el, new):
     return el
 
 
+def fillWith(tag, new):
+    for el in findAll("[data-fill-with='{0}']".format(tag)):
+        replaceContents(el, new)
+
+
 def transformMarkdownParagraphs(doc):
     # This converts Markdown-style paragraphs into actual paragraphs.
     # Any line that is preceded by a blank line,
@@ -424,14 +429,14 @@ def addReferencesSection(doc):
         text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
-    replaceContents(find("#normative + div"), parseHTML(text))
+    fillWith("normative-references", parseHTML(text))
 
     text = "<dl>"
     for ref in doc.informativeRefs:
         text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
-    replaceContents(find("#informative + div"), parseHTML(text))
+    fillWith("informative-references", parseHTML(text))
 
 
 def addHeadingNumbers(doc):
@@ -495,7 +500,7 @@ def addTOCSection(doc):
         html += "<li><a href='#{0}'>{1}</a>".format(header.get('id'),
                                                    innerHTML(header))
         previousLevel = level
-    replaceContents(find("#contents + div"), parseHTML(html))
+    fillWith("table-of-contents", parseHTML(html))
 
 
 def formatPropertyNames(doc):
@@ -546,7 +551,7 @@ def addPropertyIndex(doc):
         for column in columns:
             html += "<td>" + propdef.get(column, "")
     html += "</table>"
-    replaceContents(find("#property-index + div"), parseHTML(html))
+    fillWith("property-index", parseHTML(html))
 
 
 def genIdsForAutolinkTargets(doc):
@@ -674,7 +679,7 @@ def addIndexSection(doc):
     for text, id, level in sortedEntries:
         html += "<li>{0}, <a href='#{1}' title='section {2}'>{2}</a>".format(escapeHTML(text), id, level)
     html += "</ul>"
-    replaceContents(find("#index + div"), parseHTML(html))
+    fillWith("index", parseHTML(html))
 
 
 def retrieveCachedFile(cacheLocation, url, type, forceCached=False):
@@ -992,9 +997,8 @@ def fillInBoilerplate(doc):
         for feature in doc.atRisk:
             header += "<li>"+feature
         header += "</ul>"
-    header += """<h2 class="no-num no-toc no-ref" id="contents">
-Table of contents</h2>
-<div></div>
+    header += """<h2 class="no-num no-toc no-ref" id="contents">Table of contents</h2>
+<div data-fill-with="table-of-contents"></div>
 
 """
     footer = """
@@ -1178,19 +1182,19 @@ References</h2>
 
 <h3 class="no-num no-ref" id="normative">
 Normative References</h3>
-<div></div>
+<div data-fill-with="normative-references"></div>
 
 <h3 class="no-num no-ref" id="informative">
 Informative References</h3>
-<div></div>
+<div data-fill-with="informative-references"></div>
 
 <h2 class="no-num no-ref" id="index">
 Index</h2>
-<div></div>
+<div data-fill-with="index"></div>
 
 <h2 class="no-num no-ref" id="property-index">
 Property index</h2>
-<div></div>
+<div data-fill-with="property-index"></div>
 
 </body>
 </html>
