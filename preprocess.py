@@ -266,6 +266,8 @@ def transformMetadata(lines, doc, **kwargs):
             doc.ED = val
         elif key == "Abstract":
             doc.abstract = val
+        elif key == "Shortname":
+            doc.shortname = val
         elif key == "Previous Version":
             doc.previousVersions.append(val)
         elif key == "Editor":
@@ -681,6 +683,7 @@ class CSSSpec(object):
     editors = []
     previousVersions = []
     abstract = "???"
+    shortname = "???"
     atRisk = []
     otherMetadata = defaultdict(list)
     lines = []
