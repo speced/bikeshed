@@ -681,11 +681,11 @@ def addIndexSection(doc):
     fillWith("index", parseHTML(html))
 
 
-def retrieveCachedFile(cacheLocation, url, type, forceCached=False):
+def retrieveCachedFile(cacheLocation, type, fallbackurl=None):
     try:
         fh = open(cacheLocation, 'r')
     except IOError:
-        if forceCached:
+        if fallbackurl is None:
             die("Couldn't find the {0} cache file at the specified location '{1}'.".format(type, cacheLocation))
         else:
             warn("Couldn't find the {0} cache file at the specified location '{1}'.".format(type, cacheLocation))
@@ -737,7 +737,7 @@ class CSSSpec(object):
             die("Couldn't find the input file at the specified location \""+inputFilename+"\".")
 
         bibliofh = retrieveCachedFile(cacheLocation=(biblioFilename or os.path.dirname(os.path.realpath(__file__)) + "/biblio.refer"),
-                                      url="https://www.w3.org/Style/Group/css3-src/biblio.ref",
+                                      fallbackurl="https://www.w3.org/Style/Group/css3-src/biblio.ref",
                                       type="bibliography")
 
         self.biblios = processReferBiblioFile(bibliofh)
