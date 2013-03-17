@@ -127,6 +127,7 @@ def find(sel, context=None):
 def clearContents(el):
     for child in el.iterchildren():
         el.remove(child)
+    el.text = ''
     return el
 
 
@@ -364,7 +365,7 @@ def transformCSSText(doc):
 
 
 def transformPropertyNames(doc):
-    doc.html = re.sub(r"`([-]?[a-z_][a-z0-9_-]+)`", r"<a data-autolink='property' class='property'>'\1'</a>", doc.html)
+    doc.html = re.sub(r"`([a-z0-9_*-]+)`", r"<a data-autolink='property' class='property' title='\1'>'\1'</a>", doc.html)
 
 
 def addSpecMetadataSection(doc):
@@ -640,7 +641,7 @@ def processAutolinks(doc):
                     el.set('data-autolink', 'internal-ref')
                 break
         else:
-            die("Couldn't find the target for an autolink: " + outerHTML(el))
+            die("Couldn't find an autolink target matching '{0}' for {1}".format(linkText, outerHTML(el)))
 
 
 def linkTextVariations(str):
