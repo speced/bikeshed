@@ -401,6 +401,9 @@ def initializeBiblioLinks(doc):
         else:
             die("Unknown data-biblio-type value '{0}' on {1}. \
 Only 'normative' and 'informative' allowed.".format(el.get('data-biblio-type'), outerHTML(el)))
+    # If a ref shows up as both a normative and informative,
+    # keep it as normative only.
+    doc.informativeRefs -= doc.normativeRefs
 
 
 def addReferencesSection(doc):
