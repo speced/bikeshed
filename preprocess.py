@@ -23,6 +23,7 @@ from datetime import date
 
 debugQuiet = False
 debug = False
+doc = None
 
 def main():
     optparser = OptionParser()
@@ -53,9 +54,10 @@ don't run it through Bert's preprocessor afterwards.")
     global debug
     debug = options.debug
 
+    global doc
     doc = CSSSpec(inputFilename=options.inputFile,
                   biblioFilename=options.biblioFile,
-                  loginInfo=options.loginInfo)
+                  loginInfo=options.loginInfo)    
     doc.preprocess()
     doc.finish(outputFilename=options.outputFile, noBert=options.noBert)
 
@@ -103,12 +105,22 @@ def escapeAttr(str):
     return str.replace('&', '&amp;').replace("'", '&apos;').replace('"', '&quot;')
 
 
-def findAll(sel, doc):
-    return CSSSelector(sel)(doc)
+def findAll(sel, context=None):
+    if context is None:
+        global doc
+        context = doc.document
+    return CSSSelector(sel)(context)
 
 
-def find(sel, doc):
-    return findAll(sel, doc)[0]
+def find(sel, context=None):
+    if context is None:
+        global doc
+        context = doc.document
+    result = findAll(sel, context)
+    if result:
+        return result[0]
+    else:
+        return None
 
 
 def clearContents(el):
@@ -383,7 +395,7 @@ def generateHeaderDL(doc):
     return header
 
 def initializeBiblioLinks(doc):
-    biblioLinks = findAll("a[data-autolink='biblio']", doc.document)
+    biblioLinks = findAll("a[data-autolink='biblio']")
     for el in biblioLinks:
 
         if el.get('title'):
@@ -412,14 +424,14 @@ def addReferencesSection(doc):
         text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
-    replaceContents(find("#normative + div", doc.document), parseHTML(text))
+    replaceContents(find("#normative + div"), parseHTML(text))
 
     text = "<dl>"
     for ref in doc.informativeRefs:
         text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
-    replaceContents(find("#informative + div", doc.document), parseHTML(text))
+    replaceContents(find("#informative + div"), parseHTML(text))
 
 
 def addHeadingNumbers(doc):
@@ -432,7 +444,7 @@ def addHeadingNumbers(doc):
         return '.'.join(str(x) for x in headerLevel if x > 0)
 
     skipLevel = float('inf')
-    for header in doc.document.iter('h2', 'h3', 'h4', 'h5', 'h6'):
+    for header in findAll('h2, h3, h4, h5, h6'):
         level = int(header.tag[-1])
 
         # Reset, if this is a re-run.
@@ -464,7 +476,7 @@ def addTOCSection(doc):
     skipLevel = float('inf')
     previousLevel = 0
     html = ''
-    for header in doc.document.iter('h2', 'h3', 'h4', 'h5', 'h6'):
+    for header in findAll('h2, h3, h4, h5, h6'):
         level = int(header.tag[-1])
 
         # Same deal - hit a no-toc, suppress the entire section.
@@ -483,11 +495,11 @@ def addTOCSection(doc):
         html += "<li><a href='#{0}'>{1}</a>".format(header.get('id'),
                                                    innerHTML(header))
         previousLevel = level
-    replaceContents(find("#contents + div", doc.document), parseHTML(html))
+    replaceContents(find("#contents + div"), parseHTML(html))
 
 
 def formatPropertyNames(doc):
-    propertyCells = findAll("table.propdef tr:first-child > td", doc.document)
+    propertyCells = findAll("table.propdef tr:first-child > td")
     for cell in propertyCells:
         props = [x.strip() for x in textContent(cell).split(',')]
         html = ', '.join("<dfn data-autolink='property'>{0}</dfn>".format(x) for x in props)
@@ -495,7 +507,7 @@ def formatPropertyNames(doc):
 
 
 def initializePropdefs(doc):
-    propdefTables = findAll('table.propdef', doc.document)
+    propdefTables = findAll('table.propdef')
     for propdefTable in propdefTables:
         propdef = {}
         names = []
@@ -534,12 +546,12 @@ def addPropertyIndex(doc):
         for column in columns:
             html += "<td>" + propdef.get(column, "")
     html += "</table>"
-    replaceContents(find("#property-index + div", doc.document), parseHTML(html))
+    replaceContents(find("#property-index + div"), parseHTML(html))
 
 
 def genIdsForAutolinkTargets(doc):
     ids = set()
-    linkTargets = findAll("dfn, h1, h2, h3, h4, h5, h6", doc.document)
+    linkTargets = findAll("dfn, h1, h2, h3, h4, h5, h6")
     for el in linkTargets:
         if el.get('id') is not None:
             id = el.get('id')
@@ -586,8 +598,7 @@ def linkTextsFromElement(el, preserveCasing=False):
 def initializeAutolinkTargets(doc):
     links = {}
     linkTargets = findAll("dfn, h1, h2, h3, h4, h5, h6, \
-                           #normative + div dt, #informative + div dt",
-                           doc.document)
+                           #normative + div dt, #informative + div dt")
     for el in linkTargets:
         if not re.search("no-ref", el.get('class') or ""):
             linkTexts = linkTextsFromElement(el)
@@ -600,7 +611,7 @@ def initializeAutolinkTargets(doc):
 
 
 def processAutolinks(doc):
-    autolinks = findAll("a:not([href]), a[data-autolink]", doc.document)
+    autolinks = findAll("a:not([href]), a[data-autolink]")
     for el in autolinks:
         if el.get('title') == '':
             break
@@ -648,7 +659,7 @@ def headingLevelOfElement(el):
 
 
 def addIndexSection(doc):
-    indexElements = findAll("dfn:not([data-autolink='property'])", doc.document)
+    indexElements = findAll("dfn:not([data-autolink='property'])")
     indexEntries = {}
     for el in indexElements:
         linkTexts = linkTextsFromElement(el, preserveCasing=True)
@@ -663,7 +674,7 @@ def addIndexSection(doc):
     for text, id, level in sortedEntries:
         html += "<li>{0}, <a href='#{1}' title='section {2}'>{2}</a>".format(escapeHTML(text), id, level)
     html += "</ul>"
-    replaceContents(find("#index + div", doc.document), parseHTML(html))
+    replaceContents(find("#index + div"), parseHTML(html))
 
 
 def retrieveCachedFile(cacheLocation, url, type, forceCached=False):
