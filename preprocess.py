@@ -287,7 +287,7 @@ def transformMetadata(lines, doc, **kwargs):
 
 
 def transformTextReplacements(doc):
-    statuses = {
+    longstatuses = {
         "ED": "Editor's Draft",
         "WD": "W3C Working Draft",
         "CR": "W3C Candidate Recommendation",
@@ -297,17 +297,26 @@ def transformTextReplacements(doc):
         "NOTE": "W3C Working Group Note",
         "MO": "W3C Member-only Draft"
     }
-    '''
-    SHORTNAME
-    LONGSTATUS
-    STATUS
-    LATEST
-    VERSION
-    YEAR
-    DATE
-    CDATE'''
+    shortname = doc.shortname
+    longstatus = longstatuses[doc.status]
+    status = doc.status
+    latest = doc.TR
+    year = ''
+    date = ''
+    cdate = ''
+    if doc.status == "ED":
+        version = doc.ED
+    else:
+        version = "http://www.w3.org/TR/$year/{0}-{1}-{2}".format(status, shortname, cdate)
     for i in range(len(doc.lines)):
-        doc.lines[i] = doc.lines[i].replace("[LONGSTATUS]", statuses[doc.status])
+        doc.lines[i] = doc.lines[i].replace("[SHORTNAME]", shortname)
+        doc.lines[i] = doc.lines[i].replace("[LONGSTATUS]", longstatus)
+        doc.lines[i] = doc.lines[i].replace("[STATUS]", status)
+        doc.lines[i] = doc.lines[i].replace("[LATEST]", latest)
+        doc.lines[i] = doc.lines[i].replace("[VERSION]", version)
+        doc.lines[i] = doc.lines[i].replace("[YEAR]", year)
+        doc.lines[i] = doc.lines[i].replace("[DATE]", date)
+        doc.lines[i] = doc.lines[i].replace("[CDATE]", cdate)
 
 
 def transformBiblioLinks(doc):
