@@ -373,7 +373,7 @@ def addReferencesSection(doc):
     replaceContents(find("#informative + div", doc.document), parseHTML(text))
 
 
-def addTOCSection(doc):
+def addHeadingNumbers(doc):
     headerLevel = [0,0,0,0,0]
     def incrementLevel(level):
         headerLevel[level-2] += 1
@@ -382,7 +382,6 @@ def addTOCSection(doc):
     def printLevel():
         return '.'.join(str(x) for x in headerLevel if x > 0)
 
-    # Number all the sections.
     skipLevel = float('inf')
     for header in doc.document.iter('h2', 'h3', 'h4', 'h5', 'h6'):
         level = int(header.tag[-1])
@@ -411,7 +410,8 @@ def addTOCSection(doc):
         secno.tail = header.text
         header.text = ''
 
-    # Build the ToC
+
+def addTOCSection(doc):
     skipLevel = float('inf')
     previousLevel = 0
     html = ''
@@ -650,6 +650,8 @@ class CSSSpec(object):
             treebuilder='lxml',
             encoding='utf-8',
             namespaceHTMLElements=False)
+
+        addHeadingNumbers(self)
 
         # Normative/informative references
         initializeBiblioLinks(self)
