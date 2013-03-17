@@ -754,7 +754,7 @@ class CSSSpec(object):
         transformMarkdownParagraphs(self)
 
         # Convert to a single string of html now, for convenience.
-        self.html = '\n'.join(self.lines)
+        self.html = ''.join(self.lines)
         fillInBoilerplate(self)
         self.html = replaceTextMacros(self.html)
         transformCSSText(self)
