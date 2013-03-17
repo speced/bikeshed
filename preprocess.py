@@ -446,6 +446,14 @@ def addTOCSection(doc):
     replaceContents(find("#contents + div", doc.document), parseHTML(html))
 
 
+def formatPropertyNames(doc):
+    propertyCells = findAll("table.propdef tr:first-child > td", doc.document)
+    for cell in propertyCells:
+        props = [x.strip() for x in textContent(cell).split(',')]
+        html = ', '.join("<dfn data-autolink='property'>{0}</dfn>".format(x) for x in props)
+        replaceContents(cell, parseHTML(html))
+
+
 def initializePropdefs(doc):
     propdefTables = findAll('table.propdef', doc.document)
     for propdefTable in propdefTables:
@@ -457,7 +465,7 @@ def initializePropdefs(doc):
             key = re.match('(.*):', textContent(row[0])).group(1).strip()
             # Extract the value from the second cell
             if key == "Name":
-                names = [x.strip() for x in textContent(row[1]).split(',')]
+                names = [textContent(x) for x in findAll('dfn', row[1])]
             else:
                 propdef[key] = innerHTML(row[1])
         for name in names:
@@ -600,7 +608,7 @@ def headingLevelOfElement(el):
 
 
 def addIndexSection(doc):
-    indexElements = findAll("dfn", doc.document)
+    indexElements = findAll("dfn:not([data-autolink='property'])", doc.document)
     indexEntries = {}
     for el in indexElements:
         linkTexts = linkTextsFromElement(el, preserveCasing=True)
@@ -692,6 +700,7 @@ class CSSSpec(object):
             namespaceHTMLElements=False)
 
         addHeadingNumbers(self)
+        formatPropertyNames(self)
 
         # Normative/informative references
         initializeBiblioLinks(self)
