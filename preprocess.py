@@ -356,7 +356,7 @@ def transformBiblioLinks(doc):
                 biblioType,))
 
 
-def generateHeaderDL(doc):
+def addSpecMetadataSection(doc):
     header = "<dl>"
     if doc.status != "ED" and doc.TR:
         header += "<dt>This version:\n<dd><a href='"+doc.TR+"' class='u-url'>"+doc.TR+"</a>\n"
@@ -396,7 +396,8 @@ def generateHeaderDL(doc):
             for val in vals:
                 header += "<dd>"+val+"\n"
     header += "</dl>"
-    return header
+    fillWith('spec-metadata', parseHTML(header))
+
 
 def initializeBiblioLinks(doc):
     biblioLinks = findAll("a[data-autolink='biblio']")
@@ -760,9 +761,12 @@ class CSSSpec(object):
             encoding='utf-8',
             namespaceHTMLElements=False)
 
+        # Fill in and clean up a bunch of data
         addStatusSection(self)
         addLogo(self)
         addCopyright(self)
+        addSpecMetadataSection(self)
+        addAbstract(self)
         addHeadingNumbers(self)
         formatPropertyNames(self)
 
@@ -933,41 +937,39 @@ def fillInBoilerplate(doc):
 
     match = re.match("<h1>([^<]+)</h1>", doc.html)
     doc.title = match.group(1)
+    global textMacros
+    textMacros['title'] = doc.title
     doc.html = doc.html[len(match.group(0)):]
 
     header = """
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html lang="en">
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">"""
-    header += "<title>"+doc.title+"</title>"
-    header += """   <link href="../default.css" rel=stylesheet type="text/css">
-    <link href="../csslogo.ico" rel="shortcut icon" type="image/x-icon">"""
-    header += '<link href="https://www.w3.org/StyleSheets/TR/W3C-'+doc.status+'.css" rel=stylesheet type="text/css">'
-    header += """
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>[TITLE]</title>
+  <link href="../default.css" rel=stylesheet type="text/css">
+  <link href="../csslogo.ico" rel="shortcut icon" type="image/x-icon">
+  <link href="https://www.w3.org/StyleSheets/TR/W3C-[STATUS].css" rel=stylesheet type="text/css">
 </head>
 <body class="h-entry">
 <div class="head">
-<p data-fill-with="logo"></p>
-"""
-    header += '<h1 id="title" class="p-name no-ref">'+doc.title+'</h1>'
-    header += '<h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS] \
-    <span class="dt-updated"><span class="value-title" title="[CDATE]">[DATE]</span></h2>'
-    header += generateHeaderDL(doc)
-    header += """
-<p class='copyright' data-fill-with='copyright'></p>
-
-<hr title="Separator for header">
+  <p data-fill-with="logo"></p>
+  <h1 id="title" class="p-name no-ref">[TITLE]</h1>
+  <h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS]
+    <span class="dt-updated"><span class="value-title" title="[CDATE]">[DATE]</span></h2>
+  <div data-fill-with="spec-metadata"></div>
+  <p class='copyright' data-fill-with='copyright'></p>
+  <hr title="Separator for header">
 </div>
-<h2 class='no-num no-toc no-ref' id='abstract'>Abstract</h2>
-<p class="p-summary">
-"""
-    header += doc.abstract
-    header += """<h2 class='no-num no-toc no-ref' id='status'>Status of this document</h2>
-<div data-fill-with="status"></div>"""
-    header += """<h2 class="no-num no-toc no-ref" id="contents">Table of contents</h2>
-<div data-fill-with="table-of-contents"></div>
 
+<h2 class='no-num no-toc no-ref' id='abstract'>Abstract</h2>
+<p class="p-summary" data-fill-with="abstract"></p>
+
+<h2 class='no-num no-toc no-ref' id='status'>Status of this document</h2>
+<div data-fill-with="status"></div>
+
+<h2 class="no-num no-toc no-ref" id="contents">Table of contents</h2>
+<div data-fill-with="table-of-contents"></div>
 """
     footer = """
 
@@ -1187,6 +1189,10 @@ def addCopyright(doc):
     use</a> rules apply.</span>"""
     html = replaceTextMacros(html)
     fillWith('copyright', parseHTML(html))
+
+
+def addAbstract(doc):
+    fillWith('abstract', parseHTML("<span>"+doc.abstract+"</span>"))
 
 
 def addStatusSection(doc):
