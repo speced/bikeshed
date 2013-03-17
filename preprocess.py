@@ -19,7 +19,7 @@ from lxml import etree
 from lxml.cssselect import CSSSelector
 from optparse import OptionParser
 from urllib import urlopen
-from datetime import date
+from datetime import date, datetime
 
 debugQuiet = False
 debug = False
@@ -291,7 +291,7 @@ def transformMetadata(lines, doc, **kwargs):
         elif key == "ED":
             doc.ED = val
         elif key == "Date":
-            doc.date = date.strptime("%Y-%m-%d", val)
+            doc.date = datetime.strptime(val, "%Y-%m-%d").date()
         elif key == "Abstract":
             doc.abstract = val
         elif key == "Shortname":
@@ -336,7 +336,10 @@ def transformMetadata(lines, doc, **kwargs):
     if doc.status == "ED":
         textMacros["version"] = doc.ED
     else:
-        textMacros["version"] = "http://www.w3.org/TR/{3}/{0}-{1}-{2}".format(status, shortname, cdate, year)
+        textMacros["version"] = "http://www.w3.org/TR/{3}/{0}-{1}-{2}".format(doc.status, 
+                                                                              doc.shortname, 
+                                                                              textMacros["cdate"], 
+                                                                              textMacros["year"])
     return []
 
 
@@ -358,16 +361,11 @@ def transformBiblioLinks(doc):
 
 def addSpecMetadataSection(doc):
     header = "<dl>"
-    if doc.status != "ED" and doc.TR:
-        header += "<dt>This version:\n<dd><a href='"+doc.TR+"' class='u-url'>"+doc.TR+"</a>\n"
-    elif doc.status == "ED" and doc.ED:
-        header += "<dt>This version:\n<dd><a href='"+doc.ED+"' class='u-url'>"+doc.ED+"</a>\n"
-    else:
-        header += "<dt>This version:\n<dd>???\n"
+    header += "<dt>This version:<dd><a href='{0}' class='u-url'>{0}</a>".format("[VERSION]")
     if doc.TR:
-        header += "<dt>Latest version:\n<dd><a href='"+doc.TR+"'>"+doc.TR+"</a>\n"
+        header += "<dt>Latest version:<dd><a href='{0}'>{0}</a>".format(doc.TR)
     if doc.ED:
-        header += "<dt>Editor's Draft\n<dd><a href='"+doc.ED+"'>"+doc.ED+"</a>\n"
+        header += "<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.ED)
     if len(doc.previousVersions):
         header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.previousVersions))
     if len(doc.editors):
@@ -376,26 +374,25 @@ def addSpecMetadataSection(doc):
             header += "<dd class='p-author h-card vcard'>"
             if(editor['link'][0:4] == "http"):
                 header += "<a class='p-name fn u-url url' href='{0}'>{1}</a> \
-(<span class='p-org org'>{2}</span>)".format(
-                    editor['link'],
-                    editor['name'],
-                    editor['org'])
+(<span class='p-org org'>{2}</span>)".format(editor['link'],
+                                             editor['name'],
+                                             editor['org'])
             else:
                 # Link is assumed to be an email address
                 header += "<span class='p-name fn'>{0}</span> \
 (<span class='p-org org'>{1}</span>), \
-<a class='u-email email' href='mailto:{2}'>{2}</a>".format(
-                    editor['name'],
-                    editor['org'],
-                    editor['link'])
+<a class='u-email email' href='mailto:{2}'>{2}</a>".format(editor['name'],
+                                                           editor['org'],
+                                                           editor['link'])
     else:
-        header += "<dt>Editors:\n<dd>???\n"
+        header += "<dt>Editors:<dd>???"
     if len(doc.otherMetadata):
-        for (key, vals) in doc.otherMetadata.items():
-            header += "<dt>"+key+":\n"
+        for key, vals in doc.otherMetadata.items():
+            header += "<dt>{0}:".format(key)
             for val in vals:
-                header += "<dd>"+val+"\n"
+                header += "<dd>"+val
     header += "</dl>"
+    header = replaceTextMacros(header)
     fillWith('spec-metadata', parseHTML(header))
 
 
@@ -1227,8 +1224,52 @@ def addStatusSection(doc):
    must disclose the information in accordance with 
    <a href="/Consortium/Patent-Policy-20040205/#sec-Disclosure">section 6 of the W3C Patent Policy</a>.</p>
 </div>"""
+    elif doc.status == "CR":
+        html = """
+<div>
+  <p><em>This section describes the status of this document at the time of
+   its publication. Other documents may supersede this document. A list of
+   current W3C publications and the latest revision of this technical report
+   can be found in the <a href="http://www.w3.org/TR/">W3C technical reports
+   index at http://www.w3.org/TR/.</a></em>
+
+  <p>Publication as a Working Draft does not imply endorsement by the W3C
+   Membership. This is a draft document and may be updated, replaced or
+   obsoleted by other documents at any time. It is inappropriate to cite this
+   document as other than work in progress.
+
+  <p>The (<a href="http://lists.w3.org/Archives/Public/www-style/">archived</a>) 
+   public mailing list 
+   <a href="mailto:www-style@w3.org?Subject=%5B[SHORTNAME]%5D%20PUT%20SUBJECT%20HERE">www-style@w3.org</a> 
+   (see <a href="http://www.w3.org/Mail/Request">instructions</a>) 
+   is preferred for discussion of this specification. 
+   When sending e-mail, please put the text
+   “[SHORTNAME]” in the subject, preferably like this:
+   “[<!---->[SHORTNAME]<!---->] <em>…summary of comment…</em>”
+
+  <p>This document was produced by the <a
+   href="http://www.w3.org/Style/CSS/members">CSS Working Group</a> (part of
+   the <a href="http://www.w3.org/Style/">Style Activity</a>).
+
+  <p>This document was produced by a group operating under the <a
+   href="http://www.w3.org/Consortium/Patent-Policy-20040205/">5 February
+   2004 W3C Patent Policy</a>. W3C maintains a <a
+   href="http://www.w3.org/2004/01/pp-impl/32061/status"
+   rel=disclosure>public list of any patent disclosures</a> made in
+   connection with the deliverables of the group; that page also includes
+   instructions for disclosing a patent. An individual who has actual
+   knowledge of a patent which the individual believes contains <a
+   href="http://www.w3.org/Consortium/Patent-Policy-20040205/#def-essential">Essential
+   Claim(s)</a> must disclose the information in accordance with <a
+   href="http://www.w3.org/Consortium/Patent-Policy-20040205/#sec-Disclosure">section
+   6 of the W3C Patent Policy</a>.</p>
+  <!--end-status-->
+
+  <p>For changes since the last draft, see the <a href="#changes">Changes</a>
+   section.
+</div>"""
     else:
-        die("Don't have a status section for {0} document yet.".format(doc.status))
+        die("Don't have a status section for {0} documents yet.".format(doc.status))
     if len(doc.atRisk):
         html += "<p>The following features are at risk:\n<ul>"
         for feature in doc.atRisk:
