@@ -761,6 +761,8 @@ class CSSSpec(object):
             namespaceHTMLElements=False)
 
         addStatusSection(self)
+        addLogo(self)
+        addCopyright(self)
         addHeadingNumbers(self)
         formatPropertyNames(self)
 
@@ -946,17 +948,14 @@ def fillInBoilerplate(doc):
 </head>
 <body class="h-entry">
 <div class="head">
-<p>
-    <a href="http://www.w3.org/">
-        <img alt="W3C" height="48" src="http://www.w3.org/Icons/w3c_home" width="72">
-    </a>
-</p>
+<p data-fill-with="logo"></p>
 """
     header += '<h1 id="title" class="p-name no-ref">'+doc.title+'</h1>'
     header += '<h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS] \
     <span class="dt-updated"><span class="value-title" title="[CDATE]">[DATE]</span></h2>'
     header += generateHeaderDL(doc)
-    header += """<!--copyright-->
+    header += """
+<p class='copyright' data-fill-with='copyright'></p>
 
 <hr title="Separator for header">
 </div>
@@ -1171,9 +1170,29 @@ Property index</h2>
     doc.html = '\n'.join([header, doc.html, footer])
 
 
+def addLogo(doc):
+    html = """
+    <a href="http://www.w3.org/">
+        <img alt="W3C" height="48" src="http://www.w3.org/Icons/w3c_home" width="72">
+    </a>"""
+    fillWith('logo', parseHTML(html))
+
+
+def addCopyright(doc):
+    html = """
+<span><a href="http://www.w3.org/Consortium/Legal/ipr-notice#Copyright" rel="license">Copyright</a> © [YEAR] <a href="http://www.w3.org/"><abbr title="World Wide Web Consortium">W3C</abbr></a><sup>®</sup> (<a href="http://www.csail.mit.edu/"><abbr title="Massachusetts Institute of Technology">MIT</abbr></a>, <a href="http://www.ercim.eu/"><abbr title="European Research Consortium for Informatics and Mathematics">ERCIM</abbr></a>,
+    <a href="http://www.keio.ac.jp/">Keio</a>, <a href="http://ev.buaa.edu.cn/">Beihang</a>), All Rights Reserved. W3C <a href="http://www.w3.org/Consortium/Legal/ipr-notice#Legal_Disclaimer">liability</a>,
+    <a href="http://www.w3.org/Consortium/Legal/ipr-notice#W3C_Trademarks">trademark</a>
+    and <a href="http://www.w3.org/Consortium/Legal/copyright-documents">document
+    use</a> rules apply.</span>"""
+    html = replaceTextMacros(html)
+    fillWith('copyright', parseHTML(html))
+
+
 def addStatusSection(doc):
     if doc.status == "ED":
         html = """
+<div>
   <p>This is a public copy of the editors' draft. It is provided for
    discussion only and may change at any moment. Its publication here does
    not imply endorsement of its contents by W3C. Don't cite this document
@@ -1200,7 +1219,8 @@ def addStatusSection(doc):
    knowledge of a patent which the individual believes contains 
    <a href="/Consortium/Patent-Policy-20040205/#def-essential">Essential Claim(s)</a> 
    must disclose the information in accordance with 
-   <a href="/Consortium/Patent-Policy-20040205/#sec-Disclosure">section 6 of the W3C Patent Policy</a>.</p>"""
+   <a href="/Consortium/Patent-Policy-20040205/#sec-Disclosure">section 6 of the W3C Patent Policy</a>.</p>
+</div>"""
     else:
         die("Don't have a status section for {0} document yet.".format(doc.status))
     if len(doc.atRisk):
