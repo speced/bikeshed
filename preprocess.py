@@ -19,6 +19,7 @@ from lxml import etree
 from lxml.cssselect import CSSSelector
 from optparse import OptionParser
 from urllib import urlopen
+from datetime import date
 
 debugQuiet = False
 debug = False
@@ -264,6 +265,8 @@ def transformMetadata(lines, doc, **kwargs):
             doc.TR = val
         elif key == "ED":
             doc.ED = val
+        elif key == "Date":
+            doc.date = date.strptime("%Y-%m-%d", val)
         elif key == "Abstract":
             doc.abstract = val
         elif key == "Shortname":
@@ -295,19 +298,21 @@ def transformTextReplacements(doc):
         "REC": "W3C Recommendation",
         "PER": "W3C Proposed Edited Recommendation",
         "NOTE": "W3C Working Group Note",
-        "MO": "W3C Member-only Draft"
+        "MO": "W3C Member-only Draft",
+        "UD": "Unofficial Draft"
     }
     shortname = doc.shortname
     longstatus = longstatuses[doc.status]
     status = doc.status
     latest = doc.TR
-    year = ''
-    date = ''
-    cdate = ''
+    year = str(doc.date.year)
+    date = doc.date.strftime("{0} %B %Y".format(doc.date.day))
+    cdate = doc.date.strftime("%Y%m%d")
+    isodate = doc.date.strftime("%Y-%m-%d")
     if doc.status == "ED":
         version = doc.ED
     else:
-        version = "http://www.w3.org/TR/$year/{0}-{1}-{2}".format(status, shortname, cdate)
+        version = "http://www.w3.org/TR/{3}/{0}-{1}-{2}".format(status, shortname, cdate, year)
     for i in range(len(doc.lines)):
         doc.lines[i] = doc.lines[i].replace("[SHORTNAME]", shortname)
         doc.lines[i] = doc.lines[i].replace("[LONGSTATUS]", longstatus)
@@ -317,6 +322,7 @@ def transformTextReplacements(doc):
         doc.lines[i] = doc.lines[i].replace("[YEAR]", year)
         doc.lines[i] = doc.lines[i].replace("[DATE]", date)
         doc.lines[i] = doc.lines[i].replace("[CDATE]", cdate)
+        doc.lines[i] = doc.lines[i].replace("[ISODATE]", isodate)
 
 
 def transformBiblioLinks(doc):
@@ -686,6 +692,7 @@ def retrieveCachedFile(cacheLocation, url, type, forceCached=False):
 
 class CSSSpec(object):
     title = "???"
+    date = date.today()
     status = "???"
     TR = "???"
     ED = "???"
