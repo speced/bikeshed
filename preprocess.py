@@ -246,8 +246,6 @@ def transformPropdef(lines, doc, **kwargs):
         match = re.match("\s*([^:]+):\s*(.*)", line)
         key = match.group(1)
         val = match.group(2)
-        if key == "Name":
-            val = ', '.join("<dfn>"+x.strip()+"</dfn>" for x in val.split(","))
         if key == "Values":
             val = re.sub("<([^>]+)>", r"<a>&lt;\1></a>", val)
         ret.append("<tr><th>" + key + ":<td>" + val)
@@ -886,7 +884,8 @@ def fillInBoilerplate(doc):
 <!--logo-->
 """
     header += '<h1 id="title" class="p-name no-ref">'+doc.title+'</h1>'
-    header += '<h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS] <span class="dt-updated"><span class="value-title" title="[CDATE]">[DATE]</span></h2>'
+    header += '<h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS] \
+    <span class="dt-updated"><span class="value-title" title="[CDATE]">[DATE]</span></h2>'
     header += generateHeaderDL(doc)
     header += """<!--copyright-->
 
