@@ -284,6 +284,30 @@ def transformMetadata(lines, doc, **kwargs):
     return []
 
 
+def transformTextReplacements(doc):
+    statuses = {
+        "ED": "Editor's Draft",
+        "WD": "W3C Working Draft",
+        "CR": "W3C Candidate Recommendation",
+        "PR": "W3C Proposed Recommendation",
+        "REC": "W3C Recommendation",
+        "PER": "W3C Proposed Edited Recommendation",
+        "NOTE": "W3C Working Group Note",
+        "MO": "W3C Member-only Draft"
+    }
+    '''
+    SHORTNAME
+    LONGSTATUS
+    STATUS
+    LATEST
+    VERSION
+    YEAR
+    DATE
+    CDATE'''
+    for i in range(len(doc.lines)):
+        doc.lines[i] = doc.lines[i].replace("[LONGSTATUS]", statuses[doc.status])
+
+
 def transformBiblioLinks(doc):
     for i in range(len(doc.lines)):
         while re.search(r"\[\[(!?)([^\]]+)\]\]", doc.lines[i]):
@@ -688,6 +712,7 @@ class CSSSpec(object):
         transformDataBlocks(self)
         transformMarkdownParagraphs(self)
         fillInBoilerplate(self)
+        transformTextReplacements(self)
         transformBiblioLinks(self)
 
         # Build the document
