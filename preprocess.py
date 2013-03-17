@@ -359,6 +359,14 @@ def transformBiblioLinks(doc):
                 biblioType,))
 
 
+def transformCSSText(doc):
+    doc.html = re.sub(r"''([^']+)''", r"<code class='css'>'\1'</code>", doc.html)
+
+
+def transformPropertyNames(doc):
+    doc.html = re.sub(r"`([-]?[a-z_][a-z0-9_-]+)`", r"<a data-autolink='property' class='property'>'\1'</a>", doc.html)
+
+
 def addSpecMetadataSection(doc):
     header = "<dl>"
     header += "<dt>This version:<dd><a href='{0}' class='u-url'>{0}</a>".format("[VERSION]")
@@ -749,6 +757,8 @@ class CSSSpec(object):
         self.html = '\n'.join(self.lines)
         fillInBoilerplate(self)
         self.html = replaceTextMacros(self.html)
+        transformCSSText(self)
+        transformPropertyNames(self)
         transformBiblioLinks(self)
 
         # Build the document
@@ -952,7 +962,7 @@ def fillInBoilerplate(doc):
 <div class="head">
   <p data-fill-with="logo"></p>
   <h1 id="title" class="p-name no-ref">[TITLE]</h1>
-  <h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS]
+  <h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS],
     <span class="dt-updated"><span class="value-title" title="[CDATE]">[DATE]</span></h2>
   <div data-fill-with="spec-metadata"></div>
   <p class='copyright' data-fill-with='copyright'></p>
