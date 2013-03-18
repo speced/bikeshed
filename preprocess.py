@@ -335,7 +335,7 @@ def transformMetadata(lines, doc, **kwargs):
     return []
 
 
-def transformBiblioLinks(doc):
+def transformBibliolinks(doc):
     while re.search(r"\[\[(!?)([^\]]+)\]\]", doc.html):
         match = re.search(r"\[\[(!?)([^\]]+)\]\]", doc.html)
 
@@ -348,7 +348,7 @@ def transformBiblioLinks(doc):
             match.group(0),
             "<a title='{0}' data-autolink='biblio' data-biblio-type='{1}'>[{0}]</a>".format(
                 match.group(2), 
-                biblioType,))
+                biblioType))
 
 
 def transformCSSText(doc):
@@ -360,7 +360,7 @@ def transformPropertyNames(doc):
 
 
 def transformProductions(doc):
-    doc.html = re.sub(r"<<([^ ]+)>>", r"<a data-autolink class='production' title='<\1>'>&lt;\1></a>", doc.html)
+    doc.html = re.sub(r"<<([^ ]+)>>", r"<a data-autolink='internal' class='production'>&lt;\1></a>", doc.html)
 
 
 def addSpecMetadataSection(doc):
@@ -400,7 +400,7 @@ def addSpecMetadataSection(doc):
     fillWith('spec-metadata', parseHTML(header))
 
 
-def initializeBiblioLinks(doc):
+def buildBibliolinkDatabase(doc):
     biblioLinks = findAll("a[data-autolink='biblio']")
     for el in biblioLinks:
 
@@ -409,8 +409,9 @@ def initializeBiblioLinks(doc):
         else:
             # Assume the text is of the form "[NAME]"
             linkText = textContent(el)[1:-1]
+            el.set('title', linkText)
         if linkText not in doc.biblios:
-            die("Couldn't find '{0}' in biblio database.".format(linkText))
+            die("Couldn't find '{0}' in bibliography data.".format(linkText))
         biblioEntry = doc.biblios[linkText]
         if el.get('data-biblio-type') == "normative":
             doc.normativeRefs.add(biblioEntry)
@@ -419,22 +420,20 @@ def initializeBiblioLinks(doc):
         else:
             die("Unknown data-biblio-type value '{0}' on {1}. \
 Only 'normative' and 'informative' allowed.".format(el.get('data-biblio-type'), outerHTML(el)))
-    # If a ref shows up as both a normative and informative,
-    # keep it as normative only.
-    doc.informativeRefs -= doc.normativeRefs
 
 
 def addReferencesSection(doc):
     text = "<dl>"
     for ref in doc.normativeRefs:
-        text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
+        text += "<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, idFromText(ref.linkText))
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
     fillWith("normative-references", parseHTML(text))
 
     text = "<dl>"
-    for ref in doc.informativeRefs:
-        text += "<dt id='{0}' title='{0}'>[{0}]</dt>".format(ref.linkText)
+    # If the same doc is referenced as both normative and informative, normative wins.
+    for ref in doc.informativeRefs - doc.normativeRefs:
+        text += "<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, idFromText(ref.linkText))
         text += "<dd>"+str(ref)+"</dd>"
     text += "</dl>"
     fillWith("informative-references", parseHTML(text))
@@ -508,11 +507,11 @@ def formatPropertyNames(doc):
     propertyCells = findAll("table.propdef tr:first-child > td")
     for cell in propertyCells:
         props = [x.strip() for x in textContent(cell).split(',')]
-        html = ', '.join("<dfn data-autolink='property'>{0}</dfn>".format(x) for x in props)
+        html = ', '.join("<dfn id='{1}'>{0}</dfn>".format(name, idFromText(name)) for name in props)
         replaceContents(cell, parseHTML(html))
 
 
-def initializePropdefs(doc):
+def buildPropertyDatabase(doc):
     propdefTables = findAll('table.propdef')
     for propdefTable in propdefTables:
         propdef = {}
@@ -601,10 +600,9 @@ def linkTextsFromElement(el, preserveCasing=False):
         return [textContent(el).strip().lower()]       
 
 
-def initializeAutolinkTargets(doc):
+def buildAutolinkDatabase(doc):
     links = {}
-    linkTargets = findAll("dfn, h1, h2, h3, h4, h5, h6, \
-                           #normative + div dt, #informative + div dt")
+    linkTargets = findAll("dfn, h2, h3, h4, h5, h6")
     for el in linkTargets:
         if not re.search("no-ref", el.get('class') or ""):
             linkTexts = linkTextsFromElement(el)
@@ -619,25 +617,37 @@ def initializeAutolinkTargets(doc):
 def processAutolinks(doc):
     autolinks = findAll("a:not([href]), a[data-autolink]")
     for el in autolinks:
+        # Empty title means this shouldn't be an autolink.
         if el.get('title') == '':
             break
-        if el.get('title'):
-            linkText = el.get('title')
-        else:
-            linkText = textContent(el).lower()
+        # If it's not yet classified, it's a plain "internal" link.
+        if not el.get('data-autolink'):
+            el.set('data-autolink', 'internal')
+        linkText = el.get('title') or textContent(el).lower()
 
         if len(linkText) == 0:
-            die("Empty autolink {0}, probable authoring error.".format(outerHTML(el)))
+            die("Autolink {0} has no linktext.".format(outerHTML(el)))
 
-        for variation in linkTextVariations(linkText):
-            if 
-            if variation in doc.links:
-                el.set('href', '#'+doc.links[variation])
-                if not el.get('data-autolink'):
-                    el.set('data-autolink', 'internal-ref')
-                break
+        type = el.get('data-autolink')
+        if type == "biblio":
+            # All the biblio links have already been verified.
+            el.set('href', '#'+idFromText(linkText))
+        elif type == "property":
+            if linkText in doc.propdefs:
+                el.set('href', '#'+idFromText(linkText))
+            else:
+                die("Autolink {0} pointed to unknown property.")
+        elif type in ["internal", "maybe"]:
+            for variation in linkTextVariations(linkText):
+                if variation in doc.links:
+                    el.set('href', '#'+doc.links[variation])
+                    break
+            else:
+                if type == "internal":
+                    # "maybe"-type links don't care if they don't link up.
+                    die("Couldn't find an autolink target matching '{0}' for {1}".format(linkText, outerHTML(el)))
         else:
-            die("Couldn't find an autolink target matching '{0}' for {1}".format(linkText, outerHTML(el)))
+            die("Unknown type of autolink '{0}'".format(type))
 
 
 def linkTextVariations(str):
@@ -721,15 +731,13 @@ class CSSSpec(object):
     shortname = "???"
     atRisk = []
     otherMetadata = defaultdict(list)
-    lines = []
-    document = None
     ids = set()
     links = {}
-    biblios = {}
     normativeRefs = set()
     informativeRefs = set()
-    loginInfo = None
     propdefs = {}
+    biblios = {}
+    loginInfo = None
 
     def __init__(self, inputFilename, biblioFilename=None):
         try:
@@ -755,7 +763,7 @@ class CSSSpec(object):
         transformCSSText(self)
         transformPropertyNames(self)
         transformProductions(self)
-        transformBiblioLinks(self)
+        transformBibliolinks(self)
 
         # Build the document
         self.document = html5lib.parse(
@@ -770,23 +778,25 @@ class CSSSpec(object):
         addCopyright(self)
         addSpecMetadataSection(self)
         addAbstract(self)
-        addHeadingNumbers(self)
         formatPropertyNames(self)
+        buildPropertyDatabase(self)
 
         # Normative/informative references
-        initializeBiblioLinks(self)
+        buildBibliolinkDatabase(self)
         addReferencesSection(self)
-
-        # ToC
-        addTOCSection(self)
-
-        # Property index
-        initializePropdefs(self)
-        addPropertyIndex(self)
 
         # Autolinks
         genIdsForAutolinkTargets(self)
-        initializeAutolinkTargets(self)
+        buildAutolinkDatabase(self)
+        
+        # ToC
+        addHeadingNumbers(self)
+        addTOCSection(self)
+
+        # Property index
+        addPropertyIndex(self)
+
+        # Finish Autolinks
         processAutolinks(self)
 
         # Index
