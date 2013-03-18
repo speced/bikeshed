@@ -315,7 +315,7 @@ def transformMetadata(lines, doc, **kwargs):
         "PER": "W3C Proposed Edited Recommendation",
         "NOTE": "W3C Working Group Note",
         "MO": "W3C Member-only Draft",
-        "UD": "Unofficial Draft"
+        "UD": "Unofficial Proposal Draft"
     }
     textMacros["shortname"] = doc.shortname
     textMacros["longstatus"] = longstatuses[doc.status]
