@@ -51,10 +51,9 @@ the processor uses the remote file at \
 
     global doc
     doc = CSSSpec(inputFilename=options.inputFile,
-                  biblioFilename=options.biblioFile,
-                  loginInfo=options.loginInfo)    
+                  biblioFilename=options.biblioFile)    
     doc.preprocess()
-    doc.finish(outputFilename=options.outputFile, noBert=options.noBert)
+    doc.finish(outputFilename=options.outputFile)
 
 
 def die(msg):
@@ -267,8 +266,6 @@ def transformPropdef(lines, doc, **kwargs):
         match = re.match("\s*([^:]+):\s*(.*)", line)
         key = match.group(1)
         val = match.group(2)
-        if key == "Values":
-            val = re.sub("<([^>]+)>", r"<a>&lt;\1></a>", val)
         ret.append("<tr><th>" + key + ":<td>" + val)
     ret.append("</table>")
     return ret
@@ -355,11 +352,15 @@ def transformBiblioLinks(doc):
 
 
 def transformCSSText(doc):
-    doc.html = re.sub(r"''([^']+)''", r"<code class='css'>'\1'</code>", doc.html)
+    doc.html = re.sub(r"''([^']+)''", r"<a data-autolink='maybe' class='css'>'\1'</a>", doc.html)
 
 
 def transformPropertyNames(doc):
     doc.html = re.sub(r"`([a-z0-9_*-]+)`", r"<a data-autolink='property' class='property' title='\1'>'\1'</a>", doc.html)
+
+
+def transformProductions(doc):
+    doc.html = re.sub(r"<<([^ ]+)>>", r"<a data-autolink class='production' title='<\1>'>&lt;\1></a>", doc.html)
 
 
 def addSpecMetadataSection(doc):
@@ -629,6 +630,7 @@ def processAutolinks(doc):
             die("Empty autolink {0}, probable authoring error.".format(outerHTML(el)))
 
         for variation in linkTextVariations(linkText):
+            if 
             if variation in doc.links:
                 el.set('href', '#'+doc.links[variation])
                 if not el.get('data-autolink'):
@@ -729,9 +731,7 @@ class CSSSpec(object):
     loginInfo = None
     propdefs = {}
 
-    def __init__(self, inputFilename, biblioFilename=None, loginInfo=None):
-        self.loginInfo = loginInfo
-
+    def __init__(self, inputFilename, biblioFilename=None):
         try:
             self.lines = open(inputFilename, 'r').readlines()
         except OSError:
@@ -754,6 +754,7 @@ class CSSSpec(object):
         self.html = replaceTextMacros(self.html)
         transformCSSText(self)
         transformPropertyNames(self)
+        transformProductions(self)
         transformBiblioLinks(self)
 
         # Build the document
