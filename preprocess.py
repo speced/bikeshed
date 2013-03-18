@@ -615,11 +615,14 @@ def buildAutolinkDatabase(doc):
 
 
 def processAutolinks(doc):
-    autolinks = findAll("a:not([href]), a[data-autolink]")
+    autolinks = findAll("a:not([href]), a[data-autolink], i")
     for el in autolinks:
         # Empty title means this shouldn't be an autolink.
         if el.get('title') == '':
             break
+        # Using an <i> is a legacy autolinking form.
+        if el.tag == "i":
+            el.tag = "a"
         # If it's not yet classified, it's a plain "internal" link.
         if not el.get('data-autolink'):
             el.set('data-autolink', 'internal')
