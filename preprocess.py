@@ -1177,7 +1177,9 @@ def addCopyright(doc):
 
 
 def addAbstract(doc):
-    fillWith('abstract', parseHTML("<span>"+doc.abstract+"</span>"))
+    html = "<span>" + doc.abstract
+    html += " <a href='http://www.w3.org/TR/CSS/'>CSS</a> is a language for describing the rendering of structured documents (such as HTML and XML) on screen, on paper, in speech, etc.</span>"
+    fillWith('abstract', parseHTML(html))
 
 
 def addStatusSection(doc):
