@@ -20,6 +20,7 @@ from lxml.cssselect import CSSSelector
 from optparse import OptionParser
 from urllib import urlopen
 from datetime import date, datetime
+from cStringIO import StringIO
 
 debugQuiet = False
 debug = False
@@ -82,12 +83,13 @@ def outerHTML(el):
 
 
 def parseHTML(str):
-    doc = html5lib.parse(
-        str,
-        treebuilder='lxml',
-        encoding='utf-8',
-        namespaceHTMLElements=False)
+    doc = html5lib.parse(str, treebuilder='lxml', encoding='utf-8', namespaceHTMLElements=False)
     return find('body', doc)[0]
+
+
+def parseDocument(str):
+    doc = html5lib.parse(str, treebuilder='lxml', encoding='utf-8', namespaceHTMLElements=False)
+    return doc
 
 
 def escapeHTML(str):
@@ -335,33 +337,54 @@ def transformMetadata(lines, doc, **kwargs):
     return []
 
 
-def transformBibliolinks(doc):
-    while re.search(r"\[\[(!?)([^\]]+)\]\]", doc.html):
-        match = re.search(r"\[\[(!?)([^\]]+)\]\]", doc.html)
+def transformAutolinkShortcuts(doc):
+    # Can't do the simple thing of just running the replace over the doc's contents.
+    # Need to protect attributes, contents of <pre>, etc.
+    def transformThings(text):
+        if text is None:
+            return None
+        # Handle biblio links, [[FOO]] and [[!FOO]]
+        while re.search(r"\[\[(!?)([A-Z_-]]+)\]\]", text):
+            match = re.search(r"\[\[(!?)([A-Z_-]]+)\]\]", text)
 
-        if match.group(1) == "!":
-            biblioType = "normative"
-        else:
-            biblioType = "informative"
-        
-        doc.html = doc.html.replace(
-            match.group(0),
-            "<a title='{0}' data-autolink='biblio' data-biblio-type='{1}'>[{0}]</a>".format(
-                match.group(2), 
-                biblioType))
+            if match.group(1) == "!":
+                biblioType = "normative"
+            else:
+                biblioType = "informative"
+            
+            text = text.replace(
+                match.group(0),
+                '<a title="{0}"" data-autolink="biblio" data-biblio-type="{1}"">[{0}]</a>'.format(
+                    match.group(2), 
+                    biblioType))
+        text = re.sub(r"''([^']+)''", r'<a data-autolink="maybe" class="css">\1</a>', text)
+        text = re.sub(r"<<([^ ]+)>>", r'<a data-autolink="internal" class="production">&lt;\1></a>', text)
+        text = re.sub(r"'([a-z0-9_*-]+)'", r'<a data-autolink="property" class="property" title="\1">\1</a>', text)
+        return text
 
+    def fixElementText(el):
+        if(el.tag in ["pre", "code"]):
+            return
+        # Pull out el.text, replace stuff (may introduce elements), parse.
+        newtext = transformThings(el.text)
+        if el.text != newtext:
+            temp = parseHTML('<div>'+newtext+'</div>')
+            # Change the .text, empty out the temp children.
+            el.text = temp.text
+            for child in temp.iterchildren(tag="*", reversed=True):
+                el.insert(0, child)
+        # Same for tail.
+        newtext = transformThings(el.tail)
+        if el.tail != newtext:
+            temp = parseHTML('<div>'+transformThings(el.tail)+'</div>')
+            el.tail = temp.tail
+            for child in temp.iterchildren(tag="*", reversed=True):
+                el.addnext(child)
+        # Recurse over children.
+        for child in el:
+            fixElementText(child)
 
-def transformCSSText(doc):
-    doc.html = re.sub(r"''([^']+)''", r"<a data-autolink='maybe' class='css'>\1</a>", doc.html)
-
-
-def transformPropertyNames(doc):
-    doc.html = re.sub(r"'([a-z0-9_*-]+)'", r"<a data-autolink='property' class='property' title='\1'>\1</a>", doc.html)
-
-
-def transformProductions(doc):
-    doc.html = re.sub(r"<<([^ ]+)>>", r"<a data-autolink='internal' class='production'>&lt;\1></a>", doc.html)
-
+    fixElementText(doc.document.getroot())
 
 def addSpecMetadataSection(doc):
     header = "<dl>"
@@ -765,17 +788,9 @@ class CSSSpec(object):
         self.html = ''.join(self.lines)
         fillInBoilerplate(self)
         self.html = replaceTextMacros(self.html)
-        transformCSSText(self)
-        transformPropertyNames(self)
-        transformProductions(self)
-        transformBibliolinks(self)
 
         # Build the document
-        self.document = html5lib.parse(
-            self.html,
-            treebuilder='lxml',
-            encoding='utf-8',
-            namespaceHTMLElements=False)
+        self.document = parseDocument(self.html)
 
         # Fill in and clean up a bunch of data
         addStatusSection(self)
@@ -783,6 +798,9 @@ class CSSSpec(object):
         addCopyright(self)
         addSpecMetadataSection(self)
         addAbstract(self)
+        transformAutolinkShortcuts(self)
+
+        # Deal with property names.
         formatPropertyNames(self)
         buildPropertyDatabase(self)
 
