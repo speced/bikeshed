@@ -471,7 +471,7 @@ def addHeadingNumbers(doc):
         incrementLevel(level)
         header.set('data-level', printLevel())
         secno = etree.Element('span', {"class":"secno"})
-        secno.text = printLevel()
+        secno.text = printLevel() + ' '
         header.insert(0, secno)
         secno.tail = header.text
         header.text = ''
