@@ -337,6 +337,11 @@ def transformMetadata(lines, doc, **kwargs):
     return []
 
 
+def transformProductionAutolinks(doc):
+    # This is done separately from the rest because it won't survive the HTML parser.
+    doc.html = re.sub(r"<<([^ ]+)>>", r'<a data-autolink="internal" class="production">&lt;\1></a>', doc.html)
+
+
 def transformAutolinkShortcuts(doc):
     # Can't do the simple thing of just running the replace over the doc's contents.
     # Need to protect attributes, contents of <pre>, etc.
@@ -358,7 +363,6 @@ def transformAutolinkShortcuts(doc):
                     match.group(2), 
                     biblioType))
         text = re.sub(r"''([^']+)''", r'<a data-autolink="maybe" class="css">\1</a>', text)
-        text = re.sub(r"<<([^ ]+)>>", r'<a data-autolink="internal" class="production">&lt;\1></a>', text)
         text = re.sub(r"'([a-z0-9_*-]+)'", r'<a data-autolink="property" class="property" title="\1">\1</a>', text)
         return text
 
@@ -788,6 +792,7 @@ class CSSSpec(object):
         self.html = ''.join(self.lines)
         fillInBoilerplate(self)
         self.html = replaceTextMacros(self.html)
+        transformProductionAutolinks(self)
 
         # Build the document
         self.document = parseDocument(self.html)
