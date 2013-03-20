@@ -352,11 +352,11 @@ def transformBibliolinks(doc):
 
 
 def transformCSSText(doc):
-    doc.html = re.sub(r"''([^']+)''", r"<a data-autolink='maybe' class='css'>'\1'</a>", doc.html)
+    doc.html = re.sub(r"''([^']+)''", r"<a data-autolink='maybe' class='css'>\1</a>", doc.html)
 
 
 def transformPropertyNames(doc):
-    doc.html = re.sub(r"`([a-z0-9_*-]+)`", r"<a data-autolink='property' class='property' title='\1'>'\1'</a>", doc.html)
+    doc.html = re.sub(r"'([a-z0-9_*-]+)'", r"<a data-autolink='property' class='property' title='\1'>\1</a>", doc.html)
 
 
 def transformProductions(doc):
@@ -639,7 +639,9 @@ def processAutolinks(doc):
             if linkText in doc.propdefs:
                 el.set('href', '#'+idFromText(linkText))
             else:
-                die("Autolink {0} pointed to unknown property.")
+                pass
+                # Until I get the cross-spec references, don't die here.
+                # die("Autolink '{0}'' pointed to unknown property.".format(linkText))
         elif type in ["internal", "maybe"]:
             for variation in linkTextVariations(linkText):
                 if variation in doc.links:
