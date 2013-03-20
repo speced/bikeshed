@@ -74,7 +74,7 @@ def textContent(el):
 
 
 def innerHTML(el):
-    return el.text + ''.join(html.tostring(x) for x in el)
+    return (el.text or '') + ''.join(html.tostring(x) for x in el)
 
 
 def outerHTML(el):
