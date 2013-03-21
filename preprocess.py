@@ -210,7 +210,19 @@ def transformDataBlocks(doc):
         match = re.match("(.*)</"+tagName+">(.*)", line, re.I)
         if match and inBlock:
             inBlock = False
-            if re.match("^\s*$", match.group(1)):
+            if startLine == i:
+                # Single-line <pre>.
+                match = re.match("\s*(<{0}[^>]*>)(.+)</{0}>(.*)".format(tagName), line, re.I)
+                doc.lines[i] = match.group(3)
+                replacements.append({
+                    'start': i,
+                    'end': i,
+                    'value': blockTypes[blockType](
+                        lines=[match.group(2)],
+                        tagName=tagName,
+                        firstLine=match.group(1),
+                        doc=doc)})
+            elif re.match("^\s*$", match.group(1)):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
                 doc.lines[i] = match.group(2)
@@ -230,7 +242,7 @@ def transformDataBlocks(doc):
                 doc.lines.insert(i+1, match.group(2))
                 replacements.append({
                     'start': startLine,
-                    'end': i,
+                    'end': i+1,
                     'value': blockTypes[blockType](
                         lines=doc.lines[startLine+1:i+1],
                         tagName=tagName,
