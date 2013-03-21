@@ -392,10 +392,11 @@ def transformAutolinkShortcuts(doc):
         # Same for tail.
         newtext = transformThings(el.tail)
         if el.tail != newtext:
-            temp = parseHTML('<div>'+transformThings(el.tail)+'</div>')
-            el.tail = temp.tail
+            temp = parseHTML('<div>'+newtext+'</div>')
+            el.tail = ''
             for child in temp.iterchildren(tag="*", reversed=True):
                 el.addnext(child)
+            el.tail = temp.text
         # Recurse over children.
         for child in el:
             fixElementText(child)
