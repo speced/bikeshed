@@ -655,6 +655,8 @@ def buildAutolinkDatabase(doc):
 
 def processAutolinks(doc):
     autolinks = findAll("a:not([href]), a[data-autolink], i")
+    badProperties = set()
+    badLinks = set()
     for el in autolinks:
         # Empty title means this shouldn't be an autolink.
         if el.get('title') == '':
@@ -678,9 +680,7 @@ def processAutolinks(doc):
             if linkText in doc.propdefs:
                 el.set('href', '#'+idFromText(linkText))
             else:
-                pass
-                # Until I get the cross-spec references, don't die here.
-                # die("Autolink '{0}'' pointed to unknown property.".format(linkText))
+                badProperties.add(linkText)
         elif type in ["link", "maybe"]:
             for variation in linkTextVariations(linkText):
                 if variation in doc.links:
@@ -689,9 +689,13 @@ def processAutolinks(doc):
             else:
                 if type == "link":
                     # "maybe"-type links don't care if they don't link up.
-                    die("Couldn't find an autolink target matching '{0}' for {1}".format(linkText, outerHTML(el)))
+                    badLinks.add(linkText)
         else:
             die("Unknown type of autolink '{0}'".format(type))
+    if badProperties:
+        warn("Couldn't find definitions for the properties: " + ', '.join(map("'{0}'".format, badProperties)))
+    if badLinks:
+        warn("Couldn't find definitions for the terms: " + ', '.join(map('"{0}"'.format, badLinks)))
 
 
 def linkTextVariations(str):
