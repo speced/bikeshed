@@ -351,7 +351,7 @@ def transformMetadata(lines, doc, **kwargs):
 
 def transformProductionAutolinks(doc):
     # This is done separately from the rest because it won't survive the HTML parser.
-    doc.html = re.sub(r"<<([^ ]+)>>", r'<a data-autolink="link" class="production">&lt;\1></a>', doc.html)
+    doc.html = re.sub(r"<<([\w-]+)>>", r'<a data-autolink="link" class="production"><var>&lt;\1></var></a>', doc.html)
 
 
 def transformAutolinkShortcuts(doc):
