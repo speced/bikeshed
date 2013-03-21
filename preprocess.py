@@ -351,7 +351,7 @@ def transformMetadata(lines, doc, **kwargs):
 
 def transformProductionAutolinks(doc):
     # This is done separately from the rest because it won't survive the HTML parser.
-    doc.html = re.sub(r"<<([^ ]+)>>", r'<a data-autolink="internal" class="production">&lt;\1></a>', doc.html)
+    doc.html = re.sub(r"<<([^ ]+)>>", r'<a data-autolink="link" class="production">&lt;\1></a>', doc.html)
 
 
 def transformAutolinkShortcuts(doc):
@@ -662,9 +662,9 @@ def processAutolinks(doc):
         # Using an <i> is a legacy autolinking form.
         if el.tag == "i":
             el.tag = "a"
-        # If it's not yet classified, it's a plain "internal" link.
+        # If it's not yet classified, it's a plain "link" link.
         if not el.get('data-autolink'):
-            el.set('data-autolink', 'internal')
+            el.set('data-autolink', 'link')
         linkText = el.get('title') or textContent(el).lower()
 
         if len(linkText) == 0:
@@ -681,13 +681,13 @@ def processAutolinks(doc):
                 pass
                 # Until I get the cross-spec references, don't die here.
                 # die("Autolink '{0}'' pointed to unknown property.".format(linkText))
-        elif type in ["internal", "maybe"]:
+        elif type in ["link", "maybe"]:
             for variation in linkTextVariations(linkText):
                 if variation in doc.links:
                     el.set('href', '#'+doc.links[variation])
                     break
             else:
-                if type == "internal":
+                if type == "link":
                     # "maybe"-type links don't care if they don't link up.
                     die("Couldn't find an autolink target matching '{0}' for {1}".format(linkText, outerHTML(el)))
         else:
