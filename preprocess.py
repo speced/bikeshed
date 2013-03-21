@@ -379,7 +379,8 @@ def transformAutolinkShortcuts(doc):
         return text
 
     def fixElementText(el):
-        if(el.tag in ["pre", "code"]):
+        # Don't transform anything in some kinds of elements.
+        if(el.tag in ["pre", "code", "style", "script"]):
             return
         # Pull out el.text, replace stuff (may introduce elements), parse.
         newtext = transformThings(el.text)
