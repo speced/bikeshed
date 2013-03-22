@@ -538,8 +538,10 @@ def addTOCSection(doc):
             html += "<ul class='toc'>"
         elif level < previousLevel:
             html += "</ul>"
-        html += "<li><a href='#{0}'>{1}</a>".format(header.get('id'),
-                                                   innerHTML(header))
+        # Clean up the transplanted html to remove any <a> elements,
+        # because the HTML parser doesn't like nested <a>s.
+        contents = innerHTML(header).replace('<a', '<span').replace('</a', '</span')
+        html += "<li><a href='#{0}'>{1}</a>".format(header.get('id'), contents)
         previousLevel = level
     fillWith("table-of-contents", parseHTML(html))
 
