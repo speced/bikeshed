@@ -361,8 +361,8 @@ def transformAutolinkShortcuts(doc):
         if text is None:
             return None
         # Handle biblio links, [[FOO]] and [[!FOO]]
-        while re.search(r"\[\[(!?)([A-Z_-]]+)\]\]", text):
-            match = re.search(r"\[\[(!?)([A-Z_-]]+)\]\]", text)
+        while re.search(r"\[\[(!?)([\w-]+)\]\]", text):
+            match = re.search(r"\[\[(!?)([\w-]+)\]\]", text)
 
             if match.group(1) == "!":
                 biblioType = "normative"
