@@ -1,10 +1,22 @@
 css-preprocessor
 ================
 
-This file documents the pre-preprocessor I made to help minimize the markup of specs in the CSSWG.
-It currently sits in front of [Bert's existing preprocessor](https://www.w3.org/Style/Group/css3-src/bin/README.html), 
-so everything that could be done previously still works.
-It introduces several new features, though.
+This project is a pre-processor for the source documents the CSSWG produces their specs from.
+We write our specs in HTML, but rely on a preprocessor for a lot of niceties, 
+like automatically generating a bibliography and table of contents,
+or automatically linking terms to their definitions.
+Specs also come with a lot of boilerplate repeated on every document,
+which we omit from our source document.
+
+A short overview of my preprocessor's features:
+
+* automatic linking of terms to their definitions based on text, so you can simple write `Use <a>some term</a> to...` and have it automatically link to the `<dfn>some term</dfn>` elsewhere in the document.  (Only same-document for now, but soon cross-document links will work!)
+* automatic id generation for headings and definitions, based on their text.
+* textual shortcuts for autolinks: [[FOO]] for bibliography entries, &lt;&lt;foo>> for grammar productions, 'foo' for property names, and ''foo'' for values.
+* boilerplate generation, both wholesale and piecemeal.
+* markdown-style paragraphs.
+* a compact syntax for writing property-definition tables.
+* automatic whitespace-prefix stripping from `<pre>` contents, so the contents can be indented properly in your HTML.
 
 Examples of all of the functionality described here can be found by looking at the source of the [CSS Variables source document](http://dev.w3.org/csswg/css-variables/Overview.src.html)
 
@@ -97,6 +109,70 @@ Any Markdown-style paragraphs starting with "Note: " or "Note, "
 will instead get a `<p class='note'>`.
 
 
+Automatic Linking
+-----------------
+Every heading or `<dfn>` element automatically defines an autolink target.
+(Add `class=no-ref` to avoid this.)
+If the target doesn't have an `id` attribute,
+one is auto-generated for it out of the element's text content
+by stripping out everything but alphanumerics, dashes, and underscores.
+
+If the text content looks like a function (ends in "()"), "-function" is appended to the id.
+If the text content looks like a grammar production (start with "<", ends with ">"), "-production" is appended to the id.
+These corrections help reduce id collisions between function/productions and normal terms.
+
+If there is a collision, the processer attempts to fix it by trying to append the digits 0-9 to the id.
+If for some reason you have so many collisions that 0-9 doesn't work, it'll fail noisily.
+
+Every `<a>` element *without* an `href` attribute defines an autolink,
+as does any `<a>` with a `data-autolink` attribute on it identifying a valid autolink type.
+Autolinking is accomplished by matching up the text content of the autolink target and the autolink.
+You can override this behavior on either by providing a `title` attribute, which is used instead.
+On autolink targets, multiple match targets can be provided by using a pipe character (|) to separate each.
+
+If the text of an autolink doesn't match any target,
+the processor tries a few simple manipulations to accommodate common English variations:
+* if the text ends with an "s", "es", "'s", or "'", tries to match without it
+* if the text ends with an "ies", tries to match with that replaced by "y"
+
+The valid autolink types are:
+* "link", which matches against any heading or `<dfn>` element.
+* "maybe", which is identical to link, but doesn't complain if it fails. (This exists because the ''foo'' syntax is overloaded in the older preprocessor from Bert to also indicate any stretch of inline CSS code.  Due to the way the preprocessor worked, it would accidentally autolink sometimes, and our specs now depend on this.)
+* "property", which only matches against property definitions (`<dfn>` elements in a propdef table).
+* "biblio", which only matches against bibliography names (the `<dt>` elements in the biblio section of the spec).
+
+The various textual shortcuts all turn into an `<a>` with an appropriate `data-autolink` attribute - [[FOO]] becomes "biblio", 'foo' becomes "property", &lt;&lt;foo>> becomes "link", and ''foo'' becomes "maybe".
+
+
+Bibliography and References
+---------------------------
+
+Currently, referencing an external document can only be done through the bibliography syntax,
+triggered by an `<a data-autolink="biblio">` element (or the shorthand [[FOO]] syntax).
+When this syntax is used, the processor verifies that the link is valid by checking its biblio file,
+then generates an appropriate line in the biblio section of the spec,
+and links to it.
+
+The repo comes with a "biblio.refer" file which is used by default.
+If it's missing, the bibliography file is retrieved from the internet
+(behind a W3C member-only page, so you'll need W3C credentials to retrieve it)
+and stored in the same directory as the preprocess.py file.
+You can force it to look in a different location by passing the --biblio flag.
+
+Currently, the biblio file must be in REFER format.
+The default biblio file is already in this format,
+so you shouldn't have to do anything.
+
+Any occurence of "[[NAME]]" or "[[!NAME]]" will be assumed to be a bibliographic reference.
+The text is automatically converted into a link,
+pointing to the auto-generated References section.
+The former syntax is for informative references,
+the latter is for normative ones.
+
+The References section is generated automatically,
+and filled with full bibliographic lines for all the documents referenced by your spec.
+
+
 Metadata and Boilerplate Generation
 -----------------------------------
 
@@ -104,7 +180,8 @@ Our module template contains several screenfuls of boilerplate even when entirel
 The preprocessor adds that automatically, so your spec source will have less noise in it.
 It does so by extracting a few pieces of metadata from the document.
 
-The first line of the spec should be an `<h1>` containing the spec's title.
+To trigger the full-spec boilerplate generation,
+just start your sepc with an `<h1>` containing the spec's title.
 Then, somewhere in the spec
 (it's recommended that it be put right after the title),
 a data block (`<pre>` or `<xmp>`) with class='metadata' must exist,
@@ -147,15 +224,49 @@ Abstract: This module introduces cascading variables as a new primitive value ty
 </pre>
 ~~~~
 
-Some pieces of the boilerplate are generated specially, after the rest,
-and have a special syntax to indicate that -
-an element with a specially chosen id,
-followed by an empty `<div>`.
-Here are the current special ids currently recognized:
+Alternately, you can write your own boilerplate and just opt into individual pieces being auto-generated.
+To do this, start your spec with anything other than an `<h1>` element
+(I recommend just putting the HTML doctype `<!doctype html>` as the first line).
+Then, to get the processor to generate some part of the boilerplate,
+add an element with a `data-fill-with` attribute specifying the type of thing it should be filled with.
+The current values are:
 
-* The Table of Contents is indicated by `id=contents`.
-* The Normative and Informative References sections are indicated, respectively, by `id=normative` and `id=informative`.
+* "table-of-contents" for the ToC
+* "spec-metadata" for the `<dl>` of spec data that's in the header of all of our specs
+* "abstract" for the spec's abstract
+* "status" for the status section
+* "normative-references" for the normative bibliography refs
+* "informative-references" for the informative bibliography refs
+* "index" for the index of terms (all the `<dfn>` elements in the spec)
+* "property-index" for the table summarizing all properties defined in the spec
+* "logo" for the W3C logo
+* "copyright" for the W3C copyright statement
 
+As well, there are a few textual macros that can be invoked to fill in various small bits of information,
+written as [FOO].
+Most of them take their data straight from the document's metadata block.
+These are replaced early, before the source text has been parsed into a document,
+so they can occur anywhere, including attribute values.
+The current values are:
+"shortname"] = doc.shortname
+    textMacros["longstatus"] = longstatuses[doc.status]
+    textMacros["status"] = doc.status
+    textMacros["latest"] = doc.TR
+    textMacros["year"] = str(doc.date.year)
+    textMacros["date"] = doc.date.strftime("{0} %B %Y".format(doc.date.day))
+    textMacros["cdate"] = doc.date.strftime("%Y%m%d")
+    textMacros["isodate"
+
+* [TITLE] gives the spec's full title, as extracted from either the `<h1>` or the spec metadata.
+* [SHORTNAME] is replaced with the document's shortname.
+* [STATUS] gives the spec's status.
+* [LONGSTATUS] gives a long form of the spec's status, so "ED" becomes "Editor's Draft", for example.
+* [LATEST] gives the link to the undated /TR link, if it exists.
+* [VERSION] gives the link to the ED, if the spec is an ED, and otherwise constructs a dated /TR link from today's date.
+* [YEAR] gives the current year.
+* [DATE] gives a human-readable date.
+* [CDATE] gives a compact date in the format "YYYYMMDD".
+* [ISODATE] gives a compact date in iso format "YYYY-MM-DD".
 
 Table of Contents
 -----------------
@@ -179,86 +290,21 @@ It does not yet pay attention to the HTML outline algorithm,
 so using a bunch of `<h1>s` nested in `<section>s` will have very wrong effects.
 
 
-Automatic Linking
------------------
+"Rerun" capability
+------------------
 
-The preprocessor will now automatically link terms to their definitions within a single document.
-
-Every heading or `<dfn>` element automatically defines an autolink target.
-(Add `class=no-ref` to avoid this.)
-If the target doesn't have an `id` attribute,
-one is auto-generated for it out of the element's text content
-by stripping out everything but alphanumerics, dashes, and underscores.
-
-If the text content looks like a function (ends in "()"), "-function" is appended to the id.
-If the text content looks like a grammar production (start with "<", ends with ">"), "-production" is appended to the id.
-These corrections help reduce id collisions between function/productions and normal terms.
-
-If there is a collision, the processer attempts to fix it by trying to append the digits 0-9 to the id.
-If for some reason you have so many collisions that 0-9 doesn't work, it'll fail noisily.
-
-Every `<a>` element *without* an `href` attribute defines an autolink.
-Autolinking is accomplished by matching up the text content of the autolink target and the autolink.
-You can override this behavior on either by providing a `title` attribute, which is used instead.
-On autolink targets, multiple match targets can be provided by using a pipe character (|) to separate each.
-
-If the text of an autolink doesn't match any target,
-the processor tries a few simple manipulations to accommodate common English variations:
-* if the text ends with an "s" or "'s", tries to match without it
-* if the text ends with an "ies", tries to match with that replaced by "y"
-
-
-Bibliography and References
----------------------------
-
-External document references have a special syntax,
-copying the syntax used in Bert's preprocessor,
-which are driven by a bibliography file.
-
-By default, the bibliography file is retrieved from the internet
-(behind a W3C member-only page, so you'll need W3C credentials to retrieve it)
-and stored in the same directory as the preprocess.py file.
-You can force it to look in a different location by passing the --biblio flag.
-You can regenerate the cached file by deleting the cache and running the script again.
-
-Currently, the biblio file must be in REFER format.
-The default biblio file retrieved from the internet is already in this format,
-so you shouldn't have to do anything.
-
-Any occurence of "[[NAME]]" or "[[!NAME]]" will be assumed to be a bibliographic reference.
-Similar to autolinks, the text is automatically converted into a link,
-pointing to the auto-generated References section.
-The former syntax is for informative references,
-the latter is for normative ones.
-
-The References section is generated automatically,
-and filled with full bibliographic lines for all the documents referenced by your spec.
-
-
-Further Preprocessing
----------------------
-
-After the fixups described above, 
-the preprocessor automatically passes the result through Bert's preprocessor as well.
-This can be turned off by passing the `--no-bert` option.
-The preprocessor is rapidly subsuming all the functionality of Bert's,
-so this option will soon become standard behavior.
-
-As is CSSWG tradition,
-the preprocessor assumes that the source file is called "Overview.src.html",
-and the desired output file is called "Overview.html".
-These can be overridden with the `-i` and `-o` options.
-
-
-Additional Notes
-----------------
-
-Like Bert's preprocessor,
-this processor should be capable of running over an already-processed document as a no-op.
-A few assumptions are made to aid with this:
+Bert's preprocessor had the useful meta-feature 
+where most of it's features would continue to work if you lost the original source document
+and just started editting the output document instead.
+This preprocessor has maintained this feature as much as it could,
+with only a few caveats:
 
 1. Boilerplate is inserted if and only if the first line of your source is an `<h1>`.
-   Otherwise, it assumes that you're rolling your own boilerplate.
+   Otherwise, it assumes that you're rolling your own boilerplate,
+   which means that if your source document auto-genned its boilerplate,
+   the output document won't double-generate.
+   However, the `data-fill-with` attribute sticks around in the output,
+   ensuring that those sections will be replaced with up-to-date text every time.
 
 2. If a `<pre>` isn't nested deeply in your document (short whitespace prefix),
    but the contents are deeply nested (long whitespace prefix),
@@ -267,3 +313,8 @@ A few assumptions are made to aid with this:
    as tabs `<pre>` contents (after removing the prefix) are auto-converted into two spaces
    (because tabs are enormous by default in HTML - 8 spaces wide!),
    and so the leftover leading whitespace will never match the `<pre>` tag's prefix.
+
+3. The textual macros of the form [FOO] disappear entirely from the generated document,
+   and will need to be replaced manually.
+   It would be easy to make these work if they only showed up in content,
+   but the fact that there are valid use-cases for putting them in attributes makes it harder to keep around in-band information about replacing them.
