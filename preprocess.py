@@ -334,7 +334,7 @@ def transformMetadata(lines, doc, **kwargs):
     textMacros["shortname"] = doc.shortname
     textMacros["longstatus"] = longstatuses[doc.status]
     textMacros["status"] = doc.status
-    textMacros["latest"] = doc.TR
+    textMacros["latest"] = doc.TR or "???"
     textMacros["year"] = str(doc.date.year)
     textMacros["date"] = doc.date.strftime("{0} %B %Y".format(doc.date.day))
     textMacros["cdate"] = doc.date.strftime("%Y%m%d")
@@ -775,7 +775,7 @@ class CSSSpec(object):
     title = "???"
     date = date.today()
     status = "???"
-    TR = "???"
+    TR = None
     ED = "???"
     editors = []
     previousVersions = []
