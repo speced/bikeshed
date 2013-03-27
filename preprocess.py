@@ -43,6 +43,7 @@ the processor uses the remote file at \
                          help="Suppresses everything but fatal errors from printing.")
     optparser.add_option("--debug", dest="debug", default=False, action="store_true",
                          help="Turns on some debug features.")
+    optparser.add_option("--print-exports", dest="printExports", default=False, action="store_true")
     (options, posargs) = optparser.parse_args()
 
     global debugQuiet
@@ -54,7 +55,11 @@ the processor uses the remote file at \
     doc = CSSSpec(inputFilename=options.inputFile,
                   biblioFilename=options.biblioFile)    
     doc.preprocess()
-    doc.finish(outputFilename=options.outputFile)
+
+    if options.printExports:
+        doc.printTargets()
+    else:
+        doc.finish(outputFilename=options.outputFile)
 
 
 def die(msg):
@@ -858,6 +863,18 @@ class CSSSpec(object):
         except:
             die("Something prevented me from saving the output document to {0}.".format(outputFilename))
 
+    def printTargets(self):
+        def targetText(el):
+            return el.get('title') or textContent(el)
+        allTerms = set(targetText(el) for el in findAll('dfn'))
+        exportedTerms = set(targetText(el) for el in findAll('[data-export], .propdef dfn'))
+        ignoredTerms = set(targetText(el) for el in findAll('[data-noexport]'))
+        unexportedTerms = allTerms - exportedTerms - ignoredTerms
+        print "Exported terms:"
+        print exportedTerms
+        print "Unexported terms:"
+        print unexportedTerms
+
 
 class BiblioEntry(object):
     linkText = None
@@ -1039,14 +1056,14 @@ Conformance classes</h3>
     <p>Conformance to this specification
     is defined for three conformance classes:
     <dl>
-        <dt><dfn title="style sheet!!as conformance class">style sheet</dfn>
+        <dt><dfn data-noexport title="style sheet!!as conformance class">style sheet</dfn>
             <dd>A <a href="http://www.w3.org/TR/CSS21/conform.html#style-sheet">CSS
             style sheet</a>.
-        <dt><dfn>renderer</dfn></dt>
+        <dt><dfn data-noexport>renderer</dfn></dt>
             <dd>A <a href="http://www.w3.org/TR/CSS21/conform.html#user-agent">UA</a>
             that interprets the semantics of a style sheet and renders
             documents that use them.
-        <dt><dfn id="authoring-tool">authoring tool</dfn></dt>
+        <dt><dfn data-noexport id="authoring-tool">authoring tool</dfn></dt>
             <dd>A <a href="http://www.w3.org/TR/CSS21/conform.html#user-agent">UA</a>
             that writes a style sheet.
     </dl>
