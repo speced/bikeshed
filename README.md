@@ -248,14 +248,6 @@ Most of them take their data straight from the document's metadata block.
 These are replaced early, before the source text has been parsed into a document,
 so they can occur anywhere, including attribute values.
 The current values are:
-"shortname"] = doc.shortname
-    textMacros["longstatus"] = longstatuses[doc.status]
-    textMacros["status"] = doc.status
-    textMacros["latest"] = doc.TR
-    textMacros["year"] = str(doc.date.year)
-    textMacros["date"] = doc.date.strftime("{0} %B %Y".format(doc.date.day))
-    textMacros["cdate"] = doc.date.strftime("%Y%m%d")
-    textMacros["isodate"
 
 * [TITLE] gives the spec's full title, as extracted from either the `<h1>` or the spec metadata.
 * [SHORTNAME] is replaced with the document's shortname.
@@ -263,6 +255,7 @@ The current values are:
 * [LONGSTATUS] gives a long form of the spec's status, so "ED" becomes "Editor's Draft", for example.
 * [LATEST] gives the link to the undated /TR link, if it exists.
 * [VERSION] gives the link to the ED, if the spec is an ED, and otherwise constructs a dated /TR link from today's date.
+* [ABSTRACT] gives the document's abstract.
 * [YEAR] gives the current year.
 * [DATE] gives a human-readable date.
 * [CDATE] gives a compact date in the format "YYYYMMDD".
