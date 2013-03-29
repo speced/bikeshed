@@ -290,6 +290,30 @@ It does not yet pay attention to the HTML outline algorithm,
 so using a bunch of `<h1>s` nested in `<section>s` will have very wrong effects.
 
 
+File-based Includes
+-------------------
+
+Several of the data-fill-with values
+(those that are static, rather than generated from in-document data)
+actually come from sets of .include files in the include/ directory.
+
+The base files are simply named "foo.include",
+where "foo" is the name of the data-fill-with value.
+They can be specialized, however,
+to particular working groups,
+and to particular document statuses.
+
+Adding a "-group" to the filename, like "header-csswg.include",
+specializes it for that group.
+Adding a "-STATUS" to the filename specializes it for the status.
+These can be used together, with the group coming first, like "status-csswg-CR.include".
+
+The processor will first look for the "foo-group-STATUS.include" file,
+failing over to "foo-group.include",
+then "foo-STATUS.include",
+and finally "foo.include".
+
+
 "Rerun" capability
 ------------------
 
