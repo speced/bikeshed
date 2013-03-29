@@ -314,8 +314,8 @@ def transformMetadata(lines, doc, **kwargs):
         elif key == "Level":
             doc.level = int(val)
         elif key == "Warning":
-            if val.lower() in ('obsolete'):
-                doc.warning = val.lower()
+            if val.lower() in ('obsolete', 'not ready'):
+                doc.warning = val.lower().replace(' ', '-')
             else:
                 die('Unknown value for "Warning" metadata.')
         elif key == "Previous Version":
