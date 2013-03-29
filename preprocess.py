@@ -342,6 +342,7 @@ def transformMetadata(lines, doc, **kwargs):
     textMacros["longstatus"] = longstatuses[doc.status]
     textMacros["status"] = doc.status
     textMacros["latest"] = doc.TR or "???"
+    textMacros["abstract"] = doc.abstract or "???"
     textMacros["year"] = str(doc.date.year)
     textMacros["date"] = doc.date.strftime("{0} %B %Y".format(doc.date.day))
     textMacros["cdate"] = doc.date.strftime("%Y%m%d")
