@@ -290,6 +290,9 @@ def transformPropdef(lines, doc, **kwargs):
 
 
 def transformMetadata(lines, doc, **kwargs):
+    def boolFromString(str):
+        return str.lower() in ('true', 't', 'yes', 'y', '1')
+
     for line in lines:
         match = re.match("\s*([^:]+):\s*(.*)", line)
         key = match.group(1)
@@ -310,6 +313,11 @@ def transformMetadata(lines, doc, **kwargs):
             doc.shortname = val
         elif key == "Level":
             doc.level = int(val)
+        elif key == "Warning":
+            if val.lower() in ('obsolete'):
+                doc.warning = val.lower()
+            else:
+                die('Unknown value for "Warning" metadata.')
         elif key == "Previous Version":
             doc.previousVersions.append(val)
         elif key == "Editor":
@@ -793,6 +801,7 @@ class CSSSpec(object):
     abstract = "???"
     shortname = "???"
     level = 0
+    warning = None
     atRisk = []
     otherMetadata = defaultdict(list)
     ids = set()
@@ -835,6 +844,7 @@ class CSSSpec(object):
         addCopyright(self)
         addSpecMetadataSection(self)
         addAbstract(self)
+        addObsoletionNotice(self)
         transformAutolinkShortcuts(self)
 
         # Deal with property names.
@@ -1051,6 +1061,13 @@ def addStatusSection(doc):
     html = doc.getInclusion('status')
     html = replaceTextMacros(html)
     fillWith('status', parseHTML(html))
+
+
+def addObsoletionNotice(doc):
+    if doc.warning:
+        html = doc.getInclusion(doc.warning)
+        html = replaceTextMacros(html)
+        fillWith('warning', parseHTML(html))
 
 
 
