@@ -301,6 +301,8 @@ def transformMetadata(lines, doc, **kwargs):
             doc.TR = val
         elif key == "ED":
             doc.ED = val
+        elif key == "Group":
+            doc.group = val.lower()
         elif key == "Date":
             doc.date = datetime.strptime(val, "%Y-%m-%d").date()
         elif key == "Abstract":
@@ -780,6 +782,7 @@ class CSSSpec(object):
     title = "???"
     date = date.today()
     status = "???"
+    group = "csswg"
     TR = None
     ED = "???"
     editors = []
@@ -874,6 +877,35 @@ class CSSSpec(object):
         print exportedTerms
         print "Unexported terms:"
         print unexportedTerms
+
+    def getInclusion(self, name, group=None, status=None):
+        # First looks for a file specialized on the group and status.
+        # If that fails, specializes only on the group.
+        # If that fails, specializes only on the status.
+        # If that fails, grabs the most general file.
+        # Filenames must be of the format NAME-GROUP-STATUS.include
+        if group is None:
+            group = self.group
+        if status is None:
+            status = self.status
+
+        pathprefix = os.path.dirname(os.path.realpath(__file__)) + "/include"
+        if os.path.isfile("{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status)):
+            filename = "{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status)
+        elif os.path.isfile("{0}/{1}-{2}.include".format(pathprefix, name, group)):
+            filename = "{0}/{1}-{2}.include".format(pathprefix, name, group)
+        elif os.path.isfile("{0}/{1}-{2}.include".format(pathprefix, name, status)):
+            filename = "{0}/{1}-{2}.include".format(pathprefix, name, status)
+        elif os.path.isfile("{0}/{1}.include".format(pathprefix, name)):
+            filename = "{0}/{1}.include".format(pathprefix, name)
+        else:
+            die("Couldn't find an appropriate include file for the {0} inclusion.".format(name))
+
+        try:
+            with open(filename, 'r') as fh:
+                return fh.read()
+        except IOError:
+            die("The include file for {0} disappeared underneath me.".format(name))
 
 
 class BiblioEntry(object):
@@ -988,345 +1020,31 @@ def fillInBoilerplate(doc):
     textMacros['title'] = doc.title
     doc.html = doc.html[len(match.group(0)):]
 
-    header = """
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html lang="en">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <title>[TITLE]</title>
-  <link href="../default.css" rel=stylesheet type="text/css">
-  <link href="../csslogo.ico" rel="shortcut icon" type="image/x-icon">
-  <link href="https://www.w3.org/StyleSheets/TR/W3C-[STATUS].css" rel=stylesheet type="text/css">
-</head>
-<body class="h-entry">
-<div class="head">
-  <p data-fill-with="logo"></p>
-  <h1 id="title" class="p-name no-ref">[TITLE]</h1>
-  <h2 id="subtitle" class="no-num no-toc no-ref">[LONGSTATUS],
-    <span class="dt-updated"><span class="value-title" title="[CDATE]">[DATE]</span></h2>
-  <div data-fill-with="spec-metadata"></div>
-  <p class='copyright' data-fill-with='copyright'></p>
-  <hr title="Separator for header">
-</div>
+    header = doc.getInclusion('header')
+    footer = doc.getInclusion('footer')
 
-<h2 class='no-num no-toc no-ref' id='abstract'>Abstract</h2>
-<p class="p-summary" data-fill-with="abstract"></p>
-
-<h2 class='no-num no-toc no-ref' id='status'>Status of this document</h2>
-<div data-fill-with="status"></div>
-
-<h2 class="no-num no-toc no-ref" id="contents">Table of contents</h2>
-<div data-fill-with="table-of-contents"></div>
-"""
-    footer = """
-
-<h2 id="conformance" class="no-ref no-num">
-Conformance</h2>
-
-<h3 id="conventions" class="no-ref">
-Document conventions</h3>
-
-    <p>Conformance requirements are expressed with a combination of
-    descriptive assertions and RFC 2119 terminology. The key words "MUST",
-    "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT",
-    "RECOMMENDED", "MAY", and "OPTIONAL" in the normative parts of this
-    document are to be interpreted as described in RFC 2119.
-    However, for readability, these words do not appear in all uppercase
-    letters in this specification.
-
-    <p>All of the text of this specification is normative except sections
-    explicitly marked as non-normative, examples, and notes. [[!RFC2119]]</p>
-
-    <p>Examples in this specification are introduced with the words "for example"
-    or are set apart from the normative text with <code>class="example"</code>,
-    like this:
-
-    <div class="example">
-        <p>This is an example of an informative example.</p>
-    </div>
-
-    <p>Informative notes begin with the word "Note" and are set apart from the
-    normative text with <code>class="note"</code>, like this:
-
-    <p class="note">Note, this is an informative note.</p>
-
-<h3 id="conformance-classes" class="no-ref">
-Conformance classes</h3>
-
-    <p>Conformance to this specification
-    is defined for three conformance classes:
-    <dl>
-        <dt><dfn data-noexport title="style sheet!!as conformance class">style sheet</dfn>
-            <dd>A <a href="http://www.w3.org/TR/CSS21/conform.html#style-sheet">CSS
-            style sheet</a>.
-        <dt><dfn data-noexport>renderer</dfn></dt>
-            <dd>A <a href="http://www.w3.org/TR/CSS21/conform.html#user-agent">UA</a>
-            that interprets the semantics of a style sheet and renders
-            documents that use them.
-        <dt><dfn data-noexport id="authoring-tool">authoring tool</dfn></dt>
-            <dd>A <a href="http://www.w3.org/TR/CSS21/conform.html#user-agent">UA</a>
-            that writes a style sheet.
-    </dl>
-
-    <p>A style sheet is conformant to this specification
-    if all of its statements that use syntax defined in this module are valid
-    according to the generic CSS grammar and the individual grammars of each
-    feature defined in this module.
-
-    <p>A renderer is conformant to this specification
-    if, in addition to interpreting the style sheet as defined by the
-    appropriate specifications, it supports all the features defined
-    by this specification by parsing them correctly
-    and rendering the document accordingly. However, the inability of a
-    UA to correctly render a document due to limitations of the device
-    does not make the UA non-conformant. (For example, a UA is not
-    required to render color on a monochrome monitor.)
-
-    <p>An authoring tool is conformant to this specification
-    if it writes style sheets that are syntactically correct according to the
-    generic CSS grammar and the individual grammars of each feature in
-    this module, and meet all other conformance requirements of style sheets
-    as described in this module.
-
-<h3 id="partial" class="no-ref">
-Partial implementations</h3>
-
-    <p>So that authors can exploit the forward-compatible parsing rules to
-    assign fallback values, CSS renderers <strong>must</strong>
-    treat as invalid (and <a href="http://www.w3.org/TR/CSS21/conform.html#ignore">ignore
-    as appropriate</a>) any at-rules, properties, property values, keywords,
-    and other syntactic constructs for which they have no usable level of
-    support. In particular, user agents <strong>must not</strong> selectively
-    ignore unsupported component values and honor supported values in a single
-    multi-value property declaration: if any value is considered invalid
-    (as unsupported values must be), CSS requires that the entire declaration
-    be ignored.</p>
-
-<h3 id="experimental" class="no-ref">
-Experimental implementations</h3>
-
-    <p>To avoid clashes with future CSS features, the CSS2.1 specification
-    reserves a <a href="http://www.w3.org/TR/CSS21/syndata.html#vendor-keywords">prefixed
-    syntax</a> for proprietary and experimental extensions to CSS.
-
-    <p>Prior to a specification reaching the Candidate Recommendation stage
-    in the W3C process, all implementations of a CSS feature are considered
-    experimental. The CSS Working Group recommends that implementations
-    use a vendor-prefixed syntax for such features, including those in
-    W3C Working Drafts. This avoids incompatibilities with future changes
-    in the draft.
-    </p>
-
-<h3 id="testing" class="no-ref">
-Non-experimental implementations</h3>
-
-    <p>Once a specification reaches the Candidate Recommendation stage,
-    non-experimental implementations are possible, and implementors should
-    release an unprefixed implementation of any CR-level feature they
-    can demonstrate to be correctly implemented according to spec.
-
-    <p>To establish and maintain the interoperability of CSS across
-    implementations, the CSS Working Group requests that non-experimental
-    CSS renderers submit an implementation report (and, if necessary, the
-    testcases used for that implementation report) to the W3C before
-    releasing an unprefixed implementation of any CSS features. Testcases
-    submitted to W3C are subject to review and correction by the CSS
-    Working Group.
-
-    <p>Further information on submitting testcases and implementation reports
-    can be found from on the CSS Working Group's website at
-    <a href="http://www.w3.org/Style/CSS/Test/">http://www.w3.org/Style/CSS/Test/</a>.
-    Questions should be directed to the
-    <a href="http://lists.w3.org/Archives/Public/public-css-testsuite">public-css-testsuite@w3.org</a>
-    mailing list."""
-
-    if doc.status == "CR":
-        footer += """
-<h3 id="cr-exit-criteria" class="no-ref">
-CR exit criteria</h3>
-
-    <p>
-    For this specification to be advanced to Proposed Recommendation,
-    there must be at least two independent, interoperable implementations
-    of each feature. Each feature may be implemented by a different set of
-    products, there is no requirement that all features be implemented by
-    a single product. For the purposes of this criterion, we define the
-    following terms:
-
-    <dl>
-        <dt>independent <dd>each implementation must be developed by a
-        different party and cannot share, reuse, or derive from code
-        used by another qualifying implementation. Sections of code that
-        have no bearing on the implementation of this specification are
-        exempt from this requirement.
-
-        <dt>interoperable <dd>passing the respective test case(s) in the
-        official CSS test suite, or, if the implementation is not a Web
-        browser, an equivalent test. Every relevant test in the test
-        suite should have an equivalent test created if such a user
-        agent (UA) is to be used to claim interoperability. In addition
-        if such a UA is to be used to claim interoperability, then there
-        must one or more additional UAs which can also pass those
-        equivalent tests in the same way for the purpose of
-        interoperability. The equivalent tests must be made publicly
-        available for the purposes of peer review.
-
-        <dt>implementation <dd>a user agent which:
-
-        <ol class=inline>
-            <li>implements the specification.
-
-            <li>is available to the general public. The implementation may
-            be a shipping product or other publicly available version
-            (i.e., beta version, preview release, or "nightly build").
-            Non-shipping product releases must have implemented the
-            feature(s) for a period of at least one month in order to
-            demonstrate stability.
-
-            <li>is not experimental (i.e., a version specifically designed
-            to pass the test suite and is not intended for normal usage
-            going forward).
-        </ol>
-    </dl>
-
-    <p>The specification will remain Candidate Recommendation for at least
-    six months.
-"""
-
-    footer += """
-<h2 class="no-num no-ref" id="references">
-References</h2>
-
-<h3 class="no-num no-ref" id="normative">
-Normative References</h3>
-<div data-fill-with="normative-references"></div>
-
-<h3 class="no-num no-ref" id="informative">
-Informative References</h3>
-<div data-fill-with="informative-references"></div>
-
-<h2 class="no-num no-ref" id="index">
-Index</h2>
-<div data-fill-with="index"></div>
-
-<h2 class="no-num no-ref" id="property-index">
-Property index</h2>
-<div data-fill-with="property-index"></div>
-
-</body>
-</html>
-"""
     doc.html = '\n'.join([header, doc.html, footer])
 
 
 def addLogo(doc):
-    html = """
-    <a href="http://www.w3.org/">
-        <img alt="W3C" height="48" src="http://www.w3.org/Icons/w3c_home" width="72">
-    </a>"""
+    html = doc.getInclusion('logo')
     fillWith('logo', parseHTML(html))
 
 
 def addCopyright(doc):
-    html = """
-<span><a href="http://www.w3.org/Consortium/Legal/ipr-notice#Copyright" rel="license">Copyright</a> © [YEAR] <a href="http://www.w3.org/"><abbr title="World Wide Web Consortium">W3C</abbr></a><sup>®</sup> (<a href="http://www.csail.mit.edu/"><abbr title="Massachusetts Institute of Technology">MIT</abbr></a>, <a href="http://www.ercim.eu/"><abbr title="European Research Consortium for Informatics and Mathematics">ERCIM</abbr></a>,
-    <a href="http://www.keio.ac.jp/">Keio</a>, <a href="http://ev.buaa.edu.cn/">Beihang</a>), All Rights Reserved. W3C <a href="http://www.w3.org/Consortium/Legal/ipr-notice#Legal_Disclaimer">liability</a>,
-    <a href="http://www.w3.org/Consortium/Legal/ipr-notice#W3C_Trademarks">trademark</a>
-    and <a href="http://www.w3.org/Consortium/Legal/copyright-documents">document
-    use</a> rules apply.</span>"""
+    html = doc.getInclusion('copyright')
     html = replaceTextMacros(html)
     fillWith('copyright', parseHTML(html))
 
 
 def addAbstract(doc):
-    html = "<span>" + doc.abstract
-    html += " <a href='http://www.w3.org/TR/CSS/'>CSS</a> is a language for describing the rendering of structured documents (such as HTML and XML) on screen, on paper, in speech, etc.</span>"
+    html = doc.getInclusion('abstract')
+    html = replaceTextMacros(html)
     fillWith('abstract', parseHTML(html))
 
 
 def addStatusSection(doc):
-    if doc.status == "ED":
-        html = """
-<div>
-  <p>This is a public copy of the editors' draft. It is provided for
-   discussion only and may change at any moment. Its publication here does
-   not imply endorsement of its contents by W3C. Don't cite this document
-   other than as work in progress.
-
-  <p>The (<a href="http://lists.w3.org/Archives/Public/www-style/">archived</a>) 
-   public mailing list 
-   <a href="mailto:www-style@w3.org?Subject=%5B[SHORTNAME]%5D%20PUT%20SUBJECT%20HERE">www-style@w3.org</a> 
-   (see <a href="http://www.w3.org/Mail/Request">instructions</a>) 
-   is preferred for discussion of this specification. 
-   When sending e-mail, please put the text
-   “[SHORTNAME]” in the subject, preferably like this:
-   “[<!---->[SHORTNAME]<!---->] <em>…summary of comment…</em>”
-
-  <p>This document was produced by the <a href="/Style/CSS/members">CSS
-   Working Group</a> (part of the <a href="/Style/">Style Activity</a>).
-
-  <p>This document was produced by a group operating under the 
-   <a href="/Consortium/Patent-Policy-20040205/">5 February 2004 W3C Patent Policy</a>. 
-   W3C maintains a 
-   <a href="/2004/01/pp-impl/32061/status" rel=disclosure>public list of any patent disclosures</a> 
-   made in connection with the deliverables of the group; that page also includes
-   instructions for disclosing a patent. An individual who has actual
-   knowledge of a patent which the individual believes contains 
-   <a href="/Consortium/Patent-Policy-20040205/#def-essential">Essential Claim(s)</a> 
-   must disclose the information in accordance with 
-   <a href="/Consortium/Patent-Policy-20040205/#sec-Disclosure">section 6 of the W3C Patent Policy</a>.</p>
-</div>"""
-    elif doc.status == "CR":
-        html = """
-<div>
-  <p><em>This section describes the status of this document at the time of
-   its publication. Other documents may supersede this document. A list of
-   current W3C publications and the latest revision of this technical report
-   can be found in the <a href="http://www.w3.org/TR/">W3C technical reports
-   index at http://www.w3.org/TR/.</a></em>
-
-  <p>Publication as a Working Draft does not imply endorsement by the W3C
-   Membership. This is a draft document and may be updated, replaced or
-   obsoleted by other documents at any time. It is inappropriate to cite this
-   document as other than work in progress.
-
-  <p>The (<a href="http://lists.w3.org/Archives/Public/www-style/">archived</a>) 
-   public mailing list 
-   <a href="mailto:www-style@w3.org?Subject=%5B[SHORTNAME]%5D%20PUT%20SUBJECT%20HERE">www-style@w3.org</a> 
-   (see <a href="http://www.w3.org/Mail/Request">instructions</a>) 
-   is preferred for discussion of this specification. 
-   When sending e-mail, please put the text
-   “[SHORTNAME]” in the subject, preferably like this:
-   “[<!---->[SHORTNAME]<!---->] <em>…summary of comment…</em>”
-
-  <p>This document was produced by the <a
-   href="http://www.w3.org/Style/CSS/members">CSS Working Group</a> (part of
-   the <a href="http://www.w3.org/Style/">Style Activity</a>).
-
-  <p>This document was produced by a group operating under the <a
-   href="http://www.w3.org/Consortium/Patent-Policy-20040205/">5 February
-   2004 W3C Patent Policy</a>. W3C maintains a <a
-   href="http://www.w3.org/2004/01/pp-impl/32061/status"
-   rel=disclosure>public list of any patent disclosures</a> made in
-   connection with the deliverables of the group; that page also includes
-   instructions for disclosing a patent. An individual who has actual
-   knowledge of a patent which the individual believes contains <a
-   href="http://www.w3.org/Consortium/Patent-Policy-20040205/#def-essential">Essential
-   Claim(s)</a> must disclose the information in accordance with <a
-   href="http://www.w3.org/Consortium/Patent-Policy-20040205/#sec-Disclosure">section
-   6 of the W3C Patent Policy</a>.</p>
-  <!--end-status-->
-
-  <p>For changes since the last draft, see the <a href="#changes">Changes</a>
-   section.
-</div>"""
-    else:
-        die("Don't have a status section for {0} documents yet.".format(doc.status))
-    if len(doc.atRisk):
-        html += "<p>The following features are at risk:\n<ul>"
-        for feature in doc.atRisk:
-            html += "<li>"+feature
-        html += "</ul>"
+    html = doc.getInclusion('status')
     html = replaceTextMacros(html)
     fillWith('status', parseHTML(html))
 
