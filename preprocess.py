@@ -308,6 +308,8 @@ def transformMetadata(lines, doc, **kwargs):
             doc.abstract = val
         elif key == "Shortname":
             doc.shortname = val
+        elif key == "Level":
+            doc.level = int(val)
         elif key == "Previous Version":
             doc.previousVersions.append(val)
         elif key == "Editor":
@@ -338,6 +340,7 @@ def transformMetadata(lines, doc, **kwargs):
         "UD": "Unofficial Proposal Draft"
     }
     textMacros["shortname"] = doc.shortname
+    textMacros["vshortname"] = "{0}-{1}".format(doc.shortname, str(doc.level))
     textMacros["longstatus"] = longstatuses[doc.status]
     textMacros["status"] = doc.status
     textMacros["latest"] = doc.TR or "???"
@@ -350,7 +353,7 @@ def transformMetadata(lines, doc, **kwargs):
         textMacros["version"] = doc.ED
     else:
         textMacros["version"] = "http://www.w3.org/TR/{3}/{0}-{1}-{2}".format(doc.status, 
-                                                                              doc.shortname, 
+                                                                              textMacros["vshortname"], 
                                                                               textMacros["cdate"], 
                                                                               textMacros["year"])
     return []
@@ -789,6 +792,7 @@ class CSSSpec(object):
     previousVersions = []
     abstract = "???"
     shortname = "???"
+    level = 0
     atRisk = []
     otherMetadata = defaultdict(list)
     ids = set()
