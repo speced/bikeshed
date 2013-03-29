@@ -20,7 +20,6 @@ from lxml.cssselect import CSSSelector
 from optparse import OptionParser
 from urllib import urlopen
 from datetime import date, datetime
-from cStringIO import StringIO
 
 debugQuiet = False
 debug = False
