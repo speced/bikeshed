@@ -431,6 +431,12 @@ def addSpecMetadataSection(doc):
         header += "<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.ED)
     if len(doc.previousVersions):
         header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.previousVersions))
+    header += """
+<dt>Feedback:</dt>
+    <dd><a href="mailto:www-style@w3.org?subject=%5B[SHORTNAME]%5D%20feedback">www-style@w3.org</a> 
+        with subject line 
+        &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;
+        (<a rel="discussion" href="http://lists.w3.org/Archives/Public/www-style/">archives</a>)"""
     if len(doc.editors):
         header += "<dt>Editors:\n"
         for editor in doc.editors:

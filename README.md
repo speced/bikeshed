@@ -202,6 +202,7 @@ The relevant keys are:
 	(There is not currently any way to put a comma *in* one of these values.)
 	Multiple "Editor" lines can be used to supply multiple editors.
 * "Abstract" must contain an abstract for the spec, a 1-2 sentence description of what the spec is about.
+* "Warning" may contain either "Obsolete" or "Not Ready", which triggers the appropriate warning message in the boilerplate.
 
 Anything else put in the metadata block will be extracted and later put into the `<dl>` in the spec's header, 
 using the keys and values you specify.
@@ -241,6 +242,7 @@ The current values are:
 * "property-index" for the table summarizing all properties defined in the spec
 * "logo" for the W3C logo
 * "copyright" for the W3C copyright statement
+* "warning" for the relevant spec warning, if one was indicated in the metadata.
 
 As well, there are a few textual macros that can be invoked to fill in various small bits of information,
 written as [FOO].
