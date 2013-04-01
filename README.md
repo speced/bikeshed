@@ -204,10 +204,11 @@ The following keys are required:
 	Multiple "Editor" lines can be used to supply multiple editors.
 * "Abstract" must contain an abstract for the spec, a 1-2 sentence description of what the spec is about.
 
-The following keys are optional:
+The following keys are optional, and may be omitted:
 	
-* "TR" may contain a link that points to the latest version on /TR.
-* "Warning" may contain either "Obsolete" or "Not Ready", which triggers the appropriate warning message in the boilerplate.
+* "TR" must contain a link that points to the latest version on /TR.
+* "Warning" must contain either "Obsolete" or "Not Ready", which triggers the appropriate warning message in the boilerplate.
+* "Previous Version" must contain a link that points to a previous (dated) version on /TR.
 
 Anything else put in the metadata block will be extracted and later put into the `<dl>` in the spec's header, 
 using the keys and values you specify.
