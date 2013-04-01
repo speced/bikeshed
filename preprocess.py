@@ -421,7 +421,7 @@ def transformAutolinkShortcuts(doc):
 
         if processContents:
             # Recurse over children.
-            for child in el:
+            for child in el.iterchildren(tag="*"):
                 fixElementText(child)
 
     fixElementText(doc.document.getroot())
