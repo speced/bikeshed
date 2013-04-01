@@ -203,6 +203,8 @@ The relevant keys are:
 	Multiple "Editor" lines can be used to supply multiple editors.
 * "Abstract" must contain an abstract for the spec, a 1-2 sentence description of what the spec is about.
 * "Warning" may contain either "Obsolete" or "Not Ready", which triggers the appropriate warning message in the boilerplate.
+* "Shortname" must contain the spec's shortname, like "css-lists" or "css-backgrounds".
+* "Level" must contain the spec's level as an integer.
 
 Anything else put in the metadata block will be extracted and later put into the `<dl>` in the spec's header, 
 using the keys and values you specify.
