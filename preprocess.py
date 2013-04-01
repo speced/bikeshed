@@ -393,21 +393,23 @@ def transformAutolinkShortcuts(doc):
                     match.group(2), 
                     biblioType))
         text = re.sub(r"''([^']+)''", r'<a data-autolink="maybe" class="css">\1</a>', text)
-        text = re.sub(r"'([a-z0-9_*-]+)'", r'<a data-autolink="property" class="property" title="\1">\1</a>', text)
+        text = re.sub(r"'([a-zA-Z0-9_*-]+)'", r'<a data-autolink="property" class="property" title="\1">\1</a>', text)
         return text
 
     def fixElementText(el):
         # Don't transform anything in some kinds of elements.
-        if(el.tag in ["pre", "code", "style", "script"]):
-            return
-        # Pull out el.text, replace stuff (may introduce elements), parse.
-        newtext = transformThings(el.text)
-        if el.text != newtext:
-            temp = parseHTML('<div>'+newtext+'</div>')
-            # Change the .text, empty out the temp children.
-            el.text = temp.text
-            for child in temp.iterchildren(tag="*", reversed=True):
-                el.insert(0, child)
+        processContents = el.tag not in ("pre", "code", "style", "script")
+
+        if processContents:
+            # Pull out el.text, replace stuff (may introduce elements), parse.
+            newtext = transformThings(el.text)
+            if el.text != newtext:
+                temp = parseHTML('<div>'+newtext+'</div>')
+                # Change the .text, empty out the temp children.
+                el.text = temp.text
+                for child in temp.iterchildren(tag="*", reversed=True):
+                    el.insert(0, child)
+
         # Same for tail.
         newtext = transformThings(el.tail)
         if el.tail != newtext:
@@ -416,9 +418,11 @@ def transformAutolinkShortcuts(doc):
             for child in temp.iterchildren(tag="*", reversed=True):
                 el.addnext(child)
             el.tail = temp.text
-        # Recurse over children.
-        for child in el:
-            fixElementText(child)
+
+        if processContents:
+            # Recurse over children.
+            for child in el:
+                fixElementText(child)
 
     fixElementText(doc.document.getroot())
 
