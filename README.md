@@ -188,11 +188,12 @@ a data block (`<pre>` or `<xmp>`) with class='metadata' must exist,
 containing several pieces of metadata.
 The format is the same as propdef tables: each line is one piece of data, containing key, colon, value.
 
-The relevant keys are:
+The following keys are required:
 
-* "Status" must be the spec's status, as one of the standard abbreviations ("WD", "ED", "CR", etc.)
+* "Status" is the spec's status, as one of the standard abbreviations ("WD", "ED", "CR", etc.)
 * "ED" must contain a link that points to the editor's draft.
-* "TR" may contain a link that points to the latest version on /TR.
+* "Shortname" must contain the spec's shortname, like "css-lists" or "css-backgrounds".
+* "Level" must contain the spec's level as an integer.
 * "Editor" must contain an editor's information.
 	This has a special format:
 	it must contain the editor's name,
@@ -202,9 +203,11 @@ The relevant keys are:
 	(There is not currently any way to put a comma *in* one of these values.)
 	Multiple "Editor" lines can be used to supply multiple editors.
 * "Abstract" must contain an abstract for the spec, a 1-2 sentence description of what the spec is about.
+
+The following keys are optional:
+	
+* "TR" may contain a link that points to the latest version on /TR.
 * "Warning" may contain either "Obsolete" or "Not Ready", which triggers the appropriate warning message in the boilerplate.
-* "Shortname" must contain the spec's shortname, like "css-lists" or "css-backgrounds".
-* "Level" must contain the spec's level as an integer.
 
 Anything else put in the metadata block will be extracted and later put into the `<dl>` in the spec's header, 
 using the keys and values you specify.
