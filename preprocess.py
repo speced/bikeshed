@@ -331,6 +331,8 @@ def transformMetadata(lines, doc, **kwargs):
             else:
                 die("Error: one of the editors didn't match the format \
 '<name>, <company>, <email-or-contact-page>")
+        elif key == "At Risk":
+            doc.atRisk.append(val)
         else:
             doc.otherMetadata[key].append(val)
 
@@ -876,6 +878,7 @@ class CSSSpec(object):
         addSpecMetadataSection(self)
         addAbstract(self)
         addObsoletionNotice(self)
+        addAtRisk(self)
         transformAutolinkShortcuts(self)
 
         # Deal with property names.
@@ -1099,6 +1102,15 @@ def addObsoletionNotice(doc):
         html = doc.getInclusion(doc.warning)
         html = replaceTextMacros(html)
         fillWith('warning', parseHTML(html))
+
+def addAtRisk(doc):
+    if len(doc.atRisk) == 0:
+        return
+    html = "<div><p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
+    for feature in doc.atRisk:
+        html += "<li>"+feature
+    html += "</div>"
+    fillWith('at-risk', parseHTML(html))
 
 
 

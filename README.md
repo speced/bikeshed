@@ -209,6 +209,7 @@ The following keys are optional, and may be omitted:
 * "TR" must contain a link that points to the latest version on /TR.
 * "Warning" must contain either "Obsolete" or "Not Ready", which triggers the appropriate warning message in the boilerplate.
 * "Previous Version" must contain a link that points to a previous (dated) version on /TR.
+* "At Risk" must contain an at-risk feature.  Multiple lines can be provided.  Each will be formatted as a list item in the Status section.
 
 Anything else put in the metadata block will be extracted and later put into the `<dl>` in the spec's header, 
 using the keys and values you specify.
