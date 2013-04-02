@@ -334,6 +334,23 @@ def transformMetadata(lines, doc, **kwargs):
         else:
             doc.otherMetadata[key].append(val)
 
+    requiredSingularKeys = [
+        ('status', 'Status'), 
+        ('ED', 'ED'), 
+        ('abstract', 'Abstract'), 
+        ('shortname', 'Shortname'), 
+        ('level', 'Level')
+    ]
+    requiredMultiKeys = [
+        ('editors', 'Editor')
+    ]
+    for attr, name in requiredSingularKeys:
+        if getattr(doc, attr) is None:
+            die("Metadata block must contain a '{0}' entry.".format(name))
+    for attr, name in requiredMultiKeys:
+        if len(getattr(doc, attr)) == 0:
+            die("Metadata block must contain at least one '{0}' entry.".format(name))
+
     # Fill in text macros. 
     global textMacros
     longstatuses = {
@@ -800,27 +817,31 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None):
 
 
 class CSSSpec(object):
+    # required metadata
+    status = None
+    ED = None
+    abstract = None
+    shortname = None
+    level = None
+
+    # optional metadata
+    TR = None
     title = "???"
     date = date.today()
-    status = "???"
     group = "csswg"
-    TR = None
-    ED = "???"
     editors = []
     previousVersions = []
-    abstract = "???"
-    shortname = "???"
-    level = 0
     warning = None
     atRisk = []
     otherMetadata = defaultdict(list)
+
+    # internal state
     ids = set()
     links = {}
     normativeRefs = set()
     informativeRefs = set()
     propdefs = {}
     biblios = {}
-    loginInfo = None
 
     def __init__(self, inputFilename, biblioFilename=None):
         try:
