@@ -191,6 +191,7 @@ def transformDataBlocks(doc):
     inBlock = False
     blockTypes = {
         'propdef': transformPropdef,
+        'descdef': transformDescdef,
         'metadata': transformMetadata,
         'pre': transformPre
     }
@@ -280,6 +281,17 @@ def transformPre(lines, tagName, firstLine, **kwargs):
 
 def transformPropdef(lines, doc, **kwargs):
     ret = ["<table class='propdef'>"]
+    for (i, line) in enumerate(lines):
+        match = re.match("\s*([^:]+):\s*(.*)", line)
+        key = match.group(1)
+        val = match.group(2)
+        ret.append("<tr><th>" + key + ":<td>" + val)
+    ret.append("</table>")
+    return ret
+
+
+def transformDescdef(lines, doc, **kwargs):
+    ret = ["<table class='descdef'>"]
     for (i, line) in enumerate(lines):
         match = re.match("\s*([^:]+):\s*(.*)", line)
         key = match.group(1)
@@ -594,7 +606,7 @@ def addTOCSection(doc):
 
 
 def formatPropertyNames(doc):
-    propertyCells = findAll("table.propdef tr:first-child > td")
+    propertyCells = findAll("table.propdef tr:first-child > td, table.descdef tr:first-child > td")
     for cell in propertyCells:
         props = [x.strip() for x in textContent(cell).split(',')]
         html = ', '.join("<dfn id='{1}'>{0}</dfn>".format(name, idFromText(name)) for name in props)
@@ -602,7 +614,7 @@ def formatPropertyNames(doc):
 
 
 def buildPropertyDatabase(doc):
-    propdefTables = findAll('table.propdef')
+    propdefTables = findAll('table.propdef, table.descdef')
     for propdefTable in propdefTables:
         propdef = {}
         names = []
@@ -918,7 +930,7 @@ class CSSSpec(object):
         def targetText(el):
             return el.get('title') or textContent(el)
         allTerms = set(targetText(el) for el in findAll('dfn'))
-        exportedTerms = set(targetText(el) for el in findAll('[data-export], .propdef dfn'))
+        exportedTerms = set(targetText(el) for el in findAll('[data-export], .propdef dfn, .descdef dfn'))
         ignoredTerms = set(targetText(el) for el in findAll('[data-noexport]'))
         unexportedTerms = allTerms - exportedTerms - ignoredTerms
         print "Exported terms:"
