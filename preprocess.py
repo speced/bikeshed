@@ -144,6 +144,8 @@ def replaceTextMacros(text):
     global textMacros
     for tag, replacement in textMacros.items():
         text = text.replace("[{0}]".format(tag.upper()), replacement)
+    # Also replace the <<production>> shortcuts, because they won't survive the HTML parser.
+    text = re.sub(r"<<([\w-]+)>>", r'<a data-autolink="link" class="production"><var>&lt;\1></var></a>', text)
     return text
 
 
@@ -396,11 +398,6 @@ def transformMetadata(lines, doc, **kwargs):
                                                                               textMacros["cdate"], 
                                                                               textMacros["year"])
     return []
-
-
-def transformProductionAutolinks(doc):
-    # This is done separately from the rest because it won't survive the HTML parser.
-    doc.html = re.sub(r"<<([\w-]+)>>", r'<a data-autolink="link" class="production"><var>&lt;\1></var></a>', doc.html)
 
 
 def transformAutolinkShortcuts(doc):
@@ -878,7 +875,6 @@ class CSSSpec(object):
         self.html = ''.join(self.lines)
         fillInBoilerplate(self)
         self.html = replaceTextMacros(self.html)
-        transformProductionAutolinks(self)
 
         # Build the document
         self.document = parseDocument(self.html)
