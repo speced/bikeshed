@@ -226,9 +226,11 @@ An example metadata block:
 Status: ED
 TR: http://www.w3.org/TR/css-variables/
 ED: http://dev.w3.org/csswg/css-variables/
+Shortname: Variables
+Level: 1
 Editor: Tab Atkins Jr., Google, http://xanthir.com/contact
 Editor: Luke Macpherson, Google, macpherson@google.com
-Editor: Daniel Glazman (Disruptive Innovations) daniel.glazman@disruptive-innovations.com
+Editor: Daniel Glazman, Disruptive Innovations, daniel.glazman@disruptive-innovations.com
 Abstract: This module introduces cascading variables as a new primitive value type that is accepted by all CSS properties, and custom properties for defining them.
 </pre>
 ~~~~
