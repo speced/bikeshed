@@ -88,7 +88,11 @@ def outerHTML(el):
 
 def parseHTML(str):
     doc = html5lib.parse(str, treebuilder='lxml', encoding='utf-8', namespaceHTMLElements=False)
-    return find('body', doc)[0]
+    body = find('body', doc)
+    if body.text is None:
+        return list(body.iterchildren())
+    else:
+        return [body.text] + list(body.iterchildren())
 
 
 def parseDocument(str):
@@ -130,14 +134,28 @@ def clearContents(el):
     return el
 
 
-def replaceContents(el, new):
-    clearContents(el).append(new)
+def appendChild(parent, child):
+    # Appends either text or an element.
+    try:
+        parent.append(child)
+    except TypeError:
+        # child is a string
+        if len(parent) > 0:
+            parent[-1].tail = (parent[-1].tail or '') + child
+        else:
+            parent.text = (parent.text or '') + child
+
+
+def replaceContents(el, newElements):
+    clearContents(el)
+    for new in newElements:
+        appendChild(el, new)
     return el
 
 
-def fillWith(tag, new):
+def fillWith(tag, newElements):
     for el in findAll("[data-fill-with='{0}']".format(tag)):
-        replaceContents(el, new)
+        replaceContents(el, newElements)
 
 
 def replaceTextMacros(text):
@@ -432,7 +450,7 @@ def transformAutolinkShortcuts(doc):
             # Pull out el.text, replace stuff (may introduce elements), parse.
             newtext = transformThings(el.text)
             if el.text != newtext:
-                temp = parseHTML('<div>'+newtext+'</div>')
+                temp = parseHTML('<div>'+newtext+'</div>')[0]
                 # Change the .text, empty out the temp children.
                 el.text = temp.text
                 for child in temp.iterchildren(tag="*", reversed=True):
@@ -441,7 +459,7 @@ def transformAutolinkShortcuts(doc):
         # Same for tail.
         newtext = transformThings(el.tail)
         if el.tail != newtext:
-            temp = parseHTML('<div>'+newtext+'</div>')
+            temp = parseHTML('<div>'+newtext+'</div>')[0]
             el.tail = ''
             for child in temp.iterchildren(tag="*", reversed=True):
                 el.addnext(child)
