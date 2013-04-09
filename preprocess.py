@@ -955,7 +955,8 @@ class CSSSpec(object):
         elif os.path.isfile("{0}/{1}.include".format(pathprefix, name)):
             filename = "{0}/{1}.include".format(pathprefix, name)
         else:
-            die("Couldn't find an appropriate include file for the {0} inclusion.".format(name))
+            die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.".format(name, group, status))
+            filename = "/dev/null"
 
         try:
             with open(filename, 'r') as fh:
