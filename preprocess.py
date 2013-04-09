@@ -1133,10 +1133,9 @@ def addObsoletionNotice(doc):
 def addAtRisk(doc):
     if len(doc.atRisk) == 0:
         return
-    html = "<div><p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
+    html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
     for feature in doc.atRisk:
         html += "<li>"+feature
-    html += "</div>"
     fillWith('at-risk', parseHTML(html))
 
 
