@@ -177,14 +177,18 @@ def transformMarkdownParagraphs(doc):
     # and instead inserts a "<p class='note'>".
     inDataBlock = False
     previousLineBlank = False
+    # Elements whose contents should be skipped when looking for paragraphs.
+    opaqueBlocks = "pre|xmp|script|style"
+    # Elements which are allowed to start a markdown paragraph.
+    allowedStartElements = "em|strong|i|b|u|dfn|a|code|var"
     for (i, line) in enumerate(doc.lines):
-        if not inDataBlock and re.match("\s*<(pre|xmp)", line):
+        if not inDataBlock and re.match("\s*<({0})".format(opaqueBlocks), line):
             inDataBlock = True
             continue
-        if inDataBlock and re.match("\s*</(pre|xmp)", line):
+        if inDataBlock and re.match("\s*</({0})".format(opaqueBlocks), line):
             inDataBlock = False
             continue
-        if (re.match("\s*[^<\s]", line) or re.match("\s*<(em|strong|i|b|u|dfn|a|code|var)", line)) and previousLineBlank and not inDataBlock:
+        if (re.match("\s*[^<\s]", line) or re.match("\s*<({0})".format(allowedStartElements), line)) and previousLineBlank and not inDataBlock:
             if re.match("\s*Note(:|,) ", line):
                 doc.lines[i] = "<p class='note'>" + line
             else:
