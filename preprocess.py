@@ -368,23 +368,6 @@ def transformMetadata(lines, doc, **kwargs):
         else:
             doc.otherMetadata[key].append(val)
 
-    requiredSingularKeys = [
-        ('status', 'Status'), 
-        ('ED', 'ED'), 
-        ('abstract', 'Abstract'), 
-        ('shortname', 'Shortname'), 
-        ('level', 'Level')
-    ]
-    requiredMultiKeys = [
-        ('editors', 'Editor')
-    ]
-    for attr, name in requiredSingularKeys:
-        if getattr(doc, attr) is None:
-            die("Metadata block must contain a '{0}' entry.".format(name))
-    for attr, name in requiredMultiKeys:
-        if len(getattr(doc, attr)) == 0:
-            die("Metadata block must contain at least one '{0}' entry.".format(name))
-
     # Fill in text macros. 
     global textMacros
     longstatuses = {
@@ -416,6 +399,25 @@ def transformMetadata(lines, doc, **kwargs):
                                                                               textMacros["cdate"], 
                                                                               textMacros["year"])
     return []
+
+
+def verifyRequiredMetadata(doc):
+    requiredSingularKeys = [
+        ('status', 'Status'), 
+        ('ED', 'ED'), 
+        ('abstract', 'Abstract'), 
+        ('shortname', 'Shortname'), 
+        ('level', 'Level')
+    ]
+    requiredMultiKeys = [
+        ('editors', 'Editor')
+    ]
+    for attr, name in requiredSingularKeys:
+        if getattr(doc, attr) is None:
+            die("Metadata block must contain a '{0}' entry.".format(name))
+    for attr, name in requiredMultiKeys:
+        if len(getattr(doc, attr)) == 0:
+            die("Metadata block must contain at least one '{0}' entry.".format(name))
 
 
 def transformAutolinkShortcuts(doc):
@@ -887,6 +889,7 @@ class CSSSpec(object):
     def preprocess(self):
         # Textual hacks
         transformDataBlocks(self)
+        verifyRequiredMetadata(self)
         transformMarkdownParagraphs(self)
 
         # Convert to a single string of html now, for convenience.
