@@ -390,7 +390,10 @@ def transformMetadata(lines, doc, **kwargs):
     }
     textMacros["shortname"] = doc.shortname
     textMacros["vshortname"] = "{0}-{1}".format(doc.shortname, str(doc.level))
-    textMacros["longstatus"] = longstatuses[doc.status]
+    if doc.status in longstatuses:
+        textMacros["longstatus"] = longstatuses[doc.status]
+    else:
+        die("Unknown status '{0}' used.".format(doc.status))
     textMacros["status"] = doc.status
     textMacros["latest"] = doc.TR or "???"
     textMacros["abstract"] = doc.abstract or "???"
