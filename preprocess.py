@@ -38,6 +38,8 @@ def main():
                          help="Path to a local bibliography file. By default,\
 the processor uses the remote file at \
 <https://www.w3.org/Style/Group/css3-src/biblio.ref>.")
+    optparser.add_option("--para", dest="paragraphMode", default="markdown",
+                         help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %default]")
     optparser.add_option("-q", "--quiet", dest="quiet", default=False, action="store_true",
                          help="Suppresses everything but fatal errors from printing.")
     optparser.add_option("--debug", dest="debug", default=False, action="store_true",
@@ -52,7 +54,8 @@ the processor uses the remote file at \
 
     global doc
     doc = CSSSpec(inputFilename=options.inputFile,
-                  biblioFilename=options.biblioFile)    
+                  biblioFilename=options.biblioFile,
+                  paragraphMode=options.paragraphMode)    
     doc.preprocess()
 
     if options.printExports:
@@ -877,8 +880,9 @@ class CSSSpec(object):
     informativeRefs = set()
     propdefs = {}
     biblios = {}
+    paragraphMode = "markdown"
 
-    def __init__(self, inputFilename, biblioFilename=None):
+    def __init__(self, inputFilename, biblioFilename=None, paragraphMode="markdown"):
         try:
             self.lines = open(inputFilename, 'r').readlines()
         except OSError:
@@ -890,11 +894,14 @@ class CSSSpec(object):
 
         self.biblios = processReferBiblioFile(bibliofh)
 
+        self.paragraphMode = paragraphMode
+
     def preprocess(self):
         # Textual hacks
         transformDataBlocks(self)
         verifyRequiredMetadata(self)
-        transformMarkdownParagraphs(self)
+        if self.paragraphMode == "markdown":
+            transformMarkdownParagraphs(self)
 
         # Convert to a single string of html now, for convenience.
         self.html = ''.join(self.lines)
