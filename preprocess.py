@@ -332,6 +332,8 @@ def transformMetadata(lines, doc, **kwargs):
     def boolFromString(str):
         return str.lower() in ('true', 't', 'yes', 'y', '1')
 
+    doc.hasMetadata = True
+
     for line in lines:
         match = re.match("\s*([^:]+):\s*(.*)", line)
         key = match.group(1)
@@ -412,6 +414,9 @@ def transformMetadata(lines, doc, **kwargs):
 
 
 def verifyRequiredMetadata(doc):
+    if not doc.hasMetadata:
+        die("The document requires at least one metadata block.")
+        
     requiredSingularKeys = [
         ('status', 'Status'), 
         ('ED', 'ED'), 
@@ -859,6 +864,7 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None):
 
 class CSSSpec(object):
     # required metadata
+    hasMetadata = False
     status = None
     ED = None
     abstract = None
