@@ -374,6 +374,10 @@ def transformMetadata(lines, doc, **kwargs):
 '<name>, <company>, <email-or-contact-page>")
         elif key == "At Risk":
             doc.atRisk.append(val)
+        elif key == "Ignored Properties":
+            doc.ignoredProperties.extend(prop.strip() for prop in val.split(','))
+        elif key == "Ignored Terms":
+            doc.ignoredTerms.extend(term.strip() for term in val.split(','))
         else:
             doc.otherMetadata[key].append(val)
 
@@ -416,7 +420,7 @@ def transformMetadata(lines, doc, **kwargs):
 def verifyRequiredMetadata(doc):
     if not doc.hasMetadata:
         die("The document requires at least one metadata block.")
-        
+
     requiredSingularKeys = [
         ('status', 'Status'), 
         ('ED', 'ED'), 
@@ -774,6 +778,8 @@ def processAutolinks(doc):
         elif type == "property":
             if linkText in doc.propdefs:
                 el.set('href', '#'+idFromText(linkText))
+            elif linkText in doc.ignoredProperties:
+                pass
             else:
                 badProperties.add(linkText)
         elif type in ["link", "maybe"]:
@@ -782,7 +788,9 @@ def processAutolinks(doc):
                     el.set('href', '#'+doc.links[variation])
                     break
             else:
-                if type == "link":
+                if linkText in doc.ignoredTerms:
+                    pass
+                elif type == "link":
                     # "maybe"-type links don't care if they don't link up.
                     badLinks.add(linkText)
         else:
@@ -880,6 +888,8 @@ class CSSSpec(object):
     previousVersions = []
     warning = None
     atRisk = []
+    ignoredProperties = []
+    ignoredTerms = []
     otherMetadata = defaultdict(list)
 
     # internal state
