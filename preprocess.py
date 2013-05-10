@@ -392,7 +392,8 @@ def transformMetadata(lines, doc, **kwargs):
         "PER": "W3C Proposed Edited Recommendation",
         "NOTE": "W3C Working Group Note",
         "MO": "W3C Member-only Draft",
-        "UD": "Unofficial Proposal Draft"
+        "UD": "Unofficial Proposal Draft",
+        "DREAM": "Throw-Shit-Against-The-Wall-And-See-If-It-Sticks Draft"
     }
     textMacros["shortname"] = doc.shortname
     textMacros["vshortname"] = "{0}-{1}".format(doc.shortname, str(doc.level))
