@@ -348,6 +348,8 @@ def transformMetadata(lines, doc, **kwargs):
             doc.group = val.lower()
         elif key == "Date":
             doc.date = datetime.strptime(val, "%Y-%m-%d").date()
+        elif key == "Deadline":
+            doc.deadline = datetime.strptime(val, "%Y-%m-%d").date()
         elif key == "Abstract":
             doc.abstract = val
         elif key == "Shortname":
@@ -386,6 +388,7 @@ def transformMetadata(lines, doc, **kwargs):
     longstatuses = {
         "ED": "Editor's Draft",
         "WD": "W3C Working Draft",
+        "LCWD": "W3C Working Draft",
         "CR": "W3C Candidate Recommendation",
         "PR": "W3C Proposed Recommendation",
         "REC": "W3C Recommendation",
@@ -401,17 +404,22 @@ def transformMetadata(lines, doc, **kwargs):
         textMacros["longstatus"] = longstatuses[doc.status]
     else:
         die("Unknown status '{0}' used.".format(doc.status))
-    textMacros["status"] = doc.status
+    if doc.status == "LCWD":
+        textMacros["status"] = "WD"
+    else:
+        textMacros["status"] = doc.status
     textMacros["latest"] = doc.TR or "???"
     textMacros["abstract"] = doc.abstract or "???"
     textMacros["year"] = str(doc.date.year)
     textMacros["date"] = doc.date.strftime("{0} %B %Y".format(doc.date.day))
     textMacros["cdate"] = doc.date.strftime("%Y%m%d")
     textMacros["isodate"] = doc.date.strftime("%Y-%m-%d")
+    if doc.deadline:
+        textMacros["deadline"] = doc.date.strftime("{0} %B %Y".format(doc.deadline.day))
     if doc.status == "ED":
         textMacros["version"] = doc.ED
     else:
-        textMacros["version"] = "http://www.w3.org/TR/{3}/{0}-{1}-{2}".format(doc.status, 
+        textMacros["version"] = "http://www.w3.org/TR/{3}/{0}-{1}-{2}".format(textMacros["status"], 
                                                                               textMacros["vshortname"], 
                                                                               textMacros["cdate"], 
                                                                               textMacros["year"])
@@ -884,6 +892,7 @@ class CSSSpec(object):
     TR = None
     title = "???"
     date = date.today()
+    deadline = None
     group = "csswg"
     editors = []
     previousVersions = []
