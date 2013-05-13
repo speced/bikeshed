@@ -415,7 +415,7 @@ def transformMetadata(lines, doc, **kwargs):
     textMacros["cdate"] = doc.date.strftime("%Y%m%d")
     textMacros["isodate"] = doc.date.strftime("%Y-%m-%d")
     if doc.deadline:
-        textMacros["deadline"] = doc.date.strftime("{0} %B %Y".format(doc.deadline.day))
+        textMacros["deadline"] = doc.deadline.strftime("{0} %B %Y".format(doc.deadline.day))
     if doc.status == "ED":
         textMacros["version"] = doc.ED
     else:
