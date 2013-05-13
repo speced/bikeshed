@@ -465,7 +465,7 @@ def transformAutolinkShortcuts(doc):
             
             text = text.replace(
                 match.group(0),
-                '<a title="{0}"" data-autolink="biblio" data-biblio-type="{1}"">[{0}]</a>'.format(
+                '<a title="{0}" data-autolink="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
                     match.group(2), 
                     biblioType))
         text = re.sub(r"''([^']+)''", r'<a data-autolink="maybe" class="css">\1</a>', text)
