@@ -454,6 +454,10 @@ def transformAutolinkShortcuts(doc):
     def transformThings(text):
         if text is None:
             return None
+        # Function takes raw text, but then adds HTML, 
+        # and the result is put directly into raw HTML.
+        # So, escape the text, so it turns back into "raw HTML".
+        text = escapeHTML(text)
         # Handle biblio links, [[FOO]] and [[!FOO]]
         while re.search(r"\[\[(!?)([\w-]+)\]\]", text):
             match = re.search(r"\[\[(!?)([\w-]+)\]\]", text)
