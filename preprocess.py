@@ -685,7 +685,7 @@ def buildPropertyDatabase(doc):
 
 def addPropertyIndex(doc):
     # Set up the initial table columns
-    columns = ["Values", "Initial", "Applies To", "Inherited", "Percentages", "Media"]
+    columns = ["Value", "Initial", "Applies To", "Inherited", "Percentages", "Media"]
     # Add any additional keys used in the document.
     allKeys = set()
     for propdef in doc.propdefs.values():
