@@ -473,7 +473,7 @@ def transformAutolinkShortcuts(doc):
                     match.group(2), 
                     biblioType))
         text = re.sub(r"''([^']+)''", r'<a data-autolink="maybe" class="css">\1</a>', text)
-        text = re.sub(r"'([a-zA-Z0-9_*-]+)'", r'<a data-autolink="property" class="property" title="\1">\1</a>', text)
+        text = re.sub(r"'([*-]*[a-zA-Z][a-zA-Z0-9_*/-]*)'", r'<a data-autolink="property" class="property" title="\1">\1</a>', text)
         return text
 
     def fixElementText(el):
