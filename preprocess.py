@@ -388,7 +388,7 @@ def transformMetadata(lines, doc, **kwargs):
     longstatuses = {
         "ED": "Editor's Draft",
         "WD": "W3C Working Draft",
-        "LCWD": "W3C Working Draft",
+        "LCWD": "W3C Last Call Working Draft",
         "CR": "W3C Candidate Recommendation",
         "PR": "W3C Proposed Recommendation",
         "REC": "W3C Recommendation",
@@ -419,7 +419,7 @@ def transformMetadata(lines, doc, **kwargs):
     if doc.status == "ED":
         textMacros["version"] = doc.ED
     else:
-        textMacros["version"] = "http://www.w3.org/TR/{3}/{0}-{1}-{2}".format(textMacros["status"], 
+        textMacros["version"] = "http://www.w3.org/TR/{3}/{0}-{1}-{2}/".format(textMacros["status"], 
                                                                               textMacros["vshortname"], 
                                                                               textMacros["cdate"], 
                                                                               textMacros["year"])
