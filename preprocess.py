@@ -167,6 +167,10 @@ def replaceTextMacros(text):
         text = text.replace("[{0}]".format(tag.upper()), replacement)
     # Also replace the <<production>> shortcuts, because they won't survive the HTML parser.
     text = re.sub(r"<<([\w-]+)>>", r'<a data-autolink="link" class="production"><var>&lt;\1></var></a>', text)
+    # Also replace the ''maybe link'' shortcuts.
+    # They'll survive the HTML parser, but they don't match if they contain an element.
+    # (The other shortcuts are "atomic" and can't contain elements.)
+    text = re.sub(r"''(.+?)''", r'<span data-autolink="maybe" class="css">\1</span>', text)
     return text
 
 
@@ -472,7 +476,6 @@ def transformAutolinkShortcuts(doc):
                 '<a title="{0}" data-autolink="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
                     match.group(2), 
                     biblioType))
-        text = re.sub(r"''([^']+)''", r'<a data-autolink="maybe" class="css">\1</a>', text)
         text = re.sub(r"'([*-]*[a-zA-Z][a-zA-Z0-9_*/-]*)'", r'<a data-autolink="property" class="property" title="\1">\1</a>', text)
         return text
 
@@ -766,16 +769,13 @@ def buildAutolinkDatabase(doc):
 
 
 def processAutolinks(doc):
-    autolinks = findAll("a:not([href]), a[data-autolink], i")
+    autolinks = findAll("a:not([href]), a[data-autolink], i, [data-autolink='maybe']")
     badProperties = set()
     badLinks = set()
     for el in autolinks:
         # Empty title means this shouldn't be an autolink.
         if el.get('title') == '':
             break
-        # Using an <i> is a legacy autolinking form.
-        if el.tag == "i":
-            el.tag = "a"
         # If it's not yet classified, it's a plain "link" link.
         if not el.get('data-autolink'):
             el.set('data-autolink', 'link')
@@ -808,6 +808,9 @@ def processAutolinks(doc):
                     badLinks.add(linkText)
         else:
             die("Unknown type of autolink '{0}'".format(type))
+        if el.get('href'):
+            # If we successfully linked it up, make sure it's an <a>.
+            el.tag = "a"
     if badProperties:
         warn("Couldn't find definitions for the properties: " + ', '.join(map("'{0}'".format, badProperties)))
     if badLinks:
