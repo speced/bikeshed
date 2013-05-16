@@ -769,6 +769,10 @@ def buildAutolinkDatabase(doc):
 
 
 def processAutolinks(doc):
+    # An <a> without an href is an autolink.
+    # For re-run, if you have a [data-autolink] property, we'll regen you href anyway.
+    # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
+    # Maybe autolinks can be any element.  If it links up, we change it into an <a>.
     autolinks = findAll("a:not([href]), a[data-autolink], i, [data-autolink='maybe']")
     badProperties = set()
     badLinks = set()
