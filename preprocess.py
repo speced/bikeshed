@@ -843,7 +843,7 @@ def headingLevelOfElement(el):
         el = el.getparent()
     while not re.match(r"h\d", el.tag):
         el = el.getprevious()
-    return el.get('data-level') or '??'
+    return el.get('data-level')
 
 
 def addIndexSection(doc):
@@ -851,7 +851,7 @@ def addIndexSection(doc):
     indexEntries = {}
     for el in indexElements:
         linkTexts = linkTextsFromElement(el, preserveCasing=True)
-        headingLevel = headingLevelOfElement(el)
+        headingLevel = headingLevelOfElement(el) or "Unnumbered section"
         id = el.get('id')
         for linkText in linkTexts:
             if linkText in indexEntries:
