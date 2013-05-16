@@ -972,6 +972,7 @@ class CSSSpec(object):
         # Autolinks
         genIdsForAutolinkTargets(self)
         buildAutolinkDatabase(self)
+        processAutolinks(self)
         
         # ToC
         addHeadingNumbers(self)
@@ -979,9 +980,6 @@ class CSSSpec(object):
 
         # Property index
         addPropertyIndex(self)
-
-        # Finish Autolinks
-        processAutolinks(self)
 
         # Index
         addIndexSection(self)
