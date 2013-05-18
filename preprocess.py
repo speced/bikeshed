@@ -648,7 +648,7 @@ def addTOCSection(doc):
         if level > previousLevel:
             html += "<ul class='toc'>"
         elif level < previousLevel:
-            html += "</ul>"
+            html += "</ul>" * (previousLevel - level)
         # Clean up the transplanted html to remove any <a> elements,
         # because the HTML parser doesn't like nested <a>s.
         contents = innerHTML(header).replace('<a', '<span').replace('</a', '</span')
