@@ -1187,7 +1187,7 @@ def addAtRisk(doc):
         return
     html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
     for feature in doc.atRisk:
-        html += "<li>"+feature
+        html += "<li>"+replaceTextMacros(feature)
     fillWith('at-risk', parseHTML(html))
 
 
