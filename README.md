@@ -20,6 +20,33 @@ A short overview of my preprocessor's features:
 
 Examples of all of the functionality described here can be found by looking at the source of the [CSS Variables source document](http://dev.w3.org/csswg/css-variables/Overview.src.html)
 
+Quick-Start Guide
+---------------
+
+Starting from an empty file, do the following:
+
+1. Add an `<h1>` with the spec's title as the very first line.
+2. Add a `<pre class='metadata'>` block, with at least the following keys (each line in the format "<key>:<value>"):
+	1. "Status" - the shortcode for the spec's status (ED, WD, UD, etc.)
+	2. "ED" - link to the Editor's Draft
+	3. "Shortname" - the spec's shortname, like "css-flexbox".
+	4. "Level" - an integer for the spec's level.  If you're unsure, just put "1".
+	5. "Editor" - an editor's personal information, in the format "<name>, <company>, <email or contact url>".
+	6. "Abstract" - a short (one or two sentences) description of what the spec is for.
+3. You *should* add an `<h2>Introduction</h2>` section.
+4. Write the rest of the spec!
+
+The processor expects that your headings are all `<h2>` or higher (`<h1>` is reserved for the spec title).
+You don't need to use `<p>` tags in most cases -
+plain paragraphs are automatically inferred by linebreaks,
+and starting one with "Note:" makes it add `class="note"`.
+
+To use autolinks, just define things with `<dfn>`,
+then link to them with `<a>` (no `href` attribute).
+It matches up the contained text by default,
+which can be overridden by using `title` on either the `<dfn>` or `<a>`.
+There are more types of autolinks - check the docs below for details.
+
 `<pre>` whitespace stripping
 ----------------------------
 Using a `<pre>` element in HTML is unsatisfying, 
