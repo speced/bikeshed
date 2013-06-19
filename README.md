@@ -26,12 +26,12 @@ Quick-Start Guide
 Starting from an empty file, do the following:
 
 1. Add an `<h1>` with the spec's title as the very first line.
-2. Add a `<pre class='metadata'>` block, with at least the following keys (each line in the format "<key>:<value>"):
+2. Add a `<pre class='metadata'>` block, with at least the following keys (each line in the format "[key]:[value]"):
 	1. "Status" - the shortcode for the spec's status (ED, WD, UD, etc.)
 	2. "ED" - link to the Editor's Draft
 	3. "Shortname" - the spec's shortname, like "css-flexbox".
 	4. "Level" - an integer for the spec's level.  If you're unsure, just put "1".
-	5. "Editor" - an editor's personal information, in the format "<name>, <company>, <email or contact url>".
+	5. "Editor" - an editor's personal information, in the format "[name], [company], [email or contact url]".
 	6. "Abstract" - a short (one or two sentences) description of what the spec is for.
 3. You *should* add an `<h2>Introduction</h2>` section.
 4. Write the rest of the spec!
@@ -145,7 +145,7 @@ one is auto-generated for it out of the element's text content
 by stripping out everything but alphanumerics, dashes, and underscores.
 
 If the text content looks like a function (ends in "()"), "-function" is appended to the id.
-If the text content looks like a grammar production (start with "<", ends with ">"), "-production" is appended to the id.
+If the text content looks like a grammar production (starts with "<", ends with ">"), "-production" is appended to the id.
 These corrections help reduce id collisions between function/productions and normal terms.
 
 If there is a collision, the processer attempts to fix it by trying to append the digits 0-9 to the id.
