@@ -735,7 +735,7 @@ def idFromText(id):
     if id[-2:] == "()":
         id = id[:-2]
         suffix = "-function"
-    elif id[0] == "<" and id[-1] == ">":
+    elif id[0:1] == "<" and id[-1:] == ">":
         id = id[1:-1]
         suffix = "-production"
     else:
