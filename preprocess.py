@@ -78,7 +78,7 @@ def warn(msg):
 
 
 def textContent(el):
-    return html.tostring(el, method='text', with_tail=False)
+    return html.tostring(el, method='text', with_tail=False, encoding="unicode")
 
 
 def innerHTML(el):
