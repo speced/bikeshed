@@ -444,12 +444,15 @@ def verifyRequiredMetadata(doc):
     requiredMultiKeys = [
         ('editors', 'Editor')
     ]
+    errors = []
     for attr, name in requiredSingularKeys:
         if getattr(doc, attr) is None:
-            die("Metadata block must contain a '{0}' entry.".format(name))
+            errors.append("Metadata block must contain a '{0}' entry.".format(name))
     for attr, name in requiredMultiKeys:
         if len(getattr(doc, attr)) == 0:
-            die("Metadata block must contain at least one '{0}' entry.".format(name))
+            errors.append("Metadata block must contain at least one '{0}' entry.".format(name))
+    if errors:
+        die("\n".join(errors))
 
 
 def transformAutolinkShortcuts(doc):
