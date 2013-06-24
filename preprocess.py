@@ -64,9 +64,22 @@ the processor uses the remote file at \
         doc.finish(outputFilename=options.outputFile)
 
 
+# Fuck everything about Python 2 and Unicode.
+def u(text):
+    if isinstance(text, str):
+        return text.decode('utf-8')
+    elif isinstance(text, unicode):
+        return text
+    else:
+        try:
+            return unicode(text)
+        except:
+            die(str(type(text)) + str(text))
+
+
 def die(msg):
     global debug
-    print "FATAL ERROR: "+msg
+    print u"FATAL ERROR: "+u(msg)
     if not debug:
         sys.exit(1)
 
@@ -74,19 +87,19 @@ def die(msg):
 def warn(msg):
     global debugQuiet
     if not debugQuiet:
-        print "WARNING: "+msg
+        print u"WARNING: "+u(msg)
 
 
 def textContent(el):
-    return html.tostring(el, method='text', with_tail=False, encoding="unicode")
+    return u(html.tostring(el, method='text', with_tail=False, encoding="unicode"))
 
 
 def innerHTML(el):
-    return (el.text or '') + ''.join(html.tostring(x) for x in el)
+    return u((el.text or u'') + u''.join(u(html.tostring(x, encoding="unicode")) for x in el))
 
 
 def outerHTML(el):
-    return html.tostring(el, with_tail=False)
+    return u(html.tostring(el, with_tail=False, encoding="unicode"))
 
 
 def parseHTML(str):
@@ -105,11 +118,11 @@ def parseDocument(str):
 
 def escapeHTML(str):
     # Escape HTML
-    return str.replace('&', '&amp;').replace('<', '&lt;')
+    return u(str).replace(u'&', u'&amp;').replace(u'<', u'&lt;')
 
 
 def escapeAttr(str):
-    return str.replace('&', '&amp;').replace("'", '&apos;').replace('"', '&quot;')
+    return u(str).replace(u'&', u'&amp;').replace(u"'", u'&apos;').replace(u'"', u'&quot;')
 
 
 def findAll(sel, context=None):
@@ -157,14 +170,13 @@ def replaceContents(el, newElements):
 
 
 def fillWith(tag, newElements):
-    for el in findAll("[data-fill-with='{0}']".format(tag)):
+    for el in findAll(u"[data-fill-with='{0}']".format(u(tag))):
         replaceContents(el, newElements)
-
 
 def replaceTextMacros(text):
     global textMacros
     for tag, replacement in textMacros.items():
-        text = text.replace("[{0}]".format(tag.upper()), replacement)
+        text = u(text).replace(u"[{0}]".format(u(tag.upper())), u(replacement))
     # Also replace the <<production>> shortcuts, because they won't survive the HTML parser.
     text = re.sub(r"<<([\w-]+)>>", r'<a data-autolink="link" class="production"><var>&lt;\1></var></a>', text)
     # Also replace the ''maybe link'' shortcuts.
@@ -339,9 +351,9 @@ def transformMetadata(lines, doc, **kwargs):
     doc.hasMetadata = True
 
     for line in lines:
-        match = re.match("\s*([^:]+):\s*(.*)", line)
+        match = re.match(u"\s*([^:]+):\s*(.*)", u(line))
         key = match.group(1)
-        val = match.group(2)
+        val = u(match.group(2))
         if key == "Status":
             doc.status = val
         elif key == "TR":
@@ -361,14 +373,14 @@ def transformMetadata(lines, doc, **kwargs):
         elif key == "Level":
             doc.level = int(val)
         elif key == "Warning":
-            if val.lower() in ('obsolete', 'not ready'):
+            if val.lower() in (u'obsolete', u'not ready'):
                 doc.warning = val.lower().replace(' ', '-')
             else:
                 die('Unknown value for "Warning" metadata.')
         elif key == "Previous Version":
             doc.previousVersions.append(val)
         elif key == "Editor":
-            match = re.match("([^,]+) ,\s* ([^,]+) ,?\s* (.*)", val, re.X)
+            match = re.match(u"([^,]+) ,\s* ([^,]+) ,?\s* (.*)", val, re.X)
             if match:
                 doc.editors.append(
                     {
@@ -381,49 +393,49 @@ def transformMetadata(lines, doc, **kwargs):
         elif key == "At Risk":
             doc.atRisk.append(val)
         elif key == "Ignored Properties":
-            doc.ignoredProperties.extend(prop.strip() for prop in val.split(','))
+            doc.ignoredProperties.extend(prop.strip() for prop in val.split(u','))
         elif key == "Ignored Terms":
-            doc.ignoredTerms.extend(term.strip() for term in val.split(','))
+            doc.ignoredTerms.extend(term.strip() for term in val.split(u','))
         else:
             doc.otherMetadata[key].append(val)
 
     # Fill in text macros. 
     global textMacros
     longstatuses = {
-        "ED": "Editor's Draft",
-        "WD": "W3C Working Draft",
-        "LCWD": "W3C Last Call Working Draft",
-        "CR": "W3C Candidate Recommendation",
-        "PR": "W3C Proposed Recommendation",
-        "REC": "W3C Recommendation",
-        "PER": "W3C Proposed Edited Recommendation",
-        "NOTE": "W3C Working Group Note",
-        "MO": "W3C Member-only Draft",
-        "UD": "Unofficial Proposal Draft",
-        "DREAM": "A Collection of Interesting Ideas"
+        "ED": u"Editor's Draft",
+        "WD": u"W3C Working Draft",
+        "LCWD": u"W3C Last Call Working Draft",
+        "CR": u"W3C Candidate Recommendation",
+        "PR": u"W3C Proposed Recommendation",
+        "REC": u"W3C Recommendation",
+        "PER": u"W3C Proposed Edited Recommendation",
+        "NOTE": u"W3C Working Group Note",
+        "MO": u"W3C Member-only Draft",
+        "UD": u"Unofficial Proposal Draft",
+        "DREAM": u"A Collection of Interesting Ideas"
     }
     textMacros["shortname"] = doc.shortname
-    textMacros["vshortname"] = "{0}-{1}".format(doc.shortname, str(doc.level))
+    textMacros["vshortname"] = u"{0}-{1}".format(doc.shortname, doc.level)
     if doc.status in longstatuses:
         textMacros["longstatus"] = longstatuses[doc.status]
     else:
-        die("Unknown status '{0}' used.".format(doc.status))
+        die(u"Unknown status '{0}' used.".format(doc.status))
     if doc.status == "LCWD":
-        textMacros["status"] = "WD"
+        textMacros["status"] = u"WD"
     else:
         textMacros["status"] = doc.status
-    textMacros["latest"] = doc.TR or "???"
-    textMacros["abstract"] = doc.abstract or "???"
-    textMacros["year"] = str(doc.date.year)
-    textMacros["date"] = doc.date.strftime("{0} %B %Y".format(doc.date.day))
-    textMacros["cdate"] = doc.date.strftime("%Y%m%d")
-    textMacros["isodate"] = doc.date.strftime("%Y-%m-%d")
+    textMacros["latest"] = doc.TR or u"???"
+    textMacros["abstract"] = doc.abstract or u"???"
+    textMacros["year"] = u(doc.date.year)
+    textMacros["date"] = doc.date.strftime(u"{0} %B %Y".format(doc.date.day))
+    textMacros["cdate"] = doc.date.strftime(u"%Y%m%d")
+    textMacros["isodate"] = doc.date.strftime(u"%Y-%m-%d")
     if doc.deadline:
-        textMacros["deadline"] = doc.deadline.strftime("{0} %B %Y".format(doc.deadline.day))
+        textMacros["deadline"] = doc.deadline.strftime(u"{0} %B %Y".format(doc.deadline.day))
     if doc.status == "ED":
         textMacros["version"] = doc.ED
     else:
-        textMacros["version"] = "http://www.w3.org/TR/{3}/{0}-{1}-{2}/".format(textMacros["status"], 
+        textMacros["version"] = u"http://www.w3.org/TR/{3}/{0}-{1}-{2}/".format(textMacros["status"], 
                                                                               textMacros["vshortname"], 
                                                                               textMacros["cdate"], 
                                                                               textMacros["year"])
@@ -447,12 +459,12 @@ def verifyRequiredMetadata(doc):
     errors = []
     for attr, name in requiredSingularKeys:
         if getattr(doc, attr) is None:
-            errors.append("Metadata block must contain a '{0}' entry.".format(name))
+            errors.append(u"Metadata block must contain a '{0}' entry.".format(u(name)))
     for attr, name in requiredMultiKeys:
         if len(getattr(doc, attr)) == 0:
-            errors.append("Metadata block must contain at least one '{0}' entry.".format(name))
+            errors.append(u"Metadata block must contain at least one '{0}' entry.".format(u(name)))
     if errors:
-        die("\n".join(errors))
+        die(u"\n".join(errors))
 
 
 def transformAutolinkShortcuts(doc):
@@ -466,21 +478,21 @@ def transformAutolinkShortcuts(doc):
         # So, escape the text, so it turns back into "raw HTML".
         text = escapeHTML(text)
         # Handle biblio links, [[FOO]] and [[!FOO]]
-        while re.search(r"\[\[(!?)([\w-]+)\]\]", text):
-            match = re.search(r"\[\[(!?)([\w-]+)\]\]", text)
+        while re.search(ur"\[\[(!?)([\w-]+)\]\]", text):
+            match = re.search(ur"\[\[(!?)([\w-]+)\]\]", text)
 
             if match.group(1) == "!":
-                biblioType = "normative"
+                biblioType = u"normative"
             else:
-                biblioType = "informative"
+                biblioType = u"informative"
             
-            text = text.replace(
-                match.group(0),
-                '<a title="{0}" data-autolink="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
-                    match.group(2), 
-                    biblioType))
-        text = re.sub(r"'([*-]*[a-zA-Z][a-zA-Z0-9_*/-]*)'", r'<a data-autolink="property" class="property" title="\1">\1</a>', text)
-        return text
+            text = u(text.replace(
+                        match.group(0),
+                        u'<a title="{0}" data-autolink="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
+                            u(match.group(2)), 
+                            biblioType)))
+        text = re.sub(ur"'([*-]*[a-zA-Z][a-zA-Z0-9_*/-]*)'", ur'<a data-autolink="property" class="property" title="\1">\1</a>', text)
+        return u(text)
 
     def fixElementText(el):
         # Don't transform anything in some kinds of elements.
@@ -488,22 +500,22 @@ def transformAutolinkShortcuts(doc):
 
         if processContents:
             # Pull out el.text, replace stuff (may introduce elements), parse.
-            newtext = transformThings(el.text)
+            newtext = transformThings(u(el.text))
             if el.text != newtext:
-                temp = parseHTML('<div>'+newtext+'</div>')[0]
+                temp = parseHTML(u'<div>'+u(newtext)+u'</div>')[0]
                 # Change the .text, empty out the temp children.
-                el.text = temp.text
+                el.text = u(temp.text)
                 for child in temp.iterchildren(tag="*", reversed=True):
                     el.insert(0, child)
 
         # Same for tail.
         newtext = transformThings(el.tail)
         if el.tail != newtext:
-            temp = parseHTML('<div>'+newtext+'</div>')[0]
-            el.tail = ''
+            temp = parseHTML(u'<div>'+u(newtext)+u'</div>')[0]
+            el.tail = u''
             for child in temp.iterchildren(tag="*", reversed=True):
                 el.addnext(child)
-            el.tail = temp.text
+            el.tail = u(temp.text)
 
         if processContents:
             # Recurse over children.
@@ -513,45 +525,46 @@ def transformAutolinkShortcuts(doc):
     fixElementText(doc.document.getroot())
 
 def addSpecMetadataSection(doc):
-    header = "<dl>"
-    header += "<dt>This version:<dd><a href='{0}' class='u-url'>{0}</a>".format("[VERSION]")
+    header = u"<dl>"
+    header += u"<dt>This version:<dd><a href='[VERSION]' class='u-url'>[VERSION]</a>"
     if doc.TR:
-        header += "<dt>Latest version:<dd><a href='{0}'>{0}</a>".format(doc.TR)
+        header += u"<dt>Latest version:<dd><a href='{0}'>{0}</a>".format(doc.TR)
     if doc.ED:
-        header += "<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.ED)
+        header += u"<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.ED)
     if len(doc.previousVersions):
-        header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.previousVersions))
-    header += """
+        header += u"<dt>Previous Versions:" + u''.join(map(u"<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.previousVersions))
+    header += u"""
 <dt>Feedback:</dt>
     <dd><a href="mailto:www-style@w3.org?subject=%5B[SHORTNAME]%5D%20feedback">www-style@w3.org</a> 
         with subject line 
         &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;
         (<a rel="discussion" href="http://lists.w3.org/Archives/Public/www-style/">archives</a>)"""
     if len(doc.editors):
-        header += "<dt>Editors:\n"
+        header += u"<dt>Editors:\n"
         for editor in doc.editors:
-            header += "<dd class='p-author h-card vcard'>"
+            header += u"<dd class='p-author h-card vcard'>"
             if(editor['link'][0:4] == "http"):
-                header += "<a class='p-name fn u-url url' href='{0}'>{1}</a> \
+                header += u"<a class='p-name fn u-url url' href='{0}'>{1}</a> \
 (<span class='p-org org'>{2}</span>)".format(editor['link'],
                                              editor['name'],
                                              editor['org'])
             else:
                 # Link is assumed to be an email address
-                header += "<span class='p-name fn'>{0}</span> \
+                header += u"<span class='p-name fn'>{0}</span> \
 (<span class='p-org org'>{1}</span>), \
 <a class='u-email email' href='mailto:{2}'>{2}</a>".format(editor['name'],
                                                            editor['org'],
                                                            editor['link'])
     else:
-        header += "<dt>Editors:<dd>???"
+        header += u"<dt>Editors:<dd>???"
     if len(doc.otherMetadata):
         for key, vals in doc.otherMetadata.items():
-            header += "<dt>{0}:".format(key)
+            header += u"<dt>{0}:".format(key)
             for val in vals:
-                header += "<dd>"+val
-    header += "</dl>"
+                header += u"<dd>"+val
+    header += u"</dl>"
     header = replaceTextMacros(header)
+    warn(str(type(header)))
     fillWith('spec-metadata', parseHTML(header))
 
 
@@ -560,37 +573,37 @@ def buildBibliolinkDatabase(doc):
     for el in biblioLinks:
 
         if el.get('title'):
-            linkText = el.get('title')
+            linkText = u(el.get('title'))
         else:
             # Assume the text is of the form "[NAME]"
             linkText = textContent(el)[1:-1]
             el.set('title', linkText)
         if linkText not in doc.biblios:
-            die("Couldn't find '{0}' in bibliography data.".format(linkText))
+            die(u"Couldn't find '{0}' in bibliography data.".format(linkText))
         biblioEntry = doc.biblios[linkText]
         if el.get('data-biblio-type') == "normative":
             doc.normativeRefs.add(biblioEntry)
         elif el.get('data-biblio-type') == "informative":
             doc.informativeRefs.add(biblioEntry)
         else:
-            die("Unknown data-biblio-type value '{0}' on {1}. \
-Only 'normative' and 'informative' allowed.".format(el.get('data-biblio-type'), outerHTML(el)))
+            die(u"Unknown data-biblio-type value '{0}' on {1}. \
+Only 'normative' and 'informative' allowed.".format(u(el.get('data-biblio-type')), outerHTML(el)))
 
 
 def addReferencesSection(doc):
-    text = "<dl>"
+    text = u"<dl>"
     for ref in doc.normativeRefs:
-        text += "<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, idFromText(ref.linkText))
-        text += "<dd>"+str(ref)+"</dd>"
-    text += "</dl>"
+        text += u"<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, idFromText(ref.linkText))
+        text += u"<dd>"+u(ref)+u"</dd>"
+    text += u"</dl>"
     fillWith("normative-references", parseHTML(text))
 
-    text = "<dl>"
+    text = u"<dl>"
     # If the same doc is referenced as both normative and informative, normative wins.
     for ref in doc.informativeRefs - doc.normativeRefs:
-        text += "<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, idFromText(ref.linkText))
-        text += "<dd>"+str(ref)+"</dd>"
-    text += "</dl>"
+        text += u"<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, idFromText(ref.linkText))
+        text += u"<dd>"+u(ref)+u"</dd>"
+    text += u"</dl>"
     fillWith("informative-references", parseHTML(text))
 
 
@@ -601,7 +614,7 @@ def addHeadingNumbers(doc):
         for i in range(level-1, 5):
             headerLevel[i] = 0
     def printLevel():
-        return '.'.join(str(x) for x in headerLevel if x > 0)
+        return u'.'.join(u(x) for x in headerLevel if x > 0)
 
     skipLevel = float('inf')
     for header in findAll('h2, h3, h4, h5, h6'):
@@ -611,7 +624,7 @@ def addHeadingNumbers(doc):
         if(header.get('level')):
             del header.attrib['level']
         if(len(header) > 0 and header[0].tag == 'span' and header[0].get('class') == "secno"):
-            header.text = header[0].tail
+            header.text = u(header[0].tail)
             del header[0]
 
         # If we encounter a no-num, don't number it or any in the same section. 
@@ -626,16 +639,16 @@ def addHeadingNumbers(doc):
         incrementLevel(level)
         header.set('data-level', printLevel())
         secno = etree.Element('span', {"class":"secno"})
-        secno.text = printLevel() + ' '
+        secno.text = printLevel() + u' '
         header.insert(0, secno)
         secno.tail = header.text
-        header.text = ''
+        header.text = u''
 
 
 def addTOCSection(doc):
     skipLevel = float('inf')
     previousLevel = 0
-    html = ''
+    html = u''
     for header in findAll('h2, h3, h4, h5, h6'):
         level = int(header.tag[-1])
 
@@ -649,13 +662,13 @@ def addTOCSection(doc):
             skipLevel = float('inf')
 
         if level > previousLevel:
-            html += "<ul class='toc'>"
+            html += u"<ul class='toc'>"
         elif level < previousLevel:
-            html += "</ul>" * (previousLevel - level)
+            html += u"</ul>" * (previousLevel - level)
         # Clean up the transplanted html to remove any <a> elements,
         # because the HTML parser doesn't like nested <a>s.
-        contents = innerHTML(header).replace('<a', '<span').replace('</a', '</span')
-        html += "<li><a href='#{0}'>{1}</a>".format(header.get('id'), contents)
+        contents = innerHTML(header).replace(u'<a', u'<span').replace(u'</a', u'</span')
+        html += u"<li><a href='#{0}'>{1}</a>".format(u(header.get('id')), contents)
         previousLevel = level
     fillWith("table-of-contents", parseHTML(html))
 
@@ -663,8 +676,8 @@ def addTOCSection(doc):
 def formatPropertyNames(doc):
     propertyCells = findAll("table.propdef tr:first-child > td, table.descdef tr:first-child > td")
     for cell in propertyCells:
-        props = [x.strip() for x in textContent(cell).split(',')]
-        html = ', '.join("<dfn id='{1}'>{0}</dfn>".format(name, idFromText(name)) for name in props)
+        props = [u(x.strip()) for x in textContent(cell).split(u',')]
+        html = u', '.join(u"<dfn id='{1}'>{0}</dfn>".format(name, idFromText(name)) for name in props)
         replaceContents(cell, parseHTML(html))
 
 
@@ -676,7 +689,7 @@ def buildPropertyDatabase(doc):
         rows = findAll('tr', propdefTable)
         for row in rows:
             # Extract the key, minus the trailing :
-            key = re.match('(.*):', textContent(row[0])).group(1).strip()
+            key = re.match(u'(.*):', textContent(row[0])).group(1).strip()
             # Extract the value from the second cell
             if key == "Name":
                 names = [textContent(x) for x in findAll('dfn', row[1])]
@@ -695,19 +708,19 @@ def addPropertyIndex(doc):
         allKeys |= set(propdef.keys())
     columns.extend(allKeys - set(columns))
     # Create the table
-    html = "<table class=proptable><thead><tr><th scope=col>Name"
+    html = u"<table class=proptable><thead><tr><th scope=col>Name"
     for column in columns:
         if column == "Inherited":
-            html += "<th scope=col>Inh."
+            html += u"<th scope=col>Inh."
         elif column == "Percentages":
-            html += "<th scope=col>%ages"
+            html += u"<th scope=col>%ages"
         else:
-            html += "<th scope=col>"+column
+            html += u"<th scope=col>"+u(column)
     for name, propdef in doc.propdefs.items():
-        html += "<tr><th scope=row><a data-property>{0}</a>".format(name)
+        html += u"<tr><th scope=row><a data-property>{0}</a>".format(name)
         for column in columns:
-            html += "<td>" + propdef.get(column, "")
-    html += "</table>"
+            html += u"<td>" + propdef.get(u(column), u"")
+    html += u"</table>"
     fillWith("property-index", parseHTML(html))
 
 
@@ -718,17 +731,17 @@ def genIdsForAutolinkTargets(doc):
         if el.get('id') is not None:
             id = el.get('id')
             if id in ids:
-                die("Found a duplicate explicitly-specified id '{0}' in {1}".format(id, outerHTML(el)))
+                die(u"Found a duplicate explicitly-specified id '{0}' in {1}".format(u(id), outerHTML(el)))
         else:
             id = idFromText(textContent(el))
             if id in ids:
                 # Try to de-dup the id by appending an integer after it.
                 for x in range(10):
-                    if (id+str(x)) not in ids:
-                        id = id + str(x)
+                    if (id+u(x)) not in ids:
+                        id = id + u(x)
                         break
                 else:
-                    die("More than 10 link-targets with the same id '{0}'.".format(id))
+                    die(u"More than 10 link-targets with the same id '{0}'.".format(id))
             el.set('id', id)
         ids.add(id)
     doc.ids = ids
@@ -737,20 +750,20 @@ def genIdsForAutolinkTargets(doc):
 def idFromText(id):
     if id[-2:] == "()":
         id = id[:-2]
-        suffix = "-function"
+        suffix = u"-function"
     elif id[0:1] == "<" and id[-1:] == ">":
         id = id[1:-1]
-        suffix = "-production"
+        suffix = u"-production"
     else:
-        suffix = ""
-    return re.sub("[^a-z0-9_-]", "", id.replace(" ", "-").lower()) + suffix
+        suffix = u""
+    return re.sub(u"[^a-z0-9_-]", u"", id.replace(u" ", u"-").lower()) + suffix
 
 
 def linkTextsFromElement(el, preserveCasing=False):
     if el.get('title') == '':
         return []
     elif el.get('title'):
-        return [x.strip() for x in el.get('title').split('|')]
+        return [u(x.strip()) for x in el.get('title').split('|')]
     elif preserveCasing:
         return [textContent(el).strip()]
     else:
@@ -765,9 +778,9 @@ def buildAutolinkDatabase(doc):
             linkTexts = linkTextsFromElement(el)
             for linkText in linkTexts:
                 if linkText in links:
-                    die("Two link-targets have the same linking text: " + linkText)
+                    die(u"Two link-targets have the same linking text: " + linkText)
                 else:
-                    links[linkText] = el.get('id')
+                    links[linkText] = u(el.get('id'))
     doc.links = links
 
 
@@ -786,23 +799,23 @@ def processAutolinks(doc):
         # If it's not yet classified, it's a plain "link" link.
         if not el.get('data-autolink'):
             el.set('data-autolink', 'link')
-        linkText = el.get('title') or textContent(el).lower()
+        linkText = u(el.get('title')) or textContent(el).lower()
 
         if len(linkText) == 0:
-            die("Autolink {0} has no linktext.".format(outerHTML(el)))
+            die(u"Autolink {0} has no linktext.".format(outerHTML(el)))
 
-        type = el.get('data-autolink')
-        if type == "biblio":
+        type = u(el.get('data-autolink'))
+        if type == u"biblio":
             # All the biblio links have already been verified.
             el.set('href', '#'+idFromText(linkText))
-        elif type == "property":
+        elif type == u"property":
             if linkText in doc.propdefs:
                 el.set('href', '#'+idFromText(linkText))
             elif linkText in doc.ignoredProperties:
                 pass
             else:
                 badProperties.add(linkText)
-        elif type in ["link", "maybe"]:
+        elif type in [u"link", u"maybe"]:
             for variation in linkTextVariations(linkText):
                 if variation in doc.links:
                     el.set('href', '#'+doc.links[variation])
@@ -814,14 +827,14 @@ def processAutolinks(doc):
                     # "maybe"-type links don't care if they don't link up.
                     badLinks.add(linkText)
         else:
-            die("Unknown type of autolink '{0}'".format(type))
+            die(u"Unknown type of autolink '{0}'".format(type))
         if el.get('href'):
             # If we successfully linked it up, make sure it's an <a>.
             el.tag = "a"
     if badProperties:
-        warn("Couldn't find definitions for the properties: " + ', '.join(map("'{0}'".format, badProperties)))
+        warn(u"Couldn't find definitions for the properties: " + ', '.join(map(u"'{0}'".format, badProperties)))
     if badLinks:
-        warn("Couldn't find definitions for the terms: " + ', '.join(map('"{0}"'.format, badLinks)))
+        warn(u"Couldn't find definitions for the terms: " + ', '.join(map(u'"{0}"'.format, badLinks)))
 
 
 def linkTextVariations(str):
@@ -829,15 +842,15 @@ def linkTextVariations(str):
     # so explicitly adding a title attr isn't usually necessary.
     yield str
 
-    if str[-3:] == "ies":
-        yield str[:-3]+"y"
-    if str[-2:] == "es":
+    if str[-3:] == u"ies":
+        yield str[:-3]+u"y"
+    if str[-2:] == u"es":
         yield str[:-2]
-    if str[-2:] == "'s":
+    if str[-2:] == u"'s":
         yield str[:-2]
-    if str[-1:] == "s":
+    if str[-1:] == u"s":
         yield str[:-1]
-    if str[-1:] == "'":
+    if str[-1:] == u"'":
         yield str[:-1]
 
 
@@ -846,7 +859,7 @@ def headingLevelOfElement(el):
         el = el.getparent()
     while not re.match(r"h\d", el.tag):
         el = el.getprevious()
-    return el.get('data-level')
+    return u(el.get('data-level'))
 
 
 def addIndexSection(doc):
@@ -854,17 +867,17 @@ def addIndexSection(doc):
     indexEntries = {}
     for el in indexElements:
         linkTexts = linkTextsFromElement(el, preserveCasing=True)
-        headingLevel = headingLevelOfElement(el) or "Unnumbered section"
+        headingLevel = headingLevelOfElement(el) or u"Unnumbered section"
         id = el.get('id')
         for linkText in linkTexts:
             if linkText in indexEntries:
-                die("Multiple declarations with the same linktext '{0}'".format(linkText))
+                die(u"Multiple declarations with the same linktext '{0}'".format(u(linkText)))
             indexEntries[linkText] = (linkText, id, headingLevel)
     sortedEntries = sorted(indexEntries.values(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower()))
-    html = "<ul class='indexlist'>"
+    html = u"<ul class='indexlist'>"
     for text, id, level in sortedEntries:
-        html += "<li>{0}, <a href='#{1}' title='section {2}'>{2}</a>".format(escapeHTML(text), id, level)
-    html += "</ul>"
+        html += u"<li>{0}, <a href='#{1}' title='section {2}'>{2}</a>".format(escapeHTML(u(text)), u(id), u(level))
+    html += u"</ul>"
     fillWith("index", parseHTML(html))
 
 
@@ -1061,33 +1074,33 @@ class BiblioEntry(object):
         self.authors = []
         self.foreignAuthors = []
         for key, val in kwargs.items():
-            setattr(self, key, val)
+            setattr(self, key, u(val))
 
     def __str__(self):
-        str = ""
+        str = u""
         authors = self.authors + self.foreignAuthors
 
         if len(authors) == 0:
-            str += "???. "
+            str += u"???. "
         elif len(authors) == 1:
-            str += authors[0] + ". "
+            str += u(authors[0]) + u". "
         elif len(authors) < 4:
-            str += "; ".join(authors) + ". "
+            str += u"; ".join(u(authors)) + u". "
         else:
-            str += authors[0] + "; et al. "
+            str += u(authors[0]) + u"; et al. "
 
-        str += "<a href='{0}'>{1}</a>. ".format(self.url, self.title)
+        str += u"<a href='{0}'>{1}</a>. ".format(self.url, self.title)
 
         if self.date:
-            str += self.date + ". "
+            str += self.date + u". "
 
         if self.status:
-            str += self.status + ". "
+            str += self.status + u". "
 
         if self.other:
-            str += self.other + " "
+            str += self.other + u" "
 
-        str += "URL: <a href='{0}'>{0}</a>".format(self.url)
+        str += u"URL: <a href='{0}'>{0}</a>".format(self.url)
         return str
 
 
