@@ -66,7 +66,9 @@ the processor uses the remote file at \
 
 # Fuck everything about Python 2 and Unicode.
 def u(text):
-    if isinstance(text, str):
+    if text is None:
+        return None
+    elif isinstance(text, str):
         return text.decode('utf-8')
     elif isinstance(text, unicode):
         return text
@@ -772,7 +774,7 @@ def linkTextsFromElement(el, preserveCasing=False):
 
 def buildAutolinkDatabase(doc):
     links = {}
-    linkTargets = findAll("dfn, h2, h3, h4, h5, h6")
+    linkTargets = findAll("dfn")
     for el in linkTargets:
         if not re.search("no-ref", el.get('class') or ""):
             linkTexts = linkTextsFromElement(el)
