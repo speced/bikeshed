@@ -565,7 +565,6 @@ def addSpecMetadataSection(doc):
                 header += u"<dd>"+val
     header += u"</dl>"
     header = replaceTextMacros(header)
-    warn(str(type(header)))
     fillWith('spec-metadata', parseHTML(header))
 
 
