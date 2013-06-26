@@ -666,12 +666,21 @@ def addTOCSection(doc):
             html += u"<ul class='toc'>"
         elif level < previousLevel:
             html += u"</ul>" * (previousLevel - level)
-        # Clean up the transplanted html to remove any <a> elements,
-        # because the HTML parser doesn't like nested <a>s.
-        contents = innerHTML(header).replace(u'<a', u'<span').replace(u'</a', u'</span')
+        contents = removeBadToCElements(innerHTML(header))
         html += u"<li><a href='#{0}'>{1}</a>".format(u(header.get('id')), contents)
         previousLevel = level
     fillWith("table-of-contents", parseHTML(html))
+
+def removeBadToCElements(html):
+    # Several elements which can occur in headings shouldn't be copied over into the ToC.
+
+    # ToC text is wrapped in an <a>, but the HTML parser doesn't like nested <a>s.
+    html = html.replace(u'<a', u'<span').replace(u'</a', u'</span')
+
+    # Remove any <dfn>s, so they don't get duplicated in the ToC.
+    html = re.sub(u'(<dfn[^>]*>)|(</dfn>)', '', html)
+
+    return html
 
 
 def formatPropertyNames(doc):
@@ -876,7 +885,7 @@ def addIndexSection(doc):
             indexEntries[linkText] = (linkText, id, headingLevel, el)
     sortedEntries = sorted(indexEntries.values(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower()))
     html = u"<ul class='indexlist'>"
-    for text, id, level in sortedEntries:
+    for text, id, level, el in sortedEntries:
         html += u"<li>{0}, <a href='#{1}' title='section {2}'>{2}</a>".format(escapeHTML(u(text)), u(id), u(level))
     html += u"</ul>"
     fillWith("index", parseHTML(html))
