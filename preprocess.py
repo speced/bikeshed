@@ -872,8 +872,8 @@ def addIndexSection(doc):
         id = el.get('id')
         for linkText in linkTexts:
             if linkText in indexEntries:
-                die(u"Multiple declarations with the same linktext '{0}'", linkText)
-            indexEntries[linkText] = (linkText, id, headingLevel)
+                die(u"Multiple declarations with the same linktext: {0} and {1}", outerHTML(el), outerHTML(indexEntries[linkText][3]))
+            indexEntries[linkText] = (linkText, id, headingLevel, el)
     sortedEntries = sorted(indexEntries.values(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower()))
     html = u"<ul class='indexlist'>"
     for text, id, level in sortedEntries:
