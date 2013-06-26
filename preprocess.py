@@ -76,21 +76,20 @@ def u(text):
         try:
             return unicode(text)
         except:
-            die(str(type(text)) + str(text))
+            die("Unicode encoding error! Please report to the project maintainer. Some information: {0}", str(type(text)) + str(text))
 
 
-def die(msg):
+def die(msg, *formatArgs):
     global debug
-    print u"FATAL ERROR: "+u(msg)
+    print u"FATAL ERROR: "+u(msg).format(*map(u, formatArgs))
     if not debug:
         sys.exit(1)
 
 
-def warn(msg):
+def warn(msg, *formatArgs):
     global debugQuiet
     if not debugQuiet:
-        print u"WARNING: "+u(msg)
-
+        print u"WARNING: "+u(msg).format(*map(u, formatArgs))
 
 def textContent(el):
     return u(html.tostring(el, method='text', with_tail=False, encoding="unicode"))
@@ -421,7 +420,7 @@ def transformMetadata(lines, doc, **kwargs):
     if doc.status in longstatuses:
         textMacros["longstatus"] = longstatuses[doc.status]
     else:
-        die(u"Unknown status '{0}' used.".format(doc.status))
+        die(u"Unknown status '{0}' used.",doc.status)
     if doc.status == "LCWD":
         textMacros["status"] = u"WD"
     else:
@@ -581,7 +580,7 @@ def buildBibliolinkDatabase(doc):
             linkText = textContent(el)[1:-1]
             el.set('title', linkText)
         if linkText not in doc.biblios:
-            die(u"Couldn't find '{0}' in bibliography data.".format(linkText))
+            die(u"Couldn't find '{0}' in bibliography data.", linkText)
         biblioEntry = doc.biblios[linkText]
         if el.get('data-biblio-type') == "normative":
             doc.normativeRefs.add(biblioEntry)
@@ -589,7 +588,7 @@ def buildBibliolinkDatabase(doc):
             doc.informativeRefs.add(biblioEntry)
         else:
             die(u"Unknown data-biblio-type value '{0}' on {1}. \
-Only 'normative' and 'informative' allowed.".format(u(el.get('data-biblio-type')), outerHTML(el)))
+Only 'normative' and 'informative' allowed.", u(el.get('data-biblio-type')), outerHTML(el))
 
 
 def addReferencesSection(doc):
@@ -733,7 +732,7 @@ def genIdsForAutolinkTargets(doc):
         if el.get('id') is not None:
             id = el.get('id')
             if id in ids:
-                die(u"Found a duplicate explicitly-specified id '{0}' in {1}".format(u(id), outerHTML(el)))
+                die(u"Found a duplicate explicitly-specified id '{0}' in {1}", id, outerHTML(el))
         else:
             id = idFromText(textContent(el))
             if id in ids:
@@ -743,7 +742,7 @@ def genIdsForAutolinkTargets(doc):
                         id = id + u(x)
                         break
                 else:
-                    die(u"More than 10 link-targets with the same id '{0}'.".format(id))
+                    die(u"More than 10 link-targets with the same id '{0}'.", id)
             el.set('id', id)
         ids.add(id)
     doc.ids = ids
@@ -780,7 +779,7 @@ def buildAutolinkDatabase(doc):
             linkTexts = linkTextsFromElement(el)
             for linkText in linkTexts:
                 if linkText in links:
-                    die(u"Two link-targets have the same linking text: " + linkText)
+                    die(u"Two link-targets have the same linking text: {0}", linkText)
                 else:
                     links[linkText] = u(el.get('id'))
     doc.links = links
@@ -804,7 +803,7 @@ def processAutolinks(doc):
         linkText = u(el.get('title')) or textContent(el).lower()
 
         if len(linkText) == 0:
-            die(u"Autolink {0} has no linktext.".format(outerHTML(el)))
+            die(u"Autolink {0} has no linktext.", outerHTML(el))
 
         type = u(el.get('data-autolink'))
         if type == u"biblio":
@@ -829,14 +828,14 @@ def processAutolinks(doc):
                     # "maybe"-type links don't care if they don't link up.
                     badLinks.add(linkText)
         else:
-            die(u"Unknown type of autolink '{0}'".format(type))
+            die(u"Unknown type of autolink '{0}'", type)
         if el.get('href'):
             # If we successfully linked it up, make sure it's an <a>.
             el.tag = "a"
     if badProperties:
-        warn(u"Couldn't find definitions for the properties: " + ', '.join(map(u"'{0}'".format, badProperties)))
+        warn(u"Couldn't find definitions for the properties: " + u', '.join(map(u"'{0}'".format, badProperties)))
     if badLinks:
-        warn(u"Couldn't find definitions for the terms: " + ', '.join(map(u'"{0}"'.format, badLinks)))
+        warn(u"Couldn't find definitions for the terms: " + u', '.join(map(u'"{0}"'.format, badLinks)))
 
 
 def linkTextVariations(str):
@@ -873,7 +872,7 @@ def addIndexSection(doc):
         id = el.get('id')
         for linkText in linkTexts:
             if linkText in indexEntries:
-                die(u"Multiple declarations with the same linktext '{0}'".format(u(linkText)))
+                die(u"Multiple declarations with the same linktext '{0}'", linkText)
             indexEntries[linkText] = (linkText, id, headingLevel)
     sortedEntries = sorted(indexEntries.values(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower()))
     html = u"<ul class='indexlist'>"
@@ -888,23 +887,23 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None):
         fh = open(cacheLocation, 'r')
     except IOError:
         if fallbackurl is None:
-            die("Couldn't find the {0} cache file at the specified location '{1}'.".format(type, cacheLocation))
+            die(u"Couldn't find the {0} cache file at the specified location '{1}'.", type, cacheLocation)
         else:
-            warn("Couldn't find the {0} cache file at the specified location '{1}'.".format(type, cacheLocation))
-            warn("Attempting to download it from '{0}'...".format(url))
+            warn(u"Couldn't find the {0} cache file at the specified location '{1}'.", type, cacheLocation)
+            warn(u"Attempting to download it from '{0}'...", url)
             try:
                 fh = urlopen(url)
             except:
-                die("Couldn't retrieve the {0} file from '{1}'.".format(type, url))
+                die(u"Couldn't retrieve the {0} file from '{1}'.", type, url)
             try:
-                warn("Attempting to save the {0} file to cache...".format(type))
+                warn(u"Attempting to save the {0} file to cache...", type)
                 outfh = open(cacheLocation, 'w')
                 outfh.write(fh.read())
                 fh.close()
                 fh = open(cacheLocation, 'r')
-                warn("Successfully saved the {0} file to cache.".format(type))
+                warn("Successfully saved the {0} file to cache.", type)
             except:
-                warn("Couldn't save the {0} file to cache. Proceeding...".format(type))
+                warn("Couldn't save the {0} file to cache. Proceeding...", type)
     return fh
 
 
@@ -944,7 +943,7 @@ class CSSSpec(object):
         try:
             self.lines = open(inputFilename, 'r').readlines()
         except OSError:
-            die("Couldn't find the input file at the specified location \""+inputFilename+"\".")
+            die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
 
         bibliofh = retrieveCachedFile(cacheLocation=(biblioFilename or os.path.dirname(os.path.realpath(__file__)) + "/biblio.refer"),
                                       fallbackurl="https://www.w3.org/Style/Group/css3-src/biblio.ref",
@@ -1008,7 +1007,7 @@ class CSSSpec(object):
         try:
             open(outputFilename, mode='w').write(html.tostring(self.document))
         except:
-            die("Something prevented me from saving the output document to {0}.".format(outputFilename))
+            die("Something prevented me from saving the output document to {0}.", outputFilename)
 
     def printTargets(self):
         def targetText(el):
@@ -1043,14 +1042,14 @@ class CSSSpec(object):
         elif os.path.isfile("{0}/{1}.include".format(pathprefix, name)):
             filename = "{0}/{1}.include".format(pathprefix, name)
         else:
-            die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.".format(name, group, status))
+            die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
             filename = "/dev/null"
 
         try:
             with open(filename, 'r') as fh:
                 return fh.read()
         except IOError:
-            die("The include file for {0} disappeared underneath me.".format(name))
+            die("The include file for {0} disappeared underneath me.", name)
 
 
 class BiblioEntry(object):
