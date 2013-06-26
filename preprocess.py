@@ -850,9 +850,9 @@ def processAutolinks(doc):
             # If we successfully linked it up, make sure it's an <a>.
             el.tag = "a"
     if badProperties:
-        warn(u"Couldn't find definitions for the properties: " + u', '.join(map(u"'{0}'".format, badProperties)))
+        die(u"Couldn't find definitions for the properties: {0}\nDefine them, or add them to the 'Ignored Properties' metadata entry.", u', '.join(map(u"'{0}'".format, badProperties)))
     if badLinks:
-        warn(u"Couldn't find definitions for the terms: " + u', '.join(map(u'"{0}"'.format, badLinks)))
+        die(u"Couldn't find definitions for the terms: {0}\nDefine them, or add them to the 'Ignored Terms' metadata entry.", u', '.join(map(u'"{0}"'.format, badLinks)))
 
 
 def linkTextVariations(str):
