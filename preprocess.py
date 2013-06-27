@@ -22,6 +22,8 @@ import subprocess
 import os
 import sys
 import html5lib
+from html5lib import treewalkers
+from html5lib.serializer import htmlserializer
 from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
@@ -1021,8 +1023,11 @@ class CSSSpec(object):
         return self
 
     def finish(self, outputFilename):
+        walker = treewalkers.getTreeWalker("lxml")
+        s = htmlserializer.HTMLSerializer()
+        rendered = s.render(walker(self.document), encoding='utf-8')
         try:
-            open(outputFilename, mode='w').write(html.tostring(self.document))
+            open(outputFilename, mode='w').write(rendered)
         except:
             die("Something prevented me from saving the output document to {0}.", outputFilename)
 
