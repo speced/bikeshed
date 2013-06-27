@@ -112,7 +112,7 @@ def outerHTML(el):
 
 
 def parseHTML(str):
-    doc = html5lib.parse(str, treebuilder='lxml', encoding='utf-8', namespaceHTMLElements=False)
+    doc = html5lib.parse(u(str), treebuilder='lxml', namespaceHTMLElements=False)
     body = find('body', doc)
     if body.text is None:
         return list(body.iterchildren())
@@ -121,7 +121,7 @@ def parseHTML(str):
 
 
 def parseDocument(str):
-    doc = html5lib.parse(str, treebuilder='lxml', encoding='utf-8', namespaceHTMLElements=False)
+    doc = html5lib.parse(u(str), treebuilder='lxml', namespaceHTMLElements=False)
     return doc
 
 
