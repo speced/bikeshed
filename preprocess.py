@@ -601,7 +601,7 @@ Only 'normative' and 'informative' allowed.", u(el.get('data-biblio-type')), out
 
 def addReferencesSection(doc):
     text = u"<dl>"
-    for ref in doc.normativeRefs:
+    for ref in sorted(doc.normativeRefs, key=lambda r: r.linkText):
         text += u"<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, idFromText(ref.linkText))
         text += u"<dd>"+u(ref)+u"</dd>"
     text += u"</dl>"
@@ -609,7 +609,7 @@ def addReferencesSection(doc):
 
     text = u"<dl>"
     # If the same doc is referenced as both normative and informative, normative wins.
-    for ref in doc.informativeRefs - doc.normativeRefs:
+    for ref in sorted(doc.informativeRefs - doc.normativeRefs, key=lambda r: r.linkText):
         text += u"<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, idFromText(ref.linkText))
         text += u"<dd>"+u(ref)+u"</dd>"
     text += u"</dl>"
