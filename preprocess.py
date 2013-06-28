@@ -944,7 +944,7 @@ class CSSSpec(object):
     # optional metadata
     TR = None
     title = "???"
-    date = date.today()
+    date = datetime.utcnow().date()
     deadline = None
     group = "csswg"
     editors = []
