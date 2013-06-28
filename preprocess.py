@@ -1031,7 +1031,7 @@ class CSSSpec(object):
 
     def finish(self, outputFilename):
         walker = treewalkers.getTreeWalker("lxml")
-        s = htmlserializer.HTMLSerializer()
+        s = htmlserializer.HTMLSerializer(alphabetical_attributes=True)
         rendered = s.render(walker(self.document), encoding='utf-8')
         try:
             open(outputFilename, mode='w').write(rendered)
