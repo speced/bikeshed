@@ -403,6 +403,8 @@ def transformMetadata(lines, doc, **kwargs):
 '<name>, <company>, <email-or-contact-page>")
         elif key == "At Risk":
             doc.atRisk.append(val)
+        elif key == "Test Suite":
+            doc.testSuite = val
         elif key == "Ignored Properties":
             doc.ignoredProperties.extend(prop.strip() for prop in val.split(u','))
         elif key == "Ignored Terms":
@@ -551,6 +553,10 @@ def addSpecMetadataSection(doc):
         with subject line 
         &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;
         (<a rel="discussion" href="http://lists.w3.org/Archives/Public/www-style/">archives</a>)"""
+    if doc.testSuite is not None:
+        header += u"<dt>Test Suite<dd><a href='{0}'>{0}</a>".format(doc.testSuite)
+    else:
+        header += u"<dt>Test Suite<dd>None Yet"
     if len(doc.editors):
         header += u"<dt>Editors:\n"
         for editor in doc.editors:
@@ -947,6 +953,7 @@ class CSSSpec(object):
     atRisk = []
     ignoredProperties = []
     ignoredTerms = []
+    testSuite = None
     otherMetadata = defaultdict(list)
 
     # internal state

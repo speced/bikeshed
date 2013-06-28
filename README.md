@@ -241,6 +241,7 @@ The following keys are optional, and may be omitted:
 * "Ignored Properties" and "Ignored Terms" accept a comma-separated list of properties and terms, respectively, and ignore their absence if they can't link up.  Use these to quiet spurious preprocessor warnings caused by you inventing terms or specifying something as a term before its target exists.
 * "Date" must contain a date in YYYY-MM-DD format, which is used instead of today's date for all the date-related stuff in the spec.
 * "Deadline" is also a YYYY-MM-DD date, which is used for things like the LCWD Status section, to indicate deadlines.
+* "Test Suite" must contain a link to the test suite nightly cover page (like <http://test.csswg.org/suites/css3-flexbox/nightly-unstable>)
 
 Anything else put in the metadata block will be extracted and later put into the `<dl>` in the spec's header, 
 using the keys and values you specify.
