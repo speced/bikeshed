@@ -568,11 +568,10 @@ def addSpecMetadataSection(doc):
                                              editor['org'])
             else:
                 # Link is assumed to be an email address
-                header += u"<span class='p-name fn'>{0}</span> \
-(<span class='p-org org'>{1}</span>), \
-<a class='u-email email' href='mailto:{2}'>{2}</a>".format(editor['name'],
-                                                           editor['org'],
-                                                           editor['link'])
+                header += u"<a class='p-name fn u-email email' href='mailto:{2}'>{0}</a> \
+(<span class='p-org org'>{1}</span>)".format(editor['name'],
+                                             editor['org'],
+                                             editor['link'])
     else:
         header += u"<dt>Editors:<dd>???"
     if len(doc.otherMetadata):
