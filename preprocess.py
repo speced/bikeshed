@@ -1114,7 +1114,7 @@ class BiblioEntry(object):
         elif len(authors) == 1:
             str += u(authors[0]) + u". "
         elif len(authors) < 4:
-            str += u"; ".join(u(authors)) + u". "
+            str += u"; ".join(map(u, authors)) + u". "
         else:
             str += u(authors[0]) + u"; et al. "
 
