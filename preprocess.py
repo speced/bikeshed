@@ -609,7 +609,7 @@ Only 'normative' and 'informative' allowed.", u(el.get('data-biblio-type')), out
 def addReferencesSection(doc):
     text = u"<dl>"
     for ref in sorted(doc.normativeRefs, key=lambda r: r.linkText):
-        text += u"<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, idFromText(ref.linkText))
+        text += u"<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
         text += u"<dd>"+u(ref)+u"</dd>"
     text += u"</dl>"
     fillWith("normative-references", parseHTML(text))
@@ -617,7 +617,7 @@ def addReferencesSection(doc):
     text = u"<dl>"
     # If the same doc is referenced as both normative and informative, normative wins.
     for ref in sorted(doc.informativeRefs - doc.normativeRefs, key=lambda r: r.linkText):
-        text += u"<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, idFromText(ref.linkText))
+        text += u"<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
         text += u"<dd>"+u(ref)+u"</dd>"
     text += u"</dl>"
     fillWith("informative-references", parseHTML(text))
@@ -702,7 +702,7 @@ def formatPropertyNames(doc):
     propertyCells = findAll("table.propdef tr:first-child > td, table.descdef tr:first-child > td")
     for cell in propertyCells:
         props = [u(x.strip()) for x in textContent(cell).split(u',')]
-        html = u', '.join(u"<dfn id='{1}'>{0}</dfn>".format(name, idFromText(name)) for name in props)
+        html = u', '.join(u"<dfn id='{1}' data-dfn-type='property'>{0}</dfn>".format(name, simplifyText(name)) for name in props)
         replaceContents(cell, parseHTML(html))
 
 
@@ -758,7 +758,7 @@ def genIdsForAutolinkTargets(doc):
             if id in ids:
                 die(u"Found a duplicate explicitly-specified id '{0}' in {1}", id, outerHTML(el))
         else:
-            id = idFromText(textContent(el))
+            id = setTypeAndId(el)
             if id in ids:
                 # Try to de-dup the id by appending an integer after it.
                 for x in range(10):
@@ -772,16 +772,38 @@ def genIdsForAutolinkTargets(doc):
     doc.ids = ids
 
 
-def idFromText(id):
+def setTypeAndId(el):
+    prefix = u""
+    suffix = u""
+    id = textContent(el)
+    type = u"term"
     if id[-2:] == "()":
         id = id[:-2]
         suffix = u"-function"
+        type = u"function"
     elif id[0:1] == "<" and id[-1:] == ">":
         id = id[1:-1]
         suffix = u"-production"
-    else:
-        suffix = u""
-    return re.sub(u"[^a-z0-9_-]", u"", id.replace(u" ", u"-").lower()) + suffix
+        type = "production"
+    elif id[0:1] == "@":
+        prefix = u"at-"
+        type = "at-rule"
+    elif el is not None and isValueDefinition(el):
+        suffix = u"-value"
+        type = "value"
+    el.set('data-dfn-type', type)
+    id = prefix + simplifyText(id) + suffix
+    el.set('id', id)
+    return id
+
+
+def simplifyText(text):
+    # Remove anything that's not a name character.
+    return re.sub(u"[^a-z0-9_-]", u"", text.replace(u" ", u"-").lower())
+
+
+def isValueDefinition(el):
+    return el.tag == "dfn" and len(el) == 1 and el[0].get('data-autolink') == "maybe"
 
 
 def linkTextsFromElement(el, preserveCasing=False):
@@ -792,7 +814,7 @@ def linkTextsFromElement(el, preserveCasing=False):
     elif preserveCasing:
         return [textContent(el).strip()]
     else:
-        return [textContent(el).strip().lower()]       
+        return [textContent(el).strip().lower()]    
 
 
 def buildAutolinkDatabase(doc):
@@ -802,10 +824,15 @@ def buildAutolinkDatabase(doc):
         if not re.search("no-ref", el.get('class') or ""):
             linkTexts = linkTextsFromElement(el)
             for linkText in linkTexts:
-                if linkText in links:
-                    die(u"Two link-targets have the same linking text: {0}", linkText)
+                if el.get('data-dfn-type') == "value":
+                    if linkText in doc.valuedefs:
+                        die(u"Two link-targets have the same linking text: {0}", linkText)
+                    doc.valuedefs[linkText] = u(el.get('id'))
                 else:
+                    if linkText in links:
+                        die(u"Two link-targets have the same linking text: {0}", linkText)
                     links[linkText] = u(el.get('id'))
+
     doc.links = links
 
 
@@ -832,14 +859,16 @@ def processAutolinks(doc):
         type = u(el.get('data-autolink'))
         if type == u"biblio":
             # All the biblio links have already been verified.
-            el.set('href', '#'+idFromText(linkText))
+            el.set('href', '#'+simplifyText(linkText))
         elif type == u"property":
             if linkText in doc.propdefs:
-                el.set('href', '#'+idFromText(linkText))
+                el.set('href', '#'+doc.propdef[linkText])
             elif linkText in doc.ignoredProperties:
                 pass
             else:
                 badProperties.add(linkText)
+        elif type == u"maybe" and linkText in doc.valuedefs:
+            el.set('href', '#'+doc.valuedefs[linkText])
         elif type in [u"link", u"maybe"]:
             for variation in linkTextVariations(linkText):
                 if variation in doc.links:
@@ -892,6 +921,8 @@ def addIndexSection(doc):
     indexEntries = {}
     for el in indexElements:
         linkTexts = linkTextsFromElement(el, preserveCasing=True)
+        if el.get('data-dfn-type') == "value":
+            linkTexts = map("{0} (value)".format, linkTexts)
         headingLevel = headingLevelOfElement(el) or u"Unnumbered section"
         id = el.get('id')
         for linkText in linkTexts:
@@ -961,6 +992,7 @@ class CSSSpec(object):
     normativeRefs = set()
     informativeRefs = set()
     propdefs = {}
+    valuedefs = {}
     biblios = {}
     paragraphMode = "markdown"
 
