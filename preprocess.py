@@ -623,7 +623,7 @@ def addReferencesSection(doc):
     fillWith("informative-references", parseHTML(text))
 
 
-def addHeadingNumbers(doc):
+def determineHeadingLevels(doc):
     headerLevel = [0,0,0,0,0]
     def incrementLevel(level):
         headerLevel[level-2] += 1
@@ -634,6 +634,7 @@ def addHeadingNumbers(doc):
 
     skipLevel = float('inf')
     for header in findAll('h2, h3, h4, h5, h6'):
+        # Add the heading number.
         level = int(header.tag[-1])
 
         # Reset, if this is a re-run.
@@ -654,11 +655,23 @@ def addHeadingNumbers(doc):
 
         incrementLevel(level)
         header.set('data-level', printLevel())
-        secno = etree.Element('span', {"class":"secno"})
-        secno.text = printLevel() + u' '
-        header.insert(0, secno)
-        secno.tail = header.text
-        header.text = u''
+
+def addHeadingBonuses(doc):
+    foundFirstSection = False
+    for header in findAll('h2, h3, h4, h5, h6'):
+        if header.get("data-level") is not None:
+            foundFirstSection = True
+            secno = etree.Element('span', {"class":"secno"})
+            secno.text = header.get('data-level') + u' '
+            header.insert(0, secno)
+            secno.tail = header.text
+            header.text = u''
+
+        if foundFirstSection:
+            # Add a self-link, to help with sharing links.
+            selflink = etree.Element('a', {"href": "#" + header.get('id'), "class":"section-link"});
+            selflink.text = u"§"
+            appendChild(header, selflink)
 
 
 def addTOCSection(doc):
@@ -682,6 +695,8 @@ def addTOCSection(doc):
         elif level < previousLevel:
             html += u"</ul>" * (previousLevel - level)
         contents = removeBadToCElements(innerHTML(header))
+        # Add section number
+        contents = "<span class='secno'>{0}</span>".format(header.get('data-level') or u'') + contents
         html += u"<li><a href='#{0}'>{1}</a>".format(u(header.get('id')), contents)
         previousLevel = level
     fillWith("table-of-contents", parseHTML(html))
@@ -1050,8 +1065,9 @@ class CSSSpec(object):
         processAutolinks(self)
         
         # ToC
-        addHeadingNumbers(self)
+        determineHeadingLevels(self)
         addTOCSection(self)
+        addHeadingBonuses(self)
 
         # Property index
         addPropertyIndex(self)
