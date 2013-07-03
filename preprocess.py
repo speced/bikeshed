@@ -741,8 +741,9 @@ def addPropertyIndex(doc):
             html += u"<th scope=col>%ages"
         else:
             html += u"<th scope=col>"+u(column)
+    html += u"<tbody>"
     for name, propdef in doc.propdefs.items():
-        html += u"<tr><th scope=row><a data-property>{0}</a>".format(name)
+        html += u"\n<tr><th scope=row><a data-property>{0}</a>".format(name)
         for column in columns:
             html += u"<td>" + propdef.get(u(column), u"")
     html += u"</table>"
@@ -930,9 +931,9 @@ def addIndexSection(doc):
                 die(u"Multiple declarations with the same linktext: {0} and {1}", outerHTML(el), outerHTML(indexEntries[linkText][3]))
             indexEntries[linkText] = (linkText, id, headingLevel, el)
     sortedEntries = sorted(indexEntries.values(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower()))
-    html = u"<ul class='indexlist'>"
+    html = u"<ul class='indexlist'>\n"
     for text, id, level, el in sortedEntries:
-        html += u"<li>{0}, <a href='#{1}' title='section {2}'>{2}</a>".format(escapeHTML(u(text)), u(id), u(level))
+        html += u"<li>{0}, <a href='#{1}' title='section {2}'>{2}</a>\n".format(escapeHTML(u(text)), u(id), u(level))
     html += u"</ul>"
     fillWith("index", parseHTML(html))
 
