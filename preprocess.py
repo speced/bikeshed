@@ -878,7 +878,7 @@ def processAutolinks(doc):
             el.set('href', '#'+simplifyText(linkText))
         elif type == u"property":
             if linkText in doc.propdefs:
-                el.set('href', '#'+doc.propdef[linkText])
+                el.set('href', '#'+simplifyText(linkText))
             elif linkText in doc.ignoredProperties:
                 pass
             else:
