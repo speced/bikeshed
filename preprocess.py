@@ -386,9 +386,9 @@ def transformMetadata(lines, doc, **kwargs):
         elif key == "Group":
             doc.group = val.lower()
         elif key == "Date":
-            doc.date = datetime.strptime(val, "%Y-%m-%d").date()
+            doc.date = parseDate(val, "Date")
         elif key == "Deadline":
-            doc.deadline = datetime.strptime(val, "%Y-%m-%d").date()
+            doc.deadline = parseDate(val, "Deadline")
         elif key == "Abstract":
             doc.abstract = val
         elif key == "Shortname":
@@ -466,6 +466,13 @@ def transformMetadata(lines, doc, **kwargs):
                                                                               textMacros["cdate"], 
                                                                               textMacros["year"])
     return []
+
+
+def parseDate(val, field):
+    try:
+        return datetime.strptime(val, "%Y-%m-%d").date()
+    except:
+        die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", field, val)
 
 
 def verifyRequiredMetadata(doc):
