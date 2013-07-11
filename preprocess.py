@@ -16,6 +16,7 @@
 # $ sudo pip install cssselect
 # $ chmod u+x preprocess.py
 
+from __future__ import division
 import re
 from collections import defaultdict
 import subprocess
@@ -30,6 +31,7 @@ from lxml.cssselect import CSSSelector
 from optparse import OptionParser
 from urllib import urlopen
 from datetime import date, datetime
+import json
 
 debugQuiet = False
 debug = False
@@ -55,6 +57,7 @@ the processor uses the remote file at \
     optparser.add_option("--debug", dest="debug", default=False, action="store_true",
                          help="Turns on some debug features.")
     optparser.add_option("--print-exports", dest="printExports", default=False, action="store_true")
+    optparser.add_option("--update-cross-refs", dest="updateCrossRefs", default=False, action="store_true")
     (options, posargs) = optparser.parse_args()
 
     global debugQuiet
@@ -70,6 +73,8 @@ the processor uses the remote file at \
 
     if options.printExports:
         doc.printTargets()
+    elif options.updateCrossRefs:
+        updateCrossRefs()
     else:
         doc.finish(outputFilename=options.outputFile)
 
@@ -100,6 +105,24 @@ def warn(msg, *formatArgs):
     global debugQuiet
     if not debugQuiet:
         print u"WARNING: "+u(msg).format(*map(u, formatArgs))
+
+def say(msg, *formatArgs):
+    global debugQuiet
+    if not debugQuiet:
+        print u(msg).format(*map(u, formatArgs))
+
+def progress(msg, val, total):
+    global debugQuiet
+    if debugQuiet:
+        return
+    barSize = 20
+    fractionDone = val / total
+    hashes = "#" * int(fractionDone*barSize)
+    spaces = " " * (barSize - int(fractionDone*barSize))
+    print "\r{0} [{1}{2}] {3}%".format(msg, hashes, spaces, int(fractionDone*100)),
+    if val == total:
+        print
+    sys.stdout.flush()
 
 def textContent(el):
     return u(html.tostring(el, method='text', with_tail=False, encoding="unicode"))
@@ -363,6 +386,8 @@ def transformMetadata(lines, doc, **kwargs):
 
     for line in lines:
         match = re.match(u"\s*([^:]+):\s*(.*)", u(line))
+        if(match is None):
+            die(u"Incorrectly formatted metadata line:\n{0}", u(line))
         key = match.group(1)
         val = u(match.group(2))
         if key == "Status":
@@ -953,28 +978,33 @@ def addIndexSection(doc):
     fillWith("index", parseHTML(html))
 
 
-def retrieveCachedFile(cacheLocation, type, fallbackurl=None):
+def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):
     try:
+        if force:
+            raise IOError("Skipping cache lookup, because this is a forced retrieval.")
         fh = open(cacheLocation, 'r')
     except IOError:
         if fallbackurl is None:
             die(u"Couldn't find the {0} cache file at the specified location '{1}'.", type, cacheLocation)
         else:
-            warn(u"Couldn't find the {0} cache file at the specified location '{1}'.", type, cacheLocation)
-            warn(u"Attempting to download it from '{0}'...", url)
+            if not quiet:
+                warn(u"Couldn't find the {0} cache file at the specified location '{1}'.\nAttempting to download it from '{2}'...", type, cacheLocation, fallbackurl)
             try:
-                fh = urlopen(url)
+                fh = urlopen(fallbackurl)
             except:
-                die(u"Couldn't retrieve the {0} file from '{1}'.", type, url)
+                die(u"Couldn't retrieve the {0} file from '{1}'.", type, fallbackurl)
             try:
-                warn(u"Attempting to save the {0} file to cache...", type)
+                if not quiet:
+                    say(u"Attempting to save the {0} file to cache...", type)
                 outfh = open(cacheLocation, 'w')
                 outfh.write(fh.read())
                 fh.close()
                 fh = open(cacheLocation, 'r')
-                warn("Successfully saved the {0} file to cache.", type)
+                if not quiet:
+                    say("Successfully saved the {0} file to cache.", type)
             except:
-                warn("Couldn't save the {0} file to cache. Proceeding...", type)
+                if not quiet:
+                    warn("Couldn't save the {0} file to cache. Proceeding...", type)
     return fh
 
 
@@ -1285,6 +1315,54 @@ def addAtRisk(doc):
     fillWith('at-risk', parseHTML(html))
 
 
+
+def updateCrossRefs():
+    specFile = retrieveCachedFile(cacheLocation=os.path.dirname(os.path.realpath(__file__))+"/speclist.json", 
+                                  fallbackurl="http://test.csswg.org/shepherd/api/spec", 
+                                  type="spec list",
+                                  force=True)
+    specData = json.load(specFile)
+    specNames = [x['name'] for x in specData.values()]
+    specs = []
+    anchorTypes = set()
+    anchorsByType = {
+        'propdef':defaultdict(list),
+        'descdef':defaultdict(list),
+        'dfn':defaultdict(list),
+    }
+    allAnchors = defaultdict(list)
+    for i,specName in enumerate(specNames):
+        #progress("Fetching xref data", i+1, len(specNames))
+        sys.stdout.flush()
+        f = retrieveCachedFile(cacheLocation=os.path.dirname(os.path.realpath(__file__))+"/spec-data/{0}.json".format(specName), 
+                               fallbackurl="http://test.csswg.org/shepherd/api/spec?spec={0}&anchors=1".format(specName),
+                               type="spec data", quiet=True)
+        data = json.load(f)
+        anchors = linearizeAnchorTree(data['anchors'], [])
+        for anchor in anchors:
+            type = anchor['type']
+            if type in ("section", "other"):
+                continue
+            anchorData = {'spec':specName, 'url':anchor['uri']}
+            if 'linking_text' in anchor:
+                texts = anchor['linking_text']
+            else:
+                texts = [anchor['title']]
+            for text in texts:
+                anchorsByType[type][text].append(anchorData)
+                allAnchors[text].append(anchorData)
+    print '\n'.join(specNames)
+
+
+def linearizeAnchorTree(multiTree, list):
+    # Call with multiTree being a list of trees
+    for item in multiTree:
+        if item['type'] not in ("section", "other"):
+            list.append(item)
+        if item['children']:
+            linearizeAnchorTree(item['children'], list)
+        item['children'] = False
+    return list
 
 if __name__ == "__main__":
     main()
