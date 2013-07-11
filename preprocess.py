@@ -32,6 +32,8 @@ from optparse import OptionParser
 from urllib import urlopen
 from datetime import date, datetime
 import json
+import biblio
+from fuckunicode import u
 
 debugQuiet = False
 debug = False
@@ -77,21 +79,6 @@ the processor uses the remote file at \
         updateCrossRefs()
     else:
         doc.finish(outputFilename=options.outputFile)
-
-
-# Fuck everything about Python 2 and Unicode.
-def u(text):
-    if text is None:
-        return None
-    elif isinstance(text, str):
-        return text.decode('utf-8')
-    elif isinstance(text, unicode):
-        return text
-    else:
-        try:
-            return unicode(text)
-        except:
-            die("Unicode encoding error! Please report to the project maintainer. Some information: {0}", str(type(text)) + str(text))
 
 
 def die(msg, *formatArgs):
@@ -1052,7 +1039,7 @@ class CSSSpec(object):
                                       fallbackurl="https://www.w3.org/Style/Group/css3-src/biblio.ref",
                                       type="bibliography")
 
-        self.biblios = processReferBiblioFile(bibliofh)
+        self.biblios = biblio.processReferBiblioFile(bibliofh)
 
         self.paragraphMode = paragraphMode
 
@@ -1159,101 +1146,6 @@ class CSSSpec(object):
             die("The include file for {0} disappeared underneath me.", name)
 
 
-class BiblioEntry(object):
-    linkText = None
-    title = None
-    authors = None
-    foreignAuthors = None
-    status = None
-    date = None
-    url = None
-    other = None
-    bookName = None
-    city = None
-    issuer = None
-    journal = None
-    volumeNumber = None
-    numberInVolume = None
-    pageNumber = None
-    reportNumber = None
-    abstract = None
-
-    def __init__(self, **kwargs):
-        self.authors = []
-        self.foreignAuthors = []
-        for key, val in kwargs.items():
-            setattr(self, key, u(val))
-
-    def __str__(self):
-        str = u""
-        authors = self.authors + self.foreignAuthors
-
-        if len(authors) == 0:
-            str += u"???. "
-        elif len(authors) == 1:
-            str += u(authors[0]) + u". "
-        elif len(authors) < 4:
-            str += u"; ".join(map(u, authors)) + u". "
-        else:
-            str += u(authors[0]) + u"; et al. "
-
-        str += u"<a href='{0}'>{1}</a>. ".format(self.url, self.title)
-
-        if self.date:
-            str += self.date + u". "
-
-        if self.status:
-            str += self.status + u". "
-
-        if self.other:
-            str += self.other + u" "
-
-        str += u"URL: <a href='{0}'>{0}</a>".format(self.url)
-        return str
-
-
-def processReferBiblioFile(file):
-    biblios = {}
-    biblio = None
-    singularReferCodes = {
-        "B": "bookName",
-        "C": "city",
-        "D": "date",
-        "I": "issuer",
-        "J": "journal",
-        "L": "linkText",
-        "N": "numberInVolume",
-        "O": "other",
-        "P": "pageNumber",
-        "R": "reportNumber",
-        "S": "status",
-        "T": "title",
-        "U": "url",
-        "V": "volumeNumber",
-        "X": "abstract"
-    }
-    pluralReferCodes = {
-        "A": "authors",
-        "Q": "foreignAuthors",
-    }
-    for line in file:
-        if re.match("\s*#", line) or re.match("\s*$", line):
-            # Comment or empty line
-            if biblio is not None:
-                biblios[biblio.linkText] = biblio
-            biblio = BiblioEntry()
-        else:
-            if biblio is None:
-                biblio = BiblioEntry()
-
-        for (letter, name) in singularReferCodes.items():
-            if re.match("\s*%"+letter+"\s+[^\s]", line):
-                setattr(biblio, name, re.match("\s*%"+letter+"\s+(.*)", line).group(1))
-        for (letter, name) in pluralReferCodes.items():
-            if re.match("\s*%"+letter+"\s+[^\s]", line):
-                getattr(biblio, name).append(re.match("\s*%"+letter+"\s+(.*)", line).group(1))
-    return biblios
-
 
 def fillInBoilerplate(doc):
     # I need some signal for whether or not to insert boilerplate,
@@ -1351,7 +1243,6 @@ def updateCrossRefs():
             for text in texts:
                 anchorsByType[type][text].append(anchorData)
                 allAnchors[text].append(anchorData)
-    print '\n'.join(specNames)
 
 
 def linearizeAnchorTree(multiTree, list):
