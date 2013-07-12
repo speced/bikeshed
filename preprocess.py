@@ -719,6 +719,8 @@ def addTOCSection(doc):
         html += u"<li><a href='#{0}'>{1}</a>".format(u(header.get('id')), contents)
         previousLevel = level
     fillWith("table-of-contents", parseHTML(html))
+    for badSpan in findAll(".toc span[href]"):
+        del badSpan.attrib['href']
 
 def removeBadToCElements(html):
     # Several elements which can occur in headings shouldn't be copied over into the ToC.
