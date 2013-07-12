@@ -32,8 +32,8 @@ from optparse import OptionParser
 from urllib import urlopen
 from datetime import date, datetime
 import json
-import biblio
-from fuckunicode import u
+from lib import biblio
+from lib.fuckunicode import u
 
 debugQuiet = False
 debug = False
@@ -974,6 +974,14 @@ def addIndexSection(doc):
     fillWith("index", parseHTML(html))
 
 
+def cleanupHTML(doc):
+    # Find <style> in body, add scoped='', move to be first child.
+    for el in findAll("body style"):
+        parent = el.getparent()
+        parent.insert(0, el)
+        el.set('scoped', '')
+
+
 def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):
     try:
         if force:
@@ -1100,6 +1108,9 @@ class CSSSpec(object):
 
         # Index
         addIndexSection(self)
+
+        # Any final HTML cleanups
+        cleanupHTML(self)
 
         return self
 
