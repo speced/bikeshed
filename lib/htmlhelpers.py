@@ -75,16 +75,24 @@ def moveContents(targetEl, sourceEl):
 
 
 def headingLevelOfElement(el):
-    skippedHeadingLevel = float('inf')
-    for el in scopingElements(el, "h2", "h3", "h4", "h5", "h6"):
-        tagLevel = int(el.tag[1])
-        if tagLevel >= skippedHeadingLevel:
-            continue
+    for el in relevantHeadings(el, levels=[2,3,4,5,6]):
         if el.get('data-level') is not None:
             return u(el.get('data-level'))
-        else:
-            skippedHeadingLevel = tagLevel
     return None
+
+
+def relevantHeadings(startEl, levels=None):
+    if levels is None:
+        levels = [1,2,3,4,5,6]
+    levels = ["h"+str(level) for level in levels]
+    currentHeadingLevel = float('inf')
+    for el in scopingElements(startEl, *levels):
+        tagLevel = int(el.tag[1])
+        if tagLevel < currentHeadingLevel:
+            yield el
+            currentHeadingLevel = tagLevel
+        if tagLevel == 2:
+            return
 
 
 def scopingElements(startEl, *tags):
