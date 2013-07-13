@@ -34,6 +34,8 @@ from datetime import date, datetime
 import json
 from lib import biblio
 from lib.fuckunicode import u
+from lib.ReferenceManager import ReferenceManager
+from lib.htmlhelpers import *
 
 debugQuiet = False
 debug = False
@@ -87,7 +89,6 @@ def die(msg, *formatArgs):
     if not debug:
         sys.exit(1)
 
-
 def warn(msg, *formatArgs):
     global debugQuiet
     if not debugQuiet:
@@ -111,40 +112,6 @@ def progress(msg, val, total):
         print
     sys.stdout.flush()
 
-def textContent(el):
-    return u(html.tostring(el, method='text', with_tail=False, encoding="unicode"))
-
-
-def innerHTML(el):
-    return u((el.text or u'') + u''.join(u(html.tostring(x, encoding="unicode")) for x in el))
-
-
-def outerHTML(el):
-    return u(html.tostring(el, with_tail=False, encoding="unicode"))
-
-
-def parseHTML(str):
-    doc = html5lib.parse(u(str), treebuilder='lxml', namespaceHTMLElements=False)
-    body = find('body', doc)
-    if body.text is None:
-        return list(body.iterchildren())
-    else:
-        return [body.text] + list(body.iterchildren())
-
-
-def parseDocument(str):
-    doc = html5lib.parse(u(str), treebuilder='lxml', namespaceHTMLElements=False)
-    return doc
-
-
-def escapeHTML(str):
-    # Escape HTML
-    return u(str).replace(u'&', u'&amp;').replace(u'<', u'&lt;')
-
-
-def escapeAttr(str):
-    return u(str).replace(u'&', u'&amp;').replace(u"'", u'&apos;').replace(u'"', u'&quot;')
-
 
 def findAll(sel, context=None):
     if context is None:
@@ -154,9 +121,6 @@ def findAll(sel, context=None):
 
 
 def find(sel, context=None):
-    if context is None:
-        global doc
-        context = doc.document
     result = findAll(sel, context)
     if result:
         return result[0]
@@ -164,35 +128,11 @@ def find(sel, context=None):
         return None
 
 
-def clearContents(el):
-    for child in el.iterchildren():
-        el.remove(child)
-    el.text = ''
-    return el
-
-
-def appendChild(parent, child):
-    # Appends either text or an element.
-    try:
-        parent.append(child)
-    except TypeError:
-        # child is a string
-        if len(parent) > 0:
-            parent[-1].tail = (parent[-1].tail or '') + child
-        else:
-            parent.text = (parent.text or '') + child
-
-
-def replaceContents(el, newElements):
-    clearContents(el)
-    for new in newElements:
-        appendChild(el, new)
-    return el
-
-
 def fillWith(tag, newElements):
-    for el in findAll(u"[data-fill-with='{0}']".format(u(tag))):
+    global doc
+    for el in findAll(u"[data-fill-with='{0}']".format(u(tag)), doc.document):
         replaceContents(el, newElements)
+
 
 def replaceTextMacros(text):
     global textMacros
@@ -642,6 +582,31 @@ def addReferencesSection(doc):
     fillWith("informative-references", parseHTML(text))
 
 
+def processHeadings(doc):
+    resetHeadings(doc)
+    determineHeadingLevels(doc)
+    addHeadingIds(doc)
+    dedupIds(doc, findAll("h1, h2, h3, h4, h5, h6"))
+    addHeadingBonuses(doc)
+
+def resetHeadings(doc):
+    for header in findAll('h2, h3, h4, h5, h6'):
+        # Reset to base, if this is a re-run
+        if find(".content", header) is not None:
+            content = find(".content", header)
+            moveContents(header, content)
+
+        # Insert current header contents into a <span class='content'>
+        content = etree.Element('span', {"class":"content"})
+        moveContents(content, header)
+        appendChild(header, content)    
+
+def addHeadingIds(doc):
+    for header in findAll("h2, h3, h4, h5, h6"):
+        if header.get('id') is not None:
+            continue
+        header.set('id', simplifyText(textContent(find(".content", header))))
+
 def determineHeadingLevels(doc):
     headerLevel = [0,0,0,0,0]
     def incrementLevel(level):
@@ -657,11 +622,8 @@ def determineHeadingLevels(doc):
         level = int(header.tag[-1])
 
         # Reset, if this is a re-run.
-        if(header.get('level')):
-            del header.attrib['level']
-        if(len(header) > 0 and header[0].tag == 'span' and header[0].get('class') == "secno"):
-            header.text = u(header[0].tail)
-            del header[0]
+        if(header.get('data-level')):
+            del header.attrib['data-level']
 
         # If we encounter a no-num, don't number it or any in the same section. 
         if re.search("no-num", header.get('class') or ''):
@@ -683,8 +645,6 @@ def addHeadingBonuses(doc):
             secno = etree.Element('span', {"class":"secno"})
             secno.text = header.get('data-level') + u' '
             header.insert(0, secno)
-            secno.tail = header.text
-            header.text = u''
 
         if foundFirstSection:
             # Add a self-link, to help with sharing links.
@@ -694,6 +654,17 @@ def addHeadingBonuses(doc):
 
 
 def addTOCSection(doc):
+    def removeBadToCElements(html):
+        # Several elements which can occur in headings shouldn't be copied over into the ToC.
+
+        # ToC text is wrapped in an <a>, but the HTML parser doesn't like nested <a>s.
+        html = html.replace(u'<a', u'<span').replace(u'</a', u'</span')
+
+        # Remove any <dfn>s, so they don't get duplicated in the ToC.
+        html = re.sub(u'(<dfn[^>]*>)|(</dfn>)', '', html)
+
+        return html
+
     skipLevel = float('inf')
     previousLevel = 0
     html = u''
@@ -713,7 +684,7 @@ def addTOCSection(doc):
             html += u"<ul class='toc'>"
         elif level < previousLevel:
             html += u"</ul>" * (previousLevel - level)
-        contents = removeBadToCElements(innerHTML(header))
+        contents = removeBadToCElements(innerHTML(find(".content", header)))
         # Add section number
         contents = "<span class='secno'>{0}</span>".format(header.get('data-level') or u'') + contents
         html += u"<li><a href='#{0}'>{1}</a>".format(u(header.get('id')), contents)
@@ -722,32 +693,28 @@ def addTOCSection(doc):
     for badSpan in findAll(".toc span[href]"):
         del badSpan.attrib['href']
 
-def removeBadToCElements(html):
-    # Several elements which can occur in headings shouldn't be copied over into the ToC.
-
-    # ToC text is wrapped in an <a>, but the HTML parser doesn't like nested <a>s.
-    html = html.replace(u'<a', u'<span').replace(u'</a', u'</span')
-
-    # Remove any <dfn>s, so they don't get duplicated in the ToC.
-    html = re.sub(u'(<dfn[^>]*>)|(</dfn>)', '', html)
-
-    return html
-
 
 def formatPropertyNames(doc):
-    propertyCells = findAll("table.propdef tr:first-child > td, table.descdef tr:first-child > td")
+    propertyCells = findAll("table.propdef tr:first-child > td")
+    descriptorCells = findAll("table.descdef tr:first-child > td")
     for cell in propertyCells:
         props = [u(x.strip()) for x in textContent(cell).split(u',')]
         html = u', '.join(u"<dfn id='{1}' data-dfn-type='property'>{0}</dfn>".format(name, simplifyText(name)) for name in props)
         replaceContents(cell, parseHTML(html))
+    for cell in descriptorCells:
+        props = [u(x.strip()) for x in textContent(cell).split(u',')]
+        html = u', '.join(u"<dfn id='{1}' data-dfn-type='descriptor'>{0}</dfn>".format(name, simplifyText(name)) for name in props)
+        replaceContents(cell, parseHTML(html))
 
 
-def buildPropertyDatabase(doc):
-    propdefTables = findAll('table.propdef, table.descdef')
-    for propdefTable in propdefTables:
-        propdef = {}
+
+def addPropertyIndex(doc):
+    # Extract all the data from the propdef and descdef tables
+    props = []
+    for table in findAll('table.propdef'):
+        prop = {}
         names = []
-        rows = findAll('tr', propdefTable)
+        rows = findAll('tr', table)
         for row in rows:
             # Extract the key, minus the trailing :
             key = re.match(u'(.*):', textContent(row[0])).group(1).strip()
@@ -755,122 +722,138 @@ def buildPropertyDatabase(doc):
             if key == "Name":
                 names = [textContent(x) for x in findAll('dfn', row[1])]
             else:
-                propdef[key] = innerHTML(row[1])
+                prop[key] = innerHTML(row[1])
         for name in names:
-            doc.propdefs[name] = propdef
+            tempProp = prop.copy()
+            tempProp['Name'] = name
+            props.append(prop)
+    atRules = defaultdict(list)
+    for table in findAll('table.descdef'):
+        desc = {}
+        names = []
+        atRule = ""
+        rows = findAll('tr', table)
+        for row in rows:
+            # Extract the key, minus the trailing :
+            key = re.match(u'(.*):', textContent(row[0])).group(1).strip()
+            # Extract the value from the second cell
+            if key == "Name":
+                names = [textContent(x) for x in findAll('dfn', row[1])]
+            elif key == "For":
+                atRule = textContent(row[1])
+            else:
+                desc[key] = innerHTML(row[1])
+        for name in names:
+            tempDesc = desc.copy()
+            tempDesc['Name'] = name
+            atRules[atRule].append(tempDesc)
 
+    html = u""
 
-def addPropertyIndex(doc):
-    # Set up the initial table columns
-    columns = ["Value", "Initial", "Applies To", "Inherited", "Percentages", "Media"]
-    # Add any additional keys used in the document.
-    allKeys = set()
-    for propdef in doc.propdefs.values():
-        allKeys |= set(propdef.keys())
-    columns.extend(allKeys - set(columns))
-    # Create the table
-    html = u"<table class=proptable><thead><tr><th scope=col>Name"
-    for column in columns:
-        if column == "Inherited":
-            html += u"<th scope=col>Inh."
-        elif column == "Percentages":
-            html += u"<th scope=col>%ages"
-        else:
-            html += u"<th scope=col>"+u(column)
-    html += u"<tbody>"
-    for name, propdef in doc.propdefs.items():
-        html += u"\n<tr><th scope=row><a data-property>{0}</a>".format(name)
+    if len(props):
+        # Set up the initial table columns for properties
+        columns = ["Name", "Value", "Initial", "Applies To", "Inherited", "Percentages", "Media"]
+        # Add any additional keys used in the document.
+        allKeys = set()
+        for prop in props.values():
+            allKeys |= set(prop.keys())
+        columns.extend(sorted(allKeys - set(columns)))
+        # Create the table
+        html += u"<table class=proptable><thead><tr>"
         for column in columns:
-            html += u"<td>" + propdef.get(u(column), u"")
-    html += u"</table>"
+            if column == "Inherited":
+                html += u"<th scope=col>Inh."
+            elif column == "Percentages":
+                html += u"<th scope=col>%ages"
+            else:
+                html += u"<th scope=col>"+u(column)
+        html += u"<tbody>"
+        for prop in props:
+            html += u"\n<tr><th scope=row><a data-property>{0}</a>".format(u(prop['Name']))
+            for column in columns[1:]:
+                html += u"<td>" + u(prop.get(column, ""))
+        html += u"</table>"
+    else:
+        html += u"<p>No properties defined."
+
+    if len(atRules):
+        atRuleNames = sorted(atRules.keys())
+        for atRuleName in atRuleNames:
+            descs = atRules[atRuleName]
+            if atRuleName == "":
+                atRuleName = u"Miscellaneous"
+            columns = ["Name", "Value", "Initial"]
+            allKeys = set()
+            for desc in descs:
+                allKeys |= set(desc.keys())
+            columns.extend(sorted(allKeys - set(columns) - set("For")))
+            html += u"<h3 class='no-num'>{0} Descriptors</h3>".format(u(atRuleName))
+            html += u"<table class=proptable><thead><tr>"
+            for column in columns:
+                html += u"<th scope=col>{0}".format(u(column))
+            html += u"<tbody>"
+            for desc in descs:
+                html += u"\n<tr><th scope-row><a data-property>{0}</a>".format(u(desc['Name']))
+                for column in columns[1:]:
+                    html += u"<td>" + u(desc.get(column, ""))
+            html += u"</table>"
+
     fillWith("property-index", parseHTML(html))
 
 
-def genIdsForAutolinkTargets(doc):
-    ids = set()
-    linkTargets = findAll("dfn, h1, h2, h3, h4, h5, h6")
-    for el in linkTargets:
-        if el.get('id') is not None:
-            id = el.get('id')
-            if id in ids:
-                die(u"Found a duplicate explicitly-specified id '{0}' in {1}", id, outerHTML(el))
+def processDfns(doc):
+    classifyDfns(doc)
+    dedupIds(doc, findAll("dfn"))
+    doc.refs.processDfns(findAll("dfn"))
+
+
+def classifyDfns(doc):
+    for el in findAll("dfn"):
+        text = textContent(el)
+        prefix = u""
+        suffix = u""
+        if text[-2:] == "()":
+            text = text[:-2]
+            suffix = u"-function"
+            type = "function"
+        elif text[0:1] == "<" and text[-1:] == ">":
+            text = text[1:-1]
+            suffix = u"-production"
+            type = "production"
+        elif text[0:1] == "@":
+            prefix = u"at-"
+            type = "at-rule"
+        elif el.tag == "dfn" and len(el) == 1 and el[0].get('data-autolink') == "maybe":
+            suffix = u"-value"
+            type = "value"
         else:
-            id = setTypeAndId(el)
-            if id in ids:
-                # Try to de-dup the id by appending an integer after it.
-                for x in range(10):
-                    if (id+u(x)) not in ids:
-                        id = id + u(x)
-                        break
-                else:
-                    die(u"More than 10 link-targets with the same id '{0}'.", id)
-            el.set('id', id)
-        ids.add(id)
-    doc.ids = ids
+            type = "link"
 
+        if el.get('data-dfn-type') is None:
+            el.set('data-dfn-type', type)
+        if el.get('id') is None:
+            el.set('id', text)
+        
 
-def setTypeAndId(el):
-    prefix = u""
-    suffix = u""
-    id = textContent(el)
-    type = u"term"
-    if id[-2:] == "()":
-        id = id[:-2]
-        suffix = u"-function"
-        type = u"function"
-    elif id[0:1] == "<" and id[-1:] == ">":
-        id = id[1:-1]
-        suffix = u"-production"
-        type = "production"
-    elif id[0:1] == "@":
-        prefix = u"at-"
-        type = "at-rule"
-    elif el is not None and isValueDefinition(el):
-        suffix = u"-value"
-        type = "value"
-    el.set('data-dfn-type', type)
-    id = prefix + simplifyText(id) + suffix
-    el.set('id', id)
-    return id
+def dedupIds(doc, els):
+    def findId(id):
+        return find("#"+id) is not None
+    for el in els:
+        id = el.get('id')
+        del el.attrib['id']
+        if findId(id):
+            # Try to de-dup the id by appending an integer after it.
+            import itertools as iter
+            for x in iter.imap(str, iter.count(0)):
+                if not findId(id+x):
+                    id = id+x
+                    break
+        el.set('id', id)
 
 
 def simplifyText(text):
     # Remove anything that's not a name character.
     return re.sub(u"[^a-z0-9_-]", u"", text.replace(u" ", u"-").lower())
-
-
-def isValueDefinition(el):
-    return el.tag == "dfn" and len(el) == 1 and el[0].get('data-autolink') == "maybe"
-
-
-def linkTextsFromElement(el, preserveCasing=False):
-    if el.get('title') == '':
-        return []
-    elif el.get('title'):
-        return [u(x.strip()) for x in el.get('title').split('|')]
-    elif preserveCasing:
-        return [textContent(el).strip()]
-    else:
-        return [textContent(el).strip().lower()]    
-
-
-def buildAutolinkDatabase(doc):
-    links = {}
-    linkTargets = findAll("dfn")
-    for el in linkTargets:
-        if not re.search("no-ref", el.get('class') or ""):
-            linkTexts = linkTextsFromElement(el)
-            for linkText in linkTexts:
-                if el.get('data-dfn-type') == "value":
-                    if linkText in doc.valuedefs:
-                        die(u"Two link-targets have the same linking text: {0}", linkText)
-                    doc.valuedefs[linkText] = u(el.get('id'))
-                else:
-                    if linkText in links:
-                        die(u"Two link-targets have the same linking text: {0}", linkText)
-                    links[linkText] = u(el.get('id'))
-
-    doc.links = links
 
 
 def processAutolinks(doc):
@@ -882,93 +865,55 @@ def processAutolinks(doc):
     badProperties = set()
     badLinks = set()
     for el in autolinks:
-        # Empty title means this shouldn't be an autolink.
+        # Explicitly empty title indicates this shouldn't be an autolink.
         if el.get('title') == '':
             break
-        # If it's not yet classified, it's a plain "link" link.
-        if not el.get('data-autolink'):
-            el.set('data-autolink', 'link')
-        linkText = u(el.get('title')) or textContent(el).lower()
 
-        if len(linkText) == 0:
+        type = el.get('data-autolink') or "link"
+        text = u(el.get('title')) or textContent(el).lower()
+        if len(text) == 0:
             die(u"Autolink {0} has no linktext.", outerHTML(el))
 
-        type = u(el.get('data-autolink'))
         if type == u"biblio":
-            # All the biblio links have already been verified.
-            el.set('href', '#'+simplifyText(linkText))
-        elif type == u"property":
-            if linkText in doc.propdefs:
-                el.set('href', '#'+simplifyText(linkText))
-            elif linkText in doc.ignoredProperties:
-                pass
-            else:
-                badProperties.add(linkText)
-        elif type == u"maybe" and linkText in doc.valuedefs:
-            el.set('href', '#'+doc.valuedefs[linkText])
-        elif type in [u"link", u"maybe"]:
-            for variation in linkTextVariations(linkText):
-                if variation in doc.links:
-                    el.set('href', '#'+doc.links[variation])
-                    break
-            else:
-                if linkText in doc.ignoredTerms:
-                    pass
-                elif type == "link":
-                    # "maybe"-type links don't care if they don't link up.
-                    badLinks.add(linkText)
+            # Move biblio management into ReferenceManager later
+            el.set('href', '#'+simplifyText(text))
+            continue
+        
+        id = doc.refs.getRef(type, text)
+        if id is None:
+            if type == "property":
+                if text not in doc.ignoredProperties:
+                    badProperties.add(text)
+            elif type != "maybe":
+                if text not in doc.ignoredTerms:
+                    badLinks.add(text)
         else:
-            die(u"Unknown type of autolink '{0}'", type)
-        if el.get('href'):
-            # If we successfully linked it up, make sure it's an <a>.
+            el.set('href', '#'+id)
             el.tag = "a"
+
     if badProperties:
         die(u"Couldn't find definitions for the properties: {0}\nDefine them, or add them to the 'Ignored Properties' metadata entry.", u', '.join(map(u"'{0}'".format, badProperties)))
     if badLinks:
         die(u"Couldn't find definitions for the terms: {0}\nDefine them, or add them to the 'Ignored Terms' metadata entry.", u', '.join(map(u'"{0}"'.format, badLinks)))
 
 
-def linkTextVariations(str):
-    # Generate intelligent variations of the provided link text,
-    # so explicitly adding a title attr isn't usually necessary.
-    yield str
-
-    if str[-3:] == u"ies":
-        yield str[:-3]+u"y"
-    if str[-2:] == u"es":
-        yield str[:-2]
-    if str[-2:] == u"'s":
-        yield str[:-2]
-    if str[-1:] == u"s":
-        yield str[:-1]
-    if str[-1:] == u"'":
-        yield str[:-1]
-
-
-def headingLevelOfElement(el):
-    while el.getparent().tag != "body":
-        el = el.getparent()
-    while not re.match(r"h\d", el.tag):
-        el = el.getprevious()
-    return u(el.get('data-level'))
-
-
 def addIndexSection(doc):
-    indexElements = findAll("dfn:not([data-autolink='property'])")
-    indexEntries = {}
+    from lib.ReferenceManager import linkTextsFromElement
+    indexElements = findAll("dfn")
+    indexEntries = []
     for el in indexElements:
+        if el.get('data-dfn-type') in ("property", "descriptor"):
+            # These get their own index section.
+            continue
         linkTexts = linkTextsFromElement(el, preserveCasing=True)
         if el.get('data-dfn-type') == "value":
-            linkTexts = map("{0} (value)".format, linkTexts)
+            linkTexts = map(u"{0} (value)".format, linkTexts)
         headingLevel = headingLevelOfElement(el) or u"Unnumbered section"
         id = el.get('id')
         for linkText in linkTexts:
-            if linkText in indexEntries:
-                die(u"Multiple declarations with the same linktext: {0} and {1}", outerHTML(el), outerHTML(indexEntries[linkText][3]))
-            indexEntries[linkText] = (linkText, id, headingLevel, el)
-    sortedEntries = sorted(indexEntries.values(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower()))
+            indexEntries.append((linkText, id, headingLevel))
     html = u"<ul class='indexlist'>\n"
-    for text, id, level, el in sortedEntries:
+    for text, id, level in sorted(indexEntries, key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower())):
         html += u"<li>{0}, <a href='#{1}' title='section {2}'>{2}</a>\n".format(escapeHTML(u(text)), u(id), u(level))
     html += u"</ul>"
     fillWith("index", parseHTML(html))
@@ -1037,12 +982,9 @@ class CSSSpec(object):
     otherMetadata = defaultdict(list)
 
     # internal state
-    ids = set()
-    links = {}
     normativeRefs = set()
     informativeRefs = set()
-    propdefs = {}
-    valuedefs = {}
+    refs = ReferenceManager()
     biblios = {}
     paragraphMode = "markdown"
 
@@ -1084,29 +1026,18 @@ class CSSSpec(object):
         addObsoletionNotice(self)
         addAtRisk(self)
         transformAutolinkShortcuts(self)
-
-        # Deal with property names.
         formatPropertyNames(self)
-        buildPropertyDatabase(self)
-
-        # Normative/informative references
+        processHeadings(self)
+        processDfns(self)
         buildBibliolinkDatabase(self)
-        addReferencesSection(self)
 
         # Autolinks
-        genIdsForAutolinkTargets(self)
-        buildAutolinkDatabase(self)
         processAutolinks(self)
         
-        # ToC
-        determineHeadingLevels(self)
-        addTOCSection(self)
-        addHeadingBonuses(self)
-
-        # Property index
         addPropertyIndex(self)
-
-        # Index
+        addReferencesSection(self)
+        processHeadings(self) # again
+        addTOCSection(self)
         addIndexSection(self)
 
         # Any final HTML cleanups
