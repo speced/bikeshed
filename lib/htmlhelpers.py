@@ -75,15 +75,40 @@ def moveContents(targetEl, sourceEl):
 
 
 def headingLevelOfElement(el):
-    for prevEl in prevElements(el):
-        if prevEl.tag in ("h2", "h3", "h4", "h5", "h6") and prevEl.get('data-level') is not None:
-            return u(prevEl.get('data-level'))
+    skippedHeadingLevel = float('inf')
+    for el in scopingElements(el, "h2", "h3", "h4", "h5", "h6"):
+        tagLevel = int(el.tag[1])
+        if tagLevel >= skippedHeadingLevel:
+            continue
+        if el.get('data-level') is not None:
+            return u(el.get('data-level'))
+        else:
+            skippedHeadingLevel = tagLevel
     return None
 
 
-def prevElements(startEl, tag=None, *tags):
+def scopingElements(startEl, *tags):
+    # Elements that could form a "scope" for the startEl
+    # Ancestors, and preceding siblings of ancestors.
+    # Maps to the things that can establish a counter scope.
+    els = []
+    tagFilter = set(tags)
+
+    for el in startEl.itersiblings(preceding=True, *tags):
+        els.append(el)
+    for el in startEl.iterancestors():
+        if el.tag in tagFilter:
+            els.append(el)
+        for el in el.itersiblings(preceding=True, *tags):
+            els.append(el)
+    return els
+
+def previousElements(startEl, tag=None, *tags):
+    # Elements preceding the startEl in document order.
+    # Like .iter(), but in the opposite direction.
     els = []
     for el in startEl.getroottree().getroot().iter(tag=tag, *tags):
         if el == startEl:
             return reversed(els)
         els.append(el)
+    return els
