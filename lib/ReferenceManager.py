@@ -51,6 +51,8 @@ class ReferenceManager(object):
             for var in linkTextVariations(text):
                 if var in self.links:
                     return self.links[var]['id']
+        else:
+            die("Unknown link type '{0}'.", type)
 
         
 
