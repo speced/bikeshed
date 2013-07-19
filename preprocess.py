@@ -1006,7 +1006,7 @@ def addPropertyIndex(doc):
         for name in names:
             tempProp = prop.copy()
             tempProp['Name'] = name
-            props.append(prop)
+            props.append(tempProp)
     atRules = defaultdict(list)
     for table in findAll('table.descdef'):
         desc = {}
@@ -1035,7 +1035,7 @@ def addPropertyIndex(doc):
         columns = ["Name", "Value", "Initial", "Applies To", "Inherited", "Percentages", "Media"]
         # Add any additional keys used in the document.
         allKeys = set()
-        for prop in props.values():
+        for prop in props:
             allKeys |= set(prop.keys())
         columns.extend(sorted(allKeys - set(columns)))
         # Create the table
