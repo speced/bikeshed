@@ -631,7 +631,7 @@ def classifyDfns(doc):
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', type)
         if el.get('id') is None:
-            el.set('id', text)
+            el.set('id', simplifyText(text))
 
 
 def dedupIds(doc, els):
