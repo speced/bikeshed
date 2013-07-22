@@ -59,9 +59,11 @@ the processor uses the remote file at \
     optparser.add_option("-q", "--quiet", dest="quiet", default=False, action="store_true",
                          help="Suppresses everything but fatal errors from printing.")
     optparser.add_option("--debug", dest="debug", default=False, action="store_true",
-                         help="Turns on some debug features.")
-    optparser.add_option("--print-exports", dest="printExports", default=False, action="store_true")
-    optparser.add_option("--update-cross-refs", dest="updateCrossRefs", default=False, action="store_true")
+                         help="Makes the processor continue after hitting a fatal error.")
+    optparser.add_option("--print-exports", dest="printExports", default=False, action="store_true",
+                         help="Prints those terms that will be exported for cross-ref purposes.")
+    optparser.add_option("--update-cross-refs", dest="updateCrossRefs", default=False, action="store_true",
+                         help="Forces a fresh download of all the cross-ref data.")
     (options, posargs) = optparser.parse_args()
 
     global debugQuiet
