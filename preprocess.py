@@ -1139,9 +1139,9 @@ def addSpecMetadataSection(doc):
         &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;
         (<a rel="discussion" href="http://lists.w3.org/Archives/Public/www-style/">archives</a>)"""
     if doc.testSuite is not None:
-        header += u"<dt>Test Suite<dd><a href='{0}'>{0}</a>".format(doc.testSuite)
+        header += u"<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.testSuite)
     else:
-        header += u"<dt>Test Suite<dd>None Yet"
+        header += u"<dt>Test Suite:<dd>None Yet"
     if len(doc.editors):
         header += u"<dt>Editors:\n"
         for editor in doc.editors:
