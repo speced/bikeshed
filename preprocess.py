@@ -37,10 +37,9 @@ from lib import biblio
 from lib.fuckunicode import u
 from lib.ReferenceManager import ReferenceManager
 from lib.htmlhelpers import *
-from messages import *
+from lib.messages import *
+import lib.messages as messages
 
-debugQuiet = False
-debug = False
 doc = None
 textMacros = {}
 
@@ -68,8 +67,8 @@ the processor uses the remote file at \
                          help="Forces a fresh download of all the cross-ref data.")
     (options, posargs) = optparser.parse_args()
 
-    debugQuiet = options.quiet
-    debug = options.debug
+    messages.debugQuiet = options.quiet
+    messages.debug = options.debug
 
     if options.updateCrossRefs:
         updateCrossRefs()
@@ -107,7 +106,7 @@ def replaceTextMacros(text):
     for tag, replacement in textMacros.items():
         text = u(text).replace(u"[{0}]".format(u(tag.upper())), u(replacement))
     # Also replace the <<production>> shortcuts, because they won't survive the HTML parser.
-    text = re.sub(r"<<([\w-]+)>>", r'<a data-autolink="link" class="production"><var>&lt;\1></var></a>', text)
+    text = re.sub(r"<<([\w-]+)>>", r'<a data-autolink="type" class="production"><var>&lt;\1></var></a>', text)
     # Also replace the ''maybe link'' shortcuts.
     # They'll survive the HTML parser, but they don't match if they contain an element.
     # (The other shortcuts are "atomic" and can't contain elements.)
@@ -433,7 +432,7 @@ def transformAutolinkShortcuts(doc):
                         u'<a title="{0}" data-autolink="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
                             u(match.group(2)),
                             biblioType)))
-        text = re.sub(ur"'([*-]*[a-zA-Z][a-zA-Z0-9_*/-]*)'", ur'<a data-autolink="property" class="property" title="\1">\1</a>', text)
+        text = re.sub(ur"'([*-]*[a-zA-Z][a-zA-Z0-9_*/-]*)'", ur'<a data-autolink="propdesc" class="property" title="\1">\1</a>', text)
         return u(text)
 
     def fixElementText(el):
@@ -634,8 +633,6 @@ def processAutolinks(doc):
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # Maybe autolinks can be any element.  If it links up, we change it into an <a>.
     autolinks = findAll("a:not([href]), a[data-autolink], i, [data-autolink='maybe']")
-    badProperties = set()
-    badLinks = set()
     for el in autolinks:
         # Explicitly empty title indicates this shouldn't be an autolink.
         if el.get('title') == '':
@@ -646,6 +643,9 @@ def processAutolinks(doc):
         if len(text) == 0:
             die(u"Autolink {0} has no linktext.", outerHTML(el))
 
+        if (linkType == "property" and text in doc.ignoredProperties) or text in doc.ignoredTerms:
+            continue
+
         if linkType == u"biblio":
             # Move biblio management into ReferenceManager later
             el.set('href', '#'+simplifyText(text))
@@ -655,26 +655,11 @@ def processAutolinks(doc):
         if id is not None:
             el.set('href', '#'+id)
             el.tag = "a"
-        else:
-            xrefs = doc.refs.getXref(linkType, text)
-            if xrefs is not None:
-                if len(xrefs) == 1:
-                    el.set('href', xrefs[0]['url'])
-                    el.tag = "a"
-                else:
-                    die("Too many xrefs for \"{0}\":\n{1}", text, "\n".join(json.dumps(x) for x in xrefs))
-            else:
-                if linkType == "property":
-                    if text not in doc.ignoredProperties:
-                        badProperties.add(text)
-                elif linkType != "maybe":
-                    if text not in doc.ignoredTerms:
-                        badLinks.add(text)
-
-    if badProperties:
-        die(u"Couldn't find definitions for the properties: {0}\nDefine them, or add them to the 'Ignored Properties' metadata entry.", u', '.join(map(u"'{0}'".format, badProperties)))
-    if badLinks:
-        die(u"Couldn't find definitions for the terms: {0}\nDefine them, or add them to the 'Ignored Terms' metadata entry.", u', '.join(map(u'"{0}"'.format, badLinks)))
+            continue
+        url = doc.refs.getXref(linkType, text, spec=el.get('data-xref-spec'), status=el.get('data-xref-status'))
+        if url is not None:
+            el.set('href', url)
+            el.tag = "a"
 
 
 def cleanupHTML(doc):

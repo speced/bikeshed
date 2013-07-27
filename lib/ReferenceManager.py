@@ -7,6 +7,7 @@ class ReferenceManager(object):
     properties = dict()
     descriptors = dict()
     values = dict()
+    types = dict()
     links = dict()
 
     xrefs = dict()
@@ -38,6 +39,10 @@ class ReferenceManager(object):
                     if linkText in self.values:
                         die(u"Two link-targets have the same linking text:\n{0}\n{1}", el, self.values[linkText]['el'])
                     self.values[linkText] = {'id':u(el.get('id')), 'el':el}
+                elif type == "type":
+                    if linkText in self.types:
+                        die(u"Two link-targets have the same linking text:\n{0}\n{1}", el, self.types[linkText]['el'])
+                    self.types[linkText] = {'id':u(el.get('id')), 'el':el}
                 elif type == "property":
                     if linkText in self.properties:
                         die(u"Two link-targets have the same linking text:\n{0}\n{1}", el, self.properties[linkText]['el'])
@@ -51,51 +56,62 @@ class ReferenceManager(object):
                         die(u"Two link-targets have the same linking text:\n{0}\n{1}", el, self.links[linkText]['el'])
                     self.links[linkText] = {'id':u(el.get('id')), 'el':el}
 
-    def getRef(self, type, text):
-        if type == "property":
-            if text in self.properties:
-                return self.properties[text]['id']
-            elif text in self.descriptors:
-                return self.descriptors[text]['id']
-        elif type == "value":
-            if text in self.values:
-                return self.values[text]['id']
-        elif type == "link":
-            for var in linkTextVariations(text):
-                if var in self.links:
-                    return self.links[var]['id']
-        elif type == "maybe":
-            # Most value links will be encoded as maybes.
-            if text in self.values:
-                return self.values[text]['id']
-            for var in linkTextVariations(text):
-                if var in self.links:
-                    return self.links[var]['id']
+    def getRef(self, linkType, text):
+
+        def findRef(sources, linkTexts):
+            if isinstance(sources, dict):
+                sources = [sources]
+            if isinstance(linkTexts, basestring):
+                linkTexts = [linkTexts]
+            for source in sources:
+                for linkText in linkTexts:
+                    if linkText in source:
+                        return source[linkText]['id']
+            return None
+
+        if linkType == "property":
+            return findRef(self.properties, text)
+        elif linkType == "descriptor":
+            return findRef(self.descriptor, text)
+        elif linkType == "propdesc":
+            return findRef([self.properties, self.descriptors], text)
+        elif linkType == "value":
+            return findRef(self.values, text)
+        #elif linkType == "type":
+        #    return findRef(self.types, text)
+        elif linkType == "link":
+            return findRef(self.links, linkTextVariations(text))
+        elif linkType in ("maybe", "type"):
+            return findRef([self.values, self.types], text) or findRef(self.links, linkTextVariations(text))
         else:
             die("Unknown link type '{0}'.", type)
 
     def getXref(self, linkType, text, spec=None, status=None):
+        import json
         status = status or self.specStatus
         if status is None:
             raise "Can't calculate an xref without knowing the desired spec status."
 
         # Filter by type/text to find all the candidate refs
-        def findRefs(allRefs, dfnType, linkTexts):
+        def findRefs(allRefs, dfnTypes, linkTexts):
             # Allow either a string or an iter of strings
-            if isinstance(linkTexts, str):
+            if isinstance(dfnTypes, basestring):
+                dfnTypes = [dfnTypes]
+            if isinstance(linkTexts, basestring):
                 linkTexts = [linkTexts]
-            if isinstance(dfnType, str):
-                dfnType = [dfnType]
             for dfnText,refs in allRefs.items():
                 for linkText in linkTexts:
                     if linkText == dfnText:
                         ret = []
                         # Preserve the order of the dfntypes
                         for dfnType in dfnTypes:
-                            if ref['type'] == dfnType:
-                                ret.append(ref)
+                            for ref in refs:
+                                if ref['type'] == dfnType:
+                                    ret.append(ref)
                         return ret
             return []
+
+
 
         if linkType in ("property", "descriptor", "value", "type"):
             refs = findRefs(self.xrefs, linkType, text)
@@ -106,16 +122,22 @@ class ReferenceManager(object):
         elif linkType == "maybe":
             refs = findRefs(self.xrefs, ["value", "type"], text) + findRefs(self.xrefs, "dfn", linkTextVariations(text))
         else:
-            die("Unknown link type '{0}'.", linkType)
+            die("Unknown link type '{0}'.",linkType)
 
         if len(refs) == 0:
-            die("No xrefs found for text '{0}' with type {1}.", text, linkType)
+            if linkType == "maybe":
+                return None
+            die("No '{1}' xrefs found for '{0}'.", text, linkType)
+            return None
 
         # Filter by spec, if needed
         if spec:
             refs = [ref for ref in refs if ref['spec'] == spec]
             if len(refs) == 0:
-                die("No xrefs found for text '{0}' in spec {1}.", text, spec)
+                if linkType == "maybe":
+                    return None
+                die("No xrefs found for text '{0}' in spec '{1}'.", text, spec)
+                return None
 
         # Filter by status, set url
         if status == "ED":
@@ -126,7 +148,7 @@ class ReferenceManager(object):
                     continue
                 # Only link to TRs if there *is* no ED
                 # Don't do it otherwise, as it means the link was removed from the latest draft
-                if ref.get('TR_url') and not specs[ref['spec']]['ED']:
+                if ref.get('TR_url') and not self.specs[ref['spec']]['ED']:
                     ref['url'] = ref['TR_url']
                     continue
                 # Otherwise, filter out the ref
@@ -138,6 +160,7 @@ class ReferenceManager(object):
                     ref['url'] = ref['TR_url']
                     continue
                 # Allow downgrading to EDs, though.
+                # Later, I'll restrict this further.
                 if ref.get('ED_url'):
                     ref['url'] = ref['ED_url']
                     continue
@@ -145,14 +168,18 @@ class ReferenceManager(object):
                 refs.remove(ref)
         else:
             die("Unknown specref status '{0}'", status)
+            return None
 
         if len(refs) == 0:
-            die("No xrefs suitable for {1} status were found for '{0}'.", text, status)
+            if linkType == "maybe":
+                return None
+            die("No xrefs suitable for '{1}' status were found for '{0}'.", text, status)
+            return None
 
         if len(refs) == 1:
-            return refs[0]
+            return refs[0]['url']
 
-        die("Too many xrefs for '{0}'.\n{1}", text, '\n'.join(str(ref) for ref in refs))
+        die("Too many '{1}' xrefs for '{0}'.\n{2}", text, linkType, '\n'.join('{0}: {1}'.format(ref['spec'], ref['url']) for ref in refs))
         
 
 def linkTextsFromElement(el, preserveCasing=False):
