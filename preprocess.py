@@ -29,13 +29,15 @@ from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
 from optparse import OptionParser
-from urllib import urlopen
+from urllib2 import urlopen
+from contextlib import closing
 from datetime import date, datetime
 import json
 from lib import biblio
 from lib.fuckunicode import u
 from lib.ReferenceManager import ReferenceManager
 from lib.htmlhelpers import *
+from messages import *
 
 debugQuiet = False
 debug = False
@@ -66,10 +68,12 @@ the processor uses the remote file at \
                          help="Forces a fresh download of all the cross-ref data.")
     (options, posargs) = optparser.parse_args()
 
-    global debugQuiet
     debugQuiet = options.quiet
-    global debug
     debug = options.debug
+
+    if options.updateCrossRefs:
+        updateCrossRefs()
+        return
 
     global doc
     doc = CSSSpec(inputFilename=options.inputFile,
@@ -79,40 +83,8 @@ the processor uses the remote file at \
 
     if options.printExports:
         doc.printTargets()
-    elif options.updateCrossRefs:
-        updateCrossRefs()
     else:
         doc.finish(outputFilename=options.outputFile)
-
-
-def die(msg, *formatArgs):
-    global debug
-    print u"FATAL ERROR: "+u(msg).format(*map(u, formatArgs))
-    if not debug:
-        sys.exit(1)
-
-def warn(msg, *formatArgs):
-    global debugQuiet
-    if not debugQuiet:
-        print u"WARNING: "+u(msg).format(*map(u, formatArgs))
-
-def say(msg, *formatArgs):
-    global debugQuiet
-    if not debugQuiet:
-        print u(msg).format(*map(u, formatArgs))
-
-def progress(msg, val, total):
-    global debugQuiet
-    if debugQuiet:
-        return
-    barSize = 20
-    fractionDone = val / total
-    hashes = "#" * int(fractionDone*barSize)
-    spaces = " " * (barSize - int(fractionDone*barSize))
-    print "\r{0} [{1}{2}] {3}%".format(msg, hashes, spaces, int(fractionDone*100)),
-    if val == total:
-        print
-    sys.stdout.flush()
 
 
 def findAll(sel, context=None):
@@ -315,6 +287,7 @@ def transformMetadata(lines, doc, **kwargs):
         val = u(match.group(2))
         if key == "Status":
             doc.status = val
+            doc.refs.setStatus(val)
         elif key == "TR":
             doc.TR = val
         elif key == "ED":
@@ -603,7 +576,7 @@ def formatPropertyNames(doc):
 def processDfns(doc):
     classifyDfns(doc)
     dedupIds(doc, findAll("dfn"))
-    doc.refs.processDfns(findAll("dfn"))
+    doc.refs.addLocalDfns(findAll("dfn"))
 
 
 def classifyDfns(doc):
@@ -668,27 +641,35 @@ def processAutolinks(doc):
         if el.get('title') == '':
             break
 
-        type = el.get('data-autolink') or "link"
+        linkType = el.get('data-autolink') or "link"
         text = u(el.get('title')) or textContent(el).lower()
         if len(text) == 0:
             die(u"Autolink {0} has no linktext.", outerHTML(el))
 
-        if type == u"biblio":
+        if linkType == u"biblio":
             # Move biblio management into ReferenceManager later
             el.set('href', '#'+simplifyText(text))
             continue
 
-        id = doc.refs.getRef(type, text)
-        if id is None:
-            if type == "property":
-                if text not in doc.ignoredProperties:
-                    badProperties.add(text)
-            elif type != "maybe":
-                if text not in doc.ignoredTerms:
-                    badLinks.add(text)
-        else:
+        id = doc.refs.getRef(linkType, text)
+        if id is not None:
             el.set('href', '#'+id)
             el.tag = "a"
+        else:
+            xrefs = doc.refs.getXref(linkType, text)
+            if xrefs is not None:
+                if len(xrefs) == 1:
+                    el.set('href', xrefs[0]['url'])
+                    el.tag = "a"
+                else:
+                    die("Too many xrefs for \"{0}\":\n{1}", text, "\n".join(json.dumps(x) for x in xrefs))
+            else:
+                if linkType == "property":
+                    if text not in doc.ignoredProperties:
+                        badProperties.add(text)
+                elif linkType != "maybe":
+                    if text not in doc.ignoredTerms:
+                        badLinks.add(text)
 
     if badProperties:
         die(u"Couldn't find definitions for the properties: {0}\nDefine them, or add them to the 'Ignored Properties' metadata entry.", u', '.join(map(u"'{0}'".format, badProperties)))
@@ -790,6 +771,14 @@ class CSSSpec(object):
                                       type="bibliography")
 
         self.biblios = biblio.processReferBiblioFile(bibliofh)
+
+        # Load up the xref data
+        specs = json.load(retrieveCachedFile(cacheLocation=os.path.dirname(os.path.realpath(__file__))+"/spec-data/specs.json",
+                                      type="spec list", quiet=True))
+        anchors = json.load(retrieveCachedFile(cacheLocation=os.path.dirname(os.path.realpath(__file__))+"/spec-data/anchors.json",
+                                      type="spec list", quiet=True))
+        self.refs.specs = specs
+        self.refs.xrefs = anchors
 
         self.paragraphMode = paragraphMode
 
@@ -1203,7 +1192,39 @@ def addReferencesSection(doc):
 
 
 def updateCrossRefs():
-    def linearizeAnchorTree(multiTree, list):
+    try:
+        say("Downloading spec database...")
+        with closing(urlopen("http://test.csswg.org/shepherd/api/spec")) as f:
+            rawSpecData = json.load(f)
+    except Exception, e:
+        die("Couldn't download spec database.\n{0}", str(e))
+
+    specData = dict()
+    for rawSpec in rawSpecData.values():
+        spec = {
+            'vshortname': rawSpec['name'],
+            'TR': rawSpec['base_uri'],
+            'ED': rawSpec['draft_uri'],
+            'title': rawSpec['title'],
+            'description': rawSpec['description']
+        }
+        match = re.match("(.*)-(\d+)", rawSpec['name'])
+        if match:
+            spec['shortname'] = match.group(1)
+            spec['level'] = int(match.group(2))
+        else:
+            spec['shortname'] = spec['vshortname']
+            spec['level'] = 1
+        specData[spec['vshortname']] = spec
+    try:
+        with open(os.path.dirname(os.path.realpath(__file__))+"/spec-data/specs.json", 'w') as f:
+            json.dump(specData, f, ensure_ascii=False, indent=2)
+    except Exception, e:
+        die("Couldn't save spec database to disk.\n{0}", e)
+
+    def linearizeAnchorTree(multiTree, list=None):
+        if list is None:
+            list = []
         # Call with multiTree being a list of trees
         for item in multiTree:
             if item['type'] not in ("section", "other"):
@@ -1212,41 +1233,46 @@ def updateCrossRefs():
                 linearizeAnchorTree(item['children'], list)
             item['children'] = False
         return list
-
-    specFile = retrieveCachedFile(cacheLocation=os.path.dirname(os.path.realpath(__file__))+"/speclist.json",
-                                  fallbackurl="http://test.csswg.org/shepherd/api/spec",
-                                  type="spec list",
-                                  force=True)
-    specData = json.load(specFile)
-    specNames = [x['name'] for x in specData.values()]
-    specs = []
-    anchorTypes = set()
-    anchorsByType = {
-        'propdef':defaultdict(list),
-        'descdef':defaultdict(list),
-        'dfn':defaultdict(list),
-    }
-    allAnchors = defaultdict(list)
-    for i,specName in enumerate(specNames):
-        #progress("Fetching xref data", i+1, len(specNames))
+    
+    anchors = defaultdict(list)
+    for i, spec in enumerate(specData.values()):
+        progress("Fetching xref data", i+1, len(specData))
         sys.stdout.flush()
-        f = retrieveCachedFile(cacheLocation=os.path.dirname(os.path.realpath(__file__))+"/spec-data/{0}.json".format(specName),
-                               fallbackurl="http://test.csswg.org/shepherd/api/spec?spec={0}&anchors=1".format(specName),
-                               type="spec data", quiet=True)
-        data = json.load(f)
-        anchors = linearizeAnchorTree(data['anchors'], [])
-        for anchor in anchors:
-            type = anchor['type']
-            if type in ("section", "other"):
+        try:
+            with closing(urlopen("http://test.csswg.org/shepherd/api/spec?spec={0}&anchors=1".format(spec['vshortname']))) as f:
+                rawData = json.load(f)
+                rawAnchors = linearizeAnchorTree(rawData['anchors'])
+        except Exception, e:
+            die("Couldn't download spec data for {0}.\n{1}", spec['vshortname'], e)
+        for rawAnchor in rawAnchors:
+            if not rawAnchor.get('export'):
                 continue
-            anchorData = {'spec':specName, 'url':anchor['uri']}
-            if 'linking_text' in anchor:
-                texts = anchor['linking_text']
-            else:
-                texts = [anchor['title']]
-            for text in texts:
-                anchorsByType[type][text].append(anchorData)
-                allAnchors[text].append(anchorData)
+            linkingTexts = rawAnchor.get('linking_text') or [rawAnchor.get('title')]
+            type = rawAnchor['type']
+            # eliminate this converter once plinss converts the source info
+            if type == "propdef":
+                type = "property"
+            elif type == "descdef":
+                type = "descriptor"
+            elif type == "valuedef":
+                type = "value"
+            elif type == "typedef":
+                type = "type"
+            anchor = {
+                'type': type,
+                'spec': spec['vshortname']
+            }
+            if rawAnchor.get('draft'):
+                anchor['ED_url'] = spec['ED'] + rawAnchor['uri']
+            if rawAnchor.get('official'):
+                anchor['TR_url'] = spec['TR'] + rawAnchor['uri']
+            for text in linkingTexts:
+                anchors[text].append(anchor)
+    try:
+        with open(os.path.dirname(os.path.realpath(__file__))+"/spec-data/anchors.json", 'w') as f:
+            json.dump(anchors, f, ensure_ascii=False, indent=2)
+    except Exception, e:
+        die("Couldn't save xref database to disk.\n{0}", e)
 
 
 
