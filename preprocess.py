@@ -16,6 +16,12 @@
 # $ sudo pip install cssselect
 # $ chmod u+x preprocess.py
 
+
+# TODO
+# Handle all dfn types: 'property','value','at-rule','descriptor','type','function','selector''html-element','html-attribute','interface','method','attribute'
+# Dfn typing order: 1. data-dfn-type value  2. id has *def- prefix  3.  ancestor has *def class 4. inspect contents to see what it looks like
+# Handle "foo!!bar" in titles correctly.
+
 from __future__ import division
 import re
 from collections import defaultdict
