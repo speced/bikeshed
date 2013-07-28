@@ -624,7 +624,7 @@ def determineDfnType(dfn):
         "interfacedef":"interface",
         "methoddef":"method",
         "attrdef":"attribute",
-        "html-elementdef":"html-element",
+        "html-elemdef":"html-element",
         "html-attrdef":"html-attribute"
     }
     # 2. Look for a prefix on the id
@@ -1312,6 +1312,7 @@ def updateCrossRefs():
             linkingTexts = rawAnchor.get('linking_text') or [rawAnchor.get('title')]
             type = rawAnchor['type']
             # eliminate this converter once plinss converts the source info
+            
             if type == "propdef":
                 type = "property"
             elif type == "descdef":
