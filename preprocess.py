@@ -579,9 +579,21 @@ def formatPropertyNames(doc):
 
 
 def processDfns(doc):
+    canonicalizeDfns(doc)
     classifyDfns(doc)
     dedupIds(doc, findAll("dfn"))
     doc.refs.addLocalDfns(findAll("dfn"))
+
+
+def canonicalizeDfns(doc):
+    # Every dfn type can be abbreviated as a custom element.
+    # Rather than <dfn data-dfn-type=value>foo</dfn>, just write <value>foo</value>
+    # This restores them to their canonical form.
+
+    for el in findAll("dfn, property, value, at-rule, descriptor, type, function, selector, html-element, html-attribute, interface, method, attribute"):
+        dfnType = el.tag
+        el.tag = "dfn"
+        el.set("data-dfn-type", dfnType)
 
 
 def classifyDfns(doc):
