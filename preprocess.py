@@ -112,11 +112,11 @@ def replaceTextMacros(text):
     for tag, replacement in textMacros.items():
         text = u(text).replace(u"[{0}]".format(u(tag.upper())), u(replacement))
     # Also replace the <<production>> shortcuts, because they won't survive the HTML parser.
-    text = re.sub(r"<<([\w-]+)>>", r'<a data-autolink="type" class="production"><var>&lt;\1></var></a>', text)
+    text = re.sub(r"<<([\w-]+)>>", r'<a data-link-type="type" class="production"><var>&lt;\1></var></a>', text)
     # Also replace the ''maybe link'' shortcuts.
     # They'll survive the HTML parser, but they don't match if they contain an element.
     # (The other shortcuts are "atomic" and can't contain elements.)
-    text = re.sub(r"''(.+?)''", r'<span data-autolink="maybe" class="css">\1</span>', text)
+    text = re.sub(r"''(.+?)''", r'<span data-link-type="maybe" class="css">\1</span>', text)
     return text
 
 
@@ -435,10 +435,10 @@ def transformAutolinkShortcuts(doc):
 
             text = u(text.replace(
                         match.group(0),
-                        u'<a title="{0}" data-autolink="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
+                        u'<a title="{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
                             u(match.group(2)),
                             biblioType)))
-        text = re.sub(ur"'([*-]*[a-zA-Z][a-zA-Z0-9_*/-]*)'", ur'<a data-autolink="propdesc" class="property" title="\1">\1</a>', text)
+        text = re.sub(ur"'([*-]*[a-zA-Z][a-zA-Z0-9_*/-]*)'", ur'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
         return u(text)
 
     def fixElementText(el):
@@ -473,7 +473,7 @@ def transformAutolinkShortcuts(doc):
 
 
 def buildBibliolinkDatabase(doc):
-    biblioLinks = findAll("a[data-autolink='biblio']")
+    biblioLinks = findAll("a[data-link-type='biblio']")
     for el in biblioLinks:
 
         if el.get('title'):
@@ -570,58 +570,118 @@ def formatPropertyNames(doc):
     descriptorCells = findAll("table.descdef tr:first-child > td")
     for cell in propertyCells:
         props = [u(x.strip()) for x in textContent(cell).split(u',')]
-        html = u', '.join(u"<dfn id='{1}' data-dfn-type='property'>{0}</dfn>".format(name, simplifyText(name)) for name in props)
+        html = u', '.join(u"<dfn property id='{1}'>{0}</dfn>".format(name, simplifyText(name)) for name in props)
         replaceContents(cell, parseHTML(html))
     for cell in descriptorCells:
         props = [u(x.strip()) for x in textContent(cell).split(u',')]
-        html = u', '.join(u"<dfn id='{1}' data-dfn-type='descriptor'>{0}</dfn>".format(name, simplifyText(name)) for name in props)
+        html = u', '.join(u"<dfn descriptor id='{1}'>{0}</dfn>".format(name, simplifyText(name)) for name in props)
         replaceContents(cell, parseHTML(html))
 
 
+def canonicalizeShortcuts(doc):
+    # Take all the invalid-HTML shortcuts allowed in the dfns and fix them.
+
+    for el in findAll("dfn"):
+        for dfnType in ('property', 'value', 'at-rule', 'descriptor', 'type', 'function', 'selector', 'html-element', 'html-attribute', 'interface', 'method', 'attribute'):
+            if el.get(dfnType) is not None:
+                del el.attrib[dfnType]
+                el.set("data-dfn-type", dfnType)
+        if el.get("export") is not None:
+            del el.attrib['export']
+            el.set('data-export', '')
+        if el.get("noexport") is not None:
+            del el.attrib['noexport']
+            el.set('data-noexport', '')
+    for el in findAll("a"):
+        for linkType in ('property', 'value', 'at-rule', 'descriptor', 'type', 'function', 'selector', 'html-element', 'html-attribute', 'interface', 'method', 'attribute'):
+            if el.get(linkType) is not None:
+                del el.attrib[linkType]
+                el.set("data-link-type", linkType)
+        if el.get("spec"):
+            el.set("data-xref-spec", el.get('spec'))
+            del el.attrib['spec']
+        if el.get("status"):
+            el.set("data-xref-status", el.get('status'))
+            del el.attrib['status']
+
+
 def processDfns(doc):
-    canonicalizeDfns(doc)
     classifyDfns(doc)
     dedupIds(doc, findAll("dfn"))
     doc.refs.addLocalDfns(findAll("dfn"))
 
 
-def canonicalizeDfns(doc):
-    # Every dfn type can be abbreviated as a custom element.
-    # Rather than <dfn data-dfn-type=value>foo</dfn>, just write <value>foo</value>
-    # This restores them to their canonical form.
-
-    for el in findAll("dfn, property, value, at-rule, descriptor, type, function, selector, html-element, html-attribute, interface, method, attribute"):
-        dfnType = el.tag
-        el.tag = "dfn"
-        el.set("data-dfn-type", dfnType)
+def determineDfnType(dfn):
+    # 1. Look at data-dfn-type
+    if dfn.get('data-dfn-type'):
+        return dfn.get('data-dfn-type')
+    types = {
+        "propdef":"property",
+        "descdef":"descriptor",
+        "valuedef":"value",
+        "typedef":"type",
+        "at-ruledef":"at-rule",
+        "funcdef":"function",
+        "selectordef":"selector",
+        "interfacedef":"interface",
+        "methoddef":"method",
+        "attrdef":"attribute",
+        "html-elementdef":"html-element",
+        "html-attrdef":"html-attribute"
+    }
+    # 2. Look for a prefix on the id
+    if dfn.get('id'):
+        id = dfn.get('id')
+        for prefix, type in types.items():
+            if id.startswith(prefix):
+                return type
+    # 3. Look for a class on the ancestors
+    for ancestor in dfn.iterancestors():
+        classList = ancestor.get('class') or ''
+        for cls, type in types.items():
+            if type in classList:
+                return type
+    # 4. Introspect on the text
+    text = textContent(dfn)
+    if len(dfn) == 1 and dfn[0].get('data-link-type') == "maybe":
+        return "value"
+    elif text[-2:] == "()":
+        return "function"
+    elif text[0:1] == "<" and text[-1:] == ">":
+        return "type"
+    elif text[0:1] == "@":
+        return "at-rule"
+    elif text[0:1] == ":":
+        return "selector"
+    else:
+        return "dfn"
 
 
 def classifyDfns(doc):
-    for el in findAll("dfn"):
-        text = textContent(el)
-        prefix = u""
-        suffix = u""
-        if text[-2:] == "()":
-            text = text[:-2]
-            suffix = u"-function"
-            type = "function"
-        elif text[0:1] == "<" and text[-1:] == ">":
-            text = text[1:-1]
-            suffix = u"-production"
-            type = "production"
-        elif text[0:1] == "@":
-            prefix = u"at-"
-            type = "at-rule"
-        elif el.tag == "dfn" and len(el) == 1 and el[0].get('data-autolink') == "maybe":
-            suffix = u"-value"
-            type = "value"
-        else:
-            type = "link"
 
+    for el in findAll("dfn"):
+        dfnType = determineDfnType(el)
         if el.get('data-dfn-type') is None:
-            el.set('data-dfn-type', type)
-        if el.get('id') is None:
-            el.set('id', simplifyText(text))
+            el.set('data-dfn-type', dfnType)
+        if el.get('id') is None:         
+            id = textContent(el)
+            prefix = u""
+            suffix = u""
+            if id[-2:] == "()":
+                id = id[:-2]
+                suffix = u"-function"
+            elif id[0:1] == "<" and id[-1:] == ">":
+                id = id[1:-1]
+                suffix = u"-type"
+            elif id[0:1] == "@":
+                prefix = u"at-"
+            elif dfnType:
+                suffix = u"-value"
+            else:
+                pass
+
+            if el.get('id') is None:
+                el.set('id', simplifyText(id))
 
 
 def dedupIds(doc, els):
@@ -647,16 +707,16 @@ def simplifyText(text):
 
 def processAutolinks(doc):
     # An <a> without an href is an autolink.
-    # For re-run, if you have a [data-autolink] property, we'll regen your href anyway.
+    # For re-run, if you have a [data-link-type] property, we'll regen your href anyway.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # Maybe autolinks can be any element.  If it links up, we change it into an <a>.
-    autolinks = findAll("a:not([href]), a[data-autolink], i, [data-autolink='maybe']")
+    autolinks = findAll("a:not([href]), a[data-link-type], i, [data-link-type='maybe']")
     for el in autolinks:
         # Explicitly empty title indicates this shouldn't be an autolink.
         if el.get('title') == '':
             break
 
-        linkType = el.get('data-autolink') or "link"
+        linkType = el.get('data-link-type') or "dfn"
         text = u(el.get('title')) or textContent(el).lower()
         if len(text) == 0:
             die(u"Autolink {0} has no linktext.", outerHTML(el))
@@ -811,6 +871,7 @@ class CSSSpec(object):
         transformAutolinkShortcuts(self)
         formatPropertyNames(self)
         processHeadings(self)
+        canonicalizeShortcuts(self)
 
         # Handle all the links
         processDfns(self)

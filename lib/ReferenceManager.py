@@ -72,14 +72,14 @@ class ReferenceManager(object):
         if linkType == "property":
             return findRef(self.properties, text)
         elif linkType == "descriptor":
-            return findRef(self.descriptor, text)
+            return findRef(self.descriptors, text)
         elif linkType == "propdesc":
             return findRef([self.properties, self.descriptors], text)
         elif linkType == "value":
             return findRef(self.values, text)
-        #elif linkType == "type":
-        #    return findRef(self.types, text)
-        elif linkType == "link":
+        elif linkType == "type":
+            return findRef(self.types, text)
+        elif linkType == "dfn":
             return findRef(self.links, linkTextVariations(text))
         elif linkType in ("maybe", "type"):
             return findRef([self.values, self.types], text) or findRef(self.links, linkTextVariations(text))
@@ -114,15 +114,16 @@ class ReferenceManager(object):
 
 
         if linkType in ("property", "descriptor", "value", "type"):
-            refs = findRefs(self.xrefs, linkType, text)
+            refs = findRefs(self.xrefs, [linkType, "dfn"], text)
         elif linkType == "propdesc":
             refs = findRefs(self.xrefs, ["property", "descriptor"], text)
-        elif linkType == "link":
+        elif linkType == "dfn":
             refs = findRefs(self.xrefs, "dfn", linkTextVariations(text))
         elif linkType == "maybe":
             refs = findRefs(self.xrefs, ["value", "type"], text) + findRefs(self.xrefs, "dfn", linkTextVariations(text))
         else:
             die("Unknown link type '{0}'.",linkType)
+            return None
 
         if len(refs) == 0:
             if linkType == "maybe":
@@ -179,7 +180,7 @@ class ReferenceManager(object):
         if len(refs) == 1:
             return refs[0]['url']
 
-        die("Too many '{1}' xrefs for '{0}'.\n{2}", text, linkType, '\n'.join('{0}: {1}'.format(ref['spec'], ref['url']) for ref in refs))
+        die("Too many '{1}' xrefs for '{0}' Specify a spec, or set this in Ignored Terms.\n{2}", text, linkType, '\n'.join('{0}: {1}'.format(ref['spec'], ref['url']) for ref in refs))
         
 
 def linkTextsFromElement(el, preserveCasing=False):
