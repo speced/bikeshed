@@ -1,24 +1,22 @@
-from fuckunicode import u
 import sys
-
-debug = False
-debugQuiet = False
+from lib.fuckunicode import u
+import lib.config as config
 
 def die(msg, *formatArgs):
     print u"FATAL ERROR: "+u(msg).format(*map(u, formatArgs))
-    if not debug:
+    if not config.debug:
         sys.exit(1)
 
 def warn(msg, *formatArgs):
-    if not debugQuiet:
+    if not config.debugQuiet:
         print u"WARNING: "+u(msg).format(*map(u, formatArgs))
 
 def say(msg, *formatArgs):
-    if not debugQuiet:
+    if not config.debugQuiet:
         print u(msg).format(*map(u, formatArgs))
 
 def progress(msg, val, total):
-    if debugQuiet:
+    if config.debugQuiet:
         return
     barSize = 20
     fractionDone = val / total

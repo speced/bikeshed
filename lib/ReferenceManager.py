@@ -1,7 +1,7 @@
-from fuckunicode import u
 import re
 from collections import defaultdict
-from messages import *
+from lib.fuckunicode import u
+from lib.messages import *
 
 class ReferenceManager(object):
     properties = dict()

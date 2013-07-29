@@ -23,32 +23,25 @@
 from __future__ import division
 import re
 from collections import defaultdict
-import subprocess
 import os
-import sys
 import html5lib
-from html5lib import treewalkers
-from html5lib.serializer import htmlserializer
-from lxml import html
-from lxml import etree
-from lxml.cssselect import CSSSelector
-from optparse import OptionParser
+import lxml
+import optparse
 from urllib2 import urlopen
 from contextlib import closing
 from datetime import date, datetime
 import json
-from lib import biblio
+import lib.config as config
+import lib.biblio as biblio
 from lib.fuckunicode import u
 from lib.ReferenceManager import ReferenceManager
 from lib.htmlhelpers import *
 from lib.messages import *
-import lib.messages as messages
 
-doc = None
-textMacros = {}
+config.scriptPath = os.path.dirname(os.path.realpath(__file__))
 
 def main():
-    optparser = OptionParser()
+    optparser = optparse.OptionParser()
     optparser.add_option("-i", "--in", dest="inputFile",
                          default="Overview.src.html",
                          help="Path to the source file. [default: %default]")
@@ -71,43 +64,26 @@ the processor uses the remote file at \
                          help="Forces a fresh download of all the cross-ref data.")
     (options, posargs) = optparser.parse_args()
 
-    messages.debugQuiet = options.quiet
-    messages.debug = options.debug
+    config.debugQuiet = options.quiet
+    config.debug = options.debug
 
     if options.updateCrossRefs:
         updateCrossRefs()
         return
 
-    global doc
-    doc = CSSSpec(inputFilename=options.inputFile,
+    config.doc = CSSSpec(inputFilename=options.inputFile,
                   biblioFilename=options.biblioFile,
                   paragraphMode=options.paragraphMode)
-    doc.preprocess()
+    config.doc.preprocess()
 
     if options.printExports:
-        doc.printTargets()
+        config.doc.printTargets()
     else:
-        doc.finish(outputFilename=options.outputFile)
-
-
-def findAll(sel, context=None):
-    if context is None:
-        global doc
-        context = doc.document
-    return CSSSelector(sel)(context)
-
-
-def find(sel, context=None):
-    result = findAll(sel, context)
-    if result:
-        return result[0]
-    else:
-        return None
+        config.doc.finish(outputFilename=options.outputFile)
 
 
 def replaceTextMacros(text):
-    global textMacros
-    for tag, replacement in textMacros.items():
+    for tag, replacement in config.textMacros.items():
         text = u(text).replace(u"[{0}]".format(u(tag.upper())), u(replacement))
     # Also replace the <<production>> shortcuts, because they won't survive the HTML parser.
     text = re.sub(r"<<([\w-]+)>>", r'<a data-link-type="type" class="production"><var>&lt;\1></var></a>', text)
@@ -337,7 +313,6 @@ def transformMetadata(lines, doc, **kwargs):
             doc.otherMetadata[key].append(val)
 
     # Fill in text macros.
-    global textMacros
     longstatuses = {
         "ED": u"Editor's Draft",
         "WD": u"W3C Working Draft",
@@ -351,32 +326,32 @@ def transformMetadata(lines, doc, **kwargs):
         "UD": u"Unofficial Proposal Draft",
         "DREAM": u"A Collection of Interesting Ideas"
     }
-    textMacros["shortname"] = doc.shortname
-    textMacros["vshortname"] = u"{0}-{1}".format(doc.shortname, doc.level)
+    config.textMacros["shortname"] = doc.shortname
+    config.textMacros["vshortname"] = u"{0}-{1}".format(doc.shortname, doc.level)
     if doc.status in longstatuses:
-        textMacros["longstatus"] = longstatuses[doc.status]
+        config.textMacros["longstatus"] = longstatuses[doc.status]
     else:
         die(u"Unknown status '{0}' used.",doc.status)
     if doc.status == "LCWD":
-        textMacros["status"] = u"WD"
+        config.textMacros["status"] = u"WD"
     else:
-        textMacros["status"] = doc.status
-    textMacros["latest"] = doc.TR or u"???"
-    textMacros["abstract"] = doc.abstract or u"???"
-    textMacros["abstractattr"] = escapeAttr(doc.abstract.replace(u"<<",u"<").replace(u">>",u">")) or u"???"
-    textMacros["year"] = u(doc.date.year)
-    textMacros["date"] = doc.date.strftime(u"{0} %B %Y".format(doc.date.day))
-    textMacros["cdate"] = doc.date.strftime(u"%Y%m%d")
-    textMacros["isodate"] = doc.date.strftime(u"%Y-%m-%d")
+        config.textMacros["status"] = doc.status
+    config.textMacros["latest"] = doc.TR or u"???"
+    config.textMacros["abstract"] = doc.abstract or u"???"
+    config.textMacros["abstractattr"] = escapeAttr(doc.abstract.replace(u"<<",u"<").replace(u">>",u">")) or u"???"
+    config.textMacros["year"] = u(doc.date.year)
+    config.textMacros["date"] = doc.date.strftime(u"{0} %B %Y".format(doc.date.day))
+    config.textMacros["cdate"] = doc.date.strftime(u"%Y%m%d")
+    config.textMacros["isodate"] = doc.date.strftime(u"%Y-%m-%d")
     if doc.deadline:
-        textMacros["deadline"] = doc.deadline.strftime(u"{0} %B %Y".format(doc.deadline.day))
+        config.textMacros["deadline"] = doc.deadline.strftime(u"{0} %B %Y".format(doc.deadline.day))
     if doc.status == "ED":
-        textMacros["version"] = doc.ED
+        config.textMacros["version"] = doc.ED
     else:
-        textMacros["version"] = u"http://www.w3.org/TR/{3}/{0}-{1}-{2}/".format(textMacros["status"],
-                                                                              textMacros["vshortname"],
-                                                                              textMacros["cdate"],
-                                                                              textMacros["year"])
+        config.textMacros["version"] = u"http://www.w3.org/TR/{3}/{0}-{1}-{2}/".format(config.textMacros["status"],
+                                                                                       config.textMacros["vshortname"],
+                                                                                       config.textMacros["cdate"],
+                                                                                       config.textMacros["year"])
     return []
 
 
@@ -507,7 +482,7 @@ def resetHeadings(doc):
             moveContents(header, content)
 
         # Insert current header contents into a <span class='content'>
-        content = etree.Element('span', {"class":"content"})
+        content = lxml.etree.Element('span', {"class":"content"})
         moveContents(content, header)
         appendChild(header, content)
 
@@ -552,13 +527,13 @@ def addHeadingBonuses(doc):
     for header in findAll('h2, h3, h4, h5, h6'):
         if header.get("data-level") is not None:
             foundFirstSection = True
-            secno = etree.Element('span', {"class":"secno"})
+            secno = lxml.etree.Element('span', {"class":"secno"})
             secno.text = header.get('data-level') + u' '
             header.insert(0, secno)
 
         if foundFirstSection:
             # Add a self-link, to help with sharing links.
-            selflink = etree.Element('a', {"href": "#" + header.get('id'), "class":"section-link"});
+            selflink = lxml.etree.Element('a', {"href": "#" + header.get('id'), "class":"section-link"});
             selflink.text = u"§"
             appendChild(header, selflink)
 
@@ -827,16 +802,16 @@ class CSSSpec(object):
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
 
-        bibliofh = retrieveCachedFile(cacheLocation=(biblioFilename or os.path.dirname(os.path.realpath(__file__)) + "/biblio.refer"),
+        bibliofh = retrieveCachedFile(cacheLocation=(biblioFilename or config.scriptPath + "/biblio.refer"),
                                       fallbackurl="https://www.w3.org/Style/Group/css3-src/biblio.ref",
                                       type="bibliography")
 
         self.biblios = biblio.processReferBiblioFile(bibliofh)
 
         # Load up the xref data
-        specs = json.load(retrieveCachedFile(cacheLocation=os.path.dirname(os.path.realpath(__file__))+"/spec-data/specs.json",
+        specs = json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/specs.json",
                                       type="spec list", quiet=True))
-        anchors = json.load(retrieveCachedFile(cacheLocation=os.path.dirname(os.path.realpath(__file__))+"/spec-data/anchors.json",
+        anchors = json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.json",
                                       type="spec list", quiet=True))
         self.refs.specs = specs
         self.refs.xrefs = anchors
@@ -888,8 +863,8 @@ class CSSSpec(object):
         return self
 
     def finish(self, outputFilename):
-        walker = treewalkers.getTreeWalker("lxml")
-        s = htmlserializer.HTMLSerializer(alphabetical_attributes=True)
+        walker = html5lib.treewalkers.getTreeWalker("lxml")
+        s = html5lib.serializer.htmlserializer.HTMLSerializer(alphabetical_attributes=True)
         rendered = s.render(walker(self.document), encoding='utf-8')
         try:
             open(outputFilename, mode='w').write(rendered)
@@ -919,7 +894,7 @@ class CSSSpec(object):
         if status is None:
             status = self.status
 
-        pathprefix = os.path.dirname(os.path.realpath(__file__)) + "/include"
+        pathprefix = config.scriptPath + "/include"
         if os.path.isfile("{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status)):
             filename = "{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status)
         elif os.path.isfile("{0}/{1}-{2}.include".format(pathprefix, name, group)):
@@ -965,8 +940,7 @@ def fillInBoilerplate(doc):
 
     match = re.match("<h1>([^<]+)</h1>", doc.html)
     doc.title = match.group(1)
-    global textMacros
-    textMacros['title'] = doc.title
+    config.textMacros['title'] = doc.title
     doc.html = doc.html[len(match.group(0)):]
 
     header = doc.getInclusion('header')
@@ -976,8 +950,7 @@ def fillInBoilerplate(doc):
 
 
 def fillWith(tag, newElements):
-    global doc
-    for el in findAll(u"[data-fill-with='{0}']".format(u(tag)), doc.document):
+    for el in findAll(u"[data-fill-with='{0}']".format(u(tag))):
         replaceContents(el, newElements)
 
 
@@ -1279,7 +1252,7 @@ def updateCrossRefs():
             spec['level'] = 1
         specData[spec['vshortname']] = spec
     try:
-        with open(os.path.dirname(os.path.realpath(__file__))+"/spec-data/specs.json", 'w') as f:
+        with open(config.scriptPath+"/spec-data/specs.json", 'w') as f:
             json.dump(specData, f, ensure_ascii=False, indent=2)
     except Exception, e:
         die("Couldn't save spec database to disk.\n{0}", e)
@@ -1299,7 +1272,6 @@ def updateCrossRefs():
     anchors = defaultdict(list)
     for i, spec in enumerate(specData.values()):
         progress("Fetching xref data", i+1, len(specData))
-        sys.stdout.flush()
         try:
             with closing(urlopen("http://test.csswg.org/shepherd/api/spec?spec={0}&anchors=1".format(spec['vshortname']))) as f:
                 rawData = json.load(f)
@@ -1332,7 +1304,7 @@ def updateCrossRefs():
             for text in linkingTexts:
                 anchors[text].append(anchor)
     try:
-        with open(os.path.dirname(os.path.realpath(__file__))+"/spec-data/anchors.json", 'w') as f:
+        with open(config.scriptPath+"/spec-data/anchors.json", 'w') as f:
             json.dump(anchors, f, ensure_ascii=False, indent=2)
     except Exception, e:
         die("Couldn't save xref database to disk.\n{0}", e)

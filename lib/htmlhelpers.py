@@ -4,7 +4,21 @@ from html5lib.serializer import htmlserializer
 from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
-from fuckunicode import u
+from lib.fuckunicode import u
+import lib.config as config
+
+def findAll(sel, context=None):
+    if context is None:
+        context = config.doc.document
+    return CSSSelector(sel)(context)
+
+
+def find(sel, context=None):
+    result = findAll(sel, context)
+    if result:
+        return result[0]
+    else:
+        return None
 
 def textContent(el):
     return u(html.tostring(el, method='text', with_tail=False, encoding="unicode"))
