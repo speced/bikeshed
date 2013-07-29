@@ -599,6 +599,8 @@ def determineDfnType(dfn):
         "interfacedef":"interface",
         "methoddef":"method",
         "attrdef":"attribute",
+        "dictdef":"dictionary",
+        "enumdeg":"enum",
         "html-elemdef":"html-element",
         "html-attrdef":"html-attribute"
     }
