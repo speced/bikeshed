@@ -601,6 +601,7 @@ def determineDfnType(dfn):
         "attrdef":"attribute",
         "dictdef":"dictionary",
         "enumdeg":"enum",
+        "constdef":"const",
         "html-elemdef":"html-element",
         "html-attrdef":"html-attribute"
     }
