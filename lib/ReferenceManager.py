@@ -180,7 +180,7 @@ class ReferenceManager(object):
         if len(refs) == 1:
             return refs[0]['url']
 
-        die("Too many '{1}' xrefs for '{0}' Specify a spec, or set this in Ignored Terms.\n{2}", text, linkType, '\n'.join('{0}: {1}'.format(ref['spec'], ref['url']) for ref in refs))
+        die("Too many '{1}' xrefs for '{0}'. Specify a spec, or set this in Ignored Terms.\n{2}", text, linkType, '\n'.join('  {0}: {1}'.format(ref['spec'], ref['url']) for ref in refs))
         
 
 def linkTextsFromElement(el, preserveCasing=False):
