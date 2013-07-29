@@ -3,13 +3,13 @@ from lib.fuckunicode import u
 import lib.config as config
 
 def die(msg, *formatArgs):
-    print u"FATAL ERROR: "+u(msg).format(*map(u, formatArgs))
+    print u"\033[1;31mFATAL ERROR:\033[0m "+u(msg).format(*map(u, formatArgs))
     if not config.debug:
         sys.exit(1)
 
 def warn(msg, *formatArgs):
     if not config.debugQuiet:
-        print u"WARNING: "+u(msg).format(*map(u, formatArgs))
+        print u"\033[1;34mWARNING:\033[0m "+u(msg).format(*map(u, formatArgs))
 
 def say(msg, *formatArgs):
     if not config.debugQuiet:
