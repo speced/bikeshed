@@ -588,33 +588,16 @@ def determineDfnType(dfn):
     # 1. Look at data-dfn-type
     if dfn.get('data-dfn-type'):
         return dfn.get('data-dfn-type')
-    types = {
-        "propdef":"property",
-        "descdef":"descriptor",
-        "valuedef":"value",
-        "typedef":"type",
-        "at-ruledef":"at-rule",
-        "funcdef":"function",
-        "selectordef":"selector",
-        "interfacedef":"interface",
-        "methoddef":"method",
-        "attrdef":"attribute",
-        "dictdef":"dictionary",
-        "enumdeg":"enum",
-        "constdef":"const",
-        "html-elemdef":"html-element",
-        "html-attrdef":"html-attribute"
-    }
     # 2. Look for a prefix on the id
     if dfn.get('id'):
         id = dfn.get('id')
-        for prefix, type in types.items():
+        for prefix, type in config.dfnTypes.items():
             if id.startswith(prefix):
                 return type
     # 3. Look for a class on the ancestors
     for ancestor in dfn.iterancestors():
         classList = ancestor.get('class') or ''
-        for cls, type in types.items():
+        for cls, type in config.dfnTypes.items():
             if type in classList:
                 return type
     # 4. Introspect on the text
