@@ -628,16 +628,16 @@ def determineDfnType(dfn):
                 return type
     # 4. Introspect on the text
     text = textContent(dfn)
-    if len(dfn) == 1 and dfn[0].get('data-link-type') == "maybe":
+    if text[0:1] == "@":
+        return "at-rule"
+    elif len(dfn) == 1 and dfn[0].get('data-link-type') == "maybe":
         return "value"
-    elif text[-2:] == "()":
-        return "function"
     elif text[0:1] == "<" and text[-1:] == ">":
         return "type"
-    elif text[0:1] == "@":
-        return "at-rule"
     elif text[0:1] == ":":
         return "selector"
+    elif text[-2:] == "()" and not (dfn.get('id') or '').startswith("dom-"):
+        return "function"
     else:
         return "dfn"
 
