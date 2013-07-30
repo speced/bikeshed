@@ -49,11 +49,11 @@ class ReferenceManager(object):
     def getRef(self, linkType, text, spec=None, status=None, error=True):
         status = status or self.specStatus
         if status is None:
-            raise "Can't calculate an ref without knowing the desired spec status."
+            raise "Can't calculate a ref without knowing the desired spec status."
 
         if spec is None and text in self.defaultSpecs:
             for type, spec in self.defaultSpecs[text]:
-                if type == linkType:
+                if type == linkType or (linkType == "propdesc" and type in ("property", "descriptor")) or (linkType == "maybe" and type in ("value", "type", "function", "at-rule", "dfn")):
                     spec = spec
                     break
 
