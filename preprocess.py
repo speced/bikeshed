@@ -19,6 +19,7 @@
 
 # TODO
 # Handle "foo!!bar" in titles correctly.
+# Introspect based on IDL parsing.
 
 from __future__ import division
 import re
