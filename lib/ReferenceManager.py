@@ -4,14 +4,11 @@ from lib.fuckunicode import u
 from lib.messages import *
 
 class ReferenceManager(object):
-    properties = dict()
-    descriptors = dict()
-    values = dict()
-    types = dict()
-    links = dict()
-
     refs = defaultdict(list)
     specs = dict()
+
+    # dict(term=>(type, spec))
+    defaultSpecs = defaultdict(list)
 
     specStatus = None
 
@@ -52,6 +49,12 @@ class ReferenceManager(object):
         status = status or self.specStatus
         if status is None:
             raise "Can't calculate an ref without knowing the desired spec status."
+
+        if spec is None and text in self.defaultSpecs:
+            for type, spec in self.defaultSpecs[text]:
+                if type == linkType:
+                    spec = spec
+                    break
 
         # Filter by type/text to find all the candidate refs
         def findRefs(allRefs, dfnTypes, linkTexts):

@@ -317,16 +317,24 @@ def transformMetadata(lines, doc, **kwargs):
                         'org': match.group(2),
                         'link': match.group(3)})
             else:
-                die("Error: one of the editors didn't match the format \
-'<name>, <company>, <email-or-contact-page>")
+                die("'Editor' format is '<name>, <company>, <email-or-contact-page>. Got:\n{0}", val)
         elif key == "At Risk":
             doc.atRisk.append(val)
         elif key == "Test Suite":
             doc.testSuite = val
-        elif key == "Ignored Properties":
-            doc.ignoredProperties.extend(prop.strip() for prop in val.split(u','))
         elif key == "Ignored Terms":
             doc.ignoredTerms.extend(term.strip() for term in val.split(u','))
+        elif key == "Xref Defaults":
+            dfnTypes = "|".join(config.dfnTypes.values())
+            for default in val.split(","):
+                match = re.match(u"^\s*(\S.*)\s+({0})\s+([\w-]+)\s*$".format(dfnTypes), val)
+                if match:
+                    term = match.group(1)
+                    type = match.group(2)
+                    spec = match.group(3)
+                    config.doc.refs.defaultSpecs[term].append((type, spec))
+                else:
+                    die("'Xref Defaults' is a comma-separated list of '<term> <dfn-type> <spec>'. Got:\n{0}", default)
         else:
             doc.otherMetadata[key].append(val)
 
