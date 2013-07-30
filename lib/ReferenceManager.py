@@ -39,7 +39,8 @@ class ReferenceManager(object):
                     ref = {
                         "type":type,
                         "spec":"local",
-                        "id":"#"+el.get('id')
+                        "id":"#"+el.get('id'),
+                        "exported":True
                     }
                     # Insert at the front of the references, so it'll get grabbed first.
                     self.refs[linkText].insert(0,ref)
@@ -68,7 +69,7 @@ class ReferenceManager(object):
             for dfnText,refs in allRefs.items():
                 for linkText in linkTexts:
                     if linkText == dfnText:
-                        return [ref for dfnType in dfnTypes for ref in refs if ref['type'] == dfnType]
+                        return [ref for dfnType in dfnTypes for ref in refs if ref['type'] == dfnType and ref['exported']]
             return []
 
         if linkType in list(config.dfnTypes.values()):

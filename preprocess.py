@@ -1287,14 +1287,13 @@ def updateCrossRefs():
         except Exception, e:
             die("Couldn't download spec data for {0}.\n{1}", spec['vshortname'], e)
         for rawAnchor in rawAnchors:
-            if not rawAnchor.get('export'):
-                continue
             linkingTexts = rawAnchor.get('linking_text') or [rawAnchor.get('title')]
             type = rawAnchor['type']
             # eliminate this converter once plinss converts the source info
             anchor = {
                 'type': type,
-                'spec': spec['vshortname']
+                'spec': spec['vshortname'],
+                'exported': True if rawAnchor.get('export') else False
             }
             if rawAnchor.get('draft'):
                 anchor['ED_url'] = spec['ED'] + rawAnchor['uri']
@@ -1304,7 +1303,7 @@ def updateCrossRefs():
                 anchors[text].append(anchor)
     try:
         with open(config.scriptPath+"/spec-data/anchors.json", 'w') as f:
-            json.dump(anchors, f, ensure_ascii=False, indent=2)
+            json.dump(anchors, f, indent=2)
     except Exception, e:
         die("Couldn't save xref database to disk.\n{0}", e)
 
