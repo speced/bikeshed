@@ -1291,15 +1291,6 @@ def updateCrossRefs():
             linkingTexts = rawAnchor.get('linking_text') or [rawAnchor.get('title')]
             type = rawAnchor['type']
             # eliminate this converter once plinss converts the source info
-            
-            if type == "propdef":
-                type = "property"
-            elif type == "descdef":
-                type = "descriptor"
-            elif type == "valuedef":
-                type = "value"
-            elif type == "typedef":
-                type = "type"
             anchor = {
                 'type': type,
                 'spec': spec['vshortname']
