@@ -147,9 +147,13 @@ class ReferenceManager(object):
                 die("No refs suitable for '{1}' status were found for '{0}'.", text, status)
             return None
 
-        # Accept local dfns even if there are xrefs with the same text.
-        if len(refs) == 1 or refs[0]['spec'] == 'local':
+        if len(refs) == 1:
             return refs[0]['url']
+
+        # Accept local dfns even if there are xrefs with the same text.
+        for ref in refs:
+            if ref['spec'] == "local":
+                return ref['url']
 
         if error:
             die("Too many '{1}' refs for '{0}' to choose between.\nDeclare this in Ignored Terms, or specify a spec:\n{2}", text, linkType, '\n'.join('  {0}: {1}'.format(ref['spec'], ref['url']) for ref in refs))
