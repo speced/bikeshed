@@ -60,25 +60,43 @@ the processor uses the remote file at \
                          help="Makes the processor continue after hitting a fatal error.")
     optparser.add_option("--print-exports", dest="printExports", default=False, action="store_true",
                          help="Prints those terms that will be exported for cross-ref purposes.")
+    optparser.add_option("--print-refs-for", dest="linkText", default=False,
+                         help="Prints the ref data for a given link text.")
     optparser.add_option("--update-cross-refs", dest="updateCrossRefs", default=False, action="store_true",
                          help="Forces a fresh download of all the cross-ref data.")
     (options, posargs) = optparser.parse_args()
 
-    config.debugQuiet = options.quiet
+    config.quiet = options.quiet
     config.debug = options.debug
 
     if options.updateCrossRefs:
         updateCrossRefs()
         return
 
-    config.doc = CSSSpec(inputFilename=options.inputFile,
-                  biblioFilename=options.biblioFile,
-                  paragraphMode=options.paragraphMode)
-    config.doc.preprocess()
 
     if options.printExports:
+        config.doc = CSSSpec(inputFilename=options.inputFile,
+                      biblioFilename=options.biblioFile,
+                      paragraphMode=options.paragraphMode)
+        config.doc.preprocess()
         config.doc.printTargets()
+    elif options.linkText:
+        config.debug = True
+        config.quiet = True
+        config.doc = CSSSpec(inputFilename=options.inputFile,
+                      biblioFilename=options.biblioFile,
+                      paragraphMode=options.paragraphMode)
+        config.doc.preprocess()
+        refs = config.doc.refs.refs[options.linkText]
+        config.quiet = options.quiet
+        if not config.quiet:
+            print "Refs for '{0}':".format(options.linkText)
+        print '\n'.join('  {0} <{1}> {2}'.format(ref['spec'], ref['type'], ref.get('id') or ref.get('ED_url') or ref.get('TR_url')) for ref in refs)
     else:
+        config.doc = CSSSpec(inputFilename=options.inputFile,
+                      biblioFilename=options.biblioFile,
+                      paragraphMode=options.paragraphMode)
+        config.doc.preprocess()
         config.doc.finish(outputFilename=options.outputFile)
 
 
@@ -688,12 +706,7 @@ def processAutolinks(doc):
             el.set('href', '#'+simplifyText(text))
             continue
 
-        id = doc.refs.getRef(linkType, text)
-        if id is not None:
-            el.set('href', '#'+id)
-            el.tag = "a"
-            continue
-        url = doc.refs.getXref(linkType, text, spec=el.get('data-xref-spec'), status=el.get('data-xref-status'))
+        url = doc.refs.getRef(linkType, text, spec=el.get('data-xref-spec'), status=el.get('data-xref-status'))
         if url is not None:
             el.set('href', url)
             el.tag = "a"
@@ -797,10 +810,10 @@ class CSSSpec(object):
         # Load up the xref data
         specs = json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/specs.json",
                                       type="spec list", quiet=True))
-        anchors = json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.json",
-                                      type="spec list", quiet=True))
+        anchors = defaultdict(list, json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.json",
+                                      type="spec list", quiet=True)))
         self.refs.specs = specs
-        self.refs.xrefs = anchors
+        self.refs.refs = anchors
 
         self.paragraphMode = paragraphMode
 
