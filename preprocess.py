@@ -603,6 +603,19 @@ def canonicalizeShortcuts(doc):
         if el.get("status"):
             el.set("data-xref-status", el.get('status'))
             del el.attrib['status']
+    for el in findAll("dfn[for], a[for]"):
+        if el.tag == "dfn":
+            el.set("data-dfn-for", el.get('for'))
+        else:
+            el.set("data-link-for", el.get('for'))
+        del el.attrib['for']
+    for el in findAll("[dfn-for], [link-for]"):
+        if el.get('dfn-for') is not None:
+            el.set("data-dfn-for", el.get('dfn-for'))
+            del el.attrib['dfn-for']
+        if el.get('link-for') is not None:
+            el.set("data-link-for", el.get('link-for'))
+            del el.attrib['link-for']
 
 
 def processDfns(doc):
