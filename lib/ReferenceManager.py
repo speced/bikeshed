@@ -156,6 +156,18 @@ class ReferenceManager(object):
             if ref['spec'] == "local":
                 return ref['url']
 
+        # Eventually we need a registry for canonical definitions or something,
+        # but for now, if all the refs are for the same shortname, take the biggest level
+        if all(ref['shortname'] == refs[0]['shortname'] for ref in refs):
+            maxLevel = 0
+            url = None
+            for ref in refs:
+                if ref['level'] > maxLevel:
+                    maxLevel = ref['level']
+                    url = ref['url']
+            if url:
+                return url
+
         if error:
             die("Too many '{1}' refs for '{0}' to choose between.\nDeclare this in Ignored Terms, or specify a spec:\n{2}", text, linkType, '\n'.join('  {0}: {1}'.format(ref['spec'], ref['url']) for ref in refs))
         

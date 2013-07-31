@@ -1290,6 +1290,8 @@ def updateCrossRefs():
             anchor = {
                 'type': type,
                 'spec': spec['vshortname'],
+                'shortname': spec['shortname'],
+                'level': int(spec['level']),
                 'exported': True if rawAnchor.get('export') else False
             }
             if rawAnchor.get('draft'):
