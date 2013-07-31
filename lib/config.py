@@ -26,3 +26,4 @@ dfnClassToType = {
 dfnTypes = set(dfnClassToType.values())
 maybeTypes = set(("value", "type", "at-rule", "function", "selector", "token"))
 linkTypes = dfnTypes | set(("propdesc", "functionish", "maybe", "biblio"))
+typesUsingFor = set(("descriptor", "value", "method", "attribute", "const", "dictmember"))

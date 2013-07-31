@@ -686,6 +686,16 @@ def classifyDfns(doc):
         dfnType = determineDfnType(el)
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', dfnType)
+        if dfnType in config.typesUsingFor:
+            if el.get('data-dfn-for'):
+                pass
+            else:
+                for ancestor in el.iterancestors():
+                    if ancestor.get('data-dfn-for'):
+                        el.set('data-dfn-for', ancestor.get('data-dfn-for'))
+                        break
+                else:
+                    die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to the <dfn>, or 'dfn-for' to an ancestor.", dfnType)
         if el.get('id') is None:         
             id = simplifyText(textContent(el))
             if dfnType == "dfn":
@@ -693,10 +703,7 @@ def classifyDfns(doc):
             elif dfnType == "interface":
                 id = "dom-" + id
             elif dfnType in ("attribute", "method", "const", "dictmember"):
-                if el.get("data-dfn-for"):
-                    id = "dom-{0}-{1}".format(el.get("data-dfn-for"), id)
-                else:
-                    die("Can't generate an id for the '{0}' {1} dfn without knowing what interface it's for. Add a 'for' attribute.", id, dfnType)
+                id = "dom-{0}-{1}".format(el.get("data-dfn-for"), id)
             else:
                 id = "{0}-{1}".format(dfnTypeToPrefix[dfnType], id)
             el.set('id', id)
