@@ -168,8 +168,13 @@ class ReferenceManager(object):
             if url:
                 return url
 
+        # If we hit this point, there are >1 possible refs to choose from.
         if error:
-            die("Too many '{1}' refs for '{0}' to choose between.\nDeclare this in Ignored Terms, or specify a spec:\n{2}", text, linkType, '\n'.join('  {0}: {1}'.format(ref['spec'], ref['url']) for ref in refs))
+            warn("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into 'Link Defaults':\n{3}",
+                 linkType,
+                 text,
+                 refs[0]['spec'],
+                 '\n'.join('    {0} {1} {2}'.format(text, ref['type'], ref['spec']) for ref in refs))
         
 
 def linkTextsFromElement(el, preserveCasing=False):
