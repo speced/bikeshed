@@ -325,7 +325,7 @@ def transformMetadata(lines, doc, **kwargs):
             doc.testSuite = val
         elif key == "Ignored Terms":
             doc.ignoredTerms.extend(term.strip() for term in val.split(u','))
-        elif key == "Xref Defaults":
+        elif key == "Link Defaults":
             dfnTypes = "|".join(config.dfnTypes.values())
             for default in val.split(","):
                 match = re.match(u"^\s*(\S.*)\s+({0})\s+([\w-]+)\s*$".format(dfnTypes), default)
@@ -335,7 +335,7 @@ def transformMetadata(lines, doc, **kwargs):
                     spec = match.group(3)
                     config.doc.refs.defaultSpecs[term].append((type, spec))
                 else:
-                    die("'Xref Defaults' is a comma-separated list of '<term> <dfn-type> <spec>'. Got:\n{0}", default)
+                    die("'Link Defaults' is a comma-separated list of '<term> <dfn-type> <spec>'. Got:\n{0}", default)
         else:
             doc.otherMetadata[key].append(val)
 
