@@ -635,6 +635,8 @@ def determineDfnType(dfn):
         return "value"
     elif text[0:1] == "<" and text[-1:] == ">":
         return "type"
+    elif text[:1] == u"〈" and text[-1:] == u"〉":
+        return "token"
     elif text[0:1] == ":":
         return "selector"
     elif text[-2:] == "()" and not (dfn.get('id') or '').startswith("dom-"):
@@ -656,10 +658,13 @@ def classifyDfns(doc):
             if id[-2:] == "()":
                 id = id[:-2]
                 suffix = u"-function"
-            elif id[0:1] == "<" and id[-1:] == ">":
+            elif id[:1] == "<" and id[-1:] == ">":
                 id = id[1:-1]
                 suffix = u"-type"
-            elif id[0:1] == "@":
+            elif id[:1] == u"〈" and id[-1:] == u"〉":
+                id = id[1:-1]
+                suffix = u"-token"
+            elif id[:1] == "@":
                 prefix = u"at-"
             elif dfnType:
                 suffix = u"-value"
