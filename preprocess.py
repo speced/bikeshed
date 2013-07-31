@@ -328,7 +328,7 @@ def transformMetadata(lines, doc, **kwargs):
         elif key == "Xref Defaults":
             dfnTypes = "|".join(config.dfnTypes.values())
             for default in val.split(","):
-                match = re.match(u"^\s*(\S.*)\s+({0})\s+([\w-]+)\s*$".format(dfnTypes), val)
+                match = re.match(u"^\s*(\S.*)\s+({0})\s+([\w-]+)\s*$".format(dfnTypes), default)
                 if match:
                     term = match.group(1)
                     type = match.group(2)
