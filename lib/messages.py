@@ -10,7 +10,7 @@ def die(msg, *formatArgs):
 
 def warn(msg, *formatArgs):
     if not config.quiet:
-        print u"\033[1;34mWARNING:\033[0m "+u(msg).format(*map(u, formatArgs))
+        print u"\033[1;33mWARNING:\033[0m "+u(msg).format(*map(u, formatArgs))
 
 def say(msg, *formatArgs):
     if not config.quiet:
