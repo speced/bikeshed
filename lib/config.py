@@ -16,8 +16,8 @@ dfnTypes = {
     "methoddef":"method",
     "attrdef":"attribute",
     "dictdef":"dictionary",
-    "enumdef":"enum",
     "dictmemberdef":"dictmember",
+    "enumdef":"enum",
     "constdef":"const",
     "html-elemdef":"html-element",
     "html-attrdef":"html-attribute"
