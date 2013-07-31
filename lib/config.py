@@ -11,11 +11,13 @@ dfnTypes = {
     "at-ruledef":"at-rule",
     "funcdef":"function",
     "selectordef":"selector",
+    "tokendef":"token",
     "interfacedef":"interface",
     "methoddef":"method",
     "attrdef":"attribute",
     "dictdef":"dictionary",
     "enumdef":"enum",
+    "dictmemberdef":"dictmember",
     "constdef":"const",
     "html-elemdef":"html-element",
     "html-attrdef":"html-attribute"
