@@ -78,6 +78,8 @@ class ReferenceManager(object):
             refs = findRefs(self.refs, [linkType, "dfn"], text)
         elif linkType == "propdesc":
             refs = findRefs(self.refs, ["property", "descriptor"], text)
+        elif linkType == "functionish":
+            refs = findRefs(self.refs, ["function", "method"], text)
         elif linkType == "dfn":
             refs = findRefs(self.refs, "dfn", linkTextVariations(text))
         elif linkType == "maybe":

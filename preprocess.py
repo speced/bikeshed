@@ -644,6 +644,27 @@ def determineDfnType(dfn):
     else:
         return "dfn"
 
+def determineLinkType(el):
+    # 1. Look at data-link-type
+    if el.get('data-link-type'):
+        type = el.get('data-link-type')
+        if type in config.linkTypes:
+            return type
+        die("Unknown link type '{0}' on:\n{1}", type, outerHTML(el))
+    # 2. Introspect on the text
+    text = textContent(el)
+    if text[0:1] == "@":
+        return "at-rule"
+    elif text[0:1] == "<" and text[-1:] == ">":
+        return "type"
+    elif text[:1] == u"〈" and text[-1:] == u"〉":
+        return "token"
+    elif text[0:1] == ":":
+        return "selector"
+    elif text[-2:] == "()":
+        return "functionish"
+    else:
+        return "dfn"
 
 def classifyDfns(doc):
     dfnTypeToPrefix = {v:k for k,v in config.dfnTypes.items()}
@@ -699,7 +720,7 @@ def processAutolinks(doc):
         if el.get('title') == '':
             break
 
-        linkType = el.get('data-link-type') or "dfn"
+        linkType = determineLinkType(el)
         text = u(el.get('title')) or textContent(el).lower()
         if len(text) == 0:
             die(u"Autolink {0} has no linktext.", outerHTML(el))

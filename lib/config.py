@@ -24,3 +24,4 @@ dfnTypes = {
 }
 # The types that a "maybe" link will attempt to look to find its value.
 maybeTypes = ("value", "type", "at-rule", "function", "selector", "token")
+linkTypes = set(dfnTypes.values()) | set(("propdesc", "functionish", "maybe", "biblio"))
