@@ -704,7 +704,7 @@ def processAutolinks(doc):
         if len(text) == 0:
             die(u"Autolink {0} has no linktext.", outerHTML(el))
 
-        if (linkType == "property" and text in doc.ignoredProperties) or text in doc.ignoredTerms:
+        if text in doc.ignoredTerms:
             continue
 
         if linkType == u"biblio":
@@ -789,7 +789,6 @@ class CSSSpec(object):
     previousVersions = []
     warning = None
     atRisk = []
-    ignoredProperties = []
     ignoredTerms = []
     testSuite = None
     otherMetadata = defaultdict(list)
