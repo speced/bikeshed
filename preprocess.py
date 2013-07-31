@@ -627,6 +627,8 @@ def determineDfnType(dfn):
         for cls, type in config.dfnTypes.items():
             if type in classList:
                 return type
+            if "idl" in classList and "extract" not in classList:
+                return "interface"
     # 4. Introspect on the text
     text = textContent(dfn)
     if text[0:1] == "@":
