@@ -326,9 +326,8 @@ def transformMetadata(lines, doc, **kwargs):
         elif key == "Ignored Terms":
             doc.ignoredTerms.extend(term.strip() for term in val.split(u','))
         elif key == "Link Defaults":
-            dfnTypes = "|".join(config.dfnTypes.values())
             for default in val.split(","):
-                match = re.match(u"^\s*(\S.*)\s+({0})\s+([\w-]+)\s*$".format(dfnTypes), default)
+                match = re.match(u"^\s*(\S.*)\s+({0})\s+([\w-]+)\s*$".format("|".join(config.dfnTypes)), default)
                 if match:
                     term = match.group(1)
                     type = match.group(2)
@@ -582,7 +581,7 @@ def canonicalizeShortcuts(doc):
     # Take all the invalid-HTML shortcuts allowed in the dfns and fix them.
 
     for el in findAll("dfn"):
-        for dfnType in ('property', 'value', 'at-rule', 'descriptor', 'type', 'function', 'selector', 'html-element', 'html-attribute', 'interface', 'method', 'attribute'):
+        for dfnType in config.dfnTypes:
             if el.get(dfnType) is not None:
                 del el.attrib[dfnType]
                 el.set("data-dfn-type", dfnType)
@@ -631,13 +630,13 @@ def determineDfnType(dfn):
     # 2. Look for a prefix on the id
     if dfn.get('id'):
         id = dfn.get('id')
-        for prefix, type in config.dfnTypes.items():
+        for prefix, type in config.dfnClassToType.items():
             if id.startswith(prefix):
                 return type
     # 3. Look for a class on the ancestors
     for ancestor in dfn.iterancestors():
         classList = ancestor.get('class') or ''
-        for cls, type in config.dfnTypes.items():
+        for cls, type in config.dfnClassToType.items():
             if type in classList:
                 return type
             if "idl" in classList and "extract" not in classList:
@@ -682,7 +681,7 @@ def determineLinkType(el):
         return "dfn"
 
 def classifyDfns(doc):
-    dfnTypeToPrefix = {v:k for k,v in config.dfnTypes.items()}
+    dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
     for el in findAll("dfn"):
         dfnType = determineDfnType(el)
         if el.get('data-dfn-type') is None:

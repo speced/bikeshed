@@ -3,7 +3,7 @@ quiet = False
 scriptPath = "~"
 doc = None
 textMacros = {}
-dfnTypes = {
+dfnClassToType = {
     "propdef":"property",
     "descdef":"descriptor",
     "valuedef":"value",
@@ -23,5 +23,6 @@ dfnTypes = {
     "html-attrdef":"html-attribute"
 }
 # The types that a "maybe" link will attempt to look to find its value.
-maybeTypes = ("value", "type", "at-rule", "function", "selector", "token")
-linkTypes = set(dfnTypes.values()) | set(("propdesc", "functionish", "maybe", "biblio"))
+dfnTypes = set(dfnClassToType.values())
+maybeTypes = set(("value", "type", "at-rule", "function", "selector", "token"))
+linkTypes = dfnTypes | set(("propdesc", "functionish", "maybe", "biblio"))

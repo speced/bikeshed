@@ -26,7 +26,6 @@ class ReferenceManager(object):
 
 
     def addLocalDfns(self, dfns):
-        dfnTypes = tuple(config.dfnTypes.values())
         for el in dfns:
             if "no-ref" in (el.get('class') or ""):
                 continue
@@ -74,7 +73,7 @@ class ReferenceManager(object):
                         return [ref for dfnType in dfnTypes for ref in refs if ref['type'] == dfnType and ref['exported']]
             return []
 
-        if linkType in list(config.dfnTypes.values()):
+        if linkType in config.dfnTypes:
             refs = findRefs(self.refs, [linkType, "dfn"], text)
         elif linkType == "propdesc":
             refs = findRefs(self.refs, ["property", "descriptor"], text)
