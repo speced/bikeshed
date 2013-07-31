@@ -646,33 +646,25 @@ def determineDfnType(dfn):
 
 
 def classifyDfns(doc):
-
+    dfnTypeToPrefix = {v:k for k,v in config.dfnTypes.items()}
     for el in findAll("dfn"):
         dfnType = determineDfnType(el)
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', dfnType)
         if el.get('id') is None:         
-            id = textContent(el)
-            prefix = u""
-            suffix = u""
-            if id[-2:] == "()":
-                id = id[:-2]
-                suffix = u"-function"
-            elif id[:1] == "<" and id[-1:] == ">":
-                id = id[1:-1]
-                suffix = u"-type"
-            elif id[:1] == u"〈" and id[-1:] == u"〉":
-                id = id[1:-1]
-                suffix = u"-token"
-            elif id[:1] == "@":
-                prefix = u"at-"
-            elif dfnType:
-                suffix = u"-value"
-            else:
+            id = simplifyText(textContent(el))
+            if dfnType == "dfn":
                 pass
-
-            if el.get('id') is None:
-                el.set('id', simplifyText(id))
+            elif dfnType == "interface":
+                id = "dom-" + id
+            elif dfnType in ("attribute", "method", "const", "dictmember"):
+                if el.get("data-dfn-for"):
+                    id = "dom-{0}-{1}".format(el.get("data-dfn-for"), id)
+                else:
+                    die("Can't generate an id for the '{0}' {1} dfn without knowing what interface it's for. Add a 'for' attribute.", id, dfnType)
+            else:
+                id = "{0}-{1}".format(dfnTypeToPrefix[dfnType], id)
+            el.set('id', id)
 
 
 def dedupIds(doc, els):

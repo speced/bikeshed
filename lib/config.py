@@ -22,3 +22,4 @@ dfnTypes = {
     "html-elemdef":"html-element",
     "html-attrdef":"html-attribute"
 }
+idlDfnTypes = ("interface", "method", "attribute", "dictionary", "dictmember", "enum", "const")
