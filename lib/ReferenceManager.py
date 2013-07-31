@@ -47,6 +47,8 @@ class ReferenceManager(object):
 
 
     def getRef(self, linkType, text, spec=None, status=None, error=True):
+        # If error is False, this function just shuts up and returns a url or None
+        # Otherwise, it pops out debug messages for the user.
         status = status or self.specStatus
         if status is None:
             raise "Can't calculate a ref without knowing the desired spec status."
@@ -175,6 +177,7 @@ class ReferenceManager(object):
                  text,
                  refs[0]['spec'],
                  '\n'.join('    {0} {1} {2}'.format(text, ref['type'], ref['spec']) for ref in refs))
+        return refs[0]['url']
         
 
 def linkTextsFromElement(el, preserveCasing=False):
