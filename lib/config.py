@@ -22,4 +22,5 @@ dfnTypes = {
     "html-elemdef":"html-element",
     "html-attrdef":"html-attribute"
 }
-idlDfnTypes = ("interface", "method", "attribute", "dictionary", "dictmember", "enum", "const")
+# The types that a "maybe" link will attempt to look to find its value.
+maybeTypes = ("value", "type", "at-rule", "function", "selector", "token")

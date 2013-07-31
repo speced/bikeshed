@@ -53,7 +53,7 @@ class ReferenceManager(object):
 
         if spec is None and text in self.defaultSpecs:
             for type, spec in self.defaultSpecs[text]:
-                if type == linkType or (linkType == "propdesc" and type in ("property", "descriptor")) or (linkType == "maybe" and type in ("value", "type", "function", "at-rule", "dfn")):
+                if type == linkType or (linkType == "propdesc" and type in ("property", "descriptor")) or (linkType == "maybe" and type in config.maybeTypes):
                     spec = spec
                     break
 
@@ -79,7 +79,7 @@ class ReferenceManager(object):
         elif linkType == "dfn":
             refs = findRefs(self.refs, "dfn", linkTextVariations(text))
         elif linkType == "maybe":
-            refs = findRefs(self.refs, ["value", "type", "function", "at-rule"], text) + findRefs(self.refs, "dfn", linkTextVariations(text))
+            refs = findRefs(self.refs, config.maybeTypes, text) + findRefs(self.refs, "dfn", linkTextVariations(text))
         else:
             die("Unknown link type '{0}'.",linkType)
             return None
