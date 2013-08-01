@@ -261,13 +261,23 @@ def transformPropdef(lines, doc, **kwargs):
 
 
 def transformDescdef(lines, doc, **kwargs):
-    ret = ["<table class='descdef'>"]
+    name = None
+    descFor = None
+    ret = []
     for (i, line) in enumerate(lines):
         match = re.match("\s*([^:]+):\s*(.*)", line)
-        key = match.group(1)
-        val = match.group(2)
+        key = match.group(1).strip()
+        val = match.group(2).strip()
+        if key == "Name":
+            name = val
+        elif key == "For":
+            descFor = val
+            val = "<a at-rule>{0}</a>".format(val)
         ret.append("<tr><th>" + key + ":<td>" + val)
     ret.append("</table>")
+    if descFor is None:
+        die("The descdef for '{0}' is missing a 'For' line.", name)
+    ret.insert(0, "<table class='descdef' data-dfn-for='{0}'>".format(descFor))
     return ret
 
 
