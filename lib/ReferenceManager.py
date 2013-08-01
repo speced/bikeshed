@@ -32,6 +32,10 @@ class ReferenceManager(object):
             for linkText in linkTextsFromElement(el):
                 type = el.get('data-dfn-type')
                 dfnFor = el.get('data-dfn-for')
+                if dfnFor is not None:
+                    dfnFor = set(dfnFor.split())
+                else:
+                    dfnFor = set()
                 if type in config.dfnTypes or type == "dfn":
                     existingAnchors = self.refs[linkText]
                     if any(ref['spec'] == "local" and ref['type'] == type and ref['for'] == dfnFor for ref in existingAnchors):
