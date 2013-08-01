@@ -602,7 +602,7 @@ def canonicalizeShortcuts(doc):
             del el.attrib['noexport']
             el.set('data-noexport', '')
     for el in findAll("a"):
-        for linkType in (dfnTypes | set("dfn")):
+        for linkType in (config.dfnTypes | set("dfn")):
             if el.get(linkType) is not None:
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
@@ -705,7 +705,7 @@ def classifyDfns(doc):
                         el.set('data-dfn-for', ancestor.get('data-dfn-for'))
                         break
                 else:
-                    die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to the <dfn>, or 'dfn-for' to an ancestor.", dfnType)
+                    die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
         if el.get('id') is None:         
             id = simplifyText(textContent(el))
             if dfnType == "dfn":
