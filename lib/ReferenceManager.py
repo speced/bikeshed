@@ -42,6 +42,8 @@ class ReferenceManager(object):
                     ref = {
                         "type":type,
                         "spec":"local",
+                        "shortname":"local",
+                        "level":1,
                         "id":"#"+el.get('id'),
                         "exported":True,
                         "for": dfnFor
@@ -161,21 +163,27 @@ class ReferenceManager(object):
             return refs[0]['url']
 
         # Accept local dfns even if there are xrefs with the same text.
-        for ref in refs:
-            if ref['spec'] == "local":
-                return ref['url']
+        localRefs = [ref for ref in refs if ref['spec'] == "local"]
+        if len(localRefs) == 1:
+            return localRefs[0]['url']
+        elif len(localRefs) > 1:
+            warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into 'Link Defaults':\n{3}",
+                 linkType,
+                 text,
+                 refs[0]['spec'],
+                 '\n'.join('    {0} {1} {2}'.format(text, ref['type'], ref['spec']) for ref in localRefs))
+            return None
 
         # Eventually we need a registry for canonical definitions or something,
         # but for now, if all the refs are for the same shortname, take the biggest level
         if all(ref['shortname'] == refs[0]['shortname'] for ref in refs):
             maxLevel = 0
-            url = None
             for ref in refs:
                 if ref['level'] > maxLevel:
                     maxLevel = ref['level']
-                    url = ref['url']
-            if url:
-                return url
+            leveledRefs = [ref for ref in refs if ref['level'] == maxLevel]
+            if len(leveledRefs) == 1:
+                return leveledRefs[0]['url']
 
         # If we hit this point, there are >1 possible refs to choose from.
         if error:
