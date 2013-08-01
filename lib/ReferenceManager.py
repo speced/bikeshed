@@ -39,7 +39,8 @@ class ReferenceManager(object):
                         "type":type,
                         "spec":"local",
                         "id":"#"+el.get('id'),
-                        "exported":True
+                        "exported":True,
+                        "for": el.get('data-dfn-for') or None
                     }
                     # Insert at the front of the references, so it'll get grabbed first.
                     self.refs[linkText].insert(0,ref)
