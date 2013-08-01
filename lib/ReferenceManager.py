@@ -31,19 +31,22 @@ class ReferenceManager(object):
                 continue
             for linkText in linkTextsFromElement(el):
                 type = el.get('data-dfn-type')
+                dfnFor = el.get('data-dfn-for')
                 if type in config.dfnTypes or type == "dfn":
                     existingAnchors = self.refs[linkText]
-                    if any(ref['spec'] == "local" and ref['type'] == type for ref in existingAnchors):
-                        die(u"Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
+                    if any(ref['spec'] == "local" and ref['type'] == type and ref['for'] == dfnFor for ref in existingAnchors):
+                        if dfnFor:
+                            die(u"Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, type, dfnFor)
+                        else:
+                            die(u"Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
                     ref = {
                         "type":type,
                         "spec":"local",
                         "id":"#"+el.get('id'),
                         "exported":True,
-                        "for": el.get('data-dfn-for') or None
+                        "for": dfnFor
                     }
-                    # Insert at the front of the references, so it'll get grabbed first.
-                    self.refs[linkText].insert(0,ref)
+                    self.refs[linkText].append(ref)
 
 
     def getRef(self, linkType, text, spec=None, status=None, error=True):
