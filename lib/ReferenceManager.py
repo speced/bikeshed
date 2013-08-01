@@ -51,7 +51,7 @@ class ReferenceManager(object):
                     self.refs[linkText].append(ref)
 
 
-    def getRef(self, linkType, text, spec=None, status=None, error=True):
+    def getRef(self, linkType, text, spec=None, status=None, linkFor=None, error=True):
         # If error is False, this function just shuts up and returns a url or None
         # Otherwise, it pops out debug messages for the user.
         status = status or self.specStatus

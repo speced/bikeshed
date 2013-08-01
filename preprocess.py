@@ -607,10 +607,10 @@ def canonicalizeShortcuts(doc):
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
         if el.get("spec"):
-            el.set("data-xref-spec", el.get('spec'))
+            el.set("data-link-spec", el.get('spec'))
             del el.attrib['spec']
         if el.get("status"):
-            el.set("data-xref-status", el.get('status'))
+            el.set("data-link-status", el.get('status'))
             del el.attrib['status']
     for el in findAll("dfn[for], a[for]"):
         if el.tag == "dfn":
@@ -764,7 +764,10 @@ def processAutolinks(doc):
             el.set('href', '#'+simplifyText(text))
             continue
 
-        url = doc.refs.getRef(linkType, text, spec=el.get('data-xref-spec'), status=el.get('data-xref-status'))
+        url = doc.refs.getRef(linkType, text,
+                              spec=el.get('data-link-spec'),
+                              status=el.get('data-link-status'),
+                              linkFor=el.get('data-link-for'))
         if url is not None:
             el.set('href', url)
             el.tag = "a"
