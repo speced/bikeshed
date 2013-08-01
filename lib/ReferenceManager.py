@@ -2,6 +2,7 @@ import re
 from collections import defaultdict
 from lib.fuckunicode import u
 from lib.messages import *
+from lib.htmlhelpers import *
 
 class ReferenceManager(object):
     refs = defaultdict(list)
@@ -111,7 +112,7 @@ class ReferenceManager(object):
             if linkType == "maybe":
                 return None
             if error:
-                die("No '{1}' refs found for '{0}'.", text, linkType)
+                die("No '{1}' refs found for '{0}':\n{2}", text, linkType, outerHTML(el))
             return None
 
         # Filter by spec, if needed
@@ -121,7 +122,7 @@ class ReferenceManager(object):
                 if linkType == "maybe":
                     return None
                 if error:
-                    die("No refs found for text '{0}' in spec '{1}'.", text, spec)
+                    die("No refs found for text '{0}' in spec '{1}':\n{2}", text, spec, outerHTML(el))
                 return None
 
         # Filter by status, set url
@@ -179,12 +180,12 @@ class ReferenceManager(object):
         if len(localRefs) == 1:
             return localRefs[0]['url']
         elif len(localRefs) > 1:
-            warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into 'Link Defaults':\n{3}",
+            warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one for '{2}'.\nIf this is wrong, fix the links with one of the following 'for' values:\n{3}",
                  linkType,
                  text,
-                 refs[0]['spec'],
-                 '\n'.join('    {0} {1} {2}'.format(text, ref['type'], ref['spec']) for ref in localRefs))
-            return None
+                 ' '.join(refs[0]['for']),
+                 '\n'.join("    "+dfnFor for ref in localRefs for dfnFor in ref['for']))
+            return localRefs[0]['url']
 
         # Eventually we need a registry for canonical definitions or something,
         # but for now, if all the refs are for the same shortname, take the biggest level
