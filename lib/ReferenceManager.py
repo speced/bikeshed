@@ -31,7 +31,7 @@ class ReferenceManager(object):
                 continue
             for linkText in linkTextsFromElement(el):
                 type = el.get('data-dfn-type')
-                if type in dfnTypes or type == "dfn":
+                if type in config.dfnTypes or type == "dfn":
                     existingAnchors = self.refs[linkText]
                     if any(ref['spec'] == "local" and ref['type'] == type for ref in existingAnchors):
                         die(u"Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
@@ -79,6 +79,8 @@ class ReferenceManager(object):
             refs = findRefs(self.refs, ["property", "descriptor"], text)
         elif linkType == "functionish":
             refs = findRefs(self.refs, ["function", "method"], text)
+        elif linkType == "idl":
+            refs = findRefs(self.refs, config.idlTypes, text)
         elif linkType == "dfn":
             refs = findRefs(self.refs, "dfn", linkTextVariations(text))
         elif linkType == "maybe":
