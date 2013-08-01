@@ -23,7 +23,7 @@ dfnClassToType = {
     "html-attrdef":"html-attribute"
 }
 # The types that a "maybe" link will attempt to look to find its value.
-dfnTypes = set(dfnClassToType.values())
+dfnTypes = frozenset(dfnClassToType.values())
 maybeTypes = frozenset(("value", "type", "at-rule", "function", "selector", "token"))
 idlTypes = frozenset(("interface", "method", "attribute", "dictionary", "dictmember", "enum", "const"))
 linkTypes = dfnTypes | frozenset(("propdesc", "functionish", "idl", "maybe", "biblio"))
