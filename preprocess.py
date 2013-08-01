@@ -602,7 +602,7 @@ def canonicalizeShortcuts(doc):
             del el.attrib['noexport']
             el.set('data-noexport', '')
     for el in findAll("a"):
-        for linkType in ('property', 'value', 'at-rule', 'descriptor', 'type', 'function', 'selector', 'html-element', 'html-attribute', 'interface', 'method', 'attribute'):
+        for linkType in (dfnTypes | set("dfn")):
             if el.get(linkType) is not None:
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
