@@ -24,7 +24,7 @@ dfnClassToType = {
 }
 # The types that a "maybe" link will attempt to look to find its value.
 dfnTypes = set(dfnClassToType.values())
-maybeTypes = set(("value", "type", "at-rule", "function", "selector", "token"))
-idlTypes = set(("interface", "method", "attribute", "dictionary", "dictmember", "enum", "const"))
-linkTypes = dfnTypes | set(("propdesc", "functionish", "idl", "maybe", "biblio"))
-typesUsingFor = set(("descriptor", "value", "method", "attribute", "const", "dictmember"))
+maybeTypes = frozenset(("value", "type", "at-rule", "function", "selector", "token"))
+idlTypes = frozenset(("interface", "method", "attribute", "dictionary", "dictmember", "enum", "const"))
+linkTypes = dfnTypes | frozenset(("propdesc", "functionish", "idl", "maybe", "biblio"))
+typesUsingFor = frozenset(("descriptor", "value", "method", "attribute", "const", "dictmember"))
