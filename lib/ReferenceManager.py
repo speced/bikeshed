@@ -32,10 +32,14 @@ class ReferenceManager(object):
             for linkText in linkTextsFromElement(el):
                 type = el.get('data-dfn-type')
                 dfnFor = el.get('data-dfn-for')
-                if dfnFor is not None:
-                    dfnFor = set(dfnFor.split())
-                else:
+                if el.get('data-dfn-for') is None:
                     dfnFor = set()
+                else:
+                    dfnFor = set(el.get('data-dfn-for').split())
+                for term in dfnFor.copy():
+                    match = re.match("@[a-zA-Z0-9-_]+/(.*)", term)
+                    if match:
+                        dfnFor.add(match.group(1).strip())
                 if type in config.dfnTypes or type == "dfn":
                     existingAnchors = self.refs[linkText]
                     if any(ref['spec'] == "local" and ref['type'] == type and ref['for'] == dfnFor for ref in existingAnchors):
@@ -61,6 +65,10 @@ class ReferenceManager(object):
         status = status or self.specStatus
         if status is None:
             raise "Can't calculate a ref without knowing the desired spec status."
+        if linkFor is None:
+            linkFor = set()
+        else:
+            linkFor = set(linkFor.split())
 
         if spec is None and text in self.defaultSpecs:
             for type, spec in self.defaultSpecs[text]:
@@ -80,7 +88,7 @@ class ReferenceManager(object):
             for dfnText,refs in allRefs.items():
                 for linkText in linkTexts:
                     if linkText == dfnText:
-                        return [ref for dfnType in dfnTypes for ref in refs if ref['type'] == dfnType and ref['exported']]
+                        return [ref for dfnType in dfnTypes for ref in refs if ref['type'] == dfnType and ref['exported'] and linkFor <= (ref.get('for') or set())]
             return []
 
         if linkType in config.dfnTypes:

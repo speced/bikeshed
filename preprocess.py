@@ -92,7 +92,7 @@ the processor uses the remote file at \
         config.quiet = options.quiet
         if not config.quiet:
             print "Refs for '{0}':".format(options.linkText)
-        print '\n'.join('  {0} <{1}> {2}'.format(ref['spec'], ref['type'], ref.get('id') or ref.get('ED_url') or ref.get('TR_url')) for ref in refs)
+        print '\n'.join('  {0} <{1}> "{2}" {3}'.format(ref['spec'], ref['type'], ref.get('for'), ref.get('id') or ref.get('ED_url') or ref.get('TR_url')) for ref in refs)
     else:
         config.doc = CSSSpec(inputFilename=options.inputFile,
                       biblioFilename=options.biblioFile,
