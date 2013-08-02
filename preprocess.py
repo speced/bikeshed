@@ -339,10 +339,11 @@ def transformMetadata(lines, doc, **kwargs):
             for default in val.split(","):
                 match = re.match(u"^\s*(\S.*)\s+({0})\s+([\w-]+)\s*$".format("|".join(config.dfnTypes)), default)
                 if match:
-                    term = match.group(1)
+                    terms = match.group(1).split('/')
                     type = match.group(2)
                     spec = match.group(3)
-                    config.doc.refs.defaultSpecs[term].append((type, spec))
+                    for term in terms:
+                        config.doc.refs.defaultSpecs[term.strip()].append((type, spec))
                 else:
                     die("'Link Defaults' is a comma-separated list of '<term> <dfn-type> <spec>'. Got:\n{0}", default)
         else:
