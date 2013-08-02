@@ -25,10 +25,14 @@ def textContent(el):
 
 
 def innerHTML(el):
+    if el is None:
+        return u''
     return u((el.text or u'') + u''.join(u(html.tostring(x, encoding="unicode")) for x in el))
 
 
 def outerHTML(el):
+    if el is None:
+        return u''
     return u(html.tostring(el, with_tail=False, encoding="unicode"))
 
 

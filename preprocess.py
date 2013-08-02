@@ -770,7 +770,8 @@ def processAutolinks(doc):
         url = doc.refs.getRef(linkType, text,
                               spec=el.get('data-link-spec'),
                               status=el.get('data-link-status'),
-                              linkFor=el.get('data-link-for'))
+                              linkFor=el.get('data-link-for'),
+                              el=el)
         if url is not None:
             el.set('href', url)
             el.tag = "a"
