@@ -134,3 +134,10 @@ def previousElements(startEl, tag=None, *tags):
             return reversed(els)
         els.append(el)
     return els
+
+def treeAttr(el, attrName):
+    if el.get(attrName):
+        return el.get(attrName)
+    for ancestor in el.iterancestors():
+        if ancestor.get(attrName):
+            return el.get(attrName)

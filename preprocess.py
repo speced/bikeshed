@@ -589,43 +589,41 @@ def formatPropertyNames(doc):
 
 
 def canonicalizeShortcuts(doc):
-    # Take all the invalid-HTML shortcuts allowed in the dfns and fix them.
+    # Take all the invalid-HTML shortcuts and fix them.
+
+    attrFixup = {
+        "export":"data-export",
+        "noexport":"data-noexport",
+        "spec":"data-link-spec",
+        "status":"data-link-status",
+        "dfn-for":"data-dfn-for",
+        "link-for":"data-link-for",
+        "dfn-type":"data-dfn-type",
+        "link-type":"data-link-type"
+    }
+    for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys())):
+        for attr, fixedAttr in attrFixup.items():
+            if el.get(attr):
+                el.set(fixedAttr, el.get(attr))
+                del el.attr[attr]
 
     for el in findAll("dfn"):
         for dfnType in config.dfnTypes:
             if el.get(dfnType) is not None:
                 del el.attrib[dfnType]
                 el.set("data-dfn-type", dfnType)
-        if el.get("export") is not None:
-            del el.attrib['export']
-            el.set('data-export', '')
-        if el.get("noexport") is not None:
-            del el.attrib['noexport']
-            el.set('data-noexport', '')
     for el in findAll("a"):
         for linkType in (config.dfnTypes | set("dfn")):
             if el.get(linkType) is not None:
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
-        if el.get("spec"):
-            el.set("data-link-spec", el.get('spec'))
-            del el.attrib['spec']
-        if el.get("status"):
-            el.set("data-link-status", el.get('status'))
-            del el.attrib['status']
     for el in findAll("dfn[for], a[for]"):
         if el.tag == "dfn":
             el.set("data-dfn-for", el.get('for'))
         else:
             el.set("data-link-for", el.get('for'))
         del el.attrib['for']
-    for el in findAll("[dfn-for], [link-for]"):
-        if el.get('dfn-for') is not None:
-            el.set("data-dfn-for", el.get('dfn-for'))
-            del el.attrib['dfn-for']
-        if el.get('link-for') is not None:
-            el.set("data-link-for", el.get('link-for'))
-            del el.attrib['link-for']
+
 
 
 def processDfns(doc):
@@ -701,13 +699,13 @@ def classifyDfns(doc):
             if el.get('data-dfn-for'):
                 pass
             else:
-                for ancestor in el.iterancestors():
-                    if ancestor.get('data-dfn-for'):
-                        el.set('data-dfn-for', ancestor.get('data-dfn-for'))
-                        break
+                dfnFor = treeAttr(el, "data-dfn-for")
+                if dfnFor:
+                    el.set('data-dfn-for', dfnFor)
+                    break
                 else:
                     die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
-        if el.get('id') is None:         
+        if el.get('id') is None:
             id = simplifyText(textContent(el))
             if dfnType == "dfn":
                 pass
