@@ -296,6 +296,8 @@ def transformMetadata(lines, doc, **kwargs):
         if key == "Status":
             doc.status = val
             doc.refs.setStatus(val)
+        elif key == "Title":
+            doc.title = val
         elif key == "TR":
             doc.TR = val
         elif key == "ED":
@@ -363,6 +365,8 @@ def transformMetadata(lines, doc, **kwargs):
         "UD": u"Unofficial Proposal Draft",
         "DREAM": u"A Collection of Interesting Ideas"
     }
+    if doc.title:
+        config.textMacros["title"] = doc.title
     config.textMacros["shortname"] = doc.shortname
     config.textMacros["vshortname"] = u"{0}-{1}".format(doc.shortname, doc.level)
     if doc.status in longstatuses:
@@ -987,19 +991,20 @@ class CSSSpec(object):
 
 
 def fillInBoilerplate(doc):
-    # I need some signal for whether or not to insert boilerplate,
-    # to preserve the quality that you can run the processor over
-    # an already-processed document as a no-op.
-    # Arbitrarily, I choose to use whether the first line in the doc
-    # is an <h1> with the document's title.
-
-    if not re.match("<h1>[^<]+</h1>", doc.html):
+    # Arbitrarily-chosen signal for whether there's already boilerplate.
+    if doc.html.startswith("<!DOCTYPE html>"):
         return
 
-    match = re.match("<h1>([^<]+)</h1>", doc.html)
-    doc.title = match.group(1)
-    config.textMacros['title'] = doc.title
-    doc.html = doc.html[len(match.group(0)):]
+    # Otherwise, if you start your spec with an <h1>, I'll take it as the spec's title and remove it.
+    # (It gets added back in the header file.)
+    match = re.match("^<h1>([^<]+)</h1>", doc.html)
+    if match:
+        doc.title = match.group(1)
+        config.textMacros['title'] = doc.title
+        doc.html = doc.html[len(match.group(0)):]
+
+    if not doc.title:
+        die("Can't generate the spec without a title.\nAdd a 'Title' metadata entry, or an <h1> on the first line.")
 
     header = doc.getInclusion('header')
     footer = doc.getInclusion('footer')
