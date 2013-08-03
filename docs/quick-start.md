@@ -4,7 +4,7 @@ Quick-Start Guide
 Starting from an empty file, do the following:
 
 1. Add an `<h1>` with the spec's title as the very first line.
-2. Add a `<pre class='metadata'>` block, with at least the following keys (each line in the format "[key]:[value]"):
+2. Add a `<pre class='metadata'>` block, with at least the following keys (each line in the format "key: value"):
 	1. "Status" - the shortcode for the spec's status (ED, WD, UD, etc.)
 	2. "ED" - link to the Editor's Draft
 	3. "Shortname" - the spec's shortname, like "css-flexbox".
