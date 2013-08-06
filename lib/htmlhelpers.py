@@ -144,4 +144,4 @@ def treeAttr(el, attrName):
         return el.get(attrName)
     for ancestor in el.iterancestors():
         if ancestor.get(attrName):
-            return el.get(attrName)
+            return ancestor.get(attrName)
