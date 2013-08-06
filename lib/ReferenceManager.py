@@ -73,7 +73,7 @@ class ReferenceManager(object):
 
         if spec is None and text in self.defaultSpecs:
             for spec, dfnType, dfnFor in self.defaultSpecs[text]:
-                if dfnType in config.linkTypeToDfnType[type]:
+                if dfnType in config.linkTypeToDfnType[linkType]:
                     spec = spec
                     break
 

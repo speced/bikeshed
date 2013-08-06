@@ -29,11 +29,11 @@ import html5lib
 import lxml
 import optparse
 from urllib2 import urlopen
-from contextlib import closing
 from datetime import date, datetime
 import json
 import lib.config as config
 import lib.biblio as biblio
+import lib.update as update
 from lib.fuckunicode import u
 from lib.ReferenceManager import ReferenceManager
 from lib.htmlhelpers import *
@@ -63,15 +63,15 @@ the processor uses the remote file at \
                          help="Prints those terms that will be exported for cross-ref purposes.")
     optparser.add_option("--print-refs-for", dest="linkText", default=False,
                          help="Prints the ref data for a given link text.")
-    optparser.add_option("--update-cross-refs", dest="updateCrossRefs", default=False, action="store_true",
-                         help="Forces a fresh download of all the cross-ref data.")
+    optparser.add_option("--update", dest="update", default=False, action="store_true",
+                         help="Forces a fresh download of all the external spec data.")
     (options, posargs) = optparser.parse_args()
 
     config.quiet = options.quiet
     config.debug = options.debug
 
-    if options.updateCrossRefs:
-        updateCrossRefs()
+    if options.update:
+        update.update()
         return
 
 
@@ -873,12 +873,12 @@ class CSSSpec(object):
         self.biblios = biblio.processReferBiblioFile(bibliofh)
 
         # Load up the xref data
-        specs = json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/specs.json",
+        self.refs.specs = json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/specs.json",
                                       type="spec list", quiet=True))
-        anchors = defaultdict(list, json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.json",
-                                      type="spec list", quiet=True)))
-        self.refs.specs = specs
-        self.refs.refs = anchors
+        self.refs.refs = defaultdict(list, json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.json",
+                                      type="anchor data", quiet=True)))
+        self.refs.defaultSpecs = defaultdict(list, json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
+                                      type="link defaults", quiet=True)))
 
         self.paragraphMode = paragraphMode
 
@@ -1275,96 +1275,6 @@ def addReferencesSection(doc):
     fillWith("informative-references", parseHTML(text))
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def updateCrossRefs():
-    try:
-        say("Downloading spec database...")
-        with closing(urlopen("http://test.csswg.org/shepherd/api/spec")) as f:
-            rawSpecData = json.load(f)
-    except Exception, e:
-        die("Couldn't download spec database.\n{0}", str(e))
-
-    specData = dict()
-    for rawSpec in rawSpecData.values():
-        spec = {
-            'vshortname': rawSpec['name'],
-            'TR': rawSpec['base_uri'],
-            'ED': rawSpec['draft_uri'],
-            'title': rawSpec['title'],
-            'description': rawSpec['description']
-        }
-        match = re.match("(.*)-(\d+)", rawSpec['name'])
-        if match:
-            spec['shortname'] = match.group(1)
-            spec['level'] = int(match.group(2))
-        else:
-            spec['shortname'] = spec['vshortname']
-            spec['level'] = 1
-        specData[spec['vshortname']] = spec
-    try:
-        with open(config.scriptPath+"/spec-data/specs.json", 'w') as f:
-            json.dump(specData, f, ensure_ascii=False, indent=2)
-    except Exception, e:
-        die("Couldn't save spec database to disk.\n{0}", e)
-
-    def linearizeAnchorTree(multiTree, list=None):
-        if list is None:
-            list = []
-        # Call with multiTree being a list of trees
-        for item in multiTree:
-            if item['type'] not in ("section", "other"):
-                list.append(item)
-            if item['children']:
-                linearizeAnchorTree(item['children'], list)
-            item['children'] = False
-        return list
-    
-    anchors = defaultdict(list)
-    for i, spec in enumerate(specData.values()):
-        progress("Fetching xref data", i+1, len(specData))
-        try:
-            with closing(urlopen("http://test.csswg.org/shepherd/api/spec?spec={0}&anchors=1".format(spec['vshortname']))) as f:
-                rawData = json.load(f)
-                rawAnchors = linearizeAnchorTree(rawData['anchors'])
-        except Exception, e:
-            die("Couldn't download spec data for {0}.\n{1}", spec['vshortname'], e)
-        for rawAnchor in rawAnchors:
-            linkingTexts = rawAnchor.get('linking_text') or [rawAnchor.get('title')]
-            type = rawAnchor['type']
-            # eliminate this converter once plinss converts the source info
-            anchor = {
-                'type': type,
-                'spec': spec['vshortname'],
-                'shortname': spec['shortname'],
-                'level': int(spec['level']),
-                'exported': True if rawAnchor.get('export') else False
-            }
-            if rawAnchor.get('draft'):
-                anchor['ED_url'] = spec['ED'] + rawAnchor['uri']
-            if rawAnchor.get('official'):
-                anchor['TR_url'] = spec['TR'] + rawAnchor['uri']
-            for text in linkingTexts:
-                anchors[text].append(anchor)
-    try:
-        with open(config.scriptPath+"/spec-data/anchors.json", 'w') as f:
-            json.dump(anchors, f, indent=2)
-    except Exception, e:
-        die("Couldn't save xref database to disk.\n{0}", e)
 
 
 
