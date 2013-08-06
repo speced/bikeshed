@@ -339,15 +339,16 @@ def transformMetadata(lines, doc, **kwargs):
             doc.ignoredTerms.extend(term.strip() for term in val.split(u','))
         elif key == "Link Defaults":
             for default in val.split(","):
-                match = re.match(u"^\s*(\S.*)\s+({0})\s+([\w-]+)\s*$".format("|".join(config.dfnTypes)), default)
+                match = re.match(u"^\s* ([\w-]+)  (?:\s+\( ({0}) \) )  \s+(.*) \s*$".format("|".join(config.dfnTypes)), default, re.X)
                 if match:
-                    terms = match.group(1).split('/')
+                    spec = match.group(1)
                     type = match.group(2)
-                    spec = match.group(3)
+                    terms = match.group(3).split('/')
+                    dfnFor = None
                     for term in terms:
-                        config.doc.refs.defaultSpecs[term.strip()].append((type, spec))
+                        config.doc.refs.defaultSpecs[term.strip()].append((spec, type, dfnFor))
                 else:
-                    die("'Link Defaults' is a comma-separated list of '<term> <dfn-type> <spec>'. Got:\n{0}", default)
+                    die("'Link Defaults' is a comma-separated list of '<spec> <dfn-type> <terms>'. Got:\n{0}", default)
         else:
             doc.otherMetadata[key].append(val)
 

@@ -72,7 +72,7 @@ class ReferenceManager(object):
             linkFor = set(linkFor.split())
 
         if spec is None and text in self.defaultSpecs:
-            for type, spec in self.defaultSpecs[text]:
+            for spec, type, dfnFor in self.defaultSpecs[text]:
                 if type == linkType or (linkType == "propdesc" and type in ("property", "descriptor")) or (linkType == "maybe" and type in config.maybeTypes):
                     spec = spec
                     break
