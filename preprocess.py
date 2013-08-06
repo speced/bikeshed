@@ -610,7 +610,7 @@ def canonicalizeShortcuts(doc):
         for attr, fixedAttr in attrFixup.items():
             if el.get(attr):
                 el.set(fixedAttr, el.get(attr))
-                del el.attr[attr]
+                del el.attrib[attr]
 
     for el in findAll("dfn"):
         for dfnType in config.dfnTypes:
