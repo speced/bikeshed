@@ -707,7 +707,6 @@ def classifyDfns(doc):
                 dfnFor = treeAttr(el, "data-dfn-for")
                 if dfnFor:
                     el.set('data-dfn-for', dfnFor)
-                    break
                 else:
                     die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
         if el.get('id') is None:
