@@ -31,12 +31,12 @@ class ReferenceManager(object):
             if "no-ref" in (el.get('class') or ""):
                 continue
             for linkText in linkTextsFromElement(el):
-                type = el.get('data-dfn-type')
-                dfnFor = el.get('data-dfn-for')
-                if el.get('data-dfn-for') is None:
+                type = treeAttr(el, 'data-dfn-type')
+                dfnFor = treeAttr(el, 'data-dfn-for')
+                if dfnFor is None:
                     dfnFor = set()
                 else:
-                    dfnFor = set(el.get('data-dfn-for').split())
+                    dfnFor = set(treeAttr(el, 'data-dfn-for').split())
                 for term in dfnFor.copy():
                     match = re.match("@[a-zA-Z0-9-_]+/(.*)", term)
                     if match:
