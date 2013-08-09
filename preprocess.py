@@ -65,6 +65,11 @@ the processor uses the remote file at \
                          help="Prints the ref data for a given link text.")
     optparser.add_option("--update", dest="update", default=False, action="store_true",
                          help="Forces a fresh download of all the external spec data.")
+    optparser.add_option("--print", dest="code", default=False,
+                         help="Runs the specified code and prints it.")
+    optparser.add_option("--print-json", dest="jsonCode", default=False,
+                         help="Runs the specified code and prints it as formatted JSON.")
+
     (options, posargs) = optparser.parse_args()
 
     config.quiet = options.quiet
@@ -81,6 +86,18 @@ the processor uses the remote file at \
                       paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         config.doc.printTargets()
+    elif options.jsonCode:
+        config.doc = CSSSpec(inputFilename=options.inputFile,
+                      biblioFilename=options.biblioFile,
+                      paragraphMode=options.paragraphMode)
+        config.doc.preprocess()
+        exec("print json.dumps({0}, indent=2)".format(options.jsonCode))
+    elif options.code:
+        config.doc = CSSSpec(inputFilename=options.inputFile,
+                      biblioFilename=options.biblioFile,
+                      paragraphMode=options.paragraphMode)
+        config.doc.preprocess()
+        exec("print {0}".format(options.code))
     elif options.linkText:
         config.debug = True
         config.quiet = True
