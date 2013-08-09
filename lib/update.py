@@ -137,20 +137,20 @@ def updateLinkDefaults():
                 data["ignoredSpecs"].append(term)
             elif currentSpec:
                 if currentType:
-                    data[term].append((currentSpec, currentType, currentFor))
+                    data[term].append((currentSpec, currentType, None, currentFor))
                 elif term.startswith("<") and term.endswith(">"):
-                    data[term].append((currentSpec, "type", None))
+                    data[term].append((currentSpec, "type", None, None))
                 elif term.startswith(u"〈") and term.endswith(u"〉"):
-                    data[term].append((currentSpec, "token", None))
+                    data[term].append((currentSpec, "token", None, None))
                 elif term.endswith("()"):
-                    data[term].append((currentSpec, "function", None))
+                    data[term].append((currentSpec, "function", None, None))
                 elif re.match("(@[\w-])/([\w-])", term):
                     match = re.match("(@[\w-])/([\w-])", term)
-                    data[match.group(2)].append((currentSpec, "descriptor", match.group(1)))
+                    data[match.group(2)].append((currentSpec, "descriptor", None, match.group(1)))
                 elif term.startswith("@"):
-                    data[term].append((currentSpec, "at-rule", None))
+                    data[term].append((currentSpec, "at-rule", None, None))
                 else:
-                    data[term].append((currentSpec, "property", None))
+                    data[term].append((currentSpec, "property", None, None))
 
     try:
         with open(config.scriptPath+"/spec-data/link-defaults.json", 'w') as f:

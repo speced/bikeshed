@@ -65,19 +65,20 @@ class ReferenceManager(object):
     def getRef(self, linkType, text, spec=None, status=None, linkFor=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a url or None
         # Otherwise, it pops out debug messages for the user.
-        status = status or self.specStatus
-        if status is None:
-            raise "Can't calculate a ref without knowing the desired spec status."
         if linkFor is None:
             linkFor = set()
         else:
             linkFor = set(linkFor.split())
 
-        if spec is None and text in self.defaultSpecs:
-            for spec, dfnType, dfnFor in self.defaultSpecs[text]:
+        if (spec is None or status is None) and text in self.defaultSpecs:
+            for dfnSpec, dfnType, dfnStatus, dfnFor in self.defaultSpecs[text]:
                 if dfnType in config.linkTypeToDfnType[linkType]:
-                    spec = spec
+                    spec = spec or dfnSpec
+                    status = status or dfnStatus
                     break
+        status = status or self.specStatus
+        if status is None:
+            raise "Can't calculate a ref without knowing the desired spec status."
 
         # Filter by type/text to find all the candidate refs
         def findRefs(allRefs, dfnTypes, linkTexts):
@@ -126,6 +127,15 @@ class ReferenceManager(object):
                 if error:
                     die("No refs found for text '{0}' in spec '{1}':\n{2}", text, spec, outerHTML(el))
                 return None
+
+        # Remove any ignored or obsoleted specs
+        possibleSpecs = set(ref['spec'] for ref in refs)
+        ignoreCSS21 = bool(possibleSpecs.intersection(self.css21Replacements))
+        for ref in refs[:]:
+            if ref['spec'] in self.ignoredSpecs:
+                refs.remove(ref)
+            if ref['spec'] == "css21" and ignoreCSS21:
+                refs.remove(ref)
 
         # Filter by status, set url
         if status == "ED":
