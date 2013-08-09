@@ -878,6 +878,12 @@ class CSSSpec(object):
                                       type="anchor data", quiet=True)))
         self.refs.defaultSpecs = defaultdict(list, json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
                                       type="link defaults", quiet=True)))
+        if "css21Replacements" in self.refs.defaultSpecs:
+            self.refs.css21Replacements = set(self.refs.defaultSpecs["css21Replacements"])
+            del self.refs.defaultSpecs["css21Replacements"]
+        if "ignoredSpecs" in self.refs.defaultSpecs:
+            self.refs.ignoredSpecs = set(self.refs.defaultSpecs["ignoredSpecs"])
+            del self.refs.defaultSpecs["ignoredSpecs"]
 
         self.paragraphMode = paragraphMode
 

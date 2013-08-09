@@ -10,6 +10,8 @@ class ReferenceManager(object):
 
     # dict(term=>(type, spec))
     defaultSpecs = defaultdict(list)
+    css21Replacements = set()
+    ignoredSpecs = set()
 
     specStatus = None
 
