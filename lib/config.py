@@ -35,4 +35,4 @@ linkTypeToDfnType = {
     "maybe": maybeTypes
 }
 for dfnType in dfnClassToType.values():
-    linkTypeToDfnType[dfnType] = frozenset((dfnType))
+    linkTypeToDfnType[dfnType] = frozenset([dfnType])
