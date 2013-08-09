@@ -36,7 +36,7 @@ class ReferenceManager(object):
                 if dfnFor is None:
                     dfnFor = set()
                 else:
-                    dfnFor = set(treeAttr(el, 'data-dfn-for').split())
+                    dfnFor = set(dfnFor.split())
                 for term in dfnFor.copy():
                     match = re.match("@[a-zA-Z0-9-_]+/(.*)", term)
                     if match:
