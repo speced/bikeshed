@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Dependencies:
-# * python 2.6 or 2.7
+# * python 2.7
 # * python-dev, libxml2-dev, libxslt1-dev
 # * html5lib - "pip install html5lib"
 # * lxml - "pip install lxml"
@@ -768,9 +768,9 @@ def processAutolinks(doc):
             continue
 
         url = doc.refs.getRef(linkType, text,
-                              spec=el.get('data-link-spec'),
-                              status=el.get('data-link-status'),
-                              linkFor=el.get('data-link-for'),
+                              spec=treeAttr(el, 'data-link-spec'),
+                              status=treeAttr(el, 'data-link-status'),
+                              linkFor=treeAttr(el, 'data-link-for'),
                               el=el)
         if url is not None:
             el.set('href', url)
