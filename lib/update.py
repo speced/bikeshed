@@ -105,6 +105,8 @@ def updateLinkDefaults():
     currentType = None
     currentFor = None
     data = defaultdict(list)
+    data["css21Replacements"] = []
+    data["ignoredSpecs"] = []
     for i, line in enumerate(lines):
         # Look for h2
         if re.match("^\s*-+\s*$", line):
@@ -127,23 +129,28 @@ def updateLinkDefaults():
                 else:
                     die("Unknown definition type '{0}' on line {1}", match.group(1), i)
                 currentFor = match.group(2).strip()
-        elif currentSpec and re.match("[*+-]\s+", line):
+        elif re.match("[*+-]\s+", line):
             term = re.match("^[*+-]\s+(.*)", line).group(1).strip()
-            if currentType:
-                data[term].append((currentSpec, currentType, currentFor))
-            elif term.startswith("<") and term.endswith(">"):
-                data[term].append((currentSpec, "type", None))
-            elif term.startswith(u"〈") and term.endswith(u"〉"):
-                data[term].append((currentSpec, "token", None))
-            elif term.endswith("()"):
-                data[term].append((currentSpec, "function", None))
-            elif re.match("(@[\w-])/([\w-])", term):
-                match = re.match("(@[\w-])/([\w-])", term)
-                data[match.group(2)].append((currentSpec, "descriptor", match.group(1)))
-            elif term.startswith("@"):
-                data[term].append((currentSpec, "at-rule", None))
-            else:
-                data[term].append((currentSpec, "property", None))
+            if currentSpec == "CSS 2.1 Replacements":
+                data["css21Replacements"].append(term)
+            elif currentSpec == "Ignored Specs":
+                data["ignoredSpecs"].append(term)
+            elif currentSpec:
+                if currentType:
+                    data[term].append((currentSpec, currentType, currentFor))
+                elif term.startswith("<") and term.endswith(">"):
+                    data[term].append((currentSpec, "type", None))
+                elif term.startswith(u"〈") and term.endswith(u"〉"):
+                    data[term].append((currentSpec, "token", None))
+                elif term.endswith("()"):
+                    data[term].append((currentSpec, "function", None))
+                elif re.match("(@[\w-])/([\w-])", term):
+                    match = re.match("(@[\w-])/([\w-])", term)
+                    data[match.group(2)].append((currentSpec, "descriptor", match.group(1)))
+                elif term.startswith("@"):
+                    data[term].append((currentSpec, "at-rule", None))
+                else:
+                    data[term].append((currentSpec, "property", None))
 
     try:
         with open(config.scriptPath+"/spec-data/link-defaults.json", 'w') as f:
