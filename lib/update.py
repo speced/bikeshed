@@ -111,32 +111,27 @@ def updateLinkDefaults():
             currentSpec = lines[i-1].strip()
             currentType = None
             currentFor = None
-            continue
-        if line.startswith("## "):
+        elif line.startswith("## "):
             currentSpec = line.strip(" #")
             currentType = None
             currentFor = None
-            continue
-        if line.startswith("### "):
+        elif line.startswith("### "):
             line = line.strip(" #")
             if line in config.dfnTypes:
                 currentType = line
                 currentFor = None
-                continue
-            if re.match("([\w-]+)\s+for\s+(.+)", line):
+            elif re.match("([\w-]+)\s+for\s+(.+)", line):
                 match = re.match("([\w-]+)\s+for\s+(.+)", line)
                 if match.group(1) in config.dfnTypes:
                     currentType = match.group(1)
                 else:
                     die("Unknown definition type '{0}' on line {1}", match.group(1), i)
                 currentFor = match.group(2).strip()
-
-        if currentSpec and re.match("[*+-]\s+", line):
+        elif currentSpec and re.match("[*+-]\s+", line):
             term = re.match("^[*+-]\s+(.*)", line).group(1).strip()
             if currentType:
                 data[term].append((currentSpec, currentType, currentFor))
-                continue
-            if term.startswith("<") and term.endswith(">"):
+            elif term.startswith("<") and term.endswith(">"):
                 data[term].append((currentSpec, "type", None))
             elif term.startswith(u"〈") and term.endswith(u"〉"):
                 data[term].append((currentSpec, "token", None))
@@ -149,7 +144,6 @@ def updateLinkDefaults():
                 data[term].append((currentSpec, "at-rule", None))
             else:
                 data[term].append((currentSpec, "property", None))
-            continue
 
     try:
         with open(config.scriptPath+"/spec-data/link-defaults.json", 'w') as f:
