@@ -43,18 +43,10 @@ config.scriptPath = os.path.dirname(os.path.realpath(__file__))
 
 def main():
     argparser = argparse.ArgumentParser(description="Processes spec source files into valid HTML.")
-    
-    debugArgs = argparser.add_argument_group('Debug Options')
-    debugArgs.add_argument("--debug", dest="debug", default=False, action="store_true",
-                         help="Makes the processor continue after hitting a fatal error.")
-    debugArgs.add_argument("--print-exports", dest="printExports", default=False, action="store_true",
-                         help="Prints those terms that will be exported for cross-ref purposes.")
-    debugArgs.add_argument("--print-refs-for", dest="linkText", default=False,
-                         help="Prints the ref data for a given link text.")
-    debugArgs.add_argument("--print", dest="code", default=False,
-                         help="Runs the specified code and prints it.")
-    debugArgs.add_argument("--print-json", dest="jsonCode", default=False,
-                         help="Runs the specified code and prints it as formatted JSON.")
+    argparser.add_argument("-q", "--quiet", dest="quiet", default=False, action="store_true",
+                            help="Suppresses everything but fatal errors from printing.")
+    argparser.add_argument("-f", "--force", dest="debug", default=False, action="store_true",
+                         help="Force the preprocessor to run to completion; fatal errors don't stop processing.")
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
 
@@ -67,13 +59,24 @@ def main():
                             help="Path to the output file. [default: %(default)s]")
     specParser.add_argument("--para", dest="paragraphMode", default="markdown",
                             help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %(default)s]")
-    specParser.add_argument("-q", "--quiet", dest="quiet", default=False, action="store_true",
-                            help="Suppresses everything but fatal errors from printing.")
 
     updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
     updateParser.add_argument("--anchors", default=False, action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--biblio", default=False, action="store_true", help="Download biblio data.")
     updateParser.add_argument("--link-defaults", dest="linkDefaults", default=False, action="store_true", help="Download link default data.")
+    
+    debugParser = subparsers.add_parser('debug', help="Run various debugging commands.")
+    debugParser.add_argument("infile", type=argparse.FileType('r'), nargs="?",
+                            default="Overview.src.html",
+                            help="Path to the source file. [default: %(default)s]")
+    debugParser.add_argument("--print-exports", dest="printExports", default=False, action="store_true",
+                         help="Prints those terms that will be exported for cross-ref purposes.")
+    debugParser.add_argument("--print-refs-for", dest="linkText", default=False,
+                         help="Prints the ref data for a given link text.")
+    debugParser.add_argument("--print", dest="code", default=False,
+                         help="Runs the specified code and prints it.")
+    debugParser.add_argument("--print-json", dest="jsonCode", default=False,
+                         help="Runs the specified code and prints it as formatted JSON.")
 
     options = argparser.parse_args()
 
@@ -82,35 +85,33 @@ def main():
 
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults)
-        return
-
-
-    if options.printExports:
-        config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
-        config.doc.preprocess()
-        config.doc.printTargets()
-    elif options.jsonCode:
-        config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
-        config.doc.preprocess()
-        exec("print json.dumps({0}, indent=2)".format(options.jsonCode))
-    elif options.code:
-        config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
-        config.doc.preprocess()
-        exec("print {0}".format(options.code))
-    elif options.linkText:
-        config.debug = True
-        config.quiet = True
-        config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
-        config.doc.preprocess()
-        refs = config.doc.refs.refs[options.linkText]
-        config.quiet = options.quiet
-        if not config.quiet:
-            print "Refs for '{0}':".format(options.linkText)
-        print '\n'.join('  {0} <{1}> "{2}" {3}'.format(ref['spec'], ref['type'], ref.get('for'), ref.get('id') or ref.get('ED_url') or ref.get('TR_url')) for ref in refs)
-    else:
+    elif options.subparserName == "spec":
         config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         config.doc.finish(outputFile=options.outfile)
+    elif options.subparserName == "debug":
+        if options.printExports:
+            config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
+            config.doc.preprocess()
+            config.doc.printTargets()
+        elif options.jsonCode:
+            config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
+            config.doc.preprocess()
+            exec("print json.dumps({0}, indent=2)".format(options.jsonCode))
+        elif options.code:
+            config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
+            config.doc.preprocess()
+            exec("print {0}".format(options.code))
+        elif options.linkText:
+            config.debug = True
+            config.quiet = True
+            config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
+            config.doc.preprocess()
+            refs = config.doc.refs.refs[options.linkText]
+            config.quiet = options.quiet
+            if not config.quiet:
+                print "Refs for '{0}':".format(options.linkText)
+            print '\n'.join('  {0} <{1}> "{2}" {3}'.format(ref['spec'], ref['type'], ref.get('for'), ref.get('id') or ref.get('ED_url') or ref.get('TR_url')) for ref in refs)
 
 
 def replaceTextMacros(text):
