@@ -55,17 +55,19 @@ def main():
                          help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %(default)s]")
     argparser.add_argument("-q", "--quiet", dest="quiet", default=False, action="store_true",
                          help="Suppresses everything but fatal errors from printing.")
-    argparser.add_argument("--debug", dest="debug", default=False, action="store_true",
+    
+    debug_args = argparser.add_argument_group('Debug Options')
+    debug_args.add_argument("--debug", dest="debug", default=False, action="store_true",
                          help="Makes the processor continue after hitting a fatal error.")
-    argparser.add_argument("--print-exports", dest="printExports", default=False, action="store_true",
+    debug_args.add_argument("--print-exports", dest="printExports", default=False, action="store_true",
                          help="Prints those terms that will be exported for cross-ref purposes.")
-    argparser.add_argument("--print-refs-for", dest="linkText", default=False,
+    debug_args.add_argument("--print-refs-for", dest="linkText", default=False,
                          help="Prints the ref data for a given link text.")
-    argparser.add_argument("--update", dest="update", default=False, action="store_true",
+    debug_args.add_argument("--update", dest="update", default=False, action="store_true",
                          help="Forces a fresh download of all the external spec data.")
-    argparser.add_argument("--print", dest="code", default=False,
+    debug_args.add_argument("--print", dest="code", default=False,
                          help="Runs the specified code and prints it.")
-    argparser.add_argument("--print-json", dest="jsonCode", default=False,
+    debug_args.add_argument("--print-json", dest="jsonCode", default=False,
                          help="Runs the specified code and prints it as formatted JSON.")
 
     options = argparser.parse_args()
