@@ -25,12 +25,12 @@ from __future__ import division
 import re
 from collections import defaultdict
 import os
-import html5lib
-import lxml
-import optparse
+import json
+import argparse
 from urllib2 import urlopen
 from datetime import date, datetime
-import json
+import html5lib
+import lxml
 import lib.config as config
 import lib.biblio as biblio
 import lib.update as update
@@ -42,35 +42,33 @@ from lib.messages import *
 config.scriptPath = os.path.dirname(os.path.realpath(__file__))
 
 def main():
-    optparser = optparse.OptionParser()
-    optparser.add_option("-i", "--in", dest="inputFile",
+    argparser = argparse.ArgumentParser(description="Processes spec source files into valid HTML.")
+    argparser.add_argument("-i", "--in", dest="inputFile",
                          default="Overview.src.html",
-                         help="Path to the source file. [default: %default]")
-    optparser.add_option("-o", "--out", dest="outputFile",
+                         help="Path to the source file. [default: %(default)s]")
+    argparser.add_argument("-o", "--out", dest="outputFile",
                          default="Overview.html",
-                         help="Path to the output file. [default: %default]")
-    optparser.add_option("-b", "--biblio", dest="biblioFile",
-                         help="Path to a local bibliography file. By default,\
-the processor uses the remote file at \
-<https://www.w3.org/Style/Group/css3-src/biblio.ref>.")
-    optparser.add_option("--para", dest="paragraphMode", default="markdown",
-                         help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %default]")
-    optparser.add_option("-q", "--quiet", dest="quiet", default=False, action="store_true",
+                         help="Path to the output file. [default: %(default)s]")
+    argparser.add_argument("-b", "--biblio", dest="biblioFile",
+                         help="Path to a local bibliography file. By default, the processor uses the remote file at <https://www.w3.org/Style/Group/css3-src/biblio.ref>.")
+    argparser.add_argument("--para", dest="paragraphMode", default="markdown",
+                         help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %(default)s]")
+    argparser.add_argument("-q", "--quiet", dest="quiet", default=False, action="store_true",
                          help="Suppresses everything but fatal errors from printing.")
-    optparser.add_option("--debug", dest="debug", default=False, action="store_true",
+    argparser.add_argument("--debug", dest="debug", default=False, action="store_true",
                          help="Makes the processor continue after hitting a fatal error.")
-    optparser.add_option("--print-exports", dest="printExports", default=False, action="store_true",
+    argparser.add_argument("--print-exports", dest="printExports", default=False, action="store_true",
                          help="Prints those terms that will be exported for cross-ref purposes.")
-    optparser.add_option("--print-refs-for", dest="linkText", default=False,
+    argparser.add_argument("--print-refs-for", dest="linkText", default=False,
                          help="Prints the ref data for a given link text.")
-    optparser.add_option("--update", dest="update", default=False, action="store_true",
+    argparser.add_argument("--update", dest="update", default=False, action="store_true",
                          help="Forces a fresh download of all the external spec data.")
-    optparser.add_option("--print", dest="code", default=False,
+    argparser.add_argument("--print", dest="code", default=False,
                          help="Runs the specified code and prints it.")
-    optparser.add_option("--print-json", dest="jsonCode", default=False,
+    argparser.add_argument("--print-json", dest="jsonCode", default=False,
                          help="Runs the specified code and prints it as formatted JSON.")
 
-    (options, posargs) = optparser.parse_args()
+    options = argparser.parse_args()
 
     config.quiet = options.quiet
     config.debug = options.debug
