@@ -72,13 +72,14 @@ def main():
     debugParser.add_argument("infile", type=argparse.FileType('r'), nargs="?",
                             default="Overview.src.html",
                             help="Path to the source file. [default: %(default)s]")
-    debugParser.add_argument("--print-exports", dest="printExports", action="store_true",
+    debugCommands = debugParser.add_mutually_exclusive_group(required=True)
+    debugCommands.add_argument("--print-exports", dest="printExports", action="store_true",
                          help="Prints those terms that will be exported for cross-ref purposes.")
-    debugParser.add_argument("--print-refs-for", dest="linkText",
+    debugCommands.add_argument("--print-refs-for", dest="linkText",
                          help="Prints the ref data for a given link text.")
-    debugParser.add_argument("--print", dest="code",
+    debugCommands.add_argument("--print", dest="code",
                          help="Runs the specified code and prints it.")
-    debugParser.add_argument("--print-json", dest="jsonCode",
+    debugCommands.add_argument("--print-json", dest="jsonCode",
                          help="Runs the specified code and prints it as formatted JSON.")
 
     options = argparser.parse_args()
