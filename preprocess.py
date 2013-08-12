@@ -61,20 +61,24 @@ def main():
                          help="Prints those terms that will be exported for cross-ref purposes.")
     debugArgs.add_argument("--print-refs-for", dest="linkText", default=False,
                          help="Prints the ref data for a given link text.")
-    debugArgs.add_argument("--update", dest="update", default=False, action="store_true",
-                         help="Forces a fresh download of all the external spec data.")
     debugArgs.add_argument("--print", dest="code", default=False,
                          help="Runs the specified code and prints it.")
     debugArgs.add_argument("--print-json", dest="jsonCode", default=False,
                          help="Runs the specified code and prints it as formatted JSON.")
+
+    subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
+    updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
+    updateParser.add_argument("--anchors", default=False, action="store_true", help="Download crossref anchor data.")
+    updateParser.add_argument("--biblio", default=False, action="store_true", help="Download biblio data.")
+    updateParser.add_argument("--link-defaults", dest="linkDefaults", default=False, action="store_true", help="Download link default data.")
 
     options = argparser.parse_args()
 
     config.quiet = options.quiet
     config.debug = options.debug
 
-    if options.update:
-        update.update()
+    if options.subparserName == "update":
+        update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults)
         return
 
 

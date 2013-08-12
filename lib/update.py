@@ -8,10 +8,15 @@ from urllib2 import urlopen
 import lib.config as config
 from lib.messages import *
 
-def update():
-    updateCrossRefs()
-    updateBiblio()
-    updateLinkDefaults()
+def update(anchors=False, biblio=False, linkDefaults=False):
+    # If all are False, update everything
+    updateAnyway = not (anchors or biblio or linkDefaults)
+    if anchors or updateAnyway:
+        updateCrossRefs()
+    if biblio or updateAnyway:
+        updateBiblio()
+    if linkDefaults or updateAnyway:
+        updateLinkDefaults()
 
 def updateCrossRefs():
     try:
