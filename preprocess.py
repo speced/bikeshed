@@ -47,6 +47,8 @@ def main():
                             help="Suppresses everything but fatal errors from printing.")
     argparser.add_argument("-f", "--force", dest="debug", default=False, action="store_true",
                          help="Force the preprocessor to run to completion; fatal errors don't stop processing.")
+    argparser.add_argument("-d", "--dry-run", dest="dryRun", default=False, action="store_true",
+                           help="Prevents the processor from actually saving anything to disk, but otherwise fully runs.")
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
 
@@ -54,7 +56,8 @@ def main():
     specParser.add_argument("infile", type=argparse.FileType('r'), nargs="?",
                             default="Overview.src.html",
                             help="Path to the source file. [default: %(default)s]")
-    specParser.add_argument("outfile", type=argparse.FileType('w'), nargs="?",
+    # Have to use string type for the outfile, so it doens't truncate the output on --dry-run
+    specParser.add_argument("outfile", nargs="?",
                             default="Overview.html",
                             help="Path to the output file. [default: %(default)s]")
     specParser.add_argument("--para", dest="paragraphMode", default="markdown",
@@ -82,13 +85,14 @@ def main():
 
     config.quiet = options.quiet
     config.debug = options.debug
+    config.dryRun = options.dryRun
 
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults)
     elif options.subparserName == "spec":
         config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
-        config.doc.finish(outputFile=options.outfile)
+        config.doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         if options.printExports:
             config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
@@ -817,9 +821,10 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force
             try:
                 if not quiet:
                     say(u"Attempting to save the {0} file to cache...", type)
-                outfh = open(cacheLocation, 'w')
-                outfh.write(fh.read())
-                fh.close()
+                if not dryRun:
+                    outfh = open(cacheLocation, 'w')
+                    outfh.write(fh.read())
+                    fh.close()
                 fh = open(cacheLocation, 'r')
                 if not quiet:
                     say("Successfully saved the {0} file to cache.", type)
@@ -944,14 +949,19 @@ class CSSSpec(object):
 
         return self
 
-    def finish(self, outputFile):
+    def finish(self, outputFilename):
         walker = html5lib.treewalkers.getTreeWalker("lxml")
         s = html5lib.serializer.htmlserializer.HTMLSerializer(alphabetical_attributes=True)
         rendered = s.render(walker(self.document), encoding='utf-8')
-        try:
-            outputFile.write(rendered)
-        except:
-            die("Something prevented me from saving the output document to {0}.", outputFilename)
+        if not config.dryRun:
+            try:
+                if outputFilename == "-":
+                    outputFile = sys.stdout.write(rendered)
+                else:
+                    with open(outputFilename, "w") as f:
+                        f.write(rendered)
+            except:
+                die("Something prevented me from saving the output document to {0}.", outputFilename)
 
     def printTargets(self):
         def targetText(el):

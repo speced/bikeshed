@@ -1,5 +1,6 @@
 debug = False
 quiet = False
+dryRun = False
 scriptPath = "~"
 doc = None
 textMacros = {}

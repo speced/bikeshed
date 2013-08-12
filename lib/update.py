@@ -43,11 +43,12 @@ def updateCrossRefs():
             spec['shortname'] = spec['vshortname']
             spec['level'] = 1
         specData[spec['vshortname']] = spec
-    try:
-        with open(config.scriptPath+"/spec-data/specs.json", 'w') as f:
-            json.dump(specData, f, ensure_ascii=False, indent=2)
-    except Exception, e:
-        die("Couldn't save spec database to disk.\n{0}", e)
+    if not config.dryRun:
+        try:
+            with open(config.scriptPath+"/spec-data/specs.json", 'w') as f:
+                json.dump(specData, f, ensure_ascii=False, indent=2)
+        except Exception, e:
+            die("Couldn't save spec database to disk.\n{0}", e)
 
     def linearizeAnchorTree(multiTree, list=None):
         if list is None:
@@ -86,11 +87,12 @@ def updateCrossRefs():
                 anchor['TR_url'] = spec['TR'] + rawAnchor['uri']
             for text in linkingTexts:
                 anchors[text].append(anchor)
-    try:
-        with open(config.scriptPath+"/spec-data/anchors.json", 'w') as f:
-            json.dump(anchors, f, indent=2)
-    except Exception, e:
-        die("Couldn't save xref database to disk.\n{0}", e)
+    if not config.dryRun:
+        try:
+            with open(config.scriptPath+"/spec-data/anchors.json", 'w') as f:
+                json.dump(anchors, f, indent=2)
+        except Exception, e:
+            die("Couldn't save xref database to disk.\n{0}", e)
 
 
 def updateBiblio():
@@ -157,8 +159,9 @@ def updateLinkDefaults():
                 else:
                     data[term].append((currentSpec, "property", None, None))
 
-    try:
-        with open(config.scriptPath+"/spec-data/link-defaults.json", 'w') as f:
-            json.dump(data, f, indent=2)
-    except Exception, e:
-        die("Couldn't save link-defaults database to disk.\n{0}", e)
+    if not config.dryRun:
+        try:
+            with open(config.scriptPath+"/spec-data/link-defaults.json", 'w') as f:
+                json.dump(data, f, indent=2)
+        except Exception, e:
+            die("Couldn't save link-defaults database to disk.\n{0}", e)
