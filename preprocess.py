@@ -43,16 +43,6 @@ config.scriptPath = os.path.dirname(os.path.realpath(__file__))
 
 def main():
     argparser = argparse.ArgumentParser(description="Processes spec source files into valid HTML.")
-    argparser.add_argument("-i", "--in", dest="inputFile", type=argparse.FileType('r'),
-                         default="Overview.src.html",
-                         help="Path to the source file. [default: %(default)s]")
-    argparser.add_argument("-o", "--out", dest="outputFile", type=argparse.FileType('w'),
-                         default="Overview.html",
-                         help="Path to the output file. [default: %(default)s]")
-    argparser.add_argument("--para", dest="paragraphMode", default="markdown",
-                         help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %(default)s]")
-    argparser.add_argument("-q", "--quiet", dest="quiet", default=False, action="store_true",
-                         help="Suppresses everything but fatal errors from printing.")
     
     debugArgs = argparser.add_argument_group('Debug Options')
     debugArgs.add_argument("--debug", dest="debug", default=False, action="store_true",
@@ -67,6 +57,19 @@ def main():
                          help="Runs the specified code and prints it as formatted JSON.")
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
+
+    specParser = subparsers.add_parser('spec', help="Process a spec source file into a valid output file.")
+    specParser.add_argument("infile", type=argparse.FileType('r'), nargs="?",
+                            default="Overview.src.html",
+                            help="Path to the source file. [default: %(default)s]")
+    specParser.add_argument("outfile", type=argparse.FileType('w'), nargs="?",
+                            default="Overview.html",
+                            help="Path to the output file. [default: %(default)s]")
+    specParser.add_argument("--para", dest="paragraphMode", default="markdown",
+                            help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %(default)s]")
+    specParser.add_argument("-q", "--quiet", dest="quiet", default=False, action="store_true",
+                            help="Suppresses everything but fatal errors from printing.")
+
     updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
     updateParser.add_argument("--anchors", default=False, action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--biblio", default=False, action="store_true", help="Download biblio data.")
@@ -83,21 +86,21 @@ def main():
 
 
     if options.printExports:
-        config.doc = CSSSpec(inputFile=options.inputFile, paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         config.doc.printTargets()
     elif options.jsonCode:
-        config.doc = CSSSpec(inputFile=options.inputFile, paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         exec("print json.dumps({0}, indent=2)".format(options.jsonCode))
     elif options.code:
-        config.doc = CSSSpec(inputFile=options.inputFile, paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         exec("print {0}".format(options.code))
     elif options.linkText:
         config.debug = True
         config.quiet = True
-        config.doc = CSSSpec(inputFile=options.inputFile, paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         refs = config.doc.refs.refs[options.linkText]
         config.quiet = options.quiet
@@ -105,9 +108,9 @@ def main():
             print "Refs for '{0}':".format(options.linkText)
         print '\n'.join('  {0} <{1}> "{2}" {3}'.format(ref['spec'], ref['type'], ref.get('for'), ref.get('id') or ref.get('ED_url') or ref.get('TR_url')) for ref in refs)
     else:
-        config.doc = CSSSpec(inputFile=options.inputFile, paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
-        config.doc.finish(outputFile=options.outputFile)
+        config.doc.finish(outputFile=options.outfile)
 
 
 def replaceTextMacros(text):
