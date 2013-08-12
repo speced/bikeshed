@@ -5,11 +5,10 @@ import lib.config as config
 messages = set()
 
 def die(msg, *formatArgs):
-    if not config.quiet:
-        msg = u"\033[1;31mFATAL ERROR:\033[0m "+u(msg).format(*map(u, formatArgs))
-        if msg not in messages:
-            messages.add(msg)
-            print msg
+    msg = u"\033[1;31mFATAL ERROR:\033[0m "+u(msg).format(*map(u, formatArgs))
+    if msg not in messages:
+        messages.add(msg)
+        print msg
     if not config.debug:
         sys.exit(1)
 
