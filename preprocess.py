@@ -49,8 +49,6 @@ def main():
     argparser.add_argument("-o", "--out", dest="outputFile",
                          default="Overview.html",
                          help="Path to the output file. [default: %(default)s]")
-    argparser.add_argument("-b", "--biblio", dest="biblioFile",
-                         help="Path to a local bibliography file. By default, the processor uses the remote file at <https://www.w3.org/Style/Group/css3-src/biblio.ref>.")
     argparser.add_argument("--para", dest="paragraphMode", default="markdown",
                          help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %(default)s]")
     argparser.add_argument("-q", "--quiet", dest="quiet", default=False, action="store_true",
@@ -81,29 +79,21 @@ def main():
 
 
     if options.printExports:
-        config.doc = CSSSpec(inputFilename=options.inputFile,
-                      biblioFilename=options.biblioFile,
-                      paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFilename=options.inputFile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         config.doc.printTargets()
     elif options.jsonCode:
-        config.doc = CSSSpec(inputFilename=options.inputFile,
-                      biblioFilename=options.biblioFile,
-                      paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFilename=options.inputFile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         exec("print json.dumps({0}, indent=2)".format(options.jsonCode))
     elif options.code:
-        config.doc = CSSSpec(inputFilename=options.inputFile,
-                      biblioFilename=options.biblioFile,
-                      paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFilename=options.inputFile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         exec("print {0}".format(options.code))
     elif options.linkText:
         config.debug = True
         config.quiet = True
-        config.doc = CSSSpec(inputFilename=options.inputFile,
-                      biblioFilename=options.biblioFile,
-                      paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFilename=options.inputFile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         refs = config.doc.refs.refs[options.linkText]
         config.quiet = options.quiet
@@ -111,9 +101,7 @@ def main():
             print "Refs for '{0}':".format(options.linkText)
         print '\n'.join('  {0} <{1}> "{2}" {3}'.format(ref['spec'], ref['type'], ref.get('for'), ref.get('id') or ref.get('ED_url') or ref.get('TR_url')) for ref in refs)
     else:
-        config.doc = CSSSpec(inputFilename=options.inputFile,
-                      biblioFilename=options.biblioFile,
-                      paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFilename=options.inputFile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         config.doc.finish(outputFilename=options.outputFile)
 
@@ -877,16 +865,15 @@ class CSSSpec(object):
     biblios = {}
     paragraphMode = "markdown"
 
-    def __init__(self, inputFilename, biblioFilename=None, paragraphMode="markdown"):
+    def __init__(self, inputFilename, paragraphMode="markdown"):
         try:
             self.lines = open(inputFilename, 'r').readlines()
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
 
-        bibliofh = retrieveCachedFile(cacheLocation=(biblioFilename or config.scriptPath + "/biblio.refer"),
+        bibliofh = retrieveCachedFile(cacheLocation=config.scriptPath + "/biblio.refer",
                                       fallbackurl="https://www.w3.org/Style/Group/css3-src/biblio.ref",
                                       type="bibliography")
-
         self.biblios = biblio.processReferBiblioFile(bibliofh)
 
         # Load up the xref data
