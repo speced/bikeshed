@@ -43,10 +43,10 @@ config.scriptPath = os.path.dirname(os.path.realpath(__file__))
 
 def main():
     argparser = argparse.ArgumentParser(description="Processes spec source files into valid HTML.")
-    argparser.add_argument("-i", "--in", dest="inputFile",
+    argparser.add_argument("-i", "--in", dest="inputFile", type=argparse.FileType('r'),
                          default="Overview.src.html",
                          help="Path to the source file. [default: %(default)s]")
-    argparser.add_argument("-o", "--out", dest="outputFile",
+    argparser.add_argument("-o", "--out", dest="outputFile", type=argparse.FileType('w'),
                          default="Overview.html",
                          help="Path to the output file. [default: %(default)s]")
     argparser.add_argument("--para", dest="paragraphMode", default="markdown",
@@ -79,21 +79,21 @@ def main():
 
 
     if options.printExports:
-        config.doc = CSSSpec(inputFilename=options.inputFile, paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFile=options.inputFile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         config.doc.printTargets()
     elif options.jsonCode:
-        config.doc = CSSSpec(inputFilename=options.inputFile, paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFile=options.inputFile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         exec("print json.dumps({0}, indent=2)".format(options.jsonCode))
     elif options.code:
-        config.doc = CSSSpec(inputFilename=options.inputFile, paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFile=options.inputFile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         exec("print {0}".format(options.code))
     elif options.linkText:
         config.debug = True
         config.quiet = True
-        config.doc = CSSSpec(inputFilename=options.inputFile, paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFile=options.inputFile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         refs = config.doc.refs.refs[options.linkText]
         config.quiet = options.quiet
@@ -101,9 +101,9 @@ def main():
             print "Refs for '{0}':".format(options.linkText)
         print '\n'.join('  {0} <{1}> "{2}" {3}'.format(ref['spec'], ref['type'], ref.get('for'), ref.get('id') or ref.get('ED_url') or ref.get('TR_url')) for ref in refs)
     else:
-        config.doc = CSSSpec(inputFilename=options.inputFile, paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFile=options.inputFile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
-        config.doc.finish(outputFilename=options.outputFile)
+        config.doc.finish(outputFile=options.outputFile)
 
 
 def replaceTextMacros(text):
@@ -865,9 +865,9 @@ class CSSSpec(object):
     biblios = {}
     paragraphMode = "markdown"
 
-    def __init__(self, inputFilename, paragraphMode="markdown"):
+    def __init__(self, inputFile, paragraphMode="markdown"):
         try:
-            self.lines = open(inputFilename, 'r').readlines()
+            self.lines = inputFile.readlines()
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
 
@@ -936,12 +936,12 @@ class CSSSpec(object):
 
         return self
 
-    def finish(self, outputFilename):
+    def finish(self, outputFile):
         walker = html5lib.treewalkers.getTreeWalker("lxml")
         s = html5lib.serializer.htmlserializer.HTMLSerializer(alphabetical_attributes=True)
         rendered = s.render(walker(self.document), encoding='utf-8')
         try:
-            open(outputFilename, mode='w').write(rendered)
+            outputFile.write(rendered)
         except:
             die("Something prevented me from saving the output document to {0}.", outputFilename)
 
