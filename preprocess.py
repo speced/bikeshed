@@ -668,8 +668,10 @@ def determineDfnType(dfn):
         for prefix, type in config.dfnClassToType.items():
             if id.startswith(prefix):
                 return type
-    # 3. Look for a class on the ancestors
+    # 3. Look for a class or data-dfn-type on the ancestors
     for ancestor in dfn.iterancestors():
+        if ancestor.get('data-dfn-type'):
+            return ancestor.get('data-dfn-type')
         classList = ancestor.get('class') or ''
         for cls, type in config.dfnClassToType.items():
             if type in classList:
@@ -719,6 +721,7 @@ def classifyDfns(doc):
     dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
     for el in findAll("dfn"):
         dfnType = determineDfnType(el)
+        # Push the dfn type down to the <dfn> itself.
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', dfnType)
         if dfnType in config.typesUsingFor:
