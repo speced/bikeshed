@@ -152,6 +152,7 @@ There are several additional shortcuts for writing an autolink:
 * `'foo'` (apostophes/straight quotes) is an autolink to a property or descriptor named "foo"
 * `''foo''` (double apostrophes) is an autolink to any of the CSS definition types except property and descriptor
 * `<<foo>>` is an autolink to a type/production named "&lt;foo>"
+* `<<<foo>>>` is an autolink to a token named "〈foo〉"
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 
