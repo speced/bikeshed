@@ -700,11 +700,11 @@ def determineDfnType(dfn):
 
 def determineLinkType(el):
     # 1. Look at data-link-type
-    if el.get('data-link-type'):
-        type = el.get('data-link-type')
-        if type in config.linkTypes:
-            return type
-        die("Unknown link type '{0}' on:\n{1}", type, outerHTML(el))
+    linkType = treeAttr(el, 'data-link-type')
+    if linkType:
+        if linkType in config.linkTypes:
+            return linkType
+        die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
     # 2. Introspect on the text
     text = textContent(el)
     if text[0:1] == "@":
