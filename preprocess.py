@@ -120,13 +120,16 @@ def main():
 
 
 def replaceTextMacros(text):
+    # Replace the [FOO] things.
     for tag, replacement in config.textMacros.items():
         text = u(text).replace(u"[{0}]".format(u(tag.upper())), u(replacement))
-    # Also replace the <<production>> shortcuts, because they won't survive the HTML parser.
+    # Replace <<<token>>> shortcuts.  (It's annoying to type the actual token syntax.)
+    text = re.sub(ur"<<<([^>]+)>>>", ur"<a data-link-type='token'>〈\1〉</a>", text)
+    # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
     # <'foo'> is a link to the 'foo' property
     text = re.sub(r"<<'([\w-]+)'>>", r'<a data-link-type="propdesc" title="\1" class="production">&lt;&lsquo;\1&rsquo;></a>', text)
     text = re.sub(r"<<([\w-]+)>>", r'<a data-link-type="type" class="production">&lt;\1></a>', text)
-    # Also replace the ''maybe link'' shortcuts.
+    # Replace the ''maybe link'' shortcuts.
     # They'll survive the HTML parser, but they don't match if they contain an element.
     # (The other shortcuts are "atomic" and can't contain elements.)
     text = re.sub(r"''(.+?)''", r'<span data-link-type="maybe" class="css">\1</span>', text)
