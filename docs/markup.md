@@ -26,7 +26,9 @@ There are several shortcuts for writing autolinks of particular types, so you do
 * `'foo'` (apostophes/straight quotes) is an autolink to a property or descriptor named "foo"
 * `''foo''` (double apostrophes) is an autolink to any of the CSS definition types except property and descriptor
 * `<<foo>>` is an autolink to a type/production named "&lt;foo>"
-* `<<'foo'>>` is an autolink to the the property or descriptor named "foo" (used in grammars)
+* `<<'foo'>>` is an autolink to the the property or descriptor named "foo" (used in grammars, where you need `<foo>` for non-terminals)
+* `<<foo()>>` is an autolink to the function named "foo" (same)
+* `<<@foo>>` is an autolink to the at-rule named "@foo" (same)
 * `<<<foo>>>` is an autolink to a token named "〈foo〉"
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.

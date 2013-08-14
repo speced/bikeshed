@@ -128,6 +128,11 @@ def replaceTextMacros(text):
     # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
     # <'foo'> is a link to the 'foo' property
     text = re.sub(r"<<'([\w-]+)'>>", r'<a data-link-type="propdesc" title="\1" class="production">&lt;&lsquo;\1&rsquo;></a>', text)
+    # <foo()> is a link to the 'foo' function
+    text = re.sub(r"<<([\w-]+\(\))>>", r'<a data-link-type="function" title="\1" class="production">&lt;\1></a>', text)
+    # <@foo> is a link to the @foo rule
+    text = re.sub(r"<<(@[\w-]+)>>", r'<a data-link-type="at-rule" title="\1" class="production">&lt;\1></a>', text)
+    # Otherwise, it's a link to a type.
     text = re.sub(r"<<([\w-]+)>>", r'<a data-link-type="type" class="production">&lt;\1></a>', text)
     # Replace the ''maybe link'' shortcuts.
     # They'll survive the HTML parser, but they don't match if they contain an element.
