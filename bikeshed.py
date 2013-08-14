@@ -25,6 +25,7 @@ from __future__ import division
 import re
 from collections import defaultdict
 import os
+import sys
 import json
 import argparse
 from urllib2 import urlopen
@@ -42,6 +43,10 @@ from lib.messages import *
 config.scriptPath = os.path.dirname(os.path.realpath(__file__))
 
 def main():
+    # Hack around argparse's lack of optional subparsers
+    if len(sys.argv) == 1:
+        sys.argv.append("spec")
+
     argparser = argparse.ArgumentParser(description="Processes spec source files into valid HTML.")
     argparser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
                             help="Suppresses everything but fatal errors from printing.")
