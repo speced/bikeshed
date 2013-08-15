@@ -96,7 +96,7 @@ class ReferenceManager(object):
             return []
 
         if linkType in config.dfnTypes:
-            refs = findRefs(self.refs, [linkType, "dfn"], text)
+            refs = findRefs(self.refs, [linkType], text)
         elif linkType == "propdesc":
             refs = findRefs(self.refs, ["property", "descriptor"], text)
         elif linkType == "functionish":
