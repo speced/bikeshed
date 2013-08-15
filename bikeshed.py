@@ -820,6 +820,8 @@ def cleanupHTML(doc):
         parent = el.getparent()
         parent.insert(0, el)
         el.set('scoped', '')
+
+    # Move any stray <link>, <script>, or <meta> into the <head>.
     head = find("head")
     for el in findAll("body link, body script, body meta"):
         head.append(el)
