@@ -820,6 +820,9 @@ def cleanupHTML(doc):
         parent = el.getparent()
         parent.insert(0, el)
         el.set('scoped', '')
+    head = find("head")
+    for el in findAll("body link, body script, body meta"):
+        head.append(el)
 
 
 def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):
