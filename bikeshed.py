@@ -382,7 +382,7 @@ def transformMetadata(lines, doc, **kwargs):
                     for term in terms:
                         config.doc.refs.defaultSpecs[term.strip()].append((spec, type, status, dfnFor))
                 else:
-                    die("'Link Defaults' is a comma-separated list of '<spec> <dfn-type> <terms>'. Got:\n{0}", default)
+                    die("'Link Defaults' is a comma-separated list of '<spec> (<dfn-type>) <terms>'. Got:\n{0}", default)
         else:
             doc.otherMetadata[key].append(val)
 

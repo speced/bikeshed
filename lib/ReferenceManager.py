@@ -216,7 +216,7 @@ class ReferenceManager(object):
                  linkType,
                  text,
                  refs[0]['spec'],
-                 '\n'.join('    {0} {1} {2}'.format(text, ref['type'], ref['spec']) for ref in refs))
+                 '\n'.join('    {2} ({1}) {0}'.format(text, ref['type'], ref['spec']) for ref in refs))
         return refs[0]['url']
         
 
