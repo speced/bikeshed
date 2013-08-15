@@ -10,7 +10,7 @@ import lib.config as config
 def findAll(sel, context=None):
     if context is None:
         context = config.doc.document
-    return CSSSelector(sel)(context)
+    return CSSSelector(sel, namespaces={"svg":"http://www.w3.org/2000/svg"})(context)
 
 
 def find(sel, context=None):

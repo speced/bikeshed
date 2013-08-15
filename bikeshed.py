@@ -826,6 +826,11 @@ def cleanupHTML(doc):
     for el in findAll("body link, body script, body meta"):
         head.append(el)
 
+    # If we accidentally recognized an autolink shortcut in SVG, kill it.
+    for el in findAll("svg|a[data-link-type]"):
+        del el.attrib["data-link-type"]
+        el.tag = "{http://www.w3.org/2000/svg}tspan"
+
 
 def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):
     try:
