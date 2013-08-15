@@ -757,6 +757,19 @@ def classifyDfns(doc):
             else:
                 id = "{0}-{1}".format(dfnTypeToPrefix[dfnType], id)
             el.set('id', id)
+        if not (el.get('data-export') or el.get('data-noexport')):
+            for ancestor in el.iterancestors():
+                if ancestor.get('data-export'):
+                    el.set('data-export', '')
+                    break
+                elif ancestor.get('data-noexport'):
+                    el.set('data-noexport', '')
+                    break
+            else:
+                if dfnType == "dfn":
+                    el.set('data-noexport', '')
+                else:
+                    el.set('data-export', '')
 
 
 def dedupIds(doc, els):
