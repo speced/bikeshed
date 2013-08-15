@@ -796,9 +796,6 @@ def processAutolinks(doc):
         if len(text) == 0:
             die(u"Autolink {0} has no linktext.", outerHTML(el))
 
-        if text in doc.ignoredTerms:
-            continue
-
         if linkType == u"biblio":
             # Move biblio management into ReferenceManager later
             el.set('href', '#'+simplifyText(text))
@@ -808,7 +805,8 @@ def processAutolinks(doc):
                               spec=treeAttr(el, 'data-link-spec'),
                               status=treeAttr(el, 'data-link-status'),
                               linkFor=treeAttr(el, 'data-link-for'),
-                              el=el)
+                              el=el,
+                              error=(text not in doc.ignoredTerms))
         if url is not None:
             el.set('href', url)
             el.tag = "a"
