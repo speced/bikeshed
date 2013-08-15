@@ -1007,13 +1007,14 @@ class CSSSpec(object):
         def targetText(el):
             return el.get('title') or textContent(el)
         allTerms = set(targetText(el) for el in findAll('dfn'))
-        exportedTerms = set(targetText(el) for el in findAll('[data-export], .propdef dfn, .descdef dfn'))
+        exportedTerms = set(targetText(el) for el in findAll('[data-export]'))
         ignoredTerms = set(targetText(el) for el in findAll('[data-noexport]'))
-        unexportedTerms = allTerms - exportedTerms - ignoredTerms
         print "Exported terms:"
-        print exportedTerms
+        for term in exportedTerms:
+            print u"  {0}".format(term)
         print "Unexported terms:"
-        print unexportedTerms
+        for term in ignoredTerms:
+            print u"  {0}".format(term)
 
     def getInclusion(self, name, group=None, status=None):
         # First looks for a file specialized on the group and status.
