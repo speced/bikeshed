@@ -325,7 +325,7 @@ def transformMetadata(lines, doc, **kwargs):
         if(match is None):
             die(u"Incorrectly formatted metadata line:\n{0}", u(line))
         key = match.group(1)
-        val = u(match.group(2))
+        val = u(match.group(2)).strip()
         if key == "Status":
             doc.status = val
             doc.refs.setStatus(val)
