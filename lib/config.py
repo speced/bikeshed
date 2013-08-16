@@ -33,7 +33,8 @@ linkTypeToDfnType = {
     "propdesc": frozenset(("property", "descriptor")),
     "functionish": frozenset(("function", "method")),
     "idl": idlTypes,
-    "maybe": maybeTypes
+    "maybe": maybeTypes,
+    "dfn": frozenset(["dfn"])
 }
 for dfnType in dfnClassToType.values():
     linkTypeToDfnType[dfnType] = frozenset([dfnType])
