@@ -82,6 +82,7 @@ class ReferenceManager(object):
 
         # Filter by type/text to find all the candidate refs
         def findRefs(allRefs, dfnTypes, linkTexts):
+            import json
             # Allow either a string or an iter of strings
             if isinstance(dfnTypes, basestring):
                 dfnTypes = [dfnTypes]
@@ -89,11 +90,14 @@ class ReferenceManager(object):
                 linkTexts = [linkTexts]
             # I'll re-use linkTexts a lot, so I can't have it be an iterator!
             linkTexts = list(linkTexts)
-            for dfnText,refs in allRefs.items():
-                for linkText in linkTexts:
-                    if linkText == dfnText:
-                        return [ref for dfnType in dfnTypes for ref in refs if ref['type'] == dfnType and ref['exported'] and linkFor <= (ref.get('for') or set())]
-            return []
+            dfnTypes = set(dfnTypes)
+            refs = []
+            for linkText in linkTexts:
+                if linkText in allRefs:
+                    for ref in allRefs[linkText]:
+                        if ref['type'] in dfnTypes and ref['exported'] and linkFor <= (ref.get('for') or set()):
+                            refs.append(ref)
+            return refs
 
         if linkType in config.dfnTypes:
             refs = findRefs(self.refs, [linkType], text)

@@ -1006,9 +1006,8 @@ class CSSSpec(object):
     def printTargets(self):
         def targetText(el):
             return el.get('title') or textContent(el)
-        allTerms = set(targetText(el) for el in findAll('dfn'))
-        exportedTerms = set(targetText(el) for el in findAll('[data-export]'))
-        ignoredTerms = set(targetText(el) for el in findAll('[data-noexport]'))
+        exportedTerms = set(targetText(el) for el in findAll('dfn[data-export]'))
+        ignoredTerms = set(targetText(el) for el in findAll('dfn[data-noexport]'))
         print "Exported terms:"
         for term in exportedTerms:
             print u"  {0}".format(term)
