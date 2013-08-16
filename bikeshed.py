@@ -719,7 +719,7 @@ def determineLinkType(el):
     text = textContent(el)
     if text[0:1] == "@":
         return "at-rule"
-    elif text[0:1] == "<" and text[-1:] == ">":
+    elif re.match("^<[\w-]+>$", text):
         return "type"
     elif text[:1] == u"〈" and text[-1:] == u"〉":
         return "token"
