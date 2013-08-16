@@ -802,7 +802,7 @@ def processAutolinks(doc):
     for el in autolinks:
         # Explicitly empty title indicates this shouldn't be an autolink.
         if el.get('title') == '':
-            break
+            continue
 
         linkType = determineLinkType(el)
         text = u(el.get('title')) or textContent(el).lower()
