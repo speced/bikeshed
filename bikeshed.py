@@ -642,7 +642,7 @@ def canonicalizeShortcuts(doc):
     }
     for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys())):
         for attr, fixedAttr in attrFixup.items():
-            if el.get(attr):
+            if el.get(attr) is not None:
                 el.set(fixedAttr, el.get(attr))
                 del el.attrib[attr]
 
@@ -757,7 +757,7 @@ def classifyDfns(doc):
             else:
                 id = "{0}-{1}".format(dfnTypeToPrefix[dfnType], id)
             el.set('id', id)
-        if not (el.get('data-export') or el.get('data-noexport')):
+        if el.get('data-export') is None and el.get('data-noexport') is None:
             for ancestor in el.iterancestors():
                 if ancestor.get('data-export'):
                     el.set('data-export', '')
