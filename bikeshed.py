@@ -524,7 +524,6 @@ def transformAutolinkShortcuts(doc):
 def buildBibliolinkDatabase(doc):
     biblioLinks = findAll("a[data-link-type='biblio']")
     for el in biblioLinks:
-
         if el.get('title'):
             linkText = u(el.get('title'))
         else:
@@ -533,6 +532,7 @@ def buildBibliolinkDatabase(doc):
             el.set('title', linkText)
         if linkText not in doc.biblios:
             die(u"Couldn't find '{0}' in bibliography data.", linkText)
+            continue
         biblioEntry = doc.biblios[linkText]
         if el.get('data-biblio-type') == "normative":
             doc.normativeRefs.add(biblioEntry)
