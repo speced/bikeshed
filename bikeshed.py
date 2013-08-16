@@ -121,7 +121,7 @@ def main():
             config.quiet = options.quiet
             if not config.quiet:
                 print "Refs for '{0}':".format(options.linkText)
-            print '\n'.join('  {0} <{1}> "{2}" {3}'.format(ref['spec'], ref['type'], ref.get('for'), ref.get('id') or ref.get('ED_url') or ref.get('TR_url')) for ref in refs)
+            print json.dumps(refs, indent=2)
 
 
 def replaceTextMacros(text):
