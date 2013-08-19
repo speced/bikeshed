@@ -711,12 +711,16 @@ def determineDfnType(dfn):
 def determineLinkType(el):
     # 1. Look at data-link-type
     linkType = treeAttr(el, 'data-link-type')
+    text = textContent(el)
+    # ''foo: bar'' is a propdef for 'foo'
+    if linkType == "maybe" and re.match("^[\w-]+\s*:\s*\S", text):
+        el.set('title', re.match("^\s*([\w-]+)\s*:\s*\S", text).group(1))
+        return "property"
     if linkType:
         if linkType in config.linkTypes:
             return linkType
         die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
     # 2. Introspect on the text
-    text = textContent(el)
     if text[0:1] == "@":
         return "at-rule"
     elif re.match("^<[\w-]+>$", text):
