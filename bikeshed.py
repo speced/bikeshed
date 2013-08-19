@@ -763,10 +763,10 @@ def classifyDfns(doc):
             el.set('id', id)
         if el.get('data-export') is None and el.get('data-noexport') is None:
             for ancestor in el.iterancestors():
-                if ancestor.get('data-export'):
+                if ancestor.get('data-export') is not None:
                     el.set('data-export', '')
                     break
-                elif ancestor.get('data-noexport'):
+                elif ancestor.get('data-noexport') is not None:
                     el.set('data-noexport', '')
                     break
             else:
