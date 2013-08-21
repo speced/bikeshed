@@ -56,7 +56,7 @@ class ReferenceManager(object):
                         "shortname":"local",
                         "level":1,
                         "id":"#"+el.get('id'),
-                        "exported":True,
+                        "export":{"ED":True, "TR":True},
                         "for": dfnFor
                     }
                     self.refs[linkText].append(ref)
@@ -79,6 +79,8 @@ class ReferenceManager(object):
         status = status or self.specStatus
         if status is None:
             raise "Can't calculate a ref without knowing the desired spec status."
+        elif status is not "ED" and status is not "TR":
+            die("Status must be ED or TR, got '{0}'.", status)
 
         # Filter by type/text to find all the candidate refs
         def findRefs(allRefs, dfnTypes, linkTexts):
@@ -95,7 +97,7 @@ class ReferenceManager(object):
             for linkText in linkTexts:
                 if linkText in allRefs:
                     for ref in allRefs[linkText]:
-                        if ref['type'] in dfnTypes and ref['exported'] and linkFor <= (ref.get('for') or set()):
+                        if ref['type'] in dfnTypes and ref['export'][status] and linkFor <= (ref.get('for') or set()):
                             refs.append(ref)
             return refs
 
