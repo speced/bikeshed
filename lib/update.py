@@ -20,35 +20,11 @@ def update(anchors=False, biblio=False, linkDefaults=False):
 
 def updateCrossRefs():
     try:
-        say("Downloading spec database...")
-        with closing(urlopen("http://test.csswg.org/shepherd/api/spec")) as f:
+        say("Downloading anchor data...")
+        with closing(urlopen("https://api.csswg.org/shepherd/spec/?anchors&draft")) as f:
             rawSpecData = json.load(f)
     except Exception, e:
-        die("Couldn't download spec database.\n{0}", str(e))
-
-    specData = dict()
-    for rawSpec in rawSpecData.values():
-        spec = {
-            'vshortname': rawSpec['name'],
-            'TR': rawSpec['base_uri'],
-            'ED': rawSpec['draft_uri'],
-            'title': rawSpec['title'],
-            'description': rawSpec['description']
-        }
-        match = re.match("(.*)-(\d+)", rawSpec['name'])
-        if match:
-            spec['shortname'] = match.group(1)
-            spec['level'] = int(match.group(2))
-        else:
-            spec['shortname'] = spec['vshortname']
-            spec['level'] = 1
-        specData[spec['vshortname']] = spec
-    if not config.dryRun:
-        try:
-            with open(config.scriptPath+"/spec-data/specs.json", 'w') as f:
-                json.dump(specData, f, ensure_ascii=False, indent=2)
-        except Exception, e:
-            die("Couldn't save spec database to disk.\n{0}", e)
+        die("Couldn't download anchor data.  Error was:\n{0}", str(e))
 
     def linearizeAnchorTree(multiTree, list=None):
         if list is None:
@@ -57,22 +33,37 @@ def updateCrossRefs():
         for item in multiTree:
             if item['type'] not in ("section", "other"):
                 list.append(item)
-            if item['children']:
+            if item.get('children'):
                 linearizeAnchorTree(item['children'], list)
-            item['children'] = False
         return list
-    
+
+    specs = dict()
     anchors = defaultdict(list)
-    for i, spec in enumerate(specData.values()):
-        progress("Fetching xref data", i+1, len(specData))
-        try:
-            with closing(urlopen("http://test.csswg.org/shepherd/api/spec?spec={0}&anchors=1".format(spec['vshortname']))) as f:
-                rawData = json.load(f)
-                rawAnchors = linearizeAnchorTree(rawData['anchors'])
-        except Exception, e:
-            die("Couldn't download spec data for {0}.\n{1}", spec['vshortname'], e)
-        for rawAnchor in rawAnchors:
-            linkingTexts = rawAnchor.get('linking_text') or [rawAnchor.get('title')]
+    for rawSpec in rawSpecData.values():
+        spec = {
+            'vshortname': rawSpec['name'],
+            'TR': rawSpec.get('base_uri'),
+            'ED': rawSpec.get('draft_uri'),
+            'title': rawSpec.get('title'),
+            'description': rawSpec.get('description')
+        }
+        match = re.match("(.*)-(\d+)", rawSpec['name'])
+        if match:
+            spec['shortname'] = match.group(1)
+            spec['level'] = int(match.group(2))
+        else:
+            spec['shortname'] = spec['vshortname']
+            spec['level'] = 1
+        specs[spec['vshortname']] = spec
+
+        def setStatus(status):
+            def temp(obj):
+                obj['status'] = status
+                return obj
+            return temp
+        rawAnchorData = map(setStatus('TR'), linearizeAnchorTree(rawSpec.get('anchors', []))) + map(setStatus('ED'), linearizeAnchorTree(rawSpec.get('draft_anchors',[])))
+        for rawAnchor in rawAnchorData:
+            linkingTexts = rawAnchor.get('linking_text', [rawAnchor.get('title')])
             type = rawAnchor['type']
             if rawAnchor.get('export_draft'):
                 exportED = True
@@ -83,27 +74,31 @@ def updateCrossRefs():
             else:
                 exportED = False
             anchor = {
+                'status': rawAnchor['status'],
                 'type': type,
                 'spec': spec['vshortname'],
                 'shortname': spec['shortname'],
                 'level': int(spec['level']),
-                'export': {
-                    'ED': exportED,
-                    'TR': rawAnchor.get('export_official', False) or rawAnchor.get('export_draft', False)
-                } 
+                'export': rawAnchor.get('export', False),
+                'normative': rawAnchor.get('normative', False),
+                'url': spec[rawAnchor['status']] + rawAnchor['uri'],
+                'for': [] # until the data actually includes 'for'
             }
-            if rawAnchor.get('draft'):
-                anchor['ED_url'] = spec['ED'] + rawAnchor['uri']
-            if rawAnchor.get('official'):
-                anchor['TR_url'] = spec['TR'] + rawAnchor['uri']
             for text in linkingTexts:
                 anchors[text].append(anchor)
+        
     if not config.dryRun:
+        try:
+            with open(config.scriptPath+"/spec-data/specs.json", 'w') as f:
+                json.dump(specs, f, ensure_ascii=False, indent=2)
+        except Exception, e:
+            die("Couldn't save spec database to disk.\n{0}", e)
         try:
             with open(config.scriptPath+"/spec-data/anchors.json", 'w') as f:
                 json.dump(anchors, f, indent=2)
         except Exception, e:
-            die("Couldn't save xref database to disk.\n{0}", e)
+            die("Couldn't save anchor database to disk.\n{0}", e)
+    say("Success!")
 
 
 def updateBiblio():

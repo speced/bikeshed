@@ -40,10 +40,14 @@ class ReferenceManager(object):
                 else:
                     dfnFor = set(dfnFor.split())
                 for term in dfnFor.copy():
+                    # Saying a value is for a descriptor with @foo/bar
+                    # should also make it for the bare descriptor bar.
                     match = re.match("@[a-zA-Z0-9-_]+/(.*)", term)
                     if match:
                         dfnFor.add(match.group(1).strip())
-                if type in config.dfnTypes or type == "dfn":
+                # convert back into a list now, for easier JSONing
+                dfnFor = list(dfnFor)
+                if type in config.dfnTypes.union(["dfn"]):
                     existingAnchors = self.refs[linkText]
                     if any(ref['spec'] == "local" and ref['type'] == type and ref['for'] == dfnFor for ref in existingAnchors):
                         if dfnFor:
@@ -52,11 +56,12 @@ class ReferenceManager(object):
                             die(u"Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
                     ref = {
                         "type":type,
-                        "spec":"local",
-                        "shortname":"local",
-                        "level":1,
-                        "id":"#"+el.get('id'),
-                        "export":{"ED":True, "TR":True},
+                        "status":"local",
+                        "spec":"",
+                        "shortname":"",
+                        "level":0,
+                        "url":"#"+el.get('id'),
+                        "export":True,
                         "for": dfnFor
                     }
                     self.refs[linkText].append(ref)
@@ -65,154 +70,147 @@ class ReferenceManager(object):
     def getRef(self, linkType, text, spec=None, status=None, linkFor=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a url or None
         # Otherwise, it pops out debug messages for the user.
-        if linkFor is None:
-            linkFor = set()
-        else:
-            linkFor = set(linkFor.split())
 
+        # 'maybe' links might not link up, so it's fine for them to have no references.
+        # The relevent errors are gated by this variable.
+        zeroRefsError = error and linkType!="maybe"
+
+        status = status or self.specStatus
+        if status not in ("ED", "TR"):
+            if error:
+                die("Unknown spec status '{0}'. Status must be ED or TR.", status)
+            return None
+
+        # Take defaults into account
         if (spec is None or status is None) and text in self.defaultSpecs:
             for dfnSpec, dfnType, dfnStatus, dfnFor in self.defaultSpecs[text]:
                 if dfnType in config.linkTypeToDfnType[linkType]:
                     spec = spec or dfnSpec
                     status = status or dfnStatus
+                    linkFor = linkFor or dfnFor
                     break
-        status = status or self.specStatus
-        if status is None:
-            raise "Can't calculate a ref without knowing the desired spec status."
-        elif status is not "ED" and status is not "TR":
-            die("Status must be ED or TR, got '{0}'.", status)
 
-        # Filter by type/text to find all the candidate refs
-        def findRefs(allRefs, dfnTypes, linkTexts):
+        def filterRefsByTypeAndText(allRefs, dfnTypes, linkTexts):
+            '''Filter by type/text to find all the candidate refs'''
             import json
             # Allow either a string or an iter of strings
             if isinstance(dfnTypes, basestring):
                 dfnTypes = [dfnTypes]
             if isinstance(linkTexts, basestring):
                 linkTexts = [linkTexts]
-            # I'll re-use linkTexts a lot, so I can't have it be an iterator!
-            linkTexts = list(linkTexts)
             dfnTypes = set(dfnTypes)
             refs = []
             for linkText in linkTexts:
                 if linkText in allRefs:
                     for ref in allRefs[linkText]:
-                        if ref['type'] in dfnTypes and ref['export'][status] and linkFor <= (ref.get('for') or set()):
+                        if ref['type'] in dfnTypes:
                             refs.append(ref)
             return refs
 
+        # Get the relevant refs
         if linkType in config.dfnTypes:
-            refs = findRefs(self.refs, [linkType], text)
+            refs = filterRefsByTypeAndText(self.refs, [linkType], text)
         elif linkType == "propdesc":
-            refs = findRefs(self.refs, ["property", "descriptor"], text)
+            refs = filterRefsByTypeAndText(self.refs, ["property", "descriptor"], text)
         elif linkType == "functionish":
-            refs = findRefs(self.refs, ["function", "method"], text)
+            refs = filterRefsByTypeAndText(self.refs, ["function", "method"], text)
         elif linkType == "idl":
-            refs = findRefs(self.refs, config.idlTypes, text)
+            refs = filterRefsByTypeAndText(self.refs, config.idlTypes, text)
         elif linkType == "dfn":
-            refs = findRefs(self.refs, "dfn", linkTextVariations(text))
+            refs = filterRefsByTypeAndText(self.refs, "dfn", linkTextVariations(text))
         elif linkType == "maybe":
-            refs = findRefs(self.refs, config.maybeTypes, text) + findRefs(self.refs, "dfn", linkTextVariations(text))
+            refs = filterRefsByTypeAndText(self.refs, config.maybeTypes, text) + filterRefsByTypeAndText(self.refs, "dfn", linkTextVariations(text))
         else:
-            die("Unknown link type '{0}'.",linkType)
+            if error:
+                die("Unknown link type '{0}'.",linkType)
             return None
 
         if len(refs) == 0:
-            if linkType == "maybe":
-                return None
-            if error:
-                die("No '{1}' refs found for '{0}':\n{2}", text, linkType, outerHTML(el))
+            if zeroRefsError:
+                die("No '{0}' refs found for '{1}'.", linkType, text)
             return None
 
-        # Filter by spec, if needed
-        if spec:
-            refs = [ref for ref in refs if ref['spec'] == spec]
-            if len(refs) == 0:
-                if linkType == "maybe":
-                    return None
-                if error:
-                    die("No refs found for text '{0}' in spec '{1}':\n{2}", text, spec, outerHTML(el))
-                return None
+        # Unless you've specified a particular spec to look in, cut out all non-exported things.
+        if spec is None:
+            refs = [ref for ref in refs if ref['export']]
+        if len(refs) == 0:
+            if zeroRefsError:
+                die("No '{0}' refs found for '{1}' that are marked for export.", linkType, text)
+            return None
+
+        # If spec is specified, kill anything that doesn't match
+        if spec is not None:
+            refs = [ref for ref in refs if ref['shortname']==spec or ref['spec']==spec]
+        if len(refs) == 0:
+            if zeroRefsError:
+                die("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec)
+            return None
+
+        # If linkFor is specified, kill anything that doesn't match
+        if linkFor is not None:
+            refs = [ref for ref in refs if linkFor in ref['for']]
+        if len(refs) == 0:
+            if zeroRefsError:
+                die("No '{0}' refs found for '{1}' with for='{2}'.", linktype, text, linkFor)
+
+        # If status is ED, kill TR refs unless their spec *only* has a TR url
+        if status == "ED":
+            refs = [ref for ref in refs if ref['status'] in ("ED", "local") or (ref['status'] == "TR" and self.specs[ref['spec']]['ED'] is None)]
+        if len(refs) == 0:
+            if zeroRefsError:
+                die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
+            return None
 
         # Remove any ignored or obsoleted specs
+        def ignoredSpec(spec, ignoreCSS21=False, ignoreSVG=False):
+            if spec in self.ignoredSpecs:
+                return True
+            if spec == "css21" and ignoreCSS21:
+                return True
+            if spec == "svg" and ignoreSVG:
+                return True
+            return False
         possibleSpecs = set(ref['spec'] for ref in refs)
         ignoreCSS21 = bool(possibleSpecs.intersection(self.css21Replacements))
-        for ref in refs[:]:
-            if ref['spec'] in self.ignoredSpecs:
-                refs.remove(ref)
-            if ref['spec'] == "css21" and ignoreCSS21:
-                refs.remove(ref)
+        # CSS21 also replaces SVG
+        ignoreSVG = ignoreCSS21 or "css21" in possibleSpecs
+        refs = [ref for ref in refs if not ignoredSpec(ref['spec'], ignoreCSS21, ignoreSVG)]
 
-        # Filter by status, set url
-        if status == "ED":
-            for ref in refs[:]:
-                # Take local refs first
-                if ref.get('id'):
-                    ref['url'] = ref['id']
-                    continue
-                # Prefer linking to EDs
-                if ref.get('ED_url'):
-                    ref['url'] = ref['ED_url']
-                    continue
-                # Only link to TRs if there *is* no ED
-                # Don't do it otherwise, as it means the link was removed from the latest draft
-                if ref.get('TR_url') and not self.specs[ref['spec']]['ED']:
-                    ref['url'] = ref['TR_url']
-                    continue
-                # Otherwise, filter out the ref
-                refs.remove(ref)
-        elif status == "TR":
-            for ref in refs[:]:
-                # Take local refs first
-                if ref.get('id'):
-                    ref['url'] = ref['id']
-                    continue
-                # Prefer linking to TRs
-                if ref.get('TR_url'):
-                    ref['url'] = ref['TR_url']
-                    continue
-                # Allow downgrading to EDs, though.
-                # Later, I'll restrict this further.
-                if ref.get('ED_url'):
-                    ref['url'] = ref['ED_url']
-                    continue
-                # Otherwise, filter out the ref
-                refs.remove(ref)
-        else:
-            if error:
-                die("Unknown specref status '{0}'", status)
-            return None
-
+        # At this point, all the filtering is done.
+        # We won't error out due to no refs being found past this point,
+        # only for there being *too many* refs.
         if len(refs) == 0:
-            if linkType == "maybe":
-                return None
-            if error:
-                die("No refs suitable for '{1}' status were found for '{0}'.", text, status)
+            if zeroRefsError:
+                die("No '{0}' refs found for '{1}':\n{2}", linkType, text, outerHTML(el))
             return None
 
         if len(refs) == 1:
+            # Success!
             return refs[0]['url']
 
         # Accept local dfns even if there are xrefs with the same text.
-        localRefs = [ref for ref in refs if ref['spec'] == "local"]
+        localRefs = [ref for ref in refs if ref['status'] == "local"]
         if len(localRefs) == 1:
             return localRefs[0]['url']
         elif len(localRefs) > 1:
-            warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one for '{2}'.\nIf this is wrong, fix the links with one of the following 'for' values:\n{3}",
+            warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
                  linkType,
                  text,
-                 ' '.join(refs[0]['for']),
+                 refs[0]['type'],
+                 "' or '".join(refs[0]['for']),
                  '\n'.join("    "+dfnFor for ref in localRefs for dfnFor in ref['for']))
             return localRefs[0]['url']
 
-        # Eventually we need a registry for canonical definitions or something,
-        # but for now, if all the refs are for the same shortname, take the biggest level
+        # If all the refs are for the same shortname,
+        # assume you want to link to the latest one (highest level).
         if all(ref['shortname'] == refs[0]['shortname'] for ref in refs):
-            maxLevel = 0
+            maxLevel = -1
             for ref in refs:
                 if ref['level'] > maxLevel:
                     maxLevel = ref['level']
             leveledRefs = [ref for ref in refs if ref['level'] == maxLevel]
+            # Still potentially possible for a non-Bikeshed spec to have duplicate refs here,
+            # so I have to check for singularity.
             if len(leveledRefs) == 1:
                 return leveledRefs[0]['url']
 
