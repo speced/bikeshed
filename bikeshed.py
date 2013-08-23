@@ -320,6 +320,12 @@ def transformMetadata(lines, doc, **kwargs):
 
     doc.hasMetadata = True
 
+    def parseDate(val, field):
+        try:
+            return datetime.strptime(val, "%Y-%m-%d").date()
+        except:
+            die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", field, val)
+
     for line in lines:
         match = re.match(u"\s*([^:]+):\s*(.*)", u(line))
         if(match is None):
@@ -386,7 +392,10 @@ def transformMetadata(lines, doc, **kwargs):
         else:
             doc.otherMetadata[key].append(val)
 
-    # Fill in text macros.
+    # Remove the metadata block from the generated document.
+    return []
+
+def initializeTextMacros(doc):
     longstatuses = {
         "ED": u"Editor's Draft",
         "WD": u"W3C Working Draft",
@@ -428,14 +437,6 @@ def transformMetadata(lines, doc, **kwargs):
                                                                                        config.textMacros["vshortname"],
                                                                                        config.textMacros["cdate"],
                                                                                        config.textMacros["year"])
-    return []
-
-
-def parseDate(val, field):
-    try:
-        return datetime.strptime(val, "%Y-%m-%d").date()
-    except:
-        die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", field, val)
 
 
 def verifyRequiredMetadata(doc):
@@ -954,6 +955,7 @@ class CSSSpec(object):
         # Textual hacks
         transformDataBlocks(self)
         verifyRequiredMetadata(self)
+        initializeTextMacros(self)
         if self.paragraphMode == "markdown":
             transformMarkdownParagraphs(self)
 
