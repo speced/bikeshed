@@ -4,7 +4,7 @@ import json
 import re
 from collections import defaultdict
 from contextlib import closing
-from urllib2 import urlopen
+import urllib2
 import lib.config as config
 from lib.messages import *
 
@@ -21,10 +21,18 @@ def update(anchors=False, biblio=False, linkDefaults=False):
 def updateCrossRefs():
     try:
         say("Downloading anchor data...")
-        with closing(urlopen("https://api.csswg.org/shepherd/spec/?anchors&draft")) as f:
+        res = urllib2.urlopen(urllib2.Request("https://api.csswg.org/shepherd/spec/?anchors&draft", headers={"Accept":"application/vnd.csswg.shepherd.v1+json"}))
+        if res.getcode() == 406:
+            die("This version of the anchor-data API is no longer supported. Please update Bikeshed.")
+            return
+        if res.info().gettype() not in config.anchorDataContentTypes:
+            die("Unrecognized anchor-data content-type '{0}'.", res.inf().gettype())
+            return
+        with closing(res) as f:
             rawSpecData = json.load(f)
     except Exception, e:
         die("Couldn't download anchor data.  Error was:\n{0}", str(e))
+        return
 
     def linearizeAnchorTree(multiTree, list=None):
         if list is None:
@@ -108,7 +116,7 @@ def updateBiblio():
 def updateLinkDefaults():
     try:
         say("Downloading link defaults...")
-        with closing(urlopen("http://dev.w3.org/csswg/autolinker-config.md")) as f:
+        with closing(urllib2.urlopen("http://dev.w3.org/csswg/autolinker-config.md")) as f:
             lines = f.readlines()
         say("Success!")
     except Exception, e:

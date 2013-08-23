@@ -38,3 +38,5 @@ linkTypeToDfnType = {
 }
 for dfnType in dfnClassToType.values():
     linkTypeToDfnType[dfnType] = frozenset([dfnType])
+
+anchorDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
