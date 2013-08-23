@@ -151,7 +151,7 @@ class ReferenceManager(object):
             refs = [ref for ref in refs if linkFor in ref['for']]
         if len(refs) == 0:
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}' with for='{2}'.", linktype, text, linkFor)
+                die("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
 
         # If status is ED, kill TR refs unless their spec *only* has a TR url
         if status == "ED":
