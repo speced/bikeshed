@@ -90,7 +90,7 @@ def updateCrossRefs():
                 'export': rawAnchor.get('export', False),
                 'normative': rawAnchor.get('normative', False),
                 'url': spec[rawAnchor['status']] + rawAnchor['uri'],
-                'for': [] # until the data actually includes 'for'
+                'for': rawAnchor.get('for', [])
             }
             for text in linkingTexts:
                 anchors[text].append(anchor)
