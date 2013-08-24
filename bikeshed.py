@@ -927,6 +927,7 @@ class CSSSpec(object):
     def __init__(self, inputFile, paragraphMode="markdown"):
         try:
             self.lines = inputFile.readlines()
+            self.date = datetime.fromtimestamp(os.path.getmtime(inputFile.name))
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
 
