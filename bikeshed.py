@@ -548,7 +548,7 @@ def processHeadings(doc):
     resetHeadings(doc)
     determineHeadingLevels(doc)
     addHeadingIds(doc)
-    dedupIds(doc, findAll("h1, h2, h3, h4, h5, h6"))
+    dedupIds(doc, findAll("h2, h3, h4, h5, h6"))
     addHeadingBonuses(doc)
 
 def resetHeadings(doc):
@@ -648,7 +648,7 @@ def canonicalizeShortcuts(doc):
                 del el.attrib[attr]
 
     for el in findAll("dfn"):
-        for dfnType in config.dfnTypes:
+        for dfnType in config.dfnTypes.union(["dfn"]):
             if el.get(dfnType) is not None:
                 del el.attrib[dfnType]
                 el.set("data-dfn-type", dfnType)
