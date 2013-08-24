@@ -33,6 +33,9 @@ There are several shortcuts for writing autolinks of particular types, so you do
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 
+Remember that if you need to write out the `<a>` tag explicitly,
+you can add the type as a boolean attribute.
+
 
 `<pre>` whitespace stripping
 ----------------------------

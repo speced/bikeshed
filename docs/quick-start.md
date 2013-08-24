@@ -29,7 +29,7 @@ Linking
 
 When you first download the processor, it'll come with the necessary crossref data needed to do cross-spec linking,
 but there's no telling how recent it is.
-You probably want to start by running `preprocess --update-cross-refs`, which'll fetch the latest data.
+You probably want to start by running `bikeshed update`, which'll fetch the latest data.
 
 To use autolinks, just define things with `<dfn>`,
 then link to them with `<a>` (no `href` attribute).
@@ -60,7 +60,7 @@ Defining Properties and Descriptors
 If defining a property/descriptor, rather than writing out the table markup explicitly, just add a propdef or descdef block, like so:
 
 ~~~~html
-<pre class='propdef'>
+<pre class='propdef'> (or 'descdef')
 Name: var-*
 Values: [ <value> | <CDO> | <CDC> ]
 Initial: (nothing, see prose)
@@ -70,3 +70,11 @@ Computed Value: specified value with variables substituted (but see prose for "i
 Media: all
 </pre>
 ~~~~
+
+Common practice is to define all of the values for the property in a `<dl>` underneath the propdef table.
+If you do so, and you're only defining the values in there
+(no other `<dfn>`s show up),
+go ahead and put `dfn-type=value` and `dfn-for=property-name` attributes on the `<dl>`,
+where "property-name" is the name of the property.
+This'll automatically set up the correct types and references for the value definitions,
+so the processor won't balk at you as much.
