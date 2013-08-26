@@ -378,7 +378,7 @@ def transformMetadata(lines, doc, **kwargs):
             doc.ignoredTerms.extend(term.strip() for term in val.split(u','))
         elif key == "Link Defaults":
             for default in val.split(","):
-                match = re.match(u"^\s* ([\w-]+)  (?:\s+\( ({0}) (?:\s+(TR|ED))? \) )  \s+(.*) \s*$".format("|".join(config.dfnTypes)), default, re.X)
+                match = re.match(u"^([\w-]+)  (?:\s+\( ({0}) (?:\s+(TR|ED))? \) )  \s+(.*)$".format("|".join(config.dfnTypes.union(["dfn"]))), default.strip(), re.X)
                 if match:
                     spec = match.group(1)
                     type = match.group(2)
