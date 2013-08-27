@@ -72,7 +72,7 @@ def updateCrossRefs():
         rawAnchorData = map(setStatus('TR'), linearizeAnchorTree(rawSpec.get('anchors', []))) + map(setStatus('ED'), linearizeAnchorTree(rawSpec.get('draft_anchors',[])))
         for rawAnchor in rawAnchorData:
             linkingTexts = rawAnchor.get('linking_text', [rawAnchor.get('title')])
-            if linkingTexts is None:
+            if linkingTexts[0] is None:
                 continue
             type = rawAnchor['type']
             if rawAnchor.get('export_draft'):
