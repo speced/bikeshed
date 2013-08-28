@@ -628,19 +628,11 @@ def determineHeadingLevels(doc):
         header.set('data-level', printLevel())
 
 def addHeadingBonuses(doc):
-    foundFirstSection = False
     for header in findAll('h2, h3, h4, h5, h6'):
         if header.get("data-level") is not None:
-            foundFirstSection = True
             secno = lxml.etree.Element('span', {"class":"secno"})
             secno.text = header.get('data-level') + u' '
             header.insert(0, secno)
-
-        if foundFirstSection:
-            # Add a self-link, to help with sharing links.
-            selflink = lxml.etree.Element('a', {"href": "#" + header.get('id'), "class":"section-link"});
-            selflink.text = u"§"
-            appendChild(header, selflink)
 
 
 def formatPropertyNames(doc):
@@ -867,6 +859,21 @@ def processIssues(doc):
     dedupIds(doc, findAll(".issue"))
 
 
+def addSelfLinks(doc):
+    def makeSelfLink(el):
+        selflink = lxml.etree.Element('a', {"href": "#" + el.get('id', ''), "class":"self-link"});
+        selflink.text = u"§"
+        return selflink
+
+    foundFirstNumberedSection = False
+    for el in findAll("h2, h3, h4, h5, h6"):
+        foundFirstNumberedSection = foundFirstNumberedSection or (el.get('data-level') is not None)
+        if True:#foundFirstNumberedSection:
+            appendChild(el, makeSelfLink(el))
+    for el in findAll(".issue"):
+        prependChild(el, makeSelfLink(el))
+
+
 def cleanupHTML(doc):
     # Find <style> in body, add scoped='', move to be first child.
     for el in findAll("body style"):
@@ -1017,6 +1024,8 @@ class CSSSpec(object):
         processHeadings(self)
         canonicalizeShortcuts(self)
         processIssues(self)
+
+        addSelfLinks(self)
 
         # Handle all the links
         processDfns(self)

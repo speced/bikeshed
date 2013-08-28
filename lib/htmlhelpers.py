@@ -77,6 +77,19 @@ def appendChild(parent, child):
         else:
             parent.text = (parent.text or '') + child
 
+def prependChild(parent, child):
+    # Prepends either text or an element to the parent.
+    if isinstance(child, basestring):
+        if parent.text is None:
+            parent.text = child
+        else:
+            parent.text = child + parent.text
+    else:
+        parent.insert(0, child)
+        if parent.text is not None:
+            child.tail = (child.tail or '') + parent.text
+            parent.text = None
+
 
 def replaceContents(el, newElements):
     clearContents(el)
