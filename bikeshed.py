@@ -879,9 +879,8 @@ def addSelfLinks(doc):
         foundFirstNumberedSection = foundFirstNumberedSection or (el.get('data-level') is not None)
         if foundFirstNumberedSection:
             appendChild(el, makeSelfLink(el))
-    for el in findAll(".issue, .example, .note"):
-        if el.get('id') is not None:
-            prependChild(el, makeSelfLink(el))
+    for el in findAll(".issue[id], .example[id], .note[id], li[id], dt[id]"):
+        prependChild(el, makeSelfLink(el))
 
 
 def cleanupHTML(doc):
