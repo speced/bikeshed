@@ -291,8 +291,8 @@ def transformPropdef(lines, doc, **kwargs):
         if(match is None):
             die(u"Incorrectly formatted propdef line for '{0}':\n{1}", vals.get("Name", "???"), line)
             continue
-        key = match.group(1)
-        val = match.group(2)
+        key = match.group(1).strip()
+        val = match.group(2).strip()
         if key == "Value" and "Value" in vals:
             vals[key] += " "+val
         else:
