@@ -573,14 +573,19 @@ Only 'normative' and 'informative' allowed.", u(el.get('data-biblio-type')), out
 
 
 def processHeadings(doc):
-    resetHeadings(doc)
-    determineHeadingLevels(doc)
-    addHeadingIds(doc)
-    dedupIds(doc, findAll("h2, h3, h4, h5, h6"))
-    addHeadingBonuses(doc)
+    for el in findAll('h2, h3, h4, h5, h6'):
+        addClass(el, 'heading')
+    headings = findAll(".heading:not(.settled)")
+    resetHeadings(doc, headings)
+    determineHeadingLevels(doc, headings)
+    addHeadingIds(doc, headings)
+    dedupIds(doc, headings)
+    addHeadingBonuses(doc, headings)
+    for el in headings:
+        addClass(el, 'settled')
 
-def resetHeadings(doc):
-    for header in findAll('h2, h3, h4, h5, h6'):
+def resetHeadings(doc, headings):
+    for header in headings:
         # Reset to base, if this is a re-run
         if find(".content", header) is not None:
             content = find(".content", header)
@@ -591,13 +596,13 @@ def resetHeadings(doc):
         moveContents(content, header)
         appendChild(header, content)
 
-def addHeadingIds(doc):
-    for header in findAll("h2, h3, h4, h5, h6"):
+def addHeadingIds(doc, headings):
+    for header in headings:
         if header.get('id') is not None:
             continue
         header.set('id', simplifyText(textContent(find(".content", header))))
 
-def determineHeadingLevels(doc):
+def determineHeadingLevels(doc, headings):
     headerLevel = [0,0,0,0,0]
     def incrementLevel(level):
         headerLevel[level-2] += 1
@@ -607,7 +612,7 @@ def determineHeadingLevels(doc):
         return u'.'.join(u(x) for x in headerLevel if x > 0)
 
     skipLevel = float('inf')
-    for header in findAll('h2, h3, h4, h5, h6'):
+    for header in headings:
         # Add the heading number.
         level = int(header.tag[-1])
 
@@ -627,8 +632,8 @@ def determineHeadingLevels(doc):
         incrementLevel(level)
         header.set('data-level', printLevel())
 
-def addHeadingBonuses(doc):
-    for header in findAll('h2, h3, h4, h5, h6'):
+def addHeadingBonuses(doc, headings):
+    for header in headings:
         if header.get("data-level") is not None:
             secno = lxml.etree.Element('span', {"class":"secno"})
             secno.text = header.get('data-level') + u' '
@@ -868,7 +873,7 @@ def addSelfLinks(doc):
     foundFirstNumberedSection = False
     for el in findAll("h2, h3, h4, h5, h6"):
         foundFirstNumberedSection = foundFirstNumberedSection or (el.get('data-level') is not None)
-        if True:#foundFirstNumberedSection:
+        if foundFirstNumberedSection:
             appendChild(el, makeSelfLink(el))
     for el in findAll(".issue"):
         prependChild(el, makeSelfLink(el))

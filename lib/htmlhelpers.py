@@ -158,3 +158,10 @@ def treeAttr(el, attrName):
     for ancestor in el.iterancestors():
         if ancestor.get(attrName):
             return ancestor.get(attrName)
+
+
+def addClass(el, cls):
+    if el.get('class') is None:
+        el.set('class', cls)
+    else:
+        el.set('class', "{0} {1}".format(el.get('class'), cls))
