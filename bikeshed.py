@@ -284,7 +284,7 @@ def transformPre(lines, tagName, firstLine, **kwargs):
     return lines
 
 
-def transformPropdef(lines, doc, **kwargs):
+def transformPropdef(lines, doc, firstLine, **kwargs):
     vals = {}
     for (i, line) in enumerate(lines):
         match = re.match("\s*([^:]+):\s*(.*)", line)
@@ -298,7 +298,10 @@ def transformPropdef(lines, doc, **kwargs):
         else:
             vals[key] = val
     # The required keys are specified in the order they should show up in the propdef table.
-    requiredKeys = ["Name", "Value", "Initial", "Applies to", "Inherited", "Media", "Computed value"]
+    if "partial" in firstLine or "New values" in vals:
+        requiredKeys = ["Name"]
+    else:
+        requiredKeys = ["Name", "Value", "Initial", "Applies to", "Inherited", "Media", "Computed value"]
     ret = ["<table class='propdef'>"]
     for key in requiredKeys:
         if key in vals:
@@ -312,7 +315,7 @@ def transformPropdef(lines, doc, **kwargs):
     return ret
 
 
-def transformDescdef(lines, doc, **kwargs):
+def transformDescdef(lines, doc, firstLine, **kwargs):
     vals = {}
     for (i, line) in enumerate(lines):
         match = re.match("\s*([^:]+):\s*(.*)", line)
@@ -327,7 +330,10 @@ def transformDescdef(lines, doc, **kwargs):
             vals[key] = "<a at-rule>{0}</a>".format(val)
         else:
             vals[key] = val
-    requiredKeys = ["Name", "For", "Value", "Initial"]
+    if "partial" in firstLine or "New values" in vals:
+        requiredKeys = ["Name", "For"]
+    else:
+        requiredKeys = ["Name", "For", "Value", "Initial"]
     ret = ["<table class='descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
     for key in requiredKeys:
         if key in vals:

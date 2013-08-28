@@ -165,3 +165,10 @@ def addClass(el, cls):
         el.set('class', cls)
     else:
         el.set('class', "{0} {1}".format(el.get('class'), cls))
+
+def hasClass(el, cls):
+    if el.get('class') is None:
+        return False
+    paddedAttr = " {0} ".format(el.get('class'))
+    paddedCls = " {0} ".format(cls)
+    return paddedCls in paddedAttr
