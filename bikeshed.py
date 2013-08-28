@@ -283,40 +283,59 @@ def transformPre(lines, tagName, firstLine, **kwargs):
 
 
 def transformPropdef(lines, doc, **kwargs):
-    ret = ["<table class='propdef'>"]
+    vals = {}
     for (i, line) in enumerate(lines):
         match = re.match("\s*([^:]+):\s*(.*)", line)
         if(match is None):
-            die(u"Incorrectly formatted propdef line:\n{0}", u(line))
+            die(u"Incorrectly formatted propdef line for '{0}':\n{1}", vals.get("Name", "???"), line)
             continue
         key = match.group(1)
         val = match.group(2)
-        ret.append("<tr><th>" + key + ":<td>" + val)
+        if key == "Value" and "Value" in vals:
+            vals[key] += " "+val
+        else:
+            vals[key] = val
+    # The required keys are specified in the order they should show up in the propdef table.
+    requiredKeys = ["Name", "Value", "Initial", "Applies to", "Inherited", "Media", "Computed value"]
+    ret = ["<table class='propdef'>"]
+    for key in requiredKeys:
+        if key in vals:
+            ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
+        else:
+            die("The propdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key)
+            continue
+    for key in vals.viewkeys() - requiredKeys:
+        ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
     ret.append("</table>")
     return ret
 
 
 def transformDescdef(lines, doc, **kwargs):
-    name = None
-    descFor = None
-    ret = []
+    vals = {}
     for (i, line) in enumerate(lines):
         match = re.match("\s*([^:]+):\s*(.*)", line)
         if(match is None):
-            die(u"Incorrectly formatted descdef line:\n{0}", u(line))
+            die(u"Incorrectly formatted descdef line for '{0}':\n{1}", vals.get("Name", "???"), u(line))
             continue
         key = match.group(1).strip()
         val = match.group(2).strip()
-        if key == "Name":
-            name = val
+        if key == "Value" and "Value" in vals:
+            vals[key] += " "+val
         elif key == "For":
-            descFor = val
-            val = "<a at-rule>{0}</a>".format(val)
-        ret.append("<tr><th>" + key + ":<td>" + val)
+            vals[key] = "<a at-rule>{0}</a>".format(val)
+        else:
+            vals[key] = val
+    requiredKeys = ["Name", "For", "Value", "Initial"]
+    ret = ["<table class='descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
+    for key in requiredKeys:
+        if key in vals:
+            ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
+        else:
+            die("The descdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key)
+            continue
+    for key in vals.viewkeys() - requiredKeys:
+        ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
     ret.append("</table>")
-    if descFor is None:
-        die("The descdef for '{0}' is missing a 'For' line.", name)
-    ret.insert(0, "<table class='descdef' data-dfn-for='{0}'>".format(descFor))
     return ret
 
 
