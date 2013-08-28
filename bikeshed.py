@@ -128,6 +128,8 @@ def replaceTextMacros(text):
     # Replace the [FOO] things.
     for tag, replacement in config.textMacros.items():
         text = u(text).replace(u"[{0}]".format(u(tag.upper())), u(replacement))
+    # Replace straight aposes with curly quotes for possessives and contractions.
+    text = re.sub(r"([>\w])'([\w])", ur"\1’\2", text)
     # Replace <<<token>>> shortcuts.  (It's annoying to type the actual token syntax.)
     text = re.sub(ur"<<<([^>]+)>>>", ur"<a data-link-type='token'>〈\1〉</a>", text)
     # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
