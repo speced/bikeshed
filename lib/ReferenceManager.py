@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import re
 from collections import defaultdict
 from lib.fuckunicode import u
@@ -247,7 +248,11 @@ def linkTextVariations(str):
         yield str[:-2]
     if str[-2:] == u"'s":
         yield str[:-2]
+    if str[-2:] == u"’s":
+        yield str[:-2]
     if str[-1:] == u"s":
         yield str[:-1]
     if str[-1:] == u"'":
+        yield str[:-1]
+    if str[-1:] == u"’":
         yield str[:-1]
