@@ -286,6 +286,9 @@ def transformPropdef(lines, doc, **kwargs):
     ret = ["<table class='propdef'>"]
     for (i, line) in enumerate(lines):
         match = re.match("\s*([^:]+):\s*(.*)", line)
+        if(match is None):
+            die(u"Incorrectly formatted propdef line:\n{0}", u(line))
+            continue
         key = match.group(1)
         val = match.group(2)
         ret.append("<tr><th>" + key + ":<td>" + val)
@@ -299,6 +302,9 @@ def transformDescdef(lines, doc, **kwargs):
     ret = []
     for (i, line) in enumerate(lines):
         match = re.match("\s*([^:]+):\s*(.*)", line)
+        if(match is None):
+            die(u"Incorrectly formatted descdef line:\n{0}", u(line))
+            continue
         key = match.group(1).strip()
         val = match.group(2).strip()
         if key == "Name":
@@ -330,6 +336,7 @@ def transformMetadata(lines, doc, **kwargs):
         match = re.match(u"\s*([^:]+):\s*(.*)", u(line))
         if(match is None):
             die(u"Incorrectly formatted metadata line:\n{0}", u(line))
+            continue
         key = match.group(1)
         val = u(match.group(2)).strip()
         if key == "Status":
