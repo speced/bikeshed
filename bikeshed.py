@@ -877,7 +877,6 @@ def processIssues(doc):
 def addSelfLinks(doc):
     def makeSelfLink(el):
         selflink = lxml.etree.Element('a', {"href": "#" + el.get('id', ''), "class":"self-link"});
-        selflink.text = u"§"
         return selflink
 
     foundFirstNumberedSection = False
@@ -887,6 +886,8 @@ def addSelfLinks(doc):
             appendChild(el, makeSelfLink(el))
     for el in findAll(".issue[id], .example[id], .note[id], li[id], dt[id]"):
         prependChild(el, makeSelfLink(el))
+    for el in findAll("dfn"):
+        appendChild(el, makeSelfLink(el))
 
 
 def cleanupHTML(doc):
