@@ -113,6 +113,11 @@ Within the Values line, things that look like grammar nonterminals (anything lik
 This also works for descdef tables, describing the syntax of descriptors.
 When writing a descdef table, you should additionally add a "For" line containing the name of the at-rule the descriptor is for.
 
+If you're defining a *partial* propdef or descdef
+(for example, just defining a few new values for an existing property),
+you can indicate this by adding a "partial" class to the `<pre>`.
+(This will prevent Bikeshed from complaining about lots of missing propdef/descdef lines.)
+
 
 Automatic ID Generation
 -----------------------
