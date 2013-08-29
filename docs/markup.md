@@ -161,6 +161,5 @@ which just links to the element,
 so people can click on the link and then just copy the URL from their address bar
 to get a link straight to what they care about.
 
-Self-links are currently auto-generated for headings and issues,
+Self-links are currently auto-generated for headings, definitions, and issues,
 and notes, examples, `<li>`s, and `<dt>`s that have been given IDs.
-Research is ongoing as to how to provide self-links for definitions in an attractive manner.
