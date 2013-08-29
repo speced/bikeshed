@@ -147,3 +147,20 @@ it's automatically de-duped by appending a number to the end.
 This isn't very pretty,
 so if you want to avoid it,
 supply an ID yourself.
+
+
+Automatic Self-Link Generation
+------------------------------
+
+Giving IDs to important things in your document,
+like headings and definitions,
+is great, but of little use if people don't know they can link to them.
+Bikeshed will automatically generate a "self-link"
+in the margin next to certain linkable elements
+which just links to the element,
+so people can click on the link and then just copy the URL from their address bar
+to get a link straight to what they care about.
+
+Self-links are currently auto-generated for headings and issues,
+and notes, examples, `<li>`s, and `<dt>`s that have been given IDs.
+Research is ongoing as to how to provide self-links for definitions in an attractive manner.
