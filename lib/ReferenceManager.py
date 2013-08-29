@@ -9,12 +9,9 @@ class ReferenceManager(object):
     refs = defaultdict(list)
     specs = dict()
 
-    # dict(term=>(type, spec))
     defaultSpecs = defaultdict(list)
     css21Replacements = set()
     ignoredSpecs = set()
-
-    specStatus = None
 
     def __init__(self, specStatus=None):
         if specStatus is not None:
@@ -28,6 +25,18 @@ class ReferenceManager(object):
             # I'll want to make this more complex later,
             # to enforce pubrules linking policy.
 
+    def setSpecData(self, spec):
+        if spec.status in ("ED", "DREAM", "UD"):
+            self.specStatus = "ED"
+        else:
+            self.specStatus = "TR"
+            # I'll want to make this more complex later,
+            # to enforce pubrules linking policy.
+        self.specLevel = spec.level
+        self.specName = spec.shortname
+        self.specVName = spec.shortname + "-" + u(spec.level)
+        # Need to get a real versioned shortname,
+        # with the possibility of overriding the "shortname-level" pattern.
 
     def addLocalDfns(self, dfns):
         for el in dfns:
@@ -58,9 +67,9 @@ class ReferenceManager(object):
                     ref = {
                         "type":type,
                         "status":"local",
-                        "spec":"",
-                        "shortname":"",
-                        "level":0,
+                        "spec":self.specVName,
+                        "shortname":self.specName,
+                        "level":self.specLevel,
                         "url":"#"+el.get('id'),
                         "export":True,
                         "for": dfnFor

@@ -471,6 +471,8 @@ def initializeTextMacros(doc):
                                                                                        config.textMacros["vshortname"],
                                                                                        config.textMacros["cdate"],
                                                                                        config.textMacros["year"])
+    # Now we have enough data to set all the relevant stuff in ReferenceManager
+    doc.refs.setSpecData(doc)
 
 
 def verifyRequiredMetadata(doc):
