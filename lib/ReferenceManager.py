@@ -37,6 +37,13 @@ class ReferenceManager(object):
         self.specVName = spec.shortname + "-" + u(spec.level)
         # Need to get a real versioned shortname,
         # with the possibility of overriding the "shortname-level" pattern.
+        self.removeSameSpecRefs()
+
+    def removeSameSpecRefs(self):
+        # Kill all the non-local anchors with the same shortname as the current spec,
+        # so you don't end up accidentally linking to something that's been removed from the local copy.
+        for term, refs in self.refs.items():
+            self.refs[term] = [ref for ref in refs if ref['shortname']!=self.specName]
 
     def addLocalDfns(self, dfns):
         for el in dfns:
