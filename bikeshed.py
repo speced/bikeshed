@@ -1041,7 +1041,6 @@ class CSSSpec(object):
         canonicalizeShortcuts(self)
         processIssues(self)
 
-        addSelfLinks(self)
 
         # Handle all the links
         processDfns(self)
@@ -1053,6 +1052,7 @@ class CSSSpec(object):
         addIndexSection(self)
         processHeadings(self) # again
         addTOCSection(self)
+        addSelfLinks(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
