@@ -90,6 +90,14 @@ def prependChild(parent, child):
             child.tail = (child.tail or '') + parent.text
             parent.text = None
 
+def insertBefore(target, el):
+    parent = target.getparent()
+    parent.insert(parent.index(target), el)
+
+def insertAfter(target, el):
+    parent = target.getparent()
+    parent.insert(parent.index(target)+1, el)
+
 
 def replaceContents(el, newElements):
     clearContents(el)
