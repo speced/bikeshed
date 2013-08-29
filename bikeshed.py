@@ -1050,6 +1050,7 @@ class CSSSpec(object):
         addPropertyIndex(self)
         addReferencesSection(self)
         addIndexSection(self)
+        addIssuesSection(self)
         processHeadings(self) # again
         addTOCSection(self)
         addSelfLinks(self)
@@ -1411,6 +1412,29 @@ def addReferencesSection(doc):
         text += u"<dd>"+u(ref)+u"</dd>"
     text += u"</dl>"
     fillWith("informative-references", parseHTML(text))
+
+def addIssuesSection(doc):
+    from copy import deepcopy
+    issues = findAll('.issue')
+    if len(issues) == 0:
+        return
+    header = find("#issues-index")
+    if not header:
+        header = lxml.etree.Element('h2', {'id':"issues-index", 'class':"no-num"})
+        header.text = "Issues Index"
+        appendChild(find("body"), header)
+    container = lxml.etree.Element('div', {'style':"counter-reset: issue"})
+    insertAfter(header, container)
+    for issue in issues:
+        el = deepcopy(issue)
+        appendChild(container, el)
+        issuelink = lxml.etree.Element('a', {'href':'#'+issue.get('id')})
+        issuelink.text = u" ↵ "
+        appendChild(el, issuelink)
+    for idel in findAll("[id]", container):
+        del idel.attrib['id']
+    for dfnel in findAll("dfn", container):
+        dfnel.tag = "span"
 
 
 
