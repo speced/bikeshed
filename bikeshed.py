@@ -37,6 +37,7 @@ import lib.biblio as biblio
 import lib.update as update
 from lib.fuckunicode import u
 from lib.ReferenceManager import ReferenceManager
+from lib.ReferenceManager import linkTextsFromElement
 from lib.htmlhelpers import *
 from lib.messages import *
 
@@ -776,9 +777,22 @@ def classifyDfns(doc):
     dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
     for el in findAll("dfn"):
         dfnType = determineDfnType(el)
+        dfnText = linkTextsFromElement(el)[0]
         # Push the dfn type down to the <dfn> itself.
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', dfnType)
+        # Some error checking
+        if dfnType in config.functionishTypes and not dfnText.endswith("()"):
+            # Maybe make this smarter so that it's okay to have <dfn function>foo(bar)</dfn>
+            # Auto-fill title with title='foo()' in that case.
+            die("Functions/methods must end with () in their linking text, got '{0}'.", dfnText)
+        # If type=argument, try to infer what it's for.
+        if dfnType == "argument" and el.get('data-dfn-for') is None:
+            parent = el.getparent()
+            if parent.get('data-dfn-type') in config.functionishTypes and parent.get('data-dfn-for') is not None:
+                el.set('data-dfn-for', "{0}/{1}".format(parent.get('data-dfn-for'), linkTextsFromElement(parent)[0]))
+            else:
+                die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el))
         if dfnType in config.typesUsingFor:
             if el.get('data-dfn-for'):
                 pass
