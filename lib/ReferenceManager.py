@@ -246,11 +246,13 @@ def linkTextsFromElement(el, preserveCasing=False):
     if el.get('title') == '':
         return []
     elif el.get('title'):
-        return [u(x.strip()) for x in el.get('title').split('|')]
-    elif preserveCasing:
-        return [textContent(el).strip()]
+        texts = [u(x.strip()) for x in el.get('title').split('|')]
     else:
-        return [textContent(el).strip().lower()]
+        texts = [textContent(el).strip()]
+    if preserveCasing:
+        return texts
+    else:
+        return [t.lower() for t in texts]
 
 
 def linkTextVariations(str):

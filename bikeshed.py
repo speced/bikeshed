@@ -863,7 +863,7 @@ def processAutolinks(doc):
             continue
 
         linkType = determineLinkType(el)
-        text = u(el.get('title')) or textContent(el).lower()
+        text = (u(el.get('title')) or textContent(el)).lower()
         text = re.sub(u"\s+", u" ", text)
         if len(text) == 0:
             die(u"Autolink {0} has no linktext.", outerHTML(el))
