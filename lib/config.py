@@ -15,6 +15,7 @@ dfnClassToType = {
     "tokendef":"token",
     "interfacedef":"interface",
     "methoddef":"method",
+    "argdef":"argument",
     "attrdef":"attribute",
     "dictdef":"dictionary",
     "dictmemberdef":"dictmember",
@@ -27,13 +28,14 @@ dfnClassToType = {
 }
 dfnTypes = frozenset(dfnClassToType.values())
 maybeTypes = frozenset(("value", "type", "at-rule", "function", "selector", "token"))
-idlTypes = frozenset(("interface", "method", "attribute", "dictionary", "dictmember", "enum", "const", "callback", "event"))
+idlTypes = frozenset(("interface", "method", "argument", "attribute", "dictionary", "dictmember", "enum", "const", "callback", "event"))
+functionishTypes = frozenset(("function", "method"))
 linkTypes = dfnTypes | frozenset(("propdesc", "functionish", "idl", "maybe", "biblio"))
-typesUsingFor = frozenset(("descriptor", "value", "method", "attribute", "const", "dictmember", "event"))
+typesUsingFor = frozenset(("descriptor", "value", "method", "argument", "attribute", "const", "dictmember", "event"))
 
 linkTypeToDfnType = {
     "propdesc": frozenset(("property", "descriptor")),
-    "functionish": frozenset(("function", "method")),
+    "functionish": functionishTypes,
     "idl": idlTypes,
     "maybe": maybeTypes,
     "dfn": frozenset(["dfn"])
