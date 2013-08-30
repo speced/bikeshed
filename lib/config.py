@@ -20,7 +20,7 @@ dfnClassToType = {
     "dictmemberdef":"dictmember",
     "enumdef":"enum",
     "constdef":"const",
-    "callbackdef":"callback"
+    "callbackdef":"callback",
     "html-elemdef":"html-element",
     "html-attrdef":"html-attribute"
 }
