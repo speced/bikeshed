@@ -802,17 +802,19 @@ def classifyDfns(doc):
                     el.set('data-dfn-for', dfnFor)
                 else:
                     die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
+        # Automatically fill in id if necessary.
         if el.get('id') is None:
             id = simplifyText(textContent(el))
             if dfnType == "dfn":
                 pass
             elif dfnType == "interface":
                 id = "dom-" + id
-            elif dfnType in ("attribute", "method", "const", "dictmember"):
-                id = "dom-{0}-{1}".format(el.get("data-dfn-for"), id)
+            elif dfnType in config.idlTypes.intersection(config.typesUsingFor):
+                id = simplifyText("dom-{0}-{1}".format(el.get("data-dfn-for"), id))
             else:
                 id = "{0}-{1}".format(dfnTypeToPrefix[dfnType], id)
             el.set('id', id)
+        # Push export/noexport down to the definition
         if el.get('data-export') is None and el.get('data-noexport') is None:
             for ancestor in el.iterancestors():
                 if ancestor.get('data-export') is not None:
