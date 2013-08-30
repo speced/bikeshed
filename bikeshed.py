@@ -634,7 +634,7 @@ def determineHeadingLevels(doc, headings):
             del header.attrib['data-level']
 
         # If we encounter a no-num, don't number it or any in the same section.
-        if re.search("no-num", header.get('class') or ''):
+        if hasClass(header, "no-num"):
             skipLevel = min(level, skipLevel)
             continue
         if skipLevel < level:
@@ -726,9 +726,9 @@ def determineDfnType(dfn):
             return ancestor.get('data-dfn-type')
         classList = ancestor.get('class') or ''
         for cls, type in config.dfnClassToType.items():
-            if type in classList:
+            if hasClass(ancestor, cls):
                 return type
-            if "idl" in classList and "extract" not in classList:
+            if hasClass(ancestor, "idl") and not hasClass(ancestor, "extract"):
                 return "interface"
     # 4. Introspect on the text
     text = textContent(dfn)
@@ -1356,7 +1356,7 @@ def addTOCSection(doc):
         level = int(header.tag[-1])
 
         # Same deal - hit a no-toc, suppress the entire section.
-        if re.search("no-toc", header.get('class') or ''):
+        if hasClass(header, "no-toc"):
             skipLevel = min(level, skipLevel)
             continue
         if skipLevel < level:

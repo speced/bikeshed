@@ -47,7 +47,7 @@ class ReferenceManager(object):
 
     def addLocalDfns(self, dfns):
         for el in dfns:
-            if "no-ref" in (el.get('class') or ""):
+            if hasClass(el, "no-ref"):
                 continue
             for linkText in linkTextsFromElement(el):
                 type = treeAttr(el, 'data-dfn-type')
