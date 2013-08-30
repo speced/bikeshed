@@ -20,12 +20,13 @@ dfnClassToType = {
     "dictmemberdef":"dictmember",
     "enumdef":"enum",
     "constdef":"const",
+    "callbackdef":"callback"
     "html-elemdef":"html-element",
     "html-attrdef":"html-attribute"
 }
 dfnTypes = frozenset(dfnClassToType.values())
 maybeTypes = frozenset(("value", "type", "at-rule", "function", "selector", "token"))
-idlTypes = frozenset(("interface", "method", "attribute", "dictionary", "dictmember", "enum", "const"))
+idlTypes = frozenset(("interface", "method", "attribute", "dictionary", "dictmember", "enum", "const", "callback"))
 linkTypes = dfnTypes | frozenset(("propdesc", "functionish", "idl", "maybe", "biblio"))
 typesUsingFor = frozenset(("descriptor", "value", "method", "attribute", "const", "dictmember"))
 
