@@ -909,6 +909,14 @@ def cleanupHTML(doc):
         del el.attrib["data-link-type"]
         el.tag = "{http://www.w3.org/2000/svg}tspan"
 
+    # Tag classes on wide types of dfns/links
+    def selectorForTypes(types):
+        return ",".join("dfn[data-dfn-type={0}],a[data-link-type={0}]".format(type) for type in types)
+    for el in findAll(selectorForTypes(config.idlTypes)):
+        addClass(el, 'idl-code')
+    for el in findAll(selectorForTypes(config.maybeTypes.union(config.linkTypeToDfnType['propdesc']))):
+        addClass(el, 'css-code')
+
 
 def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):
     try:
