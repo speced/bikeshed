@@ -6,11 +6,15 @@ from lxml import etree
 from lxml.cssselect import CSSSelector
 from lib.fuckunicode import u
 import lib.config as config
+from lib.messages import *
 
 def findAll(sel, context=None):
     if context is None:
         context = config.doc.document
-    return CSSSelector(sel, namespaces={"svg":"http://www.w3.org/2000/svg"})(context)
+    try:
+        return CSSSelector(sel, namespaces={"svg":"http://www.w3.org/2000/svg"})(context)
+    except Exception, e:
+        die("The selector '{0}' returned an error:\n{1}", sel, e)
 
 
 def find(sel, context=None):
@@ -161,10 +165,10 @@ def previousElements(startEl, tag=None, *tags):
     return els
 
 def treeAttr(el, attrName):
-    if el.get(attrName):
+    if el.get(attrName) is not None:
         return el.get(attrName)
     for ancestor in el.iterancestors():
-        if ancestor.get(attrName):
+        if ancestor.get(attrName) is not None:
             return ancestor.get(attrName)
 
 
