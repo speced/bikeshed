@@ -98,7 +98,9 @@ exception foo:bar {
     
     
     for construct in parser.constructs:
-        print construct.idlType + ': ' + construct.name
+        print construct.idlType + ': ' + construct.normalName
+        for member in construct:
+            print '    ' + member.idlType + ': ' + member.normalName
 
     print "FIND:"
     print parser.find('round').fullName

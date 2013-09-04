@@ -41,6 +41,10 @@ class Construct(ChildProduction):
     def fullName(self):
         return self.parent.fullName + '/' + self.name if (self.parent) else self.name
     
+    @property
+    def normalName(self):
+        return self.name
+    
     def __nonzero__(self):
         return True
     
@@ -98,6 +102,10 @@ class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
     def idlType(self):
         return 'const'
         
+    @property
+    def methodName(self):
+        return None
+
     def complexityFactor(self):
         return 0
     
@@ -277,6 +285,10 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | [ExtendedAttrib
     @property
     def methodName(self):
         return self.member.methodName
+
+    @property
+    def normalName(self):
+        return self.methodName if (self.methodName) else self.name
 
     @property
     def arguments(self):
