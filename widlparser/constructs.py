@@ -39,7 +39,7 @@ class Construct(ChildProduction):
 
     @property
     def fullName(self):
-        return self.parent.fullName + '/' + self.name if (self.parent) else self.name
+        return self.parent.fullName + '/' + self.normalName if (self.parent) else self.normalName
     
     @property
     def normalName(self):
@@ -380,20 +380,20 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
         return (key in self.members)
 
     def findMember(self, name):
-        for member in self.members:
+        for member in reversed(self.members):
             if (name == member.name):
                 return member
         return None
 
     def findMethod(self, name):
-        for member in self.members:
+        for member in reversed(self.members):
             if (('method' == member.idlType) and (name == member.name)):
                 return member
         return None
     
     def findArgument(self, name, searchMembers = True):
         if (searchMembers):
-            for member in self.members:
+            for member in reversed(self.members):
                 argument = member.findArgument(name)
                 if (argument):
                     return argument
@@ -527,7 +527,7 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
         return (key in self.members)
 
     def findMember(self, name):
-        for member in self.members:
+        for member in reversed(self.members):
             if (name == member.name):
                 return member
         return None
@@ -632,7 +632,7 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
 
     def findMember(self, name):
         if (self.interface):
-            for member in self.interface.members:
+            for member in reversed(self.interface.members):
                 if (name == member.name):
                     return member
         return None
@@ -643,7 +643,7 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
                 if (name == argument.name):
                     return argument
         if (self.interface and searchMembers):
-            for member in self.interface.members:
+            for member in reversed(self.interface.members):
                 argument = member.findArgument(name)
                 if (argument):
                     return argument
@@ -766,13 +766,7 @@ class Exception(Construct):   # [ExtendedAttributes] "exception" identifier [Inh
         return (key in self.members)
 
     def findMember(self, name):
-        for member in self.members:
-            if (name == member.name):
-                return member
-        return None
-
-    def findMember(self, name):
-        for member in self.members:
+        for member in reversed(self.members):
             if (name == member.name):
                 return member
         return None

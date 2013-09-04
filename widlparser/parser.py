@@ -88,16 +88,22 @@ class Parser(object):
         return (key in self.constructs)
 
     def find(self, name):
-        def stripArguments(name):   # strip ()s
-            match = re.match('(.*)\(.*\)', name)
-            return match.group(1) if (match) else name
+        match = re.match('(.*)\(.*\)(.*)', name)    # strip ()'s
+        while (match):
+            name = match.group(1) + match.group(2)
+            match = re.match('(.*)\(.*\)(.*)', name)
         
+        path = None
         if ('/' in name):
             path = name.split('/')
-            constructName = stripArguments(path[0])
-            memberName = stripArguments(path[1])
-            argumentName = stripArguments(path[2]) if (2 < len(path)) else memberName
-            for construct in self.constructs:
+        elif ('.' in name):
+            path = name.split('.')
+            
+        if (path):
+            constructName = path[0]
+            memberName = path[1]
+            argumentName = path[2] if (2 < len(path)) else memberName
+            for construct in reversed(self.constructs):
                 if (constructName == construct.name):
                     if (1 == len(path)):
                         return construct
@@ -116,37 +122,41 @@ class Parser(object):
                                 return argument
             return None
         
-        name = stripArguments(name)
-        for construct in self.constructs:
+        for construct in reversed(self.constructs):
             if (name == construct.name):
                 return construct
 
         # check inside top level constructs
-        for construct in self.constructs:
+        for construct in reversed(self.constructs):
             member = construct.findMember(name)
             if (member):
                 return member
 
         # check argument names last
-        for construct in self.constructs:
+        for construct in reversed(self.constructs):
             argument = construct.findArgument(name)
             if (argument):
                 return argument
 
     def normalizedMethodName(self, methodText):
-        match = re.match(r'(.*)\((.*)\)', methodText)
+        match = re.match(r'(.*)\((.*)\)(.*)', methodText)
         if (match):
             tokens = tokenizer.Tokenizer(match.group(2))
             if (ArgumentList.peek(tokens)):
                 arguments = ArgumentList(tokens, None)
                 return match.group(1) + '(' + ', '.join([argument.name for argument in arguments]) + ')'
-            name = match.group(1)
+            name = match.group(1) + match.group(3)
+            arguments = match.group(2)
         else:
             name = methodText
+            arguments = ''
+        construct = self.find(name)
+        if (construct and ('method' == construct.idlType)):
+            return construct.methodName
         for construct in self.constructs:
             method = construct.findMethod(name)
             if (method):
                 return method.methodName
-        return name + '()'
+        return name + '(' + arguments + ')'
 
 

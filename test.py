@@ -36,7 +36,7 @@ if __name__ == "__main__":      # called from the command line
     sys.excepthook = debugHook
     parser = parser.Parser()
     idl = """
-foo implements bar;
+Window implements WindowInterface;
 
 enum foo { "one" };
 enum bar { "one", "two", "three" };
@@ -64,13 +64,20 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
 const double trouble = 42.0;
 
 partial interface Foo: Bar {
-    unsigned long long (short x, unsigned long long y, optional sequence<Foo> fooArg = 123.4) raises (hell);
+    unsigned long long method(short x, unsigned long long y, optional sequence<Foo> fooArg = 123.4) raises (hell);
     [ha!] attribute short bar getraises (an, exception);
     const short fortyTwo = 42;
     long foo(long x, long y);
 };
 [NoInterfaceObject] interface LinkStyle {
-readonly attribute short bar;
+    stringifier attribute DOMString mediaText;
+    readonly attribute short bar;
+    getter object (DOMString name);
+    getter object bob(DOMString name);
+    stringifier foo me(int x);
+    stringifier foo ();
+    stringifier;
+    stringifier attribute short string;
 };
 [foo] partial dictionary FooDict:BarDict {
     [one "]" ( tricky ] test)] short bar;
@@ -100,14 +107,18 @@ exception foo:bar {
     for construct in parser.constructs:
         print construct.idlType + ': ' + construct.normalName
         for member in construct:
-            print '    ' + member.idlType + ': ' + member.normalName
+            print '    ' + member.idlType + ': ' + str(member.normalName) + ' (' + str(member.name) + ')'
 
     print "FIND:"
     print parser.find('round').fullName
     print parser.find('foo/round').fullName
-    print parser.find('Foo/x/y').fullName
+    print parser.find('Foo/method/y').fullName
+    print parser.find('Foo.method').fullName
+    print parser.find('Foo(constructor)').fullName
     print parser.find('longest').fullName
     print parser.find('fooArg').fullName
+    print parser.find('Window').fullName
+    print parser.find('mediaText').fullName
 
     print "NORMALIZE:"
     print parser.normalizedMethodName('foo')

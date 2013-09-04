@@ -199,13 +199,17 @@ class ConstValue(object):    # "true" | "false" | FloatLiteral | integer | "null
         return str(self.value)
 
 
-class EnumValueList(object): # string ["," string]...
+class EnumValueList(object): # string ["," string]... [","]
     @classmethod
     def peek(cls, tokens):
         token = tokens.pushPosition()
         if (token and token.isString()):
             token = tokens.pushPosition()
             if (token and token.isSymbol(',')):
+                token = tokens.pushPosition()
+                tokens.popPosition(False)
+                if (token and token.isSymbol('}')):
+                    return tokens.popPosition(tokens.popPosition(True))
                 return tokens.popPosition(tokens.popPosition(EnumValueList.peek(tokens)))
             tokens.popPosition(False)
             return tokens.popPosition(True)
@@ -222,6 +226,9 @@ class EnumValueList(object): # string ["," string]...
                 continue
             elif (token.isSymbol(',')):
                 token = tokens.next()
+                if (token.isSymbol('}')):
+                    tokens.restore(token)
+                    break
                 continue
             tokens.restore(token)
             break
@@ -715,7 +722,12 @@ class ChildProduction(object):
 
     @property
     def fullName(self):
-        return self.parent.fullName + '/' + self.name if (self.parent) else self.name
+        return self.parent.fullName + '/' + self.normalName if (self.parent) else self.normalName
+
+    @property
+    def normalName(self):
+        return self.name
+    
 
     def _consumeSemicolon(self, tokens):
         token = tokens.next()
@@ -800,8 +812,6 @@ class OperationRest(ChildProduction):   # ReturnType [identifier] "(" [ArgumentL
         if (Ignore.peek(tokens)):
             Ignore(tokens)
         self._consumeSemicolon(tokens)
-        if (self.arguments and not self.name):
-            self.name = self.arguments.name
 
     def __str__(self):
         output = str(self.returnType) + ' '
@@ -812,7 +822,6 @@ class OperationRest(ChildProduction):   # ReturnType [identifier] "(" [ArgumentL
         output = '[rest: [returnType: ' + str(self.returnType) + '] '
         output += ('[name: ' + self.name + '] ') if (self.name) else ''
         return output + '[argumentlist: ' + (repr(self.arguments) if (self.arguments) else '') + ']]'
-
 
 
 class Operation(ChildProduction):   # [Qualifiers] OperationRest
@@ -836,22 +845,29 @@ class Operation(ChildProduction):   # [Qualifiers] OperationRest
         
     @property
     def name(self):
-        return self.rest.name if (self.rest.name) else self.qualifiers.name if (self.qualifiers) else None
+        if (self.rest.name):
+            return self.rest.name
+        return self.qualifiers.name if (self.qualifiers) else None
     
     @property
     def methodName(self):
-        return self.name + '(' + (', '.join([argument.name for argument in self.arguments]) if (self.arguments) else '') + ')'
+        name = self.name + '(' if (self.name) else '('
+        if (self.arguments):
+            name += ', '.join([argument.name for argument in self.arguments])
+            if (self.arguments[-1].variadic):
+                name += '...'
+        return name + ')'
     
     @property
-    def fullName(self):
-        return self.parent.fullName + '/' + self.methodName if (self.parent) else self.methodName
+    def normalName(self):
+        return self.methodName
     
     @property
     def arguments(self):
         return self.rest.arguments
     
     def __str__(self):
-        output = str(self.qualifiers) if (self.qualifiers) else ''
+        output = (str(self.qualifiers) + ' ') if (self.qualifiers) else ''
         return output + str(self.rest)
 
     def __repr__(self):
@@ -875,7 +891,7 @@ class StringifierAttributeOrOperation(ChildProduction): # Attribute | OperationR
         if (Attribute.peek(tokens)):
             self.attribute = Attribute(tokens, parent)
         elif (OperationRest.peek(tokens)):
-            self.operation = OperationRest(tokens)
+            self.operation = OperationRest(tokens, parent)
         else:
             self._consumeSemicolon(tokens)
 
@@ -887,19 +903,24 @@ class StringifierAttributeOrOperation(ChildProduction): # Attribute | OperationR
     def name(self):
         if (self.attribute):
             return self.attribute.name
-        return self.operation.name if (self.operation) else 'stringifier'
+        return self.operation.name if (self.operation and self.operation.name) else 'stringifier'
 
     @property
     def methodName(self):
         if (self.operation):
-            return self.name + '(' + (', '.join([argument.name for argument in self.arguments]) if (self.arguments) else '') + ')'
+            name = self.name + '('
+            if (self.arguments):
+                name += ', '.join([argument.name for argument in self.arguments])
+                if (self.arguments[-1].variadic):
+                    name += '...'
+            return name + ')'
         return None
     
     @property
-    def fullName(self):
+    def normalName(self):
         if (self.operation):
-            return self.parent.fullName + '/' + self.methodName if (self.parent) else self.methodName
-        return ChildProduction.fullName
+            return self.methodName
+        return self.name
     
     @property
     def arguments(self):
@@ -908,9 +929,9 @@ class StringifierAttributeOrOperation(ChildProduction): # Attribute | OperationR
     def __str__(self):
         output = 'stringifier'
         if (self.attribute):
-            output += ' ' + str(self.attribute)
+            return output + ' ' + str(self.attribute)
         elif (self.operation):
-            output += ' ' + str(self.operation)
+            return output + ' ' + str(self.operation)
         return output + ';'
 
     def __repr__(self):
@@ -961,14 +982,19 @@ class AtributeOrOperation(ChildProduction): # "stringifier" StringifierAttribute
     @property
     def methodName(self):
         if (self.operation):
-            return self.name + '(' + (', '.join([argument.name for argument in self.arguments]) if (self.arguments) else '') + ')'
+            name = self.name + '(' if (self.name) else '('
+            if (self.arguments):
+                name += ', '.join([argument.name for argument in self.arguments])
+                if (self.arguments[-1].variadic):
+                    name += '...'
+            return name + ')'
         return None
     
     @property
-    def fullName(self):
+    def normalName(self):
         if (self.operation):
-            return self.parent.fullName + '/' + self.methodName if (self.parent) else self.methodName
-        return ChildProduction.fullName(self)
+            return self.methodName
+        return self.name
 
     @property
     def arguments(self):
