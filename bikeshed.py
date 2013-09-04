@@ -512,8 +512,8 @@ def transformAutolinkShortcuts(doc):
         # So, escape the text, so it turns back into "raw HTML".
         text = escapeHTML(text)
         # Handle biblio links, [[FOO]] and [[!FOO]]
-        while re.search(ur"\[\[(!?)([\w-]+)\]\]", text):
-            match = re.search(ur"\[\[(!?)([\w-]+)\]\]", text)
+        while re.search(ur"\[\[(!?)([A-Z0-9-]+)\]\]", text):
+            match = re.search(ur"\[\[(!?)([A-Z0-9-]+)\]\]", text)
 
             if match.group(1) == "!":
                 biblioType = u"normative"
