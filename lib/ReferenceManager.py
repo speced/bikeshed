@@ -173,6 +173,10 @@ class ReferenceManager(object):
         # If status is ED, kill TR refs unless their spec *only* has a TR url
         if status == "ED":
             refs = [ref for ref in refs if ref['status'] in ("ED", "local") or (ref['status'] == "TR" and self.specs[ref['spec']]['ED'] is None)]
+        # If status is TR, kill ED refs if there's a corresponding TR ref for the same spec.
+        if status == "TR":
+            TRRefSpecs = [ref['spec'] for ref in refs if ref['status'] == 'TR']
+            refs = [ref for ref in refs if ref['status'] in ("TR", "local") or (ref['status'] == "ED") and ref['spec'] not in TRRefSpecs]
         if len(refs) == 0:
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
