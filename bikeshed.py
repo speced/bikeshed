@@ -790,7 +790,7 @@ def classifyDfns(doc):
         if dfnType == "argument" and el.get('data-dfn-for') is None:
             parent = el.getparent()
             if parent.get('data-dfn-type') in config.functionishTypes and parent.get('data-dfn-for') is not None:
-                el.set('data-dfn-for', "{0}/{1}".format(parent.get('data-dfn-for'), linkTextsFromElement(parent)[0]))
+                el.set('data-dfn-for', "{0}/{1} {1}".format(parent.get('data-dfn-for'), linkTextsFromElement(parent, preserveCasing=True)[0]))
             else:
                 die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el))
         if dfnType in config.typesUsingFor:
