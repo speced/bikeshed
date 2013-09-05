@@ -679,7 +679,7 @@ def canonicalizeShortcuts(doc):
         "dfn-type":"data-dfn-type",
         "link-type":"data-link-type"
     }
-    for el in findAll(",".join("[{0}='']".format(attr) for attr in attrFixup.keys())):
+    for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys())):
         for attr, fixedAttr in attrFixup.items():
             if el.get(attr) is not None:
                 el.set(fixedAttr, el.get(attr))
@@ -687,7 +687,7 @@ def canonicalizeShortcuts(doc):
 
     for el in findAll("dfn"):
         for dfnType in config.dfnTypes.union(["dfn"]):
-            if el.get(dfnType) is not None:
+            if el.get(dfnType) == "":
                 del el.attrib[dfnType]
                 el.set("data-dfn-type", dfnType)
     for el in findAll("a"):
