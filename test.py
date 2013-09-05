@@ -61,9 +61,7 @@ typedef (short or (long or double)) nestedUnion;
 typedef (short or (long or double) or long long) moreNested;
 typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequenceUnion;
 
-const double trouble = 42.0;
-
-partial interface Foo: Bar {
+[Constructor, NamedConstructor=MyConstructor, Constructor(short one), NamedConstructor=MyOtherConstructor(long two, long long longest)] partial interface Foo: Bar {
     unsigned long long method(short x, unsigned long long y, optional sequence<Foo> fooArg = 123.4) raises (hell);
     [ha!] attribute short bar getraises (an, exception);
     const short fortyTwo = 42;

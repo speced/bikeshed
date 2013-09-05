@@ -48,7 +48,7 @@ class Parser(object):
                 self.constructs.append(Enum(tokens))
             elif (Typedef.peek(tokens)):
                 self.constructs.append(Typedef(tokens))
-            elif (Const.peek(tokens)):   # XXX DEBUG only?
+            elif (Const.peek(tokens)):   # Legacy support (SVG spec)
                 self.constructs.append(Const(tokens))
             elif (ImplementsStatement.peek(tokens)):
                 self.constructs.append(ImplementsStatement(tokens))

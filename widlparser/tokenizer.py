@@ -19,8 +19,14 @@ class Token(object):
         self.text = text
     
     def isSymbol(self, symbol = None):
-        return (('symbol' == self.type) and ((None == symbol) or (symbol == self.text)))
-    
+        if ('symbol' == self.type):
+            if (symbol):
+                if isinstance(symbol, basestring):
+                    return (symbol == self.text)
+                return (self.text in symbol)
+            return True
+        return False
+
     def isIdentifier(self):
         return ('identifier' == self.type)
     
@@ -104,14 +110,16 @@ class Tokenizer(object):
     def __repr__(self):
         return ''.join([repr(token) for token in self.tokens])
 
-    def hasTokens(self):
+    def hasTokens(self, skipWhitespace = True):
+        "Test if one or more tokens are available, optionally ignoring whitespace"
         if (0 < len(self.tokens)):
-            if (self.tokens[0].isWhitespace()):
+            if (skipWhitespace and self.tokens[0].isWhitespace()):
                 return (1 < len(self.tokens))
             return True
         return False
     
     def next(self, skipWhitespace = True):
+        "Remove and return next available token, optionally skipping whitespace"
         self.resetPeek()
         if (0 < len(self.tokens)):
             token = self.tokens.popleft()
@@ -121,20 +129,24 @@ class Tokenizer(object):
         return None
     
     def restore(self, token):
+        "Return token to the front of the stream"
         if (token):
             self.tokens.appendleft(token)
 
     def pushPosition(self, andPeek = True):
+        "Save current lookahead index and optionally lookahead next token"
         self.positionStack.append(self.peekIndex)
         return self.peek() if (andPeek) else None
     
     def popPosition(self, holdPosition):
+        "Remove saved lookahead state and optionally rewind lookahead index"
         index = self.positionStack.pop()
         if (not holdPosition):
             self.peekIndex = index
         return holdPosition
     
     def peek(self, skipWhitespace = True):
+        "Return next available token without removing it, advance lookahead index, optionally skip whitespace"
         self.peekIndex += 1
         if (self.peekIndex < len(self.tokens)):
             token = self.tokens[self.peekIndex]
@@ -144,7 +156,16 @@ class Tokenizer(object):
             return token
         return None
     
+    def sneakPeek(self, skipWhitespace = True):
+        "Return next available token without removing it or advancing lookahead index, optionally skip whitespace"
+        if ((self.peekIndex + 1) < len(self.tokens)):
+            token = self.tokens[self.peekIndex + 1]
+            if (skipWhitespace and token.isWhitespace()):
+                return self.tokens[self.peekIndex + 2] if ((self.peekIndex + 2) < len(self.tokens)) else None
+        return None
+    
     def peekSymbol(self, symbol):
+        "Advance lookahead index until symbol token is found, respect nesting of (), {}, []"
         token = self.peek()
         while (token and (not token.isSymbol(symbol))):
             if (token.isSymbol('(')):
@@ -157,10 +178,12 @@ class Tokenizer(object):
         return token
     
     def resetPeek(self):
+        "Reset lookahead index to first available token"
         assert (0 == len(self.positionStack))
         self.peekIndex = -1
 
     def seekSymbol(self, symbol):
+        "Return all tokens up to and inculding symbol, respect nesting of (), {}, []"
         token = self.next(False)
         skipped = []
         while (token and (not token.isSymbol(symbol))):
@@ -176,8 +199,10 @@ class Tokenizer(object):
         return skipped
 
     def syntaxError(self, symbol):
-        skipped = self.seekSymbol(';')
+        "Seek to symbol and report skipped tokens as syntax error"
+        skipped = self.seekSymbol(symbol)
         if (self.ui):
             self.ui.warn('IDL SYNTAX ERROR - skipped: ' + ''.join([str(token) for token in skipped]) + '\n')
+        return skipped
     
 

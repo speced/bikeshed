@@ -206,8 +206,7 @@ class EnumValueList(object): # string ["," string]... [","]
         if (token and token.isString()):
             token = tokens.pushPosition()
             if (token and token.isSymbol(',')):
-                token = tokens.pushPosition()
-                tokens.popPosition(False)
+                token = tokens.sneakPeek()
                 if (token and token.isSymbol('}')):
                     return tokens.popPosition(tokens.popPosition(True))
                 return tokens.popPosition(tokens.popPosition(EnumValueList.peek(tokens)))
@@ -727,7 +726,6 @@ class ChildProduction(object):
     @property
     def normalName(self):
         return self.name
-    
 
     def _consumeSemicolon(self, tokens):
         token = tokens.next()
@@ -1010,4 +1008,52 @@ class AtributeOrOperation(ChildProduction): # "stringifier" StringifierAttribute
             return repr(self.attribute)
         return repr(self.operation) if (self.operation) else repr(self.stringifier)
 
+
+class ExtendedAttributeList(ChildProduction):   # "[" ExtendedAttribute ["," ExtendedAttribute]... "]"
+    @classmethod
+    def peek(cls, tokens):
+        token = tokens.pushPosition()
+        if (token and token.isSymbol('[')):
+            return tokens.popPosition(tokens.peekSymbol(']'))
+        return tokens.popPosition(False)
+
+    def __init__(self, tokens, parent):
+        token = tokens.next()   # "["
+        self.attributes = []
+        while (tokens.hasTokens()):
+            self.attributes.append(constructs.ExtendedAttribute(tokens, parent))
+            token = tokens.next()
+            if ((not token) or token.isSymbol(']')):
+                break
+            if (token.isSymbol(',')):
+                continue
+            tokens.restore(token)
+
+    def __len__(self):
+        return len(self.attributes)
+    
+    def __getitem__(self, key):
+        if (isinstance(key, basestring)):
+            for attribute in self.attributes:
+                if (key == attribute.name):
+                    return attribute
+            return None
+        return self.attributes[key]
+    
+    def __iter__(self):
+        return iter(self.attributes)
+    
+    def __contains__(self, key):
+        if (isinstance(key, basestring)):
+            for attribute in self.attributes:
+                if (key == attribute.name):
+                    return True
+            return False
+        return (key in self.attributes)
+
+    def __str__(self):
+        return '[' + ', '.join([str(attribute) for attribute in self.attributes]) + '] '
+
+    def __repr__(self):
+        return '[Extended Attributes: ' + ' '.join([repr(attribute) for attribute in self.attributes]) + '] '
 
