@@ -1,4 +1,5 @@
 # Fuck everything about Python 2 and Unicode.
+
 def u(text):
     if text is None:
         return None
@@ -10,4 +11,6 @@ def u(text):
         try:
             return unicode(text)
         except:
-            die("Unicode encoding error! Please report to the project maintainer. Some information: {0}", str(type(text)) + str(text))
+            print "Unicode encoding error! Please report to the project maintainer. Some information:"
+            print "  " + str(type(text))
+            print "  " + str(text)
