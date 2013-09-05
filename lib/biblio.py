@@ -39,7 +39,7 @@ class BiblioEntry(object):
         else:
             str += u(authors[0]) + u"; et al. "
 
-        str += u"<a href='{0}'>{1}</a>. ".format(self.url, self.title)
+        str += u"<a href='{0}'>{1}</a>. ".format(u(self.url), u(self.title))
 
         if self.date:
             str += self.date + u". "
@@ -50,7 +50,7 @@ class BiblioEntry(object):
         if self.other:
             str += self.other + u" "
 
-        str += u"URL: <a href='{0}'>{0}</a>".format(self.url)
+        str += u"URL: <a href='{0}'>{0}</a>".format(u(self.url))
         return str
 
 
