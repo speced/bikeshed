@@ -19,8 +19,8 @@ class Production(object):
         self._tail = None
         self._semicolon = ''
     
-    def _didParse(self, tokens):
-        self._trailingSpace = self._whitespace(tokens)
+    def _didParse(self, tokens, includeTrailingSpace = True):
+        self._trailingSpace = self._whitespace(tokens) if (includeTrailingSpace) else ''
 
     def _whitespace(self, tokens):
         whitespace = tokens.whitespace()
@@ -31,14 +31,26 @@ class Production(object):
         output += ''.join([str(token) for token in self._tail]) if (self._tail) else ''
         return output + str(self._semicolon) + self._trailingSpace
 
+    def _markup(self, marker, parent):
+        return (self._str(), self)
+
+    def markup(self, marker, parent = None):
+        text, target = self._markup(marker, parent)
+        text += (''.join([str(token) for token in target._tail]) if (target._tail) else '') + str(target._semicolon)
+        if (self != target):
+            text += (''.join([str(token) for token in self._tail]) if (self._tail) else '') + str(self._semicolon)
+        output = self._leadingSpace + text
+        output += target._trailingSpace if (self != target) else ''
+        return output + self._trailingSpace
+
     def _consumeSemicolon(self, tokens):
         if (Symbol.peek(tokens, ';')):
-            self._semicolon = Symbol(tokens, ';')
+            self._semicolon = Symbol(tokens, ';', False)
         elif (not Symbol.peek(tokens, '}')):
             skipped = tokens.syntaxError((';', '}'))
             self._tail = skipped[:-1]
             tokens.restore(skipped[-1])
-            self._semicolon = Symbol(tokens, ';') if (Symbol.peek(tokens, ';')) else ''
+            self._semicolon = Symbol(tokens, ';', False) if (Symbol.peek(tokens, ';')) else ''
 
 
 class Symbol(Production):
@@ -47,12 +59,12 @@ class Symbol(Production):
         token = tokens.pushPosition()
         return tokens.popPosition(token and token.isSymbol(symbol))
 
-    def __init__(self, tokens, symbol = None):
+    def __init__(self, tokens, symbol = None, includeTrailingSpace = True):
         Production.__init__(self, tokens)
         self.symbol = tokens.next().text
         if (symbol):
             assert(self.symbol == symbol)
-        self._didParse(tokens)
+        self._didParse(tokens, includeTrailingSpace)
 
     def _str(self):
         return self.symbol
@@ -211,7 +223,14 @@ class ConstType(Production): # PrimitiveType [Null] | identifier [Null]
 
     def _str(self):
         return str(self.type) + (str(self.null) if (self.null) else '')
-
+    
+    def _markup(self, marker, parent):
+        if (isinstance(self.type, basestring)):
+            if (self.null):
+                return (marker.markupType(self.type, parent) + str(self.null), self.null)
+            return (marker.markupType(self.type, parent), self)
+        return Production._markup(self, marker, parent)
+    
     def __repr__(self):
         return '[ConstType: ' + repr(self.type) + (' [null]' if (self.null) else '') + ']'
 
@@ -407,7 +426,10 @@ class SingleType(Production):    # NonAnyType | "any" [TypeSuffixStartingWithArr
 
     def _str(self):
         return str(self.type) + (str(self.suffix) if (self.suffix) else '')
-
+    
+    def _markup(self, marker, parent):
+        return (self.type.markup(marker, parent), self)
+    
     def __repr__(self):
         return '[SingleType: ' + repr(self.type) + (repr(self.suffix) if (self.suffix) else '') + ']'
 
@@ -464,9 +486,19 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "DOMString" [Type
         output = str(self.type)
         return output + (str(self.suffix) if (self.suffix) else '')
 
+    def _markup(self, marker, parent):
+        if (isinstance(self.type, basestring)):
+            text = marker.markupType(self.type, parent)
+            text += str(self.suffix) if (self.suffix) else ''
+            return (text, self)
+        if (self.sequence):
+            output = str(self.sequence) + str(self._openSequence) + self.type.markup(marker, parent) + str(self._closeSequence)
+            return (output + (str(self.null) if (self.null) else ''), self)
+        return Production._markup(self, marker, parent)
+
     def __repr__(self):
         output = '[NonAnyType: ' + ('[sequence]' if (self.sequence) else '') + repr(self.type)
-        return output + (repr(self.suffix) if (self.suffix) else '')
+        return output + (repr(self.suffix) if (self.suffix) else '') + ']'
 
 
 class UnionMemberType(Production):   # NonAnyType | UnionType [TypeSuffix] | "any" "[" "]" [TypeSuffix]
@@ -507,9 +539,13 @@ class UnionMemberType(Production):   # NonAnyType | UnionType [TypeSuffix] | "an
     def _str(self):
         output = (str(self.any) + str(self._openBracket) + str(self._closeBracket)) if (self.any) else str(self.type)
         return output + (str(self.suffix) if (self.suffix) else '')
-
+    
+    def _markup(self, marker, parent):
+        output = (str(self.any) + str(self._openBracket) + str(self._closeBracket)) if (self.any) else self.type.markup(marker, parent)
+        return (output + (str(self.suffix) if (self.suffix) else ''), self)
+    
     def __repr__(self):
-        output = '[UnionMemberType: ' + ('[any[]]' if (self.amy) else repr(self.type))
+        output = '[UnionMemberType: ' + ('[any[]]' if (self.any) else repr(self.type))
         return output + (repr(self.suffix) if (self.suffix) else '') + ']'
 
 
@@ -550,7 +586,12 @@ class UnionType(Production): # "(" UnionMemberType ["or" UnionMemberType]... ")"
         output = str(self._openParen)
         output += ''.join([str(type) + str(_or) for type, _or in itertools.izip_longest(self.types, self._ors, fillvalue = '')])
         return output + str(self._closeParen)
-
+    
+    def _markup(self, marker, parent):
+        output = str(self._openParen)
+        output += ''.join([type.markup(marker, parent) + str(_or) for type, _or in itertools.izip_longest(self.types, self._ors, fillvalue = '')])
+        return (output + str(self._closeParen), self)
+    
     def __repr__(self):
         return '[UnionType: ' + ''.join([repr(type) for type in self.types]) + ']'
 
@@ -577,9 +618,14 @@ class Type(Production):  # SingleType | UnionType [TypeSuffix]
 
     def _str(self):
         return str(self.type) + (str(self.suffix) if (self.suffix) else '')
-        
+
+    def _markup(self, marker, parent):
+        if (self.suffix):
+            return (self.type.markup(marker, parent) + str(self.suffix), self)
+        return (self.type.markup(marker, parent), self)
+                    
     def __repr__(self):
-        return '[type: ' + str(self) + ']'
+        return '[Type: ' + repr(self.type) + (repr(self.suffix) if (self.suffix) else '') + ']'
 
 
 class IgnoreInOut(Production):  # "in" | "out"
@@ -652,6 +698,9 @@ class IgnoreMultipleInheritance(Production):    # [, identifier]...
     def _str(self):
         return str(self._comma) + self.inherit + (str(self.next) if (self.next) else '')
 
+    def _markup(self, marker, parent):
+        return (str(self._comma) + marker.markupType(self.inherit, parent) + (self.next.markup(marker, parent) if (self.next) else ''), self)
+
 
 class Inheritance(Production):   # ":" identifier [IgnoreMultipleInheritance]
     @classmethod
@@ -673,7 +722,13 @@ class Inheritance(Production):   # ":" identifier [IgnoreMultipleInheritance]
 
     def _str(self):
         return str(self._colon) + self.base + (str(self._ignore) if (self._ignore) else '')
-
+    
+    def _markup(self, marker, parent):
+        text = str(self._colon) + marker.markupType(self.base, parent)
+        if (self._ignore):
+            return (text + self._ignore.markup(marker, parent), self._ignore)
+        return (text, self)
+    
     def __repr__(self):
         return '[inherits: ' + self.base + ']'
 
@@ -723,7 +778,10 @@ class ArgumentName(Production):   # identifier | NameSymbol
 
     def _str(self):
         return self.name
-
+    
+    def _markup(self, marker, parent):
+        return (marker.markupName(self.name, parent), self)
+    
     def __repr__(self):
         return '[ArgumentName: ' + repr(self.name) + ']'
 
@@ -780,7 +838,10 @@ class ArgumentList(Production):    # Argument ["," Argument]...
     
     def _str(self):
         return ''.join([str(argument) + str(comma) for argument, comma in itertools.izip_longest(self.arguments, self._commas, fillvalue = '')])
-
+    
+    def _markup(self, marker, parent):
+        return (''.join([argument.markup(marker, parent) + str(comma) for argument, comma in itertools.izip_longest(self.arguments, self._commas, fillvalue = '')]), self)
+    
     def __repr__(self):
         return ' '.join([repr(argument) for argument in self.arguments])
 
@@ -804,7 +865,10 @@ class ReturnType(Production):    # Type | "void"
 
     def _str(self):
         return str(self.type)
-
+    
+    def _markup(self, marker, parent):
+        return self.type._markup(marker, parent)
+    
     def __repr__(self):
         return repr(self.type)
 
@@ -922,7 +986,14 @@ class Attribute(ChildProduction):   # ["inherit"] ["readonly"] "attribute" Type 
         output = str(self.inherit) if (self.inherit) else ''
         output += str(self.readonly) if (self.readonly) else ''
         return output + str(self._attribute) + str(self.type) + self.name + (str(self._ignore) if (self._ignore) else '')
-
+    
+    def _markup(self, marker, parent):
+        output = str(self.inherit) if (self.inherit) else ''
+        output += str(self.readonly) if (self.readonly) else ''
+        output += str(self._attribute) + self.type.markup(marker, self)
+        output += marker.markupName(self.name, parent)
+        return (output + (str(self._ignore) if (self._ignore) else ''), self)
+    
     def __repr__(self):
         output = '[attribute: '
         output += '[inherit] ' if (self.inherit) else ''
@@ -960,7 +1031,13 @@ class OperationRest(ChildProduction):   # ReturnType [identifier] "(" [ArgumentL
         output += self.name if (self.name) else ''
         output += str(self._openParen) + (str(self.arguments) if (self.arguments) else '') + str(self._closeParen)
         return output + (str(self._ignore) if (self._ignore) else '')
-
+    
+    def _markup(self, marker, parent):
+        output = self.returnType.markup(marker, parent)
+        output += marker.markupName(self.name, parent) if (self.name) else ''
+        output += str(self._openParen) + (self.arguments.markup(marker, parent) if (self.arguments) else '') + str(self._closeParen)
+        return (output + (str(self._ignore) if (self._ignore) else ''), self)
+    
     def __repr__(self):
         output = '[rest: [returnType: ' + str(self.returnType) + '] '
         output += ('[name: ' + self.name + '] ') if (self.name) else ''
@@ -1012,6 +1089,11 @@ class Operation(ChildProduction):   # [Qualifiers] OperationRest
     def _str(self):
         output = str(self.qualifiers) if (self.qualifiers) else ''
         return output + str(self.rest)
+    
+    def _markup(self, marker, parent):
+        text, target = self.rest._markup(marker, parent)
+        text = (str(self.qualifiers) if (self.qualifiers) else '') + text
+        return (text, target)
 
     def __repr__(self):
         output = '[operation: ' + ((repr(self.qualifiers) + ' ') if (self.qualifiers) else '')
@@ -1075,6 +1157,13 @@ class StringifierAttributeOrOperation(ChildProduction): # Attribute | OperationR
         elif (self.operation):
             return str(self.operation)
         return ''
+    
+    def _markup(self, marker, parent):
+        if (self.attribute):
+            return self.attribute._markup(marker, parent)
+        elif (self.operation):
+            return self.operation._markup(marker, parent)
+        return ('', self)
 
     def __repr__(self):
         output = '[stringifier'
@@ -1085,7 +1174,7 @@ class StringifierAttributeOrOperation(ChildProduction): # Attribute | OperationR
         return output + ']'
 
 
-class AtributeOrOperation(ChildProduction): # "stringifier" StringifierAttributeOrOperation | Attribute | Operation
+class AttributeOrOperation(ChildProduction): # "stringifier" StringifierAttributeOrOperation | Attribute | Operation
     @classmethod
     def peek(cls, tokens):
         if (Attribute.peek(tokens) or Operation.peek(tokens)):
@@ -1148,6 +1237,15 @@ class AtributeOrOperation(ChildProduction): # "stringifier" StringifierAttribute
             return str(self.attribute)
         return str(self.operation) if (self.operation) else (str(self._stringifier) + str(self.stringifier))
 
+    def _markup(self, marker, parent):
+        if (self.attribute):
+            return self.attribute._markup(marker, parent)
+        if (self.operation):
+            return self.operation._markup(marker, parent)
+        text, target = self.stringifier._markup(marker, parent)
+        text = str(self._stringifier) + text
+        return (text, target)
+    
     def __repr__(self):
         if (self.attribute):
             return repr(self.attribute)
@@ -1204,7 +1302,12 @@ class ExtendedAttributeList(ChildProduction):   # "[" ExtendedAttribute ["," Ext
         output = str(self._openBracket)
         output += ''.join([str(attribute) + str(comma) for attribute, comma in itertools.izip_longest(self.attributes, self._commas, fillvalue = '')])
         return output + str(self._closeBracket)
-
+    
+    def _markup(self, marker, parent):
+        output = str(self._openBracket)
+        output += ''.join([attribute.markup(marker,parent) + str(comma) for attribute, comma in itertools.izip_longest(self.attributes, self._commas, fillvalue = '')])
+        return (output + str(self._closeBracket), self)
+    
     def __repr__(self):
         return '[Extended Attributes: ' + ' '.join([repr(attribute) for attribute in self.attributes]) + '] '
 

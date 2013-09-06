@@ -31,14 +31,60 @@ def debugHook(type, value, tb):
         # ...then start the debugger in post-mortem mode.
         pdb.pm()
 
+class Marker(object):
+    def markupConstruct(self, text, construct):
+        return '<' + construct.idlType + '>' + text + '</' + construct.idlType + '>'
+    
+    def markupType(self, text, construct):
+        return '<TYPE for=' + construct.idlType + '>' + text + '</TYPE>'
+    
+    def markupName(self, text, construct):
+        return '<NAME for=' + construct.idlType + '>' + text + '</NAME>'
+
+class NullMarker(object):
+    def markupConstruct(self, text, construct):
+        return text
+    
+    def markupType(self, text, construct):
+        return text
+    
+    def markupName(self, text, construct):
+        return text
+
 class ui(object):
     def warn(self, str):
         print str
+
+def testDifference(input, output):
+    if (output == input):
+        print "NULLIPOTENT"
+    else:
+        print "DIFFERENT"
+        inputLines = input.split('\n')
+        outputLines = output.split('\n')
+        
+        for inputLine, outputLine in itertools.izip_longest(inputLines, outputLines, fillvalue = ''):
+            if (inputLine != outputLine):
+                print "<" + inputLine
+                print ">" + outputLine
+                print
+
 
 if __name__ == "__main__":      # called from the command line
     sys.excepthook = debugHook
     parser = parser.Parser(ui=ui())
     idl = """ // this is a comment
+interface Multi : One  ,  Two   ,   Three     {
+        attribute short one;
+};
+typedef sequence<Foo[]>? fooType;
+typedef (short or Foo) maybeFoo;
+typedef sequence<(short or Foo)> maybeFoos;
+interface foo {
+  [one] attribute Foo one;
+  [two] Foo two();
+  [three] const Foo three = 3;
+};
  typedef   short    shorttype  = error this is;
 
    const  long    long   one=   2   ;
@@ -73,7 +119,7 @@ typedef (short or (long or double)) nestedUnion;
 typedef (short or (long or double) or long long) moreNested;
 typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequenceUnion;
 
-[ Constructor , NamedConstructor = MyConstructor, Constructor (short one), NamedConstructor = MyOtherConstructor (long two , long long longest ) ] partial interface Foo: Bar {
+[ Constructor , NamedConstructor = MyConstructor, Constructor (Foo one), NamedConstructor = MyOtherConstructor (Foo two , long long longest ) ] partial interface Foo: Bar {
     unsigned long long method(short x, unsigned long long y, optional sequence<Foo> fooArg = 123.4) raises (hell);
     [ha!] attribute short bar getraises (an, exception);
     const short fortyTwo = 42;
@@ -104,27 +150,19 @@ callback interface callMe {
 exception foo:bar {
     short round;
     const long one = 2;
+    Foo foo;
     unsigned long long longest;
 };
 """
-    idl = idl.replace(' ', '  ')
-    print "IDL >>>\n" + idl + "\n==="
+#    idl = idl.replace(' ', '  ')
+    print "IDL >>>\n" + idl + "\n<<<"
     parser.parse(idl)
-    print str(parser)
-    print "<<<"
-    if (str(parser) == idl):
-        print "NULLIPOTENT"
-    else:
-        print "DIFFERENT"
-        idlLines = idl.split('\n')
-        parserLines = str(parser).split('\n')
+    testDifference(idl, str(parser))
 
-        for idlLine, parserLine in itertools.izip_longest(idlLines, parserLines, fillvalue = ''):
-            if (idlLine != parserLine):
-                print "<" + idlLine
-                print ">" + parserLine
-                print
-    
+    print "MARKED UP:"
+    testDifference(idl, parser.markup(NullMarker()))
+    print parser.markup(Marker())
+
     print repr(parser)
     print "Complexity: " + str(parser.complexityFactor())
     

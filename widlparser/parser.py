@@ -53,7 +53,7 @@ class Parser(object):
             elif (ImplementsStatement.peek(tokens)):
                 self.constructs.append(ImplementsStatement(tokens))
             else:
-                tokens.syntaxError(';')
+                self.constructs.append(SyntaxError(tokens, ';'))
         
 
     def __str__(self):
@@ -158,5 +158,8 @@ class Parser(object):
             if (method):
                 return method.methodName
         return name + '(' + arguments + ')'
+
+    def markup(self, marker):
+        return ''.join([construct.markup(marker) for construct in self.constructs])
 
 

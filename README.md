@@ -54,6 +54,10 @@ Return a named construct. If a single name is provided, a breadth-first search t
 
 Provide a normalized version of a method name, including the names of all arguments, e.g. 'drawCircle(long x, long y, long radius)' becomes: 'drawCircle(x, y, radius)'. If a valid set of arguments is passed, the passed argument names will be returned in the normalized form. Otherwise, a search is performed for a matching previously parsed method name.
 
+**Parser.markup(marker)**
+
+Returns a marked-up version of the WebIDL input text. For each Construct, Type, and Name, the 'marker' will get called with 'markupConstruct(text, construct)', 'markupType(text, construct)', or 'markupName(text, construct)' repsectively. The 'markup*' methods need to return the marked-up version of the passed text.
+
 Constructs
 ----------
 **Construct.name**
@@ -111,6 +115,10 @@ Find a method within the construct.
 **Construct.findArgument(name[, searchMembers = True])**
 
 Find an argument within the construct. If 'searchMembers' is true, all members will be searched as well. This is to distinguish between arguments of a callback versus arguments of a callback interface's methods.
+
+**Construct.markup(marker)**
+
+Return a marked-up version of the Construct's WebIDL. Uses the same marker interface as Parser.markup(marker).
 
 Notes
 -----
