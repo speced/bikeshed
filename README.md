@@ -70,7 +70,7 @@ The name of the construct and all of its parents in path form.
 
 **Construct.normalName**
 
-For methods, contains the normalized method name, otherwise the name of the construct.
+For 'method' Constructs, contains the normalized method name, otherwise the name of the construct.
 
 **Construct.parent**
 
@@ -114,7 +114,7 @@ Find an argument within the construct. If 'searchMembers' is true, all members w
 
 Notes
 -----
-The parser itself is iterable, and indexable. Top-level constructs can be tested by the 'in' operator and retrieved by name or index via []. The str() function can also be used on the parser to re-serialize the parsed WebIDL.
+The parser itself is iterable, and indexable. Top-level constructs can be tested by the 'in' operator and retrieved by name or index via []. The str() function can also be used on the parser to re-serialize the parsed WebIDL. The serialized output is nullipotent, i.e. str(parser.Parser(text)) == text
 
 Constructs are also iterable and indexable to access members. Additionally constructs can be re-serialized as valid WebIDL via the str() function.
 

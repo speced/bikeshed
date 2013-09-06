@@ -11,8 +11,57 @@
 #
 
 import constructs
+import itertools
 
-class IntegerType(object):   # "short" | "long" ["long"]
+class Production(object):
+    def __init__(self, tokens):
+        self._leadingSpace = self._whitespace(tokens)
+        self._tail = None
+        self._semicolon = ''
+    
+    def _didParse(self, tokens):
+        self._trailingSpace = self._whitespace(tokens)
+
+    def _whitespace(self, tokens):
+        whitespace = tokens.whitespace()
+        return whitespace.text if (whitespace) else ''
+    
+    def __str__(self):
+        output = self._leadingSpace + self._str()
+        output += ''.join([str(token) for token in self._tail]) if (self._tail) else ''
+        return output + str(self._semicolon) + self._trailingSpace
+
+    def _consumeSemicolon(self, tokens):
+        if (Symbol.peek(tokens, ';')):
+            self._semicolon = Symbol(tokens, ';')
+        elif (not Symbol.peek(tokens, '}')):
+            skipped = tokens.syntaxError((';', '}'))
+            self._tail = skipped[:-1]
+            tokens.restore(skipped[-1])
+            self._semicolon = Symbol(tokens, ';') if (Symbol.peek(tokens, ';')) else ''
+
+
+class Symbol(Production):
+    @classmethod
+    def peek(cls, tokens, symbol):
+        token = tokens.pushPosition()
+        return tokens.popPosition(token and token.isSymbol(symbol))
+
+    def __init__(self, tokens, symbol = None):
+        Production.__init__(self, tokens)
+        self.symbol = tokens.next().text
+        if (symbol):
+            assert(self.symbol == symbol)
+        self._didParse(tokens)
+
+    def _str(self):
+        return self.symbol
+
+    def __repr__(self):
+        return self.symbol
+
+
+class IntegerType(Production):   # "short" | "long" ["long"]
     @classmethod
     def peek(cls, tokens):
         token = tokens.pushPosition()
@@ -25,82 +74,94 @@ class IntegerType(object):   # "short" | "long" ["long"]
         return tokens.popPosition(False)
     
     def __init__(self, tokens):
+        Production.__init__(self, tokens)
+        self._space = None
         token = tokens.next()
         if ('long' == token.text):
             self.type = 'long'
-            token = tokens.next()
+            token = tokens.sneakPeek()
             if (token and token.isSymbol('long')):
-                self.type += ' long'
-            else:
-                tokens.restore(token)
+                self._space = self._whitespace(tokens)
+                self.type += ' ' + tokens.next().text
         else:
             self.type = token.text
+        self._didParse(tokens)
 
-    def __str__(self):
+    def _str(self):
+        if (self._space):
+            return self._space.join(self.type.split(' '))
         return self.type
 
+    def __repr__(self):
+        return '[IntegerType: ' + self.type + ']'
 
-class UnsignedIntegerType(object):   # "unsigned" IntegerType | IntegerType
+
+class UnsignedIntegerType(Production):   # "unsigned" IntegerType | IntegerType
     @classmethod
     def peek(cls, tokens):
         if (IntegerType.peek(tokens)):
             return True
-        token = tokens.pushPosition()
-        if (token and token.isSymbol('unsigned')):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, 'unsigned')):
             return tokens.popPosition(IntegerType.peek(tokens))
         return tokens.popPosition(False)
     
     def __init__(self, tokens): #
-        self.unsigned = False
-        token = tokens.next()
-        if (token.isSymbol('unsigned')):
-            self.unsigned = True
-        else:
-            tokens.restore(token)
+        Production.__init__(self, tokens)
+        self.unsigned = Symbol(tokens, 'unsigned') if (Symbol.peek(tokens, 'unsigned')) else None
         self.type = IntegerType(tokens)
+        self._didParse(tokens)
 
-    def __str__(self):
-        return 'unsigned ' + str(self.type) if (self.unsigned) else str(self.type)
+    def _str(self):
+        return (str(self.unsigned) + str(self.type)) if (self.unsigned) else str(self.type)
+
+    def __repr__(self):
+        return '[UnsignedIntegerType: ' + ('[unsigned]' if (self.unsigned) else '') + repr(self.type) + ']'
 
 
-class FloatType(object):   # "float" | "double"
+class FloatType(Production):   # "float" | "double"
     @classmethod
     def peek(cls, tokens):
         token = tokens.pushPosition()
         return tokens.popPosition(token and (token.isSymbol('float') or token.isSymbol('double')))
     
     def __init__(self, tokens):
+        Production.__init__(self, tokens)
         token = tokens.next()
         self.type = token.text
+        self._didParse(tokens)
 
-    def __str__(self):
+    def _str(self):
         return self.type
 
+    def __repr__(self):
+        return '[FloatType: ' + self.type + ']'
 
-class UnrestrictedFloatType(object): # "unrestricted" FloatType | FloatType
+
+class UnrestrictedFloatType(Production): # "unrestricted" FloatType | FloatType
     @classmethod
     def peek(cls, tokens):
         if (FloatType.peek(tokens)):
             return True
-        token = tokens.pushPosition()
-        if (token and token.isSymbol('unrestricted')):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, 'unrestricted')):
             return tokens.popPosition(FloatType.peek(tokens))
         return tokens.popPosition(False)
     
     def __init__(self, tokens): #
-        self.unrestricted = False
-        token = tokens.next()
-        if (token.isSymbol('unrestricted')):
-            self.unrestricted = True
-        else:
-            tokens.restore(token)
+        Production.__init__(self, tokens)
+        self.unrestricted = Symbol(tokens, 'unrestricted') if (Symbol.peek(tokens, 'unrestricted')) else None
         self.type = FloatType(tokens)
+        self._didParse(tokens)
 
-    def __str__(self):
-        return ('unrestricted ' + str(self.type)) if (self.unrestricted) else str(self.type)
+    def _str(self):
+        return (str(self.unrestricted) + str(self.type)) if (self.unrestricted) else str(self.type)
+
+    def __repr__(self):
+        return '[UnrestrictedFloatType: ' + ('[unrestricted]' if (self.unrestricted) else '') + repr(self.type) + ']'
 
 
-class PrimitiveType(object): # UnsignedIntegerType | UnrestrictedFloatType | "boolean" | "byte" | "octet"
+class PrimitiveType(Production): # UnsignedIntegerType | UnrestrictedFloatType | "boolean" | "byte" | "octet"
     @classmethod
     def peek(cls, tokens):
         if (UnsignedIntegerType.peek(tokens) or UnrestrictedFloatType.peek(tokens)):
@@ -111,50 +172,50 @@ class PrimitiveType(object): # UnsignedIntegerType | UnrestrictedFloatType | "bo
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
-        tokens.resetPeek()
+        Production.__init__(self, tokens)
         if (UnsignedIntegerType.peek(tokens)):
             self.type = UnsignedIntegerType(tokens)
         elif (UnrestrictedFloatType.peek(tokens)):
             self.type = UnrestrictedFloatType(tokens)
         else:
             self.type = tokens.next().text
+        self._didParse(tokens)
 
-    def __str__(self):
+    def _str(self):
         return str(self.type)
 
+    def __repr__(self):
+        return '[PrimitiveType: ' + repr(self.type) + ']'
 
-class ConstType(object): # PrimitiveType [Null] | identifier [Null]
+
+class ConstType(Production): # PrimitiveType [Null] | identifier [Null]
     @classmethod
     def peek(cls, tokens):
         if (PrimitiveType.peek(tokens)):
-            token = tokens.pushPosition()
-            tokens.popPosition(token and token.isSymbol('?'))
+            Symbol.peek(tokens, '?')
             return True
         token = tokens.pushPosition()
         if (token and token.isIdentifier()):
-            token = tokens.pushPosition()
-            tokens.popPosition(token and token.isSymbol('?'))
+            Symbol.peek(tokens, '?')
             return tokens.popPosition(True)
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
-        tokens.resetPeek()
+        Production.__init__(self, tokens)
         if (PrimitiveType.peek(tokens)):
             self.type = PrimitiveType(tokens)
         else:
             self.type = tokens.next().text
-        self.null = False
-        token = tokens.next()
-        if (token and token.isSymbol('?')):
-            self.null = True
-        else:
-            tokens.restore(token)
+        self.null = Symbol(tokens, '?') if (Symbol.peek(tokens, '?')) else None
+        self._didParse(tokens)
 
-    def __str__(self):
-        return str(self.type) + ('?' if self.null else '')
+    def _str(self):
+        return str(self.type) + (str(self.null) if (self.null) else '')
 
+    def __repr__(self):
+        return '[ConstType: ' + repr(self.type) + (' [null]' if (self.null) else '') + ']'
 
-class FloatLiteral(object):  # float | "-" "Infinity" | "Infinity" | "NaN"
+class FloatLiteral(Production):  # float | "-" "Infinity" | "Infinity" | "NaN"
     @classmethod
     def peek(cls, tokens):
         token = tokens.pushPosition()
@@ -168,17 +229,19 @@ class FloatLiteral(object):  # float | "-" "Infinity" | "Infinity" | "NaN"
         return tokens.popPosition(False)
     
     def __init__(self, tokens): #
-        token = tokens.next()
-        if (token.isSymbol('-')):
-            self.value = '-' + tokens.next().text
-        else:
-            self.value = token.text
+        Production.__init__(self, tokens)
+        self.negative = Symbol(tokens, '-') if (Symbol.peek(tokens, '-')) else None
+        self.value = tokens.next().text
+        self._didParse(tokens)
 
-    def __str__(self):
-        return self.value
+    def _str(self):
+        return (str(self.negative) if (self.negative) else '') + self.value
+
+    def __repr__(self):
+        return '[FloatLiteral: ' + (repr(self.negative) if (self.negative) else '') + self.value + ']'
 
 
-class ConstValue(object):    # "true" | "false" | FloatLiteral | integer | "null"
+class ConstValue(Production):    # "true" | "false" | FloatLiteral | integer | "null"
     @classmethod
     def peek(cls, tokens):
         if (FloatLiteral.peek(tokens)):
@@ -189,21 +252,43 @@ class ConstValue(object):    # "true" | "false" | FloatLiteral | integer | "null
         return tokens.popPosition(token and token.isInteger())
     
     def __init__(self, tokens): #
-        tokens.resetPeek()
+        Production.__init__(self, tokens)
         if (FloatLiteral.peek(tokens)):
             self.value = FloatLiteral(tokens)
         else:
             self.value = tokens.next().text
+        self._didParse(tokens)
 
-    def __str__(self):
+    def _str(self):
         return str(self.value)
 
+    def __repr__(self):
+        return '[ConstValue: ' + repr(self.value) + ']'
 
-class EnumValueList(object): # string ["," string]... [","]
+
+class EnumValue(Production): # string
     @classmethod
     def peek(cls, tokens):
         token = tokens.pushPosition()
-        if (token and token.isString()):
+        return tokens.popPosition(token and token.isString())
+
+    def __init__(self, tokens):
+        Production.__init__(self, tokens)
+        self.value = tokens.next().text
+        self._didParse(tokens)
+
+    def _str(self):
+        return self.value
+
+    def __repr__(self):
+        return '[EnumValue: ' + self.value + ']'
+
+
+class EnumValueList(Production): # EnumValue ["," EnumValue]... [","]
+    @classmethod
+    def peek(cls, tokens):
+        tokens.pushPosition(False)
+        if (EnumValue.peek(tokens)):
             token = tokens.pushPosition()
             if (token and token.isSymbol(',')):
                 token = tokens.sneakPeek()
@@ -215,107 +300,120 @@ class EnumValueList(object): # string ["," string]... [","]
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
+        Production.__init__(self, tokens)
         self.values = []
-        self.values.append(tokens.next().text)
-        token = tokens.next()
-        while (token):
-            if (token.isString()):
-                self.values.append(token.text)
-                token = tokens.next()
-                continue
-            elif (token.isSymbol(',')):
-                token = tokens.next()
-                if (token.isSymbol('}')):
-                    tokens.restore(token)
+        self._commas = []
+        while (tokens.hasTokens()):
+            self.values.append(EnumValue(tokens))
+            if (Symbol.peek(tokens, ',')):
+                self._commas.append(Symbol(tokens, ','))
+                token = tokens.sneakPeek()
+                if (token and token.isSymbol('}')):
                     break
                 continue
-            tokens.restore(token)
             break
-            
-    def __str__(self):
-        return ', '.join(self.values)
+        self._didParse(tokens)
+
+    def _str(self):
+        return ''.join([str(value) + str(comma) for value, comma in itertools.izip_longest(self.values, self._commas, fillvalue = '')])
+
+    def __repr__(self):
+        return '[EnumValueList: ' + ''.join([repr(value) for value in self.values]) + ']'
 
 
-class TypeSuffix(object):    # "[" "]" [TypeSuffix] | "?" [TypeSuffixStartingWithArray]
+class TypeSuffix(Production):    # "[" "]" [TypeSuffix] | "?" [TypeSuffixStartingWithArray]
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isSymbol('[')):
-            token = tokens.peek()
-            if (token and token.isSymbol(']')):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, '[')):
+            if (Symbol.peek(tokens, ']')):
                 TypeSuffix.peek(tokens)
                 return tokens.popPosition(True)
-        elif (token and token.isSymbol('?')):
+        elif (Symbol.peek(tokens, '?')):
             TypeSuffixStartingWithArray.peek(tokens)
             return tokens.popPosition(True)
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
-        token = tokens.next()
-        self.array = False
-        self.null = False
-        if (token.isSymbol('[')):
-            token = tokens.next()   # "]"
-            self.array = True
+        Production.__init__(self, tokens)
+        if (Symbol.peek(tokens, '[')):
+            self._openBracket = Symbol(tokens, '[')
+            self._closeBracket = Symbol(tokens, ']')
             self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
+            self.array = True
+            self.null = None
         else:
-            self.null = True
+            self.null = Symbol(tokens, '?')
             self.suffix = TypeSuffixStartingWithArray(tokens) if (TypeSuffixStartingWithArray.peek(tokens)) else None
+            self.array = False
+            self._openBracket = None
+            self._closeBracket = None
+        self._didParse(tokens)
 
-    def __str__(self):
-        output = '[]' if (self.array) else ''
-        output += '?' if (self.null) else ''
+    def _str(self):
+        output = (str(self._openBracket) + str(self._closeBracket)) if (self.array) else ''
+        output += str(self.null) if (self.null) else ''
         return output + (str(self.suffix) if (self.suffix) else '')
 
+    def __repr__(self):
+        output = '[TypeSuffix: ' + ('[array] ' if (self.array) else '') + ('[null] ' if (self.null) else '')
+        return output + (repr(self.suffix) if (self.suffix) else '') + ']'
 
-class TypeSuffixStartingWithArray(object):   # "[" "]" [TypeSuffix]
+
+class TypeSuffixStartingWithArray(Production):   # "[" "]" [TypeSuffix]
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isSymbol('[')):
-            token = tokens.peek()
-            if (token and token.isSymbol(']')):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, '[')):
+            if (Symbol.peek(tokens, ']')):
                 TypeSuffix.peek(tokens)
                 return tokens.popPosition(True)
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
-        token = tokens.next()   # "["
-        token = tokens.next()   # "]"
+        Production.__init__(self, tokens)
+        self._openBracket = Symbol(tokens, '[')
+        self._closeBracket = Symbol(tokens, ']')
         self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
-        
-    def __str__(self):
-        return '[]' + (str(self.suffix) if (self.suffix) else '')
+        self._didParse(tokens)
+    
+    def _str(self):
+        return str(self._openBracket) + str(self._closeBracket) + (str(self.suffix) if (self.suffix) else '')
+
+    def __repr__(self):
+        return '[TypeSuffixStartingWithArray: ' + (repr(self.suffix) if (self.suffix) else '') + ']'
 
 
-class SingleType(object):    # NonAnyType | "any" [TypeSuffixStartingWithArray]
+class SingleType(Production):    # NonAnyType | "any" [TypeSuffixStartingWithArray]
     @classmethod
     def peek(cls, tokens):
         if (NonAnyType.peek(tokens)):
             return True
-        token = tokens.pushPosition()
-        if (token and token.isSymbol('any')):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, 'any')):
             TypeSuffixStartingWithArray.peek(tokens)
             return tokens.popPosition(True)
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
-        tokens.resetPeek()
+        Production.__init__(self, tokens)
         if (NonAnyType.peek(tokens)):
             self.type = NonAnyType(tokens)
             self.suffix = None
         else:
-            token = tokens.next()   # "any"
-            self.type = 'any'
+            self.type = Symbol(tokens, 'any')
             self.suffix = TypeSuffixStartingWithArray(tokens) if (TypeSuffixStartingWithArray.peek(tokens)) else None
+        self._didParse(tokens)
 
-    def __str__(self):
-        output = str(self.type)
-        return output + (str(self.suffix) if (self.suffix) else '')
+    def _str(self):
+        return str(self.type) + (str(self.suffix) if (self.suffix) else '')
+
+    def __repr__(self):
+        return '[SingleType: ' + repr(self.type) + (repr(self.suffix) if (self.suffix) else '') + ']'
 
 
-class NonAnyType(object):    # PrimitiveType [TypeSuffix] | "DOMString" [TypeSuffix] | identifier [TypeSuffix] |
-                             #   "sequence" "<" Type ">" [Null] | "object" [TypeSuffix] | "Date" [TypeSuffix]
+class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "DOMString" [TypeSuffix] | identifier [TypeSuffix] |
+                                #   "sequence" "<" Type ">" [Null] | "object" [TypeSuffix] | "Date" [TypeSuffix]
     @classmethod
     def peek(cls, tokens):
         if (PrimitiveType.peek(tokens)):
@@ -326,49 +424,52 @@ class NonAnyType(object):    # PrimitiveType [TypeSuffix] | "DOMString" [TypeSuf
             TypeSuffix.peek(tokens)
             return tokens.popPosition(True)
         elif (token and token.isSymbol('sequence')):
-            token = tokens.peek()
-            if (token and token.isSymbol('<')):
+            if (Symbol.peek(tokens, '<')):
                 if (Type.peek(tokens)):
-                    token = tokens.peek()
-                    if (token and token.isSymbol('>')):
-                        token = tokens.pushPosition()
-                        tokens.popPosition(token and token.isSymbol('?'))
+                    if (Symbol.peek(tokens, '>')):
+                        Symbol.peek(tokens, '?')
                         return tokens.popPosition(True)
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
-        tokens.resetPeek()
-        self.sequence = False
+        Production.__init__(self, tokens)
+        self.sequence = None
+        self._openSequence = None
+        self._closeSequence = None
         self.null = False
+        self.suffix = None
         if (PrimitiveType.peek(tokens)):
             self.type = PrimitiveType(tokens)
             self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
         else:
-            token = tokens.next()
-            if (token.isSymbol('DOMString') or token.isIdentifier() or token.isSymbol('object') or token.isSymbol('Date')):
-                self.type = token.text
+            token = tokens.sneakPeek()
+            if (token.isIdentifier()):
+                self.type = tokens.next().text
                 self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
             elif (token.isSymbol('sequence')):
-                self.sequence = True
-                token = tokens.next()   # "<"
+                self.sequence = Symbol(tokens, 'sequence')
+                self._openSequence = Symbol(tokens, '<')
                 self.type = Type(tokens)
-                token = tokens.next()   # ">"
-                token = tokens.next()
-                self.suffix = None
-                if (token and token.isSymbol('?')):
-                    self.null = True
-                else:
-                    tokens.restore(token)
+                self._closeSequence = Symbol(tokens, '>')
+                self.null = Symbol(tokens, '?') if (Symbol.peek(tokens, '?')) else None
+            else:
+                self.type = Symbol(tokens)  # "DOMString" | "object" | "Date"
+                self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
+        self._didParse(tokens)
 
-    def __str__(self):
-        output = 'sequence<' if (self.sequence) else ''
-        output += str(self.type)
-        output += '>' if (self.sequence) else ''
-        output += (str(self.suffix) if (self.suffix) else '')
-        return output + ('?' if (self.null) else '')
+    def _str(self):
+        if (self.sequence):
+            output = str(self.sequence) + str(self._openSequence) + str(self.type) + str(self._closeSequence)
+            return output + (str(self.null) if (self.null) else '')
+        output = str(self.type)
+        return output + (str(self.suffix) if (self.suffix) else '')
+
+    def __repr__(self):
+        output = '[NonAnyType: ' + ('[sequence]' if (self.sequence) else '') + repr(self.type)
+        return output + (repr(self.suffix) if (self.suffix) else '')
 
 
-class UnionMemberType(object):   # NonAnyType | UnionType [TypeSuffix] | "any" "[" "]" [TypeSuffix]
+class UnionMemberType(Production):   # NonAnyType | UnionType [TypeSuffix] | "any" "[" "]" [TypeSuffix]
     @classmethod
     def peek(cls, tokens):
         if (NonAnyType.peek(tokens)):
@@ -376,18 +477,19 @@ class UnionMemberType(object):   # NonAnyType | UnionType [TypeSuffix] | "any" "
         if (UnionType.peek(tokens)):
             TypeSuffix.peek(tokens)
             return True
-        token = tokens.pushPosition()
-        if (token and token.isSymbol('any')):
-            token = tokens.peek()
-            if (token and token.isSymbol('[')):
-                token = tokens.peek()
-                if (token and token.isSymbol(']')):
+        tokens.pushPosition()
+        if (Symbol.peek(tokens, 'any')):
+            if (Symbol.peek(tokens, '[')):
+                if (Symbol.peek(tokens, ']')):
                     TypeSuffix.peek(tokens)
                     return tokens.popPosition(True)
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
-        tokens.resetPeek()
+        Production.__init__(self, tokens)
+        self.any = None
+        self._openBracket = None
+        self._closeBracket = None
         if (NonAnyType.peek(tokens)):
             self.type = NonAnyType(tokens)
             self.suffix = None
@@ -395,21 +497,27 @@ class UnionMemberType(object):   # NonAnyType | UnionType [TypeSuffix] | "any" "
             self.type = UnionType(tokens)
             self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
         else:
-            token = tokens.next()   # "any"
-            token = tokens.next()   # "["
-            token = tokens.next()   # "]"
+            self.any = Symbol(tokens, 'any')
+            self._openBracket = Symbol(tokens, '[')
+            self._closeBracket = Symbol(tokens, ']')
             self.type = 'any[]'
             self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
+        self._didParse(tokens)
 
-    def __str__(self):
-        return str(self.type) + (str(self.suffix) if self.suffix else '')
-        
+    def _str(self):
+        output = (str(self.any) + str(self._openBracket) + str(self._closeBracket)) if (self.any) else str(self.type)
+        return output + (str(self.suffix) if (self.suffix) else '')
 
-class UnionType(object): # "(" UnionMemberType ["or" UnionMemberType]... ")"
+    def __repr__(self):
+        output = '[UnionMemberType: ' + ('[any[]]' if (self.amy) else repr(self.type))
+        return output + (repr(self.suffix) if (self.suffix) else '') + ']'
+
+
+class UnionType(Production): # "(" UnionMemberType ["or" UnionMemberType]... ")"
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isSymbol('(')):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, '(')):
             while (tokens.hasTokens()):
                 if (UnionMemberType.peek(tokens)):
                     token = tokens.peek()
@@ -421,24 +529,33 @@ class UnionType(object): # "(" UnionMemberType ["or" UnionMemberType]... ")"
         return tokens.popPosition(False)
         
     def __init__(self, tokens):
+        Production.__init__(self, tokens)
+        self._openParen = Symbol(tokens, '(')
         self.types = []
-        token = tokens.next()   # "("
+        self._ors = []
         while (tokens.hasTokens()):
             self.types.append(UnionMemberType(tokens))
-            token = tokens.next()
+            token = tokens.sneakPeek()
             if (token and token.isSymbol()):
                 if ('or' == token.text):
+                    self._ors.append(Symbol(tokens, 'or'))
                     continue
                 elif (')' == token.text):
                     break
-            tokens.restore(token)
             break
-    
-    def __str__(self):
-        return '(' + ' or '.join([str(type) for type in self.types]) + ')'
+        self._closeParen = Symbol(tokens, ')')
+        self._didParse(tokens)
+
+    def _str(self):
+        output = str(self._openParen)
+        output += ''.join([str(type) + str(_or) for type, _or in itertools.izip_longest(self.types, self._ors, fillvalue = '')])
+        return output + str(self._closeParen)
+
+    def __repr__(self):
+        return '[UnionType: ' + ''.join([repr(type) for type in self.types]) + ']'
 
 
-class Type(object):  # SingleType | UnionType [TypeSuffix]
+class Type(Production):  # SingleType | UnionType [TypeSuffix]
     @classmethod
     def peek(cls, tokens):
         if (SingleType.peek(tokens)):
@@ -449,22 +566,23 @@ class Type(object):  # SingleType | UnionType [TypeSuffix]
         return False
         
     def __init__(self, tokens):
-        tokens.resetPeek()
+        Production.__init__(self, tokens)
         if (SingleType.peek(tokens)):
             self.type = SingleType(tokens)
             self.suffix = None
         else:
             self.type = UnionType(tokens)
             self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
-    
-    def __str__(self):
+        self._didParse(tokens)
+
+    def _str(self):
         return str(self.type) + (str(self.suffix) if (self.suffix) else '')
         
     def __repr__(self):
         return '[type: ' + str(self) + ']'
 
 
-class IgnoreInOut(object):  # "in" | "out"
+class IgnoreInOut(Production):  # "in" | "out"
     @classmethod
     def peek(cls, tokens):
         token = tokens.pushPosition()
@@ -473,9 +591,15 @@ class IgnoreInOut(object):  # "in" | "out"
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
-        token = tokens.next()
+        Production.__init__(self, tokens)
+        self.text = tokens.next().text
+        self._didParse(tokens)
 
-class Ignore(object):    # "inherits" "getter" | "getraises" "(" ... ")" | "setraises" "(" ... ")" | "raises" "(" ... ")"
+    def _str(self):
+        return self.text
+
+
+class Ignore(Production):    # "inherits" "getter" | "getraises" "(" ... ")" | "setraises" "(" ... ")" | "raises" "(" ... ")"
     @classmethod
     def peek(cls, tokens):
         token = tokens.pushPosition()
@@ -490,19 +614,28 @@ class Ignore(object):    # "inherits" "getter" | "getraises" "(" ... ")" | "setr
         return tokens.popPosition(False)
         
     def __init__(self, tokens):
+        Production.__init__(self, tokens)
+        self.tokens = []
         token = tokens.next()
+        self.tokens.append(token)
         if (token and token.isIdentifier() and ('inherits' == token.text)):
-            token = tokens.next()    # "getter"
+            self.tokens.append(tokens.whitespace())
+            self.tokens.append(tokens.next())   # "getter"
         else:
-            token = tokens.next()    # "("
-            tokens.seekSymbol(')')
+            self.tokens.append(tokens.whitespace())
+            self.tokens.append(tokens.next())    # "("
+            self.tokens += tokens.seekSymbol(')')
+        self._didParse(tokens)
+
+    def _str(self):
+        return ''.join([str(token) for token in self.tokens])
 
 
-class IgnoreMultipleInheritance(object):    # [, identifier]...
+class IgnoreMultipleInheritance(Production):    # [, identifier]...
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isSymbol(',')):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, ',')):
             token = tokens.peek()
             if (token and token.isIdentifier()):
                 IgnoreMultipleInheritance.peek(tokens)
@@ -510,17 +643,21 @@ class IgnoreMultipleInheritance(object):    # [, identifier]...
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
-        token = tokens.next()   # ","
-        token = tokens.next()   # identifier
-        if (IgnoreMultipleInheritance.peek(tokens)):
-            IgnoreMultipleInheritance(tokens)
+        Production.__init__(self, tokens)
+        self._comma = Symbol(tokens, ',')
+        self.inherit = tokens.next().text
+        self.next = IgnoreMultipleInheritance(tokens) if (IgnoreMultipleInheritance.peek(tokens)) else None
+        self._didParse(tokens)
+
+    def _str(self):
+        return str(self._comma) + self.inherit + (str(self.next) if (self.next) else '')
 
 
-class Inheritance(object):   # ":" identifier [IgnoreMultipleInheritance]
+class Inheritance(Production):   # ":" identifier [IgnoreMultipleInheritance]
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isSymbol(':')):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, ':')):
             token = tokens.peek()
             if (token and token.isIdentifier()):
                 IgnoreMultipleInheritance.peek(tokens)
@@ -528,23 +665,24 @@ class Inheritance(object):   # ":" identifier [IgnoreMultipleInheritance]
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
-        token = tokens.next()   # ":"
+        Production.__init__(self, tokens)
+        self._colon = Symbol(tokens, ':')
         self.base = tokens.next().text
-        if (IgnoreMultipleInheritance.peek(tokens)):
-            IgnoreMultipleInheritance(tokens)
+        self._ignore = IgnoreMultipleInheritance(tokens) if (IgnoreMultipleInheritance.peek(tokens)) else None
+        self._didParse(tokens)
 
-    def __str__(self):
-        return ': ' + self.base
+    def _str(self):
+        return str(self._colon) + self.base + (str(self._ignore) if (self._ignore) else '')
 
     def __repr__(self):
         return '[inherits: ' + self.base + ']'
 
 
-class Default(object):   # "=" ConstValue | "=" string
+class Default(Production):   # "=" ConstValue | "=" string
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isSymbol('=')):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, '=')):
             if (ConstValue.peek(tokens)):
                 return tokens.popPosition(True)
             token = tokens.peek()
@@ -552,22 +690,23 @@ class Default(object):   # "=" ConstValue | "=" string
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
-        token = tokens.next()   # '='
-        token = tokens.next()
+        Production.__init__(self, tokens)
+        self._equals = Symbol(tokens, '=')
+        token = tokens.sneakPeek()
         if (token.isString()):
-            self.value = token.text
+            self.value = tokens.next().text
         else:
-            tokens.restore(token)
             self.value = ConstValue(tokens)
+        self._didParse(tokens)
 
-    def __str__(self):
-        return ' = ' + str(self.value)
+    def _str(self):
+        return str(self._equals) + str(self.value)
 
     def __repr__(self):
-        return str(self.value)
+        return '[Default: ' + repr(self.value) + ']'
 
 
-class ArgumentName(object):   # identifier | NameSymbol
+class ArgumentName(Production):   # identifier | NameSymbol
     NameSymbols = frozenset(['attribute', 'callback', 'const', 'creator', 'deleter', 'dictionary', 'enum', 'exception',
                              'getter', 'implements', 'inherit', 'interface', 'legacycaller', 'partial', 'setter', 'static',
                              'stringifier', 'typedef', 'unrestricted'])
@@ -578,13 +717,18 @@ class ArgumentName(object):   # identifier | NameSymbol
         return tokens.popPosition(token and (token.isIdentifier() or (token.isSymbol() and (token.text in cls.NameSymbols))))
 
     def __init__(self, tokens):
+        Production.__init__(self, tokens)
         self.name = tokens.next().text
+        self._didParse(tokens)
 
-    def __str__(self):
+    def _str(self):
         return self.name
 
+    def __repr__(self):
+        return '[ArgumentName: ' + repr(self.name) + ']'
 
-class ArgumentList(object):    # Argument ["," Argument]...
+
+class ArgumentList(Production):    # Argument ["," Argument]...
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
@@ -597,13 +741,16 @@ class ArgumentList(object):    # Argument ["," Argument]...
         return tokens.popPosition(False)
 
     def __init__(self, tokens, parent):
+        Production.__init__(self, tokens)
         self.arguments = []
+        self._commas = []
         self.arguments.append(constructs.Argument(tokens, parent))
-        token = tokens.next()
+        token = tokens.sneakPeek()
         while (token and token.isSymbol(',')):
+            self._commas.append(Symbol(tokens, ','))
             self.arguments.append(constructs.Argument(tokens, parent))
-            token = tokens.next()
-        tokens.restore(token)
+            token = tokens.sneakPeek()
+        self._didParse(tokens)
 
     @property
     def name(self):
@@ -631,14 +778,14 @@ class ArgumentList(object):    # Argument ["," Argument]...
             return False
         return (key in self.arguments)
     
-    def __str__(self):
-        return ', '.join([str(argument) for argument in self.arguments])
+    def _str(self):
+        return ''.join([str(argument) + str(comma) for argument, comma in itertools.izip_longest(self.arguments, self._commas, fillvalue = '')])
 
     def __repr__(self):
         return ' '.join([repr(argument) for argument in self.arguments])
 
 
-class ReturnType(object):    # Type | "void"
+class ReturnType(Production):    # Type | "void"
     @classmethod
     def peek(cls, tokens):
         if (Type.peek(tokens)):
@@ -647,21 +794,22 @@ class ReturnType(object):    # Type | "void"
         return tokens.popPosition(token and token.isSymbol('void'))
 
     def __init__(self, tokens):
-        token = tokens.next()
+        Production.__init__(self, tokens)
+        token = tokens.sneakPeek()
         if (token.isSymbol('void')):
-            self.type = 'void'
+            self.type = Symbol(tokens, 'void')
         else:
-            tokens.restore(token)
             self.type = Type(tokens)
+        self._didParse(tokens)
 
-    def __str__(self):
+    def _str(self):
         return str(self.type)
 
     def __repr__(self):
         return repr(self.type)
 
 
-class Special(object):   # "getter" | "setter" | "creator" | "deleter" | "legacycaller"
+class Special(Production):   # "getter" | "setter" | "creator" | "deleter" | "legacycaller"
     SpecialSymbols = frozenset(['getter', 'setter', 'creator', 'deleter', 'legacycaller'])
     @classmethod
     def peek(cls, tokens):
@@ -669,16 +817,18 @@ class Special(object):   # "getter" | "setter" | "creator" | "deleter" | "legacy
         return tokens.popPosition(token and token.isSymbol() and (token.text in cls.SpecialSymbols))
 
     def __init__(self, tokens):
+        Production.__init__(self, tokens)
         self.name = tokens.next().text
+        self._didParse(tokens)
 
-    def __str__(self):
+    def _str(self):
         return self.name
 
     def __repr__(self):
         return '[' + self.name + ']'
 
 
-class Qualifiers(object):    # "static" | [Special]...
+class Qualifiers(Production):    # "static" | [Special]...
     @classmethod
     def peek(cls, tokens):
         if (Special.peek(tokens)):
@@ -689,25 +839,26 @@ class Qualifiers(object):    # "static" | [Special]...
         return tokens.popPosition(token and token.isSymbol('static'))
 
     def __init__(self, tokens):
-        self.static = False
+        Production.__init__(self, tokens)
+        self.static = None
         self.specials = []
-        token = tokens.next()
+        token = tokens.sneakPeek()
         if (token.isSymbol('static')):
-            self.static = True
+            self.static = Symbol(tokens, 'static')
         else:
-            tokens.restore(token)
             self.specials.append(Special(tokens))
             while (Special.peek(tokens)):
                 self.specials.append(Special(tokens))
+        self._didParse(tokens)
 
     @property
     def name(self):
         return 'static' if (self.static) else ' '.join([special.name for special in self.specials])
 
-    def __str__(self):
+    def _str(self):
         if (self.static):
-            return 'static'
-        return ' '.join([str(special) for special in self.specials])
+            return str(self.static)
+        return ''.join([str(special) for special in self.specials])
 
     def __repr__(self):
         if (self.static):
@@ -715,8 +866,9 @@ class Qualifiers(object):    # "static" | [Special]...
         return ' '.join([repr(special) for special in self.specials])
 
 
-class ChildProduction(object):
-    def __init__(self, parent):
+class ChildProduction(Production):
+    def __init__(self, tokens, parent):
+        Production.__init__(self, tokens)
         self.parent = parent
 
     @property
@@ -727,13 +879,8 @@ class ChildProduction(object):
     def normalName(self):
         return self.name
 
-    def _consumeSemicolon(self, tokens):
-        token = tokens.next()
-        if (not (token and token.isSymbol(';'))):
-            tokens.restore(token)
 
-
-class Attribute(ChildProduction):   # ["inherit"] ["readonly"] "attribute" Type identifier [Ignore]";"
+class Attribute(ChildProduction):   # ["inherit"] ["readonly"] "attribute" Type identifier [Ignore] ";"
     @classmethod
     def peek(cls, tokens):
         token = tokens.pushPosition()
@@ -748,21 +895,21 @@ class Attribute(ChildProduction):   # ["inherit"] ["readonly"] "attribute" Type 
         tokens.popPosition(False)
     
     def __init__(self, tokens, parent):
-        ChildProduction.__init__(self, parent)
-        self.inherit = False
-        self.readonly = False
-        token = tokens.next()       # "inherit" or "readonly" or "attribute"
+        ChildProduction.__init__(self, tokens, parent)
+        self.inherit = None
+        self.readonly = None
+        token = tokens.sneakPeek()       # "inherit" or "readonly" or "attribute"
         if (token.isSymbol('inherit')):
-            self.inherit = True
-            token = tokens.next()   # "readonly" or "attribute"
+            self.inherit = Symbol(tokens, 'inherit')
+            token = tokens.sneakPeek()   # "readonly" or "attribute"
         if (token.isSymbol('readonly')):
-            self.readonly = True
-            token = tokens.next()   # "attribute"
+            self.readonly = Symbol(tokens, 'readonly')
+        self._attribute = Symbol(tokens, 'attribute')
         self.type = Type(tokens)
         self.name = tokens.next().text
-        if (Ignore.peek(tokens)):
-            Ignore(tokens)
+        self._ignore = Ignore(tokens) if (Ignore.peek(tokens)) else None
         self._consumeSemicolon(tokens)
+        self._didParse(tokens)
 
     @property
     def idlType(self):
@@ -771,10 +918,10 @@ class Attribute(ChildProduction):   # ["inherit"] ["readonly"] "attribute" Type 
     def complexityFactor(self):
         return 1
     
-    def __str__(self):
-        output = 'inherit ' if (self.inherit) else ''
-        output += 'readonly ' if (self.readonly) else ''
-        return output + 'attribute ' + str(self.type) + ' ' + self.name + ';'
+    def _str(self):
+        output = str(self.inherit) if (self.inherit) else ''
+        output += str(self.readonly) if (self.readonly) else ''
+        return output + str(self._attribute) + str(self.type) + self.name + (str(self._ignore) if (self._ignore) else '')
 
     def __repr__(self):
         output = '[attribute: '
@@ -798,23 +945,21 @@ class OperationRest(ChildProduction):   # ReturnType [identifier] "(" [ArgumentL
         return tokens.popPosition(False)
 
     def __init__(self, tokens, parent):
-        ChildProduction.__init__(self, parent)
+        ChildProduction.__init__(self, tokens, parent)
         self.returnType = ReturnType(tokens)
-        token = tokens.next()   # identifier or "("
-        self.name = None
-        if (token.isIdentifier()):
-            self.name = token.text
-            token = tokens.next()   # "("
+        self.name = tokens.next().text if (tokens.sneakPeek().isIdentifier()) else None
+        self._openParen = Symbol(tokens, '(')
         self.arguments = ArgumentList(tokens, parent) if (ArgumentList.peek(tokens)) else None
-        token = tokens.next()   # ")"
-        if (Ignore.peek(tokens)):
-            Ignore(tokens)
+        self._closeParen = Symbol(tokens, ')')
+        self._ignore = Ignore(tokens) if (Ignore.peek(tokens)) else None
         self._consumeSemicolon(tokens)
+        self._didParse(tokens)
 
-    def __str__(self):
-        output = str(self.returnType) + ' '
+    def _str(self):
+        output = str(self.returnType)
         output += self.name if (self.name) else ''
-        return output + '(' + (str(self.arguments) if (self.arguments) else '') + ');'
+        output += str(self._openParen) + (str(self.arguments) if (self.arguments) else '') + str(self._closeParen)
+        return output + (str(self._ignore) if (self._ignore) else '')
 
     def __repr__(self):
         output = '[rest: [returnType: ' + str(self.returnType) + '] '
@@ -830,12 +975,12 @@ class Operation(ChildProduction):   # [Qualifiers] OperationRest
         return tokens.popPosition(OperationRest.peek(tokens))
 
     def __init__(self, tokens, parent):
-        ChildProduction.__init__(self, parent)
+        ChildProduction.__init__(self, tokens, parent)
         self.qualifiers = None
-        tokens.resetPeek()
         if (Qualifiers.peek(tokens)):
             self.qualifiers = Qualifiers(tokens)
         self.rest = OperationRest(tokens, self)
+        self._didParse(tokens)
 
     @property
     def idlType(self):
@@ -864,8 +1009,8 @@ class Operation(ChildProduction):   # [Qualifiers] OperationRest
     def arguments(self):
         return self.rest.arguments
     
-    def __str__(self):
-        output = (str(self.qualifiers) + ' ') if (self.qualifiers) else ''
+    def _str(self):
+        output = str(self.qualifiers) if (self.qualifiers) else ''
         return output + str(self.rest)
 
     def __repr__(self):
@@ -882,16 +1027,16 @@ class StringifierAttributeOrOperation(ChildProduction): # Attribute | OperationR
         return tokens.popPosition(token and token.isSymbol(';'))
 
     def __init__(self, tokens, parent):
-        ChildProduction.__init__(self, parent)
+        ChildProduction.__init__(self, tokens, parent)
         self.attribute = None
         self.operation = None
-        tokens.resetPeek()
         if (Attribute.peek(tokens)):
             self.attribute = Attribute(tokens, parent)
         elif (OperationRest.peek(tokens)):
             self.operation = OperationRest(tokens, parent)
         else:
             self._consumeSemicolon(tokens)
+        self._didParse(tokens)
 
     @property
     def idlType(self):
@@ -924,13 +1069,12 @@ class StringifierAttributeOrOperation(ChildProduction): # Attribute | OperationR
     def arguments(self):
         return self.operation.arguments
 
-    def __str__(self):
-        output = 'stringifier'
+    def _str(self):
         if (self.attribute):
-            return output + ' ' + str(self.attribute)
+            return str(self.attribute)
         elif (self.operation):
-            return output + ' ' + str(self.operation)
-        return output + ';'
+            return str(self.operation)
+        return ''
 
     def __repr__(self):
         output = '[stringifier'
@@ -946,24 +1090,25 @@ class AtributeOrOperation(ChildProduction): # "stringifier" StringifierAttribute
     def peek(cls, tokens):
         if (Attribute.peek(tokens) or Operation.peek(tokens)):
             return True
-        token = tokens.pushPosition()
-        if (token and token.isSymbol('stringifier')):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, 'stringifier')):
             return tokens.popPosition(StringifierAttributeOrOperation.peek(tokens))
         return tokens.popPosition(False)
 
     def __init__(self, tokens, parent):
-        ChildProduction.__init__(self, parent)
+        ChildProduction.__init__(self, tokens, parent)
         self.attribute = None
         self.operation = None
+        self._stringifier = None
         self.stringifier = None
-        tokens.resetPeek()
         if (Attribute.peek(tokens)):
             self.attribute = Attribute(tokens, parent)
         elif (Operation.peek(tokens)):
             self.operation = Operation(tokens, parent)
         else:
-            token = tokens.next()   # "stringifier"
+            self._stringifier = Symbol(tokens, 'stringifier')
             self.stringifier = StringifierAttributeOrOperation(tokens, parent)
+        self._didParse(tokens)
 
     @property
     def idlType(self):
@@ -998,10 +1143,10 @@ class AtributeOrOperation(ChildProduction): # "stringifier" StringifierAttribute
     def arguments(self):
         return self.operation.arguments if (self.operation) else None
 
-    def __str__(self):
+    def _str(self):
         if (self.attribute):
             return str(self.attribute)
-        return str(self.operation) if (self.operation) else str(self.stringifier)
+        return str(self.operation) if (self.operation) else (str(self._stringifier) + str(self.stringifier))
 
     def __repr__(self):
         if (self.attribute):
@@ -1012,22 +1157,26 @@ class AtributeOrOperation(ChildProduction): # "stringifier" StringifierAttribute
 class ExtendedAttributeList(ChildProduction):   # "[" ExtendedAttribute ["," ExtendedAttribute]... "]"
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isSymbol('[')):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, '[')):
             return tokens.popPosition(tokens.peekSymbol(']'))
         return tokens.popPosition(False)
 
     def __init__(self, tokens, parent):
-        token = tokens.next()   # "["
+        ChildProduction.__init__(self, tokens, parent)
+        self._openBracket = Symbol(tokens, '[')
         self.attributes = []
+        self._commas = []
         while (tokens.hasTokens()):
             self.attributes.append(constructs.ExtendedAttribute(tokens, parent))
-            token = tokens.next()
+            token = tokens.sneakPeek()
             if ((not token) or token.isSymbol(']')):
                 break
             if (token.isSymbol(',')):
+                self._commas.append(Symbol(tokens, ','))
                 continue
-            tokens.restore(token)
+        self._closeBracket = Symbol(tokens, ']')
+        self._didParse(tokens)
 
     def __len__(self):
         return len(self.attributes)
@@ -1051,8 +1200,10 @@ class ExtendedAttributeList(ChildProduction):   # "[" ExtendedAttribute ["," Ext
             return False
         return (key in self.attributes)
 
-    def __str__(self):
-        return '[' + ', '.join([str(attribute) for attribute in self.attributes]) + '] '
+    def _str(self):
+        output = str(self._openBracket)
+        output += ''.join([str(attribute) + str(comma) for attribute, comma in itertools.izip_longest(self.attributes, self._commas, fillvalue = '')])
+        return output + str(self._closeBracket)
 
     def __repr__(self):
         return '[Extended Attributes: ' + ' '.join([repr(attribute) for attribute in self.attributes]) + '] '

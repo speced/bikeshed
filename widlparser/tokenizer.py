@@ -133,6 +133,15 @@ class Tokenizer(object):
         if (token):
             self.tokens.appendleft(token)
 
+    def whitespace(self):
+        "Get next token only if it is whitespace"
+        token = self.next(False)
+        if (token):
+            if (token.isWhitespace()):
+                return token
+            self.restore(token)
+        return None
+
     def pushPosition(self, andPeek = True):
         "Save current lookahead index and optionally lookahead next token"
         self.positionStack.append(self.peekIndex)
@@ -162,6 +171,7 @@ class Tokenizer(object):
             token = self.tokens[self.peekIndex + 1]
             if (skipWhitespace and token.isWhitespace()):
                 return self.tokens[self.peekIndex + 2] if ((self.peekIndex + 2) < len(self.tokens)) else None
+            return token
         return None
     
     def peekSymbol(self, symbol):
@@ -202,7 +212,7 @@ class Tokenizer(object):
         "Seek to symbol and report skipped tokens as syntax error"
         skipped = self.seekSymbol(symbol)
         if (self.ui):
-            self.ui.warn('IDL SYNTAX ERROR - skipped: ' + ''.join([str(token) for token in skipped]) + '\n')
+            self.ui.warn("IDL SYNTAX ERROR - skipped: '" + ''.join([str(token) for token in skipped[:-1]]) + "'\n")
         return skipped
     
 

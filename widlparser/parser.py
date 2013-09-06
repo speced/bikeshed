@@ -57,7 +57,7 @@ class Parser(object):
         
 
     def __str__(self):
-        return ''.join([(str(construct) + '\n') for construct in self.constructs])
+        return ''.join([str(construct) for construct in self.constructs])
 
     def __repr__(self):
         return '[Parser: ' + ''.join([(repr(construct) + '\n') for construct in self.constructs]) + ']'
