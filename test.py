@@ -46,17 +46,19 @@ class Marker(object):
 
 
 class NullMarker(object):
+    def __init__(self):
+        self.text = u''
+    
     def markupConstruct(self, text, construct):
-        return ('', '')
+        return (None, None)
     
     def markupType(self, text, construct):
         return ('', '')
-    
-    def markupName(self, text, construct):
-        return ('', '')
 
     def encode(self, text):
+        self.text += text
         return text
+
 
 class ui(object):
     def warn(self, str):
@@ -174,7 +176,9 @@ exception foo:bar {
     testDifference(idl, unicode(parser))
 
     print "MARKED UP:"
-    testDifference(idl, parser.markup(NullMarker()))
+    marker = NullMarker()
+    testDifference(idl, parser.markup(marker))
+    assert(marker.text == idl)
     print parser.markup(Marker())
 
     print repr(parser)

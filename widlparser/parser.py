@@ -162,9 +162,11 @@ class Parser(object):
         return name + '(' + arguments + ')'
 
     def markup(self, marker):
-        generator = MarkupGenerator(None)
-        for construct in self.constructs:
-            construct.markup(generator)
-        return generator.markup(marker)
+        if (marker):
+            generator = MarkupGenerator(None)
+            for construct in self.constructs:
+                construct.markup(generator)
+            return generator.markup(marker)
+        return unicode(self)
 
 
