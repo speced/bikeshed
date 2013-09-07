@@ -11,7 +11,7 @@
 #
 
 from productions import *
-
+from markup import MarkupGenerator
 
 class Construct(ChildProduction):
     @classmethod
@@ -58,6 +58,7 @@ class Construct(ChildProduction):
     def findArgument(self, name, searchMembers = True):
         return None
 
+    @property
     def complexityFactor(self):
         return 1
     
@@ -68,7 +69,16 @@ class Construct(ChildProduction):
         return repr(self.extendedAttributes) if (self.extendedAttributes) else ''
 
     def markup(self, generator):
-        generator.addText(self._leadingSpace)
+        if (not generator):
+            return unicode(self)
+        
+        if (isinstance(generator, MarkupGenerator)):
+            marker = None
+            generator.addText(self._leadingSpace)
+        else:
+            marker = generator
+            generator = None
+                
         myGenerator = MarkupGenerator(self)
         if (self.extendedAttributes):
             self.extendedAttributes.markup(myGenerator)
@@ -76,10 +86,15 @@ class Construct(ChildProduction):
         if (target._tail):
             myGenerator.addText(''.join([unicode(token) for token in target._tail]))
         myGenerator.addText(unicode(target._semicolon))
-        generator.addGenerator(myGenerator)
-        if (self != target):
-            generator.addText(target._trailingSpace)
-        generator.addText(self._trailingSpace)
+
+        if (generator):
+            generator.addGenerator(myGenerator)
+            if (self != target):
+                generator.addText(target._trailingSpace)
+            generator.addText(self._trailingSpace)
+            return self
+        return myGenerator.markup(marker)
+
 
 
 class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
@@ -112,6 +127,7 @@ class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
     def methodName(self):
         return None
 
+    @property
     def complexityFactor(self):
         return 0
     
@@ -402,6 +418,7 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
     def idlType(self):
         return 'interface'
 
+    @property
     def complexityFactor(self):
         return len(self.members) + 1
 
@@ -558,6 +575,7 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
     def idlType(self):
         return 'dictionary'
     
+    @property
     def complexityFactor(self):
         return len(self.members) + 1
     
@@ -668,8 +686,9 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
     def idlType(self):
         return 'callback'
 
+    @property
     def complexityFactor(self):
-        return self.interface.complexityFactor() if (self.interface) else 1
+        return self.interface.complexityFactor if (self.interface) else 1
     
     def __len__(self):
         return len(self.interface.members) if (self.interface) else 0
@@ -827,6 +846,7 @@ class Exception(Construct):   # [ExtendedAttributes] "exception" identifier [Inh
     def idlType(self):
         return 'exception'
     
+    @property
     def complexityFactor(self):
         return len(self.members) + 1
     

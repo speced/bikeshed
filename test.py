@@ -182,7 +182,7 @@ exception foo:bar {
     print parser.markup(Marker())
 
     print repr(parser)
-    print "Complexity: " + unicode(parser.complexityFactor())
+    print "Complexity: " + unicode(parser.complexityFactor)
     
     
     for construct in parser.constructs:
@@ -200,6 +200,7 @@ exception foo:bar {
     print parser.find('fooArg').fullName
     print parser.find('Window').fullName
     print parser.find('mediaText').fullName
+    print parser.find('Foo.method').markup(Marker())
 
     print "NORMALIZE:"
     print parser.normalizedMethodName('foo')

@@ -26,10 +26,11 @@ class Parser(object):
     def reset(self):
         self.constructs = []
 
+    @property
     def complexityFactor(self):
         complexity = 0
         for construct in self.constructs:
-            complexity += construct.complexityFactor()
+            complexity += construct.complexityFactor
         return complexity
     
     def parse(self, text):
