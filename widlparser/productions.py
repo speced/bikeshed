@@ -39,7 +39,9 @@ class MarkupGenerator(object):
 
     def markup(self, marker, parent = None):
         head, tail = marker.markupConstruct(self.text, self.construct) if (self.construct) else (u'', u'')
-        return unicode(head) + u''.join([child.markup(marker, self.construct) for child in self.children]) + unicode(tail)
+        output = unicode(head) if (head) else u''
+        output += u''.join([child.markup(marker, self.construct) for child in self.children])
+        return output + (unicode(tail) if (tail) else u'')
 
 class MarkupText(object):
     def __init__(self, text):
