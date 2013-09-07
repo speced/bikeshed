@@ -56,7 +56,7 @@ Provide a normalized version of a method name, including the names of all argume
 
 **Parser.markup(marker)**
 
-Returns a marked-up version of the WebIDL input text. For each Construct, Type, and Name, the 'marker' will get called with 'markupConstruct(text, construct)', 'markupType(text, construct)', or 'markupName(text, construct)' repsectively. The 'markup*' methods need to return the marked-up version of the passed text.
+Returns a marked-up version of the WebIDL input text. For each Construct, Type, and Name, the 'marker' will get called with 'markupConstruct(text, construct)', 'markupType(text, construct)', or 'markupName(text, construct)' repsectively. The 'markup*' methods need to return the marked-up version of the passed text. The 'marker' also needs to implement 'encode(text)' to encode any text for the output format.
 
 Constructs
 ----------
@@ -115,10 +115,6 @@ Find a method within the construct.
 **Construct.findArgument(name[, searchMembers = True])**
 
 Find an argument within the construct. If 'searchMembers' is true, all members will be searched as well. This is to distinguish between arguments of a callback versus arguments of a callback interface's methods.
-
-**Construct.markup(marker)**
-
-Return a marked-up version of the Construct's WebIDL. Uses the same marker interface as Parser.markup(marker).
 
 Notes
 -----

@@ -55,9 +55,11 @@ class Parser(object):
             else:
                 self.constructs.append(SyntaxError(tokens, ';'))
         
-
     def __str__(self):
-        return ''.join([str(construct) for construct in self.constructs])
+        return self.__unicode__()
+                    
+    def __unicode__(self):
+        return u''.join([unicode(construct) for construct in self.constructs])
 
     def __repr__(self):
         return '[Parser: ' + ''.join([(repr(construct) + '\n') for construct in self.constructs]) + ']'
@@ -160,6 +162,9 @@ class Parser(object):
         return name + '(' + arguments + ')'
 
     def markup(self, marker):
-        return ''.join([construct.markup(marker) for construct in self.constructs])
+        generator = MarkupGenerator(None)
+        for construct in self.constructs:
+            construct.markup(generator)
+        return generator.markup(marker)
 
 

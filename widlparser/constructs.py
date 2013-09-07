@@ -61,20 +61,25 @@ class Construct(ChildProduction):
     def complexityFactor(self):
         return 1
     
-    def _str(self):
-        return str(self.extendedAttributes) if (self.extendedAttributes) else ''
+    def _unicode(self):
+        return unicode(self.extendedAttributes) if (self.extendedAttributes) else ''
 
     def __repr__(self):
         return repr(self.extendedAttributes) if (self.extendedAttributes) else ''
 
-    def markup(self, marker, parent = None):
-        text, target = self._markup(marker, parent)
-        text += (''.join([str(token) for token in target._tail]) if (target._tail) else '') + str(target._semicolon)
+    def markup(self, generator):
+        generator.addText(self._leadingSpace)
+        myGenerator = MarkupGenerator(self)
+        if (self.extendedAttributes):
+            self.extendedAttributes.markup(myGenerator)
+        target = self._markup(myGenerator)
+        if (target._tail):
+            myGenerator.addText(''.join([unicode(token) for token in target._tail]))
+        myGenerator.addText(unicode(target._semicolon))
+        generator.addGenerator(myGenerator)
         if (self != target):
-            text += (''.join([str(token) for token in self._tail]) if (self._tail) else '') + str(self._semicolon)
-        output = self._leadingSpace + marker.markupConstruct(text, self)
-        output += target._trailingSpace if (self != target) else ''
-        return output + self._trailingSpace
+            generator.addText(target._trailingSpace)
+        generator.addText(self._trailingSpace)
 
 
 class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
@@ -110,16 +115,20 @@ class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
     def complexityFactor(self):
         return 0
     
-    def _str(self):
-        return str(self._const) + str(self.type) + self.name + str(self._equals) + str(self.value)
+    def _unicode(self):
+        return unicode(self._const) + unicode(self.type) + self.name + unicode(self._equals) + unicode(self.value)
     
-    def _markup(self, marker, parent):
-        output = str(self._const) + self.type.markup(marker, self) + marker.markupName(self.name, self)
-        return (output + str(self._equals) + str(self.value), self)
-    
+    def _markup(self, generator):
+        generator.addText(self._const)
+        self.type.markup(generator)
+        generator.addName(self.name)
+        generator.addText(self._equals)
+        self.value.markup(generator)
+        return self
+
     def __repr__(self):
         return ('[const: ' + repr(self.type) +
-                '[name: ' + self.name + '] = [value: ' + str(self.value) + ']]')
+                '[name: ' + self.name + '] = [value: ' + unicode(self.value) + ']]')
 
 
 class Enum(Construct):    # [ExtendedAttributes] "enum" identifier "{" EnumValueList "}" ";"
@@ -152,14 +161,17 @@ class Enum(Construct):    # [ExtendedAttributes] "enum" identifier "{" EnumValue
     def idlType(self):
         return 'enum'
     
-    def _str(self):
-        return Construct._str(self) + str(self._enum) + self.name + str(self._openBrace) + str(self.values) + str(self._closeBrace)
+    def _unicode(self):
+        return Construct._unicode(self) + unicode(self._enum) + self.name + unicode(self._openBrace) + unicode(self.values) + unicode(self._closeBrace)
 
-    def _markup(self, marker, parent):
-        output = self.extendedAttributes.markup(marker, self) if (self.extendedAttributes) else ''
-        text = str(self._enum) + marker.markupName(self.name, self) + str(self._openBrace) + str(self.values) + str(self._closeBrace)
-        return (output + text, self)
-
+    def _markup(self, generator):
+        generator.addText(self._enum)
+        generator.addName(self.name)
+        generator.addText(self._openBrace)
+        self.values.markup(generator)
+        generator.addText(self._closeBrace)
+        return self
+    
     def __repr__(self):
         return ('[enum: ' + Construct.__repr__(self) + '[name: ' + self.name + '] ' +
                 '[values: ' + repr(self.values) + ']]')
@@ -190,16 +202,18 @@ class Typedef(Construct):    # [ExtendedAttributes] "typedef" [ExtendedAttribute
     def idlType(self):
         return 'typedef'
     
-    def _str(self):
-        output = Construct._str(self) + str(self._typedef)
-        output += str(self.typeExtendedAttributes) if (self.typeExtendedAttributes) else ''
-        return output + str(self.type) + str(self.name)
+    def _unicode(self):
+        output = Construct._unicode(self) + unicode(self._typedef)
+        output += unicode(self.typeExtendedAttributes) if (self.typeExtendedAttributes) else ''
+        return output + unicode(self.type) + unicode(self.name)
     
-    def _markup(self, marker, parent):
-        output = self.extendedAttributes.markup(marker, self) if (self.extendedAttributes) else ''
-        output += str(self._typedef)
-        output += str(self.typeExtendedAttributes) if (self.typeExtendedAttributes) else ''
-        return (output + self.type.markup(marker, self) + marker.markupName(self.name, self), self)
+    def _markup(self, generator):
+        generator.addText(self._typedef)
+        if (self.typeExtendedAttributes):
+            self.typeExtendedAttributes.markup(generator)
+        self.type.markup(generator)
+        generator.addName(self.name)
+        return self
     
     def __repr__(self):
         output = '[typedef: ' + Construct.__repr__(self)
@@ -252,28 +266,31 @@ class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut]
     def name(self):
         return self._name.name
 
-    def _str(self):
-        output = Construct._str(self)
-        output += str(self.optional) if (self.optional) else ''
-        output += str(self._ignore) if (self._ignore) else ''
-        output += str(self.type)
-        output += str(self.variadic) if (self.variadic) else ''
-        return output + str(self._name) + (str(self.default) if (self.default) else '')
+    def _unicode(self):
+        output = Construct._unicode(self)
+        output += unicode(self.optional) if (self.optional) else ''
+        output += unicode(self._ignore) if (self._ignore) else ''
+        output += unicode(self.type)
+        output += unicode(self.variadic) if (self.variadic) else ''
+        return output + unicode(self._name) + (unicode(self.default) if (self.default) else '')
     
-    def _markup(self, marker, parent):
-        output = self.extendedAttributes.markup(marker, self) if (self.extendedAttributes) else ''
-        output += str(self.optional) if (self.optional) else ''
-        output += str(self._ignore) if (self._ignore) else ''
-        output += self.type.markup(marker, self)
-        output += str(self.variadic) if (self.variadic) else ''
-        return (output + self._name.markup(marker, self) + (str(self.default) if (self.default) else ''), self)
+    def _markup(self, generator):
+        generator.addText(self.optional)
+        if (self._ignore):
+            self._ignore.markup(generator)
+        self.type.markup(generator)
+        generator.addText(self.variadic)
+        self._name.markup(generator)
+        if (self.default):
+            self.default.markup(generator)
+        return self
     
     def __repr__(self):
         output = '[argument: ' + Construct.__repr__(self)
         output += '[optional] ' if (self.optional) else ''
-        output += '[type: ' + str(self.type) + ']'
+        output += '[type: ' + unicode(self.type) + ']'
         output += '[...] ' if (self.variadic) else ' '
-        output += '[name: ' + str(self.name) + ']'
+        output += '[name: ' + unicode(self.name) + ']'
         return output + ((' [default: ' + repr(self.default) + ']]') if (self.default) else ']')
 
 
@@ -316,17 +333,12 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | [ExtendedAttrib
                     return argument
         return None
 
-    def _str(self):
-        return Construct._str(self) + str(self.member)
+    def _unicode(self):
+        return Construct._unicode(self) + unicode(self.member)
     
-    def markup(self, marker, parent = None):
-        output = self.extendedAttributes.markup(marker, self) if (self.extendedAttributes) else ''
-        text, target = self.member._markup(marker, self)
-        assert(target != self)
-        text = output + text
-        text += (''.join([str(token) for token in target._tail]) if (target._tail) else '') + str(target._semicolon)
-        return self._leadingSpace + marker.markupConstruct(text, self) + target._trailingSpace + self._trailingSpace
-
+    def _markup(self, generator):
+        return self.member._markup(generator)
+    
     def __repr__(self):
         output = '[member: ' + Construct.__repr__(self)
         return output + repr(self.member) + ']'
@@ -336,7 +348,7 @@ class SyntaxError(Construct):   # ... ";" | ... "}"
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent, False)
         self.tokens = tokens.syntaxError((';', '}'))
-        if (self.tokens[-1].isSymbol('}')):
+        if ((1 < len(self.tokens)) and self.tokens[-1].isSymbol('}')):
             tokens.restore(self.tokens[-1])
             self.tokens = self.tokens[:-1]
         self._didParse(tokens)
@@ -349,8 +361,8 @@ class SyntaxError(Construct):   # ... ";" | ... "}"
     def name(self):
         return None
 
-    def _str(self):
-        return ''.join([str(token) for token in self.tokens])
+    def _unicode(self):
+        return ''.join([unicode(token) for token in self.tokens])
 
 
 class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" identifier [Inheritance] "{" [InterfaceMember]... "}" ";"
@@ -435,32 +447,34 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
                     return argument
         return None
 
-    def _str(self):
-        output = Construct._str(self)
-        output += str(self.partial) if (self.partial) else ''
-        output += str(self._interface) + self.name
-        output += str(self.inheritance) if (self.inheritance) else ''
-        output += str(self._openBrace)
+    def _unicode(self):
+        output = Construct._unicode(self)
+        output += unicode(self.partial) if (self.partial) else ''
+        output += unicode(self._interface) + self.name
+        output += unicode(self.inheritance) if (self.inheritance) else ''
+        output += unicode(self._openBrace)
         for member in self.members:
             if ('constructor' != member.idlType):
-                output += str(member)
-        return output + str(self._closeBrace)
+                output += unicode(member)
+        return output + unicode(self._closeBrace)
 
-    def _markup(self, marker, parent):
-        output = self.extendedAttributes.markup(marker, self) if (self.extendedAttributes) else ''
-        output += str(self.partial) if (self.partial) else ''
-        output += str(self._interface) + marker.markupName(self.name, self)
-        output += self.inheritance.markup(marker, self) if (self.inheritance) else ''
-        output += str(self._openBrace)
+    def _markup(self, generator):
+        generator.addText(self.partial)
+        generator.addText(self._interface)
+        generator.addName(self.name)
+        if (self.inheritance):
+            self.inheritance.markup(generator)
+        generator.addText(self._openBrace)
         for member in self.members:
             if ('constructor' != member.idlType):
-                output += member.markup(marker, self)
-        return (output + str(self._closeBrace), self)
+                member.markup(generator)
+        generator.addText(self._closeBrace)
+        return self
 
     def __repr__(self):
         output = '[interface: ' + Construct.__repr__(self)
         output += '[partial] ' if (self.partial) else ''
-        output += '[name: ' + self.name + '] '
+        output += '[name: ' + self.name.encode('ascii', 'replace') + '] '
         output += repr(self.inheritance) if (self.inheritance) else ''
         output += '[members: \n'
         for member in self.members:
@@ -492,17 +506,19 @@ class DictionaryMember(Construct): # [ExtendedAttributes] Type identifier [Defau
     def idlType(self):
         return 'dictmember'
     
-    def _str(self):
-        output = Construct._str(self) + str(self.type) + str(self.name)
-        return output + (str(self.default) if (self.default) else '')
+    def _unicode(self):
+        output = Construct._unicode(self) + unicode(self.type) + unicode(self.name)
+        return output + (unicode(self.default) if (self.default) else '')
     
-    def _markup(self, marker, parent):
-        output = self.extendedAttributes.markup(marker, self) if (self.extendedAttributes) else ''
-        output += self.type.markup(marker, self) + marker.markupName(self.name, self)
-        return (output + (str(self.default) if (self.default) else ''), self)
-    
+    def _markup(self, generator):
+        self.type.markup(generator)
+        generator.addName(self.name)
+        if (self.default):
+            self.default.markup(generator)
+        return self
+
     def __repr__(self):
-        output = '[dictmember: ' + Construct.__repr__(self) + repr(self.type) + ' [name: ' + self.name + ']'
+        output = '[dictmember: ' + Construct.__repr__(self) + repr(self.type) + ' [name: ' + self.name.encode('ascii', 'replace') + ']'
         return output + ((' = [default: ' + repr(self.default) + ']]') if (self.default) else ']')
 
 
@@ -573,30 +589,32 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
                 return member
         return None
 
-    def _str(self):
-        output = Construct._str(self)
-        output += str(self.partial) if (self.partial) else ''
-        output += str(self._dictionary) + self.name
-        output += str(self.inheritance) if (self.inheritance) else ''
-        output += str(self._openBrace)
+    def _unicode(self):
+        output = Construct._unicode(self)
+        output += unicode(self.partial) if (self.partial) else ''
+        output += unicode(self._dictionary) + self.name
+        output += unicode(self.inheritance) if (self.inheritance) else ''
+        output += unicode(self._openBrace)
         for member in self.members:
-            output += str(member)
-        return output + str(self._closeBrace)
+            output += unicode(member)
+        return output + unicode(self._closeBrace)
     
-    def _markup(self, marker, parent):
-        output = self.extendedAttributes.markup(marker, self) if (self.extendedAttributes) else ''
-        output += str(self.partial) if (self.partial) else ''
-        output += str(self._dictionary) + marker.markupName(self.name, self)
-        output += self.inheritance.markup(marker, self) if (self.inheritance) else ''
-        output += str(self._openBrace)
+    def _markup(self, generator):
+        generator.addText(self.partial)
+        generator.addText(self._dictionary)
+        generator.addName(self.name)
+        if (self.inheritance):
+            self.inheritance.markup(generator)
+        generator.addText(self._openBrace)
         for member in self.members:
-            output += member.markup(marker, self)
-        return (output + str(self._closeBrace), self)
-    
+            member.markup(generator)
+        generator.addText(self._closeBrace)
+        return self
+
     def __repr__(self):
         output = '[dictionary: ' + Construct.__repr__(self)
         output += '[partial] ' if (self.partial) else ''
-        output += '[name: ' + self.name + '] '
+        output += '[name: ' + self.name.encode('ascii', 'replace') + '] '
         output += repr(self.inheritance) if (self.inheritance) else ''
         output += '[members: \n'
         for member in self.members:
@@ -700,27 +718,31 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
                     return argument
         return None
 
-    def _str(self):
-        output = Construct._str(self) + str(self._callback)
+    def _unicode(self):
+        output = Construct._unicode(self) + unicode(self._callback)
         if (self.interface):
-            return output + str(self.interface)
-        output += self.name + str(self._equals) + str(self.returnType)
-        return output + str(self._openParen) + (str(self.arguments) if (self.arguments) else '') + str(self._closeParen)
+            return output + unicode(self.interface)
+        output += self.name + unicode(self._equals) + unicode(self.returnType)
+        return output + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
     
-    def _markup(self, marker, parent):
-        output = self.extendedAttributes.markup(marker, self) if (self.extendedAttributes) else ''
-        output += str(self._callback)
+    def _markup(self, generator):
+        generator.addText(self._callback)
         if (self.interface):
-            text, target = self.interface._markup(marker, parent)
-            return (output + text, target)
-        output += marker.markupName(self.name, self) + str(self._equals) + str(self.returnType)
-        return (output + str(self._openParen) + (self.arguments.markup(marker, self) if (self.arguments) else '') + str(self._closeParen), self)
-    
+            return self.interface._markup(generator)
+        generator.addName(self.name)
+        generator.addText(self._equals)
+        self.returnType.markup(generator)
+        generator.addText(self._openParen)
+        if (self.arguments):
+            self.arguments.markup(generator)
+        generator.addText(self._closeParen)
+        return self
+
     def __repr__(self):
         output = '[callback: ' + Construct.__repr__(self)
         if (self.interface):
             return output + repr(self.interface) + ']'
-        output += '[name: ' + self.name + '] [returnType: ' + str(self.returnType) + '] '
+        output += '[name: ' + self.name.encode('ascii', 'replace') + '] [returnType: ' + unicode(self.returnType) + '] '
         return output + '[argumentlist: ' + (repr(self.arguments) if (self.arguments) else '') + ']]'
 
 
@@ -753,18 +775,17 @@ class ExceptionMember(Construct): # [ExtendedAttributes] Const | [ExtendedAttrib
     def idlType(self):
         return 'const' if (self.const) else 'exceptfield'
 
-    def _str(self):
-        output = Construct._str(self)
-        return output + (str(self.const) if (self.const) else str(self.type) + self.name)
+    def _unicode(self):
+        output = Construct._unicode(self)
+        return output + (unicode(self.const) if (self.const) else unicode(self.type) + self.name)
 
-    def _markup(self, marker, parent):
+    def _markup(self, generator):
         if (self.const):
-            text, target = self.const._markup(marker, parent)
+            self.const.markup(generator)
         else:
-            text, target = ((self.type.markup(marker, self) + marker.markupName(self.name, self)), self)
-        output = self.extendedAttributes.markup(marker, self) if (self.extendedAttributes) else ''
-        text = output + text
-        return (text, target)
+            self.type.markup(generator)
+            generator.addName(self.name)
+        return self
     
     def __repr__(self):
         output = '[member: ' + Construct.__repr__(self)
@@ -837,26 +858,28 @@ class Exception(Construct):   # [ExtendedAttributes] "exception" identifier [Inh
                 return member
         return None
 
-    def _str(self):
-        output = Construct._str(self) + str(self._exception) + self.name
-        output += str(self.inheritance) if (self.inheritance) else ''
-        output += str(self._openBrace)
+    def _unicode(self):
+        output = Construct._unicode(self) + unicode(self._exception) + self.name
+        output += unicode(self.inheritance) if (self.inheritance) else ''
+        output += unicode(self._openBrace)
         for member in self.members:
-            output += str(member)
-        return output + str(self._closeBrace)
+            output += unicode(member)
+        return output + unicode(self._closeBrace)
     
-    def _markup(self, marker, parent):
-        output = self.extendedAttributes.markup(marker, self) if (self.extendedAttributes) else ''
-        output += str(self._exception) + marker.markupName(self.name, self)
-        output += self.inheritance.markup(marker, self) if (self.inheritance) else ''
-        output += str(self._openBrace)
+    def _markup(self, generator):
+        generator.addText(self._exception)
+        generator.addName(self.name)
+        if (self.inheritance):
+            self.inheritance.markup(generator)
+        generator.addText(self._openBrace)
         for member in self.members:
-            output += member.markup(marker, self)
-        return (output + str(self._closeBrace), self)
-    
+            member.markup(generator)
+        generator.addText(self._closeBrace)
+        return self
+
     def __repr__(self):
         output = '[exception: ' + Construct.__repr__(self)
-        output += '[name: ' + self.name + '] '
+        output += '[name: ' + self.name.encode('ascii', 'replace') + '] '
         output += repr(self.inheritance) if (self.inheritance) else ''
         output += '[members: \n'
         for member in self.members:
@@ -888,15 +911,17 @@ class ImplementsStatement(Construct):  # [ExtendedAttributes] identifier "implem
     def idlType(self):
         return 'implements'
 
-    def _str(self):
-        return Construct._str(self) + self.name + str(self._implements) + self.implements
+    def _unicode(self):
+        return Construct._unicode(self) + self.name + unicode(self._implements) + self.implements
 
-    def _markup(self, marker, parent):
-        output = self.extendedAttributes.markup(marker, self) if (self.extendedAttributes) else ''
-        return (output + marker.markupName(self.name, self) + str(self._implements) + marker.markupType(self.implements, self), self)
+    def _markup(self, generator):
+        generator.addName(self.name)
+        generator.addText(self._implements)
+        generator.addType(self.implements)
+        return self
     
     def __repr__(self):
-        return '[implements: ' + Construct.__repr__(self) + '[name: ' + self.name + '] [implements: ' + self.implements + ']]'
+        return '[implements: ' + Construct.__repr__(self) + '[name: ' + self.name.encode('ascii', 'replace') + '] [implements: ' + self.implements + ']]'
 
 
 class ExtendedAttributeUnknown(Construct): # list of tokens
@@ -915,11 +940,11 @@ class ExtendedAttributeUnknown(Construct): # list of tokens
     def name(self):
         return None
     
-    def _str(self):
-        return ''.join([str(token) for token in self.tokens])
+    def _unicode(self):
+        return ''.join([unicode(token) for token in self.tokens])
     
     def __repr__(self):
-        return '[ExtendedAttribute: ' + ''.join([str(token) for token in self.tokens]) + ']'
+        return '[ExtendedAttribute: ' + ''.join([repr(token) for token in self.tokens]) + ']'
 
 
 class ExtendedAttributeNoArgs(Construct):   # identifier
@@ -948,11 +973,11 @@ class ExtendedAttributeNoArgs(Construct):   # identifier
     def normalName(self):
         return (self.parent.name + '()') if ('constructor' == self.idlType) else self.attribute
     
-    def _str(self):
+    def _unicode(self):
         return self.attribute
     
     def __repr__(self):
-        return '[ExtendedAttributeNoArgs: ' + self.attribute + ']'
+        return '[ExtendedAttributeNoArgs: ' + self.attribute.encode('ascii', 'replace') + ']'
 
 
 class ExtendedAttributeArgList(Construct):  # identifier "(" [ArgumentList] ")"
@@ -989,14 +1014,19 @@ class ExtendedAttributeArgList(Construct):  # identifier "(" [ArgumentList] ")"
             return self.parent.name + '(' + (', '.join(argument.name for argument in self.arguments) if (self.arguments) else '') + ')'
         return self.attribute
     
-    def _str(self):
-        return self.attribute + str(self._openParen) + (str(self.arguments) if (self.arguments) else '') + str(self._closeParen)
+    def _unicode(self):
+        return self.attribute + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
     
-    def _markup(self, marker, parent):
-        return (self.attribute + str(self._openParen) + (self.arguments.markup(marker, self) if (self.arguments) else '') + str(self._closeParen), self)
+    def _markup(self, generator):
+        generator.addText(self.attribute)
+        generator.addText(self._openParen)
+        if (self.arguments):
+            self.arguments.markup(generator)
+        generator.addText(self._closeParen)
+        return self
     
     def __repr__(self):
-        return ('[ExtendedAttributeArgList: ' + self.attribute +
+        return ('[ExtendedAttributeArgList: ' + self.attribute.encode('ascii', 'replace') +
                 ' [arguments: ' + (repr(self.arguments) if (self.arguments) else '') + ']]')
 
 
@@ -1031,17 +1061,20 @@ class ExtendedAttributeIdent(Construct):    # identifier "=" identifier
     def normalName(self):
         return (self.value + '()') if ('constructor' == self.idlType) else self.attribute
     
-    def _str(self):
-        return self.attribute + str(self._equals) + self.value
+    def _unicode(self):
+        return self.attribute + unicode(self._equals) + self.value
     
-    def _markup(self, marker, parent):
+    def _markup(self, generator):
+        generator.addText(self.attribute)
+        generator.addText(self._equals)
         if ('constructor' == self.idlType):
-            return (self.attribute + str(self._equals) + marker.markupType(self.value, self), self)
-        return (self.attribute + str(self._equals) + marker.markupName(self.value, self), self)
-    
+            generator.addType(self.value)
+        else:
+            generator.addName(self.value)
+        return self
     
     def __repr__(self):
-        return ('[ExtendedAttributeIdent: ' + self.attribute + ' [value: ' + self.value + ']]')
+        return ('[ExtendedAttributeIdent: ' + self.attribute.encode('ascii', 'replace') + ' [value: ' + self.value + ']]')
 
 
 class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" [ArgumentList] ")"
@@ -1083,17 +1116,25 @@ class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" 
             return self.value + '(' + (', '.join(argument.name for argument in self.arguments) if (self.arguments) else '') + ')'
         return self.attribute
     
-    def _str(self):
-        output = self.attribute + str(self._equals) + self.value
-        return output + str(self._openParen) + (str(self.arguments) if (self.arguments) else '') + str(self._closeParen)
+    def _unicode(self):
+        output = self.attribute + unicode(self._equals) + self.value
+        return output + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
     
-    def _markup(self, marker, parent):
-        output = self.attribute + str(self._equals)
-        output += marker.markupType(self.value, self) if ('constructor' == self.idlType) else marker.markupName(self.value, self)
-        return (output + str(self._openParen) + (self.arguments.markup(marker, self) if (self.arguments) else '') + str(self._closeParen), self)
-    
+    def _markup(self, generator):
+        generator.addText(self.attribute)
+        generator.addText(self._equals)
+        if ('constructor' == self.idlType):
+            generator.addType(self.value)
+        else:
+            generator.addName(self.value)
+        generator.addText(self._openParen)
+        if (self.arguments):
+            self.arguments.markup(generator)
+        generator.addText(self._closeParen)
+        return self
+
     def __repr__(self):
-        return ('[ExtendedAttributeNamedArgList: ' + self.attribute + ' [value: ' + self.value + ']' +
+        return ('[ExtendedAttributeNamedArgList: ' + self.attribute.encode('ascii', 'replace') + ' [value: ' + self.value + ']' +
                 ' [arguments: ' + (repr(self.arguments) if (self.arguments) else '') + ']]')
 
 
@@ -1139,11 +1180,11 @@ class ExtendedAttribute(Construct): # ExtendedAttributeNoArgs | ExtendedAttribut
                     return argument
         return None
     
-    def _str(self):
-        return str(self.attribute)
+    def _unicode(self):
+        return unicode(self.attribute)
     
-    def _markup(self, marker, parent):
-        return self.attribute._markup(marker, parent)
+    def _markup(self, generator):
+        return self.attribute._markup(generator)
     
     def __repr__(self):
         return repr(self.attribute)

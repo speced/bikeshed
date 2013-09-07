@@ -42,11 +42,11 @@ class Token(object):
     def isWhitespace(self):
         return ('whitespace' == self.type)
     
-    def __str__(self):
+    def __unicode__(self):
         return self.text
 
     def __repr__(self):
-        return '[' + self.type + ':' + self.text + ']'
+        return '[' + self.type + ':' + self.text.encode('ascii', 'replace') + ']'
 
 
 
@@ -104,8 +104,8 @@ class Tokenizer(object):
             self.tokens.append(Token('other', match.group(1)))
             text = match.group(2)
 
-    def __str__(self):
-        return ''.join([str(token) for token in self.tokens])
+    def __unicode__(self):
+        return u''.join([unicode(token) for token in self.tokens])
 
     def __repr__(self):
         return ''.join([repr(token) for token in self.tokens])
@@ -212,7 +212,7 @@ class Tokenizer(object):
         "Seek to symbol and report skipped tokens as syntax error"
         skipped = self.seekSymbol(symbol)
         if (self.ui):
-            self.ui.warn("IDL SYNTAX ERROR - skipped: '" + ''.join([str(token) for token in skipped[:-1]]) + "'\n")
+            self.ui.warn(u"IDL SYNTAX ERROR - skipped: '" + u''.join([unicode(token) for token in skipped[:-1]]) + "'\n")
         return skipped
     
 

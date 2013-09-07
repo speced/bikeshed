@@ -13,9 +13,9 @@
 
 import sys
 import itertools
+import cgi
 
 from widlparser import parser
-
 
 
 def debugHook(type, value, tb):
@@ -33,22 +33,29 @@ def debugHook(type, value, tb):
 
 class Marker(object):
     def markupConstruct(self, text, construct):
-        return '<' + construct.idlType + '>' + text + '</' + construct.idlType + '>'
+        return ('<' + construct.idlType + '>', '</' + construct.idlType + '>')
     
     def markupType(self, text, construct):
-        return '<TYPE for=' + construct.idlType + '>' + text + '</TYPE>'
+        return ('<TYPE for=' + construct.idlType + '>', '</TYPE>')
     
     def markupName(self, text, construct):
-        return '<NAME for=' + construct.idlType + '>' + text + '</NAME>'
+        return ('<NAME for=' + construct.idlType + '>', '</NAME>')
+
+    def encode(self, text):
+        return cgi.escape(text)
+
 
 class NullMarker(object):
     def markupConstruct(self, text, construct):
-        return text
+        return ('', '')
     
     def markupType(self, text, construct):
-        return text
+        return ('', '')
     
     def markupName(self, text, construct):
+        return ('', '')
+
+    def encode(self, text):
         return text
 
 class ui(object):
@@ -73,9 +80,16 @@ def testDifference(input, output):
 if __name__ == "__main__":      # called from the command line
     sys.excepthook = debugHook
     parser = parser.Parser(ui=ui())
-    idl = """ // this is a comment
+    idl = u"""
+        typedef Foo foo; // comment <>
+[Constructor(sequence<Foo> foo)]         typedef Two too;
+const Foo bar = 42.0;
+enum ewok { "one", "two" };
+"""
+    idl = u""" // this is a comment éß
 interface Multi : One  ,  Two   ,   Three     {
         attribute short one;
+        attribute DOMString id setraises(DOMException);
 };
 typedef sequence<Foo[]>? fooType;
 typedef (short or Foo) maybeFoo;
@@ -102,7 +116,7 @@ enum comments {
  typedef  short shorttype;
 typedef long longtype;
 typedef long long longtype;
-typedef [hello, my name is inigo montoya (you ] killed my father)] unsigned long long inigo;
+typedef [hello, my name is inigo montøya (you ] killed my father)] unsigned long long inigo;
 typedef unrestricted double dubloons;
 typedef short [ ] shortarray;
 typedef DOMString string;
@@ -157,20 +171,20 @@ exception foo:bar {
 #    idl = idl.replace(' ', '  ')
     print "IDL >>>\n" + idl + "\n<<<"
     parser.parse(idl)
-    testDifference(idl, str(parser))
+    testDifference(idl, unicode(parser))
 
     print "MARKED UP:"
     testDifference(idl, parser.markup(NullMarker()))
     print parser.markup(Marker())
 
     print repr(parser)
-    print "Complexity: " + str(parser.complexityFactor())
+    print "Complexity: " + unicode(parser.complexityFactor())
     
     
     for construct in parser.constructs:
-        print construct.idlType + ': ' + construct.normalName
+        print unicode(construct.idlType) + u': ' + unicode(construct.normalName)
         for member in construct:
-            print '    ' + member.idlType + ': ' + str(member.normalName) + ' (' + str(member.name) + ')'
+            print '    ' + member.idlType + ': ' + unicode(member.normalName) + ' (' + unicode(member.name) + ')'
 
     print "FIND:"
     print parser.find('round').fullName
