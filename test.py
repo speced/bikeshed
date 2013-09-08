@@ -98,10 +98,9 @@ typedef (short or Foo) maybeFoo;
 typedef sequence<(short or Foo)> maybeFoos;
 interface foo {
   [one] attribute Foo one;
-  [two] Foo two();
-  [three] const Foo three = 3;
-};
- typedef   short    shorttype  = error this is;
+  [two] Foo two()bar;
+  [three] const Foo three = 3}}foo
+typedef   short    shorttype  = error this is;
 
    const  long    long   one=   2   ;
  Window   implements     WindowInterface  ; // more comment
@@ -140,7 +139,7 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
     [ha!] attribute short bar getraises (an, exception);
     const short fortyTwo = 42;
     long foo(long x, long y);
-};
+}
 [ NoInterfaceObject ] interface LinkStyle {
     stringifier attribute DOMString mediaText;
     readonly attribute short bar;
@@ -155,7 +154,7 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
 [foo] partial dictionary FooDict:BarDict {
     [one "]" ( tricky ] test)] short bar;
     [two] sequence<(double or Foo)> foo = "hello";
-};
+}
 
 callback callFoo = short();
 callback callFoo2 = unsigned long long(unrestricted double one, DOMString two, Fubar ... three);

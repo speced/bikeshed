@@ -50,15 +50,21 @@ class Production(object):
         generator.addText(self._trailingSpace)
 
 
-    def _consumeSemicolon(self, tokens):
+    def _consumeSemicolon(self, tokens, consumeTail = True):
         if (Symbol.peek(tokens, ';')):
             self._semicolon = Symbol(tokens, ';', False)
         elif (not Symbol.peek(tokens, '}')):
-            skipped = tokens.syntaxError((';', '}'))
-            if (0 < len(skipped)):
-                self._tail = skipped[:-1]
-                tokens.restore(skipped[-1])
-                self._semicolon = Symbol(tokens, ';', False) if (Symbol.peek(tokens, ';')) else ''
+            if (consumeTail):
+                skipped = tokens.syntaxError((';', '}'))
+                if (0 < len(skipped)):
+                    self._tail = skipped[:-1]
+                    tokens.restore(skipped[-1])
+                    self._semicolon = Symbol(tokens, ';', False) if (Symbol.peek(tokens, ';')) else ''
+            else:
+                tokens.syntaxError(None)
+        else:
+            tokens.syntaxError(None)
+
 
 
 class Symbol(Production):

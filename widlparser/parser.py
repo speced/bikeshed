@@ -54,7 +54,7 @@ class Parser(object):
             elif (ImplementsStatement.peek(tokens)):
                 self.constructs.append(ImplementsStatement(tokens))
             else:
-                self.constructs.append(SyntaxError(tokens, ';'))
+                self.constructs.append(SyntaxError(tokens, None))
         
     def __str__(self):
         return self.__unicode__()

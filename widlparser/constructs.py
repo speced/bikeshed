@@ -170,7 +170,7 @@ class Enum(Construct):    # [ExtendedAttributes] "enum" identifier "{" EnumValue
         self._openBrace = Symbol(tokens, '{')
         self.values = EnumValueList(tokens)
         self._closeBrace = Symbol(tokens, '}')
-        self._consumeSemicolon(tokens)
+        self._consumeSemicolon(tokens, False)
         self._didParse(tokens)
 
     @property
@@ -363,7 +363,7 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | [ExtendedAttrib
 class SyntaxError(Construct):   # ... ";" | ... "}"
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent, False)
-        self.tokens = tokens.syntaxError((';', '}'))
+        self.tokens = tokens.syntaxError((';', '}'), False)
         if ((1 < len(self.tokens)) and self.tokens[-1].isSymbol('}')):
             tokens.restore(self.tokens[-1])
             self.tokens = self.tokens[:-1]
@@ -411,7 +411,7 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
                 self.members.append(InterfaceMember(tokens, parent if (parent) else self))
             else:
                 self.members.append(SyntaxError(tokens, parent if (parent) else self))
-        self._consumeSemicolon(tokens)
+        self._consumeSemicolon(tokens, False)
         self._didParse(tokens)
 
     @property
@@ -568,7 +568,7 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
                 self.members.append(DictionaryMember(tokens, self))
             else:
                 self.members.append(SyntaxError(tokens, self))
-        self._consumeSemicolon(tokens)
+        self._consumeSemicolon(tokens, False)
         self._didParse(tokens)
 
     @property
@@ -839,7 +839,7 @@ class Exception(Construct):   # [ExtendedAttributes] "exception" identifier [Inh
                 self.members.append(ExceptionMember(tokens, self))
             else:
                 self.members.append(SyntaxError(tokens, self))
-        self._consumeSemicolon(tokens)
+        self._consumeSemicolon(tokens, False)
         self._didParse(tokens)
 
     @property

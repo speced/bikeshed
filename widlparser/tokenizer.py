@@ -63,6 +63,7 @@ class Tokenizer(object):
         self.tokens = collections.deque()
         self.positionStack = []
         self.peekIndex = -1
+        self.lineNumber = 1
         self._tokenize(text)
 
     def _tokenize(self, text):
@@ -123,14 +124,18 @@ class Tokenizer(object):
         self.resetPeek()
         if (0 < len(self.tokens)):
             token = self.tokens.popleft()
+            self.lineNumber += token.text.count('\n')
             if (skipWhitespace and token.isWhitespace()):
-                return self.tokens.popleft() if (0 < len(self.tokens)) else None
+                token = self.tokens.popleft() if (0 < len(self.tokens)) else None
+                if (token):
+                    self.lineNumber += token.text.count('\n')
             return token
         return None
     
     def restore(self, token):
         "Return token to the front of the stream"
         if (token):
+            self.lineNumber -= token.text.count('\n')
             self.tokens.appendleft(token)
 
     def whitespace(self):
@@ -209,14 +214,23 @@ class Tokenizer(object):
             skipped.append(token)
         return skipped
 
-    def syntaxError(self, symbol):
+    def syntaxError(self, symbol, ending = True):
         "Seek to symbol and report skipped tokens as syntax error"
-        skipped = self.seekSymbol(symbol)
+        lineNumber = self.lineNumber
+        skipped = self.seekSymbol(symbol) if (symbol) else None
         if (self.ui):
-            if (0 < len(skipped)):
-                self.ui.warn(u"IDL SYNTAX ERROR - skipped: '" + u''.join([unicode(token) for token in skipped[:-1]]) + "'\n")
+            message = u'IDL SYNTAX ERROR LINE: ' + unicode(lineNumber) + u' - '
+            if (ending):
+                message += 'expected ";" '
+            
+            skip = skipped[:-1] if (skipped and (0 < len(skipped)) and
+                                    (skipped[-1].isSymbol(';') or
+                                     ((1 < len(skipped)) and skipped[-1].isSymbol('}')))) else skipped
+            
+            if (symbol):
+                if (0 < len(skip)):
+                    self.ui.warn(message + u'skipped: "' + u''.join([unicode(token) for token in skip]) + '"\n')
             else:
-                self.ui.warn(u'IDL SYNTAX ERROR - expected: ";" or "}"\n')
+                self.ui.warn(message + '\n')
         return skipped
     
-
