@@ -40,6 +40,7 @@ from lib.ReferenceManager import ReferenceManager
 from lib.ReferenceManager import linkTextsFromElement
 from lib.htmlhelpers import *
 from lib.messages import *
+from lib.widlparser.widlparser import parser
 
 config.scriptPath = os.path.dirname(os.path.realpath(__file__))
 
@@ -705,9 +706,10 @@ def canonicalizeShortcuts(doc):
 
 
 def processDfns(doc):
-    classifyDfns(doc)
-    dedupIds(doc, findAll("dfn"))
-    doc.refs.addLocalDfns(findAll("dfn"))
+    dfns = findAll("dfn")
+    classifyDfns(doc, dfns)
+    dedupIds(doc, dfns)
+    doc.refs.addLocalDfns(dfns)
 
 
 def determineDfnType(dfn):
@@ -773,9 +775,9 @@ def determineLinkType(el):
     else:
         return "dfn"
 
-def classifyDfns(doc):
+def classifyDfns(doc, dfns):
     dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
-    for el in findAll("dfn"):
+    for el in dfns:
         dfnType = determineDfnType(el)
         dfnText = linkTextsFromElement(el)[0]
         # Push the dfn type down to the <dfn> itself.
@@ -906,6 +908,84 @@ def addSelfLinks(doc):
         prependChild(el, makeSelfLink(el))
     for el in findAll("dfn"):
         appendChild(el, makeSelfLink(el))
+
+
+class IDLMarker(object):
+    def markupConstruct(self, text, construct):
+        return (None, None)
+
+    def markupType(self, text, construct):
+        return ('<a data-link-type="idl">', '</a>')
+
+    def markupName(self, text, construct):
+        if construct.idlType not in config.idlTypes:
+            return (None,None)
+
+        if construct.idlType == "constructor":
+            idlType = "method"
+        else:
+            idlType = construct.idlType
+
+        if idlType == "method":
+            title = parser.Parser().normalizedMethodName(text)
+        else:
+            title = text
+
+        def getForValues(construct):
+            if construct.idlType in ("method", "constructor"):
+                myForValue = parser.Parser().normalizedMethodName(construct.name)
+            else:
+                myForValue = construct.name
+            if construct.parent:
+                forValues = getForValues(construct.parent)
+                forValues.append(myForValue)
+                return forValues
+            else:
+                return [myForValue]
+
+        if idlType in config.typesUsingFor:
+            idlFor = "data-idl-for='{0}'".format('/'.join(getForValues(construct.parent)))
+        else:
+            idlFor = ""
+        return ('<idl title="{0}" data-idl-type="{1}" {2}>'.format(title, idlType, idlFor), '</idl>')
+
+    def encode(self, text):
+        return escapeHTML(text)
+
+
+def markupIDL(doc):
+    for el in findAll('pre.idl'):
+        widl = parser.Parser(textContent(el))
+        text = unicode(widl.markup(IDLMarker()))
+        replaceContents(el, parseHTML(text))
+
+
+def processIDL(doc):
+    for el in findAll("idl"):
+        idlType = el.get('data-idl-type')
+        url = doc.refs.getRef(idlType, el.get('title').lower(),
+                              linkFor=el.get('data-idl-for'),
+                              el=el,
+                              error=False)
+        if url is None:
+            el.tag = "dfn"
+            el.set('data-dfn-type', idlType)
+            del el.attrib['data-idl-type']
+            if el.get('data-idl-for'):
+                el.set('data-dfn-for', el.get('data-idl-for'))
+                del el.attrib['data-idl-for']
+        else:
+            el.tag = "a"
+            el.set('data-link-type', idlType)
+            del el.attrib['data-idl-type']
+            if el.get('data-idl-for'):
+                el.set('data-link-for', el.get('data-idl-for'))
+                del el.attrib['data-idl-for']
+    dfns = findAll("pre.idl dfn")
+    classifyDfns(doc, dfns)
+    dedupIds(doc, dfns)
+    doc.refs.addLocalDfns(dfns)
+
 
 
 def cleanupHTML(doc):
@@ -1066,10 +1146,12 @@ class CSSSpec(object):
         processHeadings(self)
         canonicalizeShortcuts(self)
         processIssues(self)
+        markupIDL(self)
 
 
         # Handle all the links
         processDfns(self)
+        processIDL(self)
         buildBibliolinkDatabase(self)
         processAutolinks(self)
 

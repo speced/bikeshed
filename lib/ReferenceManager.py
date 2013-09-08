@@ -214,12 +214,12 @@ class ReferenceManager(object):
         if len(localRefs) == 1:
             return localRefs[0]['url']
         elif len(localRefs) > 1:
-            warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
-                 linkType,
-                 text,
-                 refs[0]['type'],
-                 "' or '".join(refs[0]['for']),
-                 '\n'.join("    "+dfnFor for ref in localRefs for dfnFor in ref['for']))
+            if error:
+                warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
+                     linkType,
+                     text,
+                     refs[0]['type'],
+                     "' or '".join(refs[0]['for']))
             return localRefs[0]['url']
 
         # If all the refs are for the same shortname,
