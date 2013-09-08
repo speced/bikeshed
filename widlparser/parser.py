@@ -141,7 +141,7 @@ class Parser(object):
             if (argument):
                 return argument
 
-    def normalizedMethodName(self, methodText):
+    def normalizedMethodName(self, methodText, interfaceName = None):
         match = re.match(r'(.*)\((.*)\)(.*)', methodText)
         if (match):
             tokens = tokenizer.Tokenizer(match.group(2))
@@ -153,13 +153,23 @@ class Parser(object):
         else:
             name = methodText
             arguments = ''
-        construct = self.find(name)
-        if (construct and ('method' == construct.idlType)):
-            return construct.methodName
+            
+        if (interfaceName):
+            interface = self.find(interfaceName)
+            if (interface):
+                method = interface.findMethod(name)
+                if (method):
+                    return method.methodName
+            return name + '(' + arguments + ')'
+
         for construct in self.constructs:
             method = construct.findMethod(name)
             if (method):
                 return method.methodName
+
+        construct = self.find(name)
+        if (construct and ('method' == construct.idlType)):
+            return construct.methodName
         return name + '(' + arguments + ')'
 
     def markup(self, marker):

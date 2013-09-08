@@ -207,4 +207,7 @@ exception foo:bar {
     print parser.normalizedMethodName('unknown')
     print parser.normalizedMethodName('testMethod(short one, double two)')
     print parser.normalizedMethodName('testMethod2(one, two, and a half)')
+    print parser.normalizedMethodName('bob(xxx)', 'LinkStyle')
+    print parser.normalizedMethodName('bob')
+    print parser.normalizedMethodName('bob()')
 
