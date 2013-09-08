@@ -205,14 +205,18 @@ class Tokenizer(object):
             elif (token.isSymbol('[')):
                 skipped += self.seekSymbol(']')
             token = self.next(False)
-        skipped.append(token)
+        if (token):
+            skipped.append(token)
         return skipped
 
     def syntaxError(self, symbol):
         "Seek to symbol and report skipped tokens as syntax error"
         skipped = self.seekSymbol(symbol)
         if (self.ui):
-            self.ui.warn(u"IDL SYNTAX ERROR - skipped: '" + u''.join([unicode(token) for token in skipped[:-1]]) + "'\n")
+            if (0 < len(skipped)):
+                self.ui.warn(u"IDL SYNTAX ERROR - skipped: '" + u''.join([unicode(token) for token in skipped[:-1]]) + "'\n")
+            else:
+                self.ui.warn(u'IDL SYNTAX ERROR - expected: ";" or "}"\n')
         return skipped
     
 
