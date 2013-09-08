@@ -911,9 +911,6 @@ def addSelfLinks(doc):
 
 
 class IDLMarker(object):
-    def markupConstruct(self, text, construct):
-        return (None, None)
-
     def markupType(self, text, construct):
         return ('<a data-link-type="idl">', '</a>')
 
@@ -952,10 +949,13 @@ class IDLMarker(object):
     def encode(self, text):
         return escapeHTML(text)
 
+class IDLUI(object):
+    def warn(self, msg):
+        die("{0}", msg)
 
 def markupIDL(doc):
     for el in findAll('pre.idl'):
-        widl = parser.Parser(textContent(el))
+        widl = parser.Parser(textContent(el), IDLUI())
         text = unicode(widl.markup(IDLMarker()))
         replaceContents(el, parseHTML(text))
 
