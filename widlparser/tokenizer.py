@@ -218,7 +218,7 @@ class Tokenizer(object):
         "Seek to symbol and report skipped tokens as syntax error"
         lineNumber = self.lineNumber
         skipped = self.seekSymbol(symbol) if (symbol) else None
-        if (self.ui):
+        if (self.ui and hasattr(self.ui, 'warn')):
             message = u'IDL SYNTAX ERROR LINE: ' + unicode(lineNumber) + u' - '
             if (ending):
                 message += 'expected ";" '
@@ -233,4 +233,10 @@ class Tokenizer(object):
             else:
                 self.ui.warn(message + '\n')
         return skipped
-    
+
+    def didIgnore(self, ignored):
+        "Report ignored content"
+        if (self.ui and hasattr(self.ui, 'note')):
+            message = u'IGNORED LEGACY IDL LINE: ' + unicode(self.lineNumber) + u' - "'
+            ignoreText = u''.join(unicode(ignore) for ignore in ignored) if (hasattr(ignored, '__iter__')) else unicode(ignored)
+            self.ui.note(message + ignoreText + '"\n')

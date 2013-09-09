@@ -671,6 +671,7 @@ class IgnoreInOut(Production):  # "in" | "out"
         Production.__init__(self, tokens)
         self.text = tokens.next().text
         self._didParse(tokens)
+        tokens.didIgnore(self.text)
 
     def _unicode(self):
         return self.text
@@ -707,6 +708,7 @@ class Ignore(Production):    # "inherits" "getter" | "getraises" "(" ... ")" | "
             self.tokens.append(tokens.next())    # "("
             self.tokens += tokens.seekSymbol(')')
         self._didParse(tokens)
+        tokens.didIgnore(self.tokens)
 
     def _unicode(self):
         return ''.join([unicode(token) for token in self.tokens])
@@ -723,12 +725,14 @@ class IgnoreMultipleInheritance(Production):    # [, identifier]...
                 return tokens.popPosition(True)
         return tokens.popPosition(False)
 
-    def __init__(self, tokens):
+    def __init__(self, tokens, continuation = False):
         Production.__init__(self, tokens)
         self._comma = Symbol(tokens, ',')
         self.inherit = tokens.next().text
-        self.next = IgnoreMultipleInheritance(tokens) if (IgnoreMultipleInheritance.peek(tokens)) else None
+        self.next = IgnoreMultipleInheritance(tokens, True) if (IgnoreMultipleInheritance.peek(tokens)) else None
         self._didParse(tokens)
+        if (not continuation):
+            tokens.didIgnore(self)
 
     def _unicode(self):
         return unicode(self._comma) + self.inherit + (unicode(self.next) if (self.next) else '')
