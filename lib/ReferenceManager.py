@@ -88,8 +88,7 @@ class ReferenceManager(object):
         refs = [ref for ref in refs if ref['status'] == "local"]
         if linkFor:
             refs = [ref for ref in refs if linkFor in ref['for']]
-        if len(refs) == 1:
-            return refs[0]
+        return refs
 
     def getRef(self, linkType, text, spec=None, status=None, linkFor=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a url or None
@@ -105,9 +104,18 @@ class ReferenceManager(object):
                 die("Unknown spec status '{0}'. Status must be ED, TR, or local.", status)
             return None
 
-        localRef = self.getLocalRef(linkType, text, linkFor, el)
-        if localRef:
-            return localRef['url']
+        # Local refs always get precedence, no matter what.
+        localRefs = self.getLocalRef(linkType, text, linkFor, el)
+        if len(localRefs) == 1:
+            return localRefs[0]['url']
+        elif len(localRefs) > 1:
+            if error:
+                warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
+                     linkType,
+                     text,
+                     refs[0]['type'],
+                     "' or '".join(refs[0]['for']))
+            return localRefs[0]['url']
 
         # Take defaults into account
         if (spec is None or status is None) and text in self.defaultSpecs:
@@ -151,11 +159,11 @@ class ReferenceManager(object):
 
         # If status is ED, kill TR refs unless their spec *only* has a TR url
         if status == "ED":
-            refs = [ref for ref in refs if ref['status'] in ("ED", "local") or (ref['status'] == "TR" and self.specs[ref['spec']]['ED'] is None)]
+            refs = [ref for ref in refs if ref['status'] == "ED" or (ref['status'] == "TR" and self.specs[ref['spec']]['ED'] is None)]
         # If status is TR, kill ED refs if there's a corresponding TR ref for the same spec.
         if status == "TR":
             TRRefSpecs = [ref['spec'] for ref in refs if ref['status'] == 'TR']
-            refs = [ref for ref in refs if ref['status'] in ("TR", "local") or (ref['status'] == "ED") and ref['spec'] not in TRRefSpecs]
+            refs = [ref for ref in refs if ref['status'] == "TR" or (ref['status'] == "ED") and ref['spec'] not in TRRefSpecs]
         if len(refs) == 0:
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
@@ -187,19 +195,6 @@ class ReferenceManager(object):
         if len(refs) == 1:
             # Success!
             return refs[0]['url']
-
-        # Accept local dfns even if there are xrefs with the same text.
-        localRefs = [ref for ref in refs if ref['status'] == "local"]
-        if len(localRefs) == 1:
-            return localRefs[0]['url']
-        elif len(localRefs) > 1:
-            if error:
-                warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
-                     linkType,
-                     text,
-                     refs[0]['type'],
-                     "' or '".join(refs[0]['for']))
-            return localRefs[0]['url']
 
         # If all the refs are for the same shortname,
         # assume you want to link to the latest one (highest level).
