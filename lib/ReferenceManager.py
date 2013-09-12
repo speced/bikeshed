@@ -83,6 +83,10 @@ class ReferenceManager(object):
                     }
                     self.refs[linkText].append(ref)
 
+    def getLocalRef(self, linkType, text, linkFor=None, el=None):
+        pass
+
+
 
     def getRef(self, linkType, text, spec=None, status=None, linkFor=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a url or None
@@ -93,9 +97,9 @@ class ReferenceManager(object):
         zeroRefsError = error and linkType!="maybe"
 
         status = status or self.specStatus
-        if status not in ("ED", "TR"):
+        if status not in ("ED", "TR", "local"):
             if error:
-                die("Unknown spec status '{0}'. Status must be ED or TR.", status)
+                die("Unknown spec status '{0}'. Status must be ED, TR, or local.", status)
             return None
 
         # Take defaults into account
@@ -107,40 +111,8 @@ class ReferenceManager(object):
                     linkFor = linkFor or dfnFor
                     break
 
-        def filterRefsByTypeAndText(allRefs, dfnTypes, linkTexts):
-            '''Filter by type/text to find all the candidate refs'''
-            import json
-            # Allow either a string or an iter of strings
-            if isinstance(dfnTypes, basestring):
-                dfnTypes = [dfnTypes]
-            if isinstance(linkTexts, basestring):
-                linkTexts = [linkTexts]
-            dfnTypes = set(dfnTypes)
-            refs = []
-            for linkText in linkTexts:
-                if linkText in allRefs:
-                    for ref in allRefs[linkText]:
-                        if ref['type'] in dfnTypes:
-                            refs.append(ref)
-            return refs
-
         # Get the relevant refs
-        if linkType in config.dfnTypes:
-            refs = filterRefsByTypeAndText(self.refs, [linkType], text)
-        elif linkType == "propdesc":
-            refs = filterRefsByTypeAndText(self.refs, ["property", "descriptor"], text)
-        elif linkType == "functionish":
-            refs = filterRefsByTypeAndText(self.refs, ["function", "method"], text)
-        elif linkType == "idl":
-            refs = filterRefsByTypeAndText(self.refs, config.idlTypes, text)
-        elif linkType == "dfn":
-            refs = filterRefsByTypeAndText(self.refs, "dfn", linkTextVariations(text))
-        elif linkType == "maybe":
-            refs = filterRefsByTypeAndText(self.refs, config.maybeTypes, text) + filterRefsByTypeAndText(self.refs, "dfn", linkTextVariations(text))
-        else:
-            if error:
-                die("Unknown link type '{0}'.",linkType)
-            return None
+        refs = filterRefsByTypeAndText(self.refs, linkType, text, error)
 
         if len(refs) == 0:
             if zeroRefsError:
@@ -278,3 +250,32 @@ def linkTextVariations(str):
         yield str[:-1]
     if str[-1:] == u"’":
         yield str[:-1]
+
+def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
+    '''Filter by type/text to find all the candidate refs'''
+
+    def filter(refs, dfnTypes, linkTexts):
+        # Allow either a string or an iter of strings
+        if isinstance(dfnTypes, basestring):
+            dfnTypes = [dfnTypes]
+        if isinstance(linkTexts, basestring):
+            linkTexts = [linkTexts]
+        dfnTypes = set(dfnTypes)
+        return [ref for linkText in linkTexts for ref in refs.get(linkText,[]) if ref['type'] in dfnTypes]
+
+    if linkType in config.dfnTypes:
+        return filter(allRefs, [linkType], linkText)
+    elif linkType == "propdesc":
+        return filter(allRefs, ["property", "descriptor"], linkText)
+    elif linkType == "functionish":
+        return filter(allRefs, ["function", "method"], linkText)
+    elif linkType == "idl":
+        return filter(allRefs, config.idlTypes, linkText)
+    elif linkType == "dfn":
+        return filter(allRefs, "dfn", linkTextVariations(linkText))
+    elif linkType == "maybe":
+        return filter(allRefs, config.maybeTypes, linkText) + filter(allRefs, "dfn", linkTextVariations(linkText))
+    else:
+        if error:
+            die("Unknown link type '{0}'.",linkType)
+        return None
