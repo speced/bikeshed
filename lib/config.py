@@ -5,37 +5,40 @@ scriptPath = "~"
 doc = None
 textMacros = {}
 dfnClassToType = {
-    "propdef":"property",
-    "descdef":"descriptor",
-    "valuedef":"value",
-    "typedef":"type",
-    "at-ruledef":"at-rule",
-    "funcdef":"function",
-    "selectordef":"selector",
-    "tokendef":"token",
-    "interfacedef":"interface",
-    "methoddef":"method",
-    "argdef":"argument",
-    "attrdef":"attribute",
-    "dictdef":"dictionary",
-    "dictmemberdef":"dictmember",
-    "enumdef":"enum",
-    "constdef":"const",
-    "callbackdef":"callback",
-    "eventdef":"event",
-    "typedefdef":"typedef",
-    "html-elemdef":"html-element",
-    "html-attrdef":"html-attribute"
-}
-dfnTypes = frozenset(dfnClassToType.values())
-maybeTypes = frozenset(("value", "type", "at-rule", "function", "selector", "token"))
-idlTypes = frozenset(("interface", "method", "argument", "attribute", "dictionary", "dictmember", "enum", "const", "callback", "event", "typedef"))
-functionishTypes = frozenset(("function", "method"))
-linkTypes = dfnTypes | frozenset(("propdesc", "functionish", "idl", "maybe", "biblio"))
-typesUsingFor = frozenset(("descriptor", "value", "method", "argument", "attribute", "const", "dictmember", "event"))
+    'propdef'         : 'property',
+    'valuedef'        : 'value',
+    'at-ruledef'      : 'at-rule',
+    'descdef'         : 'descriptor',
+    'typedef'         : 'type',
+    'funcdef'         : 'function',
+    'selectordef'     : 'selector',
+    'tokendef'        : 'token',
+    'elementdef'      : 'element',
+    'element-attrdef' : 'element-attr',
+    'eventdef'        : 'event',
+    'interfacedef'    : 'interface',
+    'constructordef'  : 'constructor',
+    'methoddef'       : 'method',
+    'argdef'          : 'argument',
+    'attrdef'         : 'attribute',
+    'callbackdef'     : 'callback',
+    'dictdef'         : 'dictionary',
+    'dict-memberdef'  : 'dict-member',
+    'exceptdef'       : 'exception',
+    'except-fielddef' : 'except-field',
+    'enumdef'         : 'enum',
+    'constdef'        : 'const',
+    'typedefdef'      : 'typedef' }
+
+dfnTypes = frozenset(dfnClassToType.values()) | frozenset(["dfn"])
+maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector", "token"])
+idlTypes = frozenset(['event', 'interface', 'constructor', 'method', 'argument', 'attribute', 'callback', 'dictionary', 'dict-member', 'exception', 'except-field', 'enum', 'const', 'typedef'])
+functionishTypes = frozenset(["function", "method"])
+linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "maybe", "biblio"])
+typesUsingFor = frozenset(["descriptor", "value", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "except-field"])
 
 linkTypeToDfnType = {
-    "propdesc": frozenset(("property", "descriptor")),
+    "propdesc": frozenset(["property", "descriptor"]),
     "functionish": functionishTypes,
     "idl": idlTypes,
     "maybe": maybeTypes,
