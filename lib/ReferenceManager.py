@@ -84,9 +84,12 @@ class ReferenceManager(object):
                     self.refs[linkText].append(ref)
 
     def getLocalRef(self, linkType, text, linkFor=None, el=None):
-        pass
-
-
+        refs = filterRefsByTypeAndText(self.refs, linkType, text)
+        refs = [ref for ref in refs if ref['status'] == "local"]
+        if linkFor:
+            refs = [ref for ref in refs if linkFor in ref['for']]
+        if len(refs) == 1:
+            return refs[0]
 
     def getRef(self, linkType, text, spec=None, status=None, linkFor=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a url or None
@@ -101,6 +104,10 @@ class ReferenceManager(object):
             if error:
                 die("Unknown spec status '{0}'. Status must be ED, TR, or local.", status)
             return None
+
+        localRef = self.getLocalRef(linkType, text, linkFor, el)
+        if localRef:
+            return localRef['url']
 
         # Take defaults into account
         if (spec is None or status is None) and text in self.defaultSpecs:
