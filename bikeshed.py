@@ -907,6 +907,9 @@ def addSelfLinks(doc):
     for el in findAll(".issue[id], .example[id], .note[id], li[id], dt[id]"):
         prependChild(el, makeSelfLink(el))
     for el in findAll("dfn"):
+        if len([x for x in el.iterancestors("a")]):
+            warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el))
+            continue
         appendChild(el, makeSelfLink(el))
 
 
