@@ -20,6 +20,22 @@ A short overview of my preprocessor's features:
 
 Examples of all of the functionality described here can be found by looking at the source of the [CSS Variables source document](http://dev.w3.org/csswg/css-variables/Overview.src.html)
 
+Note About Fatal Errors
+-----------------------
+
+Bikeshed generates "fatal errors" for lots of things that it wants you to fix,
+but generally recovers gracefully from them anyway.
+If you're getting a fatal error,
+but don't have time to fix it and just need a spec **right now**,
+you can force Bikeshed to generate anyway with the `-f` flag, like: `bikeshed -f spec`.
+
+This is also sometimes useful when converting a spec to Bikeshed for the first time,
+so you can see all the errors at once and fix them in whatever order is easiest,
+rather than having to deal with them one-by-one with no idea when they'll end.
+(You may also want to silence the warnings in this case,
+to reduce visual noise until you've gotten it at least building successfully.
+Use `bikeshed -qf spec`.)
+
 Documentation Sections
 ----------------------
 
