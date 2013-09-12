@@ -28,6 +28,7 @@ import os
 import sys
 import json
 import argparse
+import urllib
 from urllib2 import urlopen
 from datetime import date, datetime
 import html5lib
@@ -896,7 +897,8 @@ def processIssues(doc):
 
 def addSelfLinks(doc):
     def makeSelfLink(el):
-        selflink = lxml.etree.Element('a', {"href": "#" + el.get('id', ''), "class":"self-link"});
+        selflink = lxml.etree.Element(
+            'a', {"href": "#" + urllib.quote(el.get('id', '')), "class":"self-link"});
         return selflink
 
     foundFirstNumberedSection = False
