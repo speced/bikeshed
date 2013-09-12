@@ -30,7 +30,7 @@ dfnClassToType = {
     'constdef'        : 'const',
     'typedefdef'      : 'typedef' }
 
-dfnTypes = frozenset(dfnClassToType.values()) | frozenset(["dfn"])
+dfnTypes = frozenset(dfnClassToType.values())
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector", "token"])
 idlTypes = frozenset(['event', 'interface', 'constructor', 'method', 'argument', 'attribute', 'callback', 'dictionary', 'dict-member', 'exception', 'except-field', 'enum', 'const', 'typedef'])
 functionishTypes = frozenset(["function", "method"])
