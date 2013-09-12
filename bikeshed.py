@@ -102,6 +102,8 @@ def main():
         config.doc.preprocess()
         config.doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "debug":
+        config.debug = True
+        config.quiet = True
         if options.printExports:
             config.doc = CSSSpec(inputFile=options.infile)
             config.doc.preprocess()
@@ -115,8 +117,6 @@ def main():
             config.doc.preprocess()
             exec("print {0}".format(options.code))
         elif options.linkText:
-            config.debug = True
-            config.quiet = True
             config.doc = CSSSpec(inputFile=options.infile)
             config.doc.preprocess()
             refs = config.doc.refs.refs[options.linkText]

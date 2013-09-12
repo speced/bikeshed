@@ -256,27 +256,27 @@ def linkTextVariations(str):
 def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
     '''Filter by type/text to find all the candidate refs'''
 
-    def filter(refs, dfnTypes, linkTexts):
+    def filterRefs(allRefs, dfnTypes, linkTexts):
         # Allow either a string or an iter of strings
         if isinstance(dfnTypes, basestring):
             dfnTypes = [dfnTypes]
         if isinstance(linkTexts, basestring):
             linkTexts = [linkTexts]
         dfnTypes = set(dfnTypes)
-        return [ref for linkText in linkTexts for ref in refs.get(linkText,[]) if ref['type'] in dfnTypes]
+        return [ref for linkText in linkTexts for ref in allRefs.get(linkText,[]) if ref['type'] in dfnTypes]
 
     if linkType in config.dfnTypes:
-        return filter(allRefs, [linkType], linkText)
+        return filterRefs(allRefs, [linkType], linkText)
     elif linkType == "propdesc":
-        return filter(allRefs, ["property", "descriptor"], linkText)
+        return filterRefs(allRefs, ["property", "descriptor"], linkText)
     elif linkType == "functionish":
-        return filter(allRefs, ["function", "method"], linkText)
+        return filterRefs(allRefs, ["function", "method"], linkText)
     elif linkType == "idl":
-        return filter(allRefs, config.idlTypes, linkText)
+        return filterRefs(allRefs, config.idlTypes, linkText)
     elif linkType == "dfn":
-        return filter(allRefs, "dfn", linkTextVariations(linkText))
+        return filterRefs(allRefs, "dfn", linkTextVariations(linkText))
     elif linkType == "maybe":
-        return filter(allRefs, config.maybeTypes, linkText) + filter(allRefs, "dfn", linkTextVariations(linkText))
+        return filterRefs(allRefs, config.maybeTypes, linkText) + filterRefs(allRefs, "dfn", linkTextVariations(linkText))
     else:
         if error:
             die("Unknown link type '{0}'.",linkType)
