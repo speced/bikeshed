@@ -175,7 +175,7 @@ class ReferenceManager(object):
                 return True
             if spec == "css21" and ignoreCSS21:
                 return True
-            if spec == "svg" and ignoreSVG:
+            if spec in ("svg", "svg2") and ignoreSVG:
                 return True
             return False
         possibleSpecs = set(ref['spec'] for ref in refs)
