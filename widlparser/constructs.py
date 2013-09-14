@@ -521,7 +521,7 @@ class DictionaryMember(Construct): # [ExtendedAttributes] Type identifier [Defau
 
     @property
     def idlType(self):
-        return 'dictmember'
+        return 'dict-member'
     
     def _unicode(self):
         output = Construct._unicode(self) + unicode(self.type) + unicode(self.name)
@@ -535,7 +535,7 @@ class DictionaryMember(Construct): # [ExtendedAttributes] Type identifier [Defau
         return self
 
     def __repr__(self):
-        output = '[dictmember: ' + Construct.__repr__(self) + repr(self.type) + ' [name: ' + self.name.encode('ascii', 'replace') + ']'
+        output = '[dict-member: ' + Construct.__repr__(self) + repr(self.type) + ' [name: ' + self.name.encode('ascii', 'replace') + ']'
         return output + ((' = [default: ' + repr(self.default) + ']]') if (self.default) else ']')
 
 
@@ -792,7 +792,7 @@ class ExceptionMember(Construct): # [ExtendedAttributes] Const | [ExtendedAttrib
 
     @property
     def idlType(self):
-        return 'const' if (self.const) else 'exceptfield'
+        return 'const' if (self.const) else 'except-field'
 
     def _unicode(self):
         output = Construct._unicode(self)

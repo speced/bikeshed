@@ -73,7 +73,7 @@ The name of the construct.
 
 **Construct.idlType**
 
-Contains a string indicating the type of the construct. Possible values are: "const", "enum", "typedef", "interface", "constructor", "attribute", "method", "argument", "dictionary", "dictmember", "callback", "exception", "exceptfield", "implements", "extended-attribute", and "unknown".
+Contains a string indicating the type of the construct. Possible values are: "const", "enum", "typedef", "interface", "constructor", "attribute", "method", "argument", "dictionary", "dict-member", "callback", "exception", "except-field", "implements", "extended-attribute", and "unknown".
 
 **Construct.fullName**
 
