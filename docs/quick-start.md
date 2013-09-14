@@ -62,12 +62,13 @@ If defining a property/descriptor, rather than writing out the table markup expl
 ~~~~html
 <pre class='propdef'> (or 'descdef')
 Name: var-*
-Values: [ <value> | <CDO> | <CDC> ]
+Value: [ <<value>> | <<CDO>> | <<CDC>> ]
 Initial: (nothing, see prose)
-Applies To: all elements
+Applies to: all elements
 Inherited: yes
-Computed Value: specified value with variables substituted (but see prose for "invalid variables")
 Media: all
+Computed value: specified value with variables substituted (but see prose for "invalid variables")
+Percentage: n/a
 </pre>
 ~~~~
 
