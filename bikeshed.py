@@ -1394,7 +1394,7 @@ def addPropertyIndex(doc):
         for prop in props:
             html += u"\n<tr><th scope=row><a data-property>{0}</a>".format(u(prop['Name']))
             for column in columns[1:]:
-                html += u"<td>" + u(prop.get(column, ""))
+                html += u"<td>" + u(escapeHTML(prop.get(column, "")))
         html += u"</table>"
     else:
         html += u"<p>No properties defined."
