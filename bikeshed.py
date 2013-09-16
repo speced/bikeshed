@@ -1429,7 +1429,7 @@ def addTOCSection(doc):
         # Several elements which can occur in headings shouldn't be copied over into the ToC.
 
         # ToC text is wrapped in an <a>, but the HTML parser doesn't like nested <a>s.
-        html = html.replace(u'<a', u'<span').replace(u'</a', u'</span')
+        html = re.sub(r'<(/?)a\b', r'<\1span', html)
 
         # Remove any <dfn>s, so they don't get duplicated in the ToC.
         html = re.sub(u'(<dfn[^>]*>)|(</dfn>)', '', html)
