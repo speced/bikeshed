@@ -362,6 +362,17 @@ def transformMetadata(lines, doc, **kwargs):
         except:
             die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", field, val)
 
+    def parseEditor(val, field):
+        match = re.match(u"([^,]+) ,\s* ([^,]+) ,?\s* (.*)", val, re.X)
+        if match:
+            return {
+                'name': match.group(1),
+                'org': match.group(2),
+                'link': match.group(3)
+            }
+        else:
+            die("'{0}' format is '<name>, <company>, <email-or-contact-page>. Got:\n{1}", field, val)
+
     for line in lines:
         match = re.match(u"\s*([^:]+):\s*(.*)", u(line))
         if(match is None):
@@ -398,15 +409,9 @@ def transformMetadata(lines, doc, **kwargs):
         elif key == "Previous Version":
             doc.previousVersions.append(val)
         elif key == "Editor":
-            match = re.match(u"([^,]+) ,\s* ([^,]+) ,?\s* (.*)", val, re.X)
-            if match:
-                doc.editors.append(
-                    {
-                        'name': match.group(1),
-                        'org': match.group(2),
-                        'link': match.group(3)})
-            else:
-                die("'Editor' format is '<name>, <company>, <email-or-contact-page>. Got:\n{0}", val)
+            doc.editors.append(parseEditor(val, key))
+        elif key == "Former Editor":
+            doc.previousEditors.append(parseEditor(val, key))
         elif key == "At Risk":
             doc.atRisk.append(val)
         elif key == "Test Suite":
@@ -1168,6 +1173,7 @@ class CSSSpec(object):
     deadline = None
     group = "csswg"
     editors = []
+    previousEditors = []
     previousVersions = []
     warning = None
     atRisk = []
@@ -1553,6 +1559,15 @@ def addTOCSection(doc):
         del badSpan.attrib['href']
 
 def addSpecMetadataSection(doc):
+    def printEditor(val):
+        str = u"<dd class='p-author h-card vcard'>"
+        if(editor['link'][0:4] == "http"):
+            str += u"<a class='p-name fn u-url url' href='{0}'>{1}</a> (<span class='p-org org'>{2}</span>)".format(editor['link'], editor['name'], editor['org'])
+        else:
+            # Link is assumed to be an email address
+            str += u"<a class='p-name fn u-email email' href='mailto:{2}'>{0}</a> (<span class='p-org org'>{1}</span>)".format(editor['name'], editor['org'], editor['link'])
+        return str
+
     header = u"<dl>"
     header += u"<dt>This version:<dd><a href='[VERSION]' class='u-url'>[VERSION]</a>"
     if doc.TR:
@@ -1574,20 +1589,13 @@ def addSpecMetadataSection(doc):
     if len(doc.editors):
         header += u"<dt>Editors:\n"
         for editor in doc.editors:
-            header += u"<dd class='p-author h-card vcard'>"
-            if(editor['link'][0:4] == "http"):
-                header += u"<a class='p-name fn u-url url' href='{0}'>{1}</a> \
-(<span class='p-org org'>{2}</span>)".format(editor['link'],
-                                             editor['name'],
-                                             editor['org'])
-            else:
-                # Link is assumed to be an email address
-                header += u"<a class='p-name fn u-email email' href='mailto:{2}'>{0}</a> \
-(<span class='p-org org'>{1}</span>)".format(editor['name'],
-                                             editor['org'],
-                                             editor['link'])
+            header += printEditor(editor)
     else:
         header += u"<dt>Editors:<dd>???"
+    if len(doc.previousEditors):
+        header += "<dt>Former Editors:\n"
+        for editor in doc.previousEditors:
+            header += printEditor(editor)
     if len(doc.otherMetadata):
         for key, vals in doc.otherMetadata.items():
             header += u"<dt>{0}:".format(key)
