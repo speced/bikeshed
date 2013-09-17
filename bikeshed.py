@@ -583,6 +583,21 @@ def buildBibliolinkDatabase(doc):
 Only 'normative' and 'informative' allowed.", u(el.get('data-biblio-type')), outerHTML(el))
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Headings Stuff
+
 def processHeadings(doc):
     for el in findAll('h2, h3, h4, h5, h6'):
         addClass(el, 'heading')
@@ -654,6 +669,24 @@ def addHeadingBonuses(doc, headings):
             secno.text = header.get('data-level') + u' '
             header.insert(0, secno)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Definitions and the like
 
 def formatPropertyNames(doc):
     propertyCells = findAll("table.propdef tr:first-child > td")
@@ -852,6 +885,24 @@ def dedupIds(doc, els):
 def simplifyText(text):
     # Remove anything that's not a name character.
     return re.sub(u"[^a-z0-9_-]", u"", text.replace(u" ", u"-").lower())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Additional Processing
 
 
 def processAutolinks(doc):
