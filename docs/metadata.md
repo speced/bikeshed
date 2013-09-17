@@ -37,10 +37,12 @@ Several keys are required information, and will cause the processor to flag an e
 	(There is not currently any way to put a comma *in* one of these values.)
 	Multiple "Editor" lines can be used to supply multiple editors.
 * "Abstract" must contain an abstract for the spec, a 1-2 sentence description of what the spec is about.
+    Multiple Abstract lines can be used, with each representing a separate paragraph in the Abstract section.
 
 There are several additional optional keys:
 
 * "TR" must contain a link that points to the latest version on /TR.
+* "Former Editor" must contain a former editor's information, in the same format as "Editor".
 * "Warning" must contain either "Obsolete" or "Not Ready", which triggers the appropriate warning message in the boilerplate.
 * "Previous Version" must contain a link that points to a previous (dated) version on /TR.  You can specify this key more than once for multiple entries.
 * "At Risk" must contain an at-risk feature.  You can specify this key more than once for multiple entries.
