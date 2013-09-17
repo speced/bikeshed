@@ -385,7 +385,7 @@ def transformMetadata(lines, doc, **kwargs):
         elif key == "Deadline":
             doc.deadline = parseDate(val, "Deadline")
         elif key == "Abstract":
-            doc.abstract = val
+            doc.abstracts.append(val)
         elif key == "Shortname":
             doc.shortname = val
         elif key == "Level":
@@ -459,8 +459,8 @@ def initializeTextMacros(doc):
     else:
         config.textMacros["status"] = doc.status
     config.textMacros["latest"] = doc.TR or u"???"
-    config.textMacros["abstract"] = doc.abstract or u"???"
-    config.textMacros["abstractattr"] = escapeAttr(doc.abstract.replace(u"<<",u"<").replace(u">>",u">")) or u"???"
+    config.textMacros["abstract"] = "<p>".join(doc.abstracts) or u"???"
+    config.textMacros["abstractattr"] = escapeAttr("  ".join(doc.abstracts).replace(u"<<",u"<").replace(u">>",u">")) or u"???"
     config.textMacros["year"] = u(doc.date.year)
     config.textMacros["date"] = doc.date.strftime(u"{0} %B %Y".format(doc.date.day))
     config.textMacros["cdate"] = doc.date.strftime(u"%Y%m%d")
@@ -485,7 +485,7 @@ def verifyRequiredMetadata(doc):
     requiredSingularKeys = [
         ('status', 'Status'),
         ('ED', 'ED'),
-        ('abstract', 'Abstract'),
+        ('abstracts', 'Abstract'),
         ('shortname', 'Shortname'),
         ('level', 'Level')
     ]
@@ -1069,7 +1069,7 @@ class CSSSpec(object):
     hasMetadata = False
     status = None
     ED = None
-    abstract = None
+    abstracts = []
     shortname = None
     level = None
 
