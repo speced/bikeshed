@@ -783,32 +783,6 @@ def determineDfnType(dfn):
     else:
         return "dfn"
 
-def determineLinkType(el):
-    # 1. Look at data-link-type
-    linkType = treeAttr(el, 'data-link-type')
-    text = textContent(el)
-    # ''foo: bar'' is a propdef for 'foo'
-    if linkType == "maybe" and re.match("^[\w-]+\s*:\s*\S", text):
-        el.set('title', re.match("^\s*([\w-]+)\s*:\s*\S", text).group(1))
-        return "property"
-    if linkType:
-        if linkType in config.linkTypes:
-            return linkType
-        die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
-    # 2. Introspect on the text
-    if text[0:1] == "@":
-        return "at-rule"
-    elif re.match("^<[\w-]+>$", text):
-        return "type"
-    elif text[:1] == u"〈" and text[-1:] == u"〉":
-        return "token"
-    elif text[0:1] == ":":
-        return "selector"
-    elif text[-2:] == "()":
-        return "functionish"
-    else:
-        return "dfn"
-
 def classifyDfns(doc, dfns):
     dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
     for el in dfns:
@@ -887,8 +861,59 @@ def simplifyText(text):
     return re.sub(u"[^a-z0-9_-]", u"", text.replace(u" ", u"-").lower())
 
 
+def determineLinkType(el):
+    # 1. Look at data-link-type
+    linkType = treeAttr(el, 'data-link-type')
+    text = textContent(el)
+    # ''foo: bar'' is a propdef for 'foo'
+    if linkType == "maybe" and re.match("^[\w-]+\s*:\s*\S", text):
+        el.set('title', re.match("^\s*([\w-]+)\s*:\s*\S", text).group(1))
+        return "property"
+    if linkType:
+        if linkType in config.linkTypes:
+            return linkType
+        die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
+    # 2. Introspect on the text
+    if text[0:1] == "@":
+        return "at-rule"
+    elif re.match("^<[\w-]+>$", text):
+        return "type"
+    elif text[:1] == u"〈" and text[-1:] == u"〉":
+        return "token"
+    elif text[0:1] == ":":
+        return "selector"
+    elif re.match("^[\w-]+\(.*\)$", text):
+        return "functionish"
+    else:
+        return "dfn"
 
 
+def determineLinkText(el):
+    linkType = el.get('data-link-type')
+    contents = textContent(el)
+    if el.get('title'):
+        linkText = el.get('title')
+    elif linkType in config.functionishTypes.union(["functionish"]) and re.match("^[\w-]+\(.*\)$", contents):
+        linkText = re.match("^([\w-]+)\(.*\)$", contents).group(1)+"()"
+        # Need to fix this using the idl parser.
+    else:
+        linkText = contents
+    linkText = re.sub(u"\s+", u" ", linkText.lower())
+    if len(linkText) == 0:
+        die(u"Autolink {0} has no linktext.", outerHTML(el))
+    return linkText
+
+
+def classifyLink(el):
+    linkType = determineLinkType(el)
+    el.set('data-link-type', linkType)
+    linkText = determineLinkText(el)
+    el.set('title', linkText)
+    for attr in ["data-link-status", "data-link-for", "data-link-spec"]:
+        val = treeAttr(el, attr)
+        if val is not None:
+            el.set(attr, val)
+    return el
 
 
 
@@ -916,23 +941,21 @@ def processAutolinks(doc):
         if el.get('title') == '':
             continue
 
-        linkType = determineLinkType(el)
-        text = (u(el.get('title')) or textContent(el)).lower()
-        text = re.sub(u"\s+", u" ", text)
-        if len(text) == 0:
-            die(u"Autolink {0} has no linktext.", outerHTML(el))
+        classifyLink(el)
+        linkType = el.get('data-link-type')
+        linkText = el.get('title')
 
         if linkType == u"biblio":
             # Move biblio management into ReferenceManager later
-            el.set('href', '#'+simplifyText(text))
+            el.set('href', '#'+simplifyText(linkText))
             continue
 
-        url = doc.refs.getRef(linkType, text,
-                              spec=treeAttr(el, 'data-link-spec'),
-                              status=treeAttr(el, 'data-link-status'),
-                              linkFor=treeAttr(el, 'data-link-for'),
+        url = doc.refs.getRef(linkType, linkText,
+                              spec=el.get('data-link-spec'),
+                              status=el.get('data-link-status'),
+                              linkFor=el.get('data-link-for'),
                               el=el,
-                              error=(text not in doc.ignoredTerms))
+                              error=(linkText not in doc.ignoredTerms))
         if url is not None:
             el.set('href', url)
             el.tag = "a"
