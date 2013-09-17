@@ -783,6 +783,17 @@ def determineDfnType(dfn):
     else:
         return "dfn"
 
+def determineDfnText(el):
+    dfnType = el.get('data-dfn-type')
+    contents = textContent(el)
+    if el.get('title'):
+        dfnText = el.get('title')
+    elif dfnType in config.functionishTypes and re.match("^[\w-]+\(.*\)$", contents):
+        dfnText = re.match("^([\w-]+)\(.*\)$", contents).group(1)+"()"
+    else:
+        dfnText = contents
+    return dfnText
+
 def classifyDfns(doc, dfns):
     dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
     for el in dfns:
@@ -817,7 +828,7 @@ def classifyDfns(doc, dfns):
                     die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
         # Automatically fill in id if necessary.
         if el.get('id') is None:
-            id = simplifyText(textContent(el))
+            id = simplifyText(determineDfnText(el))
             if dfnType == "dfn":
                 pass
             elif dfnType == "interface":
