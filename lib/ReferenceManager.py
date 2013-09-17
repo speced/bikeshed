@@ -113,8 +113,8 @@ class ReferenceManager(object):
                 warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
                      linkType,
                      text,
-                     refs[0]['type'],
-                     "' or '".join(refs[0]['for']))
+                     localRefs[0]['type'],
+                     "' or '".join(localRefs[0]['for']))
             return localRefs[0]['url']
 
         # Take defaults into account
