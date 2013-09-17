@@ -778,7 +778,7 @@ def determineDfnType(dfn):
         return "token"
     elif text[0:1] == ":":
         return "selector"
-    elif text[-2:] == "()" and not (dfn.get('id') or '').startswith("dom-"):
+    elif re.match("^[\w-]+\(.*\)$", text) and not (dfn.get('id') or '').startswith("dom-"):
         return "function"
     else:
         return "dfn"
@@ -792,10 +792,13 @@ def classifyDfns(doc, dfns):
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', dfnType)
         # Some error checking
-        if dfnType in config.functionishTypes and not dfnText.endswith("()"):
-            # Maybe make this smarter so that it's okay to have <dfn function>foo(bar)</dfn>
-            # Auto-fill title with title='foo()' in that case.
-            die("Functions/methods must end with () in their linking text, got '{0}'.", dfnText)
+        if dfnType in config.functionishTypes:
+            if not re.match("^[\w-]+\(.*\)$", dfnText):
+                die("Functions/methods must end with () in their linking text, got '{0}'.", dfnText)
+            elif el.get('title') is None:
+                # Make sure that functionish dfns have their title set up right.
+                # Need to fix this to use the idl parser instead.
+                el.set('title', re.match("^([\w-]+)\(.*\)$", dfnText).group(1)+"()")
         # If type=argument, try to infer what it's for.
         if dfnType == "argument" and el.get('data-dfn-for') is None:
             parent = el.getparent()
