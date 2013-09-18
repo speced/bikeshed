@@ -1213,6 +1213,37 @@ class CSSSpec(object):
         if "ignoredSpecs" in self.refs.defaultSpecs:
             self.refs.ignoredSpecs = set(self.refs.defaultSpecs["ignoredSpecs"])
             del self.refs.defaultSpecs["ignoredSpecs"]
+        if "customDfns" in self.refs.defaultSpecs:
+            for specName, specUrl, dfnText, dfnType, dfnUrl in self.refs.defaultSpecs["customDfns"]:
+                if specName not in self.refs.specs:
+                    levelMatch = re.match("(.*)-(\d+)", specName)
+                    if levelMatch:
+                        shortname = levelMatch.group(1)
+                        level = levelMatch.group(2)
+                    else:
+                        shortname = specName
+                        level = "1"
+                    self.refs.specs[specName] = {
+                        "description": "Custom Spec Link for {0}".format(specName), 
+                        "title": "Custom Spec Link for {0}".format(specName), 
+                        "level": int(level), 
+                        "TR": specUrl, 
+                        "shortname": shortname, 
+                        "vshortname": specName
+                    }
+                spec = self.refs.specs[specName]
+                self.refs.refs[dfnText].append({
+                    "status": "TR",
+                    "export": True,
+                    "for": [],
+                    "level": spec['level'],
+                    "url": specUrl + dfnUrl,
+                    "normative": True,
+                    "shortname": spec['shortname'],
+                    "spec": spec['vshortname'],
+                    "type": dfnType
+                })
+            del self.refs.defaultSpecs["customDfns"]
 
         self.paragraphMode = paragraphMode
 

@@ -130,6 +130,7 @@ def updateLinkDefaults():
     data = defaultdict(list)
     data["css21Replacements"] = []
     data["ignoredSpecs"] = []
+    data["customDfns"] = []
     for i, line in enumerate(lines):
         # Look for h2
         if re.match("^\s*-+\s*$", line):
@@ -158,6 +159,18 @@ def updateLinkDefaults():
                 data["css21Replacements"].append(term)
             elif currentSpec == "Ignored Specs":
                 data["ignoredSpecs"].append(term)
+            elif currentSpec.startswith("Custom "):
+                match = re.match("Custom ([\w-]+) (.*)", currentSpec)
+                specName = match.group(1)
+                specUrl = match.group(2).strip()
+                match = re.match("(.*) \(([\w-]+)\) (.*)", term)
+                if match is None:
+                    die("Custom link lines must be of the form '<term> (<type>) <hash-link>'.Got:\n  {0}", term)
+                    continue
+                dfnText = match.group(1).strip()
+                dfnType = match.group(2)
+                dfnUrl = match.group(3).strip()
+                data["customDfns"].append((specName, specUrl, dfnText, dfnType, dfnUrl))
             elif currentSpec:
                 if currentType:
                     data[term].append((currentSpec, currentType, None, currentFor))
