@@ -1,11 +1,11 @@
 widlparser
 ==========
 
-Stand-alone WebIDL Parser in Python
+Stand-alone WebIDL Parser in Python. Requires Python 2.6 or 2.7.
 
-Parses WebIDL per: http://www.w3.org/TR/2012/CR-WebIDL-20120419/ (plus a few legacy compatability items)
+Parses WebIDL per: http://dev.w3.org/2006/webapi/WebIDL/ (plus a few legacy compatability items)
 
-Tis parser was created to support a W3C specification parser and pre-processor, it's API is geared towards finding and identifying various WebIDL constructs by name. However, all of the WebIDL source is parsed and stored in the construct objects.
+Tis parser was created to support a W3C specification parser and pre-processor, it's API is geared towards finding and identifying various WebIDL constructs by name. However, all of the WebIDL source is parsed and stored in the construct objects. The parser has error recovery and preserves the entire input for re-serialization and markup of the WebIDL constructs.
 
 
 Installation
@@ -19,11 +19,11 @@ Standard python package installation:
 Usage
 -----
 
-Import the parser module from the widlparser package and instantiate a Parser.
+Import the widlparser package and instantiate a Parser.
 
-       from widlparser import parser
+       import widlparser
 
-       widl = parser.Parser()
+       widl = widlparser.parser.Parser()
 
 Either pass the WebIDL text to be parsed in the constructor or call the **Parser.parse(text)** method.
 
@@ -32,7 +32,7 @@ Parser class
 ------------
 **class parser.Parser([text[, ui]])**
 
-The Parser's constructor takes two optional arguments, text and ui. If present, text is a string containing the WebIDL text to parse. ui.warn() will get called with any syntax errors encountered during parsing (if implemented). ui.note() will get called for any legacy WebIDL that was ignored during parsing (if implemented). 
+The Parser's constructor takes two optional arguments, text and ui. If present, text is a unicode string containing the WebIDL text to parse. ui.warn() will get called with any syntax errors encountered during parsing (if implemented). ui.note() will get called for any legacy WebIDL that was ignored during parsing (if implemented). 
 
 **Parser.constructs**
 
@@ -54,18 +54,18 @@ Clears all stored constructs.
 
 Return a named construct. If a single name is provided, a breadth-first search through all parsed constructs is performed. Alternatively, a path (names separated by "/" or ".") may be passed to target the search more narrowly. e.g.: find("Foo/bar/baz") looks for an Attribute 'baz', inside a Method 'bar', inside an Interface 'Foo'.
 
-**Parser.normalizedMethodName(name)**
+**Parser.normalizedMethodName(name [, interfaceName = None])**
 
-Provide a normalized version of a method name, including the names of all arguments, e.g. "drawCircle(long x, long y, long radius)" becomes: "drawCircle(x, y, radius)". If a valid set of arguments is passed, the passed argument names will be returned in the normalized form. Otherwise, a search is performed for a matching previously parsed method name.
+Provide a normalized version of a method name, including the names of all arguments, e.g. "drawCircle(long x, long y, long radius)" becomes: "drawCircle(x, y, radius)". If a valid set of arguments is passed, the passed argument names will be returned in the normalized form. Otherwise, a search is performed for a matching previously parsed method name. The search may be narrowed to a particular interface by passing the name fo the interface or callbak in interfaceName.
 
 **Parser.markup(marker)**
 
-Returns a marked-up version of the WebIDL input text. For each Construct, Type, and Name, the 'marker' will get called with 'markupConstruct(text, construct)', 'markupType(text, construct)', or 'markupName(text, construct)' repsectively, if implemented. Implementation of each method is optional. The 'markup*' methods must return a tuple of the prefix and suffix to inject as markup around the text, or '(None, None)'. If the 'marker' also implements 'encode(text)' it will get called with each block of text to return in any encoding necessary for the output format. Markup and encode calls will happen in source order.
+Returns a marked-up version of the WebIDL input text. For each Construct, Type, and Name, the 'marker' will get called with 'markupConstruct(text, construct)', 'markupType(text, construct)', or 'markupName(text, construct)' repsectively, if implemented. Implementation of each method is optional. The 'markup*' methods must return a tuple of the prefix and suffix to inject as markup around the text, or '(None, None)'. If the 'marker' also implements 'encode(text)' it will get called with each block of text to return in any encoding necessary for the output format. Markup and encode calls will happen in source order, the text will be split at markup boundaries.
 
 
 Constructs
 ----------
-All Constructs access from the parser's Parser.constructs attribute or returned from the parser's find() method are subclasses of the Construct class. The base class provides the following:
+All Constructs accessed from the parser's Parser.constructs attribute or returned from the parser's find() method are subclasses of the Construct class. The base class provides the following:
 
 **Construct.name**
 
@@ -73,7 +73,7 @@ The name of the construct.
 
 **Construct.idlType**
 
-Contains a string indicating the type of the construct. Possible values are: "const", "enum", "typedef", "interface", "constructor", "attribute", "method", "argument", "dictionary", "dict-member", "callback", "exception", "except-field", "implements", "extended-attribute", and "unknown".
+Contains a string indicating the type of the construct. Possible values are: "const", "enum", "typedef", "interface", "constructor", "attribute", "iterator", "stringifier", "serializer", "method", "argument", "dictionary", "dict-member", "callback", "exception", "except-field", "implements", "extended-attribute", and "unknown".
 
 **Construct.fullName**
 
@@ -89,7 +89,7 @@ The parent construct, or None if it is a top-level Construct in the source WebID
 
 **Construct.extendedAttributes**
 
-A list of extended attributes, or None. Extended attributes are stored as Constructs, those of the forms: 'identifier', 'identifier=identifier', 'identifier(ArgumentList)', or 'identifier=identifier(ArgumentList)' are parsed. The first identifier is stored in 'Construct.attribute', the second, if present, is stored in 'Construct.name', arguments are stored in 'Construct.arguments'.  Extended attributes not mathing those four forms contain a list of tokens in 'Construct.tokens' and their name is set to 'None'.
+A list of extended attributes, or None. Extended attributes are stored as Constructs, those of the forms: 'identifier', 'identifier=identifier', 'identifier(ArgumentList)', 'identifier=identifier(ArgumentList)', or 'identifier(Type,Type)' are parsed. The first identifier is stored in 'Construct.attribute', the second, if present, is stored in 'Construct.name', arguments are stored in 'Construct.arguments'.  Extended attributes not mathing those five forms contain a list of tokens in 'Construct.tokens' and their name is set to 'None'.
 
 **Construct.constructors**
 
@@ -132,10 +132,6 @@ The ConstValue Production of the Const.
 
 The EnumValueList Production of the Enum.
 
-**Typedef.typeExtendedAtributes**
-
-Contains a list of extended attributes immediately preceding the Type or 'None'.
-
 **Typedef.type**
 
 The Type Production of the Typedef.
@@ -154,7 +150,7 @@ The Default Production of the Argument or 'None'.
 
 **InterfaceMember.member**
 
-Either a Const Construct or an AttributeOrOperation Production.
+Either a Const Construct or an AttributeOrOperationOrIterator Production.
 
 **InterfaceMember.arguments**
 
@@ -240,9 +236,17 @@ Contains a string of the identifier present after the "=".
 
 Contains a list of any arguments present or 'None'.
 
+**ExtendedAttributeTypePair.keyType**
+
+The first Type Production of the pair.
+
+**ExtendedAttributeTypePair.valueType**
+
+The second Type Production of the pair.
+
 **ExtendedAttributeUnknown.tokens**
 
-Contains a list of tokens in ExtendedAttributes not matching one of the four basic types.
+Contains a list of tokens in ExtendedAttributes not matching one of the five basic types.
 
 **SyntaxError.tokens**
 
@@ -251,7 +255,7 @@ Contains a list of tokens that did not match the WebIDL grammar.
 
 Notes
 -----
-The parser itself is iterable, and indexable. Top-level constructs can be tested by the 'in' operator and retrieved by name or index via []. The unicode() or str() functions can also be used on the parser to re-serialize the parsed WebIDL. The serialized output is nullipotent, i.e. str(parser.Parser(text)) == text
+The parser itself is iterable and indexable. Top-level constructs can be tested by the 'in' operator and retrieved by name or index via []. The unicode() or str() functions can also be used on the parser to re-serialize the parsed WebIDL. The serialized output is nullipotent, i.e. str(parser.Parser(text)) == text
 
 Constructs are also iterable and indexable to access members. Additionally constructs can be re-serialized as valid WebIDL via the unicode() or str() functions.
 

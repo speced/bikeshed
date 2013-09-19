@@ -51,12 +51,12 @@ class Token(object):
 
 
 class Tokenizer(object):
-    SymbolIdents = frozenset([
-        'any', 'attribute', 'boolean', 'byte', 'callback', 'const', 'creator', 'Date', 'deleter', 'dictionary',
-        'DOMString', 'double', 'enum', 'exception', 'false', 'float', 'getter', 'implements', 'Infinity', 'inherit',
-        'interface', 'legacycaller', 'long', 'NaN', 'null', 'object', 'octet', 'optional', 'or', 'partial',
-        'readonly', 'sequence', 'setter', 'short', 'static', 'stringifier', 'true', 'typedef', 'unrestricted',
-        'unsigned', 'void'])
+    SymbolIdents = frozenset((
+        'any', 'attribute', 'boolean', 'byte', 'ByteString', 'callback', 'const', 'creator', 'Date', 'deleter',
+        'dictionary', 'DOMString', 'double', 'enum', 'exception', 'false', 'float', 'getter', 'implements',
+        'Infinity', 'inherit', 'interface', 'iterator', 'legacycaller', 'long', 'NaN', 'null', 'object', 'octet',
+        'optional', 'or', 'partial', 'readonly', 'RegExp', 'sequence', 'serializer', 'setter', 'short', 'static',
+        'stringifier', 'true', 'typedef', 'unrestricted', 'unsigned', 'void'))
     
     def __init__(self, text, ui = None):
         self.ui = ui
@@ -73,12 +73,12 @@ class Tokenizer(object):
                 self.tokens.append(Token('float', match.group(1)))
                 text = match.group(5)
                 continue
-            match = re.match(r'(-?(0([0-7]*|[Xx][0-9A-Fa-f]+)|[1-9][0-9]*))(.*)', text, re.DOTALL)
+            match = re.match(r'(-?(0([0-7]*|0[Xx][0-9A-Fa-f]+)|[1-9][0-9]*))(.*)', text, re.DOTALL)
             if (match):
                 self.tokens.append(Token('integer', match.group(1)))
                 text = match.group(4)
                 continue
-            match = re.match(r'([A-Z_a-z][0-9A-Z_a-z]*)(.*)', text, re.DOTALL)
+            match = re.match(r'(_?[A-Z_a-z][0-9A-Z_a-z]*)(.*)', text, re.DOTALL)
             if (match):
                 if (match.group(1) in self.SymbolIdents):
                     self.tokens.append(Token('symbol', match.group(1)))
@@ -96,7 +96,7 @@ class Tokenizer(object):
                 self.tokens.append(Token('whitespace', match.group(1)))
                 text = match.group(3)
                 continue
-            match = re.match(r'(-|,|;|:|\?|\.\.\.|\.|\(|\)|\[|\]|\{|\}|\<|=|\>)(.*)', text, re.DOTALL)
+            match = re.match(r'(-Infinity|-|,|;|:|\?|\.\.\.|\.|\(|\)|\[|\]|\{|\}|\<|=|\>)(.*)', text, re.DOTALL)
             if (match):
                 self.tokens.append(Token('symbol', match.group(1)))
                 text = match.group(2)

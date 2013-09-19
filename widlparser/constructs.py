@@ -193,13 +193,12 @@ class Enum(Construct):    # [ExtendedAttributes] "enum" identifier "{" EnumValue
                 '[values: ' + repr(self.values) + ']]')
 
 
-class Typedef(Construct):    # [ExtendedAttributes] "typedef" [ExtendedAttributes] Type identifier ";"
+class Typedef(Construct):    # [ExtendedAttributes] "typedef" Type identifier ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
         if (Symbol.peek(tokens, 'typedef')):
-            Construct.peek(tokens)
             if (Type.peek(tokens)):
                 token = tokens.peek()
                 return tokens.popPosition(token and token.isIdentifier())
@@ -208,7 +207,6 @@ class Typedef(Construct):    # [ExtendedAttributes] "typedef" [ExtendedAttribute
     def __init__(self, tokens, parent = None):
         Construct.__init__(self, tokens, parent)
         self._typedef = Symbol(tokens, 'typedef')
-        self.typeExtendedAttributes = self._parseExtendedAttributes(tokens, self)
         self.type = Type(tokens)
         self.name = tokens.next().text
         self._consumeSemicolon(tokens)
@@ -220,20 +218,16 @@ class Typedef(Construct):    # [ExtendedAttributes] "typedef" [ExtendedAttribute
     
     def _unicode(self):
         output = Construct._unicode(self) + unicode(self._typedef)
-        output += unicode(self.typeExtendedAttributes) if (self.typeExtendedAttributes) else ''
         return output + unicode(self.type) + unicode(self.name)
     
     def _markup(self, generator):
         generator.addText(self._typedef)
-        if (self.typeExtendedAttributes):
-            self.typeExtendedAttributes.markup(generator)
         self.type.markup(generator)
         generator.addName(self.name)
         return self
     
     def __repr__(self):
         output = '[typedef: ' + Construct.__repr__(self)
-        output += repr(self.typeExtendedAttributes) if (self.typeExtendedAttributes) else ''
         return output + repr(self.type) + ' [name: ' + self.name + ']]'
 
 
@@ -310,16 +304,34 @@ class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut]
         return output + ((' [default: ' + repr(self.default) + ']]') if (self.default) else ']')
 
 
-class InterfaceMember(Construct): # [ExtendedAttributes] Const | [ExtendedAttributes] AttributeOrOperation
+class InterfaceMember(Construct): # [ExtendedAttributes] Const | Serializer | Stringifier | StaticMember | Attribute | OperationOrIterator
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
-        return tokens.popPosition(Const.peek(tokens) or AttributeOrOperation.peek(tokens))
+        return tokens.popPosition(Const.peek(tokens) or Serializer.peek(tokens) or
+                                  Stringifier.peek(tokens) or StaticMember.peek(tokens) or
+                                  Attribute.peek(tokens) or SpecialOperation.peek(tokens) or
+                                  Iterator.peek(tokens) or Operation.peek(tokens))
 
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent)
-        self.member = Const(tokens, parent) if (Const.peek(tokens)) else AttributeOrOperation(tokens, parent)
+        if (Const.peek(tokens)):
+            self.member = Const(tokens, parent)
+        elif (Serializer.peek(tokens)):
+            self.member = Serializer(tokens, parent)
+        elif (Stringifier.peek(tokens)):
+            self.member = Stringifier(tokens, parent)
+        elif (StaticMember.peek(tokens)):
+            self.member = StaticMember(tokens, parent)
+        elif (Attribute.peek(tokens)):
+            self.member = Attribute(tokens, parent)
+        elif (SpecialOperation.peek(tokens)):
+            self.member = SpecialOperation(tokens, parent)
+        elif (Iterator.peek(tokens)):
+            self.member = Iterator(tokens)
+        else:
+            self.member = Operation(tokens, parent)
         self._didParse(tokens)
 
     @property
@@ -379,6 +391,10 @@ class SyntaxError(Construct):   # ... ";" | ... "}"
 
     def _unicode(self):
         return ''.join([unicode(token) for token in self.tokens])
+
+    def __repr__(self):
+        output = '[unknown: ' + Construct.__repr__(self) + ' tokens: '
+        return output + ''.join([repr(token) for token in self.tokens]) + ']'
 
 
 class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" identifier [Inheritance] "{" [InterfaceMember]... "}" ";"
@@ -831,8 +847,7 @@ class Exception(Construct):   # [ExtendedAttributes] "exception" identifier [Inh
         self._openBrace = Symbol(tokens, '{')
         self.members = []
         while (tokens.hasTokens()):
-            token = tokens.sneakPeek()
-            if (token.isSymbol('}')):
+            if (Symbol.peek(tokens, '}')):
                 self._closeBrace = Symbol(tokens, '}')
                 break
             if (ExceptionMember.peek(tokens)):
@@ -973,7 +988,7 @@ class ExtendedAttributeNoArgs(Construct):   # identifier
         token = tokens.pushPosition()
         if (token and token.isIdentifier()):
             token = tokens.sneakPeek()
-            return tokens.popPosition((not token) or token.isSymbol(',') or token.isSymbol(']'))
+            return tokens.popPosition((not token) or token.isSymbol((',', ']')))
         return tokens.popPosition(False)
     
     def __init__(self, tokens, parent):
@@ -1009,7 +1024,7 @@ class ExtendedAttributeArgList(Construct):  # identifier "(" [ArgumentList] ")"
                 ArgumentList.peek(tokens)
                 if (Symbol.peek(tokens, ')')):
                     token = tokens.sneakPeek()
-                    return tokens.popPosition((not token) or token.isSymbol(',') or token.isSymbol(']'))
+                    return tokens.popPosition((not token) or token.isSymbol((',', ']')))
         return tokens.popPosition(False)
     
     def __init__(self, tokens, parent):
@@ -1059,7 +1074,7 @@ class ExtendedAttributeIdent(Construct):    # identifier "=" identifier
                 token = tokens.peek()
                 if (token and token.isIdentifier()):
                     token = tokens.sneakPeek()
-                    return tokens.popPosition((not token) or token.isSymbol(',') or token.isSymbol(']'))
+                    return tokens.popPosition((not token) or token.isSymbol((',', ']')))
         return tokens.popPosition(False)
     
     def __init__(self, tokens, parent):
@@ -1109,7 +1124,7 @@ class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" 
                         ArgumentList.peek(tokens)
                         if (Symbol.peek(tokens, ')')):
                             token = tokens.sneakPeek()
-                            return tokens.popPosition((not token) or token.isSymbol(',') or token.isSymbol(']'))
+                            return tokens.popPosition((not token) or token.isSymbol((',', ']')))
         return tokens.popPosition(False)
     
     def __init__(self, tokens, parent):
@@ -1158,25 +1173,79 @@ class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" 
                 ' [arguments: ' + (repr(self.arguments) if (self.arguments) else '') + ']]')
 
 
+class ExtendedAttributeTypePair(Construct): # identifier "(" Type "," Type ")"
+    @classmethod
+    def peek(cls, tokens):
+        token = tokens.pushPosition()
+        if (token and token.isIdentifier()):
+            if (Symbol.peek(tokens, '(')):
+                if (Type.peek(tokens)):
+                    if (Symbol.peek(tokens, ',')):
+                        if (Type.peek(tokens)):
+                            if (Symbol.peek(tokens, ')')):
+                                token = tokens.sneakPeek()
+                                return tokens.popPosition((not token) or token.isSymbol((',', ']')))
+        return tokens.popPosition(False)
+    
+    def __init__(self, tokens, parent):
+        Construct.__init__(self, tokens, parent, False)
+        self.attribute = tokens.next().text
+        self._openParen = Symbol(tokens, '(')
+        self.keyType = Type(tokens)
+        self._comma = Symbol(tokens, ',')
+        self.valueType = Type(tokens)
+        self._closeParen = Symbol(tokens, ')')
+        self._didParse(tokens)
+    
+    @property
+    def idlType(self):
+        return 'extended-attribute'
+    
+    @property
+    def name(self):
+        return self.attribute
+    
+    def _unicode(self):
+        output = self.attribute + unicode(self._openParen) + unicode(self.keyType) + unicode(self._comma)
+        return output + unicode(self.valueType) + unicode(self._closeParen)
+    
+    def _markup(self, generator):
+        generator.addText(self.attribute)
+        generator.addText(self._openParen)
+        self.keyType.markup(generator)
+        generator.addText(self._comma)
+        self.valueType.markup(generator)
+        generator.addText(self._closeParen)
+        return self
+
+    def __repr__(self):
+        return ('[ExtendedAttributeTypePair: ' + self.attribute.encode('ascii', 'replace') + ' ' +
+                repr(self.keyType) + ' ' + repr(self.valueType) + ']')
+
+
 class ExtendedAttribute(Construct): # ExtendedAttributeNoArgs | ExtendedAttributeArgList |
-                                    # ExtendedAttributeIdent | ExtendedAttributeNamedArgList
+                                    # ExtendedAttributeIdent | ExtendedAttributeNamedArgList |
+                                    # ExtendedAttributeTypePair
     @classmethod
     def peek(cls, tokens):
         return (ExtendedAttributeNamedArgList.peek(tokens) or
-                ExtendedAttributeIdent.peek() or
                 ExtendedAttributeArgList.peek(tokens) or
-                ExtendedAttributeNoArgs.peek())
+                ExtendedAttributeNoArgs.peek(tokens) or
+                ExtendedAttributeTypePair.peek(tokens) or
+                ExtendedAttributeIdent.peek(tokens))
     
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent, False)
         if (ExtendedAttributeNamedArgList.peek(tokens)):
             self.attribute = ExtendedAttributeNamedArgList(tokens, parent)
-        elif (ExtendedAttributeIdent.peek(tokens)):
-            self.attribute = ExtendedAttributeIdent(tokens, parent)
         elif (ExtendedAttributeArgList.peek(tokens)):
             self.attribute = ExtendedAttributeArgList(tokens, parent)
         elif (ExtendedAttributeNoArgs.peek(tokens)):
             self.attribute = ExtendedAttributeNoArgs(tokens, parent)
+        elif (ExtendedAttributeTypePair.peek(tokens)):
+            self.attribute = ExtendedAttributeTypePair(tokens, parent)
+        elif (ExtendedAttributeIdent.peek(tokens)):
+            self.attribute = ExtendedAttributeIdent(tokens, parent)
         else:
             self.attribute = ExtendedAttributeUnknown(tokens, parent)
         self._didParse(tokens)

@@ -250,30 +250,24 @@ class ConstType(Production): # PrimitiveType [Null] | identifier [Null]
     def __repr__(self):
         return '[ConstType: ' + repr(self.type) + (' [null]' if (self.null) else '') + ']'
 
-class FloatLiteral(Production):  # float | "-" "Infinity" | "Infinity" | "NaN"
+class FloatLiteral(Production):  # float | "-Infinity" | "Infinity" | "NaN"
     @classmethod
     def peek(cls, tokens):
         token = tokens.pushPosition()
         if (token and token.isFloat()):
             return tokens.popPosition(True)
-        elif (token and token.isSymbol()):
-            if ('-' == token.text):
-                token = tokens.peek()
-                return tokens.popPosition(token and token.isSymbol('Infinity'))
-            return tokens.popPosition(('Infinity' == token.text) or ('NaN' == token.text))
-        return tokens.popPosition(False)
+        return tokens.popPosition(token and token.isSymbol(('-Infinity', 'Infinity', 'NaN')))
     
     def __init__(self, tokens): #
         Production.__init__(self, tokens)
-        self.negative = Symbol(tokens, '-') if (Symbol.peek(tokens, '-')) else None
         self.value = tokens.next().text
         self._didParse(tokens)
 
     def _unicode(self):
-        return (unicode(self.negative) if (self.negative) else '') + self.value
+        return self.value
 
     def __repr__(self):
-        return '[FloatLiteral: ' + (repr(self.negative) if (self.negative) else '') + self.value.encode('ascii', 'replace') + ']'
+        return '[FloatLiteral: ' + self.value.encode('ascii', 'replace') + ']'
 
 
 class ConstValue(Production):    # "true" | "false" | FloatLiteral | integer | "null"
@@ -282,9 +276,7 @@ class ConstValue(Production):    # "true" | "false" | FloatLiteral | integer | "
         if (FloatLiteral.peek(tokens)):
             return True
         token = tokens.pushPosition()
-        if (token and token.isSymbol()):
-            return tokens.popPosition(('true' == token.text) or ('false' == token.text) or ('null' == token.text))
-        return tokens.popPosition(token and token.isInteger())
+        return tokens.popPosition(token and (token.isSymbol(('true', 'false', 'null')) or token.isInteger()))
     
     def __init__(self, tokens): #
         Production.__init__(self, tokens)
@@ -343,7 +335,8 @@ class EnumValueList(Production): # EnumValue ["," EnumValue]... [","]
             if (Symbol.peek(tokens, ',')):
                 self._commas.append(Symbol(tokens, ','))
                 token = tokens.sneakPeek()
-                if (token and token.isSymbol('}')):
+                if ((not token) or token.isSymbol('}')):
+                    tokens.didIgnore(',')
                     break
                 continue
             break
@@ -451,15 +444,16 @@ class SingleType(Production):    # NonAnyType | "any" [TypeSuffixStartingWithArr
         return '[SingleType: ' + repr(self.type) + (repr(self.suffix) if (self.suffix) else '') + ']'
 
 
-class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "DOMString" [TypeSuffix] | identifier [TypeSuffix] |
-                                #   "sequence" "<" Type ">" [Null] | "object" [TypeSuffix] | "Date" [TypeSuffix]
+class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [TypeSuffix] | "DOMString" [TypeSuffix] |
+                                # identifier [TypeSuffix] | "sequence" "<" Type ">" [Null] | "object" [TypeSuffix] |
+                                # "Date" [TypeSuffix] | "RegExp" [TypeSuffix]
     @classmethod
     def peek(cls, tokens):
         if (PrimitiveType.peek(tokens)):
             TypeSuffix.peek(tokens)
             return True
         token = tokens.pushPosition()
-        if (token and (token.isSymbol('DOMString') or token.isIdentifier() or token.isSymbol('object') or token.isSymbol('Date'))):
+        if (token and (token.isSymbol(('ByteString', 'DOMString', 'object', 'Date', 'RegExp')) or token.isIdentifier())):
             TypeSuffix.peek(tokens)
             return tokens.popPosition(True)
         elif (token and token.isSymbol('sequence')):
@@ -492,7 +486,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "DOMString" [Type
                 self._closeSequence = Symbol(tokens, '>')
                 self.null = Symbol(tokens, '?') if (Symbol.peek(tokens, '?')) else None
             else:
-                self.type = Symbol(tokens)  # "DOMString" | "object" | "Date"
+                self.type = Symbol(tokens)  # "ByteString" | "DOMString" | "object" | "Date" | "RegExp"
                 self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
         self._didParse(tokens)
 
@@ -805,15 +799,14 @@ class Default(Production):   # "=" ConstValue | "=" string
         return '[Default: ' + repr(self.value) + ']'
 
 
-class ArgumentName(Production):   # identifier | NameSymbol
-    NameSymbols = frozenset(['attribute', 'callback', 'const', 'creator', 'deleter', 'dictionary', 'enum', 'exception',
-                             'getter', 'implements', 'inherit', 'interface', 'legacycaller', 'partial', 'setter', 'static',
-                             'stringifier', 'typedef', 'unrestricted'])
-
+class ArgumentName(Production):   # identifier | ArgumentNameKeyword
+    ArgumentNameKeywords = frozenset(['attribute', 'callback', 'const', 'creator', 'deleter', 'dictionary', 'enum', 'exception',
+                                      'getter', 'implements', 'inherit', 'interface', 'legacycaller', 'partial', 'serializer',
+                                      'setter', 'static', 'stringifier', 'typedef', 'unrestricted'])
     @classmethod
     def peek(cls, tokens):
         token = tokens.pushPosition()
-        return tokens.popPosition(token and (token.isIdentifier() or (token.isSymbol() and (token.text in cls.NameSymbols))))
+        return tokens.popPosition(token and (token.isIdentifier() or (token.isSymbol() and (token.text in cls.ArgumentNameKeywords))))
 
     def __init__(self, tokens):
         Production.__init__(self, tokens)
@@ -940,42 +933,45 @@ class Special(Production):   # "getter" | "setter" | "creator" | "deleter" | "le
         return '[' + self.name.encode('ascii', 'replace') + ']'
 
 
-class Qualifiers(Production):    # "static" | [Special]...
+class AttributeRest(Production):   # ["readonly"] "attribute" Type identifier [Ignore] ";"
     @classmethod
     def peek(cls, tokens):
-        if (Special.peek(tokens)):
-            while (Special.peek(tokens)):
-                pass
-            return True
         token = tokens.pushPosition()
-        return tokens.popPosition(token and token.isSymbol('static'))
-
+        if (token and token.isSymbol('readonly')):
+            token = tokens.peek()
+        if (token and token.isSymbol('attribute')):
+            if (Type.peek(tokens)):
+                token = tokens.peek()
+                return tokens.popPosition(token and token.isIdentifier())
+        return tokens.popPosition(False)
+    
     def __init__(self, tokens):
         Production.__init__(self, tokens)
-        self.static = None
-        self.specials = []
-        token = tokens.sneakPeek()
-        if (token.isSymbol('static')):
-            self.static = Symbol(tokens, 'static')
-        else:
-            self.specials.append(Special(tokens))
-            while (Special.peek(tokens)):
-                self.specials.append(Special(tokens))
+        self.readonly = Symbol(tokens, 'readonly') if (Symbol.peek(tokens, 'readonly')) else None
+        self._attribute = Symbol(tokens, 'attribute')
+        self.type = Type(tokens)
+        self.name = tokens.next().text
+        self._ignore = Ignore(tokens) if (Ignore.peek(tokens)) else None
+        self._consumeSemicolon(tokens)
         self._didParse(tokens)
 
-    @property
-    def name(self):
-        return 'static' if (self.static) else ' '.join([special.name for special in self.specials])
-
     def _unicode(self):
-        if (self.static):
-            return unicode(self.static)
-        return ''.join([unicode(special) for special in self.specials])
+        output = unicode(self.readonly) if (self.readonly) else ''
+        return output + unicode(self._attribute) + unicode(self.type) + self.name + (unicode(self._ignore) if (self._ignore) else '')
+    
+    def _markup(self, generator):
+        generator.addText(self.readonly)
+        generator.addText(self._attribute)
+        self.type.markup(generator)
+        generator.addName(self.name)
+        if (self._ignore):
+            self._ignore.markup(generator)
+        return self
 
     def __repr__(self):
-        if (self.static):
-            return '[static]'
-        return ' '.join([repr(special) for special in self.specials])
+        output = '[AttributeRest: '
+        output += '[readonly] ' if (self.readonly) else ''
+        return output + repr(self.type) + ' [name: ' + self.name + ']]'
 
 
 class ChildProduction(Production):
@@ -992,35 +988,17 @@ class ChildProduction(Production):
         return self.name
 
 
-class Attribute(ChildProduction):   # ["inherit"] ["readonly"] "attribute" Type identifier [Ignore] ";"
+class Attribute(ChildProduction):   # ["inherit"] AttributeRest
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isSymbol('inherit')):
-            token = tokens.peek()
-        if (token and token.isSymbol('readonly')):
-            token = tokens.peek()
-        if (token and token.isSymbol('attribute')):
-            if (Type.peek(tokens)):
-                token = tokens.peek()
-                return tokens.popPosition(token and token.isIdentifier())
-        tokens.popPosition(False)
+        tokens.pushPosition(False)
+        Symbol.peek(tokens, 'inherit')
+        return tokens.popPosition(AttributeRest.peek(tokens))
     
     def __init__(self, tokens, parent):
         ChildProduction.__init__(self, tokens, parent)
-        self.inherit = None
-        self.readonly = None
-        token = tokens.sneakPeek()       # "inherit" or "readonly" or "attribute"
-        if (token.isSymbol('inherit')):
-            self.inherit = Symbol(tokens, 'inherit')
-            token = tokens.sneakPeek()   # "readonly" or "attribute"
-        if (token.isSymbol('readonly')):
-            self.readonly = Symbol(tokens, 'readonly')
-        self._attribute = Symbol(tokens, 'attribute')
-        self.type = Type(tokens)
-        self.name = tokens.next().text
-        self._ignore = Ignore(tokens) if (Ignore.peek(tokens)) else None
-        self._consumeSemicolon(tokens)
+        self.inherit = Symbol(tokens, 'inherit') if (Symbol.peek(tokens, 'inherit')) else None
+        self.rest = AttributeRest(tokens)
         self._didParse(tokens)
 
     @property
@@ -1028,48 +1006,45 @@ class Attribute(ChildProduction):   # ["inherit"] ["readonly"] "attribute" Type 
         return 'attribute'
     
     @property
-    def complexityFactor(self):
-        return 1
+    def name(self):
+        return self.rest.name
+    
+    @property
+    def arguments(self):
+        return None
+    
+    @property
+    def methodName(self):
+        return None
     
     def _unicode(self):
         output = unicode(self.inherit) if (self.inherit) else ''
-        output += unicode(self.readonly) if (self.readonly) else ''
-        return output + unicode(self._attribute) + unicode(self.type) + self.name + (unicode(self._ignore) if (self._ignore) else '')
+        return output + unicode(self.rest)
     
     def _markup(self, generator):
         generator.addText(self.inherit)
-        generator.addText(self.readonly)
-        generator.addText(self._attribute)
-        self.type.markup(generator)
-        generator.addName(self.name)
-        if (self._ignore):
-            self._ignore.markup(generator)
-        return self
+        return self.rest._markup(generator)
 
     def __repr__(self):
         output = '[attribute: '
         output += '[inherit] ' if (self.inherit) else ''
-        output += '[readonly] ' if (self.readonly) else ''
-        return output + repr(self.type) + ' [name: ' + self.name + ']]'
+        return output + repr(self.rest) + ']'
 
 
-class OperationRest(ChildProduction):   # ReturnType [identifier] "(" [ArgumentList] ")" [Ignore] ";"
+class OperationRest(ChildProduction):   # [identifier] "(" [ArgumentList] ")" [Ignore] ";"
     @classmethod
     def peek(cls, tokens):
-        tokens.pushPosition(False)
-        if (ReturnType.peek(tokens)):
+        token = tokens.pushPosition()
+        if (token and token.isIdentifier()):
             token = tokens.peek()
-            if (token and token.isIdentifier()):
-                token = tokens.peek()
-            if (token and token.isSymbol('(')):
-                ArgumentList.peek(tokens)
-                token = tokens.peek()
-                return tokens.popPosition(token and token.isSymbol(')'))
+        if (token and token.isSymbol('(')):
+            ArgumentList.peek(tokens)
+            token = tokens.peek()
+            return tokens.popPosition(token and token.isSymbol(')'))
         return tokens.popPosition(False)
 
     def __init__(self, tokens, parent):
         ChildProduction.__init__(self, tokens, parent)
-        self.returnType = ReturnType(tokens)
         self.name = tokens.next().text if (tokens.sneakPeek().isIdentifier()) else None
         self._openParen = Symbol(tokens, '(')
         self.arguments = ArgumentList(tokens, parent) if (ArgumentList.peek(tokens)) else None
@@ -1077,15 +1052,17 @@ class OperationRest(ChildProduction):   # ReturnType [identifier] "(" [ArgumentL
         self._ignore = Ignore(tokens) if (Ignore.peek(tokens)) else None
         self._consumeSemicolon(tokens)
         self._didParse(tokens)
+    
+    @property
+    def idlType(self):
+        return 'method'
 
     def _unicode(self):
-        output = unicode(self.returnType)
-        output += self.name if (self.name) else ''
+        output = self.name if (self.name) else ''
         output += unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
         return output + (unicode(self._ignore) if (self._ignore) else '')
     
     def _markup(self, generator):
-        self.returnType.markup(generator)
         generator.addName(self.name)
         generator.addText(self._openParen)
         if (self.arguments):
@@ -1096,23 +1073,150 @@ class OperationRest(ChildProduction):   # ReturnType [identifier] "(" [ArgumentL
         return self
     
     def __repr__(self):
-        output = '[rest: [returnType: ' + repr(self.returnType) + '] '
+        output = '[OperationRest: '
         output += ('[name: ' + self.name.encode('ascii', 'replace') + '] ') if (self.name) else ''
         return output + '[argumentlist: ' + (repr(self.arguments) if (self.arguments) else '') + ']]'
 
 
-class Operation(ChildProduction):   # [Qualifiers] OperationRest
+class Iterator(Production):    # ReturnType "iterator" ["=" identifier | "object"] ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
-        Qualifiers.peek(tokens)
-        return tokens.popPosition(OperationRest.peek(tokens))
+        if (ReturnType.peek(tokens)):
+            if (Symbol.peek(tokens, 'iterator')):
+                if (Symbol.peek(tokens, '=')):
+                    token = tokens.peek()
+                    return tokens.popPosition(token and token.isIdentifier())
+                Symbol.peek(tokens, 'object')
+                return tokens.popPosition(True)
+        return tokens.popPosition(False)
+
+    def __init__(self, tokens):
+        Production.__init__(self, tokens)
+        self.returnType = ReturnType(tokens)
+        self._iterator = Symbol(tokens, 'iterator')
+        self._equals = None
+        self.interface = None
+        self.object = None
+        token = tokens.sneakPeek()
+        if (token.isSymbol('=')):
+            self._equals = Symbol(tokens, '=')
+            self.interface = tokens.next().text
+        elif (token.isSymbol('object')):
+            self.object = Symbol(tokens, 'object')
+        self._consumeSemicolon(tokens)
+        self._didParse(tokens)
+
+    @property
+    def idlType(self):
+        return 'iterator'
+
+    @property
+    def name(self):
+        return None
+    
+    @property
+    def arguments(self):
+        return None
+    
+    @property
+    def methodName(self):
+        return None
+    
+    def _unicode(self):
+        output = unicode(self.returnType) + unicode(self._iterator)
+        if (self._equals):
+            output += unicode(self._equals) + self.interface
+        elif (self.object):
+            output += unicode(self.object)
+        return output
+
+    def _markup(self, generator):
+        self.returnType.markup(generator)
+        generator.addText(self._iterator)
+        if (self._equals):
+            generator.addText(self._equals)
+            generator.addType(self.interface)
+        elif (self.object):
+            generator.addText(self.object)
+        return self
+
+    def __repr__(self):
+        output = '[Iterator: ' + repr(self.returnType)
+        if (self._equals):
+            output += '[interface: ' + self.interface.encode('ascii', 'replace') + ']'
+        elif (self.object):
+            output += '[object]'
+        return output + ']'
+
+
+class SpecialOperation(ChildProduction):    # Special [Special]... ReturnType OperationRest
+    @classmethod
+    def peek(cls, tokens):
+        tokens.pushPosition(False)
+        if (Special.peek(tokens)):
+            while (Special.peek(tokens)):
+                pass
+            if (ReturnType.peek(tokens)):
+                return tokens.popPosition(OperationRest.peek(tokens))
+        return tokens.popPosition(False)
 
     def __init__(self, tokens, parent):
         ChildProduction.__init__(self, tokens, parent)
-        self.qualifiers = None
-        if (Qualifiers.peek(tokens)):
-            self.qualifiers = Qualifiers(tokens)
+        self.specials = []
+        while (Special.peek(tokens)):
+            self.specials.append(Special(tokens))
+        self.returnType = ReturnType(tokens)
+        self.rest = OperationRest(tokens, self)
+        self._didParse(tokens)
+
+    @property
+    def idlType(self):
+        return 'method'
+
+    @property
+    def name(self):
+        return self.rest.name if (self.rest.name) else self.specials[0].name
+
+    @property
+    def arguments(self):
+        return self.rest.arguments
+
+    @property
+    def methodName(self):
+        name = self.name + '(' if (self.name) else '('
+        if (self.arguments):
+            name += ', '.join([argument.name for argument in self.arguments])
+            if (self.arguments[-1].variadic):
+                name += '...'
+        return name + ')'
+
+    def _unicode(self):
+        output = u''.join([unicode(special) for special in self.specials])
+        return output + unicode(self.returnType) + unicode(self.rest)
+
+    def _markup(self, generator):
+        for special in self.specials:
+            special.markup(generator)
+        self.returnType.markup(generator)
+        return self.rest._markup(generator)
+
+    def __repr__(self):
+        output = '[SpecialOperation: ' + ' '.join([repr(special) for special in self.specials])
+        return output + ' ' + repr(self.returnType) + ' ' + repr(self.rest) + ']'
+
+
+class Operation(ChildProduction):   # ReturnType OperationRest
+    @classmethod
+    def peek(cls, tokens):
+        tokens.pushPosition(False)
+        if (ReturnType.peek(tokens)):
+            return tokens.popPosition(OperationRest.peek(tokens))
+        return tokens.popPosition(False)
+
+    def __init__(self, tokens, parent):
+        ChildProduction.__init__(self, tokens, parent)
+        self.returnType = ReturnType(tokens)
         self.rest = OperationRest(tokens, self)
         self._didParse(tokens)
 
@@ -1122,9 +1226,11 @@ class Operation(ChildProduction):   # [Qualifiers] OperationRest
         
     @property
     def name(self):
-        if (self.rest.name):
-            return self.rest.name
-        return self.qualifiers.name if (self.qualifiers) else None
+        return self.rest.name
+
+    @property
+    def arguments(self):
+        return self.rest.arguments
     
     @property
     def methodName(self):
@@ -1134,138 +1240,57 @@ class Operation(ChildProduction):   # [Qualifiers] OperationRest
             if (self.arguments[-1].variadic):
                 name += '...'
         return name + ')'
-    
-    @property
-    def normalName(self):
-        return self.methodName
-    
-    @property
-    def arguments(self):
-        return self.rest.arguments
-    
+
     def _unicode(self):
-        output = unicode(self.qualifiers) if (self.qualifiers) else ''
-        return output + unicode(self.rest)
+        return unicode(self.returnType) + unicode(self.rest)
     
     def _markup(self, generator):
-        generator.addText(self.qualifiers)
+        self.returnType.markup(generator)
         return self.rest._markup(generator)
     
     def __repr__(self):
-        output = '[operation: ' + ((repr(self.qualifiers) + ' ') if (self.qualifiers) else '')
-        return output + repr(self.rest) + ']'
+        return '[Operation: ' + repr(self.returnType) + ' ' + repr(self.rest) + ']'
 
 
-class StringifierAttributeOrOperation(ChildProduction): # Attribute | OperationRest | ";"
+class Stringifier(ChildProduction): # "stringifier" AttributeRest | "stringifier" ReturnType OperationRest | "stringifier" ";"
     @classmethod
     def peek(cls, tokens):
-        if (Attribute.peek(tokens) or OperationRest.peek(tokens)):
-            return True
-        token = tokens.pushPosition()
-        return tokens.popPosition(token and token.isSymbol(';'))
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, 'stringifier')):
+            if (ReturnType.peek(tokens)):
+                return tokens.popPosition(OperationRest.peek(tokens))
+            AttributeRest.peek(tokens)
+            return tokens.popPosition(True)
+        return tokens.popPosition(False)
 
     def __init__(self, tokens, parent):
         ChildProduction.__init__(self, tokens, parent)
+        self._stringifier = Symbol(tokens, 'stringifier')
         self.attribute = None
+        self.returnType = None
         self.operation = None
-        if (Attribute.peek(tokens)):
-            self.attribute = Attribute(tokens, parent)
-        elif (OperationRest.peek(tokens)):
-            self.operation = OperationRest(tokens, parent)
+        if (ReturnType.peek(tokens)):
+            self.returnType = ReturnType(tokens)
+            self.operation = OperationRest(tokens, self)
+        elif (AttributeRest.peek(tokens)):
+            self.attribute = AttributeRest(tokens)
         else:
             self._consumeSemicolon(tokens)
         self._didParse(tokens)
 
     @property
     def idlType(self):
-        return 'attribute' if (self.attribute) else 'method'
-        
-    @property
-    def name(self):
-        if (self.attribute):
-            return self.attribute.name
-        return self.operation.name if (self.operation and self.operation.name) else 'stringifier'
-
-    @property
-    def methodName(self):
-        if (self.operation):
-            name = self.name + '('
-            if (self.arguments):
-                name += ', '.join([argument.name for argument in self.arguments])
-                if (self.arguments[-1].variadic):
-                    name += '...'
-            return name + ')'
-        return None
+        return 'stringifier'
     
     @property
-    def normalName(self):
+    def name(self):
         if (self.operation):
-            return self.methodName
-        return self.name
+            return self.operation.name
+        return self.attribute.name if (self.attribute) else None
     
     @property
     def arguments(self):
-        return self.operation.arguments
-
-    def _unicode(self):
-        if (self.attribute):
-            return unicode(self.attribute)
-        elif (self.operation):
-            return unicode(self.operation)
-        return ''
-    
-    def _markup(self, generator):
-        if (self.attribute):
-            return self.attribute._markup(generator)
-        elif (self.operation):
-            return self.operation._markup(generator)
-        return self
-    
-    def __repr__(self):
-        output = '[stringifier'
-        if (self.attribute):
-            output += ' ' + repr(self.attribute)
-        elif (self.operation):
-            output += ' ' + repr(self.operation)
-        return output + ']'
-
-
-class AttributeOrOperation(ChildProduction): # "stringifier" StringifierAttributeOrOperation | Attribute | Operation
-    @classmethod
-    def peek(cls, tokens):
-        if (Attribute.peek(tokens) or Operation.peek(tokens)):
-            return True
-        tokens.pushPosition(False)
-        if (Symbol.peek(tokens, 'stringifier')):
-            return tokens.popPosition(StringifierAttributeOrOperation.peek(tokens))
-        return tokens.popPosition(False)
-
-    def __init__(self, tokens, parent):
-        ChildProduction.__init__(self, tokens, parent)
-        self.attribute = None
-        self.operation = None
-        self._stringifier = None
-        self.stringifier = None
-        if (Attribute.peek(tokens)):
-            self.attribute = Attribute(tokens, parent)
-        elif (Operation.peek(tokens)):
-            self.operation = Operation(tokens, parent)
-        else:
-            self._stringifier = Symbol(tokens, 'stringifier')
-            self.stringifier = StringifierAttributeOrOperation(tokens, parent)
-        self._didParse(tokens)
-
-    @property
-    def idlType(self):
-        if (self.attribute):
-            return 'attribute'
-        return 'method' if (self.operation) else self.stringifier.idlType
-        
-    @property
-    def name(self):
-        if (self.attribute):
-            return self.attribute.name
-        return self.operation.name if (self.operation) else self.stringifier.name
+        return self.operation.arguments if (self.operation) else None
 
     @property
     def methodName(self):
@@ -1277,34 +1302,341 @@ class AttributeOrOperation(ChildProduction): # "stringifier" StringifierAttribut
                     name += '...'
             return name + ')'
         return None
+
+    def _unicode(self):
+        output = unicode(self._stringifier)
+        output += (unicode(self.returnType) + unicode(self.operation)) if (self.operation) else ''
+        return output + (unicode(self.attribute) if (self.attribute) else '')
+
+    def _markup(self, generator):
+        generator.addText(self._stringifier)
+        if (self.operation):
+            self.returnType.markup(generator)
+            return self.operation._markup(generator)
+        if (self.attribute):
+            return self.attribute._markup(generator)
+        return self
+
+    def __repr__(self):
+        output = '[Stringifier: '
+        if (self.operation):
+            output += repr(self.returnType) + ' ' + repr(self.operation)
+        else:
+            output += repr(self.attribute) if (self.attribute) else ''
+        return output + ']'
+
+
+class Identifiers(Production):  # "," identifier ["," identifier]...
+    @classmethod
+    def peek(cls, tokens):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, ',')):
+            token = tokens.peek()
+            if (token and token.isIdentifier()):
+                Identifiers.peek(tokens)
+                return tokens.popPosition(True)
+        return tokens.popPosition(False)
+
+    def __init__(self, tokens):
+        Production.__init__(self, tokens)
+        self._comma = Symbol(tokens, ',')
+        self.name = tokens.next().text
+        self.next = Identifiers(tokens) if (Identifiers.peek(tokens)) else None
+        self._didParse(tokens)
+
+    def _unicode(self):
+        output = unicode(self._comma) + self.name
+        return output + (unicode(self.next) if (self.next) else '')
+
+    def __repr__(self):
+        return ' ' + self.name.encode('ascii', 'replace') + (repr(self.next) if (self.next) else '')
+
+
+class SerializationPatternMap(Production):  # "getter" | "attribute" | "inherit" "," "attribute" |
+                                            # "inherit" [Identifiers] | identifier [Identifiers]
+    @classmethod
+    def peek(cls, tokens):
+        if (Symbol.peek(tokens, 'getter')):
+            return True
+        if (Symbol.peek(tokens, 'attribute')):
+            return True
+        token = tokens.pushPosition()
+        if (token and token.isSymbol('inherit')):
+            tokens.pushPosition(False)
+            if (Symbol.peek(tokens, ',')):
+                if (Symbol.peek(tokens, 'attribute')):
+                    return tokens.popPosition(tokens.popPosition(True))
+            tokens.popPosition(False)
+            Identifiers.peek(tokens)
+            return tokens.popPosition(True)
+        if (token and token.isIdentifier()):
+            Identifiers.peek(tokens)
+            return tokens.popPosition(True)
+        return tokens.popPosition(False)
+
+    def __init__(self, tokens):
+        Production.__init__(self, tokens)
+        self._getter = None
+        self._attribute = None
+        self._inherit = None
+        self._comma = None
+        self.name = None
+        self.next = None
+        if (Symbol.peek(tokens, 'getter')):
+            self._getter = Symbol(tokens, 'getter')
+        elif (Symbol.peek(tokens, 'attribute')):
+            self._attribute = Symbol(tokens, 'attribute')
+        elif (Symbol.peek(tokens, 'inherit')):
+            self._inherit = Symbol(tokens)
+            if (Identifiers.peek(tokens)):
+                self.next = Identifiers(tokens)
+            if (Symbol.peek(tokens, ',')):
+                if (Symbol.peek(tokens, 'attribute')):
+                    self._comma = Symbol(tokens, ',')
+                    self._attribute = Symbol(tokens, 'attribute')
+        else:
+            self.name = tokens.next().text
+            if (Identifiers.peek(tokens)):
+                self.next = Identifiers(tokens)
+        self._didParse(tokens)
+
+    def _unicode(self):
+        output = unicode(self._getter) if (self._getter) else ''
+        output += unicode(self._inherit) if (self._inherit) else ''
+        output += unicode(self._comma) if (self._comma) else ''
+        output += unicode(self._attribute) if (self._attribute) else ''
+        output += self.name if (self.name) else ''
+        return output + (unicode(self.next) if (self.next) else '')
+
+    def __repr__(self):
+        output = '[SerializationPatternMap: '
+        output += '[getter] ' if (self._getter) else ''
+        output += '[inherit] ' if (self._inherit) else ''
+        output += '[attribute] ' if (self._attribute) else ''
+        output += self.name.encode('ascii', 'replace') if (self.name) else ''
+        output += repr(self.next) if (self.next) else ''
+        return output + ']'
+
+
+class SerializationPatternList(Production): # "getter" | identifer Identifiers
+    @classmethod
+    def peek(cls, tokens):
+        if (Symbol.peek(tokens, 'getter')):
+            return True
+        token = tokens.pushPosition()
+        if (token and token.isIdentifier()):
+            Identifiers.peek(tokens)
+            return tokens.popPosition(True)
+        return tokens.popPosition(False)
+
+    def __init__(self, tokens):
+        Production.__init__(self, tokens)
+        if (Symbol.peek(tokens, 'getter')):
+            self._getter = Symbol(tokens, 'getter')
+            self.name = None
+            self.next = None
+        else:
+            self._getter = None
+            self.name = tokens.next().text
+            self.next = Identifiers(tokens) if (Identifiers.peek(tokens)) else None
+        self._didParse(tokens)
+
+    def _unicode(self):
+        output = unicode(self._getter) if (self._getter) else ''
+        output += self.name if (self.name) else ''
+        return output + (unicode(self.next) if (self.next) else '')
+
+    def __repr__(self):
+        output = '[SerializationPatternList: '
+        output += '[getter]' if (self._getter) else ''
+        output += self.name.encode('ascii', 'replace') if (self.name) else ''
+        output += repr(self.next) if (self.next) else ''
+        return output + ']'
+
+
+class SerializationPattern(Production): # "{" [SerializationPatternMap] "}" | "[" [SerializationPatternList] "]" | identifier
+    @classmethod
+    def peek(cls, tokens):
+        token = tokens.pushPosition()
+        if (token and token.isSymbol('{')):
+            SerializationPatternMap.peek(tokens)
+            return tokens.popPosition(Symbol.peek(tokens, '}'))
+        elif (token and token.isSymbol('[')):
+            SerializationPatternList.peek(tokens)
+            return tokens.popPosition(Symbol.peek(tokens, ']'))
+        else:
+            return tokens.popPosition(token and token.isIdentifier())
+        return tokens.popPosition(False)
+
+    def __init__(self, tokens):
+        Production.__init__(self, tokens)
+        if (Symbol.peek(tokens, '{')):
+            self._open = Symbol(tokens, '{')
+            self.pattern = SerializationPatternMap(tokens) if (SerializationPatternMap.peek(tokens)) else None
+            self._close = Symbol(tokens, '}')
+            self.name = None
+        elif (Symbol.peek(tokens, '[')):
+            self._open = Symbol(tokens, '[')
+            self.pattern = SerializationPatternList(tokens) if (SerializationPatternList.peek(tokens)) else None
+            self._close = Symbol(tokens, ']')
+            self.name = None
+        else:
+            self._open = None
+            self.pattern = None
+            self._close = None
+            self.name = tokens.next().text
+        self._didParse(tokens)
+
+    def _unicode(self):
+        if (self.name):
+            return self.name
+        output = unicode(self._open)
+        output += unicode(self.pattern) if (self.pattern) else ''
+        return output + unicode(self._close)
+
+    def __repr__(self):
+        output = '[SerializationPattern: '
+        output += repr(self.pattern) if (self.pattern) else ''
+        output += self.name if (self.name) else ''
+        return output + ']'
+
+
+class Serializer(ChildProduction):  # "serializer" [OperationRest] ";" | "serializer" "=" SerializationPattern ";"
+    @classmethod
+    def peek(cls, tokens):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, 'serializer')):
+            if (Symbol.peek(tokens, '=')):
+                return tokens.popPosition(SerializationPattern.peek(tokens))
+            OperationRest.peek(tokens)
+            return tokens.popPosition(True)
+        return tokens.popPosition(False)
+
+    def __init__(self, tokens, parent):
+        ChildProduction.__init__(self, tokens, parent)
+        self._serializer = Symbol(tokens, 'serializer')
+        if (Symbol.peek(tokens, '=')):
+            self._equals = Symbol(tokens, '=')
+            self.pattern = SerializationPattern(tokens)
+            self.operation = None
+        else:
+            self._equals = None
+            self.pattern = None
+            self.operation = OperationRest(tokens, self) if (OperationRest.peek(tokens)) else None
+        self._consumeSemicolon(tokens)
+        self._didParse(tokens)
+
+    @property
+    def idlType(self):
+        return 'serializer'
+
+    @property
+    def name(self):
+        return self.operation.name if (self.operation) else None
+
+    @property
+    def methodName(self):
+        if (self.operation):
+            name = self.name + '(' if (self.name) else '('
+            if (self.arguments):
+                name += ', '.join([argument.name for argument in self.arguments])
+                if (self.arguments[-1].variadic):
+                    name += '...'
+            return name + ')'
+        return None
+
+    @property
+    def arguments(self):
+        return self.operation.arguments if (self.operation) else None
+    
+    def _unicode(self):
+        output = unicode(self._serializer)
+        if (self.pattern):
+            output += unicode(self._equals) + unicode(self.pattern)
+        output += unicode(self.operation) if (self.operation) else ''
+        return output
+
+    def _markup(self, generator):
+        generator.addText(self._serializer)
+        if (self.pattern):
+            generator.addText(self._equals)
+            self.pattern.markup(generator)
+        if (self.operation):
+            self.operation.markup(generator)
+        return self
+
+    def __repr__(self):
+        output = '[Serializer: '
+        output += repr(self.pattern) if (self.pattern) else ''
+        output += repr(self.operation) if (self.operation) else ''
+        return output + ']'
+
+
+class StaticMember(ChildProduction):    # "static" AttributeRest | "static" ReturnType OperationRest
+    @classmethod
+    def peek(cls, tokens):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, 'static')):
+            if (AttributeRest.peek(tokens)):
+                return tokens.popPosition(True)
+            if (ReturnType.peek(tokens)):
+                return tokens.popPosition(OperationRest.peek(tokens))
+        return tokens.popPosition(False)
+
+    def __init__(self, tokens, parent):
+        ChildProduction.__init__(self, tokens, parent)
+        self._static = Symbol(tokens, 'static')
+        if (AttributeRest.peek(tokens)):
+            self.attribute = AttributeRest(tokens)
+            self.returnType = None
+            self.operation = None
+        else:
+            self.attribute = None
+            self.returnType = ReturnType(tokens)
+            self.operation = OperationRest(tokens, self)
+        self._didParse(tokens)
+
+    @property
+    def idlType(self):
+        return 'method' if (self.operation) else 'attribute'
     
     @property
-    def normalName(self):
-        if (self.operation):
-            return self.methodName
-        return self.name
+    def name(self):
+        return self.operation.name if (self.operation) else self.attribute.name
 
     @property
     def arguments(self):
         return self.operation.arguments if (self.operation) else None
 
+    @property
+    def methodName(self):
+        if (self.operation):
+            name = self.name + '(' if (self.name) else '('
+            if (self.arguments):
+                name += ', '.join([argument.name for argument in self.arguments])
+                if (self.arguments[-1].variadic):
+                    name += '...'
+            return name + ')'
+        return None
+
     def _unicode(self):
-        if (self.attribute):
-            return unicode(self.attribute)
-        return unicode(self.operation) if (self.operation) else (unicode(self._stringifier) + unicode(self.stringifier))
+        output = unicode(self._static)
+        if (self.operation):
+            return output + unicode(self.returnType) + unicode(self.operation)
+        return output + unicode(self.attribute)
 
     def _markup(self, generator):
-        if (self.attribute):
-            return self.attribute._markup(generator)
+        generator.addText(self._static)
         if (self.operation):
+            self.returnType.markup(generator)
             return self.operation._markup(generator)
-        generator.addText(self._stringifier)
-        return self.stringifier._markup(generator)
+        return self.attribute._markup(generator)
 
     def __repr__(self):
-        if (self.attribute):
-            return repr(self.attribute)
-        return repr(self.operation) if (self.operation) else repr(self.stringifier)
+        output = '[StaticMember: '
+        if (self.operation):
+            return output + repr(self.returnType) + ' ' + repr(self.operation) + ']'
+        return output + repr(self.attribute) + ']'
 
 
 class ExtendedAttributeList(ChildProduction):   # "[" ExtendedAttribute ["," ExtendedAttribute]... "]"

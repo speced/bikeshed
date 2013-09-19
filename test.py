@@ -64,6 +64,10 @@ class ui(object):
     def warn(self, str):
         print str
 
+    def note(self, str):
+        return
+        print str
+
 def testDifference(input, output):
     if (output == input):
         print "NULLIPOTENT"
@@ -82,13 +86,26 @@ def testDifference(input, output):
 if __name__ == "__main__":      # called from the command line
     sys.excepthook = debugHook
     parser = parser.Parser(ui=ui())
-    idl = u"""
-        typedef Foo foo; // comment <>
-[Constructor(sequence<Foo> foo)]         typedef Two too;
-const Foo bar = 42.0;
-enum ewok { "one", "two" };
-"""
-    idl = u""" // this is a comment éß
+    idl = u"""interface Simple{
+    serializer;
+    serializer = { foo };
+    serializer = { foo, bar };
+    serializer = { inherit };
+    serializer = { inherit, foo };
+    serializer = { attribute };
+    serializer = { inherit, attribute };
+    serializer = { getter };
+    serializer = [ foo ];
+    serializer = [ foo, bar ];
+    serializer = [ getter ];
+    serializer = foo;
+    Foo iterator;
+    Foo iterator = Simple;
+    Foo iterator object;
+    static attribute Foo foo;
+    static Foo foo();
+};"""
+    idl += u""" // this is a comment éß
 interface Multi : One  ,  Two   ,   Three     {
         attribute short one;
         attribute DOMString id setraises(DOMException);
@@ -103,6 +120,10 @@ interface foo {
 typedef   short    shorttype  = error this is;
 
    const  long    long   one=   2   ;
+   const double reallyHigh = Infinity;
+   const double reallyLow = -Infinity;
+   const double notANumber = NaN;
+   const double invalid = - Infinity;
  Window   implements     WindowInterface  ; // more comment
        
 enum   foo    {"one"  ,    "two",    }     ;
@@ -110,6 +131,7 @@ enum foo { "one" };
 enum bar{"one","two","three",}; // and another
 enum comments {
 "one", //comment one
+       // more comment
 "two", //comment two
 "three"  , //coment three
 };
@@ -117,7 +139,7 @@ enum comments {
  typedef  short shorttype;
 typedef long longtype;
 typedef long long longtype;
-typedef [hello, my name is inigo montøya (you ] killed my father)] unsigned long long inigo;
+[hello, my name is inigo montøya (you ] killed my father)] typedef unsigned long long inigo;
 typedef unrestricted double dubloons;
 typedef short [ ] shortarray;
 typedef DOMString string;
@@ -140,7 +162,7 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
     const short fortyTwo = 42;
     long foo(long x, long y);
 }
-[ NoInterfaceObject ] interface LinkStyle {
+[ NoInterfaceObject , MapClass (short, Foo )] interface LinkStyle {
     stringifier attribute DOMString mediaText;
     readonly attribute short bar;
     getter object (DOMString name);
