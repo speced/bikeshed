@@ -406,6 +406,7 @@ def transformMetadata(lines, doc, **kwargs):
                 doc.warning = val.lower().replace(' ', '-')
             else:
                 die('Unknown value for "Warning" metadata.')
+                continue
         elif key == "Previous Version":
             doc.previousVersions.append(val)
         elif key == "Editor":
@@ -431,6 +432,7 @@ def transformMetadata(lines, doc, **kwargs):
                         config.doc.refs.defaultSpecs[term.strip()].append((spec, type, status, dfnFor))
                 else:
                     die("'Link Defaults' is a comma-separated list of '<spec> (<dfn-type>) <terms>'. Got:\n{0}", default)
+                    continue
         else:
             doc.otherMetadata[key].append(val)
 
@@ -486,6 +488,7 @@ def initializeTextMacros(doc):
 def verifyRequiredMetadata(doc):
     if not doc.hasMetadata:
         die("The document requires at least one metadata block.")
+        return
 
     requiredSingularKeys = [
         ('status', 'Status'),
@@ -506,6 +509,7 @@ def verifyRequiredMetadata(doc):
             errors.append(u"    Must provide at least one '{0}' entry.".format(u(name)))
     if errors:
         die(u"Not all required metadata was provided:\n{0}", u"\n".join(errors))
+        return
 
 
 def transformAutolinkShortcuts(doc):
@@ -584,8 +588,7 @@ def buildBibliolinkDatabase(doc):
         elif el.get('data-biblio-type') == "informative":
             doc.informativeRefs.add(biblioEntry)
         else:
-            die(u"Unknown data-biblio-type value '{0}' on {1}. \
-Only 'normative' and 'informative' allowed.", u(el.get('data-biblio-type')), outerHTML(el))
+            die(u"Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", u(el.get('data-biblio-type')), outerHTML(el))
 
 
 
@@ -811,6 +814,7 @@ def classifyDfns(doc, dfns):
         if dfnType in config.functionishTypes:
             if not re.match("^[\w-]+\(.*\)$", dfnText):
                 die("Functions/methods must end with () in their linking text, got '{0}'.", dfnText)
+                continue
             elif el.get('title') is None:
                 # Make sure that functionish dfns have their title set up right.
                 # Need to fix this to use the idl parser instead.
@@ -822,6 +826,7 @@ def classifyDfns(doc, dfns):
                 el.set('data-dfn-for', "{0}/{1} {1}".format(parent.get('data-dfn-for'), linkTextsFromElement(parent, preserveCasing=True)[0]))
             else:
                 die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el))
+                continue
         if dfnType in config.typesUsingFor:
             if el.get('data-dfn-for'):
                 pass
@@ -831,6 +836,7 @@ def classifyDfns(doc, dfns):
                     el.set('data-dfn-for', dfnFor)
                 else:
                     die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
+                    continue
         # Automatically fill in id if necessary.
         if el.get('id') is None:
             id = simplifyText(determineDfnText(el))
@@ -892,6 +898,7 @@ def determineLinkType(el):
         if linkType in config.linkTypes:
             return linkType
         die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
+        return "unknown-type"
     # 2. Introspect on the text
     if text[0:1] == "@":
         return "at-rule"
@@ -1194,6 +1201,7 @@ class CSSSpec(object):
             self.date = datetime.fromtimestamp(os.path.getmtime(inputFile.name))
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
+            return
 
         bibliofh = retrieveCachedFile(cacheLocation=config.scriptPath + "/biblio.refer",
                                       fallbackurl="https://www.w3.org/Style/Group/css3-src/biblio.ref",

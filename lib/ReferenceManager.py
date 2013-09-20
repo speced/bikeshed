@@ -71,6 +71,7 @@ class ReferenceManager(object):
                             die(u"Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, type, dfnFor)
                         else:
                             die(u"Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
+                        continue
                     ref = {
                         "type":type,
                         "status":"local",
@@ -156,6 +157,7 @@ class ReferenceManager(object):
         if len(refs) == 0:
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
+            return None
 
         # If status is ED, kill TR refs unless their spec *only* has a TR url
         if status == "ED":
