@@ -38,22 +38,27 @@ There are several types for CSS values:
 * at-rule
 * function (like counter() or linear-gradient())
 * selector
-* token
 
 There are additional types for WebIDL definitions:
 
 * interface
+* constructor
 * method
+* argument
 * attribute
+* callback
 * dictionary
-* dictmember
+* dict-member
+* exception
+* except-field
 * enum
 * const
+* typedef
 
-And for HTML definitions:
+And for HTML/SVG/etc element definitions:
 
-* html-element
-* html-attribute
+* element
+* element-attr
 
 And finally, a catch-all category for general terms and phrases, and anything that doesn't fall into one of the above categories:
 
@@ -65,7 +70,6 @@ The processor will attempt to infer your definition type from the context and te
 * Is it inside an idl block (`<pre class='idl'>`)?  Then it's an **interface**.
 * Does it start with an `@`?  Then it's an **at-rule**.
 * Is it surrounded by `<>`?  Then it's a **type**.
-* Is it surrounded by `〈〉`?  Then it's a **token**.
 * Does it start with a `:`?  Then it's a **selector**.
 * Does it end with `()`?  Then it's a **function**.
 * Is it surrounded by double single quotes in the source, like `''foo''`?  Then it's a **value**.
@@ -103,8 +107,10 @@ This is specified with a `for=''` attribute on the definition.
 
 Specifically:
 
-* "attribute", "method", and "const" definitions must define what interface they're relative to.
-* "dictmember" definitions must define what dictionary they're relative to.
+* "attribute", "constructor", "method", and "const" definitions must define what interface they're relative to.
+* "argument" definitions must define what method or constructor they're relative to.
+* "dict-member" definitions must define what dictionary they're relative to.
+* "except-field" definitions must define what exception they're relative to.
 * "descriptor" definitions must define what at-rule they're relative to.
     (This happens automatically if you add a "For" line to the descdef table.)
 * "value" definitions must define what property, descriptor, at-rule, type, selector, or function they're relative to.
@@ -155,7 +161,6 @@ There are several additional shortcuts for writing an autolink:
 * `<<'foo'>>` is an autolink to the the property or descriptor named "foo" (used in grammars, where you need `<foo>` for non-terminals)
 * `<<foo()>>` is an autolink to the function named "foo" (same)
 * `<<@foo>>` is an autolink to the at-rule named "@foo" (same)
-* `<<<foo>>>` is an autolink to a token named "〈foo〉"
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 
@@ -175,7 +180,8 @@ so here's a list of them:
 
 Additionally, there's an "idl" link type which *is* intended to be used by authors.
 It's a union of all the WebIDL types,
-and exists because the WebIDL types are somewhat verbose.
+and exists because the WebIDL types are somewhat verbose,
+so simply putting "idl" as the type on an IDL-heavy container can eliminate the need to individually specify types most of the time.
 
 When you actually run the processor, you may get errors about there being too many possible references to choose from.
 The processor will continue to run anyway, but its default choice might be the wrong definition.
