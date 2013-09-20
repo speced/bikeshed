@@ -54,8 +54,19 @@ class ReferenceManager(object):
                 dfnFor = treeAttr(el, 'data-dfn-for')
                 if dfnFor is None:
                     dfnFor = set()
+                    if self.getLocalRef(type, linkText):
+                        die(u"Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
+                        continue
                 else:
                     dfnFor = set(dfnFor.split())
+                    encounteredError = False
+                    for singleFor in dfnFor:
+                        if self.getLocalRef(type, linkText, linkFor=singleFor):
+                            encounteredError = True
+                            die(u"Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, type, singleFor)
+                            break
+                    if encounteredError:
+                        continue
                 for term in dfnFor.copy():
                     # Saying a value is for a descriptor with @foo/bar
                     # should also make it for the bare descriptor bar.
@@ -66,12 +77,6 @@ class ReferenceManager(object):
                 dfnFor = list(dfnFor)
                 if type in config.dfnTypes.union(["dfn"]):
                     existingAnchors = self.refs[linkText]
-                    if any(ref['spec'] == "local" and ref['type'] == type and ref['for'] == dfnFor for ref in existingAnchors):
-                        if dfnFor:
-                            die(u"Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, type, dfnFor)
-                        else:
-                            die(u"Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
-                        continue
                     ref = {
                         "type":type,
                         "status":"local",
