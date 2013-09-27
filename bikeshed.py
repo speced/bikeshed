@@ -433,6 +433,10 @@ def transformMetadata(lines, doc, **kwargs):
                 else:
                     die("'Link Defaults' is a comma-separated list of '<spec> (<dfn-type>) <terms>'. Got:\n{0}", default)
                     continue
+        elif key == "Mailing List":
+            doc.mailingList = val
+        elif key == "Mailing List Archives":
+            doc.mailingListArchives = val
         else:
             doc.otherMetadata[key].append(val)
 
@@ -1191,6 +1195,8 @@ class CSSSpec(object):
     ignoredTerms = []
     testSuite = None
     otherMetadata = defaultdict(list)
+    mailingList = "www-style@w3.org"
+    mailingListArchives = "http://lists.w3.org/Archives/Public/www-style/"
 
     # internal state
     normativeRefs = set()
@@ -1621,10 +1627,10 @@ def addSpecMetadataSection(doc):
         header += u"<dt>Previous Versions:" + u''.join(map(u"<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.previousVersions))
     header += u"""
 <dt>Feedback:</dt>
-    <dd><a href="mailto:www-style@w3.org?subject=%5B[SHORTNAME]%5D%20feedback">www-style@w3.org</a>
+    <dd><a href="mailto:{0}?subject=%5B[SHORTNAME]%5D%20feedback">{0}</a>
         with subject line
         &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;
-        (<a rel="discussion" href="http://lists.w3.org/Archives/Public/www-style/">archives</a>)"""
+        (<a rel="discussion" href="{1}">archives</a>)""".format(doc.mailingList, doc.mailingListArchives)
     if doc.testSuite is not None:
         header += u"<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.testSuite)
     else:
