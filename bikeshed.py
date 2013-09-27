@@ -870,6 +870,10 @@ def dedupIds(doc, els):
         return find("#"+id) is not None
     for el in els:
         id = el.get('id')
+        if id is None:
+            die("No id to dedup: {0}", outerHTML(el))
+            id = "giant-error"
+            el.set('id', id)
         del el.attrib['id']
         if findId(id):
             # Try to de-dup the id by appending an integer after it.
