@@ -51,8 +51,27 @@ There are several additional optional keys:
 * "Link Defaults" lets you specify a default spec for particular autolinks to link to.  The value is a comma-separated list of entries, where each entry is a versioned spec shortname, followed by a link type, followed by a "/"-separated list of link phrases.
 * "Date" must contain a date in YYYY-MM-DD format, which is used instead of today's date for all the date-related stuff in the spec.
 * "Deadline" is also a YYYY-MM-DD date, which is used for things like the LCWD Status section, to indicate deadlines.
-* "Test Suite" must contain a link to the test suite nightly cover page (like <http://test.csswg.org/suites/css3-flexbox/nightly-unstable>)
+* "Test Suite" must contain a link to the test suite nightly cover page (like <http://test.csswg.org/suites/css3-flexbox/nightly-unstable>).
+* "Mailing List" must contain an email address to be used for mailing lists.
+* "Mailing List Archives" must contain a link to the list archives.
 
 You can also provide custom keys with whatever values you want.
 Any unrecognized keys are collected together and formatted as entries in the spec's boilerplate header `<dl>`.
 Specifying a custom key multiple times will put all the values as `<dd>`s under a single `<dt>` for the key.
+
+Default Metadata
+----------------
+
+To specify default metadata for all specs generated for a given group and/or spec status,
+add an appropriate "default.include" file to the `include/` folder.
+This file must be a JSON file,
+with the keys and values all strings matching the above descriptions.
+
+Here's an example file:
+
+~~~~js
+{
+	"Mailing List": "www-style@w3.org",
+	"Mailing List Archives": "http://lists.w3.org/Archives/Public/www-style/"
+}
+~~~~
