@@ -27,9 +27,10 @@ class MetadataManager:
     atRisk = []
     ignoredTerms = []
     testSuite = None
-    otherMetadata = defaultdict(list)
     mailingList = None
     mailingListArchives = None
+
+    otherMetadata = defaultdict(list)
 
     @property
     def hasMetadata(self):
@@ -47,9 +48,9 @@ class MetadataManager:
             "Group": "group",
             "Date": "date",
             "Deadline": "deadline",
-            "Test Suite": "testSuite"
+            "Test Suite": "testSuite",
             "Mailing List": "mailingList",
-            "Mailing List Archives", "mailingListArchives"
+            "Mailing List Archives": "mailingListArchives"
         }
 
         self.multiValueKeys = {
@@ -62,7 +63,7 @@ class MetadataManager:
             "Link Defaults": ""
         }
 
-        self.knownKeys = self.singleValueKeys.viewkeys() + self.multiValueKeys.viewkeys()
+        self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
 
         self.manuallySetKeys = set()
 
@@ -72,7 +73,7 @@ class MetadataManager:
             "Group": convertGroup,
             "Date": parseDate,
             "Deadline": parseDate,
-            "Level": int,
+            "Level": lambda a,b: int(b),
             "Warning": convertWarning,
             "Editor": parseEditor,
             "Former Editor": parseEditor,
@@ -86,6 +87,8 @@ class MetadataManager:
         }
 
     def addData(self, key, val, default=False):
+        key = key.strip()
+        val = val.strip()
         if key in self.knownKeys and not default:
             self.manuallySetKeys.add(key)
 
@@ -142,7 +145,7 @@ def parseEditor(key, val):
     die("'{0}' format is '<name>, <company>, <email-or-contact-page>. Got:\n{1}", key, val)
 
 def parseIgnoredTerms(key, val):
-    return [term.strip() for term in val.split(u','))]
+    return [term.strip() for term in val.split(u',')]
 
 def parseLinkDefaults(key, val):
     defaultSpecs = defaultdict(list)
@@ -162,5 +165,6 @@ def parseLinkDefaults(key, val):
     return defaultSpecs
 
 def saveLinkDefaults(key, val):
-    for term, default in val.items():
-        config.doc.refs.defaultSpecs[term].append(default)
+    for term, defaults in val.items():
+        for default in defaults:
+            config.doc.refs.defaultSpecs[term].append(default)

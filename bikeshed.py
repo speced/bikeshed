@@ -39,6 +39,7 @@ import lib.update as update
 from lib.fuckunicode import u
 from lib.ReferenceManager import ReferenceManager
 from lib.ReferenceManager import linkTextsFromElement
+from lib.MetadataManager import MetadataManager
 from lib.htmlhelpers import *
 from lib.messages import *
 from lib.widlparser.widlparser import parser
@@ -351,95 +352,12 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
 
 
 def transformMetadata(lines, doc, **kwargs):
-    def boolFromString(str):
-        return str.lower() in ('true', 't', 'yes', 'y', '1')
-
-    doc.hasMetadata = True
-
-    def parseDate(val, field):
-        try:
-            return datetime.strptime(val, "%Y-%m-%d").date()
-        except:
-            die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", field, val)
-
-    def parseEditor(val, field):
-        match = re.match(u"([^,]+) ,\s* ([^,]+) ,?\s* (.*)", val, re.X)
-        if match:
-            return {
-                'name': match.group(1),
-                'org': match.group(2),
-                'link': match.group(3)
-            }
-        else:
-            die("'{0}' format is '<name>, <company>, <email-or-contact-page>. Got:\n{1}", field, val)
-
     for line in lines:
         match = re.match(u"\s*([^:]+):\s*(.*)", u(line))
         if(match is None):
             die(u"Incorrectly formatted metadata line:\n{0}", u(line))
             continue
-        key = match.group(1)
-        val = u(match.group(2)).strip()
-        if key == "Status":
-            doc.status = val
-            doc.refs.setStatus(val)
-        elif key == "Title":
-            doc.title = val
-        elif key == "TR":
-            doc.TR = val
-        elif key == "ED":
-            doc.ED = val
-        elif key == "Group":
-            doc.group = val.lower()
-        elif key == "Date":
-            doc.date = parseDate(val, "Date")
-        elif key == "Deadline":
-            doc.deadline = parseDate(val, "Deadline")
-        elif key == "Abstract":
-            doc.abstracts.append(val)
-        elif key == "Shortname":
-            doc.shortname = val
-        elif key == "Level":
-            doc.level = int(val)
-        elif key == "Warning":
-            if val.lower() in (u'obsolete', u'not ready'):
-                doc.warning = val.lower().replace(' ', '-')
-            else:
-                die('Unknown value for "Warning" metadata.')
-                continue
-        elif key == "Previous Version":
-            doc.previousVersions.append(val)
-        elif key == "Editor":
-            doc.editors.append(parseEditor(val, key))
-        elif key == "Former Editor":
-            doc.previousEditors.append(parseEditor(val, key))
-        elif key == "At Risk":
-            doc.atRisk.append(val)
-        elif key == "Test Suite":
-            doc.testSuite = val
-        elif key == "Ignored Terms":
-            doc.ignoredTerms.extend(term.strip() for term in val.split(u','))
-        elif key == "Link Defaults":
-            for default in val.split(","):
-                match = re.match(u"^([\w-]+)  (?:\s+\( ({0}) (?:\s+(TR|ED))? \) )  \s+(.*)$".format("|".join(config.dfnTypes.union(["dfn"]))), default.strip(), re.X)
-                if match:
-                    spec = match.group(1)
-                    type = match.group(2)
-                    status = match.group(3)
-                    terms = match.group(4).split('/')
-                    dfnFor = None
-                    for term in terms:
-                        config.doc.refs.defaultSpecs[term.strip()].append((spec, type, status, dfnFor))
-                else:
-                    die("'Link Defaults' is a comma-separated list of '<spec> (<dfn-type>) <terms>'. Got:\n{0}", default)
-                    continue
-        elif key == "Mailing List":
-            doc.mailingList = val
-        elif key == "Mailing List Archives":
-            doc.mailingListArchives = val
-        else:
-            doc.otherMetadata[key].append(val)
-
+        doc.md.addData(match.group(1), match.group(2))
     # Remove the metadata block from the generated document.
     return []
 
@@ -457,29 +375,29 @@ def initializeTextMacros(doc):
         "UD": u"Unofficial Proposal Draft",
         "DREAM": u"A Collection of Interesting Ideas"
     }
-    if doc.title:
-        config.textMacros["title"] = doc.title
-    config.textMacros["shortname"] = doc.shortname
-    config.textMacros["vshortname"] = u"{0}-{1}".format(doc.shortname, doc.level)
-    if doc.status in longstatuses:
-        config.textMacros["longstatus"] = longstatuses[doc.status]
+    if doc.md.title:
+        config.textMacros["title"] = doc.md.title
+    config.textMacros["shortname"] = doc.md.shortname
+    config.textMacros["vshortname"] = u"{0}-{1}".format(doc.md.shortname, doc.md.level)
+    if doc.md.status in longstatuses:
+        config.textMacros["longstatus"] = longstatuses[doc.md.status]
     else:
-        die(u"Unknown status '{0}' used.",doc.status)
-    if doc.status == "LCWD":
+        die(u"Unknown status '{0}' used.",doc.md.status)
+    if doc.md.status == "LCWD":
         config.textMacros["status"] = u"WD"
     else:
-        config.textMacros["status"] = doc.status
-    config.textMacros["latest"] = doc.TR or u"???"
-    config.textMacros["abstract"] = "<p>".join(doc.abstracts) or u"???"
-    config.textMacros["abstractattr"] = escapeAttr("  ".join(doc.abstracts).replace(u"<<",u"<").replace(u">>",u">")) or u"???"
-    config.textMacros["year"] = u(doc.date.year)
-    config.textMacros["date"] = doc.date.strftime(u"{0} %B %Y".format(doc.date.day))
-    config.textMacros["cdate"] = doc.date.strftime(u"%Y%m%d")
-    config.textMacros["isodate"] = doc.date.strftime(u"%Y-%m-%d")
-    if doc.deadline:
-        config.textMacros["deadline"] = doc.deadline.strftime(u"{0} %B %Y".format(doc.deadline.day))
-    if doc.status == "ED":
-        config.textMacros["version"] = doc.ED
+        config.textMacros["status"] = doc.md.status
+    config.textMacros["latest"] = doc.md.TR or u"???"
+    config.textMacros["abstract"] = "<p>".join(doc.md.abstracts) or u"???"
+    config.textMacros["abstractattr"] = escapeAttr("  ".join(doc.md.abstracts).replace(u"<<",u"<").replace(u">>",u">")) or u"???"
+    config.textMacros["year"] = u(doc.md.date.year)
+    config.textMacros["date"] = doc.md.date.strftime(u"{0} %B %Y".format(doc.md.date.day))
+    config.textMacros["cdate"] = doc.md.date.strftime(u"%Y%m%d")
+    config.textMacros["isodate"] = doc.md.date.strftime(u"%Y-%m-%d")
+    if doc.md.deadline:
+        config.textMacros["deadline"] = doc.md.deadline.strftime(u"{0} %B %Y".format(doc.md.deadline.day))
+    if doc.md.status == "ED":
+        config.textMacros["version"] = doc.md.ED
     else:
         config.textMacros["version"] = u"http://www.w3.org/TR/{3}/{0}-{1}-{2}/".format(config.textMacros["status"],
                                                                                        config.textMacros["vshortname"],
@@ -490,7 +408,7 @@ def initializeTextMacros(doc):
 
 
 def verifyRequiredMetadata(doc):
-    if not doc.hasMetadata:
+    if not doc.md.hasMetadata:
         die("The document requires at least one metadata block.")
         return
 
@@ -506,10 +424,10 @@ def verifyRequiredMetadata(doc):
     ]
     errors = []
     for attr, name in requiredSingularKeys:
-        if getattr(doc, attr) is None:
+        if getattr(doc.md, attr) is None:
             errors.append(u"    Missing a '{0}' entry.".format(u(name)))
     for attr, name in requiredMultiKeys:
-        if len(getattr(doc, attr)) == 0:
+        if len(getattr(doc.md, attr)) == 0:
             errors.append(u"    Must provide at least one '{0}' entry.".format(u(name)))
     if errors:
         die(u"Not all required metadata was provided:\n{0}", u"\n".join(errors))
@@ -989,7 +907,7 @@ def processAutolinks(doc):
                               status=el.get('data-link-status'),
                               linkFor=el.get('data-link-for'),
                               el=el,
-                              error=(linkText not in doc.ignoredTerms))
+                              error=(linkText not in doc.md.ignoredTerms))
         if url is not None:
             el.set('href', url)
             el.tag = "a"
@@ -1173,35 +1091,11 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force
 
 
 class CSSSpec(object):
-    # required metadata
-    hasMetadata = False
-    status = None
-    ED = None
-    abstracts = []
-    shortname = None
-    level = None
-
-    # optional metadata
-    TR = None
-    title = "???"
-    date = datetime.utcnow().date()
-    deadline = None
-    group = "csswg"
-    editors = []
-    previousEditors = []
-    previousVersions = []
-    warning = None
-    atRisk = []
-    ignoredTerms = []
-    testSuite = None
-    otherMetadata = defaultdict(list)
-    mailingList = "www-style@w3.org"
-    mailingListArchives = "http://lists.w3.org/Archives/Public/www-style/"
-
     # internal state
     normativeRefs = set()
     informativeRefs = set()
     refs = ReferenceManager()
+    md = MetadataManager()
     biblios = {}
     paragraphMode = "markdown"
 
@@ -1349,9 +1243,9 @@ class CSSSpec(object):
         # If that fails, grabs the most general file.
         # Filenames must be of the format NAME-GROUP-STATUS.include
         if group is None:
-            group = self.group
+            group = self.md.group
         if status is None:
-            status = self.status
+            status = self.md.status
 
         pathprefix = config.scriptPath + "/include"
         if os.path.isfile("{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status)):
@@ -1396,11 +1290,11 @@ def fillInBoilerplate(doc):
     # (It gets added back in the header file.)
     match = re.match("^<h1>([^<]+)</h1>", doc.html)
     if match:
-        doc.title = match.group(1)
-        config.textMacros['title'] = doc.title
+        doc.md.title = match.group(1)
+        config.textMacros['title'] = doc.md.title
         doc.html = doc.html[len(match.group(0)):]
 
-    if not doc.title:
+    if not doc.md.title:
         die("Can't generate the spec without a title.\nAdd a 'Title' metadata entry, or an <h1> on the first line.")
 
     header = doc.getInclusion('header')
@@ -1438,16 +1332,16 @@ def addStatusSection(doc):
 
 
 def addObsoletionNotice(doc):
-    if doc.warning:
-        html = doc.getInclusion(doc.warning)
+    if doc.md.warning:
+        html = doc.getInclusion(doc.md.warning)
         html = replaceTextMacros(html)
         fillWith('warning', parseHTML(html))
 
 def addAtRisk(doc):
-    if len(doc.atRisk) == 0:
+    if len(doc.md.atRisk) == 0:
         return
     html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
-    for feature in doc.atRisk:
+    for feature in doc.md.atRisk:
         html += "<li>"+replaceTextMacros(feature)
     fillWith('at-risk', parseHTML(html))
 
@@ -1619,34 +1513,34 @@ def addSpecMetadataSection(doc):
 
     header = u"<dl>"
     header += u"<dt>This version:<dd><a href='[VERSION]' class='u-url'>[VERSION]</a>"
-    if doc.TR:
-        header += u"<dt>Latest version:<dd><a href='{0}'>{0}</a>".format(doc.TR)
-    if doc.ED:
-        header += u"<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.ED)
-    if len(doc.previousVersions):
-        header += u"<dt>Previous Versions:" + u''.join(map(u"<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.previousVersions))
+    if doc.md.TR:
+        header += u"<dt>Latest version:<dd><a href='{0}'>{0}</a>".format(doc.md.TR)
+    if doc.md.ED:
+        header += u"<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.md.ED)
+    if len(doc.md.previousVersions):
+        header += u"<dt>Previous Versions:" + u''.join(map(u"<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.md.previousVersions))
     header += u"""
 <dt>Feedback:</dt>
     <dd><a href="mailto:{0}?subject=%5B[SHORTNAME]%5D%20feedback">{0}</a>
         with subject line
         &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;
-        (<a rel="discussion" href="{1}">archives</a>)""".format(doc.mailingList, doc.mailingListArchives)
-    if doc.testSuite is not None:
-        header += u"<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.testSuite)
+        (<a rel="discussion" href="{1}">archives</a>)""".format(doc.md.mailingList, doc.md.mailingListArchives)
+    if doc.md.testSuite is not None:
+        header += u"<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.md.testSuite)
     else:
         header += u"<dt>Test Suite:<dd>None Yet"
-    if len(doc.editors):
+    if len(doc.md.editors):
         header += u"<dt>Editors:\n"
-        for editor in doc.editors:
+        for editor in doc.md.editors:
             header += printEditor(editor)
     else:
         header += u"<dt>Editors:<dd>???"
-    if len(doc.previousEditors):
+    if len(doc.md.previousEditors):
         header += "<dt>Former Editors:\n"
-        for editor in doc.previousEditors:
+        for editor in doc.md.previousEditors:
             header += printEditor(editor)
-    if len(doc.otherMetadata):
-        for key, vals in doc.otherMetadata.items():
+    if len(doc.md.otherMetadata):
+        for key, vals in doc.md.otherMetadata.items():
             header += u"<dt>{0}:".format(key)
             for val in vals:
                 header += u"<dd>"+val
