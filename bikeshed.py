@@ -61,7 +61,7 @@ def main():
     subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
 
     specParser = subparsers.add_parser('spec', help="Process a spec source file into a valid output file.")
-    specParser.add_argument("infile", type=argparse.FileType('r'), nargs="?",
+    specParser.add_argument("infile", nargs="?",
                             default="Overview.src.html",
                             help="Path to the source file. [default: %(default)s]")
     # Have to use string type for the outfile, so it doens't truncate the output on --dry-run
@@ -96,29 +96,34 @@ def main():
     config.debug = options.debug
     config.dryRun = options.dryRun
 
+    try:
+        inputFile = open(options.infile, 'r')
+    except Exception, e:
+        die("Couldn't open input file. Error was:\n{0}", str(e))
+
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults)
     elif options.subparserName == "spec":
-        config.doc = CSSSpec(inputFile=options.infile, paragraphMode=options.paragraphMode)
+        config.doc = CSSSpec(inputFile=inputFile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
         config.doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         config.debug = True
         config.quiet = True
         if options.printExports:
-            config.doc = CSSSpec(inputFile=options.infile)
+            config.doc = CSSSpec(inputFile=inputFile)
             config.doc.preprocess()
             config.doc.printTargets()
         elif options.jsonCode:
-            config.doc = CSSSpec(inputFile=options.infile)
+            config.doc = CSSSpec(inputFile=inputFile)
             config.doc.preprocess()
             exec("print json.dumps({0}, indent=2)".format(options.jsonCode))
         elif options.code:
-            config.doc = CSSSpec(inputFile=options.infile)
+            config.doc = CSSSpec(inputFile=inputFile)
             config.doc.preprocess()
             exec("print {0}".format(options.code))
         elif options.linkText:
-            config.doc = CSSSpec(inputFile=options.infile)
+            config.doc = CSSSpec(inputFile=inputFile)
             config.doc.preprocess()
             refs = config.doc.refs.refs[options.linkText]
             config.quiet = options.quiet
