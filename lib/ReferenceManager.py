@@ -26,15 +26,15 @@ class ReferenceManager(object):
             # to enforce pubrules linking policy.
 
     def setSpecData(self, spec):
-        if spec.status in ("ED", "DREAM", "UD"):
+        if spec.md.status in ("ED", "DREAM", "UD"):
             self.specStatus = "ED"
         else:
             self.specStatus = "TR"
             # I'll want to make this more complex later,
             # to enforce pubrules linking policy.
-        self.specLevel = spec.level
-        self.specName = spec.shortname
-        self.specVName = spec.shortname + "-" + u(spec.level)
+        self.specLevel = spec.md.level
+        self.specName = spec.md.shortname
+        self.specVName = spec.md.shortname + "-" + u(spec.md.level)
         # Need to get a real versioned shortname,
         # with the possibility of overriding the "shortname-level" pattern.
         self.removeSameSpecRefs()
