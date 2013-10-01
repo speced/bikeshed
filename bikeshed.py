@@ -1542,12 +1542,14 @@ def addSpecMetadataSection(doc):
         header += u"<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.md.ED)
     if len(doc.md.previousVersions):
         header += u"<dt>Previous Versions:" + u''.join(map(u"<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.md.previousVersions))
-    header += u"""
-<dt>Feedback:</dt>
-    <dd><a href="mailto:{0}?subject=%5B[SHORTNAME]%5D%20feedback">{0}</a>
-        with subject line
-        &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;
-        (<a rel="discussion" href="{1}">archives</a>)""".format(doc.md.mailingList, doc.md.mailingListArchives)
+    if doc.md.mailingList:
+        header += u"""
+    <dt>Feedback:</dt>
+        <dd><a href="mailto:{0}?subject=%5B[SHORTNAME]%5D%20feedback">{0}</a>
+            with subject line
+            &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;""".format(doc.md.mailingList)
+        if doc.md.mailingListArchives:
+            header += u"""(<a rel="discussion" href="{0}">archives</a>)""".format(doc.md.mailingListArchives)
     if doc.md.testSuite is not None:
         header += u"<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.md.testSuite)
     else:
