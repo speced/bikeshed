@@ -1482,18 +1482,25 @@ def addIndexSection(doc):
 def addPropertyIndex(doc):
     # Extract all the data from the propdef and descdef tables
     props = []
+    def extractKeyValFromRow(tr):
+        # Extract the key, minus the trailing :
+        result = re.match(u'(.*):', textContent(row[0]).strip())
+        if result is None:
+            die("Propdef row headers need be a word followed by a colon. Got:\n{0}", textContent(row[0]).strip())
+            return '',''
+        key = result.group(1).strip()
+        # Extract the value from the second cell
+        val = innerHTML(row[1]).strip()
+        return key, val
     for table in findAll('table.propdef'):
         prop = {}
         names = []
-        rows = findAll('tr', table)
-        for row in rows:
-            # Extract the key, minus the trailing :
-            key = re.match(u'(.*):', textContent(row[0])).group(1).strip()
-            # Extract the value from the second cell
+        for row in findAll('tr', table):
+            key, val = extractKeyValFromRow(row)
             if key == "Name":
                 names = [textContent(x) for x in findAll('dfn', row[1])]
             else:
-                prop[key] = innerHTML(row[1])
+                prop[key] = val
         for name in names:
             tempProp = prop.copy()
             tempProp['Name'] = name
@@ -1503,17 +1510,14 @@ def addPropertyIndex(doc):
         desc = {}
         names = []
         atRule = ""
-        rows = findAll('tr', table)
-        for row in rows:
-            # Extract the key, minus the trailing :
-            key = re.match(u'(.*):', textContent(row[0])).group(1).strip()
-            # Extract the value from the second cell
+        for row in findAll('tr', table):
+            key, val = extractKeyValFromRow(row)
             if key == "Name":
                 names = [textContent(x) for x in findAll('dfn', row[1])]
             elif key == "For":
                 atRule = textContent(row[1])
             else:
-                desc[key] = innerHTML(row[1])
+                desc[key] = val
         for name in names:
             tempDesc = desc.copy()
             tempDesc['Name'] = name
