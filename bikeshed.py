@@ -361,6 +361,17 @@ def transformMetadata(lines, doc, **kwargs):
     # Remove the metadata block from the generated document.
     return []
 
+def loadDefaultMetadata(doc):
+    data = doc.getInclusion('defaults', error=False)
+    try:
+        defaults = json.loads(data)
+    except Exception, e:
+        if data != "":
+            die("Error loading defaults:\n{0}", str(e))
+        return
+    for key,val in defaults.items():
+        doc.md.addDefault(key, val)
+
 def initializeTextMacros(doc):
     longstatuses = {
         "ED": u"Editor's Draft",
@@ -1162,6 +1173,7 @@ class CSSSpec(object):
     def preprocess(self):
         # Textual hacks
         transformDataBlocks(self)
+        loadDefaultMetadata(self)
         verifyRequiredMetadata(self)
         initializeTextMacros(self)
         if self.paragraphMode == "markdown":
@@ -1236,7 +1248,7 @@ class CSSSpec(object):
         for term in ignoredTerms:
             print u"  {0}".format(term)
 
-    def getInclusion(self, name, group=None, status=None):
+    def getInclusion(self, name, group=None, status=None, error=True):
         # First looks for a file specialized on the group and status.
         # If that fails, specializes only on the group.
         # If that fails, specializes only on the status.
@@ -1257,14 +1269,16 @@ class CSSSpec(object):
         elif os.path.isfile("{0}/{1}.include".format(pathprefix, name)):
             filename = "{0}/{1}.include".format(pathprefix, name)
         else:
-            die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
+            if error:
+                die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
             filename = "/dev/null"
 
         try:
             with open(filename, 'r') as fh:
                 return fh.read()
         except IOError:
-            die("The include file for {0} disappeared underneath me.", name)
+            if error:
+                die("The include file for {0} disappeared underneath me.", name)
 
 
 
