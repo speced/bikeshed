@@ -1400,7 +1400,7 @@ def addPropertyIndex(doc):
             return '',''
         key = result.group(1).strip()
         # Extract the value from the second cell
-        val = innerHTML(row[1]).strip()
+        val = textContent(row[1]).strip()
         return key, val
     for table in findAll('table.propdef'):
         prop = {}
