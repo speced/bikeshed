@@ -55,7 +55,7 @@ def main():
     argparser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
                             help="Suppresses everything but fatal errors from printing.")
     argparser.add_argument("-f", "--force", dest="debug", action="store_true",
-                         help="Force the preprocessor to run to completion; fatal errors don't stop processing.")
+                           help="Force the preprocessor to run to completion; fatal errors don't stop processing.")
     argparser.add_argument("-d", "--dry-run", dest="dryRun", action="store_true",
                            help="Prevents the processor from actually saving anything to disk, but otherwise fully runs.")
 
@@ -78,18 +78,18 @@ def main():
     updateParser.add_argument("--link-defaults", dest="linkDefaults", action="store_true", help="Download link default data.")
     
     debugParser = subparsers.add_parser('debug', help="Run various debugging commands.")
-    debugParser.add_argument("infile", type=argparse.FileType('r'), nargs="?",
-                            default="Overview.src.html",
-                            help="Path to the source file. [default: %(default)s]")
+    debugParser.add_argument("infile", nargs="?",
+                             default="Overview.src.html",
+                             help="Path to the source file. [default: %(default)s]")
     debugCommands = debugParser.add_mutually_exclusive_group(required=True)
     debugCommands.add_argument("--print-exports", dest="printExports", action="store_true",
-                         help="Prints those terms that will be exported for cross-ref purposes.")
+                               help="Prints those terms that will be exported for cross-ref purposes.")
     debugCommands.add_argument("--print-refs-for", dest="linkText",
-                         help="Prints the ref data for a given link text.")
+                               help="Prints the ref data for a given link text.")
     debugCommands.add_argument("--print", dest="code",
-                         help="Runs the specified code and prints it.")
+                               help="Runs the specified code and prints it.")
     debugCommands.add_argument("--print-json", dest="jsonCode",
-                         help="Runs the specified code and prints it as formatted JSON.")
+                               help="Runs the specified code and prints it as formatted JSON.")
 
     options = argparser.parse_args()
 
