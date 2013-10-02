@@ -89,6 +89,14 @@ class MetadataManager:
     def addData(self, key, val, default=False):
         key = key.strip()
         val = val.strip()
+
+        # This'll be a fatal error later, but for now it's just a warning.
+        if not (key in self.knownKeys or key.startswith("!")):
+            warn('Unknown metadata key "{0}". Prefix custom keys with "!".', key)
+
+        if key.startswith("!"):
+            key = key.lstrip("!")
+
         if key in self.knownKeys and not default:
             self.manuallySetKeys.add(key)
 
