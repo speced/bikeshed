@@ -97,10 +97,11 @@ def main():
     config.debug = options.debug
     config.dryRun = options.dryRun
 
-    try:
-        inputFile = open(options.infile, 'r')
-    except Exception, e:
-        die("Couldn't open input file. Error was:\n{0}", str(e))
+    if "infile" in options:
+        try:
+            inputFile = open(options.infile, 'r')
+        except Exception, e:
+            die("Couldn't open input file. Error was:\n{0}", str(e))
 
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults)
