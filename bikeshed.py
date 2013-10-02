@@ -308,7 +308,7 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
             vals[key] = val
     # The required keys are specified in the order they should show up in the propdef table.
     if "partial" in firstLine or "New values" in vals:
-        requiredKeys = ["Name"]
+        requiredKeys = ["Name", "New values"]
     else:
         requiredKeys = ["Name", "Value", "Initial", "Applies to", "Inherited", "Media", "Computed value"]
     ret = ["<table class='propdef'>"]

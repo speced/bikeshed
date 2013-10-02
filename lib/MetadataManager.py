@@ -145,7 +145,7 @@ def parseEditor(key, val):
     die("'{0}' format is '<name>, <company>, <email-or-contact-page>. Got:\n{1}", key, val)
 
 def parseIgnoredTerms(key, val):
-    return [term.strip() for term in val.split(u',')]
+    return [term.strip().lower() for term in val.split(u',')]
 
 def parseLinkDefaults(key, val):
     defaultSpecs = defaultdict(list)
