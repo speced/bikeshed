@@ -1004,6 +1004,8 @@ class IDLUI(object):
 
 def markupIDL(doc):
     for el in findAll('pre.idl'):
+        if el.get("data-no-idl") is not None:
+            continue
         widl = parser.Parser(textContent(el), IDLUI())
         text = unicode(widl.markup(IDLMarker()))
         replaceContents(el, parseHTML(text))
@@ -1011,8 +1013,6 @@ def markupIDL(doc):
 
 def processIDL(doc):
     for el in findAll("idl"):
-        if el.get("data-no-idl") is not None:
-            continue
         idlType = el.get('data-idl-type')
         url = doc.refs.getRef(idlType, el.get('title').lower(),
                               linkFor=el.get('data-idl-for'),
