@@ -120,6 +120,7 @@ class MetadataManager:
             else:
                 getattr(self, self.multiValueKeys[key]).append(val)
         else:
+            # FIXME: When unknown metadata keys become fatal errors, remove this clause.
             self.otherMetadata[key].append(val)
 
     def addDefault(self, key, val):
