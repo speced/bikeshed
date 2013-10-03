@@ -92,7 +92,8 @@ class MetadataManager:
 
         # This'll be a fatal error later, but for now it's just a warning.
         if not (key in self.knownKeys or key.startswith("!")):
-            warn('Unknown metadata key "{0}". Prefix custom keys with "!".', key)
+            die('Unknown metadata key "{0}". Prefix custom keys with "!".', key)
+            return
 
         if key.startswith("!"):
             key = key.lstrip("!")
@@ -114,14 +115,11 @@ class MetadataManager:
 
         if key in self.singleValueKeys:
             setattr(self, self.singleValueKeys[key], val)
-        elif key in self.multiValueKeys:
+        else:
             if isinstance(val, list):
                 getattr(self, self.multiValueKeys[key]).extend(val)
             else:
                 getattr(self, self.multiValueKeys[key]).append(val)
-        else:
-            # FIXME: When unknown metadata keys become fatal errors, remove this clause.
-            self.otherMetadata[key].append(val)
 
     def addDefault(self, key, val):
         self.addData(key, val, default=True)
