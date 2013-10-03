@@ -96,6 +96,8 @@ class MetadataManager:
 
         if key.startswith("!"):
             key = key.lstrip("!")
+            self.otherMetadata[key].append(val)
+            return
 
         if key in self.knownKeys and not default:
             self.manuallySetKeys.add(key)
