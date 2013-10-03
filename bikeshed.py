@@ -1011,6 +1011,8 @@ def markupIDL(doc):
 
 def processIDL(doc):
     for el in findAll("idl"):
+        if el.get("data-no-idl") is not None:
+            continue
         idlType = el.get('data-idl-type')
         url = doc.refs.getRef(idlType, el.get('title').lower(),
                               linkFor=el.get('data-idl-for'),
