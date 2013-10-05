@@ -1439,7 +1439,7 @@ def addPropertyIndex(doc):
 
     if len(props):
         # Set up the initial table columns for properties
-        columns = ["Name", "Value", "Initial", "Applies To", "Inherited", "Percentages", "Media"]
+        columns = ["Name", "Value", "Initial", "Applies to", "Inherited", "Percentages", "Media"]
         # Add any additional keys used in the document.
         allKeys = set()
         for prop in props:
