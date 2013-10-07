@@ -88,6 +88,8 @@ class MetadataManager:
 
     def addData(self, key, val, default=False):
         key = key.strip()
+        if key not in ("ED", "TR"):
+            key = key.title()
         val = val.strip()
 
         # This'll be a fatal error later, but for now it's just a warning.

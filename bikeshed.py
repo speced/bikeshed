@@ -282,7 +282,7 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
         if(match is None):
             die(u"Incorrectly formatted propdef line for '{0}':\n{1}", vals.get("Name", "???"), line)
             continue
-        key = match.group(1).strip()
+        key = match.group(1).strip().capitalize()
         val = match.group(2).strip()
         if key == "Value" and "Value" in vals:
             vals[key] += " "+val
@@ -313,7 +313,7 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
         if(match is None):
             die(u"Incorrectly formatted descdef line for '{0}':\n{1}", vals.get("Name", "???"), u(line))
             continue
-        key = match.group(1).strip()
+        key = match.group(1).strip().capitalize()
         val = match.group(2).strip()
         if key == "Value" and "Value" in vals:
             vals[key] += " "+val
@@ -1380,7 +1380,7 @@ def addPropertyIndex(doc):
         if result is None:
             die("Propdef row headers need be a word followed by a colon. Got:\n{0}", textContent(row[0]).strip())
             return '',''
-        key = result.group(1).strip()
+        key = result.group(1).strip().capitalize()
         # Extract the value from the second cell
         val = textContent(row[1]).strip()
         return key, val
