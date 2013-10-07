@@ -1454,7 +1454,7 @@ def addPropertyIndex(doc):
             for desc in descs:
                 allKeys |= set(desc.keys())
             columns.extend(sorted(allKeys - set(columns) - set("For")))
-            html += u"<h3 class='no-num' id='{0}-descriptor-table'>{0} Descriptors</h3>".format(u(atRuleName))
+            html += u"<h3 class='no-num' id='{1}-descriptor-table'>{0} Descriptors</h3>".format(u(atRuleName), simplifyText(u(atRuleName)))
             html += u"<table class=proptable><thead><tr>"
             for column in columns:
                 html += u"<th scope=col>{0}".format(u(column))
