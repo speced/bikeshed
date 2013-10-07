@@ -38,6 +38,9 @@ class Marker(object):
     def markupType(self, text, construct):
         return ('<TYPE for=' + construct.idlType + '>', '</TYPE>')
     
+    def markupTypeName(self, text, construct):
+        return ('<TYPE-NAME for=' + construct.idlType + '>', '</TYPE-NAME>')
+    
     def markupName(self, text, construct):
         return ('<NAME for=' + construct.idlType + '>', '</NAME>')
 
@@ -52,7 +55,10 @@ class NullMarker(object):
     def markupConstruct(self, text, construct):
         return (None, None)
     
-    def markupType(self, text, construct):
+    def markupType(self, text, type):
+        return (None, None)
+    
+    def markupTypeName(self, text, construct):
         return ('', '')
 
     def encode(self, text):
@@ -65,7 +71,7 @@ class ui(object):
         print str
 
     def note(self, str):
-        return
+#        return
         print str
 
 def testDifference(input, output):
@@ -86,6 +92,18 @@ def testDifference(input, output):
 if __name__ == "__main__":      # called from the command line
     sys.excepthook = debugHook
     parser = parser.Parser(ui=ui())
+    
+    if (1 < len(sys.argv)):
+        for fileName in sys.argv[1:]:
+            print "Parsing: " + fileName
+            file = open(fileName)
+            parser.reset()
+            text = file.read()
+            parser.parse(text)
+            assert (text == unicode(parser))
+        quit()
+    
+    
     idl = u"""interface Simple{
     serializer;
     serializer = { foo };
@@ -99,6 +117,7 @@ if __name__ == "__main__":      # called from the command line
     serializer = [ foo, bar ];
     serializer = [ getter ];
     serializer = foo;
+    serializer cereal(short one);
     Foo iterator;
     Foo iterator = Simple;
     Foo iterator object;
