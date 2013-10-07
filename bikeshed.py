@@ -1,26 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Dependencies:
-# * python 2.7
-# * python-dev, libxml2-dev, libxslt1-dev
-# * html5lib - "pip install html5lib"
-# * lxml - "pip install lxml"
-# * cssselect "pip install cssselect"
-#
-# OSX setup:
-# $ curl -O https://raw.github.com/pypa/pip/master/contrib/get-pip.py
-# $ sudo python get-pip.py
-# $ sudo pip install html5lib
-# $ sudo pip install lxml
-# $ sudo pip install cssselect
-# $ chmod u+x preprocess.py
-
-
-# TODO
-# Handle "foo!!bar" in titles correctly.
-# Introspect based on IDL parsing.
-
 from __future__ import division
 import re
 from collections import defaultdict
