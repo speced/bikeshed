@@ -1373,7 +1373,6 @@ def addIndexSection(doc):
 
 def addPropertyIndex(doc):
     # Extract all the data from the propdef and descdef tables
-    props = []
     def extractKeyValFromRow(tr):
         # Extract the key, minus the trailing :
         result = re.match(u'(.*):', textContent(row[0]).strip())
@@ -1384,6 +1383,8 @@ def addPropertyIndex(doc):
         # Extract the value from the second cell
         val = textContent(row[1]).strip()
         return key, val
+    # Extract propdef info
+    props = []
     for table in findAll('table.propdef'):
         prop = {}
         names = []
@@ -1397,6 +1398,7 @@ def addPropertyIndex(doc):
             tempProp = prop.copy()
             tempProp['Name'] = name
             props.append(tempProp)
+    # Extract descdef info
     atRules = defaultdict(list)
     for table in findAll('table.descdef'):
         desc = {}
@@ -1407,7 +1409,7 @@ def addPropertyIndex(doc):
             if key == "Name":
                 names = [textContent(x) for x in findAll('dfn', row[1])]
             elif key == "For":
-                atRule = textContent(row[1])
+                atRule = val
             else:
                 desc[key] = val
         for name in names:
@@ -1433,10 +1435,10 @@ def addPropertyIndex(doc):
             elif column == "Percentages":
                 html += u"<th scope=col>%ages"
             else:
-                html += u"<th scope=col>"+u(column)
+                html += u"<th scope=col>"+escapeHTML(u(column))
         html += u"<tbody>"
         for prop in props:
-            html += u"\n<tr><th scope=row><a data-property>{0}</a>".format(u(prop['Name']))
+            html += u"\n<tr><th scope=row><a data-property>{0}</a>".format(escapeHTML(u(prop['Name'])))
             for column in columns[1:]:
                 html += u"<td>" + u(escapeHTML(prop.get(column, "")))
         html += u"</table>"
@@ -1453,16 +1455,16 @@ def addPropertyIndex(doc):
             allKeys = set()
             for desc in descs:
                 allKeys |= set(desc.keys())
-            columns.extend(sorted(allKeys - set(columns) - set("For")))
+            columns.extend(sorted(allKeys - set(columns)))
             html += u"<h3 class='no-num' id='{1}-descriptor-table'>{0} Descriptors</h3>".format(u(atRuleName), simplifyText(u(atRuleName)))
             html += u"<table class=proptable><thead><tr>"
             for column in columns:
-                html += u"<th scope=col>{0}".format(u(column))
+                html += u"<th scope=col>{0}".format(escapeHTML(u(column)))
             html += u"<tbody>"
             for desc in descs:
-                html += u"\n<tr><th scope-row><a data-property>{0}</a>".format(u(desc['Name']))
+                html += u"\n<tr><th scope-row><a data-property>{0}</a>".format(escapeHTML(u(desc['Name'])))
                 for column in columns[1:]:
-                    html += u"<td>" + u(desc.get(column, ""))
+                    html += u"<td>" + escapeHTML(u(desc.get(column, "")))
             html += u"</table>"
 
     fillWith("property-index", parseHTML(html))
