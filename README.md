@@ -39,6 +39,7 @@ Use `bikeshed -qf spec`.)
 Documentation Sections
 ----------------------
 
+* [Installing Bikeshed](docs/install.md) - gets you from "reading this page" to "running Bikeshed" in as few steps as possible.
 * [Quick Start Guide](docs/quick-start.md) - gets you from an empty file to a full spec in no time.
 * [Metadata](docs/metadata.md) - describes the format of the required metadata block in your spec.
 * [Definitions, Autolinks, and Bibliography](docs/definitions-autolinks.md) - describes how to create definitions, autolinks, and bibliography entries.
