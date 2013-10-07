@@ -858,6 +858,12 @@ def classifyLink(el):
     linkType = determineLinkType(el)
     el.set('data-link-type', linkType)
     linkText = determineLinkText(el)
+    if linkType == "maybe" and re.match(r"([\w-/]+)/([\w-]+)", linkText):
+        match = re.match(r"^([\w-/]+)/([\w-]+)$", linkText)
+        el.set('data-link-for', match.group(1))
+        clearContents(el)
+        linkText = match.group(2)
+        el.text = linkText
     el.set('title', linkText)
     for attr in ["data-link-status", "data-link-for", "data-link-spec"]:
         val = treeAttr(el, attr)
