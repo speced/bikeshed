@@ -60,7 +60,7 @@ Provide a normalized version of a method name, including the names of all argume
 
 **Parser.markup(marker)**
 
-Returns a marked-up version of the WebIDL input text. For each Construct, Type, and Name, the 'marker' will get called with 'markupConstruct(text, construct)', 'markupType(text, construct)', or 'markupName(text, construct)' repsectively, if implemented. Implementation of each method is optional. The 'markup*' methods must return a tuple of the prefix and suffix to inject as markup around the text, or '(None, None)'. If the 'marker' also implements 'encode(text)' it will get called with each block of text to return in any encoding necessary for the output format. Markup and encode calls will happen in source order, the text will be split at markup boundaries.
+Returns a marked-up version of the WebIDL input text. For each Construct, Type, and Name, the 'marker' will get called with 'markupConstruct(text, construct)', 'markupType(text, construct)', 'markupTypeName(text, construct)', or 'markupName(text, construct)' repsectively, if implemented. Implementation of each method is optional. The 'markup*' methods must return a tuple of the prefix and suffix to inject as markup around the text, or '(None, None)'. 'markupConstruct' will get called for each construct, 'markupType' will get called for each type, 'markupTypeName' will get called for each interface name within a type, 'markupName' will get called for the defining name of a construct (at most one per construct). If the 'marker' also implements 'encode(text)' it will get called with each block of text to return in any encoding necessary for the output format. Markup and encode calls will happen in source order, the text will be split at markup boundaries.
 
 
 Constructs
