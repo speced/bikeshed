@@ -113,7 +113,7 @@ def updateCrossRefs():
 
 
 def updateBiblio():
-    pass
+    warn("Can't automatically update biblio.refer. Manually update it you want up-to-date information.")
 
 
 def updateLinkDefaults():
