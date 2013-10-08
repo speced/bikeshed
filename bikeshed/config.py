@@ -7,37 +7,37 @@ scriptPath = os.path.dirname(os.path.realpath(__file__))
 doc = None
 textMacros = {}
 dfnClassToType = {
-    'propdef'         : 'property',
-    'valuedef'        : 'value',
-    'at-ruledef'      : 'at-rule',
-    'descdef'         : 'descriptor',
-    'typedef'         : 'type',
-    'funcdef'         : 'function',
-    'selectordef'     : 'selector',
-    'tokendef'        : 'token',
-    'elementdef'      : 'element',
-    'element-attrdef' : 'element-attr',
-    'eventdef'        : 'event',
-    'interfacedef'    : 'interface',
-    'constructordef'  : 'constructor',
-    'methoddef'       : 'method',
-    'argdef'          : 'argument',
-    'attrdef'         : 'attribute',
-    'callbackdef'     : 'callback',
-    'dictdef'         : 'dictionary',
-    'dict-memberdef'  : 'dict-member',
-    'exceptdef'       : 'exception',
-    'except-fielddef' : 'except-field',
-    'enumdef'         : 'enum',
-    'constdef'        : 'const',
-    'typedefdef'      : 'typedef',
-    'stringdef'       : 'stringifier',
-    'serialdef'       : 'serializer',
-    'iterdef'         : 'iterator' }
+    "propdef"         : "property",
+    "valuedef"        : "value",
+    "at-ruledef"      : "at-rule",
+    "descdef"         : "descriptor",
+    "typedef"         : "type",
+    "funcdef"         : "function",
+    "selectordef"     : "selector",
+    "tokendef"        : "token",
+    "elementdef"      : "element",
+    "element-attrdef" : "element-attr",
+    "eventdef"        : "event",
+    "interfacedef"    : "interface",
+    "constructordef"  : "constructor",
+    "methoddef"       : "method",
+    "argdef"          : "argument",
+    "attrdef"         : "attribute",
+    "callbackdef"     : "callback",
+    "dictdef"         : "dictionary",
+    "dict-memberdef"  : "dict-member",
+    "exceptdef"       : "exception",
+    "except-fielddef" : "except-field",
+    "enumdef"         : "enum",
+    "constdef"        : "const",
+    "typedefdef"      : "typedef",
+    "stringdef"       : "stringifier",
+    "serialdef"       : "serializer",
+    "iterdef"         : "iterator" }
 
 dfnTypes = frozenset(dfnClassToType.values())
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector", "token"])
-idlTypes = frozenset(['event', 'interface', 'constructor', 'method', 'argument', 'attribute', 'callback', 'dictionary', 'dict-member', 'exception', 'except-field', 'enum', 'const', 'typedef', 'stringifier', 'serializer', 'iterator'])
+idlTypes = frozenset(["event", "interface", "constructor", "method", "argument", "attribute", "callback", "dictionary", "dict-member", "exception", "except-field", "enum", "const", "typedef", "stringifier", "serializer", "iterator"])
 functionishTypes = frozenset(["function", "method"])
 linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "maybe", "biblio"])
 typesUsingFor = frozenset(["descriptor", "value", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "except-field", "stringifier", "serializer", "iterator"])
