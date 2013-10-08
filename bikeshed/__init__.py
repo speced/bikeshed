@@ -1353,24 +1353,39 @@ def addAtRisk(doc):
         html += "<li>"+replaceTextMacros(feature)
     fillWith('at-risk', parseHTML(html))
 
+
 def addIndexSection(doc):
     from .ReferenceManager import linkTextsFromElement
-    indexElements = findAll("dfn")
-    indexEntries = []
-    for el in indexElements:
-        if el.get('data-dfn-type') in ("property", "descriptor"):
-            # These get their own index section.
-            continue
+    from collections import OrderedDict
+    indexEntries = defaultdict(list)
+    for el in findAll("dfn"):
         linkTexts = linkTextsFromElement(el, preserveCasing=True)
-        if el.get('data-dfn-type') == "value":
-            linkTexts = map(u"{0} (value)".format, linkTexts)
         headingLevel = headingLevelOfElement(el) or u"Unnumbered section"
+        if el.get('data-dfn-for') is not None:
+            disambiguator = u"{0} for {1}".format(el.get('data-dfn-type'), ', '.join(el.get('data-dfn-for').split()))
+        else:
+            disambiguator = u"({0})".format(el.get('data-dfn-type'))
         id = el.get('id')
         for linkText in linkTexts:
-            indexEntries.append((linkText, id, headingLevel))
+            sort = re.sub(r'[^a-z0-9]', '', linkText.lower())
+            indexEntries[linkText].append({
+                'text':u(escapeHTML(linkText)),
+                'id':u(id),
+                'level':u(headingLevel),
+                'disambiguator':u(disambiguator),
+                'sort':sort
+                })
+    # Now print the indexes
+    sortedEntries = OrderedDict(sorted(indexEntries.items(), key=lambda x:x[1][0]['sort']))
     html = u"<ul class='indexlist'>\n"
-    for text, id, level in sorted(indexEntries, key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower())):
-        html += u"<li>{0}, <a href='#{1}' title='section {2}'>{2}</a>\n".format(escapeHTML(u(text)), u(id), u(level))
+    for text, items in sortedEntries.items():
+        if len(items) == 1:
+            html += u"<li>{text}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**items[0])
+        else:
+            html += u"<li>{text}<ul>".format(**items[0])
+            for item in items:
+                html += u"<li><small>{disambiguator}, <a href='#{id}' title='section {level}'>{level}</a></small>\n".format(**item)
+            html += u"</ul>"
     html += u"</ul>"
     fillWith("index", parseHTML(html))
 
