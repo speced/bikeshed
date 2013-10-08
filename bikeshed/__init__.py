@@ -1372,7 +1372,7 @@ def addIndexSection(doc):
                 'text':u(escapeHTML(linkText)),
                 'id':u(id),
                 'level':u(headingLevel),
-                'disambiguator':u(disambiguator),
+                'disambiguator':u(escapeHTML(disambiguator)),
                 'sort':sort
                 })
     # Now print the indexes
