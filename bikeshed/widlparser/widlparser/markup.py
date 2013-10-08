@@ -22,7 +22,14 @@ class MarkupGenerator(object):
     
     def addType(self, type):
         if (type):
-            self.children.append(MarkupType(type))
+            self.addText(type._leadingSpace)
+            self.children.append(MarkupType(self.construct, type))
+            self.addText(type._semicolon)
+            self.addText(type._trailingSpace)
+    
+    def addTypeName(self, typeName):
+        if (typeName):
+            self.children.append(MarkupTypeName(typeName))
     
     def addName(self, name):
         if (name):
@@ -38,15 +45,29 @@ class MarkupGenerator(object):
     @property
     def text(self):
         return u''.join([child.text for child in self.children])
+
+    def _markup(self, marker):
+        if (self.construct and hasattr(marker, 'markupConstruct')):
+            return marker.markupConstruct(self.text, self.construct)
+        return (None, None)
     
     def markup(self, marker, parent = None):
-        if (self.construct and hasattr(marker, 'markupConstruct')):
-            head, tail = marker.markupConstruct(self.text, self.construct)
-        else:
-            head, tail = (None, None)
+        head, tail = self._markup(marker)
         output = unicode(head) if (head) else u''
         output += u''.join([child.markup(marker, self.construct) for child in self.children])
         return output + (unicode(tail) if (tail) else u'')
+
+
+class MarkupType(MarkupGenerator):
+    def __init__(self, construct, type):
+        MarkupGenerator.__init__(self, construct)
+        type._markup(self)
+
+    def _markup(self, marker):
+        if (self.construct and hasattr(marker, 'markupType')):
+            return marker.markupType(self.text, self.construct)
+        return (None, None)
+
 
 class MarkupText(object):
     def __init__(self, text):
@@ -56,15 +77,16 @@ class MarkupText(object):
         return unicode(marker.encode(self.text)) if (hasattr(marker, 'encode')) else self.text
 
 
-class MarkupType(MarkupText):
+class MarkupTypeName(MarkupText):
     def __init__(self, type):
         MarkupText.__init__(self, type)
     
     def markup(self, marker, construct):
-        head, tail = marker.markupType(self.text, construct) if (hasattr(marker, 'markupType')) else (None, None)
+        head, tail = marker.markupTypeName(self.text, construct) if (hasattr(marker, 'markupTypeName')) else (None, None)
         output = unicode(head) if (head) else u''
         output += MarkupText.markup(self, marker, construct)
         return output + (unicode(tail) if (tail) else u'')
+
 
 class MarkupName(MarkupText):
     def __init__(self, name):

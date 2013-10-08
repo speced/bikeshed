@@ -111,7 +111,7 @@ class IntegerType(Production):   # "short" | "long" ["long"]
                 self.type += ' ' + tokens.next().text
         else:
             self.type = token.text
-        self._didParse(tokens)
+        self._didParse(tokens, False)
 
     def _unicode(self):
         if (self._space):
@@ -136,10 +136,10 @@ class UnsignedIntegerType(Production):   # "unsigned" IntegerType | IntegerType
         Production.__init__(self, tokens)
         self.unsigned = Symbol(tokens, 'unsigned') if (Symbol.peek(tokens, 'unsigned')) else None
         self.type = IntegerType(tokens)
-        self._didParse(tokens)
+        self._didParse(tokens, False)
 
     def _unicode(self):
-        return (unicode(self.unsigned) + unicode(self.type)) if (self.unsigned) else unicode(self.type)
+        return (unicode(self.unsigned) + self.type._unicode()) if (self.unsigned) else self.type._unicode()
 
     def __repr__(self):
         return '[UnsignedIntegerType: ' + ('[unsigned]' if (self.unsigned) else '') + repr(self.type) + ']'
@@ -155,7 +155,7 @@ class FloatType(Production):   # "float" | "double"
         Production.__init__(self, tokens)
         token = tokens.next()
         self.type = token.text
-        self._didParse(tokens)
+        self._didParse(tokens, False)
 
     def _unicode(self):
         return self.type
@@ -178,7 +178,7 @@ class UnrestrictedFloatType(Production): # "unrestricted" FloatType | FloatType
         Production.__init__(self, tokens)
         self.unrestricted = Symbol(tokens, 'unrestricted') if (Symbol.peek(tokens, 'unrestricted')) else None
         self.type = FloatType(tokens)
-        self._didParse(tokens)
+        self._didParse(tokens, False)
 
     def _unicode(self):
         return (unicode(self.unrestricted) + unicode(self.type)) if (self.unrestricted) else unicode(self.type)
@@ -205,10 +205,12 @@ class PrimitiveType(Production): # UnsignedIntegerType | UnrestrictedFloatType |
             self.type = UnrestrictedFloatType(tokens)
         else:
             self.type = tokens.next().text
-        self._didParse(tokens)
+        self._didParse(tokens, False)
 
     def _unicode(self):
-        return unicode(self.type)
+        if (isinstance(self.type, basestring)):
+            return unicode(self.type)
+        return self.type._unicode()
 
     def __repr__(self):
         return '[PrimitiveType: ' + repr(self.type) + ']'
@@ -232,7 +234,7 @@ class ConstType(Production): # PrimitiveType [Null] | identifier [Null]
             self.type = PrimitiveType(tokens)
         else:
             self.type = tokens.next().text
-        self.null = Symbol(tokens, '?') if (Symbol.peek(tokens, '?')) else None
+        self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
         self._didParse(tokens)
 
     def _unicode(self):
@@ -240,7 +242,7 @@ class ConstType(Production): # PrimitiveType [Null] | identifier [Null]
     
     def _markup(self, generator):
         if (isinstance(self.type, basestring)):
-            generator.addType(self.type)
+            generator.addTypeName(self.type)
             if (self.null):
                 generator.addText(self.null)
                 return self.null
@@ -249,6 +251,7 @@ class ConstType(Production): # PrimitiveType [Null] | identifier [Null]
     
     def __repr__(self):
         return '[ConstType: ' + repr(self.type) + (' [null]' if (self.null) else '') + ']'
+
 
 class FloatLiteral(Production):  # float | "-Infinity" | "Infinity" | "NaN"
     @classmethod
@@ -366,17 +369,17 @@ class TypeSuffix(Production):    # "[" "]" [TypeSuffix] | "?" [TypeSuffixStartin
         Production.__init__(self, tokens)
         if (Symbol.peek(tokens, '[')):
             self._openBracket = Symbol(tokens, '[')
-            self._closeBracket = Symbol(tokens, ']')
+            self._closeBracket = Symbol(tokens, ']', False)
             self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
             self.array = True
             self.null = None
         else:
-            self.null = Symbol(tokens, '?')
+            self.null = Symbol(tokens, '?', False)
             self.suffix = TypeSuffixStartingWithArray(tokens) if (TypeSuffixStartingWithArray.peek(tokens)) else None
             self.array = False
             self._openBracket = None
             self._closeBracket = None
-        self._didParse(tokens)
+        self._didParse(tokens, False)
 
     def _unicode(self):
         output = (unicode(self._openBracket) + unicode(self._closeBracket)) if (self.array) else ''
@@ -401,9 +404,9 @@ class TypeSuffixStartingWithArray(Production):   # "[" "]" [TypeSuffix]
     def __init__(self, tokens):
         Production.__init__(self, tokens)
         self._openBracket = Symbol(tokens, '[')
-        self._closeBracket = Symbol(tokens, ']')
+        self._closeBracket = Symbol(tokens, ']', False)
         self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
-        self._didParse(tokens)
+        self._didParse(tokens, False)
     
     def _unicode(self):
         return unicode(self._openBracket) + unicode(self._closeBracket) + (unicode(self.suffix) if (self.suffix) else '')
@@ -431,7 +434,7 @@ class SingleType(Production):    # NonAnyType | "any" [TypeSuffixStartingWithArr
         else:
             self.type = Symbol(tokens, 'any')
             self.suffix = TypeSuffixStartingWithArray(tokens) if (TypeSuffixStartingWithArray.peek(tokens)) else None
-        self._didParse(tokens)
+        self._didParse(tokens, False)
 
     def _unicode(self):
         return unicode(self.type) + (unicode(self.suffix) if (self.suffix) else '')
@@ -483,12 +486,12 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                 self.sequence = Symbol(tokens, 'sequence')
                 self._openSequence = Symbol(tokens, '<')
                 self.type = Type(tokens)
-                self._closeSequence = Symbol(tokens, '>')
-                self.null = Symbol(tokens, '?') if (Symbol.peek(tokens, '?')) else None
+                self._closeSequence = Symbol(tokens, '>', False)
+                self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
             else:
-                self.type = Symbol(tokens)  # "ByteString" | "DOMString" | "object" | "Date" | "RegExp"
+                self.type = Symbol(tokens, None, False)  # "ByteString" | "DOMString" | "object" | "Date" | "RegExp"
                 self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
-        self._didParse(tokens)
+        self._didParse(tokens, False)
 
     def _unicode(self):
         if (self.sequence):
@@ -499,7 +502,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
 
     def _markup(self, generator):
         if (isinstance(self.type, basestring)):
-            generator.addType(self.type)
+            generator.addTypeName(self.type)
             if (self.suffix):
                 self.suffix.markup(generator)
             return self
@@ -550,7 +553,7 @@ class UnionMemberType(Production):   # NonAnyType | UnionType [TypeSuffix] | "an
             self._closeBracket = Symbol(tokens, ']')
             self.type = 'any[]'
             self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
-        self._didParse(tokens)
+        self._didParse(tokens, False)
 
     def _unicode(self):
         output = (unicode(self.any) + unicode(self._openBracket) + unicode(self._closeBracket)) if (self.any) else unicode(self.type)
@@ -601,8 +604,8 @@ class UnionType(Production): # "(" UnionMemberType ["or" UnionMemberType]... ")"
                 elif (')' == token.text):
                     break
             break
-        self._closeParen = Symbol(tokens, ')')
-        self._didParse(tokens)
+        self._closeParen = Symbol(tokens, ')', False)
+        self._didParse(tokens, False)
 
     def _unicode(self):
         output = unicode(self._openParen)
@@ -642,7 +645,7 @@ class Type(Production):  # SingleType | UnionType [TypeSuffix]
         self._didParse(tokens)
 
     def _unicode(self):
-        return unicode(self.type) + (unicode(self.suffix) if (self.suffix) else '')
+        return unicode(self.type) + (self.suffix._unicode() if (self.suffix) else '')
 
     def _markup(self, generator):
         self.type.markup(generator)
@@ -733,7 +736,7 @@ class IgnoreMultipleInheritance(Production):    # [, identifier]...
 
     def _markup(self, generator):
         generator.addText(self._comma)
-        generator.addType(self.inherit)
+        generator.addTypeName(self.inherit)
         if (self.next):
             self.next.markup(generator)
         return self
@@ -762,7 +765,7 @@ class Inheritance(Production):   # ":" identifier [IgnoreMultipleInheritance]
     
     def _markup(self, generator):
         generator.addText(self._colon)
-        generator.addType(self.base)
+        generator.addTypeName(self.base)
         if (self._ignore):
             self._ignore.markup(generator)
         return self
@@ -899,7 +902,7 @@ class ReturnType(Production):    # Type | "void"
         Production.__init__(self, tokens)
         token = tokens.sneakPeek()
         if (token.isSymbol('void')):
-            self.type = Symbol(tokens, 'void')
+            self.type = Symbol(tokens, 'void', False)
         else:
             self.type = Type(tokens)
         self._didParse(tokens)
@@ -908,7 +911,8 @@ class ReturnType(Production):    # Type | "void"
         return unicode(self.type)
     
     def _markup(self, generator):
-        return self.type._markup(generator)
+        generator.addType(self.type)
+        return self
     
     def __repr__(self):
         return repr(self.type)
@@ -962,7 +966,7 @@ class AttributeRest(Production):   # ["readonly"] "attribute" Type identifier [I
     def _markup(self, generator):
         generator.addText(self.readonly)
         generator.addText(self._attribute)
-        self.type.markup(generator)
+        generator.addType(self.type)
         generator.addName(self.name)
         if (self._ignore):
             self._ignore.markup(generator)
@@ -1136,7 +1140,7 @@ class Iterator(Production):    # ReturnType "iterator" ["=" identifier | "object
         generator.addText(self._iterator)
         if (self._equals):
             generator.addText(self._equals)
-            generator.addType(self.interface)
+            generator.addTypeName(self.interface)
         elif (self.object):
             generator.addText(self.object)
         return self
@@ -1519,11 +1523,11 @@ class Serializer(ChildProduction):  # "serializer" [OperationRest] ";" | "serial
             self._equals = Symbol(tokens, '=')
             self.pattern = SerializationPattern(tokens)
             self.operation = None
+            self._consumeSemicolon(tokens)
         else:
             self._equals = None
             self.pattern = None
             self.operation = OperationRest(tokens, self) if (OperationRest.peek(tokens)) else None
-        self._consumeSemicolon(tokens)
         self._didParse(tokens)
 
     @property
@@ -1562,7 +1566,7 @@ class Serializer(ChildProduction):  # "serializer" [OperationRest] ";" | "serial
             generator.addText(self._equals)
             self.pattern.markup(generator)
         if (self.operation):
-            self.operation.markup(generator)
+            return self.operation._markup(generator)
         return self
 
     def __repr__(self):

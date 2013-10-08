@@ -136,7 +136,7 @@ class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
     
     def _markup(self, generator):
         generator.addText(self._const)
-        self.type.markup(generator)
+        generator.addType(self.type)
         generator.addName(self.name)
         generator.addText(self._equals)
         self.value.markup(generator)
@@ -222,7 +222,7 @@ class Typedef(Construct):    # [ExtendedAttributes] "typedef" Type identifier ";
     
     def _markup(self, generator):
         generator.addText(self._typedef)
-        self.type.markup(generator)
+        generator.addType(self.type)
         generator.addName(self.name)
         return self
     
@@ -288,7 +288,7 @@ class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut]
         generator.addText(self.optional)
         if (self._ignore):
             self._ignore.markup(generator)
-        self.type.markup(generator)
+        generator.addType(self.type)
         generator.addText(self.variadic)
         self._name.markup(generator)
         if (self.default):
@@ -544,7 +544,7 @@ class DictionaryMember(Construct): # [ExtendedAttributes] Type identifier [Defau
         return output + (unicode(self.default) if (self.default) else '')
     
     def _markup(self, generator):
-        self.type.markup(generator)
+        generator.addType(self.type)
         generator.addName(self.name)
         if (self.default):
             self.default.markup(generator)
@@ -816,9 +816,9 @@ class ExceptionMember(Construct): # [ExtendedAttributes] Const | [ExtendedAttrib
 
     def _markup(self, generator):
         if (self.const):
-            self.const.markup(generator)
+            return self.const._markup(generator)
         else:
-            self.type.markup(generator)
+            generator.addType(self.type)
             generator.addName(self.name)
         return self
     
@@ -950,9 +950,9 @@ class ImplementsStatement(Construct):  # [ExtendedAttributes] identifier "implem
         return Construct._unicode(self) + self.name + unicode(self._implements) + self.implements
 
     def _markup(self, generator):
-        generator.addName(self.name)
+        generator.addTypeName(self.name)
         generator.addText(self._implements)
-        generator.addType(self.implements)
+        generator.addTypeName(self.implements)
         return self
     
     def __repr__(self):
@@ -1103,7 +1103,7 @@ class ExtendedAttributeIdent(Construct):    # identifier "=" identifier
         generator.addText(self.attribute)
         generator.addText(self._equals)
         if ('constructor' == self.idlType):
-            generator.addType(self.value)
+            generator.addTypeName(self.value)
         else:
             generator.addName(self.value)
         return self
@@ -1159,7 +1159,7 @@ class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" 
         generator.addText(self.attribute)
         generator.addText(self._equals)
         if ('constructor' == self.idlType):
-            generator.addType(self.value)
+            generator.addTypeName(self.value)
         else:
             generator.addName(self.value)
         generator.addText(self._openParen)
