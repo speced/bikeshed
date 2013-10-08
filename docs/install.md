@@ -22,6 +22,31 @@ If you're on OSX and using MacPorts, install py27-pip from it.
 
 If you're on some other setup, I don't know how to best get Pip running.  If you find out, let me know, and I'll add it to this readme.
 
-Finally, just run `pip install --user git+https://github.com/tabatkins/bikeshed.git`.  This'll download Bikeshed and its dependencies, and automatically install a `css-bikeshed` command that runs Bikeshed.  See the [Quick Start Guide](quick-start.md) for a quick run-through of how to actually use the processor, and the rest of the docs for more detailed information.
+Third, you'll need the Bikeshed repository itself.  Run the following in your favorite command line:
 
-If this final command fails when attempting to install lxml, it's probably because it's missing its own dependencies, which can't be automatically installed by Pip.  Manually install `libxml2` and `libxslt` - you can do so with `apt-get` exactly like above, or whatever your particular system does.
+~~~~
+$ git clone git@github.com:tabatkins/bikeshed.git
+~~~~
+
+(This'll download bikeshed to a "bikeshed" folder, created wherever you're currently at.)
+
+Finally, run:
+
+~~~~
+$ pip install --editable /path/to/cloned/bikeshed
+~~~~
+
+This'll install Bikeshed, making it available to your Python environment as the `bikeshed` package, and automatically add a `bikeshed` command to your path.
+
+To update bikeshed to its latest version at any time, just enter Bikeshe'd folder, and run:
+
+~~~~
+$ git pull --rebase
+$ bikeshed update
+~~~~
+
+This'll pull the latest version of Bikeshed, and ensure that you're looking at the latest version of the data files, rather than whatever stale version is currently sitting in the repo.
+
+See the [Quick Start Guide](quick-start.md) for a quick run-through of how to actually use the processor, and the rest of the docs for more detailed information.
+
+(If anything doesn't work in here, let me know and I'll fix it.  It's very likely I'm accidentally skipping a step or two right now, as I'm writing this long after I've actually installed everything necessary myself.)
