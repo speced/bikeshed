@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 from __future__ import division
@@ -1604,10 +1603,3 @@ def addIssuesSection(doc):
         del idel.attrib['id']
     for dfnel in findAll("dfn", container):
         dfnel.tag = "span"
-
-
-
-
-
-if __name__ == "__main__":
-    main()
