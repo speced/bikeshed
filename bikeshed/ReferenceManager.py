@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import re
 from collections import defaultdict
-from lib.fuckunicode import u
-from lib.messages import *
-from lib.htmlhelpers import *
+from .fuckunicode import u
+from .messages import *
+from .htmlhelpers import *
 
 class ReferenceManager(object):
     refs = defaultdict(list)
@@ -224,10 +224,10 @@ class ReferenceManager(object):
                  refs[0]['spec'],
                  '\n'.join('    {2} ({1}) {0}'.format(text, ref['type'], ref['spec']) for ref in refs))
         return refs[0]['url']
-        
+
 
 def linkTextsFromElement(el, preserveCasing=False):
-    from lib.htmlhelpers import textContent
+    from .htmlhelpers import textContent
     if el.get('title') == '':
         return []
     elif el.get('title'):

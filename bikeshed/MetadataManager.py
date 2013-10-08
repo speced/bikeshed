@@ -2,9 +2,9 @@
 import re
 from collections import defaultdict
 from datetime import date, datetime
-from lib.fuckunicode import u
-from lib.messages import *
-from lib.htmlhelpers import *
+from .fuckunicode import u
+from .messages import *
+from .htmlhelpers import *
 
 class MetadataManager:
     # required metadata
