@@ -1,6 +1,8 @@
 import sys
-from lib.fuckunicode import u
-import lib.config as config
+
+from .fuckunicode import u
+from . import config
+
 
 messages = set()
 

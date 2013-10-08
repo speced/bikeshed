@@ -4,9 +4,11 @@ from html5lib.serializer import htmlserializer
 from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
-from lib.fuckunicode import u
-import lib.config as config
-from lib.messages import *
+
+from .fuckunicode import u
+from . import config
+from .messages import *
+
 
 def findAll(sel, context=None):
     if context is None:

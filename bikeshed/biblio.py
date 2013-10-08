@@ -1,5 +1,5 @@
 import re
-from fuckunicode import u
+from .fuckunicode import u
 
 class BiblioEntry(object):
     linkText = None
