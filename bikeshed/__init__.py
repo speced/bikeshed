@@ -13,18 +13,18 @@ from urllib2 import urlopen
 from datetime import date, datetime
 import html5lib
 import lxml
-import lib.config as config
-import lib.biblio as biblio
-import lib.update as update
-from lib.fuckunicode import u
-from lib.ReferenceManager import ReferenceManager
-from lib.ReferenceManager import linkTextsFromElement
-from lib.MetadataManager import MetadataManager
-from lib.htmlhelpers import *
-from lib.messages import *
-from lib.widlparser.widlparser import parser
 
-config.scriptPath = os.path.dirname(os.path.realpath(__file__))
+from . import config
+from . import biblio
+from . import update
+from .fuckunicode import u
+from .ReferenceManager import ReferenceManager
+from .ReferenceManager import linkTextsFromElement
+from .MetadataManager import MetadataManager
+from .htmlhelpers import *
+from .messages import *
+from .widlparser.widlparser import parser
+
 
 def main():
     # Hack around argparse's lack of optional subparsers
@@ -1113,7 +1113,7 @@ class CSSSpec(object):
             die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
             return
 
-        bibliofh = retrieveCachedFile(cacheLocation=config.scriptPath + "/biblio.refer",
+        bibliofh = retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.refer",
                                       fallbackurl="https://www.w3.org/Style/Group/css3-src/biblio.ref",
                                       type="bibliography")
         self.biblios = biblio.processReferBiblioFile(bibliofh)
@@ -1355,7 +1355,7 @@ def addAtRisk(doc):
     fillWith('at-risk', parseHTML(html))
 
 def addIndexSection(doc):
-    from lib.ReferenceManager import linkTextsFromElement
+    from .ReferenceManager import linkTextsFromElement
     indexElements = findAll("dfn")
     indexEntries = []
     for el in indexElements:

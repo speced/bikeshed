@@ -1,7 +1,9 @@
+import os.path
+
 debug = False
 quiet = False
 dryRun = False
-scriptPath = "~"
+scriptPath = os.path.dirname(os.path.realpath(__file__))
 doc = None
 textMacros = {}
 dfnClassToType = {

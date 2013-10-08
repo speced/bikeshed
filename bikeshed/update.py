@@ -5,8 +5,9 @@ import re
 from collections import defaultdict
 from contextlib import closing
 import urllib2
-import lib.config as config
-from lib.messages import *
+
+from . import config
+from .messages import *
 
 def update(anchors=False, biblio=False, linkDefaults=False):
     # If all are False, update everything
