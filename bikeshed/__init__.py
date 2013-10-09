@@ -823,13 +823,13 @@ def determineLinkType(el):
         die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
         return "unknown-type"
     # 2. Introspect on the text
-    if typeRe["at-rule"].match(text):
+    if config.typeRe["at-rule"].match(text):
         return "at-rule"
-    elif typeRe["type"].match(text):
+    elif config.typeRe["type"].match(text):
         return "type"
-    elif typeRe["selector"].match(text):
+    elif config.typeRe["selector"].match(text):
         return "selector"
-    elif typeRe["function"].match(text):
+    elif config.typeRe["function"].match(text):
         return "functionish"
     else:
         return "dfn"

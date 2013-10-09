@@ -1,5 +1,6 @@
 import os.path
 import re
+from collections import defaultdict
 
 debug = False
 quiet = False
@@ -54,14 +55,14 @@ for dfnType in dfnClassToType.values():
 
 # Some of the more significant types and their patterns
 trivialPattern = re.compile(".+")
-typePatterns = defaultdict(lambda x:trivialPattern)
-typePatterns["property"] = re.compile("^[\w-]+$")
-typePatterns["at-rule"] = re.compile("^@[\w-]+$")
-typePatterns["descriptor"] = typePatterns["property"]
-typePatterns["type"] = re.compile("^<[\w-]+>$")
-typePatterns["function"] = re.compile("^[\w-]+\(.*\)$")
-typePatterns["selector"] = re.compile("^:")
-typePatterns["constructor"] = typePatterns["function"]
-typePatterns["method"] = typePatterns["function"]
+typeRe = defaultdict(lambda x:trivialPattern)
+typeRe["property"] = re.compile("^[\w-]+$")
+typeRe["at-rule"] = re.compile("^@[\w-]+$")
+typeRe["descriptor"] = typeRe["property"]
+typeRe["type"] = re.compile("^<[\w-]+>$")
+typeRe["function"] = re.compile("^[\w-]+\(.*\)$")
+typeRe["selector"] = re.compile("^:")
+typeRe["constructor"] = typeRe["function"]
+typeRe["method"] = typeRe["function"]
 
 anchorDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
