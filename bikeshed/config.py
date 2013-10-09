@@ -64,5 +64,6 @@ typeRe["function"] = re.compile("^[\w-]+\(.*\)$")
 typeRe["selector"] = re.compile("^:")
 typeRe["constructor"] = typeRe["function"]
 typeRe["method"] = typeRe["function"]
+typeRe["interface"] = re.compile("^\w+$")
 
 anchorDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
