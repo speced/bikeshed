@@ -807,7 +807,6 @@ def getGlobalReferences(el=None, type=None, forText=None):
     return [canonicalizeFor(forVal, type) for forVal in splitForAttr(forText)]
 
 
-
 def splitForAttr(forText):
     # For values are space-separated, but can't just split on spaces.
     # for="Foo/bar(baz, qux)" is a valid for value, for example.
@@ -833,6 +832,7 @@ def splitForAttr(forText):
         die("Found unbalanced parens when processing the for attr for:\n{0}", outerHTML(el))
         return []
     return forValues
+
 
 def canonicalizeFor(forText, childType):
     # Given a single for value, and the type of the child that is using the for,
