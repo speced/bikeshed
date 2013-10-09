@@ -784,6 +784,60 @@ def classifyDfns(doc, dfns):
                     el.set('data-export', '')
 
 
+def getGlobalNames(el):
+    texts = linkTextsFromElement(el)
+    dfnType = el.get('data-dfn-type')
+    dfnFor = el.get('data-dfn-for')
+
+
+def splitForAttr(forText):
+    # For values are space-separated, but can't just split on spaces.
+    # for="Foo/bar(baz, qux)" is a valid for value, for example.
+    # So far, only need to respect parens, which is easy.
+    forValues = []
+    numOpen = 0
+    numClosed = 0
+    for chunk in forText.strip().split():
+        if numOpen == numClosed:
+            forValues.append(chunk)
+        elif numOpen > numClosed:
+            # Inside of a parenthesized section
+            forValues[-1] += " " + chunk
+        else:
+            # Unbalanced parens?
+            die("Found unbalanced parens when processing the for attr for:\n{0}", outerHTML(el))
+            return []
+        numOpen += chunk.count("(")
+        numClosed += chunk.count(")")
+    if numOpen != numClosed:
+        die("Found unbalanced parens when processing the for attr for:\n{0}", outerHTML(el))
+        return []
+    return forValues
+
+def canonicalizeFor(forText, childType):
+    # Given a single for value, and the type of the child that is using the for,
+    # turns the for text into a global name.
+    text, _, rest = forText.partition("/")
+    if childType == "value":
+        if re.match("^@[\w-]+$", text):
+            type = "at-rule"
+        elif re.match("^<.*>$", text):
+        elif text[0:1] == "<" and text[-1:] == ">":
+            type = "type"
+        elif text[0:1] == ":":
+            type = "selector"
+        elif re.match("^[\w-]+\(.*\)$", text):
+            type = "function"
+        elif rest[0:1] == "@":
+            type = "descriptor"
+        else:
+            type = "property"
+    elif childType == "descriptor":
+
+    elif childType in ("")
+
+
+
 def dedupIds(doc, els):
     def findId(id):
         return find("#"+id) is not None
