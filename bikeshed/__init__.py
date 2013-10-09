@@ -784,16 +784,36 @@ def classifyDfns(doc, dfns):
                     el.set('data-export', '')
 
 
-def getGlobalNames(el):
-    texts = linkTextsFromElement(el)
-    dfnType = el.get('data-dfn-type')
-    dfnFor = el.get('data-dfn-for')
+def getGlobalNames(el=None, texts=None, type=None, forText=None):
+    # Returns a string that uniquely identifies the definition
+    # (assuming the definition is indeed unique, of course).
+    if texts is None:
+        texts = linkTextsFromElement(el)
+    if type is None:
+        type = el.get('data-dfn-type') or el.get('data-link-type')
+    refs = getGlobalReferences(el=el, type=type, forText=forText)
+    if refs:
+        return ["{2}/{0}({1})".format(text, type, ref) for text in texts for ref in refs]
+    else:
+        return ["{0}({1})".format(text, type) for text in texts]
+
+
+def getGlobalReferences(el=None, type=None, forText=None):
+    # Turns the for='' values into global names.
+    if type is None:
+        type = el.get('data-dfn-type') or el.get('data-link-type')
+    if forText is None:
+        forText = el.get('data-dfn-for') or el.get('data-link-for')
+    return [canonicalizeFor(forVal, type) for forVal in splitForAttr(forText)]
+
 
 
 def splitForAttr(forText):
     # For values are space-separated, but can't just split on spaces.
     # for="Foo/bar(baz, qux)" is a valid for value, for example.
     # So far, only need to respect parens, which is easy.
+    if forText is None or forText == '':
+        return []
     forValues = []
     numOpen = 0
     numClosed = 0
@@ -817,24 +837,61 @@ def splitForAttr(forText):
 def canonicalizeFor(forText, childType):
     # Given a single for value, and the type of the child that is using the for,
     # turns the for text into a global name.
-    text, _, rest = forText.partition("/")
+    def cantParse(text):
+        die("Can't figure out how to canonicalize the for value '{0}'", text)
+        return ""
+    if childType not in config.typesUsingFor:
+        die("Definitions of type '{0}' don't use for=''.", childType)
+        return ""
+    splits = forText.rsplit("/", 1)
+    if len(splits) == 1:
+        text = splits[0]
+        rest = ""
+    else:
+        text = splits[1]
+        rest = splits[0]
     if childType == "value":
-        if re.match("^@[\w-]+$", text):
+        if config.typeRe["at-rule"].match(text):
             type = "at-rule"
-        elif re.match("^<.*>$", text):
-        elif text[0:1] == "<" and text[-1:] == ">":
+        elif config.typeRe["type"].match(text):
             type = "type"
-        elif text[0:1] == ":":
+        elif config.typeRe["selector"].match(text):
             type = "selector"
-        elif re.match("^[\w-]+\(.*\)$", text):
+        elif config.typeRe["function"].match(text):
             type = "function"
-        elif rest[0:1] == "@":
+        elif config.typeRe["descriptor"].match(text) and config.typeRe["at-rule"].match(rest):
             type = "descriptor"
-        else:
+        elif config.typeRe["property"].match(text):
             type = "property"
+        else:
+            return cantParse(text)
     elif childType == "descriptor":
+        if config.typeRe["at-rule"].match(text):
+            type = "at-rule"
+        else:
+            return cantParse(text)
+    elif childType in ("method", "constructor", "attribute", "const", "event", "stringifier", "serializer", "iterator"):
+        if config.typeRe["interface"].match(text):
+            type = "interface"
+        else:
+            return cantParse(text)
+    elif childType == "dict-member":
+        if config.typeRe["dictionary"].match(text):
+            type = "dictionary"
+        else:
+            return cantParse(text)
+    elif childType == "except-field":
+        if config.typeRe["exception"].match(text):
+            type = "exception"
+        else:
+            return cantParse(text)
+    else:
+        raise "Coding error - I'm missing some of the typesUsingFor values."
 
-    elif childType in ("")
+    if rest:
+        return "{2}/{0}({1})".format(text, type, canonicalizeFor(rest, type))
+    else:
+        return "{0}({1})".format(text, type)
 
 
 
