@@ -1,4 +1,5 @@
 import os.path
+import re
 
 debug = False
 quiet = False
@@ -14,7 +15,6 @@ dfnClassToType = {
     "typedef"         : "type",
     "funcdef"         : "function",
     "selectordef"     : "selector",
-    "tokendef"        : "token",
     "elementdef"      : "element",
     "element-attrdef" : "element-attr",
     "eventdef"        : "event",
@@ -36,7 +36,7 @@ dfnClassToType = {
     "iterdef"         : "iterator" }
 
 dfnTypes = frozenset(dfnClassToType.values())
-maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector", "token"])
+maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
 idlTypes = frozenset(["event", "interface", "constructor", "method", "argument", "attribute", "callback", "dictionary", "dict-member", "exception", "except-field", "enum", "const", "typedef", "stringifier", "serializer", "iterator"])
 functionishTypes = frozenset(["function", "method", "constructor"])
 linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "maybe", "biblio"])
@@ -51,5 +51,17 @@ linkTypeToDfnType = {
 }
 for dfnType in dfnClassToType.values():
     linkTypeToDfnType[dfnType] = frozenset([dfnType])
+
+# Some of the more significant types and their patterns
+trivialPattern = re.compile(".+")
+typePatterns = defaultdict(lambda x:trivialPattern)
+typePatterns["property"] = re.compile("^[\w-]+$")
+typePatterns["at-rule"] = re.compile("^@[\w-]+$")
+typePatterns["descriptor"] = typePatterns["property"]
+typePatterns["type"] = re.compile("^<[\w-]+>$")
+typePatterns["function"] = re.compile("^[\w-]+\(.*\)$")
+typePatterns["selector"] = re.compile("^:")
+typePatterns["constructor"] = typePatterns["function"]
+typePatterns["method"] = typePatterns["function"]
 
 anchorDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]

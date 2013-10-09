@@ -823,15 +823,13 @@ def determineLinkType(el):
         die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
         return "unknown-type"
     # 2. Introspect on the text
-    if text[0:1] == "@":
+    if typeRe["at-rule"].match(text):
         return "at-rule"
-    elif re.match("^<[\w-]+>$", text):
+    elif typeRe["type"].match(text):
         return "type"
-    elif text[:1] == u"〈" and text[-1:] == u"〉":
-        return "token"
-    elif text[0:1] == ":":
+    elif typeRe["selector"].match(text):
         return "selector"
-    elif re.match("^[\w-]+\(.*\)$", text):
+    elif typeRe["function"].match(text):
         return "functionish"
     else:
         return "dfn"
