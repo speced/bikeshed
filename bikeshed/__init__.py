@@ -155,9 +155,10 @@ def transformMarkdownParagraphs(doc):
     for (i, line) in enumerate(doc.lines):
         if not inDataBlock and re.match("\s*<({0})".format(opaqueBlocks), line):
             inDataBlock = True
-            continue
-        if inDataBlock and re.match("\s*</({0})".format(opaqueBlocks), line):
+        if inDataBlock and re.search("</({0})".format(opaqueBlocks), line):
             inDataBlock = False
+            continue
+        if inDataBlock:
             continue
         if (re.match("\s*[^<\s]", line) or re.match("\s*<({0})".format(allowedStartElements), line)) and previousLineBlank and not inDataBlock:
             if re.match("\s*Note(:|,) ", line):
