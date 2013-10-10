@@ -34,7 +34,7 @@ Several keys are required information, and will cause the processor to flag an e
 	followed by the editor's affiliation,
 	followed by either an email address or a link to their contact page,
 	all comma-separated.
-	(There is not currently any way to put a comma *in* one of these values.)
+	(To put a comma *in* one of these values, use an HTML character reference: `&#44;`.)
 	Multiple "Editor" lines can be used to supply multiple editors.
 * "Abstract" must contain an abstract for the spec, a 1-2 sentence description of what the spec is about.
     Multiple Abstract lines can be used, with each representing a separate paragraph in the Abstract section.
