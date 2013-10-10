@@ -33,14 +33,20 @@ There are several shortcuts for writing autolinks of particular types, so you do
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 
+If using the `''foo''` shortcut,
+you can specify the `for=''` attribute in the shortcut as well
+by writing the for value first, then a slash, then the value.
+For example, `''width/auto''` specifically refers to the `auto` value for the `width` property,
+which is much shorter than writing out `<a value for=width>auto</a>`.
+
 Remember that if you need to write out the `<a>` tag explicitly,
 you can add the type as a boolean attribute.
 
 
 `<pre>` whitespace stripping
 ----------------------------
-Using a `<pre>` element in HTML is unsatisfying, 
-because it forces you to break your indentation strategy, 
+Using a `<pre>` element in HTML is unsatisfying,
+because it forces you to break your indentation strategy,
 pulling the content back to the margin edge
 (or else employing silly hacks with comments and explicit newlines).
 The preprocessor fixes this.
@@ -104,7 +110,7 @@ and let the processor automatically generate a `<table>` from it:
 	</pre>
 ~~~~
 
-The data block is parsed as a series of lines, 
+The data block is parsed as a series of lines,
 with each line composed of one of the propdef headings, a colon, then the value.
 
 The property name will automatically be wrapped in a `<dfn>` element.
