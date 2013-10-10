@@ -55,7 +55,7 @@ def main():
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
     updateParser.add_argument("--link-defaults", dest="linkDefaults", action="store_true", help="Download link default data.")
-    
+
     debugParser = subparsers.add_parser('debug', help="Run various debugging commands.")
     debugParser.add_argument("infile", nargs="?",
                              default="Overview.src.html",
@@ -1250,11 +1250,11 @@ class CSSSpec(object):
                         shortname = specName
                         level = "1"
                     self.refs.specs[specName] = {
-                        "description": "Custom Spec Link for {0}".format(specName), 
-                        "title": "Custom Spec Link for {0}".format(specName), 
-                        "level": int(level), 
-                        "TR": specUrl, 
-                        "shortname": shortname, 
+                        "description": "Custom Spec Link for {0}".format(specName),
+                        "title": "Custom Spec Link for {0}".format(specName),
+                        "level": int(level),
+                        "TR": specUrl,
+                        "shortname": shortname,
                         "vshortname": specName
                     }
                 spec = self.refs.specs[specName]
