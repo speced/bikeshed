@@ -794,9 +794,9 @@ def getGlobalNames(el=None, texts=None, type=None, forText=None):
         type = el.get('data-dfn-type') or el.get('data-link-type')
     refs = getGlobalReferences(el=el, type=type, forText=forText)
     if refs:
-        return ["{2}/{0}({1})".format(text, type, ref) for text in texts for ref in refs]
+        return [u"{2}/{0}({1})".format(text, type, ref) for text in texts for ref in refs]
     else:
-        return ["{0}({1})".format(text, type) for text in texts]
+        return [u"{0}({1})".format(text, type) for text in texts]
 
 
 def getGlobalReferences(el=None, type=None, forText=None):
@@ -1468,6 +1468,8 @@ def addIndexSection(doc):
     from .ReferenceManager import linkTextsFromElement
     from collections import OrderedDict
     indexEntries = defaultdict(list)
+    attemptedForRefs = defaultdict(list)
+    seenGlobalNames = set()
     for el in findAll("dfn"):
         linkTexts = linkTextsFromElement(el, preserveCasing=True)
         headingLevel = headingLevelOfElement(el) or u"Unnumbered section"
@@ -1480,25 +1482,43 @@ def addIndexSection(doc):
             else:
                 disambiguator = u"({0})".format(el.get('data-dfn-type'))
         id = el.get('id')
+        seenGlobalNames.update(getGlobalNames(el))
         for linkText in linkTexts:
             sort = re.sub(r'[^a-z0-9]', '', linkText.lower())
-            indexEntries[linkText].append({
+            entry = {
                 'text':u(escapeHTML(linkText)),
+                'type':el.get('data-dfn-type'),
                 'id':u(id),
                 'level':u(headingLevel),
                 'disambiguator':u(escapeHTML(disambiguator)),
-                'sort':sort
-                })
+                'sort':sort,
+                'globalNames': getGlobalNames(el)
+                }
+            indexEntries[linkText].append(entry)
+            for ref in getGlobalReferences(el):
+                attemptedForRefs[ref].append(entry)
+    unseenForRefs = set(attemptedForRefs.viewkeys()).difference(seenGlobalNames)
+
     # Now print the indexes
     sortedEntries = OrderedDict(sorted(indexEntries.items(), key=lambda x:x[1][0]['sort']))
     html = u"<ul class='indexlist'>\n"
     for text, items in sortedEntries.items():
         if len(items) == 1:
-            html += u"<li>{text}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**items[0])
+            item = items[0]
+            html += u"<li>{text}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**item)
+            if item['type'] == "property":
+                reffingDfns = []
+                for globalName in item['globalNames']:
+                    reffingDfns += attemptedForRefs[globalName]
+                if reffingDfns:
+                    html += u"<dl><dt>Property Values:"
+                    for reffingDfn in reffingDfns:
+                        html += u"<dd>{text}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**reffingDfn)
+                    html += u"</dl>"
         else:
             html += u"<li>{text}<ul>".format(**items[0])
             for item in items:
-                html += u"<li><small>{disambiguator}, <a href='#{id}' title='section {level}'>{level}</a></small>\n".format(**item)
+                html += u"<li>{disambiguator}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**item)
             html += u"</ul>"
     html += u"</ul>"
     fillWith("index", parseHTML(html))
