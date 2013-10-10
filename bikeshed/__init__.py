@@ -617,8 +617,8 @@ def addHeadingBonuses(doc, headings):
 # Definitions and the like
 
 def formatPropertyNames(doc):
-    propertyCells = findAll("table.propdef tr:first-child > td")
-    descriptorCells = findAll("table.descdef tr:first-child > td")
+    propertyCells = findAll("table.propdef:not([data-dfn-partial]):not([partial]) tr:first-child > td")
+    descriptorCells = findAll("table.descdef:not([data-dfn-partial]):not([partial]) tr:first-child > td")
     for cell in propertyCells:
         props = [u(x.strip()) for x in textContent(cell).split(u',')]
         html = u', '.join(u"<dfn property>{0}</dfn>".format(name, simplifyText(name)) for name in props)
