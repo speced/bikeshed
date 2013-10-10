@@ -1473,7 +1473,11 @@ def addIndexSection(doc):
         if el.get('data-dfn-for') is not None:
             disambiguator = u"{0} for {1}".format(el.get('data-dfn-type'), ', '.join(el.get('data-dfn-for').split()))
         else:
-            disambiguator = u"({0})".format(el.get('data-dfn-type'))
+            type = el.get('data-dfn-type')
+            if type == "dfn":
+                disambiguator = "definition of"
+            else:
+                disambiguator = u"({0})".format(el.get('data-dfn-type'))
         id = el.get('id')
         for linkText in linkTexts:
             sort = re.sub(r'[^a-z0-9]', '', linkText.lower())
