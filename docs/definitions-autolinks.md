@@ -2,7 +2,7 @@ Definitions
 ===========
 
 Defining a term is as easy as wrapping a `<dfn>` element around it.
-Most of the time, this is all you'll need to do - 
+Most of the time, this is all you'll need to do -
 the definition automatically gains an id,
 and is usually automatically exposed as an autolink target for local and cross-spec autolinks.
 
@@ -81,7 +81,7 @@ and those win over the auto-detection.
 
 If your value doesn't fit one of these categories,
 you'll have to tag it manually.
-Just add the type as a boolean attribute to the definition, like 
+Just add the type as a boolean attribute to the definition, like
 
 ~~~~html
   attribute DOMString <dfn attribute>name</dfn>;
@@ -225,6 +225,20 @@ etc.
 
 If you need to override the processor's choice for which status to link to for a particular link,
 provide a `status=''` attribute containing either "ED" or "TR" on the link or a container.
+
+Linking to Unexported Definitions
+---------------------------------
+
+Most definition types are automatically exported and made available for cross-linking,
+but "dfn" type definitions aren't,
+because specs often define terms for their own internal use that aren't meant to be used outside the spec
+(and in particular, aren't named in a way so as to avoid collisions).
+
+If a spec contains a "dfn" type definition that you want to link to,
+but it's not marked for export
+(either intentionally, or because it was accidentally missed and fixing the spec would be time-consuming),
+using the `spec=''` attribute (defined above) will override the lack of an export declaration,
+and go ahead and link to it anyway.
 
 
 Bibliography
