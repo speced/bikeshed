@@ -291,9 +291,10 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     # The required keys are specified in the order they should show up in the propdef table.
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "New values"]
+        ret = ["<table class='propdef partial'>"]
     else:
         requiredKeys = ["Name", "Value", "Initial", "Applies to", "Inherited", "Media", "Computed value"]
-    ret = ["<table class='propdef'>"]
+        ret = ["<table class='propdef'>"]
     for key in requiredKeys:
         if key in vals:
             ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
@@ -323,9 +324,10 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
             vals[key] = val
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
+        ret = ["<table class='descdef partial' data-dfn-for='{0}'>".format(vals.get("For", ""))]
     else:
         requiredKeys = ["Name", "For", "Value", "Initial"]
-    ret = ["<table class='descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
+        ret = ["<table class='descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
     for key in requiredKeys:
         if key in vals:
             ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
@@ -617,16 +619,13 @@ def addHeadingBonuses(doc, headings):
 # Definitions and the like
 
 def formatPropertyNames(doc):
-    propertyCells = findAll("table.propdef:not([data-dfn-partial]):not([partial]) tr:first-child > td")
-    descriptorCells = findAll("table.descdef:not([data-dfn-partial]):not([partial]) tr:first-child > td")
-    for cell in propertyCells:
-        props = [u(x.strip()) for x in textContent(cell).split(u',')]
-        html = u', '.join(u"<dfn property>{0}</dfn>".format(name, simplifyText(name)) for name in props)
-        replaceContents(cell, parseHTML(html))
-    for cell in descriptorCells:
-        props = [u(x.strip()) for x in textContent(cell).split(u',')]
-        html = u', '.join(u"<dfn descriptor>{0}</dfn>".format(name, simplifyText(name)) for name in props)
-        replaceContents(cell, parseHTML(html))
+    for table in findAll("table.propdef, table.descdef"):
+        tag = "a" if hasClass(table, "partial") else "dfn"
+        type = "property" if hasClass(table, "propdef") else "descriptor"
+        for cell in findAll("tr:first-child > td", table):
+            names = [u(x.strip()) for x in textContent(cell).split(u',')]
+            html = u', '.join(u"<{tag} {type}>{0}</{tag}>".format(name, tag=tag, type=type) for name in names)
+            replaceContents(cell, parseHTML(html))
 
 
 def canonicalizeShortcuts(doc):
