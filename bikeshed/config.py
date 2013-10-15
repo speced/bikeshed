@@ -55,7 +55,7 @@ for dfnType in dfnClassToType.values():
 
 # Some of the more significant types and their patterns
 trivialPattern = re.compile(".+")
-typeRe = defaultdict(lambda x:trivialPattern)
+typeRe = defaultdict(lambda:trivialPattern)
 typeRe["property"] = re.compile("^[\w-]+$")
 typeRe["at-rule"] = re.compile("^@[\w-]+$")
 typeRe["descriptor"] = typeRe["property"]
