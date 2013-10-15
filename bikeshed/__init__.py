@@ -875,6 +875,11 @@ def canonicalizeFor(forText, childType):
             type = "interface"
         else:
             return cantParse(text)
+    elif childType == "argument":
+        if config.typeRe["method"].match(text):
+            type = "method"
+        else:
+            return cantParse(text)
     elif childType == "dict-member":
         if config.typeRe["dictionary"].match(text):
             type = "dictionary"
@@ -886,7 +891,7 @@ def canonicalizeFor(forText, childType):
         else:
             return cantParse(text)
     else:
-        raise "Coding error - I'm missing some of the typesUsingFor values."
+        raise Exception("Coding error - I'm missing the '{0}' typeUsingFor.".format(childType))
 
     if rest:
         return "{2}/{0}({1})".format(text, type, canonicalizeFor(rest, type))
