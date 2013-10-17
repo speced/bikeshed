@@ -19,6 +19,7 @@ from . import update
 from .fuckunicode import u
 from .ReferenceManager import ReferenceManager
 from .ReferenceManager import linkTextsFromElement
+from .globalnames import *
 from .MetadataManager import MetadataManager
 from .htmlhelpers import *
 from .messages import *
@@ -784,149 +785,6 @@ def classifyDfns(doc, dfns):
                     el.set('data-export', '')
 
 
-def getGlobalNames(el=None, texts=None, type=None, forText=None):
-    # Returns a string that uniquely identifies the definition
-    # (assuming the definition is indeed unique, of course).
-    if texts is None:
-        texts = linkTextsFromElement(el)
-    if type is None:
-        type = el.get('data-dfn-type') or el.get('data-link-type')
-    refs = getGlobalReferences(el=el, type=type, forText=forText)
-    if refs:
-        return [u"{2}/{0}({1})".format(text, type, ref) for text in texts for ref in refs]
-    else:
-        return [u"{0}({1})".format(text, type) for text in texts]
-
-
-def getGlobalReferences(el=None, type=None, forText=None):
-    # Turns the for='' values into global names.
-    if type is None:
-        type = el.get('data-dfn-type') or el.get('data-link-type') or el.get('data-idl-type')
-    if forText is None:
-        forText = el.get('data-dfn-for') or el.get('data-link-for') or el.get('data-idl-for')
-    return [canonicalizeFor(forVal, type) for forVal in splitForAttr(forText)]
-
-
-def compareGlobalNames(name1, name2):
-    # Returns true if the names are equal,
-    # or at least possibly equal if one was extended to a full global name.
-    # For example, "foo(value)" is true with "bar(property)/foo(value)" or "<baz>(type)/foo(value)".
-    pieces1 = reversed(name1.split('/'))
-    pieces2 = reversed(name2.split('/'))
-    return all(p[0] == p[1] for p in zip(pieces1, pieces2))
-
-
-def splitForAttr(forText):
-    # For values are space-separated, but can't just split on spaces.
-    # for="Foo/bar(baz, qux)" is a valid for value, for example.
-    # So far, only need to respect parens, which is easy.
-    if forText is None or forText == '':
-        return []
-    forValues = []
-    numOpen = 0
-    numClosed = 0
-    for chunk in forText.strip().split():
-        if numOpen == numClosed:
-            forValues.append(chunk)
-        elif numOpen > numClosed:
-            # Inside of a parenthesized section
-            forValues[-1] += " " + chunk
-        else:
-            # Unbalanced parens?
-            die("Found unbalanced parens when processing the for attr for:\n{0}", outerHTML(el))
-            return []
-        numOpen += chunk.count("(")
-        numClosed += chunk.count(")")
-    if numOpen != numClosed:
-        die("Found unbalanced parens when processing the for attr for:\n{0}", outerHTML(el))
-        return []
-    return forValues
-
-
-def canonicalizeGlobalName(reducedName, type):
-    # Turns a "reduced" global name, like @counter-style/width/<integer>, into a full global name.
-    if type is None:
-        # Assume that the type is like "foo(value)"
-        match = re.match(r"(.*)\([\w-]+\)$", reducedName)
-        if match is None:
-            die("'{0}' doesn't match the format of a reduced global name.")
-            return ""
-        reducedName = match.group(1)
-        type = match.group(2)
-    if '/' not in reducedName:
-        return "{0}({1})".format(reducedName, type)
-    else:
-        pieces = reducedName.split('/')
-        restOfName = '/'.join(pieces[:-1])
-        return "{2}/{0}({1})".format(pieces[-1], type, canonicalizeFor(restOfName, type))
-
-
-def canonicalizeFor(forText, childType):
-    # Given a single for value, and the type of the child that is using the for,
-    # turns the for text into a global name.
-    def cantParse(text):
-        die("Can't figure out how to canonicalize the for value '{0}'", text)
-        return ""
-    if childType not in config.typesUsingFor:
-        die("Definitions of type '{0}' don't use for=''.", childType)
-        return ""
-    splits = forText.rsplit("/", 1)
-    if len(splits) == 1:
-        text = splits[0]
-        rest = ""
-    else:
-        text = splits[1]
-        rest = splits[0]
-    if childType == "value":
-        if config.typeRe["at-rule"].match(text):
-            type = "at-rule"
-        elif config.typeRe["type"].match(text):
-            type = "type"
-        elif config.typeRe["selector"].match(text):
-            type = "selector"
-        elif config.typeRe["function"].match(text):
-            type = "function"
-        elif config.typeRe["descriptor"].match(text) and config.typeRe["at-rule"].match(rest):
-            type = "descriptor"
-        elif config.typeRe["property"].match(text):
-            type = "property"
-        else:
-            return cantParse(text)
-    elif childType == "descriptor":
-        if config.typeRe["at-rule"].match(text):
-            type = "at-rule"
-        else:
-            return cantParse(text)
-    elif childType in ("method", "constructor", "attribute", "const", "event", "stringifier", "serializer", "iterator"):
-        if config.typeRe["interface"].match(text):
-            type = "interface"
-        else:
-            return cantParse(text)
-    elif childType == "argument":
-        if config.typeRe["method"].match(text):
-            type = "method"
-        else:
-            return cantParse(text)
-    elif childType == "dict-member":
-        if config.typeRe["dictionary"].match(text):
-            type = "dictionary"
-        else:
-            return cantParse(text)
-    elif childType == "except-field":
-        if config.typeRe["exception"].match(text):
-            type = "exception"
-        else:
-            return cantParse(text)
-    else:
-        raise Exception("Coding error - I'm missing the '{0}' typeUsingFor.".format(childType))
-
-    if rest:
-        return "{2}/{0}({1})".format(text, type, canonicalizeFor(rest, type))
-    else:
-        return "{0}({1})".format(text, type)
-
-
-
 def dedupIds(doc, els):
     def findId(id):
         return find("#"+id) is not None
@@ -1138,26 +996,34 @@ def markupIDL(doc):
 
 
 def processIDL(doc):
-    for el in findAll("idl"):
-        idlType = el.get('data-idl-type')
-        url = doc.refs.getRef(idlType, el.get('title').lower(),
-                              linkFor=el.get('data-idl-for'),
-                              el=el,
-                              error=False)
-        if url is None:
-            el.tag = "dfn"
-            el.set('data-dfn-type', idlType)
-            del el.attrib['data-idl-type']
-            if el.get('data-idl-for'):
-                el.set('data-dfn-for', el.get('data-idl-for'))
-                del el.attrib['data-idl-for']
+    for pre in findAll("pre.idl"):
+        forcedDfnsText = treeAttr(pre, "data-dfn-force")
+        if forcedDfnsText is None:
+            forcedDfns = []
         else:
-            el.tag = "a"
-            el.set('data-link-type', idlType)
-            del el.attrib['data-idl-type']
-            if el.get('data-idl-for'):
-                el.set('data-link-for', el.get('data-idl-for'))
-                del el.attrib['data-idl-for']
+            forcedDfns = filter(None, map(canonicalizeGlobalName, splitForAttr(forcedDfnsText)))
+        for el in findAll("idl", pre):
+            idlType = el.get('data-idl-type')
+            idlText = el.get('title')
+            url = doc.refs.getRef(idlType, idlText.lower(),
+                                  linkFor=el.get('data-idl-for'),
+                                  el=el,
+                                  error=False)
+            globalName = 
+            if url is None or (idlType, idlText) in forcedDfns:
+                el.tag = "dfn"
+                el.set('data-dfn-type', idlType)
+                del el.attrib['data-idl-type']
+                if el.get('data-idl-for'):
+                    el.set('data-dfn-for', el.get('data-idl-for'))
+                    del el.attrib['data-idl-for']
+            else:
+                el.tag = "a"
+                el.set('data-link-type', idlType)
+                del el.attrib['data-idl-type']
+                if el.get('data-idl-for'):
+                    el.set('data-link-for', el.get('data-idl-for'))
+                    del el.attrib['data-idl-for']
     dfns = findAll("pre.idl dfn")
     classifyDfns(doc, dfns)
     dedupIds(doc, dfns)
@@ -1513,7 +1379,7 @@ def addIndexSection(doc):
             else:
                 disambiguator = u"({0})".format(el.get('data-dfn-type'))
         id = el.get('id')
-        seenGlobalNames.update(getGlobalNames(el))
+        seenGlobalNames.update(GlobalNames.fromEl(el))
         for linkText in linkTexts:
             sort = re.sub(r'[^a-z0-9]', '', linkText.lower())
             entry = {
@@ -1523,10 +1389,10 @@ def addIndexSection(doc):
                 'level':u(headingLevel),
                 'disambiguator':u(escapeHTML(disambiguator)),
                 'sort':sort,
-                'globalNames': getGlobalNames(el)
+                'globalNames': GlobalNames.fromEl(el)
                 }
             indexEntries[linkText].append(entry)
-            for ref in getGlobalReferences(el):
+            for ref in GlobalNames.refsFromEl(el):
                 attemptedForRefs[ref].append(entry)
     unseenForRefs = set(attemptedForRefs.viewkeys()).difference(seenGlobalNames)
 
