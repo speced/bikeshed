@@ -807,6 +807,15 @@ def getGlobalReferences(el=None, type=None, forText=None):
     return [canonicalizeFor(forVal, type) for forVal in splitForAttr(forText)]
 
 
+def compareGlobalNames(testName, fullyQualifiedName):
+    # Returns true if testName might expand into fullyQualifiedName.
+    # For example, "foo(value)" is true with "bar(property)/foo(value)" or "<baz>(type)/foo(value)".
+    import itertools as i
+    testNamePieces = reversed(testName.split('/'))
+    namePieces = reversed(fullyQualifiedName.split('/'))
+    return all(p[0] == p[1] or p[0] == None for p in i.izip_longest(testNamePieces, namePieces))
+
+
 def splitForAttr(forText):
     # For values are space-separated, but can't just split on spaces.
     # for="Foo/bar(baz, qux)" is a valid for value, for example.
@@ -832,6 +841,16 @@ def splitForAttr(forText):
         die("Found unbalanced parens when processing the for attr for:\n{0}", outerHTML(el))
         return []
     return forValues
+
+
+def canonicalizeGlobalName(reducedName, type):
+    # Turns a "reduced" global name, like @counter-style/width/<integer>, into a full global name.
+    if '/' not in reducedName:
+        return "{0}({1})".format(reducedName, type)
+    else:
+        pieces = reducedName.split('/')
+        restOfName = '/'.join(pieces[:-1])
+        return "{2}/{0}({1})".format(pieces[-1], type, canonicalizeFor(restOfName, type))
 
 
 def canonicalizeFor(forText, childType):
