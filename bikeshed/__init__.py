@@ -845,6 +845,14 @@ def splitForAttr(forText):
 
 def canonicalizeGlobalName(reducedName, type):
     # Turns a "reduced" global name, like @counter-style/width/<integer>, into a full global name.
+    if type is None:
+        # Assume that the type is like "foo(value)"
+        match = re.match(r"(.*)\([\w-]+\)$", reducedName)
+        if match is None:
+            die("'{0}' doesn't match the format of a reduced global name.")
+            return ""
+        reducedName = match.group(1)
+        type = match.group(2)
     if '/' not in reducedName:
         return "{0}({1})".format(reducedName, type)
     else:
