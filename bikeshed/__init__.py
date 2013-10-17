@@ -801,19 +801,19 @@ def getGlobalNames(el=None, texts=None, type=None, forText=None):
 def getGlobalReferences(el=None, type=None, forText=None):
     # Turns the for='' values into global names.
     if type is None:
-        type = el.get('data-dfn-type') or el.get('data-link-type')
+        type = el.get('data-dfn-type') or el.get('data-link-type') or el.get('data-idl-type')
     if forText is None:
-        forText = el.get('data-dfn-for') or el.get('data-link-for')
+        forText = el.get('data-dfn-for') or el.get('data-link-for') or el.get('data-idl-for')
     return [canonicalizeFor(forVal, type) for forVal in splitForAttr(forText)]
 
 
-def compareGlobalNames(testName, fullyQualifiedName):
-    # Returns true if testName might expand into fullyQualifiedName.
+def compareGlobalNames(name1, name2):
+    # Returns true if the names are equal,
+    # or at least possibly equal if one was extended to a full global name.
     # For example, "foo(value)" is true with "bar(property)/foo(value)" or "<baz>(type)/foo(value)".
-    import itertools as i
-    testNamePieces = reversed(testName.split('/'))
-    namePieces = reversed(fullyQualifiedName.split('/'))
-    return all(p[0] == p[1] or p[0] == None for p in i.izip_longest(testNamePieces, namePieces))
+    pieces1 = reversed(name1.split('/'))
+    pieces2 = reversed(name2.split('/'))
+    return all(p[0] == p[1] for p in zip(pieces1, pieces2))
 
 
 def splitForAttr(forText):
