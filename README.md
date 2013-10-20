@@ -1,12 +1,15 @@
-css-preprocessor
-================
+Bikeshed, a spec preprocessor
+=============================
 
-This project is a pre-processor for the source documents the CSSWG produces their specs from.
+Bikeshed is a pre-processor for the source documents the CSSWG produces their specs from.
 We write our specs in HTML, but rely on a preprocessor for a lot of niceties, 
 like automatically generating a bibliography and table of contents,
 or automatically linking terms to their definitions.
 Specs also come with a lot of boilerplate repeated on every document,
 which we omit from our source document.
+
+While a few features are specialized for the CSSWG's purposes,
+the processor is quite usable for other groups, too. 
 
 A short overview of my preprocessor's features:
 
