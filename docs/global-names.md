@@ -24,7 +24,7 @@ its global name is `"width<property>/auto<value>"`.
 Simplified Global Names
 -----------------------
 
-Not all information needs to be provided in the global name,
+Not all information needs to be provided in a global name used just to *reference* a term,
 if there's not currently any ambiguity.
 You may leave off terms from the front,
 or leave off type information from any term.
@@ -35,9 +35,8 @@ as will a simple `"auto"`.
 Specifying a full global name is never a bad idea, however,
 to avoid accidental matches with unintended terms
 that may not be immediately obvious.
-(Currently, it is never necessary to specify type information on anything but the final term,
-as the rest of the types can be automatically inferred in a guaranteed-correct manner.
-This may not remain true in the future, however.)
+For example, `"auto"` matches `"width<property>/auto<value>"`,
+but it also matches `"Foo<interface>/auto<attribute>"`.
 
 Multiple Global Names
 ---------------------
