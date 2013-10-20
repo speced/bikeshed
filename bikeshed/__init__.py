@@ -1359,7 +1359,6 @@ def addAtRisk(doc):
 
 
 def addIndexSection(doc):
-    from .ReferenceManager import linkTextsFromElement
     from collections import OrderedDict
     indexEntries = defaultdict(list)
     attemptedForRefs = defaultdict(list)
