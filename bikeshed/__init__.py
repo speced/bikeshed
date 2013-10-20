@@ -997,11 +997,7 @@ def markupIDL(doc):
 
 def processIDL(doc):
     for pre in findAll("pre.idl"):
-        forcedDfnsText = treeAttr(pre, "data-dfn-force")
-        if forcedDfnsText is None:
-            forcedDfns = []
-        else:
-            forcedDfns = filter(None, map(canonicalizeGlobalName, splitForAttr(forcedDfnsText)))
+        forcedDfns = GlobalNames(text=treeAttr(pre, "data-dfn-force"))
         for el in findAll("idl", pre):
             idlType = el.get('data-idl-type')
             idlText = el.get('title')
@@ -1009,8 +1005,9 @@ def processIDL(doc):
                                   linkFor=el.get('data-idl-for'),
                                   el=el,
                                   error=False)
-            globalName = 
-            if url is None or (idlType, idlText) in forcedDfns:
+            globalNames = GlobalNames.fromEl(el)
+            el.set("data-global-name", str(globalNames))
+            if url is None or globalNames.matches(forcedDfns):
                 el.tag = "dfn"
                 el.set('data-dfn-type', idlType)
                 del el.attrib['data-idl-type']
