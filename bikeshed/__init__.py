@@ -50,6 +50,12 @@ def main():
                             help="Path to the output file. [default: %(default)s]")
     specParser.add_argument("--para", dest="paragraphMode", default="markdown",
                             help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %(default)s]")
+    minifyGroup = specParser.add_argument_group("Minification")
+    specParser.set_defaults(minify=True)
+    minifyGroup.add_argument("--minify", dest="minify", action="store_true",
+                             help="Turn on minification. [default]")
+    minifyGroup.add_argument("--no-minify", dest="minify", action="store_false",
+                            help="Turn off minification.")
 
     updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
@@ -75,6 +81,7 @@ def main():
     config.quiet = options.quiet
     config.debug = options.debug
     config.dryRun = options.dryRun
+    config.minify = options.minify
 
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults)
@@ -1046,6 +1053,12 @@ def cleanupHTML(doc):
         addClass(el, 'idl-code')
     for el in findAll(selectorForTypes(config.maybeTypes.union(config.linkTypeToDfnType['propdesc']))):
         addClass(el, 'css-code')
+
+    # Remove comments from the generated HTML, maybe.
+    if config.minify:
+        comments = list(doc.document.iter(lxml.etree.Comment))
+        for comment in comments:
+            comment.getparent().remove(comment)
 
 
 def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):

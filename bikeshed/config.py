@@ -5,6 +5,7 @@ from collections import defaultdict
 debug = False
 quiet = False
 dryRun = False
+minify = True
 scriptPath = os.path.dirname(os.path.realpath(__file__))
 doc = None
 textMacros = {}
