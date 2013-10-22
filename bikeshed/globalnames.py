@@ -128,7 +128,7 @@ class GlobalName(object):
                 return None
         for i, segment in enumerate(self.segments):
             prevType = childType if i == 0 else self.segments[i-1].type
-            nextValue = None if i+1 == len(self.segments) else self.segments[i+1].value
+            nextValue = '' if i+1 == len(self.segments) else self.segments[i+1].value
             self.segments[i] = segment._replace(type=guessType(*segment, prevType=prevType, nextValue=nextValue))
         return self
 
