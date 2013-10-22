@@ -81,7 +81,7 @@ def main():
     config.quiet = options.quiet
     config.debug = options.debug
     config.dryRun = options.dryRun
-    config.minify = options.minify
+    config.minify = getattr(options, 'minify', True)
 
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults)
