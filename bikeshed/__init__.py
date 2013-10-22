@@ -1126,6 +1126,9 @@ class CSSSpec(object):
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
             return
+        except IOError:
+            die("Couldn't open the input file '{0}'.", inputFilename)
+            return
 
         bibliofh = retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.refer",
                                       fallbackurl="https://www.w3.org/Style/Group/css3-src/biblio.ref",
