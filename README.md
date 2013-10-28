@@ -8,8 +8,11 @@ or automatically linking terms to their definitions.
 Specs also come with a lot of boilerplate repeated on every document,
 which we omit from our source document.
 
+The processor can be easily installed and run locally (requiring no network access unless you're updating),
+or accessed as a CGI without any installation at all: <https://api.csswg.org/bikeshed/>
+
 While a few features are specialized for the CSSWG's purposes,
-the processor is quite usable for other groups, too.
+Bikeshed should be useful as a general-purpose spec processor.
 
 A short overview of my preprocessor's features:
 
@@ -23,7 +26,7 @@ A short overview of my preprocessor's features:
 * [automatic IDL processing and syntax-checking](docs/idl.md) for `<pre class=idl>` contents, so you don't have to mark up every single significant term yourself.
 * [automatic generation of railroad diagrams](docs/railroad-diagrams.md) from `<pre class='railroad'>` contents.
 
-Examples of all of the functionality described here can be found by looking at the source of the [CSS Variables source document](http://dev.w3.org/csswg/css-variables/Overview.src.html)
+Examples of much of the functionality described here can be found by looking at the source of the [CSS Variables source document](http://dev.w3.org/csswg/css-variables/Overview.src.html)
 
 Note About Fatal Errors
 -----------------------
