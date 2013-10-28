@@ -26,48 +26,7 @@ Diagram(
 
 This draws the following diagram:
 
-<img width=497 height=81 src='data:image/svg+xml,<svg class="railroad-diagram" height="81" viewBox="0 0 497 81" width="497">
-<g transform="translate(.5 .5)">
-<path d="M 20 31 v 20 m 10 -20 v 20 m -10 -10 h 20.5">
-</path><path d="M40 41h10">
-</path><g>
-<path d="M50 41h0">
-</path><path d="M86 41h0">
-</path><rect height="22" rx="10" ry="10" width="36" x="50" y="30">
-</rect><text x="68" y="45">
-/*</text></g><path d="M86 41h10">
-</path><g>
-<path d="M96 41h0">
-</path><path d="M400 41h0">
-</path><path d="M96 41a10 10 0 0 0 10 -10v0a10 10 0 0 1 10 -10">
-</path><g>
-<path d="M116 21h264">
-</path></g><path d="M380 21a10 10 0 0 1 10 10v0a10 10 0 0 0 10 10">
-</path><path d="M96 41h20">
-</path><g>
-<path d="M116 41h0">
-</path><path d="M380 41h0">
-</path><path d="M116 41h10">
-</path><g>
-<path d="M126 41h0">
-</path><path d="M370 41h0">
-</path><rect height="22" width="244" x="126" y="30">
-</rect><text x="248" y="45">
-anything but * followed by /</text></g><path d="M370 41h10">
-</path><path d="M126 41a10 10 0 0 0 -10 10v0a10 10 0 0 0 10 10">
-</path><g>
-<path d="M126 61h244">
-</path></g><path d="M370 61a10 10 0 0 0 10 -10v0a10 10 0 0 0 -10 -10">
-</path></g><path d="M380 41h20">
-</path></g><path d="M400 41h10">
-</path><g>
-<path d="M410 41h0">
-</path><path d="M446 41h0">
-</path><rect height="22" rx="10" ry="10" width="36" x="410" y="30">
-</rect><text x="428" y="45">
-*/</text></g><path d="M446 41h10">
-</path><path d="M 456 41 h 20 m -10 -10 v 20 m 10 -20 v 20">
-</path></g></svg>'>
+<img width=497 height=81 src='https://rawgithub.com/tabatkins/bikeshed/master/docs/rr2.svg'>
 
 The top-level element must always be a Diagram, and you must not use a Diagram anywhere else (it's not meaningful, and will do weird things).  Inside of a Diagram, any of the other elements may be used.  Elements are split into two groups: containers and text.
 
