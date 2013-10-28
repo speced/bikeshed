@@ -53,3 +53,12 @@ Documentation Sections
 * [IDL](docs/idl.md) - describes Bikeshed's automatic IDL processing.
 * [Railroad Diagrams](docs/railroad-diagrams.md) - describes the railroad-diagram feature, and its syntax.
 * [Boilerplate](docs/boilerplate.md) - describes the use and generation of a spec's boilerplate sections. You probably don't need to read this.
+
+License
+-------
+
+This document and all associated files in the github project are licensed under [CC0](http://creativecommons.org/publicdomain/zero/1.0/) ![](http://i.creativecommons.org/p/zero/1.0/80x15.png).
+This means you can reuse, remix, or otherwise appropriate this project for your own use **without restriction**.
+(The actual legal meaning can be found at the above link.)
+Don't ask me for permission to use any part of this project, **just use it**.
+I would appreciate attribution, but that is not required by the license.
