@@ -439,7 +439,7 @@ def verifyRequiredMetadata(doc):
 def transformRailroad(lines, doc, **kwargs):
     import StringIO
     from railroaddiagrams import Diagram, Sequence, Choice, Optional, OneOrMore, ZeroOrMore, Terminal, NonTerminal, Comment, Skip
-    from railroaddiagrams import NonTerminal as NT
+    from railroaddiagrams import Sequence as S, Choice as Or, Optional as Opt, OneOrMore as Plus, ZeroOrMore as Star, NonTerminal as NT, Comment as C
     ret = [
         "<style>svg.railroad-diagram{background-color:hsl(30,20%,95%);}svg.railroad-diagram path{stroke-width:3;stroke:black;fill:rgba(0,0,0,0);}svg.railroad-diagram text{font:bold 14px monospace;text-anchor:middle;}svg.railroad-diagram text.label{text-anchor:start;}svg.railroad-diagram text.comment{font:italic 12px monospace;}svg.railroad-diagram rect{stroke-width:3;stroke:black;fill:hsl(120,100%,90%);}</style>"]
     code = ''.join(lines)
