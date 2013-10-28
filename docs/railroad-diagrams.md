@@ -6,7 +6,7 @@ A **railroad diagram** is a particular way of visually representing a structure 
 Here's an example of a railroad diagram, this one describing the syntax of valid IDENT tokens in CSS:
 
 <style scoped="">svg.railroad-diagram{background-color:hsl(30,20%,95%);}svg.railroad-diagram path{stroke-width:3;stroke:black;fill:rgba(0,0,0,0);}svg.railroad-diagram text{font:bold 14px monospace;text-anchor:middle;}svg.railroad-diagram text.label{text-anchor:start;}svg.railroad-diagram text.comment{font:italic 12px monospace;}svg.railroad-diagram rect{stroke-width:3;stroke:black;fill:hsl(120,100%,90%);}</style>
-<svg class="railroad-diagram" height="110" viewBox="0 0 729 110" width="729">
+<img width=729 height=110 src='data:image/svg+xml,<svg class="railroad-diagram" height="110" viewBox="0 0 729 110" width="729">
 <g transform="translate(.5 .5)">
 <path d="M 20 31 v 20 m 10 -20 v 20 m -10 -10 h 20.5">
 </path><g>
@@ -76,7 +76,7 @@ escape</text></g><path d="M638 71a10 10 0 0 0 10 -10v-10a10 10 0 0 1 10 -10">
 </path></g><path d="M658 90a10 10 0 0 0 10 -10v-29a10 10 0 0 0 -10 -10">
 </path></g><path d="M668 41h20">
 </path></g><path d="M 688 41 h 20 m -10 -10 v 20 m 10 -20 v 20">
-</path></g></svg>
+</path></g></svg>'>
 
 Bikeshed supports the automatic generation of railroad diagrams from a simplified DSL.  To use, simply embed a diagram description in a `<pre class='railroad'>` element - it'll get replaced by an appropriate `<svg>` element.
 
@@ -97,7 +97,7 @@ Diagram(
 
 This draws the following diagram:
 
-<svg class="railroad-diagram" height="81" viewBox="0 0 497 81" width="497">
+<img width=497 height=81 src='data:image/svg+xml,<svg class="railroad-diagram" height="81" viewBox="0 0 497 81" width="497">
 <g transform="translate(.5 .5)">
 <path d="M 20 31 v 20 m 10 -20 v 20 m -10 -10 h 20.5">
 </path><path d="M40 41h10">
@@ -138,7 +138,7 @@ anything but * followed by /</text></g><path d="M370 41h10">
 </rect><text x="428" y="45">
 */</text></g><path d="M446 41h10">
 </path><path d="M 456 41 h 20 m -10 -10 v 20 m 10 -20 v 20">
-</path></g></svg>
+</path></g></svg>'>
 
 The top-level element must always be a Diagram, and you must not use a Diagram anywhere else (it's not meaningful, and will do weird things).  Inside of a Diagram, any of the other elements may be used.  Elements are split into two groups: containers and text.
 
