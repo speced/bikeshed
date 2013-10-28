@@ -190,6 +190,7 @@ def transformDataBlocks(doc):
         'propdef': transformPropdef,
         'descdef': transformDescdef,
         'metadata': transformMetadata,
+        'railroad': transformRailroad,
         'pre': transformPre
     }
     blockType = ""
@@ -433,6 +434,24 @@ def verifyRequiredMetadata(doc):
     if errors:
         die(u"Not all required metadata was provided:\n{0}", u"\n".join(errors))
         return
+
+
+def transformRailroad(lines, doc, **kwargs):
+    import StringIO
+    from railroaddiagrams import Diagram, Sequence, Choice, Optional, OneOrMore, ZeroOrMore, Terminal, NonTerminal, Comment, Skip
+    from railroaddiagrams import NonTerminal as NT
+    ret = [
+        "<style>svg.railroad-diagram{background-color:hsl(30,20%,95%);}svg.railroad-diagram path{stroke-width:3;stroke:black;fill:rgba(0,0,0,0);}svg.railroad-diagram text{font:bold 14px monospace;text-anchor:middle;}svg.railroad-diagram text.label{text-anchor:start;}svg.railroad-diagram text.comment{font:italic 12px monospace;}svg.railroad-diagram rect{stroke-width:3;stroke:black;fill:hsl(120,100%,90%);}</style>"]
+    code = ''.join(lines)
+    try:
+        diagram = eval(code)
+    except Exception, e:
+        die("Error generating a railroad diagram:\n{0}\n{1}", str(e), code.replace('\t', '  '))
+    temp = StringIO.StringIO()
+    diagram.writeSvg(temp.write)
+    ret.append(temp.getvalue())
+    temp.close()
+    return ret
 
 
 def transformAutolinkShortcuts(doc):
