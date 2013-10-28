@@ -5,7 +5,7 @@ A **railroad diagram** is a particular way of visually representing a structure 
 
 Here's an example of a railroad diagram, this one describing the syntax of valid IDENT tokens in CSS:
 
-<img width=729 height=110 src='rr1.svg?raw=1'>
+<img width=729 height=110 src='https://rawgithub.com/tabatkins/bikeshed/master/docs/rr1.svg'>
 
 Bikeshed supports the automatic generation of railroad diagrams from a simplified DSL.  To use, simply embed a diagram description in a `<pre class='railroad'>` element - it'll get replaced by an appropriate `<svg>` element.
 
