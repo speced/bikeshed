@@ -2,14 +2,14 @@ Bikeshed, a spec preprocessor
 =============================
 
 Bikeshed is a pre-processor for the source documents the CSSWG produces their specs from.
-We write our specs in HTML, but rely on a preprocessor for a lot of niceties, 
+We write our specs in HTML, but rely on a preprocessor for a lot of niceties,
 like automatically generating a bibliography and table of contents,
 or automatically linking terms to their definitions.
 Specs also come with a lot of boilerplate repeated on every document,
 which we omit from our source document.
 
 While a few features are specialized for the CSSWG's purposes,
-the processor is quite usable for other groups, too. 
+the processor is quite usable for other groups, too.
 
 A short overview of my preprocessor's features:
 
@@ -20,7 +20,8 @@ A short overview of my preprocessor's features:
 * [markdown-style paragraphs](docs/markup.md).
 * a [compact syntax](docs/markup.md) for writing property-definition tables.
 * [automatic whitespace-prefix stripping](docs/markup.md) from `<pre>` contents, so the contents can be indented properly in your HTML.
-* [automatic IDL processing and syntax-checking](docs/idl.md) fro `<pre class=idl>` contents, so you don't have to mark up every single significant term yourself.
+* [automatic IDL processing and syntax-checking](docs/idl.md) for `<pre class=idl>` contents, so you don't have to mark up every single significant term yourself.
+* [automatic generation of railroad diagrams](docs/railroad-diagrams.md) from `<pre class='railroad'>` contents.
 
 Examples of all of the functionality described here can be found by looking at the source of the [CSS Variables source document](http://dev.w3.org/csswg/css-variables/Overview.src.html)
 
@@ -50,4 +51,5 @@ Documentation Sections
 * [Markup](docs/markup.md) - describes several of the markup niceties and shortcuts over plain HTML that the processor recognizes.
 * [Global Names](docs/global-names.md) - describes the concept and syntax of global names, which are used by several features to uniquely identify and refer to defined terms.
 * [IDL](docs/idl.md) - describes Bikeshed's automatic IDL processing.
+* [Railroad Diagrams](docs/railroad-diagrams.md) - describes the railroad-diagram feature, and its syntax.
 * [Boilerplate](docs/boilerplate.md) - describes the use and generation of a spec's boilerplate sections. You probably don't need to read this.
