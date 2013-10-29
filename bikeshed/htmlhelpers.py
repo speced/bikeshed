@@ -106,6 +106,18 @@ def insertAfter(target, el):
     parent.insert(parent.index(target)+1, el)
 
 
+def removeNode(node):
+    text = node.tail or ''
+    parent = node.getparent()
+    index = parent.index(node)
+    if index == 0:
+        parent.text = (parent.text or '') + text
+    else:
+        prevsibling = parent[index-1]
+        prevsibling.tail = (prevsibling.tail or '') + text
+    parent.remove(node)
+
+
 def replaceContents(el, newElements):
     clearContents(el)
     if(etree.iselement(newElements) and newElements.text is not None):
