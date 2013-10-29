@@ -155,6 +155,9 @@ class GlobalName(object):
         that is, if they are compatible.
         For example, "foo<value>" is equal to "bar<property>/foo<value>",
         or to just "foo".
+        Note that equality is *not* transitive;
+        "foo<value>" == "foo", and "foo<property>" == "foo",
+        but "foo<value>" != "foo<property>".
         '''
         if not isinstance(other, GlobalName):
             return False
