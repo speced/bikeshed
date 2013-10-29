@@ -4,6 +4,7 @@ import collections as col
 from .messages import *
 from . import config
 from .ReferenceManager import linkTextsFromElement
+from .fuckunicode import u
 
 '''
 A global name uniquely identifies a definition
@@ -47,6 +48,9 @@ class GlobalName(object):
         If you indicate that it's a partial name,
         no canonicalization will occur.
         '''
+        text = u(text)
+        type = u(type)
+        childType = u(childType)
         self.segments = []
         if isinstance(globalName, GlobalName):
             self.segments = copy.deepcopy(val.segments)
@@ -66,19 +70,24 @@ class GlobalName(object):
         # If I haven't returned yet, something's invalid.
         self.valid = False
 
-    def __str__(self):
+    def __unicode__(self):
         strPieces = []
         for segment in reversed(self.segments):
             if segment[1] is not None:
-                strPieces.append("{0}<{1}>".format(*segment))
+                strPieces.append(u"{0}<{1}>".format(*segment))
             else:
                 strPieces.append(segment.value)
-        return '/'.join(strPieces)
+        return u'/'.join(strPieces)
+
+    def __str__(self):
+        return unicode(self).encode('utf-8')
 
     def canonicalize(self, type=None, childType=None):
         '''
         Guesses at any missing types.
         '''
+        type = u(type)
+        childType = u(childType)
         # Push type into the first segment, as long as it's possible.
         if type is not None:
             if self.segments[0].type is None:
@@ -129,7 +138,7 @@ class GlobalName(object):
         for i, segment in enumerate(self.segments):
             prevType = childType if i == 0 else self.segments[i-1].type
             nextValue = '' if i+1 == len(self.segments) else self.segments[i+1].value
-            self.segments[i] = segment._replace(type=guessType(*segment, prevType=prevType, nextValue=nextValue))
+            self.segments[i] = segment._replace(type=u(guessType(*segment, prevType=prevType, nextValue=nextValue)))
         return self
 
     def validate(self):
@@ -175,6 +184,9 @@ class GlobalName(object):
 class GlobalNames(col.Set, col.Hashable):
     def __init__(self, text=None, type=None, childType=None):
         self.__names = set()
+        text = u(text)
+        type = u(type)
+        childType = u(childType)
         if isinstance(text, basestring):
             text = GlobalNames.__splitNames(text)
         if isinstance(text, col.Sequence):
@@ -192,6 +204,7 @@ class GlobalNames(col.Set, col.Hashable):
         "Foo/bar(baz, qux)" is a valid global name, for example.
         So far, only need to respect parens, which is easy.
         '''
+        namesText = u(namesText)
         if not namesText:
             return []
         names = []
@@ -201,7 +214,7 @@ class GlobalNames(col.Set, col.Hashable):
                 names.append(chunk)
             elif nesting > 0:
                 # Inside of a parenthesized section
-                names[-1] += " " + chunk
+                names[-1] += u" " + chunk
             else:
                 # Unbalanced parens?
                 die("Found unbalanced parens when processing the globalnames:\n{0}", namesText)
@@ -213,14 +226,17 @@ class GlobalNames(col.Set, col.Hashable):
         return names
 
     def specialize(self, texts, type=None):
+        type = u(type)
         if isinstance(texts, basestring):
             texts = [texts]
         for text in texts:
             for name in self.__names:
-                name.specialize(text, type)
+                name.specialize(u(text), type)
         return self.canonicalize()
 
     def canonicalize(self, type=None, childType=None):
+        type = u(type)
+        childType = u(childType)
         for name in self.__names:
             name.canonicalize(type=type, childType=childType)
         return self
@@ -235,14 +251,14 @@ class GlobalNames(col.Set, col.Hashable):
     @classmethod
     def fromEl(cls, el):
         texts = linkTextsFromElement(el)
-        type = el.get('data-dfn-type') or el.get('data-link-type') or el.get('data-idl-type')
-        forText = el.get('data-dfn-for') or el.get('data-link-for') or el.get('data-idl-for')
+        type = u(el.get('data-dfn-type') or el.get('data-link-type') or el.get('data-idl-type'))
+        forText = u(el.get('data-dfn-for') or el.get('data-link-for') or el.get('data-idl-for'))
         return cls(forText).specialize(texts, type)
 
     @classmethod
     def refsFromEl(cls, el):
-        type = el.get('data-dfn-type') or el.get('data-link-type') or el.get('data-idl-type')
-        forText = el.get('data-dfn-for') or el.get('data-link-for') or el.get('data-idl-for')
+        type = u(el.get('data-dfn-type') or el.get('data-link-type') or el.get('data-idl-type'))
+        forText = u(el.get('data-dfn-for') or el.get('data-link-for') or el.get('data-idl-for'))
         return cls(forText, childType=type)
 
     def __contains__(self, other):
@@ -256,5 +272,8 @@ class GlobalNames(col.Set, col.Hashable):
 
     __hash__ = col.Set._hash
 
+    def __unicode__(self):
+        return u' '.join(map(unicode,self))
+
     def __str__(self):
-        return ' '.join(map(str,self))
+        return unicode(self).encode('utf-8')
