@@ -1077,7 +1077,7 @@ def cleanupHTML(doc):
     if config.minify:
         comments = list(doc.document.iter(lxml.etree.Comment))
         for comment in comments:
-            comment.getparent().remove(comment)
+            removeNode(comment)
 
 
 def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):
