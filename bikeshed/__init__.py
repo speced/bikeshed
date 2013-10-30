@@ -837,7 +837,7 @@ def determineLinkType(el):
     # ''foo: bar'' is a propdef for 'foo'
     if linkType == "maybe" and re.match("^[\w-]+\s*:\s*\S", text):
         el.set('title', re.match("^\s*([\w-]+)\s*:\s*\S", text).group(1))
-        return "property"
+        return "propdesc"
     if linkType:
         if linkType in config.linkTypes:
             return linkType
