@@ -38,7 +38,6 @@ There are several shortcuts for writing autolinks of particular types, so you do
 * `<<'foo'>>` is an autolink to the the property or descriptor named "foo" (used in grammars, where you need `<foo>` for non-terminals)
 * `<<foo()>>` is an autolink to the function named "foo" (same)
 * `<<@foo>>` is an autolink to the at-rule named "@foo" (same)
-* `<<<foo>>>` is an autolink to a token named "〈foo〉"
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 

@@ -119,8 +119,6 @@ def replaceTextMacros(text):
     for tag, replacement in config.textMacros.items():
         text = u(text).replace(u"[{0}]".format(u(tag.upper())), u(replacement))
     text = fixTypography(text)
-    # Replace <<<token>>> shortcuts.  (It's annoying to type the actual token syntax.)
-    text = re.sub(ur"<<<([^>]+)>>>", ur"<a data-link-type='token'>〈\1〉</a>", text)
     # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
     # <'foo'> is a link to the 'foo' property
     text = re.sub(r"<<'([\w-]+)'>>", r'<a data-link-type="propdesc" title="\1" class="production">&lt;&lsquo;\1&rsquo;></a>', text)
