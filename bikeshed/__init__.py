@@ -141,6 +141,9 @@ def fixTypography(text):
     # Replace straight aposes with curly quotes for possessives and contractions.
     text = re.sub(r"([\w])'([\w])", ur"\1’\2", text)
     text = re.sub(r"(</[\w]+>)'([\w])", ur"\1’\2", text)
+    # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
+    text = re.sub(ur"(—|--)\r?\n\s+(\S)", ur"—<wbr>\2", text)
+    return text
 
 
 def transformMarkdownParagraphs(doc):
