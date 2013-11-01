@@ -1673,6 +1673,8 @@ def addIssuesSection(doc):
     insertAfter(header, container)
     for issue in issues:
         el = deepcopy(issue)
+        if el.tag not in ("pre",):
+            el.tag = "div"
         appendChild(container, el)
         issuelink = lxml.etree.Element('a', {'href':'#'+issue.get('id')})
         issuelink.text = u" ↵ "
