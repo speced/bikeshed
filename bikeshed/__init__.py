@@ -380,6 +380,8 @@ def initializeTextMacros(doc):
     if doc.md.title:
         config.textMacros["title"] = doc.md.title
     config.textMacros["shortname"] = doc.md.shortname
+    if doc.md.status:
+        config.textMacros["statusText"] = doc.md.statusText
     config.textMacros["vshortname"] = u"{0}-{1}".format(doc.md.shortname, doc.md.level)
     if doc.md.status in longstatuses:
         config.textMacros["longstatus"] = longstatuses[doc.md.status]
@@ -416,6 +418,7 @@ def verifyRequiredMetadata(doc):
 
     requiredSingularKeys = [
         ('status', 'Status'),
+        ('statusText', 'Status Text'),
         ('ED', 'ED'),
         ('abstracts', 'Abstract'),
         ('shortname', 'Shortname'),
