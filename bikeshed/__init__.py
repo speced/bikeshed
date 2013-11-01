@@ -786,7 +786,7 @@ def classifyDfns(doc, dfns):
                     continue
         # Automatically fill in id if necessary.
         if el.get('id') is None:
-            id = simplifyText(determineDfnText(el))
+            id = simplifyText(determineDfnText(el).split('|')[0])
             if dfnType == "dfn":
                 pass
             elif dfnType == "interface":
