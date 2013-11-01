@@ -418,7 +418,6 @@ def verifyRequiredMetadata(doc):
 
     requiredSingularKeys = [
         ('status', 'Status'),
-        ('statusText', 'Status Text'),
         ('ED', 'ED'),
         ('abstracts', 'Abstract'),
         ('shortname', 'Shortname'),

@@ -17,7 +17,7 @@ class MetadataManager:
     # optional metadata
     TR = None
     title = "???"
-    statusText = "???"
+    statusText = ""
     date = datetime.utcnow().date()
     deadline = None
     group = "csswg"
