@@ -131,7 +131,7 @@ def replaceTextMacros(text):
     # Replace the ''maybe link'' shortcuts.
     # They'll survive the HTML parser, but they don't match if they contain an element.
     # (The other shortcuts are "atomic" and can't contain elements.)
-    text = re.sub(r"''([^=']*)''", r'<span data-link-type="maybe" class="css">\1</span>', text)
+    text = re.sub(r"''([^=]+?)''", r'<span data-link-type="maybe" class="css">\1</span>', text)
     return text
 
 
