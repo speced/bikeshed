@@ -17,6 +17,15 @@ Additionally, starting a paragraph with "Note: " will add a `class='note'` to th
 which triggers special formatting in the CSS stylesheet.
 
 
+Typography Fixes
+----------------
+
+Bikeshed will automatically handle a few typographic niceties for you, ones that it can reliably detect:
+
+* Possessive apostophes, and most contraction apostrophes, are automatically turned into curly right single quotes (`’`).
+* Ending a line with `--` will turn it into an em dash (`—`) and pull the following line upwards so there's no space between the surrounding words and the dash.
+
+
 Autolink Shortcuts
 ------------------
 
