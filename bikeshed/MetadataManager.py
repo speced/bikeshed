@@ -17,6 +17,7 @@ class MetadataManager:
     # optional metadata
     TR = None
     title = "???"
+    statusText = "???"
     date = datetime.utcnow().date()
     deadline = None
     group = "csswg"
@@ -40,6 +41,7 @@ class MetadataManager:
         self.singleValueKeys = {
             "Title": "title",
             "Status": "status",
+            "Status Text": "statusText",
             "ED": "ED",
             "Shortname": "shortname",
             "Level": "level",

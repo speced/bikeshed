@@ -47,6 +47,7 @@ There are several additional optional keys:
 * "Previous Version" must contain a link that points to a previous (dated) version on /TR.  You can specify this key more than once for multiple entries.
 * "At Risk" must contain an at-risk feature.  You can specify this key more than once for multiple entries.
 * "Group" must contain the name of the group the spec is being generated for.  This is used by the boilerplate generation to select the correct file.  It defaults to "csswg".
+* "Status Text" allows adding an additional customized sentence that can be used in the document status section.
 * "Ignored Terms" accepts a comma-separated list of terms and won't attempt to link them.  Use these to quiet spurious preprocessor warnings caused by you inventing terms (for example, the Variables spec invents custom properties like 'var-foo'), or as a temporary patch when the spec you want to link to doesn't set up its definitions correctly.
 * "Link Defaults" lets you specify a default spec for particular autolinks to link to.  The value is a comma-separated list of entries, where each entry is a versioned spec shortname, followed by a link type, followed by a "/"-separated list of link phrases.
 * "Date" must contain a date in YYYY-MM-DD format, which is used instead of today's date for all the date-related stuff in the spec.

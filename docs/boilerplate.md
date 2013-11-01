@@ -20,6 +20,7 @@ The following macros are defined:
 * [VSHORTNAME] gives the "versioned" shortname, like "css-cascade-3".
 * [STATUS] gives the spec's status.
 * [LONGSTATUS] gives a long form of the spec's status, so "ED" becomes "Editor's Draft", for example.
+* [STATUSTEXT] gives an additional status text snippet.
 * [LATEST] gives the link to the undated /TR link, if it exists.
 * [VERSION] gives the link to the ED, if the spec is an ED, and otherwise constructs a dated /TR link from today's date.
 * [ABSTRACT] gives the document's abstract.
