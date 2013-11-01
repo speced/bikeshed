@@ -140,7 +140,7 @@ def fixTypography(text):
     text = re.sub(r"([\w])'([\w])", ur"\1’\2", text)
     text = re.sub(r"(</[\w]+>)'([\w])", ur"\1’\2", text)
     # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-    text = re.sub(ur"(—|--)\r?\n\s+(\S)", ur"—<wbr>\2", text)
+    text = re.sub(ur"([^<][^!])(—|--)\r?\n\s+(\S)", ur"\1—<wbr>\3", text)
     return text
 
 
