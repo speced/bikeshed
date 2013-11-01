@@ -926,6 +926,10 @@ def processAutolinks(doc):
         linkType = el.get('data-link-type')
         linkText = el.get('title')
 
+        # Properties and descriptors are often written like 'foo-*'. Just ignore these.
+        if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
+            continue
+
         if linkType == u"biblio":
             # Move biblio management into ReferenceManager later
             el.set('href', '#'+simplifyText(linkText))
