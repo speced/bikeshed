@@ -62,6 +62,14 @@ def main():
     updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
     updateParser.add_argument("--link-defaults", dest="linkDefaults", action="store_true", help="Download link default data.")
 
+    issueParser = subparsers.add_parser('issue-list', help="Process a plain-text issues file into HTML.")
+    issueParser.add_argument("infile", nargs="?",
+                              default=None,
+                              help="Path to the plain-text issue file.")
+    issueParser.add_argument("outfile", nargs="?",
+                              default=None,
+                              help="Path to the output file. Default is file of the same name as input, with .html.")
+
     debugParser = subparsers.add_parser('debug', help="Run various debugging commands.")
     debugParser.add_argument("infile", nargs="?",
                              default="Overview.src.html",
@@ -112,6 +120,9 @@ def main():
             if not config.quiet:
                 print "Refs for '{0}':".format(options.linkText)
             print json.dumps(refs, indent=2)
+    elif options.subparserName == "issue-list":
+        from . import issuelist as il
+        il.convertIssueList(option.infile, options.outfile)
 
 
 def replaceTextMacros(text):
