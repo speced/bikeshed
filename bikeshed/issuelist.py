@@ -30,7 +30,7 @@ def printIssueList(infilename=None, outfilename=None):
 
 	if outfilename is None:
 		if infilename == "-":
-			outfilename = "issues-{status}-{cdate}.html".format(**headerInfo)
+			outfilename = "issues-{status}-{cdate}.html".format(**headerInfo).lower()
 		elif infilename.endswith(".txt"):
 			outfilename = infilename[:-4] + ".html"
 		else:
@@ -52,13 +52,16 @@ def printIssueList(infilename=None, outfilename=None):
 def extractHeaderInfo(lines, infilename):
 	title = None
 	url = None
+	status = None
 	for line in lines:
-		match = re.match("(Draft|Title):\s*(.*)", line)
+		match = re.match("(Draft|Title|Status):\s*(.*)", line)
 		if match:
 			if match.group(1) == "Draft":
 				url = match.group(2)
 			elif match.group(1) == "Title":
 				title = match.group(2)
+			elif match.group(1) == "Status":
+				status = match.group(2).upper()
 	if url is None:
 		die("Missing 'Draft' metadata.")
 		return
@@ -68,9 +71,11 @@ def extractHeaderInfo(lines, infilename):
 
 	match = re.search("([A-Z]{2,})-([a-z0-9-]+)-(\d{8})", url)
 	if match:
-		status = match.group(1)
-		if status == "WD" and re.search("LC", infilename, re.I):
-			status = "LCWD"
+		if status is None:
+			# Auto-detect from the URL and filename.
+			status = match.group(1)
+			if status == "WD" and re.search("LC", infilename, re.I):
+				status = "LCWD"
 		shortname = match.group(2)
 		cdate = match.group(3)
 		date = "{0}-{1}-{2}".format(*re.match("(\d{4})(\d\d)(\d\d)", cdate).groups())
@@ -148,7 +153,7 @@ def printHeader(outfile, headerInfo):
 
 
 def printIssues(outfile, lines):
-	text = '\n'.join(lines)
+	text = ''.join(lines)
 	issues = text.split('----\n')[1:]
 	for issue in issues:
 		issue = issue.strip()
