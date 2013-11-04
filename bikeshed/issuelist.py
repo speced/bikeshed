@@ -148,7 +148,7 @@ def printHeader(outfile, headerInfo):
 
 
 def printIssues(outfile, lines):
-	text = ''.join(lines)
+	text = '\n'.join(lines)
 	issues = text.split('----\n')[1:]
 	for issue in issues:
 		issue = issue.strip()

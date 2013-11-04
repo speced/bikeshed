@@ -120,7 +120,7 @@ def main():
             if not config.quiet:
                 print "Refs for '{0}':".format(options.linkText)
             print json.dumps(refs, indent=2)
-    elif options.subparserName == "issue-list":
+    elif options.subparserName == "issues-list":
         from . import issuelist as il
         il.printIssueList(options.infile, options.outfile)
 
