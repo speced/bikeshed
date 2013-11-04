@@ -122,7 +122,7 @@ def main():
             print json.dumps(refs, indent=2)
     elif options.subparserName == "issue-list":
         from . import issuelist as il
-        il.convertIssueList(option.infile, options.outfile)
+        il.printIssueList(options.infile, options.outfile)
 
 
 def replaceTextMacros(text):
