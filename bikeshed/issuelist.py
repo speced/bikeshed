@@ -52,7 +52,6 @@ def printIssueList(infilename=None, outfilename=None):
 def extractHeaderInfo(lines, infilename):
 	title = None
 	url = None
-	lc = False
 	for line in lines:
 		match = re.match("(Draft|Title):\s*(.*)", line)
 		if match:
@@ -70,7 +69,6 @@ def extractHeaderInfo(lines, infilename):
 	match = re.search("([A-Z]{2,})-([a-z0-9-]+)-(\d{8})", url)
 	if match:
 		status = match.group(1)
-		lc = lc or bool(re.search("LC", line, re.I))
 		if status == "WD" and re.search("LC", infilename, re.I):
 			status = "LCWD"
 		shortname = match.group(2)
