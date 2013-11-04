@@ -62,7 +62,7 @@ def main():
     updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
     updateParser.add_argument("--link-defaults", dest="linkDefaults", action="store_true", help="Download link default data.")
 
-    issueParser = subparsers.add_parser('issue-list', help="Process a plain-text issues file into HTML.")
+    issueParser = subparsers.add_parser('issues-list', help="Process a plain-text issues file into HTML. Call with no args to see an example input text.")
     issueParser.add_argument("infile", nargs="?",
                               default=None,
                               help="Path to the plain-text issue file.")
