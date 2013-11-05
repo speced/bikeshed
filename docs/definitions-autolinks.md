@@ -262,3 +262,32 @@ and can be found at <https://www.w3.org/Style/Group/css3-src/biblio.ref>
 A version of this file is included in the processor's repository,
 and the data doesn't change often,
 so it should be sufficient.
+
+The bibliography data is automatically imported from a global database.
+Currently, it's Bert's `biblio.ref` file,
+but it will switch to Tobie's Specref project eventually.
+
+You can also add your own biblio references when necessary.
+Just add a `biblio.json` file to the spec's folder,
+with the file being a JSON file formatted according to Specref's conventions, like so:
+
+```json
+{
+    "foo-bar": {
+        "authors": [
+            "Tab Atkins",
+            "Dirk Schultze"
+        ],
+        "href": "http://www.w3.org/TR/foo-bar/",
+        "title": "Foo Bar Level 1",
+        "status": "CR",
+        "publisher": "W3C",
+        "deliveredBy": [
+            "http://www.w3.org/html/wg/"
+        ]
+    }
+}
+```
+
+Only the "title" and "href" fields are strictly necessary;
+the rest can be omitted if desired.
