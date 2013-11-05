@@ -483,8 +483,8 @@ def transformAutolinkShortcuts(doc):
         # So, escape the text, so it turns back into "raw HTML".
         text = escapeHTML(text)
         # Handle biblio links, [[FOO]] and [[!FOO]]
-        while re.search(ur"\[\[(!?)([A-Z0-9-]+)\]\]", text):
-            match = re.search(ur"\[\[(!?)([A-Z0-9-]+)\]\]", text)
+        while re.search(ur"\[\[(!?)([A-Za-z0-9-]+)\]\]", text):
+            match = re.search(ur"\[\[(!?)([A-Za-z0-9-]+)\]\]", text)
 
             if match.group(1) == "!":
                 biblioType = u"normative"
@@ -1175,6 +1175,16 @@ class CSSSpec(object):
                                       fallbackurl="https://www.w3.org/Style/Group/css3-src/biblio.ref",
                                       type="bibliography")
         self.biblios = biblio.processReferBiblioFile(bibliofh)
+        bibliofh.close()
+
+        # Get local bibliography data
+        try:
+            bibliofh = open("biblio.json", 'r')
+        except:
+            pass
+        else:
+            self.biblios.update(biblio.processSpecrefBiblioFile(bibliofh))
+            bibliofh.close()
 
         # Load up the xref data
         self.refs.specs = json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/specs.json",
