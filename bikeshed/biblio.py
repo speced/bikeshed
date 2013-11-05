@@ -1,4 +1,5 @@
 import re
+from .messages import *
 from .fuckunicode import u
 
 class BiblioEntry(object):
@@ -53,6 +54,13 @@ class BiblioEntry(object):
         str += u"URL: <a href='{0}'>{0}</a>".format(u(self.url))
         return str
 
+    def valid(self):
+        if self.url is None:
+            return False
+        if self.title is None:
+            return False
+        return True
+
 
 def processReferBiblioFile(file):
     biblios = {}
@@ -94,4 +102,41 @@ def processReferBiblioFile(file):
         for (letter, name) in pluralReferCodes.items():
             if re.match("\s*%"+letter+"\s+[^\s]", line):
                 getattr(biblio, name).append(re.match("\s*%"+letter+"\s+(.*)", line).group(1))
+    return biblios
+
+def processSpecrefBiblioFile(file):
+    import json
+    biblios = {}
+    try:
+        datas = json.load(file)
+    except Exception, e:
+        die("Couldn't read the local JSON file:\n{0}", str(e))
+
+    # JSON field name: BiblioEntry name
+    fields = {
+        "authors": "authors",
+        "href": "url",
+        "title": "title",
+        "rawDate": "date",
+        "status": "status"
+    }
+    # Required BiblioEntry fields
+    requiredFields = ["url", "title"]
+
+    for biblioKey, data in datas.items():
+        biblio = BiblioEntry()
+        biblio.linkText = biblioKey
+        for jsonField, biblioField in fields.items():
+            if jsonField in data:
+                setattr(biblio, biblioField, data[jsonField])
+        if not biblio.valid():
+            missingFields = []
+            for field in requiredFields:
+                try:
+                    getattr(biblio, field)
+                except:
+                    missingFields.append(field)
+            die("Missing the field(s) {1} from biblio entry for {0}", biblioKey, ', '.join(map("'{0}'".format, missingFields)))
+            continue
+        biblios[biblioKey] = biblio
     return biblios
