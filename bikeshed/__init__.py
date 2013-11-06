@@ -360,7 +360,10 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
 
 def transformMetadata(lines, doc, **kwargs):
     for line in lines:
-        match = re.match(u"\s*([^:]+):\s*(.*)", u(line))
+        line = line.strip()
+        if line == "":
+            continue
+        match = re.match(u"([^:]+):\s*(.*)", u(line))
         if(match is None):
             die(u"Incorrectly formatted metadata line:\n{0}", u(line))
             continue
