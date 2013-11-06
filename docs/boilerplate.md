@@ -6,11 +6,29 @@ the text that is repeated nearly identically across all specs.
 
 Generally, you won't need to understand what's going on here in order to use the processor - it'll just automatically do the right thing.
 
+Groups
+------
+
+Much of the boilerplate is determined based on the "Group" metadata.
+This defaults to "csswg", as Bikeshed is written primarily by a CSS spec writer and is intended to replace the CSSWG's previous spec preprocessor,
+but it can be set to anything.
+
+Several groups are already accommodated with appropriate inclusion files:
+* "csswg", as mentioned.
+* "fxtf", for the FX Task Force
+* "svg", for the SVG Working Group
+
+You can put whatever value you want into the "Group" value, though.
+Unrecognized values will just use the default boilerplate files.
+If you want to add specialized boilerplate files for your group,
+check out the File-Based Includes section, later in this document,
+and write your own files.
+
 
 Text Macros
 -----------
 
-Several text "macros" are defined by the spec's metadata, 
+Several text "macros" are defined by the spec's metadata,
 and can be used anywhere in the spec to substitute in the spec they stand for by using the syntax `[FOO]`.
 Note that this is similar to the syntax for bibliography references, but it has only a single set of `[]` characters.
 The following macros are defined:
@@ -106,7 +124,7 @@ and finally "foo.include".
 "Rerun" capability
 ------------------
 
-Bert's preprocessor had the useful meta-feature 
+Bert's preprocessor had the useful meta-feature
 where most of it's features would continue to work if you lost the original source document
 and just started editting the output document instead.
 This preprocessor has maintained this feature as much as it could,

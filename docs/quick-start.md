@@ -11,6 +11,7 @@ Starting from an empty file, do the following:
 	4. "Level" - an integer for the spec's level.  If you're unsure, just put "1".
 	5. "Editor" - an editor's personal information, in the format "[name], [company], [email or contact url]".
 	6. "Abstract" - a short (one or two sentences) description of what the spec is for.
+	7. "Group" - this defaults to "csswg", but can be changed to whatever group you're generating for.
 3. You *should* add an `<h2>Introduction</h2>` section.
 4. Write the rest of the spec!
 
