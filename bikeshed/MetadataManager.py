@@ -20,7 +20,7 @@ class MetadataManager:
     statusText = ""
     date = datetime.utcnow().date()
     deadline = None
-    group = "csswg"
+    group = None
     editors = []
     previousEditors = []
     previousVersions = []
