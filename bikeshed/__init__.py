@@ -1543,7 +1543,7 @@ def addPropertyIndex(doc):
             allKeys |= set(prop.keys())
         columns.extend(sorted(allKeys - set(columns)))
         # Create the table
-        html += u"<table class=proptable><thead><tr>"
+        html += u"<table class='proptable data'><thead><tr>"
         for column in columns:
             if column == "Inherited":
                 html += u"<th scope=col>Inh."
