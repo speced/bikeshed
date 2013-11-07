@@ -309,10 +309,10 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     # The required keys are specified in the order they should show up in the propdef table.
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "New values"]
-        ret = ["<table class='propdef partial'>"]
+        ret = ["<table class='definition propdef partial'>"]
     else:
         requiredKeys = ["Name", "Value", "Initial", "Applies to", "Inherited", "Media", "Computed value"]
-        ret = ["<table class='propdef'>"]
+        ret = ["<table class='definition propdef'>"]
     for key in requiredKeys:
         if key in vals:
             ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
@@ -342,10 +342,10 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
             vals[key] = val
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
-        ret = ["<table class='descdef partial' data-dfn-for='{0}'>".format(vals.get("For", ""))]
+        ret = ["<table class='definition descdef partial' data-dfn-for='{0}'>".format(vals.get("For", ""))]
     else:
         requiredKeys = ["Name", "For", "Value", "Initial"]
-        ret = ["<table class='descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
+        ret = ["<table class='definition descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
     for key in requiredKeys:
         if key in vals:
             ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
