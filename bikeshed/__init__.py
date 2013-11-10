@@ -343,6 +343,9 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
         ret = ["<table class='definition descdef partial' data-dfn-for='{0}'>".format(vals.get("For", ""))]
+    if "mq" in firstLine:
+        requiredKeys = ["Name", "For", "Value"]
+        ret = ["<table class='definition descdef mq' data-dfn-for='{0}'>".format(vals.get("For",""))]
     else:
         requiredKeys = ["Name", "For", "Value", "Initial"]
         ret = ["<table class='definition descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
