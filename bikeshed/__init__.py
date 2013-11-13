@@ -336,8 +336,6 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
         val = match.group(2).strip()
         if key == "Value" and "Value" in vals:
             vals[key] += " "+val
-        elif key == "For":
-            vals[key] = "<a at-rule>{0}</a>".format(val)
         else:
             vals[key] = val
     if "partial" in firstLine or "New values" in vals:
@@ -350,7 +348,9 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
         requiredKeys = ["Name", "For", "Value", "Initial"]
         ret = ["<table class='definition descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
     for key in requiredKeys:
-        if key in vals:
+        if key == "For":
+            ret.append("<tr><th>{0}:<td><a at-rule>{1}</a>".format(key, vals[key]))
+        elif key in vals:
             ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
         else:
             die("The descdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key)
