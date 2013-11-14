@@ -965,7 +965,7 @@ def processIssues(doc):
     import hashlib
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues.
     for el in findAll(".issue:not([id])"):
-        el.set('id', "issue-"+hashlib.md5(outerHTML(el).encode("ascii", "xmlcharrefreplace")).hexdigest()[0:8])
+        el.set('id', "issue-"+hashlib.md5(innerHTML(el).strip().encode("ascii", "xmlcharrefreplace")).hexdigest()[0:8])
     dedupIds(doc, findAll(".issue"))
 
 
