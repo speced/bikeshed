@@ -16,7 +16,7 @@ Diagrams are described by a custom DSL that somewhat resembles Python.
 
 A railroad diagram consists of a number of nested elements, each of which may contain multiple children.  Each element is specified as a command followed by a colon, possibly followed by additional data (the prelude), and the element's children indented on following lines, like:
 
-```js
+```plain
 T: /*
 ZeroOrMore:
 	N: anything but * followed by /
