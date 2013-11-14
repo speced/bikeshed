@@ -115,7 +115,7 @@ def _createDiagram(command, prelude, children, line=-1):
         if prelude not in ("", "skip"):
             return die("Line {0} - Optional preludes must be nothing or 'skip'. Got:\n{1}", line, prelude)
         if len(children) != 1:
-            return die("Line {0} - Optional commands need exactly one child.")
+            return die("Line {0} - Optional commands need exactly one child.", line)
         children = filter(None, [_createDiagram(**child) for child in children])
         return rr.Optional(*children, skip=(prelude=="skip"))
     elif command in ("Plus", "OneOrMore"):
