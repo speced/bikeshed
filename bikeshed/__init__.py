@@ -1104,6 +1104,11 @@ def cleanupHTML(doc):
         comments = list(doc.document.iter(lxml.etree.Comment))
         for comment in comments:
             removeNode(comment)
+    
+    # Remove duplicate titles.
+    for el in findAll("dfn[title]"):
+        if el.get('title') == textContent(el):
+            del el.attrib['title']
 
 
 def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):
