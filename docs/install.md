@@ -3,37 +3,29 @@ Installing Bikeshed
 
 If you want to run a local copy of Bikeshed rather than use the cgi version, it’s pretty easy to install.
 
-First, you’ll need Python 2.7.  Install that however you do that best.  For example, on Ubuntu you would type `sudo apt-get install python2.7` into a console window.
-
-Second, you’ll need Pip, a python package installer.  On an appropriately Linux-compatible system, do:
+First, install Python 2.7, PIP, and a few other support libraries:
 
 ~~~~
-$ sudo apt-get install python-pip
+$ sudo apt-get install python2.7 python-dev python-pip libxslt1-dev libxml2-dev
 ~~~~
 
-or
+The `apt-get` command works on Debian-based systems like Ubuntu; if you work on some other type of system, and can figure out how to get things working on your own, let me know and I'll add instructions for your system.
+
+Then, we'll need to install lxml.
 
 ~~~~
-$ curl -O https://raw.github.com/pypa/pip/master/contrib/get-pip.py
-$ sudo python get-pip.py
-~~~~
-
-If you’re on OSX and using MacPorts, install py27-pip from it.
-
-If you’re on some other setup, I don’t know how to best get Pip running.  If you find out, let me know, and I’ll add it to this readme.
-
-You’ll probably also need a few more tools:
-
-~~~~
-$ sudo apt-get install python-dev
-$ sudo apt-get install libxslt1-dev
-$ sudo apt-get install libxml2-dev
 $ sudo pip install lxml
 ~~~~
 
-(If that last one report that you already have a version of lxml, run it again with `--upgrade` at the end.)
+**Important**: If this command reports that you already have lxml, instead run:
 
-Third, you’ll need the Bikeshed repository itself.  Run the following in your favorite command line:
+~~~~
+$ sudo pip install lxml --upgrade
+~~~~
+
+That'll spew a lot of console trash, but don't worry about it.
+
+Second, you’ll need the Bikeshed repository itself.  Run the following in your favorite command line:
 
 ~~~~
 $ git clone https://github.com/tabatkins/bikeshed.git
