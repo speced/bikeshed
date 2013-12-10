@@ -25,10 +25,13 @@ If you’re on some other setup, I don’t know how to best get Pip running.  If
 You’ll probably also need a few more tools:
 
 ~~~~
-$ sudo apt-get install python-lxml
+$ sudo apt-get install python-dev
 $ sudo apt-get install libxslt1-dev
 $ sudo apt-get install libxml2-dev
+$ sudo pip install lxml
 ~~~~
+
+(If that last one report that you already have a version of lxml, run it again with `--upgrade` at the end.)
 
 Third, you’ll need the Bikeshed repository itself.  Run the following in your favorite command line:
 
