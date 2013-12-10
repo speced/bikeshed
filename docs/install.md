@@ -22,6 +22,14 @@ If you're on OSX and using MacPorts, install py27-pip from it.
 
 If you're on some other setup, I don't know how to best get Pip running.  If you find out, let me know, and I'll add it to this readme.
 
+You'll probably also need a few more tools:
+
+~~~~
+$ sudo apt-get install python-lxml
+$ sudo apt-get install libxslt1-dev
+$ sudo apt-get install libxml2-dev
+~~~~
+
 Third, you'll need the Bikeshed repository itself.  Run the following in your favorite command line:
 
 ~~~~
