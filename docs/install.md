@@ -33,10 +33,10 @@ $ sudo apt-get install libxml2-dev
 Third, you'll need the Bikeshed repository itself.  Run the following in your favorite command line:
 
 ~~~~
-$ git clone git@github.com:tabatkins/bikeshed.git
+$ git clone https://github.com/tabatkins/bikeshed.git
 ~~~~
 
-(This'll download bikeshed to a "bikeshed" folder, created wherever you're currently at.)
+(This'll download bikeshed to a "bikeshed" folder, created wherever you're currently at.  If you think you might want to commit back to Bikeshed, instead download it over SSH. I won't explain how to do that here.)
 
 Finally, run:
 
@@ -46,7 +46,7 @@ $ pip install --editable /path/to/cloned/bikeshed
 
 This'll install Bikeshed, making it available to your Python environment as the `bikeshed` package, and automatically add a `bikeshed` command to your path.
 
-To update bikeshed to its latest version at any time, just enter Bikeshe'd folder, and run:
+To update bikeshed to its latest version at any time, just enter Bikeshed's folder, and run:
 
 ~~~~
 $ git pull --rebase
