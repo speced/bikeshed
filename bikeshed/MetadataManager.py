@@ -148,14 +148,14 @@ def convertWarning(key, val):
     die('Unknown value for "{0}" metadata.', key)
 
 def parseEditor(key, val):
-    match = re.match(u"([^,]+) ,\s* ([^,]+) ,?\s* (.*)", val, re.X)
+    match = re.match(u"([^,]+) ,\s* ([^,]*) ,?\s* (.*)", val, re.X)
     if match:
         return {
             'name': match.group(1),
             'org': match.group(2),
             'link': match.group(3)
         }
-    die("'{0}' format is '<name>, <company>, <email-or-contact-page>. Got:\n{1}", key, val)
+    die("'{0}' format is '<name>, <company>?, <email-or-contact-page>. Got:\n{1}", key, val)
 
 def parseIgnoredTerms(key, val):
     return [term.strip().lower() for term in val.split(u',')]
