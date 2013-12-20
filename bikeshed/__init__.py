@@ -43,11 +43,11 @@ def main():
 
     specParser = subparsers.add_parser('spec', help="Process a spec source file into a valid output file.")
     specParser.add_argument("infile", nargs="?",
-                            default="Overview.src.html",
-                            help="Path to the source file. [default: %(default)s]")
+                            default=None,
+                            help="Path to the source file.")
     specParser.add_argument("outfile", nargs="?",
-                            default="Overview.html",
-                            help="Path to the output file. [default: %(default)s]")
+                            default=None,
+                            help="Path to the output file.")
     specParser.add_argument("--para", dest="paragraphMode", default="markdown",
                             help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %(default)s]")
     minifyGroup = specParser.add_argument_group("Minification")
@@ -72,8 +72,8 @@ def main():
 
     debugParser = subparsers.add_parser('debug', help="Run various debugging commands.")
     debugParser.add_argument("infile", nargs="?",
-                             default="Overview.src.html",
-                             help="Path to the source file. [default: %(default)s]")
+                             default=None,
+                             help="Path to the source file.")
     debugCommands = debugParser.add_mutually_exclusive_group(required=True)
     debugCommands.add_argument("--print-exports", dest="printExports", action="store_true",
                                help="Prints those terms that will be exported for cross-ref purposes.")
@@ -1164,8 +1164,18 @@ class CSSSpec(object):
     md = MetadataManager()
     biblios = {}
     paragraphMode = "markdown"
+    inputSource = None
 
     def __init__(self, inputFilename, paragraphMode="markdown"):
+        if inputFilename is None:
+            # Default the path to something sensible.
+            import glob
+            possibleInputs = glob.glob("*.src.html")
+            if possibleInputs:
+                inputFilename = possibleInputs[0]
+            else:
+                inputFilename = "-"
+        self.inputSource = inputFilename
         try:
             if inputFilename == "-":
                 self.lines = sys.stdin.readlines()
@@ -1295,6 +1305,14 @@ class CSSSpec(object):
         return self
 
     def finish(self, outputFilename):
+        if outputFilename is None:
+            # More sensible defaults!
+            if self.inputSource.endswith(".src.html"):
+                outputFilename = self.inputSource[0:-9] + ".html"
+            elif self.inputSource == "-":
+                outputFilename = "-"
+            else:
+                outputFilename = "-"
         walker = html5lib.treewalkers.getTreeWalker("lxml")
         s = html5lib.serializer.htmlserializer.HTMLSerializer(alphabetical_attributes=True)
         rendered = s.render(walker(self.document), encoding='utf-8')
