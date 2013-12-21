@@ -441,11 +441,11 @@ def verifyRequiredMetadata(doc):
     requiredSingularKeys = [
         ('status', 'Status'),
         ('ED', 'ED'),
-        ('abstracts', 'Abstract'),
         ('shortname', 'Shortname'),
         ('level', 'Level')
     ]
     requiredMultiKeys = [
+        ('abstracts', 'Abstract'),
         ('editors', 'Editor')
     ]
     errors = []
