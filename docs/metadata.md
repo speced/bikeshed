@@ -31,8 +31,8 @@ Several keys are required information, and will cause the processor to flag an e
 * "Editor" must contain an editor's information.
 	This has a special format:
 	it must contain the editor's name,
-	followed by the editor's affiliation,
-	followed by either an email address or a link to their contact page,
+	optionally followed by the editor's affiliation,
+	optionally followed by either an email address or a link to their contact page,
 	all comma-separated.
 	(To put a comma *in* one of these values, use an HTML character reference: `&#44;`.)
 	Multiple "Editor" lines can be used to supply multiple editors.

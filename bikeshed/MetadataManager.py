@@ -149,13 +149,27 @@ def convertWarning(key, val):
 
 def parseEditor(key, val):
     match = re.match(u"([^,]+) ,\s* ([^,]*) ,?\s* (.*)", val, re.X)
-    if match:
-        return {
-            'name': match.group(1),
-            'org': match.group(2),
-            'link': match.group(3)
-        }
-    die("'{0}' format is '<name>, <company>?, <email-or-contact-page>. Got:\n{1}", key, val)
+    pieces = [piece.strip() for piece in val.split(',')]
+    def looksLinkish(string):
+        return re.match(ur"\w+:", string) or re.match(ur".+@.+\..+", string)
+    data = {
+        'name': pieces[0],
+        'org' : '',
+        'link': ''
+    }
+    if len(pieces) == 3 and looksLinkish(pieces[2]):
+        data['org'] = pieces[1]
+        data['link'] = pieces[2]
+    elif len(pieces) == 2:
+        # See if the piece looks like a link/email
+        if looksLinkish(pieces[1]):
+            data['link'] = pieces[1]
+        else:
+            data['org'] = pieces[1]
+    else:
+        die("'{0}' format is '<name>, <company>?, <email-or-contact-page>?. Got:\n{1}", key, val)
+    return data
+
 
 def parseIgnoredTerms(key, val):
     return [term.strip().lower() for term in val.split(u',')]
