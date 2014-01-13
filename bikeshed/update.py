@@ -97,7 +97,7 @@ def updateCrossRefs():
             }
             for text in linkingTexts:
                 anchors[text.lower()].append(anchor)
-        
+
     if not config.dryRun:
         try:
             with open(config.scriptPath+"/spec-data/specs.json", 'w') as f:
@@ -113,7 +113,14 @@ def updateCrossRefs():
 
 
 def updateBiblio():
-    warn("Can't automatically update biblio.refer. Manually update it you want up-to-date information.")
+    say("Downloading biblio data...")
+    try:
+        with closing(urllib2.urlopen("http://dev.w3.org/csswg/biblio.ref")) as infh:
+            with open(config.scriptPath+"/spec-data/biblio.refer", 'w') as outfh:
+                outfh.write(infh.read())
+        say("Success!")
+    except Exception, e:
+        die("Couldn't download/save the biblio data.\n{0}", e)
 
 
 def updateLinkDefaults():

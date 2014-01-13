@@ -1191,7 +1191,7 @@ class CSSSpec(object):
             return
 
         bibliofh = retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.refer",
-                                      fallbackurl="https://www.w3.org/Style/Group/css3-src/biblio.ref",
+                                      fallbackurl="http://dev.w3.org/csswg/biblio.ref",
                                       type="bibliography")
         self.biblios = biblio.processReferBiblioFile(bibliofh)
         bibliofh.close()
