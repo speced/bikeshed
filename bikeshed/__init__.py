@@ -981,9 +981,12 @@ def addSelfLinks(doc):
         if foundFirstNumberedSection:
             appendChild(el, makeSelfLink(el))
     for el in findAll(".issue[id], .example[id], .note[id], li[id], dt[id]"):
+        if list(el.iterancestors("figure")):
+            # Skipping - element is inside a figure and is part of an example.
+            continue
         prependChild(el, makeSelfLink(el))
     for el in findAll("dfn"):
-        if len([x for x in el.iterancestors("a")]):
+        if list(el.iterancestors("a")):
             warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el))
             continue
         appendChild(el, makeSelfLink(el))
