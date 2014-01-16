@@ -1114,6 +1114,15 @@ def cleanupHTML(doc):
             del el.attrib['title']
 
 
+def finalHackyCleanup(html):
+    # For hacky last-minute string-based cleanups of the rendered html.
+
+    # Remove the </wbr> end tag until the serializer is fixed.
+    html = re.sub(r"</wbr>", "", html)
+
+    return html
+
+
 def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):
     try:
         if force:
@@ -1319,6 +1328,7 @@ class CSSSpec(object):
         walker = html5lib.treewalkers.getTreeWalker("lxml")
         s = html5lib.serializer.htmlserializer.HTMLSerializer(alphabetical_attributes=True)
         rendered = s.render(walker(self.document), encoding='utf-8')
+        rendered = finalHackyCleanup(rendered)
         if not config.dryRun:
             try:
                 if outputFilename == "-":
