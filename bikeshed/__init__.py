@@ -664,10 +664,10 @@ def formatPropertyNames(doc):
     for table in findAll("table.propdef, table.descdef"):
         tag = "a" if hasClass(table, "partial") else "dfn"
         type = "property" if hasClass(table, "propdef") else "descriptor"
-        for cell in findAll("tr:first-child > td", table):
-            names = [u(x.strip()) for x in textContent(cell).split(u',')]
-            html = u', '.join(u"<{tag} {type}>{0}</{tag}>".format(name, tag=tag, type=type) for name in names)
-            replaceContents(cell, parseHTML(html))
+        cell = findAll("tr:first-child > :nth-child(2)", table)[0]
+        names = [u(x.strip()) for x in textContent(cell).split(u',')]
+        html = u', '.join(u"<{tag} {type}>{0}</{tag}>".format(name, tag=tag, type=type) for name in names)
+        replaceContents(cell, parseHTML(html))
 
 
 def canonicalizeShortcuts(doc):
