@@ -1078,15 +1078,9 @@ def processIDL(doc):
 
 
 def cleanupHTML(doc):
-    # Find <style> in body, add scoped='', move to be first child.
-    for el in findAll("body style"):
-        parent = el.getparent()
-        parent.insert(0, el)
-        el.set('scoped', '')
-
-    # Move any stray <link>, <script>, or <meta> into the <head>.
+    # Move any stray <link>, <script>, <meta>, or <style> into the <head>.
     head = find("head")
-    for el in findAll("body link, body script, body meta"):
+    for el in findAll("body link, body script, body meta, body style:not([scoped])"):
         head.append(el)
 
     # If we accidentally recognized an autolink shortcut in SVG, kill it.
