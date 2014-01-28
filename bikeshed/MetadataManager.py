@@ -16,7 +16,7 @@ class MetadataManager:
 
     # optional metadata
     TR = None
-    title = "???"
+    title = None
     statusText = ""
     date = datetime.utcnow().date()
     deadline = None
