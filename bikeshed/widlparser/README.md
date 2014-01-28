@@ -5,7 +5,7 @@ Stand-alone WebIDL Parser in Python. Requires Python 2.6 or 2.7.
 
 Parses WebIDL per: http://dev.w3.org/2006/webapi/WebIDL/ (plus a few legacy compatability items)
 
-Tis parser was created to support a W3C specification parser and pre-processor, it's API is geared towards finding and identifying various WebIDL constructs by name. However, all of the WebIDL source is parsed and stored in the construct objects. The parser has error recovery and preserves the entire input for re-serialization and markup of the WebIDL constructs.
+This parser was created to support a W3C specification parser and pre-processor, it's API is geared towards finding and identifying various WebIDL constructs by name. However, all of the WebIDL source is parsed and stored in the construct objects. The parser has error recovery and preserves the entire input for re-serialization and markup of the WebIDL constructs.
 
 
 Installation
