@@ -68,6 +68,9 @@ class Parser(object):
     def __len__(self):
         return len(self.constructs)
     
+    def keys(self):
+        return [construct.name for construct in self.constructs]
+    
     def __getitem__(self, key):
         if (isinstance(key, basestring)):
             for construct in self.constructs:

@@ -40,6 +40,9 @@ class Construct(ChildProduction):
     def __len__(self):
         return 0
     
+    def keys(self):
+        return []
+    
     def __getitem__(self, key):
         return None
     
@@ -419,6 +422,7 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
         self.inheritance = Inheritance(tokens) if (Inheritance.peek(tokens)) else None
         self._openBrace = Symbol(tokens, '{')
         self.members = self.constructors
+        self._closeBrace = None
         while (tokens.hasTokens()):
             if (Symbol.peek(tokens, '}')):
                 self._closeBrace = Symbol(tokens, '}')
@@ -440,6 +444,9 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
 
     def __len__(self):
         return len(self.members)
+    
+    def keys(self):
+        return [member.name for member in self.members]
     
     def __getitem__(self, key):
         if (isinstance(key, basestring)):
@@ -489,7 +496,7 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
         for member in self.members:
             if ('constructor' != member.idlType):
                 output += unicode(member)
-        return output + unicode(self._closeBrace)
+        return output + unicode(self._closeBrace) if (self._closeBrace) else output
 
     def _markup(self, generator):
         generator.addText(self.partial)
@@ -576,6 +583,7 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
         self.inheritance = Inheritance(tokens) if (Inheritance.peek(tokens)) else None
         self._openBrace = Symbol(tokens, '{')
         self.members = []
+        self._closeBrace = None
         while (tokens.hasTokens()):
             if (Symbol.peek(tokens, '}')):
                 self._closeBrace = Symbol(tokens, '}')
@@ -597,6 +605,9 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
     
     def __len__(self):
         return len(self.members)
+    
+    def keys(self):
+        return [member.name for member in self.members]
     
     def __getitem__(self, key):
         if (isinstance(key, basestring)):
@@ -631,7 +642,7 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
         output += unicode(self._openBrace)
         for member in self.members:
             output += unicode(member)
-        return output + unicode(self._closeBrace)
+        return output + unicode(self._closeBrace) if (self._closeBrace) else output
     
     def _markup(self, generator):
         generator.addText(self.partial)
@@ -708,6 +719,9 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
     
     def __len__(self):
         return len(self.interface.members) if (self.interface) else 0
+    
+    def keys(self):
+        return [member.name for member in self.interface.members] if (self.interface) else []
     
     def __getitem__(self, key):
         if (self.interface):
@@ -846,6 +860,7 @@ class Exception(Construct):   # [ExtendedAttributes] "exception" identifier [Inh
         self.inheritance = Inheritance(tokens) if (Inheritance.peek(tokens)) else None
         self._openBrace = Symbol(tokens, '{')
         self.members = []
+        self._closeBrace = None
         while (tokens.hasTokens()):
             if (Symbol.peek(tokens, '}')):
                 self._closeBrace = Symbol(tokens, '}')
@@ -867,6 +882,9 @@ class Exception(Construct):   # [ExtendedAttributes] "exception" identifier [Inh
     
     def __len__(self):
         return len(self.members)
+    
+    def keys(self):
+        return [member.name for member in self.members]
     
     def __getitem__(self, key):
         if (isinstance(key, basestring)):
@@ -899,7 +917,7 @@ class Exception(Construct):   # [ExtendedAttributes] "exception" identifier [Inh
         output += unicode(self._openBrace)
         for member in self.members:
             output += unicode(member)
-        return output + unicode(self._closeBrace)
+        return output + unicode(self._closeBrace) if (self._closeBrace) else output
     
     def _markup(self, generator):
         generator.addText(self._exception)

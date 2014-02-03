@@ -9,6 +9,8 @@ import urllib2
 from . import config
 from .messages import *
 
+from .apiclient.apiclient import apiclient
+
 def update(anchors=False, biblio=False, linkDefaults=False):
     # If all are False, update everything
     updateAnyway = not (anchors or biblio or linkDefaults)
@@ -22,15 +24,15 @@ def update(anchors=False, biblio=False, linkDefaults=False):
 def updateCrossRefs():
     try:
         say("Downloading anchor data...")
-        res = urllib2.urlopen(urllib2.Request("https://api.csswg.org/shepherd/spec/?anchors&draft", headers={"Accept":"application/vnd.csswg.shepherd.v1+json"}))
-        if res.getcode() == 406:
+        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version = "vnd.csswg.shepherd.v1")
+        res = shepherd.get("specifications", anchors = True, draft = True)
+        if ((not res) or (406 == res.status)):
             die("This version of the anchor-data API is no longer supported. Please update Bikeshed.")
             return
-        if res.info().gettype() not in config.anchorDataContentTypes:
-            die("Unrecognized anchor-data content-type '{0}'.", res.inf().gettype())
+        if res.contentType not in config.anchorDataContentTypes:
+            die("Unrecognized anchor-data content-type '{0}'.", res.contentType)
             return
-        with closing(res) as f:
-            rawSpecData = json.load(f)
+        rawSpecData = res.data
     except Exception, e:
         die("Couldn't download anchor data.  Error was:\n{0}", str(e))
         return

@@ -858,6 +858,9 @@ class ArgumentList(Production):    # Argument ["," Argument]...
     def __len__(self):
         return len(self.arguments)
     
+    def keys(self):
+        return [argument.name for argument in self.arguments]
+    
     def __getitem__(self, key):
         if (isinstance(key, basestring)):
             for argument in self.arguments:
@@ -1669,6 +1672,9 @@ class ExtendedAttributeList(ChildProduction):   # "[" ExtendedAttribute ["," Ext
 
     def __len__(self):
         return len(self.attributes)
+    
+    def keys(self):
+        return [attribute.name for attribute in self.attributes]
     
     def __getitem__(self, key):
         if (isinstance(key, basestring)):
