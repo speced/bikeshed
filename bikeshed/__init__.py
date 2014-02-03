@@ -125,6 +125,12 @@ def main():
         il.printIssueList(options.infile, options.outfile)
 
 
+def stripBOM(doc):
+    if doc.lines[0][:3] == "\xef\xbb\xbf":
+        doc.lines[0] = doc.lines[0][3:]
+        warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
+
+
 def replaceTextMacros(text):
     # Replace the [FOO] things.
     for tag, replacement in config.textMacros.items():
@@ -1260,6 +1266,7 @@ class CSSSpec(object):
 
     def preprocess(self):
         # Textual hacks
+        stripBOM(self)
         transformDataBlocks(self)
         loadDefaultMetadata(self)
         verifyRequiredMetadata(self)
