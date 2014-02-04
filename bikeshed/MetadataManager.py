@@ -145,6 +145,10 @@ def parseDate(key, val):
 def convertWarning(key, val):
     if val.lower() in (u'obsolete', u'not ready'):
         return val.lower().replace(' ', '-')
+    match = re.match(u"Replaced By +(.+)", val, re.I)
+    if match:
+        config.textMacros['replacedby'] = match.group(1)
+        return u"replaced-by"
     die('Unknown value for "{0}" metadata.', key)
 
 def parseEditor(key, val):
