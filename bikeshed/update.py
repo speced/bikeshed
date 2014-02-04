@@ -11,15 +11,17 @@ from .messages import *
 
 from .apiclient.apiclient import apiclient
 
-def update(anchors=False, biblio=False, linkDefaults=False):
+def update(anchors=False, biblio=False, linkDefaults=False, testSuites=False):
     # If all are False, update everything
-    updateAnyway = not (anchors or biblio or linkDefaults)
+    updateAnyway = not (anchors or biblio or linkDefaults or testSuites)
     if anchors or updateAnyway:
         updateCrossRefs()
     if biblio or updateAnyway:
         updateBiblio()
     if linkDefaults or updateAnyway:
         updateLinkDefaults()
+    if testSuites or updateAnyway:
+        updateTestSuites()
 
 def updateCrossRefs():
     try:
@@ -204,3 +206,44 @@ def updateLinkDefaults():
                 json.dump(data, f, indent=2)
         except Exception, e:
             die("Couldn't save link-defaults database to disk.\n{0}", e)
+
+def updateTestSuites():
+    try:
+        say("Downloading test suite data...")
+        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version = "vnd.csswg.shepherd.v1")
+        res = shepherd.get("test_suites")
+        if ((not res) or (406 == res.status)):
+            die("This version of the test suite API is no longer supported. Please update Bikeshed.")
+            return
+        if res.contentType not in config.testSuiteDataContentTypes:
+            die("Unrecognized test suite content-type '{0}'.", res.contentType)
+            return
+        rawTestSuiteData = res.data
+    except Exception, e:
+        die("Couldn't download test suite data.  Error was:\n{0}", str(e))
+        return
+
+    testSuites = dict()
+    for rawTestSuite in rawTestSuiteData.values():
+        testSuite = {
+            'vshortname': rawTestSuite['name'],
+            'title': rawTestSuite.get('title'),
+            'description': rawTestSuite.get('description'),
+            'status': rawTestSuite.get('status'),
+            'url': rawTestSuite.get('uri'),
+            'spec': rawTestSuite['specs'][0]
+        }
+        testSuites[testSuite['spec']] = testSuite
+
+    if not config.dryRun:
+        try:
+            with open(config.scriptPath+"/spec-data/test-suites.json", 'w') as f:
+                json.dump(testSuites, f, ensure_ascii=False, indent=2)
+        except Exception, e:
+            die("Couldn't save test-suite database to disk.\n{0}", e)
+        try:
+            with open(config.scriptPath+"/spec-data/test-suites.json", 'w') as f:
+                json.dump(testSuites, f, indent=2)
+        except Exception, e:
+            die("Couldn't save test-suite database to disk.\n{0}", e)
+    say("Success!")
