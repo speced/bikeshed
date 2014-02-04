@@ -61,6 +61,7 @@ def main():
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
     updateParser.add_argument("--link-defaults", dest="linkDefaults", action="store_true", help="Download link default data.")
+    updateParser.add_argument("--test-suites", dest="testSuites", action="store_true", help="Download test suite data.")
 
     issueParser = subparsers.add_parser('issues-list', help="Process a plain-text issues file into HTML. Call with no args to see an example input text.")
     issueParser.add_argument("infile", nargs="?",
@@ -92,7 +93,7 @@ def main():
     config.minify = getattr(options, 'minify', True)
 
     if options.subparserName == "update":
-        update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults)
+        update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
         config.doc = CSSSpec(inputFilename=options.infile, paragraphMode=options.paragraphMode)
         config.doc.preprocess()
@@ -372,6 +373,7 @@ def transformMetadata(lines, doc, **kwargs):
             continue
         doc.md.addData(match.group(1), match.group(2))
     # Remove the metadata block from the generated document.
+    doc.md.vshortname = u"{0}-{1}".format(doc.md.shortname, doc.md.level)
     return []
 
 def loadDefaultMetadata(doc):
@@ -404,7 +406,7 @@ def initializeTextMacros(doc):
     config.textMacros["shortname"] = doc.md.shortname
     if doc.md.status:
         config.textMacros["statusText"] = doc.md.statusText
-    config.textMacros["vshortname"] = u"{0}-{1}".format(doc.md.shortname, doc.md.level)
+    config.textMacros["vshortname"] = doc.md.vshortname
     if doc.md.status in longstatuses:
         config.textMacros["longstatus"] = longstatuses[doc.md.status]
     else:
@@ -429,6 +431,8 @@ def initializeTextMacros(doc):
                                                                                        config.textMacros["vshortname"],
                                                                                        config.textMacros["cdate"],
                                                                                        config.textMacros["year"])
+    config.textMacros["annotations"] = config.testAnnotationURL
+    config.textMacros["testsuite"] = doc.testSuites[doc.md.vshortname]['vshortname'] if doc.md.vshortname in doc.testSuites else u"???"
     # Now we have enough data to set all the relevant stuff in ReferenceManager
     doc.refs.setSpecData(doc)
 
@@ -1218,6 +1222,10 @@ class CSSSpec(object):
                                       type="anchor data", quiet=True)))
         self.refs.defaultSpecs = defaultdict(list, json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
                                       type="link defaults", quiet=True)))
+                                      
+        self.testSuites = json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/test-suites.json",
+                                      type="test suite list", quiet=True))
+
         if "css21Replacements" in self.refs.defaultSpecs:
             self.refs.css21Replacements = set(self.refs.defaultSpecs["css21Replacements"])
             del self.refs.defaultSpecs["css21Replacements"]
@@ -1304,6 +1312,8 @@ class CSSSpec(object):
         processHeadings(self) # again
         addTOCSection(self)
         addSelfLinks(self)
+
+        addAnnotations(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
@@ -1456,6 +1466,11 @@ def addAtRisk(doc):
         html += "<li>"+replaceTextMacros(feature)
     fillWith('at-risk', parseHTML(html))
 
+def addAnnotations(doc):
+    if (doc.md.vshortname in doc.testSuites):
+        html = doc.getInclusion('annotations')
+        html = replaceTextMacros(html)
+        appendContents(find("head"), parseHTML(html))
 
 def addIndexSection(doc):
     from collections import OrderedDict
@@ -1690,7 +1705,10 @@ def addSpecMetadataSection(doc):
     if doc.md.testSuite is not None:
         header += u"<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.md.testSuite)
     else:
-        header += u"<dt>Test Suite:<dd>None Yet"
+        if (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]['url'] is not None):
+            header += u"<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.testSuites[doc.md.vshortname]['url'])
+        else:
+            header += u"<dt>Test Suite:<dd>None Yet"
     if len(doc.md.editors):
         header += u"<dt>Editors:\n"
         for editor in doc.md.editors:

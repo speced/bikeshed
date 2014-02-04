@@ -47,7 +47,12 @@ def parseHTML(str):
     doc = html5lib.parse(u(str), treebuilder='lxml', namespaceHTMLElements=False)
     body = doc.getroot()[1]
     if body.text is None:
-        return list(body.iterchildren())
+        if len(body):
+            return list(body.iterchildren())
+        head = doc.getroot()[0]
+        if head.text is None:
+            return list(head.iterchildren())
+        return [head.text] + list(head.iterchildren())
     else:
         return [body.text] + list(body.iterchildren())
 
@@ -118,13 +123,17 @@ def removeNode(node):
     parent.remove(node)
 
 
-def replaceContents(el, newElements):
-    clearContents(el)
+def appendContents(el, newElements):
     if(etree.iselement(newElements) and newElements.text is not None):
         appendChild(el, newElements.text)
     for new in newElements:
         appendChild(el, new)
     return el
+
+
+def replaceContents(el, newElements):
+    clearContents(el)
+    return appendContents(el, newElements)
 
 
 def moveContents(targetEl, sourceEl):

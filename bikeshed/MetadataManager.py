@@ -13,6 +13,7 @@ class MetadataManager:
     abstracts = []
     shortname = None
     level = None
+    vshortname = None
 
     # optional metadata
     TR = None
