@@ -157,6 +157,8 @@ def printIssues(outfile, lines):
 	issues = text.split('----\n')[1:]
 	for issue in issues:
 		issue = issue.strip()
+		if issue == "":
+			continue
 		originaltext = issue[:]
 
 		# Issue number
