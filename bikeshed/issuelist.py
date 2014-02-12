@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
 import re
 import sys
 from .messages import *
@@ -20,7 +22,7 @@ def printIssueList(infilename=None, outfilename=None):
 		infile = sys.stdin
 	else:
 		try:
-			infile = open(infilename, 'r')
+			infile = io.open(infilename, 'r', encoding="utf-8")
 		except Exception, e:
 			die("Couldn't read from the infile:\n{0}", str(e))
 			return

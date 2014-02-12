@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import division
+from __future__ import division, unicode_literals
 import re
 from collections import defaultdict
+import io
 import os
 import sys
 import json
@@ -16,7 +17,6 @@ import lxml
 from . import config
 from . import biblio
 from . import update
-from .fuckunicode import u
 from .ReferenceManager import ReferenceManager
 from .ReferenceManager import linkTextsFromElement
 from .globalnames import *
@@ -127,15 +127,15 @@ def main():
 
 
 def stripBOM(doc):
-    if doc.lines[0][:3] == "\xef\xbb\xbf":
-        doc.lines[0] = doc.lines[0][3:]
+    if doc.lines[0][0] == "\ufeff":
+        doc.lines[0] = doc.lines[0][1:]
         warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
 
 
 def replaceTextMacros(text):
     # Replace the [FOO] things.
     for tag, replacement in config.textMacros.items():
-        text = u(text).replace(u"[{0}]".format(u(tag.upper())), u(replacement))
+        text = text.replace("[{0}]".format(tag.upper()), replacement)
     text = fixTypography(text)
     # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
     # <'foo'> is a link to the 'foo' property
@@ -305,7 +305,7 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     for (i, line) in enumerate(lines):
         match = re.match("\s*([^:]+):\s*(.*)", line)
         if(match is None):
-            die(u"Incorrectly formatted propdef line for '{0}':\n{1}", vals.get("Name", "???"), line)
+            die("Incorrectly formatted propdef line for '{0}':\n{1}", vals.get("Name", "???"), line)
             continue
         key = match.group(1).strip().capitalize()
         val = match.group(2).strip()
@@ -337,7 +337,7 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
     for (i, line) in enumerate(lines):
         match = re.match("\s*([^:]+):\s*(.*)", line)
         if(match is None):
-            die(u"Incorrectly formatted descdef line for '{0}':\n{1}", vals.get("Name", "???"), u(line))
+            die("Incorrectly formatted descdef line for '{0}':\n{1}", vals.get("Name", "???"), line)
             continue
         key = match.group(1).strip().capitalize()
         val = match.group(2).strip()
@@ -373,13 +373,13 @@ def transformMetadata(lines, doc, **kwargs):
         line = line.strip()
         if line == "":
             continue
-        match = re.match(u"([^:]+):\s*(.*)", u(line))
+        match = re.match("([^:]+):\s*(.*)", line)
         if(match is None):
-            die(u"Incorrectly formatted metadata line:\n{0}", u(line))
+            die("Incorrectly formatted metadata line:\n{0}", line)
             continue
         doc.md.addData(match.group(1), match.group(2))
     # Remove the metadata block from the generated document.
-    doc.md.vshortname = u"{0}-{1}".format(doc.md.shortname, doc.md.level)
+    doc.md.vshortname = "{0}-{1}".format(doc.md.shortname, doc.md.level)
     return []
 
 def loadDefaultMetadata(doc):
@@ -395,17 +395,17 @@ def loadDefaultMetadata(doc):
 
 def initializeTextMacros(doc):
     longstatuses = {
-        "ED": u"Editor's Draft",
-        "WD": u"W3C Working Draft",
-        "LCWD": u"W3C Last Call Working Draft",
-        "CR": u"W3C Candidate Recommendation",
-        "PR": u"W3C Proposed Recommendation",
-        "REC": u"W3C Recommendation",
-        "PER": u"W3C Proposed Edited Recommendation",
-        "NOTE": u"W3C Working Group Note",
-        "MO": u"W3C Member-only Draft",
-        "UD": u"Unofficial Proposal Draft",
-        "DREAM": u"A Collection of Interesting Ideas"
+        "ED": "Editor's Draft",
+        "WD": "W3C Working Draft",
+        "LCWD": "W3C Last Call Working Draft",
+        "CR": "W3C Candidate Recommendation",
+        "PR": "W3C Proposed Recommendation",
+        "REC": "W3C Recommendation",
+        "PER": "W3C Proposed Edited Recommendation",
+        "NOTE": "W3C Working Group Note",
+        "MO": "W3C Member-only Draft",
+        "UD": "Unofficial Proposal Draft",
+        "DREAM": "A Collection of Interesting Ideas"
     }
     if doc.md.title:
         config.textMacros["title"] = doc.md.title
@@ -416,29 +416,29 @@ def initializeTextMacros(doc):
     if doc.md.status in longstatuses:
         config.textMacros["longstatus"] = longstatuses[doc.md.status]
     else:
-        die(u"Unknown status '{0}' used.",doc.md.status)
+        die("Unknown status '{0}' used.",doc.md.status)
     if doc.md.status == "LCWD":
-        config.textMacros["status"] = u"WD"
+        config.textMacros["status"] = "WD"
     else:
         config.textMacros["status"] = doc.md.status
-    config.textMacros["latest"] = doc.md.TR or u"???"
-    config.textMacros["abstract"] = "<p>".join(doc.md.abstracts) or u"???"
-    config.textMacros["abstractattr"] = escapeAttr("  ".join(doc.md.abstracts).replace(u"<<",u"<").replace(u">>",u">")) or u"???"
-    config.textMacros["year"] = u(doc.md.date.year)
-    config.textMacros["date"] = doc.md.date.strftime(u"{0} %B %Y".format(doc.md.date.day))
-    config.textMacros["cdate"] = doc.md.date.strftime(u"%Y%m%d")
-    config.textMacros["isodate"] = doc.md.date.strftime(u"%Y-%m-%d")
+    config.textMacros["latest"] = doc.md.TR or "???"
+    config.textMacros["abstract"] = "<p>".join(doc.md.abstracts) or "???"
+    config.textMacros["abstractattr"] = escapeAttr("  ".join(doc.md.abstracts).replace("<<","<").replace(">>",">")) or "???"
+    config.textMacros["year"] = unicode(doc.md.date.year)
+    config.textMacros["date"] = unicode(doc.md.date.strftime("{0} %B %Y".format(doc.md.date.day)), encoding="utf-8")
+    config.textMacros["cdate"] = unicode(doc.md.date.strftime("%Y%m%d"), encoding="utf-8")
+    config.textMacros["isodate"] = unicode(doc.md.date.strftime("%Y-%m-%d"), encoding="utf-8")
     if doc.md.deadline:
-        config.textMacros["deadline"] = doc.md.deadline.strftime(u"{0} %B %Y".format(doc.md.deadline.day))
+        config.textMacros["deadline"] = unicode(doc.md.deadline.strftime("{0} %B %Y".format(doc.md.deadline.day)), encoding="utf-8")
     if doc.md.status == "ED":
         config.textMacros["version"] = doc.md.ED
     else:
-        config.textMacros["version"] = u"http://www.w3.org/TR/{3}/{0}-{1}-{2}/".format(config.textMacros["status"],
+        config.textMacros["version"] = "http://www.w3.org/TR/{3}/{0}-{1}-{2}/".format(config.textMacros["status"],
                                                                                        config.textMacros["vshortname"],
                                                                                        config.textMacros["cdate"],
                                                                                        config.textMacros["year"])
     config.textMacros["annotations"] = config.testAnnotationURL
-    config.textMacros["testsuite"] = doc.testSuites[doc.md.vshortname]['vshortname'] if doc.md.vshortname in doc.testSuites else u"???"
+    config.textMacros["testsuite"] = doc.testSuites[doc.md.vshortname]['vshortname'] if doc.md.vshortname in doc.testSuites else "???"
     # Now we have enough data to set all the relevant stuff in ReferenceManager
     doc.refs.setSpecData(doc)
 
@@ -461,12 +461,12 @@ def verifyRequiredMetadata(doc):
     errors = []
     for attr, name in requiredSingularKeys:
         if getattr(doc.md, attr) is None:
-            errors.append(u"    Missing a '{0}' entry.".format(u(name)))
+            errors.append("    Missing a '{0}' entry.".format(name))
     for attr, name in requiredMultiKeys:
         if len(getattr(doc.md, attr)) == 0:
-            errors.append(u"    Must provide at least one '{0}' entry.".format(u(name)))
+            errors.append("    Must provide at least one '{0}' entry.".format(name))
     if errors:
-        die(u"Not all required metadata was provided:\n{0}", u"\n".join(errors))
+        die("Not all required metadata was provided:\n{0}", "\n".join(errors))
         return
 
 
@@ -501,17 +501,17 @@ def transformAutolinkShortcuts(doc):
             match = re.search(ur"\[\[(!?)([A-Za-z0-9-]+)\]\]", text)
 
             if match.group(1) == "!":
-                biblioType = u"normative"
+                biblioType = "normative"
             else:
-                biblioType = u"informative"
+                biblioType = "informative"
 
-            text = u(text.replace(
+            text = text.replace(
                         match.group(0),
-                        u'<a title="{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
-                            u(match.group(2)),
-                            biblioType)))
-        text = re.sub(ur"'([*-]*[a-zA-Z][a-zA-Z0-9_*/-]*)'", ur'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
-        return u(text)
+                        '<a title="{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
+                            match.group(2),
+                            biblioType))
+        text = re.sub(r"'([*-]*[a-zA-Z][a-zA-Z0-9_*/-]*)'", ur'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
+        return text
 
     def fixElementText(el):
         # Don't transform anything in some kinds of elements.
@@ -519,22 +519,22 @@ def transformAutolinkShortcuts(doc):
 
         if processContents:
             # Pull out el.text, replace stuff (may introduce elements), parse.
-            newtext = transformThings(u(el.text))
+            newtext = transformThings(el.text)
             if el.text != newtext:
-                temp = parseHTML(u'<div>'+u(newtext)+u'</div>')[0]
+                temp = parseHTML('<div>'+newtext+'</div>')[0]
                 # Change the .text, empty out the temp children.
-                el.text = u(temp.text)
+                el.text = temp.text
                 for child in temp.iterchildren(tag="*", reversed=True):
                     el.insert(0, child)
 
         # Same for tail.
         newtext = transformThings(el.tail)
         if el.tail != newtext:
-            temp = parseHTML(u'<div>'+u(newtext)+u'</div>')[0]
-            el.tail = u''
+            temp = parseHTML('<div>'+newtext+'</div>')[0]
+            el.tail = ''
             for child in temp.iterchildren(tag="*", reversed=True):
                 el.addnext(child)
-            el.tail = u(temp.text)
+            el.tail = temp.text
 
         if processContents:
             # Recurse over children.
@@ -548,13 +548,13 @@ def buildBibliolinkDatabase(doc):
     biblioLinks = findAll("a[data-link-type='biblio']")
     for el in biblioLinks:
         if el.get('title'):
-            linkText = u(el.get('title'))
+            linkText = el.get('title')
         else:
             # Assume the text is of the form "[NAME]"
             linkText = textContent(el)[1:-1]
             el.set('title', linkText)
         if linkText not in doc.biblios:
-            die(u"Couldn't find '{0}' in bibliography data.", linkText)
+            die("Couldn't find '{0}' in bibliography data.", linkText)
             continue
         biblioEntry = doc.biblios[linkText]
         if el.get('data-biblio-type') == "normative":
@@ -562,7 +562,7 @@ def buildBibliolinkDatabase(doc):
         elif el.get('data-biblio-type') == "informative":
             doc.informativeRefs.add(biblioEntry)
         else:
-            die(u"Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", u(el.get('data-biblio-type')), outerHTML(el))
+            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", el.get('data-biblio-type'), outerHTML(el))
 
 
 
@@ -621,7 +621,7 @@ def determineHeadingLevels(doc, headings):
         for i in range(level-1, 5):
             headerLevel[i] = 0
     def printLevel():
-        return u'.'.join(u(x) for x in headerLevel if x > 0)
+        return '.'.join(unicode(x) for x in headerLevel if x > 0)
 
     skipLevel = float('inf')
     for header in headings:
@@ -648,7 +648,7 @@ def addHeadingBonuses(doc, headings):
     for header in headings:
         if header.get("data-level") is not None:
             secno = lxml.etree.Element('span', {"class":"secno"})
-            secno.text = header.get('data-level') + u' '
+            secno.text = header.get('data-level') + ' '
             header.insert(0, secno)
 
 
@@ -675,8 +675,8 @@ def formatPropertyNames(doc):
         tag = "a" if hasClass(table, "partial") else "dfn"
         type = "property" if hasClass(table, "propdef") else "descriptor"
         cell = findAll("tr:first-child > :nth-child(2)", table)[0]
-        names = [u(x.strip()) for x in textContent(cell).split(u',')]
-        html = u', '.join(u"<{tag} {type}>{0}</{tag}>".format(name, tag=tag, type=type) for name in names)
+        names = [x.strip() for x in textContent(cell).split(',')]
+        html = ', '.join("<{tag} {type}>{0}</{tag}>".format(name, tag=tag, type=type) for name in names)
         replaceContents(cell, parseHTML(html))
 
 
@@ -754,7 +754,7 @@ def determineDfnType(dfn):
         return "value"
     elif text[0:1] == "<" and text[-1:] == ">":
         return "type"
-    elif text[:1] == u"〈" and text[-1:] == u"〉":
+    elif text[:1] == "〈" and text[-1:] == "〉":
         return "token"
     elif text[0:1] == ":":
         return "selector"
@@ -859,7 +859,7 @@ def dedupIds(doc, els):
 
 def simplifyText(text):
     # Remove anything that's not a name character.
-    return re.sub(u"[^a-z0-9_-]", u"", text.replace(u" ", u"-").lower())
+    return re.sub("[^a-z0-9_-]", "", text.replace(" ", "-").lower())
 
 
 def determineLinkType(el):
@@ -898,9 +898,9 @@ def determineLinkText(el):
         # Need to fix this using the idl parser.
     else:
         linkText = contents
-    linkText = re.sub(u"\s+", u" ", linkText.lower())
+    linkText = re.sub("\s+", " ", linkText.lower())
     if len(linkText) == 0:
-        die(u"Autolink {0} has no linktext.", outerHTML(el))
+        die("Autolink {0} has no linktext.", outerHTML(el))
     return linkText
 
 
@@ -955,7 +955,7 @@ def processAutolinks(doc):
         if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
             continue
 
-        if linkType == u"biblio":
+        if linkType == "biblio":
             # Move biblio management into ReferenceManager later
             el.set('href', '#'+simplifyText(linkText))
             continue
@@ -1134,17 +1134,17 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force
         fh = open(cacheLocation, 'r')
     except IOError:
         if fallbackurl is None:
-            die(u"Couldn't find the {0} cache file at the specified location '{1}'.", type, cacheLocation)
+            die("Couldn't find the {0} cache file at the specified location '{1}'.", type, cacheLocation)
         else:
             if not quiet:
-                warn(u"Couldn't find the {0} cache file at the specified location '{1}'.\nAttempting to download it from '{2}'...", type, cacheLocation, fallbackurl)
+                warn("Couldn't find the {0} cache file at the specified location '{1}'.\nAttempting to download it from '{2}'...", type, cacheLocation, fallbackurl)
             try:
                 fh = urlopen(fallbackurl)
             except:
-                die(u"Couldn't retrieve the {0} file from '{1}'.", type, fallbackurl)
+                die("Couldn't retrieve the {0} file from '{1}'.", type, fallbackurl)
             try:
                 if not quiet:
-                    say(u"Attempting to save the {0} file to cache...", type)
+                    say("Attempting to save the {0} file to cache...", type)
                 if not dryRun:
                     outfh = open(cacheLocation, 'w')
                     outfh.write(fh.read())
@@ -1186,18 +1186,18 @@ class CSSSpec(object):
         if inputFilename is None:
             # Default the path to something sensible.
             import glob
-            possibleInputs = glob.glob("*.src.html")
-            if possibleInputs:
-                inputFilename = possibleInputs[0]
+            bytePossibleInputs = glob.glob("*.src.html")
+            if bytePossibleInputs:
+                inputFilename = bytePossibleInputs[0]
             else:
                 inputFilename = "-"
         self.inputSource = inputFilename
         try:
             if inputFilename == "-":
-                self.lines = sys.stdin.readlines()
+                self.lines = [unicode(line, encoding="utf-8") for line in sys.stdin.readlines()]
                 self.date = datetime.today()
             else:
-                self.lines = open(inputFilename, 'r').readlines()
+                self.lines = io.open(inputFilename, 'r', encoding="utf-8").readlines()
                 self.date = datetime.fromtimestamp(os.path.getmtime(inputFilename))
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
@@ -1206,31 +1206,42 @@ class CSSSpec(object):
             die("Couldn't open the input file '{0}'.", inputFilename)
             return
 
-        bibliofh = retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.refer",
+
+
+        with retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.refer",
                                       fallbackurl="http://dev.w3.org/csswg/biblio.ref",
-                                      type="bibliography")
-        self.biblios = biblio.processReferBiblioFile(bibliofh)
-        bibliofh.close()
+                                      type="bibliography") as fh:
+            biblioLines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
+            self.biblios = biblio.processReferBiblioFile(biblioLines)
 
         # Get local bibliography data
+
         try:
-            bibliofh = open("biblio.json", 'r')
-        except:
+            with io.open("biblio.json", 'r', encoding="utf-8") as fh:
+                self.biblios.update(biblio.processSpecrefBiblioFile(fh.read()))
+        except IOError:
+            # Missing file is fine
             pass
-        else:
-            self.biblios.update(biblio.processSpecrefBiblioFile(bibliofh))
-            bibliofh.close()
 
         # Load up the xref data
-        self.refs.specs = json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/specs.json",
-                                      type="spec list", quiet=True))
-        self.refs.refs = defaultdict(list, json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.json",
-                                      type="anchor data", quiet=True)))
-        self.refs.defaultSpecs = defaultdict(list, json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
-                                      type="link defaults", quiet=True)))
-                                      
-        self.testSuites = json.load(retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/test-suites.json",
-                                      type="test suite list", quiet=True))
+        self.refs.specs = json.loads(
+                            unicode(
+                                retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/specs.json", type="spec list", quiet=True).read(),
+                                encoding="utf-8"))
+        self.refs.refs = defaultdict(list,
+                            json.loads(
+                                unicode(
+                                    retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.json", type="anchor data", quiet=True).read(),
+                                    encoding="utf-8")))
+        self.refs.defaultSpecs = defaultdict(list,
+                                    json.loads(
+                                        unicode(
+                                            retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/link-defaults.json", type="link defaults", quiet=True).read(),
+                                            encoding="utf-8")))
+        self.testSuites = json.loads(
+                            unicode(
+                                retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/test-suites.json", type="test suite list", quiet=True).read(),
+                                encoding="utf-8"))
 
         if "css21Replacements" in self.refs.defaultSpecs:
             self.refs.css21Replacements = set(self.refs.defaultSpecs["css21Replacements"])
@@ -1357,10 +1368,10 @@ class CSSSpec(object):
         ignoredTerms = set(targetText(el) for el in findAll('dfn[data-noexport]'))
         print "Exported terms:"
         for term in exportedTerms:
-            print u"  {0}".format(term)
+            print "  {0}".format(term)
         print "Unexported terms:"
         for term in ignoredTerms:
-            print u"  {0}".format(term)
+            print "  {0}".format(term)
 
     def getInclusion(self, name, group=None, status=None, error=True):
         # First looks for a file specialized on the group and status.
@@ -1388,7 +1399,7 @@ class CSSSpec(object):
             filename = "/dev/null"
 
         try:
-            with open(filename, 'r') as fh:
+            with io.open(filename, 'r', encoding="utf-8") as fh:
                 return fh.read()
         except IOError:
             if error:
@@ -1432,7 +1443,7 @@ def fillInBoilerplate(doc):
 
 
 def fillWith(tag, newElements):
-    for el in findAll(u"[data-fill-with='{0}']".format(u(tag))):
+    for el in findAll("[data-fill-with='{0}']".format(tag)):
         replaceContents(el, newElements)
 
 
@@ -1486,25 +1497,25 @@ def addIndexSection(doc):
     seenGlobalNames = set()
     for el in findAll("dfn"):
         linkTexts = linkTextsFromElement(el, preserveCasing=True)
-        headingLevel = headingLevelOfElement(el) or u"Unnumbered section"
+        headingLevel = headingLevelOfElement(el) or "Unnumbered section"
         if el.get('data-dfn-for') is not None:
-            disambiguator = u"{0} for {1}".format(el.get('data-dfn-type'), ', '.join(el.get('data-dfn-for').split()))
+            disambiguator = "{0} for {1}".format(el.get('data-dfn-type'), ', '.join(el.get('data-dfn-for').split()))
         else:
             type = el.get('data-dfn-type')
             if type == "dfn":
                 disambiguator = "definition of"
             else:
-                disambiguator = u"({0})".format(el.get('data-dfn-type'))
+                disambiguator = "({0})".format(el.get('data-dfn-type'))
         id = el.get('id')
         seenGlobalNames.update(GlobalNames.fromEl(el))
         for linkText in linkTexts:
             sort = re.sub(r'[^a-z0-9]', '', linkText.lower())
             entry = {
-                'text':u(escapeHTML(linkText)),
+                'text':escapeHTML(linkText),
                 'type':el.get('data-dfn-type'),
-                'id':u(id),
-                'level':u(headingLevel),
-                'disambiguator':u(escapeHTML(disambiguator)),
+                'id':id,
+                'level':headingLevel,
+                'disambiguator':escapeHTML(disambiguator),
                 'sort':sort,
                 'globalNames': GlobalNames.fromEl(el)
                 }
@@ -1515,26 +1526,26 @@ def addIndexSection(doc):
 
     # Now print the indexes
     sortedEntries = OrderedDict(sorted(indexEntries.items(), key=lambda x:x[1][0]['sort']))
-    html = u"<ul class='indexlist'>\n"
+    html = "<ul class='indexlist'>\n"
     for text, items in sortedEntries.items():
         if len(items) == 1:
             item = items[0]
-            html += u"<li>{text}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**item)
+            html += "<li>{text}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**item)
             if item['type'] == "property":
                 reffingDfns = []
                 for globalName in item['globalNames']:
                     reffingDfns += attemptedForRefs[globalName]
                 if reffingDfns:
-                    html += u"<dl><dt>Property Values:"
+                    html += "<dl><dt>Property Values:"
                     for reffingDfn in reffingDfns:
-                        html += u"<dd>{text}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**reffingDfn)
-                    html += u"</dl>"
+                        html += "<dd>{text}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**reffingDfn)
+                    html += "</dl>"
         else:
-            html += u"<li>{text}<ul>".format(**items[0])
+            html += "<li>{text}<ul>".format(**items[0])
             for item in items:
-                html += u"<li>{disambiguator}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**item)
-            html += u"</ul>"
-    html += u"</ul>"
+                html += "<li>{disambiguator}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**item)
+            html += "</ul>"
+    html += "</ul>"
     fillWith("index", parseHTML(html))
 
 
@@ -1543,7 +1554,7 @@ def addPropertyIndex(doc):
     # Extract all the data from the propdef and descdef tables
     def extractKeyValFromRow(tr):
         # Extract the key, minus the trailing :
-        result = re.match(u'(.*):', textContent(row[0]).strip())
+        result = re.match('(.*):', textContent(row[0]).strip())
         if result is None:
             die("Propdef row headers need be a word followed by a colon. Got:\n{0}", textContent(row[0]).strip())
             return '',''
@@ -1585,7 +1596,7 @@ def addPropertyIndex(doc):
             tempDesc['Name'] = name
             atRules[atRule].append(tempDesc)
 
-    html = u""
+    html = ""
 
     if len(props):
         # Set up the initial table columns for properties
@@ -1596,44 +1607,44 @@ def addPropertyIndex(doc):
             allKeys |= set(prop.keys())
         columns.extend(sorted(allKeys - set(columns)))
         # Create the table
-        html += u"<table class='proptable data'><thead><tr>"
+        html += "<table class='proptable data'><thead><tr>"
         for column in columns:
             if column == "Inherited":
-                html += u"<th scope=col>Inh."
+                html += "<th scope=col>Inh."
             elif column == "Percentages":
-                html += u"<th scope=col>%ages"
+                html += "<th scope=col>%ages"
             else:
-                html += u"<th scope=col>"+escapeHTML(u(column))
-        html += u"<tbody>"
+                html += "<th scope=col>"+escapeHTML(column)
+        html += "<tbody>"
         for prop in props:
-            html += u"\n<tr><th scope=row><a data-property>{0}</a>".format(escapeHTML(u(prop['Name'])))
+            html += "\n<tr><th scope=row><a data-property>{0}</a>".format(escapeHTML(prop['Name']))
             for column in columns[1:]:
-                html += u"<td>" + u(escapeHTML(prop.get(column, "")))
-        html += u"</table>"
+                html += "<td>" + escapeHTML(prop.get(column, ""))
+        html += "</table>"
     else:
-        html += u"<p>No properties defined."
+        html += "<p>No properties defined."
 
     if len(atRules):
         atRuleNames = sorted(atRules.keys())
         for atRuleName in atRuleNames:
             descs = atRules[atRuleName]
             if atRuleName == "":
-                atRuleName = u"Miscellaneous"
+                atRuleName = "Miscellaneous"
             columns = ["Name", "Value", "Initial"]
             allKeys = set()
             for desc in descs:
                 allKeys |= set(desc.keys())
             columns.extend(sorted(allKeys - set(columns)))
-            html += u"<h3 class='no-num' id='{1}-descriptor-table'>{0} Descriptors</h3>".format(u(atRuleName), simplifyText(u(atRuleName)))
-            html += u"<table class=proptable><thead><tr>"
+            html += "<h3 class='no-num' id='{1}-descriptor-table'>{0} Descriptors</h3>".format(atRuleName, simplifyText(atRuleName))
+            html += "<table class=proptable><thead><tr>"
             for column in columns:
-                html += u"<th scope=col>{0}".format(escapeHTML(u(column)))
-            html += u"<tbody>"
+                html += "<th scope=col>{0}".format(escapeHTML(column))
+            html += "<tbody>"
             for desc in descs:
-                html += u"\n<tr><th scope-row><a data-property>{0}</a>".format(escapeHTML(u(desc['Name'])))
+                html += "\n<tr><th scope-row><a data-property>{0}</a>".format(escapeHTML(desc['Name']))
                 for column in columns[1:]:
-                    html += u"<td>" + escapeHTML(u(desc.get(column, "")))
-            html += u"</table>"
+                    html += "<td>" + escapeHTML(desc.get(column, ""))
+            html += "</table>"
 
     fillWith("property-index", parseHTML(html))
 
@@ -1646,13 +1657,13 @@ def addTOCSection(doc):
         html = re.sub(r'<(/?)a\b', r'<\1span', html)
 
         # Remove any <dfn>s, so they don't get duplicated in the ToC.
-        html = re.sub(u'(<dfn[^>]*>)|(</dfn>)', '', html)
+        html = re.sub('(<dfn[^>]*>)|(</dfn>)', '', html)
 
         return html
 
     skipLevel = float('inf')
     previousLevel = 0
-    html = u''
+    html = ''
     for header in findAll('h2, h3, h4, h5, h6'):
         level = int(header.tag[-1])
 
@@ -1666,13 +1677,13 @@ def addTOCSection(doc):
             skipLevel = float('inf')
 
         if level > previousLevel:
-            html += u"<ul class='toc'>"
+            html += "<ul class='toc'>"
         elif level < previousLevel:
-            html += u"</ul>" * (previousLevel - level)
+            html += "</ul>" * (previousLevel - level)
         contents = removeBadToCElements(innerHTML(find(".content", header)))
         # Add section number
-        contents = "<span class='secno'>{0}</span>".format(header.get('data-level') or u'') + contents
-        html += u"<li><a href='#{0}'>{1}</a>".format(u(header.get('id')), contents)
+        contents = "<span class='secno'>{0}</span>".format(header.get('data-level') or '') + contents
+        html += "<li><a href='#{0}'>{1}</a>".format(header.get('id'), contents)
         previousLevel = level
     fillWith("table-of-contents", parseHTML(html))
     for badSpan in findAll(".toc span[href]"):
@@ -1680,76 +1691,76 @@ def addTOCSection(doc):
 
 def addSpecMetadataSection(doc):
     def printEditor(editor):
-        str = u"<dd class='p-author h-card vcard'>"
+        str = "<dd class='p-author h-card vcard'>"
         if(editor['link']):
             if(editor['link'][0:4] == "http"):
-                str += u"<a class='p-name fn u-url url' href='{0}'>{1}</a>".format(editor['link'], editor['name'])
+                str += "<a class='p-name fn u-url url' href='{0}'>{1}</a>".format(editor['link'], editor['name'])
             else:
                 # Link is assumed to be an email address
-                str += u"<a class='p-name fn u-email email' href='mailto:{0}'>{1}</a>".format(editor['link'], editor['name'])
+                str += "<a class='p-name fn u-email email' href='mailto:{0}'>{1}</a>".format(editor['link'], editor['name'])
         else:
-            str += u"<span class='p-name fn'>{0}</span>".format(editor['name'])
+            str += "<span class='p-name fn'>{0}</span>".format(editor['name'])
         if(editor['org'].strip() != ''):
-            str += u" (<span class='p-org org'>{0}</span>)".format(editor['org'])
+            str += " (<span class='p-org org'>{0}</span>)".format(editor['org'])
         return str
 
-    header = u"<dl>"
-    header += u"<dt>This version:<dd><a href='[VERSION]' class='u-url'>[VERSION]</a>"
+    header = "<dl>"
+    header += "<dt>This version:<dd><a href='[VERSION]' class='u-url'>[VERSION]</a>"
     if doc.md.TR:
-        header += u"<dt>Latest version:<dd><a href='{0}'>{0}</a>".format(doc.md.TR)
+        header += "<dt>Latest version:<dd><a href='{0}'>{0}</a>".format(doc.md.TR)
     if doc.md.ED:
-        header += u"<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.md.ED)
+        header += "<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.md.ED)
     if len(doc.md.previousVersions):
-        header += u"<dt>Previous Versions:" + u''.join(map(u"<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.md.previousVersions))
+        header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.md.previousVersions))
     if doc.md.mailingList:
-        header += u"""
+        header += """
     <dt>Feedback:</dt>
         <dd><a href="mailto:{0}?subject=%5B[SHORTNAME]%5D%20feedback">{0}</a>
             with subject line
             &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;""".format(doc.md.mailingList)
         if doc.md.mailingListArchives:
-            header += u"""(<a rel="discussion" href="{0}">archives</a>)""".format(doc.md.mailingListArchives)
+            header += """(<a rel="discussion" href="{0}">archives</a>)""".format(doc.md.mailingListArchives)
     if doc.md.testSuite is not None:
-        header += u"<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.md.testSuite)
+        header += "<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.md.testSuite)
     else:
         if (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]['url'] is not None):
-            header += u"<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.testSuites[doc.md.vshortname]['url'])
+            header += "<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.testSuites[doc.md.vshortname]['url'])
         else:
-            header += u"<dt>Test Suite:<dd>None Yet"
+            header += "<dt>Test Suite:<dd>None Yet"
     if len(doc.md.editors):
-        header += u"<dt>Editors:\n"
+        header += "<dt>Editors:\n"
         for editor in doc.md.editors:
             header += printEditor(editor)
     else:
-        header += u"<dt>Editors:<dd>???"
+        header += "<dt>Editors:<dd>???"
     if len(doc.md.previousEditors):
         header += "<dt>Former Editors:\n"
         for editor in doc.md.previousEditors:
             header += printEditor(editor)
     if len(doc.md.otherMetadata):
         for key, vals in doc.md.otherMetadata.items():
-            header += u"<dt>{0}:".format(key)
+            header += "<dt>{0}:".format(key)
             for val in vals:
-                header += u"<dd>"+val
-    header += u"</dl>"
+                header += "<dd>"+val
+    header += "</dl>"
     header = replaceTextMacros(header)
     fillWith('spec-metadata', parseHTML(header))
 
 
 def addReferencesSection(doc):
-    text = u"<dl>"
+    text = "<dl>"
     for ref in sorted(doc.normativeRefs, key=lambda r: r.linkText):
-        text += u"<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
-        text += u"<dd>"+u(ref)+u"</dd>"
-    text += u"</dl>"
+        text += "<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
+        text += "<dd>{0}</dd>".format(ref)
+    text += "</dl>"
     fillWith("normative-references", parseHTML(text))
 
-    text = u"<dl>"
+    text = "<dl>"
     # If the same doc is referenced as both normative and informative, normative wins.
     for ref in sorted(doc.informativeRefs - doc.normativeRefs, key=lambda r: r.linkText):
-        text += u"<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
-        text += u"<dd>"+u(ref)+u"</dd>"
-    text += u"</dl>"
+        text += "<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
+        text += "<dd>{0}</dd>".format(ref)
+    text += "</dl>"
     fillWith("informative-references", parseHTML(text))
 
 def addIssuesSection(doc):
@@ -1770,7 +1781,7 @@ def addIssuesSection(doc):
             el.tag = "div"
         appendChild(container, el)
         issuelink = lxml.etree.Element('a', {'href':'#'+issue.get('id')})
-        issuelink.text = u" ↵ "
+        issuelink.text = " ↵ "
         appendChild(el, issuelink)
     for idel in findAll("[id]", container):
         del idel.attrib['id']

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+from __future__ import division, unicode_literals
 import json
 import re
 from collections import defaultdict
@@ -79,7 +79,7 @@ def updateCrossRefs():
             linkingTexts = rawAnchor.get('linking_text', [rawAnchor.get('title')])
             if linkingTexts[0] is None:
                 continue
-            type = rawAnchor['type']
+            anchorType = rawAnchor['type']
             if rawAnchor.get('export_draft'):
                 exportED = True
             elif rawAnchor.get('export_official') and not spec['ED']:
@@ -90,7 +90,7 @@ def updateCrossRefs():
                 exportED = False
             anchor = {
                 'status': rawAnchor['status'],
-                'type': type,
+                'type': anchorType,
                 'spec': spec['vshortname'],
                 'shortname': spec['shortname'],
                 'level': int(spec['level']),

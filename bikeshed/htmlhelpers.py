@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
 import html5lib
 from html5lib import treewalkers
 from html5lib.serializer import htmlserializer
@@ -5,7 +7,6 @@ from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
 
-from .fuckunicode import u
 from . import config
 from .messages import *
 
@@ -28,23 +29,23 @@ def find(sel, context=None):
         return None
 
 def textContent(el):
-    return u(html.tostring(el, method='text', with_tail=False, encoding="unicode"))
+    return html.tostring(el, method='text', with_tail=False, encoding="unicode")
 
 
 def innerHTML(el):
     if el is None:
-        return u''
-    return u((el.text or u'') + u''.join(u(html.tostring(x, encoding="unicode")) for x in el))
+        return ''
+    return (el.text or '') + ''.join(html.tostring(x, encoding="unicode") for x in el)
 
 
 def outerHTML(el):
     if el is None:
-        return u''
-    return u(html.tostring(el, with_tail=False, encoding="unicode"))
+        return ''
+    return html.tostring(el, with_tail=False, encoding="unicode")
 
 
-def parseHTML(str):
-    doc = html5lib.parse(u(str), treebuilder='lxml', namespaceHTMLElements=False)
+def parseHTML(text):
+    doc = html5lib.parse(text, treebuilder='lxml', namespaceHTMLElements=False)
     body = doc.getroot()[1]
     if body.text is None:
         if len(body):
@@ -57,18 +58,18 @@ def parseHTML(str):
         return [body.text] + list(body.iterchildren())
 
 
-def parseDocument(str):
-    doc = html5lib.parse(u(str), treebuilder='lxml', namespaceHTMLElements=False)
+def parseDocument(text):
+    doc = html5lib.parse(text, treebuilder='lxml', namespaceHTMLElements=False)
     return doc
 
 
-def escapeHTML(str):
+def escapeHTML(text):
     # Escape HTML
-    return u(str).replace(u'&', u'&amp;').replace(u'<', u'&lt;')
+    return text.replace('&', '&amp;').replace('<', '&lt;')
 
 
-def escapeAttr(str):
-    return u(str).replace(u'&', u'&amp;').replace(u"'", u'&apos;').replace(u'"', u'&quot;')
+def escapeAttr(text):
+    return text.replace('&', '&amp;').replace("'", '&apos;').replace('"', '&quot;')
 
 
 def clearContents(el):
@@ -144,7 +145,7 @@ def moveContents(targetEl, sourceEl):
 def headingLevelOfElement(el):
     for el in relevantHeadings(el, levels=[2,3,4,5,6]):
         if el.get('data-level') is not None:
-            return u(el.get('data-level'))
+            return el.get('data-level')
     return None
 
 

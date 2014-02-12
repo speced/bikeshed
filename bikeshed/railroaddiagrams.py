@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
 # Display constants
 VERTICAL_SEPARATION = 8
 ARC_RADIUS = 10

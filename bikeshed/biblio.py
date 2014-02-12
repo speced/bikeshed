@@ -1,6 +1,7 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
 import re
 from .messages import *
-from .fuckunicode import u
 
 class BiblioEntry(object):
     linkText = None
@@ -25,33 +26,33 @@ class BiblioEntry(object):
         self.authors = []
         self.foreignAuthors = []
         for key, val in kwargs.items():
-            setattr(self, key, u(val))
+            setattr(self, key, val)
 
     def __str__(self):
-        str = u""
+        str = ""
         authors = self.authors + self.foreignAuthors
 
         if len(authors) == 0:
-            str += u"???. "
+            str += "???. "
         elif len(authors) == 1:
-            str += u(authors[0]) + u". "
+            str += authors[0] + ". "
         elif len(authors) < 4:
-            str += u"; ".join(map(u, authors)) + u". "
+            str += "; ".join(authors) + ". "
         else:
-            str += u(authors[0]) + u"; et al. "
+            str += authors[0] + "; et al. "
 
-        str += u"<a href='{0}'>{1}</a>. ".format(u(self.url), u(self.title))
+        str += "<a href='{0}'>{1}</a>. ".format(self.url, self.title)
 
         if self.date:
-            str += self.date + u". "
+            str += self.date + ". "
 
         if self.status:
-            str += self.status + u". "
+            str += self.status + ". "
 
         if self.other:
-            str += self.other + u" "
+            str += self.other + " "
 
-        str += u"URL: <a href='{0}'>{0}</a>".format(u(self.url))
+        str += "URL: <a href='{0}'>{0}</a>".format(self.url)
         return str
 
     def valid(self):
@@ -62,7 +63,7 @@ class BiblioEntry(object):
         return True
 
 
-def processReferBiblioFile(file):
+def processReferBiblioFile(lines):
     biblios = {}
     biblio = None
     singularReferCodes = {
@@ -86,7 +87,7 @@ def processReferBiblioFile(file):
         "A": "authors",
         "Q": "foreignAuthors",
     }
-    for line in file:
+    for line in lines:
         if re.match("\s*#", line) or re.match("\s*$", line):
             # Comment or empty line
             if biblio is not None:
@@ -104,11 +105,11 @@ def processReferBiblioFile(file):
                 getattr(biblio, name).append(re.match("\s*%"+letter+"\s+(.*)", line).group(1))
     return biblios
 
-def processSpecrefBiblioFile(file):
+def processSpecrefBiblioFile(text):
     import json
     biblios = {}
     try:
-        datas = json.load(file)
+        datas = json.loads(text)
     except Exception, e:
         die("Couldn't read the local JSON file:\n{0}", str(e))
 

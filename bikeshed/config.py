@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
 import os.path
 import re
 from collections import defaultdict
@@ -6,7 +8,7 @@ debug = False
 quiet = False
 dryRun = False
 minify = True
-scriptPath = os.path.dirname(os.path.realpath(__file__))
+scriptPath = unicode(os.path.dirname(os.path.realpath(__file__)), encoding="utf-8")
 doc = None
 textMacros = {}
 dfnClassToType = {

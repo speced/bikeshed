@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
 import re
 from collections import defaultdict
-from .fuckunicode import u
 from .messages import *
 from .htmlhelpers import *
 
@@ -34,7 +34,7 @@ class ReferenceManager(object):
             # to enforce pubrules linking policy.
         self.specLevel = spec.md.level
         self.specName = spec.md.shortname
-        self.specVName = spec.md.shortname + "-" + u(spec.md.level)
+        self.specVName = "{0}-{1}".format(spec.md.shortname, spec.md.level)
         # Need to get a real versioned shortname,
         # with the possibility of overriding the "shortname-level" pattern.
         self.removeSameSpecRefs()
@@ -55,7 +55,7 @@ class ReferenceManager(object):
                 if dfnFor is None:
                     dfnFor = set()
                     if self.getLocalRef(type, linkText):
-                        die(u"Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
+                        die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
                         continue
                 else:
                     dfnFor = set(dfnFor.split())
@@ -63,7 +63,7 @@ class ReferenceManager(object):
                     for singleFor in dfnFor:
                         if self.getLocalRef(type, linkText, linkFor=singleFor):
                             encounteredError = True
-                            die(u"Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, type, singleFor)
+                            die("Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, type, singleFor)
                             break
                     if encounteredError:
                         continue
@@ -231,7 +231,7 @@ def linkTextsFromElement(el, preserveCasing=False):
     if el.get('title') == '':
         return []
     elif el.get('title'):
-        texts = [u(x.strip()) for x in el.get('title').split('|')]
+        texts = [x.strip() for x in el.get('title').split('|')]
     else:
         texts = [textContent(el).strip()]
     if preserveCasing:
@@ -245,19 +245,19 @@ def linkTextVariations(str):
     # so explicitly adding a title attr isn't usually necessary.
     yield str
 
-    if str[-3:] == u"ies":
-        yield str[:-3]+u"y"
-    if str[-2:] == u"es":
+    if str[-3:] == "ies":
+        yield str[:-3]+"y"
+    if str[-2:] == "es":
         yield str[:-2]
-    if str[-2:] == u"'s":
+    if str[-2:] == "'s":
         yield str[:-2]
-    if str[-2:] == u"’s":
+    if str[-2:] == "’s":
         yield str[:-2]
-    if str[-1:] == u"s":
+    if str[-1:] == "s":
         yield str[:-1]
-    if str[-1:] == u"'":
+    if str[-1:] == "'":
         yield str[:-1]
-    if str[-1:] == u"’":
+    if str[-1:] == "’":
         yield str[:-1]
 
 def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):

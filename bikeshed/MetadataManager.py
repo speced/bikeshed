@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
 import re
 from collections import defaultdict
 from datetime import date, datetime
-from .fuckunicode import u
 from .messages import *
 from .htmlhelpers import *
 
@@ -144,16 +144,16 @@ def parseDate(key, val):
         die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", key, val)
 
 def convertWarning(key, val):
-    if val.lower() in (u'obsolete', u'not ready'):
+    if val.lower() in ('obsolete', 'not ready'):
         return val.lower().replace(' ', '-')
-    match = re.match(u"Replaced By +(.+)", val, re.I)
+    match = re.match("Replaced By +(.+)", val, re.I)
     if match:
         config.textMacros['replacedby'] = match.group(1)
-        return u"replaced-by"
+        return "replaced-by"
     die('Unknown value for "{0}" metadata.', key)
 
 def parseEditor(key, val):
-    match = re.match(u"([^,]+) ,\s* ([^,]*) ,?\s* (.*)", val, re.X)
+    match = re.match("([^,]+) ,\s* ([^,]*) ,?\s* (.*)", val, re.X)
     pieces = [piece.strip() for piece in val.split(',')]
     def looksLinkish(string):
         return re.match(ur"\w+:", string) or re.match(ur".+@.+\..+", string)
@@ -177,12 +177,12 @@ def parseEditor(key, val):
 
 
 def parseIgnoredTerms(key, val):
-    return [term.strip().lower() for term in val.split(u',')]
+    return [term.strip().lower() for term in val.split(',')]
 
 def parseLinkDefaults(key, val):
     defaultSpecs = defaultdict(list)
     for default in val.split(","):
-        match = re.match(u"^([\w-]+)  (?:\s+\( ({0}) (?:\s+(TR|ED))? \) )  \s+(.*)$".format("|".join(config.dfnTypes.union(["dfn"]))), default.strip(), re.X)
+        match = re.match("^([\w-]+)  (?:\s+\( ({0}) (?:\s+(TR|ED))? \) )  \s+(.*)$".format("|".join(config.dfnTypes.union(["dfn"]))), default.strip(), re.X)
         if match:
             spec = match.group(1)
             type = match.group(2)

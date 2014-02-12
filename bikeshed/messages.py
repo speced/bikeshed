@@ -1,13 +1,14 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
 import sys
 
-from .fuckunicode import u
 from . import config
 
 
 messages = set()
 
 def die(msg, *formatArgs):
-    msg = u"\033[1;31mFATAL ERROR:\033[0m "+u(msg).format(*map(u, formatArgs))
+    msg = "\033[1;31mFATAL ERROR:\033[0m "+msg.format(*formatArgs)
     if msg not in messages:
         messages.add(msg)
         print msg
@@ -16,14 +17,14 @@ def die(msg, *formatArgs):
 
 def warn(msg, *formatArgs):
     if not config.quiet:
-        msg = u"\033[1;33mWARNING:\033[0m "+u(msg).format(*map(u, formatArgs))
+        msg = "\033[1;33mWARNING:\033[0m "+msg.format(*formatArgs)
         if msg not in messages:
             messages.add(msg)
             print msg
 
 def say(msg, *formatArgs):
     if not config.quiet:
-        print u(msg).format(*map(u, formatArgs))
+        print msg.format(*formatArgs)
 
 def progress(msg, val, total):
     if config.quiet:
