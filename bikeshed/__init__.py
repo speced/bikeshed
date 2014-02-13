@@ -321,7 +321,9 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
         requiredKeys = ["Name", "Value", "Initial", "Applies to", "Inherited", "Media", "Computed value"]
         ret = ["<table class='definition propdef'>"]
     for key in requiredKeys:
-        if key in vals:
+        if key == "Value":
+            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals[key]))
+        elif key in vals:
             ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
         else:
             die("The propdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key)
