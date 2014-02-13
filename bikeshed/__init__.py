@@ -1184,11 +1184,14 @@ class CSSSpec(object):
 
     def __init__(self, inputFilename, paragraphMode="markdown"):
         if inputFilename is None:
-            # Default the path to something sensible.
+            # Default to looking for a *.bs file.
+            # Otherwise, look for a *.src.html file.
+            # Otherwise, use standard input.
             import glob
-            possibleInputs = glob.glob("*.src.html")
-            if possibleInputs:
-                inputFilename = possibleInputs[0]
+            if glob.glob("*.bs"):
+                inputFilename = glob.glob("*.bs")[0]
+            elif glob.glob("*.src.html"):
+                inputFilename = glob.glob("*.src.html")[0]
             else:
                 inputFilename = "-"
         self.inputSource = inputFilename
@@ -1341,7 +1344,9 @@ class CSSSpec(object):
     def finish(self, outputFilename):
         if outputFilename is None:
             # More sensible defaults!
-            if self.inputSource.endswith(".src.html"):
+            if self.inputSource.endswith(".bs"):
+                outputFilename = self.inputSource[0:-3] + ".html"
+            elif self.inputSource.endswith(".src.html"):
                 outputFilename = self.inputSource[0:-9] + ".html"
             elif self.inputSource == "-":
                 outputFilename = "-"
