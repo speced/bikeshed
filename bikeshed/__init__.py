@@ -1186,9 +1186,9 @@ class CSSSpec(object):
         if inputFilename is None:
             # Default the path to something sensible.
             import glob
-            bytePossibleInputs = glob.glob("*.src.html")
-            if bytePossibleInputs:
-                inputFilename = bytePossibleInputs[0]
+            possibleInputs = glob.glob("*.src.html")
+            if possibleInputs:
+                inputFilename = possibleInputs[0]
             else:
                 inputFilename = "-"
         self.inputSource = inputFilename
