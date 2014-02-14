@@ -399,6 +399,7 @@ def initializeTextMacros(doc):
     longstatuses = {
         "ED": "Editor's Draft",
         "WD": "W3C Working Draft",
+        "FPWD": "W3C First Public Working Draft",
         "LCWD": "W3C Last Call Working Draft",
         "CR": "W3C Candidate Recommendation",
         "PR": "W3C Proposed Recommendation",
@@ -419,7 +420,7 @@ def initializeTextMacros(doc):
         config.textMacros["longstatus"] = longstatuses[doc.md.status]
     else:
         die("Unknown status '{0}' used.",doc.md.status)
-    if doc.md.status == "LCWD":
+    if doc.md.status in ("LCWD", "FPWD"):
         config.textMacros["status"] = "WD"
     else:
         config.textMacros["status"] = doc.md.status
