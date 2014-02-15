@@ -513,7 +513,7 @@ def transformAutolinkShortcuts(doc):
                         '<a title="{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
                             match.group(2),
                             biblioType))
-        text = re.sub(r"'([*-]*[a-zA-Z][a-zA-Z0-9_*/-]*)'", ur'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
+        text = re.sub(r"'([\w@*-][\w@*/-]*)'", ur'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
         return text
 
     def fixElementText(el):
@@ -911,12 +911,20 @@ def classifyLink(el):
     linkType = determineLinkType(el)
     el.set('data-link-type', linkType)
     linkText = determineLinkText(el)
-    match = re.match(r"^([\w/-]+)/([\w-]+)$", linkText)
-    if linkType == "maybe" and match:
-        el.set('data-link-for', match.group(1))
-        clearContents(el)
-        linkText = match.group(2)
-        el.text = linkText
+    if linkType == 'propdesc':
+        match = re.match(r"^(@[\w-]+)/([\w-]+)$", linkText)
+        if match:
+            el.set('data-link-for', match.group(1))
+            clearContents(el)
+            linkText = match.group(2)
+            el.text = linkText
+    elif linkType == "maybe":
+        match = re.match(r"^([\w/-]+)/([\w-]+)$", linkText)
+        if match:
+            el.set('data-link-for', match.group(1))
+            clearContents(el)
+            linkText = match.group(2)
+            el.text = linkText
     el.set('title', linkText)
     for attr in ["data-link-status", "data-link-for", "data-link-spec"]:
         val = treeAttr(el, attr)
