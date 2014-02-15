@@ -1683,15 +1683,15 @@ def addTOCSection(doc):
             continue
         else:
             skipLevel = float('inf')
-
+        indent = "\t" * (level - 1)
         if level > previousLevel:
-            html += "<ul class='toc'>"
+            html += "\n{0}<ul class='toc'>".format(indent)
         elif level < previousLevel:
             html += "</ul>" * (previousLevel - level)
         contents = removeBadToCElements(innerHTML(find(".content", header)))
         # Add section number
         contents = "<span class='secno'>{0}</span>".format(header.get('data-level') or '') + contents
-        html += "<li><a href='#{0}'>{1}</a>".format(header.get('id'), contents)
+        html += "\n{2}<li><a href='#{0}'>{1}</a>".format(header.get('id'), contents.replace('\n',' '), indent)
         previousLevel = level
     fillWith("table-of-contents", parseHTML(html))
     for badSpan in findAll(".toc span[href]"):
