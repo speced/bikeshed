@@ -1121,13 +1121,13 @@ def cleanupHTML(doc):
             del el.attrib['title']
 
 
-def finalHackyCleanup(byteText):
+def finalHackyCleanup(text):
     # For hacky last-minute string-based cleanups of the rendered html.
 
     # Remove the </wbr> end tag until the serializer is fixed.
-    byteText = re.sub("</wbr>", "", byteText)
+    text = re.sub("</wbr>", "", text)
 
-    return byteText
+    return text
 
 
 def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):
