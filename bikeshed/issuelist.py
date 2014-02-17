@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
+import io
 import re
 import sys
 from .messages import *
