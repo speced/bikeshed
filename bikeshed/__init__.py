@@ -184,11 +184,15 @@ def transformMarkdownParagraphs(doc):
             continue
         if inDataBlock:
             continue
-        if (re.match("\s*[^<\s]", line) or re.match("\s*<({0})".format(allowedStartElements), line)) and previousLineBlank and not inDataBlock:
-            if re.match("\s*Note(:|,) ", line):
-                doc.lines[i] = "<p class='note'>" + line
-            else:
-                doc.lines[i] = "<p>" + line
+        if previousLineBlank and not inDataBlock:
+            match = bool(re.match("\s*[^<\s]", line))
+            match |= bool(re.match("\s*<({0})".format(allowedStartElements), line))
+            match |= bool(re.match("\s*<<", line))
+            if match:
+                if re.match("\s*Note(:|,) ", line):
+                    doc.lines[i] = "<p class='note'>" + line
+                else:
+                    doc.lines[i] = "<p>" + line
 
         previousLineBlank = re.match("^\s*$", line)
 
@@ -513,7 +517,7 @@ def transformAutolinkShortcuts(doc):
                         '<a title="{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
                             match.group(2),
                             biblioType))
-        text = re.sub(r"'([\w@*-][\w@*/-]*)'", ur'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
+        text = re.sub(r"'([-]?[\w@*][\w@*/-]*)'", ur'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
         return text
 
     def fixElementText(el):
