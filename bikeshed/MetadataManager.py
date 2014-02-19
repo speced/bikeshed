@@ -171,6 +171,8 @@ def parseEditor(key, val):
             data['link'] = pieces[1]
         else:
             data['org'] = pieces[1]
+    elif len(pieces) == 1:
+        pass
     else:
         die("'{0}' format is '<name>, <company>?, <email-or-contact-page>?. Got:\n{1}", key, val)
     return data
