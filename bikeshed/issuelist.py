@@ -42,7 +42,7 @@ def printIssueList(infilename=None, outfilename=None):
 		outfile = sys.stdout
 	else:
 		try:
-			outfile = open(outfilename, 'w')
+			outfile = io.open(outfilename, 'w', encoding="utf-8")
 		except Exception, e:
 			die("Couldn't write to outfile:\n{0}", str(e))
 			return
@@ -119,8 +119,7 @@ Issue 2.
 
 
 def printHeader(outfile, headerInfo):
-	outfile.write('''
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+	outfile.write('''<!DOCTYPE html>
 <title>{title} Disposition of Comments for {date} {status}</title>
 <style type="text/css">
   .a  {{ background: lightgreen }}
