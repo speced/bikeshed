@@ -158,7 +158,7 @@ def printIssues(outfile, lines):
 	text = ''.join(lines)
 	issues = text.split('----\n')[1:]
 	for issue in issues:
-		issue = issue.strip()
+		issue = issue.strip().replace("&", "&amp;").replace("<", "&lt;")
 		if issue == "":
 			continue
 		originaltext = issue[:]
