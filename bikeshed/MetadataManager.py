@@ -31,6 +31,7 @@ class MetadataManager:
     testSuite = None
     mailingList = None
     mailingListArchives = None
+    boilerplate = {'omitSections':set()}
 
     otherMetadata = defaultdict(list)
 
@@ -53,7 +54,8 @@ class MetadataManager:
             "Deadline": "deadline",
             "Test Suite": "testSuite",
             "Mailing List": "mailingList",
-            "Mailing List Archives": "mailingListArchives"
+            "Mailing List Archives": "mailingListArchives",
+            "Boilerplate": "boilerplate"
         }
 
         self.multiValueKeys = {
@@ -81,7 +83,8 @@ class MetadataManager:
             "Editor": parseEditor,
             "Former Editor": parseEditor,
             "Ignored Terms": parseIgnoredTerms,
-            "Link Defaults": parseLinkDefaults
+            "Link Defaults": parseLinkDefaults,
+            "Boilerplate": parseBoilerplate
         }
 
         # Alternate output handlers
@@ -202,3 +205,11 @@ def saveLinkDefaults(key, val):
     for term, defaults in val.items():
         for default in defaults:
             config.doc.refs.defaultSpecs[term].append(default)
+
+def parseBoilerplate(key, val):
+    boilerplate = {'omitSections':set()}
+    for command in val.split(","):
+        command = command.strip()
+        if re.match("omit [\w-]+$", command):
+            boilerplate['omitSections'].add(command[5:])
+    return boilerplate

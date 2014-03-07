@@ -1457,7 +1457,7 @@ def fillInBoilerplate(doc):
         die("Can't generate the spec without a title.\nAdd a 'Title' metadata entry, or an <h1> on the first line.")
 
     header = doc.getInclusion('header')
-    footer = doc.getInclusion('footer')
+    footer = doc.getInclusion('footer') if "footer" not in doc.md.boilerplate['omitSections'] else ""
 
     doc.html = '\n'.join([header, doc.html, footer])
 
