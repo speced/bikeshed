@@ -155,10 +155,10 @@ def replaceTextMacros(text):
 
 def fixTypography(text):
     # Replace straight aposes with curly quotes for possessives and contractions.
-    text = re.sub(r"([\w])'([\w])", ur"\1’\2", text)
-    text = re.sub(r"(</[\w]+>)'([\w])", ur"\1’\2", text)
+    text = re.sub(r"([\w])'([\w])", r"\1’\2", text)
+    text = re.sub(r"(</[\w]+>)'([\w])", r"\1’\2", text)
     # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-    text = re.sub(ur"([^<][^!])(—|--)\r?\n\s+(\S)", ur"\1—<wbr>\3", text)
+    text = re.sub(r"([^<][^!])(—|--)\r?\n\s+(\S)", r"\1—<wbr>\3", text)
     return text
 
 
@@ -504,8 +504,8 @@ def transformAutolinkShortcuts(doc):
         # So, escape the text, so it turns back into "raw HTML".
         text = escapeHTML(text)
         # Handle biblio links, [[FOO]] and [[!FOO]]
-        while re.search(ur"\[\[(!?)([A-Za-z0-9-]+)\]\]", text):
-            match = re.search(ur"\[\[(!?)([A-Za-z0-9-]+)\]\]", text)
+        while re.search(r"\[\[(!?)([A-Za-z0-9-]+)\]\]", text):
+            match = re.search(r"\[\[(!?)([A-Za-z0-9-]+)\]\]", text)
 
             if match.group(1) == "!":
                 biblioType = "normative"
@@ -517,7 +517,7 @@ def transformAutolinkShortcuts(doc):
                         '<a title="{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
                             match.group(2),
                             biblioType))
-        text = re.sub(r"'([-]?[\w@*][\w@*/-]*)'", ur'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
+        text = re.sub(r"'([-]?[\w@*][\w@*/-]*)'", r'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
         return text
 
     def fixElementText(el):
