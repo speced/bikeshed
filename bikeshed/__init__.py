@@ -874,8 +874,8 @@ def determineLinkType(el):
     linkType = treeAttr(el, 'data-link-type')
     text = textContent(el)
     # ''foo: bar'' is a propdef for 'foo'
-    if linkType == "maybe" and re.match("^[\w-]+\s*:\s*\S", text):
-        el.set('title', re.match("^\s*([\w-]+)\s*:\s*\S", text).group(1))
+    if linkType == "maybe" and re.match("^[\w-]+\s*:\s+\S", text):
+        el.set('title', re.match("^\s*([\w-]+)\s*:\s+\S", text).group(1))
         return "propdesc"
     if linkType:
         if linkType in config.linkTypes:
