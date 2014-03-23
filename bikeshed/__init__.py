@@ -878,7 +878,7 @@ def determineLinkType(el):
         el.set('title', re.match("^\s*([\w-]+)\s*:\s+\S", text).group(1))
         return "propdesc"
     if linkType:
-        if linkType in config.linkTypes:
+        if linkType in config.linkTypes.union(["dfn"]):
             return linkType
         die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
         return "unknown-type"
