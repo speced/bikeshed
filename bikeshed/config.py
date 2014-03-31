@@ -32,6 +32,7 @@ dfnClassToType = {
     "dict-memberdef"  : "dict-member",
     "exceptdef"       : "exception",
     "except-fielddef" : "except-field",
+    "exception-codedef"  : "exception-code",
     "enumdef"         : "enum",
     "constdef"        : "const",
     "typedefdef"      : "typedef",
@@ -41,7 +42,7 @@ dfnClassToType = {
 
 dfnTypes = frozenset(dfnClassToType.values())
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
-idlTypes = frozenset(["event", "interface", "constructor", "method", "argument", "attribute", "callback", "dictionary", "dict-member", "exception", "except-field", "enum", "const", "typedef", "stringifier", "serializer", "iterator"])
+idlTypes = frozenset(["event", "interface", "constructor", "method", "argument", "attribute", "callback", "dictionary", "dict-member", "exception", "except-field", "exception-code", "enum", "const", "typedef", "stringifier", "serializer", "iterator"])
 functionishTypes = frozenset(["function", "method", "constructor"])
 linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "maybe", "biblio"])
 typesUsingFor = frozenset(["descriptor", "value", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "except-field", "stringifier", "serializer", "iterator"])
