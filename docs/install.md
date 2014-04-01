@@ -36,7 +36,7 @@ $ git clone https://github.com/tabatkins/bikeshed.git
 Finally, run:
 
 ~~~~
-$ pip install --editable /path/to/cloned/bikeshed
+$ sudo pip install --editable /path/to/cloned/bikeshed
 ~~~~
 
 This’ll install Bikeshed, making it available to your Python environment as the `bikeshed` package, and automatically add a `bikeshed` command to your path.
