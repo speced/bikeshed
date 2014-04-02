@@ -206,15 +206,18 @@ def transformMarkdownParagraphs(doc):
         if listType != "":
             listDepth = len(line) - len(line.lstrip())
             preposition = ""
+            # Pop lists that are deeper than the current depth
             while len(listDepths) > 0 and listDepths[-1] > listDepth:
                 preposition += "</" + listTypes[-1] + ">"
                 listDepths = listDepths[:-1]
                 listTypes = listTypes[:-1]
+            # Push new list
             if len(listDepths) == 0 or listDepths[-1] < listDepth:
                 listDepths.append(listDepth)
                 listTypes.append(listType)
                 preposition += "<" + listTypes[-1] + ">"
-            elif listTypes[-1] != listType:
+            # Cycle existing list entry
+            elif listTypes[-1] != listType or previousLineBlank:
                 preposition += "</" + listTypes[-1] + "><" + listType + ">"
                 listTypes[-1] = listType
             if context is not None:
@@ -232,7 +235,7 @@ def transformMarkdownParagraphs(doc):
                         break
                     listDepths = listDepths[:-1]
                     listTypes = listTypes[:-1]
-                    
+
                 doc.lines[i - 1] += postposition
 
             # Ensure the line doesn't start with an open tag and isn't empty
