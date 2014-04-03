@@ -13,8 +13,9 @@ allowing you to omit nearly all `<p>` elements from your source.
 
 Any block of text preceded by a blank line and starting with either naked text or an inline HTML element will be recognized as a paragraph and have the appropriate markup inserted automatically.
 
-Additionally, starting a paragraph with "Note: " will add a `class='note'` to the paragraph,
+Additionally, starting a paragraph with "Note: " or "Note, " will add a `class='note'` to the paragraph,
 which triggers special formatting in the CSS stylesheet.
+Starting one with "Issue: " will add a `class='issue'` to the paragraph.
 
 
 Typography Fixes
