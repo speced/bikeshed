@@ -1689,6 +1689,11 @@ def addTOCSection(doc):
     for header in findAll('h2, h3, h4, h5, h6'):
         level = int(header.tag[-1])
 
+        if previousLevel > 0 and previousLevel < level:
+            if previousLevel != level - 1:
+                # Jumping two levels is a no-no.
+                die("Heading level jumps more than one level, from h{0} to h{1}:\n  {2}", previousLevel, level, textContent(header).replace("\n", " "))
+
         # Same deal - hit a no-toc, suppress the entire section.
         if hasClass(header, "no-toc"):
             skipLevel = min(level, skipLevel)
