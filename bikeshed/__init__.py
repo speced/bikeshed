@@ -189,8 +189,10 @@ def transformMarkdownParagraphs(doc):
             match |= bool(re.match("\s*<({0})".format(allowedStartElements), line))
             match |= bool(re.match("\s*<<", line))
             if match:
-                if re.match("\s*Note(:|,) ", line):
+                if re.match(r"\s*Note(:|,) ", line):
                     doc.lines[i] = "<p class='note'>" + line
+                elif re.match(r"\s*Issue: ", line):
+                    doc.lines[i] = "<p class='issue'>" + line.replace("Issue:", "", 1)
                 else:
                     doc.lines[i] = "<p>" + line
 
