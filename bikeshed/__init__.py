@@ -726,7 +726,20 @@ def canonicalizeShortcuts(doc):
             el.set("data-link-for", el.get('for'))
         del el.attrib['for']
 
-
+def fixIntraDocumentReferences(doc):
+    for el in findAll("a"):
+      if el.get("section") is not None:
+        del el.attrib["section"]
+        el.set("data-section", "section");
+        if el.text is None or re.match("\s*", el.text):
+          sectionID = el.get("href")
+          target = findAll(sectionID);
+          if len(target) != 1:
+            continue
+          target = target[0];
+          level = target.get("data-level")
+          title = target.getchildren()[1].text
+          el.text = "section " + level + " " + title
 
 def processDfns(doc):
     dfns = findAll("dfn")
@@ -1333,6 +1346,7 @@ class CSSSpec(object):
         formatPropertyNames(self)
         processHeadings(self)
         canonicalizeShortcuts(self)
+        fixIntraDocumentReferences(self)
         processIssues(self)
         markupIDL(self)
 
