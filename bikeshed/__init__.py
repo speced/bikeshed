@@ -734,7 +734,8 @@ def fixIntraDocumentReferences(doc):
         if el.text is None or re.match("\s*", el.text):
           sectionID = el.get("href")
           target = findAll(sectionID);
-          if len(target) != 1:
+          if len(target) == 0:
+            die("couldn't find target document section " + sectionID, outerHTML(el))
             continue
           target = target[0];
           level = target.get("data-level")
