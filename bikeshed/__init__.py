@@ -701,7 +701,8 @@ def canonicalizeShortcuts(doc):
         "link-for":"data-link-for",
         "dfn-type":"data-dfn-type",
         "link-type":"data-link-type",
-        "force":"data-dfn-force"
+        "force":"data-dfn-force",
+        "section":"data-section"
     }
     for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys())):
         for attr, fixedAttr in attrFixup.items():
@@ -727,20 +728,17 @@ def canonicalizeShortcuts(doc):
         del el.attrib['for']
 
 def fixIntraDocumentReferences(doc):
-    for el in findAll("a"):
-      if el.get("section") is not None:
-        del el.attrib["section"]
-        el.set("data-section", "section");
-        if el.text is None or re.match("\s*", el.text):
-          sectionID = el.get("href")
-          target = findAll(sectionID);
-          if len(target) == 0:
-            die("couldn't find target document section " + sectionID, outerHTML(el))
-            continue
-          target = target[0];
-          level = target.get("data-level")
-          title = target.getchildren()[1].text
-          el.text = "section " + level + " " + title
+    for el in findAll("a[data-section]"):
+      if el.text is None or el.text.strip() == '':
+        sectionID = el.get("href")
+        target = findAll(sectionID);
+        if len(target) == 0:
+          die("couldn't find target document section " + sectionID, outerHTML(el))
+          continue
+        target = target[0];
+        level = target.get("data-level")
+        title = target.getchildren()[1].text
+        el.text = "section " + level + " " + title
 
 def processDfns(doc):
     dfns = findAll("dfn")
