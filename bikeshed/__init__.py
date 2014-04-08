@@ -176,6 +176,8 @@ def transformMarkdownParagraphs(doc):
     opaqueBlocks = "pre|xmp|script|style"
     # Elements which are allowed to start a markdown paragraph.
     allowedStartElements = "em|strong|i|b|u|dfn|a|code|var"
+    listDepths = []
+    listTypes = []
     for (i, line) in enumerate(doc.lines):
         if not inDataBlock and re.match("\s*<({0})".format(opaqueBlocks), line):
             inDataBlock = True
@@ -184,9 +186,63 @@ def transformMarkdownParagraphs(doc):
             continue
         if inDataBlock:
             continue
-        if previousLineBlank and not inDataBlock:
+        listType = ""
+        r = re.match("\s*\*\s+", line)
+        context = None
+        if bool(r):
+            listType = "ul"
+            offset = r.end()
+        else:
+            r = re.match("\s*\d+.\s+", line)
+            if bool(r):
+                listType = "ol"
+                offset = r.end()
+            else:
+                r = re.match("\s*:(.*):\s+", line)
+                if bool(r):
+                    listType = "dl"
+                    context = r.group(1)
+                    offset = r.end()
+        if listType != "":
+            listDepth = len(line) - len(line.lstrip())
+            preposition = ""
+            # Pop lists that are deeper than the current depth
+            while len(listDepths) > 0 and listDepths[-1] > listDepth:
+                preposition += "</" + listTypes[-1] + ">"
+                listDepths = listDepths[:-1]
+                listTypes = listTypes[:-1]
+            # Push new list
+            if len(listDepths) == 0 or listDepths[-1] < listDepth:
+                listDepths.append(listDepth)
+                listTypes.append(listType)
+                preposition += "<" + listTypes[-1] + ">"
+            # Cycle existing list entry
+            elif listTypes[-1] != listType or previousLineBlank:
+                preposition += "</" + listTypes[-1] + "><" + listType + ">"
+                listTypes[-1] = listType
+            if context is not None:
+                doc.lines[i] = preposition + "<dt>" + context + "</dt><dd>" + line[offset:]
+            else:
+                doc.lines[i] = preposition + "<li>" + line[offset:]
+        elif previousLineBlank:
+            if len(listDepths) > 0:
+                listDepth = len(line) - len(line.lstrip())
+                postposition = ""
+                while len(listDepths) > 0:
+                    if listDepth <= listDepths[-1]:
+                        postposition += "</" + listTypes[-1] + ">"
+                    else:
+                        break
+                    listDepths = listDepths[:-1]
+                    listTypes = listTypes[:-1]
+
+                doc.lines[i - 1] += postposition
+
+            # Ensure the line doesn't start with an open tag and isn't empty
             match = bool(re.match("\s*[^<\s]", line))
+            # but it's OK if the open tag is one of the allowed start elements
             match |= bool(re.match("\s*<({0})".format(allowedStartElements), line))
+            # or a cout symbol
             match |= bool(re.match("\s*<<", line))
             if match:
                 if re.match(r"\s*Note(:|,) ", line):
@@ -198,6 +254,10 @@ def transformMarkdownParagraphs(doc):
 
         previousLineBlank = re.match("^\s*$", line)
 
+    postposition = ""
+    for i in range(len(listTypes) - 1, -1, -1):
+        postposition += "</" + listTypes[i] + ">"
+    doc.lines[i - 1] += postposition
 
 # This function does a single pass through the doc,
 # finding all the "data blocks" and processing them.
