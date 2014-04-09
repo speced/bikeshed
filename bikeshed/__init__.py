@@ -701,7 +701,8 @@ def canonicalizeShortcuts(doc):
         "link-for":"data-link-for",
         "dfn-type":"data-dfn-type",
         "link-type":"data-link-type",
-        "force":"data-dfn-force"
+        "force":"data-dfn-force",
+        "section":"data-section"
     }
     for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys())):
         for attr, fixedAttr in attrFixup.items():
@@ -726,7 +727,19 @@ def canonicalizeShortcuts(doc):
             el.set("data-link-for", el.get('for'))
         del el.attrib['for']
 
-
+def fixIntraDocumentReferences(doc):
+    for el in findAll("a[data-section]"):
+      if el.text is None or el.text.strip() == '':
+        sectionID = el.get("href")
+        if sectionID is None or sectionID == "" or sectionID[0] != '#':
+          die("Missing/invalid href {0} in section link.", sectionID);
+          continue
+        target = findAll("{0}[data-level]".format(sectionID));
+        if len(target) == 0:
+          die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
+          continue
+        target = target[0];
+        el.text = "section {0}".format(textContent(target));
 
 def processDfns(doc):
     dfns = findAll("dfn")
@@ -1333,6 +1346,7 @@ class CSSSpec(object):
         formatPropertyNames(self)
         processHeadings(self)
         canonicalizeShortcuts(self)
+        fixIntraDocumentReferences(self)
         processIssues(self)
         markupIDL(self)
 
