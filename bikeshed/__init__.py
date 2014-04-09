@@ -731,14 +731,15 @@ def fixIntraDocumentReferences(doc):
     for el in findAll("a[data-section]"):
       if el.text is None or el.text.strip() == '':
         sectionID = el.get("href")
-        target = findAll(sectionID);
+        if sectionID is None or sectionID == "" or sectionID[0] != '#':
+          die("Missing/invalid href {0} in section link.", sectionID);
+          continue
+        target = findAll("{0}[data-level]".format(sectionID));
         if len(target) == 0:
-          die("couldn't find target document section " + sectionID, outerHTML(el))
+          die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
           continue
         target = target[0];
-        level = target.get("data-level")
-        title = target.getchildren()[1].text
-        el.text = "section " + level + " " + title
+        el.text = "section {0}".format(textContent(target));
 
 def processDfns(doc):
     dfns = findAll("dfn")
