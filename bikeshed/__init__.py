@@ -1364,6 +1364,7 @@ class CSSSpec(object):
         processHeadings(self) # again
         addTOCSection(self)
         addSelfLinks(self)
+        processAutolinks(self)
 
         addAnnotations(self)
 
@@ -1653,7 +1654,7 @@ def addPropertyIndex(doc):
                 html += "<th scope=col>"+escapeHTML(column)
         html += "<tbody>"
         for prop in props:
-            html += "\n<tr><th scope=row><a data-property>{0}</a>".format(escapeHTML(prop['Name']))
+            html += "\n<tr><th scope=row><a data-link-type='property'>{0}</a>".format(escapeHTML(prop['Name']))
             for column in columns[1:]:
                 html += "<td>" + escapeHTML(prop.get(column, ""))
         html += "</table>"
@@ -1671,13 +1672,13 @@ def addPropertyIndex(doc):
             for desc in descs:
                 allKeys |= set(desc.keys())
             columns.extend(sorted(allKeys - set(columns)))
-            html += "<h3 class='no-num' id='{1}-descriptor-table'>{0} Descriptors</h3>".format(atRuleName, simplifyText(atRuleName))
+            html += "<h3 class='no-num' id='{1}-descriptor-table'><a data-link-type='at-rule'>{0}</a> Descriptors</h3>".format(atRuleName, simplifyText(atRuleName))
             html += "<table class=proptable><thead><tr>"
             for column in columns:
                 html += "<th scope=col>{0}".format(escapeHTML(column))
             html += "<tbody>"
             for desc in descs:
-                html += "\n<tr><th scope-row><a data-property>{0}</a>".format(escapeHTML(desc['Name']))
+                html += "\n<tr><th scope-row><a data-link-type='descriptor'>{0}</a>".format(escapeHTML(desc['Name']))
                 for column in columns[1:]:
                     html += "<td>" + escapeHTML(desc.get(column, ""))
             html += "</table>"
