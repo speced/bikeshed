@@ -218,6 +218,7 @@ def transformDataBlocks(doc):
     blockTypes = {
         'propdef': transformPropdef,
         'descdef': transformDescdef,
+        'elementdef': transformElementdef,
         'metadata': transformMetadata,
         'railroad': transformRailroad,
         'pre': transformPre
@@ -307,18 +308,7 @@ def transformPre(lines, tagName, firstLine, **kwargs):
 
 
 def transformPropdef(lines, doc, firstLine, **kwargs):
-    vals = {}
-    for (i, line) in enumerate(lines):
-        match = re.match("\s*([^:]+):\s*(.*)", line)
-        if(match is None):
-            die("Incorrectly formatted propdef line for '{0}':\n{1}", vals.get("Name", "???"), line)
-            continue
-        key = match.group(1).strip().capitalize()
-        val = match.group(2).strip()
-        if key == "Value" and "Value" in vals:
-            vals[key] += " "+val
-        else:
-            vals[key] = val
+    vals = parseDefBlock(lines, "propdef")
     # The required keys are specified in the order they should show up in the propdef table.
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "New values"]
@@ -341,18 +331,7 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
 
 
 def transformDescdef(lines, doc, firstLine, **kwargs):
-    vals = {}
-    for (i, line) in enumerate(lines):
-        match = re.match("\s*([^:]+):\s*(.*)", line)
-        if(match is None):
-            die("Incorrectly formatted descdef line for '{0}':\n{1}", vals.get("Name", "???"), line)
-            continue
-        key = match.group(1).strip().capitalize()
-        val = match.group(2).strip()
-        if key == "Value" and "Value" in vals:
-            vals[key] += " "+val
-        else:
-            vals[key] = val
+    vals = parseDefBlock(lines, "descdef")
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
         ret = ["<table class='definition descdef partial' data-dfn-for='{0}'>".format(vals.get("For", ""))]
@@ -374,6 +353,39 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
         ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
     ret.append("</table>")
     return ret
+
+def transformElementdef(lines, doc, **kwargs):
+    vals = parseDefBlock(lines, "elementdef")
+    requiredKeys = ["Name", "Categories", "Contexts", "Content model", "Attributes"]
+    ret = ["<table class='definition elementdef'>"]
+    for key in requiredKeys:
+        if key in vals:
+            ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
+        else:
+            die("The elementdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key)
+            continue
+    for key in vals.viewkeys() - requiredKeys:
+        ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
+    ret.append("</table>")
+    return ret
+
+
+
+def parseDefBlock(lines, type):
+    vals = {}
+    for (i, line) in enumerate(lines):
+        match = re.match("\s*([^:]+):\s*(.*)", line)
+        if(match is None):
+            die("Incorrectly formatted {2} line for '{0}':\n{1}", vals.get("Name", "???"), line, type)
+            continue
+        key = match.group(1).strip().capitalize()
+        val = match.group(2).strip()
+        if key == "Value" and "Value" in vals:
+            vals[key] += " "+val
+        else:
+            vals[key] = val
+    return vals
+
 
 
 def transformMetadata(lines, doc, **kwargs):
@@ -680,9 +692,14 @@ def addHeadingBonuses(doc, headings):
 # Definitions and the like
 
 def formatPropertyNames(doc):
-    for table in findAll("table.propdef, table.descdef"):
+    for table in findAll("table.propdef, table.descdef, table.elementdef"):
         tag = "a" if hasClass(table, "partial") else "dfn"
-        type = "property" if hasClass(table, "propdef") else "descriptor"
+        if hasClass(table, "propdef"):
+            type = "property"
+        elif hasClass(table, "descdef"):
+            type = "descriptor"
+        elif hasClass(table, "elementdef"):
+            type = "element"
         cell = findAll("tr:first-child > :nth-child(2)", table)[0]
         names = [x.strip() for x in textContent(cell).split(',')]
         html = ', '.join("<{tag} {type}>{0}</{tag}>".format(name, tag=tag, type=type) for name in names)
