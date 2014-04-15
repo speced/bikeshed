@@ -149,7 +149,7 @@ def replaceTextMacros(text):
     # Replace the ''maybe link'' shortcuts.
     # They'll survive the HTML parser, but they don't match if they contain an element.
     # (The other shortcuts are "atomic" and can't contain elements.)
-    text = re.sub(r"''([^=\n]+?)''", r'<span data-link-type="maybe" class="css">\1</span>', text)
+    text = re.sub(r"''([^=\n]+?)''", r'<a data-link-type="maybe" class="css">\1</a>', text)
     return text
 
 
@@ -983,10 +983,9 @@ def classifyLink(el):
 
 def processAutolinks(doc):
     # An <a> without an href is an autolink.
-    # For re-run, if you have a [data-link-type] property, we'll regen your href anyway.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # Maybe autolinks can be any element.  If it links up, we change it into an <a>.
-    autolinks = findAll("a:not([href]), a[data-link-type], i, [data-link-type='maybe']")
+    autolinks = findAll("a:not([href]), i")
     for el in autolinks:
         # Explicitly empty title indicates this shouldn't be an autolink.
         if el.get('title') == '':
@@ -1014,6 +1013,9 @@ def processAutolinks(doc):
         if url is not None:
             el.set('href', url)
             el.tag = "a"
+        else:
+            if linkType == "maybe":
+                el.tag = "span"
 
 
 def processIssues(doc):
