@@ -793,8 +793,6 @@ def determineDfnType(dfn):
         return "value"
     elif text[0:1] == "<" and text[-1:] == ">":
         return "type"
-    elif text[:1] == "〈" and text[-1:] == "〉":
-        return "token"
     elif text[0:1] == ":":
         return "selector"
     elif re.match("^[\w-]+\(.*\)$", text) and not (dfn.get('id') or '').startswith("dom-"):
