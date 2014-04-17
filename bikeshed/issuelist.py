@@ -111,8 +111,9 @@ Summary:  [summary]
 From:     [name]
 Comment:  [url]
 Response: [url]
-Closed:   [status ... or replace this "Closed" line with "Open"]
+Closed:   [Accepted/OutOfScope/Invalid/Rejected/Retracted ... or replace this "Closed" line with "Open"]
 Verified: [url]
+Resolved: Editorial/Bugfix (for obvious fixes)/Editors' discretion/[url to minutes]
 ----
 Issue 2.
 ...''')
