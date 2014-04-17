@@ -3,6 +3,7 @@ from __future__ import division, unicode_literals
 import io
 import re
 import sys
+import glob
 from .messages import *
 
 statusStyle = {
@@ -17,15 +18,32 @@ statusStyle = {
 
 def printIssueList(infilename=None, outfilename=None):
 	if infilename is None:
-		printHelpMessage()
-		return
+		if glob.glob("issues*.txt"):
+			# Look for digits in the filename, and use the one with the largest number if it's unique.
+			def extractNumber(filename):
+				number = re.sub("\D", "", filename)
+				return number if number else None
+			filenames = [(extractNumber(fn), fn) for fn in glob.glob("issues*.txt") if extractNumber(fn) is not None]
+			filenames.sort(reverse=True)
+			if len(filenames) > 1 and filenames[0][0] == filenames[1][0]:
+				die("Can't tell which issues-list file is the most recent. Explicitly pass a filename.")
+				return
+			infilename = filenames[0][1]
+		else:
+			printHelpMessage();
+			return
 	if infilename == "-":
 		infile = sys.stdin
 	else:
-		try:
-			infile = io.open(infilename, 'r', encoding="utf-8")
-		except Exception, e:
-			die("Couldn't read from the infile:\n{0}", str(e))
+		for suffix in [".txt", "txt", ""]:
+			try:
+				infile = io.open(infilename + suffix, 'r', encoding="utf-8")
+				infilename += suffix
+				break
+			except Exception, e:
+				pass
+		else:
+			die("Couldn't read from the infile:\n  {0}", str(e))
 			return
 
 	lines = infile.readlines()
@@ -96,12 +114,7 @@ def extractHeaderInfo(lines, infilename):
 
 
 def printHelpMessage():
-		die('''
-Pass in issues list filename for processing!
-
-~~~~~~~~~~~~~~~~~~~~~ Template for issues-list.txt ~~~~~~~~~~~~~~~~~~~~~
-
-Draft:    http://www.w3.org/TR/2013/WD-css-foo-3-20130103/
+		say('''Draft:    http://www.w3.org/TR/2013/WD-css-foo-3-20130103/
 Title:    CSS Foo Level 3
 ... anything else you want here, except 4 dashes ...
 

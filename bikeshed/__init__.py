@@ -64,6 +64,10 @@ def main():
     updateParser.add_argument("--test-suites", dest="testSuites", action="store_true", help="Download test suite data.")
 
     issueParser = subparsers.add_parser('issues-list', help="Process a plain-text issues file into HTML. Call with no args to see an example input text.")
+    issueParser.add_argument("-t",
+                              dest="printTemplate",
+                              action="store_true",
+                              help="Output example Issues List template.")
     issueParser.add_argument("infile", nargs="?",
                               default=None,
                               help="Path to the plain-text issue file.")
@@ -123,7 +127,10 @@ def main():
             print json.dumps(refs, indent=2)
     elif options.subparserName == "issues-list":
         from . import issuelist as il
-        il.printIssueList(options.infile, options.outfile)
+        if options.printTemplate:
+            il.printHelpMessage()
+        else:
+            il.printIssueList(options.infile, options.outfile)
 
 
 def stripBOM(doc):
