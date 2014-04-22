@@ -57,6 +57,19 @@ Documentation Sections
 * [Railroad Diagrams](docs/railroad-diagrams.md) - describes the railroad-diagram feature, and its syntax.
 * [Boilerplate](docs/boilerplate.md) - describes the use and generation of a spec's boilerplate sections. You probably don't need to read this.
 
+Bikeshed File Extension
+-----------------------
+
+The preferred file extensions for Bikeshed source files is `bs`, like `index.bs`.
+Bikeshed will automatically recognize `*.bs` files in the folder it's run in,
+and assume that you want an output file of the same name with a `.html` extension.
+The repository also contains a syntax highlighting script for Bikeshed source files.
+
+(Bikeshed also recognizes files with `*.src.html` for backwards compatibility with older CSS specs,
+though most such specs have switched their source file extensions to `.bs` now.
+Using `.src.html` in most text editors will display the file with HTML source formatting,
+which isn't generally what you want.)
+
 License
 -------
 
