@@ -763,8 +763,9 @@ def fixIntraDocumentReferences(doc):
             if len(target) == 0:
                 die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
                 continue
-            target = target[0];
-            el.text = "section {0}".format(textContent(target));
+            text = textContent(findAll(".content", target[0])[0]);
+            level = target[0].get('data-level');
+            el.text = "§{1} {0}".format(text, level);
 
 def fillAttributeInfoSpans(doc):
     for el in findAll("span[data-attribute-info]"):
