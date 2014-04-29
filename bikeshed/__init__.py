@@ -786,7 +786,7 @@ def fillAttributeInfoSpans(doc):
             if datatype[-1] == "?":
                 decorations += ", nullable"
                 datatype = datatype[:-1]
-            replaceContents(el, parseHTML("of type <span data-type>{0}</span>{1}".format(datatype, decorations)))
+            replaceContents(el, parseHTML("of type <a interface>{0}</a>{1}".format(datatype, decorations)))
             # FIXME: Is there a nicer way to force a leading space here?
             el.text = ' ' + el.text
 
