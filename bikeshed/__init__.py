@@ -178,7 +178,7 @@ def transformMarkdownParagraphs(doc):
     # It also auto-recognizes paragraphs that start with "Note: " or "Note, "
     # and instead inserts a "<p class='note'>".
     inDataBlock = False
-    previousLineBlank = False
+    previousLineNotText = False
     # Elements whose contents should be skipped when looking for paragraphs.
     opaqueBlocks = "pre|xmp|script|style"
     # Elements which are allowed to start a markdown paragraph.
@@ -191,7 +191,7 @@ def transformMarkdownParagraphs(doc):
             continue
         if inDataBlock:
             continue
-        if previousLineBlank and not inDataBlock:
+        if previousLineNotText and not inDataBlock:
             match = bool(re.match("\s*[^<\s]", line))
             match |= bool(re.match("\s*<({0})".format(allowedStartElements), line))
             match |= bool(re.match("\s*<<", line))
@@ -203,7 +203,7 @@ def transformMarkdownParagraphs(doc):
                 else:
                     doc.lines[i] = "<p>" + line
 
-        previousLineBlank = re.match("^\s*$", line)
+        previousLineNotText = re.match(r"\s*$", line) or re.match(r"\s*<(li|dd)[^>]*>\s*$", line)
 
 
 # This function does a single pass through the doc,
