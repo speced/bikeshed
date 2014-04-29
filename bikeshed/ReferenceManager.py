@@ -124,13 +124,15 @@ class ReferenceManager(object):
             return localRefs[0]['url']
 
         # Take defaults into account
-        if (spec is None or status is None) and text in self.defaultSpecs:
-            for dfnSpec, dfnType, dfnStatus, dfnFor in self.defaultSpecs[text]:
-                if dfnType in config.linkTypeToDfnType[linkType]:
-                    spec = spec or dfnSpec
-                    status = status or dfnStatus
-                    linkFor = linkFor or dfnFor
-                    break
+        if (spec is None or status is None):
+            variedTexts = [v for v in linkTextVariations(text) if v in self.defaultSpecs]
+            if variedTexts:
+                for dfnSpec, dfnType, dfnStatus, dfnFor in self.defaultSpecs[variedTexts[0]]:
+                    if dfnType in config.linkTypeToDfnType[linkType]:
+                        spec = spec or dfnSpec
+                        status = status or dfnStatus
+                        linkFor = linkFor or dfnFor
+                        break
 
         # Get the relevant refs
         refs = filterRefsByTypeAndText(self.refs, linkType, text, error)
