@@ -24,7 +24,7 @@ class Font(object):
                         output[i] += " "
                     output[i] += line
             else:
-                die("The character “{0}” doesn't appear in the specificed font.", letter)
+                die("The character “{0}” doesn't appear in the specified font.", letter)
         output = [line + "\n" for line in output]
         return output
 
