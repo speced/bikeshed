@@ -56,6 +56,7 @@ Documentation Sections
 * [IDL](docs/idl.md) - describes Bikeshed's automatic IDL processing.
 * [Railroad Diagrams](docs/railroad-diagrams.md) - describes the railroad-diagram feature, and its syntax.
 * [Boilerplate](docs/boilerplate.md) - describes the use and generation of a spec's boilerplate sections. You probably don't need to read this.
+* [Source-File Processing](docs/source.md) - describes the functions Bikeshed has for processing your *source file itself*.
 
 Bikeshed File Extension
 -----------------------
