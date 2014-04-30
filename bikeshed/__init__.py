@@ -89,6 +89,18 @@ def main():
     debugCommands.add_argument("--print-json", dest="jsonCode",
                                help="Runs the specified code and prints it as formatted JSON.")
 
+    sourceParser = subparsers.add_parser('source', help="Tools for formatting the *source* document.")
+    sourceParser.add_argument("--big-text",
+                              dest="bigText",
+                              action="store_true",
+                              help="Finds HTML comments containing 'Big Text: foo' and turns them into comments containing 'foo' in big text.")
+    sourceParser.add_argument("infile", nargs="?",
+                            default=None,
+                            help="Path to the source file.")
+    sourceParser.add_argument("outfile", nargs="?",
+                            default=None,
+                            help="Path to the output file.")
+
     options = argparser.parse_args()
 
     config.quiet = options.quiet
@@ -131,6 +143,13 @@ def main():
             il.printHelpMessage()
         else:
             il.printIssueList(options.infile, options.outfile)
+    elif options.subparserName == "source":
+        if not options.bigText: # If no options are given, do all options.
+            options.bigText = True
+        if options.bigText:
+            from . import fonts
+            font = fonts.Font()
+            fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
 
 
 def stripBOM(doc):
