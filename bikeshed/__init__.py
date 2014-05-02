@@ -17,6 +17,7 @@ import lxml
 from . import config
 from . import biblio
 from . import update
+from . import markdown
 from .ReferenceManager import ReferenceManager
 from .ReferenceManager import linkTextsFromElement
 from .globalnames import *
@@ -189,41 +190,7 @@ def fixTypography(text):
 
 
 def transformMarkdownParagraphs(doc):
-    # This converts Markdown-style paragraphs into actual paragraphs.
-    # Any line that is preceded by a blank line,
-    # and which starts with either text or an inline element,
-    # will have a <p> inserted at its beginning.
-    #
-    # It also auto-recognizes paragraphs that start with "Note: " or "Note, "
-    # and instead inserts a "<p class='note'>".
-    inDataBlock = False
-    previousLineNotText = False
-    # Elements whose contents should be skipped when looking for paragraphs.
-    opaqueBlocks = "pre|xmp|script|style"
-    # Elements which are allowed to start a markdown paragraph.
-    allowedStartElements = "em|strong|i|b|u|dfn|a|code|var"
-    for (i, line) in enumerate(doc.lines):
-        if not inDataBlock and re.match("\s*<({0})".format(opaqueBlocks), line):
-            inDataBlock = True
-        if inDataBlock and re.search("</({0})".format(opaqueBlocks), line):
-            inDataBlock = False
-            continue
-        if inDataBlock:
-            continue
-        if previousLineNotText and not inDataBlock:
-            match = bool(re.match("\s*[^<\s]", line))
-            match |= bool(re.match("\s*<({0})".format(allowedStartElements), line))
-            match |= bool(re.match("\s*<<", line))
-            if match:
-                if re.match(r"\s*Note(:|,) ", line):
-                    doc.lines[i] = "<p class='note'>" + line
-                elif re.match(r"\s*Issue: ", line):
-                    doc.lines[i] = "<p class='issue'>" + line.replace("Issue:", "", 1)
-                else:
-                    doc.lines[i] = "<p>" + line
-
-        previousLineNotText = re.match(r"\s*$", line) or re.match(r"\s*<(li|dd)[^>]*>\s*$", line)
-
+    doc.lines = markdown.parse(doc.lines)
 
 # This function does a single pass through the doc,
 # finding all the "data blocks" and processing them.
