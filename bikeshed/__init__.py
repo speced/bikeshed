@@ -1292,7 +1292,7 @@ class CSSSpec(object):
                                     encoding="utf-8")))
         try:
             with io.open("anchors.json", 'r', encoding="utf-8") as fh:
-                self.refs.refs.update(json.loads(unicode(fh.read())));
+                self.refs.refs.update(json.loads(fh.read()));
         except IOError:
             pass
         self.refs.defaultSpecs = defaultdict(list,
