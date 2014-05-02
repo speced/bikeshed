@@ -560,13 +560,13 @@ def transformAutolinkShortcuts(doc):
         if el.tail != newtext:
             temp = parseHTML('<div>'+newtext+'</div>')[0]
             el.tail = ''
-            for child in temp.iterchildren(tag="*", reversed=True):
+            for child in temp.iterchildren(reversed=True):
                 el.addnext(child)
             el.tail = temp.text
 
         if processContents:
             # Recurse over children.
-            for child in el.iterchildren(tag="*"):
+            for child in el.iterchildren():
                 fixElementText(child)
 
     fixElementText(doc.document.getroot())
