@@ -89,6 +89,18 @@ def main():
     debugCommands.add_argument("--print-json", dest="jsonCode",
                                help="Runs the specified code and prints it as formatted JSON.")
 
+    sourceParser = subparsers.add_parser('source', help="Tools for formatting the *source* document.")
+    sourceParser.add_argument("--big-text",
+                              dest="bigText",
+                              action="store_true",
+                              help="Finds HTML comments containing 'Big Text: foo' and turns them into comments containing 'foo' in big text.")
+    sourceParser.add_argument("infile", nargs="?",
+                            default=None,
+                            help="Path to the source file.")
+    sourceParser.add_argument("outfile", nargs="?",
+                            default=None,
+                            help="Path to the output file.")
+
     options = argparser.parse_args()
 
     config.quiet = options.quiet
@@ -131,6 +143,13 @@ def main():
             il.printHelpMessage()
         else:
             il.printIssueList(options.infile, options.outfile)
+    elif options.subparserName == "source":
+        if not options.bigText: # If no options are given, do all options.
+            options.bigText = True
+        if options.bigText:
+            from . import fonts
+            font = fonts.Font()
+            fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
 
 
 def stripBOM(doc):
@@ -726,7 +745,8 @@ def canonicalizeShortcuts(doc):
         "dfn-type":"data-dfn-type",
         "link-type":"data-link-type",
         "force":"data-dfn-force",
-        "section":"data-section"
+        "section":"data-section",
+        "attribute-info":"data-attribute-info"
     }
     for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys())):
         for attr, fixedAttr in attrFixup.items():
@@ -762,8 +782,33 @@ def fixIntraDocumentReferences(doc):
             if len(target) == 0:
                 die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
                 continue
+            text = textContent(findAll(".content", target[0])[0]);
+            level = target[0].get('data-level');
+            el.text = "§{1} {0}".format(text, level);
+
+def fillAttributeInfoSpans(doc):
+    for el in findAll("span[data-attribute-info]"):
+        if el.text is None or el.text.strip() == '':
+            referencedAttribute = el.get("for")
+            if referencedAttribute is None or referencedAttribute == "":
+                die("Missing for reference in attribute info span.");
+                continue
+            target = findAll('[data-link-type=attribute][title={0}]'.format(referencedAttribute));
+            if len(target) == 0:
+                die("Couldn't find target attribute {0}:\n{1}", referencedAttribute, outerHTML(el));
+            if len(target) > 1:
+                die("Multiple potential target attributes {0}:\n{1}", referenceDAttribute, outerHTML(el));
             target = target[0];
-            el.text = "section {0}".format(textContent(target));
+            datatype = target.get("data-type").strip()
+            decorations = ""
+            if target.get("data-readonly") == "":
+                decorations += ", readonly"
+            if datatype[-1] == "?":
+                decorations += ", nullable"
+                datatype = datatype[:-1]
+            replaceContents(el, parseHTML("of type <a interface>{0}</a>{1}".format(datatype, decorations)))
+            # FIXME: Is there a nicer way to force a leading space here?
+            el.text = ' ' + el.text
 
 def processDfns(doc):
     dfns = findAll("dfn")
@@ -1086,11 +1131,20 @@ class IDLMarker(object):
             else:
                 return [myForValue]
 
+        if idlType == "attribute":
+            if construct.member.rest.readonly is not None:
+                readonly = 'data-readonly'
+            else:
+                readonly = ''
+            extraParameters = '{0} data-type={1}'.format(readonly, construct.member.rest.type)
+        else:
+            extraParameters = ''
+
         if idlType in config.typesUsingFor:
             idlFor = "data-idl-for='{0}'".format('/'.join(getForValues(construct.parent)))
         else:
             idlFor = ""
-        return ('<idl title="{0}" data-idl-type="{1}" {2}>'.format(title, idlType, idlFor), '</idl>')
+        return ('<idl title="{0}" data-idl-type="{1}" {2} {3}>'.format(title, idlType, idlFor, extraParameters), '</idl>')
 
     def encode(self, text):
         return escapeHTML(text)
@@ -1378,6 +1432,7 @@ class CSSSpec(object):
         # Handle all the links
         processDfns(self)
         processIDL(self)
+        fillAttributeInfoSpans(self)
         buildBibliolinkDatabase(self)
         processAutolinks(self)
 

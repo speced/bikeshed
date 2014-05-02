@@ -1,11 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
-import itertools, collections, re
-
-def consume(iterator, n):
-	# Advances an iterator by n steps.
-	# If n is None, advances to the end.
-	collections.deque(itertools.islice(iterator, n))
+import re
+from itertools import *
 
 def tokenizeLines(lines, features=None):
 	# Turns lines of text into block tokens,
@@ -39,12 +35,16 @@ def tokenizeLines(lines, features=None):
 			# blank line
 			token = {'type':'blank'}
 		elif features.has("headings"):
+			# FIXME: Detect the heading ID from heading lines
+			if re.match("={3,}\s*$", line):
+				# h1 underline
+				token = {'type':'equals-line', 'raw': rawline}
 			elif re.match("-{3,}\s*$", line):
 				# h2 underline
 				token = {'type':'dash-line', 'raw': rawline}
 			elif re.match("(#{2,6})\s*(.+)"):
 				# single-line heading
-				level = len(re.match("#*").group(0))
+				level = len(re.match("#*").group(0))+1
 				token = {'type':'heading', 'text': line.strip("#"), 'raw':rawline, 'level': level}
 		elif re.match("\d+\.\s", line):
 			match = re.match("\d+\.\s+(.*)", line)
@@ -66,23 +66,50 @@ def tokenizeLines(lines, features=None):
 	return tokens
 
 def parseTokens(tokens):
-	start = "start"
-	tokens.append({'type':'eof'})
-	currElem = None
-	elems = []
+	tokens = streamFromList(tokens)
+	lines = []
 
-	it = enumerate(tokens)
-	for i, token in it:
-		type = token['type']
-		nextToken = tokens[i+1]
-		nextType = nextToken['type']
+	while True:
+		token = next(tokens)
+		tokenType = token['type']
+		next = peek(tokens)
+		nextType = next['type']
 
-		if(state == "start"):
-			currElem = None
-			if type == "eof":
-				break
-			elif type == "blank":
-				elems.append({'type':'raw', 'raw':''})
-			elif type == "heading":
-				elems.append(token)
+		if tokenType == 'eof':
+			break
+		elif tokenType == 'raw':
+			lines.append(token['raw'])
+		elif tokenType == 'heading':
+			lines.append("<h{level}>{text}</h{level}>".format(**token))
+		elif tokenType == 'text' and nextType == 'equals-line':
+			lines.append("<h2>{text}</h2>".format(**tokens))
+			next(tokens)
+		elif tokenType == 'text' and nextType == 'dash-line':
+			lines.append("<h3>{text}</h3>".format(**tokens))
+			next(tokens)
+		else:
+			lines.append(token['raw'])
 
+	return lines
+
+
+
+
+def streamFromList(l):
+	return tee(chain(tokens, repeat({'type':'eof'})), n=1)
+
+def peek(t, i=1):
+    """Inspect the i-th upcomping value from a tee object
+       while leaving the tee object at its current position.
+
+       Raise an IndexError if the underlying iterator doesn't
+       have enough values.
+
+    """
+    for value in islice(t.__copy__(), i, None):
+        return value
+    raise IndexError(i)
+
+def next(iterable):
+    "Returns the first items in the iterable."
+    return list(islice(iterable, 1))[0]
