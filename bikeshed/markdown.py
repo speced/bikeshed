@@ -96,39 +96,63 @@ def parseTokens(tokens):
 		elif tokenType == 'raw':
 			lines.append(token['raw'])
 		elif tokenType == 'heading':
-			if "id" in next:
-				idattr = " id='{0}'".format(next['id'])
-			else:
-				idattr = ""
-			lines.append("<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, **token))
-		elif tokenType == 'text' and nextType == 'equals-line':
-			if "id" in next:
-				idattr = " id='{0}'".format(next['id'])
-			else:
-				idattr = ""
-			lines.append("<h2{idattr}>{text}</h2>\n".format(idattr=idattr, **token))
-			next = consume(tokens)
-		elif tokenType == 'text' and nextType == 'dash-line':
-			if "id" in next:
-				idattr = " id='{0}'".format(next['id'])
-			else:
-				idattr = ""
-			lines.append("<h3{idattr}>{text}</h3>\n".format(idattr=idattr, **token))
-			next = consume(tokens)
+			newlines, next = parseSingleLineHeading(prev, token, next, tokens)
+			lines += newlines
+		elif tokenType == 'text' and nextType in ('equals-line', 'dash-line'):
+			newlines, next = parseMultiLineHeading(prev, token, next, tokens)
+			lines += newlines
 		elif tokenType == 'text' and prevType == 'blank':
-			# paragraph
-			line = token['text']
-			if line.startswith("Note: ") or line.startswith("Note, "):
-				p = "<p class='note'>"
-			elif line.startswith("Issue: "):
-				p = "<p class='issue'>"
-			else:
-				p = "<p>"
-			lines.append("{0}{1}\n".format(p, line))
+			newlines, next = parseParagraph(prev, token, next, tokens)
+			lines += newlines
 		else:
 			lines.append(token['raw'])
 
 	return lines
+
+# Each parser gets passed the prev, current, and next tokens,
+# plus the rest of the stream.
+# It must return an array of lines to be added to the document
+# (which must end in a \n)
+# and the "next" token back
+# (typically just what was passed, unless you're consuming more lines)
+
+def parseSingleLineHeading(prev, token, next, stream):
+	if "id" in next:
+		idattr = " id='{0}'".format(next['id'])
+	else:
+		idattr = ""
+	return ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, **token)], next
+
+def parseMultiLineHeading(prev, token, next, stream):
+	if next['type'] == "equals-line":
+		level = 2
+	elif next['type'] == "dash-line":
+		level = 3
+	else:
+		die("Markdown parser error: tried to parse a multiline heading from:\n{0}{1}{2}", prev['raw'], token['raw'], next['raw'])
+	if "id" in next:
+		idattr = " id='{0}'".format(next['id'])
+	else:
+		idattr = ""
+	lines = ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, level=level **token)]
+	next = consume(tokens)
+	return lines, next
+
+def parseParagraph(prev, token, next, stream):
+	line = token['text']
+	if line.startswith("Note: ") or line.startswith("Note, "):
+		p = "<p class='note'>"
+	elif line.startswith("Issue: "):
+		p = "<p class='issue'>"
+	else:
+		p = "<p>"
+	lines = ["{0}{1}\n".format(p, line)]
+	while True:
+		if next['type'] in ("eof", "blank", "raw"):
+			return lines, next
+		token = next
+		next = consume(stream)
+		lines.append(token['text'])
 
 
 
