@@ -59,14 +59,14 @@ def tokenizeLines(lines, features=None):
 			token = {'type':'heading', 'text': line.strip("#"), 'raw':rawline, 'level': level}
 			if re.search(r"\{#[\w-]+\}\s*$", line):
 				token['id'] = re.search(r"\{#([\w-]+)\}\s*$", line)
-		elif re.match("\d+\.\s", line):
+		elif re.match(r"\d+\.\s", line):
 			match = re.match(r"\d+\.\s+(.*)", line)
 			token = {'type':'numbered', 'text': match.group(1), 'raw':rawline}
-		elif re.match("[*+-]\s", line):
+		elif re.match(r"[*+-]\s", line):
 			match = re.match(r"[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
-		elif re.match("<", line):
-			if re.match("<<", line) or re.match(r"<({0})".format(allowedStartElements), line):
+		elif re.match(r"<", line):
+			if re.match(r"<<", line) or re.match(r"<({0})".format(allowedStartElements), line):
 				token = {'type':'text', 'text': line, 'raw': rawline}
 			else:
 				token = {'type':'raw', 'raw': rawline}

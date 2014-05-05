@@ -222,7 +222,7 @@ def transformDataBlocks(doc):
     replacements = []
     for (i, line) in enumerate(doc.lines):
         # Look for the start of a block.
-        match = re.match("\s*<(pre|xmp)(.*)", line, re.I)
+        match = re.match(r"\s*<(pre|xmp)(.*)", line, re.I)
         if match and not inBlock:
             inBlock = True
             startLine = i
@@ -233,12 +233,12 @@ def transformDataBlocks(doc):
             else:
                 blockType = "pre"
         # Look for the end of a block.
-        match = re.match("(.*)</"+tagName+">(.*)", line, re.I)
+        match = re.match(r"(.*)</"+tagName+">(.*)", line, re.I)
         if match and inBlock:
             inBlock = False
             if startLine == i:
                 # Single-line <pre>.
-                match = re.match("\s*(<{0}[^>]*>)(.+)</{0}>(.*)".format(tagName), line, re.I)
+                match = re.match(r"\s*(<{0}[^>]*>)(.+)</{0}>(.*)".format(tagName), line, re.I)
                 doc.lines[i] = match.group(3)
                 replacements.append({
                     'start': i,
@@ -248,7 +248,7 @@ def transformDataBlocks(doc):
                         tagName=tagName,
                         firstLine=match.group(1),
                         doc=doc)})
-            elif re.match("^\s*$", match.group(1)):
+            elif re.match(r"^\s*$", match.group(1)):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
                 doc.lines[i] = match.group(2)
@@ -284,7 +284,7 @@ def transformDataBlocks(doc):
 
 
 def transformPre(lines, tagName, firstLine, **kwargs):
-    prefix = re.match("\s*", firstLine).group(0)
+    prefix = re.match(r"\s*", firstLine).group(0)
     for (i, line) in enumerate(lines):
         # Remove the whitespace prefix from each line.
         match = re.match(prefix+"(.*)", line, re.DOTALL)
@@ -367,7 +367,7 @@ def transformElementdef(lines, doc, **kwargs):
 def parseDefBlock(lines, type):
     vals = {}
     for (i, line) in enumerate(lines):
-        match = re.match("\s*([^:]+):\s*(.*)", line)
+        match = re.match(r"\s*([^:]+):\s*(.*)", line)
         if(match is None):
             die("Incorrectly formatted {2} line for '{0}':\n{1}", vals.get("Name", "???"), line, type)
             continue
@@ -386,7 +386,7 @@ def transformMetadata(lines, doc, **kwargs):
         line = line.strip()
         if line == "":
             continue
-        match = re.match("([^:]+):\s*(.*)", line)
+        match = re.match(r"([^:]+):\s*(.*)", line)
         if(match is None):
             die("Incorrectly formatted metadata line:\n{0}", line)
             continue
@@ -814,7 +814,7 @@ def determineDfnType(dfn):
         return "type"
     elif text[0:1] == ":":
         return "selector"
-    elif re.match("^[\w-]+\(.*\)$", text) and not (dfn.get('id') or '').startswith("dom-"):
+    elif re.match(r"^[\w-]+\(.*\)$", text) and not (dfn.get('id') or '').startswith("dom-"):
         return "function"
     else:
         return "dfn"
@@ -824,8 +824,8 @@ def determineDfnText(el):
     contents = textContent(el)
     if el.get('title'):
         dfnText = el.get('title')
-    elif dfnType in config.functionishTypes and re.match("^[\w-]+\(.*\)$", contents):
-        dfnText = re.match("^([\w-]+)\(.*\)$", contents).group(1)+"()"
+    elif dfnType in config.functionishTypes and re.match(r"^[\w-]+\(.*\)$", contents):
+        dfnText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1)+"()"
     else:
         dfnText = contents
     return dfnText
@@ -840,13 +840,13 @@ def classifyDfns(doc, dfns):
             el.set('data-dfn-type', dfnType)
         # Some error checking
         if dfnType in config.functionishTypes:
-            if not re.match("^[\w-]+\(.*\)$", dfnText):
+            if not re.match(r"^[\w-]+\(.*\)$", dfnText):
                 die("Functions/methods must end with () in their linking text, got '{0}'.", dfnText)
                 continue
             elif el.get('title') is None:
                 # Make sure that functionish dfns have their title set up right.
                 # Need to fix this to use the idl parser instead.
-                el.set('title', re.match("^([\w-]+)\(.*\)$", dfnText).group(1)+"()")
+                el.set('title', re.match(r"^([\w-]+)\(.*\)$", dfnText).group(1)+"()")
         # If type=argument, try to infer what it's for.
         if dfnType == "argument" and el.get('data-dfn-for') is None:
             parent = el.getparent()
@@ -923,8 +923,8 @@ def determineLinkType(el):
     linkType = treeAttr(el, 'data-link-type')
     text = textContent(el)
     # ''foo: bar'' is a propdef for 'foo'
-    if linkType == "maybe" and re.match("^[\w-]+\s*:\s+\S", text):
-        el.set('title', re.match("^\s*([\w-]+)\s*:\s+\S", text).group(1))
+    if linkType == "maybe" and re.match(r"^[\w-]+\s*:\s+\S", text):
+        el.set('title', re.match(r"^\s*([\w-]+)\s*:\s+\S", text).group(1))
         return "propdesc"
     if linkType:
         if linkType in config.linkTypes.union(["dfn"]):
@@ -949,8 +949,8 @@ def determineLinkText(el):
     contents = textContent(el)
     if el.get('title'):
         linkText = el.get('title')
-    elif linkType in config.functionishTypes.union(["functionish"]) and re.match("^[\w-]+\(.*\)$", contents):
-        linkText = re.match("^([\w-]+)\(.*\)$", contents).group(1)+"()"
+    elif linkType in config.functionishTypes.union(["functionish"]) and re.match(r"^[\w-]+\(.*\)$", contents):
+        linkText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1)+"()"
         # Need to fix this using the idl parser.
     else:
         linkText = contents
@@ -1330,7 +1330,7 @@ class CSSSpec(object):
         if "customDfns" in self.refs.defaultSpecs:
             for specName, specUrl, dfnText, dfnType, dfnUrl in self.refs.defaultSpecs["customDfns"]:
                 if specName not in self.refs.specs:
-                    levelMatch = re.match("(.*)-(\d+)", specName)
+                    levelMatch = re.match(r"(.*)-(\d+)", specName)
                     if levelMatch:
                         shortname = levelMatch.group(1)
                         level = levelMatch.group(2)
@@ -1510,7 +1510,7 @@ def fillInBoilerplate(doc):
 
     # Otherwise, if you start your spec with an <h1>, I'll take it as the spec's title and remove it.
     # (It gets added back in the header file.)
-    match = re.match("^<h1>([^<]+)</h1>", doc.html)
+    match = re.match(r"^<h1>([^<]+)</h1>", doc.html)
     if match:
         doc.md.title = match.group(1)
         config.textMacros['title'] = doc.md.title
@@ -1637,7 +1637,7 @@ def addPropertyIndex(doc):
     # Extract all the data from the propdef and descdef tables
     def extractKeyValFromRow(tr):
         # Extract the key, minus the trailing :
-        result = re.match('(.*):', textContent(row[0]).strip())
+        result = re.match(r'(.*):', textContent(row[0]).strip())
         if result is None:
             die("Propdef row headers need be a word followed by a colon. Got:\n{0}", textContent(row[0]).strip())
             return '',''
