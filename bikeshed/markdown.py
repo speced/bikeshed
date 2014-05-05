@@ -40,30 +40,39 @@ def tokenizeLines(lines, features=None):
 		if line == "":
 			token = {'type':'blank', 'raw': rawline}
 		# FIXME: Detect the heading ID from heading lines
-		elif "headings" in features and re.match("={3,}\s*$", line):
+		elif "headings" in features and re.match(r"={3,}(\{#[\w-]+\})?\s*$", line):
 			# h1 underline
+			match = re.match(r"={3,}(\{#[\w-]+\})?\s*$", line)
 			token = {'type':'equals-line', 'raw': rawline}
-		elif "headings" in features and re.match("-{3,}\s*$", line):
+			if match.group(1):
+				token['id'] = match.group(1)[2:-1]
+		elif "headings" in features and re.match(r"-{3,}(\{#[\w-]+\})?\s*$", line):
 			# h2 underline
+			match = re.match(r"-{3,}(\{#[\w-]+\})?\s*$", line)
 			token = {'type':'dash-line', 'raw': rawline}
-		elif "headings" in features and re.match("(#{2,6})\s*(.+)", line):
+			if match.group(1):
+				token['id'] = match.group(1)[2:-1]
+		elif "headings" in features and re.match(r"(#{2,6})\s*(.+)(\1\{#[\w-]+\})?", line):
 			# single-line heading
-			level = len(re.match("#*", line).group(0))+1
+			match = re.match(r"(#{2,6})\s*(.+)(\1\{#[\w-]+\})?", line)
+			level = len(match.group(1))+1
 			token = {'type':'heading', 'text': line.strip("#"), 'raw':rawline, 'level': level}
+			if re.search(r"\{#[\w-]+\}\s*$", line):
+				token['id'] = re.search(r"\{#([\w-]+)\}\s*$", line)
 		elif re.match("\d+\.\s", line):
-			match = re.match("\d+\.\s+(.*)", line)
+			match = re.match(r"\d+\.\s+(.*)", line)
 			token = {'type':'numbered', 'text': match.group(1), 'raw':rawline}
 		elif re.match("[*+-]\s", line):
-			match = re.match("[*+-]\s+(.*)", line)
+			match = re.match(r"[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
 		elif re.match("<", line):
-			if re.match("<<", line) or re.match("<({0})".format(allowedStartElements), line):
+			if re.match("<<", line) or re.match(r"<({0})".format(allowedStartElements), line):
 				token = {'type':'text', 'text': line, 'raw': rawline}
 			else:
 				token = {'type':'raw', 'raw': rawline}
 		else:
 			token = {'type':'text', 'text': line, 'raw': rawline}
-		token['prefix'] = re.match("([ \t]*)\n?", rawline).group(1)
+		token['prefix'] = re.match(r"([ \t]*)\n?", rawline).group(1)
 		tokens.append(token)
 
 	return tokens
@@ -87,12 +96,24 @@ def parseTokens(tokens):
 		elif tokenType == 'raw':
 			lines.append(token['raw'])
 		elif tokenType == 'heading':
-			lines.append("<h{level}>{text}</h{level}>\n".format(**token))
+			if "id" in next:
+				idattr = " id='{0}'".format(next['id'])
+			else:
+				idattr = ""
+			lines.append("<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, **token))
 		elif tokenType == 'text' and nextType == 'equals-line':
-			lines.append("<h2>{text}</h2>\n".format(**token))
+			if "id" in next:
+				idattr = " id='{0}'".format(next['id'])
+			else:
+				idattr = ""
+			lines.append("<h2{idattr}>{text}</h2>\n".format(idattr=idattr, **token))
 			next = consume(tokens)
 		elif tokenType == 'text' and nextType == 'dash-line':
-			lines.append("<h3>{text}</h3>\n".format(**token))
+			if "id" in next:
+				idattr = " id='{0}'".format(next['id'])
+			else:
+				idattr = ""
+			lines.append("<h3{idattr}>{text}</h3>\n".format(idattr=idattr, **token))
 			next = consume(tokens)
 		elif tokenType == 'text' and prevType == 'blank':
 			# paragraph
@@ -113,19 +134,7 @@ def parseTokens(tokens):
 
 
 def streamFromList(l):
-	return tee(chain(l, repeat({'type':'eof'})), 1)[0]
-
-def peek(t, i=1):
-    """Inspect the i-th upcomping value from a tee object
-       while leaving the tee object at its current position.
-
-       Raise an IndexError if the underlying iterator doesn't
-       have enough values.
-
-    """
-    for value in islice(t.__copy__(), i, None):
-        return value
-    raise IndexError(i)
+	return chain(l, repeat({'type':'eof'}))
 
 def consume(iterable):
     "Returns the first items in the iterable."
