@@ -62,8 +62,8 @@ def tokenizeLines(lines, features=None):
 		elif re.match(r"\d+\.\s", line):
 			match = re.match(r"\d+\.\s+(.*)", line)
 			token = {'type':'numbered', 'text': match.group(1), 'raw':rawline}
-		elif re.match(r"[*+-]\s", line):
-			match = re.match(r"[*+-]\s+(.*)", line)
+		elif re.match(r"\s*[*+-]\s", line):
+			match = re.match(r"\s*[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
 		elif re.match(r"<", line):
 			if re.match(r"<<", line) or re.match(r"<({0})[ >]".format(allowedStartElements), line):
@@ -100,12 +100,8 @@ def parseTokens(tokens):
 
 	return lines
 
-# Each parser gets passed the prev, current, and next tokens,
-# plus the rest of the stream.
-# It must return an array of lines to be added to the document
-# (which must end in a \n)
-# and the "next" token back
-# (typically just what was passed, unless you're consuming more lines)
+# Each parser gets passed the stream
+# and must return the lines it returns.
 
 def parseSingleLineHeading(stream):
 	if "id" in stream.curr():
