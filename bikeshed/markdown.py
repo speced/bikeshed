@@ -79,6 +79,18 @@ def tokenizeLines(lines, features=None):
 	return tokens
 
 def parseTokens(tokens):
+	'''
+	Token types:
+	eof
+	blank
+	equals-line
+	dash-line
+	heading
+	numbered
+	bulleted
+	text
+	raw
+	'''
 	stream = TokenStream(tokens)
 	lines = []
 
@@ -94,6 +106,8 @@ def parseTokens(tokens):
 			lines += parseMultiLineHeading(stream)
 		elif stream.currtype() == 'text' and stream.prevtype() == 'blank':
 			lines += parseParagraph(stream)
+		#elif stream.currtype() == 'bulleted':
+		#	lines += parseBulleted(stream)
 		else:
 			lines.append(stream.currraw())
 			stream.advance()
@@ -143,8 +157,19 @@ def parseParagraph(stream):
 			return lines
 		lines.append(stream.currraw())
 
+def parseBulleted(stream):
+	prefix = stream.currprefix()
 
-
+	def getNextLi(stream):
+		lines = [stream.getcurr()]
+		while True:
+			stream.advance()
+			if stream.currtype() == 'bulleted' and stream.currprefix == prefix:
+				return lines
+			if not stream.currprefix().startswith(prefix):
+				return lines
+			if stream.currtype() == 'blank' and stream.nexttype() != 'bulleted':
+				return lines
 
 
 class TokenStream:
