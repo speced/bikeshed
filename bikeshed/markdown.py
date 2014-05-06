@@ -38,7 +38,7 @@ def tokenizeLines(lines, features=None):
 		line = rawline.strip()
 
 		if line == "":
-			token = {'type':'blank', 'raw': rawline}
+			token = {'type':'blank', 'raw': '\n'}
 		# FIXME: Detect the heading ID from heading lines
 		elif "headings" in features and re.match(r"={3,}(\{#[\w-]+\})?\s*$", line):
 			# h1 underline
@@ -66,7 +66,7 @@ def tokenizeLines(lines, features=None):
 			match = re.match(r"[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
 		elif re.match(r"<", line):
-			if re.match(r"<<", line) or re.match(r"<({0})".format(allowedStartElements), line):
+			if re.match(r"<<", line) or re.match(r"<({0})[ >]".format(allowedStartElements), line):
 				token = {'type':'text', 'text': line, 'raw': rawline}
 			else:
 				token = {'type':'raw', 'raw': rawline}
@@ -74,38 +74,32 @@ def tokenizeLines(lines, features=None):
 			token = {'type':'text', 'text': line, 'raw': rawline}
 		token['prefix'] = re.match(r"([ \t]*)\n?", rawline).group(1)
 		tokens.append(token)
+		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
 	return tokens
 
 def parseTokens(tokens):
-	tokens = streamFromList(tokens)
+	tokens = TokenStream(tokens)
 	lines = []
 
-	token = {'type':'blank', 'raw': ''}
-	next = consume(tokens)
 	while True:
-		prev = token
-		prevType = prev['type']
-		token = next
-		tokenType = token['type']
-		next = consume(tokens)
-		nextType = next['type']
-
-		if tokenType == 'eof':
+		if tokens.ended():
 			break
-		elif tokenType == 'raw':
-			lines.append(token['raw'])
-		elif tokenType == 'heading':
-			newlines, next = parseSingleLineHeading(prev, token, next, tokens)
+		elif tokens.currtype() == 'raw':
+			lines.append(tokens.currraw())
+			tokens.advance()
+		elif tokens.currtype() == 'heading':
+			newlines, tokens = parseSingleLineHeading(tokens)
 			lines += newlines
-		elif tokenType == 'text' and nextType in ('equals-line', 'dash-line'):
-			newlines, next = parseMultiLineHeading(prev, token, next, tokens)
+		elif tokens.currtype() == 'text' and tokens.nexttype() in ('equals-line', 'dash-line'):
+			newlines, tokens = parseMultiLineHeading(tokens)
 			lines += newlines
-		elif tokenType == 'text' and prevType == 'blank':
-			newlines, next = parseParagraph(prev, token, next, tokens)
+		elif tokens.currtype() == 'text' and tokens.prevtype() == 'blank':
+			newlines, tokens = parseParagraph(tokens)
 			lines += newlines
 		else:
-			lines.append(token['raw'])
+			lines.append(tokens.currraw())
+			tokens.advance()
 
 	return lines
 
@@ -116,30 +110,32 @@ def parseTokens(tokens):
 # and the "next" token back
 # (typically just what was passed, unless you're consuming more lines)
 
-def parseSingleLineHeading(prev, token, next, stream):
-	if "id" in next:
-		idattr = " id='{0}'".format(next['id'])
+def parseSingleLineHeading(stream):
+	if "id" in stream.curr():
+		idattr = " id='{0}'".format(stream.currid())
 	else:
 		idattr = ""
-	return ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, **token)], next
+	lines = ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, **stream.curr())]
+	stream.advance()
+	return lines, stream
 
-def parseMultiLineHeading(prev, token, next, stream):
-	if next['type'] == "equals-line":
+def parseMultiLineHeading(stream):
+	if stream.nexttype() == "equals-line":
 		level = 2
-	elif next['type'] == "dash-line":
+	elif stream.nexttype() == "dash-line":
 		level = 3
 	else:
-		die("Markdown parser error: tried to parse a multiline heading from:\n{0}{1}{2}", prev['raw'], token['raw'], next['raw'])
-	if "id" in next:
-		idattr = " id='{0}'".format(next['id'])
+		die("Markdown parser error: tried to parse a multiline heading from:\n{0}{1}{2}", stream.prevraw(), stream.currraw(), stream.nextraw())
+	if "id" in stream.next():
+		idattr = " id='{0}'".format(stream.nextid())
 	else:
 		idattr = ""
-	lines = ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, level=level **token)]
-	next = consume(tokens)
-	return lines, next
+	lines = ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, level=level, **stream.curr())]
+	stream.advance(2)
+	return lines, stream
 
-def parseParagraph(prev, token, next, stream):
-	line = token['text']
+def parseParagraph(stream):
+	line = stream.currtext()
 	if line.startswith("Note: ") or line.startswith("Note, "):
 		p = "<p class='note'>"
 	elif line.startswith("Issue: "):
@@ -148,18 +144,63 @@ def parseParagraph(prev, token, next, stream):
 		p = "<p>"
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
-		if next['type'] in ("eof", "blank", "raw"):
-			return lines, next
-		token = next
-		next = consume(stream)
-		lines.append(token['text'])
+		stream.advance()
+		if stream.currtype() in ("eof", "blank", "raw"):
+			lines[-1] = lines[-1][0:-1] + "</p>" + "\n"
+			return lines, stream
+		lines.append(stream.currraw())
 
 
 
 
-def streamFromList(l):
-	return chain(l, repeat({'type':'eof'}))
 
-def consume(iterable):
-    "Returns the first items in the iterable."
-    return list(islice(iterable, 1))[0]
+class TokenStream:
+	def __init__(self, tokens, before={'type':'blank','raw':'\n'}, after={'type':'eof','raw':''}):
+		self.tokens = tokens
+		self.i = 0
+		self.before = before
+		self.after = after
+
+	def __len__(self):
+		return len(self.tokens)
+
+	def ended(self):
+		return self.i >= len(self)
+
+	def nth(self, i):
+		if i < 0:
+			return self.before
+		elif i >= len(self):
+			return self.after
+		else:
+			return self.tokens[i]
+
+	def prev(self, i=1):
+		return self.nth(self.i - i)
+
+	def curr(self):
+		return self.nth(self.i)
+
+	def next(self, i=1):
+		return self.nth(self.i + i)
+
+	def advance(self, i=1):
+		self.i += i
+		return self.curr()
+
+	def __getattr__(self, name):
+		if len(name) >= 5 and name[0:4] in ("prev", "curr", "next"):
+			tokenDir = name[0:4]
+			attrName = name[4:]
+			def _missing(i=1):
+				if tokenDir == "prev":
+					tok = self.prev(i)
+				elif tokenDir == "next":
+					tok = self.next(i)
+				else:
+					tok = self.curr()
+				if attrName in tok:
+					return tok[attrName]
+				else:
+					raise AttributeError, attrName
+			return _missing
