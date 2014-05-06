@@ -79,27 +79,28 @@ def tokenizeLines(lines, features=None):
 	return tokens
 
 def parseTokens(tokens):
-	tokens = TokenStream(tokens)
+	stream = TokenStream(tokens)
 	lines = []
 
 	while True:
-		if tokens.ended():
+		if stream.ended():
 			break
-		elif tokens.currtype() == 'raw':
-			lines.append(tokens.currraw())
-			tokens.advance()
-		elif tokens.currtype() == 'heading':
-			newlines, tokens = parseSingleLineHeading(tokens)
+		elif stream.currtype() == 'raw':
+			lines.append(stream.currraw())
+			stream.advance()
+		elif stream.currtype() == 'heading':
+			newlines, stream = parseSingleLineHeading(stream)
 			lines += newlines
-		elif tokens.currtype() == 'text' and tokens.nexttype() in ('equals-line', 'dash-line'):
-			newlines, tokens = parseMultiLineHeading(tokens)
+		elif stream.currtype() == 'text' and stream.nexttype() in ('equals-line', 'dash-line'):
+			newlines, stream = parseMultiLineHeading(stream)
 			lines += newlines
-		elif tokens.currtype() == 'text' and tokens.prevtype() == 'blank':
-			newlines, tokens = parseParagraph(tokens)
+		elif stream.currtype() == 'text' and stream.prevtype() == 'blank':
+			newlines, stream = parseParagraph(stream)
 			lines += newlines
+
 		else:
-			lines.append(tokens.currraw())
-			tokens.advance()
+			lines.append(stream.currraw())
+			stream.advance()
 
 	return lines
 
