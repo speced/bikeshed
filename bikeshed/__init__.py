@@ -1311,6 +1311,11 @@ class CSSSpec(object):
                                 unicode(
                                     retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.json", type="anchor data", quiet=True).read(),
                                     encoding="utf-8")))
+        try:
+            with io.open("anchors.json", 'r', encoding="utf-8") as fh:
+                self.refs.refs.update(json.loads(fh.read()));
+        except IOError:
+            pass
         self.refs.defaultSpecs = defaultdict(list,
                                     json.loads(
                                         unicode(
