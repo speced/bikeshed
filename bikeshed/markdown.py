@@ -152,7 +152,7 @@ def parseParagraph(stream):
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
 		stream.advance()
-		if stream.currtype() in ("eof", "blank", "raw"):
+		if stream.currtype() in ("eof", "blank"):
 			lines[-1] = lines[-1][0:-1] + "</p>" + "\n"
 			return lines
 		lines.append(stream.currraw())
