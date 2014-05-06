@@ -1430,9 +1430,7 @@ class CSSSpec(object):
                 outputFilename = "-"
             else:
                 outputFilename = "-"
-        walker = html5lib.treewalkers.getTreeWalker("lxml")
-        s = html5lib.serializer.htmlserializer.HTMLSerializer(alphabetical_attributes=True)
-        rendered = s.render(walker(self.document))
+        rendered = html5lib.serialize(self.document, tree="lxml", alphabetical_attributes=True)
         rendered = finalHackyCleanup(rendered)
         if not config.dryRun:
             try:
