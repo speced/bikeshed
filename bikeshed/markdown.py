@@ -89,15 +89,11 @@ def parseTokens(tokens):
 			lines.append(stream.currraw())
 			stream.advance()
 		elif stream.currtype() == 'heading':
-			newlines, stream = parseSingleLineHeading(stream)
-			lines += newlines
+			lines += parseSingleLineHeading(stream)
 		elif stream.currtype() == 'text' and stream.nexttype() in ('equals-line', 'dash-line'):
-			newlines, stream = parseMultiLineHeading(stream)
-			lines += newlines
+			lines += parseMultiLineHeading(stream)
 		elif stream.currtype() == 'text' and stream.prevtype() == 'blank':
-			newlines, stream = parseParagraph(stream)
-			lines += newlines
-
+			lines += parseParagraph(stream)
 		else:
 			lines.append(stream.currraw())
 			stream.advance()
@@ -118,7 +114,7 @@ def parseSingleLineHeading(stream):
 		idattr = ""
 	lines = ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, **stream.curr())]
 	stream.advance()
-	return lines, stream
+	return lines
 
 def parseMultiLineHeading(stream):
 	if stream.nexttype() == "equals-line":
@@ -133,7 +129,7 @@ def parseMultiLineHeading(stream):
 		idattr = ""
 	lines = ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, level=level, **stream.curr())]
 	stream.advance(2)
-	return lines, stream
+	return lines
 
 def parseParagraph(stream):
 	line = stream.currtext()
@@ -148,7 +144,7 @@ def parseParagraph(stream):
 		stream.advance()
 		if stream.currtype() in ("eof", "blank", "raw"):
 			lines[-1] = lines[-1][0:-1] + "</p>" + "\n"
-			return lines, stream
+			return lines
 		lines.append(stream.currraw())
 
 
