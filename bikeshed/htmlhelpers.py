@@ -209,3 +209,9 @@ def hasClass(el, cls):
     paddedAttr = " {0} ".format(el.get('class'))
     paddedCls = " {0} ".format(cls)
     return paddedCls in paddedAttr
+
+def isElement(node):
+    return isinstance(node.tag, basestring)
+
+def isOpaqueElement(el):
+    return el.tag in ('pre', 'code', 'style', 'script')

@@ -529,7 +529,7 @@ def transformAutolinkShortcuts(doc):
 
     def fixElementText(el):
         # Don't transform anything in some kinds of elements.
-        processContents = el.tag not in ("pre", "code", "style", "script")
+        processContents = isElement(el) and not isOpaqueElement(el)
 
         if processContents:
             # Pull out el.text, replace stuff (may introduce elements), parse.
