@@ -449,7 +449,7 @@ class SingleType(Production):    # NonAnyType | "any" [TypeSuffixStartingWithArr
 
 class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [TypeSuffix] | "DOMString" [TypeSuffix] |
                                 # identifier [TypeSuffix] | "sequence" "<" Type ">" [Null] | "object" [TypeSuffix] |
-                                # "Date" [TypeSuffix] | "RegExp" [TypeSuffix]
+                                # "Date" [TypeSuffix] | "RegExp" [TypeSuffix] | "promise" "<" Type ">" [Null]
     @classmethod
     def peek(cls, tokens):
         if (PrimitiveType.peek(tokens)):
@@ -465,13 +465,20 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                     if (Symbol.peek(tokens, '>')):
                         Symbol.peek(tokens, '?')
                         return tokens.popPosition(True)
+        elif (token and token.isSymbol('promise')):
+            if (Symbol.peek(tokens, '<')):
+                if (Type.peek(tokens)):
+                    if (Symbol.peek(tokens, '>')):
+                        Symbol.peek(tokens, '?')
+                        return tokens.popPosition(True)
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
         Production.__init__(self, tokens)
         self.sequence = None
-        self._openSequence = None
-        self._closeSequence = None
+        self.promise = None
+        self._openType = None
+        self._closeType = None
         self.null = False
         self.suffix = None
         if (PrimitiveType.peek(tokens)):
@@ -484,9 +491,15 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                 self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
             elif (token.isSymbol('sequence')):
                 self.sequence = Symbol(tokens, 'sequence')
-                self._openSequence = Symbol(tokens, '<')
+                self._openType = Symbol(tokens, '<')
                 self.type = Type(tokens)
-                self._closeSequence = Symbol(tokens, '>', False)
+                self._closeType = Symbol(tokens, '>', False)
+                self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
+            elif (token.isSymbol('promise')):
+                self.promise = Symbol(tokens, 'promise')
+                self._openType = Symbol(tokens, '<')
+                self.type = Type(tokens)
+                self._closeType = Symbol(tokens, '>', False)
                 self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
             else:
                 self.type = Symbol(tokens, None, False)  # "ByteString" | "DOMString" | "object" | "Date" | "RegExp"
@@ -495,7 +508,10 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
 
     def _unicode(self):
         if (self.sequence):
-            output = unicode(self.sequence) + unicode(self._openSequence) + unicode(self.type) + unicode(self._closeSequence)
+            output = unicode(self.sequence) + unicode(self._openType) + unicode(self.type) + unicode(self._closeType)
+            return output + (unicode(self.null) if (self.null) else '')
+        if (self.promise):
+            output = unicode(self.promise) + unicode(self._openType) + unicode(self.type) + unicode(self._closeType)
             return output + (unicode(self.null) if (self.null) else '')
         output = unicode(self.type)
         return output + (unicode(self.suffix) if (self.suffix) else '')
@@ -508,15 +524,23 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             return self
         if (self.sequence):
             generator.addText(self.sequence)
-            generator.addText(self._openSequence)
+            generator.addText(self._openType)
             self.type.markup(generator)
-            generator.addText(self._closeSequence)
+            generator.addText(self._closeType)
+            generator.addText(self.null)
+            return self
+        if (self.promise):
+            generator.addText(self.promise)
+            generator.addText(self._openType)
+            self.type.markup(generator)
+            generator.addText(self._closeType)
             generator.addText(self.null)
             return self
         return Production._markup(self, generator)
     
     def __repr__(self):
-        output = '[NonAnyType: ' + ('[sequence]' if (self.sequence) else '') + repr(self.type)
+        output = '[NonAnyType: ' + ('[sequence] ' if (self.sequence) else '') + ('[promise] ' if (self.promise) else '')
+        output += repr(self.type) + ('[null]' if (self.null) else '')
         return output + (repr(self.suffix) if (self.suffix) else '') + ']'
 
 
