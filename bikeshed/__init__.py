@@ -745,13 +745,16 @@ def fixIntraDocumentReferences(doc):
             if sectionID is None or sectionID == "" or sectionID[0] != '#':
                 die("Missing/invalid href {0} in section link.", sectionID);
                 continue
-            target = findAll("{0}[data-level]".format(sectionID));
+            target = findAll("{0}.heading".format(sectionID));
             if len(target) == 0:
                 die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
                 continue
             text = textContent(findAll(".content", target[0])[0]);
-            level = target[0].get('data-level');
-            el.text = "§{1} {0}".format(text, level);
+            if 'data-level' in target[0]:
+                level = target[0].get('data-level');
+                el.text = "§{1} {0}".format(text, level);
+            else:
+                el.text = text
 
 def fillAttributeInfoSpans(doc):
     for el in findAll("span[data-attribute-info]"):
