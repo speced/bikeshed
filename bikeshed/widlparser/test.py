@@ -123,7 +123,7 @@ if __name__ == "__main__":      # called from the command line
     Foo iterator object;
     static attribute Foo foo;
     static Foo foo();
-    promise<ReallyISwear>? theCheckIsInTheMail();
+    Promise<ReallyISwear>? theCheckIsInTheMail();
 };"""
     idl += u""" // this is a comment éß
 interface Multi : One  ,  Two   ,   Three     {

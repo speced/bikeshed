@@ -55,7 +55,7 @@ class Tokenizer(object):
         'any', 'attribute', 'boolean', 'byte', 'ByteString', 'callback', 'const', 'creator', 'Date', 'deleter',
         'dictionary', 'DOMString', 'double', 'enum', 'exception', 'false', 'float', 'getter', 'implements',
         'Infinity', 'inherit', 'interface', 'iterator', 'legacycaller', 'long', 'NaN', 'null', 'object', 'octet',
-        'optional', 'or', 'partial', 'promise', 'readonly', 'RegExp', 'sequence', 'serializer', 'setter', 'short',
+        'optional', 'or', 'partial', 'Promise', 'readonly', 'RegExp', 'sequence', 'serializer', 'setter', 'short',
         'static', 'stringifier', 'true', 'typedef', 'unrestricted', 'unsigned', 'void'))
     
     def __init__(self, text, ui = None):
