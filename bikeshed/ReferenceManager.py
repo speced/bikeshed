@@ -152,7 +152,7 @@ class ReferenceManager(object):
 
         # If spec is specified, kill anything that doesn't match
         if spec is not None:
-            refs = [ref for ref in refs if ref['shortname']==spec or ref['spec']==spec]
+            refs = [ref for ref in refs if ref['shortname'].lower() == spec.lower() or ref['spec'].lower() ==spec.lower()]
         if len(refs) == 0:
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec)
