@@ -140,6 +140,8 @@ interface foo {
 typedef   short    shorttype  = error this is;
 
    const  long    long   one=   2   ;
+   const long hex = 0xabcdef09;
+   const long octal = 0777;
    const double reallyHigh = Infinity;
    const double reallyLow = -Infinity;
    const double notANumber = NaN;

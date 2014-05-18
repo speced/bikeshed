@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='widlparser',
-      version='0.98',
+      version='0.99',
       description='WebIDL Parser',
       author='Peter Linss',
       author_email='peter.linss@hp.com',
