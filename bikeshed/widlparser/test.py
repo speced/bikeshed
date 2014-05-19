@@ -123,6 +123,7 @@ if __name__ == "__main__":      # called from the command line
     Foo iterator object;
     static attribute Foo foo;
     static Foo foo();
+    Promise<ReallyISwear>? theCheckIsInTheMail();
 };"""
     idl += u""" // this is a comment éß
 interface Multi : One  ,  Two   ,   Three     {
@@ -139,6 +140,8 @@ interface foo {
 typedef   short    shorttype  = error this is;
 
    const  long    long   one=   2   ;
+   const long hex = 0xabcdef09;
+   const long octal = 0777;
    const double reallyHigh = Infinity;
    const double reallyLow = -Infinity;
    const double notANumber = NaN;

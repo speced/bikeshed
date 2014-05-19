@@ -55,8 +55,8 @@ class Tokenizer(object):
         'any', 'attribute', 'boolean', 'byte', 'ByteString', 'callback', 'const', 'creator', 'Date', 'deleter',
         'dictionary', 'DOMString', 'double', 'enum', 'exception', 'false', 'float', 'getter', 'implements',
         'Infinity', 'inherit', 'interface', 'iterator', 'legacycaller', 'long', 'NaN', 'null', 'object', 'octet',
-        'optional', 'or', 'partial', 'readonly', 'RegExp', 'sequence', 'serializer', 'setter', 'short', 'static',
-        'stringifier', 'true', 'typedef', 'unrestricted', 'unsigned', 'void'))
+        'optional', 'or', 'partial', 'Promise', 'readonly', 'RegExp', 'sequence', 'serializer', 'setter', 'short',
+        'static', 'stringifier', 'true', 'typedef', 'unrestricted', 'unsigned', 'void'))
     
     def __init__(self, text, ui = None):
         self.ui = ui
@@ -73,10 +73,10 @@ class Tokenizer(object):
                 self.tokens.append(Token('float', match.group(1)))
                 text = match.group(5)
                 continue
-            match = re.match(r'(-?(0([0-7]*|0[Xx][0-9A-Fa-f]+)|[1-9][0-9]*))(.*)', text, re.DOTALL)
+            match = re.match(r'(-?(0[Xx][0-9A-Fa-f]+|0[0-7]*|[1-9][0-9]*))(.*)', text, re.DOTALL)
             if (match):
                 self.tokens.append(Token('integer', match.group(1)))
-                text = match.group(4)
+                text = match.group(3)
                 continue
             match = re.match(r'(_?[A-Z_a-z][0-9A-Z_a-z]*)(.*)', text, re.DOTALL)
             if (match):
