@@ -187,7 +187,7 @@ def parseIgnoredTerms(key, val):
 def parseLinkDefaults(key, val):
     defaultSpecs = defaultdict(list)
     for default in val.split(","):
-        match = re.match("^([\w-]+)  (?:\s+\( ({0}) (?:\s+(TR|ED))? \) )  \s+(.*)$".format("|".join(config.dfnTypes.union(["dfn"]))), default.strip(), re.X)
+        match = re.match("^([\w\d-]+)  (?:\s+\( ({0}) (?:\s+(TR|ED))? \) )  \s+(.*)$".format("|".join(config.dfnTypes.union(["dfn"]))), default.strip(), re.X)
         if match:
             spec = match.group(1)
             type = match.group(2)
