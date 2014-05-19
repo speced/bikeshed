@@ -188,6 +188,12 @@ def fixTypography(text):
     text = re.sub(r"([^<][^!])(—|--)\r?\n\s+(\S)", r"\1—<wbr>\3", text)
     return text
 
+def unfixTypography(text):
+    # Replace curly quotes with straight quotes, and emdashes with double dashes.
+    text = re.sub(r"’", r"'", text)
+    # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
+    text = re.sub(r"—<wbr>", r"--", text)
+    return text
 
 def transformMarkdownParagraphs(doc):
     doc.lines = markdown.parse(doc.lines)
@@ -1026,7 +1032,7 @@ def processAutolinks(doc):
             el.set('href', '#'+simplifyText(linkText))
             continue
 
-        url = doc.refs.getRef(linkType, linkText,
+        url = doc.refs.getRef(linkType, unfixTypography(linkText),
                               spec=el.get('data-link-spec'),
                               status=el.get('data-link-status'),
                               linkFor=el.get('data-link-for'),
@@ -1138,7 +1144,7 @@ def processIDL(doc):
         for el in findAll("idl", pre):
             idlType = el.get('data-idl-type')
             idlText = el.get('title')
-            url = doc.refs.getRef(idlType, idlText.lower(),
+            url = doc.refs.getRef(idlType, unfixTypography(idlText.lower()),
                                   linkFor=el.get('data-idl-for'),
                                   el=el,
                                   error=False)
