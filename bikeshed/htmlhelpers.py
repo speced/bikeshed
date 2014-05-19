@@ -31,7 +31,10 @@ def find(sel, context=None):
 
 def textContent(el):
     str =  html.tostring(el, method='text', with_tail=False, encoding="unicode")
-    return re.sub(r"\s+", r" ", str)
+    if (el.tag.lower() == "pre"):
+        return str
+    else:
+        return re.sub(r"\s+", r" ", str)
 
 
 def innerHTML(el):
