@@ -50,6 +50,7 @@ class ReferenceManager(object):
             if hasClass(el, "no-ref"):
                 continue
             for linkText in linkTextsFromElement(el):
+                linkText = unfixTypography(linkText)
                 type = treeAttr(el, 'data-dfn-type')
                 dfnFor = treeAttr(el, 'data-dfn-for')
                 if dfnFor is None:
@@ -103,6 +104,8 @@ class ReferenceManager(object):
         # 'maybe' links might not link up, so it's fine for them to have no references.
         # The relevent errors are gated by this variable.
         zeroRefsError = error and linkType!="maybe"
+
+        text = unfixTypography(text)
 
         status = status or self.specStatus
         if status not in ("ED", "TR", "local"):
