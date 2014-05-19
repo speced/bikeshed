@@ -1106,7 +1106,7 @@ class IDLMarker(object):
                 readonly = 'data-readonly'
             else:
                 readonly = ''
-            extraParameters = '{0} data-type={1}'.format(readonly, construct.member.rest.type)
+            extraParameters = '{0} data-type="{1}"'.format(readonly, construct.member.rest.type)
         else:
             extraParameters = ''
 
