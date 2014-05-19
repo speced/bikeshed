@@ -261,6 +261,9 @@ def linkTextVariations(str):
         yield str[:-1]
     if str[-1:] == "’":
         yield str[:-1]
+    if str[-3:] == "ing":
+        yield str[:-3]
+        yield str[:-3]+"e"
 
 def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
     '''Filter by type/text to find all the candidate refs'''
