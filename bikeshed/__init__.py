@@ -909,7 +909,11 @@ def dedupIds(doc, els):
 
 def simplifyText(text):
     # Remove anything that's not a name character.
-    return re.sub("[^a-z0-9_-]", "", text.replace(" ", "-").lower())
+    text = text.strip()
+    text = re.sub("\s+", "-", text)
+    text = text.lower()
+    text = re.sub("[^a-z0-9_-]", "", text)
+    return text
 
 
 def determineLinkType(el):
