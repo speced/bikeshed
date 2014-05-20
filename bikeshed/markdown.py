@@ -21,7 +21,7 @@ def tokenizeLines(lines, features=None):
 
 	tokens = []
 	preDepth = 0
-	rawElements = "pre|code|style|script"
+	rawElements = "pre|style|script|xmp"
 
 	for rawline in lines:
 		# Dont' parse anything while you're inside certain elements
