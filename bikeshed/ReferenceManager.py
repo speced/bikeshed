@@ -250,23 +250,50 @@ def linkTextVariations(str):
     # so explicitly adding a title attr isn't usually necessary.
     yield str
 
+    # Berries <-> Berry
     if str[-3:] == "ies":
-        yield str[:-3]+"y"
+        yield str[:-3] + "y"
+    if str[-1:] == "y":
+        yield str[:-1] + "ies"
+
+    # Zeroes <-> Zero
     if str[-2:] == "es":
         yield str[:-2]
-    if str[-2:] == "'s":
+    else:
+        yield str + "es"
+
+    # Bikeshed's <-> Bikeshed
+    if str[-2:] == "'" or str[-2:] == "’s":
         yield str[:-2]
-    if str[-2:] == "’s":
-        yield str[:-2]
+    else:
+        yield str + "'s"
+
+    # Bikesheds <-> Bikeshed
     if str[-1:] == "s":
         yield str[:-1]
-    if str[-1:] == "'":
+    else:
+        yield str + "s"
+    
+    # Bikesheds <-> Bikesheds'
+    if str[-1:] == "'" or str[-1:] == "’":
         yield str[:-1]
-    if str[-1:] == "’":
-        yield str[:-1]
+    else:
+        yield str + "'"
+
+    # Bikesheded (bikeshod?) <-> Bikeshed
+    if str[-2:] == "ed":
+        yield str[:-2]
+    else:
+        yield str + "ed"
+
+    # Navigating <-> Navigate
     if str[-3:] == "ing":
         yield str[:-3]
         yield str[:-3]+"e"
+    elif str[-1:] == "e":
+        yield str[:-1] + "ing"
+    else:
+        yield str + "ing"
 
 def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
     '''Filter by type/text to find all the candidate refs'''
