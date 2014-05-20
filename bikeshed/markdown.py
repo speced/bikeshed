@@ -62,8 +62,8 @@ def tokenizeLines(lines, features=None):
 		elif re.match(r"\d+\.\s", line):
 			match = re.match(r"\d+\.\s+(.*)", line)
 			token = {'type':'numbered', 'text': match.group(1), 'raw':rawline}
-		elif re.match(r"\s*[*+-]\s", line):
-			match = re.match(r"\s*[*+-]\s+(.*)", line)
+		elif re.match(r"[*+-]\s", line):
+			match = re.match(r"[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
 		elif re.match(r"<", line):
 			if re.match(r"<<", line) or re.match(r"<({0})[ >]".format(allowedStartElements), line):
