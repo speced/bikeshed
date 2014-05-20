@@ -56,7 +56,7 @@ def tokenizeLines(lines, features=None):
 			# single-line heading
 			match = re.match(r"(#{2,6})\s*(.+)(\1\{#[\w-]+\})?", line)
 			level = len(match.group(1))+1
-			token = {'type':'heading', 'text': line.strip("#"), 'raw':rawline, 'level': level}
+			token = {'type':'heading', 'text': line.strip("#").strip(), 'raw':rawline, 'level': level}
 			if re.search(r"\{#[\w-]+\}\s*$", line):
 				token['id'] = re.search(r"\{#([\w-]+)\}\s*$", line)
 		elif re.match(r"\d+\.\s", line):
