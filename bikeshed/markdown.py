@@ -146,6 +146,7 @@ def parseParagraph(stream):
 	if line.startswith("Note: ") or line.startswith("Note, "):
 		p = "<p class='note'>"
 	elif line.startswith("Issue: "):
+		line = line[7:]
 		p = "<p class='issue'>"
 	else:
 		p = "<p>"
