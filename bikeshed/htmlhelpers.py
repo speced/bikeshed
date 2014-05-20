@@ -6,6 +6,7 @@ from html5lib.serializer import htmlserializer
 from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
+import re
 
 from . import config
 from .messages import *
@@ -215,3 +216,18 @@ def isElement(node):
 
 def isOpaqueElement(el):
     return el.tag in ('pre', 'code', 'style', 'script')
+
+def fixTypography(text):
+    # Replace straight aposes with curly quotes for possessives and contractions.
+    text = re.sub(r"([\w])'([\w])", r"\1’\2", text)
+    text = re.sub(r"(</[\w]+>)'([\w])", r"\1’\2", text)
+    # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
+    text = re.sub(r"([^<][^!])(—|--)\r?\n\s+(\S)", r"\1—<wbr>\3", text)
+    return text
+
+def unfixTypography(text):
+    # Replace curly quotes with straight quotes, and emdashes with double dashes.
+    text = re.sub(r"’", r"'", text)
+    # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
+    text = re.sub(r"—<wbr>", r"--", text)
+    return text
