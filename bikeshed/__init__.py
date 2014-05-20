@@ -1837,18 +1837,18 @@ def addSpecMetadataSection(doc):
 
 
 def addReferencesSection(doc):
-    text = "<dl>"
+    text = "<dl>\n"
     for ref in sorted(doc.normativeRefs, key=lambda r: r.linkText):
         text += "<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
-        text += "<dd>{0}</dd>".format(ref)
+        text += "<dd>{0}</dd>\n".format(ref)
     text += "</dl>"
     fillWith("normative-references", parseHTML(text))
 
-    text = "<dl>"
+    text = "<dl>\n"
     # If the same doc is referenced as both normative and informative, normative wins.
     for ref in sorted(doc.informativeRefs - doc.normativeRefs, key=lambda r: r.linkText):
         text += "<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
-        text += "<dd>{0}</dd>".format(ref)
+        text += "<dd>{0}</dd>\n".format(ref)
     text += "</dl>"
     fillWith("informative-references", parseHTML(text))
 
