@@ -51,6 +51,7 @@ class ReferenceManager(object):
                 continue
             for linkText in linkTextsFromElement(el):
                 linkText = unfixTypography(linkText)
+                linkText = re.sub("\s+", " ", linkText)
                 type = treeAttr(el, 'data-dfn-type')
                 dfnFor = treeAttr(el, 'data-dfn-for')
                 if dfnFor is None:

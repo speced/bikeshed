@@ -100,6 +100,7 @@ def updateCrossRefs():
                 'for': rawAnchor.get('for', [])
             }
             for text in linkingTexts:
+                text = re.sub(r'\s+', ' ', text)
                 anchors[text.lower()].append(anchor)
 
     if not config.dryRun:
