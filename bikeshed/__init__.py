@@ -512,7 +512,7 @@ def transformAutolinkShortcuts(doc):
 
             text = text.replace(
                         match.group(0),
-                        '<a title="{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
+                        '<a title="biblio-{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
                             match.group(2),
                             biblioType))
         text = re.sub(r"'([-]?[\w@*][\w@*/-]*)'", r'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
@@ -553,11 +553,12 @@ def buildBibliolinkDatabase(doc):
     biblioLinks = findAll("a[data-link-type='biblio']")
     for el in biblioLinks:
         if el.get('title'):
-            linkText = el.get('title')
+            # Assume the text is of the form "biblio-NAME"
+            linkText = el.get('title')[7:]
         else:
             # Assume the text is of the form "[NAME]"
             linkText = textContent(el)[1:-1]
-            el.set('title', linkText)
+            el.set('title', "biblio-" + linkText)
         if linkText not in doc.biblios:
             die("Couldn't find '{0}' in bibliography data.", linkText)
             continue
@@ -1839,7 +1840,7 @@ def addSpecMetadataSection(doc):
 def addReferencesSection(doc):
     text = "<dl>\n"
     for ref in sorted(doc.normativeRefs, key=lambda r: r.linkText):
-        text += "<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
+        text += "<dt id='biblio-{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
         text += "<dd>{0}</dd>\n".format(ref)
     text += "</dl>"
     fillWith("normative-references", parseHTML(text))
@@ -1847,7 +1848,7 @@ def addReferencesSection(doc):
     text = "<dl>\n"
     # If the same doc is referenced as both normative and informative, normative wins.
     for ref in sorted(doc.informativeRefs - doc.normativeRefs, key=lambda r: r.linkText):
-        text += "<dt id='{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
+        text += "<dt id='biblio-{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
         text += "<dd>{0}</dd>\n".format(ref)
     text += "</dl>"
     fillWith("informative-references", parseHTML(text))
