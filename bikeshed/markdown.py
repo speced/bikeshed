@@ -142,6 +142,7 @@ def parseMultiLineHeading(stream):
 	return lines
 
 def parseParagraph(stream):
+	initialIndent = len(stream.currraw()) - len(stream.currraw().lstrip())
 	line = stream.currtext()
 	if line.startswith("Note: ") or line.startswith("Note, "):
 		p = "<p class='note'>"
@@ -153,9 +154,20 @@ def parseParagraph(stream):
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
 		stream.advance()
+
+		# Check the indentation of the current line; if it's smaller than the
+		# initial indentation, close the paragraph, and append the raw line.
+		currentIndent = len(stream.currraw()) - len(stream.currraw().lstrip())
+		if currentIndent < initialIndent:
+			lines[-1] = lines[-1][0:-1] + "</p>" + "\n"
+			lines.append(stream.currraw())
+			return lines
+		# Otherwise, if we've hit a blank line or the end of the file, close
+		# the paragraph and return.
 		if stream.currtype() in ("eof", "blank"):
 			lines[-1] = lines[-1][0:-1] + "</p>" + "\n"
 			return lines
+		# Otherwise, just keep appending.
 		lines.append(stream.currraw())
 
 def parseBulleted(stream):
