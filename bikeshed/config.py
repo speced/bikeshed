@@ -38,7 +38,8 @@ dfnClassToType = {
     "typedefdef"      : "typedef",
     "stringdef"       : "stringifier",
     "serialdef"       : "serializer",
-    "iterdef"         : "iterator" }
+    "iterdef"         : "iterator",
+    "grammardef"      : "grammar" }
 
 dfnTypes = frozenset(dfnClassToType.values())
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
