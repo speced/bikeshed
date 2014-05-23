@@ -72,9 +72,9 @@ def tokenizeLines(lines, features=None):
 				token = {'type':'raw', 'raw': rawline}
 		else:
 			token = {'type':'text', 'text': line, 'raw': rawline}
-		token['prefix'] = re.match(r"([ \t]*)\n?", rawline).group(1)
+		token['prefix'] = re.match(r"[ \t]*", rawline).group(0)
 		tokens.append(token)
-		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
+		print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
 	return tokens
 
@@ -112,10 +112,15 @@ def parseTokens(tokens):
 			lines.append(stream.currraw())
 			stream.advance()
 
+	for line in lines:
+		print line,
+
 	return lines
 
 # Each parser gets passed the stream
 # and must return the lines it returns.
+# The stream should be advanced to the *next* line,
+# after the lines you've used up dealing with the construct.
 
 def parseSingleLineHeading(stream):
 	if "id" in stream.curr():
@@ -143,6 +148,7 @@ def parseMultiLineHeading(stream):
 
 def parseParagraph(stream):
 	line = stream.currtext()
+	initialPrefix = stream.currprefix()
 	if line.startswith("Note: ") or line.startswith("Note, "):
 		p = "<p class='note'>"
 	elif line.startswith("Issue: "):
@@ -153,7 +159,7 @@ def parseParagraph(stream):
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
 		stream.advance()
-		if stream.currtype() in ("eof", "blank"):
+		if stream.currtype() in ("eof", "blank") or not stream.currprefix().startswith(initialPrefix):
 			lines[-1] = lines[-1][0:-1] + "</p>" + "\n"
 			return lines
 		lines.append(stream.currraw())
