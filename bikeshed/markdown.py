@@ -74,7 +74,7 @@ def tokenizeLines(lines, features=None):
 			token = {'type':'text', 'text': line, 'raw': rawline}
 		token['prefix'] = re.match(r"[ \t]*", rawline).group(0)
 		tokens.append(token)
-		print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
+		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
 	return tokens
 
@@ -112,8 +112,8 @@ def parseTokens(tokens):
 			lines.append(stream.currraw())
 			stream.advance()
 
-	for line in lines:
-		print line,
+	#for line in lines:
+	#	print line,
 
 	return lines
 
