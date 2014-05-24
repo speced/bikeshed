@@ -2,6 +2,7 @@
 from __future__ import division, unicode_literals
 import re
 from collections import defaultdict
+from . import config
 from .messages import *
 from .htmlhelpers import *
 
@@ -212,7 +213,7 @@ class ReferenceManager(object):
         # If all the refs are for the same shortname,
         # assume you want to link to the latest one (highest level).
         if all(ref['shortname'] == refs[0]['shortname'] for ref in refs):
-            maxLevel = -1
+            maxLevel = config.HierarchicalNumber("-1")
             for ref in refs:
                 if ref['level'] > maxLevel:
                     maxLevel = ref['level']
@@ -274,7 +275,7 @@ def linkTextVariations(str):
         yield str[:-1]
     else:
         yield str + "s"
-    
+
     # Bikesheds <-> Bikesheds'
     if str[-1:] == "'" or str[-1:] == "’":
         yield str[:-1]

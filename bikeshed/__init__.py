@@ -1385,7 +1385,7 @@ class CSSSpec(object):
                     self.refs.specs[specName] = {
                         "description": "Custom Spec Link for {0}".format(specName),
                         "title": "Custom Spec Link for {0}".format(specName),
-                        "level": int(level),
+                        "level": config.HierarchicalNumber(level),
                         "TR": specUrl,
                         "shortname": shortname,
                         "vshortname": specName

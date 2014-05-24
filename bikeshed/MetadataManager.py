@@ -3,6 +3,7 @@ from __future__ import division, unicode_literals
 import re
 from collections import defaultdict
 from datetime import date, datetime
+from . import config
 from .messages import *
 from .htmlhelpers import *
 
@@ -78,7 +79,7 @@ class MetadataManager:
             "Group": convertGroup,
             "Date": parseDate,
             "Deadline": parseDate,
-            "Level": lambda a,b: int(b),
+            "Level": parseLevel,
             "Warning": convertWarning,
             "Editor": parseEditor,
             "Former Editor": parseEditor,
@@ -145,6 +146,9 @@ def parseDate(key, val):
         return datetime.strptime(val, "%Y-%m-%d").date()
     except:
         die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", key, val)
+
+def parseLevel(key, val):
+    return config.HierarchicalNumber(val)
 
 def convertWarning(key, val):
     if val.lower() in ('obsolete', 'not ready'):

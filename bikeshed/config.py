@@ -3,6 +3,7 @@ from __future__ import division, unicode_literals
 import os.path
 import re
 from collections import defaultdict
+from functools import total_ordering
 
 debug = False
 quiet = False
@@ -75,3 +76,18 @@ anchorDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1
 testSuiteDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
 
 testAnnotationURL = "//test.csswg.org/harness/annotate.js#"
+
+@total_ordering
+class HierarchicalNumber(object):
+    def __init__(self, valString):
+        self.nums = re.split(r"\D+", valString)
+        self.originalVal = valString
+
+    def __lt__(self, other):
+        return self.nums < other.nums
+
+    def __eq__(self, other):
+        return self.nums == other.nums
+
+    def __str__(self):
+        return self.originalVal
