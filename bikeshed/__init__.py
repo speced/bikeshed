@@ -796,7 +796,11 @@ def fillAttributeInfoSpans(doc):
             if referencedAttribute is None or referencedAttribute == "":
                 die("Missing for reference in attribute info span.");
                 continue
-            target = findAll('[data-link-type=attribute][title={0}]'.format(referencedAttribute));
+            if "/" in referencedAttribute:
+                interface, referencedAttribute = referencedAttribute.split("/")
+                target = findAll('[data-link-type=attribute][title="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface));
+            else:
+                target = findAll('[data-link-type=attribute][title="{0}"]'.format(referencedAttribute));
             if len(target) == 0:
                 die("Couldn't find target attribute {0}:\n{1}", referencedAttribute, outerHTML(el));
             if len(target) > 1:
