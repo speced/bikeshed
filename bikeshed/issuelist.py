@@ -134,6 +134,7 @@ Issue 2.
 
 def printHeader(outfile, headerInfo):
 	outfile.write('''<!DOCTYPE html>
+<meta charset="utf-8">
 <title>{title} Disposition of Comments for {date} {status}</title>
 <style type="text/css">
   .a  {{ background: lightgreen }}
