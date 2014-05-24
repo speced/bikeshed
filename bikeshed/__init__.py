@@ -800,7 +800,7 @@ def fillAttributeInfoSpans(doc):
             if len(target) == 0:
                 die("Couldn't find target attribute {0}:\n{1}", referencedAttribute, outerHTML(el));
             if len(target) > 1:
-                die("Multiple potential target attributes {0}:\n{1}", referenceDAttribute, outerHTML(el));
+                die("Multiple potential target attributes {0}:\n{1}", referencedAttribute, outerHTML(el));
             target = target[0];
             datatype = target.get("data-type").strip()
             decorations = ""
