@@ -45,14 +45,16 @@ dfnClassToType = {
 dfnTypes = frozenset(dfnClassToType.values())
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
 idlTypes = frozenset(["event", "interface", "constructor", "method", "argument", "attribute", "callback", "dictionary", "dict-member", "exception", "except-field", "exception-code", "enum", "const", "typedef", "stringifier", "serializer", "iterator"])
+idlNameTypes = frozenset(["interface", "dictionary", "enum", "exception"])
 functionishTypes = frozenset(["function", "method", "constructor"])
-linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "maybe", "biblio"])
+linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "idl-name", "maybe", "biblio"])
 typesUsingFor = frozenset(["descriptor", "value", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "except-field", "stringifier", "serializer", "iterator"])
 
 linkTypeToDfnType = {
     "propdesc": frozenset(["property", "descriptor"]),
     "functionish": functionishTypes,
     "idl": idlTypes,
+    "idl-name": idlNameTypes,
     "maybe": maybeTypes,
     "dfn": frozenset(["dfn"])
 }
