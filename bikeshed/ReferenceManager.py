@@ -311,16 +311,12 @@ def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
 
     if linkType in config.dfnTypes:
         return filterRefs(allRefs, [linkType], linkText)
-    elif linkType == "propdesc":
-        return filterRefs(allRefs, ["property", "descriptor"], linkText)
-    elif linkType == "functionish":
-        return filterRefs(allRefs, ["function", "method"], linkText)
-    elif linkType == "idl":
-        return filterRefs(allRefs, config.idlTypes, linkText)
     elif linkType == "dfn":
         return filterRefs(allRefs, "dfn", linkTextVariations(linkText))
     elif linkType == "maybe":
         return filterRefs(allRefs, config.maybeTypes, linkText) + filterRefs(allRefs, "dfn", linkTextVariations(linkText))
+    elif linkType in config.linkTypeToDfnType:
+        return filterRefs(allRefs, config.linkTypeToDfnType[linkType], linkText)
     else:
         if error:
             die("Unknown link type '{0}'.",linkType)
