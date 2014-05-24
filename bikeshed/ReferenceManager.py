@@ -265,7 +265,7 @@ def linkTextVariations(str):
         yield str + "es"
 
     # Bikeshed's <-> Bikeshed
-    if str[-2:] == "'" or str[-2:] == "’s":
+    if str[-2:] == "'s" or str[-2:] == "’s":
         yield str[:-2]
     else:
         yield str + "'s"
