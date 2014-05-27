@@ -86,10 +86,16 @@ class HierarchicalNumber(object):
         self.originalVal = valString
 
     def __lt__(self, other):
-        return self.nums < other.nums
+        try:
+            return self.nums < other.nums
+        except AttributeError:
+            return self.nums[0] < other
 
     def __eq__(self, other):
-        return self.nums == other.nums
+        try:
+            return self.nums == other.nums
+        except AttributeError:
+            return self.nums[0] == other
 
     def __str__(self):
         return self.originalVal
