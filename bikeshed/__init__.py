@@ -303,6 +303,8 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     for key in requiredKeys:
         if key == "Value":
             ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals[key]))
+        elif key.lower() == "new values":
+            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals[key]))
         elif key in vals:
             ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
         else:
@@ -328,6 +330,8 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
     for key in requiredKeys:
         if key == "For":
             ret.append("<tr><th>{0}:<td><a at-rule>{1}</a>".format(key, vals[key]))
+        elif key == "Value":
+            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals[key]))
         elif key in vals:
             ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
         else:
