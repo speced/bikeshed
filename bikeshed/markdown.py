@@ -11,6 +11,7 @@ def parse(lines, features=None):
 def tokenizeLines(lines, features=None):
 	# Turns lines of text into block tokens,
 	# which'll be turned into MD blocks later.
+	# Every token *must* have 'type', 'raw', and 'prefix' keys.
 
 	if features is None:
 		features = set(["headings"])
@@ -28,7 +29,7 @@ def tokenizeLines(lines, features=None):
 		if re.search(r"<({0})".format(rawElements), rawline):
 			preDepth += 1
 		if preDepth:
-			tokens.append({'type':'raw', 'raw':rawline})
+			tokens.append({'type':'raw', 'raw':rawline, 'prefix': re.match(r"[ \t]*", rawline).group(0)})
 		if re.search(r"</({0})>".format(rawElements), rawline):
 			preDepth = max(0, preDepth - 1)
 			continue
@@ -159,9 +160,13 @@ def parseParagraph(stream):
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
 		stream.advance()
-		if stream.currtype() in ("eof", "blank") or not stream.currprefix().startswith(initialPrefix):
-			lines[-1] = lines[-1][0:-1] + "</p>" + "\n"
-			return lines
+		try:
+			if stream.currtype() in ("eof", "blank") or not stream.currprefix().startswith(initialPrefix):
+				lines[-1] = lines[-1][0:-1] + "</p>" + "\n"
+				return lines
+		except AttributeError, e:
+			print stream.curr()
+			print str(e)
 		lines.append(stream.currraw())
 
 def parseBulleted(stream):
@@ -180,7 +185,7 @@ def parseBulleted(stream):
 
 
 class TokenStream:
-	def __init__(self, tokens, before={'type':'blank','raw':'\n'}, after={'type':'eof','raw':''}):
+	def __init__(self, tokens, before={'type':'blank','raw':'\n','prefix':''}, after={'type':'eof','raw':'','prefix':''}):
 		self.tokens = tokens
 		self.i = 0
 		self.before = before
