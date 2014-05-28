@@ -18,7 +18,7 @@ A short overview of my preprocessor's features:
 
 * [automatic linking](docs/definitions-autolinks.md) of terms to their definitions based on text, so you can simple write `Use <a>some term</a> to...` and have it automatically link to the `<dfn>some term</dfn>` elsewhere in the document, or in another spec entirely!
 * [automatic id generation](docs/markup.md) for headings and definitions, based on their text.
-* [textual shortcuts for autolinks](docs/definition-autolinks.md): [[FOO]] for bibliography entries, &lt;&lt;foo>> for grammar productions, 'foo' for property names, and ''foo'' for values.
+* [textual shortcuts for autolinks](docs/definitions-autolinks.md): [[FOO]] for bibliography entries, &lt;&lt;foo>> for grammar productions, 'foo' for property names, and ''foo'' for values.
 * [boilerplate generation](docs/boilerplate.md), both wholesale and piecemeal.
 * [markdown-style paragraphs](docs/markup.md).
 * a [compact syntax](docs/markup.md) for writing property-definition tables.
