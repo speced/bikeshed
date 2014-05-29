@@ -26,7 +26,7 @@ def tokenizeLines(lines, features=None):
 
 	for rawline in lines:
 		# Dont' parse anything while you're inside certain elements
-		if re.search(r"<({0})".format(rawElements), rawline):
+		if re.search(r"<({0})[ >]".format(rawElements), rawline):
 			preDepth += 1
 		if preDepth:
 			tokens.append({'type':'raw', 'raw':rawline, 'prefix': re.match(r"[ \t]*", rawline).group(0)})
