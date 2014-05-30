@@ -1776,7 +1776,7 @@ def addPropertyIndex(doc):
                 html += "<th scope=col>{0}".format(escapeHTML(column))
             html += "<tbody>"
             for desc in descs:
-                html += "\n<tr><th scope-row><a data-link-type='descriptor'>{0}</a>".format(escapeHTML(desc['Name']))
+                html += "\n<tr><th scope=row><a data-link-type='descriptor'>{0}</a>".format(escapeHTML(desc['Name']))
                 for column in columns[1:]:
                     html += "<td>" + escapeHTML(desc.get(column, ""))
             html += "</table>"
