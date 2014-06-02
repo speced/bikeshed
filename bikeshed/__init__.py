@@ -1853,6 +1853,8 @@ def addSpecMetadataSection(doc):
         header += "<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.md.ED)
     if len(doc.md.previousVersions):
         header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.md.previousVersions))
+    if doc.md.versionHistory:
+        header += "<dt>Version History:<dd><a href='{0}'>{0}</a>".format(doc.md.versionHistory)
     if doc.md.mailingList:
         header += """
     <dt>Feedback:</dt>
