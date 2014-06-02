@@ -750,7 +750,8 @@ def canonicalizeShortcuts(doc):
         "link-type":"data-link-type",
         "force":"data-dfn-force",
         "section":"data-section",
-        "attribute-info":"data-attribute-info"
+        "attribute-info":"data-attribute-info",
+        "local-title":"data-local-title"
     }
     for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys())):
         for attr, fixedAttr in attrFixup.items():

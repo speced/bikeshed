@@ -241,6 +241,9 @@ def linkTextsFromElement(el, preserveCasing=False):
         texts = [x.strip() for x in el.get('title').split('|')]
     else:
         texts = [textContent(el).strip()]
+    if el.get('data-local-title'):
+        texts += [x.strip() for x in el.get('data-local-title').split('|')]
+    texts = [x for x in texts if x != '']
     if preserveCasing:
         return texts
     else:

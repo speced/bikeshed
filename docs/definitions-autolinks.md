@@ -22,6 +22,18 @@ To alter the linking text, simply add a `title` attribute to the definition;
 the title text is used instead of the text content.
 You can separate multiple linking phrases by separating them with the pipe "|" character.
 
+Defining Extra-Short "Local" Linking Texts
+------------------------------------------
+
+Sometimes you want to use an extra-short version of a term for within a spec,
+but don't want to confuse things by exporting it globally.
+To achieve this, add a `local-title` attribute with the terms you want to be only usable within the spec;
+the syntax is identical to that of the `title` attribute, described above.
+
+Using local linking text does not disturb the normal linking-text process;
+that still takes from either the element text or the `title` attribute,
+as normal.
+
 Definition Types
 ----------------
 
