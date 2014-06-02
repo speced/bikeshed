@@ -275,7 +275,7 @@ def transformDataBlocks(doc):
 
 
 def transformPre(lines, tagName, firstLine, **kwargs):
-    prefix = re.match(r"\s*", firstLine).group(0)
+    prefix = re.match(r"\s*", lines[0]).group(0)
     for (i, line) in enumerate(lines):
         # Remove the whitespace prefix from each line.
         match = re.match(prefix+"(.*)", line, re.DOTALL)
