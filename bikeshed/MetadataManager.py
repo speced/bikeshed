@@ -33,6 +33,7 @@ class MetadataManager:
     mailingList = None
     mailingListArchives = None
     boilerplate = {'omitSections':set()}
+    versionHistory = None
 
     otherMetadata = defaultdict(list)
 
@@ -56,7 +57,8 @@ class MetadataManager:
             "Test Suite": "testSuite",
             "Mailing List": "mailingList",
             "Mailing List Archives": "mailingListArchives",
-            "Boilerplate": "boilerplate"
+            "Boilerplate": "boilerplate",
+            "Version History": "versionHistory",
         }
 
         self.multiValueKeys = {
