@@ -789,7 +789,7 @@ def fixIntraDocumentReferences(doc):
                 continue
             target = targets[0]
             text = textContent(findAll(".content", target)[0])
-            if 'data-level' not in target:
+            if target.get('data-level') is not None:
                 level = target.get('data-level');
                 el.text = "§{1} {0}".format(text, level);
             else:
@@ -814,7 +814,7 @@ def fillAttributeInfoSpans(doc):
             target = target[0];
             datatype = target.get("data-type").strip()
             decorations = ""
-            if target.get("data-readonly") == "":
+            if target.get("data-readonly") is not None:
                 decorations += ", readonly"
             if datatype[-1] == "?":
                 decorations += ", nullable"
