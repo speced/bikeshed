@@ -253,6 +253,36 @@ using the `spec=''` attribute (defined above) will override the lack of an expor
 and go ahead and link to it anyway.
 
 
+Section Links
+-------------
+
+Sometimes you want to link to a section of a document,
+rather than a specific definition.
+Bikeshed has section links to handle this case more easily:
+
+```html
+<a section href="#heading-id"></a>
+```
+
+renders as:
+
+```html
+<a href="#heading-id">§6.1 The Example Section</a>
+```
+
+Note that this is quite different from normal autolinks;
+rather than matching on text and letting Bikeshed fill in the href,
+you match on href and let Bikeshed fill in the text.
+This is because section titles change much more often than definition texts,
+so using text-based matching is fragile;
+on the other hand,
+their IDs tend to be stable,
+as they're often linked to.
+Also, the section titles are often long and annoying to type,
+and they move around,
+so numbering isn't stable.
+
+
 Bibliography
 ============
 
