@@ -159,6 +159,10 @@ def convertWarning(key, val):
     if match:
         config.textMacros['replacedby'] = match.group(1)
         return "replaced-by"
+    match = re.match("New Version +(.+)", val, re.I)
+    if match:
+        config.textMacros['replacedby'] = match.group(1)
+        return "new-version"
     die('Unknown value for "{0}" metadata.', key)
 
 def parseEditor(key, val):
