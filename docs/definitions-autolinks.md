@@ -63,14 +63,23 @@ There are additional types for WebIDL definitions:
 * dict-member
 * exception
 * except-field
+* exception-code
 * enum
 * const
 * typedef
+* stringifier
+* serializer
+* iterator
 
 And for HTML/SVG/etc element definitions:
 
 * element
 * element-attr
+
+A special type just for definitions of operators used in grammar definitions,
+like `||` and similar:
+
+* grammar
 
 And finally, a catch-all category for general terms and phrases, and anything that doesn't fall into one of the above categories:
 
@@ -122,7 +131,7 @@ Specifically:
 * "attribute", "constructor", "method", and "const" definitions must define what interface they're relative to.
 * "argument" definitions must define what method or constructor they're relative to.
 * "dict-member" definitions must define what dictionary they're relative to.
-* "except-field" definitions must define what exception they're relative to.
+* "except-field" and "exception-code" definitions must define what exception they're relative to.
 * "descriptor" definitions must define what at-rule they're relative to.
     (This happens automatically if you add a "For" line to the descdef table.)
 * "value" definitions must define what property, descriptor, at-rule, type, selector, or function they're relative to.
