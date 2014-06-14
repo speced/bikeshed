@@ -18,7 +18,8 @@ def runAllTests(constructor):
 		config.doc = constructor(inputFilename=testname)
 		config.doc.preprocess()
 		outputText = config.doc.serialize()
-		goldenText = io.open(testname[:-2] + "html", encoding="utf-8").read()
+		with io.open(testname[:-2] + "html", encoding="utf-8") as golden:
+			goldenText = golden.read()
 		if compare(outputText, goldenText):
 			numPassed += 1
 		else:

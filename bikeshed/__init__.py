@@ -887,7 +887,7 @@ def classifyDfns(doc, dfns):
     dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
     for el in dfns:
         dfnType = determineDfnType(el)
-        dfnText = linkTextsFromElement(el)[0]
+        dfnText = linkTextsFromElement(el, preserveCasing=True)[0]
         # Push the dfn type down to the <dfn> itself.
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', dfnType)
