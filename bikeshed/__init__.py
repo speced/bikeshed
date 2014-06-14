@@ -1474,6 +1474,13 @@ class CSSSpec(object):
 
         return self
 
+
+    def serialize(self):
+        rendered = html5lib.serialize(self.document, tree="lxml", alphabetical_attributes=True)
+        rendered = finalHackyCleanup(rendered)
+        return rendered
+
+
     def finish(self, outputFilename):
         if outputFilename is None:
             # More sensible defaults!
@@ -1485,8 +1492,7 @@ class CSSSpec(object):
                 outputFilename = "-"
             else:
                 outputFilename = "-"
-        rendered = html5lib.serialize(self.document, tree="lxml", alphabetical_attributes=True)
-        rendered = finalHackyCleanup(rendered)
+        rendered = self.serialize()
         if not config.dryRun:
             try:
                 if outputFilename == "-":
