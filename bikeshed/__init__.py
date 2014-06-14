@@ -18,6 +18,7 @@ from . import config
 from . import biblio
 from . import update
 from . import markdown
+from . import test
 from .ReferenceManager import ReferenceManager
 from .ReferenceManager import linkTextsFromElement
 from .globalnames import *
@@ -102,6 +103,8 @@ def main():
                             default=None,
                             help="Path to the output file.")
 
+    testParser = subparsers.add_parser('test', help="Tools for running Bikeshed's testsuite.")
+
     options = argparser.parse_args()
 
     config.quiet = options.quiet
@@ -151,6 +154,10 @@ def main():
             from . import fonts
             font = fonts.Font()
             fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
+    elif options.subparserName == "test":
+        config.debug = True
+        config.quiet = True
+        test.runAllTests(constructor=CSSSpec)
 
 
 def stripBOM(doc):
