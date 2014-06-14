@@ -1305,16 +1305,17 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force
 
 
 class CSSSpec(object):
-    # internal state
-    normativeRefs = set()
-    informativeRefs = set()
-    refs = ReferenceManager()
-    md = MetadataManager()
-    biblios = {}
-    paragraphMode = "markdown"
-    inputSource = None
 
     def __init__(self, inputFilename, paragraphMode="markdown"):
+        # internal state
+        self.normativeRefs = set()
+        self.informativeRefs = set()
+        self.refs = ReferenceManager()
+        self.md = MetadataManager()
+        self.biblios = {}
+        self.paragraphMode = "markdown"
+        self.inputSource = None
+
         if inputFilename is None:
             # Default to looking for a *.bs file.
             # Otherwise, look for a *.src.html file.

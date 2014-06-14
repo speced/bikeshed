@@ -8,40 +8,40 @@ from .messages import *
 from .htmlhelpers import *
 
 class MetadataManager:
-    # required metadata
-    status = None
-    ED = None
-    abstracts = []
-    shortname = None
-    level = None
-    vshortname = None
-
-    # optional metadata
-    TR = None
-    title = None
-    statusText = ""
-    date = datetime.utcnow().date()
-    deadline = None
-    group = None
-    editors = []
-    previousEditors = []
-    previousVersions = []
-    warning = None
-    atRisk = []
-    ignoredTerms = []
-    testSuite = None
-    mailingList = None
-    mailingListArchives = None
-    boilerplate = {'omitSections':set()}
-    versionHistory = None
-
-    otherMetadata = defaultdict(list)
-
     @property
     def hasMetadata(self):
         return len(self.manuallySetKeys) > 0
 
     def __init__(self):
+        # required metadata
+        self.status = None
+        self.ED = None
+        self.abstracts = []
+        self.shortname = None
+        self.level = None
+        self.vshortname = None
+
+        # optional metadata
+        self.TR = None
+        self.title = None
+        self.statusText = ""
+        self.date = datetime.utcnow().date()
+        self.deadline = None
+        self.group = None
+        self.editors = []
+        self.previousEditors = []
+        self.previousVersions = []
+        self.warning = None
+        self.atRisk = []
+        self.ignoredTerms = []
+        self.testSuite = None
+        self.mailingList = None
+        self.mailingListArchives = None
+        self.boilerplate = {'omitSections':set()}
+        self.versionHistory = None
+
+        self.otherMetadata = defaultdict(list)
+
         self.singleValueKeys = {
             "Title": "title",
             "Status": "status",
