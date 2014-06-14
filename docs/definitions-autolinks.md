@@ -63,14 +63,23 @@ There are additional types for WebIDL definitions:
 * dict-member
 * exception
 * except-field
+* exception-code
 * enum
 * const
 * typedef
+* stringifier
+* serializer
+* iterator
 
 And for HTML/SVG/etc element definitions:
 
 * element
 * element-attr
+
+A special type just for definitions of operators used in grammar definitions,
+like `||` and similar:
+
+* grammar
 
 And finally, a catch-all category for general terms and phrases, and anything that doesn't fall into one of the above categories:
 
@@ -122,7 +131,7 @@ Specifically:
 * "attribute", "constructor", "method", and "const" definitions must define what interface they're relative to.
 * "argument" definitions must define what method or constructor they're relative to.
 * "dict-member" definitions must define what dictionary they're relative to.
-* "except-field" definitions must define what exception they're relative to.
+* "except-field" and "exception-code" definitions must define what exception they're relative to.
 * "descriptor" definitions must define what at-rule they're relative to.
     (This happens automatically if you add a "For" line to the descdef table.)
 * "value" definitions must define what property, descriptor, at-rule, type, selector, or function they're relative to.
@@ -251,6 +260,36 @@ but it's not marked for export
 (either intentionally, or because it was accidentally missed and fixing the spec would be time-consuming),
 using the `spec=''` attribute (defined above) will override the lack of an export declaration,
 and go ahead and link to it anyway.
+
+
+Section Links
+-------------
+
+Sometimes you want to link to a section of a document,
+rather than a specific definition.
+Bikeshed has section links to handle this case more easily:
+
+```html
+<a section href="#heading-id"></a>
+```
+
+renders as:
+
+```html
+<a href="#heading-id">§6.1 The Example Section</a>
+```
+
+Note that this is quite different from normal autolinks;
+rather than matching on text and letting Bikeshed fill in the href,
+you match on href and let Bikeshed fill in the text.
+This is because section titles change much more often than definition texts,
+so using text-based matching is fragile;
+on the other hand,
+their IDs tend to be stable,
+as they're often linked to.
+Also, the section titles are often long and annoying to type,
+and they move around,
+so numbering isn't stable.
 
 
 Bibliography

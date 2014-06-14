@@ -275,7 +275,7 @@ def transformDataBlocks(doc):
 
 
 def transformPre(lines, tagName, firstLine, **kwargs):
-    prefix = re.match(r"\s*", firstLine).group(0)
+    prefix = re.match(r"\s*", lines[0]).group(0)
     for (i, line) in enumerate(lines):
         # Remove the whitespace prefix from each line.
         match = re.match(prefix+"(.*)", line, re.DOTALL)
@@ -781,16 +781,17 @@ def fixIntraDocumentReferences(doc):
         if el.text is None or el.text.strip() == '':
             sectionID = el.get("href")
             if sectionID is None or sectionID == "" or sectionID[0] != '#':
-                die("Missing/invalid href {0} in section link.", sectionID);
+                die("Missing/invalid href {0} in section link.", sectionID)
                 continue
-            target = findAll("{0}.heading".format(sectionID));
-            if len(target) == 0:
+            targets = findAll("{0}.heading".format(sectionID))
+            if len(targets) == 0:
                 die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
                 continue
-            text = textContent(findAll(".content", target[0])[0]);
-            if 'data-level' in target[0]:
-                level = target[0].get('data-level');
-                el.text = "§{1} {0}".format(text, level);
+            target = targets[0]
+            text = textContent(findAll(".content", target)[0])
+            if target.get('data-level') is not None:
+                level = target.get('data-level')
+                el.text = "§{1} {0}".format(text, level)
             else:
                 el.text = text
 
@@ -799,21 +800,21 @@ def fillAttributeInfoSpans(doc):
         if el.text is None or el.text.strip() == '':
             referencedAttribute = el.get("for")
             if referencedAttribute is None or referencedAttribute == "":
-                die("Missing for reference in attribute info span.");
+                die("Missing for reference in attribute info span.")
                 continue
             if "/" in referencedAttribute:
                 interface, referencedAttribute = referencedAttribute.split("/")
-                target = findAll('[data-link-type=attribute][title="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface));
+                target = findAll('[data-link-type=attribute][title="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface))
             else:
-                target = findAll('[data-link-type=attribute][title="{0}"]'.format(referencedAttribute));
+                target = findAll('[data-link-type=attribute][title="{0}"]'.format(referencedAttribute))
             if len(target) == 0:
-                die("Couldn't find target attribute {0}:\n{1}", referencedAttribute, outerHTML(el));
+                die("Couldn't find target attribute {0}:\n{1}", referencedAttribute, outerHTML(el))
             if len(target) > 1:
-                die("Multiple potential target attributes {0}:\n{1}", referencedAttribute, outerHTML(el));
-            target = target[0];
+                die("Multiple potential target attributes {0}:\n{1}", referencedAttribute, outerHTML(el))
+            target = target[0]
             datatype = target.get("data-type").strip()
             decorations = ""
-            if target.get("data-readonly") == "":
+            if target.get("data-readonly") is not None:
                 decorations += ", readonly"
             if datatype[-1] == "?":
                 decorations += ", nullable"
@@ -1097,7 +1098,7 @@ def processIssues(doc):
 def addSelfLinks(doc):
     def makeSelfLink(el):
         selflink = lxml.etree.Element(
-            'a', {"href": "#" + urllib.quote(el.get('id', '')), "class":"self-link"});
+            'a', {"href": "#" + urllib.quote(el.get('id', '')), "class":"self-link"})
         return selflink
 
     foundFirstNumberedSection = False
@@ -1362,7 +1363,7 @@ class CSSSpec(object):
                                     encoding="utf-8")))
         try:
             with io.open("anchors.json", 'r', encoding="utf-8") as fh:
-                self.refs.refs.update(json.loads(fh.read()));
+                self.refs.refs.update(json.loads(fh.read()))
         except IOError:
             pass
         self.refs.defaultSpecs = defaultdict(list,
@@ -1859,6 +1860,8 @@ def addSpecMetadataSection(doc):
         header += "<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.md.ED)
     if len(doc.md.previousVersions):
         header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.md.previousVersions))
+    if doc.md.versionHistory:
+        header += "<dt>Version History:<dd><a href='{0}'>{0}</a>".format(doc.md.versionHistory)
     if doc.md.mailingList:
         header += """
     <dt>Feedback:</dt>

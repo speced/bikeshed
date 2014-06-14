@@ -33,6 +33,7 @@ class MetadataManager:
     mailingList = None
     mailingListArchives = None
     boilerplate = {'omitSections':set()}
+    versionHistory = None
 
     otherMetadata = defaultdict(list)
 
@@ -56,7 +57,8 @@ class MetadataManager:
             "Test Suite": "testSuite",
             "Mailing List": "mailingList",
             "Mailing List Archives": "mailingListArchives",
-            "Boilerplate": "boilerplate"
+            "Boilerplate": "boilerplate",
+            "Version History": "versionHistory",
         }
 
         self.multiValueKeys = {
@@ -151,12 +153,18 @@ def parseLevel(key, val):
     return config.HierarchicalNumber(val)
 
 def convertWarning(key, val):
-    if val.lower() in ('obsolete', 'not ready'):
-        return val.lower().replace(' ', '-')
+    if val.lower() == "obsolete":
+        return "warning-obsolete"
+    if val.lower() == "not ready":
+        return "warning-not-ready"
     match = re.match("Replaced By +(.+)", val, re.I)
     if match:
         config.textMacros['replacedby'] = match.group(1)
-        return "replaced-by"
+        return "warning-replaced-by"
+    match = re.match("New Version +(.+)", val, re.I)
+    if match:
+        config.textMacros['replacedby'] = match.group(1)
+        return "warning-new-version"
     die('Unknown value for "{0}" metadata.', key)
 
 def parseEditor(key, val):
