@@ -7,14 +7,14 @@ from .messages import *
 from .htmlhelpers import *
 
 class ReferenceManager(object):
-    refs = defaultdict(list)
-    specs = dict()
-
-    defaultSpecs = defaultdict(list)
-    css21Replacements = set()
-    ignoredSpecs = set()
 
     def __init__(self, specStatus=None):
+        self.refs = defaultdict(list)
+        self.specs = dict()
+        self.defaultSpecs = defaultdict(list)
+        self.css21Replacements = set()
+        self.ignoredSpecs = set()
+
         if specStatus is not None:
             self.setStatus(specStatus)
 
