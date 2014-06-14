@@ -3,22 +3,33 @@
 from __future__ import division, unicode_literals
 import glob
 import io
+import difflib
+import sys
 from itertools import *
 from .htmlhelpers import parseDocument, outerHTML
 from . import config
 
 def runAllTests(constructor):
-	for testname in glob.glob("*.bs"):
+	numPassed = 0
+	total = 0
+	failures = []
+	for testname in glob.glob(config.scriptPath + "/../tests/*.bs"):
+		total += 1
 		config.doc = constructor(inputFilename=testname)
 		config.doc.preprocess()
 		outputText = config.doc.serialize()
 		goldenText = io.open(testname[:-2] + "html", encoding="utf-8").read()
 		if compare(outputText, goldenText):
-			continue
+			numPassed += 1
 		else:
-			print "Generated document for {0} doesn't match golden.".format(testname)
-			return
-	print "\033[32;1mAll tests passed.\033[0m"
+			print testname
+	if total == 0:
+		print "No tests were found."
+	elif numPassed == total:
+		print "\033[32;1m✔ All tests passed.\033[0m"
+		return True
+	else:
+		print "\033[31;1m✘ {0}/{1} tests passed.\033[0m".format(numPassed, total)
 
 def compare(suspect, golden):
 	suspectDoc = parseDocument(suspect)
@@ -26,6 +37,16 @@ def compare(suspect, golden):
 	for s, g in izip(suspectDoc.iter(), goldenDoc.iter()):
 		if s.tag == g.tag and s.text == g.text and s.tail == g.tail:
 			continue
-		print s.tag, g.tag
+		fromText = outerHTML(g)
+		toText = outerHTML(s)
+		differ = difflib.SequenceMatcher(None, fromText, toText)
+		for tag, i1, i2, j1, j2 in differ.get_opcodes():
+			if tag == "equal":
+				sys.stdout.write(fromText[i1:i2])
+			if tag in ("delete", "replace"):
+				sys.stdout.write("\033[41m\033[30m" + fromText[i1:i2] + "\033[0m")
+			if tag in ("insert", "replace"):
+				sys.stdout.write("\033[42m\033[30m" + toText[j1:j2] + "\033[0m")
+		print
 		return False
 	return True
