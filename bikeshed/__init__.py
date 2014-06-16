@@ -1572,11 +1572,7 @@ class CSSSpec(object):
 
 
 def fillInBoilerplate(doc):
-    # Arbitrarily-chosen signal for whether there's already boilerplate.
-    if doc.html.startswith("<!DOCTYPE html>"):
-        return
-
-    # Otherwise, if you start your spec with an <h1>, I'll take it as the spec's title and remove it.
+    # If you start your spec with an <h1>, I'll take it as the spec's title and remove it.
     # (It gets added back in the header file.)
     match = re.match(r"^<h1>([^<]+)</h1>", doc.html)
     if match:
@@ -1587,7 +1583,7 @@ def fillInBoilerplate(doc):
     if not doc.md.title:
         die("Can't generate the spec without a title.\nAdd a 'Title' metadata entry, or an <h1> on the first line.")
 
-    header = doc.getInclusion('header')
+    header = doc.getInclusion('header') if "header" not in doc.md.boilerplate['omitSections'] else ""
     footer = doc.getInclusion('footer') if "footer" not in doc.md.boilerplate['omitSections'] else ""
 
     doc.html = '\n'.join([header, doc.html, footer])
