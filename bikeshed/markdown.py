@@ -162,7 +162,7 @@ def parseParagraph(stream):
 		stream.advance()
 		try:
 			if stream.currtype() in ("eof", "blank") or not stream.currprefix().startswith(initialPrefix):
-				lines[-1] = lines[-1][0:-1] + "</p>" + "\n"
+				lines[-1] = lines[-1].rstrip() + "</p>" + "\n"
 				return lines
 		except AttributeError, e:
 			print stream.curr()
