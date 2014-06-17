@@ -19,16 +19,12 @@ class ReferenceManager(object):
             self.setStatus(specStatus)
 
     def setStatus(self, specStatus):
-        if specStatus in ("ED", "DREAM", "UD", "LS"):
-            self.specStatus = "ED"
-        else:
+        if specStatus in config.TRStatuses:
             self.specStatus = "TR"
-            # I'll want to make this more complex later,
-            # to enforce pubrules linking policy.
+        else:
+            self.specStatus = "ED"
 
     def setSpecData(self, spec):
-        # I'll want to make this more complex later,
-        # to enforce pubrules linking policy.
         self.setStatus(spec.md.status)
 
         self.specName = spec.md.shortname
