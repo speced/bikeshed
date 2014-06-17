@@ -427,8 +427,8 @@ def initializeTextMacros(doc):
     else:
         config.textMacros["status"] = doc.md.status
     config.textMacros["latest"] = doc.md.TR or "???"
-    config.textMacros["abstract"] = "<p>".join(doc.md.abstracts) or "???"
-    config.textMacros["abstractattr"] = escapeAttr("  ".join(doc.md.abstracts).replace("<<","<").replace(">>",">")) or "???"
+    config.textMacros["abstract"] = "\n".join(markdown.parse(doc.md.abstract)) or "???"
+    config.textMacros["abstractattr"] = escapeAttr("  ".join(doc.md.abstract).replace("<<","<").replace(">>",">")) or "???"
     config.textMacros["year"] = unicode(doc.md.date.year)
     config.textMacros["date"] = unicode(doc.md.date.strftime("{0} %B %Y".format(doc.md.date.day)), encoding="utf-8")
     config.textMacros["cdate"] = unicode(doc.md.date.strftime("%Y%m%d"), encoding="utf-8")
@@ -457,7 +457,7 @@ def verifyRequiredMetadata(doc):
         ('shortname', 'Shortname')
     ]
     requiredMultiKeys = [
-        ('abstracts', 'Abstract'),
+        ('abstract', 'Abstract'),
         ('editors', 'Editor')
     ]
     errors = []

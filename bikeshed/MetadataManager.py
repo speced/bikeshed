@@ -16,7 +16,7 @@ class MetadataManager:
         # required metadata
         self.status = None
         self.ED = None
-        self.abstracts = []
+        self.abstract = []
         self.shortname = None
         self.level = None
         self.vshortname = None
@@ -69,7 +69,7 @@ class MetadataManager:
         self.multiValueKeys = {
             "Editor": "editors",
             "Former Editor": "previousEditors",
-            "Abstract": "abstracts",
+            "Abstract": "abstract",
             "Previous Version": "previousVersions",
             "At Risk": "atRisk",
             "Ignored Terms": "ignoredTerms",
