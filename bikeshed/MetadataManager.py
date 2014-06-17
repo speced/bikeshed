@@ -170,22 +170,46 @@ def convertWarning(key, val):
     die('Unknown value for "{0}" metadata.', key)
 
 def parseEditor(key, val):
-    match = re.match("([^,]+) ,\s* ([^,]*) ,?\s* (.*)", val, re.X)
+    match = re.match("([^,]+) ,\s* ([^,]*) ,?\s* ([^,]*) ,?\s* ([^,]*)", val, re.X)
     pieces = [piece.strip() for piece in val.split(',')]
     def looksLinkish(string):
-        return re.match(ur"\w+:", string) or re.match(ur".+@.+\..+", string)
+        return re.match(ur"\w+:", string) or looksEmailish(string)
+    def looksEmailish(string):
+        return re.match(ur".+@.+\..+", string)
     data = {
-        'name': pieces[0],
-        'org' : '',
-        'link': ''
+        'name' : pieces[0],
+        'org'  : None,
+        'link' : None,
+        'email': None
     }
-    if len(pieces) == 3 and looksLinkish(pieces[2]):
+    if len(pieces) == 4 and looksLinkish(pieces[2]) and looksLinkish(pieces[3]):
         data['org'] = pieces[1]
-        data['link'] = pieces[2]
+        if looksEmailish(pieces[2]):
+            data['email'] = pieces[2]
+            data['link'] = pieces[3]
+        else:
+            data['link'] = pieces[2]
+            data['email'] = pieces[3]
+    elif len(pieces) == 3 and looksLinkish(pieces[1]) and looksLinkish(pieces[2]):
+        if looksEmailish(pieces[1]):
+            data['email'] = pieces[1]
+            data['link'] = pieces[2]
+        else:
+            data['link'] = pieces[1]
+            data['email'] = pieces[2]
+    elif len(pieces) == 3 and looksLinkish(pieces[2]):
+        data['org'] = pieces[1]
+        if looksEmailish(pieces[2]):
+            data['email'] = pieces[2]
+        else:
+            data['link'] = pieces[2]
     elif len(pieces) == 2:
         # See if the piece looks like a link/email
         if looksLinkish(pieces[1]):
-            data['link'] = pieces[1]
+            if looksEmailish(pieces[1]):
+                data['email'] = pieces[1]
+            else:
+                data['link'] = pieces[1]
         else:
             data['org'] = pieces[1]
     elif len(pieces) == 1:

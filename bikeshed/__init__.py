@@ -1845,16 +1845,16 @@ def addTOCSection(doc):
 def addSpecMetadataSection(doc):
     def printEditor(editor):
         str = "<dd class='p-author h-card vcard'>"
-        if(editor['link']):
-            if(editor['link'][0:4] == "http"):
-                str += "<a class='p-name fn u-url url' href='{0}'>{1}</a>".format(editor['link'], editor['name'])
-            else:
-                # Link is assumed to be an email address
-                str += "<a class='p-name fn u-email email' href='mailto:{0}'>{1}</a>".format(editor['link'], editor['name'])
+        if editor['link']:
+            str += "<a class='p-name fn u-url url' href='{0}'>{1}</a>".format(editor['link'], editor['name'])
+        elif editor['email']:
+            str += "<a class='p-name fn u-email email' href='mailto:{0}'>{1}</a>".format(editor['email'], editor['name'])
         else:
             str += "<span class='p-name fn'>{0}</span>".format(editor['name'])
-        if(editor['org'].strip() != ''):
+        if editor['org']:
             str += " (<span class='p-org org'>{0}</span>)".format(editor['org'])
+        if editor['email'] and editor['link']:
+            str += " <a class='u-email email' href='mailto:{0}'>{0}</a>".format(editor['email'])
         return str
 
     header = "<dl>"
