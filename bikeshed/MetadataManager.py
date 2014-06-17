@@ -46,7 +46,7 @@ class MetadataManager:
 
         self.singleValueKeys = {
             "Title": "title",
-            "H1": "h1"
+            "H1": "h1",
             "Status": "status",
             "Status Text": "statusText",
             "ED": "ED",
@@ -102,7 +102,7 @@ class MetadataManager:
 
     def addData(self, key, val, default=False):
         key = key.strip()
-        if key not in ("ED", "TR"):
+        if key not in ("ED", "TR", "URL"):
             key = key.title()
         val = val.strip()
 

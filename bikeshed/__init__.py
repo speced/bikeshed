@@ -471,8 +471,7 @@ def verifyRequiredMetadata(doc):
     requiredSingularKeys = [
         ('status', 'Status'),
         ('ED', 'ED'),
-        ('shortname', 'Shortname'),
-        ('level', 'Level')
+        ('shortname', 'Shortname')
     ]
     requiredMultiKeys = [
         ('abstracts', 'Abstract'),
@@ -485,6 +484,9 @@ def verifyRequiredMetadata(doc):
     for attr, name in requiredMultiKeys:
         if len(getattr(doc.md, attr)) == 0:
             errors.append("    Must provide at least one '{0}' entry.".format(name))
+    # Level is optional for some statuses.
+    if doc.md.level is None and doc.md.status not in config.unlevelledStatuses:
+        errors.append("    Missing a 'Level' entry.")
     if errors:
         die("Not all required metadata was provided:\n{0}", "\n".join(errors))
         return

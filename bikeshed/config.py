@@ -12,6 +12,9 @@ minify = True
 scriptPath = unicode(os.path.dirname(os.path.realpath(__file__)), encoding="utf-8")
 doc = None
 textMacros = {}
+
+unlevelledStatuses = ["LS", "DREAM"]
+
 dfnClassToType = {
     "propdef"         : "property",
     "valuedef"        : "value",
