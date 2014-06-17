@@ -13,7 +13,23 @@ scriptPath = unicode(os.path.dirname(os.path.realpath(__file__)), encoding="utf-
 doc = None
 textMacros = {}
 
-unlevelledStatuses = ["LS", "DREAM"]
+TRStatuses = ["WD", "FPWD", "LCWD", "CR", "PR", "REC", "PER", "NOTE", "MO"]
+unlevelledStatuses = ["LS", "DREAM", "UD"]
+shortToLongStatus = {
+    "ED": "Editor's Draft",
+    "WD": "W3C Working Draft",
+    "FPWD": "W3C First Public Working Draft",
+    "LCWD": "W3C Last Call Working Draft",
+    "CR": "W3C Candidate Recommendation",
+    "PR": "W3C Proposed Recommendation",
+    "REC": "W3C Recommendation",
+    "PER": "W3C Proposed Edited Recommendation",
+    "NOTE": "W3C Working Group Note",
+    "MO": "W3C Member-only Draft",
+    "UD": "Unofficial Proposal Draft",
+    "DREAM": "A Collection of Interesting Ideas",
+    "LS": "Living Standard"
+}
 
 dfnClassToType = {
     "propdef"         : "property",

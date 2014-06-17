@@ -409,20 +409,6 @@ def loadDefaultMetadata(doc):
         doc.md.addDefault(key, val)
 
 def initializeTextMacros(doc):
-    longstatuses = {
-        "ED": "Editor's Draft",
-        "WD": "W3C Working Draft",
-        "FPWD": "W3C First Public Working Draft",
-        "LCWD": "W3C Last Call Working Draft",
-        "CR": "W3C Candidate Recommendation",
-        "PR": "W3C Proposed Recommendation",
-        "REC": "W3C Recommendation",
-        "PER": "W3C Proposed Edited Recommendation",
-        "NOTE": "W3C Working Group Note",
-        "MO": "W3C Member-only Draft",
-        "UD": "Unofficial Proposal Draft",
-        "DREAM": "A Collection of Interesting Ideas"
-    }
     if doc.md.title:
         config.textMacros["title"] = doc.md.title
         config.textMacros["spectitle"] = doc.md.title
@@ -432,8 +418,8 @@ def initializeTextMacros(doc):
     if doc.md.status:
         config.textMacros["statusText"] = doc.md.statusText
     config.textMacros["vshortname"] = doc.md.vshortname
-    if doc.md.status in longstatuses:
-        config.textMacros["longstatus"] = longstatuses[doc.md.status]
+    if doc.md.status in config.shortToLongStatus:
+        config.textMacros["longstatus"] = config.shortToLongStatus[doc.md.status]
     else:
         die("Unknown status '{0}' used.",doc.md.status)
     if doc.md.status in ("LCWD", "FPWD"):
@@ -449,13 +435,10 @@ def initializeTextMacros(doc):
     config.textMacros["isodate"] = unicode(doc.md.date.strftime("%Y-%m-%d"), encoding="utf-8")
     if doc.md.deadline:
         config.textMacros["deadline"] = unicode(doc.md.deadline.strftime("{0} %B %Y".format(doc.md.deadline.day)), encoding="utf-8")
-    if doc.md.status == "ED":
-        config.textMacros["version"] = doc.md.ED
+    if doc.md.status in config.TRStatuses:
+        config.textMacros["version"] = "http://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**config)
     else:
-        config.textMacros["version"] = "http://www.w3.org/TR/{3}/{0}-{1}-{2}/".format(config.textMacros["status"],
-                                                                                       config.textMacros["vshortname"],
-                                                                                       config.textMacros["cdate"],
-                                                                                       config.textMacros["year"])
+        config.textMacros["version"] = doc.md.ED
     config.textMacros["annotations"] = config.testAnnotationURL
     config.textMacros["testsuite"] = doc.testSuites[doc.md.vshortname]['vshortname'] if doc.md.vshortname in doc.testSuites else "???"
     config.textMacros["logo"] = doc.md.logo
