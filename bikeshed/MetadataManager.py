@@ -106,7 +106,6 @@ class MetadataManager:
             key = key.title()
         val = val.strip()
 
-        # This'll be a fatal error later, but for now it's just a warning.
         if not (key in self.knownKeys or key.startswith("!")):
             die('Unknown metadata key "{0}". Prefix custom keys with "!".', key)
             return
