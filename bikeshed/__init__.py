@@ -455,6 +455,7 @@ def initializeTextMacros(doc):
                                                                                        config.textMacros["year"])
     config.textMacros["annotations"] = config.testAnnotationURL
     config.textMacros["testsuite"] = doc.testSuites[doc.md.vshortname]['vshortname'] if doc.md.vshortname in doc.testSuites else "???"
+    config.textMacros["logo"] = doc.md.logo
     # Now we have enough data to set all the relevant stuff in ReferenceManager
     doc.refs.setSpecData(doc)
 

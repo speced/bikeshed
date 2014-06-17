@@ -39,6 +39,7 @@ class MetadataManager:
         self.mailingListArchives = None
         self.boilerplate = {'omitSections':set()}
         self.versionHistory = None
+        self.logo = ""
 
         self.otherMetadata = defaultdict(list)
 
@@ -59,6 +60,7 @@ class MetadataManager:
             "Mailing List Archives": "mailingListArchives",
             "Boilerplate": "boilerplate",
             "Version History": "versionHistory",
+            "Logo": "logo"
         }
 
         self.multiValueKeys = {
