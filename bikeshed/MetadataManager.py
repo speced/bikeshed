@@ -50,6 +50,7 @@ class MetadataManager:
             "Status": "status",
             "Status Text": "statusText",
             "ED": "ED",
+            "URL": "ED", # URL is a synonym for ED
             "Shortname": "shortname",
             "Level": "level",
             "TR": "TR",
