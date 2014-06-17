@@ -24,6 +24,7 @@ class MetadataManager:
         # optional metadata
         self.TR = None
         self.title = None
+        self.h1 = None
         self.statusText = ""
         self.date = datetime.utcnow().date()
         self.deadline = None
@@ -45,6 +46,7 @@ class MetadataManager:
 
         self.singleValueKeys = {
             "Title": "title",
+            "H1": "h1"
             "Status": "status",
             "Status Text": "statusText",
             "ED": "ED",

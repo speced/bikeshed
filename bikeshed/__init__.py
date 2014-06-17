@@ -425,6 +425,9 @@ def initializeTextMacros(doc):
     }
     if doc.md.title:
         config.textMacros["title"] = doc.md.title
+        config.textMacros["spectitle"] = doc.md.title
+    if doc.md.h1:
+        config.textMacros["spectitle"] = doc.md.h1
     config.textMacros["shortname"] = doc.md.shortname
     if doc.md.status:
         config.textMacros["statusText"] = doc.md.statusText
