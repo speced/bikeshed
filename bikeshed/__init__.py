@@ -1585,6 +1585,7 @@ def fillWith(tag, newElements):
 
 def addLogo(doc):
     html = doc.getInclusion('logo')
+    html = replaceTextMacros(html)
     fillWith('logo', parseHTML(html))
 
 
