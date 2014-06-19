@@ -1850,7 +1850,7 @@ def addSpecMetadataSection(doc):
     header += "<dt>This version:<dd><a href='[VERSION]' class='u-url'>[VERSION]</a>"
     if doc.md.TR:
         header += "<dt>Latest version:<dd><a href='{0}'>{0}</a>".format(doc.md.TR)
-    if doc.md.ED:
+    if doc.md.ED and doc.md.status in config.TRStatuses:
         header += "<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.md.ED)
     if len(doc.md.previousVersions):
         header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.md.previousVersions))
