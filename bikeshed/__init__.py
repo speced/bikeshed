@@ -1846,44 +1846,39 @@ def addSpecMetadataSection(doc):
             str += " <a class='u-email email' href='mailto:{0}'>{0}</a>".format(editor['email'])
         return str
 
-    header = "<dl>"
-    header += "<dt>This version:<dd><a href='[VERSION]' class='u-url'>[VERSION]</a>"
+    md = defaultdict(list)
+    md["This version"].append("<a href='[VERSION]' class='u-url'>[VERSION]</a>")
     if doc.md.TR:
-        header += "<dt>Latest version:<dd><a href='{0}'>{0}</a>".format(doc.md.TR)
+        md["Latest version"].append("<a href='{0}'>{0}</a>".format(doc.md.TR))
     if doc.md.ED and doc.md.status in config.TRStatuses:
-        header += "<dt>Editor's Draft:<dd><a href='{0}'>{0}</a>".format(doc.md.ED)
+        md["Editor's Draft"].append("<a href='{0}'>{0}</a>".format(doc.md.ED))
     if len(doc.md.previousVersions):
-        header += "<dt>Previous Versions:" + ''.join(map("<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.md.previousVersions))
+        md["Previous Versions"] = map("<dd><a href='{0}' rel='previous'>{0}</a>".format, doc.md.previousVersions)
     if doc.md.versionHistory:
-        header += "<dt>Version History:<dd><a href='{0}'>{0}</a>".format(doc.md.versionHistory)
+        md["Version History"].append("<a href='{0}'>{0}</a>".format(doc.md.versionHistory))
     if doc.md.mailingList:
-        header += """
-    <dt>Feedback:</dt>
-        <dd><a href="mailto:{0}?subject=%5B[SHORTNAME]%5D%20feedback">{0}</a>
+        md["Feedback"].append("""<a href="mailto:{0}?subject=%5B[SHORTNAME]%5D%20feedback">{0}</a>
             with subject line
-            &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;""".format(doc.md.mailingList)
+            &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;""".format(doc.md.mailingList))
         if doc.md.mailingListArchives:
-            header += """(<a rel="discussion" href="{0}">archives</a>)""".format(doc.md.mailingListArchives)
+            md["Feedback"][0] += "(<a rel=discussion href='{0}''>archives</a>)".format(doc.md.mailingListArchives)
     if doc.md.testSuite is not None:
-        header += "<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.md.testSuite)
+        md["Test Suite"].append("<a href='{0}'>{0}</a>".format(doc.md.testSuite))
     else:
         if (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]['url'] is not None):
-            header += "<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.testSuites[doc.md.vshortname]['url'])
+            md["Test Suite"].append("<a href='{0}'>{0}</a>".format(doc.testSuites[doc.md.vshortname]['url']))
     if len(doc.md.editors):
-        header += "<dt>Editors:\n"
-        for editor in doc.md.editors:
-            header += printEditor(editor)
-    else:
-        header += "<dt>Editors:<dd>???"
+        md["Editors"] = map(printEditor, doc.md.editors)
     if len(doc.md.previousEditors):
-        header += "<dt>Former Editors:\n"
-        for editor in doc.md.previousEditors:
-            header += printEditor(editor)
-    if len(doc.md.otherMetadata):
-        for key, vals in doc.md.otherMetadata.items():
-            header += "<dt>{0}:".format(key)
-            for val in vals:
-                header += "<dd>"+val
+        md["Former Editors"] = map(printEditor, doc.md.previousEditors)
+    for key, vals in doc.md.otherMetadata.items():
+        md[key].extend(vals)
+
+    header = "<dl>"
+    for key, vals in md.items():
+        header += "<dt>{0}:".format(key)
+        for val in vals:
+            header += "<dd>"+val
     header += "</dl>"
     header = replaceTextMacros(header)
     fillWith('spec-metadata', parseHTML(header))

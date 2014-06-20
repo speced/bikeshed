@@ -102,17 +102,18 @@ class MetadataManager:
 
     def addData(self, key, val, default=False):
         key = key.strip()
+        val = val.strip()
+
+        if key.startswith("!"):
+            key = key[1:]
+            self.otherMetadata[key].append(val)
+            return
+
         if key not in ("ED", "TR", "URL"):
             key = key.title()
-        val = val.strip()
 
         if not (key in self.knownKeys or key.startswith("!")):
             die('Unknown metadata key "{0}". Prefix custom keys with "!".', key)
-            return
-
-        if key.startswith("!"):
-            key = key.lstrip("!")
-            self.otherMetadata[key].append(val)
             return
 
         if key in self.knownKeys and not default:
