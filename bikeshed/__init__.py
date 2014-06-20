@@ -309,11 +309,11 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
         ret = ["<table class='definition propdef'>"]
     for key in requiredKeys:
         if key == "Value":
-            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals[key]))
+            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals.get(key,'')))
         elif key.lower() == "new values":
-            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals[key]))
+            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals.get(key,'')))
         elif key in vals:
-            ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
+            ret.append("<tr><th>{0}:<td>{1}".format(key, vals.get(key,'')))
         else:
             die("The propdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key)
             continue
@@ -336,11 +336,11 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
         ret = ["<table class='definition descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
     for key in requiredKeys:
         if key == "For":
-            ret.append("<tr><th>{0}:<td><a at-rule>{1}</a>".format(key, vals[key]))
+            ret.append("<tr><th>{0}:<td><a at-rule>{1}</a>".format(key, vals.get(key,'')))
         elif key == "Value":
-            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals[key]))
+            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals.get(key,'')))
         elif key in vals:
-            ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
+            ret.append("<tr><th>{0}:<td>{1}".format(key, vals.get(key,'')))
         else:
             die("The descdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key)
             continue
