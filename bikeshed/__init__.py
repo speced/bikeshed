@@ -1869,8 +1869,6 @@ def addSpecMetadataSection(doc):
     else:
         if (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]['url'] is not None):
             header += "<dt>Test Suite:<dd><a href='{0}'>{0}</a>".format(doc.testSuites[doc.md.vshortname]['url'])
-        else:
-            header += "<dt>Test Suite:<dd>None Yet"
     if len(doc.md.editors):
         header += "<dt>Editors:\n"
         for editor in doc.md.editors:
