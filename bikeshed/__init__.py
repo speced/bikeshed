@@ -1464,6 +1464,7 @@ class CSSSpec(object):
         addTOCSection(self)
         addSelfLinks(self)
         processAutolinks(self)
+        addCustomBoilerplate(self)
 
         addAnnotations(self)
 
@@ -1620,6 +1621,14 @@ def addAtRisk(doc):
     for feature in doc.md.atRisk:
         html += "<li>"+replaceTextMacros(feature)
     fillWith('at-risk', parseHTML(html))
+
+def addCustomBoilerplate(doc):
+    for el in findAll('[boilerplate]'):
+        bType = el.get('boilerplate')
+        target = find('[data-fill-with="{0}"]'.format(bType))
+        if target is not None:
+            replaceContents(target, el)
+            removeNode(el)
 
 def addAnnotations(doc):
     if (doc.md.vshortname in doc.testSuites):
