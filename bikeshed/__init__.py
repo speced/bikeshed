@@ -1870,7 +1870,7 @@ def addSpecMetadataSection(doc):
             with subject line
             &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;""".format(doc.md.mailingList))
         if doc.md.mailingListArchives:
-            md["Feedback"][0] += "(<a rel=discussion href='{0}''>archives</a>)".format(doc.md.mailingListArchives)
+            md["Feedback"][0] += "(<a rel=discussion href='{0}'>archives</a>)".format(doc.md.mailingListArchives)
     if doc.md.testSuite is not None:
         md["Test Suite"].append("<a href='{0}'>{0}</a>".format(doc.md.testSuite))
     else:
