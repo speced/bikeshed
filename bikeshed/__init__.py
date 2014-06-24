@@ -1883,12 +1883,12 @@ def addSpecMetadataSection(doc):
     for key, vals in doc.md.otherMetadata.items():
         md[key].extend(vals)
 
-    header = "<dl>"
+    header = "\n<dl>"
     for key, vals in md.items():
-        header += "<dt>{0}:".format(key)
+        header += "\n\t<dt>{0}:".format(key)
         for val in vals:
-            header += "<dd>"+val
-    header += "</dl>"
+            header += "\n\t<dd>"+val
+    header += "\n</dl>\n"
     header = replaceTextMacros(header)
     fillWith('spec-metadata', parseHTML(header))
 
