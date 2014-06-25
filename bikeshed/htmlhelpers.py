@@ -47,16 +47,20 @@ def outerHTML(el):
 
 def parseHTML(text):
     doc = html5lib.parse(text, treebuilder='lxml', namespaceHTMLElements=False)
+    head = doc.getroot()[0]
     body = doc.getroot()[1]
-    if body.text is None:
-        if len(body):
-            return list(body.iterchildren())
-        head = doc.getroot()[0]
-        if head.text is None:
-            return list(head.iterchildren())
-        return [head.text] + list(head.iterchildren())
+    if len(body) or body.text is not None:
+        # Body contains something, so return that.
+        contents = [body.text] if body.text is not None else []
+        contents.extend(body.iterchildren())
+        return contents
+    elif len(head) or head.text is not None:
+        # Okay, anything in the head?
+        contents = [head.text] if head.text is not None else []
+        contents.extend(head.iterchildren())
+        return contents
     else:
-        return [body.text] + list(body.iterchildren())
+        return []
 
 
 def parseDocument(text):
