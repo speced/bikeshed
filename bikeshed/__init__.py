@@ -104,6 +104,12 @@ def main():
                             help="Path to the output file.")
 
     testParser = subparsers.add_parser('test', help="Tools for running Bikeshed's testsuite.")
+    testParser.add_argument("--rebase",
+                            dest="rebaseFiles",
+                            default=None,
+                            metavar="FILE",
+                            nargs="*",
+                            help="Rebase the specified files. If called with no args, rebases everything.")
 
     options = argparser.parse_args()
 
@@ -155,9 +161,12 @@ def main():
             font = fonts.Font()
             fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
     elif options.subparserName == "test":
-        config.debug = True
-        config.quiet = True
-        test.runAllTests(constructor=CSSSpec)
+        if options.rebaseFiles is not None:
+            test.rebase(options.rebaseFiles)
+        else:
+            config.debug = True
+            config.quiet = True
+            test.runAllTests(constructor=CSSSpec)
 
 
 def stripBOM(doc):

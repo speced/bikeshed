@@ -5,6 +5,8 @@ import glob
 import io
 import difflib
 import sys
+import subprocess
+import pipes
 from itertools import *
 from .htmlhelpers import parseDocument, outerHTML
 from . import config
@@ -51,3 +53,11 @@ def compare(suspect, golden):
 		print
 		return False
 	return True
+
+def rebase(files=None):
+	if not files:
+		files = glob.glob(config.scriptPath + "/../tests/*.bs")
+	numfiles = len(files)
+	for file in files:
+		print "Rebasing {0}".format(file)
+		subprocess.call("bikeshed -qf spec {0}".format(pipes.quote(file)), shell=True)
