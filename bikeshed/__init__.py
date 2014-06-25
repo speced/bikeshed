@@ -1877,11 +1877,9 @@ def addSpecMetadataSection(doc):
         if (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]['url'] is not None):
             md["Test Suite"].append("<a href='{0}'>{0}</a>".format(doc.testSuites[doc.md.vshortname]['url']))
     if len(doc.md.editors):
-        key = "Editor" if len(doc.md.editors) == 1 else "Editors"
-        md[key] = map(printEditor, doc.md.editors)
+        md["Editor" if len(doc.md.editors) == 1 else "Editors"] = map(printEditor, doc.md.editors)
     if len(doc.md.previousEditors):
-        key = "Former Editor" if len(doc.md.editors) == 1 else "Former Editors"
-        md[key] = map(printEditor, doc.md.previousEditors)
+        md["Former Editor" if len(doc.md.editors) == 1 else "Former Editors"] = map(printEditor, doc.md.previousEditors)
     for key, vals in doc.md.otherMetadata.items():
         md[key].extend(vals)
 
