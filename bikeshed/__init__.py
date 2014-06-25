@@ -1805,16 +1805,6 @@ def addPropertyIndex(doc):
 
 
 def addTOCSection(doc):
-    def removeBadToCElements(html):
-        # Several elements which can occur in headings shouldn't be copied over into the ToC.
-
-        # ToC text is wrapped in an <a>, but the HTML parser doesn't like nested <a>s.
-        html = re.sub(r'<(/?)a\b', r'<\1span', html)
-
-        # Remove any <dfn>s, so they don't get duplicated in the ToC.
-        html = re.sub('(<dfn[^>]*>)|(</dfn>)', '', html)
-
-        return html
 
     skipLevel = float('inf')
     previousLevel = 0
@@ -1840,14 +1830,24 @@ def addTOCSection(doc):
             html += "\n{0}<ul class='toc'>".format(indent)
         elif level < previousLevel:
             html += "</ul>" * (previousLevel - level)
-        contents = removeBadToCElements(innerHTML(find(".content", header)))
         # Add section number
-        contents = "<span class='secno'>{level}</span> {contents}".format(level=header.get('data-level') or '', contents=contents)
-        html += "\n{2}<li><a href='#{0}'>{1}</a>".format(header.get('id'), contents.replace('\n',' '), indent)
+        contents = "<span class='secno'>{level}</span> {contents}".format(level=header.get('data-level') or '', contents=innerHTML(find(".content", header)))
+        # Headings sometimes have <a>s in them, but the HTML parser doesn't like nested <a>s.
+        # Instead, use a fake element for now, and clean up at the end.
+        html += "\n{2}<li><willbelink href='#{0}'>{1}</willbelink>".format(header.get('id'), contents.replace('\n',' '), indent)
         previousLevel = level
     fillWith("table-of-contents", parseHTML(html))
-    for badSpan in findAll(".toc span[href]"):
-        del badSpan.attrib['href']
+    # Clean up the ToC, because lots of bad stuff gets in the headings that shouldn't be duplicated.
+    toc = find("[data-fill-with='table-of-contents'] > ul")
+    if toc is None:
+        die("ToC is lost somehow, even though I just inserted it. Report a bug?")
+    for el in findAll("a, dfn", toc):
+        el.tag = "span"
+        el.attrib.clear()
+    for el in findAll("[id]", toc):
+        del el.attrib["id"]
+    for el in findAll("willbelink", toc):
+        el.tag = "a"
 
 def addSpecMetadataSection(doc):
     def printEditor(editor):
