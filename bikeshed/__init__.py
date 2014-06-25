@@ -1842,7 +1842,7 @@ def addTOCSection(doc):
             html += "</ul>" * (previousLevel - level)
         contents = removeBadToCElements(innerHTML(find(".content", header)))
         # Add section number
-        contents = "<span class='secno'>{0}</span>".format(header.get('data-level') or '') + contents
+        contents = "<span class='secno'>{level}</span> {contents}".format(level=header.get('data-level') or '', contents=contents)
         html += "\n{2}<li><a href='#{0}'>{1}</a>".format(header.get('id'), contents.replace('\n',' '), indent)
         previousLevel = level
     fillWith("table-of-contents", parseHTML(html))
