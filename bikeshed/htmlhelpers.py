@@ -194,6 +194,9 @@ def previousElements(startEl, tag=None, *tags):
         els.append(el)
     return els
 
+def childElements(parentEl, tag="*", *tags, **stuff):
+    return parentEl.iterchildren(tag=tag, *tags, **stuff)
+
 def treeAttr(el, attrName):
     if el.get(attrName) is not None:
         return el.get(attrName)

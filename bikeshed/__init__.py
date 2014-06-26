@@ -538,7 +538,7 @@ def transformAutolinkShortcuts(doc):
                 temp = parseHTML('<div>'+newtext+'</div>')[0]
                 # Change the .text, empty out the temp children.
                 el.text = temp.text
-                for child in temp.iterchildren(tag="*", reversed=True):
+                for child in childElements(temp, reversed=True):
                     el.insert(0, child)
 
         # Same for tail.
@@ -546,13 +546,13 @@ def transformAutolinkShortcuts(doc):
         if el.tail != newtext:
             temp = parseHTML('<div>'+newtext+'</div>')[0]
             el.tail = ''
-            for child in temp.iterchildren(reversed=True):
+            for child in childElements(temp, reversed=True):
                 el.addnext(child)
             el.tail = temp.text
 
         if processContents:
             # Recurse over children.
-            for child in el.iterchildren():
+            for child in childElements(el):
                 fixElementText(child)
 
     fixElementText(doc.document.getroot())
@@ -573,7 +573,7 @@ def transformProductionGrammars(doc):
 
     def fixElementText(el, root=False):
         # Recurse over children.
-        for child in el.iterchildren():
+        for child in childElements(el):
             fixElementText(child)
 
         # Pull out el.text, replace stuff (may introduce elements), parse.
@@ -583,7 +583,7 @@ def transformProductionGrammars(doc):
                 temp = parseHTML('<div>'+newtext+'</div>')[0]
                 # Change the .text, empty out the temp children.
                 el.text = temp.text
-                for child in temp.iterchildren(tag="*", reversed=True):
+                for child in childElements(temp, reversed=True):
                     el.insert(0, child)
 
         # Same for tail, if it's a sub-element
@@ -592,7 +592,7 @@ def transformProductionGrammars(doc):
             if el.tail != newtext:
                 temp = parseHTML('<div>'+newtext+'</div>')[0]
                 el.tail = ''
-                for child in temp.iterchildren(reversed=True):
+                for child in childElements(temp, reversed=True):
                     el.addnext(child)
                 el.tail = temp.text
 
