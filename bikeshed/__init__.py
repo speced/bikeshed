@@ -26,6 +26,7 @@ from .MetadataManager import MetadataManager
 from .htmlhelpers import *
 from .messages import *
 from .widlparser.widlparser import parser
+from .DefaultOrderedDict import DefaultOrderedDict
 
 
 def main():
@@ -1864,7 +1865,7 @@ def addSpecMetadataSection(doc):
             str += " <a class='u-email email' href='mailto:{0}'>{0}</a>".format(editor['email'])
         return str
 
-    md = defaultdict(list)
+    md = DefaultOrderedDict(list)
     md["This version"].append("<a href='[VERSION]' class='u-url'>[VERSION]</a>")
     if doc.md.TR:
         md["Latest version"].append("<a href='{0}'>{0}</a>".format(doc.md.TR))
