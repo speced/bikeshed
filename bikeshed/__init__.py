@@ -445,7 +445,7 @@ def initializeTextMacros(doc):
     if doc.md.deadline:
         config.textMacros["deadline"] = unicode(doc.md.deadline.strftime("{0} %B %Y".format(doc.md.deadline.day)), encoding="utf-8")
     if doc.md.status in config.TRStatuses:
-        config.textMacros["version"] = "http://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**config)
+        config.textMacros["version"] = "http://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**config.textMacros)
     else:
         config.textMacros["version"] = doc.md.ED
     config.textMacros["annotations"] = config.testAnnotationURL
