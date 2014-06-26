@@ -221,7 +221,7 @@ def printScript(outfile):
 		sheet.addRule('pre.' + className, '');
 		var rule = sheet.rules[sheet.rules.length - 1];
 		check.onchange = function (e) {
-			rule.style.display = this.checked ? 'inherit' : 'none';
+			rule.style.display = this.checked ? 'block' : 'none';
 		}
 		element.appendChild(check);
 		element.appendChild(span);
