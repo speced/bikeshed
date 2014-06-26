@@ -104,7 +104,8 @@ if __name__ == "__main__":      # called from the command line
         quit()
     
     
-    idl = u"""interface Simple{
+    idl = u"""dictionary CSSFontFaceLoadEventInit : EventInit { sequence<CSSFontFaceRule> fontfaces = [ ]; }; 
+    interface Simple{
     serializer;
     serializer = { foo };
     serializer = { foo, bar };

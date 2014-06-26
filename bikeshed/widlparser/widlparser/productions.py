@@ -796,13 +796,15 @@ class Inheritance(Production):   # ":" identifier [IgnoreMultipleInheritance]
         return '[inherits: ' + self.base.encode('ascii', 'replace') + ']'
 
 
-class Default(Production):   # "=" ConstValue | "=" string
+class Default(Production):   # "=" ConstValue | "=" string | "=" "[" "]"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         if (Symbol.peek(tokens, '=')):
             if (ConstValue.peek(tokens)):
                 return tokens.popPosition(True)
+            if (Symbol.peek(tokens, '[')):
+                return tokens.popPosition(Symbol.peek(tokens, ']'))
             token = tokens.peek()
             return tokens.popPosition(token and token.isString())
         return tokens.popPosition(False)
@@ -810,15 +812,21 @@ class Default(Production):   # "=" ConstValue | "=" string
     def __init__(self, tokens):
         Production.__init__(self, tokens)
         self._equals = Symbol(tokens, '=')
+        self._openBracket = None
+        self._closeBracket = None
         token = tokens.sneakPeek()
         if (token.isString()):
             self.value = tokens.next().text
+        elif (token.isSymbol('[')):
+            self._openBracket = Symbol(tokens, '[')
+            self._closeBracket = Symbol(tokens, ']', False)
+            self.value = None
         else:
             self.value = ConstValue(tokens)
         self._didParse(tokens)
 
     def _unicode(self):
-        return unicode(self._equals) + unicode(self.value)
+        return unicode(self._equals) + (unicode(self.value) if (self.value) else unicode(self._openBracket) + unicode(self._closeBracket))
 
     def __repr__(self):
         return '[Default: ' + repr(self.value) + ']'
