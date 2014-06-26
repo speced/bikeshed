@@ -68,6 +68,7 @@ def printIssueList(infilename=None, outfilename=None):
 	printHeader(outfile, headerInfo)
 
 	printIssues(outfile, lines)
+	printScript(outfile);
 
 
 def extractHeaderInfo(lines, infilename):
@@ -204,3 +205,28 @@ def printIssues(outfile, lines):
 		outfile.write("<pre class='{0}' id='issue-{1}'>\n".format(code, index))
 		outfile.write(issue)
 		outfile.write("</pre>\n")
+
+def printScript(outfile):
+	outfile.write('''<script>
+(function () {
+	var sheet = document.styleSheets[0];
+	function addCheckbox(className) {
+		var element = document.querySelector('*.' + className);
+		var span = document.createElement('span');
+		span.innerHTML = element.innerHTML;
+		element.innerHTML = null;
+		var check = document.createElement('input');
+		check.type = 'checkbox';
+		check.checked = true;
+		sheet.addRule('pre.' + className, '');
+		var rule = sheet.rules[sheet.rules.length - 1];
+		check.onchange = function (e) {
+			rule.style.display = this.checked ? 'block' : 'none';
+		}
+		element.appendChild(check);
+		element.appendChild(span);
+	}
+	['a', 'd', 'fo', 'oi', 'r', 'open'].forEach(addCheckbox);
+}());
+</script>
+''');
