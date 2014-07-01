@@ -1844,7 +1844,8 @@ def addTOCSection(doc):
         die("ToC is lost somehow, even though I just inserted it. Report a bug?")
     for el in findAll("a, dfn", toc):
         el.tag = "span"
-        el.attrib.clear()
+        if "href" in el.attrib:
+            del el.attrib["href"]
     for el in findAll("[id]", toc):
         del el.attrib["id"]
     for el in findAll("willbelink", toc):
