@@ -150,9 +150,9 @@ def parseMultiLineHeading(stream):
 def parseParagraph(stream):
 	line = stream.currtext()
 	initialPrefix = stream.currprefix()
-	if line.startswith("Note: ") or line.startswith("Note, "):
+	if line.lower().startswith("note: ") or line.lower().startswith("note, "):
 		p = "<p class='note'>"
-	elif line.startswith("Issue: "):
+	elif line.lower().startswith("issue: "):
 		line = line[7:]
 		p = "<p class='issue'>"
 	else:
