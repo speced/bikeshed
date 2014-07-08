@@ -7,6 +7,7 @@ class BiblioEntry(object):
     linkText = None
     title = None
     authors = None
+    etAl = False
     foreignAuthors = None
     status = None
     date = None
@@ -31,15 +32,19 @@ class BiblioEntry(object):
     def __str__(self):
         str = ""
         authors = self.authors + self.foreignAuthors
+        etAl = self.etAl
 
         if len(authors) == 0:
-            str += "???. "
+            str += "???"
         elif len(authors) == 1:
-            str += authors[0] + ". "
+            str += authors[0]
         elif len(authors) < 4:
-            str += "; ".join(authors) + ". "
+            str += "; ".join(authors)
         else:
-            str += authors[0] + "; et al. "
+            str += authors[0]
+            etAl = True
+
+        str += "; et al. " if etAl else ". "
 
         str += "<a href='{0}'>{1}</a>. ".format(self.url, self.title)
 
@@ -116,6 +121,7 @@ def processSpecrefBiblioFile(text):
     # JSON field name: BiblioEntry name
     fields = {
         "authors": "authors",
+        "etAl": "etAl",
         "href": "url",
         "title": "title",
         "rawDate": "date",
