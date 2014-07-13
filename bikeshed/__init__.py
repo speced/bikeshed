@@ -1155,11 +1155,17 @@ class IDLMarker(object):
                 return [myForValue]
 
         if idlType == "attribute":
-            if construct.member.rest.readonly is not None:
+            if hasattr(construct.member, "rest"):
+                rest = construct.member.rest
+            elif hasattr(construct.member, "attribute"):
+                rest = construct.member.attribute
+            else:
+                die("Can't figure out how to construct attribute-info from:\n  {0}", construct)
+            if rest.readonly is not None:
                 readonly = 'data-readonly'
             else:
                 readonly = ''
-            extraParameters = '{0} data-type="{1}"'.format(readonly, construct.member.rest.type)
+            extraParameters = '{0} data-type="{1}"'.format(readonly, rest.type)
         else:
             extraParameters = ''
 
