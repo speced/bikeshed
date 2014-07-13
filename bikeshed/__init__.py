@@ -816,8 +816,10 @@ def fillAttributeInfoSpans(doc):
                 target = findAll('[data-link-type=attribute][title="{0}"]'.format(referencedAttribute))
             if len(target) == 0:
                 die("Couldn't find target attribute {0}:\n{1}", referencedAttribute, outerHTML(el))
+                continue
             if len(target) > 1:
                 die("Multiple potential target attributes {0}:\n{1}", referencedAttribute, outerHTML(el))
+                continue
             target = target[0]
             datatype = target.get("data-type").strip()
             decorations = ""
