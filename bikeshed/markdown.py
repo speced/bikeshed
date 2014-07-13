@@ -150,11 +150,16 @@ def parseMultiLineHeading(stream):
 def parseParagraph(stream):
 	line = stream.currtext()
 	initialPrefix = stream.currprefix()
-	if line.startswith("Note: ") or line.startswith("Note, "):
+	endTag = "</p>"
+	if line.lower().startswith("note: ") or line.lower().startswith("note, "):
 		p = "<p class='note'>"
-	elif line.startswith("Issue: "):
+	elif line.lower().startswith("issue: "):
 		line = line[7:]
 		p = "<p class='issue'>"
+	elif line.lower().startswith("advisement: "):
+		line = line[12:]
+		p = "<strong class='advisement'>"
+		endTag = "</strong>"
 	else:
 		p = "<p>"
 	lines = ["{0}{1}\n".format(p, line)]
@@ -162,7 +167,7 @@ def parseParagraph(stream):
 		stream.advance()
 		try:
 			if stream.currtype() in ("eof", "blank") or not stream.currprefix().startswith(initialPrefix):
-				lines[-1] = lines[-1].rstrip() + "</p>" + "\n"
+				lines[-1] = lines[-1].rstrip() + endTag + "\n"
 				return lines
 		except AttributeError, e:
 			print stream.curr()
