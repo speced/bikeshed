@@ -773,11 +773,13 @@ def canonicalizeShortcuts(doc):
             if el.get(dfnType) == "":
                 del el.attrib[dfnType]
                 el.set("data-dfn-type", dfnType)
+                break
     for el in findAll("a"):
         for linkType in (config.linkTypes | set("dfn")):
             if el.get(linkType) is not None:
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
+                break
     for el in findAll("dfn[for], a[for]"):
         if el.tag == "dfn":
             el.set("data-dfn-for", el.get('for'))
