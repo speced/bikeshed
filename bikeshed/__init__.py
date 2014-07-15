@@ -1028,6 +1028,8 @@ def classifyLink(el):
     linkType = determineLinkType(el)
     el.set('data-link-type', linkType)
     linkText = determineLinkText(el)
+
+    # Fix up "for" text shorthands
     if linkType == 'propdesc':
         match = re.match(r"^(@[\w-]+)/([\w-]+)$", linkText)
         if match:
@@ -1042,6 +1044,7 @@ def classifyLink(el):
             clearContents(el)
             linkText = match.group(2)
             el.text = linkText
+
     el.set('title', linkText)
     for attr in ["data-link-status", "data-link-for", "data-link-spec"]:
         val = treeAttr(el, attr)
