@@ -525,7 +525,10 @@ def transformAutolinkShortcuts(doc):
                         '<a title="biblio-{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
                             match.group(2),
                             biblioType))
+
+        # Handle propdesc links, like 'width'.
         text = re.sub(r"'([-]?[\w@*][\w@*/-]*)'", r'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
+
         return text
 
     def fixElementText(el):
