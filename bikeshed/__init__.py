@@ -531,6 +531,9 @@ def transformAutolinkShortcuts(doc):
         # Handle propdesc links, like 'width'.
         text = re.sub(r"'([-]?[\w@*][\w@*/-]*)'", r'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
 
+        # Handle IDL links, like {{FooBar}}
+        text = re.sub(r"{{((\S|,\s)+)}}", r'<a data-link-type="idl" title="\1">\1</a>', text)
+
         return text
 
     def fixElementText(el):
@@ -1041,6 +1044,13 @@ def classifyLink(el):
             el.text = linkText
     elif linkType == "maybe":
         match = re.match(r"^([\w/@<>-]+)/([\w-]+)$", linkText)
+        if match:
+            el.set('data-link-for', match.group(1))
+            clearContents(el)
+            linkText = match.group(2)
+            el.text = linkText
+    elif linkType == "idl":
+        match = re.match(r"^(.+)/([^/]+)$", linkText)
         if match:
             el.set('data-link-for', match.group(1))
             clearContents(el)

@@ -39,10 +39,13 @@ There are several shortcuts for writing autolinks of particular types, so you do
 * `<<'foo'>>` is an autolink to the the property or descriptor named "foo" (used in grammars, where you need `<foo>` for non-terminals)
 * `<<foo()>>` is an autolink to the function named "foo" (same)
 * `<<@foo>>` is an autolink to the at-rule named "@foo" (same)
+* `{{Foo}}` is an autolink to an IDL term named "Foo". (Accepts interfaces, attributes, methods, etc)
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 
-If using the `''foo''` shortcut,
+If using the `''foo''`,
+`<<'descriptor'>>`,
+or `{{Foo}}` shortcuts,
 you can specify the `for=''` attribute in the shortcut as well
 by writing the for value first, then a slash, then the value.
 For example, `''width/auto''` specifically refers to the `auto` value for the `width` property,
