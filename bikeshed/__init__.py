@@ -1013,7 +1013,7 @@ def determineLinkType(el):
         return "dfn"
 
 
-def determineLinkText(el):
+def determineLinkText(el, preserveCasing=False):
     linkType = el.get('data-link-type')
     contents = textContent(el)
     if el.get('title'):
@@ -1023,7 +1023,9 @@ def determineLinkText(el):
         # Need to fix this using the idl parser.
     else:
         linkText = contents
-    linkText = re.sub("\s+", " ", linkText.lower())
+    if not preserveCasing:
+        linkText = linkText.lower()
+    linkText = re.sub("\s+", " ", linkText)
     if len(linkText) == 0:
         die("Autolink {0} has no linktext.", outerHTML(el))
     return linkText
@@ -1032,10 +1034,10 @@ def determineLinkText(el):
 def classifyLink(el):
     linkType = determineLinkType(el)
     el.set('data-link-type', linkType)
-    linkText = determineLinkText(el)
 
     # Fix up "for" text shorthands
     if linkType in ('propdesc', 'descriptor'):
+        linkText = determineLinkText(el)
         match = re.match(r"^(@[\w-]+)/([\w-]+)$", linkText)
         if match:
             el.set('data-link-for', match.group(1))
@@ -1043,6 +1045,7 @@ def classifyLink(el):
             linkText = match.group(2)
             el.text = linkText
     elif linkType == "maybe":
+        linkText = determineLinkText(el)
         match = re.match(r"^([\w/@<>-]+)/([\w-]+)$", linkText)
         if match:
             el.set('data-link-for', match.group(1))
@@ -1050,12 +1053,15 @@ def classifyLink(el):
             linkText = match.group(2)
             el.text = linkText
     elif linkType == "idl":
+        linkText = determineLinkText(el, preserveCasing=True)
         match = re.match(r"^(.+)/([^/]+)$", linkText)
         if match:
             el.set('data-link-for', match.group(1))
             clearContents(el)
             linkText = match.group(2)
             el.text = linkText
+    else:
+        linkText = determineLinkText(el)
 
     el.set('title', linkText)
     for attr in ["data-link-status", "data-link-for", "data-link-spec"]:
