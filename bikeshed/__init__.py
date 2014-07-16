@@ -182,8 +182,10 @@ def replaceTextMacros(text):
         text = text.replace("[{0}]".format(tag.upper()), replacement)
     text = fixTypography(text)
     # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
-    # <'foo'> is a link to the 'foo' property
+    # <'foo'> is a link to the 'foo' property or descriptor
     text = re.sub(r"<<'([\w-]+)'>>", r'<a data-link-type="propdesc" title="\1" class="production">&lt;&lsquo;\1&rsquo;></a>', text)
+    # <'@foo/bar'> is a link to the 'bar' descriptor for the @foo at-rule
+    text = re.sub(r"<<'(@[\w-]+)/([\w-]+)'>>", r'<a data-link-type="descriptor" title="\2" for="\1" class="production">&lt;&lsquo;\2&rsquo;></a>', text)
     # <foo()> is a link to the 'foo' function
     text = re.sub(r"<<([\w-]+\(\))>>", r'<a data-link-type="function" title="\1" class="production">&lt;\1></a>', text)
     # <@foo> is a link to the @foo rule
@@ -1030,7 +1032,7 @@ def classifyLink(el):
     linkText = determineLinkText(el)
 
     # Fix up "for" text shorthands
-    if linkType == 'propdesc':
+    if linkType in ('propdesc', 'descriptor'):
         match = re.match(r"^(@[\w-]+)/([\w-]+)$", linkText)
         if match:
             el.set('data-link-for', match.group(1))
@@ -1038,7 +1040,7 @@ def classifyLink(el):
             linkText = match.group(2)
             el.text = linkText
     elif linkType == "maybe":
-        match = re.match(r"^([\w/-]+)/([\w-]+)$", linkText)
+        match = re.match(r"^([\w/@<>-]+)/([\w-]+)$", linkText)
         if match:
             el.set('data-link-for', match.group(1))
             clearContents(el)
