@@ -513,6 +513,7 @@ def transformAutolinkShortcuts(doc):
         # and the result is put directly into raw HTML.
         # So, escape the text, so it turns back into "raw HTML".
         text = escapeHTML(text)
+
         # Handle biblio links, [[FOO]] and [[!FOO]]
         while re.search(r"\[\[(!?)([A-Za-z0-9-]+)\]\]", text):
             match = re.search(r"\[\[(!?)([A-Za-z0-9-]+)\]\]", text)
@@ -527,6 +528,9 @@ def transformAutolinkShortcuts(doc):
                         '<a title="biblio-{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
                             match.group(2),
                             biblioType))
+
+        # Handle section links, [[#foo]].
+        text = re.sub(r"\[\[(#[\w-]+)\]\]", r'<a section href="\1"></a>', text)
 
         # Handle propdesc links, like 'width'.
         text = re.sub(r"'([-]?[\w@*][\w@*/-]*)'", r'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
