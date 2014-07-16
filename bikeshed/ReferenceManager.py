@@ -59,7 +59,7 @@ class ReferenceManager(object):
                         die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
                         continue
                 else:
-                    dfnFor = set(dfnFor.split())
+                    dfnFor = set(dfnFor.lower().split())
                     encounteredError = False
                     for singleFor in dfnFor:
                         if self.getLocalRef(type, linkText, linkFor=singleFor):
