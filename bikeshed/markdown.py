@@ -74,11 +74,38 @@ def tokenizeLines(lines, features=None):
 				token = {'type':'raw', 'raw': rawline}
 		else:
 			token = {'type':'text', 'text': line, 'raw': rawline}
-		token['prefix'] = re.match(r"( {4}|\t)*", rawline).group(0)
+		token['prefixlen'] = prefixLen(rawline)
 		tokens.append(token)
 		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
 	return tokens
+
+def prefixLen(text):
+	i = 0
+	prefixLen = 0
+	while i < len(text):
+		if text[i] == "\t":
+			i += 1
+			prefixLen += 1
+		elif text[i:i+4] == "    ":
+			i += 4
+			prefixLen += 1
+		else:
+			break
+	return prefixLen
+
+def stripPrefix(text, len):
+	# Removes len number of prefix groups
+	offset = 0
+	for x in range(len):
+		if text[offset] == "\t":
+			offset += 1
+		elif text[offset:offset+4] == "    ":
+			offset += 4
+		else:
+			die("Not enough prefix ({0}) in the string:\n{1}", len, text)
+	return text[offset:]
+
 
 def parseTokens(tokens):
 	'''
@@ -150,7 +177,7 @@ def parseMultiLineHeading(stream):
 
 def parseParagraph(stream):
 	line = stream.currtext()
-	initialPrefix = stream.currprefix()
+	initialPrefixLen = stream.currprefixlen()
 	endTag = "</p>"
 	if line.lower().startswith("note: ") or line.lower().startswith("note, "):
 		p = "<p class='note'>"
@@ -167,7 +194,7 @@ def parseParagraph(stream):
 	while True:
 		stream.advance()
 		try:
-			if stream.currtype() in ("eof", "blank") or not stream.currprefix().startswith(initialPrefix):
+			if stream.currtype() in ("eof", "blank") or stream.currprefixlen() < initialPrefixLen:
 				lines[-1] = lines[-1].rstrip() + endTag + "\n"
 				return lines
 		except AttributeError, e:
@@ -176,27 +203,26 @@ def parseParagraph(stream):
 		lines.append(stream.currraw())
 
 def parseBulleted(stream):
-	prefix = stream.currprefix()
-	prefixLen = len(prefix)
+	prefixLen = stream.currprefixlen()
 
 	def parseItem(stream):
 		# Assumes it's being called with curr being a bulleted line.
 		# Remove the bulleted part from the line
-		firstLine = re.match(r"\s*[*+-]\s+(.*)", stream.currraw()).group(1)
+		firstLine = re.match(r"\s*[*+-]\s+(.*)", stream.currraw()).group(1) + "\n"
 		lines = [firstLine]
 		while True:
 			stream.advance()
 			# All the conditions that indicate we're *past* the end of the item.
-			if stream.currtype() == 'bulleted' and stream.currprefix() == prefix:
+			if stream.currtype() == 'bulleted' and stream.currprefixlen() == prefixLen:
 				return lines
-			if not stream.currprefix().startswith(prefix):
+			if stream.currprefixlen() < prefixLen:
 				return lines
-			if stream.currtype() == 'blank' and stream.nexttype() != 'bulleted':
+			if stream.currtype() == 'blank' and stream.nexttype() != 'bulleted' and stream.nextprefixlen() <= prefixLen:
 				return lines
 			if stream.currtype() == 'eof':
 				return lines
 			# Remove the prefix from each line before adding it.
-			lines.append(stream.currraw()[prefixLen:])
+			lines.append(stripPrefix(stream.currraw(), prefixLen))
 
 	def getItems(stream):
 		while True:
@@ -210,14 +236,16 @@ def parseBulleted(stream):
 	lines = ["<ul>"]
 	for li_lines in getItems(stream):
 		lines.append("<li>")
-		lines.extend(li_lines)
+		lines.extend(parse(li_lines))
 		lines.append("</li>")
 	lines.append("</ul>")
 	return lines
 
 
+
+
 class TokenStream:
-	def __init__(self, tokens, before={'type':'blank','raw':'\n','prefix':''}, after={'type':'eof','raw':'','prefix':''}):
+	def __init__(self, tokens, before={'type':'blank','raw':'\n','prefixlen':0}, after={'type':'eof','raw':'','prefixlen':0}):
 		self.tokens = tokens
 		self.i = 0
 		self.before = before
