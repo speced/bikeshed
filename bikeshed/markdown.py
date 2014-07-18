@@ -74,7 +74,7 @@ def tokenizeLines(lines, features=None):
 				token = {'type':'raw', 'raw': rawline}
 		else:
 			token = {'type':'text', 'text': line, 'raw': rawline}
-		token['prefix'] = re.match(r"[ \t]*", rawline).group(0)
+		token['prefix'] = re.match(r"( {4}|\t)*", rawline).group(0)
 		tokens.append(token)
 		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
