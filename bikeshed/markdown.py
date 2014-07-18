@@ -108,8 +108,8 @@ def parseTokens(tokens):
 			lines += parseMultiLineHeading(stream)
 		elif stream.currtype() == 'text' and stream.prevtype() == 'blank':
 			lines += parseParagraph(stream)
-		#elif stream.currtype() == 'bulleted':
-		#	lines += parseBulleted(stream)
+		elif stream.currtype() == 'bulleted':
+			lines += parseBulleted(stream)
 		else:
 			lines.append(stream.currraw())
 			stream.advance()
@@ -177,17 +177,43 @@ def parseParagraph(stream):
 
 def parseBulleted(stream):
 	prefix = stream.currprefix()
+	prefixLen = len(prefix)
 
-	def getNextLi(stream):
-		lines = [stream.getcurr()]
+	def parseItem(stream):
+		# Assumes it's being called with curr being a bulleted line.
+		# Remove the bulleted part from the line
+		firstLine = re.match(r"\s*[*+-]\s+(.*)", stream.currraw()).group(1)
+		lines = [firstLine]
 		while True:
 			stream.advance()
-			if stream.currtype() == 'bulleted' and stream.currprefix == prefix:
+			# All the conditions that indicate we're *past* the end of the item.
+			if stream.currtype() == 'bulleted' and stream.currprefix() == prefix:
 				return lines
 			if not stream.currprefix().startswith(prefix):
 				return lines
 			if stream.currtype() == 'blank' and stream.nexttype() != 'bulleted':
 				return lines
+			if stream.currtype() == 'eof':
+				return lines
+			# Remove the prefix from each line before adding it.
+			lines.append(stream.currraw()[prefixLen:])
+
+	def getItems(stream):
+		while True:
+			# The conditions that indicate we're past the end of the list itself
+			if stream.currtype() == 'eof':
+				return
+			if stream.currtype() == 'blank' and stream.nexttype() != 'bulleted':
+				return
+			yield parseItem(stream)
+
+	lines = ["<ul>"]
+	for li_lines in getItems(stream):
+		lines.append("<li>")
+		lines.extend(li_lines)
+		lines.append("</li>")
+	lines.append("</ul>")
+	return lines
 
 
 class TokenStream:
