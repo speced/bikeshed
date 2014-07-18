@@ -7,24 +7,24 @@ from . import config
 
 messages = set()
 
-def die(msg, *formatArgs):
-    msg = "\033[1;31mFATAL ERROR:\033[0m "+msg.format(*formatArgs)
+def die(msg, *formatArgs, **namedArgs):
+    msg = "\033[1;31mFATAL ERROR:\033[0m "+msg.format(*formatArgs, **namedArgs)
     if msg not in messages:
         messages.add(msg)
         print msg
     if not config.debug:
         sys.exit(1)
 
-def warn(msg, *formatArgs):
+def warn(msg, *formatArgs, **namedArgs):
     if not config.quiet:
-        msg = "\033[1;33mWARNING:\033[0m "+msg.format(*formatArgs)
+        msg = "\033[1;33mWARNING:\033[0m "+msg.format(*formatArgs, **namedArgs)
         if msg not in messages:
             messages.add(msg)
             print msg
 
-def say(msg, *formatArgs):
+def say(msg, *formatArgs, **namedArgs):
     if not config.quiet:
-        print msg.format(*formatArgs)
+        print msg.format(*formatArgs, **namedArgs)
 
 def progress(msg, val, total):
     if config.quiet:

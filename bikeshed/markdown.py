@@ -65,6 +65,8 @@ def tokenizeLines(lines, features=None):
 		elif re.match(r"\d+\.\s", line):
 			match = re.match(r"\d+\.\s+(.*)", line)
 			token = {'type':'numbered', 'text': match.group(1), 'raw':rawline}
+		elif re.match(r"\d+\.", line):
+			token = {'type':'numbered', 'text': "", 'raw':rawline}
 		elif re.match(r"[*+-]\s", line):
 			match = re.match(r"[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
@@ -110,7 +112,7 @@ def stripPrefix(text, len):
 		elif text[offset:offset+4] == "    ":
 			offset += 4
 		else:
-			die("Not enough prefix ({0}) in the string:\n\"{1}\"", len, text)
+			die("Line isn't indented enough (needs {0} indent{plural}) to be valid Markdown:\n\"{1}\"", len, text[:-1], plural="" if len==1 else "s")
 	return text[offset:]
 
 
@@ -144,6 +146,8 @@ def parseTokens(tokens):
 			lines += parseParagraph(stream)
 		elif stream.currtype() == 'bulleted':
 			lines += parseBulleted(stream)
+		elif stream.currtype() == 'numbered':
+			lines += parseNumbered(stream)
 		else:
 			lines.append(stream.currraw())
 			stream.advance()
@@ -215,7 +219,7 @@ def parseBulleted(stream):
 	def parseItem(stream):
 		# Assumes it's being called with curr being a bulleted line.
 		# Remove the bulleted part from the line
-		firstLine = re.match(r"\s*[*+-]\s+(.*)", stream.currraw()).group(1) + "\n"
+		firstLine = stream.currtext() + "\n"
 		lines = [firstLine]
 		while True:
 			stream.advance()
@@ -236,7 +240,7 @@ def parseBulleted(stream):
 			# The conditions that indicate we're past the end of the list itself
 			if stream.currtype() == 'eof':
 				return
-			if stream.currtype() == 'blank' and stream.nexttype() != 'bulleted':
+			if stream.currtype() == 'blank' and stream.nexttype() != 'bulleted' and stream.nextprefixlen() <= prefixLen:
 				return
 			yield parseItem(stream)
 
@@ -248,6 +252,44 @@ def parseBulleted(stream):
 	lines.append("</ul>")
 	return lines
 
+def parseNumbered(stream):
+	prefixLen = stream.currprefixlen()
+
+	def parseItem(stream):
+		# Assumes it's being called with curr being a numbered line.
+		# Remove the numbered part from the line
+		firstLine = stream.currtext() + "\n"
+		lines = [firstLine]
+		while True:
+			stream.advance()
+			# All the conditions that indicate we're *past* the end of the item.
+			if stream.currtype() == 'numbered' and stream.currprefixlen() == prefixLen:
+				return lines
+			if stream.currprefixlen() < prefixLen:
+				return lines
+			if stream.currtype() == 'blank' and stream.nexttype() != 'numbered' and stream.nextprefixlen() <= prefixLen:
+				return lines
+			if stream.currtype() == 'eof':
+				return lines
+			# Remove the prefix from each line before adding it.
+			lines.append(stripPrefix(stream.currraw(), prefixLen+1))
+
+	def getItems(stream):
+		while True:
+			# The conditions that indicate we're past the end of the list itself
+			if stream.currtype() == 'eof':
+				return
+			if stream.currtype() == 'blank' and stream.nexttype() != 'numbered' and stream.nextprefixlen() <= prefixLen:
+				return
+			yield parseItem(stream)
+
+	lines = ["<ol>"]
+	for li_lines in getItems(stream):
+		lines.append("<li>")
+		lines.extend(parse(li_lines))
+		lines.append("</li>")
+	lines.append("</ol>")
+	return lines
 
 
 
