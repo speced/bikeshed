@@ -41,25 +41,26 @@ def tokenizeLines(lines, features=None):
 		if line == "":
 			token = {'type':'blank', 'raw': '\n'}
 		# FIXME: Detect the heading ID from heading lines
-		elif "headings" in features and re.match(r"={3,}(\{#[\w-]+\})?\s*$", line):
+		elif "headings" in features and re.match(r"={3,}\s*(\{#[\w-]+\})?\s*$", line):
 			# h1 underline
-			match = re.match(r"={3,}(\{#[\w-]+\})?\s*$", line)
+			match = re.match(r"={3,}\s*(\{#[\w-]+\})?\s*$", line)
 			token = {'type':'equals-line', 'raw': rawline}
 			if match.group(1):
 				token['id'] = match.group(1)[2:-1]
-		elif "headings" in features and re.match(r"-{3,}(\{#[\w-]+\})?\s*$", line):
+		elif "headings" in features and re.match(r"-{3,}\s*(\{#[\w-]+\})?\s*$", line):
 			# h2 underline
-			match = re.match(r"-{3,}(\{#[\w-]+\})?\s*$", line)
+			match = re.match(r"-{3,}\s*(\{#[\w-]+\})?\s*$", line)
 			token = {'type':'dash-line', 'raw': rawline}
 			if match.group(1):
 				token['id'] = match.group(1)[2:-1]
-		elif "headings" in features and re.match(r"(#{2,6})\s*(.+)(\1\{#[\w-]+\})?", line):
+		elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[\w-]+\})?\s*$", line):
 			# single-line heading
-			match = re.match(r"(#{2,6})\s*(.+)(\1\{#[\w-]+\})?", line)
+			match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[\w-]+\})?\s*$", line)
 			level = len(match.group(1))+1
-			token = {'type':'heading', 'text': line.strip("#").strip(), 'raw':rawline, 'level': level}
-			if re.search(r"\{#[\w-]+\}\s*$", line):
-				token['id'] = re.search(r"\{#([\w-]+)\}\s*$", line)
+			token = {'type':'heading', 'text': match.group(2).strip(), 'raw':rawline, 'level': level}
+			match = re.search(r"\{#([\w-]+)\}\s*$", line)
+			if match:
+				token['id'] = match.group(1)
 		elif re.match(r"\d+\.\s", line):
 			match = re.match(r"\d+\.\s+(.*)", line)
 			token = {'type':'numbered', 'text': match.group(1), 'raw':rawline}
