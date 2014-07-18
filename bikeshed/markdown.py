@@ -3,6 +3,7 @@ from __future__ import division, unicode_literals
 import re
 import json
 from itertools import *
+from .messages import *
 
 def parse(lines, features=None):
 	tokens = tokenizeLines(lines, features)
@@ -67,6 +68,8 @@ def tokenizeLines(lines, features=None):
 		elif re.match(r"[*+-]\s", line):
 			match = re.match(r"[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
+		elif re.match(r"[*+-]", line):
+			token = {'type':'bulleted', 'text': "", 'raw':rawline}
 		elif re.match(r"<", line):
 			if re.match(r"<<", line) or re.match(r"<({0})[ >]".format(allowedStartElements), line):
 				token = {'type':'text', 'text': line, 'raw': rawline}
@@ -96,6 +99,10 @@ def prefixLen(text):
 
 def stripPrefix(text, len):
 	# Removes len number of prefix groups
+
+	# Allow empty lines
+	if text.strip() == "":
+		return text
 	offset = 0
 	for x in range(len):
 		if text[offset] == "\t":
@@ -103,7 +110,7 @@ def stripPrefix(text, len):
 		elif text[offset:offset+4] == "    ":
 			offset += 4
 		else:
-			die("Not enough prefix ({0}) in the string:\n{1}", len, text)
+			die("Not enough prefix ({0}) in the string:\n\"{1}\"", len, text)
 	return text[offset:]
 
 
@@ -222,7 +229,7 @@ def parseBulleted(stream):
 			if stream.currtype() == 'eof':
 				return lines
 			# Remove the prefix from each line before adding it.
-			lines.append(stripPrefix(stream.currraw(), prefixLen))
+			lines.append(stripPrefix(stream.currraw(), prefixLen+1))
 
 	def getItems(stream):
 		while True:
