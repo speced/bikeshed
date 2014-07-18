@@ -65,13 +65,21 @@ def tokenizeLines(lines, features=None):
 		elif re.match(r"\d+\.\s", line):
 			match = re.match(r"\d+\.\s+(.*)", line)
 			token = {'type':'numbered', 'text': match.group(1), 'raw':rawline}
-		elif re.match(r"\d+\.", line):
+		elif re.match(r"\d+\.$", line):
 			token = {'type':'numbered', 'text': "", 'raw':rawline}
 		elif re.match(r"[*+-]\s", line):
 			match = re.match(r"[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
-		elif re.match(r"[*+-]", line):
+		elif re.match(r"[*+-]$", line):
 			token = {'type':'bulleted', 'text': "", 'raw':rawline}
+		elif re.match(r":{1,2}\s+", line):
+			match = re.match(r"(:{1,2})\s+(.*)", line)
+			type = 'dt' if len(match.group(1)) == 1 else 'dd'
+			token = {'type':type, 'text': match.group(2), 'raw':rawline}
+		elif re.match(r":{1,2}$", line):
+			match = re.match(r"(:{1,2})", line)
+			type = 'dt' if len(match.group(1)) == 1 else 'dd'
+			token = {'type':type, 'text': "", 'raw':rawline}
 		elif re.match(r"<", line):
 			if re.match(r"<<", line) or re.match(r"<({0})[ >]".format(allowedStartElements), line):
 				token = {'type':'text', 'text': line, 'raw': rawline}
@@ -148,6 +156,8 @@ def parseTokens(tokens):
 			lines += parseBulleted(stream)
 		elif stream.currtype() == 'numbered':
 			lines += parseNumbered(stream)
+		elif stream.currtype() in ("dt", "dd"):
+			lines += parseDl(stream)
 		else:
 			lines.append(stream.currraw())
 			stream.advance()
@@ -246,7 +256,7 @@ def parseBulleted(stream):
 
 	lines = ["<ul>"]
 	for li_lines in getItems(stream):
-		lines.append("<li>")
+		lines.append("<li data-md>")
 		lines.extend(parse(li_lines))
 		lines.append("</li>")
 	lines.append("</ul>")
@@ -285,10 +295,50 @@ def parseNumbered(stream):
 
 	lines = ["<ol>"]
 	for li_lines in getItems(stream):
-		lines.append("<li>")
+		lines.append("<li data-md>")
 		lines.extend(parse(li_lines))
 		lines.append("</li>")
 	lines.append("</ol>")
+	return lines
+
+def parseDl(stream):
+	prefixLen = stream.currprefixlen()
+
+	def parseItem(stream):
+		# Assumes it's being called with curr being a numbered line.
+		# Remove the numbered part from the line
+		firstLine = stream.currtext() + "\n"
+		type = stream.currtype()
+		lines = [firstLine]
+		while True:
+			stream.advance()
+			# All the conditions that indicate we're *past* the end of the item.
+			if stream.currtype() in ('dt', 'dd') and stream.currprefixlen() == prefixLen:
+				return type, lines
+			if stream.currprefixlen() < prefixLen:
+				return type, lines
+			if stream.currtype() == 'blank' and stream.nexttype() not in ('dt', 'dd') and stream.nextprefixlen() <= prefixLen:
+				return type, lines
+			if stream.currtype() == 'eof':
+				return type, lines
+			# Remove the prefix from each line before adding it.
+			lines.append(stripPrefix(stream.currraw(), prefixLen+1))
+
+	def getItems(stream):
+		while True:
+			# The conditions that indicate we're past the end of the list itself
+			if stream.currtype() == 'eof':
+				return
+			if stream.currtype() == 'blank' and stream.nexttype() not in ('dt', 'dd') and stream.nextprefixlen() <= prefixLen:
+				return
+			yield parseItem(stream)
+
+	lines = ["<dl>"]
+	for type, di_lines in getItems(stream):
+		lines.append("<{0} data-md>".format(type))
+		lines.extend(parse(di_lines))
+		lines.append("</{0}>".format(type))
+	lines.append("</dl>")
 	return lines
 
 
