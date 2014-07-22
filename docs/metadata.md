@@ -15,11 +15,13 @@ Shortname: css-variables
 Level: 1
 Editor: Tab Atkins Jr., Google, http://xanthir.com/contact
 Editor: Daniel Glazman, Disruptive Innovations, daniel.glazman@disruptive-innovations.com
-Abstract: This module introduces cascading variables as a new primitive value type that is accepted by all CSS properties, and custom properties for defining them.
+Abstract: This module introduces cascading variables as a new primitive value type that is accepted by all CSS properties,
+	and custom properties for defining them.
 </pre>
 ~~~~
 
 The syntax of a metadata block is very simple - it's a line-based format, with each line consisting of a key and a value, separated by a colon.
+Or if you're adding multiple lines with the same key, you can just start the subsequent lines with whitespace to have it reuse the last-seen key.
 
 Several keys are required information, and will cause the processor to flag an error if you omit them:
 
