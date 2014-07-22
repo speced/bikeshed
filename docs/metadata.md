@@ -39,7 +39,7 @@ Several keys are required information, and will cause the processor to flag an e
 	(To put a comma *in* one of these values, use an HTML character reference: `&#44;`.)
 	Multiple "Editor" lines can be used to supply multiple editors.
 * **Abstract** must contain an abstract for the spec, a 1-2 sentence description of what the spec is about.
-    Multiple Abstract lines can be used, with each representing a separate paragraph in the Abstract section.
+    Multiple Abstract lines can be used, representing multiple lines of content, as if you'd written those multiple lines directly into the document.
 
 There are several additional optional keys:
 
