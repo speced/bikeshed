@@ -333,7 +333,7 @@ def parseBoilerplate(key, val):
 
 
 
-def extract(lines):
+def parse(lines):
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
     # Returns a MetadataManager object and the text lines (with the

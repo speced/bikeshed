@@ -1341,7 +1341,7 @@ class CSSSpec(object):
         stripBOM(self)
 
         # Extract and process metadata
-        self.md, self.lines = metadata.extract(self.lines)
+        self.md, self.lines = metadata.parse(self.lines)
         self.loadDefaultMetadata()
         self.md.finish()
         self.md.fillTextMacros(self.macros, doc=self)
