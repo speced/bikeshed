@@ -176,9 +176,6 @@ def stripBOM(doc):
         warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
 
 
-def transformMarkdownParagraphs(doc):
-    doc.lines = markdown.parse(doc.lines)
-
 # This function does a single pass through the doc,
 # finding all the "data blocks" and processing them.
 # A "data block" is any <pre> or <xmp> element.
@@ -1353,7 +1350,7 @@ class CSSSpec(object):
         # Deal with further <pre> blocks, and markdown
         transformDataBlocks(self)
         if self.paragraphMode == "markdown":
-            transformMarkdownParagraphs(self)
+            self.lines = markdown.parse(self.lines)
 
         # Convert to a single string of html now, for convenience.
         self.html = ''.join(self.lines)
