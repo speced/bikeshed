@@ -19,10 +19,10 @@ from . import biblio
 from . import update
 from . import markdown
 from . import test
+from . import MetadataManager as metadata
 from .ReferenceManager import ReferenceManager
 from .ReferenceManager import linkTextsFromElement
 from .globalnames import *
-from .MetadataManager import MetadataManager
 from .htmlhelpers import *
 from .messages import *
 from .widlparser.widlparser import parser
@@ -176,29 +176,6 @@ def stripBOM(doc):
         warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
 
 
-def replaceTextMacros(text):
-    # Replace the [FOO] things.
-    for tag, replacement in config.textMacros.items():
-        text = text.replace("[{0}]".format(tag.upper()), replacement)
-    text = fixTypography(text)
-    # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
-    # <'foo'> is a link to the 'foo' property or descriptor
-    text = re.sub(r"<<'([\w-]+)'>>", r'<a data-link-type="propdesc" title="\1" class="production">&lt;&lsquo;\1&rsquo;></a>', text)
-    # <'@foo/bar'> is a link to the 'bar' descriptor for the @foo at-rule
-    text = re.sub(r"<<'(@[\w-]+)/([\w-]+)'>>", r'<a data-link-type="descriptor" title="\2" for="\1" class="production">&lt;&lsquo;\2&rsquo;></a>', text)
-    # <foo()> is a link to the 'foo' function
-    text = re.sub(r"<<([\w-]+\(\))>>", r'<a data-link-type="function" title="\1" class="production">&lt;\1></a>', text)
-    # <@foo> is a link to the @foo rule
-    text = re.sub(r"<<(@[\w-]+)>>", r'<a data-link-type="at-rule" title="\1" class="production">&lt;\1></a>', text)
-    # Otherwise, it's a link to a type.
-    text = re.sub(r"<<([\w-]+)>>", r'<a data-link-type="type" class="production">&lt;\1></a>', text)
-    # Replace the ''maybe link'' shortcuts.
-    # They'll survive the HTML parser, but they don't match if they contain an element.
-    # (The other shortcuts are "atomic" and can't contain elements.)
-    text = re.sub(r"''([^=\n]+?)''", r'<a data-link-type="maybe" class="css">\1</a>', text)
-    return text
-
-
 def transformMarkdownParagraphs(doc):
     doc.lines = markdown.parse(doc.lines)
 
@@ -222,7 +199,6 @@ def transformDataBlocks(doc):
         'propdef': transformPropdef,
         'descdef': transformDescdef,
         'elementdef': transformElementdef,
-        'metadata': transformMetadata,
         'railroad': transformRailroad,
         'pre': transformPre
     }
@@ -392,100 +368,6 @@ def parseDefBlock(lines, type):
         else:
             vals[key] = val
     return vals
-
-
-
-def transformMetadata(lines, doc, **kwargs):
-    for line in lines:
-        line = line.strip()
-        if line == "":
-            continue
-        match = re.match(r"([^:]+):\s*(.*)", line)
-        if(match is None):
-            die("Incorrectly formatted metadata line:\n{0}", line)
-            continue
-        doc.md.addData(match.group(1), match.group(2))
-    # Remove the metadata block from the generated document.
-    doc.md.vshortname = "{0}-{1}".format(doc.md.shortname, doc.md.level)
-    return []
-
-def loadDefaultMetadata(doc):
-    data = doc.getInclusion('defaults', error=False)
-    try:
-        defaults = json.loads(data)
-    except Exception, e:
-        if data != "":
-            die("Error loading defaults:\n{0}", str(e))
-        return
-    for key,val in defaults.items():
-        doc.md.addDefault(key, val)
-
-def initializeTextMacros(doc):
-    if doc.md.title:
-        config.textMacros["title"] = doc.md.title
-        config.textMacros["spectitle"] = doc.md.title
-    if doc.md.h1:
-        config.textMacros["spectitle"] = doc.md.h1
-    config.textMacros["shortname"] = doc.md.shortname
-    if doc.md.status:
-        config.textMacros["statusText"] = doc.md.statusText
-    config.textMacros["vshortname"] = doc.md.vshortname
-    if doc.md.status in config.shortToLongStatus:
-        config.textMacros["longstatus"] = config.shortToLongStatus[doc.md.status]
-    else:
-        die("Unknown status '{0}' used.",doc.md.status)
-    if doc.md.status in ("LCWD", "FPWD"):
-        config.textMacros["status"] = "WD"
-    else:
-        config.textMacros["status"] = doc.md.status
-    config.textMacros["latest"] = doc.md.TR or "???"
-    config.textMacros["abstract"] = "\n".join(markdown.parse(doc.md.abstract)) or "???"
-    config.textMacros["abstractattr"] = escapeAttr("  ".join(doc.md.abstract).replace("<<","<").replace(">>",">")) or "???"
-    config.textMacros["year"] = unicode(doc.md.date.year)
-    config.textMacros["date"] = unicode(doc.md.date.strftime("{0} %B %Y".format(doc.md.date.day)), encoding="utf-8")
-    config.textMacros["cdate"] = unicode(doc.md.date.strftime("%Y%m%d"), encoding="utf-8")
-    config.textMacros["isodate"] = unicode(doc.md.date.strftime("%Y-%m-%d"), encoding="utf-8")
-    if doc.md.deadline:
-        config.textMacros["deadline"] = unicode(doc.md.deadline.strftime("{0} %B %Y".format(doc.md.deadline.day)), encoding="utf-8")
-    if doc.md.status in config.TRStatuses:
-        config.textMacros["version"] = "http://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**config.textMacros)
-    else:
-        config.textMacros["version"] = doc.md.ED
-    config.textMacros["annotations"] = config.testAnnotationURL
-    config.textMacros["testsuite"] = doc.testSuites[doc.md.vshortname]['vshortname'] if doc.md.vshortname in doc.testSuites else "???"
-    config.textMacros["logo"] = doc.md.logo
-    # Now we have enough data to set all the relevant stuff in ReferenceManager
-    doc.refs.setSpecData(doc)
-
-
-def verifyRequiredMetadata(doc):
-    if not doc.md.hasMetadata:
-        die("The document requires at least one metadata block.")
-        return
-
-    requiredSingularKeys = [
-        ('status', 'Status'),
-        ('ED', 'ED'),
-        ('shortname', 'Shortname')
-    ]
-    requiredMultiKeys = [
-        ('abstract', 'Abstract'),
-        ('editors', 'Editor')
-    ]
-    errors = []
-    for attr, name in requiredSingularKeys:
-        if getattr(doc.md, attr) is None:
-            errors.append("    Missing a '{0}' entry.".format(name))
-    for attr, name in requiredMultiKeys:
-        if len(getattr(doc.md, attr)) == 0:
-            errors.append("    Must provide at least one '{0}' entry.".format(name))
-    # Level is optional for some statuses.
-    if doc.md.level is None and doc.md.status not in config.unlevelledStatuses:
-        errors.append("    Missing a 'Level' entry.")
-    if errors:
-        die("Not all required metadata was provided:\n{0}", "\n".join(errors))
-        return
-
 
 def transformRailroad(lines, doc, **kwargs):
     import StringIO
@@ -1343,10 +1225,11 @@ class CSSSpec(object):
         self.normativeRefs = set()
         self.informativeRefs = set()
         self.refs = ReferenceManager()
-        self.md = MetadataManager()
+        self.md = metadata.MetadataManager()
         self.biblios = {}
         self.paragraphMode = "markdown"
         self.inputSource = None
+        self.macros = defaultdict(lambda x: "???")
 
         if inputFilename is None:
             # Default to looking for a *.bs file.
@@ -1459,17 +1342,23 @@ class CSSSpec(object):
     def preprocess(self):
         # Textual hacks
         stripBOM(self)
+
+        # Extract and process metadata
+        self.md, self.lines = metadata.extract(self.lines)
+        self.loadDefaultMetadata()
+        self.md.finish()
+        self.md.fillTextMacros(self.macros, doc=self)
+        self.refs.setSpecData(self.md)
+
+        # Deal with further <pre> blocks, and markdown
         transformDataBlocks(self)
-        loadDefaultMetadata(self)
-        verifyRequiredMetadata(self)
-        initializeTextMacros(self)
         if self.paragraphMode == "markdown":
             transformMarkdownParagraphs(self)
 
         # Convert to a single string of html now, for convenience.
         self.html = ''.join(self.lines)
         fillInBoilerplate(self)
-        self.html = replaceTextMacros(self.html)
+        self.html = self.fixText(self.html)
 
         # Build the document
         self.document = parseDocument(self.html)
@@ -1544,6 +1433,39 @@ class CSSSpec(object):
                         f.write(rendered)
             except Exception, e:
                 die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)
+
+    def loadDefaultMetadata(self):
+        data = self.getInclusion('defaults', error=False)
+        try:
+            defaults = json.loads(data)
+        except Exception, e:
+            if data != "":
+                die("Error loading defaults:\n{0}", str(e))
+            return
+        for key,val in defaults.items():
+            self.md.addDefault(key, val)
+
+    def fixText(self, text):
+        # Replace the [FOO] things.
+        for tag, replacement in self.macros.items():
+            text = text.replace("[{0}]".format(tag.upper()), replacement)
+        text = fixTypography(text)
+        # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
+        # <'foo'> is a link to the 'foo' property or descriptor
+        text = re.sub(r"<<'([\w-]+)'>>", r'<a data-link-type="propdesc" title="\1" class="production">&lt;&lsquo;\1&rsquo;></a>', text)
+        # <'@foo/bar'> is a link to the 'bar' descriptor for the @foo at-rule
+        text = re.sub(r"<<'(@[\w-]+)/([\w-]+)'>>", r'<a data-link-type="descriptor" title="\2" for="\1" class="production">&lt;&lsquo;\2&rsquo;></a>', text)
+        # <foo()> is a link to the 'foo' function
+        text = re.sub(r"<<([\w-]+\(\))>>", r'<a data-link-type="function" title="\1" class="production">&lt;\1></a>', text)
+        # <@foo> is a link to the @foo rule
+        text = re.sub(r"<<(@[\w-]+)>>", r'<a data-link-type="at-rule" title="\1" class="production">&lt;\1></a>', text)
+        # Otherwise, it's a link to a type.
+        text = re.sub(r"<<([\w-]+)>>", r'<a data-link-type="type" class="production">&lt;\1></a>', text)
+        # Replace the ''maybe link'' shortcuts.
+        # They'll survive the HTML parser, but they don't match if they contain an element.
+        # (The other shortcuts are "atomic" and can't contain elements.)
+        text = re.sub(r"''([^=\n]+?)''", r'<a data-link-type="maybe" class="css">\1</a>', text)
+        return text
 
     def printTargets(self):
         def targetText(el):
@@ -1629,32 +1551,32 @@ def fillWith(tag, newElements):
 
 def addLogo(doc):
     html = doc.getInclusion('logo')
-    html = replaceTextMacros(html)
+    html = doc.fixText(html)
     fillWith('logo', parseHTML(html))
 
 
 def addCopyright(doc):
     html = doc.getInclusion('copyright')
-    html = replaceTextMacros(html)
+    html = doc.fixText(html)
     fillWith('copyright', parseHTML(html))
 
 
 def addAbstract(doc):
     html = doc.getInclusion('abstract')
-    html = replaceTextMacros(html)
+    html = doc.fixText(html)
     fillWith('abstract', parseHTML(html))
 
 
 def addStatusSection(doc):
     html = doc.getInclusion('status')
-    html = replaceTextMacros(html)
+    html = doc.fixText(html)
     fillWith('status', parseHTML(html))
 
 
 def addObsoletionNotice(doc):
     if doc.md.warning:
         html = doc.getInclusion(doc.md.warning)
-        html = replaceTextMacros(html)
+        html = doc.fixText(html)
         fillWith('warning', parseHTML(html))
 
 def addAtRisk(doc):
@@ -1662,7 +1584,7 @@ def addAtRisk(doc):
         return
     html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
     for feature in doc.md.atRisk:
-        html += "<li>"+replaceTextMacros(feature)
+        html += "<li>"+doc.fixText(feature)
     fillWith('at-risk', parseHTML(html))
 
 def addCustomBoilerplate(doc):
@@ -1676,7 +1598,7 @@ def addCustomBoilerplate(doc):
 def addAnnotations(doc):
     if (doc.md.vshortname in doc.testSuites):
         html = doc.getInclusion('annotations')
-        html = replaceTextMacros(html)
+        html = doc.fixText(html)
         appendContents(find("head"), parseHTML(html))
 
 def addIndexSection(doc):
@@ -1935,7 +1857,7 @@ def addSpecMetadataSection(doc):
         for val in vals:
             header += "\n\t<dd>"+val
     header += "\n</dl>\n"
-    header = replaceTextMacros(header)
+    header = doc.fixText(header)
     fillWith('spec-metadata', parseHTML(header))
 
 

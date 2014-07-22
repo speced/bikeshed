@@ -4,6 +4,7 @@ import re
 from collections import defaultdict
 from datetime import date, datetime
 from . import config
+from . import markdown
 from .messages import *
 from .htmlhelpers import *
 
@@ -12,6 +13,12 @@ class MetadataManager:
     def hasMetadata(self):
         return len(self.manuallySetKeys) > 0
 
+    @property
+    def vshortname(self):
+        if self.level is not None:
+            return "{0}-{1}".format(self.shortname, self.level)
+        return self.shortname
+
     def __init__(self):
         # required metadata
         self.status = None
@@ -19,7 +26,6 @@ class MetadataManager:
         self.abstract = []
         self.shortname = None
         self.level = None
-        self.vshortname = None
 
         # optional metadata
         self.TR = None
@@ -140,6 +146,76 @@ class MetadataManager:
     def addDefault(self, key, val):
         self.addData(key, val, default=True)
 
+    def finish(self):
+        self.validate()
+
+    def validate(self):
+        if not self.hasMetadata:
+            die("The document requires at least one metadata block.")
+            return
+
+        requiredSingularKeys = [
+            ('status', 'Status'),
+            ('ED', 'ED'),
+            ('shortname', 'Shortname')
+        ]
+        requiredMultiKeys = [
+            ('abstract', 'Abstract'),
+            ('editors', 'Editor')
+        ]
+        errors = []
+        for attr, name in requiredSingularKeys:
+            if getattr(self, attr) is None:
+                errors.append("    Missing a '{0}' entry.".format(name))
+        for attr, name in requiredMultiKeys:
+            if len(getattr(self, attr)) == 0:
+                errors.append("    Must provide at least one '{0}' entry.".format(name))
+        # Level is optional for some statuses.
+        if self.level is None and self.status not in config.unlevelledStatuses:
+            errors.append("    Missing a 'Level' entry.")
+        if errors:
+            die("Not all required metadata was provided:\n{0}", "\n".join(errors))
+            return
+
+    def fillTextMacros(self, macros, doc=None):
+        # Fills up a set of text macros based on metadata.
+        if self.title:
+            macros["title"] = self.title
+            macros["spectitle"] = self.title
+        if self.h1:
+            macros["spectitle"] = self.h1
+        macros["shortname"] = self.shortname
+        if self.status:
+            macros["statusText"] = self.statusText
+        macros["vshortname"] = self.vshortname
+        if self.status in config.shortToLongStatus:
+            macros["longstatus"] = config.shortToLongStatus[self.status]
+        else:
+            die("Unknown status '{0}' used.", self.status)
+        if self.status in ("LCWD", "FPWD"):
+            macros["status"] = "WD"
+        else:
+            macros["status"] = self.status
+        if self.TR:
+            macros["latest"] = self.TR
+        if self.abstract:
+            macros["abstract"] = "\n".join(markdown.parse(self.abstract))
+            macros["abstractattr"] = escapeAttr("  ".join(self.abstract).replace("<<","<").replace(">>",">"))
+        macros["year"] = unicode(self.date.year)
+        macros["date"] = unicode(self.date.strftime("{0} %B %Y".format(self.date.day)), encoding="utf-8")
+        macros["cdate"] = unicode(self.date.strftime("%Y%m%d"), encoding="utf-8")
+        macros["isodate"] = unicode(self.date.strftime("%Y-%m-%d"), encoding="utf-8")
+        if self.deadline:
+            macros["deadline"] = unicode(self.deadline.strftime("{0} %B %Y".format(self.deadline.day)), encoding="utf-8")
+        if self.status in config.TRStatuses:
+            macros["version"] = "http://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
+        else:
+            macros["version"] = self.ED
+        macros["annotations"] = config.testAnnotationURL
+        if doc and self.vshortname in doc.testSuites:
+            macros["testsuite"] = doc.testSuites[self.vshortname]['vshortname']
+        macros["logo"] = self.logo
+
 
 def setStatus(key, val):
     config.doc.refs.setStatus(val)
@@ -254,3 +330,36 @@ def parseBoilerplate(key, val):
         if re.match("omit [\w-]+$", command):
             boilerplate['omitSections'].add(command[5:])
     return boilerplate
+
+
+
+def extract(lines):
+    # Given HTML document text, in the form of an array of text lines,
+    # extracts all <pre class=metadata> lines and parses their contents.
+    # Returns a MetadataManager object and the text lines (with the
+    # metadata-related lines removed).
+
+    newlines = []
+    inMetadata = False
+    lastKey = None
+    md = MetadataManager()
+    for line in lines:
+        if not inMetadata and re.match(r"<pre .*class=.*metadata.*>", line):
+            inMetadata = True
+            continue
+        elif inMetadata and re.match(r"</pre>\s*", line):
+            inMetadata = False
+            continue
+        elif inMetadata:
+            if lastKey and (line.strip() == "") or re.match(r"\s+", line):
+                md.addData(lastKey, line.lstrip())
+            elif re.match(r"([^:]+):\s*(.*)", line):
+                match = re.match(r"([^:]+):\s*(.*)", line)
+                md.addData(match.group(1), match.group(2))
+                lastKey = match.group(1)
+            else:
+                die("Incorrectly formatted metadata line:\n{0}", line)
+                continue
+        else:
+            newlines.append(line)
+    return md, newlines

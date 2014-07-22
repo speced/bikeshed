@@ -24,13 +24,13 @@ class ReferenceManager(object):
         else:
             self.specStatus = "ED"
 
-    def setSpecData(self, spec):
-        self.setStatus(spec.md.status)
+    def setSpecData(self, md):
+        self.setStatus(md.status)
 
-        self.specName = spec.md.shortname
-        if spec.md.level is not None:
-            self.specLevel = spec.md.level
-            self.specVName = "{0}-{1}".format(spec.md.shortname, spec.md.level)
+        self.specName = md.shortname
+        if md.level is not None:
+            self.specLevel = md.level
+            self.specVName = "{0}-{1}".format(md.shortname, md.level)
         else:
             self.specLevel = 1
             self.specVName = self.specName
