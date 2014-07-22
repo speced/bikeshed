@@ -382,115 +382,6 @@ def transformRailroad(lines, doc, **kwargs):
     return ret
 
 
-def transformAutolinkShortcuts(doc):
-    # Can't do the simple thing of just running the replace over the doc's contents.
-    # Need to protect attributes, contents of <pre>, etc.
-    def transformThings(text):
-        if text is None:
-            return None
-        # Function takes raw text, but then adds HTML,
-        # and the result is put directly into raw HTML.
-        # So, escape the text, so it turns back into "raw HTML".
-        text = escapeHTML(text)
-
-        # Handle biblio links, [[FOO]] and [[!FOO]]
-        while re.search(r"\[\[(!?)([A-Za-z0-9-]+)\]\]", text):
-            match = re.search(r"\[\[(!?)([A-Za-z0-9-]+)\]\]", text)
-
-            if match.group(1) == "!":
-                biblioType = "normative"
-            else:
-                biblioType = "informative"
-
-            text = text.replace(
-                        match.group(0),
-                        '<a title="biblio-{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
-                            match.group(2),
-                            biblioType))
-
-        # Handle section links, [[#foo]].
-        text = re.sub(r"\[\[(#[\w-]+)\]\]", r'<a section href="\1"></a>', text)
-
-        # Handle propdesc links, like 'width'.
-        text = re.sub(r"'([-]?[\w@*][\w@*/-]*)'", r'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
-
-        # Handle IDL links, like {{FooBar}}
-        text = re.sub(r"{{((\S|,\s)+)}}", r'<code><a data-link-type="idl" title="\1">\1</a></code>', text)
-
-        return text
-
-    def fixElementText(el):
-        # Don't transform anything in some kinds of elements.
-        processContents = isElement(el) and not isOpaqueElement(el)
-
-        if processContents:
-            # Pull out el.text, replace stuff (may introduce elements), parse.
-            newtext = transformThings(el.text)
-            if el.text != newtext:
-                temp = parseHTML('<div>'+newtext+'</div>')[0]
-                # Change the .text, empty out the temp children.
-                el.text = temp.text
-                for child in childElements(temp, reversed=True):
-                    el.insert(0, child)
-
-        # Same for tail.
-        newtext = transformThings(el.tail)
-        if el.tail != newtext:
-            temp = parseHTML('<div>'+newtext+'</div>')[0]
-            el.tail = ''
-            for child in childElements(temp, reversed=True):
-                el.addnext(child)
-            el.tail = temp.text
-
-        if processContents:
-            # Recurse over children.
-            for child in childElements(el):
-                fixElementText(child)
-
-    fixElementText(doc.document.getroot())
-
-
-def transformProductionGrammars(doc):
-    # Link up the various grammar symbols in CSS grammars to their definitions.
-
-    def transformThings(text):
-        if text is None:
-            return None
-        # Function takes raw text, but then adds HTML,
-        # and the result is put directly into raw HTML.
-        # So, escape the text, so it turns back into "raw HTML".
-        text = escapeHTML(text)
-        text = re.sub(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|,)", r"<a grammar class='prod-punc'>\1</a>", text)
-        return text
-
-    def fixElementText(el, root=False):
-        # Recurse over children.
-        for child in childElements(el):
-            fixElementText(child)
-
-        # Pull out el.text, replace stuff (may introduce elements), parse.
-        if el.tag != "a":
-            newtext = transformThings(el.text)
-            if el.text != newtext:
-                temp = parseHTML('<div>'+newtext+'</div>')[0]
-                # Change the .text, empty out the temp children.
-                el.text = temp.text
-                for child in childElements(temp, reversed=True):
-                    el.insert(0, child)
-
-        # Same for tail, if it's a sub-element
-        if not root:
-            newtext = transformThings(el.tail)
-            if el.tail != newtext:
-                temp = parseHTML('<div>'+newtext+'</div>')[0]
-                el.tail = ''
-                for child in childElements(temp, reversed=True):
-                    el.addnext(child)
-                el.tail = temp.text
-
-    for el in findAll(".prod"):
-        fixElementText(el, root=True)
-
 def buildBibliolinkDatabase(doc):
     biblioLinks = findAll("a[data-link-type='biblio']")
     for el in biblioLinks:
@@ -1368,8 +1259,8 @@ class CSSSpec(object):
         addAbstract(self)
         addObsoletionNotice(self)
         addAtRisk(self)
-        transformAutolinkShortcuts(self)
-        transformProductionGrammars(self)
+        self.transformAutolinkShortcuts()
+        self.transformProductionGrammars()
         formatPropertyNames(self)
         processHeadings(self)
         canonicalizeShortcuts(self)
@@ -1463,6 +1354,115 @@ class CSSSpec(object):
         # (The other shortcuts are "atomic" and can't contain elements.)
         text = re.sub(r"''([^=\n]+?)''", r'<a data-link-type="maybe" class="css">\1</a>', text)
         return text
+
+    def transformAutolinkShortcuts(doc):
+        # Can't do the simple thing of just running the replace over the doc's contents.
+        # Need to protect attributes, contents of <pre>, etc.
+        def transformThings(text):
+            if text is None:
+                return None
+            # Function takes raw text, but then adds HTML,
+            # and the result is put directly into raw HTML.
+            # So, escape the text, so it turns back into "raw HTML".
+            text = escapeHTML(text)
+
+            # Handle biblio links, [[FOO]] and [[!FOO]]
+            while re.search(r"\[\[(!?)([A-Za-z0-9-]+)\]\]", text):
+                match = re.search(r"\[\[(!?)([A-Za-z0-9-]+)\]\]", text)
+
+                if match.group(1) == "!":
+                    biblioType = "normative"
+                else:
+                    biblioType = "informative"
+
+                text = text.replace(
+                            match.group(0),
+                            '<a title="biblio-{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
+                                match.group(2),
+                                biblioType))
+
+            # Handle section links, [[#foo]].
+            text = re.sub(r"\[\[(#[\w-]+)\]\]", r'<a section href="\1"></a>', text)
+
+            # Handle propdesc links, like 'width'.
+            text = re.sub(r"'([-]?[\w@*][\w@*/-]*)'", r'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
+
+            # Handle IDL links, like {{FooBar}}
+            text = re.sub(r"{{((\S|,\s)+)}}", r'<code><a data-link-type="idl" title="\1">\1</a></code>', text)
+
+            return text
+
+        def fixElementText(el):
+            # Don't transform anything in some kinds of elements.
+            processContents = isElement(el) and not isOpaqueElement(el)
+
+            if processContents:
+                # Pull out el.text, replace stuff (may introduce elements), parse.
+                newtext = transformThings(el.text)
+                if el.text != newtext:
+                    temp = parseHTML('<div>'+newtext+'</div>')[0]
+                    # Change the .text, empty out the temp children.
+                    el.text = temp.text
+                    for child in childElements(temp, reversed=True):
+                        el.insert(0, child)
+
+            # Same for tail.
+            newtext = transformThings(el.tail)
+            if el.tail != newtext:
+                temp = parseHTML('<div>'+newtext+'</div>')[0]
+                el.tail = ''
+                for child in childElements(temp, reversed=True):
+                    el.addnext(child)
+                el.tail = temp.text
+
+            if processContents:
+                # Recurse over children.
+                for child in childElements(el):
+                    fixElementText(child)
+
+        fixElementText(doc.document.getroot())
+
+
+    def transformProductionGrammars(doc):
+        # Link up the various grammar symbols in CSS grammars to their definitions.
+
+        def transformThings(text):
+            if text is None:
+                return None
+            # Function takes raw text, but then adds HTML,
+            # and the result is put directly into raw HTML.
+            # So, escape the text, so it turns back into "raw HTML".
+            text = escapeHTML(text)
+            text = re.sub(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|,)", r"<a grammar class='prod-punc'>\1</a>", text)
+            return text
+
+        def fixElementText(el, root=False):
+            # Recurse over children.
+            for child in childElements(el):
+                fixElementText(child)
+
+            # Pull out el.text, replace stuff (may introduce elements), parse.
+            if el.tag != "a":
+                newtext = transformThings(el.text)
+                if el.text != newtext:
+                    temp = parseHTML('<div>'+newtext+'</div>')[0]
+                    # Change the .text, empty out the temp children.
+                    el.text = temp.text
+                    for child in childElements(temp, reversed=True):
+                        el.insert(0, child)
+
+            # Same for tail, if it's a sub-element
+            if not root:
+                newtext = transformThings(el.tail)
+                if el.tail != newtext:
+                    temp = parseHTML('<div>'+newtext+'</div>')[0]
+                    el.tail = ''
+                    for child in childElements(temp, reversed=True):
+                        el.addnext(child)
+                    el.tail = temp.text
+
+        for el in findAll(".prod"):
+            fixElementText(el, root=True)
 
     def printTargets(self):
         def targetText(el):
