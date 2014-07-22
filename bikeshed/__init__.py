@@ -1334,6 +1334,8 @@ class CSSSpec(object):
             self.md.addDefault(key, val)
 
     def fixText(self, text):
+        # Do several textual replacements that need to happen *before* the document is parsed as HTML.
+
         # Replace the [FOO] things.
         for tag, replacement in self.macros.items():
             text = text.replace("[{0}]".format(tag.upper()), replacement)
@@ -1356,8 +1358,7 @@ class CSSSpec(object):
         return text
 
     def transformAutolinkShortcuts(doc):
-        # Can't do the simple thing of just running the replace over the doc's contents.
-        # Need to protect attributes, contents of <pre>, etc.
+        # Do the remaining textual replacements
         def transformThings(text):
             if text is None:
                 return None
@@ -1367,19 +1368,8 @@ class CSSSpec(object):
             text = escapeHTML(text)
 
             # Handle biblio links, [[FOO]] and [[!FOO]]
-            while re.search(r"\[\[(!?)([A-Za-z0-9-]+)\]\]", text):
-                match = re.search(r"\[\[(!?)([A-Za-z0-9-]+)\]\]", text)
-
-                if match.group(1) == "!":
-                    biblioType = "normative"
-                else:
-                    biblioType = "informative"
-
-                text = text.replace(
-                            match.group(0),
-                            '<a title="biblio-{0}" data-link-type="biblio" data-biblio-type="{1}">[{0}]</a>'.format(
-                                match.group(2),
-                                biblioType))
+            text = re.sub(r"\[\[([\w-]+)\]\]", r'<a title="biblio-\1" data-link-type="biblio" data-biblio-type="informative">[\1]</a>', text)
+            text = re.sub(r"\[\[!([\w-]+)\]\]", r'<a title="biblio-\1" data-link-type="biblio" data-biblio-type="normative">[\1]</a>', text)
 
             # Handle section links, [[#foo]].
             text = re.sub(r"\[\[(#[\w-]+)\]\]", r'<a section href="\1"></a>', text)
