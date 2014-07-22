@@ -1532,7 +1532,7 @@ def fillInBoilerplate(doc):
     match = re.match(r"^<h1>([^<]+)</h1>", doc.html)
     if match:
         doc.md.title = match.group(1)
-        config.textMacros['title'] = doc.md.title
+        doc.macros['title'] = doc.md.title
         doc.html = doc.html[len(match.group(0)):]
 
     if not doc.md.title:
