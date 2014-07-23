@@ -14,18 +14,27 @@ class ReferenceManager(object):
         self.defaultSpecs = defaultdict(list)
         self.css21Replacements = set()
         self.ignoredSpecs = set()
+        self.status = specStatus
 
-        if specStatus is not None:
-            self.setStatus(specStatus)
+    @property
+    def status(self):
+        return self._status
 
-    def setStatus(self, specStatus):
-        if specStatus in config.TRStatuses:
-            self.specStatus = "TR"
+    @status.setter
+    def status(self, val):
+        if val is None:
+            self._status = None
+        elif val in config.TRStatuses:
+            self._status = "TR"
+        elif val in config.shortToLongStatus:
+            self._status = "ED"
         else:
-            self.specStatus = "ED"
+            die("Unknown spec status '{0}'.", val)
+            self._status = None
+        return self._status
 
     def setSpecData(self, md):
-        self.setStatus(md.status)
+        self.status = md.status
 
         self.specName = md.shortname
         if md.level is not None:
@@ -107,7 +116,7 @@ class ReferenceManager(object):
 
         text = unfixTypography(text).lower()
 
-        status = status or self.specStatus
+        status = status or self.status
         if status not in ("ED", "TR", "local"):
             if error:
                 die("Unknown spec status '{0}'. Status must be ED, TR, or local.", status)

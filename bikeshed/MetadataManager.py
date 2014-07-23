@@ -218,7 +218,7 @@ class MetadataManager:
 
 
 def setStatus(key, val):
-    config.doc.refs.setStatus(val)
+    config.doc.refs.status = val
     return val
 
 def convertGroup(key, val):
