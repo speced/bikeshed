@@ -38,7 +38,7 @@ def compare(suspect, golden):
 	suspectDoc = parseDocument(suspect)
 	goldenDoc = parseDocument(golden)
 	for s, g in izip(suspectDoc.iter(), goldenDoc.iter()):
-		if s.tag == g.tag and s.text == g.text and s.tail == g.tail:
+		if s.tag == g.tag and s.text == g.text and s.tail == g.tail and s.get('id') == g.get('id'):
 			continue
 		fromText = outerHTML(g)
 		toText = outerHTML(s)
