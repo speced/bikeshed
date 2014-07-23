@@ -705,7 +705,7 @@ def classifyDfns(doc, dfns):
                 continue
         if dfnType in config.typesUsingFor:
             if el.get('data-dfn-for'):
-                pass
+                dfnFor = el.get('data-dfn-for')
             else:
                 dfnFor = treeAttr(el, "data-dfn-for")
                 if dfnFor:
@@ -721,9 +721,12 @@ def classifyDfns(doc, dfns):
             elif dfnType == "interface":
                 id = "dom-" + id
             elif dfnType in config.idlTypes.intersection(config.typesUsingFor):
-                id = simplifyText("dom-{0}-{1}".format(el.get("data-dfn-for"), id))
+                id = simplifyText("dom-{_for}-{id}".format(_for=dfnFor, id=id))
+            elif dfnType in config.typesUsingFor:
+                # Prepend property name to value to avoid ID duplication
+                id = simplifyText("{type}-{_for}-{id}".format(type=dfnTypeToPrefix[dfnType], _for=dfnFor, id=id))
             else:
-                id = "{0}-{1}".format(dfnTypeToPrefix[dfnType], id)
+                id = "{type}-{id}".format(type=dfnTypeToPrefix[dfnType], id=id)
             el.set('id', id)
         # Push export/noexport down to the definition
         if el.get('data-export') is None and el.get('data-noexport') is None:
@@ -753,6 +756,7 @@ def dedupIds(doc, els):
         del el.attrib['id']
         if findId(id):
             # Try to de-dup the id by appending an integer after it.
+            warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", id)
             import itertools as iter
             for x in iter.imap(str, iter.count(0)):
                 if not findId(id+x):
