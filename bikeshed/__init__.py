@@ -1397,7 +1397,7 @@ class CSSSpec(object):
             text = re.sub(r"'([-]?[\w@*][\w@*/-]*)'", r'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
 
             # Handle IDL links, like {{FooBar}}
-            text = re.sub(r"{{((\S|,\s)+)}}", r'<code><a data-link-type="idl" title="\1">\1</a></code>', text)
+            text = re.sub(r"{{((\S|,\s)+)}}", r'<code class="idl"><a data-link-type="idl" title="\1">\1</a></code>', text)
 
             return text
 
