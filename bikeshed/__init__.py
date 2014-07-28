@@ -976,6 +976,9 @@ class IDLMarker(object):
             else:
                 readonly = ''
             extraParameters = '{0} data-type="{1}"'.format(readonly, rest.type)
+        elif idlType == "dict-member":
+            extraParameters = 'data-type="{0}"'.format(construct.type);
+            idlType = 'attribute';
         else:
             extraParameters = ''
 
