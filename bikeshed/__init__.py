@@ -147,6 +147,9 @@ def main():
             config.quiet = options.quiet
             if not config.quiet:
                 print "Refs for '{0}':".format(options.linkText)
+            # Get ready for JSONing
+            for ref in refs:
+                ref['level'] = str(ref['level'])
             print json.dumps(refs, indent=2)
     elif options.subparserName == "issues-list":
         from . import issuelist as il
