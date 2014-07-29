@@ -618,12 +618,15 @@ def fillAttributeInfoSpans(doc):
                 continue
             target = target[0]
             datatype = target.get("data-type").strip()
+            default = target.get("data-default");
             decorations = ""
             if target.get("data-readonly") is not None:
                 decorations += ", readonly"
             if datatype[-1] == "?":
                 decorations += ", nullable"
                 datatype = datatype[:-1]
+            if default is not None:
+              decorations += ", defaulting to {0}".format(default);
             replaceContents(el, parseHTML("of type <a data-link-type=idl-name>{0}</a>{1}".format(datatype, decorations)))
             # FIXME: Is there a nicer way to force a leading space here?
             el.text = ' ' + el.text
@@ -981,6 +984,9 @@ class IDLMarker(object):
             extraParameters = '{0} data-type="{1}"'.format(readonly, rest.type)
         elif idlType == "dict-member":
             extraParameters = 'data-type="{0}"'.format(construct.type);
+            if construct.default is not None:
+              value = escapeAttr("{0}".format(construct.default.value));
+              extraParameters += ' data-default="{0}"'.format(value);
             idlType = 'attribute';
         else:
             extraParameters = ''
