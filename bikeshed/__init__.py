@@ -985,9 +985,7 @@ class IDLMarker(object):
         elif idlType == "dict-member":
             extraParameters = 'data-type="{0}"'.format(construct.type);
             if construct.default is not None:
-              value = "{0}".format(construct.default.value)
-              if value.startswith('"'):
-                value = '&quot;' + value[1:-1] + '&quot;'
+              value = escapeAttr("{0}".format(construct.default.value));
               extraParameters += ' data-default="{0}"'.format(value);
             idlType = 'attribute';
         else:
