@@ -900,7 +900,7 @@ def processAutolinks(doc):
                               status=el.get('data-link-status'),
                               linkFor=el.get('data-link-for'),
                               el=el,
-                              error=(linkText not in doc.md.ignoredTerms))
+                              error=(linkText.lower() not in doc.md.ignoredTerms))
         if url is not None:
             el.set('href', url)
             el.tag = "a"
