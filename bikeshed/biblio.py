@@ -45,6 +45,7 @@ class BiblioEntry(object):
             etAl = True
 
         str += "; et al. " if etAl else ". "
+
         if self.url:
             str += "<a href='{0}'>{1}</a>. ".format(self.url, self.title)
         else:
