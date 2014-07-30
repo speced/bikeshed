@@ -1903,6 +1903,7 @@ def addIssuesSection(doc):
     insertAfter(header, container)
     for issue in issues:
         el = deepcopy(issue)
+        el.tail = None
         if el.tag not in ("pre",):
             el.tag = "div"
         appendChild(container, el)
