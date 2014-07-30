@@ -45,8 +45,10 @@ class BiblioEntry(object):
             etAl = True
 
         str += "; et al. " if etAl else ". "
-
-        str += "<a href='{0}'>{1}</a>. ".format(self.url, self.title)
+        if self.url:
+            str += "<a href='{0}'>{1}</a>. ".format(self.url, self.title)
+        else:
+            str += "{0}. ".format(self.title)
 
         if self.date:
             str += self.date + ". "
@@ -61,8 +63,6 @@ class BiblioEntry(object):
         return str
 
     def valid(self):
-        if self.url is None:
-            return False
         if self.title is None:
             return False
         return True
