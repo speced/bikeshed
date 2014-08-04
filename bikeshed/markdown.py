@@ -30,7 +30,7 @@ def tokenizeLines(lines, features=None):
 		if re.search(r"<({0})[ >]".format(rawElements), rawline):
 			preDepth += 1
 		if preDepth:
-			tokens.append({'type':'raw', 'raw':rawline, 'prefix': re.match(r"[ \t]*", rawline).group(0)})
+			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': re.match(r"[ \t]*", rawline).group(0)})
 		if re.search(r"</({0})>".format(rawElements), rawline):
 			preDepth = max(0, preDepth - 1)
 			continue
@@ -66,7 +66,7 @@ def tokenizeLines(lines, features=None):
 			match = re.match(r"\d+\.\s+(.*)", line)
 			token = {'type':'numbered', 'text': match.group(1), 'raw':rawline}
 		elif re.match(r"\d+\.$", line):
-			token = {'type':'numbered', 'text': "", 'raw':rawline}
+			token = {'type':'numbered', 'text': "", 'raw':rawlineprint}
 		elif re.match(r"[*+-]\s", line):
 			match = re.match(r"[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
@@ -214,13 +214,9 @@ def parseParagraph(stream):
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
 		stream.advance()
-		try:
-			if stream.currtype() in ("eof", "blank") or stream.currprefixlen() < initialPrefixLen:
-				lines[-1] = lines[-1].rstrip() + endTag + "\n"
-				return lines
-		except AttributeError, e:
-			print stream.curr()
-			print str(e)
+		if stream.currtype() in ("eof", "blank") or stream.currprefixlen() < initialPrefixLen:
+			lines[-1] = lines[-1].rstrip() + endTag + "\n"
+			return lines
 		lines.append(stream.currraw())
 
 def parseBulleted(stream):
