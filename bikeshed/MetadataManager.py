@@ -47,6 +47,7 @@ class MetadataManager:
         self.boilerplate = {'omitSections':set()}
         self.versionHistory = None
         self.logo = ""
+        self.indent = 4
 
         self.otherMetadata = defaultdict(list)
 
@@ -69,7 +70,8 @@ class MetadataManager:
             "Mailing List Archives": "mailingListArchives",
             "Boilerplate": "boilerplate",
             "Version History": "versionHistory",
-            "Logo": "logo"
+            "Logo": "logo",
+            "Indent": "indent"
         }
 
         self.multiValueKeys = {
@@ -98,7 +100,8 @@ class MetadataManager:
             "Former Editor": parseEditor,
             "Ignored Terms": parseIgnoredTerms,
             "Link Defaults": parseLinkDefaults,
-            "Boilerplate": parseBoilerplate
+            "Boilerplate": parseBoilerplate,
+            "Indent": parseInteger
         }
 
         # Alternate output handlers
@@ -199,7 +202,7 @@ class MetadataManager:
         if self.TR:
             macros["latest"] = self.TR
         if self.abstract:
-            macros["abstract"] = "\n".join(markdown.parse(self.abstract))
+            macros["abstract"] = "\n".join(markdown.parse(self.abstract, self.indent))
             macros["abstractattr"] = escapeAttr("  ".join(self.abstract).replace("<<","<").replace(">>",">"))
         macros["year"] = unicode(self.date.year)
         macros["date"] = unicode(self.date.strftime("{0} %B %Y".format(self.date.day)), encoding="utf-8")
@@ -232,6 +235,9 @@ def parseDate(key, val):
 
 def parseLevel(key, val):
     return config.HierarchicalNumber(val)
+
+def parseInteger(key, val):
+    return int(val)
 
 def convertWarning(key, val):
     if val.lower() == "obsolete":

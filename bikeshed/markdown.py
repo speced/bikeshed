@@ -5,11 +5,11 @@ import json
 from itertools import *
 from .messages import *
 
-def parse(lines, features=None):
-	tokens = tokenizeLines(lines, features)
-	return parseTokens(tokens)
+def parse(lines, numSpacesForIndentation, features=None):
+	tokens = tokenizeLines(lines, numSpacesForIndentation, features)
+	return parseTokens(tokens, numSpacesForIndentation)
 
-def tokenizeLines(lines, features=None):
+def tokenizeLines(lines, numSpacesForIndentation, features=None):
 	# Turns lines of text into block tokens,
 	# which'll be turned into MD blocks later.
 	# Every token *must* have 'type', 'raw', and 'prefix' keys.
@@ -87,27 +87,27 @@ def tokenizeLines(lines, features=None):
 				token = {'type':'raw', 'raw': rawline}
 		else:
 			token = {'type':'text', 'text': line, 'raw': rawline}
-		token['prefixlen'] = prefixLen(rawline)
+		token['prefixlen'] = prefixLen(rawline, numSpacesForIndentation)
 		tokens.append(token)
 		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
 	return tokens
 
-def prefixLen(text):
+def prefixLen(text, numSpacesForIndentation):
 	i = 0
 	prefixLen = 0
 	while i < len(text):
 		if text[i] == "\t":
 			i += 1
 			prefixLen += 1
-		elif text[i:i+4] == "    ":
-			i += 4
+		elif text[i:i+numSpacesForIndentation] == " " * numSpacesForIndentation:
+			i += numSpacesForIndentation
 			prefixLen += 1
 		else:
 			break
 	return prefixLen
 
-def stripPrefix(text, len):
+def stripPrefix(text, numSpacesForIndentation, len):
 	# Removes len number of prefix groups
 
 	# Allow empty lines
@@ -117,14 +117,14 @@ def stripPrefix(text, len):
 	for x in range(len):
 		if text[offset] == "\t":
 			offset += 1
-		elif text[offset:offset+4] == "    ":
-			offset += 4
+		elif text[offset:offset+numSpacesForIndentation] == " " * numSpacesForIndentation:
+			offset += numSpacesForIndentation
 		else:
 			die("Line isn't indented enough (needs {0} indent{plural}) to be valid Markdown:\n\"{1}\"", len, text[:-1], plural="" if len==1 else "s")
 	return text[offset:]
 
 
-def parseTokens(tokens):
+def parseTokens(tokens, numSpacesForIndentation):
 	'''
 	Token types:
 	eof
@@ -137,7 +137,7 @@ def parseTokens(tokens):
 	text
 	raw
 	'''
-	stream = TokenStream(tokens)
+	stream = TokenStream(tokens, numSpacesForIndentation)
 	lines = []
 
 	while True:
@@ -221,6 +221,7 @@ def parseParagraph(stream):
 
 def parseBulleted(stream):
 	prefixLen = stream.currprefixlen()
+        numSpacesForIndentation = stream.numSpacesForIndentation
 
 	def parseItem(stream):
 		# Assumes it's being called with curr being a bulleted line.
@@ -239,7 +240,7 @@ def parseBulleted(stream):
 			if stream.currtype() == 'eof':
 				return lines
 			# Remove the prefix from each line before adding it.
-			lines.append(stripPrefix(stream.currraw(), prefixLen+1))
+			lines.append(stripPrefix(stream.currraw(), numSpacesForIndentation, prefixLen+1))
 
 	def getItems(stream):
 		while True:
@@ -253,13 +254,14 @@ def parseBulleted(stream):
 	lines = ["<ul>"]
 	for li_lines in getItems(stream):
 		lines.append("<li data-md>")
-		lines.extend(parse(li_lines))
+		lines.extend(parse(li_lines, numSpacesForIndentation))
 		lines.append("</li>")
 	lines.append("</ul>")
 	return lines
 
 def parseNumbered(stream):
 	prefixLen = stream.currprefixlen()
+        numSpacesForIndentation = stream.numSpacesForIndentation
 
 	def parseItem(stream):
 		# Assumes it's being called with curr being a numbered line.
@@ -278,7 +280,7 @@ def parseNumbered(stream):
 			if stream.currtype() == 'eof':
 				return lines
 			# Remove the prefix from each line before adding it.
-			lines.append(stripPrefix(stream.currraw(), prefixLen+1))
+			lines.append(stripPrefix(stream.currraw(), numSpacesForIndentation, prefixLen+1))
 
 	def getItems(stream):
 		while True:
@@ -292,13 +294,14 @@ def parseNumbered(stream):
 	lines = ["<ol>"]
 	for li_lines in getItems(stream):
 		lines.append("<li data-md>")
-		lines.extend(parse(li_lines))
+		lines.extend(parse(li_lines, numSpacesForIndentation))
 		lines.append("</li>")
 	lines.append("</ol>")
 	return lines
 
 def parseDl(stream):
 	prefixLen = stream.currprefixlen()
+        numSpacesForIndentation = stream.numSpacesForIndentation
 
 	def parseItem(stream):
 		# Assumes it's being called with curr being a numbered line.
@@ -318,7 +321,7 @@ def parseDl(stream):
 			if stream.currtype() == 'eof':
 				return type, lines
 			# Remove the prefix from each line before adding it.
-			lines.append(stripPrefix(stream.currraw(), prefixLen+1))
+			lines.append(stripPrefix(stream.currraw(), numSpacesForIndentation, prefixLen+1))
 
 	def getItems(stream):
 		while True:
@@ -332,7 +335,7 @@ def parseDl(stream):
 	lines = ["<dl>"]
 	for type, di_lines in getItems(stream):
 		lines.append("<{0} data-md>".format(type))
-		lines.extend(parse(di_lines))
+		lines.extend(parse(di_lines, numSpacesForIndentation))
 		lines.append("</{0}>".format(type))
 	lines.append("</dl>")
 	return lines
@@ -340,9 +343,10 @@ def parseDl(stream):
 
 
 class TokenStream:
-	def __init__(self, tokens, before={'type':'blank','raw':'\n','prefixlen':0}, after={'type':'eof','raw':'','prefixlen':0}):
+	def __init__(self, tokens, numSpacesForIndentation, before={'type':'blank','raw':'\n','prefixlen':0}, after={'type':'eof','raw':'','prefixlen':0}):
 		self.tokens = tokens
 		self.i = 0
+                self.numSpacesForIndentation = numSpacesForIndentation
 		self.before = before
 		self.after = after
 
