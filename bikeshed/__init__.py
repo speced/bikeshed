@@ -1266,7 +1266,7 @@ class CSSSpec(object):
         # Deal with further <pre> blocks, and markdown
         transformDataBlocks(self)
         if self.paragraphMode == "markdown":
-            self.lines = markdown.parse(self.lines)
+            self.lines = markdown.parse(self.lines, self.md.indent)
 
         # Convert to a single string of html now, for convenience.
         self.html = ''.join(self.lines)
