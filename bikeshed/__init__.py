@@ -906,7 +906,11 @@ def processAutolinks(doc):
             el.tag = "a"
         else:
             if linkType == "maybe":
-                el.tag = "span"
+                el.tag = "css"
+                if el.get("data-link-type"):
+                    del el.attrib["data-link-type"]
+                if el.get("title"):
+                    del el.attrib["title"]
 
 
 def processIssues(doc):
