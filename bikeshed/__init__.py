@@ -1063,7 +1063,7 @@ def cleanupHTML(doc):
     for el in findAll(selectorForTypes(config.idlTypes)):
         addClass(el, 'idl-code')
     for el in findAll(selectorForTypes(config.maybeTypes.union(config.linkTypeToDfnType['propdesc']))):
-        addClass(el, 'css-code')
+        addClass(el, 'css')
 
     # Remove comments from the generated HTML
     if config.minify:
@@ -1075,6 +1075,12 @@ def cleanupHTML(doc):
     for el in findAll("dfn[title]"):
         if el.get('title') == textContent(el):
             del el.attrib['title']
+
+    # Transform the <css> fake tag into markup.
+    # (Used when the ''foo'' shorthand doesn't work.)
+    for el in findAll("css"):
+        el.tag = "span"
+        addClass(el, "css")
 
 
 def finalHackyCleanup(text):
