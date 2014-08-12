@@ -1065,7 +1065,7 @@ def cleanupHTML(doc):
     for el in findAll(selectorForTypes(config.maybeTypes.union(config.linkTypeToDfnType['propdesc']))):
         addClass(el, 'css-code')
 
-    # Remove comments from the generated HTML, maybe.
+    # Remove comments from the generated HTML
     if config.minify:
         comments = list(doc.document.iter(lxml.etree.Comment))
         for comment in comments:
