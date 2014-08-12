@@ -208,6 +208,8 @@ def treeAttr(el, attrName):
 def addClass(el, cls):
     if el.get('class') is None:
         el.set('class', cls)
+    elif hasClass(el, cls):
+        pass
     else:
         el.set('class', "{0} {1}".format(el.get('class'), cls))
 
