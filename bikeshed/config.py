@@ -33,7 +33,7 @@ shortToLongStatus = {
 
 dfnClassToType = {
     "propdef"         : "property",
-    "valuedef"        : "value",
+    "valdef"          : "value",
     "at-ruledef"      : "at-rule",
     "descdef"         : "descriptor",
     "typedef"         : "type",

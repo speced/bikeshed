@@ -774,9 +774,9 @@ def dedupIds(doc, els):
 def simplifyText(text):
     # Remove anything that's not a name character.
     text = text.strip()
-    text = re.sub("\s+", "-", text)
+    text = re.sub(r"[\s/]+", "-", text)
     text = text.lower()
-    text = re.sub("[^a-z0-9_-]", "", text)
+    text = re.sub(r"[^a-z0-9_-]", "", text)
     return text
 
 
