@@ -268,6 +268,12 @@ def linkTextVariations(str):
     if str[-1:] == "y":
         yield str[:-1] + "ies"
 
+    # Blockified <-> Blockify
+    if str[-3:] == "ied":
+        yield str[:-3] + "y"
+    if str[-1:] == "y":
+        yield str[:-1] + "ied"
+
     # Zeroes <-> Zero
     if str[-2:] == "es":
         yield str[:-2]
