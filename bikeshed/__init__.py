@@ -945,6 +945,12 @@ def addSelfLinks(doc):
 
 
 class IDLMarker(object):
+    def markupConstruct(self, text, construct):
+        return (None, None)
+
+    def markupType(self, text, construct):
+        return (None, None)
+
     def markupTypeName(self, text, construct):
         return ('<a data-link-type="idl">', '</a>')
 
