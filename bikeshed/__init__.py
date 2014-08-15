@@ -1490,16 +1490,14 @@ class CSSSpec(object):
             fixElementText(el, root=True)
 
     def printTargets(self):
-        def targetText(el):
-            return el.get('title') or textContent(el)
-        exportedTerms = set(targetText(el) for el in findAll('dfn[data-export]'))
-        ignoredTerms = set(targetText(el) for el in findAll('dfn[data-noexport]'))
         print "Exported terms:"
-        for term in exportedTerms:
-            print "  {0}".format(term)
+        for el in findAll('dfn[data-export]'):
+            for term in  linkTextsFromElement(el):
+                print "  ", term
         print "Unexported terms:"
-        for term in ignoredTerms:
-            print "  {0}".format(term)
+        for el in findAll('dfn[data-noexport]'):
+            for term in  linkTextsFromElement(el):
+                print "  ", term
 
     def getInclusion(self, name, group=None, status=None, error=True):
         # First looks for a file specialized on the group and status.
