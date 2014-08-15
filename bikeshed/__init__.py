@@ -1086,6 +1086,13 @@ def cleanupHTML(doc):
         el.tag = "span"
         addClass(el, "css")
 
+    # Transform the <assert> fake tag into a span with a unique ID based on its contents.
+    # This is just used to tag arbitrary sections with an ID so you can point tests at it.
+    # (And the ID will be guaranteed stable across publications, but guaranteed to change when the text changes.)
+    for el in findAll("assert"):
+        el.tag = "span"
+        el.set("id", "assert-" + hashContents(el))
+
 
 def finalHackyCleanup(text):
     # For hacky last-minute string-based cleanups of the rendered html.
