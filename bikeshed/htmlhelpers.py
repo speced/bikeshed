@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
+import hashlib
 import html5lib
 from html5lib import treewalkers
 from html5lib.serializer import htmlserializer
