@@ -192,7 +192,11 @@ def printIssues(outfile, lines):
 			code = 'a'
 		elif re.search(r"\n(Closed|Open):\s+\S+", issue):
 			code = re.search(r"\n(Closed|Open):\s+(\S+)", issue).group(2)
-			code = statusStyle[code.lower()]
+			if code.lower() in statusStyle:
+				code = statusStyle[code.lower()]
+			else:
+				code = ''
+				warn("Unknown status value found for issue #{num}: “{code}”", code=code, num=index)
 		else:
 			code = ''
 		if re.search(r"\nOpen", issue):
