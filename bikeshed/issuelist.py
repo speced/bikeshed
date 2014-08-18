@@ -191,12 +191,14 @@ def printIssues(outfile, lines):
 		if re.search(r"\nVerified:\s+http", issue):
 			code = 'a'
 		elif re.search(r"\n(Closed|Open):\s+\S+", issue):
-			code = re.search(r"\n(Closed|Open):\s+(\S+)", issue).group(2)
+			match = re.search(r"\n(Closed|Open):\s+(\S+)", issue).group(2)
+			code = match.group(2)
 			if code.lower() in statusStyle:
 				code = statusStyle[code.lower()]
 			else:
 				code = ''
-				warn("Unknown status value found for issue #{num}: “{code}”", code=code, num=index)
+				if match.group(1) == "Closed":
+					warn("Unknown status value found for issue #{num}: “{code}”", code=code, num=index)
 		else:
 			code = ''
 		if re.search(r"\nOpen", issue):
