@@ -191,7 +191,7 @@ def printIssues(outfile, lines):
 		if re.search(r"\nVerified:\s+http", issue):
 			code = 'a'
 		elif re.search(r"\n(Closed|Open):\s+\S+", issue):
-			match = re.search(r"\n(Closed|Open):\s+(\S+)", issue).group(2)
+			match = re.search(r"\n(Closed|Open):\s+(\S+)", issue)
 			code = match.group(2)
 			if code.lower() in statusStyle:
 				code = statusStyle[code.lower()]
@@ -223,12 +223,21 @@ def printScript(outfile):
 		element.innerHTML = null;
 		var check = document.createElement('input');
 		check.type = 'checkbox';
-		check.checked = true;
-		sheet.addRule('pre.' + className, '');
-		var rule = sheet.rules[sheet.rules.length - 1];
-		check.onchange = function (e) {
-			rule.style.display = this.checked ? 'block' : 'none';
+		if (className == 'open') {
+			check.checked = false;
+			sheet.insertRule('pre:not(.open)' + '{}', sheet.cssRules.length);
+			check.onchange = function (e) {
+				rule.style.display = this.checked ? 'none' : 'block';
+			}
 		}
+		else {
+			check.checked = true;
+			sheet.insertRule('pre.' + className + '{}', sheet.cssRules.length);
+			check.onchange = function (e) {
+				rule.style.display = this.checked ? 'block' : 'none';
+			}
+		}
+		var rule = sheet.cssRules[sheet.cssRules.length - 1];
 		element.appendChild(check);
 		element.appendChild(span);
 	}
