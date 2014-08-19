@@ -191,19 +191,27 @@ class ReferenceManager(object):
             return None
 
         # Remove any ignored or obsoleted specs
-        def ignoredSpec(spec, ignoreCSS21=False, ignoreSVG=False):
+        def ignoredSpec(spec, moreIgnores=set()):
             if spec in self.ignoredSpecs:
                 return True
-            if spec == "css21" and ignoreCSS21:
-                return True
-            if spec in ("svg", "svg2") and ignoreSVG:
+            if spec in moreIgnores:
                 return True
             return False
         possibleSpecs = set(ref['spec'] for ref in refs)
-        ignoreCSS21 = bool(possibleSpecs.intersection(self.css21Replacements))
+        moreIgnores = set()
+        # All the individual CSS specs replace SVG.
+        if bool(possibleSpecs.intersection(self.css21Replacements)):
+            moreIgnores.add("css21")
+            moreIgnores.add("svg")
+            moreIgnores.add("svg2")
         # CSS21 also replaces SVG
-        ignoreSVG = ignoreCSS21 or "css21" in possibleSpecs
-        refs = [ref for ref in refs if not ignoredSpec(ref['spec'], ignoreCSS21, ignoreSVG)]
+        if "css21" in possibleSpecs:
+            moreIgnores.add("svg")
+            moreIgnores.add("svg2")
+        # SVG2 replaces SVG1
+        if "svg2" in possibleSpecs:
+            moreIgnores.add("svg")
+        refs = [ref for ref in refs if not ignoredSpec(ref['spec'], moreIgnores)]
 
         # At this point, all the filtering is done.
         # We won't error out due to no refs being found past this point,
