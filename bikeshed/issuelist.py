@@ -218,8 +218,8 @@ def printScript(outfile):
 	var sheet = document.styleSheets[0];
 	function addCheckbox(className) {
 		var element = document.querySelector('*.' + className);
-		var span = document.createElement('span');
-		span.innerHTML = element.innerHTML;
+		var label = document.createElement('label');
+		label.innerHTML = element.innerHTML;
 		element.innerHTML = null;
 		var check = document.createElement('input');
 		check.type = 'checkbox';
@@ -238,8 +238,8 @@ def printScript(outfile):
 			}
 		}
 		var rule = sheet.cssRules[sheet.cssRules.length - 1];
-		element.appendChild(check);
-		element.appendChild(span);
+		element.appendChild(label);
+		label.insertBefore(check, label.firstChild);
 	}
 	['a', 'd', 'fo', 'oi', 'r', 'open'].forEach(addCheckbox);
 }());
