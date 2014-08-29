@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import re
+import json
+import io
 from collections import defaultdict
 from . import config
 from .messages import *
@@ -15,6 +17,39 @@ class ReferenceManager(object):
         self.css21Replacements = set()
         self.ignoredSpecs = set()
         self.status = specStatus
+        self.biblios = dict()
+
+    def initializeRefs(self):
+        # Load up the xref data
+        self.specs = json.loads(
+                            unicode(
+                                config.retrieveCachedFile(
+                                        cacheLocation=config.scriptPath+"/spec-data/specs.json",
+                                        type="spec list",
+                                        quiet=True).read(),
+                                encoding="utf-8"))
+        self.refs = defaultdict(list,
+                            json.loads(
+                                unicode(
+                                    config.retrieveCachedFile(
+                                        cacheLocation=config.scriptPath+"/spec-data/anchors.json",
+                                        type="anchor data",
+                                        quiet=True).read(),
+                                    encoding="utf-8")))
+        try:
+            with io.open("anchors.json", 'r', encoding="utf-8") as fh:
+                self.refs.update(json.loads(fh.read()))
+        except IOError:
+            pass
+
+        self.defaultSpecs = defaultdict(list,
+                                    json.loads(
+                                        unicode(
+                                            config.retrieveCachedFile(
+                                                cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
+                                                type="link defaults",
+                                                quiet=True).read(),
+                                            encoding="utf-8")))
 
     @property
     def status(self):

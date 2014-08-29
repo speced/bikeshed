@@ -1109,37 +1109,6 @@ def finalHackyCleanup(text):
     return text
 
 
-def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):
-    try:
-        if force:
-            raise IOError("Skipping cache lookup, because this is a forced retrieval.")
-        fh = open(cacheLocation, 'r')
-    except IOError:
-        if fallbackurl is None:
-            die("Couldn't find the {0} cache file at the specified location '{1}'.", type, cacheLocation)
-        else:
-            if not quiet:
-                warn("Couldn't find the {0} cache file at the specified location '{1}'.\nAttempting to download it from '{2}'...", type, cacheLocation, fallbackurl)
-            try:
-                fh = urlopen(fallbackurl)
-            except:
-                die("Couldn't retrieve the {0} file from '{1}'.", type, fallbackurl)
-            try:
-                if not quiet:
-                    say("Attempting to save the {0} file to cache...", type)
-                if not dryRun:
-                    outfh = open(cacheLocation, 'w')
-                    outfh.write(fh.read())
-                    fh.close()
-                fh = open(cacheLocation, 'r')
-                if not quiet:
-                    say("Successfully saved the {0} file to cache.", type)
-            except:
-                if not quiet:
-                    warn("Couldn't save the {0} file to cache. Proceeding...", type)
-    return fh
-
-
 
 
 
@@ -1195,7 +1164,7 @@ class CSSSpec(object):
 
 
 
-        with retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.refer",
+        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.refer",
                                       fallbackurl="http://dev.w3.org/csswg/biblio.ref",
                                       type="bibliography") as fh:
             biblioLines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
@@ -1210,29 +1179,11 @@ class CSSSpec(object):
             # Missing file is fine
             pass
 
-        # Load up the xref data
-        self.refs.specs = json.loads(
-                            unicode(
-                                retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/specs.json", type="spec list", quiet=True).read(),
-                                encoding="utf-8"))
-        self.refs.refs = defaultdict(list,
-                            json.loads(
-                                unicode(
-                                    retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.json", type="anchor data", quiet=True).read(),
-                                    encoding="utf-8")))
-        try:
-            with io.open("anchors.json", 'r', encoding="utf-8") as fh:
-                self.refs.refs.update(json.loads(fh.read()))
-        except IOError:
-            pass
-        self.refs.defaultSpecs = defaultdict(list,
-                                    json.loads(
-                                        unicode(
-                                            retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/link-defaults.json", type="link defaults", quiet=True).read(),
-                                            encoding="utf-8")))
+        self.refs.initializeRefs();
+
         self.testSuites = json.loads(
                             unicode(
-                                retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/test-suites.json", type="test suite list", quiet=True).read(),
+                                config.retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/test-suites.json", type="test suite list", quiet=True).read(),
                                 encoding="utf-8"))
 
         if "css21Replacements" in self.refs.defaultSpecs:
