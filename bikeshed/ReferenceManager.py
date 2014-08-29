@@ -21,35 +21,33 @@ class ReferenceManager(object):
 
     def initializeRefs(self):
         # Load up the xref data
-        self.specs = json.loads(
-                            unicode(
-                                config.retrieveCachedFile(
-                                        cacheLocation=config.scriptPath+"/spec-data/specs.json",
-                                        type="spec list",
-                                        quiet=True).read(),
-                                encoding="utf-8"))
-        self.refs = defaultdict(list,
-                            json.loads(
-                                unicode(
-                                    config.retrieveCachedFile(
-                                        cacheLocation=config.scriptPath+"/spec-data/anchors.json",
-                                        type="anchor data",
-                                        quiet=True).read(),
-                                    encoding="utf-8")))
+        self.specs.update(json.loads(
+            unicode(
+                config.retrieveCachedFile(
+                    cacheLocation=config.scriptPath+"/spec-data/specs.json",
+                    type="spec list",
+                    quiet=True).read(),
+                encoding="utf-8")))
+        self.refs.update(json.loads(
+            unicode(
+                config.retrieveCachedFile(
+                    cacheLocation=config.scriptPath+"/spec-data/anchors.json",
+                    type="anchor data",
+                    quiet=True).read(),
+                encoding="utf-8")))
         try:
             with io.open("anchors.json", 'r', encoding="utf-8") as fh:
                 self.refs.update(json.loads(fh.read()))
         except IOError:
             pass
 
-        self.defaultSpecs = defaultdict(list,
-                                    json.loads(
-                                        unicode(
-                                            config.retrieveCachedFile(
-                                                cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
-                                                type="link defaults",
-                                                quiet=True).read(),
-                                            encoding="utf-8")))
+        self.defaultSpecs.update(json.loads(
+            unicode(
+                config.retrieveCachedFile(
+                    cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
+                    type="link defaults",
+                    quiet=True).read(),
+                encoding="utf-8")))
 
     @property
     def status(self):
