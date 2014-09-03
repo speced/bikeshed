@@ -397,23 +397,22 @@ def transformRailroad(lines, doc, **kwargs):
 def buildBibliolinkDatabase(doc):
     biblioLinks = findAll("a[data-link-type='biblio']")
     for el in biblioLinks:
-        if el.get('title'):
-            # Assume the text is of the form "biblio-NAME"
-            linkText = el.get('title')[7:]
-        else:
-            # Assume the text is of the form "[NAME]"
-            linkText = textContent(el)[1:-1]
-            el.set('title', "biblio-" + linkText)
-        if linkText not in doc.biblios:
+        linkText = determineLinkText(el)
+        if linkText.startswith("biblio-"):
+            linkText = linkText[7:]
+        elif linkText[0] == "[" and linkText[-1] == "]":
+            linkText = linkText[1:-1]
+        ref = doc.refs.getBiblioRef(linkText, el=el)
+        if not ref:
             die("Couldn't find '{0}' in bibliography data.", linkText)
             continue
-        biblioEntry = doc.biblios[linkText]
-        if el.get('data-biblio-type') == "normative":
-            doc.normativeRefs.add(biblioEntry)
-        elif el.get('data-biblio-type') == "informative":
-            doc.informativeRefs.add(biblioEntry)
+        type = el.get('data-biblio-type')
+        if type == "normative":
+            doc.normativeRefs.add(ref)
+        elif type == "informative":
+            doc.informativeRefs.add(ref)
         else:
-            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", el.get('data-biblio-type'), outerHTML(el))
+            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", type, outerHTML(el))
 
 
 
@@ -1163,23 +1162,8 @@ class CSSSpec(object):
             return
 
 
-
-        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.refer",
-                                      fallbackurl="http://dev.w3.org/csswg/biblio.ref",
-                                      type="bibliography") as fh:
-            biblioLines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
-            self.biblios = biblio.processReferBiblioFile(biblioLines)
-
-        # Get local bibliography data
-
-        try:
-            with io.open("biblio.json", 'r', encoding="utf-8") as fh:
-                self.biblios.update(biblio.processSpecrefBiblioFile(fh.read()))
-        except IOError:
-            # Missing file is fine
-            pass
-
         self.refs.initializeRefs();
+        self.refs.initializeBiblio();
 
         self.testSuites = json.loads(
                             unicode(

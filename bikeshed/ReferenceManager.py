@@ -3,10 +3,14 @@ from __future__ import division, unicode_literals
 import re
 import json
 import io
+import collections
 from collections import defaultdict
 from . import config
+from . import biblio
 from .messages import *
 from .htmlhelpers import *
+
+TypedBiblio = collections.namedtuple('TypedBiblio', ['value', 'type'])
 
 class ReferenceManager(object):
 
@@ -17,7 +21,7 @@ class ReferenceManager(object):
         self.css21Replacements = set()
         self.ignoredSpecs = set()
         self.status = specStatus
-        self.biblios = dict()
+        self.biblios = defaultdict(list)
 
     def initializeRefs(self):
         # Load up the xref data
@@ -48,6 +52,30 @@ class ReferenceManager(object):
                     type="link defaults",
                     quiet=True).read(),
                 encoding="utf-8")))
+
+    def initializeBiblio(self):
+        # Biblio structure is a dict of keys to [(BiblioEntry, type)]
+        # When looking up a biblio ref, if type is unspecified,
+        # prefer taking the first one in the list.
+
+        # Get local bibliography data
+        try:
+            with io.open("biblio.json", 'r', encoding="utf-8") as fh:
+                biblios = biblio.processSpecrefBiblioFile(fh.read())
+                for key, b in biblios.items():
+                    self.biblios[key].append(TypedBiblio(b, 'local'))
+        except IOError:
+            # Missing file is fine
+            pass
+
+        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.refer",
+                                      fallbackurl="http://dev.w3.org/csswg/biblio.ref",
+                                      type="bibliography") as fh:
+            biblioLines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
+            biblios = biblio.processReferBiblioFile(biblioLines)
+            for key, b in biblios.items():
+                self.biblios[key].append(TypedBiblio(b, 'refer'))
+
 
     @property
     def status(self):
@@ -279,6 +307,18 @@ class ReferenceManager(object):
                  refs[0]['spec'],
                  '\n'.join('    {2} ({1}) {0}'.format(text, ref['type'], ref['spec']) for ref in refs))
         return refs[0]['url']
+
+    def getBiblioRef(self, text, type=None, el=None):
+        biblios = self.biblios[text]
+        if not biblios:
+            die("Couldn't find '{0}' in bibliography data.", text)
+        if type is None:
+            return biblios[0].value
+        for b in biblios:
+            if b.type == type:
+                return b.value
+        else:
+            die("Couldn't find '{0}' for type '{1}' in bibliography data.", text, type)
 
 
 def linkTextsFromElement(el, preserveCasing=False):
