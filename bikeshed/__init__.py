@@ -397,6 +397,15 @@ def transformRailroad(lines, doc, **kwargs):
 def buildBibliolinkDatabase(doc):
     biblioLinks = findAll("a[data-link-type='biblio']")
     for el in biblioLinks:
+        type = el.get('data-biblio-type')
+        if type == "normative":
+            storage = doc.normativeRefs
+        elif type == "informative":
+            storage = doc.informativeRefs
+        else:
+            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", type, outerHTML(el))
+            continue
+
         linkText = determineLinkText(el)
         if linkText.startswith("biblio-"):
             linkText = linkText[7:]
@@ -406,13 +415,10 @@ def buildBibliolinkDatabase(doc):
         if not ref:
             die("Couldn't find '{0}' in bibliography data.", linkText)
             continue
-        type = el.get('data-biblio-type')
-        if type == "normative":
-            doc.normativeRefs.add(ref)
-        elif type == "informative":
-            doc.informativeRefs.add(ref)
-        else:
-            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", type, outerHTML(el))
+
+        id = simplifyText(linkText)
+        el.set('href', '#'+id)
+        storage.add(ref)
 
 
 
@@ -887,11 +893,6 @@ def processAutolinks(doc):
 
         # Properties and descriptors are often written like 'foo-*'. Just ignore these.
         if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
-            continue
-
-        if linkType == "biblio":
-            # Move biblio management into ReferenceManager later
-            el.set('href', '#'+simplifyText(linkText))
             continue
 
         url = doc.refs.getRef(linkType, linkText,
