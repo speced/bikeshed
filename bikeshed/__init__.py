@@ -394,33 +394,6 @@ def transformRailroad(lines, doc, **kwargs):
     return ret
 
 
-def buildBibliolinkDatabase(doc):
-    biblioLinks = findAll("a[data-link-type='biblio']")
-    for el in biblioLinks:
-        type = el.get('data-biblio-type')
-        if type == "normative":
-            storage = doc.normativeRefs
-        elif type == "informative":
-            storage = doc.informativeRefs
-        else:
-            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", type, outerHTML(el))
-            continue
-
-        linkText = determineLinkText(el)
-        if linkText.startswith("biblio-"):
-            linkText = linkText[7:]
-        elif linkText[0] == "[" and linkText[-1] == "]":
-            linkText = linkText[1:-1]
-        ref = doc.refs.getBiblioRef(linkText, el=el)
-        if not ref:
-            die("Couldn't find '{0}' in bibliography data.", linkText)
-            continue
-
-        id = simplifyText(linkText)
-        el.set('href', '#'+id)
-        storage.add(ref)
-
-
 
 
 
@@ -877,6 +850,33 @@ def classifyLink(el):
 # Additional Processing
 
 
+def processBiblioLinks(doc):
+    biblioLinks = findAll("a[data-link-type='biblio']")
+    for el in biblioLinks:
+        type = el.get('data-biblio-type')
+        if type == "normative":
+            storage = doc.normativeRefs
+        elif type == "informative":
+            storage = doc.informativeRefs
+        else:
+            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", type, outerHTML(el))
+            continue
+
+        linkText = determineLinkText(el)
+        if linkText.startswith("biblio-"):
+            linkText = linkText[7:]
+        elif linkText[0] == "[" and linkText[-1] == "]":
+            linkText = linkText[1:-1]
+        ref = doc.refs.getBiblioRef(linkText, el=el)
+        if not ref:
+            die("Couldn't find '{0}' in bibliography data.", linkText)
+            continue
+
+        id = simplifyText(linkText)
+        el.set('href', '#'+id)
+        storage.add(ref)
+
+
 def processAutolinks(doc):
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
@@ -1257,7 +1257,7 @@ class CSSSpec(object):
         processDfns(self)
         processIDL(self)
         fillAttributeInfoSpans(self)
-        buildBibliolinkDatabase(self)
+        processBiblioLinks(self)
         processAutolinks(self)
 
         addPropertyIndex(self)
