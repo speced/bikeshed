@@ -314,13 +314,13 @@ A version of this file is included in the processor's repository,
 and the data doesn't change often,
 so it should be sufficient.
 
-The bibliography data is automatically imported from a global database.
-Currently, it's Bert's `biblio.ref` file,
-but it will switch to Tobie's Specref project eventually.
+Bibliography data can come from multiple sources.
+A bunch of data gets auto-filled from the file at <http://dev.w3.org/csswg/biblio.ref>,
+maintained by the CSSWG.
+Soonish, Bikeshed will also import a bunch of data from the [SpecRef project](https://github.com/tobie/specref).
 
-You can also add your own biblio references when necessary.
-Just add a `biblio.json` file to the spec's folder,
-with the file being a JSON file formatted according to Specref's conventions, like so:
+You can also add your own bibliography data,
+following the SpecRef JSON format:
 
 ```json
 {
@@ -342,3 +342,6 @@ with the file being a JSON file formatted according to Specref's conventions, li
 
 Only the "title" and "href" fields are strictly necessary;
 the rest can be omitted if desired.
+
+This JSON should either be inline, in a `<pre class=biblio>` block,
+or in a `biblio.json` file in the same folder as the spec file.
