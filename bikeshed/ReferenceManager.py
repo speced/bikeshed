@@ -311,6 +311,9 @@ class ReferenceManager(object):
                  '\n'.join('    {2} ({1}) {0}'.format(text, ref['type'], ref['spec']) for ref in refs))
         return refs[0]['url']
 
+    def addBiblioRef(self, text, ref, type):
+        self.biblios[text].insert(TypedBiblio(ref, BiblioType[type]))
+
     def getBiblioRef(self, text, type=None, el=None):
         biblios = self.biblios[text]
         if not biblios:

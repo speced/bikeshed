@@ -4,28 +4,26 @@ import re
 from .messages import *
 
 class BiblioEntry(object):
-    linkText = None
-    title = None
-    authors = None
-    etAl = False
-    foreignAuthors = None
-    status = None
-    date = None
-    url = None
-    other = None
-    bookName = None
-    city = None
-    issuer = None
-    journal = None
-    volumeNumber = None
-    numberInVolume = None
-    pageNumber = None
-    reportNumber = None
-    abstract = None
 
     def __init__(self, **kwargs):
+        self.linkText = None
+        self.title = None
         self.authors = []
+        self.etAl = False
         self.foreignAuthors = []
+        self.status = None
+        self.date = None
+        self.url = None
+        self.other = None
+        self.bookName = None
+        self.city = None
+        self.issuer = None
+        self.journal = None
+        self.volumeNumber = None
+        self.numberInVolume = None
+        self.pageNumber = None
+        self.reportNumber = None
+        self.abstract = None
         for key, val in kwargs.items():
             setattr(self, key, val)
 

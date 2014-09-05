@@ -200,6 +200,7 @@ def transformDataBlocks(doc):
         'descdef': transformDescdef,
         'elementdef': transformElementdef,
         'railroad': transformRailroad,
+        'biblio': transformBiblio,
         'pre': transformPre
     }
     blockType = ""
@@ -392,6 +393,13 @@ def transformRailroad(lines, doc, **kwargs):
     temp.close()
     ret.append("</div>")
     return ret
+
+def transformBiblio(lines, doc, **kwargs):
+    biblios = biblio.processSpecrefBiblioFile(''.join(lines))
+    for key, b in biblios.items():
+        #doc.refs.biblios[key].insert(TypedBiblio(b, BiblioType.inline))
+        doc.refs.addBiblioRef(text=key, ref=b, type="inline")
+    return []
 
 
 
