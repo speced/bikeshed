@@ -5,8 +5,11 @@ import json
 import io
 import collections
 from collections import defaultdict
+from operator import attrgetter
 from . import config
 from . import biblio
+from . import enum
+from .SortedList import SortedList
 from .messages import *
 from .htmlhelpers import *
 
@@ -21,7 +24,7 @@ class ReferenceManager(object):
         self.css21Replacements = set()
         self.ignoredSpecs = set()
         self.status = specStatus
-        self.biblios = defaultdict(list)
+        self.biblios = defaultdict(lambda: SortedList(key=attrgetter('type')))
 
     def initializeRefs(self):
         # Load up the xref data
@@ -63,7 +66,7 @@ class ReferenceManager(object):
             with io.open("biblio.json", 'r', encoding="utf-8") as fh:
                 biblios = biblio.processSpecrefBiblioFile(fh.read())
                 for key, b in biblios.items():
-                    self.biblios[key].append(TypedBiblio(b, 'local'))
+                    self.biblios[key].insert(TypedBiblio(b, BiblioType.local))
         except IOError:
             # Missing file is fine
             pass
@@ -74,7 +77,7 @@ class ReferenceManager(object):
             biblioLines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
             biblios = biblio.processReferBiblioFile(biblioLines)
             for key, b in biblios.items():
-                self.biblios[key].append(TypedBiblio(b, 'refer'))
+                self.biblios[key].insert(TypedBiblio(b, BiblioType.refer))
 
 
     @property
@@ -416,3 +419,18 @@ def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
         if error:
             die("Unknown link type '{0}'.",linkType)
         return None
+
+class BiblioType(enum.OrderedEnum):
+    """
+    Captures the ordering that biblio sources should be consulted in,
+    with lower numbers coming first.
+
+    inline = from a <pre class=biblio> in the spec
+    local = from a biblio.json file in the same folder as the spec
+    specref = from the specref database
+    refer = from the biblio.ref document maintained by the CSSWG
+    """
+    inline = 1
+    local = 2
+    specref = 3
+    refer = 4
