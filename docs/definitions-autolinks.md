@@ -270,7 +270,7 @@ rather than a specific definition.
 Bikeshed has section links to handle this case more easily:
 
 ```html
-<a section href="#heading-id"></a>
+[[#heading-id]]
 ```
 
 renders as:
@@ -290,6 +290,11 @@ as they're often linked to.
 Also, the section titles are often long and annoying to type,
 and they move around,
 so numbering isn't stable.
+
+Note how Section Links have a similar syntax to Bibliography Links;
+these will soonish merge,
+allowing you to link to sections in other documents
+(at least, when Bikeshed has section information for them).
 
 
 Bibliography
