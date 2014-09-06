@@ -123,6 +123,9 @@ def updateBiblio():
         with closing(urllib2.urlopen("http://dev.w3.org/csswg/biblio.ref")) as infh:
             with open(config.scriptPath+"/spec-data/biblio.refer", 'w') as outfh:
                 outfh.write(infh.read())
+        with closing(urllib2.urlopen("http://specref.jit.su/bibrefs")) as infh:
+            with open(config.scriptPath+"/spec-data/specref.json", 'w') as outfh:
+                outfh.write(infh.read())
         say("Success!")
     except Exception, e:
         die("Couldn't download/save the biblio data.\n{0}", e)
