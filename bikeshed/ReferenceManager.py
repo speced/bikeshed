@@ -427,13 +427,8 @@ class BiblioType(enum.OrderedEnum):
     """
     Captures the ordering that biblio sources should be consulted in,
     with lower numbers coming first.
-
-    inline = from a <pre class=biblio> in the spec
-    local = from a biblio.json file in the same folder as the spec
-    specref = from the specref database
-    refer = from the biblio.ref document maintained by the CSSWG
     """
-    inline = 1
-    local = 2
-    specref = 3
-    refer = 4
+    inline  = 1 # from a <pre class=biblio>
+    local   = 2 # from a biblio.json in the same folder
+    specref = 3 # from SpecRef
+    refer   = 4 # from the CSSWG biblio.ref doc
