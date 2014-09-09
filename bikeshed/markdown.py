@@ -30,7 +30,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 		if re.search(r"<({0})[ >]".format(rawElements), rawline):
 			preDepth += 1
 		if preDepth:
-			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': re.match(r"[ \t]*", rawline).group(0)})
+			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': prefixLen(rawline, numSpacesForIndentation)})
 		if re.search(r"</({0})>".format(rawElements), rawline):
 			preDepth = max(0, preDepth - 1)
 			continue
