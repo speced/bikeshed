@@ -3,7 +3,10 @@ Installing Bikeshed
 
 If you want to run a local copy of Bikeshed rather than use the cgi version, it’s pretty easy to install.
 
-First, install Python 2.7, PIP, and a few other support libraries:
+You need to install Python 2.7, PIP, and a few other support libraries before installing Bikeshed itself. Here is how to do this on linux and OS X:
+
+Linux steps
+-----------
 
 ~~~~
 $ sudo apt-get install python2.7 python-dev python-pip libxslt1-dev libxml2-dev
@@ -25,7 +28,28 @@ $ sudo pip install lxml --upgrade
 
 That'll spew a lot of console trash, but don't worry about it.
 
-Second, you’ll need the Bikeshed repository itself.  Run the following in your favorite command line:
+From here, you can follow the commons steps outlined below.
+
+OS X steps
+----------
+
+These instructions assume that you have [Mac Ports](https://www.macports.org/) installed. If you successfully install Bikeshed using some other method, please contribute to this documentation.
+
+First, get the right packages installed onto your system:
+~~~
+sudo port install python27 py27-pip py27-lxml py27-html5lib py27-cssselect py27-libxslt py27-libxml2
+~~~
+
+Then, activate the python version you just installed as the one the system should use:
+~~~
+sudo port select --set python python27
+~~~
+
+From here, you can follow the commons steps outlined below.
+
+Common steps
+------------
+With the dependencies in place, you can now install the Bikeshed repository itself.  Run the following in your favorite command line:
 
 ~~~~
 $ git clone https://github.com/tabatkins/bikeshed.git
