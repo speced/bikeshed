@@ -138,7 +138,7 @@ class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
         return unicode(self._const) + unicode(self.type) + self.name + unicode(self._equals) + unicode(self.value)
     
     def _markup(self, generator):
-        generator.addText(self._const)
+        self._const.markup(generator)
         generator.addType(self.type)
         generator.addName(self.name)
         generator.addText(self._equals)
@@ -184,7 +184,7 @@ class Enum(Construct):    # [ExtendedAttributes] "enum" identifier "{" EnumValue
         return Construct._unicode(self) + unicode(self._enum) + self.name + unicode(self._openBrace) + unicode(self.values) + unicode(self._closeBrace)
 
     def _markup(self, generator):
-        generator.addText(self._enum)
+        self._enum.markup(generator)
         generator.addName(self.name)
         generator.addText(self._openBrace)
         self.values.markup(generator)
@@ -224,7 +224,7 @@ class Typedef(Construct):    # [ExtendedAttributes] "typedef" Type identifier ";
         return output + unicode(self.type) + unicode(self.name)
     
     def _markup(self, generator):
-        generator.addText(self._typedef)
+        self._typedef.markup(generator)
         generator.addType(self.type)
         generator.addName(self.name)
         return self
@@ -288,7 +288,8 @@ class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut]
         return output + unicode(self._name) + (unicode(self.default) if (self.default) else '')
     
     def _markup(self, generator):
-        generator.addText(self.optional)
+        if (self.optional):
+            self.optional.markup(generator)
         if (self._ignore):
             self._ignore.markup(generator)
         generator.addType(self.type)
@@ -499,8 +500,9 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
         return output + unicode(self._closeBrace) if (self._closeBrace) else output
 
     def _markup(self, generator):
-        generator.addText(self.partial)
-        generator.addText(self._interface)
+        if (self.partial):
+            self.partial.markup(generator)
+        self._interface.markup(generator)
         generator.addName(self.name)
         if (self.inheritance):
             self.inheritance.markup(generator)
@@ -645,8 +647,9 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
         return output + unicode(self._closeBrace) if (self._closeBrace) else output
     
     def _markup(self, generator):
-        generator.addText(self.partial)
-        generator.addText(self._dictionary)
+        if (self.partial):
+            self.partial.markup(generator)
+        self._dictionary.markup(generator)
         generator.addName(self.name)
         if (self.inheritance):
             self.inheritance.markup(generator)
@@ -775,7 +778,7 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
         return output + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
     
     def _markup(self, generator):
-        generator.addText(self._callback)
+        self._callback.markup(generator)
         if (self.interface):
             return self.interface._markup(generator)
         generator.addName(self.name)
@@ -920,7 +923,7 @@ class Exception(Construct):   # [ExtendedAttributes] "exception" identifier [Inh
         return output + unicode(self._closeBrace) if (self._closeBrace) else output
     
     def _markup(self, generator):
-        generator.addText(self._exception)
+        self._exception.markup(generator)
         generator.addName(self.name)
         if (self.inheritance):
             self.inheritance.markup(generator)
@@ -969,7 +972,7 @@ class ImplementsStatement(Construct):  # [ExtendedAttributes] identifier "implem
 
     def _markup(self, generator):
         generator.addTypeName(self.name)
-        generator.addText(self._implements)
+        self._implements.markup(generator)
         generator.addTypeName(self.implements)
         return self
     

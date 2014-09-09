@@ -44,6 +44,9 @@ class Marker(object):
     def markupName(self, text, construct):
         return ('<NAME for=' + construct.idlType + '>', '</NAME>')
 
+    def markupKeyword(self, text, construct):
+        return ('<KEYWORD for=' + construct.idlType + '>', '</KEYWORD>')
+
     def encode(self, text):
         return cgi.escape(text)
 
@@ -59,6 +62,12 @@ class NullMarker(object):
         return (None, None)
     
     def markupTypeName(self, text, construct):
+        return ('', '')
+
+    def markupName(self, text, construct):
+        return ('', '')
+
+    def markupKeyword(self, text, construct):
         return ('', '')
 
     def encode(self, text):
@@ -180,7 +189,8 @@ typedef (short or (long or double) or long long) moreNested;
 typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequenceUnion;
 
 [ Constructor , NamedConstructor = MyConstructor, Constructor (Foo one), NamedConstructor = MyOtherConstructor (Foo two , long long longest ) ] partial interface Foo: Bar {
-    unsigned long long method(short x, unsigned long long y, optional sequence<Foo> fooArg = 123.4) raises (hell);
+    unsigned long long method(short x, unsigned long long y, optional double inf = Infinity, optional sequence<Foo> fooArg = 123.4) raises (hell);
+    void anotherMethod(short round);
     [ha!] attribute short bar getraises (an, exception);
     const short fortyTwo = 42;
     long foo(long x, long y);
@@ -204,7 +214,7 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
 callback callFoo = short();
 callback callFoo2 = unsigned long long(unrestricted double one, DOMString two, Fubar ... three);
 callback interface callMe {
-    attribute short round setraises (for the heck of it);
+    inherit attribute short round setraises (for the heck of it);
 };
 
 exception foo:bar {
@@ -217,6 +227,8 @@ exception foo:bar {
 #    idl = idl.replace(' ', '  ')
     print "IDL >>>\n" + idl + "\n<<<"
     parser.parse(idl)
+    print repr(parser)
+
     testDifference(idl, unicode(parser))
 
     print "MARKED UP:"
@@ -225,7 +237,6 @@ exception foo:bar {
     assert(marker.text == idl)
     print parser.markup(Marker())
 
-    print repr(parser)
     print "Complexity: " + unicode(parser.complexityFactor)
     
     

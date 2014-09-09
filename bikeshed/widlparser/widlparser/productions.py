@@ -10,7 +10,7 @@
 #  [1] http://www.w3.org/Consortium/Legal/2002/copyright-software-20021231 
 #
 
-import constructs
+import constructs, tokenizer
 import itertools
 
 
@@ -83,6 +83,13 @@ class Symbol(Production):
     def _unicode(self):
         return self.symbol
 
+    def _markup(self, generator):
+        if (self.symbol in tokenizer.Tokenizer.SymbolIdents):
+            generator.addKeyword(self.symbol)
+        else:
+            generator.addText(self.symbol)
+        return self
+
     def __repr__(self):
         return self.symbol.encode('ascii', 'replace')
 
@@ -118,6 +125,16 @@ class IntegerType(Production):   # "short" | "long" ["long"]
             return self._space.join(self.type.split(' '))
         return self.type
 
+    def _markup(self, generator):
+        if (self._space):
+            keywords = self.type.split(' ')
+            generator.addKeyword(keywords[0])
+            generator.addText(self._space)
+            generator.addKeyword(keywords[1])
+        else:
+            generator.addKeyword(self.type)
+        return self
+
     def __repr__(self):
         return '[IntegerType: ' + self.type + ']'
 
@@ -141,6 +158,11 @@ class UnsignedIntegerType(Production):   # "unsigned" IntegerType | IntegerType
     def _unicode(self):
         return (unicode(self.unsigned) + self.type._unicode()) if (self.unsigned) else self.type._unicode()
 
+    def _markup(self, generator):
+        if (self.unsigned):
+            self.unsigned.markup(generator)
+        return self.type._markup(generator)
+        
     def __repr__(self):
         return '[UnsignedIntegerType: ' + ('[unsigned]' if (self.unsigned) else '') + repr(self.type) + ']'
 
@@ -159,6 +181,10 @@ class FloatType(Production):   # "float" | "double"
 
     def _unicode(self):
         return self.type
+
+    def _markup(self, generator):
+        generator.addKeyword(self.type)
+        return self
 
     def __repr__(self):
         return '[FloatType: ' + self.type.encode('ascii', 'replace') + ']'
@@ -182,6 +208,11 @@ class UnrestrictedFloatType(Production): # "unrestricted" FloatType | FloatType
 
     def _unicode(self):
         return (unicode(self.unrestricted) + unicode(self.type)) if (self.unrestricted) else unicode(self.type)
+
+    def _markup(self, generator):
+        if (self.unrestricted):
+            self.unrestricted.markup(generator)
+        return self.type._markup(generator)
 
     def __repr__(self):
         return '[UnrestrictedFloatType: ' + ('[unrestricted]' if (self.unrestricted) else '') + repr(self.type) + ']'
@@ -211,6 +242,12 @@ class PrimitiveType(Production): # UnsignedIntegerType | UnrestrictedFloatType |
         if (isinstance(self.type, basestring)):
             return unicode(self.type)
         return self.type._unicode()
+
+    def _markup(self, generator):
+        if (isinstance(self.type, basestring)):
+            generator.addKeyword(self.type)
+            return self
+        return self.type._markup(generator)
 
     def __repr__(self):
         return '[PrimitiveType: ' + repr(self.type) + ']'
@@ -247,8 +284,11 @@ class ConstType(Production): # PrimitiveType [Null] | identifier [Null]
                 generator.addText(self.null)
                 return self.null
             return self
-        return Production._markup(self, generator)
-    
+        self.type._markup(generator)
+        if (self.null):
+            self.null.markup(generator)
+        return self
+
     def __repr__(self):
         return '[ConstType: ' + repr(self.type) + (' [null]' if (self.null) else '') + ']'
 
@@ -268,6 +308,13 @@ class FloatLiteral(Production):  # float | "-Infinity" | "Infinity" | "NaN"
 
     def _unicode(self):
         return self.value
+
+    def _markup(self, generator):
+        if (self.value in tokenizer.Tokenizer.SymbolIdents):
+            generator.addKeyword(self.value)
+        else:
+            generator.addText(self.value)
+        return self
 
     def __repr__(self):
         return '[FloatLiteral: ' + self.value.encode('ascii', 'replace') + ']'
@@ -291,6 +338,15 @@ class ConstValue(Production):    # "true" | "false" | FloatLiteral | integer | "
 
     def _unicode(self):
         return unicode(self.value)
+
+    def _markup(self, generator):
+        if (isinstance(self.value, basestring)):
+            if (self.value in tokenizer.Tokenizer.SymbolIdents):
+                generator.addKeyword(self.value)
+            else:
+                generator.addText(self.value)
+            return self
+        return self.value._markup(generator)
 
     def __repr__(self):
         return '[ConstValue: ' + repr(self.value) + ']'
@@ -440,7 +496,9 @@ class SingleType(Production):    # NonAnyType | "any" [TypeSuffixStartingWithArr
         return unicode(self.type) + (unicode(self.suffix) if (self.suffix) else '')
     
     def _markup(self, generator):
-        self.type.markup(generator)
+        self.type._markup(generator)
+        if (self.suffix):
+            self.suffix.markup(generator)
         return self
     
     def __repr__(self):
@@ -449,7 +507,7 @@ class SingleType(Production):    # NonAnyType | "any" [TypeSuffixStartingWithArr
 
 class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [TypeSuffix] | "DOMString" [TypeSuffix] |
                                 # identifier [TypeSuffix] | "sequence" "<" Type ">" [Null] | "object" [TypeSuffix] |
-                                # "Date" [TypeSuffix] | "RegExp" [TypeSuffix] | "Promise" "<" Type ">"
+                                # "Date" [TypeSuffix] | "RegExp" [TypeSuffix] | "Promise" "<" Type ">" [Null]
     @classmethod
     def peek(cls, tokens):
         if (PrimitiveType.peek(tokens)):
@@ -467,8 +525,9 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                         return tokens.popPosition(True)
         elif (token and token.isSymbol('Promise')):
             if (Symbol.peek(tokens, '<')):
-                if (Type.peek(tokens)):
+                if (ReturnType.peek(tokens)):
                     if (Symbol.peek(tokens, '>')):
+                        Symbol.peek(tokens, '?')
                         return tokens.popPosition(True)
         return tokens.popPosition(False)
 
@@ -497,8 +556,9 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             elif (token.isSymbol('Promise')):
                 self.promise = Symbol(tokens, 'Promise')
                 self._openType = Symbol(tokens, '<')
-                self.type = Type(tokens)
+                self.type = ReturnType(tokens)
                 self._closeType = Symbol(tokens, '>', False)
+                self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
             else:
                 self.type = Symbol(tokens, None, False)  # "ByteString" | "DOMString" | "object" | "Date" | "RegExp"
                 self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
@@ -515,26 +575,29 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
         return output + (unicode(self.suffix) if (self.suffix) else '')
 
     def _markup(self, generator):
-        if (isinstance(self.type, basestring)):
-            generator.addTypeName(self.type)
-            if (self.suffix):
-                self.suffix.markup(generator)
-            return self
         if (self.sequence):
-            generator.addText(self.sequence)
+            self.sequence.markup(generator)
             generator.addText(self._openType)
             self.type.markup(generator)
             generator.addText(self._closeType)
             generator.addText(self.null)
             return self
         if (self.promise):
-            generator.addText(self.promise)
+            self.promise.markup(generator)
             generator.addText(self._openType)
             self.type.markup(generator)
             generator.addText(self._closeType)
             generator.addText(self.null)
             return self
-        return Production._markup(self, generator)
+        if (isinstance(self.type, basestring)):
+            generator.addTypeName(self.type)
+            if (self.suffix):
+                self.suffix.markup(generator)
+            return self
+        self.type._markup(generator)
+        if (self.suffix):
+            self.suffix.markup(generator)
+        return self
     
     def __repr__(self):
         output = '[NonAnyType: ' + ('[sequence] ' if (self.sequence) else '') + ('[Promise] ' if (self.promise) else '')
@@ -583,7 +646,7 @@ class UnionMemberType(Production):   # NonAnyType | UnionType [TypeSuffix] | "an
     
     def _markup(self, generator):
         if (self.any):
-            generator.addText(self.any)
+            self.any.markup(generator)
             generator.addText(self._openBracket)
             generator.addText(self._closeBracket)
         else:
@@ -638,7 +701,8 @@ class UnionType(Production): # "(" UnionMemberType ["or" UnionMemberType]... ")"
         generator.addText(self._openParen)
         for type, _or in itertools.izip_longest(self.types, self._ors, fillvalue = ''):
             type.markup(generator)
-            generator.addText(_or)
+            if (_or):
+                _or.markup(generator)
         generator.addText(self._closeParen)
         return self
     
@@ -828,6 +892,17 @@ class Default(Production):   # "=" ConstValue | "=" string | "=" "[" "]"
     def _unicode(self):
         return unicode(self._equals) + (unicode(self.value) if (self.value) else unicode(self._openBracket) + unicode(self._closeBracket))
 
+    def _markup(self, generator):
+        self._equals.markup(generator)
+        if (self.value):
+            if (isinstance(self.value, basestring)):
+                generator.addText(self.value)
+                return self
+            return self.value._markup(generator)
+        self._openBracket.markup(generator)
+        self._closeBracket.markup(generator)
+        return self
+
     def __repr__(self):
         return '[Default: ' + repr(self.value) + ']'
 
@@ -850,7 +925,10 @@ class ArgumentName(Production):   # identifier | ArgumentNameKeyword
         return self.name
     
     def _markup(self, generator):
-        generator.addName(self.name)
+        if (self.name in self.ArgumentNameKeywords):
+            generator.addKeyword(self.name)
+        else:
+            generator.addName(self.name)
         return self
     
     def __repr__(self):
@@ -944,7 +1022,10 @@ class ReturnType(Production):    # Type | "void"
         return unicode(self.type)
     
     def _markup(self, generator):
-        generator.addType(self.type)
+        if (isinstance(self.type, Symbol)):
+            self.type._markup(generator)
+        else:
+            generator.addType(self.type)
         return self
     
     def __repr__(self):
@@ -966,6 +1047,10 @@ class Special(Production):   # "getter" | "setter" | "creator" | "deleter" | "le
     def _unicode(self):
         return self.name
 
+    def _markup(self, generator):
+        generator.addKeyword(self.name)
+        return self
+    
     def __repr__(self):
         return '[' + self.name.encode('ascii', 'replace') + ']'
 
@@ -997,8 +1082,9 @@ class AttributeRest(Production):   # ["readonly"] "attribute" Type identifier [I
         return output + unicode(self._attribute) + unicode(self.type) + self.name + (unicode(self._ignore) if (self._ignore) else '')
     
     def _markup(self, generator):
-        generator.addText(self.readonly)
-        generator.addText(self._attribute)
+        if (self.readonly):
+            self.readonly.markup(generator)
+        self._attribute.markup(generator)
         generator.addType(self.type)
         generator.addName(self.name)
         if (self._ignore):
@@ -1035,7 +1121,7 @@ class Attribute(ChildProduction):   # ["inherit"] AttributeRest
     def __init__(self, tokens, parent):
         ChildProduction.__init__(self, tokens, parent)
         self.inherit = Symbol(tokens, 'inherit') if (Symbol.peek(tokens, 'inherit')) else None
-        self.rest = AttributeRest(tokens)
+        self.attribute = AttributeRest(tokens)
         self._didParse(tokens)
 
     @property
@@ -1044,7 +1130,7 @@ class Attribute(ChildProduction):   # ["inherit"] AttributeRest
     
     @property
     def name(self):
-        return self.rest.name
+        return self.attribute.name
     
     @property
     def arguments(self):
@@ -1056,16 +1142,17 @@ class Attribute(ChildProduction):   # ["inherit"] AttributeRest
     
     def _unicode(self):
         output = unicode(self.inherit) if (self.inherit) else ''
-        return output + unicode(self.rest)
+        return output + unicode(self.attribute)
     
     def _markup(self, generator):
-        generator.addText(self.inherit)
-        return self.rest._markup(generator)
+        if (self.inherit):
+            self.inherit.markup(generator)
+        return self.attribute._markup(generator)
 
     def __repr__(self):
         output = '[attribute: '
         output += '[inherit] ' if (self.inherit) else ''
-        return output + repr(self.rest) + ']'
+        return output + repr(self.attribute) + ']'
 
 
 class OperationRest(ChildProduction):   # [identifier] "(" [ArgumentList] ")" [Ignore] ";"
@@ -1170,7 +1257,7 @@ class Iterator(Production):    # ReturnType "iterator" ["=" identifier | "object
 
     def _markup(self, generator):
         self.returnType.markup(generator)
-        generator.addText(self._iterator)
+        self._iterator.markup(generator)
         if (self._equals):
             generator.addText(self._equals)
             generator.addTypeName(self.interface)
@@ -1204,7 +1291,7 @@ class SpecialOperation(ChildProduction):    # Special [Special]... ReturnType Op
         while (Special.peek(tokens)):
             self.specials.append(Special(tokens))
         self.returnType = ReturnType(tokens)
-        self.rest = OperationRest(tokens, self)
+        self.operation = OperationRest(tokens, self)
         self._didParse(tokens)
 
     @property
@@ -1213,11 +1300,11 @@ class SpecialOperation(ChildProduction):    # Special [Special]... ReturnType Op
 
     @property
     def name(self):
-        return self.rest.name if (self.rest.name) else self.specials[0].name
+        return self.operation.name if (self.operation.name) else self.specials[0].name
 
     @property
     def arguments(self):
-        return self.rest.arguments
+        return self.operation.arguments
 
     @property
     def methodName(self):
@@ -1230,17 +1317,17 @@ class SpecialOperation(ChildProduction):    # Special [Special]... ReturnType Op
 
     def _unicode(self):
         output = u''.join([unicode(special) for special in self.specials])
-        return output + unicode(self.returnType) + unicode(self.rest)
+        return output + unicode(self.returnType) + unicode(self.operation)
 
     def _markup(self, generator):
         for special in self.specials:
             special.markup(generator)
         self.returnType.markup(generator)
-        return self.rest._markup(generator)
+        return self.operation._markup(generator)
 
     def __repr__(self):
         output = '[SpecialOperation: ' + ' '.join([repr(special) for special in self.specials])
-        return output + ' ' + repr(self.returnType) + ' ' + repr(self.rest) + ']'
+        return output + ' ' + repr(self.returnType) + ' ' + repr(self.operation) + ']'
 
 
 class Operation(ChildProduction):   # ReturnType OperationRest
@@ -1254,7 +1341,7 @@ class Operation(ChildProduction):   # ReturnType OperationRest
     def __init__(self, tokens, parent):
         ChildProduction.__init__(self, tokens, parent)
         self.returnType = ReturnType(tokens)
-        self.rest = OperationRest(tokens, self)
+        self.operation = OperationRest(tokens, self)
         self._didParse(tokens)
 
     @property
@@ -1263,11 +1350,11 @@ class Operation(ChildProduction):   # ReturnType OperationRest
         
     @property
     def name(self):
-        return self.rest.name
+        return self.operation.name
 
     @property
     def arguments(self):
-        return self.rest.arguments
+        return self.operation.arguments
     
     @property
     def methodName(self):
@@ -1279,14 +1366,14 @@ class Operation(ChildProduction):   # ReturnType OperationRest
         return name + ')'
 
     def _unicode(self):
-        return unicode(self.returnType) + unicode(self.rest)
+        return unicode(self.returnType) + unicode(self.operation)
     
     def _markup(self, generator):
         self.returnType.markup(generator)
-        return self.rest._markup(generator)
+        return self.operation._markup(generator)
     
     def __repr__(self):
-        return '[Operation: ' + repr(self.returnType) + ' ' + repr(self.rest) + ']'
+        return '[Operation: ' + repr(self.returnType) + ' ' + repr(self.operation) + ']'
 
 
 class Stringifier(ChildProduction): # "stringifier" AttributeRest | "stringifier" ReturnType OperationRest | "stringifier" ";"
@@ -1346,7 +1433,7 @@ class Stringifier(ChildProduction): # "stringifier" AttributeRest | "stringifier
         return output + (unicode(self.attribute) if (self.attribute) else '')
 
     def _markup(self, generator):
-        generator.addText(self._stringifier)
+        self._stringifier.markup(generator)
         if (self.operation):
             self.returnType.markup(generator)
             return self.operation._markup(generator)
@@ -1445,6 +1532,24 @@ class SerializationPatternMap(Production):  # "getter" | "attribute" | "inherit"
         output += self.name if (self.name) else ''
         return output + (unicode(self.next) if (self.next) else '')
 
+    def _markup(self, generator):
+        if (self._getter):
+            self._getter.markup(generator)
+        elif (self._inherit):
+            self._inherit.markup(generator)
+            if (self._comma):
+                self._comma.markup(generator)
+                self._attribute.markup(generator)
+            elif (self.next):
+                self.next.markup(generator)
+        elif (self._attribute):
+            self._attribute.markup(generator)
+        else:
+            generator.addText(self.name)
+            if (self.next):
+                self.next.markup(generator)
+        return self
+    
     def __repr__(self):
         output = '[SerializationPatternMap: '
         output += '[getter] ' if (self._getter) else ''
@@ -1455,7 +1560,7 @@ class SerializationPatternMap(Production):  # "getter" | "attribute" | "inherit"
         return output + ']'
 
 
-class SerializationPatternList(Production): # "getter" | identifer Identifiers
+class SerializationPatternList(Production): # "getter" | identifer [Identifiers]
     @classmethod
     def peek(cls, tokens):
         if (Symbol.peek(tokens, 'getter')):
@@ -1482,6 +1587,15 @@ class SerializationPatternList(Production): # "getter" | identifer Identifiers
         output = unicode(self._getter) if (self._getter) else ''
         output += self.name if (self.name) else ''
         return output + (unicode(self.next) if (self.next) else '')
+    
+    def _markup(self, generator):
+        if (self._getter):
+            self._getter.markup(generator)
+        else:
+            generator.addText(self.name)
+            if (self.next):
+                self.next.markup(generator)
+        return self
 
     def __repr__(self):
         output = '[SerializationPatternList: '
@@ -1530,6 +1644,16 @@ class SerializationPattern(Production): # "{" [SerializationPatternMap] "}" | "[
         output = unicode(self._open)
         output += unicode(self.pattern) if (self.pattern) else ''
         return output + unicode(self._close)
+        
+    def _markup(self, generator):
+        if (self.name):
+            generator.addText(self.name)
+        else:
+            generator.addText(self._open)
+            if (self.pattern):
+                self.pattern.markup(generator)
+            generator.addText(self._close)
+        return self
 
     def __repr__(self):
         output = '[SerializationPattern: '
@@ -1560,7 +1684,11 @@ class Serializer(ChildProduction):  # "serializer" [OperationRest] ";" | "serial
         else:
             self._equals = None
             self.pattern = None
-            self.operation = OperationRest(tokens, self) if (OperationRest.peek(tokens)) else None
+            if (OperationRest.peek(tokens)):
+                self.operation = OperationRest(tokens, self)
+            else:
+                self.operation = None
+                self._consumeSemicolon(tokens)
         self._didParse(tokens)
 
     @property
@@ -1594,7 +1722,7 @@ class Serializer(ChildProduction):  # "serializer" [OperationRest] ";" | "serial
         return output
 
     def _markup(self, generator):
-        generator.addText(self._serializer)
+        self._serializer.markup(generator)
         if (self.pattern):
             generator.addText(self._equals)
             self.pattern.markup(generator)
@@ -1663,7 +1791,7 @@ class StaticMember(ChildProduction):    # "static" AttributeRest | "static" Retu
         return output + unicode(self.attribute)
 
     def _markup(self, generator):
-        generator.addText(self._static)
+        self._static.markup(generator)
         if (self.operation):
             self.returnType.markup(generator)
             return self.operation._markup(generator)

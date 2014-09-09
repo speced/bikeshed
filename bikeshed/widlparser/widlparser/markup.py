@@ -35,6 +35,10 @@ class MarkupGenerator(object):
         if (name):
             self.children.append(MarkupName(name))
     
+    def addKeyword(self, keyword):
+        if (keyword):
+            self.children.append(MarkupKeyword(keyword))
+    
     def addText(self, text):
         if (text):
             if ((0 < len(self.children)) and (type(self.children[-1]) is MarkupText)):
@@ -94,6 +98,17 @@ class MarkupName(MarkupText):
     
     def markup(self, marker, construct):
         head, tail = marker.markupName(self.text, construct) if (hasattr(marker, 'markupName')) else (None, None)
+        output = unicode(head) if (head) else u''
+        output += MarkupText.markup(self, marker, construct)
+        return output + (unicode(tail) if (tail) else u'')
+
+
+class MarkupKeyword(MarkupText):
+    def __init__(self, keyword):
+        MarkupText.__init__(self, keyword)
+    
+    def markup(self, marker, construct):
+        head, tail = marker.markupKeyword(self.text, construct) if (hasattr(marker, 'markupKeyword')) else (None, None)
         output = unicode(head) if (head) else u''
         output += MarkupText.markup(self, marker, construct)
         return output + (unicode(tail) if (tail) else u'')
