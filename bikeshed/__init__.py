@@ -878,6 +878,7 @@ def processBiblioLinks(doc):
         ref = doc.refs.getBiblioRef(linkText, el=el)
         if not ref:
             die("Couldn't find '{0}' in bibliography data.", linkText)
+            el.tag = "span"
             continue
 
         id = simplifyText(linkText)

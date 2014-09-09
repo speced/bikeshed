@@ -318,6 +318,7 @@ class ReferenceManager(object):
         biblios = self.biblios[text]
         if not biblios:
             die("Couldn't find '{0}' in bibliography data.", text)
+            return None
         if type is None:
             return biblios[0].value
         for b in biblios:
