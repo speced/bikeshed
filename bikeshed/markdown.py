@@ -66,7 +66,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 			match = re.match(r"\d+\.\s+(.*)", line)
 			token = {'type':'numbered', 'text': match.group(1), 'raw':rawline}
 		elif re.match(r"\d+\.$", line):
-			token = {'type':'numbered', 'text': "", 'raw':rawlineprint}
+			token = {'type':'numbered', 'text': "", 'raw':rawline}
 		elif re.match(r"[*+-]\s", line):
 			match = re.match(r"[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
