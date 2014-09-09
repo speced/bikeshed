@@ -1361,8 +1361,15 @@ class CSSSpec(object):
             text = escapeHTML(text)
 
             # Handle biblio links, [[FOO]] and [[!FOO]]
-            text = re.sub(r"\[\[([\w-]+)\]\]", r'<a title="biblio-\1" data-link-type="biblio" data-biblio-type="informative">[\1]</a>', text)
-            text = re.sub(r"\[\[!([\w-]+)\]\]", r'<a title="biblio-\1" data-link-type="biblio" data-biblio-type="normative">[\1]</a>', text)
+            def biblioReplacer(match):
+                if match.group(1) is not None:
+                    return match.group(0)[1:]
+                if match.group(2) == "!":
+                    type = "normative"
+                else:
+                    type = "informative"
+                return r'<a title="biblio-{term}" data-link-type="biblio" data-biblio-type="{type}">[{term}]</a>'.format(term=match.group(3), type=type)
+            text = re.sub(r"(\\)?\[\[(!)?([\w-]+)\]\]", biblioReplacer, text)
 
             # Handle section links, [[#foo]].
             text = re.sub(r"\[\[(#[\w-]+)\]\]", r'<a section href="\1"></a>', text)
@@ -1387,6 +1394,7 @@ class CSSSpec(object):
                     # Change the .text, empty out the temp children.
                     el.text = temp.text
                     for child in childElements(temp, reversed=True):
+                        child.set("text-fixed", "yes")
                         el.insert(0, child)
 
             # Same for tail.
@@ -1395,15 +1403,19 @@ class CSSSpec(object):
                 temp = parseHTML('<div>'+newtext+'</div>')[0]
                 el.tail = ''
                 for child in childElements(temp, reversed=True):
+                    child.set("text-fixed", "yes")
                     el.addnext(child)
                 el.tail = temp.text
 
             if processContents:
                 # Recurse over children.
                 for child in childElements(el):
-                    fixElementText(child)
+                    if not child.get("text-fixed"):
+                        fixElementText(child)
 
         fixElementText(doc.document.getroot())
+        for el in findAll("[text-fixed]"):
+            del el.attrib['text-fixed']
 
 
     def transformProductionGrammars(doc):
