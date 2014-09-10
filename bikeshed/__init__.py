@@ -871,9 +871,7 @@ def processBiblioLinks(doc):
             continue
 
         linkText = determineLinkText(el)
-        if linkText.startswith("biblio-"):
-            linkText = linkText[7:]
-        elif linkText[0] == "[" and linkText[-1] == "]":
+        if linkText[0] == "[" and linkText[-1] == "]":
             linkText = linkText[1:-1]
         ref = doc.refs.getBiblioRef(linkText, el=el)
         if not ref:
@@ -882,7 +880,7 @@ def processBiblioLinks(doc):
             continue
 
         id = simplifyText(linkText)
-        el.set('href', '#'+id)
+        el.set('href', '#biblio-'+id)
         storage.add(ref)
 
 
@@ -1368,7 +1366,7 @@ class CSSSpec(object):
                     type = "normative"
                 else:
                     type = "informative"
-                return r'<a title="biblio-{term}" data-link-type="biblio" data-biblio-type="{type}">[{term}]</a>'.format(term=match.group(3), type=type)
+                return r'<a title="{term}" data-link-type="biblio" data-biblio-type="{type}">[{term}]</a>'.format(term=match.group(3), type=type)
             text = re.sub(r"(\\)?\[\[(!)?([\w-]+)\]\]", biblioReplacer, text)
 
             # Handle section links, [[#foo]].
