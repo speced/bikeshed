@@ -66,7 +66,7 @@ class ReferenceManager(object):
             with io.open("biblio.json", 'r', encoding="utf-8") as fh:
                 biblios = biblio.processSpecrefBiblioFile(fh.read())
                 for key, b in biblios.items():
-                    self.biblios[key].insert(TypedBiblio(b, BiblioType.local))
+                    self.biblios[key.lower()].insert(TypedBiblio(b, BiblioType.local))
         except IOError:
             # Missing file is fine
             pass
@@ -77,7 +77,9 @@ class ReferenceManager(object):
             biblioLines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
             biblios = biblio.processReferBiblioFile(biblioLines)
             for key, b in biblios.items():
-                self.biblios[key].insert(TypedBiblio(b, BiblioType.refer))
+                if key is None:
+                    print b
+                self.biblios[key.lower()].insert(TypedBiblio(b, BiblioType.refer))
 
 
     @property
@@ -315,7 +317,7 @@ class ReferenceManager(object):
         self.biblios[text].insert(TypedBiblio(ref, BiblioType[type]))
 
     def getBiblioRef(self, text, type=None, el=None):
-        biblios = self.biblios[text]
+        biblios = self.biblios[text.lower()]
         if not biblios:
             die("Couldn't find '{0}' in bibliography data.", text)
             return None
