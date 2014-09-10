@@ -96,7 +96,7 @@ def processReferBiblioFile(lines):
             # Comment or empty line
             if biblio is not None:
                 biblios[biblio.linkText] = biblio
-            biblio = BiblioEntry()
+                biblio = None
         else:
             if biblio is None:
                 biblio = BiblioEntry()
