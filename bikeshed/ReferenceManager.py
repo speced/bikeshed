@@ -109,6 +109,11 @@ class ReferenceManager(object):
         else:
             self.specLevel = 1
             self.specVName = self.specName
+
+        for term, defaults in md.linkDefaults.items():
+            for default in defaults:
+                self.defaultSpecs[term].append(default)
+
         # Need to get a real versioned shortname,
         # with the possibility of overriding the "shortname-level" pattern.
         self.removeSameSpecRefs()

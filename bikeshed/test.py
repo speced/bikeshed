@@ -17,9 +17,9 @@ def runAllTests(constructor):
 	failures = []
 	for testname in glob.glob(config.scriptPath + "/../tests/*.bs"):
 		total += 1
-		config.doc = constructor(inputFilename=testname)
-		config.doc.preprocess()
-		outputText = config.doc.serialize()
+		doc = constructor(inputFilename=testname)
+		doc.preprocess()
+		outputText = doc.serialize()
 		with io.open(testname[:-2] + "html", encoding="utf-8") as golden:
 			goldenText = golden.read()
 		if compare(outputText, goldenText):

@@ -19,7 +19,9 @@ class MetadataManager:
             return "{0}-{1}".format(self.shortname, self.level)
         return self.shortname
 
-    def __init__(self):
+    def __init__(self, doc):
+        self.doc = doc
+
         # required metadata
         self.status = None
         self.ED = None
@@ -48,9 +50,12 @@ class MetadataManager:
         self.versionHistory = None
         self.logo = ""
         self.indent = 4
+        self.linkDefaults = defaultdict(list)
 
         self.otherMetadata = defaultdict(list)
 
+        # Some keys are single-value:
+        # the result of parsing is simply assigned to them.
         self.singleValueKeys = {
             "Title": "title",
             "H1": "h1",
@@ -74,6 +79,12 @@ class MetadataManager:
             "Indent": "indent"
         }
 
+        # Some keys are multi-value:
+        # they *must* already be established as lists or dicts in __init__.
+        # If a list, result of parsing can be a single value (appended) or a list (extended).
+        # If a dict, result of parsing must be a dict of either single values or lists.
+        # (Note that a multi-valued key might only allow a single value *per key instance*, like Editor,
+        #  or multiple values per key, like Ignored Terms, which are agglomerated across keys.)
         self.multiValueKeys = {
             "Editor": "editors",
             "Former Editor": "previousEditors",
@@ -81,16 +92,16 @@ class MetadataManager:
             "Previous Version": "previousVersions",
             "At Risk": "atRisk",
             "Ignored Terms": "ignoredTerms",
-            "Link Defaults": ""
+            "Link Defaults": "linkDefaults"
         }
 
         self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
 
         self.manuallySetKeys = set()
 
-        # Input transformers
+        # Input transformers, passed the key and string value.
+        # The "default" input is a no-op that just returns the input string.
         self.customInput = {
-            "Status": setStatus,
             "Group": convertGroup,
             "Date": parseDate,
             "Deadline": parseDate,
@@ -104,9 +115,9 @@ class MetadataManager:
             "Indent": parseInteger
         }
 
-        # Alternate output handlers
+        # Alternate output handlers, passed key/value/doc.
+        # The "default" output assigns the value to self.key.
         self.customOutput = {
-            "Link Defaults": saveLinkDefaults
         }
 
     def addData(self, key, val, default=False):
@@ -135,16 +146,15 @@ class MetadataManager:
             val = self.customInput[key](key, val)
 
         if key in self.customOutput:
-            self.customOutput[key](key, val)
+            self.customOutput[key](key, val, doc=self.doc)
             return
 
         if key in self.singleValueKeys:
             setattr(self, self.singleValueKeys[key], val)
-        else:
-            if isinstance(val, list):
-                getattr(self, self.multiValueKeys[key]).extend(val)
-            else:
-                getattr(self, self.multiValueKeys[key]).append(val)
+        elif key in self.multiValueKeys:
+            attr = getattr(self, self.multiValueKeys[key])
+            smooshValues(attr, val)
+
 
     def addDefault(self, key, val):
         self.addData(key, val, default=True)
@@ -218,11 +228,6 @@ class MetadataManager:
         if doc and self.vshortname in doc.testSuites:
             macros["testsuite"] = doc.testSuites[self.vshortname]['vshortname']
         macros["logo"] = self.logo
-
-
-def setStatus(key, val):
-    config.doc.refs.status = val
-    return val
 
 def convertGroup(key, val):
     return val.lower()
@@ -324,11 +329,6 @@ def parseLinkDefaults(key, val):
             continue
     return defaultSpecs
 
-def saveLinkDefaults(key, val):
-    for term, defaults in val.items():
-        for default in defaults:
-            config.doc.refs.defaultSpecs[term].append(default)
-
 def parseBoilerplate(key, val):
     boilerplate = {'omitSections':set()}
     for command in val.split(","):
@@ -339,16 +339,14 @@ def parseBoilerplate(key, val):
 
 
 
-def parse(lines):
-    # Given HTML document text, in the form of an array of text lines,
+def parse(md, lines):
+    # Given a MetadataManager and HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
-    # Returns a MetadataManager object and the text lines (with the
-    # metadata-related lines removed).
+    # Returns the text lines, with the metadata-related lines removed.
 
     newlines = []
     inMetadata = False
     lastKey = None
-    md = MetadataManager()
     for line in lines:
         if not inMetadata and re.match(r"<pre .*class=.*metadata.*>", line):
             inMetadata = True
@@ -368,4 +366,27 @@ def parse(lines):
                 continue
         else:
             newlines.append(line)
-    return md, newlines
+    return newlines
+
+def smooshValues(container, val):
+    '''
+    "Smooshes" the values into the container.
+    If container is a list,
+    val must be either a single item or a list;
+    it's merged into the container.
+    If container is a dict with list values,
+    val must be a dict,
+    which is merged in dict-wise same as lists.
+    (container should be a defaultdict(list) in this case).
+    '''
+    if isinstance(container, list):
+        if isinstance(val, list):
+            container.extend(val)
+        else:
+            container.append(val)
+    elif isinstance(container, dict):
+        for k,v in val.items():
+            if isinstance(v, list):
+                container[k].extend(v)
+            else:
+                container[k].append(v)

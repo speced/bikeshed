@@ -13,6 +13,7 @@ from urllib2 import urlopen
 from datetime import date, datetime
 import html5lib
 import lxml
+import cProfile
 
 from . import config
 from . import biblio
@@ -122,28 +123,28 @@ def main():
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
-        config.doc = CSSSpec(inputFilename=options.infile, paragraphMode=options.paragraphMode)
-        config.doc.preprocess()
-        config.doc.finish(outputFilename=options.outfile)
+        doc = CSSSpec(inputFilename=options.infile, paragraphMode=options.paragraphMode)
+        doc.preprocess()
+        doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         config.debug = True
         config.quiet = True
         if options.printExports:
-            config.doc = CSSSpec(inputFilename=options.infile)
-            config.doc.preprocess()
-            config.doc.printTargets()
+            doc = CSSSpec(inputFilename=options.infile)
+            doc.preprocess()
+            doc.printTargets()
         elif options.jsonCode:
-            config.doc = CSSSpec(inputFilename=options.infile)
-            config.doc.preprocess()
+            doc = CSSSpec(inputFilename=options.infile)
+            doc.preprocess()
             exec("print json.dumps({0}, indent=2)".format(options.jsonCode))
         elif options.code:
-            config.doc = CSSSpec(inputFilename=options.infile)
-            config.doc.preprocess()
+            doc = CSSSpec(inputFilename=options.infile)
+            doc.preprocess()
             exec("print {0}".format(options.code))
         elif options.linkText:
-            config.doc = CSSSpec(inputFilename=options.infile)
-            config.doc.preprocess()
-            refs = config.doc.refs.refs[options.linkText]
+            doc = CSSSpec(inputFilename=options.infile)
+            doc.preprocess()
+            refs = doc.refs.refs[options.linkText]
             config.quiet = options.quiet
             if not config.quiet:
                 print "Refs for '{0}':".format(options.linkText)
@@ -418,9 +419,9 @@ def transformBiblio(lines, doc, **kwargs):
 # Headings Stuff
 
 def processHeadings(doc):
-    for el in findAll('h2, h3, h4, h5, h6'):
+    for el in findAll('h2, h3, h4, h5, h6', doc):
         addClass(el, 'heading')
-    headings = findAll(".heading:not(.settled)")
+    headings = findAll(".heading:not(.settled)", doc)
     resetHeadings(doc, headings)
     determineHeadingLevels(doc, headings)
     addHeadingIds(doc, headings)
@@ -508,7 +509,7 @@ def addHeadingBonuses(doc, headings):
 # Definitions and the like
 
 def formatPropertyNames(doc):
-    for table in findAll("table.propdef, table.descdef, table.elementdef"):
+    for table in findAll("table.propdef, table.descdef, table.elementdef", doc):
         tag = "a" if hasClass(table, "partial") else "dfn"
         if hasClass(table, "propdef"):
             type = "property"
@@ -539,25 +540,25 @@ def canonicalizeShortcuts(doc):
         "attribute-info":"data-attribute-info",
         "local-title":"data-local-title"
     }
-    for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys())):
+    for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys()), doc):
         for attr, fixedAttr in attrFixup.items():
             if el.get(attr) is not None:
                 el.set(fixedAttr, el.get(attr))
                 del el.attrib[attr]
 
-    for el in findAll("dfn"):
+    for el in findAll("dfn", doc):
         for dfnType in config.dfnTypes.union(["dfn"]):
             if el.get(dfnType) == "":
                 del el.attrib[dfnType]
                 el.set("data-dfn-type", dfnType)
                 break
-    for el in findAll("a"):
+    for el in findAll("a", doc):
         for linkType in (config.linkTypes | set("dfn")):
             if el.get(linkType) is not None:
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
                 break
-    for el in findAll("dfn[for], a[for]"):
+    for el in findAll("dfn[for], a[for]", doc):
         if el.tag == "dfn":
             el.set("data-dfn-for", el.get('for'))
         else:
@@ -565,13 +566,13 @@ def canonicalizeShortcuts(doc):
         del el.attrib['for']
 
 def fixIntraDocumentReferences(doc):
-    for el in findAll("a[data-section]"):
+    for el in findAll("a[data-section]", doc):
         if el.text is None or el.text.strip() == '':
             sectionID = el.get("href")
             if sectionID is None or sectionID == "" or sectionID[0] != '#':
                 die("Missing/invalid href {0} in section link.", sectionID)
                 continue
-            targets = findAll("{0}.heading".format(sectionID))
+            targets = findAll("{0}.heading".format(sectionID), doc)
             if len(targets) == 0:
                 die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
                 continue
@@ -585,7 +586,7 @@ def fixIntraDocumentReferences(doc):
             cleanupAutogeneratedLinksInHTML(el)
 
 def fillAttributeInfoSpans(doc):
-    for el in findAll("span[data-attribute-info]"):
+    for el in findAll("span[data-attribute-info]", doc):
         if el.text is None or el.text.strip() == '':
             referencedAttribute = el.get("for")
             if referencedAttribute is None or referencedAttribute == "":
@@ -593,9 +594,9 @@ def fillAttributeInfoSpans(doc):
                 continue
             if "/" in referencedAttribute:
                 interface, referencedAttribute = referencedAttribute.split("/")
-                target = findAll('[data-link-type=attribute][title="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface))
+                target = findAll('[data-link-type=attribute][title="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface), doc)
             else:
-                target = findAll('[data-link-type=attribute][title="{0}"]'.format(referencedAttribute))
+                target = findAll('[data-link-type=attribute][title="{0}"]'.format(referencedAttribute), doc)
             if len(target) == 0:
                 die("Couldn't find target attribute {0}:\n{1}", referencedAttribute, outerHTML(el))
                 continue
@@ -618,7 +619,7 @@ def fillAttributeInfoSpans(doc):
             el.text = ' ' + el.text
 
 def processDfns(doc):
-    dfns = findAll("dfn")
+    dfns = findAll("dfn", doc)
     classifyDfns(doc, dfns)
     dedupIds(doc, dfns)
     doc.refs.addLocalDfns(dfns)
@@ -738,7 +739,7 @@ def classifyDfns(doc, dfns):
 
 def dedupIds(doc, els):
     def findId(id):
-        return find("#"+id) is not None
+        return find("#"+id, doc) is not None
     for el in els:
         id = el.get('id')
         if id is None:
@@ -859,7 +860,7 @@ def classifyLink(el):
 
 
 def processBiblioLinks(doc):
-    biblioLinks = findAll("a[data-link-type='biblio']")
+    biblioLinks = findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:
         type = el.get('data-biblio-type')
         if type == "normative":
@@ -888,7 +889,7 @@ def processAutolinks(doc):
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
     # Maybe autolinks can be any element.  If it links up, we change it into an <a>.
-    autolinks = findAll("a:not([href]), i")
+    autolinks = findAll("a:not([href]), i", doc)
     for el in autolinks:
         # Explicitly empty title indicates this shouldn't be an autolink.
         if el.get('title') == '':
@@ -923,9 +924,9 @@ def processAutolinks(doc):
 def processIssues(doc):
     import hashlib
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues.
-    for el in findAll(".issue:not([id])"):
+    for el in findAll(".issue:not([id])", doc):
         el.set('id', "issue-"+hashContents(el))
-    dedupIds(doc, findAll(".issue"))
+    dedupIds(doc, findAll(".issue", doc))
 
 
 def addSelfLinks(doc):
@@ -935,16 +936,16 @@ def addSelfLinks(doc):
         return selflink
 
     foundFirstNumberedSection = False
-    for el in findAll("h2, h3, h4, h5, h6"):
+    for el in findAll("h2, h3, h4, h5, h6", doc):
         foundFirstNumberedSection = foundFirstNumberedSection or (el.get('data-level') is not None)
         if foundFirstNumberedSection:
             appendChild(el, makeSelfLink(el))
-    for el in findAll(".issue[id], .example[id], .note[id], li[id], dt[id]"):
+    for el in findAll(".issue[id], .example[id], .note[id], li[id], dt[id]", doc):
         if list(el.iterancestors("figure")):
             # Skipping - element is inside a figure and is part of an example.
             continue
         prependChild(el, makeSelfLink(el))
-    for el in findAll("dfn"):
+    for el in findAll("dfn", doc):
         if list(el.iterancestors("a")):
             warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el))
             continue
@@ -1022,7 +1023,7 @@ class IDLUI(object):
         die("{0}", msg)
 
 def markupIDL(doc):
-    for el in findAll('pre.idl'):
+    for el in findAll("pre.idl", doc):
         if el.get("data-no-idl") is not None:
             continue
         widl = parser.Parser(textContent(el), IDLUI())
@@ -1031,7 +1032,7 @@ def markupIDL(doc):
 
 
 def processIDL(doc):
-    for pre in findAll("pre.idl"):
+    for pre in findAll("pre.idl", doc):
         forcedDfns = GlobalNames(text=treeAttr(pre, "data-dfn-force"))
         for el in findAll("idl", pre):
             idlType = el.get('data-idl-type')
@@ -1056,7 +1057,7 @@ def processIDL(doc):
                 if el.get('data-idl-for'):
                     el.set('data-link-for', el.get('data-idl-for'))
                     del el.attrib['data-idl-for']
-    dfns = findAll("pre.idl dfn")
+    dfns = findAll("pre.idl dfn", doc)
     classifyDfns(doc, dfns)
     dedupIds(doc, dfns)
     doc.refs.addLocalDfns(dfns)
@@ -1065,21 +1066,21 @@ def processIDL(doc):
 
 def cleanupHTML(doc):
     # Move any stray <link>, <script>, <meta>, or <style> into the <head>.
-    head = find("head")
-    for el in findAll("body link, body script, body meta, body style:not([scoped])"):
+    head = find("head", doc)
+    for el in findAll("body link, body script, body meta, body style:not([scoped])", doc):
         head.append(el)
 
     # If we accidentally recognized an autolink shortcut in SVG, kill it.
-    for el in findAll("svg|a[data-link-type]"):
+    for el in findAll("svg|a[data-link-type]", doc):
         del el.attrib["data-link-type"]
         el.tag = "{http://www.w3.org/2000/svg}tspan"
 
     # Tag classes on wide types of dfns/links
     def selectorForTypes(types):
         return ",".join("dfn[data-dfn-type={0}],a[data-link-type={0}]".format(type) for type in types)
-    for el in findAll(selectorForTypes(config.idlTypes)):
+    for el in findAll(selectorForTypes(config.idlTypes), doc):
         addClass(el, 'idl-code')
-    for el in findAll(selectorForTypes(config.maybeTypes.union(config.linkTypeToDfnType['propdesc']))):
+    for el in findAll(selectorForTypes(config.maybeTypes.union(config.linkTypeToDfnType['propdesc'])), doc):
         addClass(el, 'css')
 
     # Remove comments from the generated HTML
@@ -1089,20 +1090,20 @@ def cleanupHTML(doc):
             removeNode(comment)
 
     # Remove duplicate titles.
-    for el in findAll("dfn[title]"):
+    for el in findAll("dfn[title]", doc):
         if el.get('title') == textContent(el):
             del el.attrib['title']
 
     # Transform the <css> fake tag into markup.
     # (Used when the ''foo'' shorthand doesn't work.)
-    for el in findAll("css"):
+    for el in findAll("css", doc):
         el.tag = "span"
         addClass(el, "css")
 
     # Transform the <assert> fake tag into a span with a unique ID based on its contents.
     # This is just used to tag arbitrary sections with an ID so you can point tests at it.
     # (And the ID will be guaranteed stable across publications, but guaranteed to change when the text changes.)
-    for el in findAll("assert"):
+    for el in findAll("assert", doc):
         el.tag = "span"
         el.set("id", "assert-" + hashContents(el))
 
@@ -1137,7 +1138,7 @@ class CSSSpec(object):
         self.normativeRefs = set()
         self.informativeRefs = set()
         self.refs = ReferenceManager()
-        self.md = metadata.MetadataManager()
+        self.md = metadata.MetadataManager(doc=self)
         self.biblios = {}
         self.paragraphMode = "markdown"
         self.inputSource = None
@@ -1223,7 +1224,7 @@ class CSSSpec(object):
         stripBOM(self)
 
         # Extract and process metadata
-        self.md, self.lines = metadata.parse(self.lines)
+        self.lines = metadata.parse(md = self.md, lines=self.lines)
         self.loadDefaultMetadata()
         self.md.finish()
         self.md.fillTextMacros(self.macros, doc=self)
@@ -1412,7 +1413,7 @@ class CSSSpec(object):
                         fixElementText(child)
 
         fixElementText(doc.document.getroot())
-        for el in findAll("[text-fixed]"):
+        for el in findAll("[text-fixed]", doc):
             del el.attrib['text-fixed']
 
 
@@ -1454,16 +1455,16 @@ class CSSSpec(object):
                         el.addnext(child)
                     el.tail = temp.text
 
-        for el in findAll(".prod"):
+        for el in findAll(".prod", doc):
             fixElementText(el, root=True)
 
     def printTargets(self):
         print "Exported terms:"
-        for el in findAll('dfn[data-export]'):
+        for el in findAll("dfn[data-export]", doc):
             for term in  linkTextsFromElement(el):
                 print "  ", term
         print "Unexported terms:"
-        for el in findAll('dfn[data-noexport]'):
+        for el in findAll("dfn[data-noexport]", doc):
             for term in  linkTextsFromElement(el):
                 print "  ", term
 
@@ -1499,7 +1500,7 @@ class CSSSpec(object):
             if error:
                 die("The include file for {0} disappeared underneath me.", name)
 
-
+config.specClass = CSSSpec
 
 
 
@@ -1532,40 +1533,40 @@ def fillInBoilerplate(doc):
     doc.html = '\n'.join([header, doc.html, footer])
 
 
-def fillWith(tag, newElements):
-    for el in findAll("[data-fill-with='{0}']".format(tag)):
+def fillWith(tag, newElements, doc):
+    for el in findAll("[data-fill-with='{0}']".format(tag), doc):
         replaceContents(el, newElements)
 
 
 def addLogo(doc):
     html = doc.getInclusion('logo')
     html = doc.fixText(html)
-    fillWith('logo', parseHTML(html))
+    fillWith('logo', parseHTML(html), doc=doc)
 
 
 def addCopyright(doc):
     html = doc.getInclusion('copyright')
     html = doc.fixText(html)
-    fillWith('copyright', parseHTML(html))
+    fillWith('copyright', parseHTML(html), doc=doc)
 
 
 def addAbstract(doc):
     html = doc.getInclusion('abstract')
     html = doc.fixText(html)
-    fillWith('abstract', parseHTML(html))
+    fillWith('abstract', parseHTML(html), doc=doc)
 
 
 def addStatusSection(doc):
     html = doc.getInclusion('status')
     html = doc.fixText(html)
-    fillWith('status', parseHTML(html))
+    fillWith('status', parseHTML(html), doc=doc)
 
 
 def addObsoletionNotice(doc):
     if doc.md.warning:
         html = doc.getInclusion(doc.md.warning)
         html = doc.fixText(html)
-        fillWith('warning', parseHTML(html))
+        fillWith('warning', parseHTML(html), doc=doc)
 
 def addAtRisk(doc):
     if len(doc.md.atRisk) == 0:
@@ -1573,12 +1574,12 @@ def addAtRisk(doc):
     html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
     for feature in doc.md.atRisk:
         html += "<li>"+doc.fixText(feature)
-    fillWith('at-risk', parseHTML(html))
+    fillWith('at-risk', parseHTML(html), doc=doc)
 
 def addCustomBoilerplate(doc):
-    for el in findAll('[boilerplate]'):
+    for el in findAll('[boilerplate]', doc):
         bType = el.get('boilerplate')
-        target = find('[data-fill-with="{0}"]'.format(bType))
+        target = find('[data-fill-with="{0}"]'.format(bType), doc)
         if target is not None:
             replaceContents(target, el)
             removeNode(el)
@@ -1587,14 +1588,14 @@ def addAnnotations(doc):
     if (doc.md.vshortname in doc.testSuites):
         html = doc.getInclusion('annotations')
         html = doc.fixText(html)
-        appendContents(find("head"), parseHTML(html))
+        appendContents(find("head", doc), parseHTML(html))
 
 def addIndexSection(doc):
     from collections import OrderedDict
     indexEntries = defaultdict(list)
     attemptedForRefs = defaultdict(list)
     seenGlobalNames = set()
-    for el in findAll("dfn"):
+    for el in findAll("dfn", doc):
         linkTexts = linkTextsFromElement(el, preserveCasing=True)
         headingLevel = headingLevelOfElement(el) or "Unnumbered section"
         if el.get('data-dfn-for') is not None:
@@ -1645,7 +1646,7 @@ def addIndexSection(doc):
                 html += "<li>{disambiguator}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**item)
             html += "</ul>"
     html += "</ul>"
-    fillWith("index", parseHTML(html))
+    fillWith("index", parseHTML(html), doc=doc)
 
 
 
@@ -1663,7 +1664,7 @@ def addPropertyIndex(doc):
         return key, val
     # Extract propdef info
     props = []
-    for table in findAll('table.propdef'):
+    for table in findAll('table.propdef', doc):
         prop = {}
         names = []
         for row in findAll('tr', table):
@@ -1678,7 +1679,7 @@ def addPropertyIndex(doc):
             props.append(tempProp)
     # Extract descdef info
     atRules = defaultdict(list)
-    for table in findAll('table.descdef'):
+    for table in findAll('table.descdef', doc):
         desc = {}
         names = []
         atRule = ""
@@ -1745,7 +1746,7 @@ def addPropertyIndex(doc):
                     html += "<td>" + escapeHTML(desc.get(column, ""))
             html += "</table>"
 
-    fillWith("property-index", parseHTML(html))
+    fillWith("property-index", parseHTML(html), doc=doc)
 
 
 def addTOCSection(doc):
@@ -1753,7 +1754,7 @@ def addTOCSection(doc):
     skipLevel = float('inf')
     previousLevel = 0
     html = ''
-    for header in findAll('h2, h3, h4, h5, h6'):
+    for header in findAll('h2, h3, h4, h5, h6', doc):
         level = int(header.tag[-1])
 
         if previousLevel > 0 and previousLevel < level:
@@ -1780,8 +1781,8 @@ def addTOCSection(doc):
         # Instead, use a fake element for now, and clean up at the end.
         html += "\n{2}<li><willbelink href='#{0}'>{1}</willbelink>".format(header.get('id'), contents.replace('\n',' '), indent)
         previousLevel = level
-    fillWith("table-of-contents", parseHTML(html))
-    cleanupAutogeneratedLinksInHTML(find("[data-fill-with='table-of-contents'] > ul"))
+    fillWith("table-of-contents", parseHTML(html), doc=doc)
+    cleanupAutogeneratedLinksInHTML(find("[data-fill-with='table-of-contents'] > ul", doc))
 
 def cleanupAutogeneratedLinksInHTML(container):
     # Assumes that 'real' links will be represented by <willbelink> elements.
@@ -1847,7 +1848,7 @@ def addSpecMetadataSection(doc):
             header += "\n\t<dd>"+val
     header += "\n</dl>\n"
     header = doc.fixText(header)
-    fillWith('spec-metadata', parseHTML(header))
+    fillWith('spec-metadata', parseHTML(header), doc=doc)
 
 
 def addReferencesSection(doc):
@@ -1856,7 +1857,7 @@ def addReferencesSection(doc):
         text += "<dt id='biblio-{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
         text += "<dd>{0}</dd>\n".format(ref)
     text += "</dl>"
-    fillWith("normative-references", parseHTML(text))
+    fillWith("normative-references", parseHTML(text), doc=doc)
 
     text = "<dl>\n"
     # If the same doc is referenced as both normative and informative, normative wins.
@@ -1864,18 +1865,18 @@ def addReferencesSection(doc):
         text += "<dt id='biblio-{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
         text += "<dd>{0}</dd>\n".format(ref)
     text += "</dl>"
-    fillWith("informative-references", parseHTML(text))
+    fillWith("informative-references", parseHTML(text), doc=doc)
 
 def addIssuesSection(doc):
     from copy import deepcopy
-    issues = findAll('.issue')
+    issues = findAll('.issue', doc)
     if len(issues) == 0:
         return
-    header = find("#issues-index")
+    header = find("#issues-index", doc)
     if not header:
         header = lxml.etree.Element('h2', {'id':"issues-index", 'class':"no-num"})
         header.text = "Issues Index"
-        appendChild(find("body"), header)
+        appendChild(find("body", doc), header)
     container = lxml.etree.Element('div', {'style':"counter-reset: issue"})
     insertAfter(header, container)
     for issue in issues:
