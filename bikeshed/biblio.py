@@ -92,21 +92,32 @@ def processReferBiblioFile(lines):
         "Q": "foreignAuthors",
     }
     for line in lines:
-        if re.match("\s*#", line) or re.match("\s*$", line):
-            # Comment or empty line
+        if re.match("\s*$", line):
+            # Empty line
             if biblio is not None:
                 biblios[biblio.linkText] = biblio
                 biblio = None
+            continue
+        elif re.match("\s*%?#", line):
+            # Comment
+            continue
         else:
             if biblio is None:
                 biblio = BiblioEntry()
 
-        for (letter, name) in singularReferCodes.items():
-            if re.match("\s*%"+letter+"\s+[^\s]", line):
-                setattr(biblio, name, re.match("\s*%"+letter+"\s+(.*)", line).group(1))
-        for (letter, name) in pluralReferCodes.items():
-            if re.match("\s*%"+letter+"\s+[^\s]", line):
-                getattr(biblio, name).append(re.match("\s*%"+letter+"\s+(.*)", line).group(1))
+        match = re.match("\s*%(\w)\s+(.*)", line)
+        if match:
+            letter, value = match.groups()
+        else:
+            die("Biblio line in unexpected format:\n{0}", line)
+            continue
+
+        if letter in singularReferCodes:
+            setattr(biblio, singularReferCodes[letter], value)
+        elif letter in pluralReferCodes:
+            getattr(biblio, pluralReferCodes[letter]).append(value)
+        else:
+            die("Unknown line type ")
     return biblios
 
 def processSpecrefBiblioFile(text):
