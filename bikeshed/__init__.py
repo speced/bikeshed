@@ -175,7 +175,7 @@ def main():
             config.quiet = True
             test.runAllTests(constructor=CSSSpec)
     elif options.subparserName == "profile":
-        os.system("python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py && gprof2dot.py -f pstats stat.prof | dot -Tsvg -o callgraph.svg && rm stat.prof")
+        os.system("python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py && gprof2dot.py -f pstats --skew=.0001 stat.prof | dot -Tsvg -o callgraph.svg && rm stat.prof")
 
 
 
