@@ -113,6 +113,8 @@ def main():
                             nargs="*",
                             help="Rebase the specified files. If called with no args, rebases everything.")
 
+    profileParser = subparsers.add_parser('profile', help="Profiling Bikeshed. Needs graphviz, gprof2dot installed.")
+
     options = argparser.parse_args()
 
     config.quiet = options.quiet
@@ -172,6 +174,9 @@ def main():
             config.debug = True
             config.quiet = True
             test.runAllTests(constructor=CSSSpec)
+    elif options.subparserName == "profile":
+        os.system("python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py && gprof2dot.py -f pstats stat.prof | dot -Tsvg -o callgraph.svg && rm stat.prof")
+
 
 
 def stripBOM(doc):
