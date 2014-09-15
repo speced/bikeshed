@@ -1087,6 +1087,9 @@ def cleanupHTML(doc):
         addClass(el, 'idl-code')
     for el in findAll(selectorForTypes(config.maybeTypes.union(config.linkTypeToDfnType['propdesc'])), doc):
         addClass(el, 'css')
+    # Correct over-application of the .css class
+    for el in findAll("pre .css", doc):
+        removeClass(el, 'css')
 
     # Remove comments from the generated HTML
     if config.minify:
