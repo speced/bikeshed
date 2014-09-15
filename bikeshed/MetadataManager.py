@@ -249,23 +249,23 @@ def convertWarning(key, val):
         return "warning-obsolete"
     if val.lower() == "not ready":
         return "warning-not-ready"
-    match = re.match("Replaced By +(.+)", val, re.I)
+    match = re.match(r"Replaced By +(.+)", val, re.I)
     if match:
         config.textMacros['replacedby'] = match.group(1)
         return "warning-replaced-by"
-    match = re.match("New Version +(.+)", val, re.I)
+    match = re.match(r"New Version +(.+)", val, re.I)
     if match:
         config.textMacros['replacedby'] = match.group(1)
         return "warning-new-version"
     die('Unknown value for "{0}" metadata.', key)
 
 def parseEditor(key, val):
-    match = re.match("([^,]+) ,\s* ([^,]*) ,?\s* ([^,]*) ,?\s* ([^,]*)", val, re.X)
+    match = re.match(r"([^,]+) ,\s* ([^,]*) ,?\s* ([^,]*) ,?\s* ([^,]*)", val, re.X)
     pieces = [piece.strip() for piece in val.split(',')]
     def looksLinkish(string):
-        return re.match(ur"\w+:", string) or looksEmailish(string)
+        return re.match(r"\w+:", string) or looksEmailish(string)
     def looksEmailish(string):
-        return re.match(ur".+@.+\..+", string)
+        return re.match(r".+@.+\..+", string)
     data = {
         'name' : pieces[0],
         'org'  : None,
@@ -315,7 +315,7 @@ def parseIgnoredTerms(key, val):
 def parseLinkDefaults(key, val):
     defaultSpecs = defaultdict(list)
     for default in val.split(","):
-        match = re.match("^([\w\d-]+)  (?:\s+\( ({0}) (?:\s+(TR|ED))? \) )  \s+(.*)$".format("|".join(config.dfnTypes.union(["dfn"]))), default.strip(), re.X)
+        match = re.match(r"^([\w\d-]+)  (?:\s+\( ({0}) (?:\s+(TR|ED))? \) )  \s+(.*)$".format("|".join(config.dfnTypes.union(["dfn"]))), default.strip(), re.X)
         if match:
             spec = match.group(1)
             type = match.group(2)
@@ -333,7 +333,7 @@ def parseBoilerplate(key, val):
     boilerplate = {'omitSections':set()}
     for command in val.split(","):
         command = command.strip()
-        if re.match("omit [\w-]+$", command):
+        if re.match(r"omit [\w-]+$", command):
             boilerplate['omitSections'].add(command[5:])
     return boilerplate
 
