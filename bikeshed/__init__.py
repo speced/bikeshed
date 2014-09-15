@@ -1572,7 +1572,7 @@ def addStatusSection(doc):
 
 def addObsoletionNotice(doc):
     if doc.md.warning:
-        html = doc.getInclusion(doc.md.warning)
+        html = doc.getInclusion(doc.md.warning[0])
         html = doc.fixText(html)
         fillWith('warning', parseHTML(html), doc=doc)
 

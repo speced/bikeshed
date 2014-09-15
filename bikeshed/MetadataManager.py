@@ -227,6 +227,8 @@ class MetadataManager:
         macros["annotations"] = config.testAnnotationURL
         if doc and self.vshortname in doc.testSuites:
             macros["testsuite"] = doc.testSuites[self.vshortname]['vshortname']
+        if self.warning and self.warning[1] is not None:
+            macros["replacedby"] = self.warning[1]
         macros["logo"] = self.logo
 
 def convertGroup(key, val):
@@ -246,17 +248,15 @@ def parseInteger(key, val):
 
 def convertWarning(key, val):
     if val.lower() == "obsolete":
-        return "warning-obsolete"
+        return "warning-obsolete",
     if val.lower() == "not ready":
-        return "warning-not-ready"
+        return "warning-not-ready",
     match = re.match(r"Replaced By +(.+)", val, re.I)
     if match:
-        config.textMacros['replacedby'] = match.group(1)
-        return "warning-replaced-by"
+        return "warning-replaced-by", match.group(1)
     match = re.match(r"New Version +(.+)", val, re.I)
     if match:
-        config.textMacros['replacedby'] = match.group(1)
-        return "warning-new-version"
+        return "warning-new-version", match.group(1)
     die('Unknown value for "{0}" metadata.', key)
 
 def parseEditor(key, val):
