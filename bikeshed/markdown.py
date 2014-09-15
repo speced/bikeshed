@@ -87,7 +87,11 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 				token = {'type':'raw', 'raw': rawline}
 		else:
 			token = {'type':'text', 'text': line, 'raw': rawline}
-		token['prefixlen'] = prefixLen(rawline, numSpacesForIndentation)
+
+		if token['type'] == "blank":
+			token['prefixlen'] = float('inf')
+		else:
+			token['prefixlen'] = prefixLen(rawline, numSpacesForIndentation)
 		tokens.append(token)
 		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
