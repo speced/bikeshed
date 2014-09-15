@@ -221,6 +221,17 @@ def hasClass(el, cls):
     paddedCls = " {0} ".format(cls)
     return paddedCls in paddedAttr
 
+def removeClass(el, cls):
+    oldClass = el.get('class')
+    if oldClass is None:
+        return
+    newClass = ' '.join(c for c in oldClass.split() if c != cls)
+    if newClass == "":
+        del el.attrib['class']
+    else:
+        el.set('class', newClass)
+
+
 def isElement(node):
     return isinstance(node.tag, basestring)
 
