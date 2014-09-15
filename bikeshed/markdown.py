@@ -253,6 +253,8 @@ def parseBulleted(stream):
 				return
 			if stream.currtype() == 'blank' and stream.nexttype() != 'bulleted' and stream.nextprefixlen() <= prefixLen:
 				return
+			if stream.currtype() == 'blank':
+				stream.advance()
 			yield parseItem(stream)
 
 	lines = ["<ul>"]
@@ -293,6 +295,8 @@ def parseNumbered(stream):
 				return
 			if stream.currtype() == 'blank' and stream.nexttype() != 'numbered' and stream.nextprefixlen() <= prefixLen:
 				return
+			if stream.currtype() == 'blank':
+				stream.advance()
 			yield parseItem(stream)
 
 	lines = ["<ol>"]
@@ -334,6 +338,8 @@ def parseDl(stream):
 				return
 			if stream.currtype() == 'blank' and stream.nexttype() not in ('dt', 'dd') and stream.nextprefixlen() <= prefixLen:
 				return
+			if stream.currtype() == 'blank':
+				stream.advance()
 			yield parseItem(stream)
 
 	lines = ["<dl>"]
