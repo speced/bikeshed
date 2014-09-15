@@ -26,11 +26,11 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 	rawElements = "pre|style|script|xmp"
 
 	for rawline in lines:
-		# Dont' parse anything while you're inside certain elements
+		# Don't parse anything while you're inside certain elements
 		if re.search(r"<({0})[ >]".format(rawElements), rawline):
 			preDepth += 1
 		if preDepth:
-			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': prefixLen(rawline, numSpacesForIndentation)})
+			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': float('inf')})
 		if re.search(r"</({0})>".format(rawElements), rawline):
 			preDepth = max(0, preDepth - 1)
 			continue
@@ -84,7 +84,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 			if re.match(r"<<", line) or re.match(r"<({0})[ >]".format(allowedStartElements), line):
 				token = {'type':'text', 'text': line, 'raw': rawline}
 			else:
-				token = {'type':'raw', 'raw': rawline}
+				token = {'type':'htmlblock', 'raw': rawline}
 		else:
 			token = {'type':'text', 'text': line, 'raw': rawline}
 
@@ -111,12 +111,19 @@ def prefixLen(text, numSpacesForIndentation):
 			break
 	return prefixLen
 
-def stripPrefix(text, numSpacesForIndentation, len):
-	# Removes len number of prefix groups
+def stripPrefix(token, numSpacesForIndentation, len):
+	'''Removes len number of prefix groups'''
+
+	text = token['raw']
+
+	# Don't mess with "infinite" prefix lines
+	if token['prefixlen'] == float('inf'):
+		return text
 
 	# Allow empty lines
 	if text.strip() == "":
 		return text
+
 	offset = 0
 	for x in range(len):
 		if text[offset] == "\t":
@@ -139,6 +146,7 @@ def parseTokens(tokens, numSpacesForIndentation):
 	numbered
 	bulleted
 	text
+	htmlblock
 	raw
 	'''
 	stream = TokenStream(tokens, numSpacesForIndentation)
@@ -147,7 +155,7 @@ def parseTokens(tokens, numSpacesForIndentation):
 	while True:
 		if stream.ended():
 			break
-		elif stream.currtype() == 'raw':
+		elif stream.currtype() in ('raw', 'htmlblock'):
 			lines.append(stream.currraw())
 			stream.advance()
 		elif stream.currtype() == 'heading':
@@ -244,7 +252,7 @@ def parseBulleted(stream):
 			if stream.currtype() == 'eof':
 				return lines
 			# Remove the prefix from each line before adding it.
-			lines.append(stripPrefix(stream.currraw(), numSpacesForIndentation, prefixLen+1))
+			lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen+1))
 
 	def getItems(stream):
 		while True:
@@ -286,7 +294,7 @@ def parseNumbered(stream):
 			if stream.currtype() == 'eof':
 				return lines
 			# Remove the prefix from each line before adding it.
-			lines.append(stripPrefix(stream.currraw(), numSpacesForIndentation, prefixLen+1))
+			lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen+1))
 
 	def getItems(stream):
 		while True:
@@ -329,7 +337,7 @@ def parseDl(stream):
 			if stream.currtype() == 'eof':
 				return type, lines
 			# Remove the prefix from each line before adding it.
-			lines.append(stripPrefix(stream.currraw(), numSpacesForIndentation, prefixLen+1))
+			lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen+1))
 
 	def getItems(stream):
 		while True:
@@ -401,5 +409,6 @@ class TokenStream:
 				if attrName in tok:
 					return tok[attrName]
 				else:
+					return tok['raw']
 					raise AttributeError, attrName
 			return _missing
