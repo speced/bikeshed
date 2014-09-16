@@ -77,8 +77,6 @@ class ReferenceManager(object):
             biblioLines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
             biblios = biblio.processReferBiblioFile(biblioLines)
             for key, b in biblios.items():
-                if key is None:
-                    print b
                 self.biblios[key.lower()].insert(TypedBiblio(b, BiblioType.refer))
 
 
