@@ -58,7 +58,9 @@ class BiblioEntry(object):
         if self.other:
             str += self.other + " "
 
-        str += "URL: <a href='{0}'>{0}</a>".format(self.url)
+        if self.url:
+            str += "URL: <a href='{0}'>{0}</a>".format(self.url)
+
         return str
 
     def valid(self):
