@@ -219,7 +219,7 @@ def updateLinkDefaults():
     if not config.dryRun:
         try:
             with io.open(config.scriptPath+"/spec-data/link-defaults.json", 'w', encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+                f.write(unicode(json.dumps(data, indent=2)))
         except Exception, e:
             die("Couldn't save link-defaults database to disk.\n{0}", e)
             return
@@ -256,7 +256,7 @@ def updateTestSuites():
     if not config.dryRun:
         try:
             with io.open(config.scriptPath+"/spec-data/test-suites.json", 'w', encoding="utf-8") as f:
-                json.dump(testSuites, f, ensure_ascii=False, indent=2)
+                f.write(unicode(json.dumps(testSuites, ensure_ascii=False, indent=2)))
         except Exception, e:
             die("Couldn't save test-suite database to disk.\n{0}", e)
     say("Success!")
