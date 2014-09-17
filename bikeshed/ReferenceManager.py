@@ -24,7 +24,7 @@ class ReferenceManager(object):
         self.css21Replacements = set()
         self.ignoredSpecs = set()
         self.status = specStatus
-        self.biblios = defaultdict(lambda: SortedList(key=attrgetter('type')))
+        self.biblios = defaultdict(list)
 
     def initializeRefs(self):
         # Load up the xref data
