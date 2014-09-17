@@ -311,7 +311,11 @@ class ReferenceManager(object):
         return refs[0]['url']
 
     def getBiblioRef(self, text, type=None, el=None):
-        candidates = sorted(self.biblios[text.lower()], key=itemgetter('order'))
+        try:
+            candidates = sorted(self.biblios[text.lower()], key=itemgetter('order'))
+        except KeyError, e:
+            die("Couldn't find '{0}' in bibliography data, text)
+            return
         if not candidates:
             die("Couldn't find '{0}' in bibliography data.", text)
             return None
@@ -322,6 +326,7 @@ class ReferenceManager(object):
                 return biblio.BiblioEntry(**c)
         else:
             die("Couldn't find '{0}' for type '{1}' in bibliography data.", text, type)
+            return
 
 
 def linkTextsFromElement(el, preserveCasing=False):
