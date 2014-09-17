@@ -5,7 +5,7 @@ import json
 import io
 import collections
 from collections import defaultdict
-from operator import attrgetter
+from operator import itemgetter
 from . import config
 from . import biblio
 from . import enum
@@ -61,23 +61,17 @@ class ReferenceManager(object):
         # When looking up a biblio ref, if type is unspecified,
         # prefer taking the first one in the list.
 
+        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.json",
+                                      type="bibliography") as fh:
+            self.biblios = json.load(fh)
+
         # Get local bibliography data
         try:
             with io.open("biblio.json", 'r', encoding="utf-8") as fh:
-                biblios = biblio.processSpecrefBiblioFile(fh.read())
-                for key, b in biblios.items():
-                    self.biblios[key.lower()].insert(TypedBiblio(b, BiblioType.local))
+                biblio.processSpecrefBiblioFile(self.biblios, fh.read(), order=2)
         except IOError:
             # Missing file is fine
             pass
-
-        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.refer",
-                                      fallbackurl="http://dev.w3.org/csswg/biblio.ref",
-                                      type="bibliography") as fh:
-            biblioLines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
-            biblios = biblio.processReferBiblioFile(biblioLines)
-            for key, b in biblios.items():
-                self.biblios[key.lower()].insert(TypedBiblio(b, BiblioType.refer))
 
 
     @property
@@ -316,19 +310,16 @@ class ReferenceManager(object):
                  '\n'.join('    {2} ({1}) {0}'.format(text, ref['type'], ref['spec']) for ref in refs))
         return refs[0]['url']
 
-    def addBiblioRef(self, text, ref, type):
-        self.biblios[text].insert(TypedBiblio(ref, BiblioType[type]))
-
     def getBiblioRef(self, text, type=None, el=None):
-        biblios = self.biblios[text.lower()]
-        if not biblios:
+        candidates = sorted(self.biblios[text.lower()], key=itemgetter('order'))
+        if not candidates:
             die("Couldn't find '{0}' in bibliography data.", text)
             return None
         if type is None:
-            return biblios[0].value
-        for b in biblios:
-            if b.type == type:
-                return b.value
+            return biblio.BiblioEntry(**candidates[0])
+        for c in candidates:
+            if c['type'] == type:
+                return biblio.BiblioEntry(**c)
         else:
             die("Couldn't find '{0}' for type '{1}' in bibliography data.", text, type)
 

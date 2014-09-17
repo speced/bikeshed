@@ -401,10 +401,7 @@ def transformRailroad(lines, doc, **kwargs):
     return ret
 
 def transformBiblio(lines, doc, **kwargs):
-    biblios = biblio.processSpecrefBiblioFile(''.join(lines))
-    for key, b in biblios.items():
-        #doc.refs.biblios[key].insert(TypedBiblio(b, BiblioType.inline))
-        doc.refs.addBiblioRef(text=key, ref=b, type="inline")
+    biblio.processSpecrefBiblioFile(doc.refs.biblios, ''.join(lines), order=1)
     return []
 
 
@@ -889,7 +886,7 @@ def processBiblioLinks(doc):
 
         id = simplifyText(linkText)
         el.set('href', '#biblio-'+id)
-        storage.add(ref)
+        storage[ref.linkText] = ref
 
 
 def processAutolinks(doc):
@@ -1145,8 +1142,8 @@ class CSSSpec(object):
 
     def __init__(self, inputFilename, paragraphMode="markdown"):
         # internal state
-        self.normativeRefs = set()
-        self.informativeRefs = set()
+        self.normativeRefs = {}
+        self.informativeRefs = {}
         self.refs = ReferenceManager()
         self.md = metadata.MetadataManager(doc=self)
         self.biblios = {}
@@ -1863,15 +1860,17 @@ def addSpecMetadataSection(doc):
 
 def addReferencesSection(doc):
     text = "<dl>\n"
-    for ref in sorted(doc.normativeRefs, key=lambda r: r.linkText):
+    for ref in sorted(doc.normativeRefs.values(), key=lambda r: r.linkText):
         text += "<dt id='biblio-{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
         text += "<dd>{0}</dd>\n".format(ref)
     text += "</dl>"
     fillWith("normative-references", parseHTML(text), doc=doc)
 
     text = "<dl>\n"
-    # If the same doc is referenced as both normative and informative, normative wins.
-    for ref in sorted(doc.informativeRefs - doc.normativeRefs, key=lambda r: r.linkText):
+    for ref in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText):
+        # If the same doc is referenced as both normative and informative, normative wins.
+        if ref.linkText in doc.normativeRefs:
+            continue
         text += "<dt id='biblio-{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
         text += "<dd>{0}</dd>\n".format(ref)
     text += "</dl>"

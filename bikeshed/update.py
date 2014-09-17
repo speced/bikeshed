@@ -2,11 +2,13 @@
 from __future__ import division, unicode_literals
 import json
 import re
+import io
 from collections import defaultdict
 from contextlib import closing
 import urllib2
 
 from . import config
+from . import biblio
 from .messages import *
 
 from .apiclient.apiclient import apiclient
@@ -106,40 +108,49 @@ def updateCrossRefs():
 
     if not config.dryRun:
         try:
-            with open(config.scriptPath+"/spec-data/specs.json", 'w') as f:
-                json.dump(specs, f, ensure_ascii=False, indent=2)
+            with io.open(config.scriptPath+"/spec-data/specs.json", 'w', encoding="utf-8") as f:
+                f.write(unicode(json.dumps(specs, ensure_ascii=False, indent=2)))
         except Exception, e:
             die("Couldn't save spec database to disk.\n{0}", e)
+            return
         try:
-            with open(config.scriptPath+"/spec-data/anchors.json", 'w') as f:
-                json.dump(anchors, f, indent=2)
+            with io.open(config.scriptPath+"/spec-data/anchors.json", 'w', encoding="utf-8") as f:
+                f.write(unicode(json.dumps(anchors, ensure_ascii=False, indent=2)))
         except Exception, e:
             die("Couldn't save anchor database to disk.\n{0}", e)
+            return
     say("Success!")
 
 
 def updateBiblio():
     say("Downloading biblio data...")
+    biblios = defaultdict(list)
     try:
-        with closing(urllib2.urlopen("http://dev.w3.org/csswg/biblio.ref")) as infh:
-            with open(config.scriptPath+"/spec-data/biblio.refer", 'w') as outfh:
-                outfh.write(infh.read())
-        with closing(urllib2.urlopen("http://specref.jit.su/bibrefs")) as infh:
-            with open(config.scriptPath+"/spec-data/specref.json", 'w') as outfh:
-                outfh.write(infh.read())
-        say("Success!")
+        with closing(urllib2.urlopen("http://specref.jit.su/bibrefs")) as fh:
+            biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
+        with closing(urllib2.urlopen("http://dev.w3.org/csswg/biblio.ref")) as fh:
+            lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
+            biblio.processReferBiblioFile(lines, biblios, order=4)
     except Exception, e:
-        die("Couldn't download/save the biblio data.\n{0}", e)
+        die("Couldn't download the biblio data.\n{0}", e)
+    if not config.dryRun:
+        try:
+            with io.open(config.scriptPath + "/spec-data/biblio.json", 'w', encoding="utf-8") as fh:
+                fh.write(unicode(json.dumps(biblios, ensure_ascii=False, indent=2)))
+        except Exception, e:
+            die("Couldn't save biblio database to disk.\n{0}", e)
+            return
+    say("Success!")
 
 
 def updateLinkDefaults():
     try:
         say("Downloading link defaults...")
-        with closing(urllib2.urlopen("http://dev.w3.org/csswg/autolinker-config.md")) as f:
-            lines = f.readlines()
-        say("Success!")
+        with closing(urllib2.urlopen("http://dev.w3.org/csswg/autolinker-config.md")) as fh:
+            lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
     except Exception, e:
         die("Couldn't download link defaults data.\n{0}", e)
+        return
 
     currentSpec = None
     currentType = None
@@ -207,10 +218,12 @@ def updateLinkDefaults():
 
     if not config.dryRun:
         try:
-            with open(config.scriptPath+"/spec-data/link-defaults.json", 'w') as f:
+            with io.open(config.scriptPath+"/spec-data/link-defaults.json", 'w', encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
         except Exception, e:
             die("Couldn't save link-defaults database to disk.\n{0}", e)
+            return
+    say("Success!")
 
 def updateTestSuites():
     try:
@@ -242,13 +255,8 @@ def updateTestSuites():
 
     if not config.dryRun:
         try:
-            with open(config.scriptPath+"/spec-data/test-suites.json", 'w') as f:
+            with io.open(config.scriptPath+"/spec-data/test-suites.json", 'w', encoding="utf-8") as f:
                 json.dump(testSuites, f, ensure_ascii=False, indent=2)
-        except Exception, e:
-            die("Couldn't save test-suite database to disk.\n{0}", e)
-        try:
-            with open(config.scriptPath+"/spec-data/test-suites.json", 'w') as f:
-                json.dump(testSuites, f, indent=2)
         except Exception, e:
             die("Couldn't save test-suite database to disk.\n{0}", e)
     say("Success!")
