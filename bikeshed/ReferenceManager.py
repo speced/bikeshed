@@ -63,7 +63,7 @@ class ReferenceManager(object):
 
         with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.json",
                                       type="bibliography") as fh:
-            self.biblios = json.load(fh)
+            self.biblios.update(json.load(fh))
 
         # Get local bibliography data
         try:
