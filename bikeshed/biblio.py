@@ -135,7 +135,7 @@ def processSpecrefBiblioFile(text, storage, order):
         for jsonField, biblioField in fields.items():
             if jsonField in data:
                 biblio[biblioField] = data[jsonField]
-        if "url" not in biblio or "title" not in biblio:
+        if "title" not in biblio:
             # Aliases should hit this case, I'll deal with them later
             continue
         storage[biblioKey.lower()].append(biblio)
