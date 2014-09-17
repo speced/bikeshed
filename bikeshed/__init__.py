@@ -3,6 +3,7 @@
 from __future__ import division, unicode_literals
 import re
 from collections import defaultdict
+from collections import Counter
 import io
 import os
 import sys
@@ -740,26 +741,24 @@ def classifyDfns(doc, dfns):
 
 
 def dedupIds(doc, els):
+    import itertools as iter
     def findId(id):
         return find("#"+id, doc) is not None
-    for el in els:
-        id = el.get('id')
-        if id is None:
-            die("No id to dedup: {0}", outerHTML(el))
-            id = "giant-error"
-            el.set('id', id)
-        del el.attrib['id']
-        if findId(id):
+    ids = Counter(el.get('id') for el in findAll("[id]", doc))
+    dupes = [id for id,count in ids.items() if count > 1]
+    for dupe in dupes:
+        if re.match(r"issue-[0-9a-fA-F]{8}$", dupe):
+            # Don't warn about issues, it's okay if they have the same ID because they're identical text.
+            continue
+        els = findAll("#"+id, doc)
+        ints = iter.imap(str, iter.count(0))
+        for el in els[1:]:
             # Try to de-dup the id by appending an integer after it.
-            if not re.match(r"issue-[0-9a-fA-F]{8}", id):
-                # Don't warn about issues, it's okay if they have the same ID because they're identical text.
-                warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", id)
-            import itertools as iter
-            for x in iter.imap(str, iter.count(0)):
+            warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", id)
+            for x in ints:
                 if not findId(id+x):
                     id = id+x
                     break
-        el.set('id', id)
 
 
 def simplifyText(text):
