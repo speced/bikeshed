@@ -68,7 +68,7 @@ class ReferenceManager(object):
         # Get local bibliography data
         try:
             with io.open("biblio.json", 'r', encoding="utf-8") as fh:
-                biblio.processSpecrefBiblioFile(self.biblios, fh.read(), order=2)
+                biblio.processSpecrefBiblioFile(fh.read(), self.biblios, order=2)
         except IOError:
             # Missing file is fine
             pass
