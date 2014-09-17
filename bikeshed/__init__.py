@@ -401,7 +401,7 @@ def transformRailroad(lines, doc, **kwargs):
     return ret
 
 def transformBiblio(lines, doc, **kwargs):
-    biblio.processSpecrefBiblioFile(doc.refs.biblios, ''.join(lines), order=1)
+    biblio.processSpecrefBiblioFile(''.join(lines), doc.refs.biblios, order=1)
     return []
 
 
