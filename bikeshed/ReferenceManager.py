@@ -314,7 +314,7 @@ class ReferenceManager(object):
         try:
             candidates = sorted(self.biblios[text.lower()], key=itemgetter('order'))
         except KeyError, e:
-            die("Couldn't find '{0}' in bibliography data, text)
+            die("Couldn't find '{0}' in bibliography data", text)
             return
         if not candidates:
             die("Couldn't find '{0}' in bibliography data.", text)
