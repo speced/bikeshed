@@ -1717,7 +1717,9 @@ def addPropertyIndex(doc):
             tempDesc['Name'] = name
             atRules[atRule].append(tempDesc)
 
-    html = ""
+    html = E.div()
+
+    # TODO: Move the heading generation into this function.
 
     if len(props):
         # Set up the initial table columns for properties
@@ -1728,22 +1730,26 @@ def addPropertyIndex(doc):
             allKeys |= set(prop.keys())
         columns.extend(sorted(allKeys - set(columns)))
         # Create the table
-        html += "<table class='proptable data'><thead><tr>"
-        for column in columns:
-            if column == "Inherited":
-                html += "<th scope=col>Inh."
-            elif column == "Percentages":
-                html += "<th scope=col>%ages"
-            else:
-                html += "<th scope=col>"+escapeHTML(column)
-        html += "<tbody>"
-        for prop in props:
-            html += "\n<tr><th scope=row><a data-link-type='property'>{0}</a>".format(escapeHTML(prop['Name']))
-            for column in columns[1:]:
-                html += "<td>" + escapeHTML(prop.get(column, ""))
-        html += "</table>"
+        def formatColumnName(name):
+            if name == "Inherited":
+                return "Inh."
+            if name == "Percentages":
+                return "%ages"
+            return name
+        def createPropRow(prop):
+            return E.tr(
+                E.th({"scope":"row"},
+                    E.a({"data-link-type":"property"}, prop['Name'])),
+                *[E.td(prop.get(column,"")) for column in columns[1:]])
+        appendChild(html,
+            E.table({"class":"proptable data"},
+                E.thead(
+                    E.tr(
+                        *[E.th({"scope":"col"}, formatColumnName(column)) for column in columns])),
+                E.tbody(
+                    *[createPropRow(prop) for prop in props])))
     else:
-        html += "<p>No properties defined."
+        appendChild(html, E.p("No properties defined."))
 
     if len(atRules):
         atRuleNames = sorted(atRules.keys())
@@ -1756,18 +1762,22 @@ def addPropertyIndex(doc):
             for desc in descs:
                 allKeys |= set(desc.keys())
             columns.extend(sorted(allKeys - set(columns)))
-            html += "<h3 class='no-num' id='{1}-descriptor-table'><a data-link-type='at-rule'>{0}</a> Descriptors</h3>".format(atRuleName, simplifyText(atRuleName))
-            html += "<table class=proptable><thead><tr>"
-            for column in columns:
-                html += "<th scope=col>{0}".format(escapeHTML(column))
-            html += "<tbody>"
-            for desc in descs:
-                html += "\n<tr><th scope=row><a data-link-type='descriptor'>{0}</a>".format(escapeHTML(desc['Name']))
-                for column in columns[1:]:
-                    html += "<td>" + escapeHTML(desc.get(column, ""))
-            html += "</table>"
+            appendChild(html,
+                E.h3({"class":"no-num", "id":simplifyText(atRuleName)+"-descriptor-table"},
+                    E.a({"data-link-type":"at-rule"}, atRuleName),
+                    " Descriptors"))
+            appendChild(html,
+                E.table({"class":"proptable data"},
+                    E.thead(
+                        E.tr(
+                            *[E.tr({"scope":"col"}, column) for column in columns])),
+                    E.tbody(
+                        E.tr(
+                            E.th({"scope":"row"},
+                                E.a({"data-link-type":"descriptor"}, desc['Name'])),
+                            *[E.td(desc.get(column, "")) for column in columns[1:]]))))
 
-    fillWith("property-index", parseHTML(html), doc=doc)
+    fillWith("property-index", html, doc=doc)
 
 
 def addTOCSection(doc):
