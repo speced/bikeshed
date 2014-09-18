@@ -1404,6 +1404,7 @@ class CSSSpec(object):
             processContents = isElement(el) and not isOpaqueElement(el)
 
             if processContents:
+                originalChildren = [c for c in childElements(el)]
                 # Pull out el.text, replace stuff (may introduce elements), parse.
                 newtext = transformThings(el.text)
                 if el.text != newtext:
@@ -1411,7 +1412,6 @@ class CSSSpec(object):
                     # Change the .text, empty out the temp children.
                     el.text = temp.text
                     for child in childElements(temp, reversed=True):
-                        child.set("text-fixed", "yes")
                         el.insert(0, child)
 
             # Same for tail.
@@ -1420,15 +1420,13 @@ class CSSSpec(object):
                 temp = parseHTML('<div>'+newtext+'</div>')[0]
                 el.tail = ''
                 for child in childElements(temp, reversed=True):
-                    child.set("text-fixed", "yes")
                     el.addnext(child)
                 el.tail = temp.text
 
             if processContents:
                 # Recurse over children.
-                for child in childElements(el):
-                    if not child.get("text-fixed"):
-                        fixElementText(child)
+                for child in originalChildren:
+                    fixElementText(child)
 
         fixElementText(doc.document.getroot())
         for el in findAll("[text-fixed]", doc):
