@@ -1627,11 +1627,11 @@ def addIndexSection(doc):
         for linkText in linkTexts:
             sort = re.sub(r'[^a-z0-9]', '', linkText.lower())
             entry = {
-                'text':escapeHTML(linkText),
+                'text':linkText,
                 'type':el.get('data-dfn-type'),
                 'id':id,
                 'level':headingLevel,
-                'disambiguator':escapeHTML(disambiguator),
+                'disambiguator':disambiguator,
                 'sort':sort,
                 'globalNames': GlobalNames.fromEl(el)
                 }
@@ -1642,27 +1642,32 @@ def addIndexSection(doc):
 
     # Now print the indexes
     sortedEntries = OrderedDict(sorted(indexEntries.items(), key=lambda x:x[1][0]['sort']))
-    html = "<ul class='indexlist'>\n"
+    container = createElement('div')
+    html = appendChild(container, createElement('ul', {"class":"indexlist"}))
     for text, items in sortedEntries.items():
         if len(items) == 1:
             item = items[0]
-            html += "<li>{text}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**item)
+            li = appendChild(html, createElement('li', {}, item['text'], ", ",
+                createElement('a', {"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
             if item['type'] == "property":
                 reffingDfns = []
                 for globalName in item['globalNames']:
                     reffingDfns += attemptedForRefs[globalName]
                 if reffingDfns:
-                    html += "<dl><dt>Property Values:"
-                    for reffingDfn in reffingDfns:
-                        html += "<dd>{text}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**reffingDfn)
-                    html += "</dl>"
+                    dl = appendChild(li, createElement('dl', {},
+                        createElement('dt', {}, "Property Values:")))
+                    for r in reffingDfns:
+                        appendChild(dl,
+                            createElement('dd', {}, r.text, ", ",
+                                createElement('a', {"href":"#"+r['id'], "title":"section "+r['level']}, r['level'])))
         else:
-            html += "<li>{text}<ul>".format(**items[0])
+            li = appendChild(html, createElement('li', {}, items[0]['text']))
+            ul = appendChild(li, createElement('ul', {}))
             for item in items:
-                html += "<li>{disambiguator}, <a href='#{id}' title='section {level}'>{level}</a>\n".format(**item)
-            html += "</ul>"
-    html += "</ul>"
-    fillWith("index", parseHTML(html), doc=doc)
+                appendChild(ul,
+                    createElement('li',{}, item['disambiguator'], ", ",
+                        createElement('a', {"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
+    fillWith("index", container, doc=doc)
 
 
 
