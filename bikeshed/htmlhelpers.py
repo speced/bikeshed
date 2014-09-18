@@ -258,5 +258,8 @@ def hashContents(el):
     # Generally used for generating probably-unique IDs.
     return hashlib.md5(innerHTML(el).strip().encode("ascii", "xmlcharrefreplace")).hexdigest()[0:8]
 
-def createElement(tag, attrs):
-    return etree.Element(tag, attrs)
+def createElement(tag, attrs={}, *children):
+    el = etree.Element(tag, attrs)
+    for child in children:
+        appendChild(el, child)
+    return el
