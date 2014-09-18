@@ -534,8 +534,8 @@ def formatPropertyNames(doc):
             type = "element"
         cell = findAll("tr:first-child > :nth-child(2)", table)[0]
         names = [x.strip() for x in textContent(cell).split(',')]
-        html = ', '.join("<{tag} {type}>{0}</{tag}>".format(name, tag=tag, type=type) for name in names)
-        replaceContents(cell, parseHTML(html))
+        newContents = config.intersperse((createElement(tag, {type:""}, name) for name in names), ", ")
+        replaceContents(cell, newContents)
 
 
 def canonicalizeShortcuts(doc):
