@@ -13,8 +13,6 @@ from .SortedList import SortedList
 from .messages import *
 from .htmlhelpers import *
 
-TypedBiblio = collections.namedtuple('TypedBiblio', ['value', 'type'])
-
 class ReferenceManager(object):
 
     def __init__(self, specStatus=None):
@@ -424,13 +422,3 @@ def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
         if error:
             die("Unknown link type '{0}'.",linkType)
         return None
-
-class BiblioType(enum.OrderedEnum):
-    """
-    Captures the ordering that biblio sources should be consulted in,
-    with lower numbers coming first.
-    """
-    inline  = 1 # from a <pre class=biblio>
-    local   = 2 # from a biblio.json in the same folder
-    specref = 3 # from SpecRef
-    refer   = 4 # from the CSSWG biblio.ref doc
