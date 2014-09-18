@@ -1642,31 +1642,31 @@ def addIndexSection(doc):
 
     # Now print the indexes
     sortedEntries = OrderedDict(sorted(indexEntries.items(), key=lambda x:x[1][0]['sort']))
-    container = createElement('div')
-    html = appendChild(container, createElement('ul', {"class":"indexlist"}))
+    container = E.div()
+    html = appendChild(container, E.ul({"class":"indexlist"}))
     for text, items in sortedEntries.items():
         if len(items) == 1:
             item = items[0]
-            li = appendChild(html, createElement('li', {}, item['text'], ", ",
-                createElement('a', {"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
+            li = appendChild(html,
+                E.li(item['text'], ", ",
+                    E.a({"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
             if item['type'] == "property":
                 reffingDfns = []
                 for globalName in item['globalNames']:
                     reffingDfns += attemptedForRefs[globalName]
                 if reffingDfns:
-                    dl = appendChild(li, createElement('dl', {},
-                        createElement('dt', {}, "Property Values:")))
+                    dl = appendChild(li, E.dl(E.dt("Property Values:")))
                     for r in reffingDfns:
                         appendChild(dl,
-                            createElement('dd', {}, r.text, ", ",
-                                createElement('a', {"href":"#"+r['id'], "title":"section "+r['level']}, r['level'])))
+                            E.dd(r.text, ", ",
+                                E.a({"href":"#"+r['id'], "title":"section "+r['level']}, r['level'])))
         else:
-            li = appendChild(html, createElement('li', {}, items[0]['text']))
-            ul = appendChild(li, createElement('ul', {}))
+            li = appendChild(html, E.li(items[0]['text']))
+            ul = appendChild(li, E.ul())
             for item in items:
                 appendChild(ul,
-                    createElement('li',{}, item['disambiguator'], ", ",
-                        createElement('a', {"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
+                    E.li(item['disambiguator'], ", ",
+                        E.a({"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
     fillWith("index", container, doc=doc)
 
 
