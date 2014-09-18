@@ -257,3 +257,6 @@ def hashContents(el):
     # Hash the contents of an element into an 8-character alphanum string.
     # Generally used for generating probably-unique IDs.
     return hashlib.md5(innerHTML(el).strip().encode("ascii", "xmlcharrefreplace")).hexdigest()[0:8]
+
+def createElement(tag, attrs):
+    return etree.Element(tag, attrs)
