@@ -115,6 +115,16 @@ def main():
                             help="Rebase the specified files. If called with no args, rebases everything.")
 
     profileParser = subparsers.add_parser('profile', help="Profiling Bikeshed. Needs graphviz, gprof2dot installed.")
+    profileParser.add_argument("--root",
+                               dest="root",
+                               default=None,
+                               metavar="ROOTFUNC",
+                               help="Prune the graph to start with the specified root node.")
+    profileParser.add_argument("--leaf",
+                               dest="leaf",
+                               default=None,
+                               metavar="LEAFFUNC",
+                               help="Prune the graph to only show ancestors of the specified leaf node.")
 
     options = argparser.parse_args()
 
@@ -176,7 +186,9 @@ def main():
             config.quiet = True
             test.runAllTests(constructor=CSSSpec)
     elif options.subparserName == "profile":
-        os.system("python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py && gprof2dot -f pstats --skew=.0001 stat.prof | dot -Tsvg -o callgraph.svg && rm stat.prof")
+        root = "--root=\"{0}\"".format(options.root) if options.root else ""
+        leaf = "--leaf=\"{0}\"".format(options.leaf) if options.leaf else ""
+        os.system("python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o callgraph.svg && rm stat.prof".format(root=root, leaf=leaf))
 
 
 
