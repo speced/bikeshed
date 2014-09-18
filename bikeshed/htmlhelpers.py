@@ -264,3 +264,15 @@ def createElement(tag, attrs={}, *children):
     for child in children:
         appendChild(el, child)
     return el
+
+class ElementCreationHelper:
+    def __getattr__(self, name):
+        def _creater(*children):
+            if children and not (isinstance(children[0], basestring) or etree.iselement(children[0])):
+                attrs = children[0]
+                children = children[1:]
+            else:
+                attrs = {}
+            return createElement(name, attrs, *children)
+        return _creater
+E = ElementCreationHelper()

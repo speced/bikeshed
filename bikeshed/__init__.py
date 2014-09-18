@@ -946,7 +946,7 @@ def processIssues(doc):
 
 def addSelfLinks(doc):
     def makeSelfLink(el):
-        return createElement('a', {"href": "#" + urllib.quote(el.get('id', '')), "class":"self-link"})
+        return E.a({"href": "#" + urllib.quote(el.get('id', '')), "class":"self-link"})
 
     foundFirstNumberedSection = False
     for el in findAll("h2, h3, h4, h5, h6", doc):
