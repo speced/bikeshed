@@ -1372,6 +1372,8 @@ class CSSSpec(object):
         def transformThings(text):
             if text is None:
                 return None
+            if not ("[[" in text or "{{" in text or "'" in text):
+                return None
             # Function takes raw text, but then adds HTML,
             # and the result is put directly into raw HTML.
             # So, escape the text, so it turns back into "raw HTML".
@@ -1407,7 +1409,7 @@ class CSSSpec(object):
                 originalChildren = [c for c in childElements(el)]
                 # Pull out el.text, replace stuff (may introduce elements), parse.
                 newtext = transformThings(el.text)
-                if el.text != newtext:
+                if newtext is not None and el.text != newtext:
                     temp = parseHTML('<div>'+newtext+'</div>')[0]
                     # Change the .text, empty out the temp children.
                     el.text = temp.text
@@ -1416,7 +1418,7 @@ class CSSSpec(object):
 
             # Same for tail.
             newtext = transformThings(el.tail)
-            if el.tail != newtext:
+            if newtext is not None and el.tail != newtext:
                 temp = parseHTML('<div>'+newtext+'</div>')[0]
                 el.tail = ''
                 for child in childElements(temp, reversed=True):
