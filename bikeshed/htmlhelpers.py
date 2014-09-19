@@ -201,6 +201,29 @@ def previousElements(startEl, tag=None, *tags):
 def childElements(parentEl, tag="*", *tags, **stuff):
     return parentEl.iterchildren(tag=tag, *tags, **stuff)
 
+def childNodes(parentEl, mutate=False):
+    '''
+    This function returns all the nodes in a parent element in the DOM sense,
+    mixing text nodes and other nodes together
+    (rather than LXML's default handling of text).
+    Pass the mutate flag if you want it to actually null out LXML's text things,
+    so that the text in the returned array is the only copy
+    (and so that you can then use appendChild() safely later,
+        without duplicating text).
+    '''
+    ret = []
+    if parentEl.text is not None:
+        ret.append(parentEl.text)
+        if mutate:
+            parentEl.text = None
+    for c in childElements(parentEl):
+        ret.append(c)
+        if c.tail is not None:
+            ret.append(c.tail)
+            if mutate:
+                c.tail = None
+    return ret
+
 def treeAttr(el, attrName):
     if el.get(attrName) is not None:
         return el.get(attrName)
