@@ -132,6 +132,7 @@ def removeNode(node):
 
 
 def appendContents(el, newElements):
+    # Accepts either an iterable *or* a container element
     if(etree.iselement(newElements) and newElements.text is not None):
         appendChild(el, newElements.text)
     for new in newElements:
