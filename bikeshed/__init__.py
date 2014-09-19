@@ -1828,56 +1828,70 @@ def addTOCSection(doc):
 
 def addSpecMetadataSection(doc):
     def printEditor(editor):
-        str = "<div class='p-author h-card vcard'>"
+        div = E.div({"class":"p-author h-card vcard"})
         if editor['link']:
-            str += "<a class='p-name fn u-url url' href='{0}'>{1}</a>".format(editor['link'], editor['name'])
+            appendChild(div, E.a({"class":"p-name fn u-url url", "href":editor['link']}, editor['name']))
         elif editor['email']:
-            str += "<a class='p-name fn u-email email' href='mailto:{0}'>{1}</a>".format(editor['email'], editor['name'])
+            appendChild(div, E.a({"class":"p-name fn u-email email", "href":"mailto:"+editor['email']}, editor['name']))
         else:
-            str += "<span class='p-name fn'>{0}</span>".format(editor['name'])
+            appendChild(div, E.a({"class":"p-name fn"}, editor['name']))
         if editor['org']:
-            str += " (<span class='p-org org'>{0}</span>)".format(editor['org'])
+            appendChild(div,
+                " (",
+                E.span({"class":"p-org org"}, editor['org']),
+                ")")
         if editor['email'] and editor['link']:
-            str += " <a class='u-email email' href='mailto:{0}'>{0}</a>".format(editor['email'])
-        str += "</div>"
-        return str
+            appendChild(div,
+                " ",
+                E.a({"class":"u-email email", "href":"mailto:"+editor['email']}, editor['email']))
+        return div
 
     md = DefaultOrderedDict(list)
-    md["This version"].append("<a href='[VERSION]' class='u-url'>[VERSION]</a>")
+    mac = doc.macros
+    md["This version"].append(E.a({"href":mac['version'], "class":"u-url"}, mac['version']))
     if doc.md.TR:
-        md["Latest version"].append("<a href='{0}'>{0}</a>".format(doc.md.TR))
+        md["Latest version"].append(E.a({"href": doc.md.TR}, doc.md.TR))
     if doc.md.ED and doc.md.status in config.TRStatuses:
-        md["Editor's Draft"].append("<a href='{0}'>{0}</a>".format(doc.md.ED))
+        md["Editor's Draft"].append(E.a({"href": doc.md.ED}, doc.md.ED))
     if len(doc.md.previousVersions):
-        md["Previous Versions"] = map("<a href='{0}' rel='previous'>{0}</a>".format, doc.md.previousVersions)
+        md["Previous Versions"] = [E.a({"href":ver, "rel":"previous"}, ver) for ver in doc.md.previousVersions]
     if doc.md.versionHistory:
-        md["Version History"].append("<a href='{0}'>{0}</a>".format(doc.md.versionHistory))
+        md["Version History"].append(E.a({"href":doc.md.versionHistory}, doc.md.versionHistory))
     if doc.md.mailingList:
-        md["Feedback"].append("""<a href="mailto:{0}?subject=%5B[SHORTNAME]%5D%20feedback">{0}</a>
-            with subject line
-            &ldquo;<kbd>[[SHORTNAME]] <var>&hellip; message topic &hellip;</var></kbd>&rdquo;""".format(doc.md.mailingList))
+        span = E.span(
+            E.a({"href":"mailto:"+doc.md.mailingList+"?subject=["+mac['shortname']+"] feedback"}, doc.md.mailingList),
+            " with subject line “",
+            E.kbd(
+                "[",
+                mac['shortname'],
+                "] ",
+                E.var(
+                    "… message topic …")),
+            "”")
         if doc.md.mailingListArchives:
-            md["Feedback"][0] += "(<a rel=discussion href='{0}'>archives</a>)".format(doc.md.mailingListArchives)
+            appendChild(span,
+                " (",
+                E.a({"rel":"discussion", "href":doc.md.mailingListArchives}, "archives"),
+                ")")
+        md["Feedback"].append(span)
     if doc.md.testSuite is not None:
-        md["Test Suite"].append("<a href='{0}'>{0}</a>".format(doc.md.testSuite))
-    else:
-        if (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]['url'] is not None):
-            md["Test Suite"].append("<a href='{0}'>{0}</a>".format(doc.testSuites[doc.md.vshortname]['url']))
+        md["Test Suite"].append(E.a({"href":doc.md.testSuite}, doc.md.testSuite))
+    elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]['url'] is not None):
+        url = doc.testSuites[doc.md.vshortname]['url']
+        md["Test Suite"].append(E.a({"href":url}, url))
     if len(doc.md.editors):
         md["Editor" if len(doc.md.editors) == 1 else "Editors"] = map(printEditor, doc.md.editors)
     if len(doc.md.previousEditors):
         md["Former Editor" if len(doc.md.editors) == 1 else "Former Editors"] = map(printEditor, doc.md.previousEditors)
     for key, vals in doc.md.otherMetadata.items():
-        md[key].extend(vals)
+        md[key].extend(parseHTML("<span>"+doc.fixText(val)+"</span>")[0] for val in vals)
 
-    header = "\n<dl>"
+    dl = E.dl()
     for key, vals in md.items():
-        header += "\n\t<dt>{0}:".format(key)
-        for val in vals:
-            header += "\n\t<dd>"+val
-    header += "\n</dl>\n"
-    header = doc.fixText(header)
-    fillWith('spec-metadata', parseHTML(header), doc=doc)
+        appendChild(dl,
+            E.dt(key, ":"),
+            *[E.dd(val) for val in vals])
+    fillWith('spec-metadata', E.div(dl), doc=doc)
 
 
 def addReferencesSection(doc):
