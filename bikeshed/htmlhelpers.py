@@ -96,7 +96,7 @@ def appendChild(parent, *children):
                 parent[-1].tail = (parent[-1].tail or '') + child
             else:
                 parent.text = (parent.text or '') + child
-    return children[0]
+    return children[0] if len(children) else None
 
 def prependChild(parent, child):
     # Prepends either text or an element to the parent.
