@@ -1834,7 +1834,7 @@ def addSpecMetadataSection(doc):
         elif editor['email']:
             appendChild(div, E.a({"class":"p-name fn u-email email", "href":"mailto:"+editor['email']}, editor['name']))
         else:
-            appendChild(div, E.a({"class":"p-name fn"}, editor['name']))
+            appendChild(div, E.span({"class":"p-name fn"}, editor['name']))
         if editor['org']:
             appendChild(div,
                 " (",
