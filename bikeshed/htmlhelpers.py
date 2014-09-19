@@ -85,17 +85,18 @@ def clearContents(el):
     return el
 
 
-def appendChild(parent, child):
+def appendChild(parent, *children):
     # Appends either text or an element.
-    try:
-        parent.append(child)
-    except TypeError:
-        # child is a string
-        if len(parent) > 0:
-            parent[-1].tail = (parent[-1].tail or '') + child
-        else:
-            parent.text = (parent.text or '') + child
-    return child
+    for child in children:
+        try:
+            parent.append(child)
+        except TypeError:
+            # child is a string
+            if len(parent) > 0:
+                parent[-1].tail = (parent[-1].tail or '') + child
+            else:
+                parent.text = (parent.text or '') + child
+    return children[0]
 
 def prependChild(parent, child):
     # Prepends either text or an element to the parent.
