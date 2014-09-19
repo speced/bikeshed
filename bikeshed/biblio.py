@@ -3,6 +3,7 @@ from __future__ import division, unicode_literals
 import re
 from collections import defaultdict
 from .messages import *
+from .htmlhelpers import *
 
 class BiblioEntry(object):
 
@@ -52,6 +53,44 @@ class BiblioEntry(object):
             str += "URL: <a href='{0}'>{0}</a>".format(self.url)
 
         return str
+
+    def toHTML(self):
+        ret = []
+
+        str = ""
+        etAl = self.etAl
+        if len(self.authors) == 0:
+            str += "???"
+        elif len(self.authors) == 1:
+            str += self.authors[0]
+        elif len(self.authors) < 4:
+            str += "; ".join(self.authors)
+        else:
+            str += self.authors[0]
+            etAl = True
+
+        str += "; et al. " if etAl else ". "
+        ret.append(str)
+
+        if self.url:
+            ret.append(E.a({"href":self.url}, self.title))
+        else:
+            ret.append(self.title + ". ")
+
+        str = ""
+        if self.date:
+            str += self.date + ". "
+        if self.status:
+            str += self.status + ". "
+        if self.other:
+            str += self.other + " "
+        ret.append(str)
+
+        if self.url:
+            ret.append("URL: ")
+            ret.append(E.a({"href":self.url}, self.url))
+
+        return ret
 
     def valid(self):
         if self.title is None:

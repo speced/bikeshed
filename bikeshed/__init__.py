@@ -1881,22 +1881,20 @@ def addSpecMetadataSection(doc):
 
 
 def addReferencesSection(doc):
-    text = "<dl>\n"
+    dl = E.dl()
     for ref in sorted(doc.normativeRefs.values(), key=lambda r: r.linkText):
-        text += "<dt id='biblio-{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
-        text += "<dd>{0}</dd>\n".format(ref)
-    text += "</dl>"
-    fillWith("normative-references", parseHTML(text), doc=doc)
+        appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText), "title":ref.linkText}, "["+ref.linkText+"]"))
+        appendChild(dl, E.dd(*ref.toHTML()))
+    fillWith("normative-references", E.div(dl), doc=doc)
 
-    text = "<dl>\n"
+    dl = E.dl()
     for ref in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText):
         # If the same doc is referenced as both normative and informative, normative wins.
         if ref.linkText in doc.normativeRefs:
             continue
-        text += "<dt id='biblio-{1}' title='{0}'>[{0}]</dt>".format(ref.linkText, simplifyText(ref.linkText))
-        text += "<dd>{0}</dd>\n".format(ref)
-    text += "</dl>"
-    fillWith("informative-references", parseHTML(text), doc=doc)
+        appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText), "title":ref.linkText}, "["+ref.linkText+"]"))
+        appendChild(dl, E.dd(*ref.toHTML()))
+    fillWith("informative-references", E.div(dl), doc=doc)
 
 def addIssuesSection(doc):
     issues = findAll('.issue', doc)
