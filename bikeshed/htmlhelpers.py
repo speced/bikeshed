@@ -134,7 +134,7 @@ def removeNode(node):
 
 def appendContents(el, newElements):
     # Accepts either an iterable *or* a container element
-    if(etree.iselement(newElements) and newElements.text is not None):
+    if(isElement(newElements) and newElements.text is not None):
         appendChild(el, newElements.text)
     for new in newElements:
         appendChild(el, new)
@@ -259,7 +259,7 @@ def removeClass(el, cls):
 
 
 def isElement(node):
-    return isinstance(node.tag, basestring)
+    return etree.iselement(node)
 
 def isOpaqueElement(el):
     return el.tag in ('pre', 'code', 'style', 'script')
@@ -293,7 +293,7 @@ def createElement(tag, attrs={}, *children):
 class ElementCreationHelper:
     def __getattr__(self, name):
         def _creater(*children):
-            if children and not (isinstance(children[0], basestring) or etree.iselement(children[0])):
+            if children and not (isinstance(children[0], basestring) or isElement(children[0])):
                 attrs = children[0]
                 children = children[1:]
             else:
