@@ -88,14 +88,23 @@ def clearContents(el):
 def appendChild(parent, *children):
     # Appends either text or an element.
     for child in children:
-        try:
-            parent.append(child)
-        except TypeError:
-            # child is a string
+        if isinstance(child, basestring):
             if len(parent) > 0:
                 parent[-1].tail = (parent[-1].tail or '') + child
             else:
                 parent.text = (parent.text or '') + child
+        else:
+            if len(parent) == 0 and parent.text is not None:
+                # LXML "helpfully" assumes you meant to insert it before the text,
+                # and so moves the text into the element's tail when you append.
+                text, parent.text = parent.text, None
+                parent.append(child)
+                parent.text = text
+            else:
+                # For some reason it doesn't make any weird assumptions about text
+                # when the parent already has children; the last child's tail
+                # doesn't get moved into the appended child or anything.
+                parent.append(child)
     return children[0] if len(children) else None
 
 def prependChild(parent, child):
@@ -201,27 +210,44 @@ def previousElements(startEl, tag=None, *tags):
 def childElements(parentEl, tag="*", *tags, **stuff):
     return parentEl.iterchildren(tag=tag, *tags, **stuff)
 
-def childNodes(parentEl, mutate=False):
+def childNodes(parentEl, clear=False):
     '''
     This function returns all the nodes in a parent element in the DOM sense,
-    mixing text nodes and other nodes together
+    mixing text nodes (strings) and other nodes together
     (rather than LXML's default handling of text).
-    Pass the mutate flag if you want it to actually null out LXML's text things,
-    so that the text in the returned array is the only copy
-    (and so that you can then use appendChild() safely later,
-        without duplicating text).
+
+    If you set "clear" to True, it'll
+    1. remove all of parentEl's children,
+       so you can append nodes back to it safely, and
+    2. Set parentEl.text and child elements' .tail to null,
+       again so you can safely append text to parentEl.
+    In other words, the following is a no-op:
+
+    ```
+    appendChild(parentEl, *childNodes(parentEl, clear=True))
+    ```
+
+    But omitting the clear=True argument will, generally,
+    have stupid and nonsensical results,
+    as text is duplicated and placed in weird spots.
+
+    Nonetheless, clear is False by default,
+    to avoid doing extra computation when not needed,
+    and to match the DOM method's behavior.
     '''
     ret = []
     if parentEl.text is not None:
         ret.append(parentEl.text)
-        if mutate:
+        if clear:
             parentEl.text = None
     for c in childElements(parentEl):
         ret.append(c)
         if c.tail is not None:
             ret.append(c.tail)
-            if mutate:
+            if clear:
                 c.tail = None
+    if clear:
+        clearContents(parentEl)
     return ret
 
 def treeAttr(el, attrName):
