@@ -582,15 +582,22 @@ def canonicalizeShortcuts(doc):
         del el.attrib['for']
 
 def fixIntraDocumentReferences(doc):
-    for el in findAll("a[data-section]", doc):
+    for el in findAll("a[href^='#']", doc):
         sectionID = el.get("href")
         if sectionID is None or sectionID == "" or sectionID[0] != '#':
             die("Missing/invalid href {0} in section link.", sectionID)
             continue
-        targets = findAll("{0}.heading".format(sectionID), doc)
-        if len(targets) == 0:
-            die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
-            continue
+        if el.get('data-section') is not None:
+            # Specifically a section link, should point to a heading
+            targets = findAll("{0}.heading".format(sectionID), doc)
+            if len(targets) == 0:
+                die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
+                continue
+        else:
+            # All other in-doc links
+            targets = findAll(sectionID, doc)
+            if len(targets) == 0:
+                die("Couldn't find target anchor {0}:\n{1}", sectionID, outerHTML(el))
         if (el.text is None or el.text.strip() == '') and len(el) == 0:
             target = targets[0]
             # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
