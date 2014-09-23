@@ -865,9 +865,15 @@ def classifyLink(el):
         match = re.match(r"^(.+)/([^/]+)$", linkText)
         if match:
             el.set('data-link-for', match.group(1))
-            clearContents(el)
             linkText = match.group(2)
+            clearContents(el)
             el.text = linkText
+        match = re.match(r"(.+)!([\w-]+)$", linkText)
+        if match:
+            linkText = match.group(1)
+            clearContents(el)
+            el.text = linkText
+            el.set("data-link-type", match.group(2))
 
     el.set('title', linkText)
     for attr in ["data-link-status", "data-link-for", "data-link-spec"]:
