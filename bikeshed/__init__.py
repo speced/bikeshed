@@ -582,7 +582,7 @@ def canonicalizeShortcuts(doc):
         del el.attrib['for']
 
 def fixIntraDocumentReferences(doc):
-    for el in findAll("a[href^='#']", doc):
+    for el in findAll("a[href^='#']:not([href='#'])", doc):
         sectionID = el.get("href")
         if sectionID is None or sectionID == "" or sectionID[0] != '#':
             die("Missing/invalid href {0} in section link.", sectionID)
