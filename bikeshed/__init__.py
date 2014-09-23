@@ -583,7 +583,7 @@ def canonicalizeShortcuts(doc):
 
 def fixIntraDocumentReferences(doc):
     for el in findAll("a[data-section]", doc):
-        if el.text is None or el.text.strip() == '':
+        if (el.text is None or el.text.strip() == '') and len(el) == 0:
             sectionID = el.get("href")
             if sectionID is None or sectionID == "" or sectionID[0] != '#':
                 die("Missing/invalid href {0} in section link.", sectionID)
@@ -596,10 +596,8 @@ def fixIntraDocumentReferences(doc):
             # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
             text = textContent(findAll(".content", target)[0])
             if target.get('data-level') is not None:
-                level = target.get('data-level')
-                replaceContents(el, parseHTML("§{1} {0}".format(text, level)))
-            else:
-                replaceContents(el, parseHTML(text))
+                text = "§{1} {0}".format(text, target.get('data-level'))
+            appendChild(el, text)
 
 def fillAttributeInfoSpans(doc):
     for el in findAll("span[data-attribute-info]", doc):
