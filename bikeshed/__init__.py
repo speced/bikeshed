@@ -1385,6 +1385,7 @@ class CSSSpec(object):
         # Do the remaining textual replacements
 
         def biblioReplacer(match):
+            # Allow escaping things that aren't actually biblio links, by preceding with a \
             if match.group(1) is not None:
                 return match.group(0)[1:]
             if match.group(2) == "!":
