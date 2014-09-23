@@ -1437,43 +1437,29 @@ class CSSSpec(object):
     def transformProductionGrammars(doc):
         # Link up the various grammar symbols in CSS grammars to their definitions.
 
-        def transformThings(text):
-            if text is None:
-                return None
-            # Function takes raw text, but then adds HTML,
-            # and the result is put directly into raw HTML.
-            # So, escape the text, so it turns back into "raw HTML".
-            text = escapeHTML(text)
-            text = re.sub(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|,)", r"<a grammar class='prod-punc'>\1</a>", text)
-            return text
+        def transformElement(parentEl):
+            children = childNodes(parentEl, clear=True)
+            newChildren = []
+            for el in children:
+                if isinstance(el, basestring):
+                    newChildren.extend(transformText(el))
+                elif isElement(el):
+                    if el.tag != "a":
+                        transformElement(el)
+                    newChildren.append(el)
+            appendChild(parentEl, *newChildren)
 
-        def fixElementText(el, root=False):
-            # Recurse over children.
-            for child in childElements(el):
-                fixElementText(child)
-
-            # Pull out el.text, replace stuff (may introduce elements), parse.
-            if el.tag != "a":
-                newtext = transformThings(el.text)
-                if el.text != newtext:
-                    temp = parseHTML('<div>'+newtext+'</div>')[0]
-                    # Change the .text, empty out the temp children.
-                    el.text = temp.text
-                    for child in childElements(temp, reversed=True):
-                        el.insert(0, child)
-
-            # Same for tail, if it's a sub-element
-            if not root:
-                newtext = transformThings(el.tail)
-                if el.tail != newtext:
-                    temp = parseHTML('<div>'+newtext+'</div>')[0]
-                    el.tail = ''
-                    for child in childElements(temp, reversed=True):
-                        el.addnext(child)
-                    el.tail = temp.text
+        def transformText(text):
+            # alternates between normal text and the grammar productions
+            splits = re.split(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|,)", text)
+            for i, p in enumerate(splits):
+                if i%2 == 0:
+                    continue
+                splits[i] = E.a({"grammar":"", "class":"prod-punc"}, p)
+            return splits
 
         for el in findAll(".prod", doc):
-            fixElementText(el, root=True)
+            transformElement(el)
 
     def printTargets(self):
         print "Exported terms:"
