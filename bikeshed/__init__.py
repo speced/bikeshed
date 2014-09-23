@@ -1024,11 +1024,10 @@ class IDLMarker(object):
                 readonly = ''
             extraParameters = '{0} data-type="{1}"'.format(readonly, rest.type)
         elif idlType == "dict-member":
-            extraParameters = 'data-type="{0}"'.format(construct.type);
+            extraParameters = 'data-type="{0}"'.format(construct.type)
             if construct.default is not None:
-              value = escapeAttr("{0}".format(construct.default.value));
-              extraParameters += ' data-default="{0}"'.format(value);
-            idlType = 'attribute';
+                value = escapeAttr("{0}".format(construct.default.value))
+                extraParameters += ' data-default="{0}"'.format(value)
         else:
             extraParameters = ''
 
