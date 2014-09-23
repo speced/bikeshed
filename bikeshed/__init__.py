@@ -628,10 +628,20 @@ def fillAttributeInfoSpans(doc):
                 datatype = datatype[:-1]
             if default is not None:
                 decorations += ", defaulting to {0}".format(default);
-            appendChild(el,
-                " of type ",
-                E.a({"data-link-type":"idl-name"}, datatype),
-                decorations)
+            if "<" in datatype:
+                match = re.match(r"(\w+)<(\w+)>", datatype)
+                appendChild(el,
+                    " of type ",
+                    match.group(1),
+                    "<",
+                    E.a({"data-link-type":"idl-name"}, match.group(2)),
+                    ">",
+                    decorations)
+            else:
+                appendChild(el,
+                    " of type ",
+                    E.a({"data-link-type":"idl-name"}, datatype),
+                    decorations)
 
 def processDfns(doc):
     dfns = findAll("dfn", doc)
