@@ -601,7 +601,7 @@ def fixIntraDocumentReferences(doc):
 
 def fillAttributeInfoSpans(doc):
     for el in findAll("span[data-attribute-info]", doc):
-        if el.text is None or el.text.strip() == '':
+        if (el.text is None or el.text.strip() == '') and len(el) == 0:
             referencedAttribute = el.get("for")
             if referencedAttribute is None or referencedAttribute == "":
                 die("Missing for reference in attribute info span.")
@@ -627,10 +627,11 @@ def fillAttributeInfoSpans(doc):
                 decorations += ", nullable"
                 datatype = datatype[:-1]
             if default is not None:
-              decorations += ", defaulting to {0}".format(default);
-            replaceContents(el, parseHTML("of type <a data-link-type=idl-name>{0}</a>{1}".format(datatype, decorations)))
-            # FIXME: Is there a nicer way to force a leading space here?
-            el.text = ' ' + el.text
+                decorations += ", defaulting to {0}".format(default);
+            appendChild(el,
+                " of type ",
+                E.a({"data-link-type":"idl-name"}, datatype),
+                decorations)
 
 def processDfns(doc):
     dfns = findAll("dfn", doc)
