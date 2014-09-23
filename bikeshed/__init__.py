@@ -1368,70 +1368,79 @@ class CSSSpec(object):
 
     def transformAutolinkShortcuts(doc):
         # Do the remaining textual replacements
-        def transformThings(text):
-            if text is None:
-                return None
-            if not ("[[" in text or "{{" in text or "'" in text):
-                return None
-            # Function takes raw text, but then adds HTML,
-            # and the result is put directly into raw HTML.
-            # So, escape the text, so it turns back into "raw HTML".
-            text = escapeHTML(text)
 
-            # Handle biblio links, [[FOO]] and [[!FOO]]
-            def biblioReplacer(match):
-                if match.group(1) is not None:
-                    return match.group(0)[1:]
-                if match.group(2) == "!":
-                    type = "normative"
+        def biblioReplacer(match):
+            if match.group(1) is not None:
+                return match.group(0)[1:]
+            if match.group(2) == "!":
+                type = "normative"
+            else:
+                type = "informative"
+            term = match.group(3)
+            return E.a({"title":term, "data-link-type":"biblio", "data-biblio-type":type},
+                "[",
+                term,
+                "]")
+        def sectionReplacer(match):
+            return E.a({"section":"", "href":match.group(1)})
+        def propdescReplacer(match):
+            return E.a({"data-link-type":"propdesc", "class":"property", "title":match.group(1)}, match.group(1))
+        def idlReplacer(match):
+            return E.code({"class":"idl"},
+                E.a({"data-link-type":"idl", "title":match.group(1)}, match.group(1)))
+        biblioRe = re.compile(r"(\\)?\[\[(!)?([\w-]+)\]\]")
+        sectionRe = re.compile(r"\[\[(#[\w-]+)\]\]")
+        propdescRe = re.compile(r"'([-]?[\w@*][\w@*/-]*)'")
+        idlRe = re.compile(r"{{(([^ }]|,\s)+)}}")
+
+        def transformElement(parentEl):
+            processContents = isElement(parentEl) and not isOpaqueElement(parentEl)
+            if not processContents:
+                return
+            children = childNodes(parentEl, clear=True)
+            newChildren = []
+            for el in children:
+                if isinstance(el, basestring):
+                    newChildren.extend(transformText(el))
+                elif isElement(el):
+                    transformElement(el)
+                    newChildren.append(el)
+            appendChild(parentEl, *newChildren)
+
+
+        def transformText(text):
+            res = reSubObject(biblioRe, text, biblioReplacer)
+            for i, x in enumerate(res):
+                if i%2 == 0:
+                    res[i:i+1] = reSubObject(sectionRe, x, sectionReplacer)
+            for i, x in enumerate(res):
+                if i%2 == 0:
+                    res[i:i+1] = reSubObject(propdescRe, x, propdescReplacer)
+            for i, x in enumerate(res):
+                if i%2 == 0:
+                    res[i:i+1] = reSubObject(idlRe, x, idlReplacer)
+            return res
+
+        def reSubObject(pattern, string, repl=None):
+            '''
+            like re.sub, but replacements don't have to be text;
+            returns an array of alternating unmatched text and match objects instead.
+            If repl is specified, it's called with each match object,
+            and the result then shows up in the array instead.
+            '''
+            lastEnd = 0
+            pieces = []
+            for match in pattern.finditer(string):
+                pieces.append(string[lastEnd:match.start()])
+                if repl:
+                    pieces.append(repl(match))
                 else:
-                    type = "informative"
-                return r'<a title="{term}" data-link-type="biblio" data-biblio-type="{type}">[{term}]</a>'.format(term=match.group(3), type=type)
-            text = re.sub(r"(\\)?\[\[(!)?([\w-]+)\]\]", biblioReplacer, text)
+                    pieces.append(match)
+                lastEnd = match.end()
+            pieces.append(string[lastEnd:])
+            return pieces
 
-            # Handle section links, [[#foo]].
-            text = re.sub(r"\[\[(#[\w-]+)\]\]", r'<a section href="\1"></a>', text)
-
-            # Handle propdesc links, like 'width'.
-            text = re.sub(r"'([-]?[\w@*][\w@*/-]*)'", r'<a data-link-type="propdesc" class="property" title="\1">\1</a>', text)
-
-            # Handle IDL links, like {{FooBar}}
-            text = re.sub(r"{{(([^ }]|,\s)+)}}", r'<code class="idl"><a data-link-type="idl" title="\1">\1</a></code>', text)
-
-            return text
-
-        def fixElementText(el):
-            # Don't transform anything in some kinds of elements.
-            processContents = isElement(el) and not isOpaqueElement(el)
-
-            if processContents:
-                originalChildren = [c for c in childElements(el)]
-                # Pull out el.text, replace stuff (may introduce elements), parse.
-                newtext = transformThings(el.text)
-                if newtext is not None and el.text != newtext:
-                    temp = parseHTML('<div>'+newtext+'</div>')[0]
-                    # Change the .text, empty out the temp children.
-                    el.text = temp.text
-                    for child in childElements(temp, reversed=True):
-                        el.insert(0, child)
-
-            # Same for tail.
-            newtext = transformThings(el.tail)
-            if newtext is not None and el.tail != newtext:
-                temp = parseHTML('<div>'+newtext+'</div>')[0]
-                el.tail = ''
-                for child in childElements(temp, reversed=True):
-                    el.addnext(child)
-                el.tail = temp.text
-
-            if processContents:
-                # Recurse over children.
-                for child in originalChildren:
-                    fixElementText(child)
-
-        fixElementText(doc.document.getroot())
-        for el in findAll("[text-fixed]", doc):
-            del el.attrib['text-fixed']
+        transformElement(doc.document.getroot())
 
 
     def transformProductionGrammars(doc):
