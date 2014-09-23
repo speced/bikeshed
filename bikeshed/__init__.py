@@ -1424,17 +1424,23 @@ class CSSSpec(object):
 
 
         def transformText(text):
-            res = reSubObject(biblioRe, text, biblioReplacer)
-            for i, x in enumerate(res):
+            nodes = [text]
+            processTextNodes(nodes, sectionRe, sectionReplacer)
+            processTextNodes(nodes, propdescRe, propdescReplacer)
+            processTextNodes(nodes, idlRe, idlReplacer)
+            processTextNodes(nodes, biblioRe, biblioReplacer)
+            return nodes
+
+        def processTextNodes(nodes, regex, replacer):
+            # Takes an array of alternating text/objects,
+            # and runs reSubObject on the text parts,
+            # splicing them into the "nodes" array.
+            # Mutates!
+            for i, node in enumerate(nodes):
+                # Node list always alternates between text and elements
                 if i%2 == 0:
-                    res[i:i+1] = reSubObject(sectionRe, x, sectionReplacer)
-            for i, x in enumerate(res):
-                if i%2 == 0:
-                    res[i:i+1] = reSubObject(propdescRe, x, propdescReplacer)
-            for i, x in enumerate(res):
-                if i%2 == 0:
-                    res[i:i+1] = reSubObject(idlRe, x, idlReplacer)
-            return res
+                    nodes[i:i+1] = reSubObject(regex, node, replacer)
+            return nodes
 
         def reSubObject(pattern, string, repl=None):
             '''
