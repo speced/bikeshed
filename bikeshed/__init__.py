@@ -583,15 +583,15 @@ def canonicalizeShortcuts(doc):
 
 def fixIntraDocumentReferences(doc):
     for el in findAll("a[data-section]", doc):
+        sectionID = el.get("href")
+        if sectionID is None or sectionID == "" or sectionID[0] != '#':
+            die("Missing/invalid href {0} in section link.", sectionID)
+            continue
+        targets = findAll("{0}.heading".format(sectionID), doc)
+        if len(targets) == 0:
+            die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
+            continue
         if (el.text is None or el.text.strip() == '') and len(el) == 0:
-            sectionID = el.get("href")
-            if sectionID is None or sectionID == "" or sectionID[0] != '#':
-                die("Missing/invalid href {0} in section link.", sectionID)
-                continue
-            targets = findAll("{0}.heading".format(sectionID), doc)
-            if len(targets) == 0:
-                die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
-                continue
             target = targets[0]
             # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
             text = textContent(findAll(".content", target)[0])
