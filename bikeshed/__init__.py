@@ -1425,10 +1425,10 @@ class CSSSpec(object):
 
         def transformText(text):
             nodes = [text]
-            processTextNodes(nodes, sectionRe, sectionReplacer)
             processTextNodes(nodes, propdescRe, propdescReplacer)
             processTextNodes(nodes, idlRe, idlReplacer)
             processTextNodes(nodes, biblioRe, biblioReplacer)
+            processTextNodes(nodes, sectionRe, sectionReplacer)
             return nodes
 
         def processTextNodes(nodes, regex, replacer):
