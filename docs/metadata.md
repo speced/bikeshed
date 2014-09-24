@@ -33,10 +33,13 @@ Several keys are required information, and will cause the processor to flag an e
 * **Editor** must contain an editor's information.
 	This has a special format:
 	it must contain the editor's name,
-	optionally followed by the editor's affiliation,
-	optionally followed by either an email address or a link to their contact page,
+	optionally followed by the editor's affiliation
+	(composed of a company name, optionally followed by a link to the company homepage),
+	optionally followed by an email address and/or a link to their contact page,
 	all comma-separated.
 	(To put a comma *in* one of these values, use an HTML character reference: `&#44;`.)
+	For example: `Editor: Tab Atkins Jr., Google http://google.com, http://xanthir.com/contact/`
+
 	Multiple "Editor" lines can be used to supply multiple editors.
 * **Abstract** must contain an abstract for the spec, a 1-2 sentence description of what the spec is about.
     Multiple Abstract lines can be used, representing multiple lines of content, as if you'd written those multiple lines directly into the document.
