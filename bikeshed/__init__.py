@@ -1859,10 +1859,11 @@ def addSpecMetadataSection(doc):
         else:
             appendChild(div, E.span({"class":"p-name fn"}, editor['name']))
         if editor['org']:
-            appendChild(div,
-                " (",
-                E.span({"class":"p-org org"}, editor['org']),
-                ")")
+            if editor['orglink']:
+                el = E.a({"class":"p-org org", "href":editor['orglink']}, editor['org'])
+            else:
+                el = E.span({"class":"p-org org"}, editor['org'])
+            appendChild(div, " (", el, ")")
         if editor['email'] and editor['link']:
             appendChild(div,
                 " ",

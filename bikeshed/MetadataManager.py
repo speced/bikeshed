@@ -267,10 +267,11 @@ def parseEditor(key, val):
     def looksEmailish(string):
         return re.match(r".+@.+\..+", string)
     data = {
-        'name' : pieces[0],
-        'org'  : None,
-        'link' : None,
-        'email': None
+        'name'   : pieces[0],
+        'org'    : None,
+        'orglink': None,
+        'link'   : None,
+        'email'  : None
     }
     if len(pieces) == 4 and looksLinkish(pieces[2]) and looksLinkish(pieces[3]):
         data['org'] = pieces[1]
@@ -306,6 +307,11 @@ def parseEditor(key, val):
         pass
     else:
         die("'{0}' format is '<name>, <company>?, <email-or-contact-page>?. Got:\n{1}", key, val)
+    # Check if the org ends with a link
+    if " " in data['org'] and looksLinkish(data['org'].split()[-1]):
+        pieces = data['org'].split()
+        data['orglink'] = pieces[-1]
+        data['org'] = ' '.join(pieces[:-1])
     return data
 
 
