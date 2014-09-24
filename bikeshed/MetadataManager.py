@@ -308,7 +308,7 @@ def parseEditor(key, val):
     else:
         die("'{0}' format is '<name>, <company>?, <email-or-contact-page>?. Got:\n{1}", key, val)
     # Check if the org ends with a link
-    if " " in data['org'] and looksLinkish(data['org'].split()[-1]):
+    if data['org'] is not None and " " in data['org'] and looksLinkish(data['org'].split()[-1]):
         pieces = data['org'].split()
         data['orglink'] = pieces[-1]
         data['org'] = ' '.join(pieces[:-1])
