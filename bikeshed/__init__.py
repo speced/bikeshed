@@ -1306,9 +1306,9 @@ class CSSSpec(object):
         processBiblioLinks(self)
         processAutolinks(self)
 
-        addPropertyIndex(self)
         addReferencesSection(self)
         addIndexSection(self)
+        addPropertyIndex(self)
         addIssuesSection(self)
         processHeadings(self) # again
         addTOCSection(self)
@@ -1577,6 +1577,30 @@ def fillWith(tag, newElements, doc):
     for el in findAll("[data-fill-with='{0}']".format(tag), doc):
         replaceContents(el, newElements)
 
+def getFillContainer(tag, doc, default=False):
+    '''
+    Gets the element that should be filled with the stuff corresponding to tag.
+    If it returns None, don't generate the section.
+
+    If default=True,
+    indicates that this is a "default on" section,
+    and will be appended to <body> unless explicitly suppressed.
+    Otherwise,
+    it'll only be appended if explicitly requested with a data-fill-with attribute.
+    '''
+
+    # If you've explicitly suppressed that section, don't do anything
+    if tag in doc.md.boilerplate['omitSections']:
+        return None
+
+    # If a fill-with is found, fill that
+    if find("[data-fill-with='{0}']".format(tag), doc) is not None:
+        return find("[data-fill-with='{0}']".format(tag), doc)
+
+    # Otherwise, append to the end of the document
+    if default:
+        return find("body", doc)
+
 
 def addLogo(doc):
     html = doc.getInclusion('logo')
@@ -1631,6 +1655,14 @@ def addAnnotations(doc):
         appendContents(find("head", doc), parseHTML(html))
 
 def addIndexSection(doc):
+    if len(findAll("dfn", doc)) == 0:
+        return
+    container = getFillContainer('index', doc=doc, default=True)
+    if container is None:
+        return
+    appendChild(container,
+        E.h2({"class":"no-num", "id":"index"}, "Index"))
+
     from collections import OrderedDict
     indexEntries = defaultdict(list)
     attemptedForRefs = defaultdict(list)
@@ -1666,12 +1698,11 @@ def addIndexSection(doc):
 
     # Now print the indexes
     sortedEntries = OrderedDict(sorted(indexEntries.items(), key=lambda x:x[1][0]['sort']))
-    container = E.div()
-    html = appendChild(container, E.ul({"class":"indexlist"}))
+    topList = appendChild(container, E.ul({"class":"indexlist"}))
     for text, items in sortedEntries.items():
         if len(items) == 1:
             item = items[0]
-            li = appendChild(html,
+            li = appendChild(topList,
                 E.li(item['text'], ", ",
                     E.a({"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
             if item['type'] == "property":
@@ -1685,36 +1716,26 @@ def addIndexSection(doc):
                             E.dd(r.text, ", ",
                                 E.a({"href":"#"+r['id'], "title":"section "+r['level']}, r['level'])))
         else:
-            li = appendChild(html, E.li(items[0]['text']))
+            li = appendChild(topList, E.li(items[0]['text']))
             ul = appendChild(li, E.ul())
             for item in items:
                 appendChild(ul,
                     E.li(item['disambiguator'], ", ",
                         E.a({"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
-    fillWith("index", container, doc=doc)
 
 
 
 def addPropertyIndex(doc):
     # Extract all the data from the propdef and descdef tables
 
-    # If you've explicitly suppressed it, don't do anything
-    if "property-index" in doc.md.boilerplate['omitSections']:
-        return
-
-    # If there are no propdef or descdef table, don't generate anything.
     if len(findAll("table.propdef, table.descdef", doc)) == 0:
         return
-
-    # If a fill-with is found, fill that
-    if find("[data-fill-with='property-index']", doc) is not None:
-        html = find("[data-fill-with='property-index']", doc)
-    else:
-        # Otherwise, append to the end of the document
-        html = find("body", doc)
+    html = getFillContainer('property-index', doc=doc, default=True)
+    if html is None:
+        return
 
     appendChild(html,
-        E.h2({"class":"no-num no-ref", "id":"property-index"}, "Property Index"))
+        E.h2({"class":"no-num", "id":"property-index"}, "Property Index"))
 
     def extractKeyValFromRow(tr):
         # Extract the key, minus the trailing :
@@ -1821,7 +1842,6 @@ def addPropertyIndex(doc):
 
 
 def addTOCSection(doc):
-
     skipLevel = float('inf')
     previousLevel = 1
     containers = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -1935,41 +1955,53 @@ def addSpecMetadataSection(doc):
 
 
 def addReferencesSection(doc):
-    dl = E.dl()
-    for ref in sorted(doc.normativeRefs.values(), key=lambda r: r.linkText):
-        appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText), "title":ref.linkText}, "["+ref.linkText+"]"))
-        appendChild(dl, E.dd(*ref.toHTML()))
-    fillWith("normative-references", E.div(dl), doc=doc)
+    if len(doc.normativeRefs) == 0 and len(doc.informativeRefs) is None:
+        return
+    container = getFillContainer('references', doc=doc, default=True)
+    if container is None:
+        return
 
-    dl = E.dl()
-    for ref in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText):
-        # If the same doc is referenced as both normative and informative, normative wins.
-        if ref.linkText in doc.normativeRefs:
-            continue
-        appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText), "title":ref.linkText}, "["+ref.linkText+"]"))
-        appendChild(dl, E.dd(*ref.toHTML()))
-    fillWith("informative-references", E.div(dl), doc=doc)
+    appendChild(container,
+        E.h2({"class":"no-num", "id":"references"}, "References"))
+
+    normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText)
+    if len(normRefs):
+        dl = appendChild(container,
+            E.h3({"class":"no-num", "id":"normative"}, "Normative References"),
+            E.dl())
+        for ref in normRefs:
+            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText), "title":ref.linkText}, "["+ref.linkText+"]"))
+            appendChild(dl, E.dd(*ref.toHTML()))
+
+    informRefs = [x for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText) if x.linkText not in doc.normativeRefs]
+    if len(informRefs):
+        dl = appendChild(container,
+            E.h3({"class":"no-num", "id":"informative"}, "Informative References"),
+            E.dl())
+        for ref in informRefs:
+            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText), "title":ref.linkText}, "["+ref.linkText+"]"))
+            appendChild(dl, E.dd(*ref.toHTML()))
 
 def addIssuesSection(doc):
     issues = findAll('.issue', doc)
     if len(issues) == 0:
         return
-    header = find("#issues-index", doc)
-    if not header:
-        header = lxml.etree.Element('h2', {'id':"issues-index", 'class':"no-num"})
-        header.text = "Issues Index"
-        appendChild(find("body", doc), header)
-    container = lxml.etree.Element('div', {'style':"counter-reset: issue"})
-    insertAfter(header, container)
+    container = getFillContainer('issues-index', doc=doc, default=True)
+    if container is None:
+        return
+
+    appendChild(container,
+        E.h2({"class":"no-num", "id":"issues-index"}, "Issues Index"))
+    container = appendChild(container,
+        E.div({"style":"counter-reset:issue"}))
     for issue in issues:
         el = deepcopy(issue)
         el.tail = None
         if el.tag not in ("pre",):
             el.tag = "div"
         appendChild(container, el)
-        issuelink = lxml.etree.Element('a', {'href':'#'+issue.get('id')})
-        issuelink.text = " ↵ "
-        appendChild(el, issuelink)
+        appendChild(el,
+            E.a({"href":"#"+issue.get('id')}, " ↵ "))
     for idel in findAll("[id]", container):
         del idel.attrib['id']
     for dfnel in findAll("dfn", container):
