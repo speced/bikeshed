@@ -285,7 +285,8 @@ def removeClass(el, cls):
 
 
 def isElement(node):
-    return etree.iselement(node) and node.tag is not etree.Comment and node.tag is not etree.PI
+    # LXML HAS THE DUMBEST XML TREE DATA MODEL IN THE WORLD
+    return etree.iselement(node) and isinstance(node.tag, basestring)
 
 def isOpaqueElement(el):
     return el.tag in ('pre', 'code', 'style', 'script')
