@@ -285,7 +285,7 @@ def removeClass(el, cls):
 
 
 def isElement(node):
-    return etree.iselement(node)
+    return etree.iselement(node) and node.tag is not etree.Comment and node.tag is not etree.PI
 
 def isOpaqueElement(el):
     return el.tag in ('pre', 'code', 'style', 'script')
