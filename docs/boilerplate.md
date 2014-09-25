@@ -147,33 +147,3 @@ The processor will first look for the "foo-group-STATUS.include" file,
 failing over to "foo-group.include",
 then "foo-STATUS.include",
 and finally "foo.include".
-
-
-"Rerun" capability
-------------------
-
-Bert's preprocessor had the useful meta-feature
-where most of it's features would continue to work if you lost the original source document
-and just started editting the output document instead.
-This preprocessor has maintained this feature as much as it could,
-with only a few caveats:
-
-1. Boilerplate is inserted if and only if your spec doesn't start with a doctype.
-   Otherwise, it assumes that you're rolling your own boilerplate,
-   which means that if your source document auto-genned its boilerplate,
-   the output document won't double-generate.
-   However, the `data-fill-with` attribute sticks around in the output,
-   ensuring that those sections will be replaced with up-to-date text every time.
-
-2. If a `<pre>` isn't nested deeply in your document (short whitespace prefix),
-   but the contents are deeply nested (long whitespace prefix),
-   it's possible that a second run-through would strip more whitespace in error.
-   If you always indent with tabs, this is automatically avoided,
-   as tabs `<pre>` contents (after removing the prefix) are auto-converted into two spaces
-   (because tabs are enormous by default in HTML - 8 spaces wide!),
-   and so the leftover leading whitespace will never match the `<pre>` tag's prefix.
-
-3. The textual macros of the form [FOO] disappear entirely from the generated document,
-   and will need to be replaced manually.
-   It would be easy to make these work if they only showed up in content,
-   but the fact that there are valid use-cases for putting them in attributes makes it harder to keep around in-band information about replacing them.
