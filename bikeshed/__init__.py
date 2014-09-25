@@ -1697,6 +1697,25 @@ def addIndexSection(doc):
 
 def addPropertyIndex(doc):
     # Extract all the data from the propdef and descdef tables
+
+    # If you've explicitly suppressed it, don't do anything
+    if "property-index" in doc.md.boilerplate['omitSections']:
+        return
+
+    # If there are no propdef or descdef table, don't generate anything.
+    if len(findAll("table.propdef, table.descdef", doc)) == 0:
+        return
+
+    # If a fill-with is found, fill that
+    if find("[data-fill-with='property-index']", doc) is not None:
+        html = find("[data-fill-with='property-index']", doc)
+    else:
+        # Otherwise, append to the end of the document
+        html = find("body", doc)
+
+    appendChild(html,
+        E.h2({"class":"no-num no-ref", "id":"property-index"}, "Property Index"))
+
     def extractKeyValFromRow(tr):
         # Extract the key, minus the trailing :
         result = re.match(r'(.*):', textContent(row[0]).strip())
@@ -1741,7 +1760,6 @@ def addPropertyIndex(doc):
             tempDesc['Name'] = name
             atRules[atRule].append(tempDesc)
 
-    html = E.div()
 
     # TODO: Move the heading generation into this function.
 
@@ -1800,8 +1818,6 @@ def addPropertyIndex(doc):
                             E.th({"scope":"row"},
                                 E.a({"data-link-type":"descriptor"}, desc['Name'])),
                             *[E.td(desc.get(column, "")) for column in columns[1:]]))))
-
-    fillWith("property-index", html, doc=doc)
 
 
 def addTOCSection(doc):
