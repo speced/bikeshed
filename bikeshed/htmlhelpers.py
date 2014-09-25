@@ -240,7 +240,7 @@ def childNodes(parentEl, clear=False):
         ret.append(parentEl.text)
         if clear:
             parentEl.text = None
-    for c in childElements(parentEl):
+    for c in childElements(parentEl, tag=None):
         ret.append(c)
         if c.tail is not None:
             ret.append(c.tail)
