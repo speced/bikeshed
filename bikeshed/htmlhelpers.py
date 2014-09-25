@@ -105,7 +105,7 @@ def appendChild(parent, *children):
                 # when the parent already has children; the last child's tail
                 # doesn't get moved into the appended child or anything.
                 parent.append(child)
-    return children[0] if len(children) else None
+    return children[-1] if len(children) else None
 
 def prependChild(parent, child):
     # Prepends either text or an element to the parent.
