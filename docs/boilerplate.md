@@ -10,13 +10,18 @@ Groups
 ------
 
 Much of the boilerplate is determined based on the "Group" metadata.
-This defaults to "csswg", as Bikeshed is written primarily by a CSS spec writer and is intended to replace the CSSWG's previous spec preprocessor,
-but it can be set to anything.
+If unspecified, it defaults to a generic set of boilerplate that is generally appropriate for most things,
+without making reference to any particular standards body or the like.
+However, to obtain correct boilerplate for a given standards body,
+"Group" can be used.
 
 Several groups are already accommodated with appropriate inclusion files:
+
 * "csswg", as mentioned.
 * "fxtf", for the FX Task Force
 * "svg", for the SVG Working Group
+* "webappsec", for the WebApps Security Working Group
+* "whatwg", for the WHATWG
 
 You can put whatever value you want into the "Group" value, though.
 Unrecognized values will just use the default boilerplate files.
@@ -63,13 +68,36 @@ The valid `data-fill-with=''` values are:
 * "spec-metadata" for the `<dl>` of spec data that's in the header of all of our specs
 * "abstract" for the spec's abstract
 * "status" for the status section
-* "normative-references" for the normative bibliography refs
-* "informative-references" for the informative bibliography refs
-* "index" for the index of terms (all the `<dfn>` elements in the spec)
-* "property-index" for the table summarizing all properties defined in the spec
 * "logo" for the W3C logo
 * "copyright" for the W3C copyright statement
 * "warning" for the relevant spec warning, if one was indicated in the metadata.
+* "references" for the bibliography refs
+* "index" for the index of terms (all the `<dfn>` elements in the spec)
+* "property-index" for the table summarizing all properties defined in the spec
+* "issues-index"
+
+### Default Boilerplate ###
+
+Some sections listed above are generated *by default*;
+if you don't put an explicitly `data-fill-with` container in your document,
+they'll generate anyway (if they have anything to fill themselves with),
+appending themselves to the end of the `<body>`.
+These sections are:
+
+* all of the indexes: "index", "property-index", and "issues-index"
+* "references"
+
+Again, these will only auto-generate if there is something for them to do;
+if your spec doesn't define any CSS properties, for example,
+the "property-index" boilerplate won't generate.
+If you want to suppress their generation even when they do have something to do,
+use the `Boilerplate` metadata, like:
+
+```
+<pre class="metadata">
+Boilerplate: omit property-index
+</pre>
+```
 
 
 Table of Contents
