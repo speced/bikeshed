@@ -1,18 +1,16 @@
 Bikeshed, a spec preprocessor
 =============================
 
-Bikeshed is a pre-processor for the source documents the CSSWG produces their specs from.
-We write our specs in HTML, but rely on a preprocessor for a lot of niceties,
-like automatically generating a bibliography and table of contents,
-or automatically linking terms to their definitions.
-Specs also come with a lot of boilerplate repeated on every document,
-which we omit from our source document.
+Bikeshed is a pre-processor for spec documents,
+turning a source document
+(containing only the actual spec content, plus several shorthands for linking to terms and other things)
+into a final spec document,
+with appropriate boilerplate, bibliography, indexes, etc all filled in.
+It's currently used on nearly all specs in the CSSWG,
+as well as various specs in the FXTF, SVGWG, WebAppSecurity, WHATWG, and elsewhere!
 
 The processor can be easily installed and run locally (requiring no network access unless you're updating),
 or accessed as a CGI without any installation at all: <https://api.csswg.org/bikeshed/>
-
-While a few features are specialized for the CSSWG's purposes,
-Bikeshed should be useful as a general-purpose spec processor.
 
 A short overview of my preprocessor's features:
 
@@ -25,8 +23,6 @@ A short overview of my preprocessor's features:
 * [automatic whitespace-prefix stripping](docs/markup.md) from `<pre>` contents, so the contents can be indented properly in your HTML.
 * [automatic IDL processing and syntax-checking](docs/idl.md) for `<pre class=idl>` contents, so you don't have to mark up every single significant term yourself.
 * [automatic generation of railroad diagrams](docs/railroad-diagrams.md) from `<pre class='railroad'>` contents.
-
-Examples of much of the functionality described here can be found by looking at the source of the [CSS Variables source document](http://dev.w3.org/csswg/css-variables/Overview.src.html)
 
 Note About Fatal Errors
 -----------------------
