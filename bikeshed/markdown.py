@@ -196,7 +196,7 @@ def parseMultiLineHeading(stream):
 		level = 3
 	else:
 		die("Markdown parser error: tried to parse a multiline heading from:\n{0}{1}{2}", stream.prevraw(), stream.currraw(), stream.nextraw())
-	match = re.search(r"(.*)\{\s*#([\w-]+)\s*\}\s*$", stream.currtext())
+	match = re.search(r"(.*?)\s*\{\s*#([\w-]+)\s*\}\s*$", stream.currtext())
 	if match:
 		text = match.group(1)
 		idattr = "id='{0}'".format(match.group(2))
