@@ -1,21 +1,49 @@
 Markup Shortcuts
 ================
 
-The processor allows you to omit or shorten several verbose/annoying parts of HTML,
+Bikeshed's source format is *roughly* HTML,
+but it allows you to omit or shorten several verbose/annoying parts of the language,
 reducing the amount of format noise in the spec source,
 making it easier to read and write.
 
-Markdown-style Paragraphs
--------------------------
+Markdown
+--------
 
-The processor recognizes Markdown-style paragraphs,
-allowing you to omit nearly all `<p>` elements from your source.
+Bikeshed currently recognizes a subset of Markdown:
 
-Any block of text preceded by a blank line and starting with either naked text or an inline HTML element will be recognized as a paragraph and have the appropriate markup inserted automatically.
+* paragraphs
+* lists
+* headings
+
+It also recognizes **definition lists**, with the following format:
+
+```
+Here's the dl syntax:
+
+: key
+:: val
+: key 1
+: key 2
+:: more vals
+```
+
+It supports adding IDs to headings,
+via the Markdown Extra syntax:
+
+```
+Header 1 {#header1}
+========
+
+### Header 2 ### {#header2}
+```
 
 Additionally, starting a paragraph with "Note: " or "Note, " will add a `class='note'` to the paragraph,
 which triggers special formatting in the CSS stylesheet.
 Starting one with "Issue: " will add a `class='issue'` to the paragraph.
+Starting one with "Advisement: " will add a `<strong class=advisement>` around the contents of the paragraph.
+
+More of Markdown will be supported in the future,
+as is adherence to the CommonMark specification.
 
 
 Typography Fixes
@@ -42,6 +70,7 @@ There are several shortcuts for writing autolinks of particular types, so you do
 * `{{Foo}}` is an autolink to an IDL term named "Foo". (Accepts interfaces, attributes, methods, etc)
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
+* `[[#foo]]` is an autolink to the heading in the same document with that ID. This generates appropriate reference text in its place, like "§5.3 Baseline Self-Alignment"
 
 If using the `''foo''`,
 `<<'descriptor'>>`,
@@ -50,6 +79,12 @@ you can specify the `for=''` attribute in the shortcut as well
 by writing the for value first, then a slash, then the value.
 For example, `''width/auto''` specifically refers to the `auto` value for the `width` property,
 which is much shorter than writing out `<a value for=width>auto</a>`.
+For the `{{foo}}` shortcut,
+you can also specify exactly which type of IDL link it is,
+in case of ambiguity,
+by appending a `!` and the type,
+like `{{family!argument}}`,
+which is equivalent to `<a argument><code>family</code></a>`
 
 Remember that if you need to write out the `<a>` tag explicitly,
 you can add the type as a boolean attribute.
@@ -165,6 +200,14 @@ it's automatically de-duped by appending a number to the end.
 This isn't very pretty,
 so if you want to avoid it,
 supply an ID yourself.
+
+Bikeshed recognizes a fake element named `<assert>` for marking "assertions" that tests can refer to.
+In the generated output, this is converted to a `<span>` with a unique ID generated from its contents,
+like issues (described above).
+This ensures that you have a unique ID that won't change arbitrarily,
+but *will* change **when the contents of the assertion change**,
+making it easier to tell when a test might no longer be testing the assertion it points to
+(because it's no longer pointing to a valid target at all!).
 
 
 Automatic Self-Link Generation
