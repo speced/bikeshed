@@ -42,18 +42,14 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 		if line == "":
 			token = {'type':'blank', 'raw': '\n'}
 		# FIXME: Detect the heading ID from heading lines
-		elif "headings" in features and re.match(r"={3,}\s*(\{#[\w-]+\})?\s*$", line):
+		elif "headings" in features and re.match(r"={3,}\s*$", line):
 			# h1 underline
-			match = re.match(r"={3,}\s*(\{#[\w-]+\})?\s*$", line)
+			match = re.match(r"={3,}\s$", line)
 			token = {'type':'equals-line', 'raw': rawline}
-			if match.group(1):
-				token['id'] = match.group(1)[2:-1]
-		elif "headings" in features and re.match(r"-{3,}\s*(\{#[\w-]+\})?\s*$", line):
+		elif "headings" in features and re.match(r"-{3,}\s*$", line):
 			# h2 underline
-			match = re.match(r"-{3,}\s*(\{#[\w-]+\})?\s*$", line)
+			match = re.match(r"-{3,}\s*$", line)
 			token = {'type':'dash-line', 'raw': rawline}
-			if match.group(1):
-				token['id'] = match.group(1)[2:-1]
 		elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[\w-]+\})?\s*$", line):
 			# single-line heading
 			match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[\w-]+\})?\s*$", line)
@@ -200,11 +196,14 @@ def parseMultiLineHeading(stream):
 		level = 3
 	else:
 		die("Markdown parser error: tried to parse a multiline heading from:\n{0}{1}{2}", stream.prevraw(), stream.currraw(), stream.nextraw())
-	if "id" in stream.next():
-		idattr = " id='{0}'".format(stream.nextid())
+	match = re.search(r"(.*)\{\s*#([\w-]+)\s*\}\s*$", stream.currtext())
+	if match:
+		text = match.group(1)
+		idattr = "id='{0}'".format(match.group(2))
 	else:
+		text = stream.currtext()
 		idattr = ""
-	lines = ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, level=level, **stream.curr())]
+	lines = ["<h{level} {idattr} >{htext}</h{level}>\n".format(idattr=idattr, level=level, htext=text, **stream.curr())]
 	stream.advance(2)
 	return lines
 
