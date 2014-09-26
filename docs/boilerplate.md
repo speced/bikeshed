@@ -76,6 +76,10 @@ The valid `data-fill-with=''` values are:
 * "property-index" for the table summarizing all properties defined in the spec
 * "issues-index"
 
+Additionally, "header" and "footer" boilerplate files are used to put content at the start and end of your document.
+Most or all of the above boilerplate sections should actually show up here, in the header and footer,
+rather than being manually specified in your source file.
+
 ### Default Boilerplate ###
 
 Some sections listed above are generated *by default*;
@@ -98,6 +102,19 @@ use the `Boilerplate` metadata, like:
 Boilerplate: omit property-index
 </pre>
 ```
+
+### Overriding Boilerplate ###
+
+Sometimes a file-based boilerplate (see below) that is appropriate for most of the specs in your group
+isn't quite right for your specific spec.
+Any boilerplate, file-based or Bikeshed-generated,
+can be overriden by custom text of your choosing.
+Just add an element to your source document with the content you'd like to show up in place of the offending boilerplate,
+and add a `boilerplate="foo"` attribute to the container,
+specifying which boilerplate section is being replaced.
+
+Bikeshed will automatically remove that element from you document,
+and instead inject its contents in place of the boilerplate that it would normally provide.
 
 
 Table of Contents
