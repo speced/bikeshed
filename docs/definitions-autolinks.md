@@ -313,8 +313,7 @@ which link to `<dfn>` elements,
 biblio autolinks cause the spec to generate entries in its "References" section,
 and then link to that instead.
 The biblio database is also entirely separate from the normal definitions database,
-and can be found at <https://www.w3.org/Style/Group/css3-src/biblio.ref>
-(member-only link, unfortunately).
+and can be found at <http://dev.w3.org/csswg/biblio.ref>.
 A version of this file is included in the processor's repository,
 and the data doesn't change often,
 so it should be sufficient.
