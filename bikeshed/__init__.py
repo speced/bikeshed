@@ -502,7 +502,7 @@ def addHeadingBonuses(doc, headings):
     for header in headings:
         if header.get("data-level") is not None:
             secno = lxml.etree.Element('span', {"class":"secno"})
-            secno.text = header.get('data-level') + ' '
+            secno.text = header.get('data-level') + '. '
             header.insert(0, secno)
 
 
