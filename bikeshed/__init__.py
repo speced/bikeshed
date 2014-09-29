@@ -1520,14 +1520,15 @@ class CSSSpec(object):
             status = self.md.status
 
         pathprefix = config.scriptPath + "/include"
-        if os.path.isfile("{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status)):
-            filename = "{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status)
-        elif os.path.isfile("{0}/{1}-{2}.include".format(pathprefix, name, group)):
-            filename = "{0}/{1}-{2}.include".format(pathprefix, name, group)
-        elif os.path.isfile("{0}/{1}-{2}.include".format(pathprefix, name, status)):
-            filename = "{0}/{1}-{2}.include".format(pathprefix, name, status)
-        elif os.path.isfile("{0}/{1}.include".format(pathprefix, name)):
-            filename = "{0}/{1}.include".format(pathprefix, name)
+        for filename in [
+            "{0}/{1}.include".format(os.path.dirname(os.path.abspath(self.inputSource)), name),
+            "{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status),
+            "{0}/{1}-{2}.include".format(pathprefix, name, group),
+            "{0}/{1}-{2}.include".format(pathprefix, name, status),
+            "{0}/{1}.include".format(pathprefix, name),
+        ]:
+            if os.path.isfile(filename):
+                break
         else:
             if error:
                 die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
