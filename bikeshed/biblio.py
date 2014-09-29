@@ -74,6 +74,7 @@ class BiblioEntry(object):
 
         if self.url:
             ret.append(E.a({"href":self.url}, self.title))
+            ret.append(". ")
         else:
             ret.append(self.title + ". ")
 
