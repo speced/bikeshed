@@ -169,9 +169,10 @@ class MetadataManager:
 
         requiredSingularKeys = [
             ('status', 'Status'),
-            ('ED', 'ED'),
             ('shortname', 'Shortname')
         ]
+        if getattr(self, 'status', None) != 'LS':
+            requiredSingularKeys.append(('ED', 'ED'))
         requiredMultiKeys = [
             ('abstract', 'Abstract'),
             ('editors', 'Editor')
