@@ -175,15 +175,17 @@ Setting an empty title attribute turns off autolinking entirely,
 if for whatever reason you need to do so.
 
 There are several additional shortcuts for writing an autolink:
-* `<i>` elements are treated as autolinks as well, for legacy reasons.
 * `'foo'` (apostophes/straight quotes) is an autolink to a property or descriptor named "foo"
 * `''foo''` (double apostrophes) is an autolink to any of the CSS definition types except property and descriptor
 * `<<foo>>` is an autolink to a type/production named "&lt;foo>"
 * `<<'foo'>>` is an autolink to the the property or descriptor named "foo" (used in grammars, where you need `<foo>` for non-terminals)
 * `<<foo()>>` is an autolink to the function named "foo" (same)
 * `<<@foo>>` is an autolink to the at-rule named "@foo" (same)
+* `{{foo}}` is an autolink to one of the IDL types for the term "foo".
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
+* `[[#foo]]` is an autolink to a heading in the same document with the given ID.  (See [Section Links](#section-links) for more detail.)
+
 
 Link Types
 ----------
@@ -216,12 +218,13 @@ There are three things you might have to do to fix these:
     you may need to specify `for` on the link as well to narrow down which definition you're referring to.
     For example, many properties define an "auto" value;
     to link to the "auto" value of the 'width' property in particular,
-    specify `<a value for=width>auto</a>`.
+    specify `<a value for=width>auto</a>`,
+    or the shortcut syntax `''width/auto''.
     To refer to a value of a descriptor,
     you *can* be completely explicit and specify the at-rule as well,
     like `<a value for='@counter-style/system'>numeric</a>`,
     but you're allowed to omit the at-rule if there are no other properties or descriptors with the same name,
-    like `<a value for='system'>numeric</a>`.
+    like `''system/numeric''`.
     This might trigger errors in the future if a conflicting property or definition gets added later,
     but it keeps your links shorter for now.
 
@@ -232,6 +235,12 @@ There are three things you might have to do to fix these:
     Just add a `spec=''` attribute with the spec's shortname to either the link or a container.
     This can also be specified in the spec's [metadata](metadata.md) with "Link Defaults",
     which applies document-wide.
+
+**Note:** You can specify the type of a link using the shortcut syntax, too.
+This is currently only available for the IDL shortcut syntax (`{{foo}}`),
+but will eventually spread to the others.
+Simply append a `!` character, followed by the link type, to the term,
+like `{{foo!argument}}`
 
 As a final note, the autolinking algorithm will link differently based on whether the spec being processed is an "unofficial" or "official" draft.
 If "unofficial" (ED, UD, etc.), it'll prefer to link to other EDs, and will only link to TRs if no ED version of that spec exists.
@@ -318,10 +327,10 @@ A version of this file is included in the processor's repository,
 and the data doesn't change often,
 so it should be sufficient.
 
-Bibliography data can come from multiple sources.
-A bunch of data gets auto-filled from the file at <http://dev.w3.org/csswg/biblio.ref>,
-maintained by the CSSWG.
-Soonish, Bikeshed will also import a bunch of data from the [SpecRef project](https://github.com/tobie/specref).
+The bibliography database is completely separate from the autolinking database,
+and comes from multiple sources.
+The default data comes from the [SpecRef project](https://github.com/tobie/specref)
+and [the CSSWG's own biblio file](http://dev.w3.org/csswg/biblio.ref).
 
 You can also add your own bibliography data,
 following the SpecRef JSON format:
@@ -344,7 +353,7 @@ following the SpecRef JSON format:
 }
 ```
 
-Only the "title" and "href" fields are strictly necessary;
+Only the "title" field is strictly necessary;
 the rest can be omitted if desired.
 
 This JSON should either be inline, in a `<pre class=biblio>` block,
