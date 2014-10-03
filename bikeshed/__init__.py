@@ -1368,8 +1368,7 @@ class CSSSpec(object):
 
         # Replace the [FOO] things.
         for tag, replacement in self.macros.items():
-            if replacement is not None:
-                text = text.replace("[{0}]".format(tag.upper()), replacement)
+            text = text.replace("[{0}]".format(tag.upper()), replacement)
         text = fixTypography(text)
         # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
         # <'foo'> is a link to the 'foo' property or descriptor
@@ -1910,7 +1909,7 @@ def addSpecMetadataSection(doc):
 
     md = DefaultOrderedDict(list)
     mac = doc.macros
-    if mac['version']:
+    if mac.get('version'):
         md["This version"].append(E.a({"href":mac['version'], "class":"u-url"}, mac['version']))
     if doc.md.TR:
         md["Latest version"].append(E.a({"href": doc.md.TR}, doc.md.TR))
