@@ -171,22 +171,34 @@ class MetadataManager:
             ('status', 'Status'),
             ('shortname', 'Shortname')
         ]
-        if getattr(self, 'status', None) != 'LS':
-            requiredSingularKeys.append(('ED', 'ED'))
+        recommendedSingularKeys = []
         requiredMultiKeys = [
             ('abstract', 'Abstract'),
             ('editors', 'Editor')
         ]
+
+        if self.status != 'LS':
+            requiredSingularKeys.append(('ED', 'ED'))
+        if self.status in ["LCWD", "PR"]
+            requiredSingularKeys.append(('deadline', 'Deadline'))
+            recommendedSingularKeys.append(('date', 'Date'))
+
         errors = []
+        warnings = []
         for attr, name in requiredSingularKeys:
             if getattr(self, attr) is None:
                 errors.append("    Missing a '{0}' entry.".format(name))
+        for attr, name in recommendedSingularKeys:
+            if getattr(self, attr) is None:
+                warnings.append("    You probably want to provide a '{0}' entry.".format(name))
         for attr, name in requiredMultiKeys:
             if len(getattr(self, attr)) == 0:
                 errors.append("    Must provide at least one '{0}' entry.".format(name))
         # Level is optional for some statuses.
         if self.level is None and self.status not in config.unlevelledStatuses:
             errors.append("    Missing a 'Level' entry.")
+        if warnings:
+            warn("Some recommended metadata is missing:\n{0}", "\n".join(warnings))
         if errors:
             die("Not all required metadata was provided:\n{0}", "\n".join(errors))
             return
