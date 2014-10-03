@@ -308,7 +308,7 @@ class ReferenceManager(object):
                  '\n'.join('    {2} ({1}) {0}'.format(text, ref['type'], ref['spec']) for ref in refs))
         return refs[0]['url']
 
-    def getBiblioRef(self, text, type=None, el=None):
+    def getBiblioRef(self, text, el=None):
         try:
             candidates = sorted(self.biblios[text.lower()], key=itemgetter('order'))
         except KeyError, e:
@@ -317,14 +317,10 @@ class ReferenceManager(object):
         if not candidates:
             die("Couldn't find '{0}' in bibliography data.", text)
             return None
-        if type is None:
-            return biblio.BiblioEntry(**candidates[0])
-        for c in candidates:
-            if c['type'] == type:
-                return biblio.BiblioEntry(**c)
-        else:
-            die("Couldn't find '{0}' for type '{1}' in bibliography data.", text, type)
-            return
+        # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
+        # if candidates[0]['order'] > 3: # 3 is SpecRef level
+        #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
+        return biblio.BiblioEntry(**candidates[0])
 
 
 def linkTextsFromElement(el, preserveCasing=False):
