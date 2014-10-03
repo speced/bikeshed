@@ -181,7 +181,10 @@ class MetadataManager:
             requiredSingularKeys.append(('ED', 'ED'))
         if self.status in ["LCWD", "PR"]
             requiredSingularKeys.append(('deadline', 'Deadline'))
+        if self.status in config.TRStatuses:
             recommendedSingularKeys.append(('date', 'Date'))
+        if self.status not in config.unlevelledStatuses:
+            requiredSingularKeys.append(('level', 'Level'))
 
         errors = []
         warnings = []
@@ -194,9 +197,6 @@ class MetadataManager:
         for attr, name in requiredMultiKeys:
             if len(getattr(self, attr)) == 0:
                 errors.append("    Must provide at least one '{0}' entry.".format(name))
-        # Level is optional for some statuses.
-        if self.level is None and self.status not in config.unlevelledStatuses:
-            errors.append("    Missing a 'Level' entry.")
         if warnings:
             warn("Some recommended metadata is missing:\n{0}", "\n".join(warnings))
         if errors:
