@@ -180,7 +180,7 @@ class MetadataManager:
 
         if self.status != 'LS':
             requiredSingularKeys['ED'] = 'ED'
-        if self.status in ["LCWD", "PR"]:
+        if self.status in config.deadlineStatuses:
             requiredSingularKeys['deadline'] = 'Deadline'
         if self.status in config.TRStatuses:
             recommendedSingularKeys['date'] = 'Date'

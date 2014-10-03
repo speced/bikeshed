@@ -15,6 +15,7 @@ textMacros = {}
 
 TRStatuses = ["WD", "FPWD", "LCWD", "CR", "PR", "REC", "PER", "NOTE", "MO"]
 unlevelledStatuses = ["LS", "DREAM", "UD"]
+deadlineStatuses = ["LCWD", "PR"]
 shortToLongStatus = {
     "ED": "Editor's Draft",
     "WD": "W3C Working Draft",
