@@ -176,11 +176,11 @@ class MetadataManager:
         requiredMultiKeys = {
             'abstract': 'Abstract',
             'editors': 'Editor'
-        ]
+        }
 
         if self.status != 'LS':
             requiredSingularKeys['ED'] = 'ED'
-        if self.status in ["LCWD", "PR"]
+        if self.status in ["LCWD", "PR"]:
             requiredSingularKeys['deadline'] = 'Deadline'
         if self.status in config.TRStatuses:
             recommendedSingularKeys['date'] = 'Date'
@@ -189,13 +189,13 @@ class MetadataManager:
 
         errors = []
         warnings = []
-        for attr, name in requiredSingularKeys.entries():
+        for attr, name in requiredSingularKeys.items():
             if getattr(self, attr) is None:
                 errors.append("    Missing a '{0}' entry.".format(name))
-        for attr, name in recommendedSingularKeys.entries():
+        for attr, name in recommendedSingularKeys.items():
             if getattr(self, attr) is None:
                 warnings.append("    You probably want to provide a '{0}' entry.".format(name))
-        for attr, name in requiredMultiKeys.entries():
+        for attr, name in requiredMultiKeys.items():
             if len(getattr(self, attr)) == 0:
                 errors.append("    Must provide at least one '{0}' entry.".format(name))
         if warnings:
