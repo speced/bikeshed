@@ -1909,7 +1909,8 @@ def addSpecMetadataSection(doc):
 
     md = DefaultOrderedDict(list)
     mac = doc.macros
-    md["This version"].append(E.a({"href":mac['version'], "class":"u-url"}, mac['version']))
+    if mac.get('version'):
+        md["This version"].append(E.a({"href":mac['version'], "class":"u-url"}, mac['version']))
     if doc.md.TR:
         md["Latest version"].append(E.a({"href": doc.md.TR}, doc.md.TR))
     if doc.md.ED and doc.md.status in config.TRStatuses:
