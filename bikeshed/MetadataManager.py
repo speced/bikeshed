@@ -167,34 +167,35 @@ class MetadataManager:
             die("The document requires at least one metadata block.")
             return
 
-        requiredSingularKeys = [
-            ('status', 'Status'),
-            ('shortname', 'Shortname')
-        ]
-        recommendedSingularKeys = []
-        requiredMultiKeys = [
-            ('abstract', 'Abstract'),
-            ('editors', 'Editor')
+        # { MetadataManager attr : metadata name }
+        requiredSingularKeys = {
+            'status': 'Status',
+            'shortname': 'Shortname'
+        }
+        recommendedSingularKeys = {}
+        requiredMultiKeys = {
+            'abstract': 'Abstract',
+            'editors': 'Editor'
         ]
 
         if self.status != 'LS':
-            requiredSingularKeys.append(('ED', 'ED'))
+            requiredSingularKeys['ED'] = 'ED'
         if self.status in ["LCWD", "PR"]
-            requiredSingularKeys.append(('deadline', 'Deadline'))
+            requiredSingularKeys['deadline'] = 'Deadline'
         if self.status in config.TRStatuses:
-            recommendedSingularKeys.append(('date', 'Date'))
+            recommendedSingularKeys['date'] = 'Date'
         if self.status not in config.unlevelledStatuses:
-            requiredSingularKeys.append(('level', 'Level'))
+            requiredSingularKeys['level'] = 'Level'
 
         errors = []
         warnings = []
-        for attr, name in requiredSingularKeys:
+        for attr, name in requiredSingularKeys.entries():
             if getattr(self, attr) is None:
                 errors.append("    Missing a '{0}' entry.".format(name))
-        for attr, name in recommendedSingularKeys:
+        for attr, name in recommendedSingularKeys.entries():
             if getattr(self, attr) is None:
                 warnings.append("    You probably want to provide a '{0}' entry.".format(name))
-        for attr, name in requiredMultiKeys:
+        for attr, name in requiredMultiKeys.entries():
             if len(getattr(self, attr)) == 0:
                 errors.append("    Must provide at least one '{0}' entry.".format(name))
         if warnings:
