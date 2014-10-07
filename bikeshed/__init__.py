@@ -1384,7 +1384,7 @@ class CSSSpec(object):
         # Replace the ''maybe link'' shortcuts.
         # They'll survive the HTML parser, but they don't match if they contain an element.
         # (The other shortcuts are "atomic" and can't contain elements.)
-        text = re.sub(r"''([^=\n]+?)''", r'<a data-link-type="maybe" class="css">\1</a>', text)
+        text = re.sub(r"''([^=\n]+?)''", r'<a data-link-type="maybe" class="css" title="\1">\1</a>', text)
         return text
 
     def transformAutolinkShortcuts(doc):
