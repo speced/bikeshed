@@ -136,7 +136,21 @@ def updateBiblio():
     if not config.dryRun:
         try:
             with io.open(config.scriptPath + "/spec-data/biblio.data", 'w', encoding="utf-8") as fh:
-                # set([u'status', u'title', u'url', u'etAl', u'other', u'linkText', u'authors', u'date', u'order'])
+                '''
+                Biblio file format:
+                Each line is a value for a specific key, in the order:
+                key
+                linkText
+                date
+                status
+                title
+                url
+                other
+                etAl (as a boolish string)
+                authors* (each on a separate line, an indeterminate number of lines)
+
+                Entries are separated by a line consisting of a lone - character.
+                '''
                 for key, entries in biblios.items():
                     b = sorted(entries, key=lambda x:x['order'])[0]
                     fh.write(key.lower() + "\n")
