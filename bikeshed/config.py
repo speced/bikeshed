@@ -4,6 +4,7 @@ import os.path
 import re
 from collections import defaultdict
 from functools import total_ordering
+from .messages import *
 
 debug = False
 quiet = False

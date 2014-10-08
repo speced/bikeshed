@@ -135,7 +135,7 @@ def updateBiblio():
         die("Couldn't download the biblio data.\n{0}", e)
     if not config.dryRun:
         try:
-            with io.open(config.scriptPath + "/spec-data/biblio.json", 'w', encoding="utf-8") as fh:
+            with io.open(config.scriptPath + "/spec-data/biblio.data", 'w', encoding="utf-8") as fh:
                 # set([u'status', u'title', u'url', u'etAl', u'other', u'linkText', u'authors', u'date', u'order'])
                 for key, entries in biblios.items():
                     b = sorted(entries, key=lambda x:x['order'])[0]

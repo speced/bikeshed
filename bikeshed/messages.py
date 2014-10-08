@@ -2,7 +2,7 @@
 from __future__ import division, unicode_literals
 import sys
 
-from . import config
+import config
 
 
 messages = set()

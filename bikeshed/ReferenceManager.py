@@ -53,7 +53,7 @@ class ReferenceManager(object):
 
     def initializeBiblio(self):
 
-        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.json", type="bibliography") as fh:
+        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.data", type="bibliography") as fh:
             try:
                 while True:
                     key = fh.next()[:-1]
