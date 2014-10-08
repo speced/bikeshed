@@ -62,9 +62,9 @@ class BiblioEntry(object):
         if len(self.authors) == 0:
             str += "???"
         elif len(self.authors) == 1:
-            str += self.authors[0]
+            str += u(self.authors[0])
         elif len(self.authors) < 4:
-            str += "; ".join(self.authors)
+            str += "; ".join(map(u, self.authors))
         else:
             str += self.authors[0]
             etAl = True
@@ -73,23 +73,23 @@ class BiblioEntry(object):
         ret.append(str)
 
         if self.url:
-            ret.append(E.a({"href":self.url}, self.title))
+            ret.append(E.a({"href":u(self.url)}, u(self.title)))
             ret.append(". ")
         else:
-            ret.append(self.title + ". ")
+            ret.append(u(self.title) + ". ")
 
         str = ""
         if self.date:
-            str += self.date + ". "
+            str += u(self.date) + ". "
         if self.status:
-            str += self.status + ". "
+            str += u(self.status) + ". "
         if self.other:
-            str += self.other + " "
+            str += u(self.other) + " "
         ret.append(str)
 
         if self.url:
             ret.append("URL: ")
-            ret.append(E.a({"href":self.url}, self.url))
+            ret.append(E.a({"href":u(self.url)}, u(self.url)))
 
         return ret
 
@@ -180,3 +180,7 @@ def processSpecrefBiblioFile(text, storage, order):
             continue
         storage[biblioKey.lower()].append(biblio)
     return storage
+
+
+def u(str):
+    return unicode(str, encoding="utf-8")

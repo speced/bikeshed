@@ -2,7 +2,6 @@
 from __future__ import division, unicode_literals
 import os.path
 import re
-import io
 from collections import defaultdict
 from functools import total_ordering
 
@@ -137,11 +136,11 @@ def intersperse(iterable, delimiter):
 
 
 
-def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False):
+def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False, str=False):
     try:
         if force:
             raise IOError("Skipping cache lookup, because this is a forced retrieval.")
-        fh = io.open(cacheLocation, 'r', encoding="utf-8")
+        fh = open(cacheLocation, 'r')
     except IOError:
         if fallbackurl is None:
             die("Couldn't find the {0} cache file at the specified location '{1}'.", type, cacheLocation)
@@ -156,13 +155,16 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force
                 if not quiet:
                     say("Attempting to save the {0} file to cache...", type)
                 if not dryRun:
-                    outfh = io.open(cacheLocation, 'w', encoding="utf-8")
+                    outfh = open(cacheLocation, 'w')
                     outfh.write(fh.read())
                     fh.close()
-                fh = io.open(cacheLocation, 'r', encoding="utf-8")
+                fh = open(cacheLocation, 'r')
                 if not quiet:
                     say("Successfully saved the {0} file to cache.", type)
             except:
                 if not quiet:
                     warn("Couldn't save the {0} file to cache. Proceeding...", type)
-    return fh
+    if str:
+        return unicode(fh.read(), encoding="utf-8")
+    else:
+        return fh

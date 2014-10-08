@@ -30,15 +30,17 @@ class ReferenceManager(object):
             config.retrieveCachedFile(
                 cacheLocation=config.scriptPath+"/spec-data/specs.json",
                 type="spec list",
-                quiet=True).read()))
+                quiet=True,
+                str=True)))
         self.refs.update(json.loads(
             config.retrieveCachedFile(
                 cacheLocation=config.scriptPath+"/spec-data/anchors.json",
                 type="anchor data",
-                quiet=True).read()))
+                quiet=True,
+                str=True)))
         try:
             with io.open("anchors.json", 'r', encoding="utf-8") as fh:
-                self.refs.update(json.loads(fh.read()))
+                self.refs.update(json.load(fh))
         except IOError:
             pass
 
@@ -46,7 +48,8 @@ class ReferenceManager(object):
             config.retrieveCachedFile(
                 cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
                 type="link defaults",
-                quiet=True).read()))
+                quiet=True,
+                str=True)))
 
     def initializeBiblio(self):
 
