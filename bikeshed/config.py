@@ -2,6 +2,7 @@
 from __future__ import division, unicode_literals
 import os.path
 import re
+import io
 from collections import defaultdict
 from functools import total_ordering
 
@@ -140,7 +141,7 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force
     try:
         if force:
             raise IOError("Skipping cache lookup, because this is a forced retrieval.")
-        fh = open(cacheLocation, 'r')
+        fh = io.open(cacheLocation, 'r', encoding="utf-8")
     except IOError:
         if fallbackurl is None:
             die("Couldn't find the {0} cache file at the specified location '{1}'.", type, cacheLocation)
@@ -155,10 +156,10 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force
                 if not quiet:
                     say("Attempting to save the {0} file to cache...", type)
                 if not dryRun:
-                    outfh = open(cacheLocation, 'w')
+                    outfh = io.open(cacheLocation, 'w', encoding="utf-8")
                     outfh.write(fh.read())
                     fh.close()
-                fh = open(cacheLocation, 'r')
+                fh = io.open(cacheLocation, 'r', encoding="utf-8")
                 if not quiet:
                     say("Successfully saved the {0} file to cache.", type)
             except:

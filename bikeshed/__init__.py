@@ -1213,9 +1213,7 @@ class CSSSpec(object):
         self.refs.initializeBiblio();
 
         self.testSuites = json.loads(
-                            unicode(
-                                config.retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/test-suites.json", type="test suite list", quiet=True).read(),
-                                encoding="utf-8"))
+                            config.retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/test-suites.json", type="test suite list", quiet=True).read())
 
         if "css21Replacements" in self.refs.defaultSpecs:
             self.refs.css21Replacements = set(self.refs.defaultSpecs["css21Replacements"])

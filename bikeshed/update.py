@@ -136,7 +136,19 @@ def updateBiblio():
     if not config.dryRun:
         try:
             with io.open(config.scriptPath + "/spec-data/biblio.json", 'w', encoding="utf-8") as fh:
-                fh.write(unicode(json.dumps(biblios, ensure_ascii=False, indent=2)))
+                # set([u'status', u'title', u'url', u'etAl', u'other', u'linkText', u'authors', u'date', u'order'])
+                for key, entries in biblios.items():
+                    b = sorted(entries, key=lambda x:x['order'])[0]
+                    fh.write(key.lower() + "\n")
+                    for field in ["linkText", "date", "status", "title", "url", "other"]:
+                        fh.write(b.get(field, "") + "\n")
+                    if b.get("etAl", False):
+                        fh.write("1\n")
+                    else:
+                        fh.write("\n")
+                    for author in b.get("authors", []):
+                        fh.write(author+"\n")
+                    fh.write("-" + "\n")
         except Exception, e:
             die("Couldn't save biblio database to disk.\n{0}", e)
             return

@@ -27,19 +27,15 @@ class ReferenceManager(object):
     def initializeRefs(self):
         # Load up the xref data
         self.specs.update(json.loads(
-            unicode(
-                config.retrieveCachedFile(
-                    cacheLocation=config.scriptPath+"/spec-data/specs.json",
-                    type="spec list",
-                    quiet=True).read(),
-                encoding="utf-8")))
+            config.retrieveCachedFile(
+                cacheLocation=config.scriptPath+"/spec-data/specs.json",
+                type="spec list",
+                quiet=True).read()))
         self.refs.update(json.loads(
-            unicode(
-                config.retrieveCachedFile(
-                    cacheLocation=config.scriptPath+"/spec-data/anchors.json",
-                    type="anchor data",
-                    quiet=True).read(),
-                encoding="utf-8")))
+            config.retrieveCachedFile(
+                cacheLocation=config.scriptPath+"/spec-data/anchors.json",
+                type="anchor data",
+                quiet=True).read()))
         try:
             with io.open("anchors.json", 'r', encoding="utf-8") as fh:
                 self.refs.update(json.loads(fh.read()))
@@ -47,21 +43,37 @@ class ReferenceManager(object):
             pass
 
         self.defaultSpecs.update(json.loads(
-            unicode(
-                config.retrieveCachedFile(
-                    cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
-                    type="link defaults",
-                    quiet=True).read(),
-                encoding="utf-8")))
+            config.retrieveCachedFile(
+                cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
+                type="link defaults",
+                quiet=True).read()))
 
     def initializeBiblio(self):
-        # Biblio structure is a dict of keys to [(BiblioEntry, type)]
-        # When looking up a biblio ref, if type is unspecified,
-        # prefer taking the first one in the list.
 
-        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.json",
-                                      type="bibliography") as fh:
-            self.biblios.update(json.load(fh))
+        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.json", type="bibliography") as fh:
+            try:
+                while True:
+                    key = fh.next()[:-1]
+                    b = {
+                        "linkText": fh.next()[:-1],
+                        "date": fh.next()[:-1],
+                        "status": fh.next()[:-1],
+                        "title": fh.next()[:-1],
+                        "url": fh.next()[:-1],
+                        "other": fh.next()[:-1],
+                        "etAl": bool(fh.next()[:-1]),
+                        "order": 3,
+                        "authors": []
+                    }
+                    while True:
+                        line = fh.next()[:-1]
+                        if line == b"-":
+                            break
+                        b['authors'].append(line)
+                    self.biblios[key].append(b)
+            except:
+                pass
+
 
         # Get local bibliography data
         try:
