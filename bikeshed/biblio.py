@@ -169,7 +169,7 @@ def processSpecrefBiblioFile(text, storage, order):
         "etAl": "etAl",
         "href": "url",
         "title": "title",
-        "rawDate": "date",
+        "date": "date",
         "status": "status"
     }
     # Required BiblioEntry fields
