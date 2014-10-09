@@ -136,33 +136,7 @@ def updateBiblio():
     if not config.dryRun:
         try:
             with io.open(config.scriptPath + "/spec-data/biblio.data", 'w', encoding="utf-8") as fh:
-                '''
-                Biblio file format:
-                Each line is a value for a specific key, in the order:
-                key
-                linkText
-                date
-                status
-                title
-                url
-                other
-                etAl (as a boolish string)
-                authors* (each on a separate line, an indeterminate number of lines)
-
-                Entries are separated by a line consisting of a lone - character.
-                '''
-                for key, entries in biblios.items():
-                    b = sorted(entries, key=lambda x:x['order'])[0]
-                    fh.write(key.lower() + "\n")
-                    for field in ["linkText", "date", "status", "title", "url", "other"]:
-                        fh.write(b.get(field, "") + "\n")
-                    if b.get("etAl", False):
-                        fh.write("1\n")
-                    else:
-                        fh.write("\n")
-                    for author in b.get("authors", []):
-                        fh.write(author+"\n")
-                    fh.write("-" + "\n")
+                writeBiblioFile(fh, biblios)
         except Exception, e:
             die("Couldn't save biblio database to disk.\n{0}", e)
             return
@@ -286,3 +260,34 @@ def updateTestSuites():
         except Exception, e:
             die("Couldn't save test-suite database to disk.\n{0}", e)
     say("Success!")
+
+
+
+def writeBiblioFile(fh, biblios):
+    '''
+    Each line is a value for a specific key, in the order:
+
+    key
+    linkText
+    date
+    status
+    title
+    url
+    other
+    etAl (as a boolish string)
+    authors* (each on a separate line, an indeterminate number of lines)
+
+    Each entry (including last) is ended by a line containing a single - character.
+    '''
+    for key, entries in biblios.items():
+        b = sorted(entries, key=lambda x:x['order'])[0]
+        fh.write(key.lower() + "\n")
+        for field in ["linkText", "date", "status", "title", "url", "other"]:
+            fh.write(b.get(field, "") + "\n")
+        if b.get("etAl", False):
+            fh.write("1\n")
+        else:
+            fh.write("\n")
+        for author in b.get("authors", []):
+            fh.write(author+"\n")
+        fh.write("-" + "\n")
