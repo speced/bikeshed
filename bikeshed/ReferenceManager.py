@@ -71,24 +71,24 @@ class ReferenceManager(object):
                 str=True)))
 
     def initializeBiblio(self):
-
         with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.data", type="bibliography") as fh:
+            lines = stripLineBreaks(fh)
             try:
                 while True:
-                    key = fh.next()[:-1]
+                    key = lines.next()
                     b = {
-                        "linkText": fh.next()[:-1],
-                        "date": fh.next()[:-1],
-                        "status": fh.next()[:-1],
-                        "title": fh.next()[:-1],
-                        "url": fh.next()[:-1],
-                        "other": fh.next()[:-1],
-                        "etAl": bool(fh.next()[:-1]),
+                        "linkText": lines.next(),
+                        "date": lines.next(),
+                        "status": lines.next(),
+                        "title": lines.next(),
+                        "url": lines.next(),
+                        "other": lines.next(),
+                        "etAl": bool(lines.next()),
                         "order": 3,
                         "authors": []
                     }
                     while True:
-                        line = fh.next()[:-1]
+                        line = lines.next()
                         if line == b"-":
                             break
                         b['authors'].append(line)
