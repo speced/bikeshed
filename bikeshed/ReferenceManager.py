@@ -32,12 +32,31 @@ class ReferenceManager(object):
                 type="spec list",
                 quiet=True,
                 str=True)))
-        self.refs.update(json.loads(
-            config.retrieveCachedFile(
-                cacheLocation=config.scriptPath+"/spec-data/anchors.json",
-                type="anchor data",
-                quiet=True,
-                str=True)))
+        with config.retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.data", type="anchor data", quiet=True) as fh:
+            lines = stripLineBreaks(fh)
+            try:
+                while True:
+                    key = lines.next()
+                    a = {
+                        "type": lines.next(),
+                        "spec": lines.next(),
+                        "shortname": lines.next(),
+                        "level": lines.next(),
+                        "status": lines.next(),
+                        "url": lines.next(),
+                        "export": bool(lines.next()),
+                        "normative": bool(lines.next()),
+                        "for": []
+                    }
+                    while True:
+                        line = lines.next()
+                        if line == b"-":
+                            break
+                        a['for'].append(line)
+                    self.refs[key].append(a)
+            except StopIteration:
+                pass
+
         try:
             with io.open("anchors.json", 'r', encoding="utf-8") as fh:
                 self.refs.update(json.load(fh))
@@ -74,7 +93,7 @@ class ReferenceManager(object):
                             break
                         b['authors'].append(line)
                     self.biblios[key].append(b)
-            except:
+            except StopIteration:
                 pass
 
 
@@ -433,3 +452,9 @@ def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
         if error:
             die("Unknown link type '{0}'.",linkType)
         return None
+
+
+
+def stripLineBreaks(iterator):
+    for line in iterator:
+        yield line[:-1]

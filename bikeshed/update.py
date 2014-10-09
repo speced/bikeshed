@@ -114,8 +114,8 @@ def updateCrossRefs():
             die("Couldn't save spec database to disk.\n{0}", e)
             return
         try:
-            with io.open(config.scriptPath+"/spec-data/anchors.json", 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(anchors, ensure_ascii=False, indent=2)))
+            with io.open(config.scriptPath+"/spec-data/anchors.data", 'w', encoding="utf-8") as f:
+                writeAnchorsFile(f, anchors)
         except Exception, e:
             die("Couldn't save anchor database to disk.\n{0}", e)
             return
@@ -291,3 +291,33 @@ def writeBiblioFile(fh, biblios):
         for author in b.get("authors", []):
             fh.write(author+"\n")
         fh.write("-" + "\n")
+
+def writeAnchorsFile(fh, anchors):
+    '''
+    Keys may be duplicated.
+
+    key
+    type
+    spec
+    shortname
+    level
+    status
+    url
+    export (boolish string)
+    normative (boolish string)
+    for* (one per line, unknown #)
+    - (by itself, ends the segment)
+    '''
+    for key, entries in anchors.items():
+        for e in entries:
+            fh.write(key + "\n")
+            for field in ["type", "spec", "shortname", "level", "status", "url"]:
+                fh.write(unicode(e.get(field, "")) + "\n")
+            for field in ["export", "normative"]:
+                if e.get(field, False):
+                    fh.write("1\n")
+                else:
+                    fh.write("\n")
+            for forValue in e.get("for", []):
+                fh.write(forValue+"\n")
+            fh.write("-" + "\n")
