@@ -18,12 +18,12 @@ class BiblioEntry(object):
         self.other = None
         for key, val in kwargs.items():
             if key == "authors":
-                setattr(self, key, [unicode(x, encoding="utf-8") for x in val])
+                setattr(self, key, [unicode(x, encoding="utf-8").strip("\n") for x in val])
             elif key == "etAl":
                 self.etAl = val
             else:
                 try:
-                    setattr(self, key, unicode(val, encoding="utf-8"))
+                    setattr(self, key, unicode(val, encoding="utf-8").strip("\n"))
                 except:
                     setattr(self, key, val)
 

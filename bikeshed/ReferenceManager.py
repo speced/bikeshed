@@ -71,8 +71,8 @@ class ReferenceManager(object):
                 str=True)))
 
     def initializeBiblio(self):
-        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.data", type="bibliography") as fh:
-            lines = stripLineBreaks(fh)
+        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.data", type="bibliography") as lines:
+            #lines = stripLineBreaks(fh)
             try:
                 while True:
                     key = lines.next()
@@ -83,13 +83,13 @@ class ReferenceManager(object):
                         "title": lines.next(),
                         "url": lines.next(),
                         "other": lines.next(),
-                        "etAl": bool(lines.next()),
+                        "etAl": len(lines.next()) > 1,
                         "order": 3,
                         "authors": []
                     }
                     while True:
                         line = lines.next()
-                        if line == b"-":
+                        if line == b"-\n":
                             break
                         b['authors'].append(line)
                     self.biblios[key].append(b)
@@ -343,14 +343,15 @@ class ReferenceManager(object):
         return refs[0]['url']
 
     def getBiblioRef(self, text, el=None):
-        try:
-            candidates = sorted(self.biblios[text.lower()], key=itemgetter('order'))
-        except KeyError, e:
-            die("Couldn't find '{0}' in bibliography data", text)
-            return
-        if not candidates:
+        key = text.lower()
+        if key in self.biblios:
+            candidates = self.biblios[key]
+        elif key+"\n" in self.biblios:
+            candidates = self.biblios[key+"\n"]
+        else:
             die("Couldn't find '{0}' in bibliography data.", text)
             return None
+        candidates = sorted(candidates, key=itemgetter('order'))
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
         # if candidates[0]['order'] > 3: # 3 is SpecRef level
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
