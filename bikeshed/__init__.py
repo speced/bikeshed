@@ -293,22 +293,24 @@ def transformDataBlocks(doc):
 def transformPre(lines, tagName, firstLine, **kwargs):
     indent = float("inf")
     for (i, line) in enumerate(lines):
+        if line.strip() == "":
+            continue
+
         # Use tabs in the source, but spaces in the output,
         # because tabs are ginormous in HTML.
-        # Also, it means lines in processed files will never
-        # accidentally match a prefix.
         lines[i] = lines[i].replace("\t", "  ")
 
         # Find the line with the shortest whitespace prefix.
         # (It might not be the first!)
-        if line.strip() != "":
-            indent = min(indent, len(re.match(r" *", lines[i]).group(0)))
+        indent = min(indent, len(re.match(r" *", lines[i]).group(0)))
 
     if indent == float("inf"):
         indent = 0
 
     # Strip off the whitespace prefix from each line
     for (i, line) in enumerate(lines):
+        if line.strip() == "":
+            continue
         lines[i] = lines[i][indent:]
     # Put the first/last lines back into the results.
     lines.insert(0, firstLine)
