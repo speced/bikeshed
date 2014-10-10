@@ -8,10 +8,14 @@ from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
 import re
+import HTMLParser
 
 from . import config
 from .messages import *
 
+unescapeParser = HTMLParser.HTMLParser()
+def unescape(string):
+    return unescapeParser.unescape(string)
 
 def findAll(sel, context):
     if isinstance(context, config.specClass):
