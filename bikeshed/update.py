@@ -82,18 +82,9 @@ def updateCrossRefs():
             linkingTexts = rawAnchor.get('linking_text', [rawAnchor.get('title')])
             if linkingTexts[0] is None:
                 continue
-            anchorType = rawAnchor['type']
-            if rawAnchor.get('export_draft'):
-                exportED = True
-            elif rawAnchor.get('export_official') and not spec['ED']:
-                # If it's only exported in TR, normally don't consider it exported for EDs.
-                # But do so if it only *exists* as a TR, so an ED export is impossible.
-                exportED = True
-            else:
-                exportED = False
             anchor = {
                 'status': rawAnchor['status'],
-                'type': anchorType,
+                'type': rawAnchor['type'],
                 'spec': spec['vshortname'],
                 'shortname': spec['shortname'],
                 'level': int(spec['level']),
