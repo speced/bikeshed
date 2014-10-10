@@ -1781,8 +1781,6 @@ def addPropertyIndex(doc):
             atRules[atRule].append(tempDesc)
 
 
-    # TODO: Move the heading generation into this function.
-
     if len(props):
         # Set up the initial table columns for properties
         columns = ["Name", "Value", "Initial", "Applies to", "Inherited", "Percentages", "Media"]
