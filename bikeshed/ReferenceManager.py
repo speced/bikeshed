@@ -32,8 +32,7 @@ class ReferenceManager(object):
                 type="spec list",
                 quiet=True,
                 str=True)))
-        with config.retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.data", type="anchor data", quiet=True) as fh:
-            lines = stripLineBreaks(fh)
+        with config.retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.data", type="anchor data", quiet=True) as lines:
             try:
                 while True:
                     key = lines.next()
@@ -44,13 +43,13 @@ class ReferenceManager(object):
                         "level": lines.next(),
                         "status": lines.next(),
                         "url": lines.next(),
-                        "export": bool(lines.next()),
-                        "normative": bool(lines.next()),
+                        "export": len(lines.next()) > 1,
+                        "normative": len(lines.next()) > 1,
                         "for": []
                     }
                     while True:
                         line = lines.next()
-                        if line == b"-":
+                        if line == b"-\n":
                             break
                         a['for'].append(line)
                     self.refs[key].append(a)
@@ -146,7 +145,10 @@ class ReferenceManager(object):
         # Kill all the non-local anchors with the same shortname as the current spec,
         # so you don't end up accidentally linking to something that's been removed from the local copy.
         for term, refs in self.refs.items():
-            self.refs[term] = [ref for ref in refs if ref['shortname']!=self.specName]
+            self.refs[term] = [ref for ref in refs if ref['shortname'].rstrip("\n")!=self.specName]
+            # TODO: OMIGOD WHY AM I DOING THIS FOR EVERY SINGLE REF EVER AT LEAST SEARCH FIRST
+            # Or maybe just move this functionality into addLocalDfns, ffs
+            # This damned thing is a whole 1.25% of runtime
 
     def addLocalDfns(self, dfns):
         for el in dfns:
@@ -351,7 +353,7 @@ class ReferenceManager(object):
         else:
             die("Couldn't find '{0}' in bibliography data.", text)
             return None
-        candidates = sorted(candidates, key=itemgetter('order'))
+        candidates = sorted(stripLineBreaks(candidates), key=itemgetter('order'))
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
         # if candidates[0]['order'] > 3: # 3 is SpecRef level
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
@@ -441,7 +443,13 @@ def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
         if isinstance(linkTexts, basestring):
             linkTexts = [linkTexts]
         dfnTypes = set(dfnTypes)
-        return [ref for linkText in linkTexts for ref in allRefs.get(linkText,[]) if ref['type'] in dfnTypes]
+        refs = []
+        for linkText in linkTexts:
+            if linkText in allRefs:
+                refs.extend(allRefs[linkText])
+            elif linkText+"\n" in allRefs:
+                refs.extend(allRefs[linkText+"\n"])
+        return [stripLineBreaks(ref) for ref in refs if ref['type'].rstrip("\n") in dfnTypes]
 
     if linkType in config.dfnTypes:
         return filterRefs(allRefs, [linkType], linkText)
@@ -456,6 +464,13 @@ def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
 
 
 
-def stripLineBreaks(iterator):
-    for line in iterator:
-        yield line[:-1]
+def stripLineBreaks(obj):
+    it = obj.items() if isinstance(obj, dict) else enumerate(obj)
+    for key, val in it:
+        if isinstance(val, str):
+            obj[key] = unicode(val, encoding="utf-8").rstrip("\n")
+        elif isinstance(val, unicode):
+            obj[key] = val.rstrip("\n")
+        elif isinstance(val, dict) or isinstance(val, list):
+            stripLineBreaks(val)
+    return obj
