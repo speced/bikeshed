@@ -158,7 +158,7 @@ def main():
         elif options.linkText:
             doc = CSSSpec(inputFilename=options.infile)
             doc.preprocess()
-            refs = doc.refs.refs[options.linkText]
+            refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText+"\n"]
             config.quiet = options.quiet
             if not config.quiet:
                 print "Refs for '{0}':".format(options.linkText)
