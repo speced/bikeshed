@@ -43,8 +43,8 @@ class ReferenceManager(object):
                         "level": lines.next(),
                         "status": lines.next(),
                         "url": lines.next(),
-                        "export": len(lines.next()) > 1,
-                        "normative": len(lines.next()) > 1,
+                        "export": lines.next() != "\n",
+                        "normative": lines.next() != "\n",
                         "for": []
                     }
                     while True:
@@ -82,7 +82,7 @@ class ReferenceManager(object):
                         "title": lines.next(),
                         "url": lines.next(),
                         "other": lines.next(),
-                        "etAl": len(lines.next()) > 1,
+                        "etAl": lines.next() != "\n",
                         "order": 3,
                         "authors": []
                     }
