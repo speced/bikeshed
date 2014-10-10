@@ -1307,6 +1307,7 @@ class CSSSpec(object):
         addReferencesSection(self)
         addIndexSection(self)
         addPropertyIndex(self)
+        addIDLSection(self)
         addIssuesSection(self)
         processHeadings(self) # again
         addTOCSection(self)
@@ -1836,6 +1837,29 @@ def addPropertyIndex(doc):
                             E.th({"scope":"row"},
                                 E.a({"data-link-type":"descriptor"}, desc['Name'])),
                             *[E.td(desc.get(column, "")) for column in columns[1:]]))))
+
+
+def addIDLSection(doc):
+    from copy import deepcopy
+    idlBlocks = findAll("pre.idl", doc)
+    if len(idlBlocks) == 0:
+        return
+    html = getFillContainer('idl-index', doc=doc, default=True)
+    if html is None:
+        return
+
+    appendChild(html,
+        E.h2({"class":"no-num", "id":"idl-index"}, "IDL Index"))
+
+    container = appendChild(html, E.pre({"class":"idl"}))
+    for block in idlBlocks:
+        copy = deepcopy(block)
+        appendContents(container, copy)
+        appendChild(container, "\n")
+    for dfn in findAll("dfn", container):
+        dfn.tag = "a"
+        dfn.set("href", "#"+dfn.get("id"))
+        del dfn.attrib["id"]
 
 
 def addTOCSection(doc):
