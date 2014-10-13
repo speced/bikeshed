@@ -169,3 +169,7 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force
         return unicode(fh.read(), encoding="utf-8")
     else:
         return fh
+
+def printjson(obj):
+    import json
+    return json.dumps(obj, indent=2, default=lambda x:x.__json__())
