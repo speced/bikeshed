@@ -1560,7 +1560,7 @@ config.specClass = CSSSpec
 def fillInBoilerplate(doc):
     # If you start your spec with an <h1>, I'll take it as the spec's title and remove it.
     # (It gets added back in the header file.)
-    match = re.match(r"^<h1>([^<]+)</h1>", doc.html)
+    match = re.match(r"^<h1>(.+?)</h1>", doc.html)
     if match:
         doc.md.title = match.group(1)
         doc.macros['title'] = doc.md.title
