@@ -71,7 +71,6 @@ class ReferenceManager(object):
 
     def initializeBiblio(self):
         with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.data", type="bibliography") as lines:
-            #lines = stripLineBreaks(fh)
             try:
                 while True:
                     key = lines.next()
@@ -245,7 +244,6 @@ class ReferenceManager(object):
 
         # Get the relevant refs
         refs = filterRefsByTypeAndText(self.refs, linkType, text, error)
-
         if len(refs) == 0:
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}'.", linkType, text)
@@ -436,31 +434,29 @@ def linkTextVariations(str):
 def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
     '''Filter by type/text to find all the candidate refs'''
 
-    def filterRefs(allRefs, dfnTypes, linkTexts):
-        # Allow either a string or an iter of strings
-        if isinstance(dfnTypes, basestring):
-            dfnTypes = [dfnTypes]
-        if isinstance(linkTexts, basestring):
-            linkTexts = [linkTexts]
-        dfnTypes = set(dfnTypes)
-        refs = []
-        for linkText in linkTexts:
-            if linkText in allRefs:
-                refs.extend(allRefs[linkText])
-            elif linkText+"\n" in allRefs:
-                refs.extend(allRefs[linkText+"\n"])
-        return [stripLineBreaks(ref) for ref in refs if ref['type'].rstrip("\n") in dfnTypes]
-
     if linkType in config.dfnTypes:
-        return filterRefs(allRefs, [linkType], linkText)
+        linkTypes = [linkType]
+        linkTexts = [linkText]
     elif linkType == "dfn":
-        return filterRefs(allRefs, "dfn", linkTextVariations(linkText))
+        linkTypes = ["dfn"]
+        linkTexts = linkTextVariations(linkText)
     elif linkType in config.linkTypeToDfnType:
-        return filterRefs(allRefs, config.linkTypeToDfnType[linkType], linkText)
+        linkTypes = config.linkTypeToDfnType[linkType]
+        linkTexts = [linkText]
     else:
         if error:
             die("Unknown link type '{0}'.",linkType)
         return None
+
+    refs = []
+    for linkText in linkTexts:
+        if linkText in allRefs:
+            refs.extend(allRefs[linkText])
+        if linkText+"\n" in allRefs:
+            refs.extend(allRefs[linkText+"\n"])
+    stripLineBreaks(refs)
+    return [ref for ref in refs if ref['type'] in linkTypes]
+
 
 
 
