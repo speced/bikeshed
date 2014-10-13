@@ -47,7 +47,7 @@ def updateCrossRefs():
             list = []
         # Call with multiTree being a list of trees
         for item in multiTree:
-            if item['type'] not in ("section", "other"):
+            if item['type'] in config.dfnTypes.union(["dfn"]):
                 list.append(item)
             if item.get('children'):
                 linearizeAnchorTree(item['children'], list)
@@ -82,18 +82,9 @@ def updateCrossRefs():
             linkingTexts = rawAnchor.get('linking_text', [rawAnchor.get('title')])
             if linkingTexts[0] is None:
                 continue
-            anchorType = rawAnchor['type']
-            if rawAnchor.get('export_draft'):
-                exportED = True
-            elif rawAnchor.get('export_official') and not spec['ED']:
-                # If it's only exported in TR, normally don't consider it exported for EDs.
-                # But do so if it only *exists* as a TR, so an ED export is impossible.
-                exportED = True
-            else:
-                exportED = False
             anchor = {
                 'status': rawAnchor['status'],
-                'type': anchorType,
+                'type': rawAnchor['type'],
                 'spec': spec['vshortname'],
                 'shortname': spec['shortname'],
                 'level': int(spec['level']),
@@ -114,8 +105,8 @@ def updateCrossRefs():
             die("Couldn't save spec database to disk.\n{0}", e)
             return
         try:
-            with io.open(config.scriptPath+"/spec-data/anchors.json", 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(anchors, ensure_ascii=False, indent=2)))
+            with io.open(config.scriptPath+"/spec-data/anchors.data", 'w', encoding="utf-8") as f:
+                writeAnchorsFile(f, anchors)
         except Exception, e:
             die("Couldn't save anchor database to disk.\n{0}", e)
             return
@@ -136,33 +127,7 @@ def updateBiblio():
     if not config.dryRun:
         try:
             with io.open(config.scriptPath + "/spec-data/biblio.data", 'w', encoding="utf-8") as fh:
-                '''
-                Biblio file format:
-                Each line is a value for a specific key, in the order:
-                key
-                linkText
-                date
-                status
-                title
-                url
-                other
-                etAl (as a boolish string)
-                authors* (each on a separate line, an indeterminate number of lines)
-
-                Entries are separated by a line consisting of a lone - character.
-                '''
-                for key, entries in biblios.items():
-                    b = sorted(entries, key=lambda x:x['order'])[0]
-                    fh.write(key.lower() + "\n")
-                    for field in ["linkText", "date", "status", "title", "url", "other"]:
-                        fh.write(b.get(field, "") + "\n")
-                    if b.get("etAl", False):
-                        fh.write("1\n")
-                    else:
-                        fh.write("\n")
-                    for author in b.get("authors", []):
-                        fh.write(author+"\n")
-                    fh.write("-" + "\n")
+                writeBiblioFile(fh, biblios)
         except Exception, e:
             die("Couldn't save biblio database to disk.\n{0}", e)
             return
@@ -286,3 +251,64 @@ def updateTestSuites():
         except Exception, e:
             die("Couldn't save test-suite database to disk.\n{0}", e)
     say("Success!")
+
+
+
+def writeBiblioFile(fh, biblios):
+    '''
+    Each line is a value for a specific key, in the order:
+
+    key
+    linkText
+    date
+    status
+    title
+    url
+    other
+    etAl (as a boolish string)
+    authors* (each on a separate line, an indeterminate number of lines)
+
+    Each entry (including last) is ended by a line containing a single - character.
+    '''
+    for key, entries in biblios.items():
+        b = sorted(entries, key=lambda x:x['order'])[0]
+        fh.write(key.lower() + "\n")
+        for field in ["linkText", "date", "status", "title", "url", "other"]:
+            fh.write(b.get(field, "") + "\n")
+        if b.get("etAl", False):
+            fh.write("1\n")
+        else:
+            fh.write("\n")
+        for author in b.get("authors", []):
+            fh.write(author+"\n")
+        fh.write("-" + "\n")
+
+def writeAnchorsFile(fh, anchors):
+    '''
+    Keys may be duplicated.
+
+    key
+    type
+    spec
+    shortname
+    level
+    status
+    url
+    export (boolish string)
+    normative (boolish string)
+    for* (one per line, unknown #)
+    - (by itself, ends the segment)
+    '''
+    for key, entries in anchors.items():
+        for e in entries:
+            fh.write(key + "\n")
+            for field in ["type", "spec", "shortname", "level", "status", "url"]:
+                fh.write(unicode(e.get(field, "")) + "\n")
+            for field in ["export", "normative"]:
+                if e.get(field, False):
+                    fh.write("1\n")
+                else:
+                    fh.write("\n")
+            for forValue in e.get("for", []):
+                fh.write(forValue+"\n")
+            fh.write("-" + "\n")

@@ -18,14 +18,11 @@ class BiblioEntry(object):
         self.other = None
         for key, val in kwargs.items():
             if key == "authors":
-                setattr(self, key, [unicode(x, encoding="utf-8") for x in val])
+                setattr(self, key, val)
             elif key == "etAl":
                 self.etAl = val
             else:
-                try:
-                    setattr(self, key, unicode(val, encoding="utf-8"))
-                except:
-                    setattr(self, key, val)
+                setattr(self, key, val)
 
     def __str__(self):
         str = ""
@@ -169,7 +166,7 @@ def processSpecrefBiblioFile(text, storage, order):
         "etAl": "etAl",
         "href": "url",
         "title": "title",
-        "rawDate": "date",
+        "date": "date",
         "status": "status"
     }
     # Required BiblioEntry fields

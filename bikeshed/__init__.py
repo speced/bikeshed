@@ -158,7 +158,7 @@ def main():
         elif options.linkText:
             doc = CSSSpec(inputFilename=options.infile)
             doc.preprocess()
-            refs = doc.refs.refs[options.linkText]
+            refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText+"\n"]
             config.quiet = options.quiet
             if not config.quiet:
                 print "Refs for '{0}':".format(options.linkText)
@@ -293,22 +293,24 @@ def transformDataBlocks(doc):
 def transformPre(lines, tagName, firstLine, **kwargs):
     indent = float("inf")
     for (i, line) in enumerate(lines):
+        if line.strip() == "":
+            continue
+
         # Use tabs in the source, but spaces in the output,
         # because tabs are ginormous in HTML.
-        # Also, it means lines in processed files will never
-        # accidentally match a prefix.
         lines[i] = lines[i].replace("\t", "  ")
 
         # Find the line with the shortest whitespace prefix.
         # (It might not be the first!)
-        if line.strip() != "":
-            indent = min(indent, len(re.match(r" *", lines[i]).group(0)))
+        indent = min(indent, len(re.match(r" *", lines[i]).group(0)))
 
     if indent == float("inf"):
         indent = 0
 
     # Strip off the whitespace prefix from each line
     for (i, line) in enumerate(lines):
+        if line.strip() == "":
+            continue
         lines[i] = lines[i][indent:]
     # Put the first/last lines back into the results.
     lines.insert(0, firstLine)
@@ -1307,6 +1309,7 @@ class CSSSpec(object):
         addReferencesSection(self)
         addIndexSection(self)
         addPropertyIndex(self)
+        addIDLSection(self)
         addIssuesSection(self)
         processHeadings(self) # again
         addTOCSection(self)
@@ -1557,7 +1560,7 @@ config.specClass = CSSSpec
 def fillInBoilerplate(doc):
     # If you start your spec with an <h1>, I'll take it as the spec's title and remove it.
     # (It gets added back in the header file.)
-    match = re.match(r"^<h1>([^<]+)</h1>", doc.html)
+    match = re.match(r"^<h1>(.+?)</h1>", doc.html)
     if match:
         doc.md.title = match.group(1)
         doc.macros['title'] = doc.md.title
@@ -1781,8 +1784,6 @@ def addPropertyIndex(doc):
             atRules[atRule].append(tempDesc)
 
 
-    # TODO: Move the heading generation into this function.
-
     if len(props):
         # Set up the initial table columns for properties
         columns = ["Name", "Value", "Initial", "Applies to", "Inherited", "Percentages", "Media"]
@@ -1838,6 +1839,29 @@ def addPropertyIndex(doc):
                             E.th({"scope":"row"},
                                 E.a({"data-link-type":"descriptor"}, desc['Name'])),
                             *[E.td(desc.get(column, "")) for column in columns[1:]]))))
+
+
+def addIDLSection(doc):
+    from copy import deepcopy
+    idlBlocks = findAll("pre.idl", doc)
+    if len(idlBlocks) == 0:
+        return
+    html = getFillContainer('idl-index', doc=doc, default=True)
+    if html is None:
+        return
+
+    appendChild(html,
+        E.h2({"class":"no-num", "id":"idl-index"}, "IDL Index"))
+
+    container = appendChild(html, E.pre({"class":"idl"}))
+    for block in idlBlocks:
+        copy = deepcopy(block)
+        appendContents(container, copy)
+        appendChild(container, "\n")
+    for dfn in findAll("dfn", container):
+        dfn.tag = "a"
+        dfn.set("href", "#"+dfn.get("id"))
+        del dfn.attrib["id"]
 
 
 def addTOCSection(doc):

@@ -292,7 +292,7 @@ def convertWarning(key, val):
 
 def parseEditor(key, val):
     match = re.match(r"([^,]+) ,\s* ([^,]*) ,?\s* ([^,]*) ,?\s* ([^,]*)", val, re.X)
-    pieces = [piece.strip() for piece in val.split(',')]
+    pieces = [unescape(piece.strip()) for piece in val.split(',')]
     def looksLinkish(string):
         return re.match(r"\w+:", string) or looksEmailish(string)
     def looksEmailish(string):

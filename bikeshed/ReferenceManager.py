@@ -32,12 +32,30 @@ class ReferenceManager(object):
                 type="spec list",
                 quiet=True,
                 str=True)))
-        self.refs.update(json.loads(
-            config.retrieveCachedFile(
-                cacheLocation=config.scriptPath+"/spec-data/anchors.json",
-                type="anchor data",
-                quiet=True,
-                str=True)))
+        with config.retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.data", type="anchor data", quiet=True) as lines:
+            try:
+                while True:
+                    key = lines.next()
+                    a = {
+                        "type": lines.next(),
+                        "spec": lines.next(),
+                        "shortname": lines.next(),
+                        "level": lines.next(),
+                        "status": lines.next(),
+                        "url": lines.next(),
+                        "export": lines.next() != "\n",
+                        "normative": lines.next() != "\n",
+                        "for": []
+                    }
+                    while True:
+                        line = lines.next()
+                        if line == b"-\n":
+                            break
+                        a['for'].append(line)
+                    self.refs[key].append(a)
+            except StopIteration:
+                pass
+
         try:
             with io.open("anchors.json", 'r', encoding="utf-8") as fh:
                 self.refs.update(json.load(fh))
@@ -52,29 +70,28 @@ class ReferenceManager(object):
                 str=True)))
 
     def initializeBiblio(self):
-
-        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.data", type="bibliography") as fh:
+        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.data", type="bibliography") as lines:
             try:
                 while True:
-                    key = fh.next()[:-1]
+                    key = lines.next()
                     b = {
-                        "linkText": fh.next()[:-1],
-                        "date": fh.next()[:-1],
-                        "status": fh.next()[:-1],
-                        "title": fh.next()[:-1],
-                        "url": fh.next()[:-1],
-                        "other": fh.next()[:-1],
-                        "etAl": bool(fh.next()[:-1]),
+                        "linkText": lines.next(),
+                        "date": lines.next(),
+                        "status": lines.next(),
+                        "title": lines.next(),
+                        "url": lines.next(),
+                        "other": lines.next(),
+                        "etAl": lines.next() != "\n",
                         "order": 3,
                         "authors": []
                     }
                     while True:
-                        line = fh.next()[:-1]
-                        if line == b"-":
+                        line = lines.next()
+                        if line == b"-\n":
                             break
                         b['authors'].append(line)
                     self.biblios[key].append(b)
-            except:
+            except StopIteration:
                 pass
 
 
@@ -127,7 +144,10 @@ class ReferenceManager(object):
         # Kill all the non-local anchors with the same shortname as the current spec,
         # so you don't end up accidentally linking to something that's been removed from the local copy.
         for term, refs in self.refs.items():
-            self.refs[term] = [ref for ref in refs if ref['shortname']!=self.specName]
+            self.refs[term] = [ref for ref in refs if ref['shortname'].rstrip("\n")!=self.specName]
+            # TODO: OMIGOD WHY AM I DOING THIS FOR EVERY SINGLE REF EVER AT LEAST SEARCH FIRST
+            # Or maybe just move this functionality into addLocalDfns, ffs
+            # This damned thing is a whole 1.25% of runtime
 
     def addLocalDfns(self, dfns):
         for el in dfns:
@@ -224,7 +244,6 @@ class ReferenceManager(object):
 
         # Get the relevant refs
         refs = filterRefsByTypeAndText(self.refs, linkType, text, error)
-
         if len(refs) == 0:
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}'.", linkType, text)
@@ -324,14 +343,15 @@ class ReferenceManager(object):
         return refs[0]['url']
 
     def getBiblioRef(self, text, el=None):
-        try:
-            candidates = sorted(self.biblios[text.lower()], key=itemgetter('order'))
-        except KeyError, e:
-            die("Couldn't find '{0}' in bibliography data", text)
-            return
-        if not candidates:
+        key = text.lower()
+        if key in self.biblios:
+            candidates = self.biblios[key]
+        elif key+"\n" in self.biblios:
+            candidates = self.biblios[key+"\n"]
+        else:
             die("Couldn't find '{0}' in bibliography data.", text)
             return None
+        candidates = sorted(stripLineBreaks(candidates), key=itemgetter('order'))
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
         # if candidates[0]['order'] > 3: # 3 is SpecRef level
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
@@ -414,22 +434,39 @@ def linkTextVariations(str):
 def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
     '''Filter by type/text to find all the candidate refs'''
 
-    def filterRefs(allRefs, dfnTypes, linkTexts):
-        # Allow either a string or an iter of strings
-        if isinstance(dfnTypes, basestring):
-            dfnTypes = [dfnTypes]
-        if isinstance(linkTexts, basestring):
-            linkTexts = [linkTexts]
-        dfnTypes = set(dfnTypes)
-        return [ref for linkText in linkTexts for ref in allRefs.get(linkText,[]) if ref['type'] in dfnTypes]
-
     if linkType in config.dfnTypes:
-        return filterRefs(allRefs, [linkType], linkText)
+        linkTypes = [linkType]
+        linkTexts = [linkText]
     elif linkType == "dfn":
-        return filterRefs(allRefs, "dfn", linkTextVariations(linkText))
+        linkTypes = ["dfn"]
+        linkTexts = linkTextVariations(linkText)
     elif linkType in config.linkTypeToDfnType:
-        return filterRefs(allRefs, config.linkTypeToDfnType[linkType], linkText)
+        linkTypes = config.linkTypeToDfnType[linkType]
+        linkTexts = [linkText]
     else:
         if error:
             die("Unknown link type '{0}'.",linkType)
         return None
+
+    refs = []
+    for linkText in linkTexts:
+        if linkText in allRefs:
+            refs.extend(allRefs[linkText])
+        if linkText+"\n" in allRefs:
+            refs.extend(allRefs[linkText+"\n"])
+    stripLineBreaks(refs)
+    return [ref for ref in refs if ref['type'] in linkTypes]
+
+
+
+
+def stripLineBreaks(obj):
+    it = obj.items() if isinstance(obj, dict) else enumerate(obj)
+    for key, val in it:
+        if isinstance(val, str):
+            obj[key] = unicode(val, encoding="utf-8").rstrip("\n")
+        elif isinstance(val, unicode):
+            obj[key] = val.rstrip("\n")
+        elif isinstance(val, dict) or isinstance(val, list):
+            stripLineBreaks(val)
+    return obj
