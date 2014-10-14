@@ -781,14 +781,14 @@ def dedupIds(doc, els):
         if re.match(r"issue-[0-9a-fA-F]{8}$", dupe):
             # Don't warn about issues, it's okay if they have the same ID because they're identical text.
             continue
-        els = findAll("#"+id, doc)
+        els = findAll("#"+dupe, doc)
         ints = iter.imap(str, iter.count(0))
         for el in els[1:]:
             # Try to de-dup the id by appending an integer after it.
-            warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", id)
+            warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupe)
             for x in ints:
-                if not findId(id+x):
-                    id = id+x
+                if not findId(dupe+x):
+                    el.set("id", dupe+x)
                     break
 
 
