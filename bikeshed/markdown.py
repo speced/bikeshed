@@ -225,7 +225,7 @@ def parseParagraph(stream):
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
 		stream.advance()
-		if stream.currtype() in ("eof", "blank") or stream.currprefixlen() < initialPrefixLen:
+		if stream.currtype() not in ["text"] or stream.currprefixlen() < initialPrefixLen:
 			lines[-1] = lines[-1].rstrip() + endTag + "\n"
 			return lines
 		lines.append(stream.currraw())
