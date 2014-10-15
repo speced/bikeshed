@@ -247,20 +247,7 @@ class MetadataManager:
             macros["replacedby"] = self.warning[1]
         macros["logo"] = self.logo
         # get GH repo from remote
-        if doc and doc.inputSource and doc.inputSource != "-":
-            source_dir = os.path.dirname(os.path.abspath(doc.inputSource))
-            try:
-                old_dir = os.getcwd()
-                os.chdir(source_dir)
-                remotes = check_output(["git", "remote", "-v"])
-                search = re.search('origin\tgit@github\.com:(.*?)\.git \(\w+\)', remotes)
-                if search:
-                    macros["repository"] = search.group(1)
-                else:
-                    macros["repository"] = ""
-                os.chdir(old_dir)
-            except Exception, e:
-                macros["repository"] = ""
+        macros["repository"] = getSpecRepository(doc)
 
 
 def convertGroup(key, val):
@@ -428,3 +415,23 @@ def smooshValues(container, val):
                 container[k].extend(v)
             else:
                 container[k].append(v)
+
+def getSpecRepository(doc):
+    '''
+    Attempts to find the name of the repository the spec is a part of.
+    Currently only searches for GitHub repos.
+    '''
+    if doc and doc.inputSource and doc.inputSource != "-":
+        source_dir = os.path.dirname(os.path.abspath(doc.inputSource))
+        try:
+            old_dir = os.getcwd()
+            os.chdir(source_dir)
+            remotes = check_output(["git", "remote", "-v"], stderr=FNULL)
+            search = re.search('origin\tgit@github\.com:(.*?)\.git \(\w+\)', remotes)
+            if search:
+                return search.group(1)
+            else:
+                return ""
+            os.chdir(old_dir)
+        except:
+            return ""
