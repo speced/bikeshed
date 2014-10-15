@@ -426,7 +426,8 @@ def getSpecRepository(doc):
         try:
             old_dir = os.getcwd()
             os.chdir(source_dir)
-            remotes = check_output(["git", "remote", "-v"], stderr=FNULL)
+            with open(os.devnull, "wb") as fnull:
+                remotes = check_output(["git", "remote", "-v"], stderr=fnull)
             search = re.search('origin\tgit@github\.com:(.*?)\.git \(\w+\)', remotes)
             if search:
                 return search.group(1)
@@ -434,4 +435,5 @@ def getSpecRepository(doc):
                 return ""
             os.chdir(old_dir)
         except:
+            # check_output will throw CalledProcessError when not in a git repo
             return ""
