@@ -10,7 +10,6 @@ from . import markdown
 from .messages import *
 from .htmlhelpers import *
 
-
 class MetadataManager:
     @property
     def hasMetadata(self):
