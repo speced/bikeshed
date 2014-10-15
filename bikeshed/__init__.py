@@ -13,6 +13,7 @@ import urllib
 from urllib2 import urlopen
 from datetime import date, datetime
 from copy import deepcopy
+from collections import OrderedDict
 import html5lib
 import lxml
 import cProfile
@@ -319,26 +320,42 @@ def transformPre(lines, tagName, firstLine, **kwargs):
 
 
 def transformPropdef(lines, doc, firstLine, **kwargs):
-    vals = parseDefBlock(lines, "propdef")
-    # The required keys are specified in the order they should show up in the propdef table.
-    if "partial" in firstLine or "New values" in vals:
+    requiredKeys = []
+    defaultVals = OrderedDict()
+    parsedVals = parseDefBlock(lines, "propdef")
+    # Display is:
+    # * parsed vals that are required, in order
+    # * default vals that weren't parsed, in order
+    # * parsed vals that weren't required, in order
+    if "partial" in firstLine or "New values" in parsedVals:
         requiredKeys = ["Name", "New values"]
         ret = ["<table class='definition propdef partial'>"]
+    elif "shorthand" in firstLine:
+        requiredKeys = ["Name", "Value"]
+        ret = ["<table class='definition propdef'>"]
+        for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animatable"]:
+            defaultVals[defaultKey] = "see individual properties"
     else:
         requiredKeys = ["Name", "Value", "Initial", "Applies to", "Inherited", "Media", "Computed value"]
         ret = ["<table class='definition propdef'>"]
+        defaultVals["Animatable"] = "no"
     for key in requiredKeys:
-        if key == "Value":
-            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals.get(key,'')))
-        elif key.lower() == "new values":
-            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals.get(key,'')))
-        elif key in vals:
-            ret.append("<tr><th>{0}:<td>{1}".format(key, vals.get(key,'')))
+        if key in parsedVals:
+            if key == "Value" or key == "New values":
+                ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, parsedVals[key]))
+            else:
+                ret.append("<tr><th>{0}:<td>{1}".format(key, parsedVals[key]))
         else:
-            die("The propdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key)
+            die("The propdef for '{0}' is missing a '{1}' line.", parsedVals.get("Name", "???"), key)
             continue
-    for key in vals.viewkeys() - requiredKeys:
-        ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
+    for key, val in defaultVals.items():
+        if key in parsedVals:
+            continue
+        ret.append("<tr><th>{0}:<td>{1}".format(key, val))
+    for key, val in parsedVals.items():
+        if key in requiredKeys:
+            continue
+        ret.append("<tr><th>{0}:<td>{1}".format(key, val))
     ret.append("</table>")
     return ret
 
@@ -387,7 +404,7 @@ def transformElementdef(lines, doc, **kwargs):
 
 
 def parseDefBlock(lines, type):
-    vals = {}
+    vals = OrderedDict()
     for (i, line) in enumerate(lines):
         match = re.match(r"\s*([^:]+):\s*(.*)", line)
         if(match is None):
