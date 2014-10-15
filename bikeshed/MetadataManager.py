@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import re
+import os
+from subprocess import check_output
 from collections import defaultdict
 from datetime import date, datetime
 from . import config
@@ -244,6 +246,22 @@ class MetadataManager:
         if self.warning and self.warning[1] is not None:
             macros["replacedby"] = self.warning[1]
         macros["logo"] = self.logo
+        # get GH repo from remote
+        if doc and doc.inputSource and doc.inputSource != "-":
+            source_dir = os.path.dirname(os.path.abspath(doc.inputSource))
+            try:
+                old_dir = os.getcwd()
+                os.chdir(source_dir)
+                remotes = check_output(["git", "remote", "-v"])
+                search = re.search('origin\tgit@github\.com:(.*?)\.git \(\w+\)', remotes)
+                if search:
+                    macros["repository"] = search.group(1)
+                else:
+                    macros["repository"] = ""
+                os.chdir(old_dir)
+            except Exception, e:
+                macros["repository"] = ""
+
 
 def convertGroup(key, val):
     return val.lower()
