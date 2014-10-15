@@ -366,7 +366,7 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     ret.append("</table>")
     return ret
 
-
+# TODO: Make these functions match transformPropdef's new structure
 def transformDescdef(lines, doc, firstLine, **kwargs):
     vals = parseDefBlock(lines, "descdef")
     if "partial" in firstLine or "New values" in vals:
