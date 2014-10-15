@@ -320,40 +320,47 @@ def transformPre(lines, tagName, firstLine, **kwargs):
 
 
 def transformPropdef(lines, doc, firstLine, **kwargs):
-    requiredKeys = []
-    defaultVals = OrderedDict()
-    parsedVals = parseDefBlock(lines, "propdef")
-    # Display is:
-    # * parsed vals that are required, in order
-    # * default vals that weren't parsed, in order
-    # * parsed vals that weren't required, in order
-    if "partial" in firstLine or "New values" in parsedVals:
-        requiredKeys = ["Name", "New values"]
+    attrs = OrderedDict()
+    parsedAttrs = parseDefBlock(lines, "propdef")
+    # Displays entries in the order specified in attrs,
+    # then if there are any unknown parsedAttrs values,
+    # they're displayed afterward in the order they were specified.
+    # attrs with a value of None are required to be present in parsedAttrs;
+    # attrs with any other value are optional, and use the specified value if not present in parsedAttrs
+    if "partial" in firstLine or "New values" in parsedAttrs:
+        attrs["Name"] = None
+        attrs["New values"] = None
         ret = ["<table class='definition propdef partial'>"]
     elif "shorthand" in firstLine:
-        requiredKeys = ["Name", "Value"]
-        ret = ["<table class='definition propdef'>"]
+        attrs["Name"] = None
+        attrs["Value"] = None
         for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animatable"]:
-            defaultVals[defaultKey] = "see individual properties"
-    else:
-        requiredKeys = ["Name", "Value", "Initial", "Applies to", "Inherited", "Media", "Computed value"]
+            attrs[defaultKey] = "see individual properties"
         ret = ["<table class='definition propdef'>"]
-        defaultVals["Animatable"] = "no"
-    for key in requiredKeys:
-        if key in parsedVals:
-            if key == "Value" or key == "New values":
-                ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, parsedVals[key]))
+    else:
+        attrs["Name"] = None
+        attrs["Value"] = None
+        attrs["Initial"] = None
+        attrs["Applies to"] = "all elements"
+        attrs["Inherited"] = None
+        attrs["Percentages"] = "n/a"
+        attrs["Media"] = "visual"
+        attrs["Computed value"] = None
+        attrs["Animatable"] = "no"
+        ret = ["<table class='definition propdef'>"]
+    for key, val in attrs.items():
+        if key in parsedAttrs or val is not None:
+            if key in parsedAttrs:
+                val = parsedAttrs[key]
+            if key in ("Value", "New values"):
+                ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, val))
             else:
-                ret.append("<tr><th>{0}:<td>{1}".format(key, parsedVals[key]))
+                ret.append("<tr><th>{0}:<td>{1}".format(key, val))
         else:
-            die("The propdef for '{0}' is missing a '{1}' line.", parsedVals.get("Name", "???"), key)
+            die("The propdef for '{0}' is missing a '{1}' line.", parsedAttrs.get("Name", "???"), key)
             continue
-    for key, val in defaultVals.items():
-        if key in parsedVals:
-            continue
-        ret.append("<tr><th>{0}:<td>{1}".format(key, val))
-    for key, val in parsedVals.items():
-        if key in requiredKeys:
+    for key, val in parsedAttrs.items():
+        if key in attrs:
             continue
         ret.append("<tr><th>{0}:<td>{1}".format(key, val))
     ret.append("</table>")
