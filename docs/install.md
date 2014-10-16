@@ -3,7 +3,7 @@ Installing Bikeshed
 
 If you want to run a local copy of Bikeshed rather than use the cgi version, it’s pretty easy to install.
 
-You need to install Python 2.7, PIP, and a few other support libraries before installing Bikeshed itself. Here is how to do this on linux and OS X:
+You need to install Python 2.7, PIP, and a few other support libraries before installing Bikeshed itself. Here is how to do this on Linux and OS X:
 
 Linux steps
 -----------
