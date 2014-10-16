@@ -345,7 +345,7 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
         attrs["Inherited"] = None
         attrs["Percentages"] = "n/a"
         attrs["Media"] = "visual"
-        attrs["Computed value"] = None
+        attrs["Computed value"] = "as specified"
         attrs["Animatable"] = "no"
         ret = ["<table class='definition propdef'>"]
     for key, val in attrs.items():
@@ -1517,7 +1517,7 @@ class CSSSpec(object):
             for i, p in enumerate(splits):
                 if i%2 == 0:
                     continue
-                splits[i] = E.a({"grammar":"", "class":"prod-punc"}, p)
+                splits[i] = E.a({"grammar":"", "class":"prod-punc", "for":""}, p)
             return splits
 
         for el in findAll(".prod", doc):

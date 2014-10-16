@@ -232,7 +232,7 @@ class ReferenceManager(object):
             return localRefs[0]['url']
 
         # Take defaults into account
-        if (spec is None or status is None):
+        if (not spec or not status):
             variedTexts = [v for v in linkTextVariations(text) if v in self.defaultSpecs]
             if variedTexts:
                 for dfnSpec, dfnType, dfnStatus, dfnFor in self.defaultSpecs[variedTexts[0]]:
@@ -250,7 +250,7 @@ class ReferenceManager(object):
             return None
 
         # Unless you've specified a particular spec to look in, cut out all non-exported things.
-        if spec is None:
+        if not spec:
             refs = [ref for ref in refs if ref['export']]
         if len(refs) == 0:
             if zeroRefsError:
@@ -258,7 +258,7 @@ class ReferenceManager(object):
             return None
 
         # If spec is specified, kill anything that doesn't match
-        if spec is not None:
+        if spec:
             refs = [ref for ref in refs if ref['shortname'].lower() == spec.lower() or ref['spec'].lower() ==spec.lower()]
         if len(refs) == 0:
             if zeroRefsError:
@@ -266,7 +266,7 @@ class ReferenceManager(object):
             return None
 
         # If linkFor is specified, kill anything that doesn't match
-        if linkFor is not None:
+        if linkFor:
             refs = [ref for ref in refs if linkFor in ref['for']]
         if len(refs) == 0:
             if zeroRefsError:
