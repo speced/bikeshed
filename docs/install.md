@@ -45,6 +45,19 @@ Then, activate the python version you just installed as the one the system shoul
 sudo port select --set python python27
 ~~~
 
+Windows steps
+-----------
+
+Tested on Windows 7, 8/8.1 & 10
+
+1. Install the latest [Python 2.7](https://www.python.org/download/releases/2.7.8/)
+2. Run the following in an elevated command prompt (change the path if your location is different)
+~~~
+setx /m PATH "%PATH%;C:\Python27;C:\Python27\Scripts"
+~~~
+3. Install [PIP](https://pip.pypa.io/en/latest/installing.html) by saving [get-pip.py](https://bootstrap.pypa.io/get-pip.py) and just double clicking the file.
+4. Install [LXML](http://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml) for your version of Python (it should be lxml-3.4.0win32-py2.7.exe)
+
 From here, you can follow the commons steps outlined below.
 
 Common steps
@@ -59,8 +72,16 @@ $ git clone https://github.com/tabatkins/bikeshed.git
 
 Finally, run:
 
+For Linux/OSX:
+
 ~~~~
 $ sudo pip install --editable /path/to/cloned/bikeshed
+~~~~
+
+On Windows:
+
+~~~~
+python -m pip install --editable /path/to/cloned/bikeshed
 ~~~~
 
 This’ll install Bikeshed, making it available to your Python environment as the `bikeshed` package, and automatically add a `bikeshed` command to your path.
