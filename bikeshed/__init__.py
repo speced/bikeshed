@@ -894,7 +894,7 @@ def classifyLink(el):
             linkText = match.group(2)
             clearContents(el)
             el.text = linkText
-        match = re.match(r"(.+)!([\w-]+)$", linkText)
+        match = re.match(r"(.+)!!([\w-]+)$", linkText)
         if match:
             linkText = match.group(1)
             clearContents(el)

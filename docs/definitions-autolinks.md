@@ -239,8 +239,8 @@ There are three things you might have to do to fix these:
 **Note:** You can specify the type of a link using the shortcut syntax, too.
 This is currently only available for the IDL shortcut syntax (`{{foo}}`),
 but will eventually spread to the others.
-Simply append a `!` character, followed by the link type, to the term,
-like `{{foo!argument}}`
+Simply append `!!`, followed by the link type, to the term,
+like `{{foo!!argument}}`
 
 As a final note, the autolinking algorithm will link differently based on whether the spec being processed is an "unofficial" or "official" draft.
 If "unofficial" (ED, UD, etc.), it'll prefer to link to other EDs, and will only link to TRs if no ED version of that spec exists.
