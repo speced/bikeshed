@@ -1415,6 +1415,7 @@ class CSSSpec(object):
     def transformAutolinkShortcuts(doc):
         # Do the remaining textual replacements
 
+        biblioRe = re.compile(r"(\\)?\[\[(!)?([\w-]+)\]\]")
         def biblioReplacer(match):
             # Allow escaping things that aren't actually biblio links, by preceding with a \
             if match.group(1) is not None:
@@ -1428,17 +1429,19 @@ class CSSSpec(object):
                 "[",
                 term,
                 "]")
+
+        sectionRe = re.compile(r"\[\[(#[\w-]+)\]\]")
         def sectionReplacer(match):
             return E.a({"section":"", "href":match.group(1)})
+
+        propdescRe = re.compile(r"'([-]?[\w@*][\w@*/-]*)'")
         def propdescReplacer(match):
             return E.a({"data-link-type":"propdesc", "class":"property", "title":match.group(1)}, match.group(1))
+
+        idlRe = re.compile(r"{{(([^ }]|,\s)+)}}")
         def idlReplacer(match):
             return E.code({"class":"idl"},
                 E.a({"data-link-type":"idl", "title":match.group(1)}, match.group(1)))
-        biblioRe = re.compile(r"(\\)?\[\[(!)?([\w-]+)\]\]")
-        sectionRe = re.compile(r"\[\[(#[\w-]+)\]\]")
-        propdescRe = re.compile(r"'([-]?[\w@*][\w@*/-]*)'")
-        idlRe = re.compile(r"{{(([^ }]|,\s)+)}}")
 
         def transformElement(parentEl):
             processContents = isElement(parentEl) and not isOpaqueElement(parentEl)
@@ -1454,50 +1457,35 @@ class CSSSpec(object):
                     newChildren.append(el)
             appendChild(parentEl, *newChildren)
 
-
         def transformText(text):
             nodes = [text]
-            processTextNodes(nodes, propdescRe, propdescReplacer)
-            processTextNodes(nodes, idlRe, idlReplacer)
-            processTextNodes(nodes, biblioRe, biblioReplacer)
-            processTextNodes(nodes, sectionRe, sectionReplacer)
+            config.processTextNodes(nodes, propdescRe, propdescReplacer)
+            config.processTextNodes(nodes, idlRe, idlReplacer)
+            config.processTextNodes(nodes, biblioRe, biblioReplacer)
+            config.processTextNodes(nodes, sectionRe, sectionReplacer)
             return nodes
-
-        def processTextNodes(nodes, regex, replacer):
-            # Takes an array of alternating text/objects,
-            # and runs reSubObject on the text parts,
-            # splicing them into the "nodes" array.
-            # Mutates!
-            for i, node in enumerate(nodes):
-                # Node list always alternates between text and elements
-                if i%2 == 0:
-                    nodes[i:i+1] = reSubObject(regex, node, replacer)
-            return nodes
-
-        def reSubObject(pattern, string, repl=None):
-            '''
-            like re.sub, but replacements don't have to be text;
-            returns an array of alternating unmatched text and match objects instead.
-            If repl is specified, it's called with each match object,
-            and the result then shows up in the array instead.
-            '''
-            lastEnd = 0
-            pieces = []
-            for match in pattern.finditer(string):
-                pieces.append(string[lastEnd:match.start()])
-                if repl:
-                    pieces.append(repl(match))
-                else:
-                    pieces.append(match)
-                lastEnd = match.end()
-            pieces.append(string[lastEnd:])
-            return pieces
 
         transformElement(doc.document.getroot())
 
 
     def transformProductionGrammars(doc):
         # Link up the various grammar symbols in CSS grammars to their definitions.
+
+        hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
+        def hashMultReplacer(match):
+            return E.a({"data-link-type":"grammar", "title": "#"}, match.group(0))
+
+        multRe = re.compile(r"{\s*\d+\s*}")
+        def multReplacer(match):
+            return E.a({"data-link-type":"grammar", "title": "{A}"}, match.group(0))
+
+        multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
+        def multRangeReplacer(match):
+            return E.a({"data-link-type":"grammar", "title": "{A,B}"}, match.group(0))
+
+        simpleRe = re.compile(r"\?|!|#|\*|\+|\|\||\||&amp;&amp;|,")
+        def simpleReplacer(match):
+            return E.a({"data-link-type":"grammar", "title": match.group(0)}, match.group(0))
 
         def transformElement(parentEl):
             children = childNodes(parentEl, clear=True)
@@ -1506,19 +1494,17 @@ class CSSSpec(object):
                 if isinstance(el, basestring):
                     newChildren.extend(transformText(el))
                 elif isElement(el):
-                    if el.tag != "a":
-                        transformElement(el)
+                    transformElement(el)
                     newChildren.append(el)
             appendChild(parentEl, *newChildren)
 
         def transformText(text):
-            # alternates between normal text and the grammar productions
-            splits = re.split(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|,)", text)
-            for i, p in enumerate(splits):
-                if i%2 == 0:
-                    continue
-                splits[i] = E.a({"grammar":"", "class":"prod-punc", "for":""}, p)
-            return splits
+            nodes = [text]
+            config.processTextNodes(nodes, hashMultRe, hashMultReplacer)
+            config.processTextNodes(nodes, multRe, multReplacer)
+            config.processTextNodes(nodes, multRangeRe, multRangeReplacer)
+            config.processTextNodes(nodes, simpleRe, simpleReplacer)
+            return nodes
 
         for el in findAll(".prod", doc):
             transformElement(el)
