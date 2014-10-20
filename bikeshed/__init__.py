@@ -1434,14 +1434,28 @@ class CSSSpec(object):
         def sectionReplacer(match):
             return E.a({"section":"", "href":match.group(1)})
 
-        propdescRe = re.compile(r"'([-]?[\w@*][\w@*/-]*)'")
+        propdescRe = re.compile(r"'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'")
         def propdescReplacer(match):
-            return E.a({"data-link-type":"propdesc", "class":"property", "title":match.group(1)}, match.group(1))
+            if match.group(3) is None:
+                linkType = "propdesc"
+            elif match.group(3) in ("property", "descriptor"):
+                linkType = match.group(2)
+            else:
+                die("Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3))
+                return E.span(match.group(0))
+            return E.a({"data-link-type":linkType, "class":"property", "for": match.group(1)}, match.group(2))
 
-        idlRe = re.compile(r"{{(([^ }]|,\s)+)}}")
+        idlRe = re.compile(r"{{(?:(.*)/)?((?:[^ }]|,\s)+?)(?:!!([\w-]+))?}}")
         def idlReplacer(match):
+            if match.group(3) is None:
+                linkType = "idl"
+            elif match.group(3) in config.idlTypes:
+                linkType = match.group(3)
+            else:
+                die("Shorthand {0} gives type as '{1}', but only IDL types are allowed.", match.group(0), match.group(3))
+                return E.span(match.group(0))
             return E.code({"class":"idl"},
-                E.a({"data-link-type":"idl", "title":match.group(1)}, match.group(1)))
+                E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
 
         def transformElement(parentEl):
             processContents = isElement(parentEl) and not isOpaqueElement(parentEl)
