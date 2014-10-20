@@ -1473,19 +1473,19 @@ class CSSSpec(object):
 
         hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
         def hashMultReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": "#"}, match.group(0))
+            return E.a({"data-link-type":"grammar", "title": "#", "for":""}, match.group(0))
 
         multRe = re.compile(r"{\s*\d+\s*}")
         def multReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": "{A}"}, match.group(0))
+            return E.a({"data-link-type":"grammar", "title": "{A}", "for":""}, match.group(0))
 
         multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
         def multRangeReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": "{A,B}"}, match.group(0))
+            return E.a({"data-link-type":"grammar", "title": "{A,B}", "for":""}, match.group(0))
 
         simpleRe = re.compile(r"\?|!|#|\*|\+|\|\||\||&amp;&amp;|,")
         def simpleReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": match.group(0)}, match.group(0))
+            return E.a({"data-link-type":"grammar", "title": match.group(0), "for":""}, match.group(0))
 
         def transformElement(parentEl):
             children = childNodes(parentEl, clear=True)
