@@ -1313,6 +1313,8 @@ class CSSSpec(object):
         addAbstract(self)
         addObsoletionNotice(self)
         addAtRisk(self)
+        self.transformProductionPlaceholders()
+        self.transformMaybePlaceholders()
         self.transformAutolinkShortcuts()
         self.transformProductionGrammars()
         formatPropertyNames(self)
@@ -1396,21 +1398,103 @@ class CSSSpec(object):
             text = text.replace("[{0}]".format(tag.upper()), replacement)
         text = fixTypography(text)
         # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
-        # <'foo'> is a link to the 'foo' property or descriptor
-        text = re.sub(r"<<'([\w-]+)'>>", r'<a data-link-type="propdesc" title="\1" class="production">&lt;&lsquo;\1&rsquo;></a>', text)
-        # <'@foo/bar'> is a link to the 'bar' descriptor for the @foo at-rule
-        text = re.sub(r"<<'(@[\w-]+)/([\w-]+)'>>", r'<a data-link-type="descriptor" title="\2" for="\1" class="production">&lt;&lsquo;\2&rsquo;></a>', text)
-        # <foo()> is a link to the 'foo' function
-        text = re.sub(r"<<([\w-]+\(\))>>", r'<a data-link-type="function" title="\1" class="production">&lt;\1></a>', text)
-        # <@foo> is a link to the @foo rule
-        text = re.sub(r"<<(@[\w-]+)>>", r'<a data-link-type="at-rule" title="\1" class="production">&lt;\1></a>', text)
-        # Otherwise, it's a link to a type.
-        text = re.sub(r"<<([\w-]+)>>", r'<a data-link-type="type" class="production">&lt;\1></a>', text)
+        text = re.sub("<<", "<fake-production-placeholder class=production>", text)
+        text = re.sub(">>", "</fake-production-placeholder>", text)
         # Replace the ''maybe link'' shortcuts.
         # They'll survive the HTML parser, but they don't match if they contain an element.
         # (The other shortcuts are "atomic" and can't contain elements.)
-        text = re.sub(r"''([^=\n]+?)''", r'<a data-link-type="maybe" class="css">\1</a>', text)
+        text = re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
         return text
+
+    def transformProductionPlaceholders(doc):
+        propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
+        funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
+        atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
+        typeRe = re.compile(r"^(?:(\S*)/)?([\w-]+)$")
+        for el in findAll("fake-production-placeholder", doc):
+            text = textContent(el)
+            clearContents(el)
+            match = propdescRe.match(text)
+            if match:
+                if match.group(3) is None:
+                    linkType = "propdesc"
+                elif match.group(3) in ("property", "descriptor"):
+                    linkType = match.group(2)
+                else:
+                    die("Shorthand <<{0}>> gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3))
+                    el.tag = "span"
+                    el.text = "<‘" + text[1:-1] + "’>"
+                    continue
+                el.tag = "a"
+                el.set("data-link-type", linkType)
+                el.set("title", match.group(2))
+                if match.group(1) is not None:
+                    el.set("for", match.group(1))
+                el.text = "<‘" + match.group(2) + "’>"
+                continue
+            match = funcRe.match(text)
+            if match:
+                el.tag = "a"
+                el.set("data-link-type", "function")
+                el.set("title", match.group(2))
+                if match.group(1) is not None:
+                    el.set("for", match.group(1))
+                el.text = "<" + match.group(2) + ">"
+                continue
+            match = atruleRe.match(text)
+            if match:
+                el.tag = "a"
+                el.set("data-link-type", "at-rule")
+                el.set("title", match.group(2))
+                if match.group(1) is not None:
+                    el.set("for", match.group(1))
+                el.text = "<" + match.group(2) + ">"
+                continue
+            match = typeRe.match(text)
+            if match:
+                el.tag = "a"
+                el.set("data-link-type", "type")
+                if match.group(1) is not None:
+                    el.set("for", match.group(1))
+                el.text = "<" + match.group(2) + ">"
+                continue
+            die("Shorthand <<{0}>> does not match any recognized shorthand grammar.", text)
+            continue
+
+    def transformMaybePlaceholders(doc):
+        propRe = re.compile(r"^([\w-]+):.+")
+        valRe = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
+        for el in findAll("fake-maybe-placeholder", doc):
+            text = textContent(el)
+            clearContents(el)
+            match = propRe.match(text)
+            if match:
+                el.tag = "a"
+                el.set("class", "css")
+                el.set("data-link-type", "propdesc")
+                el.set("title", match.group(1))
+                el.text = text
+                continue
+            match = valRe.match(text)
+            if match:
+                if match.group(3) is None:
+                    linkType = "maybe"
+                elif match.group(3) in config.maybeTypes:
+                    linkType = match.group(3)
+                else:
+                    die("Shorthand ''{0}'' gives type as '{1}', but only “maybe” types are allowed.", match.group(0), match.group(3))
+                    el.tag = "css"
+                    continue
+                el.tag = "a"
+                el.set("class", "css")
+                el.set("data-link-type", linkType)
+                el.set("title", match.group(2))
+                if match.group(1) is not None:
+                    el.set("for", match.group(1))
+                el.text = match.group(2)
+                continue
+            el.tag="css"
+            el.text = text
 
     def transformAutolinkShortcuts(doc):
         # Do the remaining textual replacements
