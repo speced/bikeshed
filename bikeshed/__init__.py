@@ -818,9 +818,8 @@ def dedupIds(doc, els):
 
 def simplifyText(text):
     # Remove anything that's not a name character.
-    text = text.strip()
+    text = text.strip().lower()
     text = re.sub(r"[\s/]+", "-", text)
-    text = text.lower()
     text = re.sub(r"[^a-z0-9_-]", "", text)
     return text
 
@@ -829,10 +828,6 @@ def determineLinkType(el):
     # 1. Look at data-link-type
     linkType = treeAttr(el, 'data-link-type')
     text = textContent(el)
-    # ''foo: bar'' is a propdef for 'foo'
-    if linkType == "maybe" and re.match(r"^[\w-]+\s*:\s+\S", text):
-        el.set('title', re.match(r"^\s*([\w-]+)\s*:\s+\S", text).group(1))
-        return "propdesc"
     if linkType:
         if linkType in config.linkTypes.union(["dfn"]):
             return linkType
@@ -871,35 +866,6 @@ def classifyLink(el):
     linkType = determineLinkType(el)
     el.set('data-link-type', linkType)
     linkText = determineLinkText(el)
-
-    # Fix up "for" text shorthands
-    if linkType in ('propdesc', 'descriptor'):
-        match = re.match(r"^(@[\w-]+)/([\w-]+)$", linkText)
-        if match:
-            el.set('data-link-for', match.group(1))
-            clearContents(el)
-            linkText = match.group(2)
-            el.text = linkText
-    elif linkType == "maybe":
-        match = re.match(r"^([\w/@<>-]+)/([\w-]+)$", linkText)
-        if match:
-            el.set('data-link-for', match.group(1))
-            clearContents(el)
-            linkText = match.group(2)
-            el.text = linkText
-    elif linkType == "idl":
-        match = re.match(r"^(.+)/([^/]+)$", linkText)
-        if match:
-            el.set('data-link-for', match.group(1))
-            linkText = match.group(2)
-            clearContents(el)
-            el.text = linkText
-        match = re.match(r"(.+)!!([\w-]+)$", linkText)
-        if match:
-            linkText = match.group(1)
-            clearContents(el)
-            el.text = linkText
-            el.set("data-link-type", match.group(2))
 
     el.set('title', linkText)
     for attr in ["data-link-status", "data-link-for", "data-link-spec"]:
