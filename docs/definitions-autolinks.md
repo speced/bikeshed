@@ -87,8 +87,8 @@ And finally, a catch-all category for general terms and phrases, and anything th
 
 The processor will attempt to infer your definition type from the context and text content of the definition:
 
-* Is it inside a propdef or descdef block?  Then it's a **property** or **descriptor**.
-* Is it inside an idl block (`<pre class='idl'>`)?  Then it's an **interface**.
+* Is it inside a propdef, descdef, or elementdef block?  Then it's a **property**, **descriptor**, or **element**.
+* Is it inside an idl block (`<pre class='idl'>`)?  Then it's an **one of the IDL types, inferred by parsing the IDL**.
 * Does it start with an `@`?  Then it's an **at-rule**.
 * Is it surrounded by `<>`?  Then it's a **type**.
 * Does it start with a `:`?  Then it's a **selector**.
@@ -186,6 +186,23 @@ There are several additional shortcuts for writing an autolink:
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 * `[[#foo]]` is an autolink to a heading in the same document with the given ID.  (See [Section Links](#section-links) for more detail.)
 
+For any of the above shorthands that can have a "for" value, you can indicate this inline by preceding the linking text with the "for" value and separating it with a slash. For example, to disambiguate that you want the "foo" value from the "prop1" property (rather than "prop2", which also has a "foo" value), you can write:
+
+```
+''prop1/foo''
+```
+
+The "for" value will not be shown in the processed document; it's extracted and stashed in metadata for the link instead.
+
+Similarly, any of the above types except biblio links can have their type specified explicitly, by *appending* the type and separating it with a double bang, like the following to indicate that you want the *attribute* named "bar", rather than the dictionary member of the same name:
+
+```
+{{bar!!attribute}}
+```
+
+Again, the type value won't be shown in the processed document.
+
+These two techniques can, of course, be combined.
 
 Link Types
 ----------
@@ -213,13 +230,14 @@ There are three things you might have to do to fix these:
 1. Specify the type explicitly, if the link isn't being processed as the correct type.
     Like definitions, this can be done by just adding the type as a boolean attribute on the link,
     or by adding a `link-for=''` attribute to a container.
+    If the link is using shorthand syntax, you can use the `!!type` suffix to specify the type.
 
 2. If the link type corresponds to one of the definition types that needs `for` to be specified,
     you may need to specify `for` on the link as well to narrow down which definition you're referring to.
     For example, many properties define an "auto" value;
     to link to the "auto" value of the 'width' property in particular,
     specify `<a value for=width>auto</a>`,
-    or the shortcut syntax `''width/auto''.
+    or the shorthand syntax `''width/auto''.
     To refer to a value of a descriptor,
     you *can* be completely explicit and specify the at-rule as well,
     like `<a value for='@counter-style/system'>numeric</a>`,
@@ -235,12 +253,7 @@ There are three things you might have to do to fix these:
     Just add a `spec=''` attribute with the spec's shortname to either the link or a container.
     This can also be specified in the spec's [metadata](metadata.md) with "Link Defaults",
     which applies document-wide.
-
-**Note:** You can specify the type of a link using the shortcut syntax, too.
-This is currently only available for the IDL shortcut syntax (`{{foo}}`),
-but will eventually spread to the others.
-Simply append `!!`, followed by the link type, to the term,
-like `{{foo!!argument}}`
+    (There is no shorthand syntax for specifying this; if you need to add this to a shorthand autolink, you must first convert it into an explicitly `<a>` element.)
 
 As a final note, the autolinking algorithm will link differently based on whether the spec being processed is an "unofficial" or "official" draft.
 If "unofficial" (ED, UD, etc.), it'll prefer to link to other EDs, and will only link to TRs if no ED version of that spec exists.
