@@ -1484,7 +1484,7 @@ class CSSSpec(object):
         def sectionReplacer(match):
             return E.a({"section":"", "href":match.group(1)})
 
-        propdescRe = re.compile(r"'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'")
+        propdescRe = re.compile(r"'(?:([^\s']*)/)?([\w*-]+)(?:!!([\w-]+))?'")
         def propdescReplacer(match):
             if match.group(3) is None:
                 linkType = "propdesc"
@@ -1495,7 +1495,7 @@ class CSSSpec(object):
                 return E.span(match.group(0))
             return E.a({"data-link-type":linkType, "class":"property", "for": match.group(1)}, match.group(2))
 
-        idlRe = re.compile(r"{{(?:(.*)/)?((?:[^ }]|,\s)+?)(?:!!([\w-]+))?}}")
+        idlRe = re.compile(r"{{(?:([^ }]*)/)?((?:[^ }]|,\s)+?)(?:!!([\w-]+))?}}")
         def idlReplacer(match):
             if match.group(3) is None:
                 linkType = "idl"
