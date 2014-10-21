@@ -73,7 +73,7 @@ The name of the construct.
 
 **Construct.idlType**
 
-Contains a string indicating the type of the construct. Possible values are: "const", "enum", "typedef", "interface", "constructor", "attribute", "iterator", "stringifier", "serializer", "method", "argument", "dictionary", "dict-member", "callback", "exception", "except-field", "implements", "extended-attribute", and "unknown".
+Contains a string indicating the type of the construct. Possible values are: "const", "enum", "typedef", "interface", "constructor", "attribute", "iterable", "maplike", "setlike", "stringifier", "serializer", "method", "argument", "dictionary", "dict-member", "callback", "implements", "extended-attribute", and "unknown".
 
 **Construct.fullName**
 
@@ -150,7 +150,7 @@ The Default Production of the Argument or 'None'.
 
 **InterfaceMember.member**
 
-Either a Const Construct or an AttributeOrOperationOrIterator Production.
+One of the following Constructs or Productions: Const, Serializer, Stringifier, StaticMember, Iterable, Maplike, Setlike, Attribute, SpecialOperation, or Operation.
 
 **InterfaceMember.arguments**
 
@@ -195,22 +195,6 @@ Contains a list of any arguments present or 'None' for interface callbacks.
 **Callback.interface**
 
 The 'interface' Construct of the callback, or 'None' for function callbacks.
-
-**ExceptionMember.const**
-
-The Const Production of the ExceptionMember or 'None'.
-
-**ExceptionMember.type**
-
-The Type Production of the ExceptionMember. 'None' for Const members.
-
-**Exception.inheritance**
-
-The Inheritance Production of the Exception or 'None'.
-
-**Exception.members**
-
-A list of ExceptionMembers.
 
 **ImplementsStatement.implements**
 

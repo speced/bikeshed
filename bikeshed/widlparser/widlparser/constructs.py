@@ -308,15 +308,16 @@ class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut]
         return output + ((' [default: ' + repr(self.default) + ']]') if (self.default) else ']')
 
 
-class InterfaceMember(Construct): # [ExtendedAttributes] Const | Serializer | Stringifier | StaticMember | Attribute | OperationOrIterator
+class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | SpecialOperation | Serializer | Stringifier | StaticMember | Iterable | Attribute | Maplike | Setlike
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
         return tokens.popPosition(Const.peek(tokens) or Serializer.peek(tokens) or
                                   Stringifier.peek(tokens) or StaticMember.peek(tokens) or
-                                  Attribute.peek(tokens) or SpecialOperation.peek(tokens) or
-                                  Iterator.peek(tokens) or Operation.peek(tokens))
+                                  Iterable.peek(tokens) or Maplike.peek(tokens) or
+                                  Setlike.peek(tokens) or Attribute.peek(tokens) or 
+                                  SpecialOperation.peek(tokens) or Operation.peek(tokens))
 
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent)
@@ -328,12 +329,16 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | Serializer | St
             self.member = Stringifier(tokens, parent)
         elif (StaticMember.peek(tokens)):
             self.member = StaticMember(tokens, parent)
+        elif (Iterable.peek(tokens)):
+            self.member = Iterable(tokens, parent)
+        elif (Maplike.peek(tokens)):
+            self.member = Maplike(tokens, parent)
+        elif (Setlike.peek(tokens)):
+            self.member = Setlike(tokens, parent)
         elif (Attribute.peek(tokens)):
             self.member = Attribute(tokens, parent)
         elif (SpecialOperation.peek(tokens)):
             self.member = SpecialOperation(tokens, parent)
-        elif (Iterator.peek(tokens)):
-            self.member = Iterator(tokens)
         else:
             self.member = Operation(tokens, parent)
         self._didParse(tokens)
@@ -796,151 +801,6 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
             return output + repr(self.interface) + ']'
         output += '[name: ' + self.name.encode('ascii', 'replace') + '] [returnType: ' + unicode(self.returnType) + '] '
         return output + '[argumentlist: ' + (repr(self.arguments) if (self.arguments) else '') + ']]'
-
-
-class ExceptionMember(Construct): # [ExtendedAttributes] Const | [ExtendedAttributes] Type identifier ";"
-    @classmethod
-    def peek(cls, tokens):
-        tokens.pushPosition(False)
-        Construct.peek(tokens)
-        if (Const.peek(tokens)):
-            return tokens.popPosition(True)
-        if (Type.peek(tokens)):
-            token = tokens.peek()
-            return tokens.popPosition(token and token.isIdentifier())
-        tokens.popPosition(False)
-
-    def __init__(self, tokens, parent):
-        Construct.__init__(self, tokens, parent)
-        if (Const.peek(tokens)):
-            self.const = Const(tokens)
-            self.type = None
-            self.name = self.const.name
-        else:
-            self.const = None
-            self.type = Type(tokens)
-            self.name = tokens.next().text
-            self._consumeSemicolon(tokens)
-        self._didParse(tokens)
-
-    @property
-    def idlType(self):
-        return 'const' if (self.const) else 'except-field'
-
-    def _unicode(self):
-        output = Construct._unicode(self)
-        return output + (unicode(self.const) if (self.const) else unicode(self.type) + self.name)
-
-    def _markup(self, generator):
-        if (self.const):
-            return self.const._markup(generator)
-        else:
-            generator.addType(self.type)
-            generator.addName(self.name)
-        return self
-    
-    def __repr__(self):
-        output = '[member: ' + Construct.__repr__(self)
-        return output + ((repr(self.const) + ']') if (self.const) else repr(self.type) + ' [name: ' + self.name + ']]')
-
-
-class Exception(Construct):   # [ExtendedAttributes] "exception" identifier [Inheritance] "{" [ExceptionMembers]... "}" ";"
-    @classmethod
-    def peek(cls, tokens):
-        tokens.pushPosition(False)
-        Construct.peek(tokens)
-        if (Symbol.peek(tokens, 'exception')):
-            token = tokens.peek()
-            if (token and token.isIdentifier()):
-                Inheritance.peek(tokens)
-                return tokens.popPosition(Symbol.peek(tokens, '{'))
-        tokens.popPosition(False)
-    
-    def __init__(self, tokens, parent = None):
-        Construct.__init__(self, tokens, parent)
-        self._exception = Symbol(tokens, 'exception')
-        self.name = tokens.next().text
-        self.inheritance = Inheritance(tokens) if (Inheritance.peek(tokens)) else None
-        self._openBrace = Symbol(tokens, '{')
-        self.members = []
-        self._closeBrace = None
-        while (tokens.hasTokens()):
-            if (Symbol.peek(tokens, '}')):
-                self._closeBrace = Symbol(tokens, '}')
-                break
-            if (ExceptionMember.peek(tokens)):
-                self.members.append(ExceptionMember(tokens, self))
-            else:
-                self.members.append(SyntaxError(tokens, self))
-        self._consumeSemicolon(tokens, False)
-        self._didParse(tokens)
-
-    @property
-    def idlType(self):
-        return 'exception'
-    
-    @property
-    def complexityFactor(self):
-        return len(self.members) + 1
-    
-    def __len__(self):
-        return len(self.members)
-    
-    def keys(self):
-        return [member.name for member in self.members]
-    
-    def __getitem__(self, key):
-        if (isinstance(key, basestring)):
-            for member in self.members:
-                if (key == member.name):
-                    return member
-            return None
-        return self.members[key]
-    
-    def __iter__(self):
-        return iter(self.members)
-
-    def __contains__(self, key):
-        if (isinstance(key, basestring)):
-            for member in self.members:
-                if (key == member.name):
-                    return True
-            return False
-        return (key in self.members)
-
-    def findMember(self, name):
-        for member in reversed(self.members):
-            if (name == member.name):
-                return member
-        return None
-
-    def _unicode(self):
-        output = Construct._unicode(self) + unicode(self._exception) + self.name
-        output += unicode(self.inheritance) if (self.inheritance) else ''
-        output += unicode(self._openBrace)
-        for member in self.members:
-            output += unicode(member)
-        return output + unicode(self._closeBrace) if (self._closeBrace) else output
-    
-    def _markup(self, generator):
-        self._exception.markup(generator)
-        generator.addName(self.name)
-        if (self.inheritance):
-            self.inheritance.markup(generator)
-        generator.addText(self._openBrace)
-        for member in self.members:
-            member.markup(generator)
-        generator.addText(self._closeBrace)
-        return self
-
-    def __repr__(self):
-        output = '[exception: ' + Construct.__repr__(self)
-        output += '[name: ' + self.name.encode('ascii', 'replace') + '] '
-        output += repr(self.inheritance) if (self.inheritance) else ''
-        output += '[members: \n'
-        for member in self.members:
-            output += '  ' + repr(member) + '\n'
-        return output + ']]'
 
 
 class ImplementsStatement(Construct):  # [ExtendedAttributes] identifier "implements" identifier ";"

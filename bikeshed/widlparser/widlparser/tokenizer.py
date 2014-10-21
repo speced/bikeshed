@@ -52,11 +52,14 @@ class Token(object):
 
 class Tokenizer(object):
     SymbolIdents = frozenset((
-        'any', 'attribute', 'boolean', 'byte', 'ByteString', 'callback', 'const', 'creator', 'Date', 'deleter',
-        'dictionary', 'DOMString', 'double', 'enum', 'exception', 'false', 'float', 'getter', 'implements',
-        'Infinity', '-Infinity', 'inherit', 'interface', 'iterator', 'legacycaller', 'long', 'NaN', 'null', 'object',
-        'octet', 'optional', 'or', 'partial', 'Promise', 'readonly', 'RegExp', 'sequence', 'serializer', 'setter',
-        'short', 'static', 'stringifier', 'true', 'typedef', 'unrestricted', 'unsigned', 'void'))
+        'any', 'attribute', 'ArrayBuffer', 'boolean', 'byte', 'ByteString', 'callback', 'const', 'creator', 'DataView',
+        'Date', 'deleter', 'dictionary', 'DOMString', 'double', 'enum', 'Error', 'exception', 'false', 'float', 
+        'Float32Array', 'Float64Array', 'getter', 'implements', 'Infinity', '-Infinity', 'inherit', 'Int8Array', 
+        'Int16Array', 'Int32Array', 'interface', 'iterable', 'legacycaller', 'legacyiterable', 'long', 'maplike', 
+        'NaN', 'null', 'object', 'octet', 'optional', 'or', 'partial', 'Promise', 'readonly', 'RegExp', 'required', 
+        'sequence', 'serializer', 'setlike', 'setter', 'short', 'static', 'stringifier', 'true', 'typedef', 
+        'Uint8Array', 'Uint16Array', 'Uint32Array', 'Uint8ClampedArray', 'unrestricted', 'unsigned', 'USVString', 
+        'void'))
     
     def __init__(self, text, ui = None):
         self.ui = ui
