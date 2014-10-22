@@ -45,6 +45,8 @@ Then, activate the python version you just installed as the one the system shoul
 sudo port select --set python python27
 ~~~
 
+(If you get `ImportError: No module named six` when you first run Bikeshed, additionally run `sudo port install py27-six`.)
+
 Windows steps
 -----------
 
