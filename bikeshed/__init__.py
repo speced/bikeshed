@@ -988,7 +988,7 @@ class IDLMarker(object):
         return (None, None)
 
     def markupTypeName(self, text, construct):
-        return ('<a data-link-type="idl">', '</a>')
+        return ('<a data-link-type="idl-name">', '</a>')
 
     def markupName(self, text, construct):
         if construct.idlType not in config.idlTypes:
