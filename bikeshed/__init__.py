@@ -1364,8 +1364,7 @@ class CSSSpec(object):
             text = text.replace("[{0}]".format(tag.upper()), replacement)
         text = fixTypography(text)
         # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
-        text = re.sub("<<", "<fake-production-placeholder class=production>", text)
-        text = re.sub(">>", "</fake-production-placeholder>", text)
+        text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
         # Replace the ''maybe link'' shortcuts.
         # They'll survive the HTML parser, but they don't match if they contain an element.
         # (The other shortcuts are "atomic" and can't contain elements.)
