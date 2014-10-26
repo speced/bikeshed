@@ -1001,6 +1001,7 @@ class IDLMarker(object):
 
         if idlType == "method":
             title = parser.Parser().normalizedMethodName(text)
+            # Switch to construct.methodName
         else:
             title = text
 
