@@ -1428,7 +1428,7 @@ class CSSSpec(object):
             continue
 
     def transformMaybePlaceholders(doc):
-        propRe = re.compile(r"^([\w-]+):.+")
+        propRe = re.compile(r"^([\w-]+): .+")
         valRe = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
         for el in findAll("fake-maybe-placeholder", doc):
             text = textContent(el)
