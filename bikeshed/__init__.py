@@ -2046,9 +2046,12 @@ def addSpecMetadataSection(doc):
 
     dl = E.dl()
     for key, vals in md.items():
+        attrs = {}
+        if key in ("Editor", "Editors"):
+            attrs["class"] = "editor"
         appendChild(dl,
-            E.dt(key, ":"),
-            *[E.dd(val) for val in vals])
+            E.dt(attrs, key, ":"),
+            *[E.dd(attrs, val) for val in vals])
     fillWith('spec-metadata', E.div(dl), doc=doc)
 
 
