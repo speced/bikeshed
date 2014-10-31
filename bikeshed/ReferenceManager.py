@@ -334,13 +334,21 @@ class ReferenceManager(object):
                 return leveledRefs[0]['url']
 
         # If we hit this point, there are >1 possible refs to choose from.
+        # Default to linking to the first one.
+        defaultRef = refs[0]
+        if linkType == "propdesc":
+            # If both props and descs are possible, default to prop.
+            for ref in refs:
+                if ref['type'] == "property":
+                    defaultRef = ref
+                    break
         if error:
             warn("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into 'Link Defaults':\n{3}",
                  linkType,
                  text,
-                 refs[0]['spec'],
+                 defaultRef['spec'],
                  '\n'.join('    {2} ({1}) {0}'.format(text, ref['type'], ref['spec']) for ref in refs))
-        return refs[0]['url']
+        return defaultRef['url']
 
     def getBiblioRef(self, text, el=None):
         key = text.lower()
