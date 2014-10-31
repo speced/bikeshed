@@ -918,8 +918,10 @@ def processBiblioLinks(doc):
 def processAutolinks(doc):
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
-    # Maybe autolinks can be any element.  If it links up, we change it into an <a>.
-    autolinks = findAll("a:not([href]), i", doc)
+    if doc.md.useIAutolinks:
+        autolinks = findAll("a:not([href]), i", doc)
+    else:
+        autolinks = findAll("a:not([href])", doc)
     for el in autolinks:
         # Explicitly empty title indicates this shouldn't be an autolink.
         if el.get('title') == '':
