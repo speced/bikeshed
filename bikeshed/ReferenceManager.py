@@ -56,12 +56,6 @@ class ReferenceManager(object):
             except StopIteration:
                 pass
 
-        try:
-            with io.open("anchors.json", 'r', encoding="utf-8") as fh:
-                self.refs.update(json.load(fh))
-        except IOError:
-            pass
-
         self.defaultSpecs.update(json.loads(
             config.retrieveCachedFile(
                 cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",

@@ -153,6 +153,41 @@ To force a link to be exported, add an `export` boolean attribute to it.
 To force a link *not* to be exported, add a `noexport` boolean attribute instead.
 Like the other attributes, you can instead add this to a container to have it be a default for the definitions inside.
 
+Providing Custom Definitions
+----------------------------
+
+If you want to link to dfns in specs that aren't yet part of the autolinking database,
+you can provide your own definition data that Bikeshed can use.
+Within a `<pre class='anchors'>` element,
+provide a JSON array of the terms you want to link to,
+where each term is a JSON object with the following keys:
+
+* "linkingText", a string or array of strings with the linking text of the anchor
+* "type", a string matching one of the definition types listed above
+* optionally, "for", a string or array of strings denoting what the definition is scoped to (see above)
+* "url", a string with the url of the anchor you're linking to
+* "shortname", a string containing the shortname of the spec
+* "level", a string or int containing the level of the spec
+* "status", a string containing either "ED" (if the spec is an Editor's Draft, Living Standard, etc) or "TR" (if the spec is a stable/dead snapshot)
+
+Example:
+
+```html
+<pre class="anchors">
+[
+    {
+        "linkingText": "foo",
+        "type": "dfn",
+        "url": "http://example.com#foo",
+        "shortname": "example",
+        "level": 1,
+        "status": "ED"
+    }
+]
+</pre>
+
+<a>foo</a> links now!
+```
 
 
 Autolinking

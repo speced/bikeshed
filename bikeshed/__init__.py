@@ -222,6 +222,7 @@ def transformDataBlocks(doc):
         'elementdef': transformElementdef,
         'railroad': transformRailroad,
         'biblio': transformBiblio,
+        'anchors': transformAnchors,
         'pre': transformPre
     }
     blockType = ""
@@ -444,7 +445,63 @@ def transformBiblio(lines, doc, **kwargs):
     biblio.processSpecrefBiblioFile(''.join(lines), doc.refs.biblios, order=1)
     return []
 
+def transformAnchors(lines, doc, **kwargs):
+    try:
+        anchors = json.loads(''.join(lines))
+    except Exception, e:
+        die("JSON parse error:\n{0}", e)
+        return
 
+    def checkTypes(anchor, key, field, *types):
+        if field not in anchor:
+            return True
+        val = anchor[field]
+        for fieldType in types:
+            if isinstance(val, fieldType):
+                break
+        else:
+            die("Field '{1}' of inline anchor for '{0}' must be a {3}. Got a '{2}'.", key, field, type(val), ' or '.join(str(t) for t in types))
+            return False
+        return True
+
+    for anchor in anchors:
+        # Check all the mandatory fields
+        for field in ["linkingText", "type", "shortname", "level", "status", "url"]:
+            if field not in anchor:
+                die("Inline anchor for '{0}' is missing the '{1}' field.", key, field)
+                continue
+        key = anchor['linkingText'] if isinstance(anchor['linkingText'], basestring) else anchor['linkingText'][0]
+        # String fields
+        for field in ["type", "shortname", "status", "url"]:
+            if not checkTypes(anchor, key, field, basestring):
+                continue
+            anchor[field] = anchor[field].strip()+"\n"
+        if anchor['status'].strip() not in ["ED", "TR"]:
+            die("Field 'status' of inline anchor for '{0}' must be 'TR' or 'ED'. Got '{1}'.", key, anchor['status'].strip())
+            continue
+        # String or int fields, convert to string
+        for field in ["level"]:
+            if not checkTypes(anchor, key, field, basestring, int):
+                continue
+            anchor[field] = unicode(anchor[field]).strip() + "\n"
+        anchor['spec'] = "{0}-{1}\n".format(anchor['shortname'].strip(), anchor['level'].strip())
+        anchor['export'] = True
+        # String or list-of-strings fields, convert to list
+        for field in ["linkingText", "for"]:
+            if field not in anchor:
+                continue
+            if not checkTypes(anchor, key, field, basestring, list):
+                continue
+            if isinstance(anchor[field], basestring):
+                anchor[field] = [anchor[field]]
+            for i,line in enumerate(anchor[field]):
+                if not isinstance(line, basestring):
+                    die("All of the values for field '{1}' of inline anchor for '{0}' must be strings. Got a '{2}'.", key, field, type(line))
+                    continue
+                anchor[field][i] = re.sub(r'\s+', ' ', anchor[field][i].strip()) + "\n"
+        for text in anchor['linkingText']:
+            doc.refs.refs[text.lower()].append(anchor)
+    return []
 
 
 
