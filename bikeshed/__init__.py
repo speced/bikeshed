@@ -476,9 +476,12 @@ def transformAnchors(lines, doc, **kwargs):
             if not checkTypes(anchor, key, field, basestring):
                 continue
             anchor[field] = anchor[field].strip()+"\n"
-        if anchor['status'].strip() not in ["ED", "TR"]:
-            die("Field 'status' of inline anchor for '{0}' must be 'TR' or 'ED'. Got '{1}'.", key, anchor['status'].strip())
+        if anchor['status'].strip() not in ["current", "dated"]:
+            die("Field 'status' of inline anchor for '{0}' must be 'current' or 'dated'. Got '{1}'.", key, anchor['status'].strip())
             continue
+        else:
+            # TODO Convert the internal representation from ED/TR to current/dated
+            anchor['status'] = "ED\n" if anchor['status'] == "current\n" else "TR\n"
         # String or int fields, convert to string
         for field in ["level"]:
             if not checkTypes(anchor, key, field, basestring, int):

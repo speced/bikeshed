@@ -168,7 +168,7 @@ where each term is a JSON object with the following keys:
 * "url", a string with the url of the anchor you're linking to
 * "shortname", a string containing the shortname of the spec
 * "level", a string or int containing the level of the spec
-* "status", a string containing either "ED" (if the spec is an Editor's Draft, Living Standard, etc) or "TR" (if the spec is a stable/dead snapshot)
+* "status", a string containing either "current" (if the spec is an Editor's Draft, Living Standard, etc) or "dated" (if the spec is a stable/dead snapshot)
 
 Example:
 
@@ -181,7 +181,7 @@ Example:
         "url": "http://example.com#foo",
         "shortname": "example",
         "level": 1,
-        "status": "ED"
+        "status": "current"
     }
 ]
 </pre>
