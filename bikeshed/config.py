@@ -66,7 +66,7 @@ dfnClassToType = {
 dfnTypes = frozenset(dfnClassToType.values())
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
 idlTypes = frozenset(["event", "interface", "constructor", "method", "argument", "attribute", "callback", "dictionary", "dict-member", "exception", "except-field", "exception-code", "enum", "const", "typedef", "stringifier", "serializer", "iterator"])
-idlNameTypes = frozenset(["interface", "dictionary", "enum", "exception", "typedef"])
+idlNameTypes = frozenset(["interface", "dictionary", "enum", "exception", "typedef", "callback"])
 functionishTypes = frozenset(["function", "method", "constructor"])
 linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "idl-name", "maybe", "biblio"])
 typesUsingFor = frozenset(["descriptor", "value", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "except-field", "stringifier", "serializer", "iterator"])
@@ -173,3 +173,36 @@ def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force
 def printjson(obj):
     import json
     return json.dumps(obj, indent=2, default=lambda x:x.__json__())
+
+
+def processTextNodes(nodes, regex, replacer):
+    '''
+    Takes an array of alternating text/objects,
+    and runs reSubObject on the text parts,
+    splicing them into the passed-in array.
+    Mutates!
+    '''
+    for i, node in enumerate(nodes):
+        # Node list always alternates between text and elements
+        if i%2 == 0:
+            nodes[i:i+1] = reSubObject(regex, node, replacer)
+    return nodes
+
+def reSubObject(pattern, string, repl=None):
+    '''
+    like re.sub, but replacements don't have to be text;
+    returns an array of alternating unmatched text and match objects instead.
+    If repl is specified, it's called with each match object,
+    and the result then shows up in the array instead.
+    '''
+    lastEnd = 0
+    pieces = []
+    for match in pattern.finditer(string):
+        pieces.append(string[lastEnd:match.start()])
+        if repl:
+            pieces.append(repl(match))
+        else:
+            pieces.append(match)
+        lastEnd = match.end()
+    pieces.append(string[lastEnd:])
+    return pieces

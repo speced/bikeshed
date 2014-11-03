@@ -56,12 +56,6 @@ class ReferenceManager(object):
             except StopIteration:
                 pass
 
-        try:
-            with io.open("anchors.json", 'r', encoding="utf-8") as fh:
-                self.refs.update(json.load(fh))
-        except IOError:
-            pass
-
         self.defaultSpecs.update(json.loads(
             config.retrieveCachedFile(
                 cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
@@ -232,7 +226,7 @@ class ReferenceManager(object):
             return localRefs[0]['url']
 
         # Take defaults into account
-        if (spec is None or status is None):
+        if (not spec or not status):
             variedTexts = [v for v in linkTextVariations(text) if v in self.defaultSpecs]
             if variedTexts:
                 for dfnSpec, dfnType, dfnStatus, dfnFor in self.defaultSpecs[variedTexts[0]]:
@@ -250,7 +244,7 @@ class ReferenceManager(object):
             return None
 
         # Unless you've specified a particular spec to look in, cut out all non-exported things.
-        if spec is None:
+        if not spec:
             refs = [ref for ref in refs if ref['export']]
         if len(refs) == 0:
             if zeroRefsError:
@@ -258,7 +252,7 @@ class ReferenceManager(object):
             return None
 
         # If spec is specified, kill anything that doesn't match
-        if spec is not None:
+        if spec:
             refs = [ref for ref in refs if ref['shortname'].lower() == spec.lower() or ref['spec'].lower() ==spec.lower()]
         if len(refs) == 0:
             if zeroRefsError:
@@ -266,7 +260,7 @@ class ReferenceManager(object):
             return None
 
         # If linkFor is specified, kill anything that doesn't match
-        if linkFor is not None:
+        if linkFor:
             refs = [ref for ref in refs if linkFor in ref['for']]
         if len(refs) == 0:
             if zeroRefsError:
@@ -334,13 +328,21 @@ class ReferenceManager(object):
                 return leveledRefs[0]['url']
 
         # If we hit this point, there are >1 possible refs to choose from.
+        # Default to linking to the first one.
+        defaultRef = refs[0]
+        if linkType == "propdesc":
+            # If both props and descs are possible, default to prop.
+            for ref in refs:
+                if ref['type'] == "property":
+                    defaultRef = ref
+                    break
         if error:
             warn("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into 'Link Defaults':\n{3}",
                  linkType,
                  text,
-                 refs[0]['spec'],
+                 defaultRef['spec'],
                  '\n'.join('    {2} ({1}) {0}'.format(text, ref['type'], ref['spec']) for ref in refs))
-        return refs[0]['url']
+        return defaultRef['url']
 
     def getBiblioRef(self, text, el=None):
         key = text.lower()

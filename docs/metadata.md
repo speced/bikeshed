@@ -60,6 +60,7 @@ There are several additional optional keys:
 * **Test Suite** must contain a link to the test suite nightly cover page (like <http://test.csswg.org/suites/css3-flexbox/nightly-unstable>).
 * **Mailing List** must contain an email address to be used for mailing lists.
 * **Mailing List Archives** must contain a link to the list archives.
+* **Use `<i>` Autolinks** turns on legacy support for using `<i>` elements as "dfn" autolinks.  It takes a bool-ish value: "yes/no", "y/n", "true/false", or "on/off".  (This only exists for legacy purposes; do not use in new documents. Instead, just use the `<a>` element like you're supposed to.)
 
 You can also provide custom keys with whatever values you want,
 by prefixing the key with `!`,

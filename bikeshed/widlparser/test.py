@@ -114,7 +114,7 @@ if __name__ == "__main__":      # called from the command line
     
     
     idl = u"""dictionary CSSFontFaceLoadEventInit : EventInit { sequence<CSSFontFaceRule> fontfaces = [ ]; }; 
-    interface Simple{
+interface Simple{
     serializer;
     serializer = { foo };
     serializer = { foo, bar };
@@ -128,9 +128,11 @@ if __name__ == "__main__":      # called from the command line
     serializer = [ getter ];
     serializer = foo;
     serializer cereal(short one);
-    Foo iterator;
-    Foo iterator = Simple;
-    Foo iterator object;
+    iterable<Foo>;
+    iterable<Foo, Bar>;
+    readonly maplike<Foo, Bar>;
+    setlike<Uint8ClampedArray>;
+    attribute boolean required;
     static attribute Foo foo;
     static Foo foo();
     Promise<ReallyISwear>? theCheckIsInTheMail();
@@ -217,12 +219,6 @@ callback interface callMe {
     inherit attribute short round setraises (for the heck of it);
 };
 
-exception foo:bar {
-    short round;
-    const long one = 2;
-    Foo foo;
-    unsigned long long longest;
-};
 """
 #    idl = idl.replace(' ', '  ')
     print "IDL >>>\n" + idl + "\n<<<"
@@ -247,7 +243,6 @@ exception foo:bar {
 
     print "FIND:"
     print parser.find('round').fullName
-    print parser.find('foo/round').fullName
     print parser.find('Foo/method/y').fullName
     print parser.find('Foo.method').fullName
     print parser.find('Foo(constructor)').fullName

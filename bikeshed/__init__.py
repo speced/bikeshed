@@ -13,6 +13,7 @@ import urllib
 from urllib2 import urlopen
 from datetime import date, datetime
 from copy import deepcopy
+from collections import OrderedDict
 import html5lib
 import lxml
 import cProfile
@@ -221,6 +222,7 @@ def transformDataBlocks(doc):
         'elementdef': transformElementdef,
         'railroad': transformRailroad,
         'biblio': transformBiblio,
+        'anchors': transformAnchors,
         'pre': transformPre
     }
     blockType = ""
@@ -319,30 +321,53 @@ def transformPre(lines, tagName, firstLine, **kwargs):
 
 
 def transformPropdef(lines, doc, firstLine, **kwargs):
-    vals = parseDefBlock(lines, "propdef")
-    # The required keys are specified in the order they should show up in the propdef table.
-    if "partial" in firstLine or "New values" in vals:
-        requiredKeys = ["Name", "New values"]
+    attrs = OrderedDict()
+    parsedAttrs = parseDefBlock(lines, "propdef")
+    # Displays entries in the order specified in attrs,
+    # then if there are any unknown parsedAttrs values,
+    # they're displayed afterward in the order they were specified.
+    # attrs with a value of None are required to be present in parsedAttrs;
+    # attrs with any other value are optional, and use the specified value if not present in parsedAttrs
+    if "partial" in firstLine or "New values" in parsedAttrs:
+        attrs["Name"] = None
+        attrs["New values"] = None
         ret = ["<table class='definition propdef partial'>"]
-    else:
-        requiredKeys = ["Name", "Value", "Initial", "Applies to", "Inherited", "Media", "Computed value"]
+    elif "shorthand" in firstLine:
+        attrs["Name"] = None
+        attrs["Value"] = None
+        for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animatable"]:
+            attrs[defaultKey] = "see individual properties"
         ret = ["<table class='definition propdef'>"]
-    for key in requiredKeys:
-        if key == "Value":
-            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals.get(key,'')))
-        elif key.lower() == "new values":
-            ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, vals.get(key,'')))
-        elif key in vals:
-            ret.append("<tr><th>{0}:<td>{1}".format(key, vals.get(key,'')))
+    else:
+        attrs["Name"] = None
+        attrs["Value"] = None
+        attrs["Initial"] = None
+        attrs["Applies to"] = "all elements"
+        attrs["Inherited"] = None
+        attrs["Percentages"] = "n/a"
+        attrs["Media"] = "visual"
+        attrs["Computed value"] = "as specified"
+        attrs["Animatable"] = "no"
+        ret = ["<table class='definition propdef'>"]
+    for key, val in attrs.items():
+        if key in parsedAttrs or val is not None:
+            if key in parsedAttrs:
+                val = parsedAttrs[key]
+            if key in ("Value", "New values"):
+                ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, val))
+            else:
+                ret.append("<tr><th>{0}:<td>{1}".format(key, val))
         else:
-            die("The propdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key)
+            die("The propdef for '{0}' is missing a '{1}' line.", parsedAttrs.get("Name", "???"), key)
             continue
-    for key in vals.viewkeys() - requiredKeys:
-        ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
+    for key, val in parsedAttrs.items():
+        if key in attrs:
+            continue
+        ret.append("<tr><th>{0}:<td>{1}".format(key, val))
     ret.append("</table>")
     return ret
 
-
+# TODO: Make these functions match transformPropdef's new structure
 def transformDescdef(lines, doc, firstLine, **kwargs):
     vals = parseDefBlock(lines, "descdef")
     if "partial" in firstLine or "New values" in vals:
@@ -387,7 +412,7 @@ def transformElementdef(lines, doc, **kwargs):
 
 
 def parseDefBlock(lines, type):
-    vals = {}
+    vals = OrderedDict()
     for (i, line) in enumerate(lines):
         match = re.match(r"\s*([^:]+):\s*(.*)", line)
         if(match is None):
@@ -420,7 +445,63 @@ def transformBiblio(lines, doc, **kwargs):
     biblio.processSpecrefBiblioFile(''.join(lines), doc.refs.biblios, order=1)
     return []
 
+def transformAnchors(lines, doc, **kwargs):
+    try:
+        anchors = json.loads(''.join(lines))
+    except Exception, e:
+        die("JSON parse error:\n{0}", e)
+        return
 
+    def checkTypes(anchor, key, field, *types):
+        if field not in anchor:
+            return True
+        val = anchor[field]
+        for fieldType in types:
+            if isinstance(val, fieldType):
+                break
+        else:
+            die("Field '{1}' of inline anchor for '{0}' must be a {3}. Got a '{2}'.", key, field, type(val), ' or '.join(str(t) for t in types))
+            return False
+        return True
+
+    for anchor in anchors:
+        # Check all the mandatory fields
+        for field in ["linkingText", "type", "shortname", "level", "status", "url"]:
+            if field not in anchor:
+                die("Inline anchor for '{0}' is missing the '{1}' field.", key, field)
+                continue
+        key = anchor['linkingText'] if isinstance(anchor['linkingText'], basestring) else anchor['linkingText'][0]
+        # String fields
+        for field in ["type", "shortname", "status", "url"]:
+            if not checkTypes(anchor, key, field, basestring):
+                continue
+            anchor[field] = anchor[field].strip()+"\n"
+        if anchor['status'].strip() not in ["ED", "TR"]:
+            die("Field 'status' of inline anchor for '{0}' must be 'TR' or 'ED'. Got '{1}'.", key, anchor['status'].strip())
+            continue
+        # String or int fields, convert to string
+        for field in ["level"]:
+            if not checkTypes(anchor, key, field, basestring, int):
+                continue
+            anchor[field] = unicode(anchor[field]).strip() + "\n"
+        anchor['spec'] = "{0}-{1}\n".format(anchor['shortname'].strip(), anchor['level'].strip())
+        anchor['export'] = True
+        # String or list-of-strings fields, convert to list
+        for field in ["linkingText", "for"]:
+            if field not in anchor:
+                continue
+            if not checkTypes(anchor, key, field, basestring, list):
+                continue
+            if isinstance(anchor[field], basestring):
+                anchor[field] = [anchor[field]]
+            for i,line in enumerate(anchor[field]):
+                if not isinstance(line, basestring):
+                    die("All of the values for field '{1}' of inline anchor for '{0}' must be strings. Got a '{2}'.", key, field, type(line))
+                    continue
+                anchor[field][i] = re.sub(r'\s+', ' ', anchor[field][i].strip()) + "\n"
+        for text in anchor['linkingText']:
+            doc.refs.refs[text.lower()].append(anchor)
+    return []
 
 
 
@@ -781,22 +862,21 @@ def dedupIds(doc, els):
         if re.match(r"issue-[0-9a-fA-F]{8}$", dupe):
             # Don't warn about issues, it's okay if they have the same ID because they're identical text.
             continue
-        els = findAll("#"+id, doc)
+        els = findAll("#"+dupe, doc)
         ints = iter.imap(str, iter.count(0))
         for el in els[1:]:
             # Try to de-dup the id by appending an integer after it.
-            warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", id)
+            warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupe)
             for x in ints:
-                if not findId(id+x):
-                    id = id+x
+                if not findId(dupe+x):
+                    el.set("id", dupe+x)
                     break
 
 
 def simplifyText(text):
     # Remove anything that's not a name character.
-    text = text.strip()
+    text = text.strip().lower()
     text = re.sub(r"[\s/]+", "-", text)
-    text = text.lower()
     text = re.sub(r"[^a-z0-9_-]", "", text)
     return text
 
@@ -805,10 +885,6 @@ def determineLinkType(el):
     # 1. Look at data-link-type
     linkType = treeAttr(el, 'data-link-type')
     text = textContent(el)
-    # ''foo: bar'' is a propdef for 'foo'
-    if linkType == "maybe" and re.match(r"^[\w-]+\s*:\s+\S", text):
-        el.set('title', re.match(r"^\s*([\w-]+)\s*:\s+\S", text).group(1))
-        return "propdesc"
     if linkType:
         if linkType in config.linkTypes.union(["dfn"]):
             return linkType
@@ -847,35 +923,6 @@ def classifyLink(el):
     linkType = determineLinkType(el)
     el.set('data-link-type', linkType)
     linkText = determineLinkText(el)
-
-    # Fix up "for" text shorthands
-    if linkType in ('propdesc', 'descriptor'):
-        match = re.match(r"^(@[\w-]+)/([\w-]+)$", linkText)
-        if match:
-            el.set('data-link-for', match.group(1))
-            clearContents(el)
-            linkText = match.group(2)
-            el.text = linkText
-    elif linkType == "maybe":
-        match = re.match(r"^([\w/@<>-]+)/([\w-]+)$", linkText)
-        if match:
-            el.set('data-link-for', match.group(1))
-            clearContents(el)
-            linkText = match.group(2)
-            el.text = linkText
-    elif linkType == "idl":
-        match = re.match(r"^(.+)/([^/]+)$", linkText)
-        if match:
-            el.set('data-link-for', match.group(1))
-            linkText = match.group(2)
-            clearContents(el)
-            el.text = linkText
-        match = re.match(r"(.+)!([\w-]+)$", linkText)
-        if match:
-            linkText = match.group(1)
-            clearContents(el)
-            el.text = linkText
-            el.set("data-link-type", match.group(2))
 
     el.set('title', linkText)
     for attr in ["data-link-status", "data-link-for", "data-link-spec"]:
@@ -928,8 +975,10 @@ def processBiblioLinks(doc):
 def processAutolinks(doc):
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
-    # Maybe autolinks can be any element.  If it links up, we change it into an <a>.
-    autolinks = findAll("a:not([href]), i", doc)
+    if doc.md.useIAutolinks:
+        autolinks = findAll("a:not([href]), i", doc)
+    else:
+        autolinks = findAll("a:not([href])", doc)
     for el in autolinks:
         # Explicitly empty title indicates this shouldn't be an autolink.
         if el.get('title') == '':
@@ -998,7 +1047,7 @@ class IDLMarker(object):
         return (None, None)
 
     def markupTypeName(self, text, construct):
-        return ('<a data-link-type="idl">', '</a>')
+        return ('<a data-link-type="idl-name">', '</a>')
 
     def markupName(self, text, construct):
         if construct.idlType not in config.idlTypes:
@@ -1011,6 +1060,7 @@ class IDLMarker(object):
 
         if idlType == "method":
             title = parser.Parser().normalizedMethodName(text)
+            # Switch to construct.methodName
         else:
             title = text
 
@@ -1289,6 +1339,8 @@ class CSSSpec(object):
         addAbstract(self)
         addObsoletionNotice(self)
         addAtRisk(self)
+        self.transformProductionPlaceholders()
+        self.transformMaybePlaceholders()
         self.transformAutolinkShortcuts()
         self.transformProductionGrammars()
         formatPropertyNames(self)
@@ -1372,25 +1424,107 @@ class CSSSpec(object):
             text = text.replace("[{0}]".format(tag.upper()), replacement)
         text = fixTypography(text)
         # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
-        # <'foo'> is a link to the 'foo' property or descriptor
-        text = re.sub(r"<<'([\w-]+)'>>", r'<a data-link-type="propdesc" title="\1" class="production">&lt;&lsquo;\1&rsquo;></a>', text)
-        # <'@foo/bar'> is a link to the 'bar' descriptor for the @foo at-rule
-        text = re.sub(r"<<'(@[\w-]+)/([\w-]+)'>>", r'<a data-link-type="descriptor" title="\2" for="\1" class="production">&lt;&lsquo;\2&rsquo;></a>', text)
-        # <foo()> is a link to the 'foo' function
-        text = re.sub(r"<<([\w-]+\(\))>>", r'<a data-link-type="function" title="\1" class="production">&lt;\1></a>', text)
-        # <@foo> is a link to the @foo rule
-        text = re.sub(r"<<(@[\w-]+)>>", r'<a data-link-type="at-rule" title="\1" class="production">&lt;\1></a>', text)
-        # Otherwise, it's a link to a type.
-        text = re.sub(r"<<([\w-]+)>>", r'<a data-link-type="type" class="production">&lt;\1></a>', text)
+        text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
         # Replace the ''maybe link'' shortcuts.
         # They'll survive the HTML parser, but they don't match if they contain an element.
         # (The other shortcuts are "atomic" and can't contain elements.)
-        text = re.sub(r"''([^=\n]+?)''", r'<a data-link-type="maybe" class="css" title="\1">\1</a>', text)
+        text = re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
         return text
+
+    def transformProductionPlaceholders(doc):
+        propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
+        funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
+        atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
+        typeRe = re.compile(r"^(?:(\S*)/)?([\w-]+)$")
+        for el in findAll("fake-production-placeholder", doc):
+            text = textContent(el)
+            clearContents(el)
+            match = propdescRe.match(text)
+            if match:
+                if match.group(3) is None:
+                    linkType = "propdesc"
+                elif match.group(3) in ("property", "descriptor"):
+                    linkType = match.group(2)
+                else:
+                    die("Shorthand <<{0}>> gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3))
+                    el.tag = "span"
+                    el.text = "<‘" + text[1:-1] + "’>"
+                    continue
+                el.tag = "a"
+                el.set("data-link-type", linkType)
+                el.set("title", match.group(2))
+                if match.group(1) is not None:
+                    el.set("for", match.group(1))
+                el.text = "<‘" + match.group(2) + "’>"
+                continue
+            match = funcRe.match(text)
+            if match:
+                el.tag = "a"
+                el.set("data-link-type", "function")
+                el.set("title", match.group(2))
+                if match.group(1) is not None:
+                    el.set("for", match.group(1))
+                el.text = "<" + match.group(2) + ">"
+                continue
+            match = atruleRe.match(text)
+            if match:
+                el.tag = "a"
+                el.set("data-link-type", "at-rule")
+                el.set("title", match.group(2))
+                if match.group(1) is not None:
+                    el.set("for", match.group(1))
+                el.text = "<" + match.group(2) + ">"
+                continue
+            match = typeRe.match(text)
+            if match:
+                el.tag = "a"
+                el.set("data-link-type", "type")
+                if match.group(1) is not None:
+                    el.set("for", match.group(1))
+                el.text = "<" + match.group(2) + ">"
+                continue
+            die("Shorthand <<{0}>> does not match any recognized shorthand grammar.", text)
+            continue
+
+    def transformMaybePlaceholders(doc):
+        propRe = re.compile(r"^([\w-]+): .+")
+        valRe = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
+        for el in findAll("fake-maybe-placeholder", doc):
+            text = textContent(el)
+            clearContents(el)
+            match = propRe.match(text)
+            if match:
+                el.tag = "a"
+                el.set("class", "css")
+                el.set("data-link-type", "propdesc")
+                el.set("title", match.group(1))
+                el.text = text
+                continue
+            match = valRe.match(text)
+            if match:
+                if match.group(3) is None:
+                    linkType = "maybe"
+                elif match.group(3) in config.maybeTypes:
+                    linkType = match.group(3)
+                else:
+                    die("Shorthand ''{0}'' gives type as '{1}', but only “maybe” types are allowed.", match.group(0), match.group(3))
+                    el.tag = "css"
+                    continue
+                el.tag = "a"
+                el.set("class", "css")
+                el.set("data-link-type", linkType)
+                el.set("title", match.group(2))
+                if match.group(1) is not None:
+                    el.set("for", match.group(1))
+                el.text = match.group(2)
+                continue
+            el.tag="css"
+            el.text = text
 
     def transformAutolinkShortcuts(doc):
         # Do the remaining textual replacements
 
+        biblioRe = re.compile(r"(\\)?\[\[(!)?([\w-]+)\]\]")
         def biblioReplacer(match):
             # Allow escaping things that aren't actually biblio links, by preceding with a \
             if match.group(1) is not None:
@@ -1404,17 +1538,33 @@ class CSSSpec(object):
                 "[",
                 term,
                 "]")
+
+        sectionRe = re.compile(r"\[\[(#[\w-]+)\]\]")
         def sectionReplacer(match):
             return E.a({"section":"", "href":match.group(1)})
+
+        propdescRe = re.compile(r"'(?:([^\s']*)/)?([\w*-]+)(?:!!([\w-]+))?'")
         def propdescReplacer(match):
-            return E.a({"data-link-type":"propdesc", "class":"property", "title":match.group(1)}, match.group(1))
+            if match.group(3) is None:
+                linkType = "propdesc"
+            elif match.group(3) in ("property", "descriptor"):
+                linkType = match.group(2)
+            else:
+                die("Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3))
+                return E.span(match.group(0))
+            return E.a({"data-link-type":linkType, "class":"property", "for": match.group(1)}, match.group(2))
+
+        idlRe = re.compile(r"{{(?:([^ }]*)/)?((?:[^ }]|,\s)+?)(?:!!([\w-]+))?}}")
         def idlReplacer(match):
+            if match.group(3) is None:
+                linkType = "idl"
+            elif match.group(3) in config.idlTypes:
+                linkType = match.group(3)
+            else:
+                die("Shorthand {0} gives type as '{1}', but only IDL types are allowed.", match.group(0), match.group(3))
+                return E.span(match.group(0))
             return E.code({"class":"idl"},
-                E.a({"data-link-type":"idl", "title":match.group(1)}, match.group(1)))
-        biblioRe = re.compile(r"(\\)?\[\[(!)?([\w-]+)\]\]")
-        sectionRe = re.compile(r"\[\[(#[\w-]+)\]\]")
-        propdescRe = re.compile(r"'([-]?[\w@*][\w@*/-]*)'")
-        idlRe = re.compile(r"{{(([^ }]|,\s)+)}}")
+                E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
 
         def transformElement(parentEl):
             processContents = isElement(parentEl) and not isOpaqueElement(parentEl)
@@ -1430,50 +1580,35 @@ class CSSSpec(object):
                     newChildren.append(el)
             appendChild(parentEl, *newChildren)
 
-
         def transformText(text):
             nodes = [text]
-            processTextNodes(nodes, propdescRe, propdescReplacer)
-            processTextNodes(nodes, idlRe, idlReplacer)
-            processTextNodes(nodes, biblioRe, biblioReplacer)
-            processTextNodes(nodes, sectionRe, sectionReplacer)
+            config.processTextNodes(nodes, propdescRe, propdescReplacer)
+            config.processTextNodes(nodes, idlRe, idlReplacer)
+            config.processTextNodes(nodes, biblioRe, biblioReplacer)
+            config.processTextNodes(nodes, sectionRe, sectionReplacer)
             return nodes
-
-        def processTextNodes(nodes, regex, replacer):
-            # Takes an array of alternating text/objects,
-            # and runs reSubObject on the text parts,
-            # splicing them into the "nodes" array.
-            # Mutates!
-            for i, node in enumerate(nodes):
-                # Node list always alternates between text and elements
-                if i%2 == 0:
-                    nodes[i:i+1] = reSubObject(regex, node, replacer)
-            return nodes
-
-        def reSubObject(pattern, string, repl=None):
-            '''
-            like re.sub, but replacements don't have to be text;
-            returns an array of alternating unmatched text and match objects instead.
-            If repl is specified, it's called with each match object,
-            and the result then shows up in the array instead.
-            '''
-            lastEnd = 0
-            pieces = []
-            for match in pattern.finditer(string):
-                pieces.append(string[lastEnd:match.start()])
-                if repl:
-                    pieces.append(repl(match))
-                else:
-                    pieces.append(match)
-                lastEnd = match.end()
-            pieces.append(string[lastEnd:])
-            return pieces
 
         transformElement(doc.document.getroot())
 
 
     def transformProductionGrammars(doc):
         # Link up the various grammar symbols in CSS grammars to their definitions.
+
+        hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
+        def hashMultReplacer(match):
+            return E.a({"data-link-type":"grammar", "title": "#", "for":""}, match.group(0))
+
+        multRe = re.compile(r"{\s*\d+\s*}")
+        def multReplacer(match):
+            return E.a({"data-link-type":"grammar", "title": "{A}", "for":""}, match.group(0))
+
+        multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
+        def multRangeReplacer(match):
+            return E.a({"data-link-type":"grammar", "title": "{A,B}", "for":""}, match.group(0))
+
+        simpleRe = re.compile(r"\?|!|#|\*|\+|\|\||\||&amp;&amp;|,")
+        def simpleReplacer(match):
+            return E.a({"data-link-type":"grammar", "title": match.group(0), "for":""}, match.group(0))
 
         def transformElement(parentEl):
             children = childNodes(parentEl, clear=True)
@@ -1482,19 +1617,17 @@ class CSSSpec(object):
                 if isinstance(el, basestring):
                     newChildren.extend(transformText(el))
                 elif isElement(el):
-                    if el.tag != "a":
-                        transformElement(el)
+                    transformElement(el)
                     newChildren.append(el)
             appendChild(parentEl, *newChildren)
 
         def transformText(text):
-            # alternates between normal text and the grammar productions
-            splits = re.split(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|,)", text)
-            for i, p in enumerate(splits):
-                if i%2 == 0:
-                    continue
-                splits[i] = E.a({"grammar":"", "class":"prod-punc"}, p)
-            return splits
+            nodes = [text]
+            config.processTextNodes(nodes, hashMultRe, hashMultReplacer)
+            config.processTextNodes(nodes, multRe, multReplacer)
+            config.processTextNodes(nodes, multRangeRe, multRangeReplacer)
+            config.processTextNodes(nodes, simpleRe, simpleReplacer)
+            return nodes
 
         for el in findAll(".prod", doc):
             transformElement(el)
@@ -1972,9 +2105,12 @@ def addSpecMetadataSection(doc):
 
     dl = E.dl()
     for key, vals in md.items():
+        attrs = {}
+        if key in ("Editor", "Editors"):
+            attrs["class"] = "editor"
         appendChild(dl,
-            E.dt(key, ":"),
-            *[E.dd(val) for val in vals])
+            E.dt(attrs, key, ":"),
+            *[E.dd(attrs, val) for val in vals])
     fillWith('spec-metadata', E.div(dl), doc=doc)
 
 

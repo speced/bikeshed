@@ -25,12 +25,12 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 	preDepth = 0
 	rawElements = "pre|style|script|xmp"
 
-	for rawline in lines:
+	for i, rawline in enumerate(lines):
 		# Don't parse anything while you're inside certain elements
 		if re.search(r"<({0})[ >]".format(rawElements), rawline):
 			preDepth += 1
 		if preDepth:
-			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': float('inf')})
+			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': float('inf'), 'line': i})
 		if re.search(r"</({0})>".format(rawElements), rawline):
 			preDepth = max(0, preDepth - 1)
 			continue
@@ -88,6 +88,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 			token['prefixlen'] = float('inf')
 		else:
 			token['prefixlen'] = prefixLen(rawline, numSpacesForIndentation)
+		token['line'] = i
 		tokens.append(token)
 		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
@@ -127,7 +128,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
 		elif text[offset:offset+numSpacesForIndentation] == " " * numSpacesForIndentation:
 			offset += numSpacesForIndentation
 		else:
-			die("Line isn't indented enough (needs {0} indent{plural}) to be valid Markdown:\n\"{1}\"", len, text[:-1], plural="" if len==1 else "s")
+			die("Line {i} isn't indented enough (needs {0} indent{plural}) to be valid Markdown:\n\"{1}\"", len, text[:-1], plural="" if len==1 else "s", i=token['line'])
 	return text[offset:]
 
 
@@ -225,7 +226,7 @@ def parseParagraph(stream):
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
 		stream.advance()
-		if stream.currtype() in ("eof", "blank") or stream.currprefixlen() < initialPrefixLen:
+		if stream.currtype() not in ["text"] or stream.currprefixlen() < initialPrefixLen:
 			lines[-1] = lines[-1].rstrip() + endTag + "\n"
 			return lines
 		lines.append(stream.currraw())

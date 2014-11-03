@@ -43,8 +43,6 @@ class Parser(object):
                 self.constructs.append(Interface(tokens))
             elif (Dictionary.peek(tokens)):
                 self.constructs.append(Dictionary(tokens))
-            elif (Exception.peek(tokens)):
-                self.constructs.append(Exception(tokens))
             elif (Enum.peek(tokens)):
                 self.constructs.append(Enum(tokens))
             elif (Typedef.peek(tokens)):

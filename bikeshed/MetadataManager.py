@@ -53,6 +53,7 @@ class MetadataManager:
         self.logo = ""
         self.indent = 4
         self.linkDefaults = defaultdict(list)
+        self.useIAutolinks = False
 
         self.otherMetadata = defaultdict(list)
 
@@ -78,7 +79,8 @@ class MetadataManager:
             "Boilerplate": "boilerplate",
             "Version History": "versionHistory",
             "Logo": "logo",
-            "Indent": "indent"
+            "Indent": "indent",
+            "Use <I> Autolinks": "useIAutolinks"
         }
 
         # Some keys are multi-value:
@@ -114,7 +116,8 @@ class MetadataManager:
             "Ignored Terms": parseIgnoredTerms,
             "Link Defaults": parseLinkDefaults,
             "Boilerplate": parseBoilerplate,
-            "Indent": parseInteger
+            "Indent": parseInteger,
+            "Use <I> Autolinks": parseBoolean
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -247,20 +250,8 @@ class MetadataManager:
             macros["replacedby"] = self.warning[1]
         macros["logo"] = self.logo
         # get GH repo from remote
-        if doc and doc.inputSource and doc.inputSource != "-":
-            source_dir = os.path.dirname(os.path.abspath(doc.inputSource))
-            try:
-                old_dir = os.getcwd()
-                os.chdir(source_dir)
-                remotes = check_output(["git", "remote", "-v"])
-                search = re.search('origin\tgit@github\.com:(.*?)\.git \(\w+\)', remotes)
-                if search:
-                    macros["repository"] = search.group(1)
-                else:
-                    macros["repository"] = ""
-                os.chdir(old_dir)
-            except Exception, e:
-                macros["repository"] = ""
+        macros["repository"] = getSpecRepository(doc)
+
 
 def convertGroup(key, val):
     return val.lower()
@@ -276,6 +267,13 @@ def parseLevel(key, val):
 
 def parseInteger(key, val):
     return int(val)
+
+def parseBoolean(key, val):
+    if val.lower() in ("true", "yes", "y", "on"):
+        return True
+    if val.lower() in ("false", "no", "n", "off"):
+        return False
+    die("The {0} field must be true/false, yes/no, y/n, or on/off. Got '{1}' instead.", key, val);
 
 def convertWarning(key, val):
     if val.lower() == "obsolete":
@@ -427,3 +425,25 @@ def smooshValues(container, val):
                 container[k].extend(v)
             else:
                 container[k].append(v)
+
+def getSpecRepository(doc):
+    '''
+    Attempts to find the name of the repository the spec is a part of.
+    Currently only searches for GitHub repos.
+    '''
+    if doc and doc.inputSource and doc.inputSource != "-":
+        source_dir = os.path.dirname(os.path.abspath(doc.inputSource))
+        try:
+            old_dir = os.getcwd()
+            os.chdir(source_dir)
+            with open(os.devnull, "wb") as fnull:
+                remotes = check_output(["git", "remote", "-v"], stderr=fnull)
+            search = re.search('origin\tgit@github\.com:(.*?)\.git \(\w+\)', remotes)
+            if search:
+                return search.group(1)
+            else:
+                return ""
+            os.chdir(old_dir)
+        except:
+            # check_output will throw CalledProcessError when not in a git repo
+            return ""

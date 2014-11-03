@@ -159,6 +159,7 @@ def processSpecrefBiblioFile(text, storage, order):
         datas = json.loads(text)
     except Exception, e:
         die("Couldn't read the local JSON file:\n{0}", str(e))
+        return storage
 
     # JSON field name: BiblioEntry name
     fields = {
