@@ -54,6 +54,7 @@ class MetadataManager:
         self.indent = 4
         self.linkDefaults = defaultdict(list)
         self.useIAutolinks = False
+        self.noEditor = False
 
         self.otherMetadata = defaultdict(list)
 
@@ -80,7 +81,8 @@ class MetadataManager:
             "Version History": "versionHistory",
             "Logo": "logo",
             "Indent": "indent",
-            "Use <I> Autolinks": "useIAutolinks"
+            "Use <I> Autolinks": "useIAutolinks",
+            "No Editor": "noEditor"
         }
 
         # Some keys are multi-value:
@@ -117,7 +119,8 @@ class MetadataManager:
             "Link Defaults": parseLinkDefaults,
             "Boilerplate": parseBoilerplate,
             "Indent": parseInteger,
-            "Use <I> Autolinks": parseBoolean
+            "Use <I> Autolinks": parseBoolean,
+            "No Editor": parseBoolean
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -172,15 +175,14 @@ class MetadataManager:
             die("The document requires at least one metadata block.")
             return
 
-        # { MetadataManager attr : metadata name }
+        # { MetadataManager attr : metadata name (for printing) }
         requiredSingularKeys = {
             'status': 'Status',
             'shortname': 'Shortname'
         }
         recommendedSingularKeys = {}
         requiredMultiKeys = {
-            'abstract': 'Abstract',
-            'editors': 'Editor'
+            'abstract': 'Abstract'
         }
 
         if self.status != 'LS':
@@ -191,6 +193,8 @@ class MetadataManager:
             recommendedSingularKeys['date'] = 'Date'
         if self.status not in config.unlevelledStatuses:
             requiredSingularKeys['level'] = 'Level'
+        if not self.noEditor:
+            requiredMultiKeys['editors'] = "Editor"
 
         errors = []
         warnings = []
