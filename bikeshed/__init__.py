@@ -1120,6 +1120,8 @@ def markupIDL(doc):
 
 def processIDL(doc):
     for pre in findAll("pre.idl", doc):
+        if pre.get("data-no-idl") is not None:
+            continue
         forcedDfns = GlobalNames(text=treeAttr(pre, "data-dfn-force"))
         for el in findAll("idl", pre):
             idlType = el.get('data-idl-type')
@@ -1144,7 +1146,7 @@ def processIDL(doc):
                 if el.get('data-idl-for'):
                     el.set('data-link-for', el.get('data-idl-for'))
                     del el.attrib['data-idl-for']
-    dfns = findAll("pre.idl dfn", doc)
+    dfns = findAll("pre.idl:not([data-no-idl]) dfn", doc)
     classifyDfns(doc, dfns)
     dedupIds(doc, dfns)
     doc.refs.addLocalDfns(dfns)
