@@ -6,6 +6,8 @@ the text that is repeated nearly identically across all specs.
 
 Generally, you won't need to understand what's going on here in order to use the processor - it'll just automatically do the right thing.
 
+For help in creating *new* boilerplate files for your organization, see [Creating New Boilerplate Files](creating-boilerplate.md).
+
 Groups
 ------
 
@@ -39,6 +41,7 @@ Note that this is similar to the syntax for bibliography references, but it has 
 The following macros are defined:
 
 * [TITLE] gives the spec's full title, as extracted from either the `<h1>` or the spec metadata.
+* [H1] gives the desired document heading, in case the in-page title is supposed to be different from the `<title>` element value.
 * [SHORTNAME] gives the document's shortname, like "css-cascade".
 * [VSHORTNAME] gives the "versioned" shortname, like "css-cascade-3".
 * [STATUS] gives the spec's status.
@@ -53,6 +56,8 @@ The following macros are defined:
 * [CDATE] gives a compact date in the format "YYYYMMDD".
 * [ISODATE] gives a compact date in iso format "YYYY-MM-DD".
 * [DEADLINE] gives a human-readable version of the deadline data, if one was specified.
+* [LOGO] gives the url of the spec's logo
+* [REPOSITORY] gives the name of the VCS repository the spec is located in; this is currently only filled when the spec source is in a GitHub repository. (Patches welcome for more repo-extraction code!)
 
 As these are substituted at the text level, not the higher HTML level, you can use them *anywhere*, including in attribute values.
 
