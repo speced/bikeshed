@@ -69,7 +69,7 @@ idlTypes = frozenset(["event", "interface", "constructor", "method", "argument",
 idlNameTypes = frozenset(["interface", "dictionary", "enum", "exception", "typedef", "callback"])
 functionishTypes = frozenset(["function", "method", "constructor"])
 linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "idl-name", "maybe", "biblio"])
-typesUsingFor = frozenset(["descriptor", "value", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "except-field", "stringifier", "serializer", "iterator"])
+typesUsingFor = frozenset(["descriptor", "value", "element-attr", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "except-field", "stringifier", "serializer", "iterator"])
 
 linkTypeToDfnType = {
     "propdesc": frozenset(["property", "descriptor"]),
