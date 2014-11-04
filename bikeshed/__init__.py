@@ -534,22 +534,25 @@ def transformAnchors(lines, doc, **kwargs):
 
     for anchor in anchors:
         # Check all the mandatory fields
-        for field in ["linkingText", "type", "shortname", "level", "status", "url"]:
+        for field in ["linkingText", "type", "shortname", "level", "url"]:
             if field not in anchor:
                 die("Inline anchor for '{0}' is missing the '{1}' field.", key, field)
                 continue
         key = anchor['linkingText'] if isinstance(anchor['linkingText'], basestring) else anchor['linkingText'][0]
         # String fields
-        for field in ["type", "shortname", "status", "url"]:
+        for field in ["type", "shortname", "url"]:
             if not checkTypes(anchor, key, field, basestring):
                 continue
             anchor[field] = anchor[field].strip()+"\n"
-        if anchor['status'].strip() not in ["current", "dated"]:
-            die("Field 'status' of inline anchor for '{0}' must be 'current' or 'dated'. Got '{1}'.", key, anchor['status'].strip())
-            continue
+        if "status" in anchor:
+            if anchor['status'].strip() not in ["current", "dated", "local"]:
+                die("Field 'status' of inline anchor for '{0}' must be 'current', 'dated', or 'local'. Got '{1}'.", key, anchor['status'].strip())
+                continue
+            else:
+                # TODO Convert the internal representation from ED/TR to current/dated
+                anchor['status'] = "ED\n" if anchor['status'] == "current\n" else "TR\n"
         else:
-            # TODO Convert the internal representation from ED/TR to current/dated
-            anchor['status'] = "ED\n" if anchor['status'] == "current\n" else "TR\n"
+            anchor['status'] = "local"
         # String or int fields, convert to string
         for field in ["level"]:
             if not checkTypes(anchor, key, field, basestring, int):
