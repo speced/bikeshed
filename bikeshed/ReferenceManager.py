@@ -359,29 +359,35 @@ class ReferenceManager(object):
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
         return biblio.BiblioEntry(**candidates[0])
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, exact=True):
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, exact=True, **kwargs):
+        def refsIterator(refs):
+            # Turns a dict of arrays of refs into an iterator of refs
+            for key, group in refs.items():
+                for ref in group:
+                    yield key,ref
+        def textRefsIterator(refs, texts):
+            # Same as above, but only grabs those keyed to a given text
+            for text in texts:
+                for ref in self.refs.get(text, []):
+                    yield text, ref
+                for ref in self.refs.get(text+"\n", []):
+                    yield text, ref
         if text:
             if exact:
-                text = [text]
+                texts = [text]
             else:
-                text = linkTextVariations(text)
-            refs = []
-            for t in text:
-                if t in self.refs:
-                    refs.extend(self.refs[t])
-                if t+"\n" in self.refs:
-                    refs.extend(self.refs[t+"\n"])
+                texts = linkTextVariations(text)
+            refs = textRefsIterator(self.refs, texts)
         else:
-            refs = [x for x in self.refs.values()]
-        print refs
+            refs = refsIterator(self.refs)
         if spec:
-            refs = [x for x in refs if x['spec'] == spec]
+            refs = (x for x in refs if x[1]['spec'] in (spec, spec+"\n"))
         if linkType:
-            refs = [x for x in refs if x['type'] == linkType]
+            refs = (x for x in refs if x[1]['type'] in (linkType, linkType+"\n"))
         if status:
-            refs = [x for x in refs if x['status'] == status]
+            refs = (x for x in refs if x[1]['status'] in (status, status+"\n"))
         if linkFor:
-            refs = [x for x in refs if linkFor in x['for']]
+            refs = (x for x in refs if linkFor in x[1]['for'] or (linkFor+"\n") in x[1]['for'])
         return refs
 
 

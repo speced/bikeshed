@@ -96,6 +96,17 @@ def main():
     debugCommands.add_argument("--print-json", dest="jsonCode",
                                help="Runs the specified code and prints it as formatted JSON.")
 
+    refParser = subparsers.add_parser('refs', help="Search Bikeshed's ref database.")
+    refParser.add_argument("infile", nargs="?",
+                             default=None,
+                             help="Path to the source file.")
+    refParser.add_argument("--text", dest="text", default=None)
+    refParser.add_argument("--type", dest="linkType", default=None)
+    refParser.add_argument("--for", dest="linkFor", default=None)
+    refParser.add_argument("--spec", dest="spec", default=None)
+    refParser.add_argument("--status", dest="status", default=None)
+    refParser.add_argument("--exact", dest="exact", action="store_true")
+
     sourceParser = subparsers.add_parser('source', help="Tools for formatting the *source* document.")
     sourceParser.add_argument("--big-text",
                               dest="bigText",
@@ -167,6 +178,13 @@ def main():
             for ref in refs:
                 ref['level'] = str(ref['level'])
             print json.dumps(refs, indent=2)
+    elif options.subparserName == "refs":
+        config.debug = True
+        config.quiet = True
+        doc = CSSSpec(inputFilename=options.infile)
+        doc.preprocess()
+        refs = doc.refs.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact)
+        print config.printjson(refs)
     elif options.subparserName == "issues-list":
         from . import issuelist as il
         if options.printTemplate:
@@ -1747,27 +1765,29 @@ config.specClass = CSSSpec
 
 def formatElementdefTables(doc):
     for table in findAll("table.elementdef", doc):
-        elements = ', '.join(textContent(x) for x in find("tr:first-child dfn", table))
+        elements = findAll("tr:first-child dfn", table)
+        elementsFor = ' '.join(textContent(x) for x in elements)
         for el in findAll("a[data-element-attr-group]", table):
             groupName = textContent(el)
-            groupAttrs = doc.refs.queryRefs(linkType="element-attr", linkFor=groupName)
+            groupFor = re.sub("\s+", "-", groupName)
+            groupAttrs = sorted(doc.refs.queryRefs(linkType="element-attr", linkFor=groupFor), key=lambda x:x[1])
             if len(groupAttrs) == 0:
                 die("The element-attr group '{0}' doesn't have any attributes defined for it.", groupName)
                 continue
             el.tag = "details"
+            clearContents(el)
             del el.attrib["data-element-attr-group"]
-            del el.attrib["data-link-type"]
             del el.attrib["dfn"]
             ul = appendChild(el,
                 E.summary(
                     E.a({"data-link-type":"dfn"}, groupName)),
                 E.ul())
-            for attr in groupAttr:
+            for attrName,ref in groupAttrs:
                 appendChild(ul,
                     E.li(
-                        E.dfn({"for":elements, "data-dfn-type":"element-attr"},
-                            E.a({"data-link-type":"element-attr", "for":groupName},
-                                attr))))
+                        E.dfn({"id":"element-attrdef-"+simplifyText(textContent(elements[0]))+"-"+attrName, "for":elementsFor, "data-dfn-type":"element-attr"},
+                            E.a({"data-link-type":"element-attr", "for":groupFor},
+                                attrName))))
 
 
 
