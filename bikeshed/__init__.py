@@ -518,7 +518,7 @@ def transformAnchors(lines, doc, **kwargs):
         anchors = json.loads(''.join(lines))
     except Exception, e:
         die("JSON parse error:\n{0}", e)
-        return
+        return []
 
     def checkTypes(anchor, key, field, *types):
         if field not in anchor:
