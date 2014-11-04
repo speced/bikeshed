@@ -1768,7 +1768,7 @@ def formatElementdefTables(doc):
         elements = findAll("tr:first-child dfn", table)
         elementsFor = ' '.join(textContent(x) for x in elements)
         for el in findAll("a[data-element-attr-group]", table):
-            groupName = textContent(el)
+            groupName = textContent(el).strip()
             groupFor = re.sub("\s+", "-", groupName)
             groupAttrs = sorted(doc.refs.queryRefs(linkType="element-attr", linkFor=groupFor), key=lambda x:x[1])
             if len(groupAttrs) == 0:
@@ -1787,7 +1787,7 @@ def formatElementdefTables(doc):
                     E.li(
                         E.dfn({"id":"element-attrdef-"+simplifyText(textContent(elements[0]))+"-"+attrName, "for":elementsFor, "data-dfn-type":"element-attr"},
                             E.a({"data-link-type":"element-attr", "for":groupFor},
-                                attrName))))
+                                attrName.strip()))))
 
 
 
