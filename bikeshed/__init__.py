@@ -555,7 +555,10 @@ def transformAnchors(lines, doc, **kwargs):
             if not checkTypes(anchor, key, field, basestring, int):
                 continue
             anchor[field] = unicode(anchor[field]).strip() + "\n"
-        anchor['spec'] = "{0}-{1}\n".format(anchor['shortname'].strip(), anchor['level'].strip())
+        if anchor['level'].strip() != '0':
+            anchor['spec'] = "{0}-{1}\n".format(anchor['shortname'].strip(), anchor['level'].strip())
+        else:
+            anchor['spec'] = anchor['shortname'].strip()
         anchor['export'] = True
         # String or list-of-strings fields, convert to list
         for field in ["linkingText", "for"]:
