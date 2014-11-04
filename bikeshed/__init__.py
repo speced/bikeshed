@@ -571,7 +571,10 @@ def transformAnchors(lines, doc, **kwargs):
                     continue
                 anchor[field][i] = re.sub(r'\s+', ' ', anchor[field][i].strip()) + "\n"
         for text in anchor['linkingText']:
-            doc.refs.refs[text.lower()].append(anchor)
+            # Overwrite existing references whose shortname matches the inline-defined anchor.
+            if doc.refs.refs[text.lower()]:
+                doc.refs.refs[text.lower()] = [ref for ref in doc.refs.refs[text.lower()] if ref['shortname'] != anchor['shortname']]
+            doc.refs.refs[text.lower()].insert(0, anchor)
     return []
 
 
