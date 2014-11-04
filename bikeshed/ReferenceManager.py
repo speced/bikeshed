@@ -359,6 +359,31 @@ class ReferenceManager(object):
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
         return biblio.BiblioEntry(**candidates[0])
 
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, exact=True):
+        if text:
+            if exact:
+                text = [text]
+            else:
+                text = linkTextVariations(text)
+            refs = []
+            for t in text:
+                if t in self.refs:
+                    refs.extend(self.refs[t])
+                if t+"\n" in self.refs:
+                    refs.extend(self.refs[t+"\n"])
+        else:
+            refs = [x for x in self.refs.values()]
+        print refs
+        if spec:
+            refs = [x for x in refs if x['spec'] == spec]
+        if linkType:
+            refs = [x for x in refs if x['type'] == linkType]
+        if status:
+            refs = [x for x in refs if x['status'] == status]
+        if linkFor:
+            refs = [x for x in refs if linkFor in x['for']]
+        return refs
+
 
 def linkTextsFromElement(el, preserveCasing=False):
     from .htmlhelpers import textContent

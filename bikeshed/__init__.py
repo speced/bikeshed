@@ -395,17 +395,60 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
     return ret
 
 def transformElementdef(lines, doc, **kwargs):
-    vals = parseDefBlock(lines, "elementdef")
-    requiredKeys = ["Name", "Categories", "Contexts", "Content model", "Attributes"]
-    ret = ["<table class='definition elementdef'>"]
-    for key in requiredKeys:
-        if key in vals:
-            ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
+    attrs = OrderedDict()
+    parsedAttrs = parseDefBlock(lines, "elementdef")
+    if "Attribute groups" in parsedAttrs or "Attributes" in parsedAttrs:
+        html = "<ul>"
+        if "Attribute groups" in parsedAttrs:
+            groups = [x.strip() for x in parsedAttrs["Attribute groups"].split(",")]
+            for group in groups:
+                html += "<li><a dfn data-element-attr-group>{0}</a>".format(group)
+            del parsedAttrs["Attribute groups"]
+        if "Attributes" in parsedAttrs:
+            atts = [x.strip() for x in parsedAttrs["Attributes"].split(",")]
+            for att in atts:
+                html += "<li><a element-attr>{0}</a>".format(att)
+        html += "</ul>"
+        parsedAttrs["Attributes"] = html
+
+
+    # Displays entries in the order specified in attrs,
+    # then if there are any unknown parsedAttrs values,
+    # they're displayed afterward in the order they were specified.
+    # attrs with a value of None are required to be present in parsedAttrs;
+    # attrs with any other value are optional, and use the specified value if not present in parsedAttrs
+    attrs["Name"] = None
+    attrs["Categories"] = None
+    attrs["Contexts"] = None
+    attrs["Content model"] = None
+    attrs["Attributes"] = None
+    attrs["Dom interfaces"] = None
+    ret = ["<table class='definition-table elementdef'>"]
+    for key, val in attrs.items():
+        if key in parsedAttrs or val is not None:
+            if key in parsedAttrs:
+                val = parsedAttrs[key]
+            if key == "Name":
+                ret.append("<tr><th>Name:<td>")
+                ret.append(', '.join("<dfn element>{0}</dfn>".format(x.strip()) for x in val.split(",")))
+            elif key == "Content model":
+                ret.append("<tr><th>{0}:<td>".format(key))
+                ret.extend(val.split("\n"))
+            elif key == "Categories":
+                ret.append("<tr><th>Categories:<td>")
+                ret.append(', '.join("<a dfn>{0}</a>".format(x.strip()) for x in val.split(",")))
+            elif key == "Dom interfaces":
+                ret.append("<tr><th>DOM Interfaces:<td>")
+                ret.append(', '.join("<a interface>{0}</a>".format(x.strip()) for x in val.split(",")))
+            else:
+                ret.append("<tr><th>{0}:<td>{1}".format(key, val))
         else:
-            die("The elementdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key)
+            die("The elementdef for '{0}' is missing a '{1}' line.", parsedAttrs.get("Name", "???"), key)
             continue
-    for key in vals.viewkeys() - requiredKeys:
-        ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
+    for key, val in parsedAttrs.items():
+        if key in attrs:
+            continue
+        ret.append("<tr><th>{0}:<td>{1}".format(key, val))
     ret.append("</table>")
     return ret
 
@@ -413,15 +456,22 @@ def transformElementdef(lines, doc, **kwargs):
 
 def parseDefBlock(lines, type):
     vals = OrderedDict()
-    for (i, line) in enumerate(lines):
+    lastKey = None
+    for line in lines:
         match = re.match(r"\s*([^:]+):\s*(.*)", line)
-        if(match is None):
-            die("Incorrectly formatted {2} line for '{0}':\n{1}", vals.get("Name", "???"), line, type)
-            continue
-        key = match.group(1).strip().capitalize()
-        val = match.group(2).strip()
-        if key == "Value" and "Value" in vals:
-            vals[key] += " "+val
+        if match is None:
+            if lastKey is not None and (line.strip() == "" or re.match(r"\s+", line)):
+                key = lastKey
+                val = line.strip()
+            else:
+                die("Incorrectly formatted {2} line for '{0}':\n{1}", vals.get("Name", "???"), line, type)
+                continue
+        else:
+            key = match.group(1).strip().capitalize()
+            lastKey = key
+            val = match.group(2).strip()
+        if key in vals:
+            vals[key] += "\n"+val
         else:
             vals[key] = val
     return vals
@@ -1360,6 +1410,7 @@ class CSSSpec(object):
         processDfns(self)
         processIDL(self)
         fillAttributeInfoSpans(self)
+        formatElementdefTables(self)
         processBiblioLinks(self)
         processAutolinks(self)
 
@@ -1692,6 +1743,31 @@ config.specClass = CSSSpec
 
 
 
+
+
+def formatElementdefTables(doc):
+    for table in findAll("table.elementdef", doc):
+        elements = ', '.join(textContent(x) for x in find("tr:first-child dfn", table))
+        for el in findAll("a[data-element-attr-group]", table):
+            groupName = textContent(el)
+            groupAttrs = doc.refs.queryRefs(linkType="element-attr", linkFor=groupName)
+            if len(groupAttrs) == 0:
+                die("The element-attr group '{0}' doesn't have any attributes defined for it.", groupName)
+                continue
+            el.tag = "details"
+            del el.attrib["data-element-attr-group"]
+            del el.attrib["data-link-type"]
+            del el.attrib["dfn"]
+            ul = appendChild(el,
+                E.summary(
+                    E.a({"data-link-type":"dfn"}, groupName)),
+                E.ul())
+            for attr in groupAttr:
+                appendChild(ul,
+                    E.li(
+                        E.dfn({"for":elements, "data-dfn-type":"element-attr"},
+                            E.a({"data-link-type":"element-attr", "for":groupName},
+                                attr))))
 
 
 
