@@ -600,7 +600,7 @@ def processHeadings(doc, scope="doc"):
     for el in findAll(".heading:not(.settled)", doc):
         if scope == "doc" and treeAttr(el, "boilerplate"):
             continue
-        headeings.append(el)
+        headings.append(el)
     resetHeadings(doc, headings)
     determineHeadingLevels(doc, headings)
     addHeadingIds(doc, headings)
@@ -1445,12 +1445,12 @@ class CSSSpec(object):
         processBiblioLinks(self)
         processAutolinks(self)
 
-        addCustomBoilerplate(self)
         addReferencesSection(self)
         addIndexSection(self)
         addPropertyIndex(self)
         addIDLSection(self)
         addIssuesSection(self)
+        addCustomBoilerplate(self)
         processHeadings(self, "all") # again
         addTOCSection(self)
         addSelfLinks(self)
