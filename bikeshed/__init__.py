@@ -2126,21 +2126,23 @@ def addTOCSection(doc):
             die("Heading level jumps more than one level, from h{0} to h{1}:\n  {2}", previousLevel, level, textContent(header).replace("\n", " "))
 
         # Hit a no-toc, suppress the entire section.
+        addToTOC = True
         if hasClass(header, "no-toc"):
             skipLevel = min(level, skipLevel)
-            continue
+            addToTOC = False
         if skipLevel < level:
-            continue
+            addToTOC = False
         else:
             skipLevel = float('inf')
 
-        li = appendChild(container,
-            E.li(
-                E.a({"href":"#"+header.get('id')},
-                    E.span({"class":"secno"},header.get('data-level', '')),
-                    " ",
-                    deepcopy(find(".content", header)))))
-        containers[level+1] = appendChild(li, E.ul({"class":"toc"}))
+        if addToTOC:
+            li = appendChild(container,
+                E.li(
+                    E.a({"href":"#"+header.get('id')},
+                        E.span({"class":"secno"},header.get('data-level', '')),
+                        " ",
+                        deepcopy(find(".content", header)))))
+            containers[level+1] = appendChild(li, E.ul({"class":"toc"}))
         previousLevel = level
 
     container = containers[1]
