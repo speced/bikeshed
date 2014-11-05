@@ -73,7 +73,8 @@ class ReferenceManager(object):
                         "date": lines.next(),
                         "status": lines.next(),
                         "title": lines.next(),
-                        "url": lines.next(),
+                        "dated_url": lines.next(),
+                        "current_url": lines.next(),
                         "other": lines.next(),
                         "etAl": lines.next() != "\n",
                         "order": 3,
@@ -344,7 +345,7 @@ class ReferenceManager(object):
                  '\n'.join('    {2} ({1}) {0}'.format(text, ref['type'], ref['spec']) for ref in refs))
         return defaultRef['url']
 
-    def getBiblioRef(self, text, el=None):
+    def getBiblioRef(self, text, status, el=None):
         key = text.lower()
         if key in self.biblios:
             candidates = self.biblios[key]
@@ -357,7 +358,7 @@ class ReferenceManager(object):
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
         # if candidates[0]['order'] > 3: # 3 is SpecRef level
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
-        return biblio.BiblioEntry(**candidates[0])
+        return biblio.BiblioEntry(preferredURL=status, **candidates[0])
 
     def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, exact=True, **kwargs):
         def refsIterator(refs):

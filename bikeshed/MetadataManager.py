@@ -55,6 +55,7 @@ class MetadataManager:
         self.linkDefaults = defaultdict(list)
         self.useIAutolinks = False
         self.noEditor = False
+        self.defaultBiblioStatus = "dated"
 
         self.otherMetadata = defaultdict(list)
 
@@ -82,7 +83,8 @@ class MetadataManager:
             "Logo": "logo",
             "Indent": "indent",
             "Use <I> Autolinks": "useIAutolinks",
-            "No Editor": "noEditor"
+            "No Editor": "noEditor",
+            "Default Biblio Status": "defaultBiblioStatus"
         }
 
         # Some keys are multi-value:
@@ -120,7 +122,8 @@ class MetadataManager:
             "Boilerplate": parseBoilerplate,
             "Indent": parseInteger,
             "Use <I> Autolinks": parseBoolean,
-            "No Editor": parseBoolean
+            "No Editor": parseBoolean,
+            "Default Biblio Status": parseBiblioStatus
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -376,6 +379,13 @@ def parseBoilerplate(key, val):
             boilerplate['omitSections'].add(command[5:])
     return boilerplate
 
+def parseBiblioStatus(key, val):
+    val = val.strip().lower()
+    if val in ("current", "dated"):
+        return val
+    else:
+        die("'{0}' must be either 'current' or 'dated'. Got '{1}'", key, val)
+        return "dated"
 
 
 def parse(md, lines):

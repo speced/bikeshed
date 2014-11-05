@@ -7,13 +7,15 @@ from .htmlhelpers import *
 
 class BiblioEntry(object):
 
-    def __init__(self, **kwargs):
+    def __init__(self, preferredURL="dated", **kwargs):
         self.linkText = None
         self.title = None
         self.authors = []
         self.etAl = False
         self.status = None
         self.date = None
+        self.dated_url = None
+        self.current_url = None
         self.url = None
         self.other = None
         for key, val in kwargs.items():
@@ -23,6 +25,10 @@ class BiblioEntry(object):
                 self.etAl = val
             else:
                 setattr(self, key, val)
+        if preferredURL == "dated":
+            self.url = self.dated_url or self.current_url
+        else:
+            self.url = self.current_url or self.dated_url
 
     def __str__(self):
         str = ""
@@ -105,7 +111,7 @@ class BiblioEntry(object):
 
 def processReferBiblioFile(lines, storage, order):
     singularReferCodes = {
-        "U": "url",
+        "U": "dated_url",
         "T": "title",
         "D": "date",
         "S": "status",
@@ -165,7 +171,8 @@ def processSpecrefBiblioFile(text, storage, order):
     fields = {
         "authors": "authors",
         "etAl": "etAl",
-        "href": "url",
+        "href": "dated_url",
+        "edDraft": "current_url",
         "title": "title",
         "date": "date",
         "status": "status"

@@ -263,7 +263,8 @@ def writeBiblioFile(fh, biblios):
     date
     status
     title
-    url
+    dated url
+    current url
     other
     etAl (as a boolish string)
     authors* (each on a separate line, an indeterminate number of lines)
@@ -273,7 +274,7 @@ def writeBiblioFile(fh, biblios):
     for key, entries in biblios.items():
         b = sorted(entries, key=lambda x:x['order'])[0]
         fh.write(key.lower() + "\n")
-        for field in ["linkText", "date", "status", "title", "url", "other"]:
+        for field in ["linkText", "date", "status", "title", "dated_url", "current_url", "other"]:
             fh.write(b.get(field, "") + "\n")
         if b.get("etAl", False):
             fh.write("1\n")

@@ -1041,7 +1041,12 @@ def processBiblioLinks(doc):
         linkText = determineLinkText(el)
         if linkText[0] == "[" and linkText[-1] == "]":
             linkText = linkText[1:-1]
-        ref = doc.refs.getBiblioRef(linkText, el=el)
+
+        biblioStatus = treeAttr(el, "data-biblio-status")
+        if not biblioStatus:
+            biblioStatus = doc.md.defaultBiblioStatus
+
+        ref = doc.refs.getBiblioRef(linkText, status=biblioStatus, el=el)
         if not ref:
             die("Couldn't find '{0}' in bibliography data.", linkText)
             el.tag = "span"
@@ -1611,7 +1616,7 @@ class CSSSpec(object):
     def transformAutolinkShortcuts(doc):
         # Do the remaining textual replacements
 
-        biblioRe = re.compile(r"(\\)?\[\[(!)?([\w-]+)\]\]")
+        biblioRe = re.compile(r"(\\)?\[\[(!)?([\w-]+)((?: +current)|(?: +dated))?\]\]")
         def biblioReplacer(match):
             # Allow escaping things that aren't actually biblio links, by preceding with a \
             if match.group(1) is not None:
@@ -1621,7 +1626,10 @@ class CSSSpec(object):
             else:
                 type = "informative"
             term = match.group(3)
-            return E.a({"title":term, "data-link-type":"biblio", "data-biblio-type":type},
+            attrs = {"title":term, "data-link-type":"biblio", "data-biblio-type":type}
+            if match.group(4) is not None:
+                attrs['data-biblio-status'] = match.group(4).strip()
+            return E.a(attrs,
                 "[",
                 term,
                 "]")
