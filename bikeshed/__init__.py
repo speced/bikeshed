@@ -591,10 +591,16 @@ def transformAnchors(lines, doc, **kwargs):
 
 # Headings Stuff
 
-def processHeadings(doc):
+def processHeadings(doc, scope="doc"):
+    # scope arg can be "doc" or "all"
+    # "doc" ignores things that are part of boilerplate
     for el in findAll('h2, h3, h4, h5, h6', doc):
         addClass(el, 'heading')
-    headings = findAll(".heading:not(.settled)", doc)
+    headings = []
+    for el in findAll(".heading:not(.settled)", doc):
+        if scope == "doc" and treeAttr(el, "boilerplate"):
+            continue
+        headeings.append(el)
     resetHeadings(doc, headings)
     determineHeadingLevels(doc, headings)
     addHeadingIds(doc, headings)
@@ -1439,16 +1445,16 @@ class CSSSpec(object):
         processBiblioLinks(self)
         processAutolinks(self)
 
+        addCustomBoilerplate(self)
         addReferencesSection(self)
         addIndexSection(self)
         addPropertyIndex(self)
         addIDLSection(self)
         addIssuesSection(self)
-        processHeadings(self) # again
+        processHeadings(self, "all") # again
         addTOCSection(self)
         addSelfLinks(self)
         processAutolinks(self)
-        addCustomBoilerplate(self)
 
         addAnnotations(self)
 
