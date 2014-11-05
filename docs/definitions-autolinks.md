@@ -362,8 +362,15 @@ They're typically added *only* via the shorthands
 `[[FOO]]` for informative references
 and `[[!FOO]]` for normative references.
 
+Some biblio entries come with multiple sets of urls;
+at present, Bikeshed tracks a single "current" url and a single "dated" url.
+In the W3C, for example, this maps to Editors Drafts and things in /TR space.
+You can specify which url to use by specifying "current" or "dated" within the biblio shorthand,
+like `[[FOO current]]`,
+or specify the default url to choose for all your biblio refs with the ["Default Biblio Status" metadata](metadata.md).
+
 If, for whatever reason, you need to craft a bibliography link manually,
-add `data-link-type=biblio` and `data-biblio-type=[normative | informative]` attributes to the link.
+add `data-link-type=biblio`, `data-biblio-type=[normative | informative]`, and `data-biblio-status=[current | dated]` attributes to the link.
 
 Unlike regular autolinks,
 which link to `<dfn>` elements,
