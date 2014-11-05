@@ -1273,6 +1273,10 @@ def cleanupHTML(doc):
         el.tag = "span"
         el.set("id", "assert-" + hashContents(el))
 
+    # Look for nested <a> elements, and warn about them.
+    for el in findAll("a a", doc):
+        warn("The following (probably auto-generated) link is illegally nested in another link:\n{0}", outerHTML(el))
+
 
 def finalHackyCleanup(text):
     # For hacky last-minute string-based cleanups of the rendered html.
