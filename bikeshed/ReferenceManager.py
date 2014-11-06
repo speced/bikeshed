@@ -269,12 +269,12 @@ class ReferenceManager(object):
             return None
 
         # If status is ED, kill TR refs unless their spec *only* has a TR url
-        if status == "ED":
-            refs = [ref for ref in refs if ref['status'] == "ED" or (ref['status'] == "TR" and self.specs.get(ref['spec'],{}).get('ED') is None)]
+        if status.strip() == "ED":
+            refs = [ref for ref in refs if ref['status'].strip() == "ED" or (ref['status'].strip() == "TR" and self.specs.get(ref['spec'],{}).get('ED') is None)]
         # If status is TR, kill ED refs if there's a corresponding TR ref for the same spec.
-        if status == "TR":
-            TRRefSpecs = [ref['spec'] for ref in refs if ref['status'] == 'TR']
-            refs = [ref for ref in refs if ref['status'] == "TR" or (ref['status'] == "ED") and ref['spec'] not in TRRefSpecs]
+        if status.strip() == "TR":
+            TRRefSpecs = [ref['spec'] for ref in refs if ref['status'].strip() == 'TR']
+            refs = [ref for ref in refs if ref['status'].strip() == "TR" or (ref['status'].strip() == "ED") and ref['spec'] not in TRRefSpecs]
         if len(refs) == 0:
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
