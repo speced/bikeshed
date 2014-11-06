@@ -538,6 +538,8 @@ def transformAnchors(lines, doc, **kwargs):
             if field not in anchor:
                 die("Inline anchor for '{0}' is missing the '{1}' field.", key, field)
                 continue
+        if "for" not in anchor:
+            anchor["for"] = []
         key = anchor['linkingText'] if isinstance(anchor['linkingText'], basestring) else anchor['linkingText'][0]
         # String fields
         for field in ["type", "shortname", "url"]:
