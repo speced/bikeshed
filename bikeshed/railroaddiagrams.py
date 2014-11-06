@@ -338,11 +338,7 @@ class End(DiagramItem):
 class TextDiagramItem(DiagramItem):
     def __init__(self, prelude):
         DiagramItem.__init__(self, 'g')
-        if prelude.strip() != "":
-            print prelude
         self.raw = "raw" in prelude.split()
-        if self.raw:
-            print True
 
 
 class Terminal(TextDiagramItem):
