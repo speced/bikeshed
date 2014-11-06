@@ -31,6 +31,7 @@ class DiagramItem(object):
         self.attrs = attrs or {}
         self.children = [text] if text else []
         self.needsSpace = False
+        self.raw = None
 
     def format(self, x, y, width):
         raise NotImplementedError  # Virtual
@@ -39,14 +40,18 @@ class DiagramItem(object):
         parent.children.append(self)
         return self
 
-    def writeSvg(self, write):
+    def writeSvg(self, write, raw=None):
+        if raw is None and self.raw is not None:
+            raw = self.raw
         write('<{0}'.format(self.name))
         for name, value in sorted(self.attrs.items()):
             write(' {0}="{1}"'.format(name, e(value)))
         write('>\n')
         for child in self.children:
             if isinstance(child, DiagramItem):
-                child.writeSvg(write)
+                child.writeSvg(write, raw)
+            elif raw:
+                write(child)
             else:
                 write(e(child))
         write('</{0}>'.format(self.name))
@@ -330,10 +335,21 @@ class End(DiagramItem):
         return self
 
 
-class Terminal(DiagramItem):
-    def __init__(self, text):
+class TextDiagramItem(DiagramItem):
+    def __init__(self, prelude):
         DiagramItem.__init__(self, 'g')
+        if prelude.strip() != "":
+            print prelude
+        self.raw = "raw" in prelude.split()
+        if self.raw:
+            print True
+
+
+class Terminal(TextDiagramItem):
+    def __init__(self, text, prelude=""):
+        TextDiagramItem.__init__(self, prelude)
         self.text = text
+        self.prelude = prelude
         self.width = len(text) * CHARACTER_ADVANCE + 20
         self.up = 11
         self.down = 11
@@ -355,10 +371,11 @@ class Terminal(DiagramItem):
         return self
 
 
-class NonTerminal(DiagramItem):
-    def __init__(self, text):
-        DiagramItem.__init__(self, 'g')
+class NonTerminal(TextDiagramItem):
+    def __init__(self, text, prelude=""):
+        TextDiagramItem.__init__(self, prelude)
         self.text = text
+        self.prelude = prelude
         self.width = len(text) * CHARACTER_ADVANCE + 20
         self.up = 11
         self.down = 11
@@ -380,10 +397,11 @@ class NonTerminal(DiagramItem):
         return self
 
 
-class Comment(DiagramItem):
-    def __init__(self, text):
-        DiagramItem.__init__(self, 'g')
+class Comment(TextDiagramItem):
+    def __init__(self, text, prelude=""):
+        TextDiagramItem.__init__(self, prelude)
         self.text = text
+        self.prelude = prelude
         self.width = len(text) * 7 + 10
         self.up = 11
         self.down = 11
@@ -403,9 +421,10 @@ class Comment(DiagramItem):
         return self
 
 
-class Skip(DiagramItem):
-    def __init__(self):
-        DiagramItem.__init__(self, 'g')
+class Skip(TextDiagramItem):
+    def __init__(self, prelude=""):
+        TextDiagramItem.__init__(self, prelude)
+        self.prelude = prelude
         self.width = 0
         self.up = 0
         self.down = 0
