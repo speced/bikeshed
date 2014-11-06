@@ -2128,7 +2128,7 @@ def addTOCSection(doc):
     previousLevel = 1
     containers = [0, 1, 2, 3, 4, 5, 6, 7]
     containers[1] = E.div()
-    containers[2] = appendChild(containers[1], E.ul({"class":"toc", "role":"navigation"}))
+    containers[2] = appendChild(containers[1], E.ul({"class":"toc", "role":"directory"}))
     for header in findAll('h2, h3, h4, h5, h6', doc):
         level = int(header.tag[-1])
         container = containers[level]
