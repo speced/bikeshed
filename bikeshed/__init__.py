@@ -1294,6 +1294,14 @@ def cleanupHTML(doc):
     for el in findAll("a a", doc):
         warn("The following (probably auto-generated) link is illegally nested in another link:\n{0}", outerHTML(el))
 
+    # If the <h1> contains only capital letters, add a class=allcaps for styling hook
+    h1 = find("h1", doc)
+    for letter in textContent(h1):
+        if letter.isalpha() and letter.islower():
+            break
+    else:
+        addClass(h1, "allcaps")
+
 
 def finalHackyCleanup(text):
     # For hacky last-minute string-based cleanups of the rendered html.
