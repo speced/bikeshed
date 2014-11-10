@@ -872,19 +872,25 @@ def classifyDfns(doc, dfns):
     dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
     for el in dfns:
         dfnType = determineDfnType(el)
-        dfnText = linkTextsFromElement(el, preserveCasing=True)[0]
+        # TODO Why am I using linkTextsFromElement here, but determineDfnText further down?
+        dfnTexts = linkTextsFromElement(el, preserveCasing=True)
+        if len(dfnTexts):
+            primaryDfnText = dfnTexts[0]
+        else:
+            die("Dfn has no linking text:\n{0}", outerHTML(el))
+            continue
         # Push the dfn type down to the <dfn> itself.
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', dfnType)
         # Some error checking
         if dfnType in config.functionishTypes:
-            if not re.match(r"^[\w-]+\(.*\)$", dfnText):
-                die("Functions/methods must end with () in their linking text, got '{0}'.", dfnText)
+            if not re.match(r"^[\w-]+\(.*\)$", primaryDfnText):
+                die("Functions/methods must end with () in their linking text, got '{0}'.", primaryDfnText)
                 continue
             elif el.get('title') is None:
                 # Make sure that functionish dfns have their title set up right.
                 # Need to fix this to use the idl parser instead.
-                el.set('title', re.match(r"^([\w-]+)\(.*\)$", dfnText).group(1)+"()")
+                el.set('title', re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1)+"()")
         # If type=argument, try to infer what it's for.
         if dfnType == "argument" and el.get('data-dfn-for') is None:
             parent = el.getparent()
