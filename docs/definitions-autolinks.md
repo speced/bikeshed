@@ -385,7 +385,8 @@ so it should be sufficient.
 The bibliography database is completely separate from the autolinking database,
 and comes from multiple sources.
 The default data comes from the [SpecRef project](https://github.com/tobie/specref)
-and [the CSSWG's own biblio file](http://dev.w3.org/csswg/biblio.ref).
+and [the CSSWG's own biblio file](http://dev.w3.org/csswg/biblio.ref)
+(preferring SpecRef's information when the same name appears in both).
 
 You can also add your own bibliography data,
 following the SpecRef JSON format:
