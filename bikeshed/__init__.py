@@ -476,7 +476,7 @@ def parseDefBlock(lines, type):
     vals = OrderedDict()
     lastKey = None
     for line in lines:
-        match = re.match(r"\s*([^:]+):\s*(.*)", line)
+        match = re.match(r"\s*([^:]+):\s*(\S.*)", line)
         if match is None:
             if lastKey is not None and (line.strip() == "" or re.match(r"\s+", line)):
                 key = lastKey
@@ -485,6 +485,7 @@ def parseDefBlock(lines, type):
                 die("Incorrectly formatted {2} line for '{0}':\n{1}", vals.get("Name", "???"), line, type)
                 continue
         else:
+
             key = match.group(1).strip().capitalize()
             lastKey = key
             val = match.group(2).strip()
