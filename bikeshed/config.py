@@ -137,34 +137,28 @@ def intersperse(iterable, delimiter):
 
 
 
-def retrieveCachedFile(cacheLocation, type, fallbackurl=None, quiet=False, force=False, str=False):
+def retrieveCachedFile(filename, quiet=False, str=False):
+    cacheLocation = scriptPath + "/spec-data/" + filename
+    fallbackLocation = scriptPath + "/spec-data/readonly/" + filename
     try:
-        if force:
-            raise IOError("Skipping cache lookup, because this is a forced retrieval.")
         fh = open(cacheLocation, 'r')
     except IOError:
-        if fallbackurl is None:
-            die("Couldn't find the {0} cache file at the specified location '{1}'.", type, cacheLocation)
-        else:
+        try:
+            fh = open(fallbackLocation, 'r')
+        except IOError:
+            die("Couldn't retrieve the file '{0}' from cache. Something's wrong, please report this.", filename)
+            return
+        import shutil
+        try:
             if not quiet:
-                warn("Couldn't find the {0} cache file at the specified location '{1}'.\nAttempting to download it from '{2}'...", type, cacheLocation, fallbackurl)
-            try:
-                fh = urlopen(fallbackurl)
-            except:
-                die("Couldn't retrieve the {0} file from '{1}'.", type, fallbackurl)
-            try:
-                if not quiet:
-                    say("Attempting to save the {0} file to cache...", type)
-                if not dryRun:
-                    outfh = open(cacheLocation, 'w')
-                    outfh.write(fh.read())
-                    fh.close()
-                fh = open(cacheLocation, 'r')
-                if not quiet:
-                    say("Successfully saved the {0} file to cache.", type)
-            except:
-                if not quiet:
-                    warn("Couldn't save the {0} file to cache. Proceeding...", type)
+                say("Attempting to save the {0} file to cache...", type)
+            if not dryRun:
+                shutil.copy(fallbackLocation, cacheLocation)
+            if not quiet:
+                say("Successfully saved the {0} file to cache.", type)
+        except:
+            if not quiet:
+                warn("Couldn't save the {0} file to cache. Proceeding...", type)
     if str:
         return unicode(fh.read(), encoding="utf-8")
     else:

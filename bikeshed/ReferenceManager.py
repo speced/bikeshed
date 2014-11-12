@@ -26,13 +26,8 @@ class ReferenceManager(object):
 
     def initializeRefs(self):
         # Load up the xref data
-        self.specs.update(json.loads(
-            config.retrieveCachedFile(
-                cacheLocation=config.scriptPath+"/spec-data/specs.json",
-                type="spec list",
-                quiet=True,
-                str=True)))
-        with config.retrieveCachedFile(cacheLocation=config.scriptPath+"/spec-data/anchors.data", type="anchor data", quiet=True) as lines:
+        self.specs.update(json.loads(config.retrieveCachedFile("specs.json", quiet=True, str=True)))
+        with config.retrieveCachedFile("anchors.data", quiet=True) as lines:
             try:
                 while True:
                     key = lines.next()
@@ -56,15 +51,10 @@ class ReferenceManager(object):
             except StopIteration:
                 pass
 
-        self.defaultSpecs.update(json.loads(
-            config.retrieveCachedFile(
-                cacheLocation=config.scriptPath+"/spec-data/link-defaults.json",
-                type="link defaults",
-                quiet=True,
-                str=True)))
+        self.defaultSpecs.update(json.loads(config.retrieveCachedFile("link-defaults.json", quiet=True, str=True)))
 
     def initializeBiblio(self):
-        with config.retrieveCachedFile(cacheLocation=config.scriptPath + "/spec-data/biblio.data", type="bibliography") as lines:
+        with config.retrieveCachedFile("biblio.data", quiet=True) as lines:
             try:
                 while True:
                     key = lines.next()
