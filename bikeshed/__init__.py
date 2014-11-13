@@ -311,6 +311,16 @@ def transformDataBlocks(doc):
 
 
 def transformPre(lines, tagName, firstLine, **kwargs):
+    # If the last line in the source is a </code></pre>,
+    # the generic processor will turn that into a final </code> line,
+    # which'll mess up the indent finding.
+    # Instead, specially handle this case.
+    if re.match(r"\s*</code>\s*$", lines[-1]):
+        lastLine = "</code></{0}>".format(tagName)
+        lines = lines[:-1]
+    else:
+        lastLine = "</{0}>".format(tagName)
+
     indent = float("inf")
     for (i, line) in enumerate(lines):
         if line.strip() == "":
@@ -333,8 +343,8 @@ def transformPre(lines, tagName, firstLine, **kwargs):
             continue
         lines[i] = lines[i][indent:]
     # Put the first/last lines back into the results.
-    lines.insert(0, firstLine)
-    lines.append("</"+tagName+">")
+    lines[0] = firstLine.rstrip() + lines[0]
+    lines.append(lastLine)
     return lines
 
 
