@@ -112,7 +112,7 @@ var _ = self.Prism = {
 	},
 
 	highlightAll: function(async, callback) {
-		var elements = document.querySelectorAll('code[class*="language-"], [class*="language-"] code, code[class*="lang-"], [class*="lang-"] code');
+		var elements = document.querySelectorAll('pre[class*="language-"], [class*="language-"] pre, pre[class*="lang-"], [class*="lang-"] pre');
 
 		for (var i=0, element; element = elements[i++];) {
 			_.highlightElement(element, async === true, callback);

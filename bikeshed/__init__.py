@@ -1247,6 +1247,35 @@ def processIDL(doc):
 
 
 
+def addSyntaxHighlighting(doc):
+    langs = set()
+    for el in findAll("[class*=language-], [class*=lang-]", doc):
+        match = re.search("lang(?:uage)?-(\w+)", el.get("class"))
+        if match:
+            langs.add(match.group(1))
+    if not langs:
+        return
+    langs.discard("none")
+    pathPrefix = config.scriptPath + "/../prism/"
+    script = ""
+    style = ""
+    def read(filename):
+        return io.open(pathPrefix + filename, 'r', encoding="utf-8").read()
+    try:
+        script += read("prism.js")
+        style += read("prism.css")
+        for lang in langs:
+            script += read(lang+".lang.js")
+    except Exception, e:
+        die("Couldn't find the syntax highlighting files.\n{0}", e)
+        return
+    body = find("body", doc)
+    appendChild(body,
+        E.script(script),
+        E.style(style))
+
+
+
 def cleanupHTML(doc):
     # Move any stray <link>, <script>, <meta>, or <style> into the <head>.
     head = find("head", doc)
@@ -1480,8 +1509,8 @@ class CSSSpec(object):
         addTOCSection(self)
         addSelfLinks(self)
         processAutolinks(self)
-
         addAnnotations(self)
+        addSyntaxHighlighting(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
