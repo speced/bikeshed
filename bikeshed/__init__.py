@@ -1251,7 +1251,7 @@ def addSyntaxHighlighting(doc):
     # Find what langs are requesting syntax highlighting
     langs = set()
     for el in findAll("[class*=language-], [class*=lang-]", doc):
-        match = re.search("lang(?:uage)?-(\w+)", el.get("class"))
+        match = re.search("(?:lang|language)-(\w+)", el.get("class"))
         if match:
             langs.add(match.group(1))
     if not langs:
