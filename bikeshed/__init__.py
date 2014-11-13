@@ -1248,6 +1248,7 @@ def processIDL(doc):
 
 
 def addSyntaxHighlighting(doc):
+    # Find what langs are requesting syntax highlighting
     langs = set()
     for el in findAll("[class*=language-], [class*=lang-]", doc):
         match = re.search("lang(?:uage)?-(\w+)", el.get("class"))
@@ -1256,6 +1257,37 @@ def addSyntaxHighlighting(doc):
     if not langs:
         return
     langs.discard("none")
+
+    # If any of the langs have prereqs, put them in too.
+    dependencies = {
+        "aspnet": "markup",
+        "bash": "clike",
+        "c": "clike",
+        "coffeescript": "javascript",
+        "cpp": "c",
+        "csharp": "clike",
+        "go": "clike",
+        "groovy": "clike",
+        "java": "clike",
+        "javascript": "clike",
+        "objectivec": "c",
+        "php": "clike",
+        "ruby": "clike",
+        "scala": "java",
+        "scss": "css",
+        "swift": "clike"
+    }
+    langlist = list(langs)
+    prereqs = set()
+    while langs:
+        for lang in langs:
+            if lang in dependencies:
+                prereqs.add(dependencies[lang])
+        langlist = list(prereqs) + langlist
+        langs = prereqs
+        prereqs = set()
+
+    # Put together all the scripts and insert them.
     pathPrefix = config.scriptPath + "/../prism/"
     script = ""
     style = ""
@@ -1264,11 +1296,14 @@ def addSyntaxHighlighting(doc):
     try:
         script += read("prism.js")
         style += read("prism.css")
-        for lang in langs:
-            script += read(lang+".lang.js")
     except Exception, e:
         die("Couldn't find the syntax highlighting files.\n{0}", e)
         return
+    for lang in langlist:
+        try:
+            script += read(lang+".lang.js")
+        except Exception, e:
+            die("Can't find the language file for '{0}'.\n{1}", lang, e)
     body = find("body", doc)
     appendChild(body,
         E.script(script),
@@ -1689,6 +1724,8 @@ class CSSSpec(object):
 
         propdescRe = re.compile(r"'(?:([^\s']*)/)?([\w*-]+)(?:!!([\w-]+))?'")
         def propdescReplacer(match):
+            if match.group(2) == "-":
+                return "'-'"
             if match.group(3) is None:
                 linkType = "propdesc"
             elif match.group(3) in ("property", "descriptor"):
