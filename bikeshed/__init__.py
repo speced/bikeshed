@@ -315,11 +315,17 @@ def transformPre(lines, tagName, firstLine, **kwargs):
     # the generic processor will turn that into a final </code> line,
     # which'll mess up the indent finding.
     # Instead, specially handle this case.
+    if len(lines) == 0:
+        return [firstLine, "</{0}>".format(tagName)]
+
     if re.match(r"\s*</code>\s*$", lines[-1]):
         lastLine = "</code></{0}>".format(tagName)
         lines = lines[:-1]
     else:
         lastLine = "</{0}>".format(tagName)
+
+    if len(lines) == 0:
+        return [firstLine, lastLine]
 
     indent = float("inf")
     for (i, line) in enumerate(lines):
