@@ -200,3 +200,10 @@ def reSubObject(pattern, string, repl=None):
         lastEnd = match.end()
     pieces.append(string[lastEnd:])
     return pieces
+
+def simplifyText(text):
+    # Remove anything that's not a name character.
+    text = text.strip().lower()
+    text = re.sub(r"[\s/]+", "-", text)
+    text = re.sub(r"[^a-z0-9_-]", "", text)
+    return text

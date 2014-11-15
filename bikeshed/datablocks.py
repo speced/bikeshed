@@ -2,6 +2,11 @@
 from __future__ import division, unicode_literals
 import re
 import json
+import copy
+
+import config
+import biblio
+from .messages import *
 
 # This function does a single pass through the doc,
 # finding all the "data blocks" and processing them.
@@ -342,7 +347,7 @@ def transformAnchors(lines, doc, **kwargs):
                 continue
         if "for" not in anchor:
             anchor["for"] = []
-        key = anchor['linkingText'] if isinstance(anchor['linkingText'], basestring) else anchor['linkingText'][0]
+        key = anchor['linkingText'] if isinstance(anchor['linkingText'], basestring) else list(anchor['linkingText'])[0]
         # String fields
         for field in ["type", "shortname", "url"]:
             if not checkTypes(anchor, key, field, basestring):
@@ -368,15 +373,47 @@ def transformAnchors(lines, doc, **kwargs):
         for field in ["linkingText", "for"]:
             if field not in anchor:
                 continue
-            if not checkTypes(anchor, key, field, basestring, list):
+            if not checkTypes(anchor, key, field, basestring, list, dict):
                 continue
             if isinstance(anchor[field], basestring):
                 anchor[field] = [anchor[field]]
-            for i,line in enumerate(anchor[field]):
-                if not isinstance(line, basestring):
-                    die("All of the values for field '{1}' of inline anchor for '{0}' must be strings. Got a '{2}'.", key, field, type(line))
-                    continue
-                anchor[field][i] = re.sub(r'\s+', ' ', anchor[field][i].strip()) + "\n"
-        for text in anchor['linkingText']:
-            doc.refs.refs[text.lower()].append(anchor)
+            if isinstance(anchor[field], list):
+                for i,line in enumerate(anchor[field]):
+                    if not isinstance(line, basestring):
+                        die("All of the values for field '{1}' of inline anchor for '{0}' must be strings. Got a '{2}'.", key, field, type(line))
+                        continue
+                    anchor[field][i] = re.sub(r'\s+', ' ', anchor[field][i].strip()) + "\n"
+            elif isinstance(anchor[field], dict):
+                for text,val in anchor[field].items():
+                    if not isinstance(val, basestring):
+                        die("All of the values for field '{1}' of inline anchor for '{0}' must be strings. Got a '{2}'.", key, field, type(line))
+                        continue
+                    fixedText = re.sub(r'\s+', ' ', text.strip()) + "\n"
+                    anchor[field][fixedText] = anchor[field][text]
+                    del anchor[field][text]
+
+
+        if anchor.get("anchor macro"):
+            # The anchor is actually a macro, defining a template for generating URLs for the real anchors.
+            texts = anchor['linkingText']
+            if isinstance(texts, dict):
+                # {term:suffix}
+                for text,suffix in texts.items():
+                    clone = copy.deepcopy(anchor)
+                    clone['url'] = anchor['url'] + suffix
+                    doc.refs.refs[text.lower()].append(clone)
+            elif isinstance(texts, list):
+                # [term]
+                for text in texts:
+                    clone = copy.deepcopy(anchor)
+                    clone['url'] = anchor['url'] + config.simplifyText(text)
+                    doc.refs.refs[text.lower()].append(clone)
+            # Now stash the anchor macro away, so any <a spec> anchors pointing to this spec
+            # can also still autogenerate, despite not being listed here.
+            doc.refs.anchorMacros[anchor['spec']] = anchor
+            doc.refs.anchorMacros[anchor['shortname']] = anchor
+        else:
+            for text in anchor['linkingText']:
+                doc.refs.refs[text.lower()].append(anchor)
+
     return []

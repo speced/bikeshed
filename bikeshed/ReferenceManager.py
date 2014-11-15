@@ -23,6 +23,7 @@ class ReferenceManager(object):
         self.ignoredSpecs = set()
         self.status = specStatus
         self.biblios = defaultdict(list)
+        self.anchorMacros = dict()
 
     def initializeRefs(self):
         # Load up the xref data
@@ -230,6 +231,9 @@ class ReferenceManager(object):
         # Get the relevant refs
         refs = filterRefsByTypeAndText(self.refs, linkType, text, error)
         if len(refs) == 0:
+            if spec and spec in self.anchorMacros:
+                # If there's a macro registered for this spec, use it to generate a ref.
+                return anchorMacros[spec]['url'] + config.simplifyText(text)
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}'.", linkType, text)
             return None
@@ -246,6 +250,9 @@ class ReferenceManager(object):
         if spec:
             refs = [ref for ref in refs if ref['shortname'].lower() == spec.lower() or ref['spec'].lower() ==spec.lower()]
         if len(refs) == 0:
+            # If there's a macro registered for this spec, use it to generate a ref.
+            if spec in self.anchorMacros:
+                return anchorMacros[spec]['url'] + config.simplifyText(text)
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec)
             return None

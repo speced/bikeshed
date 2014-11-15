@@ -32,6 +32,7 @@ from .htmlhelpers import *
 from .messages import *
 from .widlparser.widlparser import parser
 from .DefaultOrderedDict import DefaultOrderedDict
+from .config import simplifyText
 
 
 def main():
@@ -589,14 +590,6 @@ def dedupIds(doc, els):
                 if not findId(dupe+x):
                     el.set("id", dupe+x)
                     break
-
-
-def simplifyText(text):
-    # Remove anything that's not a name character.
-    text = text.strip().lower()
-    text = re.sub(r"[\s/]+", "-", text)
-    text = re.sub(r"[^a-z0-9_-]", "", text)
-    return text
 
 
 def determineLinkType(el):
