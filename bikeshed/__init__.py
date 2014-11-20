@@ -141,7 +141,7 @@ def main():
                                metavar="LEAFFUNC",
                                help="Prune the graph to only show ancestors of the specified leaf node.")
 
-    options = argparser.parse_args()
+    options, extras = argparser.parse_known_args()
 
     config.quiet = options.quiet
     config.debug = options.debug
@@ -152,6 +152,7 @@ def main():
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
         doc = CSSSpec(inputFilename=options.infile, paragraphMode=options.paragraphMode)
+        doc.md.addOverrides(extras)
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "debug":

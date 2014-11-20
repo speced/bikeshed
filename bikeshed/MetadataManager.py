@@ -59,6 +59,8 @@ class MetadataManager:
 
         self.otherMetadata = defaultdict(list)
 
+        self.overrides = set()
+
         # Some keys are single-value:
         # the result of parsing is simply assigned to them.
         self.singleValueKeys = {
@@ -135,6 +137,9 @@ class MetadataManager:
         key = key.strip()
         val = val.strip()
 
+        if key in self.overrides:
+            return
+
         if key.startswith("!"):
             key = key[1:]
             self.otherMetadata[key].append(val)
@@ -169,6 +174,20 @@ class MetadataManager:
 
     def addDefault(self, key, val):
         self.addData(key, val, default=True)
+
+    def addOverrides(self, overrides):
+        for o in overrides:
+            match = re.match("--md-([^ =]+)=(.+)", o)
+            if not match:
+                # Not a metadata key
+                continue
+            # Convert the key into a metadata name
+            key = match.group(1).replace("-", " ")
+            if key not in ("ED", "TR"):
+                key = key.title()
+            val = match.group(2).strip()
+            self.addData(key, val)
+            self.overrides.add(key)
 
     def finish(self):
         self.validate()

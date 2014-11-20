@@ -86,3 +86,23 @@ Here's an example file:
 	"Mailing List Archives": "http://lists.w3.org/Archives/Public/www-style/"
 }
 ~~~~
+
+Overriding Metadata From The Command Line
+-----------------------------------------
+
+If you want to generate multiple versions of a spec from the same source
+(such as a primary spec, plus some snapshots),
+you can override the metadata from the command line to generate the alternate forms.
+
+For any metadata key defined above,
+just pass it as a `--md-foo=bar` command-line argument.
+For example, to override the **Status** metadata,
+run `bikeshed spec --md-status=ED`.
+
+(If the metadata name has spaces in it, use dashes to separate the words instead.)
+
+### Known Issues
+
+1. You can't override the `Use <i> Autolinks` status, because you can't input the `<>` characters. I don't intend to fix this, as you shouldn't be specifying this in the first place.
+2. You can't supply custom metadata keys (ones with a `!` prefix). If you want to do this, let me know, and I'll work on it.
+3. You can't pass values with spaces in them.  This is [an issue with the argparse library](http://bugs.python.org/issue22909), and I don't know a way around it.
