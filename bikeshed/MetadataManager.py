@@ -56,6 +56,7 @@ class MetadataManager:
         self.useIAutolinks = False
         self.noEditor = False
         self.defaultBiblioStatus = "dated"
+        self.issues = []
 
         self.otherMetadata = defaultdict(list)
 
@@ -102,7 +103,8 @@ class MetadataManager:
             "Previous Version": "previousVersions",
             "At Risk": "atRisk",
             "Ignored Terms": "ignoredTerms",
-            "Link Defaults": "linkDefaults"
+            "Link Defaults": "linkDefaults",
+            "Issue Tracking": "issues"
         }
 
         self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
@@ -125,7 +127,8 @@ class MetadataManager:
             "Indent": parseInteger,
             "Use <I> Autolinks": parseBoolean,
             "No Editor": parseBoolean,
-            "Default Biblio Status": parseBiblioStatus
+            "Default Biblio Status": parseBiblioStatus,
+            "Issue Tracking": parseIssues
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -406,6 +409,13 @@ def parseBiblioStatus(key, val):
         die("'{0}' must be either 'current' or 'dated'. Got '{1}'", key, val)
         return "dated"
 
+def parseIssues(key, val):
+    issues = []
+    vals = [v.strip() for v in val.split(",")]
+    for v in vals:
+        issues.append(v.rsplit(" ", 1))
+    return issues
+
 
 def parse(md, lines):
     # Given a MetadataManager and HTML document text, in the form of an array of text lines,
@@ -480,3 +490,10 @@ def getSpecRepository(doc):
         except:
             # check_output will throw CalledProcessError when not in a git repo
             return ""
+
+def parseDoc(doc):
+    # Look through the doc for any additional metadata information that might be needed.
+
+    if find(".issue", doc) is not None:
+        # There's at least one inline issue.
+        doc.md.issues.append(("Inline In Spec", "#issues-index"))

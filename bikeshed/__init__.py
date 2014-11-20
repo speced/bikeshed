@@ -1128,6 +1128,7 @@ class CSSSpec(object):
 
         # Build the document
         self.document = parseDocument(self.html)
+        metadata.parseDoc(self)
 
         # Fill in and clean up a bunch of data
         addStatusSection(self)
@@ -1929,6 +1930,8 @@ def addSpecMetadataSection(doc):
     elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]['url'] is not None):
         url = doc.testSuites[doc.md.vshortname]['url']
         md["Test Suite"].append(E.a({"href":url}, url))
+    if len(doc.md.issues):
+        md["Issue Tracking"] = [E.a({"href":url}, text) for text,url in doc.md.issues]
     if len(doc.md.editors):
         md["Editor" if len(doc.md.editors) == 1 else "Editors"] = map(printEditor, doc.md.editors)
     if len(doc.md.previousEditors):

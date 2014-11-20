@@ -60,6 +60,7 @@ There are several additional optional keys:
 * **Test Suite** must contain a link to the test suite nightly cover page (like <http://test.csswg.org/suites/css3-flexbox/nightly-unstable>).
 * **Mailing List** must contain an email address to be used for mailing lists.
 * **Mailing List Archives** must contain a link to the list archives.
+* **Issue Tracking** indicates what and where you track issues. It must contain a comma-separated list of locations, each of which consists of the name of the location followed by the url.  (If you use any inline issues, Bikeshed will automatically indicate that as well.)
 * **Use `<i>` Autolinks** turns on legacy support for using `<i>` elements as "dfn" autolinks.  It takes a bool-ish value: "yes/no", "y/n", "true/false", or "on/off".  (This only exists for legacy purposes; do not use in new documents. Instead, just use the `<a>` element like you're supposed to.)
 * **No Editor** lets you omit the `Editor` metadata without an error. It takes a bool-ish value.  This shouldn't generally be used; even if your organization doesn't privilege editors in any way, putting the organization itself in the `Editor` field meets the intent while still producing useful information for readers of the spec.
 * **Default Biblio Status** takes the values "current" or "dated", and selects which URL you want to default to for bibliography entries that have both "current" and "dated" URLs. (You can also specify this per-biblio entry.)
