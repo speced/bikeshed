@@ -400,13 +400,21 @@ def transformAnchors(lines, doc, **kwargs):
                 # {term:suffix}
                 for text,suffix in texts.items():
                     clone = copy.deepcopy(anchor)
-                    clone['url'] = anchor['url'] + suffix
+                    if '#' not in anchor['url'] and '#' not in suffix:
+                        shim = '#'
+                    else:
+                        shim = ''
+                    clone['url'] = anchor['url'] + shim + suffix
                     doc.refs.refs[text.lower()].append(clone)
             elif isinstance(texts, list):
                 # [term]
                 for text in texts:
                     clone = copy.deepcopy(anchor)
-                    clone['url'] = anchor['url'] + config.simplifyText(text)
+                    if '#' not in anchor['url']:
+                        shim = '#'
+                    else:
+                        shim = ''
+                    clone['url'] = anchor['url'] + shim + config.simplifyText(text)
                     doc.refs.refs[text.lower()].append(clone)
             # Now stash the anchor macro away, so any <a spec> anchors pointing to this spec
             # can also still autogenerate, despite not being listed here.
