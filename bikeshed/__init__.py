@@ -379,7 +379,7 @@ def canonicalizeShortcuts(doc):
         del el.attrib['for']
 
 def fixIntraDocumentReferences(doc):
-    for el in findAll("a[href^='#']:not([href='#'])", doc):
+    for el in findAll("a[href^='#']:not([href='#']):not(.self-link)", doc):
         sectionID = el.get("href")
         if el.get('data-section') is not None:
             # Specifically a section link, should point to a heading
@@ -1144,7 +1144,6 @@ class CSSSpec(object):
         formatPropertyNames(self)
         processHeadings(self)
         canonicalizeShortcuts(self)
-        fixIntraDocumentReferences(self)
         processIssues(self)
         markupIDL(self)
 
@@ -1169,6 +1168,7 @@ class CSSSpec(object):
         processAutolinks(self)
         addAnnotations(self)
         addSyntaxHighlighting(self)
+        fixIntraDocumentReferences(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
