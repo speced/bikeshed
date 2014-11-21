@@ -405,23 +405,22 @@ def fixIntraDocumentReferences(doc):
 
 def fillAttributeInfoSpans(doc):
     # Auto-add <span attribute-info> to <dt><dfn> when it's an attribute or dict-member.
-    for dl in findAll("dl", doc):
-        for dt in findAll("dt", dl):
-            if find("span[data-attribute-info]", dt) is not None:
-                # Already has one, no need to do any work here
-                continue
-            dfn = find("dfn", dt)
-            if dfn is None:
-                continue
-            dfnType = dfn.get("data-dfn-type")
-            if dfnType not in ("attribute", "dict-member"):
-                continue
-            spanFor = determineDfnText(dfn).split('|')[0]
-            if dfn.get("data-dfn-for"):
-                spanFor = dfn.get("data-dfn-for") + "/" + spanFor
-            insertAfter(dfn,
-                ", ",
-                E.span({"data-attribute-info":"", "for":spanFor}))
+    for dt in findAll("dt", doc):
+        if find("span[data-attribute-info]", dt) is not None:
+            # Already has one, no need to do any work here
+            continue
+        dfn = find("dfn", dt)
+        if dfn is None:
+            continue
+        dfnType = dfn.get("data-dfn-type")
+        if dfnType not in ("attribute", "dict-member"):
+            continue
+        spanFor = determineDfnText(dfn).split('|')[0]
+        if dfn.get("data-dfn-for"):
+            spanFor = dfn.get("data-dfn-for") + "/" + spanFor
+        insertAfter(dfn,
+            ", ",
+            E.span({"data-attribute-info":"", "for":spanFor}))
 
     for el in findAll("span[data-attribute-info]", doc):
         if (el.text is None or el.text.strip() == '') and len(el) == 0:
