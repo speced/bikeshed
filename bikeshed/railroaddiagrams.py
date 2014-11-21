@@ -6,7 +6,7 @@ ARC_RADIUS = 10
 DIAGRAM_CLASS = 'railroad-diagram'
 TRANSLATE_HALF_PIXEL = True
 INTERNAL_ALIGNMENT = 'center'
-DEBUG=False
+DEBUG = True
 
 # Assume a monospace font with each char .5em wide, and the em is 16px
 CHARACTER_ADVANCE = 8
@@ -252,7 +252,7 @@ class Choice(DiagramItem):
                 ARC_RADIUS,
                 item.down
                     + VERTICAL_SEPARATION
-                    + (self.items[i + 1].up if i < len(self.items) else 0))
+                    + (below[i + 1].up if i+1 < len(below) else 0))
         return self
 
 
