@@ -128,9 +128,15 @@ def insertBefore(target, el):
     parent = target.getparent()
     parent.insert(parent.index(target), el)
 
-def insertAfter(target, el):
+def insertAfter(target, *els):
     parent = target.getparent()
-    parent.insert(parent.index(target)+1, el)
+    for el in els:
+        if isinstance(el, basestring):
+            target.tail = (target.tail or '') + el
+        else:
+            parent.insert(parent.index(target)+1, el)
+            target = el
+    return target
 
 
 def removeNode(node):
