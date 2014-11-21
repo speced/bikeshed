@@ -1353,7 +1353,7 @@ class CSSSpec(object):
             if match.group(3) is None:
                 linkType = "propdesc"
             elif match.group(3) in ("property", "descriptor"):
-                linkType = match.group(2)
+                linkType = match.group(3)
             else:
                 die("Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3))
                 return E.span(match.group(0))
