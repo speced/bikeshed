@@ -981,7 +981,7 @@ def cleanupHTML(doc):
             removeNode(comment)
 
     # Remove duplicate titles.
-    for el in findAll("dfn[title]", doc):
+    for el in findAll("dfn[title], a[title]", doc):
         if el.get('title') == textContent(el):
             del el.attrib['title']
 
