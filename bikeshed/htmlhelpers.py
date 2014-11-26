@@ -34,6 +34,32 @@ def find(sel, context=None):
     else:
         return None
 
+def escapeCSSIdent(val):
+    if len(val) == 0:
+        die("Programming error: can't escape an empty ident.")
+        return ""
+    ident = "";
+    firstCode = val[0]
+    for i,code in enumerate(ord(x) for x in val):
+        if code == 0:
+            die("Invalid character: the string '{0}' somehow has a NUL in it.", val)
+            return ""
+        if (0x1 <= code <= 0x1f or
+            code == 0x7f or
+            (i == 0 and 0x30 <= code <= 0x39) or
+            (i == 1 and 0x30 <= code <= 0x39 and firstCode == 0x2d)):
+            ident += r"\{0:x} ".format(code)
+        elif (code >= 0x80 or
+            code == 0x2d or
+            code == 0x5f or
+            0x30 <= code <= 0x39 or
+            0x41 <= code <= 0x5a or
+            0x61 <= code <= 0x7a):
+            ident += chr(code)
+        else:
+            ident += r"\{0}".format(chr(code))
+    return ident
+
 def textContent(el):
     return html.tostring(el, method='text', with_tail=False, encoding="unicode")
 

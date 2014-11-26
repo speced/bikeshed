@@ -380,7 +380,7 @@ def canonicalizeShortcuts(doc):
 
 def fixIntraDocumentReferences(doc):
     for el in findAll("a[href^='#']:not([href='#']):not(.self-link)", doc):
-        sectionID = el.get("href")
+        sectionID = '#' + escapeCSSIdent(el.get("href")[1:])
         if el.get('data-section') is not None:
             # Specifically a section link, should point to a heading
             target = find("{0}.heading".format(sectionID), doc)
