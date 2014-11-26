@@ -210,7 +210,7 @@ class MetadataManager:
             'abstract': 'Abstract'
         }
 
-        if self.status != 'LS':
+        if self.status not in config.noEDStatuses:
             requiredSingularKeys['ED'] = 'ED'
         if self.status in config.deadlineStatuses:
             requiredSingularKeys['deadline'] = 'Deadline'
@@ -277,6 +277,10 @@ class MetadataManager:
             macros["testsuite"] = doc.testSuites[self.vshortname]['vshortname']
         if self.warning and self.warning[1] is not None:
             macros["replacedby"] = self.warning[1]
+        if self.warning and self.warning[2] is not None:
+            macros["snapshotid"] = self.warning[2]
+        if self.warning and self.warning[3] is not None:
+            macros["snapshoturl"] = self.warning[3]
         macros["logo"] = self.logo
         # get GH repo from remote
         macros["repository"] = getSpecRepository(doc)
@@ -309,6 +313,12 @@ def convertWarning(key, val):
         return "warning-obsolete",
     if val.lower() == "not ready":
         return "warning-not-ready",
+    match = re.match(r"Commit +([^ ]+) +(.+) +replaced by +(.+)", val, re.I)
+    if match:
+        return "warning-commit", match.group(3), match.group(1), match.group(2)
+    match = re.match(r"Branch +([^ ]+) +(.+) +replaced by +(.+)", val, re.I)
+    if match:
+        return "warning-branch", match.group(3), match.group(1), match.group(2)
     match = re.match(r"Replaced By +(.+)", val, re.I)
     if match:
         return "warning-replaced-by", match.group(1)
