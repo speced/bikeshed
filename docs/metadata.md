@@ -48,7 +48,7 @@ There are several additional optional keys:
 
 * **TR** must contain a link that points to the latest version on /TR.
 * **Former Editor** must contain a former editor's information, in the same format as "Editor".
-* **Warning** must contain either "Obsolete", "Not Ready", "New Version XXX", or "Replaced by XXX", which triggers the appropriate warning message in the boilerplate.
+* **Warning** must contain either "Obsolete", "Not Ready", "New Version XXX", "Replaced by XXX", "Commit deadb33f http://example.com/url/to/deadb33f replaced by XXX", or "Branch XXX http://example.com/url/to/XXX replaced by YYY" which triggers the appropriate warning message in the boilerplate.
 * **Previous Version** must contain a link that points to a previous (dated) version on /TR.  You can specify this key more than once for multiple entries.
 * **At Risk** must contain an at-risk feature.  You can specify this key more than once for multiple entries.
 * **Group** must contain the name of the group the spec is being generated for.  This is used by the boilerplate generation to select the correct file.  It defaults to "csswg".

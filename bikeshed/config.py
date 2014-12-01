@@ -15,8 +15,9 @@ doc = None
 textMacros = {}
 
 TRStatuses = ["WD", "FPWD", "LCWD", "CR", "PR", "REC", "PER", "NOTE", "MO"]
-unlevelledStatuses = ["LS", "DREAM", "UD"]
+unlevelledStatuses = ["LS", "DREAM", "UD", "Commit", "Branch"]
 deadlineStatuses = ["LCWD", "PR"]
+noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH"]
 shortToLongStatus = {
     "ED": "Editor's Draft",
     "WD": "W3C Working Draft",
@@ -30,7 +31,9 @@ shortToLongStatus = {
     "MO": "W3C Member-only Draft",
     "UD": "Unofficial Proposal Draft",
     "DREAM": "A Collection of Interesting Ideas",
-    "LS": "Living Standard"
+    "LS": "Living Standard",
+    "LS-COMMIT": "Commit Snapshot",
+    "LS-BRANCH": "Branch Snapshot"
 }
 
 dfnClassToType = {
