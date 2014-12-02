@@ -351,6 +351,7 @@ def canonicalizeShortcuts(doc):
         "force":"data-dfn-force",
         "section":"data-section",
         "attribute-info":"data-attribute-info",
+        "dict-member-info":"data-dict-member-info",
         "local-title":"data-local-title"
     }
     for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys()), doc):
@@ -413,16 +414,24 @@ def fillAttributeInfoSpans(doc):
         if dfn is None:
             continue
         dfnType = dfn.get("data-dfn-type")
-        if dfnType not in ("attribute", "dict-member"):
+        if dfnType == "attribute":
+            attrName = "data-attribute-info"
+        elif dfnType == "dict-member":
+            attrName = "data-dict-member-info"
+        else:
             continue
         spanFor = determineDfnText(dfn).split('|')[0]
         if dfn.get("data-dfn-for"):
             spanFor = dfn.get("data-dfn-for") + "/" + spanFor
         insertAfter(dfn,
             ", ",
-            E.span({"data-attribute-info":"", "for":spanFor}))
+            E.span({attrName:"", "for":spanFor}))
 
-    for el in findAll("span[data-attribute-info]", doc):
+    for el in findAll("span[data-attribute-info], span[data-dict-member-info]", doc):
+        if el.get('data-attribute-info') is not None:
+            refType = "attribute"
+        else:
+            refType = "dict-member"
         if (el.text is None or el.text.strip() == '') and len(el) == 0:
             referencedAttribute = el.get("for")
             if referencedAttribute is None or referencedAttribute == "":
@@ -430,26 +439,27 @@ def fillAttributeInfoSpans(doc):
                 continue
             if "/" in referencedAttribute:
                 interface, referencedAttribute = referencedAttribute.split("/")
-                target = findAll('[data-link-type=attribute][title="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface), doc)
+                target = findAll('[data-link-type={2}][title="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface, refType), doc)
             else:
-                target = findAll('[data-link-type=attribute][title="{0}"]'.format(referencedAttribute), doc)
+                target = findAll('[data-link-type={1}][title="{0}"]'.format(referencedAttribute, refType), doc)
             if len(target) == 0:
-                die("Couldn't find target attribute {0}:\n{1}", referencedAttribute, outerHTML(el))
+                die("Couldn't find target {1} {0}:\n{2}", referencedAttribute, refType, outerHTML(el))
                 continue
-            if len(target) > 1:
-                die("Multiple potential target attributes {0}:\n{1}", referencedAttribute, outerHTML(el))
+            elif len(target) > 1:
+                die("Multiple potential target {1}s {0}:\n{2}", referencedAttribute, refType, outerHTML(el))
                 continue
             target = target[0]
             datatype = target.get("data-type").strip()
             default = target.get("data-default");
-            decorations = ""
+            decorations = []
             if target.get("data-readonly") is not None:
-                decorations += ", readonly"
+                decorations.append(", readonly")
             if datatype[-1] == "?":
-                decorations += ", nullable"
+                decorations.append(", nullable")
                 datatype = datatype[:-1]
             if default is not None:
-                decorations += ", defaulting to {0}".format(default);
+                decorations.append(", defaulting to ")
+                decorations.append(E.code(default))
             if "<" in datatype:
                 match = re.match(r"(\w+)<(\w+)>", datatype)
                 appendChild(el,
@@ -458,12 +468,12 @@ def fillAttributeInfoSpans(doc):
                     "<",
                     E.a({"data-link-type":"idl-name"}, match.group(2)),
                     ">",
-                    decorations)
+                    *decorations)
             else:
                 appendChild(el,
                     " of type ",
                     E.a({"data-link-type":"idl-name"}, datatype),
-                    decorations)
+                    *decorations)
 
 def processDfns(doc):
     dfns = findAll("dfn", doc)
