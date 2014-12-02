@@ -380,21 +380,19 @@ def canonicalizeShortcuts(doc):
         del el.attrib['for']
 
 def fixIntraDocumentReferences(doc):
-    for el in findAll("a[href^='#']:not([href='#']):not(.self-link)", doc):
-        sectionID = '#' + escapeCSSIdent(el.get("href")[1:])
-        if el.get('data-section') is not None:
-            # Specifically a section link, should point to a heading
-            target = find("{0}.heading".format(sectionID), doc)
-            if target is None:
-                die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
-                continue
-        else:
-            # All other in-doc links
-            target = find(sectionID, doc)
-            if target is None:
-                die("Couldn't find target anchor {0}:\n{1}", sectionID, outerHTML(el))
+    ids = {el.get('id'):el for el in findAll("[id]", doc)}
+    headingIDs = {el.get('id'):el for el in findAll("[id].heading", doc)}
+    for el in findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
+        targetID = el.get("href")[1:]
+        if el.get('data-section') is not None and targetID not in headingIDs:
+            die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
+            continue
+        elif targetID not in ids:
+            die("Couldn't find target anchor {0}:\n{1}", sectionID, outerHTML(el))
+            continue
         if (el.text is None or el.text.strip() == '') and len(el) == 0:
             # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
+            target = ids[targetID]
             content = find(".content", target)
             if content is None:
                 die("Tried to generate text for a section link, but the target isn't a heading:\n{0}", outerHTML(el))
