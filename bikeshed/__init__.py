@@ -798,9 +798,9 @@ class IDLMarker(object):
 
         idlType = construct.idlType
         extraParameters = ''
-        normalizedName = construct.normalName
+        idlTitle = construct.normalName
         if idlType in config.functionishTypes:
-            pass
+            idlTitle = '|'.join(self.methodLinkingTexts(construct))
         elif idlType == "attribute":
             if hasattr(construct.member, "rest"):
                 rest = construct.member.rest
@@ -823,10 +823,36 @@ class IDLMarker(object):
             idlFor = "data-idl-for='{0}'".format(construct.fullName.rpartition("/")[0])
         else:
             idlFor = ""
-        return ('<idl title="{0}" data-idl-type="{1}" {2} {3}>'.format(normalizedName, idlType, idlFor, extraParameters), '</idl>')
+        return ('<idl title="{0}" data-idl-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters), '</idl>')
 
     def encode(self, text):
         return escapeHTML(text)
+
+    def methodLinkingTexts(self, method):
+        '''
+        Given a method-ish widlparser Construct,
+        finds all possible linking texts.
+        The full linking text is "foo(bar, baz)";
+        beyond that, any optional or variadic arguments can be omitted.
+        So, if both were optional,
+        "foo(bar)" and "foo()" would both also be valid linking texts.
+        '''
+        if method.arguments is None:
+            return [method.normalName]
+        for i,arg in enumerate(method.arguments):
+            if arg.optional or arg.variadic:
+                optStart = i
+                break
+        else:
+            # No optionals, so no work to be done
+            return [method.normalName]
+        prefix = method.name + "("
+        texts = []
+        for i in range(optStart, len(method.arguments)):
+            argText = ', '.join(arg.name for arg in method.arguments[:i])
+            texts.append(prefix + argText + ")")
+        texts.append(method.normalName)
+        return reversed(texts)
 
 class IDLUI(object):
     def warn(self, msg):
