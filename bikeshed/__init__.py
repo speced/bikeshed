@@ -554,7 +554,7 @@ def classifyDfns(doc, dfns):
             parent = el.getparent()
             if parent.get('data-dfn-type') in config.functionishTypes and parent.get('data-dfn-for') is not None:
                 el.set('data-dfn-for', "{0}/{1} {1}".format(parent.get('data-dfn-for'), linkTextsFromElement(parent, preserveCasing=True)[0]))
-            else:
+            elif treeAttr(el, "data-dfn-for") is None:
                 die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el))
                 continue
         if dfnType in config.typesUsingFor:
