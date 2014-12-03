@@ -798,8 +798,9 @@ class IDLMarker(object):
 
         idlType = construct.idlType
         extraParameters = ''
+        normalizedName = construct.normalName
         if idlType in config.functionishTypes:
-            text = construct.methodName
+            pass
         elif idlType == "attribute":
             if hasattr(construct.member, "rest"):
                 rest = construct.member.rest
@@ -822,7 +823,7 @@ class IDLMarker(object):
             idlFor = "data-idl-for='{0}'".format(construct.fullName.rpartition("/")[0])
         else:
             idlFor = ""
-        return ('<idl title="{0}" data-idl-type="{1}" {2} {3}>'.format(text, idlType, idlFor, extraParameters), '</idl>')
+        return ('<idl title="{0}" data-idl-type="{1}" {2} {3}>'.format(normalizedName, idlType, idlFor, extraParameters), '</idl>')
 
     def encode(self, text):
         return escapeHTML(text)
