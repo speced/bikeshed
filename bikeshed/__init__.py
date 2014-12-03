@@ -796,17 +796,6 @@ class IDLMarker(object):
         if construct.idlType not in config.idlTypes:
             return (None,None)
 
-        if construct.idlType == "constructor":
-            idlType = "method"
-        else:
-            idlType = construct.idlType
-
-        if idlType == "method":
-            title = parser.Parser().normalizedMethodName(text)
-            # Switch to construct.methodName
-        else:
-            title = text
-
         def getForValues(construct):
             if construct.idlType in ("method", "constructor"):
                 myForValue = parser.Parser().normalizedMethodName(construct.name)
@@ -819,7 +808,12 @@ class IDLMarker(object):
             else:
                 return [myForValue]
 
-        if idlType == "attribute":
+        idlType = construct.idlType
+        extraParameters = ''
+        if idlType in ("constructor", "method"):
+            text = parser.Parser().normalizedMethodName(text)
+            # TODO: Switch to construct.methodName
+        elif idlType == "attribute":
             if hasattr(construct.member, "rest"):
                 rest = construct.member.rest
             elif hasattr(construct.member, "attribute"):
@@ -836,14 +830,12 @@ class IDLMarker(object):
             if construct.default is not None:
                 value = escapeAttr("{0}".format(construct.default.value))
                 extraParameters += ' data-default="{0}"'.format(value)
-        else:
-            extraParameters = ''
 
         if idlType in config.typesUsingFor:
             idlFor = "data-idl-for='{0}'".format('/'.join(getForValues(construct.parent)))
         else:
             idlFor = ""
-        return ('<idl title="{0}" data-idl-type="{1}" {2} {3}>'.format(title, idlType, idlFor, extraParameters), '</idl>')
+        return ('<idl title="{0}" data-idl-type="{1}" {2} {3}>'.format(text, idlType, idlFor, extraParameters), '</idl>')
 
     def encode(self, text):
         return escapeHTML(text)
