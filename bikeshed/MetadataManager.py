@@ -275,11 +275,11 @@ class MetadataManager:
         macros["annotations"] = config.testAnnotationURL
         if doc and self.vshortname in doc.testSuites:
             macros["testsuite"] = doc.testSuites[self.vshortname]['vshortname']
-        if self.warning and self.warning[1] is not None:
+        if self.warning and len(self.warning) >= 2:
             macros["replacedby"] = self.warning[1]
-        if self.warning and self.warning[2] is not None:
+        if self.warning and len(self.warning) >= 3:
             macros["snapshotid"] = self.warning[2]
-        if self.warning and self.warning[3] is not None:
+        if self.warning and len(self.warning) >= 4:
             macros["snapshoturl"] = self.warning[3]
         macros["logo"] = self.logo
         # get GH repo from remote
