@@ -796,18 +796,6 @@ class IDLMarker(object):
         if construct.idlType not in config.idlTypes:
             return (None,None)
 
-        def getForValues(construct):
-            if construct.idlType in config.functionishTypes:
-                myForValue = construct.methodName
-            else:
-                myForValue = construct.name
-            if construct.parent:
-                forValues = getForValues(construct.parent)
-                forValues.append(myForValue)
-                return forValues
-            else:
-                return [myForValue]
-
         idlType = construct.idlType
         extraParameters = ''
         if idlType in config.functionishTypes:
@@ -832,7 +820,7 @@ class IDLMarker(object):
                 extraParameters += ' data-default="{0}"'.format(value)
 
         if idlType in config.typesUsingFor:
-            idlFor = "data-idl-for='{0}'".format('/'.join(getForValues(construct.parent)))
+            idlFor = "data-idl-for='{0}'".format(construct.fullName.rpartition("/")[0])
         else:
             idlFor = ""
         return ('<idl title="{0}" data-idl-type="{1}" {2} {3}>'.format(text, idlType, idlFor, extraParameters), '</idl>')
