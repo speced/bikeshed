@@ -232,7 +232,7 @@ def transformElementdef(lines, doc, **kwargs):
         if "Attributes" in parsedAttrs:
             atts = [x.strip() for x in parsedAttrs["Attributes"].split(",")]
             for att in atts:
-                html += "<li><a element-attr>{0}</a>".format(att)
+                html += "<li><a element-attr for='{1}'>{0}</a>".format(att, parsedAttrs.get("Name", ""))
         html += "</ul>"
         parsedAttrs["Attributes"] = html
 
