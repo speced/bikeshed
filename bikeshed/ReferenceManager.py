@@ -150,7 +150,7 @@ class ReferenceManager(object):
                         die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
                         continue
                 else:
-                    dfnFor = set(dfnFor.split())
+                    dfnFor = set(splitForValues(dfnFor))
                     encounteredError = False
                     for singleFor in dfnFor:
                         if self.getLocalRef(type, linkText, linkFor=singleFor):
@@ -501,3 +501,33 @@ def stripLineBreaks(obj):
         elif isinstance(val, dict) or isinstance(val, list):
             stripLineBreaks(val)
     return obj
+
+def splitForValues(forValues):
+    '''
+    Splits a string of 1+ "for" values into an array of individual value.
+    Respects function args, etc.
+    Currently, for values are separated by spaces.
+    '''
+    startIndex = 0
+    mode = "between"
+    arr = []
+    for i,c in enumerate(forValues):
+        if mode == "between":
+            if c.isspace():
+                continue
+            else:
+                mode = "in-for"
+                startIndex = i
+        elif mode == "in-args":
+            if c == ")":
+                mode = "in-for"
+        elif mode == "in-for":
+            if c == "(":
+                mode = "in-args"
+            elif c.isspace():
+                arr.append(forValues[startIndex:i])
+                mode = "between"
+            else:
+                continue
+    arr.append(forValues[startIndex:])
+    return arr
