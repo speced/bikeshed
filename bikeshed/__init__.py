@@ -800,7 +800,6 @@ class IDLMarker(object):
         extraParameters = ''
         if idlType in config.functionishTypes:
             text = construct.methodName
-            # TODO: Switch to construct.methodName
         elif idlType == "attribute":
             if hasattr(construct.member, "rest"):
                 rest = construct.member.rest
