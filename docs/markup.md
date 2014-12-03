@@ -138,8 +138,8 @@ The preprocessor will automatically convert it into:
 ~~~~
 
 
-Propdef table expansion
------------------------
+Property/descriptor/element definition table expansion
+------------------------------------------------------
 
 Propdef tables are rather large, even when correctly formatted.
 Instead, you can write the table in a simple text format similar to the spec's metadata block,
@@ -170,6 +170,22 @@ If you're defining a *partial* propdef or descdef
 (for example, just defining a few new values for an existing property),
 you can indicate this by adding a "partial" class to the `<pre>`.
 (This will prevent Bikeshed from complaining about lots of missing propdef/descdef lines.)
+
+The format of an elementdef table is a little different.  It can contain the following lines:
+
+* **Name** - the element name(s)
+* **Categories** - what "categories" the element is classified in, such as "flow content" or "graphics element".
+	These must be defined terms, as Bikeshed will attempt to link them.
+* **Contexts** - what contexts the element can be used in
+* **Content Model** - what kind of elements and other nodes can validly appear inside the element
+* **Attributes** - what attributes are defined for the element.
+	These must be defined (as `element-attr` definitions), as Bikeshed will attempt to link to them.
+* **Attribute Groups** - optional. If some attributes commonly appear on lots of elements, you can classify them into groups and list them here.
+	The group name must be defined as a `dfn` type definition,
+	with the attributes in the group defined as `element-attr` definitions with a `for` value of the group name.
+	Bikeshed will expand the group into a `<details>` element for you and automatically link the attributes.
+* **DOM Interfaces** - list the IDL interfaces that correspond to the elements defined in the block.
+	These must be defined (as `interface` definitions), as Bikeshed will attempt to link to them.
 
 
 Automatic ID Generation
