@@ -797,8 +797,8 @@ class IDLMarker(object):
             return (None,None)
 
         def getForValues(construct):
-            if construct.idlType in ("method", "constructor"):
-                myForValue = parser.Parser().normalizedMethodName(construct.name)
+            if construct.idlType in config.functionishTypes:
+                myForValue = construct.methodName
             else:
                 myForValue = construct.name
             if construct.parent:
@@ -810,8 +810,8 @@ class IDLMarker(object):
 
         idlType = construct.idlType
         extraParameters = ''
-        if idlType in ("constructor", "method"):
-            text = parser.Parser().normalizedMethodName(text)
+        if idlType in config.functionishTypes:
+            text = construct.methodName
             # TODO: Switch to construct.methodName
         elif idlType == "attribute":
             if hasattr(construct.member, "rest"):
