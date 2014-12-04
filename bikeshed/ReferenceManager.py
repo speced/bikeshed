@@ -226,7 +226,6 @@ class ReferenceManager(object):
                         break
 
         # Get the relevant refs
-        #refs = filterRefsByTypeAndText(self.refs, linkType, text, error)
         refs = self.queryRefs(text=text, linkType=linkType)
         if len(refs) == 0:
             if spec and spec in self.anchorMacros:
