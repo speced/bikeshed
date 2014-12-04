@@ -784,15 +784,22 @@ def addSelfLinks(doc):
 
 class IDLMarker(object):
     def markupConstruct(self, text, construct):
+        # Fires for every 'construct' in the WebIDL.
+        # Some things are "productions", not "constructs".
         return (None, None)
 
     def markupType(self, text, construct):
+        # Fires for "types", but dunno what this is used for.
+        # It includes things like whole unions, or whole parametrized type statements.
+        # Think it's probably everything that matches the "type" grammar in WebIDL.
         return (None, None)
 
     def markupTypeName(self, text, construct):
+        # Fires for non-defining type names, such as arg types.
         return ('<a data-link-type="idl-name">', '</a>')
 
     def markupName(self, text, construct):
+        # Fires for defining names: method names, arg names, interface names, etc.
         if construct.idlType not in config.idlTypes:
             return (None,None)
 
