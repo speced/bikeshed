@@ -378,7 +378,7 @@ class ReferenceManager(object):
         else:
             refs = list(refsIterator(self.refs))
         if spec:
-            refs = [x for x in refs if x.spec == spec]
+            refs = [x for x in refs if x.spec == spec or x.shortname == spec]
         if linkType:
             if linkType in config.dfnTypes:
                 linkTypes = [linkType]
