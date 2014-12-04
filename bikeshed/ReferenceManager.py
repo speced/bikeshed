@@ -219,7 +219,7 @@ class ReferenceManager(object):
 
         # Take defaults into account
         if (not spec or not status):
-            variedTexts = [v for v in linkTextVariations(text) if v in self.defaultSpecs]
+            variedTexts = [v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs]
             if variedTexts:
                 for dfnSpec, dfnType, dfnStatus, dfnFor in self.defaultSpecs[variedTexts[0]]:
                     if dfnType in config.linkTypeToDfnType[linkType]:
@@ -374,7 +374,7 @@ class ReferenceManager(object):
             if exact:
                 texts = [text]
             else:
-                texts = linkTextVariations(text)
+                texts = linkTextVariations(text, linkType)
             refs = textRefsIterator(self.refs, texts)
         else:
             refs = refsIterator(self.refs)
@@ -406,78 +406,81 @@ def linkTextsFromElement(el, preserveCasing=False):
         return [t.lower() for t in texts]
 
 
-def linkTextVariations(str):
+def linkTextVariations(str, linkType):
     # Generate intelligent variations of the provided link text,
     # so explicitly adding a title attr isn't usually necessary.
     yield str
 
-    # Berries <-> Berry
-    if str[-3:] == "ies":
-        yield str[:-3] + "y"
-    if str[-1:] == "y":
-        yield str[:-1] + "ies"
+    if linkType == "dfn":
+        # Berries <-> Berry
+        if str[-3:] == "ies":
+            yield str[:-3] + "y"
+        if str[-1:] == "y":
+            yield str[:-1] + "ies"
 
-    # Blockified <-> Blockify
-    if str[-3:] == "ied":
-        yield str[:-3] + "y"
-    if str[-1:] == "y":
-        yield str[:-1] + "ied"
+        # Blockified <-> Blockify
+        if str[-3:] == "ied":
+            yield str[:-3] + "y"
+        if str[-1:] == "y":
+            yield str[:-1] + "ied"
 
-    # Zeroes <-> Zero
-    if str[-2:] == "es":
-        yield str[:-2]
-    else:
-        yield str + "es"
+        # Zeroes <-> Zero
+        if str[-2:] == "es":
+            yield str[:-2]
+        else:
+            yield str + "es"
 
-    # Bikeshed's <-> Bikeshed
-    if str[-2:] == "'s" or str[-2:] == "’s":
-        yield str[:-2]
-    else:
-        yield str + "'s"
+        # Bikeshed's <-> Bikeshed
+        if str[-2:] == "'s" or str[-2:] == "’s":
+            yield str[:-2]
+        else:
+            yield str + "'s"
 
-    # Bikesheds <-> Bikeshed
-    if str[-1:] == "s":
-        yield str[:-1]
-    else:
-        yield str + "s"
+        # Bikesheds <-> Bikeshed
+        if str[-1:] == "s":
+            yield str[:-1]
+        else:
+            yield str + "s"
 
-    # Bikesheds <-> Bikesheds'
-    if str[-1:] == "'" or str[-1:] == "’":
-        yield str[:-1]
-    else:
-        yield str + "'"
+        # Bikesheds <-> Bikesheds'
+        if str[-1:] == "'" or str[-1:] == "’":
+            yield str[:-1]
+        else:
+            yield str + "'"
 
-    # Bikesheded (bikeshod?) <-> Bikeshed
-    if str[-2:] == "ed":
-        yield str[:-2]
-    else:
-        yield str + "ed"
+        # Bikesheded (bikeshod?) <-> Bikeshed
+        if str[-2:] == "ed":
+            yield str[:-2]
+        else:
+            yield str + "ed"
 
-    # Navigating <-> Navigate
-    if str[-3:] == "ing":
-        yield str[:-3]
-        yield str[:-3]+"e"
-    elif str[-1:] == "e":
-        yield str[:-1] + "ing"
-    else:
-        yield str + "ing"
+        # Navigating <-> Navigate
+        if str[-3:] == "ing":
+            yield str[:-3]
+            yield str[:-3]+"e"
+        elif str[-1:] == "e":
+            yield str[:-1] + "ing"
+        else:
+            yield str + "ing"
+
+    if linkType in config.functionishTypes:
+        # Allow a foo(bar) method to be linkified with foo()
+        yield str[:str.find("(")] + "()"
 
 def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
     '''Filter by type/text to find all the candidate refs'''
 
     if linkType in config.dfnTypes:
         linkTypes = [linkType]
-        linkTexts = [linkText]
     elif linkType == "dfn":
         linkTypes = ["dfn"]
-        linkTexts = linkTextVariations(linkText)
     elif linkType in config.linkTypeToDfnType:
         linkTypes = config.linkTypeToDfnType[linkType]
-        linkTexts = [linkText]
     else:
         if error:
             die("Unknown link type '{0}'.",linkType)
         return None
+    linkTexts = linkTextVariations(linkText, linkType)
 
     refs = []
     for linkText in linkTexts:
