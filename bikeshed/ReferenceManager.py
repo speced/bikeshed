@@ -357,7 +357,9 @@ class ReferenceManager(object):
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
         return biblio.BiblioEntry(preferredURL=status, **candidates[0])
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, exact=True, **kwargs):
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, exact=True, refs=None, **kwargs):
+        if refs is None:
+            refs = self.refs
         def refsIterator(refs):
             # Turns a dict of arrays of refs into an iterator of refs
             for key, group in refs.items():
