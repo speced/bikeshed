@@ -874,11 +874,14 @@ def processIDL(doc):
         forcedDfns = GlobalNames(text=treeAttr(pre, "data-dfn-force"))
         for el in findAll("idl", pre):
             idlType = el.get('data-idl-type')
-            idlText = el.get('title')
-            url = doc.refs.getRef(idlType, idlText.lower(),
-                                  linkFor=el.get('data-idl-for'),
-                                  el=el,
-                                  error=False)
+            url = None
+            for idlText in el.get('title').split('|'):
+                url = doc.refs.getRef(idlType, idlText.lower(),
+                                      linkFor=el.get('data-idl-for'),
+                                      el=el,
+                                      error=False)
+                if url:
+                    break
             globalNames = GlobalNames.fromEl(el)
             el.set("data-global-name", str(globalNames))
             if url is None or globalNames.matches(forcedDfns):
@@ -891,6 +894,7 @@ def processIDL(doc):
             else:
                 el.tag = "a"
                 el.set('data-link-type', idlType)
+                el.set('title', idlText)
                 del el.attrib['data-idl-type']
                 if el.get('data-idl-for'):
                     el.set('data-link-for', el.get('data-idl-for'))
