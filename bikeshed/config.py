@@ -127,6 +127,9 @@ class HierarchicalNumber(object):
     def __json__(self):
         return self.originalVal
 
+    def __repr__(self):
+        return "HierarchicalNumber("+repr(self.originalVal)+")"
+
 def intersperse(iterable, delimiter):
     it = iter(iterable)
     yield next(it)
