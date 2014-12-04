@@ -6,8 +6,8 @@ from collections import defaultdict
 from functools import total_ordering
 from .messages import *
 
-debug = False
-quiet = False
+debug = True
+quiet = True
 dryRun = False
 minify = True
 scriptPath = unicode(os.path.dirname(os.path.realpath(__file__)), encoding="utf-8")
