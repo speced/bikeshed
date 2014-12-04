@@ -4,6 +4,7 @@ import re
 import json
 import io
 import collections
+import copy
 from collections import defaultdict
 from operator import itemgetter
 from . import config
@@ -140,7 +141,7 @@ class ReferenceManager(object):
             if hasClass(el, "no-ref"):
                 continue
             for linkText in linkTextsFromElement(el):
-                linkText = unfixTypography(linkText)
+                linkText = unfixTypography(linkText).lower()
                 linkText = re.sub("\s+", " ", linkText)
                 type = treeAttr(el, 'data-dfn-type')
                 dfnFor = treeAttr(el, 'data-dfn-for')
@@ -182,11 +183,7 @@ class ReferenceManager(object):
                     self.refs[linkText].append(ref)
 
     def getLocalRef(self, linkType, text, linkFor=None, el=None):
-        refs = filterRefsByTypeAndText(self.refs, linkType, text)
-        refs = [ref for ref in refs if ref['status'] == "local"]
-        if linkFor:
-            refs = [ref for ref in refs if linkFor in ref['for']]
-        return refs
+        return list(self.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor))
 
     def getRef(self, linkType, text, spec=None, status=None, linkFor=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a url or None
@@ -207,15 +204,15 @@ class ReferenceManager(object):
         # Local refs always get precedence, no matter what.
         localRefs = self.getLocalRef(linkType, text, linkFor, el)
         if len(localRefs) == 1:
-            return localRefs[0]['url']
+            return localRefs[0].url
         elif len(localRefs) > 1:
             if error:
                 warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
                      linkType,
                      text,
-                     localRefs[0]['type'],
-                     "' or '".join(localRefs[0]['for']))
-            return localRefs[0]['url']
+                     localRefs[0].type,
+                     "' or '".join(localRefs[0].for_))
+            return localRefs[0].url
 
         # Take defaults into account
         if (not spec or not status):
@@ -229,18 +226,19 @@ class ReferenceManager(object):
                         break
 
         # Get the relevant refs
-        refs = filterRefsByTypeAndText(self.refs, linkType, text, error)
+        #refs = filterRefsByTypeAndText(self.refs, linkType, text, error)
+        refs = self.queryRefs(text=text, linkType=linkType)
         if len(refs) == 0:
             if spec and spec in self.anchorMacros:
                 # If there's a macro registered for this spec, use it to generate a ref.
-                return anchorMacros[spec]['url'] + config.simplifyText(text)
+                return anchorMacros[spec].url + config.simplifyText(text)
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}'.", linkType, text)
             return None
 
         # Unless you've specified a particular spec to look in, cut out all non-exported things.
         if not spec:
-            refs = [ref for ref in refs if ref['export']]
+            refs = [ref for ref in refs if ref.export]
         if len(refs) == 0:
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' that are marked for export.", linkType, text)
@@ -248,7 +246,7 @@ class ReferenceManager(object):
 
         # If spec is specified, kill anything that doesn't match
         if spec:
-            refs = [ref for ref in refs if ref['shortname'].lower() == spec.lower() or ref['spec'].lower() ==spec.lower()]
+            refs = [ref for ref in refs if ref.shortname.lower() == spec.lower() or ref.spec.lower() ==spec.lower()]
         if len(refs) == 0:
             # If there's a macro registered for this spec, use it to generate a ref.
             if spec in self.anchorMacros:
@@ -259,7 +257,7 @@ class ReferenceManager(object):
 
         # If linkFor is specified, kill anything that doesn't match
         if linkFor:
-            refs = [ref for ref in refs if linkFor in ref['for']]
+            refs = [ref for ref in refs if linkFor in ref.for_]
         if len(refs) == 0:
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
@@ -267,11 +265,11 @@ class ReferenceManager(object):
 
         # If status is ED, kill TR refs unless their spec *only* has a TR url
         if status.strip() == "ED":
-            refs = [ref for ref in refs if ref['status'].strip() == "ED" or (ref['status'].strip() == "TR" and self.specs.get(ref['spec'],{}).get('ED') is None)]
+            refs = [ref for ref in refs if ref.status.strip() == "ED" or (ref.status.strip() == "TR" and self.specs.get(ref.spec,{}).get('ED') is None)]
         # If status is TR, kill ED refs if there's a corresponding TR ref for the same spec.
         if status.strip() == "TR":
-            TRRefSpecs = [ref['spec'] for ref in refs if ref['status'].strip() == 'TR']
-            refs = [ref for ref in refs if ref['status'].strip() == "TR" or (ref['status'].strip() == "ED") and ref['spec'] not in TRRefSpecs]
+            TRRefSpecs = [ref.spec for ref in refs if ref.status.strip() == 'TR']
+            refs = [ref for ref in refs if ref.status.strip() == "TR" or (ref.status.strip() == "ED") and ref.spec not in TRRefSpecs]
         if len(refs) == 0:
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
@@ -284,7 +282,7 @@ class ReferenceManager(object):
             if spec in moreIgnores:
                 return True
             return False
-        possibleSpecs = set(ref['spec'] for ref in refs)
+        possibleSpecs = set(ref.spec for ref in refs)
         moreIgnores = set()
         # All the individual CSS specs replace SVG.
         if bool(possibleSpecs.intersection(self.css21Replacements)):
@@ -298,7 +296,7 @@ class ReferenceManager(object):
         # SVG2 replaces SVG1
         if "svg2" in possibleSpecs:
             moreIgnores.add("svg")
-        refs = [ref for ref in refs if not ignoredSpec(ref['spec'], moreIgnores)]
+        refs = [ref for ref in refs if not ignoredSpec(ref.spec, moreIgnores)]
 
         # At this point, all the filtering is done.
         # We won't error out due to no refs being found past this point,
@@ -310,20 +308,20 @@ class ReferenceManager(object):
 
         if len(refs) == 1:
             # Success!
-            return refs[0]['url']
+            return refs[0].url
 
         # If all the refs are for the same shortname,
         # assume you want to link to the latest one (highest level).
-        if all(ref['shortname'] == refs[0]['shortname'] for ref in refs):
+        if all(ref.shortname == refs[0].shortname for ref in refs):
             maxLevel = config.HierarchicalNumber("-1")
             for ref in refs:
-                if ref['level'] > maxLevel:
-                    maxLevel = ref['level']
-            leveledRefs = [ref for ref in refs if ref['level'] == maxLevel]
+                if ref.level > maxLevel:
+                    maxLevel = ref.level
+            leveledRefs = [ref for ref in refs if ref.level == maxLevel]
             # Still potentially possible for a non-Bikeshed spec to have duplicate refs here,
             # so I have to check for singularity.
             if len(leveledRefs) == 1:
-                return leveledRefs[0]['url']
+                return leveledRefs[0].url
 
         # If we hit this point, there are >1 possible refs to choose from.
         # Default to linking to the first one.
@@ -331,16 +329,16 @@ class ReferenceManager(object):
         if linkType == "propdesc":
             # If both props and descs are possible, default to prop.
             for ref in refs:
-                if ref['type'] == "property":
+                if ref.type == "property":
                     defaultRef = ref
                     break
         if error:
             warn("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into 'Link Defaults':\n{3}",
                  linkType,
                  text,
-                 defaultRef['spec'],
-                 '\n'.join('    {2} ({1}) {0}'.format(text, ref['type'], ref['spec']) for ref in refs))
-        return defaultRef['url']
+                 defaultRef.spec,
+                 '\n'.join('    {2} ({1}) {0}'.format(text, ref.type, ref.spec) for ref in refs))
+        return defaultRef.url
 
     def getBiblioRef(self, text, status, el=None):
         key = text.lower()
@@ -357,37 +355,46 @@ class ReferenceManager(object):
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
         return biblio.BiblioEntry(preferredURL=status, **candidates[0])
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, exact=True, refs=None, **kwargs):
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, refs=None, **kwargs):
         if refs is None:
             refs = self.refs
+        debug = text.lower() == "fontfaceset"
         def refsIterator(refs):
             # Turns a dict of arrays of refs into an iterator of refs
             for key, group in refs.items():
                 for ref in group:
-                    yield key,ref
+                    yield RefWrapper(key, ref)
         def textRefsIterator(refs, texts):
             # Same as above, but only grabs those keyed to a given text
             for text in texts:
+                text = text.lower()
+
                 for ref in self.refs.get(text, []):
-                    yield text, ref
+                    yield RefWrapper(text, ref)
                 for ref in self.refs.get(text+"\n", []):
-                    yield text, ref
+                    yield RefWrapper(text, ref)
         if text:
-            if exact:
-                texts = [text]
-            else:
-                texts = linkTextVariations(text, linkType)
-            refs = textRefsIterator(self.refs, texts)
+            refs = list(textRefsIterator(self.refs, linkTextVariations(text, linkType)))
         else:
-            refs = refsIterator(self.refs)
+            refs = list(refsIterator(self.refs))
         if spec:
-            refs = (x for x in refs if x[1]['spec'] in (spec, spec+"\n"))
+            refs = [x for x in refs if x.spec == spec]
         if linkType:
-            refs = (x for x in refs if x[1]['type'] in (linkType, linkType+"\n"))
+            if linkType in config.dfnTypes:
+                linkTypes = [linkType]
+            elif linkType == "dfn":
+                linkTypes = ["dfn"]
+            elif linkType in config.linkTypeToDfnType:
+                linkTypes = list(config.linkTypeToDfnType[linkType])
+            else:
+                if error:
+                    die("Unknown link type '{0}'.",linkType)
+                return []
+            refs = [x for x in refs if x.type in linkTypes]
         if status:
-            refs = (x for x in refs if x[1]['status'] in (status, status+"\n"))
+            refs = [x for x in refs if x.status == status]
         if linkFor:
-            refs = (x for x in refs if linkFor in x[1]['for'] or (linkFor+"\n") in x[1]['for'])
+            refs = [x for x in refs if linkFor in x.for_]
         return refs
 
 
@@ -469,33 +476,6 @@ def linkTextVariations(str, linkType):
         # Allow a foo(bar) method to be linkified with foo()
         yield str[:str.find("(")] + "()"
 
-def filterRefsByTypeAndText(allRefs, linkType, linkText, error=False):
-    '''Filter by type/text to find all the candidate refs'''
-
-    if linkType in config.dfnTypes:
-        linkTypes = [linkType]
-    elif linkType == "dfn":
-        linkTypes = ["dfn"]
-    elif linkType in config.linkTypeToDfnType:
-        linkTypes = config.linkTypeToDfnType[linkType]
-    else:
-        if error:
-            die("Unknown link type '{0}'.",linkType)
-        return None
-    linkTexts = linkTextVariations(linkText, linkType)
-
-    refs = []
-    for linkText in linkTexts:
-        if linkText in allRefs:
-            refs.extend(allRefs[linkText])
-        if linkText+"\n" in allRefs:
-            refs.extend(allRefs[linkText+"\n"])
-    stripLineBreaks(refs)
-    return [ref for ref in refs if ref['type'] in linkTypes]
-
-
-
-
 def stripLineBreaks(obj):
     it = obj.items() if isinstance(obj, dict) else enumerate(obj)
     for key, val in it:
@@ -536,3 +516,28 @@ def splitForValues(forValues):
                 continue
     arr.append(forValues[startIndex:])
     return arr
+
+
+class RefWrapper(object):
+    # Refs don't contain their own name, so I don't have to copy as much when there are multiple linkTexts
+    # This wraps that, producing an object that looks like it has a text property.
+    # It also makes all the ref dict keys look like object attributes.
+    def __init__(self, text, ref):
+        self.text = text
+        self.ref = stripLineBreaks(ref)
+
+    def __getattr__(self, name):
+        if name == "for_":
+            name = "for"
+        val = self.ref[name]
+        if isinstance(val, basestring):
+            val = val.strip()
+        return val
+
+    def __json__(self):
+        refCopy = copy.copy(self.ref)
+        refCopy['text'] = self.text
+        return refCopy
+
+    def __repr__(self):
+        return "RefWrapper("+repr(self.text)+", "+repr(self.ref)+")"
