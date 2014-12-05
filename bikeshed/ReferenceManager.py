@@ -482,9 +482,6 @@ def linkTextVariations(str, linkType):
         else:
             yield str + "ing"
 
-    if linkType in config.functionishTypes:
-        # Allow a foo(bar) method to be linkified with foo()
-        yield str[:str.find("(")] + "()"
 
 def stripLineBreaks(obj):
     it = obj.items() if isinstance(obj, dict) else enumerate(obj)
