@@ -183,7 +183,7 @@ class ReferenceManager(object):
                     self.refs[linkText].append(ref)
 
     def getLocalRef(self, linkType, text, linkFor=None, el=None):
-        return list(self.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor))
+        return self.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor)[0]
 
     def getRef(self, linkType, text, spec=None, status=None, linkFor=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a url or None
@@ -226,83 +226,44 @@ class ReferenceManager(object):
                         break
 
         # Get the relevant refs
-        refs = self.queryRefs(text=text, linkType=linkType)
-        if len(refs) == 0:
+        if spec is None:
+            export = True
+        else:
+            export = None
+        refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor=linkFor, export=export, ignoreObsoletes=True)
+
+        if failure == "text" or failure == "type":
             if spec and spec in self.anchorMacros:
                 # If there's a macro registered for this spec, use it to generate a ref.
                 return anchorMacros[spec].url + config.simplifyText(text)
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}'.", linkType, text)
             return None
-
-        # Unless you've specified a particular spec to look in, cut out all non-exported things.
-        if not spec:
-            refs = [ref for ref in refs if ref.export]
-        if len(refs) == 0:
+        elif failure == "export":
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' that are marked for export.", linkType, text)
             return None
-
-        # If spec is specified, kill anything that doesn't match
-        if spec:
-            refs = [ref for ref in refs if ref.shortname.lower() == spec.lower() or ref.spec.lower() ==spec.lower()]
-        if len(refs) == 0:
+        elif failure == "spec":
             # If there's a macro registered for this spec, use it to generate a ref.
             if spec in self.anchorMacros:
                 return anchorMacros[spec]['url'] + config.simplifyText(text)
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec)
             return None
-
-        # If linkFor is specified, kill anything that doesn't match
-        if linkFor:
-            refs = [ref for ref in refs if linkFor in ref.for_]
-        if len(refs) == 0:
+        elif failure == "for":
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
             return None
-
-        # If status is ED, kill TR refs unless their spec *only* has a TR url
-        if status.strip() == "ED":
-            refs = [ref for ref in refs if ref.status.strip() == "ED" or (ref.status.strip() == "TR" and self.specs.get(ref.spec,{}).get('ED') is None)]
-        # If status is TR, kill ED refs if there's a corresponding TR ref for the same spec.
-        if status.strip() == "TR":
-            TRRefSpecs = [ref.spec for ref in refs if ref.status.strip() == 'TR']
-            refs = [ref for ref in refs if ref.status.strip() == "TR" or (ref.status.strip() == "ED") and ref.spec not in TRRefSpecs]
-        if len(refs) == 0:
+        elif failure == "status":
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
             return None
-
-        # Remove any ignored or obsoleted specs
-        def ignoredSpec(spec, moreIgnores=set()):
-            if spec in self.ignoredSpecs:
-                return True
-            if spec in moreIgnores:
-                return True
-            return False
-        possibleSpecs = set(ref.spec for ref in refs)
-        moreIgnores = set()
-        # All the individual CSS specs replace SVG.
-        if bool(possibleSpecs.intersection(self.css21Replacements)):
-            moreIgnores.add("css21")
-            moreIgnores.add("svg")
-            moreIgnores.add("svg2")
-        # CSS21 also replaces SVG
-        if "css21" in possibleSpecs:
-            moreIgnores.add("svg")
-            moreIgnores.add("svg2")
-        # SVG2 replaces SVG1
-        if "svg2" in possibleSpecs:
-            moreIgnores.add("svg")
-        refs = [ref for ref in refs if not ignoredSpec(ref.spec, moreIgnores)]
-
-        # At this point, all the filtering is done.
-        # We won't error out due to no refs being found past this point,
-        # only for there being *too many* refs.
-        if len(refs) == 0:
+        elif failure == "ignored-specs":
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}':\n{2}", linkType, text, outerHTML(el))
+            return None
+        elif failure:
+            die("Programming error - I'm not catching '{0}'-type link failures. Please report!", failure)
             return None
 
         if len(refs) == 1:
@@ -354,10 +315,11 @@ class ReferenceManager(object):
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
         return biblio.BiblioEntry(preferredURL=status, **candidates[0])
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, refs=None, **kwargs):
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, refs=None, export=None, ignoreObsoletes=False, **kwargs):
+        # Query the ref database.
+        # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         if refs is None:
             refs = self.refs
-        debug = text.lower() == "fontfaceset"
         def refsIterator(refs):
             # Turns a dict of arrays of refs into an iterator of refs
             for key, group in refs.items():
@@ -368,16 +330,18 @@ class ReferenceManager(object):
             for text in texts:
                 text = text.lower()
 
-                for ref in self.refs.get(text, []):
+                for ref in refs.get(text, []):
                     yield RefWrapper(text, ref)
-                for ref in self.refs.get(text+"\n", []):
+                for ref in refs.get(text+"\n", []):
                     yield RefWrapper(text, ref)
+
         if text:
-            refs = list(textRefsIterator(self.refs, linkTextVariations(text, linkType)))
+            refs = list(textRefsIterator(refs, linkTextVariations(text, linkType)))
         else:
-            refs = list(refsIterator(self.refs))
-        if spec:
-            refs = [x for x in refs if x.spec == spec or x.shortname == spec]
+            refs = list(refsIterator(refs))
+        if not refs:
+            return refs, "text"
+
         if linkType:
             if linkType in config.dfnTypes:
                 linkTypes = [linkType]
@@ -390,11 +354,58 @@ class ReferenceManager(object):
                     die("Unknown link type '{0}'.",linkType)
                 return []
             refs = [x for x in refs if x.type in linkTypes]
-        if status:
-            refs = [x for x in refs if x.status == status]
+        if not refs:
+            return refs, "type"
+
+        if export is not None:
+            refs = [x for x in refs if x.export == export]
+        if not refs:
+            return refs, "export"
+
+        if spec:
+            refs = [x for x in refs if x.spec == spec or x.shortname == spec]
+        if not refs:
+            return refs, "spec"
+
         if linkFor:
             refs = [x for x in refs if linkFor in x.for_]
-        return refs
+        if not refs:
+            return refs, "for"
+
+        if status:
+            # If status is ED, kill TR refs unless their spec *only* has a TR url
+            if status == "ED":
+                refs = [ref for ref in refs if ref.status == "ED" or (ref.status == "TR" and self.specs.get(ref.spec,{}).get('ED') is None)]
+            # If status is TR, kill ED refs if there's a corresponding TR ref for the same spec.
+            elif status == "TR":
+                TRRefSpecs = [ref.spec for ref in refs if ref.status == 'TR']
+                refs = [ref for ref in refs if ref.status == "TR" or (ref.status == "ED") and ref.spec not in TRRefSpecs]
+            else:
+                refs = [x for x in refs if x.status == status]
+        if not refs:
+            return refs, "status"
+
+        if ignoreObsoletes:
+            # Remove any ignored or obsoleted specs
+            possibleSpecs = set(ref.spec for ref in refs)
+            moreIgnores = set()
+            # All the individual CSS specs replace SVG.
+            if bool(possibleSpecs.intersection(self.css21Replacements)):
+                moreIgnores.add("css21")
+                moreIgnores.add("svg")
+                moreIgnores.add("svg2")
+            # CSS21 also replaces SVG
+            if "css21" in possibleSpecs:
+                moreIgnores.add("svg")
+                moreIgnores.add("svg2")
+            # SVG2 replaces SVG1
+            if "svg2" in possibleSpecs:
+                moreIgnores.add("svg")
+            refs = [ref for ref in refs if ref.spec not in self.ignoredSpecs and ref.spec not in moreIgnores]
+        if not refs:
+            return refs, "ignored-specs"
+
+        return refs, None
 
 
 def linkTextsFromElement(el, preserveCasing=False):
