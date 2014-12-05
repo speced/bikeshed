@@ -232,6 +232,21 @@ class ReferenceManager(object):
             export = None
         refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor=linkFor, export=export, ignoreObsoletes=True)
 
+        if failure and linkType in config.idlMethodTypes and text.endswith("()"):
+            # Allow foo(bar) to be linked to with just foo(), but only if it's completely unambiguous.
+            textPrefix = text[:-1]
+            candidates, _ = self.queryRefs(linkType=linkType, status="local", linkFor=linkFor)
+            urls = list(set(c.url for c in candidates if c.text.startswith(textPrefix)))
+            if len(urls) == 1:
+                return urls[0]
+            # And repeat for non-locals
+            candidates, _ = self.queryRefs(linkType=linkType, spec=spec, status=status, linkFor=linkFor, export=export, ignoreObsoletes=True)
+            urls = list(set(c for c in candidates if c.text.startswith(textPrefix)))
+            if len(urls) == 1:
+                return urls[0]
+            if zeroRefsError:
+                die("Too many possible '{0}' targets to disambiguate. Please specify the names of the required args, like 'foo(bar, baz)'.", text)
+
         if failure == "text" or failure == "type":
             if spec and spec in self.anchorMacros:
                 # If there's a macro registered for this spec, use it to generate a ref.
