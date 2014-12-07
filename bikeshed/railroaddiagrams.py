@@ -370,8 +370,8 @@ class TextDiagramItem(DiagramItem):
         DiagramItem.__init__(self, 'g')
         self.raw = "raw" in prelude.split()
 
-    def _textWidth(self, text):
-        return (len(self._stripTextMarkup(text)) * CHARACTER_ADVANCE) + 20
+    def _textWidth(self, text, advance = CHARACTER_ADVANCE, padding = 20):
+        return (len(self._stripTextMarkup(text)) * advance) + padding
 
 
 class Terminal(TextDiagramItem):
@@ -431,7 +431,7 @@ class Comment(TextDiagramItem):
         TextDiagramItem.__init__(self, prelude)
         self.text = text
         self.prelude = prelude
-        self.width = len(text) * 7 + 10
+        self.width = self._textWidth(text, 7, 10)
         self.up = 11
         self.down = 11
         self.needsSpace = True
