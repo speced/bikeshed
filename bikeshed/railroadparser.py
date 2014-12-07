@@ -137,14 +137,14 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
     elif command in ("Plus", "OneOrMore"):
         if prelude:
             return die("Line {0} - OneOrMore commands cannot have preludes.", line)
-        if 0 == len(children) > 2:
+        if (not children) or (2 < len(children)):
             return die("Line {0} - OneOrMore commands must have one or two children.", line)
         children = filter(None, [_createDiagram(**child) for child in children])
         return rr.OneOrMore(*children)
     elif command in ("Star", "ZeroOrMore"):
         if prelude:
             return die("Line {0} - ZeroOrMore commands cannot have preludes.", line)
-        if 0 == len(children) > 2:
+        if (not children) or (2 < len(children)):
             return die("Line {0} - ZeroOrMore commands must have one or two children.", line)
         children = filter(None, [_createDiagram(**child) for child in children])
         return rr.ZeroOrMore(*children)

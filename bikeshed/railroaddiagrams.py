@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
+import re
 # Display constants
 VERTICAL_SEPARATION = 8
 ARC_RADIUS = 10
@@ -40,20 +41,46 @@ class DiagramItem(object):
         parent.children.append(self)
         return self
 
-    def writeSvg(self, write, raw=None):
+    def _stripTextMarkup(self, text):
+        match = re.match(r'(.*)\[([^\]]+)\](\(([^\)]+)\))?(.*)', text)
+        if (match):
+            return self._stripTextMarkup(match.group(1)) + match.group(2) + match.group(5)
+        return text
+        
+    def _processText(self, text, raw):
+        match = re.match(r'(.*)\[([^\]]+)\](\(([^\)]+)\))?(.*)', text)
+        if (match):
+            return (self._processText(match.group(1), raw) + 
+                    '<a xlink:href="' + e(match.group(4) if (match.group(4)) else match.group(2)) + '">' +
+                    match.group(2) + '</a>' + self._processText(match.group(5), raw))
+        return text if (raw) else e(text)
+        
+    def writeSvg(self, write, raw=None, indent=''):
+        if (indent):
+            write(indent)
         if raw is None and self.raw is not None:
             raw = self.raw
         write('<{0}'.format(self.name))
         for name, value in sorted(self.attrs.items()):
             write(' {0}="{1}"'.format(name, e(value)))
-        write('>\n')
-        for child in self.children:
-            if isinstance(child, DiagramItem):
-                child.writeSvg(write, raw)
-            elif raw:
-                write(child)
+        write('>')
+        if (self.children):
+            if (indent is not None):
+                write('\n')
+                childIndent = indent + '  '
             else:
-                write(e(child))
+                childIndent = None
+            for child in self.children:
+                if isinstance(child, DiagramItem):
+                    child.writeSvg(write, raw, childIndent)
+                else:
+                    if (childIndent):
+                        write(childIndent)
+                    write(self._processText(child, raw))
+                if (indent is not None):
+                    write('\n')
+            if (indent):
+                write(indent)
         write('</{0}>'.format(self.name))
 
 
@@ -106,7 +133,9 @@ def wrapString(value):
 
 class Diagram(DiagramItem):
     def __init__(self, *items):
-        DiagramItem.__init__(self, 'svg', {'class': DIAGRAM_CLASS})
+        DiagramItem.__init__(self, 'svg', {'class': DIAGRAM_CLASS, 
+                                           'xmlns': 'http://www.w3.org/2000/svg', 
+                                           'xmlns:xlink': 'http://www.w3.org/1999/xlink'})
         self.items = [Start()] + [wrapString(item) for item in items] + [End()]
         self.width = 1 + sum(item.width + (20 if item.needsSpace else 0)
                              for item in self.items)
@@ -143,10 +172,10 @@ class Diagram(DiagramItem):
         return self
 
 
-    def writeSvg(self, write):
+    def writeSvg(self, write, raw=None, indent=''):
         if not self.formatted:
             self.format()
-        return DiagramItem.writeSvg(self, write)
+        return DiagramItem.writeSvg(self, write, raw, indent)
 
 
 class Sequence(DiagramItem):
@@ -340,13 +369,16 @@ class TextDiagramItem(DiagramItem):
         DiagramItem.__init__(self, 'g')
         self.raw = "raw" in prelude.split()
 
+    def _textWidth(self, text):
+        return (len(self._stripTextMarkup(text)) * CHARACTER_ADVANCE) + 20
+
 
 class Terminal(TextDiagramItem):
     def __init__(self, text, prelude=""):
         TextDiagramItem.__init__(self, prelude)
         self.text = text
         self.prelude = prelude
-        self.width = len(text) * CHARACTER_ADVANCE + 20
+        self.width = self._textWidth(text)
         self.up = 11
         self.down = 11
         self.needsSpace = True
@@ -372,7 +404,7 @@ class NonTerminal(TextDiagramItem):
         TextDiagramItem.__init__(self, prelude)
         self.text = text
         self.prelude = prelude
-        self.width = len(text) * CHARACTER_ADVANCE + 20
+        self.width = self._textWidth(text)
         self.up = 11
         self.down = 11
         self.needsSpace = True
