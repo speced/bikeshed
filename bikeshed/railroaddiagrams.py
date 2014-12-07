@@ -48,11 +48,12 @@ class DiagramItem(object):
         return text
         
     def _processText(self, text, raw):
-        match = re.match(r'(.*)\[([^\]]+)\](\(([^\)]+)\))?(.*)', text)
+        match = re.match(r'(.*)\[([^\]]+)\](\(([^\s]+)\s*([^\)]*)\))?(.*)', text)
         if (match):
             return (self._processText(match.group(1), raw) + 
-                    '<a xlink:href="' + e(match.group(4) if (match.group(4)) else match.group(2)) + '">' +
-                    match.group(2) + '</a>' + self._processText(match.group(5), raw))
+                    '<a xlink:href="' + e(match.group(4) if (match.group(4)) else match.group(2)) + '"' +
+                    ((' title="' + e(match.group(5)) + '"') if (match.group(5)) else '') + '>' + 
+                    self._processText(match.group(2), raw) + '</a>' + self._processText(match.group(6), raw))
         return text if (raw) else e(text)
         
     def writeSvg(self, write, raw=None, indent=''):
