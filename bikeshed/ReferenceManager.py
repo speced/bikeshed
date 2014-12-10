@@ -246,6 +246,8 @@ class ReferenceManager(object):
                 return urls[0]
             if zeroRefsError:
                 die("Too many possible '{0}' targets to disambiguate. Please specify the names of the required args, like 'foo(bar, baz)'.", text)
+            return None
+
 
         if failure == "text" or failure == "type":
             if spec and spec in self.anchorMacros:
