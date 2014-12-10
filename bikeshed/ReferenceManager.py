@@ -5,6 +5,7 @@ import json
 import io
 import collections
 import copy
+import collections
 from collections import defaultdict
 from operator import itemgetter
 from . import config
@@ -246,8 +247,22 @@ class ReferenceManager(object):
                 return urls[0]
             if zeroRefsError:
                 die("Too many possible '{0}' targets to disambiguate. Please specify the names of the required args, like 'foo(bar, baz)'.", text)
-            return None
 
+        if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
+            # Allow foo(bar) to be for'd to with just foo() if it's completely unambiguous.
+            candidateFor, _, forPrefix = linkFor.partition("/") if "/" in linkFor else (None, None, '')
+            forPrefix = forPrefix[:-1]
+            candidates, _ = self.queryRefs(linkType="functionish", status="local", linkFor=candidateFor)
+            localUrls = list(set(c.url for c in candidates if c.text.startswith(forPrefix)))
+            if len(localUrls) == 1:
+                return localUrls[0]
+            # And repeat for non-locals
+            candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, linkFor=candidateFor, export=export, ignoreObsoletes=True)
+            remoteUrls = list(set(c for c in candidates if c.text.startwith(forPrefix)))
+            if len(remoteUrls) == 1:
+                return remoteUrls[0]
+            if zeroRefsError and (len(localUrls) or len(remoteUrls)):
+                die("Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.", linkFor, text)
 
         if failure == "text" or failure == "type":
             if spec and spec in self.anchorMacros:
