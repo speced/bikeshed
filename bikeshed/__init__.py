@@ -856,7 +856,7 @@ class IDLMarker(object):
                 extraParameters += ' data-default="{0}"'.format(value)
 
         if idlType in config.typesUsingFor:
-            idlFor = "data-idl-for='{0}'".format(construct.fullName.rpartition("/")[0])
+            idlFor = "data-idl-for='{0}'".format(construct.parent.fullName)
         else:
             idlFor = ""
         return ('<idl title="{0}" data-idl-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters), '</idl>')
