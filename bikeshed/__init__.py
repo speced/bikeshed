@@ -807,9 +807,10 @@ class IDLMarker(object):
         return (None, None)
 
     def markupType(self, text, construct):
-        # Fires for "types", but dunno what this is used for.
-        # It includes things like whole unions, or whole parametrized type statements.
-        # Think it's probably everything that matches the "type" grammar in WebIDL.
+        # Fires for entire type definitions.
+        # It'll contain keywords or names, or sometimes more types.
+        # For example, a "type" wrapper surrounds an entire union type,
+        # as well as its component types.
         return (None, None)
 
     def markupTypeName(self, text, construct):
