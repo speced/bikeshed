@@ -441,10 +441,10 @@ def fillAttributeInfoSpans(doc):
             else:
                 target = findAll('[data-link-type={1}][title="{0}"]'.format(referencedAttribute, refType), doc)
             if len(target) == 0:
-                die("Couldn't find target {1} {0}:\n{2}", referencedAttribute, refType, outerHTML(el))
+                die("Couldn't find target {1} '{0}':\n{2}", referencedAttribute, refType, outerHTML(el))
                 continue
             elif len(target) > 1:
-                die("Multiple potential target {1}s {0}:\n{2}", referencedAttribute, refType, outerHTML(el))
+                die("Multiple potential target {1}s '{0}':\n{2}", referencedAttribute, refType, outerHTML(el))
                 continue
             target = target[0]
             datatype = target.get("data-type").strip()
