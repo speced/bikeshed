@@ -782,6 +782,24 @@ def addSelfLinks(doc):
         appendChild(el, makeSelfLink(el))
 
 
+class DebugMarker(object):
+    # Debugging tool for IDL markup
+
+    def markupConstruct(self, text, construct):
+        return ('<' + construct.idlType + '>', '</' + construct.idlType + '>')
+
+    def markupType(self, text, construct):
+        return ('<TYPE for=' + construct.idlType + '>', '</TYPE>')
+
+    def markupTypeName(self, text, construct):
+        return ('<TYPE-NAME for=' + construct.idlType + '>', '</TYPE-NAME>')
+
+    def markupName(self, text, construct):
+        return ('<NAME for=' + construct.idlType + '>', '</NAME>')
+
+    def markupKeyword(self, text, construct):
+        return ('<KEYWORD for=' + construct.idlType + '>', '</KEYWORD>')
+
 class IDLMarker(object):
     def markupConstruct(self, text, construct):
         # Fires for every 'construct' in the WebIDL.
