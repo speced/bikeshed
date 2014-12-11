@@ -817,6 +817,16 @@ class IDLMarker(object):
         # Fires for non-defining type names, such as arg types.
         return ('<a data-link-type="idl-name">', '</a>')
 
+    def markupKeyword(self, text, construct):
+        # Fires on the various "keywords" of WebIDL -
+        # words that are part of the WebIDL syntax,
+        # rather than names exposed to JS.
+        # Examples: "interface", "stringifier", the IDL-defined type names like "DOMString" and "long".
+        if text == "stringifier" and construct.name is None:
+            # If no name was defined, you're required to define stringification behavior.
+            return ("<a dfn for='{0}' title='stringification behavior'>".format(construct.parent.fullName), "</a>")
+        return (None, None)
+
     def markupName(self, text, construct):
         # Fires for defining names: method names, arg names, interface names, etc.
         if construct.idlType not in config.idlTypes:
