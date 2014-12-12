@@ -477,7 +477,7 @@ def processDfns(doc):
     dfns = findAll("dfn", doc)
     classifyDfns(doc, dfns)
     dedupIds(doc, dfns)
-    doc.refs.addLocalDfns(dfns)
+    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
 
 
 def determineDfnType(dfn):
@@ -938,7 +938,7 @@ def processIDL(doc):
     dfns = findAll("pre.idl:not([data-no-idl]) dfn", doc)
     classifyDfns(doc, dfns)
     dedupIds(doc, dfns)
-    doc.refs.addLocalDfns(dfns)
+    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
 
 
 
@@ -1706,7 +1706,7 @@ def addIndexSection(doc):
     indexEntries = defaultdict(list)
     attemptedForRefs = defaultdict(list)
     seenGlobalNames = set()
-    for el in findAll("dfn", doc):
+    for el in findAll("dfn[id]", doc):
         linkTexts = linkTextsFromElement(el, preserveCasing=True)
         headingLevel = headingLevelOfElement(el) or "Unnumbered section"
         if el.get('data-dfn-for') is not None:
@@ -1895,7 +1895,7 @@ def addIDLSection(doc):
         copy = deepcopy(block)
         appendContents(container, copy)
         appendChild(container, "\n")
-    for dfn in findAll("dfn", container):
+    for dfn in findAll("dfn[id]", container):
         dfn.tag = "a"
         dfn.set("href", "#"+dfn.get("id"))
         del dfn.attrib["id"]
