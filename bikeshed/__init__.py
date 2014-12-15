@@ -1866,16 +1866,18 @@ def addPropertyIndex(doc):
                 E.h3({"class":"no-num", "id":simplifyText(atRuleName)+"-descriptor-table"},
                     E.a({"data-link-type":"at-rule"}, atRuleName),
                     " Descriptors"))
-            appendChild(html,
+            tbody = appendChild(html,
                 E.table({"class":"proptable data"},
                     E.thead(
                         E.tr(
                             *[E.th({"scope":"col"}, column) for column in columns])),
-                    E.tbody(
-                        E.tr(
-                            E.th({"scope":"row"},
-                                E.a({"data-link-type":"descriptor"}, desc['Name'])),
-                            *[E.td(desc.get(column, "")) for column in columns[1:]]))))
+                    E.tbody()))
+            for desc in descs:
+                appendChild(tbody,
+                    E.tr(
+                        E.th({"scope":"row"},
+                            E.a({"data-link-type":"descriptor"}, desc['Name'])),
+                        *[E.td(desc.get(column, "")) for column in columns[1:]]))
 
 
 def addIDLSection(doc):
