@@ -1870,7 +1870,7 @@ def addPropertyIndex(doc):
                 E.table({"class":"proptable data"},
                     E.thead(
                         E.tr(
-                            *[E.tr({"scope":"col"}, column) for column in columns])),
+                            *[E.th({"scope":"col"}, column) for column in columns])),
                     E.tbody(
                         E.tr(
                             E.th({"scope":"row"},
