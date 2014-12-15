@@ -148,7 +148,7 @@ class Parser(object):
             tokens = tokenizer.Tokenizer(match.group(2))
             if (ArgumentList.peek(tokens)):
                 arguments = ArgumentList(tokens, None)
-                return match.group(1) + '(' + ', '.join([argument.name for argument in arguments]) + ')'
+                return match.group(1) + '(' + arguments.argumentNames[0] + ')'
             name = match.group(1) + match.group(3)
             arguments = match.group(2)
         else:
@@ -172,6 +172,37 @@ class Parser(object):
         if (construct and ('method' == construct.idlType)):
             return construct.methodName
         return name + '(' + arguments + ')'
+
+    def normalizedMethodNames(self, methodText, interfaceName = None):
+        match = re.match(r'(.*)\((.*)\)(.*)', methodText)
+        if (match):
+            tokens = tokenizer.Tokenizer(match.group(2))
+            if (ArgumentList.peek(tokens)):
+                arguments = ArgumentList(tokens, None)
+                return [match.group(1) + '(' + argumentName + ')' for argumentName in arguments.argumentNames]
+            name = match.group(1) + match.group(3)
+            arguments = match.group(2)
+        else:
+            name = methodText
+            arguments = ''
+            
+        if (interfaceName):
+            interface = self.find(interfaceName)
+            if (interface):
+                method = interface.findMethod(name)
+                if (method):
+                    return method.methodNames
+            return [name + '(' + arguments + ')']
+
+        for construct in self.constructs:
+            method = construct.findMethod(name)
+            if (method):
+                return method.methodNames
+
+        construct = self.find(name)
+        if (construct and ('method' == construct.idlType)):
+            return construct.methodNames
+        return [name + '(' + arguments + ')']
 
     def markup(self, marker):
         if (marker):

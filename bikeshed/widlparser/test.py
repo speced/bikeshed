@@ -260,4 +260,5 @@ callback interface callMe {
     print parser.normalizedMethodName('bob(xxx)', 'LinkStyle')
     print parser.normalizedMethodName('bob')
     print parser.normalizedMethodName('bob()')
+    print repr(parser.normalizedMethodNames('method', 'Foo'))
 

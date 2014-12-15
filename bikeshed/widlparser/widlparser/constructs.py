@@ -131,6 +131,10 @@ class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
         return None
 
     @property
+    def methodNames(self):
+        return []
+
+    @property
     def complexityFactor(self):
         return 0
     
@@ -354,6 +358,10 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | Spe
     @property
     def methodName(self):
         return self.member.methodName
+
+    @property
+    def methodNames(self):
+        return self.member.methodNames
 
     @property
     def normalName(self):
@@ -892,6 +900,10 @@ class ExtendedAttributeNoArgs(Construct):   # identifier
     def _unicode(self):
         return self.attribute
     
+    def _markup(self, generator):
+        generator.addName(self.attribute)
+        return self
+
     def __repr__(self):
         return '[ExtendedAttributeNoArgs: ' + self.attribute.encode('ascii', 'replace') + ']'
 
@@ -934,7 +946,7 @@ class ExtendedAttributeArgList(Construct):  # identifier "(" [ArgumentList] ")"
         return self.attribute + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
     
     def _markup(self, generator):
-        generator.addText(self.attribute)
+        generator.addName(self.attribute)
         generator.addText(self._openParen)
         if (self.arguments):
             self.arguments.markup(generator)
@@ -981,12 +993,9 @@ class ExtendedAttributeIdent(Construct):    # identifier "=" identifier
         return self.attribute + unicode(self._equals) + self.value
     
     def _markup(self, generator):
-        generator.addText(self.attribute)
+        generator.addName(self.attribute)
         generator.addText(self._equals)
-        if ('constructor' == self.idlType):
-            generator.addTypeName(self.value)
-        else:
-            generator.addName(self.value)
+        generator.addTypeName(self.value)
         return self
     
     def __repr__(self):
@@ -1037,12 +1046,9 @@ class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" 
         return output + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
     
     def _markup(self, generator):
-        generator.addText(self.attribute)
+        generator.addName(self.attribute)
         generator.addText(self._equals)
-        if ('constructor' == self.idlType):
-            generator.addTypeName(self.value)
-        else:
-            generator.addName(self.value)
+        generator.addTypeName(self.value)
         generator.addText(self._openParen)
         if (self.arguments):
             self.arguments.markup(generator)
@@ -1091,7 +1097,7 @@ class ExtendedAttributeTypePair(Construct): # identifier "(" Type "," Type ")"
         return output + unicode(self.valueType) + unicode(self._closeParen)
     
     def _markup(self, generator):
-        generator.addText(self.attribute)
+        generator.addName(self.attribute)
         generator.addText(self._openParen)
         self.keyType.markup(generator)
         generator.addText(self._comma)
