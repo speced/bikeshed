@@ -873,7 +873,7 @@ class IDLMarker(object):
         So, if both were optional,
         "foo(bar)" and "foo()" would both also be valid linking texts.
         '''
-        if method.arguments is None:
+        if getattr(method, "arguments", None) is None:
             return [method.normalName]
         for i,arg in enumerate(method.arguments):
             if arg.optional or arg.variadic:
