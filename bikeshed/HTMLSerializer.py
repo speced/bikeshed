@@ -7,6 +7,7 @@ import StringIO
 class HTMLSerializer(object):
 	inlineEls = frozenset(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress"])
 	rawEls = frozenset(["xmp", "script", "style"])
+	voidEls = frozenset(["area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"])
 	def __init__(self, tree):
 		self.tree = tree
 
@@ -47,12 +48,13 @@ class HTMLSerializer(object):
 					write("\n")
 					write("  "*(indent+1))
 				write(self.escapeText(child.tail))
-		if not pre and blockChildren:
-			write("\n")
-			write("  "*indent)
-		write("</")
-		write(el.tag)
-		write(">")
+		if el.tag not in self.voidEls:
+			if not pre and blockChildren:
+				write("\n")
+				write("  "*indent)
+			write("</")
+			write(el.tag)
+			write(">")
 
 	def escapeAttrVal(self, val):
 		return val.replace("&", "&amp;").replace('"', "&quot;")
