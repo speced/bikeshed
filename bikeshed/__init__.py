@@ -24,6 +24,7 @@ from . import update
 from . import markdown
 from . import test
 from . import MetadataManager as metadata
+from . import HTMLSerializer
 from .datablocks import transformDataBlocks
 from .ReferenceManager import ReferenceManager
 from .ReferenceManager import linkTextsFromElement
@@ -1250,7 +1251,7 @@ class CSSSpec(object):
 
 
     def serialize(self):
-        rendered = html5lib.serialize(self.document, tree="lxml", alphabetical_attributes=True)
+        rendered = HTMLSerializer.HTMLSerializer(self.document).serialize()
         rendered = finalHackyCleanup(rendered)
         return rendered
 
