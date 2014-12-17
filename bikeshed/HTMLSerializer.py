@@ -21,9 +21,10 @@ class HTMLSerializer(object):
 		output.close()
 		return str
 
-	def _serializeEl(self, el, write, indent=0, pre=False):
+	def _serializeEl(self, el, write, indent=0, pre=False, prevSiblingHadNewline=False):
 		if el.tag not in self.inlineEls:
-			write("\n")
+			if not prevSiblingHadNewline:
+				write("\n")
 			write("  "*indent)
 		write("<")
 		write(el.tag)
@@ -38,16 +39,18 @@ class HTMLSerializer(object):
 			pre = True
 		if el.text:
 			write(self.escapeText(el.text))
+			prevSiblingHadNewline = el.text.endswith("\n")
 		blockChildren = False
 		for child in el.iterchildren():
 			if not blockChildren and child.tag not in self.inlineEls:
 				blockChildren = True
-			self._serializeEl(child, write, indent+1)
+			self._serializeEl(child, write, indent+1, prevSiblingHadNewline)
 			if child.tail:
 				if not pre and child.tag not in self.inlineEls:
 					write("\n")
 					write("  "*(indent+1))
 				write(self.escapeText(child.tail))
+				prevSiblingHadNewline = child.tail.endswith("\n")
 		if el.tag not in self.voidEls:
 			if not pre and blockChildren:
 				write("\n")
