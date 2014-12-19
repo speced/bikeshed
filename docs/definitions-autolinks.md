@@ -109,7 +109,7 @@ Just add the type as a boolean attribute to the definition, like
 ~~~~
 
 Alternately, if you've got several definitions of the same type that share some container element (such as a `<pre>` or `<dl>`),
-just add a `dfn-for="type-goes-here"` attribute to the container.
+just add a `dfn-type="type-goes-here"` attribute to the container.
 Anything which isn't explicitly tagged otherwise will take that type by default.
 
 (There are more methods to determine definition type, but they're only meant for legacy content, and so are not documented here.)
