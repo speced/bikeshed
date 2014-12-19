@@ -823,9 +823,13 @@ class IDLMarker(object):
         # words that are part of the WebIDL syntax,
         # rather than names exposed to JS.
         # Examples: "interface", "stringifier", the IDL-defined type names like "DOMString" and "long".
-        if text == "stringifier" and construct.name is None:
-            # If no name was defined, you're required to define stringification behavior.
-            return ("<a dfn for='{0}' title='stringification behavior'>".format(construct.parent.fullName), "</a>")
+        if text == "stringifier":
+            if construct.name is None:
+                # If no name was defined, you're required to define stringification behavior.
+                return ("<a dfn for='{0}' title='stringification behavior'>".format(construct.parent.fullName), "</a>")
+            else:
+                # Otherwise, you *can* point to/dfn stringification behavior if you want.
+                return ("<idl data-idl-type=dfn data-idl-for='{0}' title='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
         return (None, None)
 
     def markupName(self, text, construct):
@@ -936,6 +940,9 @@ def processIDL(doc):
                 if el.get('data-idl-for'):
                     el.set('data-link-for', el.get('data-idl-for'))
                     del el.attrib['data-idl-for']
+                if el.get('id'):
+                    # ID was defensively added by the Marker.
+                    del el.attrib['id']
     dfns = findAll("pre.idl:not([data-no-idl]) dfn", doc)
     classifyDfns(doc, dfns)
     dedupIds(doc, dfns)
