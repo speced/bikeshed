@@ -73,6 +73,43 @@ To mark up the `baz` argument of the above method, for example,
 do `<dfn argument for="Foo/bar(baz, qux)">baz</dfn>`.
 You *should* use the full call signature of the method.
 
+Linking to Stringifiers
+-----------------------
+
+Linking to a stringifier is a little complicated,
+because WebIDL allows *four* different syntaxes for it.
+
+The `stringifier` keyword itself is always linkable;
+it's a "dfn" type definition with `for=MyInterface`
+and linking text "stringification behavior".
+Like any other IDL construct,
+you can instead define the term yourself in the same way,
+and the IDL will link to your definition instead,
+like `<dfn dfn for=MyInterface>stringification behavior</dfn>`.
+
+If you use the "stringifier attribute" form,
+like `stringifier attribute DOMString href;`,
+you can also just link/dfn the attribute as normal.
+
+If you use the "stringifier method" form,
+like `stringifier DOMString foo(long bar);`,
+you can also just link/dfn the method as normal,
+like `<dfn stringifier for=MyInterface>foo(bar)</dfn>.
+(Note that it's a "stringifier" type definition,
+not "method".)
+
+If you use the "*anonymous* stringifer method" form,
+like `stringifier DOMString(long bar)`,
+you can still technically link/dfn it as a stringifier method.
+It doesn't have a name, so we invent one -
+it's called `__stringifier__()`, a la Python's magic methods.
+(Note the *two* underscores on each side.)
+You should *almost* never need to do this;
+the only reason to need to specify the method name
+(rather than just linking to the keyword, as described above)
+is if you're linking/dfning an argument to the method,
+and need to specify a `for` value for it.
+
 
 
 Forcing Definitions
