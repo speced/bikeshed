@@ -27,10 +27,16 @@ class HTMLSerializer(object):
 				write("\n")
 			write("  "*indent)
 		write("<")
-		write(el.tag)
+		if el.tag.startswith("{"):
+			write(el.tag.partition("}")[2])
+		else:
+			write(el.tag)
 		for attrName, attrVal in sorted(el.items()):
 			write(" ")
-			write(attrName)
+			if attrName.startswith("{"):
+				write(attrName.partition("}")[2])
+			else:
+				write(attrName)
 			write('="')
 			write(self.escapeAttrVal(attrVal))
 			write('"')
@@ -56,7 +62,10 @@ class HTMLSerializer(object):
 				write("\n")
 				write("  "*indent)
 			write("</")
-			write(el.tag)
+			if el.tag.startswith("{"):
+				write(el.tag.partition("}")[2])
+			else:
+				write(el.tag)
 			write(">")
 
 	def escapeAttrVal(self, val):
