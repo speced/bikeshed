@@ -86,6 +86,8 @@ Like any other IDL construct,
 you can instead define the term yourself in the same way,
 and the IDL will link to your definition instead,
 like `<dfn dfn for=MyInterface>stringification behavior</dfn>`.
+This is generally what you *should* use to link to the stringifier,
+as it'll maintain the links even if you change which syntax form you use.
 
 If you use the "stringifier attribute" form,
 like `stringifier attribute DOMString href;`,
