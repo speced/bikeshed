@@ -3,7 +3,7 @@ from __future__ import division, unicode_literals
 import re
 import json
 import copy
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 import config
 import biblio
@@ -32,6 +32,7 @@ def transformDataBlocks(doc):
         'railroad': transformRailroad,
         'biblio': transformBiblio,
         'anchors': transformAnchors,
+        'debug': transformDebug,
         'pre': transformPre
     }
     blockType = ""
@@ -426,3 +427,70 @@ def transformAnchors(lines, doc, **kwargs):
                 doc.refs.refs[text.lower()].append(anchor)
 
     return []
+
+def transformDebug(lines, doc, **kwargs):
+    print config.printjson(parseInfoTree(lines, doc.md.indent))
+    return []
+
+def parseInfoTree(lines, indent=4):
+    # Parses sets of info, which can be arranged into trees.
+    # Each info is a set of key/value pairs, semicolon-separated:
+    # key1: val1; key2: val2; key3: val3
+    # Intead of semicolon-separating, pieces can be nested with higher indentation
+    # key1: val1
+    #     key2: val2
+    #         key3: val3
+    # Multiple fragments can be chained off of a single higher-level piece,
+    # to avoid repetition:
+    # key1: val1
+    #     key2: val2
+    #     key2a: val2a
+    # ===
+    # key1: val1; key2: val2
+    # key1: val1; key2a: val2a
+
+    def extendData(datas, infoLevels):
+        newData = defaultdict(list)
+        for infos in infoLevels[:lastIndent+1]:
+            for k,v in infos.items():
+                newData[k].extend(v)
+        datas.append(newData)
+
+    # Determine the indents, separate the lines.
+    datas = []
+    infoLevels = []
+    lastIndent = -1
+    indentSpace = " " * indent
+    for line in lines:
+        ws, text = re.match("(\s*)(.*)", line).groups()
+        wsLen = len(ws.replace("\t", indentSpace))
+        if wsLen % indent != 0:
+            die("Line has inconsistent indentation; use tabs or {1} spaces:\n{0}", text, indent)
+            return []
+        wsLen = wsLen // indent
+        if wsLen >= lastIndent+2:
+            die("Line jumps {1} indent levels:\n{0}", text, wsLen - lastIndent)
+            return []
+        if wsLen <= lastIndent:
+            # Previous line was a leaf node; build its full data and add to the list
+            extendData(datas, infoLevels[:lastIndent+1])
+        # Otherwise, chained data. Parse it, put it into infoLevels
+        info = defaultdict(list)
+        for piece in text.split(";"):
+            if piece.strip() == "":
+                continue
+            match = re.match("([^:]+):\s*(.*)", piece)
+            if not match:
+                die("Line doesn't match the grammar `k:v; k:v; k:v`:\n{0}", text)
+                return []
+            key = match.group(1).strip()
+            val = match.group(2).strip()
+            info[key].append(val)
+        if wsLen < len(infoLevels):
+            infoLevels[wsLen] = info
+        else:
+            infoLevels.append(info)
+        lastIndent = wsLen
+    # Grab the last bit of data.
+    extendData(datas, infoLevels[:lastIndent+1])
+    return datas
