@@ -213,6 +213,8 @@ class ReferenceManager(object):
                      text,
                      localRefs[0].type,
                      "' or '".join(localRefs[0].for_))
+                if text == "encoding":
+                    warn("{0}", config.printjson(localRefs))
             return localRefs[0].url
 
         # Take defaults into account
@@ -348,6 +350,13 @@ class ReferenceManager(object):
         return biblio.BiblioEntry(preferredURL=status, **candidates[0])
 
     def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, refs=None, export=None, ignoreObsoletes=False, **kwargs):
+        results, error = self._queryRefs(text, spec, linkType, linkFor, status, refs, export, ignoreObsoletes, exact=True)
+        if error:
+            return self._queryRefs(text, spec, linkType, linkFor, status, refs, export, ignoreObsoletes)
+        else:
+            return results, error
+
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, refs=None, export=None, ignoreObsoletes=False, exact=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         if refs is None:
@@ -368,7 +377,10 @@ class ReferenceManager(object):
                     yield RefWrapper(text, ref)
 
         if text:
-            refs = list(textRefsIterator(refs, linkTextVariations(text, linkType)))
+            if exact:
+                refs = list(textRefsIterator(refs, [text]))
+            else:
+                refs = list(textRefsIterator(refs, linkTextVariations(text, linkType)))
         else:
             refs = list(refsIterator(refs))
         if not refs:
