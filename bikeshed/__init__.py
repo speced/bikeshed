@@ -187,7 +187,7 @@ def main():
         config.quiet = True
         doc = CSSSpec(inputFilename=options.infile)
         doc.preprocess()
-        refs = list(doc.refs.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
+        refs,_ = list(doc.refs.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
         print config.printjson(refs)
     elif options.subparserName == "issues-list":
         from . import issuelist as il
