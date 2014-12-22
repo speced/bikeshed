@@ -322,108 +322,37 @@ def transformBiblio(lines, doc, **kwargs):
     return []
 
 def transformAnchors(lines, doc, **kwargs):
-    try:
-        anchors = json.loads(''.join(lines))
-    except Exception, e:
-        die("JSON parse error:\n{0}", e)
-        return []
-
-    def checkTypes(anchor, key, field, *types):
-        if field not in anchor:
-            return True
-        val = anchor[field]
-        for fieldType in types:
-            if isinstance(val, fieldType):
-                break
-        else:
-            die("Field '{1}' of inline anchor for '{0}' must be a {3}. Got a '{2}'.", key, field, type(val), ' or '.join(str(t) for t in types))
-            return False
-        return True
-
+    anchors = parseInfoTree(lines, doc.md.indent)
     for anchor in anchors:
-        # Check all the mandatory fields
-        for field in ["linkingText", "type", "shortname", "level", "url"]:
-            if field not in anchor:
-                die("Inline anchor for '{0}' is missing the '{1}' field.", key, field)
+        if "type" not in anchor or len(anchor['type']) != 1:
+            die("Each anchor needs exactly one type. Got:\n{0}", config.printjson(anchor))
+            continue
+        if "text" not in anchor or len(anchor['text']) != 1:
+            die("Each anchor needs exactly one text. Got:\n{0}", config.printjson(anchor))
+            continue
+        if "url" not in anchor and "urlPrefix" not in anchor:
+            die("Each anchor needs a url and/or at least one urlPrefix. Got:\n{0}", config.printjson(anchor))
+            continue
+        for key in anchor:
+            if key not in ("type", "text", "url", "urlPrefix", "for"):
+                die("Unknown key '{0}' in anchor:\n{1}", key, config.printjson(anchor))
                 continue
-        if "for" not in anchor:
-            anchor["for"] = []
-        key = anchor['linkingText'] if isinstance(anchor['linkingText'], basestring) else list(anchor['linkingText'])[0]
-        # String fields
-        for field in ["type", "shortname", "url"]:
-            if not checkTypes(anchor, key, field, basestring):
-                continue
-            anchor[field] = anchor[field].strip()+"\n"
-        if "status" in anchor:
-            if anchor['status'].strip() not in ["current", "dated", "local"]:
-                die("Field 'status' of inline anchor for '{0}' must be 'current', 'dated', or 'local'. Got '{1}'.", key, anchor['status'].strip())
-                continue
-            else:
-                # TODO Convert the internal representation from ED/TR to current/dated
-                anchor['status'] = "ED\n" if anchor['status'] == "current\n" else "TR\n"
+        if "urlPrefix" in anchor:
+            urlPrefix = ''.join(anchor['urlPrefix'][0])
+        if "url" in anchor:
+            urlSuffix = anchor['url'][0]
         else:
-            anchor['status'] = "local"
-        # String or int fields, convert to string
-        for field in ["level"]:
-            if not checkTypes(anchor, key, field, basestring, int):
-                continue
-            anchor[field] = unicode(anchor[field]).strip() + "\n"
-        anchor['spec'] = "{0}-{1}\n".format(anchor['shortname'].strip(), anchor['level'].strip())
-        anchor['export'] = True
-        # String or list-of-strings fields, convert to list
-        for field in ["linkingText", "for"]:
-            if field not in anchor:
-                continue
-            if not checkTypes(anchor, key, field, basestring, list, dict):
-                continue
-            if isinstance(anchor[field], basestring):
-                anchor[field] = [anchor[field]]
-            if isinstance(anchor[field], list):
-                for i,line in enumerate(anchor[field]):
-                    if not isinstance(line, basestring):
-                        die("All of the values for field '{1}' of inline anchor for '{0}' must be strings. Got a '{2}'.", key, field, type(line))
-                        continue
-                    anchor[field][i] = re.sub(r'\s+', ' ', anchor[field][i].strip()) + "\n"
-            elif isinstance(anchor[field], dict):
-                for text,val in anchor[field].items():
-                    if not isinstance(val, basestring):
-                        die("All of the values for field '{1}' of inline anchor for '{0}' must be strings. Got a '{2}'.", key, field, type(line))
-                        continue
-                    fixedText = re.sub(r'\s+', ' ', text.strip()) + "\n"
-                    anchor[field][fixedText] = anchor[field][text]
-                    del anchor[field][text]
+            urlSuffix = config.simplifyText(anchor['text'][0])
+        url = urlPrefix + ("" if "#" in urlPrefix or "#" in urlSuffix else "#") + urlSuffix
+        doc.refs.refs[anchor['text'][0].lower()].append({
+            "linkingText": anchor['text'][0],
+            "type": anchor['type'][0],
+            "url": url,
+            "for": anchor.get('for', []),
+            "export": True,
+            "status": "local"
+            })
 
-
-        if anchor.get("anchor macro"):
-            # The anchor is actually a macro, defining a template for generating URLs for the real anchors.
-            texts = anchor['linkingText']
-            if isinstance(texts, dict):
-                # {term:suffix}
-                for text,suffix in texts.items():
-                    clone = copy.deepcopy(anchor)
-                    if '#' not in anchor['url'] and '#' not in suffix:
-                        shim = '#'
-                    else:
-                        shim = ''
-                    clone['url'] = anchor['url'] + shim + suffix
-                    doc.refs.refs[text.lower()].append(clone)
-            elif isinstance(texts, list):
-                # [term]
-                for text in texts:
-                    clone = copy.deepcopy(anchor)
-                    if '#' not in anchor['url']:
-                        shim = '#'
-                    else:
-                        shim = ''
-                    clone['url'] = anchor['url'] + shim + config.simplifyText(text)
-                    doc.refs.refs[text.lower()].append(clone)
-            # Now stash the anchor macro away, so any <a spec> anchors pointing to this spec
-            # can also still autogenerate, despite not being listed here.
-            doc.refs.anchorMacros[anchor['spec']] = anchor
-            doc.refs.anchorMacros[anchor['shortname']] = anchor
-        else:
-            for text in anchor['linkingText']:
-                doc.refs.refs[text.lower()].append(anchor)
 
     return []
 
