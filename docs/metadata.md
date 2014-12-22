@@ -106,4 +106,4 @@ run `bikeshed spec --md-status=ED`.
 
 1. You can't override the `Use <i> Autolinks` status, because you can't input the `<>` characters. I don't intend to fix this, as you shouldn't be specifying this in the first place.
 2. You can't supply custom metadata keys (ones with a `!` prefix). If you want to do this, let me know, and I'll work on it.
-3. You can't pass values with spaces in them.  This is [an issue with the argparse library](http://bugs.python.org/issue22909), and I don't know a way around it.
+3. Passing values with spaces in them is tricky.  This is [an issue with the argparse library](http://bugs.python.org/issue22909).  The only way around it is to specify both of the positional arguments (the input and output filenames), then put the offending argument after them.
