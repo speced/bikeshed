@@ -32,7 +32,6 @@ def transformDataBlocks(doc):
         'railroad': transformRailroad,
         'biblio': transformBiblio,
         'anchors': transformAnchors,
-        'debug': transformDebug,
         'pre': transformPre
     }
     blockType = ""
@@ -426,10 +425,6 @@ def transformAnchors(lines, doc, **kwargs):
             for text in anchor['linkingText']:
                 doc.refs.refs[text.lower()].append(anchor)
 
-    return []
-
-def transformDebug(lines, doc, **kwargs):
-    print config.printjson(parseInfoTree(lines, doc.md.indent))
     return []
 
 def parseInfoTree(lines, indent=4):
