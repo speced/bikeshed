@@ -159,34 +159,33 @@ Providing Custom Definitions
 If you want to link to dfns in specs that aren't yet part of the autolinking database,
 you can provide your own definition data that Bikeshed can use.
 Within a `<pre class='anchors'>` element,
-provide a JSON array of the terms you want to link to,
-where each term is a JSON object with the following keys:
+define the anchors you need in [InfoTree format](infotree.md),
+with the following keys:
 
-* "linkingText", a string or array of strings with the linking text of the anchor
-* "type", a string matching one of the definition types listed above
-* optionally, "for", a string or array of strings denoting what the definition is scoped to (see above)
-* "url", a string with the url of the anchor you're linking to
-* "shortname", a string containing the shortname of the spec
-* "level", a string or int containing the level of the spec
-* "status", a string containing either "current" (if the spec is an Editor's Draft, Living Standard, etc) or "dated" (if the spec is a stable/dead snapshot)
+* **text** - the linking text for the definition. (Exactly 1 required.)
+* **type** - the definition's type (dfn, interface, etc)  (Exactly 1 required.)
+* **urlPrefix** and/or **url** - define the anchor's url, as described below.  (At least one of `urlPrefix` or `url` must be specified. 0+ `urlPrefix` entries allowed, 0 or 1 `url` entries allowed.)
+
+To generate the url for the anchor,
+first all of the `urlPrefix` entires are concatenated.
+If a `url` is provided,
+it's appended to the prefixes;
+otherwise, the `text` is url-ified and appended.
+(Lowercased, spaces converted to dashes, non-alphanumeric characters dropped.)
+If neither `urlPrefix` nor `url` had a "#" character in them,
+one is inserted between them.
 
 Example:
 
 ```html
 <pre class="anchors">
-[
-    {
-        "linkingText": "foo",
-        "type": "dfn",
-        "url": "http://example.com#foo",
-        "shortname": "example",
-        "level": 1,
-        "status": "current"
-    }
-]
+urlPrefix: https://encoding.spec.whatwg.org/; type: dfn
+  text: ascii whitespace
+  text: decoder
+url: http://www.unicode.org/reports/tr46/#ToASCII; type: dfn; text: toascii
 </pre>
 
-<a>foo</a> links now!
+<a>ascii whitespace</a> links now!
 ```
 
 
