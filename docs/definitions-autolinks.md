@@ -188,6 +188,9 @@ url: http://www.unicode.org/reports/tr46/#ToASCII; type: dfn; text: toascii
 <a>ascii whitespace</a> links now!
 ```
 
+Alternately, this data can be provided in a file named `anchors.bsdata`,
+in the same folder as the spec source.
+
 
 Autolinking
 ===========

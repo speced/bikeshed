@@ -1140,7 +1140,7 @@ class CSSSpec(object):
             return
 
 
-        self.refs.initializeRefs();
+        self.refs.initializeRefs(self);
         self.refs.initializeBiblio();
 
         self.testSuites = json.loads(config.retrieveCachedFile("test-suites.json", quiet=True, str=True))

@@ -11,6 +11,7 @@ from operator import itemgetter
 from . import config
 from . import biblio
 from . import enum
+from . import datablocks
 from .SortedList import SortedList
 from .messages import *
 from .htmlhelpers import *
@@ -27,7 +28,7 @@ class ReferenceManager(object):
         self.biblios = defaultdict(list)
         self.anchorMacros = dict()
 
-    def initializeRefs(self):
+    def initializeRefs(self, doc):
         # Load up the xref data
         self.specs.update(json.loads(config.retrieveCachedFile("specs.json", quiet=True, str=True)))
         with config.retrieveCachedFile("anchors.data", quiet=True) as lines:
@@ -53,6 +54,12 @@ class ReferenceManager(object):
                     self.refs[key].append(a)
             except StopIteration:
                 pass
+        # Get local anchor data
+        try:
+            with io.open("anchors.bsdata", 'r', encoding="utf-8") as lines:
+                datablocks.transformAnchors(lines, doc)
+        except IOError:
+            pass
 
         self.defaultSpecs.update(json.loads(config.retrieveCachedFile("link-defaults.json", quiet=True, str=True)))
 
@@ -132,7 +139,7 @@ class ReferenceManager(object):
         # Kill all the non-local anchors with the same shortname as the current spec,
         # so you don't end up accidentally linking to something that's been removed from the local copy.
         for term, refs in self.refs.items():
-            self.refs[term] = [ref for ref in refs if ref['shortname'].rstrip("\n")!=self.specName]
+            self.refs[term] = [ref for ref in refs if ref.get('shortname', '').rstrip("\n")!=self.specName]
             # TODO: OMIGOD WHY AM I DOING THIS FOR EVERY SINGLE REF EVER AT LEAST SEARCH FIRST
             # Or maybe just move this functionality into addLocalDfns, ffs
             # This damned thing is a whole 1.25% of runtime
