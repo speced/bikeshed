@@ -1091,10 +1091,10 @@ class CSSSpec(object):
         try:
             if inputFilename == "-":
                 self.lines = [unicode(line, encoding="utf-8") for line in sys.stdin.readlines()]
-                self.date = datetime.today()
+                self.md.date = datetime.today()
             else:
                 self.lines = io.open(inputFilename, 'r', encoding="utf-8").readlines()
-                self.date = datetime.fromtimestamp(os.path.getmtime(inputFilename))
+                self.md.date = datetime.fromtimestamp(os.path.getmtime(inputFilename))
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
             return
