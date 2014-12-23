@@ -574,7 +574,7 @@ def classifyDfns(doc, dfns):
             if dfnType == "dfn":
                 pass
             elif dfnType == "interface":
-                id = "dom-" + id
+                pass
             elif dfnType in config.idlTypes.intersection(config.typesUsingFor):
                 id = simplifyText("dom-{_for}-{id}".format(_for=dfnFor, id=id))
             elif dfnType in config.typesUsingFor:
