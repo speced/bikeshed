@@ -1194,12 +1194,13 @@ class CSSSpec(object):
         self.loadDefaultMetadata()
         self.md.finish()
         self.md.fillTextMacros(self.macros, doc=self)
-        self.refs.setSpecData(self.md)
 
         # Deal with further <pre> blocks, and markdown
         transformDataBlocks(self)
         if self.paragraphMode == "markdown":
             self.lines = markdown.parse(self.lines, self.md.indent)
+
+        self.refs.setSpecData(self.md)
 
         # Convert to a single string of html now, for convenience.
         self.html = ''.join(self.lines)

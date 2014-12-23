@@ -32,6 +32,7 @@ def transformDataBlocks(doc):
         'railroad': transformRailroad,
         'biblio': transformBiblio,
         'anchors': transformAnchors,
+        'link-defaults': transformLinkDefaults,
         'pre': transformPre
     }
     blockType = ""
@@ -352,9 +353,23 @@ def transformAnchors(lines, doc, **kwargs):
             "export": True,
             "status": "local"
             })
-
-
     return []
+
+def transformLinkDefaults(lines, doc, **kwargs):
+    lds = parseInfoTree(lines, doc.md.indent)
+    for ld in lds:
+        if len(ld.get('type', [])) != 1:
+            die("Every link default needs exactly one type. Got:\n{0}", config.printjson(ld))
+            continue
+        if len(ld.get('spec', [])) != 1:
+            die("Every link default needs exactly one spec. Got:\n{0}", config.printjson(ld))
+            continue
+        if len(ld.get('text', [])) != 1:
+            die("Every link default needs exactly one text. Got:\n{0}", config.printjson(ld))
+            continue
+        doc.md.linkDefaults[ld['text'][0]].append((ld['spec'][0], ld['type'][0], ld.get('status', None), ld.get('for', None)))
+    return []
+
 
 def parseInfoTree(lines, indent=4):
     # Parses sets of info, which can be arranged into trees.
