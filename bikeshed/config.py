@@ -15,7 +15,7 @@ doc = None
 textMacros = {}
 
 TRStatuses = ["WD", "FPWD", "LCWD", "CR", "PR", "REC", "PER", "NOTE", "MO"]
-unlevelledStatuses = ["LS", "DREAM", "UD", "Commit", "Branch"]
+unlevelledStatuses = ["LS", "DREAM", "UD", "LS-COMMIT", "LS-BRANCH"]
 deadlineStatuses = ["LCWD", "PR"]
 noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH"]
 shortToLongStatus = {
