@@ -385,10 +385,10 @@ def fixIntraDocumentReferences(doc):
     for el in findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
         targetID = el.get("href")[1:]
         if el.get('data-section') is not None and targetID not in headingIDs:
-            die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
+            die("Couldn't find target document section {0}:\n{1}", targetID, outerHTML(el))
             continue
         elif targetID not in ids:
-            die("Couldn't find target anchor {0}:\n{1}", sectionID, outerHTML(el))
+            die("Couldn't find target anchor {0}:\n{1}", targetID, outerHTML(el))
             continue
         if (el.text is None or el.text.strip() == '') and len(el) == 0:
             # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
