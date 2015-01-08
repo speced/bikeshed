@@ -211,6 +211,7 @@ def reSubObject(pattern, string, repl=None):
 def simplifyText(text):
     # Remove anything that's not a name character.
     text = text.strip().lower()
+    text = re.sub(r"-", "_", text)
     text = re.sub(r"[\s/]+", "-", text)
     text = re.sub(r"[^a-z0-9_-]", "", text)
     return text
