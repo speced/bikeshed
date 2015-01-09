@@ -44,8 +44,12 @@ class HTMLSerializer(object):
 		if el.tag == "pre":
 			pre = True
 		if el.text:
-			write(self.escapeText(el.text))
-			prevSiblingHadNewline = el.text.endswith("\n")
+			if el.tag in self.rawEls:
+				write(el.text)
+				# raw elements don't have children, so no need to do this in the next section.
+			else:
+				write(self.escapeText(el.text))
+				prevSiblingHadNewline = el.text.endswith("\n")
 		blockChildren = False
 		for child in el.iterchildren():
 			if not blockChildren and child.tag not in self.inlineEls:
