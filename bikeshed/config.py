@@ -208,8 +208,12 @@ def reSubObject(pattern, string, repl=None):
     pieces.append(string[lastEnd:])
     return pieces
 
-def simplifyText(text):
+def simplifyText(text, convertDashes=False):
     # Remove anything that's not a name character.
+    # If convertDashes is True, turn dashes into underscores,
+    # so two terms that differ only by dashes generate different text.
+    if convertDashes:
+        text = text.replace("-", "_")
     text = text.strip().lower()
     text = re.sub(r"[\s/]+", "-", text)
     text = re.sub(r"[^a-z0-9_-]", "", text)

@@ -261,7 +261,7 @@ def addHeadingIds(doc, headings):
     for header in headings:
         if header.get('id') is None:
             neededIds.add(header)
-            header.set('id', simplifyText(textContent(find(".content", header))))
+            header.set('id', simplifyText(textContent(find(".content", header)), convertDashes=True))
     if len(neededIds) > 0:
         warn("You should manually provide IDs for your headings:\n{0}",
             "\n".join("  "+outerHTML(el) for el in neededIds))
@@ -570,7 +570,8 @@ def classifyDfns(doc, dfns):
                     continue
         # Automatically fill in id if necessary.
         if el.get('id') is None:
-            id = simplifyText(determineDfnText(el).split('|')[0])
+            convertDashes = dfnType == "dfn"
+            id = simplifyText(determineDfnText(el).split('|')[0], convertDashes=convertDashes)
             if dfnType == "dfn":
                 pass
             elif dfnType == "interface":
