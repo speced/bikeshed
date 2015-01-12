@@ -334,11 +334,17 @@ class ReferenceManager(object):
                     defaultRef = ref
                     break
         if error:
-            warn("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into 'Link Defaults':\n{3}",
+            possibleRefs = []
+            for ref in refs:
+                if ref.for_:
+                    possibleRefs.extend('text:{text}; type:{type}; for:{for_}; spec:{spec};'.format(text=text, type=ref.type, spec=ref.spec, for_=for_) for for_ in ref.for_)
+                else:
+                    possibleRefs.append('text:{text}; type:{type}; spec:{spec};'.format(text=text, type=ref.type, spec=ref.spec))
+            warn("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
                  linkType,
                  text,
                  defaultRef.spec,
-                 '\n'.join('    {2} ({1}) {0}'.format(text, ref.type, ref.spec) for ref in refs))
+                 '\n'.join(possibleRefs))
         return defaultRef.url
 
     def getBiblioRef(self, text, status, el=None):
