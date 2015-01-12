@@ -284,6 +284,11 @@ class MetadataManager:
         macros["logo"] = self.logo
         # get GH repo from remote
         macros["repository"] = getSpecRepository(doc)
+        # W3C stylesheets are *mostly* of the form W3C-[status], except for *one*. Ugh.
+        if self.status == "UD":
+            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/w3c-unofficial"
+        else:
+            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/w3c-{0}".format(self.status)
 
 
 def convertGroup(key, val):
