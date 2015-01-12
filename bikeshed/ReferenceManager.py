@@ -335,11 +335,11 @@ class ReferenceManager(object):
                     break
         if error:
             possibleRefs = []
-            for ref in refs:
-                if ref.for_:
-                    possibleRefs.extend('text:{text}; type:{type}; for:{for_}; spec:{spec};'.format(text=text, type=ref.type, spec=ref.spec, for_=for_) for for_ in ref.for_)
+            for ref in simplifyPossibleRefs(refs):
+                if ref['for_']:
+                    possibleRefs.append('spec:{spec}; type:{type}; for:{for_}; text:{text}'.format(**ref))
                 else:
-                    possibleRefs.append('text:{text}; type:{type}; spec:{spec};'.format(text=text, type=ref.type, spec=ref.spec))
+                    possibleRefs.append('spec:{spec}; type:{type}; text:{text}'.format(**ref))
             warn("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
                  linkType,
                  text,
@@ -605,3 +605,23 @@ class RefWrapper(object):
 
     def __repr__(self):
         return "RefWrapper("+repr(self.text)+", "+repr(self.ref)+")"
+
+def simplifyPossibleRefs(refs):
+    # "Simplifies" the set of possible refs according to their 'for' value;
+    # returns a list of text/type/spec/for objects,
+    # with the for value filled in *only if necessary for disambiguation*.
+    forVals = defaultdict(list)
+    for ref in refs:
+        if ref.for_:
+            for for_ in ref.for_: # ref.for_ is a list
+                forVals[(ref.text, ref.type, ref.spec)].append(for_)
+        else:
+            forVals[(ref.text, ref.type, ref.spec)] = []
+    retRefs = []
+    for (text, type, spec), fors in forVals.items():
+        if len(fors) >= 2:
+            for for_ in fors:
+                retRefs.append({'text':text, 'type':type, 'spec':spec, 'for_':for_})
+        else:
+            retRefs.append({'text':text, 'type':type, 'spec':spec, 'for_':None})
+    return retRefs
