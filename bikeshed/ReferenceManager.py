@@ -254,7 +254,7 @@ class ReferenceManager(object):
             urls = list(set(c for c in candidates if c.text.startswith(textPrefix)))
             if len(urls) == 1:
                 return urls[0]
-            if zeroRefsError:
+            if len(urls) > 1 and zeroRefsError:
                 die("Too many possible '{0}' targets to disambiguate. Please specify the names of the required args, like 'foo(bar, baz)'.", text)
 
         if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
