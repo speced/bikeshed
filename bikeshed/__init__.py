@@ -215,7 +215,7 @@ def main():
         os.system("python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o callgraph.svg && rm stat.prof".format(root=root, leaf=leaf))
 
 def stripBOM(doc):
-    if doc.lines[0][0] == "\ufeff":
+    if doc.lines[0][0:1] == "\ufeff":
         doc.lines[0] = doc.lines[0][1:]
         warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
 
