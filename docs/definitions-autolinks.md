@@ -222,6 +222,8 @@ There are several additional shortcuts for writing an autolink:
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 * `[[#foo]]` is an autolink to a heading in the same document with the given ID.  (See [Section Links](#section-links) for more detail.)
+* `<{element}>` is an autolink to the element named "element".
+* `<{element/attribute}>` is an autolink to the attribute named "attribute" for the element "element".
 
 For any of the above shorthands that can have a "for" value, you can indicate this inline by preceding the linking text with the "for" value and separating it with a slash. For example, to disambiguate that you want the "foo" value from the "prop1" property (rather than "prop2", which also has a "foo" value), you can write:
 

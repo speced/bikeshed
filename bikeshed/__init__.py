@@ -1459,6 +1459,12 @@ class CSSSpec(object):
             return E.code({"class":"idl"},
                 E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
 
+        elementRe = re.compile(r"<{(?:(\w+)/)?(\w+)}>")
+        def elementReplacer(match):
+            linkType = "element" if match.group(1) is None else "element-attr"
+            return E.code({},
+                E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
+
         def transformElement(parentEl):
             processContents = isElement(parentEl) and not isOpaqueElement(parentEl)
             if not processContents:
@@ -1477,6 +1483,7 @@ class CSSSpec(object):
             nodes = [text]
             config.processTextNodes(nodes, propdescRe, propdescReplacer)
             config.processTextNodes(nodes, idlRe, idlReplacer)
+            config.processTextNodes(nodes, elementRe, elementReplacer)
             config.processTextNodes(nodes, biblioRe, biblioReplacer)
             config.processTextNodes(nodes, sectionRe, sectionReplacer)
             return nodes
