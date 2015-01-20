@@ -208,7 +208,8 @@ def main():
         else:
             config.debug = True
             config.quiet = True
-            test.runAllTests(constructor=CSSSpec)
+            result = test.runAllTests(constructor=CSSSpec)
+            sys.exit(0 if result else 1)
     elif options.subparserName == "profile":
         root = "--root=\"{0}\"".format(options.root) if options.root else ""
         leaf = "--leaf=\"{0}\"".format(options.leaf) if options.leaf else ""
