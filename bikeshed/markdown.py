@@ -50,9 +50,9 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 			# h2 underline
 			match = re.match(r"-{3,}\s*$", line)
 			token = {'type':'dash-line', 'raw': rawline}
-		elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[\w-]+\})?\s*$", line):
+		elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", line):
 			# single-line heading
-			match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[\w-]+\})?\s*$", line)
+			match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", line)
 			level = len(match.group(1))+1
 			token = {'type':'heading', 'text': match.group(2).strip(), 'raw':rawline, 'level': level}
 			match = re.search(r"\{#([\w-]+)\}\s*$", line)
