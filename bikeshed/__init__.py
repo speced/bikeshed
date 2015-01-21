@@ -569,6 +569,11 @@ def classifyDfns(doc, dfns):
                 else:
                     die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
                     continue
+        else:
+            # Types that aren't forced to use 'for' can still optionally use it.
+            dfnFor = treeAttr(el, "data-dfn-for")
+            if dfnFor:
+                el.set('data-dfn-for', dfnFor)
         # Automatically fill in id if necessary.
         if el.get('id') is None:
             convertDashes = dfnType == "dfn"
