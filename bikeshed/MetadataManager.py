@@ -288,7 +288,7 @@ class MetadataManager:
         if self.status == "UD":
             macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/w3c-unofficial"
         else:
-            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/w3c-{0}".format(self.status)
+            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/W3C-{0}".format(self.status)
 
 
 def convertGroup(key, val):
