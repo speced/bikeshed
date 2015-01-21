@@ -251,7 +251,7 @@ class ReferenceManager(object):
                 return urls[0]
             # And repeat for non-locals
             candidates, _ = self.queryRefs(linkType=linkType, spec=spec, status=status, linkFor=linkFor, export=export, ignoreObsoletes=True)
-            urls = list(set(c for c in candidates if c.text.startswith(textPrefix)))
+            urls = list(set(c.url for c in candidates if c.text.startswith(textPrefix)))
             if len(urls) == 1:
                 return urls[0]
             if len(urls) > 1 and zeroRefsError:
@@ -267,7 +267,7 @@ class ReferenceManager(object):
                 return localUrls[0]
             # And repeat for non-locals
             candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, linkFor=candidateFor, export=export, ignoreObsoletes=True)
-            remoteUrls = list(set(c for c in candidates if c.text.startwith(forPrefix)))
+            remoteUrls = list(set(c.url for c in candidates if c.text.startwith(forPrefix)))
             if len(remoteUrls) == 1:
                 return remoteUrls[0]
             if zeroRefsError and (len(localUrls) or len(remoteUrls)):
