@@ -555,7 +555,7 @@ def splitForValues(forValues):
     '''
     Splits a string of 1+ "for" values into an array of individual value.
     Respects function args, etc.
-    Currently, for values are separated by spaces.
+    Currently, for values are separated by commas.
     '''
     startIndex = 0
     mode = "between"
@@ -573,12 +573,12 @@ def splitForValues(forValues):
         elif mode == "in-for":
             if c == "(":
                 mode = "in-args"
-            elif c.isspace():
-                arr.append(forValues[startIndex:i])
+            elif c == ",":
+                arr.append(forValues[startIndex:i].strip())
                 mode = "between"
             else:
                 continue
-    arr.append(forValues[startIndex:])
+    arr.append(forValues[startIndex:].strip())
     return arr
 
 
