@@ -27,7 +27,7 @@ from . import MetadataManager as metadata
 from . import HTMLSerializer
 from .datablocks import transformDataBlocks
 from .ReferenceManager import ReferenceManager
-from .ReferenceManager import linkTextsFromElement
+from .ReferenceManager import linkTextsFromElement, splitForValues
 from .globalnames import *
 from .htmlhelpers import *
 from .messages import *
@@ -1733,7 +1733,7 @@ def addIndexSection(doc):
         linkTexts = linkTextsFromElement(el)
         headingLevel = headingLevelOfElement(el) or "Unnumbered section"
         if el.get('data-dfn-for') is not None:
-            disambiguator = "{0} for {1}".format(el.get('data-dfn-type'), ', '.join(el.get('data-dfn-for').split()))
+            disambiguator = "{0} for {1}".format(el.get('data-dfn-type'), ', '.join(splitForValues(el.get('data-dfn-for'))))
         else:
             type = el.get('data-dfn-type')
             if type == "dfn":
