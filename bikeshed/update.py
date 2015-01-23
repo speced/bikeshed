@@ -94,8 +94,10 @@ def updateCrossRefs():
                 'for': rawAnchor.get('for', [])
             }
             for text in linkingTexts:
+                if anchor['type'] in config.lowercaseTypes:
+                    text = text.lower()
                 text = re.sub(r'\s+', ' ', text)
-                anchors[text.lower()].append(anchor)
+                anchors[text].append(anchor)
 
     if not config.dryRun:
         try:

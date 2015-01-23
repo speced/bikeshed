@@ -149,9 +149,11 @@ class ReferenceManager(object):
             if hasClass(el, "no-ref"):
                 continue
             for linkText in linkTextsFromElement(el):
-                linkText = unfixTypography(linkText).lower()
+                linkText = unfixTypography(linkText)
                 linkText = re.sub("\s+", " ", linkText)
                 type = treeAttr(el, 'data-dfn-type')
+                if type in config.lowercaseTypes:
+                    linkText = linkText.lower()
                 dfnFor = treeAttr(el, 'data-dfn-for')
                 if dfnFor is None:
                     dfnFor = set()
@@ -201,7 +203,9 @@ class ReferenceManager(object):
         # The relevent errors are gated by this variable.
         zeroRefsError = error and linkType!="maybe"
 
-        text = unfixTypography(text).lower()
+        text = unfixTypography(text)
+        if linkType in config.lowercaseTypes:
+            text = text.lower()
 
         status = status or self.status
         if status not in ("ED", "TR", "local"):
@@ -382,8 +386,6 @@ class ReferenceManager(object):
         def textRefsIterator(refs, texts):
             # Same as above, but only grabs those keyed to a given text
             for text in texts:
-                text = text.lower()
-
                 for ref in refs.get(text, []):
                     yield RefWrapper(text, ref)
                 for ref in refs.get(text+"\n", []):
@@ -394,6 +396,8 @@ class ReferenceManager(object):
                 refs = list(textRefsIterator(refs, [text]))
             else:
                 refs = list(textRefsIterator(refs, linkTextVariations(text, linkType)))
+                if (linkType is None or linkType in config.lowercaseTypes) and text.lower() != text:
+                    refs += list(textRefsIterator(refs, linkTextVariations(text.lower(), linkType)))
         else:
             refs = list(refsIterator(refs))
         if not refs:
@@ -476,10 +480,7 @@ def linkTextsFromElement(el, preserveCasing=False):
     if el.get('data-local-title'):
         texts += [x.strip() for x in el.get('data-local-title').split('|')]
     texts = [x for x in texts if x != '']
-    if preserveCasing:
-        return texts
-    else:
-        return [t.lower() for t in texts]
+    return texts
 
 
 def linkTextVariations(str, linkType):

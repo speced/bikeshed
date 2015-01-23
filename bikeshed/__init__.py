@@ -533,7 +533,7 @@ def classifyDfns(doc, dfns):
     for el in dfns:
         dfnType = determineDfnType(el)
         # TODO Why am I using linkTextsFromElement here, but determineDfnText further down?
-        dfnTexts = linkTextsFromElement(el, preserveCasing=True)
+        dfnTexts = linkTextsFromElement(el)
         if len(dfnTexts):
             primaryDfnText = dfnTexts[0]
         else:
@@ -555,7 +555,7 @@ def classifyDfns(doc, dfns):
         if dfnType == "argument" and el.get('data-dfn-for') is None:
             parent = el.getparent()
             if parent.get('data-dfn-type') in config.functionishTypes and parent.get('data-dfn-for') is not None:
-                el.set('data-dfn-for', "{0}/{1} {1}".format(parent.get('data-dfn-for'), linkTextsFromElement(parent, preserveCasing=True)[0]))
+                el.set('data-dfn-for', "{0}/{1} {1}".format(parent.get('data-dfn-for'), linkTextsFromElement(parent)[0]))
             elif treeAttr(el, "data-dfn-for") is None:
                 die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el))
                 continue
@@ -924,7 +924,7 @@ def processIDL(doc):
             idlType = el.get('data-idl-type')
             url = None
             for idlText in el.get('title').split('|'):
-                url = doc.refs.getRef(idlType, idlText.lower(),
+                url = doc.refs.getRef(idlType, idlText,
                                       linkFor=el.get('data-idl-for'),
                                       el=el,
                                       error=False)
@@ -1730,7 +1730,7 @@ def addIndexSection(doc):
     attemptedForRefs = defaultdict(list)
     seenGlobalNames = set()
     for el in findAll("dfn[id]", doc):
-        linkTexts = linkTextsFromElement(el, preserveCasing=True)
+        linkTexts = linkTextsFromElement(el)
         headingLevel = headingLevelOfElement(el) or "Unnumbered section"
         if el.get('data-dfn-for') is not None:
             disambiguator = "{0} for {1}".format(el.get('data-dfn-type'), ', '.join(el.get('data-dfn-for').split()))

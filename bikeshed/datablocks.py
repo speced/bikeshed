@@ -345,7 +345,9 @@ def transformAnchors(lines, doc, **kwargs):
         else:
             urlSuffix = config.simplifyText(anchor['text'][0])
         url = urlPrefix + ("" if "#" in urlPrefix or "#" in urlSuffix else "#") + urlSuffix
-        doc.refs.refs[anchor['text'][0].lower()].append({
+        if anchor['type'][0] in config.lowercaseTypes:
+            anchor['text'][0] = anchor['text'][0].lower()
+        doc.refs.refs[anchor['text'][0]].append({
             "linkingText": anchor['text'][0],
             "type": anchor['type'][0],
             "url": url,
