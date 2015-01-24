@@ -340,6 +340,8 @@ def transformAnchors(lines, doc, **kwargs):
                 continue
         if "urlPrefix" in anchor:
             urlPrefix = ''.join(anchor['urlPrefix'][0])
+        else:
+            urlPrefix = ""
         if "url" in anchor:
             urlSuffix = anchor['url'][0]
         else:
