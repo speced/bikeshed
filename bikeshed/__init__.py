@@ -1313,13 +1313,24 @@ class CSSSpec(object):
         #for tag, replacement in self.macros.items():
         #    text = text.replace("[{0}]".format(tag.upper()), replacement)
         def macroReplacer(match):
-            if match.group(0).startswith("\\"):
-                return match.group(0)[1:]
-            if match.group(1).lower() in self.macros:
-                return self.macros[match.group(1).lower()]
-            die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", match.group(0))
-            return match.group(0)
-        text = re.sub(r"\\?\[([A-Z0-9-]+)\]", macroReplacer, text)
+            fullText = match.group(0)
+            innerText = match.group(2) or ""
+            if fullText.startswith("\\"):
+                # Escaped
+                return fullText[1:]
+            if fullText.startswith("[["):
+                # Actually a biblio link
+                return fullText
+            if innerText.isdigit():
+                # No refs are all-digits (this is probably JS code).
+                return fullText
+            if innerText.lower() in self.macros:
+                # For some reason I store all the macros in lowercase,
+                # despite requiring them to be spelled with uppercase.
+                return self.macros[innerText.lower()]
+            die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
+            return fullText
+        text = re.sub(r"(\\|\[)?\[([A-Z0-9-]+)\]", macroReplacer, text)
         text = fixTypography(text)
         # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
         text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
