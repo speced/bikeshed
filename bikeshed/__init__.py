@@ -1310,8 +1310,16 @@ class CSSSpec(object):
         # Do several textual replacements that need to happen *before* the document is parsed as HTML.
 
         # Replace the [FOO] things.
-        for tag, replacement in self.macros.items():
-            text = text.replace("[{0}]".format(tag.upper()), replacement)
+        #for tag, replacement in self.macros.items():
+        #    text = text.replace("[{0}]".format(tag.upper()), replacement)
+        def macroReplacer(match):
+            if match.group(0).startswith("\\"):
+                return match.group(0)[1:]
+            if match.group(1).lower() in self.macros:
+                return self.macros[match.group(1).lower()]
+            die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", match.group(0))
+            return match.group(0)
+        text = re.sub(r"\\?\[([A-Z0-9-]+)\]", macroReplacer, text)
         text = fixTypography(text)
         # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
         text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
