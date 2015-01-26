@@ -448,7 +448,7 @@ def parse(md, lines):
             inMetadata = False
             continue
         elif inMetadata:
-            if lastKey and (line.strip() == "") or re.match(r"\s+", line):
+            if lastKey and (line.strip() == "" or re.match(r"\s+$", line)):
                 md.addData(lastKey, line.lstrip())
             elif re.match(r"([^:]+):\s*(.*)", line):
                 match = re.match(r"([^:]+):\s*(.*)", line)
