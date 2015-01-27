@@ -77,7 +77,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 			type = 'dt' if len(match.group(1)) == 1 else 'dd'
 			token = {'type':type, 'text': "", 'raw':rawline}
 		elif re.match(r"<", line):
-			if re.match(r"<<", line) or re.match(r"</?({0})[ >]".format(allowedStartElements), line):
+			if re.match(r"<<|<\{", line) or re.match(r"</?({0})[ >]".format(allowedStartElements), line):
 				token = {'type':'text', 'text': line, 'raw': rawline}
 			else:
 				token = {'type':'htmlblock', 'raw': rawline}
