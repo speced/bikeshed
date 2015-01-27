@@ -1089,9 +1089,6 @@ def cleanupHTML(doc):
 def finalHackyCleanup(text):
     # For hacky last-minute string-based cleanups of the rendered html.
 
-    # Remove the </wbr> end tag until the serializer is fixed.
-    text = re.sub("</wbr>", "", text)
-
     return text
 
 
