@@ -165,9 +165,10 @@ with the following keys:
 * **text** - the linking text for the definition. (Exactly 1 required.)
 * **type** - the definition's type (dfn, interface, etc)  (Exactly 1 required.)
 * **urlPrefix** and/or **url** - define the anchor's url, as described below.  (At least one of `urlPrefix` or `url` must be specified. 0+ `urlPrefix` entries allowed, 0 or 1 `url` entries allowed.)
+* **for** - what the definition is for.  (Any number allowed, including 0.)
 
 To generate the url for the anchor,
-first all of the `urlPrefix` entires are concatenated.
+first all of the `urlPrefix` entries are concatenated.
 If a `url` is provided,
 it's appended to the prefixes;
 otherwise, the `text` is url-ified and appended.
