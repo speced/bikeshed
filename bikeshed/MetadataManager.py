@@ -57,6 +57,7 @@ class MetadataManager:
         self.noEditor = False
         self.defaultBiblioStatus = "dated"
         self.markupShorthands = set(["css", "biblio", "markup", "idl"])
+        self.customTextMacros = []
         self.issues = []
 
         self.otherMetadata = defaultdict(list)
@@ -106,7 +107,8 @@ class MetadataManager:
             "Ignored Terms": "ignoredTerms",
             "Link Defaults": "linkDefaults",
             "Issue Tracking": "issues",
-            "Markup Shorthands": "markupShorthands"
+            "Markup Shorthands": "markupShorthands",
+            "Text Macro": "customTextMacros"
         }
 
         self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
@@ -131,7 +133,8 @@ class MetadataManager:
             "No Editor": parseBoolean,
             "Default Biblio Status": parseBiblioStatus,
             "Issue Tracking": parseIssues,
-            "Markup Shorthands": parseMarkupShorthands
+            "Markup Shorthands": parseMarkupShorthands,
+            "Text Macro": parseTextMacro
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -293,6 +296,9 @@ class MetadataManager:
             macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/w3c-unofficial"
         else:
             macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/W3C-{0}".format(self.status)
+        # Custom macros
+        for name, text in self.customTextMacros:
+            macros[name.lower()] = text
 
 
 def convertGroup(key, val):
@@ -465,6 +471,19 @@ def glomMarkupShorthands(key, val, doc):
         else:
             ms.discard(name)
 
+def parseTextMacro(key, val):
+    # Each Text Macro line is just a macro name (must be uppercase)
+    # followed by the text it expands to.
+    try:
+        name, text = val.lstrip().split(None, 1)
+    except:
+        die("Text Macro lines must contain a macro name followed by the macro text. Got:\n{0}", val)
+        return None
+    if not re.match(r"[A-Z0-9-]+$", name):
+        die("Text Macro names must be all-caps and alphanumeric. Got '{0}'", name)
+        return None
+    return (name, text)
+
 
 def parse(md, lines):
     # Given a MetadataManager and HTML document text, in the form of an array of text lines,
@@ -508,6 +527,8 @@ def smooshValues(container, val):
     (container should be a defaultdict(list) in this case).
     '''
     if isinstance(container, list):
+        if val is None:
+            return
         if isinstance(val, list):
             container.extend(val)
         else:

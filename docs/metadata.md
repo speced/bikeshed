@@ -65,6 +65,7 @@ There are several additional optional keys:
 * **No Editor** lets you omit the `Editor` metadata without an error. It takes a bool-ish value.  This shouldn't generally be used; even if your organization doesn't privilege editors in any way, putting the organization itself in the `Editor` field meets the intent while still producing useful information for readers of the spec.
 * **Default Biblio Status** takes the values "current" or "dated", and selects which URL you want to default to for bibliography entries that have both "current" and "dated" URLs. (You can also specify this per-biblio entry.)
 * **Markup Shorthands** lets you specify which categories of markup shorthands you want to use; for example, you can turn off CSS shorthands and reclaim use of single quotes in your spec.  You can still link to things with explicit markup even if the shorthand is turned off.  Its value is a comma-separated list of markup categories and bool-ish values, like `css no, biblio yes`.  The currently-recognized categories are "css", "idl", "biblio" (including section links), and "markup".
+* **Text Macro** lets you specify custom text macros, like `[TITLE]` or `[DATE]`, letting you fill in different text when building a spec in multiple ways.  (This is mostly useful as a command-line option.)  Each `Text Macro` line consists of a macro name, which must be uppercase and alphanumeric, followed by the text it will get replaced with.
 
 You can also provide custom keys with whatever values you want,
 by prefixing the key with `!`,
