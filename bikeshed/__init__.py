@@ -1332,12 +1332,13 @@ class CSSSpec(object):
             return fullText
         text = re.sub(r"(\\|\[)?\[([A-Z0-9-]+)\]", macroReplacer, text)
         text = fixTypography(text)
-        # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
-        text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
-        # Replace the ''maybe link'' shortcuts.
-        # They'll survive the HTML parser, but they don't match if they contain an element.
-        # (The other shortcuts are "atomic" and can't contain elements.)
-        text = re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
+        if "css" in self.md.markupShorthands:
+            # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
+            text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
+            # Replace the ''maybe link'' shortcuts.
+            # They'll survive the HTML parser, but they don't match if they contain an element.
+            # (The other shortcuts are "atomic" and can't contain elements.)
+            text = re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
         return text
 
     def transformProductionPlaceholders(doc):
@@ -1502,11 +1503,15 @@ class CSSSpec(object):
 
         def transformText(text):
             nodes = [text]
-            config.processTextNodes(nodes, propdescRe, propdescReplacer)
-            config.processTextNodes(nodes, idlRe, idlReplacer)
-            config.processTextNodes(nodes, elementRe, elementReplacer)
-            config.processTextNodes(nodes, biblioRe, biblioReplacer)
-            config.processTextNodes(nodes, sectionRe, sectionReplacer)
+            if "css" in doc.md.markupShorthands:
+                config.processTextNodes(nodes, propdescRe, propdescReplacer)
+            if "idl" in doc.md.markupShorthands:
+                config.processTextNodes(nodes, idlRe, idlReplacer)
+            if "markup" in doc.md.markupShorthands:
+                config.processTextNodes(nodes, elementRe, elementReplacer)
+            if "biblio" in doc.md.markupShorthands:
+                config.processTextNodes(nodes, biblioRe, biblioReplacer)
+                config.processTextNodes(nodes, sectionRe, sectionReplacer)
             return nodes
 
         transformElement(doc.document.getroot())
@@ -1514,6 +1519,8 @@ class CSSSpec(object):
 
     def transformProductionGrammars(doc):
         # Link up the various grammar symbols in CSS grammars to their definitions.
+        if "css" not in doc.md.markupShorthands:
+            return
 
         hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
         def hashMultReplacer(match):

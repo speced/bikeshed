@@ -56,6 +56,7 @@ class MetadataManager:
         self.useIAutolinks = False
         self.noEditor = False
         self.defaultBiblioStatus = "dated"
+        self.markupShorthands = set(["css", "biblio", "markup", "idl"])
         self.issues = []
 
         self.otherMetadata = defaultdict(list)
@@ -104,7 +105,8 @@ class MetadataManager:
             "At Risk": "atRisk",
             "Ignored Terms": "ignoredTerms",
             "Link Defaults": "linkDefaults",
-            "Issue Tracking": "issues"
+            "Issue Tracking": "issues",
+            "Markup Shorthands": "markupShorthands"
         }
 
         self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
@@ -128,12 +130,14 @@ class MetadataManager:
             "Use <I> Autolinks": parseBoolean,
             "No Editor": parseBoolean,
             "Default Biblio Status": parseBiblioStatus,
-            "Issue Tracking": parseIssues
+            "Issue Tracking": parseIssues,
+            "Markup Shorthands": parseMarkupShorthands
         }
 
         # Alternate output handlers, passed key/value/doc.
         # The "default" output assigns the value to self.key.
         self.customOutput = {
+            "Markup Shorthands": glomMarkupShorthands
         }
 
     def addData(self, key, val, default=False):
@@ -430,6 +434,36 @@ def parseIssues(key, val):
     for v in vals:
         issues.append(v.rsplit(" ", 1))
     return issues
+
+def parseMarkupShorthands(key, val):
+    # Format is comma-separated list of shorthand category followed by boolean.
+    # Output is a dict of the shorthand categories with boolean values.
+    vals = [v.strip() for v in val.lower().split(",")]
+    ret = {}
+    validCategories = frozenset(["css", "markup", "biblio", "idl"])
+    for v in vals:
+        pieces = v.split()
+        if len(pieces) != 2:
+            die("Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}", v)
+            return {}
+        name, boolstring = pieces
+        if name not in validCategories:
+            die("Unknown Markup Shorthand category '{0}'.", name)
+            return {}
+        onoff = parseBoolean(key, boolstring)
+        if onoff is None:
+            # parsing failed
+            return {}
+        ret[name] = onoff
+    return ret
+
+def glomMarkupShorthands(key, val, doc):
+    ms = doc.md.markupShorthands
+    for name, onoff in val.items():
+        if onoff:
+            ms.add(name)
+        else:
+            ms.discard(name)
 
 
 def parse(md, lines):
