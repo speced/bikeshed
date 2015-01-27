@@ -293,6 +293,14 @@ def treeAttr(el, attrName):
         if ancestor.get(attrName) is not None:
             return ancestor.get(attrName)
 
+def removeAttr(el, attrName):
+    # Remove an attribute, silently ignoring if attr doesn't exist.
+    try:
+        del el.attrib[attrName]
+    except:
+        pass
+    return el
+
 
 def addClass(el, cls):
     if el.get('class') is None:

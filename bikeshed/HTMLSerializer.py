@@ -8,6 +8,7 @@ class HTMLSerializer(object):
 	inlineEls = frozenset(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress"])
 	rawEls = frozenset(["xmp", "script", "style"])
 	voidEls = frozenset(["area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"])
+	omitEndTagEls = frozenset(["td", "th", "tr", "thead", "tbody", "tfoot", "li", "dt", "dd"])
 	def __init__(self, tree):
 		self.tree = tree
 
@@ -25,7 +26,7 @@ class HTMLSerializer(object):
 		if el.tag not in self.inlineEls:
 			if not prevSiblingHadNewline:
 				write("\n")
-			write("  "*indent)
+			write(" "*indent)
 		write("<")
 		if el.tag.startswith("{"):
 			write(el.tag.partition("}")[2])
@@ -58,13 +59,13 @@ class HTMLSerializer(object):
 			if child.tail:
 				if not pre and child.tag not in self.inlineEls:
 					write("\n")
-					write("  "*(indent+1))
+					write(" "*(indent+1))
 				write(self.escapeText(child.tail))
 				prevSiblingHadNewline = child.tail.endswith("\n")
-		if el.tag not in self.voidEls:
+		if not (el.tag in self.voidEls or el.tag in self.omitEndTagEls):
 			if not pre and blockChildren:
 				write("\n")
-				write("  "*indent)
+				write(" "*indent)
 			write("</")
 			if el.tag.startswith("{"):
 				write(el.tag.partition("}")[2])

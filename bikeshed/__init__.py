@@ -1024,6 +1024,8 @@ def addSyntaxHighlighting(doc):
 
 
 def cleanupHTML(doc):
+    # Cleanup done immediately before serialization.
+
     # Move any stray <link>, <script>, <meta>, or <style> into the <head>.
     head = find("head", doc)
     for el in findAll("body link, body script, body meta, body style:not([scoped])", doc):
@@ -1084,6 +1086,28 @@ def cleanupHTML(doc):
             break
     else:
         addClass(h1, "allcaps")
+
+    # Remove a bunch of attributes
+    for el in findAll("[data-attribute-info], [data-dict-member-info]", doc):
+        removeAttr(el, 'data-attribute-info')
+        removeAttr(el, 'data-dict-member-info')
+        removeAttr(el, 'for')
+    for el in findAll("a", doc):
+        removeAttr(el, 'data-link-for')
+        removeAttr(el, 'data-link-status')
+        removeAttr(el, 'data-link-spec')
+        removeAttr(el, 'data-section')
+        removeAttr(el, 'data-biblio-type')
+        removeAttr(el, 'data-biblio-status')
+        removeAttr(el, 'title')
+    for el in findAll("[data-link-for]:not(a), [data-link-type]:not(a), [data-dfn-for]:not(dfn), [data-dfn-type]:not(dfn)", doc):
+        removeAttr(el, 'data-link-for')
+        removeAttr(el, 'data-link-type')
+        removeAttr(el, 'data-dfn-for')
+        removeAttr(el, 'data-dfn-type')
+    for el in findAll("[data-export]:not(dfn), [data-noexport]:not(dfn)", doc):
+        removeAttr(el, 'data-export')
+        removeAttr(el, 'data-noexport')
 
 
 def finalHackyCleanup(text):
@@ -1791,7 +1815,7 @@ def addIndexSection(doc):
             item = items[0]
             li = appendChild(topList,
                 E.li(item['text'], ", ",
-                    E.a({"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
+                    E.a({"href":"#"+item['id']}, item['level'])))
             if item['type'] == "property":
                 reffingDfns = []
                 for globalName in item['globalNames']:
@@ -1801,14 +1825,14 @@ def addIndexSection(doc):
                     for r in reffingDfns:
                         appendChild(dl,
                             E.dd(r.text, ", ",
-                                E.a({"href":"#"+r['id'], "title":"section "+r['level']}, r['level'])))
+                                E.a({"href":"#"+r['id']}, r['level'])))
         else:
             li = appendChild(topList, E.li(items[0]['text']))
             ul = appendChild(li, E.ul())
             for item in items:
                 appendChild(ul,
                     E.li(item['disambiguator'], ", ",
-                        E.a({"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
+                        E.a({"href":"#"+item['id']}, item['level'])))
 
 
 
@@ -2088,7 +2112,7 @@ def addReferencesSection(doc):
             E.h3({"class":"no-num", "id":"normative"}, "Normative References"),
             E.dl())
         for ref in normRefs:
-            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText), "title":ref.linkText}, "["+ref.linkText+"]"))
+            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText)}, "["+ref.linkText+"]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
     informRefs = [x for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText) if x.linkText not in doc.normativeRefs]
@@ -2097,7 +2121,7 @@ def addReferencesSection(doc):
             E.h3({"class":"no-num", "id":"informative"}, "Informative References"),
             E.dl())
         for ref in informRefs:
-            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText), "title":ref.linkText}, "["+ref.linkText+"]"))
+            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText)}, "["+ref.linkText+"]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
 def addIssuesSection(doc):
