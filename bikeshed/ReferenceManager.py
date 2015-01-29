@@ -471,21 +471,21 @@ class ReferenceManager(object):
 
 def linkTextsFromElement(el, preserveCasing=False):
     from .htmlhelpers import textContent
-    if el.get('title') == '':
+    if el.get('data-lt') == '':
         return []
-    elif el.get('title'):
-        texts = [x.strip() for x in el.get('title').split('|')]
+    elif el.get('data-lt'):
+        texts = [x.strip() for x in el.get('data-lt').split('|')]
     else:
         texts = [textContent(el).strip()]
-    if el.get('data-local-title'):
-        texts += [x.strip() for x in el.get('data-local-title').split('|')]
+    if el.get('data-local-lt'):
+        texts += [x.strip() for x in el.get('data-local-lt').split('|')]
     texts = [x for x in texts if x != '']
     return texts
 
 
 def linkTextVariations(str, linkType):
     # Generate intelligent variations of the provided link text,
-    # so explicitly adding a title attr isn't usually necessary.
+    # so explicitly adding an lt attr isn't usually necessary.
     yield str
 
     if linkType == "dfn":

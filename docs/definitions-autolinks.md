@@ -18,8 +18,8 @@ Sometimes, the text of the definition isn't exactly what you want it to be linke
 or you may want it to be linkable with more than one phrase.
 For example, an algorithm named "Check if three characters would start an identifier"
 may also want to be linkable from the phrase "starts with an identifier".
-To alter the linking text, simply add a `title` attribute to the definition;
-the title text is used instead of the text content.
+To alter the linking text, simply add an `lt` attribute (for "Linking Text") to the definition;
+the linking text is used instead of the text content.
 You can separate multiple linking phrases by separating them with the pipe "|" character.
 
 Defining Extra-Short "Local" Linking Texts
@@ -27,11 +27,11 @@ Defining Extra-Short "Local" Linking Texts
 
 Sometimes you want to use an extra-short version of a term for within a spec,
 but don't want to confuse things by exporting it globally.
-To achieve this, add a `local-title` attribute with the terms you want to be only usable within the spec;
-the syntax is identical to that of the `title` attribute, described above.
+To achieve this, add a `local-lt` attribute with the terms you want to be only usable within the spec;
+the syntax is identical to that of the `lt` attribute, described above.
 
 Using local linking text does not disturb the normal linking-text process;
-that still takes from either the element text or the `title` attribute,
+that still takes from either the element text or the `lt` attribute,
 as normal.
 
 Definition Types
@@ -205,11 +205,11 @@ It compares the text content of the link to the text content of all the definiti
 and if it finds a match,
 automatically sets the `href` appropriately to point at the relevant definition.
 
-Like definitions, you can override the linking text by setting a `title=''` attribute.
+Like definitions, you can override the linking text by setting a `lt=''` attribute.
 Unlike definitions, you can't separate multiple linking phrases by the bar "|" character,
 as that doesn't make sense for links.
 
-Setting an empty title attribute turns off autolinking entirely,
+Setting an empty lt attribute turns off autolinking entirely,
 if for whatever reason you need to do so.
 
 There are several additional shortcuts for writing an autolink:

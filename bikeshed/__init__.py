@@ -354,7 +354,8 @@ def canonicalizeShortcuts(doc):
         "section":"data-section",
         "attribute-info":"data-attribute-info",
         "dict-member-info":"data-dict-member-info",
-        "local-title":"data-local-title"
+        "lt":"data-lt",
+        "local-lt":"data-local-lt"
     }
     for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys()), doc):
         for attr, fixedAttr in attrFixup.items():
@@ -439,9 +440,9 @@ def fillAttributeInfoSpans(doc):
                 continue
             if "/" in referencedAttribute:
                 interface, referencedAttribute = referencedAttribute.split("/")
-                target = findAll('[data-link-type={2}][title="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface, refType), doc)
+                target = findAll('[data-link-type={2}][data-lt="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface, refType), doc)
             else:
-                target = findAll('[data-link-type={1}][title="{0}"]'.format(referencedAttribute, refType), doc)
+                target = findAll('[data-link-type={1}][data-lt="{0}"]'.format(referencedAttribute, refType), doc)
             if len(target) == 0:
                 die("Couldn't find target {1} '{0}':\n{2}", referencedAttribute, refType, outerHTML(el))
                 continue
@@ -520,8 +521,8 @@ def determineDfnType(dfn):
 def determineDfnText(el):
     dfnType = el.get('data-dfn-type')
     contents = textContent(el)
-    if el.get('title'):
-        dfnText = el.get('title')
+    if el.get('data-lt'):
+        dfnText = el.get('data-lt')
     elif dfnType in config.functionishTypes and re.match(r"^[\w-]+\(.*\)$", contents):
         dfnText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1)+"()"
     else:
@@ -547,10 +548,10 @@ def classifyDfns(doc, dfns):
             if not re.match(r"^[\w-]+\(.*\)$", primaryDfnText):
                 die("Functions/methods must end with () in their linking text, got '{0}'.", primaryDfnText)
                 continue
-            elif el.get('title') is None:
-                # Make sure that functionish dfns have their title set up right.
+            elif el.get('data-lt') is None:
+                # Make sure that functionish dfns have their linking text set up right.
                 # Need to fix this to use the idl parser instead.
-                el.set('title', re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1)+"()")
+                el.set('data-lt', re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1)+"()")
         # If type=argument, try to infer what it's for.
         if dfnType == "argument" and el.get('data-dfn-for') is None:
             parent = el.getparent()
@@ -654,8 +655,8 @@ def determineLinkType(el):
 def determineLinkText(el):
     linkType = el.get('data-link-type')
     contents = textContent(el)
-    if el.get('title'):
-        linkText = el.get('title')
+    if el.get('data-lt'):
+        linkText = el.get('data-lt')
     elif linkType in config.functionishTypes.union(["functionish"]) and re.match(r"^[\w-]+\(.*\)$", contents):
         linkText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1)+"()"
         # Need to fix this using the idl parser.
@@ -672,7 +673,7 @@ def classifyLink(el):
     el.set('data-link-type', linkType)
     linkText = determineLinkText(el)
 
-    el.set('title', linkText)
+    el.set('data-lt', linkText)
     for attr in ["data-link-status", "data-link-for", "data-link-spec"]:
         val = treeAttr(el, attr)
         if val is not None:
@@ -733,13 +734,13 @@ def processAutolinks(doc):
     else:
         autolinks = findAll("a:not([href])", doc)
     for el in autolinks:
-        # Explicitly empty title indicates this shouldn't be an autolink.
-        if el.get('title') == '':
+        # Explicitly empty linking text indicates this shouldn't be an autolink.
+        if el.get('data-lt') == '':
             continue
 
         classifyLink(el)
         linkType = el.get('data-link-type')
-        linkText = el.get('title')
+        linkText = el.get('data-lt')
 
         # Properties and descriptors are often written like 'foo-*'. Just ignore these.
         if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
@@ -759,8 +760,8 @@ def processAutolinks(doc):
                 el.tag = "css"
                 if el.get("data-link-type"):
                     del el.attrib["data-link-type"]
-                if el.get("title"):
-                    del el.attrib["title"]
+                if el.get("data-lt"):
+                    del el.attrib["data-lt"]
 
 
 def processIssues(doc):
@@ -835,10 +836,10 @@ class IDLMarker(object):
         if text == "stringifier":
             if construct.name is None:
                 # If no name was defined, you're required to define stringification behavior.
-                return ("<a dfn for='{0}' title='stringification behavior'>".format(construct.parent.fullName), "</a>")
+                return ("<a dfn for='{0}' data-lt='stringification behavior'>".format(construct.parent.fullName), "</a>")
             else:
                 # Otherwise, you *can* point to/dfn stringification behavior if you want.
-                return ("<idl data-idl-type=dfn data-idl-for='{0}' title='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
+                return ("<idl data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
         return (None, None)
 
     def markupName(self, text, construct):
@@ -873,7 +874,7 @@ class IDLMarker(object):
             idlFor = "data-idl-for='{0}'".format(construct.parent.fullName)
         else:
             idlFor = ""
-        return ('<idl title="{0}" data-idl-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters), '</idl>')
+        return ('<idl data-lt="{0}" data-idl-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters), '</idl>')
 
     def encode(self, text):
         return escapeHTML(text)
@@ -925,7 +926,7 @@ def processIDL(doc):
         for el in findAll("idl", pre):
             idlType = el.get('data-idl-type')
             url = None
-            for idlText in el.get('title').split('|'):
+            for idlText in el.get('data-lt').split('|'):
                 url = doc.refs.getRef(idlType, idlText,
                                       linkFor=el.get('data-idl-for'),
                                       el=el,
@@ -944,7 +945,7 @@ def processIDL(doc):
             else:
                 el.tag = "a"
                 el.set('data-link-type', idlType)
-                el.set('title', idlText)
+                el.set('data-lt', idlText)
                 del el.attrib['data-idl-type']
                 if el.get('data-idl-for'):
                     el.set('data-link-for', el.get('data-idl-for'))
@@ -1053,10 +1054,10 @@ def cleanupHTML(doc):
         for comment in comments:
             removeNode(comment)
 
-    # Remove duplicate titles.
-    for el in findAll("dfn[title], a[title]", doc):
-        if el.get('title') == textContent(el):
-            del el.attrib['title']
+    # Remove duplicate linking texts.
+    for el in findAll("dfn[data-lt], a[data-lt]", doc):
+        if el.get('data-lt') == textContent(el):
+            del el.attrib['data-lt']
 
     # Transform the <css> fake tag into markup.
     # (Used when the ''foo'' shorthand doesn't work.)
@@ -1099,7 +1100,7 @@ def cleanupHTML(doc):
         removeAttr(el, 'data-section')
         removeAttr(el, 'data-biblio-type')
         removeAttr(el, 'data-biblio-status')
-        removeAttr(el, 'title')
+        removeAttr(el, 'data-lt')
     for el in findAll("[data-link-for]:not(a), [data-link-type]:not(a), [data-dfn-for]:not(dfn), [data-dfn-type]:not(dfn)", doc):
         removeAttr(el, 'data-link-for')
         removeAttr(el, 'data-link-type')
@@ -1193,7 +1194,7 @@ class CSSSpec(object):
                         level = "1"
                     self.refs.specs[specName] = {
                         "description": "Custom Spec Link for {0}".format(specName),
-                        "title": "Custom Spec Link for {0}".format(specName),
+                        "data-lt": "Custom Spec Link for {0}".format(specName),
                         "level": config.HierarchicalNumber(level),
                         "TR": specUrl,
                         "shortname": shortname,
@@ -1261,6 +1262,7 @@ class CSSSpec(object):
 
 
         # Handle all the links
+        temporaryCheckForExcessiveTitle(self)
         processDfns(self)
         processIDL(self)
         fillAttributeInfoSpans(self)
@@ -1383,7 +1385,7 @@ class CSSSpec(object):
                     continue
                 el.tag = "a"
                 el.set("data-link-type", linkType)
-                el.set("title", match.group(2))
+                el.set("data-lt", match.group(2))
                 if match.group(1) is not None:
                     el.set("for", match.group(1))
                 el.text = "<‘" + match.group(2) + "’>"
@@ -1392,7 +1394,7 @@ class CSSSpec(object):
             if match:
                 el.tag = "a"
                 el.set("data-link-type", "function")
-                el.set("title", match.group(2))
+                el.set("data-lt", match.group(2))
                 if match.group(1) is not None:
                     el.set("for", match.group(1))
                 el.text = "<" + match.group(2) + ">"
@@ -1401,7 +1403,7 @@ class CSSSpec(object):
             if match:
                 el.tag = "a"
                 el.set("data-link-type", "at-rule")
-                el.set("title", match.group(2))
+                el.set("data-lt", match.group(2))
                 if match.group(1) is not None:
                     el.set("for", match.group(1))
                 el.text = "<" + match.group(2) + ">"
@@ -1428,7 +1430,7 @@ class CSSSpec(object):
                 el.tag = "a"
                 el.set("class", "css")
                 el.set("data-link-type", "propdesc")
-                el.set("title", match.group(1))
+                el.set("data-lt", match.group(1))
                 el.text = text
                 continue
             match = valRe.match(text)
@@ -1444,7 +1446,7 @@ class CSSSpec(object):
                 el.tag = "a"
                 el.set("class", "css")
                 el.set("data-link-type", linkType)
-                el.set("title", match.group(2))
+                el.set("data-lt", match.group(2))
                 if match.group(1) is not None:
                     el.set("for", match.group(1))
                 el.text = match.group(2)
@@ -1465,7 +1467,7 @@ class CSSSpec(object):
             else:
                 type = "informative"
             term = match.group(3)
-            attrs = {"title":term, "data-link-type":"biblio", "data-biblio-type":type}
+            attrs = {"data-lt":term, "data-link-type":"biblio", "data-biblio-type":type}
             if match.group(4) is not None:
                 attrs['data-biblio-status'] = match.group(4).strip()
             return E.a(attrs,
@@ -1545,19 +1547,19 @@ class CSSSpec(object):
 
         hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
         def hashMultReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": "#", "for":""}, match.group(0))
+            return E.a({"data-link-type":"grammar", "data-lt": "#", "for":""}, match.group(0))
 
         multRe = re.compile(r"{\s*\d+\s*}")
         def multReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": "{A}", "for":""}, match.group(0))
+            return E.a({"data-link-type":"grammar", "data-lt": "{A}", "for":""}, match.group(0))
 
         multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
         def multRangeReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": "{A,B}", "for":""}, match.group(0))
+            return E.a({"data-link-type":"grammar", "data-lt": "{A,B}", "for":""}, match.group(0))
 
         simpleRe = re.compile(r"\?|!|#|\*|\+|\|\||\||&amp;&amp;|,")
         def simpleReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": match.group(0), "for":""}, match.group(0))
+            return E.a({"data-link-type":"grammar", "data-lt": match.group(0), "for":""}, match.group(0))
 
         def transformElement(parentEl):
             children = childNodes(parentEl, clear=True)
@@ -2148,3 +2150,9 @@ def addIssuesSection(doc):
         del idel.attrib['id']
     for dfnel in findAll("dfn", container):
         dfnel.tag = "span"
+
+
+def temporaryCheckForExcessiveTitle(doc):
+    # This function is a migration aid, to help warn a spec if it uses a bunch of title attributes.
+    if len(findAll("dfn[title]:not([data-lt]), a[title]:not([data-lt])", doc)) > 0:
+        warn("Bikeshed now prefers you specify alternate linking texts with the 'lt' attribute, not 'title'. Please change your source.")
