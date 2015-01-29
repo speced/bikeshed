@@ -1243,6 +1243,7 @@ class CSSSpec(object):
         metadata.parseDoc(self)
 
         # Fill in and clean up a bunch of data
+        addBikeshedVersion(self)
         addStatusSection(self)
         addLogo(self)
         addCopyright(self)
@@ -1639,6 +1640,11 @@ config.specClass = CSSSpec
 
 
 
+def addBikeshedVersion(doc):
+    # Adds a <meta> containing the current Bikeshed semver.
+    head = find("head", doc)
+    appendChild(head,
+        E.meta({"name": "bikeshed-semver", "content": "1.0.0"}))
 
 def formatElementdefTables(doc):
     for table in findAll("table.elementdef", doc):
