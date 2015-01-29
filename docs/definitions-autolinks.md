@@ -277,7 +277,7 @@ There are three things you might have to do to fix these:
     For example, many properties define an "auto" value;
     to link to the "auto" value of the 'width' property in particular,
     specify `<a value for=width>auto</a>`,
-    or the shorthand syntax `''width/auto''.
+    or the shorthand syntax `''width/auto''`.
     To refer to a value of a descriptor,
     you *can* be completely explicit and specify the at-rule as well,
     like `<a value for='@counter-style/system'>numeric</a>`,
