@@ -1328,7 +1328,7 @@ class CSSSpec(object):
         propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
         funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
         atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
-        typeRe = re.compile(r"^(?:(\S*)/)?([\w-]+)$")
+        typeRe = re.compile(r"^(?:(\S*)/)?(\S+)$")
         for el in findAll("fake-production-placeholder", doc):
             text = textContent(el)
             clearContents(el)
