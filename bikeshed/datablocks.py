@@ -339,7 +339,7 @@ def transformAnchors(lines, doc, **kwargs):
                 die("Unknown key '{0}' in anchor:\n{1}", key, config.printjson(anchor))
                 continue
         if "urlPrefix" in anchor:
-            urlPrefix = ''.join(anchor['urlPrefix'][0])
+            urlPrefix = ''.join(anchor['urlPrefix'])
         else:
             urlPrefix = ""
         if "url" in anchor:
