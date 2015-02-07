@@ -60,7 +60,6 @@ Autolink Shortcuts
 
 There are several shortcuts for writing autolinks of particular types, so you don't have to write the `<a>` element yourself:
 
-* `<i>` elements are treated as autolinks as well, for legacy reasons.
 * `'foo'` (apostophes/straight quotes) is an autolink to a property or descriptor named "foo"
 * `''foo''` (double apostrophes) is an autolink to any of the CSS definition types except property and descriptor
 * `<<foo>>` is an autolink to a type/production named "&lt;foo>"
