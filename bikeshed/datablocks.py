@@ -33,6 +33,7 @@ def transformDataBlocks(doc):
         'biblio': transformBiblio,
         'anchors': transformAnchors,
         'link-defaults': transformLinkDefaults,
+        'info': transformInfo,
         'pre': transformPre
     }
     blockType = ""
@@ -324,6 +325,9 @@ def transformBiblio(lines, doc, **kwargs):
 
 def transformAnchors(lines, doc, **kwargs):
     anchors = parseInfoTree(lines, doc.md.indent)
+    return processAnchors(anchors, doc)
+
+def processAnchors(anchors, doc):
     for anchor in anchors:
         if "type" not in anchor or len(anchor['type']) != 1:
             die("Each anchor needs exactly one type. Got:\n{0}", config.printjson(anchor))
@@ -334,10 +338,6 @@ def transformAnchors(lines, doc, **kwargs):
         if "url" not in anchor and "urlPrefix" not in anchor:
             die("Each anchor needs a url and/or at least one urlPrefix. Got:\n{0}", config.printjson(anchor))
             continue
-        for key in anchor:
-            if key not in ("type", "text", "url", "urlPrefix", "for"):
-                die("Unknown key '{0}' in anchor:\n{1}", key, config.printjson(anchor))
-                continue
         if "urlPrefix" in anchor:
             urlPrefix = ''.join(anchor['urlPrefix'])
         else:
@@ -361,6 +361,9 @@ def transformAnchors(lines, doc, **kwargs):
 
 def transformLinkDefaults(lines, doc, **kwargs):
     lds = parseInfoTree(lines, doc.md.indent)
+    return processLinkDefaults(lds, doc)
+
+def processLinkDefaults(lds, doc):
     for ld in lds:
         if len(ld.get('type', [])) != 1:
             die("Every link default needs exactly one type. Got:\n{0}", config.printjson(ld))
@@ -373,6 +376,31 @@ def transformLinkDefaults(lines, doc, **kwargs):
             continue
         doc.md.linkDefaults[ld['text'][0]].append((ld['spec'][0], ld['type'][0], ld.get('status', None), ld.get('for', None)))
     return []
+
+
+def transformInfo(lines, doc, **kwargs):
+    # More generic InfoTree system.
+    # A <pre class=info> can contain any of the InfoTree collections,
+    # identified by an 'info' line.
+    infos = parseInfoTree(lines, doc.md.indent)
+    knownInfoTypes = {
+        "anchors": processAnchors,
+        "link-defaults": processLinkDefaults
+    }
+    infoCollections = defaultdict(list)
+    for info in infos:
+        if len(info.get('info', [])) != 1:
+            die("Every info-block line needs exactly one 'info' type. Got:\n{0}", config.printjson(info))
+            continue
+        infoType = info.get('info')[0].lower()
+        if infoType not in knownInfoTypes:
+            die("Unknown info-block type '{0}'", infoType)
+            continue
+        infoCollections[infoType].append(info)
+    for infoType, infos in infoCollections.items():
+        knownInfoTypes[infoType](infos, doc)
+    return []
+
 
 
 def parseInfoTree(lines, indent=4):
