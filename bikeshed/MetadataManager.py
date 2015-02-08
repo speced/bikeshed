@@ -12,10 +12,6 @@ from .htmlhelpers import *
 
 class MetadataManager:
     @property
-    def hasMetadata(self):
-        return len(self.manuallySetKeys) > 0
-
-    @property
     def vshortname(self):
         if self.level is not None:
             return "{0}-{1}".format(self.shortname, self.level)
@@ -23,6 +19,7 @@ class MetadataManager:
 
     def __init__(self, doc):
         self.doc = doc
+        self.hasMetadata = False
 
         # required metadata
         self.status = None
@@ -496,6 +493,7 @@ def parse(md, lines):
     for line in lines:
         if not inMetadata and re.match(r"<pre .*class=.*metadata.*>", line):
             inMetadata = True
+            md.hasMetadata = True
             continue
         elif inMetadata and re.match(r"</pre>\s*", line):
             inMetadata = False
