@@ -24,6 +24,7 @@ class ReferenceManager(object):
         self.defaultSpecs = defaultdict(list)
         self.css21Replacements = set()
         self.ignoredSpecs = set()
+        self.replacedSpecs = set()
         self.status = specStatus
         self.biblios = defaultdict(list)
         self.anchorMacros = dict()
@@ -61,7 +62,13 @@ class ReferenceManager(object):
         except IOError:
             pass
 
-        self.defaultSpecs.update(json.loads(config.retrieveCachedFile("link-defaults.json", quiet=True, str=True)))
+        datablocks.transformInfo(config.retrieveCachedFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
+        # local info
+        try:
+            with io.open("link-defaults.infotree", 'r', encoding="utf-8") as lines:
+                datablocks.transformInfo(lines, doc)
+        except IOError:
+            pass
 
     def initializeBiblio(self):
         with config.retrieveCachedFile("biblio.data", quiet=True) as lines:
@@ -450,6 +457,9 @@ class ReferenceManager(object):
             # Remove any ignored or obsoleted specs
             possibleSpecs = set(ref.spec for ref in refs)
             moreIgnores = set()
+            for oldSpec, newSpec in self.replacedSpecs:
+                if newSpec in possibleSpecs:
+                    moreIgnores.add(oldSpec)
             # All the individual CSS specs replace SVG.
             if bool(possibleSpecs.intersection(self.css21Replacements)):
                 moreIgnores.add("css21")

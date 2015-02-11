@@ -1170,50 +1170,9 @@ class CSSSpec(object):
             die("Couldn't open the input file '{0}'.", inputFilename)
             return
 
-
         self.refs.initializeRefs(self);
         self.refs.initializeBiblio();
-
         self.testSuites = json.loads(config.retrieveCachedFile("test-suites.json", quiet=True, str=True))
-
-        if "css21Replacements" in self.refs.defaultSpecs:
-            self.refs.css21Replacements = set(self.refs.defaultSpecs["css21Replacements"])
-            del self.refs.defaultSpecs["css21Replacements"]
-        if "ignoredSpecs" in self.refs.defaultSpecs:
-            self.refs.ignoredSpecs = set(self.refs.defaultSpecs["ignoredSpecs"])
-            del self.refs.defaultSpecs["ignoredSpecs"]
-        if "customDfns" in self.refs.defaultSpecs:
-            for specName, specUrl, dfnText, dfnType, dfnUrl in self.refs.defaultSpecs["customDfns"]:
-                if specName not in self.refs.specs:
-                    levelMatch = re.match(r"(.*)-(\d+)", specName)
-                    if levelMatch:
-                        shortname = levelMatch.group(1)
-                        level = levelMatch.group(2)
-                    else:
-                        shortname = specName
-                        level = "1"
-                    self.refs.specs[specName] = {
-                        "description": "Custom Spec Link for {0}".format(specName),
-                        "data-lt": "Custom Spec Link for {0}".format(specName),
-                        "level": config.HierarchicalNumber(level),
-                        "TR": specUrl,
-                        "shortname": shortname,
-                        "vshortname": specName
-                    }
-                spec = self.refs.specs[specName]
-                self.refs.refs[dfnText].append({
-                    "status": "TR",
-                    "export": True,
-                    "for": [],
-                    "level": spec['level'],
-                    "url": specUrl + dfnUrl,
-                    "normative": True,
-                    "shortname": spec['shortname'],
-                    "spec": spec['vshortname'],
-                    "type": dfnType
-                })
-            del self.refs.defaultSpecs["customDfns"]
-
         self.paragraphMode = paragraphMode
 
     def preprocess(self):

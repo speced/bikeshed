@@ -139,80 +139,16 @@ def updateBiblio():
 def updateLinkDefaults():
     try:
         say("Downloading link defaults...")
-        with closing(urllib2.urlopen("http://dev.w3.org/csswg/autolinker-config.md")) as fh:
+        with closing(urllib2.urlopen("https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/link-defaults.infotree")) as fh:
             lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
     except Exception, e:
         die("Couldn't download link defaults data.\n{0}", e)
         return
 
-    currentSpec = None
-    currentType = None
-    currentFor = None
-    data = defaultdict(list)
-    data["css21Replacements"] = []
-    data["ignoredSpecs"] = []
-    data["customDfns"] = []
-    for i, line in enumerate(lines):
-        # Look for h2
-        if re.match("^\s*-+\s*$", line):
-            currentSpec = lines[i-1].strip()
-            currentType = None
-            currentFor = None
-        elif line.startswith("## "):
-            currentSpec = line.strip(" #")
-            currentType = None
-            currentFor = None
-        elif line.startswith("### "):
-            line = line.strip(" #")
-            if line in config.dfnTypes:
-                currentType = line
-                currentFor = None
-            elif re.match("([\w-]+)\s+for\s+(.+)", line):
-                match = re.match("([\w-]+)\s+for\s+(.+)", line)
-                if match.group(1) in config.dfnTypes:
-                    currentType = match.group(1)
-                else:
-                    die("Unknown definition type '{0}' on line {1}", match.group(1), i)
-                currentFor = match.group(2).strip()
-        elif re.match("[*+-]\s+", line):
-            term = re.match("^[*+-]\s+(.*)", line).group(1).strip()
-            if currentSpec == "CSS 2.1 Replacements":
-                data["css21Replacements"].append(term)
-            elif currentSpec == "Ignored Specs":
-                data["ignoredSpecs"].append(term)
-            elif currentSpec.startswith("Custom "):
-                match = re.match("Custom ([\w-]+) (.*)", currentSpec)
-                specName = match.group(1)
-                specUrl = match.group(2).strip()
-                match = re.match("(.*) \(([\w-]+)\) (.*)", term)
-                if match is None:
-                    die("Custom link lines must be of the form '<term> (<type>) <hash-link>'.Got:\n  {0}", term)
-                    continue
-                dfnText = match.group(1).strip()
-                dfnType = match.group(2)
-                dfnUrl = match.group(3).strip()
-                data["customDfns"].append((specName, specUrl, dfnText, dfnType, dfnUrl))
-            elif currentSpec:
-                if currentType:
-                    data[term].append((currentSpec, currentType, None, currentFor))
-                elif term.startswith("<") and term.endswith(">"):
-                    data[term].append((currentSpec, "type", None, None))
-                elif term.startswith(u"〈") and term.endswith(u"〉"):
-                    data[term].append((currentSpec, "token", None, None))
-                elif term.endswith("()"):
-                    data[term].append((currentSpec, "function", None, None))
-                elif re.match("(@[\w-])/([\w-])", term):
-                    match = re.match("(@[\w-])/([\w-])", term)
-                    data[match.group(2)].append((currentSpec, "descriptor", None, match.group(1)))
-                elif term.startswith("@"):
-                    data[term].append((currentSpec, "at-rule", None, None))
-                else:
-                    data[term].append((currentSpec, "property", None, None))
-
     if not config.dryRun:
         try:
-            with io.open(config.scriptPath+"/spec-data/link-defaults.json", 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(data, indent=2)))
+            with io.open(config.scriptPath+"/spec-data/link-defaults.infotree", 'w', encoding="utf-8") as f:
+                f.write('\n'.join(lines))
         except Exception, e:
             die("Couldn't save link-defaults database to disk.\n{0}", e)
             return

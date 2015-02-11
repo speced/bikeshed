@@ -33,6 +33,7 @@ def transformDataBlocks(doc):
         'biblio': transformBiblio,
         'anchors': transformAnchors,
         'link-defaults': transformLinkDefaults,
+        'ignored-specs': transformIgnoredSpecs,
         'info': transformInfo,
         'pre': transformPre
     }
@@ -377,15 +378,40 @@ def processLinkDefaults(lds, doc):
         doc.md.linkDefaults[ld['text'][0]].append((ld['spec'][0], ld['type'][0], ld.get('status', None), ld.get('for', None)))
     return []
 
+def transformIgnoredSpecs(lines, doc, **kwargs):
+    specs = parseInfoTree(lines, doc.md.indent)
+    return processIgnoredSpecs(specs, doc)
+
+def processIgnoredSpecs(specs, doc):
+    for spec in specs:
+        if len(spec.get('spec', [])) == 0:
+            die("Every ignored spec line needs at least one 'spec' value. Got:\n{0}", config.printjson(spec))
+            continue
+        specNames = spec.get('spec')
+        if len(spec.get('replacedBy', [])) > 1:
+            die("Every ignored spec line needs at most one 'replacedBy' value. Got:\n{0}", config.printjson(spec))
+            continue
+        replacedBy = spec.get('replacedBy')[0] if 'replacedBy' in spec else None
+        for specName in specNames:
+            if replacedBy:
+                doc.refs.replacedSpecs.add((specName, replacedBy))
+            else:
+                doc.refs.ignoredSpecs.add(specName)
+    return []
+
 
 def transformInfo(lines, doc, **kwargs):
     # More generic InfoTree system.
     # A <pre class=info> can contain any of the InfoTree collections,
     # identified by an 'info' line.
     infos = parseInfoTree(lines, doc.md.indent)
+    return processInfo(infos, doc)
+
+def processInfo(infos, doc):
     knownInfoTypes = {
         "anchors": processAnchors,
-        "link-defaults": processLinkDefaults
+        "link-defaults": processLinkDefaults,
+        "ignored-specs": processIgnoredSpecs
     }
     infoCollections = defaultdict(list)
     for info in infos:
@@ -421,8 +447,10 @@ def parseInfoTree(lines, indent=4):
     # key1: val1; key2a: val2a
 
     def extendData(datas, infoLevels):
+        if not infoLevels:
+            return
         newData = defaultdict(list)
-        for infos in infoLevels[:lastIndent+1]:
+        for infos in infoLevels:
             for k,v in infos.items():
                 newData[k].extend(v)
         datas.append(newData)
@@ -433,6 +461,8 @@ def parseInfoTree(lines, indent=4):
     lastIndent = -1
     indentSpace = " " * indent
     for line in lines:
+        if line.strip() == "":
+            continue
         ws, text = re.match("(\s*)(.*)", line).groups()
         wsLen = len(ws.replace("\t", indentSpace))
         if wsLen % indent != 0:
@@ -452,7 +482,7 @@ def parseInfoTree(lines, indent=4):
                 continue
             match = re.match("([^:]+):\s*(.*)", piece)
             if not match:
-                die("Line doesn't match the grammar `k:v; k:v; k:v`:\n{0}", text)
+                die("Line doesn't match the grammar `k:v; k:v; k:v`:\n{0}", line)
                 return []
             key = match.group(1).strip()
             val = match.group(2).strip()

@@ -324,6 +324,41 @@ using the `spec=''` attribute (defined above) will override the lack of an expor
 and go ahead and link to it anyway.
 
 
+Configuring Linking Defaults
+----------------------------
+
+When there are multiple definitions for a given term
+and Bikeshed can't automatically tell which one you want,
+it'll emit a warning asking you to specify more explicitly.
+You can do this per-link,
+but you typically want to make the same choice every time the term is autolinked;
+this can be done by adding Link Defaults metadata.
+
+You can either add a Link Defaults metadata line to your `<pre class=metadata>`,
+as specified in [metadata](metadata.md),
+or add a `<pre class='link-defaults'>` block,
+written in the [InfoTree](infotree.md) format.
+For the latter,
+each piece of info must have a `spec`, `type`, and `text` line,
+and optionally a `for` line if necessary to further disambiguate.
+
+Sometimes this is too fine-grained,
+and you'd actually like to completely ignore a given spec when autolinking,
+always preferring to link to something else.
+To do this, add a `<pre class='ignored-specs'>` block,
+written in the [InfoTree](infotree.md) format.
+Each piece of info must have a `spec` line,
+and optionally a `replacedBy` line,
+both naming specs.
+If the info has just a `spec` line, that spec is ignored totally by default;
+linking to it requires you to manually specify a `spec=''` attribute on the autolink.
+If the info has a `replacedBy` line,
+then whenever an autolink has a choice between the two specs,
+it'll delete the `spec` value from consideration,
+leaving only the `replacedBy` value
+(plus any other specs that might be providing a definition).
+
+
 Section Links
 -------------
 
