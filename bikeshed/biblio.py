@@ -34,17 +34,16 @@ class BiblioEntry(object):
         str = ""
         etAl = self.etAl
 
-        if len(self.authors) == 0:
-            str += "???"
-        elif len(self.authors) == 1:
+        if len(self.authors) == 1:
             str += self.authors[0]
         elif len(self.authors) < 4:
             str += "; ".join(self.authors)
-        else:
+        elif len(self.authors) != 0:
             str += self.authors[0]
             etAl = True
 
-        str += "; et al. " if etAl else ". "
+        if str != "":
+            str += "; et al. " if etAl else ". "
 
         if self.url:
             str += "<a href='{0}'>{1}</a>. ".format(self.url, self.title)
@@ -70,17 +69,16 @@ class BiblioEntry(object):
 
         str = ""
         etAl = self.etAl
-        if len(self.authors) == 0:
-            str += "???"
-        elif len(self.authors) == 1:
+        if len(self.authors) == 1:
             str += self.authors[0]
         elif len(self.authors) < 4:
             str += "; ".join(self.authors)
-        else:
+        elif len(self.authors) != 0:
             str += self.authors[0]
             etAl = True
 
-        str += "; et al. " if etAl else ". "
+        if str != "":
+            str += "; et al. " if etAl else ". "
         ret.append(str)
 
         if self.url:
