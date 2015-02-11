@@ -148,7 +148,7 @@ def updateLinkDefaults():
     if not config.dryRun:
         try:
             with io.open(config.scriptPath+"/spec-data/link-defaults.infotree", 'w', encoding="utf-8") as f:
-                f.write('\n'.join(lines))
+                f.write(''.join(lines))
         except Exception, e:
             die("Couldn't save link-defaults database to disk.\n{0}", e)
             return
