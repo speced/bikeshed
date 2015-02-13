@@ -348,6 +348,7 @@ def parseEditor(key, val):
         return re.match(r".+@.+\..+", string)
     data = {
         'name'   : pieces[0],
+        'id'     : None,
         'org'    : None,
         'orglink': None,
         'link'   : None,
@@ -392,6 +393,11 @@ def parseEditor(key, val):
         pieces = data['org'].split()
         data['orglink'] = pieces[-1]
         data['org'] = ' '.join(pieces[:-1])
+    # Check if the name ends with an ID.
+    if data['name'] and re.search(r"\s\d+$", data['name']):
+        pieces = data['name'].split()
+        data['id'] = pieces[-1]
+        data['name'] = ' '.join(pieces[:-1])
     return data
 
 

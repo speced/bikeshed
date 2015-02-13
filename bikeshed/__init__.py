@@ -1991,6 +1991,8 @@ def addTOCSection(doc):
 def addSpecMetadataSection(doc):
     def printEditor(editor):
         div = E.div({"class":"p-author h-card vcard"})
+        if editor['id']:
+            div.attrib['data-editor-id'] = editor['id']
         if editor['link']:
             appendChild(div, E.a({"class":"p-name fn u-url url", "href":editor['link']}, editor['name']))
         elif editor['email']:
