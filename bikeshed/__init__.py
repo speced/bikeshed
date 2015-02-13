@@ -1990,7 +1990,7 @@ def addTOCSection(doc):
 
 def addSpecMetadataSection(doc):
     def printEditor(editor):
-        dd = E.dd({"class":"p-author h-card vcard"})
+        dd = E.dd({"class":"editor p-author h-card vcard"})
         if editor['id']:
             dd.attrib['data-editor-id'] = editor['id']
         if editor['link']:
