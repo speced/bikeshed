@@ -1990,26 +1990,26 @@ def addTOCSection(doc):
 
 def addSpecMetadataSection(doc):
     def printEditor(editor):
-        div = E.div({"class":"p-author h-card vcard"})
+        dd = E.dd({"class":"p-author h-card vcard"})
         if editor['id']:
-            div.attrib['data-editor-id'] = editor['id']
+            dd.attrib['data-editor-id'] = editor['id']
         if editor['link']:
-            appendChild(div, E.a({"class":"p-name fn u-url url", "href":editor['link']}, editor['name']))
+            appendChild(dd, E.a({"class":"p-name fn u-url url", "href":editor['link']}, editor['name']))
         elif editor['email']:
-            appendChild(div, E.a({"class":"p-name fn u-email email", "href":"mailto:"+editor['email']}, editor['name']))
+            appendChild(dd, E.a({"class":"p-name fn u-email email", "href":"mailto:"+editor['email']}, editor['name']))
         else:
-            appendChild(div, E.span({"class":"p-name fn"}, editor['name']))
+            appendChild(dd, E.span({"class":"p-name fn"}, editor['name']))
         if editor['org']:
             if editor['orglink']:
                 el = E.a({"class":"p-org org", "href":editor['orglink']}, editor['org'])
             else:
                 el = E.span({"class":"p-org org"}, editor['org'])
-            appendChild(div, " (", el, ")")
+            appendChild(dd, " (", el, ")")
         if editor['email'] and editor['link']:
-            appendChild(div,
+            appendChild(dd,
                 " ",
                 E.a({"class":"u-email email", "href":"mailto:"+editor['email']}, editor['email']))
-        return div
+        return dd
 
     md = DefaultOrderedDict(list)
     mac = doc.macros
@@ -2059,9 +2059,13 @@ def addSpecMetadataSection(doc):
         attrs = {}
         if key in ("Editor", "Editors"):
             attrs["class"] = "editor"
-        appendChild(dl,
-            E.dt(attrs, key, ":"),
-            *[E.dd(attrs, val) for val in vals])
+            appendChild(dl,
+                E.dt(attrs, key, ":"),
+                *vals)
+        else:
+            appendChild(dl,
+                E.dt(attrs, key, ":"),
+                *[E.dd(attrs, val) for val in vals])
     fillWith('spec-metadata', E.div(dl), doc=doc)
 
 
