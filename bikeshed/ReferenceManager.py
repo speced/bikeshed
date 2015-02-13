@@ -223,7 +223,7 @@ class ReferenceManager(object):
         # Local refs always get precedence, no matter what.
         localRefs = self.getLocalRef(linkType, text, linkFor, el)
         if len(localRefs) == 1:
-            return localRefs[0].url
+            return localRefs[0]
         elif len(localRefs) > 1:
             if error:
                 warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
@@ -233,7 +233,7 @@ class ReferenceManager(object):
                      "' or '".join(localRefs[0].for_))
                 if text == "encoding":
                     warn("{0}", config.printjson(localRefs))
-            return localRefs[0].url
+            return localRefs[0]
 
         # Take defaults into account
         if (not spec or not status):
@@ -257,14 +257,14 @@ class ReferenceManager(object):
             # Allow foo(bar) to be linked to with just foo(), but only if it's completely unambiguous.
             textPrefix = text[:-1]
             candidates, _ = self.queryRefs(linkType=linkType, status="local", linkFor=linkFor)
-            urls = list(set(c.url for c in candidates if c.text.startswith(textPrefix)))
-            if len(urls) == 1:
-                return urls[0]
+            candidateRefs = list(set(c for c in candidates if c.text.startswith(textPrefix)))
+            if len(candidateRefs) == 1:
+                return candidateRefs[0]
             # And repeat for non-locals
             candidates, _ = self.queryRefs(linkType=linkType, spec=spec, status=status, linkFor=linkFor, export=export, ignoreObsoletes=True)
-            urls = list(set(c.url for c in candidates if c.text.startswith(textPrefix)))
-            if len(urls) == 1:
-                return urls[0]
+            candidateRefs = list(set(c for c in candidates if c.text.startswith(textPrefix)))
+            if len(candidateRefs) == 1:
+                return candidateRefs[0]
             if len(urls) > 1 and zeroRefsError:
                 die("Too many possible '{0}' targets to disambiguate. Please specify the names of the required args, like 'foo(bar, baz)'.", text)
 
@@ -273,21 +273,28 @@ class ReferenceManager(object):
             candidateFor, _, forPrefix = linkFor.partition("/") if "/" in linkFor else (None, None, '')
             forPrefix = forPrefix[:-1]
             candidates, _ = self.queryRefs(linkType="functionish", status="local", linkFor=candidateFor)
-            localUrls = list(set(c.url for c in candidates if c.text.startswith(forPrefix)))
-            if len(localUrls) == 1:
-                return localUrls[0]
+            localRefs = list(set(c for c in candidates if c.text.startswith(forPrefix)))
+            if len(localRefs) == 1:
+                return localRefs[0]
             # And repeat for non-locals
             candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, linkFor=candidateFor, export=export, ignoreObsoletes=True)
-            remoteUrls = list(set(c.url for c in candidates if c.text.startwith(forPrefix)))
-            if len(remoteUrls) == 1:
-                return remoteUrls[0]
-            if zeroRefsError and (len(localUrls) or len(remoteUrls)):
+            remoteUrls = list(set(c for c in candidates if c.text.startwith(forPrefix)))
+            if len(remoteRefs) == 1:
+                return remoteRefs[0]
+            if zeroRefsError and (len(localRefs) or len(remoteRefs)):
                 die("Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.", linkFor, text)
 
         if failure == "text" or failure == "type":
             if spec and spec in self.anchorMacros:
                 # If there's a macro registered for this spec, use it to generate a ref.
-                return anchorMacros[spec].url + config.simplifyText(text)
+                return {
+                    "spec": spec,
+                    "shortname": spec,
+                    "url": anchorMacros[spec]['url'] + config.simplifyText(text),
+                    "for": linkFor,
+                    "text": text,
+                    "type": linkType
+                }
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}'.", linkType, text)
             return None
@@ -298,7 +305,14 @@ class ReferenceManager(object):
         elif failure == "spec":
             # If there's a macro registered for this spec, use it to generate a ref.
             if spec in self.anchorMacros:
-                return anchorMacros[spec]['url'] + config.simplifyText(text)
+                return {
+                    "spec": spec,
+                    "shortname": spec,
+                    "url": anchorMacros[spec]['url'] + config.simplifyText(text),
+                    "for": linkFor,
+                    "text": text,
+                    "type": linkType
+                }
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec)
             return None
@@ -320,7 +334,7 @@ class ReferenceManager(object):
 
         if len(refs) == 1:
             # Success!
-            return refs[0].url
+            return refs[0]
 
         # If all the refs are for the same shortname,
         # assume you want to link to the latest one (highest level).
@@ -333,7 +347,7 @@ class ReferenceManager(object):
             # Still potentially possible for a non-Bikeshed spec to have duplicate refs here,
             # so I have to check for singularity.
             if len(leveledRefs) == 1:
-                return leveledRefs[0].url
+                return leveledRefs[0]
 
         # If we hit this point, there are >1 possible refs to choose from.
         # Default to linking to the first one.
@@ -356,7 +370,7 @@ class ReferenceManager(object):
                  text,
                  defaultRef.spec,
                  '\n'.join(possibleRefs))
-        return defaultRef.url
+        return defaultRef
 
     def getBiblioRef(self, text, status, el=None):
         key = text.lower()
@@ -604,6 +618,8 @@ class RefWrapper(object):
     def __getattr__(self, name):
         if name == "for_":
             name = "for"
+        if name not in self.ref:
+            return None
         val = self.ref[name]
         if isinstance(val, basestring):
             val = val.strip()

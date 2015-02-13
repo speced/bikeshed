@@ -746,14 +746,28 @@ def processAutolinks(doc):
         if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
             continue
 
-        url = doc.refs.getRef(linkType, linkText,
+        ref = doc.refs.getRef(linkType, linkText,
                               spec=el.get('data-link-spec'),
                               status=el.get('data-link-status'),
                               linkFor=el.get('data-link-for'),
                               el=el,
                               error=(linkText.lower() not in doc.md.ignoredTerms))
-        if url is not None:
-            el.set('href', url)
+        # Capture the reference (and ensure we add a biblio entry) if it
+        # points to an external specification. We check the spec name here
+        # rather than checking `status == "local"`, as "local" refs include
+        # those defined in `<pre class="anchor">` datablocks, which we do
+        # want to capture here.
+        if ref and ref.spec is not None and ref.spec is not "" and ref.spec != doc.refs.specVName:
+            if ref.spec not in doc.externalRefsUsed:
+                doc.externalRefsUsed[ref.spec] = {}
+            if ref.text not in doc.externalRefsUsed[ref.spec]:
+                doc.externalRefsUsed[ref.spec][ref.text] = ref
+            biblioRef = doc.refs.getBiblioRef(ref.spec, status="normative")
+            if biblioRef:
+                doc.normativeRefs[biblioRef.linkText] = biblioRef
+
+        if ref.url is not None:
+            el.set('href', ref.url)
             el.tag = "a"
         else:
             if linkType == "maybe":
@@ -927,12 +941,13 @@ def processIDL(doc):
             idlType = el.get('data-idl-type')
             url = None
             for idlText in el.get('data-lt').split('|'):
-                url = doc.refs.getRef(idlType, idlText,
+                ref = doc.refs.getRef(idlType, idlText,
                                       linkFor=el.get('data-idl-for'),
                                       el=el,
                                       error=False)
-                if url:
-                    break
+                if ref.url:
+                    url = ref.url
+                    break;
             globalNames = GlobalNames.fromEl(el)
             el.set("data-global-name", str(globalNames))
             if url is None or globalNames.matches(forcedDfns):
@@ -1138,6 +1153,7 @@ class CSSSpec(object):
         self.normativeRefs = {}
         self.informativeRefs = {}
         self.refs = ReferenceManager()
+        self.externalRefsUsed = {}
         self.md = metadata.MetadataManager(doc=self)
         self.biblios = {}
         self.paragraphMode = "markdown"
@@ -1239,6 +1255,7 @@ class CSSSpec(object):
         processHeadings(self, "all") # again
         addTOCSection(self)
         addSelfLinks(self)
+        processBiblioLinks(self) # again, as biblio links could be added by addIndexSection().
         processAutolinks(self)
         addAnnotations(self)
         addSyntaxHighlighting(self)
@@ -1733,13 +1750,23 @@ def addAnnotations(doc):
         appendContents(find("head", doc), parseHTML(html))
 
 def addIndexSection(doc):
-    if len(findAll("dfn", doc)) == 0:
+    if len(findAll("dfn", doc)) == 0 and len(doc.externalRefsUsed.keys()) == 0:
         return
     container = getFillContainer('index', doc=doc, default=True)
     if container is None:
         return
     appendChild(container,
         E.h2({"class":"no-num", "id":"index"}, "Index"))
+
+    if len(findAll("dfn", doc)):
+        addIndexOfLocallyDefinedTerms(doc, container)
+
+    if len(doc.externalRefsUsed.keys()):
+        addIndexOfExternallyDefinedTerms(doc, container)
+
+def addIndexOfLocallyDefinedTerms(doc, container):
+    appendChild(container,
+        E.h3({"class":"no-num", "id":"index-defined-here"}, "Terms defined by this specification"))
 
     from collections import OrderedDict
     indexEntries = defaultdict(list)
@@ -1801,6 +1828,26 @@ def addIndexSection(doc):
                     E.li(item['disambiguator'], ", ",
                         E.a({"href":"#"+item['id']}, item['level'])))
 
+def addIndexOfExternallyDefinedTerms(doc, container):
+    if len(doc.externalRefsUsed.keys()) == 0:
+        return
+
+    specs = sorted(doc.externalRefsUsed.keys())
+    dl = E.dl()
+    for spec in specs:
+        attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"normative"}
+        dt = E.dt(E.a(attrs, "[", spec, "]"), " defines the following terms:");
+        appendChild(dl, dt)
+        for title in sorted(doc.externalRefsUsed[spec].keys()):
+            ref = doc.externalRefsUsed[spec][title]
+            attrs = {"data-link-type": ref.type}
+            if len(ref.for_):
+                attrs['for'] = ref.for_[0]
+            appendChild(dl, E.dd(E.a(attrs, title)))
+
+    appendChild(container,
+        E.h3({"class":"no-num", "id":"index-defined-elsewhere"}, "Terms defined by reference"))
+    appendChild(container, dl)
 
 
 def addPropertyIndex(doc):
