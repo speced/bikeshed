@@ -1833,21 +1833,23 @@ def addIndexOfExternallyDefinedTerms(doc, container):
         return
 
     specs = sorted(doc.externalRefsUsed.keys())
-    dl = E.dl()
+    ul = E.ul({"class": "indexlist"})
     for spec in specs:
         attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"normative"}
-        dt = E.dt(E.a(attrs, "[", spec, "]"), " defines the following terms:");
-        appendChild(dl, dt)
+        specLi = E.li(E.a(attrs, "[", spec, "]"), " defines the following terms:")
+        termsUl = E.ul()
         for title in sorted(doc.externalRefsUsed[spec].keys()):
             ref = doc.externalRefsUsed[spec][title]
             attrs = {"data-link-type": ref.type}
             if len(ref.for_):
                 attrs['for'] = ref.for_[0]
-            appendChild(dl, E.dd(E.a(attrs, title)))
+            appendChild(termsUl, E.li(E.a(attrs, title)))
+        appendChild(specLi, termsUl)
+        appendChild(ul, specLi)
 
     appendChild(container,
         E.h3({"class":"no-num", "id":"index-defined-elsewhere"}, "Terms defined by reference"))
-    appendChild(container, dl)
+    appendChild(container, ul)
 
 
 def addPropertyIndex(doc):
