@@ -1842,7 +1842,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             ref = doc.externalRefsUsed[spec][title]
             attrs = {"data-link-type": ref.type}
             if len(ref.for_):
-                attrs['for'] = ref.for_[0]
+                attrs['data-link-for'] = ref.for_[0]
             appendChild(termsUl, E.li(E.a(attrs, title)))
         appendChild(specLi, termsUl)
         appendChild(ul, specLi)
