@@ -166,6 +166,7 @@ with the following keys:
 * **type** - the definition's type (dfn, interface, etc)  (Exactly 1 required.)
 * **urlPrefix** and/or **url** - define the anchor's url, as described below.  (At least one of `urlPrefix` or `url` must be specified. 0+ `urlPrefix` entries allowed, 0 or 1 `url` entries allowed.)
 * **for** - what the definition is for.  (Any number allowed, including 0.)
+* **spec** - Which spec the definition comes from. (optional)
 
 To generate the url for the anchor,
 first all of the `urlPrefix` entries are concatenated.
@@ -176,11 +177,13 @@ otherwise, the `text` is url-ified and appended.
 If neither `urlPrefix` nor `url` had a "#" character in them,
 one is inserted between them.
 
+The `spec` attribute is used only for index generation, and has no effect on URL generation.
+
 Example:
 
 ```html
 <pre class="anchors">
-urlPrefix: https://encoding.spec.whatwg.org/; type: dfn
+urlPrefix: https://encoding.spec.whatwg.org/; type: dfn; spec: ENCODING
   text: ascii whitespace
   text: decoder
 url: http://www.unicode.org/reports/tr46/#ToASCII; type: dfn; text: toascii
