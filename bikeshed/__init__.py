@@ -729,10 +729,11 @@ def processBiblioLinks(doc):
 def processAutolinks(doc):
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
+    # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
+    query = "a:not([href]):not([data-link-type='biblio'])"
     if doc.md.useIAutolinks:
-        autolinks = findAll("a:not([href]), i", doc)
-    else:
-        autolinks = findAll("a:not([href])", doc)
+        query += ", i"
+    autolinks = findAll(query, doc)
     for el in autolinks:
         # Explicitly empty linking text indicates this shouldn't be an autolink.
         if el.get('data-lt') == '':
@@ -1250,11 +1251,11 @@ class CSSSpec(object):
         processIDL(self)
         fillAttributeInfoSpans(self)
         formatElementdefTables(self)
-        processBiblioLinks(self)
         processAutolinks(self)
-
-        addReferencesSection(self)
         addIndexSection(self)
+
+        processBiblioLinks(self)
+        addReferencesSection(self)
         addPropertyIndex(self)
         addIDLSection(self)
         addIssuesSection(self)
@@ -1262,7 +1263,6 @@ class CSSSpec(object):
         processHeadings(self, "all") # again
         addTOCSection(self)
         addSelfLinks(self)
-        processBiblioLinks(self) # again, as biblio links could be added by addIndexSection().
         processAutolinks(self)
         addAnnotations(self)
         addSyntaxHighlighting(self)
