@@ -356,7 +356,8 @@ def processAnchors(anchors, doc):
             "url": url,
             "for": anchor.get('for', []),
             "export": True,
-            "status": "local"
+            "status": "local",
+            "spec": anchor.get('spec', [''])[0]
             })
     return []
 
