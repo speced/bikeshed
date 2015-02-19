@@ -862,6 +862,7 @@ class IDLMarker(object):
         idlType = construct.idlType
         extraParameters = ''
         idlTitle = construct.normalName
+        refType="idl"
         if idlType in config.functionishTypes:
             idlTitle = '|'.join(self.methodLinkingTexts(construct))
         elif idlType == "attribute":
@@ -881,12 +882,20 @@ class IDLMarker(object):
             if construct.default is not None:
                 value = escapeAttr("{0}".format(construct.default.value))
                 extraParameters += ' data-default="{0}"'.format(value)
+        elif idlType == "interface":
+            if construct.partial:
+                refType="link"
+
+        if refType == "link":
+            elementName = "a"
+        else:
+            elementName = "idl"
 
         if idlType in config.typesUsingFor:
             idlFor = "data-idl-for='{0}'".format(construct.parent.fullName)
         else:
             idlFor = ""
-        return ('<idl data-lt="{0}" data-idl-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters), '</idl>')
+        return ('<{name} data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters, name=elementName, refType=refType), '</{0}>'.format(elementName))
 
     def encode(self, text):
         return escapeHTML(text)
@@ -1343,7 +1352,7 @@ class CSSSpec(object):
         propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
         funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
         atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
-        typeRe = re.compile(r"^(?:(\S*)/)?([\w-]+)$")
+        typeRe = re.compile(r"^(?:(\S*)/)?(\S+)$")
         for el in findAll("fake-production-placeholder", doc):
             text = textContent(el)
             clearContents(el)
