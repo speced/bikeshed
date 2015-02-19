@@ -203,7 +203,7 @@ class ReferenceManager(object):
         return self.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor)[0]
 
     def getRef(self, linkType, text, spec=None, status=None, linkFor=None, error=True, el=None):
-        # If error is False, this function just shuts up and returns a url or None
+        # If error is False, this function just shuts up and returns a reference or None
         # Otherwise, it pops out debug messages for the user.
 
         # 'maybe' links might not link up, so it's fine for them to have no references.
@@ -257,15 +257,15 @@ class ReferenceManager(object):
             # Allow foo(bar) to be linked to with just foo(), but only if it's completely unambiguous.
             textPrefix = text[:-1]
             candidates, _ = self.queryRefs(linkType=linkType, status="local", linkFor=linkFor)
-            candidateRefs = list(set(c for c in candidates if c.text.startswith(textPrefix)))
+            candidateRefs = {c.url: c for c in candidates if c.text.startswith(textPrefix)}.values()
             if len(candidateRefs) == 1:
                 return candidateRefs[0]
             # And repeat for non-locals
             candidates, _ = self.queryRefs(linkType=linkType, spec=spec, status=status, linkFor=linkFor, export=export, ignoreObsoletes=True)
-            candidateRefs = list(set(c for c in candidates if c.text.startswith(textPrefix)))
+            candidateRefs = {c.url: c for c in candidates if c.text.startswith(textPrefix)}.values()
             if len(candidateRefs) == 1:
                 return candidateRefs[0]
-            if len(urls) > 1 and zeroRefsError:
+            if len(candidateRefs) > 1 and zeroRefsError:
                 die("Too many possible '{0}' targets to disambiguate. Please specify the names of the required args, like 'foo(bar, baz)'.", text)
 
         if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
@@ -273,12 +273,12 @@ class ReferenceManager(object):
             candidateFor, _, forPrefix = linkFor.partition("/") if "/" in linkFor else (None, None, '')
             forPrefix = forPrefix[:-1]
             candidates, _ = self.queryRefs(linkType="functionish", status="local", linkFor=candidateFor)
-            localRefs = list(set(c for c in candidates if c.text.startswith(forPrefix)))
+            localRefs = {c.url: c for c in candidates if c.text.startswith(textPrefix)}.values()
             if len(localRefs) == 1:
                 return localRefs[0]
             # And repeat for non-locals
             candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, linkFor=candidateFor, export=export, ignoreObsoletes=True)
-            remoteUrls = list(set(c for c in candidates if c.text.startwith(forPrefix)))
+            remoteUrls = {c.url: c for c in candidates if c.text.startswith(textPrefix)}.values()
             if len(remoteRefs) == 1:
                 return remoteRefs[0]
             if zeroRefsError and (len(localRefs) or len(remoteRefs)):
@@ -618,8 +618,6 @@ class RefWrapper(object):
     def __getattr__(self, name):
         if name == "for_":
             name = "for"
-        if name not in self.ref:
-            return None
         val = self.ref[name]
         if isinstance(val, basestring):
             val = val.strip()

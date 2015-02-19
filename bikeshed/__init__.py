@@ -758,15 +758,13 @@ def processAutolinks(doc):
         # those defined in `<pre class="anchor">` datablocks, which we do
         # want to capture here.
         if ref and ref.spec is not None and ref.spec is not "" and ref.spec != doc.refs.specVName:
-            if ref.spec not in doc.externalRefsUsed:
-                doc.externalRefsUsed[ref.spec] = {}
             if ref.text not in doc.externalRefsUsed[ref.spec]:
                 doc.externalRefsUsed[ref.spec][ref.text] = ref
             biblioRef = doc.refs.getBiblioRef(ref.spec, status="normative")
             if biblioRef:
                 doc.normativeRefs[biblioRef.linkText] = biblioRef
 
-        if ref.url is not None:
+        if ref:
             el.set('href', ref.url)
             el.tag = "a"
         else:
@@ -945,7 +943,7 @@ def processIDL(doc):
                                       linkFor=el.get('data-idl-for'),
                                       el=el,
                                       error=False)
-                if ref.url:
+                if ref:
                     url = ref.url
                     break;
             globalNames = GlobalNames.fromEl(el)
@@ -1153,7 +1151,7 @@ class CSSSpec(object):
         self.normativeRefs = {}
         self.informativeRefs = {}
         self.refs = ReferenceManager()
-        self.externalRefsUsed = {}
+        self.externalRefsUsed = defaultdict(dict)
         self.md = metadata.MetadataManager(doc=self)
         self.biblios = {}
         self.paragraphMode = "markdown"
