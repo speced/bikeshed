@@ -285,6 +285,8 @@ class ReferenceManager(object):
                 die("Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.", linkFor, text)
 
         if failure == "text" or failure == "type":
+            if linkType in ("property", "propdesc", "descriptor") and text.startswith("--"):
+                return None
             if spec and spec in self.anchorMacros:
                 # If there's a macro registered for this spec, use it to generate a ref.
                 return {
