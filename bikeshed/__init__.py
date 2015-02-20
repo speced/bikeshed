@@ -1117,13 +1117,14 @@ def cleanupHTML(doc):
         removeAttr(el, 'data-attribute-info')
         removeAttr(el, 'data-dict-member-info')
         removeAttr(el, 'for')
-    for el in findAll("a", doc):
+    for el in findAll("a, span", doc):
         removeAttr(el, 'data-link-for')
         removeAttr(el, 'data-link-status')
         removeAttr(el, 'data-link-spec')
         removeAttr(el, 'data-section')
         removeAttr(el, 'data-biblio-type')
         removeAttr(el, 'data-biblio-status')
+        removeAttr(el, 'data-okay-to-fail')
         removeAttr(el, 'data-lt')
     for el in findAll("[data-link-for]:not(a), [data-link-type]:not(a), [data-dfn-for]:not(dfn), [data-dfn-type]:not(dfn)", doc):
         removeAttr(el, 'data-link-for')
