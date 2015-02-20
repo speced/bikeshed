@@ -273,12 +273,12 @@ class ReferenceManager(object):
             candidateFor, _, forPrefix = linkFor.partition("/") if "/" in linkFor else (None, None, '')
             forPrefix = forPrefix[:-1]
             candidates, _ = self.queryRefs(linkType="functionish", status="local", linkFor=candidateFor)
-            localRefs = {c.url: c for c in candidates if c.text.startswith(textPrefix)}.values()
+            localRefs = {c.url: c for c in candidates if c.text.startswith(forPrefix)}.values()
             if len(localRefs) == 1:
                 return localRefs[0]
             # And repeat for non-locals
             candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, linkFor=candidateFor, export=export, ignoreObsoletes=True)
-            remoteUrls = {c.url: c for c in candidates if c.text.startswith(textPrefix)}.values()
+            remoteUrls = {c.url: c for c in candidates if c.text.startswith(forPrefix)}.values()
             if len(remoteRefs) == 1:
                 return remoteRefs[0]
             if zeroRefsError and (len(localRefs) or len(remoteRefs)):
