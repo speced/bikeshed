@@ -299,7 +299,6 @@ class ReferenceManager(object):
                 die("No '{0}' refs found for '{1}'.", linkType, text)
             return None
         elif failure == "export":
-            print outerHTML(el)
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' that are marked for export.", linkType, text)
             return None
