@@ -535,6 +535,7 @@ def classifyDfns(doc, dfns):
         dfnType = determineDfnType(el)
         # TODO Why am I using linkTextsFromElement here, but determineDfnText further down?
         dfnTexts = linkTextsFromElement(el)
+        dfnFor = treeAttr(el, "data-dfn-for")
         if len(dfnTexts):
             primaryDfnText = dfnTexts[0]
         else:
@@ -560,34 +561,26 @@ def classifyDfns(doc, dfns):
             elif treeAttr(el, "data-dfn-for") is None:
                 die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el))
                 continue
-        if dfnType in config.typesUsingFor:
-            if el.get('data-dfn-for'):
-                dfnFor = el.get('data-dfn-for')
-            else:
-                dfnFor = treeAttr(el, "data-dfn-for")
-                if dfnFor:
-                    el.set('data-dfn-for', dfnFor)
-                else:
-                    die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
-                    continue
-        else:
-            # Types that aren't forced to use 'for' can still optionally use it.
-            dfnFor = treeAttr(el, "data-dfn-for")
-            if dfnFor:
-                el.set('data-dfn-for', dfnFor)
+        if dfnFor:
+            el.set('data-dfn-for', dfnFor)
+        elif dfnType in config.typesUsingFor:
+            die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
+            continue
         # Automatically fill in id if necessary.
         if el.get('id') is None:
             convertDashes = dfnType == "dfn"
             id = simplifyText(determineDfnText(el).split('|')[0], convertDashes=convertDashes)
+            if dfnFor:
+                singleFor = splitForValues(dfnFor)[0]
             if dfnType == "dfn":
                 pass
             elif dfnType == "interface":
                 pass
             elif dfnType in config.idlTypes.intersection(config.typesUsingFor):
-                id = simplifyText("dom-{_for}-{id}".format(_for=dfnFor, id=id))
+                id = simplifyText("dom-{_for}-{id}".format(_for=singleFor, id=id))
             elif dfnType in config.typesUsingFor:
                 # Prepend property name to value to avoid ID duplication
-                id = simplifyText("{type}-{_for}-{id}".format(type=dfnTypeToPrefix[dfnType], _for=dfnFor, id=id))
+                id = simplifyText("{type}-{_for}-{id}".format(type=dfnTypeToPrefix[dfnType], _for=singleFor, id=id))
             else:
                 id = "{type}-{id}".format(type=dfnTypeToPrefix[dfnType], id=id)
             el.set('id', id)
