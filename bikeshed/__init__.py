@@ -1844,16 +1844,12 @@ def addIndexOfExternallyDefinedTerms(doc, container):
     ul = E.ul({"class": "indexlist"})
     for spec, refs in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0]):
         attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"normative", "data-okay-to-fail": "true"}
-        specLi = E.li(
-            E.a(attrs, "[", spec, "]"), " defines the following terms:")
-        termsUl = E.ul()
+        specLi = appendChild(ul,
+            E.li(
+                E.a(attrs, "[", spec, "]"), " defines the following terms:"))
+        termsUl = appendChild(specLi, E.ul())
         for title, ref in sorted(refs.items(), key=lambda x:x[0]):
-            attrs = {"data-link-type": ref.type}
-            if ref.for_:
-                attrs['data-link-for'] = ref.for_[0]
-            appendChild(termsUl, E.li(E.a(attrs, title)))
-        appendChild(specLi, termsUl)
-        appendChild(ul, specLi)
+            appendChild(termsUl, E.li(E.a({"href":ref.url}, title)))
 
     appendChild(container,
         E.h3({"class":"no-num", "id":"index-defined-elsewhere"}, "Terms defined by reference"))
