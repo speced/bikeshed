@@ -379,7 +379,6 @@ class ReferenceManager(object):
         elif key+"\n" in self.biblios:
             candidates = self.biblios[key+"\n"]
         else:
-            die("Couldn't find '{0}' in bibliography data.", text)
             return None
         candidates = sorted(stripLineBreaks(candidates), key=itemgetter('order'))
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.

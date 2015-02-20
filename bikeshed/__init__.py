@@ -698,13 +698,13 @@ def classifyLink(el):
 def processBiblioLinks(doc):
     biblioLinks = findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:
-        type = el.get('data-biblio-type')
-        if type == "normative":
+        biblioType = el.get('data-biblio-type')
+        if biblioType == "normative":
             storage = doc.normativeRefs
-        elif type == "informative":
+        elif biblioType == "informative":
             storage = doc.informativeRefs
         else:
-            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", type, outerHTML(el))
+            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", biblioType, outerHTML(el))
             continue
 
         linkText = determineLinkText(el)
@@ -717,7 +717,8 @@ def processBiblioLinks(doc):
 
         ref = doc.refs.getBiblioRef(linkText, status=biblioStatus, el=el)
         if not ref:
-            die("Couldn't find '{0}' in bibliography data.", linkText)
+            if el.get("data-okay-to-fail") is None:
+                die("Couldn't find '{0}' in bibliography data.", linkText)
             el.tag = "span"
             continue
 
@@ -1836,19 +1837,18 @@ def addIndexOfLocallyDefinedTerms(doc, container):
                         E.a({"href":"#"+item['id']}, item['level'])))
 
 def addIndexOfExternallyDefinedTerms(doc, container):
-    if len(doc.externalRefsUsed.keys()) == 0:
+    if not doc.externalRefsUsed:
         return
 
-    specs = sorted(doc.externalRefsUsed.keys())
     ul = E.ul({"class": "indexlist"})
-    for spec in specs:
-        attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"normative"}
-        specLi = E.li(E.a(attrs, "[", spec, "]"), " defines the following terms:")
+    for spec, refs in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0]):
+        attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"normative", "data-okay-to-fail": "true"}
+        specLi = E.li(
+            E.a(attrs, "[", spec, "]"), " defines the following terms:")
         termsUl = E.ul()
-        for title in sorted(doc.externalRefsUsed[spec].keys()):
-            ref = doc.externalRefsUsed[spec][title]
+        for title, ref in sorted(refs.items(), key=lambda x:x[0]):
             attrs = {"data-link-type": ref.type}
-            if len(ref.for_):
+            if ref.for_:
                 attrs['data-link-for'] = ref.for_[0]
             appendChild(termsUl, E.li(E.a(attrs, title)))
         appendChild(specLi, termsUl)
