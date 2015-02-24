@@ -374,14 +374,17 @@ class ReferenceManager(object):
                  '\n'.join(possibleRefs))
         return defaultRef
 
-    def getBiblioRef(self, text, status, el=None):
+    def getBiblioRef(self, text, status, generateFakeRef=False, el=None):
         key = text.lower()
         if key in self.biblios:
             candidates = self.biblios[key]
         elif key+"\n" in self.biblios:
             candidates = self.biblios[key+"\n"]
+        elif key in self.specs and generateFakeRef:
+            return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=status)
         else:
             return None
+
         candidates = sorted(stripLineBreaks(candidates), key=itemgetter('order'))
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
         # if candidates[0]['order'] > 3: # 3 is SpecRef level

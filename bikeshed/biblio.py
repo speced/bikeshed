@@ -107,6 +107,34 @@ class BiblioEntry(object):
             return False
         return True
 
+class SpecBasedBiblioEntry(BiblioEntry):
+    '''
+    Generates a "fake" biblio entry from a spec reference,
+    for when we don't have "real" bibliography data for a reference.
+    '''
+
+    def __init__(self, spec, preferredURL="dated"):
+        self.spec = spec
+        self.linkText = spec['vshortname']
+        self._valid = True
+        if preferredURL == "dated" and spec.get("TR", None) is not None:
+            self.url = spec['TR']
+        elif 'ED' in spec:
+            self.url = spec['ED']
+        else:
+            self._valid = False
+
+    def valid(self):
+        return self._valid
+
+    def toHTML(self):
+        return [
+            self.spec['description'],
+            " URL: ",
+            E.a({"href":self.url}, self.url)
+        ]
+
+
 def processReferBiblioFile(lines, storage, order):
     singularReferCodes = {
         "U": "dated_url",

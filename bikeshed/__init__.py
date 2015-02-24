@@ -708,9 +708,11 @@ def processBiblioLinks(doc):
         if not biblioStatus:
             biblioStatus = doc.md.defaultBiblioStatus
 
-        ref = doc.refs.getBiblioRef(linkText, status=biblioStatus, el=el)
+        okayToFail = el.get('data-okay-to-fail') is not None
+
+        ref = doc.refs.getBiblioRef(linkText, status=biblioStatus, generateFakeRef=okayToFail, el=el)
         if not ref:
-            if el.get("data-okay-to-fail") is None:
+            if not okayToFail:
                 die("Couldn't find '{0}' in bibliography data.", linkText)
             el.tag = "span"
             continue
