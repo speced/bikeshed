@@ -764,6 +764,7 @@ def processAutolinks(doc):
         if ref:
             el.set('href', ref.url)
             el.tag = "a"
+            decorateAutolink(doc, el, linkType=linkType, linkText=linkText)
         else:
             if linkType == "maybe":
                 el.tag = "css"
@@ -771,6 +772,22 @@ def processAutolinks(doc):
                     del el.attrib["data-link-type"]
                 if el.get("data-lt"):
                     del el.attrib["data-lt"]
+
+def decorateAutolink(doc, el, linkType, linkText):
+    # Add additional effects to some autolinks.
+    if linkType == "type":
+        # Get all the values that the type expands to, add it as a title.
+        # TODO: Make this not have quite as sucky perf.
+        if linkText in decorateAutolink.cache:
+            titleText = decorateAutolink.cache[linkText]
+            error = False
+        else:
+            refs, error = doc.refs.queryRefs(linkFor=linkText)
+            titleText = "Expands to: " + ' | '.join(ref.text for ref in refs)
+            decorateAutolink.cache[linkText] = titleText
+        if not error:
+            el.set('title', titleText)
+decorateAutolink.cache = {}
 
 
 def processIssues(doc):
