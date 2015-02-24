@@ -2124,6 +2124,16 @@ def addReferencesSection(doc):
     if container is None:
         return
 
+    def formatBiblioTerm(linkText):
+        '''
+        If the term is all uppercase, leave it like that.
+        If it's all lowercase, uppercase it.
+        If it's mixed case, leave it like that.
+        '''
+        if linkText.islower():
+            return linkText.upper()
+        return linkText
+
     appendChild(container,
         E.h2({"class":"no-num", "id":"references"}, "References"))
 
@@ -2133,7 +2143,7 @@ def addReferencesSection(doc):
             E.h3({"class":"no-num", "id":"normative"}, "Normative References"),
             E.dl())
         for ref in normRefs:
-            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText)}, "["+ref.linkText+"]"))
+            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText)}, "["+formatBiblioTerm(ref.linkText)+"]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
     informRefs = [x for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText) if x.linkText not in doc.normativeRefs]
@@ -2142,7 +2152,7 @@ def addReferencesSection(doc):
             E.h3({"class":"no-num", "id":"informative"}, "Informative References"),
             E.dl())
         for ref in informRefs:
-            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText)}, "["+ref.linkText+"]"))
+            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText)}, "["+formatBiblioTerm(ref.linkText)+"]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
 def addIssuesSection(doc):
