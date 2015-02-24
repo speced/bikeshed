@@ -261,6 +261,8 @@ def parseBulleted(stream):
 				return
 			if stream.currtype() == 'blank' and stream.nexttype() != 'bulleted' and stream.nextprefixlen() <= prefixLen:
 				return
+			if stream.currprefixlen() < prefixLen:
+				return
 			if stream.currtype() == 'blank':
 				stream.advance()
 			yield parseItem(stream)
@@ -302,6 +304,8 @@ def parseNumbered(stream):
 			if stream.currtype() == 'eof':
 				return
 			if stream.currtype() == 'blank' and stream.nexttype() != 'numbered' and stream.nextprefixlen() <= prefixLen:
+				return
+			if stream.currprefixlen() < prefixLen:
 				return
 			if stream.currtype() == 'blank':
 				stream.advance()
@@ -345,6 +349,8 @@ def parseDl(stream):
 			if stream.currtype() == 'eof':
 				return
 			if stream.currtype() == 'blank' and stream.nexttype() not in ('dt', 'dd') and stream.nextprefixlen() <= prefixLen:
+				return
+			if stream.currprefixlen() < prefixLen:
 				return
 			if stream.currtype() == 'blank':
 				stream.advance()
