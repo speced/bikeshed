@@ -142,6 +142,8 @@ def main():
                                metavar="LEAFFUNC",
                                help="Prune the graph to only show ancestors of the specified leaf node.")
 
+    profileParser = subparsers.add_parser('template', help="Outputs a skeleton .bs file for you to start with.")
+
     options, extras = argparser.parse_known_args()
 
     config.quiet = options.quiet
@@ -214,6 +216,8 @@ def main():
         root = "--root=\"{0}\"".format(options.root) if options.root else ""
         leaf = "--leaf=\"{0}\"".format(options.leaf) if options.leaf else ""
         os.system("python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o callgraph.svg && rm stat.prof".format(root=root, leaf=leaf))
+    elif options.subparserName == "template":
+        print specTemplate()
 
 def stripBOM(doc):
     if len(doc.lines) >= 1 and doc.lines[0][0:1] == "\ufeff":
@@ -2202,3 +2206,23 @@ def temporaryCheckForExcessiveTitle(doc):
     # This function is a migration aid, to help warn a spec if it uses a bunch of title attributes.
     if len(findAll("dfn[title]:not([data-lt]), a[title]:not([data-lt])", doc)) > 0:
         warn("Bikeshed now prefers you specify alternate linking texts with the 'lt' attribute, not 'title'. Please change your source.")
+
+
+def specTemplate():
+    # Generates a skeleton .bs file
+    return '''<pre class='metadata'>
+Title: Your Spec Title
+Shortname: your-spec
+Level: 1
+Status: ED
+Group: WGNAMEORWHATEVER
+URL: http://example.com/url-this-spec-will-live-at
+Editor: Your Name, Your Company http://example.com/your-company, your-email@example.com, http://example.com/your-personal-website
+Abstract: A short description of your spec, one or two sentences.
+</pre>
+
+Introduction {#intro}
+=====================
+
+Introduction here.
+'''
