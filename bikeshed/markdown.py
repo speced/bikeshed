@@ -222,7 +222,12 @@ def parseParagraph(stream):
 		p = "<strong class='advisement'>"
 		endTag = "</strong>"
 	else:
-		p = "<p>"
+		match = re.match(r"issue\(([^)]+)\): (.+)", line, re.I)
+		if match:
+			line = match.group(2)
+                        p = "<p data-remote-issue-id='%s' class='issue'>" % match.group(1)
+                else:
+			p = "<p>"
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
 		stream.advance()

@@ -796,9 +796,16 @@ decorateAutolink.cache = {}
 
 def processIssues(doc):
     import hashlib
-    # Add an auto-genned and stable-against-changes-elsewhere id to all issues.
+    # Add an auto-genned and stable-against-changes-elsewhere id to all issues, and
+    # link to remote issues if possible:
     for el in findAll(".issue:not([id])", doc):
         el.set('id', "issue-"+hashContents(el))
+        remoteIssueID = el.get('data-remote-issue-id')
+        if remoteIssueID:
+            del el.attrib['data-remote-issue-id']
+            if doc.md.issueTrackerTemplate:
+                remoteIssueURL = doc.md.issueTrackerTemplate % remoteIssueID
+                appendChild(el, " ", E.a({"href": remoteIssueURL }, "<" + remoteIssueURL + ">"))
     dedupIds(doc, findAll(".issue", doc))
 
 
