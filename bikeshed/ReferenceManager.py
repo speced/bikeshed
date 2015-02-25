@@ -586,7 +586,7 @@ def splitForValues(forValues):
     Respects function args, etc.
     Currently, for values are separated by commas.
     '''
-    return re.split(r',(?![^()]*\))', text)
+    return re.split(r',(?![^()]*\))', forValues)
 
 
 class RefWrapper(object):
