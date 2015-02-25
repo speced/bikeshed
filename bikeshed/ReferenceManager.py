@@ -586,29 +586,7 @@ def splitForValues(forValues):
     Respects function args, etc.
     Currently, for values are separated by commas.
     '''
-    startIndex = 0
-    mode = "between"
-    arr = []
-    for i,c in enumerate(forValues):
-        if mode == "between":
-            if c.isspace():
-                continue
-            else:
-                mode = "in-for"
-                startIndex = i
-        elif mode == "in-args":
-            if c == ")":
-                mode = "in-for"
-        elif mode == "in-for":
-            if c == "(":
-                mode = "in-args"
-            elif c == ",":
-                arr.append(forValues[startIndex:i].strip())
-                mode = "between"
-            else:
-                continue
-    arr.append(forValues[startIndex:].strip())
-    return arr
+    return re.split(r',(?![^()]*\))', text)
 
 
 class RefWrapper(object):
