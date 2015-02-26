@@ -804,7 +804,7 @@ def processIssues(doc):
         if remoteIssueID:
             del el.attrib['data-remote-issue-id']
             if doc.md.issueTrackerTemplate:
-                remoteIssueURL = doc.md.issueTrackerTemplate % remoteIssueID
+                remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
                 appendChild(el, " ", E.a({"href": remoteIssueURL }, "<" + remoteIssueURL + ">"))
     dedupIds(doc, findAll(".issue", doc))
 
