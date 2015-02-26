@@ -803,8 +803,13 @@ def processIssues(doc):
         remoteIssueID = el.get('data-remote-issue-id')
         if remoteIssueID:
             del el.attrib['data-remote-issue-id']
-            if doc.md.issueTrackerTemplate:
+            githubMatch = re.match(r"([^/]+)/([^#]+)#(\d+)", remoteIssueID)
+            remoteIssueURL = None
+            if githubMatch:
+                remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(githubMatch.group(1), githubMatch.group(2), githubMatch.group(3))
+            elif doc.md.issueTrackerTemplate:
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
+            if remoteIssueURL:
                 appendChild(el, " ", E.a({"href": remoteIssueURL }, "<" + remoteIssueURL + ">"))
     dedupIds(doc, findAll(".issue", doc))
 
