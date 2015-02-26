@@ -803,7 +803,7 @@ def processIssues(doc):
         remoteIssueID = el.get('data-remote-issue-id')
         if remoteIssueID:
             del el.attrib['data-remote-issue-id']
-            githubMatch = re.match(r"([^/]+)/([^#]+)#(\d+)", remoteIssueID)
+            githubMatch = re.match(r"\s*([\w\-_]+)/([^\w\-_]+)#(\d+)\s*$", remoteIssueID)
             remoteIssueURL = None
             if githubMatch:
                 remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(githubMatch.group(1), githubMatch.group(2), githubMatch.group(3))
