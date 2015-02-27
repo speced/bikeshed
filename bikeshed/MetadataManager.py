@@ -56,6 +56,7 @@ class MetadataManager:
         self.markupShorthands = set(["css", "biblio", "markup", "idl"])
         self.customTextMacros = []
         self.issues = []
+        self.issueTrackerTemplate = None
 
         self.otherMetadata = defaultdict(list)
 
@@ -86,7 +87,8 @@ class MetadataManager:
             "Indent": "indent",
             "Use <I> Autolinks": "useIAutolinks",
             "No Editor": "noEditor",
-            "Default Biblio Status": "defaultBiblioStatus"
+            "Default Biblio Status": "defaultBiblioStatus",
+            "Issue Tracker Template": "issueTrackerTemplate"
         }
 
         # Some keys are multi-value:
