@@ -22,7 +22,7 @@ A short overview of some of Bikeshed's features:
 * [automatic id generation](docs/markup.md) for headings and definitions, based on their text.
 * [textual shortcuts for autolinks](docs/definitions-autolinks.md): [[FOO]] for bibliography entries, &lt;&lt;foo>> for grammar productions, 'foo' for CSS property names, {{foo}} for IDL terms, and more.
 * [boilerplate generation](docs/boilerplate.md), both wholesale and piecemeal.
-* [partial support for markdown](docs/markup.md) (more is coming, as is compliance with [CommonMark](http://commonmark.com)).
+* [partial support for markdown](docs/markup.md) (more is coming, as is compliance with [CommonMark](http://commonmark.org)).
 * a [compact syntax](docs/markup.md) for writing property-definition tables.
 * [automatic whitespace-prefix stripping](docs/markup.md) from `<pre>` contents, so the contents can be indented properly in your HTML.
 * [automatic IDL processing and syntax-checking](docs/idl.md) for `<pre class=idl>` contents, so you don't have to mark up every single significant term yourself.
