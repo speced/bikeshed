@@ -491,7 +491,7 @@ class SingleType(Production):    # NonAnyType | "any" [TypeSuffixStartingWithArr
             self.type = NonAnyType(tokens)
             self.suffix = None
         else:
-            self.type = Symbol(tokens, 'any')
+            self.type = Symbol(tokens, 'any', False)
             self.suffix = TypeSuffixStartingWithArray(tokens) if (TypeSuffixStartingWithArray.peek(tokens)) else None
         self._didParse(tokens, False)
 
