@@ -2,6 +2,7 @@
 from __future__ import division, unicode_literals
 import re
 import os
+from DefaultOrderedDict import DefaultOrderedDict
 from subprocess import check_output
 from collections import defaultdict
 from datetime import date, datetime
@@ -58,7 +59,7 @@ class MetadataManager:
         self.issues = []
         self.issueTrackerTemplate = None
 
-        self.otherMetadata = defaultdict(list)
+        self.otherMetadata = DefaultOrderedDict(list)
 
         self.overrides = set()
 
