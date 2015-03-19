@@ -352,6 +352,7 @@ def canonicalizeShortcuts(doc):
         "status":"data-link-status",
         "dfn-for":"data-dfn-for",
         "link-for":"data-link-for",
+        "link-for-hint":"data-link-for-hint",
         "dfn-type":"data-dfn-type",
         "link-type":"data-link-type",
         "force":"data-dfn-force",
@@ -671,7 +672,7 @@ def classifyLink(el):
     linkText = determineLinkText(el)
 
     el.set('data-lt', linkText)
-    for attr in ["data-link-status", "data-link-for", "data-link-spec"]:
+    for attr in ["data-link-status", "data-link-for", "data-link-spec", "data-link-for-hint"]:
         val = treeAttr(el, attr)
         if val is not None:
             el.set(attr, val)
@@ -751,6 +752,7 @@ def processAutolinks(doc):
                               spec=el.get('data-link-spec'),
                               status=el.get('data-link-status'),
                               linkFor=el.get('data-link-for'),
+                              linkForHint=el.get('data-link-for-hint'),
                               el=el,
                               error=(linkText.lower() not in doc.md.ignoredTerms))
         # Capture the reference (and ensure we add a biblio entry) if it
@@ -1147,6 +1149,7 @@ def cleanupHTML(doc):
         removeAttr(el, 'for')
     for el in findAll("a, span", doc):
         removeAttr(el, 'data-link-for')
+        #removeAttr(el, 'data-link-for-hint')
         removeAttr(el, 'data-link-status')
         removeAttr(el, 'data-link-spec')
         removeAttr(el, 'data-section')

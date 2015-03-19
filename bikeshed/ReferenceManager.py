@@ -199,10 +199,10 @@ class ReferenceManager(object):
                     }
                     self.refs[linkText].append(ref)
 
-    def getLocalRef(self, linkType, text, linkFor=None, el=None):
-        return self.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor)[0]
+    def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None):
+        return self.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint)[0]
 
-    def getRef(self, linkType, text, spec=None, status=None, linkFor=None, error=True, el=None):
+    def getRef(self, linkType, text, spec=None, status=None, linkFor=None, linkForHint=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a reference or None
         # Otherwise, it pops out debug messages for the user.
 
@@ -221,7 +221,7 @@ class ReferenceManager(object):
             return None
 
         # Local refs always get precedence, no matter what.
-        localRefs = self.getLocalRef(linkType, text, linkFor, el)
+        localRefs = self.getLocalRef(linkType, text, linkFor, linkForHint, el)
         if len(localRefs) == 1:
             return localRefs[0]
         elif len(localRefs) > 1:
@@ -251,7 +251,7 @@ class ReferenceManager(object):
             export = True
         else:
             export = None
-        refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor=linkFor, export=export, ignoreObsoletes=True)
+        refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor=linkFor, linkForHint=linkForHint, export=export, ignoreObsoletes=True)
 
         if failure and linkType in config.idlMethodTypes and text.endswith("()"):
             # Allow foo(bar) to be linked to with just foo(), but only if it's completely unambiguous.
@@ -391,14 +391,14 @@ class ReferenceManager(object):
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
         return biblio.BiblioEntry(preferredURL=status, **candidates[0])
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, refs=None, export=None, ignoreObsoletes=False, **kwargs):
-        results, error = self._queryRefs(text, spec, linkType, linkFor, status, refs, export, ignoreObsoletes, exact=True)
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, refs=None, export=None, ignoreObsoletes=False, **kwargs):
+        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, refs, export, ignoreObsoletes, exact=True)
         if error:
-            return self._queryRefs(text, spec, linkType, linkFor, status, refs, export, ignoreObsoletes)
+            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, refs, export, ignoreObsoletes)
         else:
             return results, error
 
-    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, status=None, refs=None, export=None, ignoreObsoletes=False, exact=False, **kwargs):
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, refs=None, export=None, ignoreObsoletes=False, exact=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         if refs is None:
@@ -493,6 +493,13 @@ class ReferenceManager(object):
             refs = [ref for ref in refs if ref.spec not in self.ignoredSpecs and ref.spec not in moreIgnores]
         if not refs:
             return refs, "ignored-specs"
+
+        if linkForHint:
+            # If anything matches the linkForHint, filter to just those,
+            # but don't worry if nothing matches it.
+            tempRefs = [x for x in refs if linkForHint in x.for_]
+            if tempRefs:
+                refs = tempRefs
 
         return refs, None
 

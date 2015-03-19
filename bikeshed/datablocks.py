@@ -156,16 +156,19 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     # they're displayed afterward in the order they were specified.
     # attrs with a value of None are required to be present in parsedAttrs;
     # attrs with any other value are optional, and use the specified value if not present in parsedAttrs
+    forHint = ""
+    if "Name" in parsedAttrs:
+        forHint = " data-link-for-hint='{0}'".format(parsedAttrs["Name"].split(",")[0].strip())
     if "partial" in firstLine or "New values" in parsedAttrs:
         attrs["Name"] = None
         attrs["New values"] = None
-        ret = ["<table class='definition propdef partial'>"]
+        ret = ["<table class='definition propdef partial'{forHint}>".format(forHint=forHint)]
     elif "shorthand" in firstLine:
         attrs["Name"] = None
         attrs["Value"] = None
         for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animatable"]:
             attrs[defaultKey] = "see individual properties"
-        ret = ["<table class='definition propdef'>"]
+        ret = ["<table class='definition propdef'{forHint}>".format(forHint=forHint)]
     else:
         attrs["Name"] = None
         attrs["Value"] = None
@@ -176,13 +179,13 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
         attrs["Media"] = "visual"
         attrs["Computed value"] = "as specified"
         attrs["Animatable"] = "no"
-        ret = ["<table class='definition propdef'>"]
+        ret = ["<table class='definition propdef'{forHint}>".format(forHint=forHint)]
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:
                 val = parsedAttrs[key]
             if key in ("Value", "New values"):
-                ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, val))
+                ret.append("<tr class='value'><th>{0}:<td class='prod'>{1}".format(key, val))
             else:
                 ret.append("<tr><th>{0}:<td>{1}".format(key, val))
         else:
