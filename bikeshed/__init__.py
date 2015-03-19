@@ -1665,8 +1665,7 @@ def formatElementdefTables(doc):
         elementsFor = ' '.join(textContent(x) for x in elements)
         for el in findAll("a[data-element-attr-group]", table):
             groupName = textContent(el).strip()
-            groupFor = re.sub("\s+", "-", groupName)
-            groupAttrs = sorted(doc.refs.queryRefs(linkType="element-attr", linkFor=groupFor), key=lambda x:x[1])
+            groupAttrs = sorted(doc.refs.queryRefs(linkType="element-attr", linkFor=groupName)[0], key=lambda x:x.text)
             if len(groupAttrs) == 0:
                 die("The element-attr group '{0}' doesn't have any attributes defined for it.", groupName)
                 continue
@@ -1678,12 +1677,12 @@ def formatElementdefTables(doc):
                 E.summary(
                     E.a({"data-link-type":"dfn"}, groupName)),
                 E.ul())
-            for attrName,ref in groupAttrs:
+            for ref in groupAttrs:
                 appendChild(ul,
                     E.li(
-                        E.dfn({"id":"element-attrdef-"+simplifyText(textContent(elements[0]))+"-"+attrName, "for":elementsFor, "data-dfn-type":"element-attr"},
-                            E.a({"data-link-type":"element-attr", "for":groupFor},
-                                attrName.strip()))))
+                        E.dfn({"id":"element-attrdef-"+simplifyText(textContent(elements[0]))+"-"+ref.text, "for":elementsFor, "data-dfn-type":"element-attr"},
+                            E.a({"data-link-type":"element-attr", "for":groupName},
+                                ref.text.strip()))))
 
 
 
