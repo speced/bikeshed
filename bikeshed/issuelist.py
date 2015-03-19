@@ -205,7 +205,7 @@ def printIssues(outfile, lines):
 			code += " open"
 
 		# Linkify urls
-		issue = re.sub(r"(http:\S+)", r"<a href='\1'>\1</a>", issue)
+		issue = re.sub(r"((http|https):\S+)", r"<a href='\1'>\1</a>", issue)
 
 		# And print it
 		outfile.write("<pre class='{0}' id='issue-{1}'>\n".format(code, index))
