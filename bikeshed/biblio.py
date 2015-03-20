@@ -245,10 +245,12 @@ def levenshtein(a,b):
 def findCloseBiblios(biblios, target, n=5):
     '''
     Finds biblio entries close to the target.
-    Defaults to only returning the 5 best.
+    Returns all biblios with target as the substring,
+    plus the 5 closest ones per levenshtein distance.
     '''
     target = target.lower()
     names = []
+    superStrings = []
     def addName(name, distance):
         tuple = (name, distance)
         if len(names) < n:
@@ -265,8 +267,7 @@ def findCloseBiblios(biblios, target, n=5):
         return names
     for name in biblios.keys():
         if target in name:
-            # Let substrings win; they're usually right.
-            addName(name, 1)
+            superStrings.append(name)
         else:
             addName(name, levenshtein(name, target))
-    return names
+    return [s.strip() for s in superStrings] + [n.strip() for n,d in names]
