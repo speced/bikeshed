@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import re
-from collections import defaultdict
+from collections import defaultdict, deque
 from .messages import *
 from .htmlhelpers import *
 
@@ -219,3 +219,54 @@ def processSpecrefBiblioFile(text, storage, order):
             continue
         storage[biblioKey.lower()].append(biblio)
     return storage
+
+
+
+def levenshtein(a,b):
+    "Calculates the Levenshtein distance between a and b."
+    n, m = len(a), len(b)
+    if n > m:
+        # Make sure n <= m, to use O(min(n,m)) space
+        a,b = b,a
+        n,m = m,n
+
+    current = range(n+1)
+    for i in range(1,m+1):
+        previous, current = current, [i]+[0]*n
+        for j in range(1,n+1):
+            add, delete = previous[j]+1, current[j-1]+1
+            change = previous[j-1]
+            if a[j-1] != b[i-1]:
+                change = change + 1
+            current[j] = min(add, delete, change)
+
+    return current[n]
+
+def findCloseBiblios(biblios, target, n=5):
+    '''
+    Finds biblio entries close to the target.
+    Defaults to only returning the 5 best.
+    '''
+    target = target.lower()
+    names = []
+    def addName(name, distance):
+        tuple = (name, distance)
+        if len(names) < n:
+            names.append(tuple)
+            names.sort(key=lambda x:x[1])
+        elif distance >= names[-1][1]:
+            pass
+        else:
+            for i, entry in enumerate(names):
+                if distance < entry[1]:
+                    names.insert(i, tuple)
+                    names.pop()
+                    break
+        return names
+    for name in biblios.keys():
+        if target in name:
+            # Let substrings win; they're usually right.
+            addName(name, 1)
+        else:
+            addName(name, levenshtein(name, target))
+    return names
