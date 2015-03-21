@@ -35,7 +35,7 @@ class ReferenceManager(object):
         with config.retrieveCachedFile("anchors.data", quiet=True) as lines:
             try:
                 while True:
-                    key = lines.next()
+                    key = lines.next().decode('utf-8')
                     a = {
                         "type": lines.next(),
                         "spec": lines.next(),
