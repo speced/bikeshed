@@ -270,4 +270,4 @@ def findCloseBiblios(biblios, target, n=5):
             superStrings.append(name)
         else:
             addName(name, levenshtein(name, target))
-    return [s.strip() for s in superStrings] + [n.strip() for n,d in names]
+    return sorted(s.strip() for s in superStrings) + [n.strip() for n,d in names]
