@@ -158,22 +158,22 @@ class ReferenceManager(object):
             for linkText in linkTextsFromElement(el):
                 linkText = unfixTypography(linkText)
                 linkText = re.sub("\s+", " ", linkText)
-                type = treeAttr(el, 'data-dfn-type')
-                if type in config.lowercaseTypes:
+                linkType = treeAttr(el, 'data-dfn-type')
+                if linkType in config.lowercaseTypes:
                     linkText = linkText.lower()
                 dfnFor = treeAttr(el, 'data-dfn-for')
                 if dfnFor is None:
                     dfnFor = set()
-                    if self.getLocalRef(type, linkText):
-                        die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, type)
+                    if self.getLocalRef(linkType, linkText):
+                        die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, linkType)
                         continue
                 else:
                     dfnFor = set(splitForValues(dfnFor))
                     encounteredError = False
                     for singleFor in dfnFor:
-                        if self.getLocalRef(type, linkText, linkFor=singleFor):
+                        if self.getLocalRef(linkType, linkText, linkFor=singleFor):
                             encounteredError = True
-                            die("Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, type, singleFor)
+                            die("Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, linkType, singleFor)
                             break
                     if encounteredError:
                         continue
@@ -185,10 +185,10 @@ class ReferenceManager(object):
                         dfnFor.add(match.group(1).strip())
                 # convert back into a list now, for easier JSONing
                 dfnFor = list(dfnFor)
-                if type in config.dfnTypes.union(["dfn"]):
+                if linkType in config.dfnTypes.union(["dfn"]):
                     existingAnchors = self.refs[linkText]
                     ref = {
-                        "type":type,
+                        "type":linkType,
                         "status":"local",
                         "spec":self.specVName,
                         "shortname":self.specName,
