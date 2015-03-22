@@ -1271,6 +1271,7 @@ class CSSSpec(object):
         addAbstract(self)
         addObsoletionNotice(self)
         addAtRisk(self)
+        removeUnwantedBoilerplate(self)
         self.transformProductionPlaceholders()
         self.transformMaybePlaceholders()
         self.transformAutolinkShortcuts()
@@ -1298,11 +1299,13 @@ class CSSSpec(object):
         addIssuesSection(self)
         addCustomBoilerplate(self)
         processHeadings(self, "all") # again
+        removeUnwantedBoilerplate(self)
         addTOCSection(self)
         addSelfLinks(self)
         processAutolinks(self)
         addAnnotations(self)
         addSyntaxHighlighting(self)
+        removeUnwantedBoilerplate(self)
         fixIntraDocumentReferences(self)
 
         # Any final HTML cleanups
@@ -1784,6 +1787,12 @@ def addCustomBoilerplate(doc):
         target = find('[data-fill-with="{0}"]'.format(bType), doc)
         if target is not None:
             replaceContents(target, el)
+            removeNode(el)
+
+def removeUnwantedBoilerplate(doc):
+    for el in findAll('[data-fill-with]', doc):
+        tag = el.get('data-fill-with')
+        if tag in doc.md.boilerplate['omitSections']:
             removeNode(el)
 
 def addAnnotations(doc):
