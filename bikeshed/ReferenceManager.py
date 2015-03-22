@@ -453,7 +453,9 @@ class ReferenceManager(object):
         if not refs:
             return refs, "spec"
 
-        if linkFor:
+        if linkFor == "/":
+            refs = [x for x in refs if not x.for_]
+        elif linkFor:
             refs = [x for x in refs if linkFor in x.for_]
         if not refs:
             return refs, "for"
