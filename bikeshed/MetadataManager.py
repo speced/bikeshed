@@ -294,6 +294,8 @@ class MetadataManager:
         # W3C stylesheets are *mostly* of the form W3C-[status], except for *one*. Ugh.
         if self.status == "UD":
             macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/w3c-unofficial"
+        elif self.status == "FPWD":
+            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/W3C-WD"
         else:
             macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/W3C-{0}".format(self.status)
         # Custom macros
