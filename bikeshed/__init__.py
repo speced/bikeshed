@@ -1150,7 +1150,7 @@ def cleanupHTML(doc):
         removeAttr(el, 'for')
     for el in findAll("a, span", doc):
         removeAttr(el, 'data-link-for')
-        #removeAttr(el, 'data-link-for-hint')
+        removeAttr(el, 'data-link-for-hint')
         removeAttr(el, 'data-link-status')
         removeAttr(el, 'data-link-spec')
         removeAttr(el, 'data-section')
