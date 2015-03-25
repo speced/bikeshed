@@ -290,6 +290,13 @@ There are three things you might have to do to fix these:
     but it keeps your links shorter for now.
 
     Again, you can specify a `link-for=''` attribute on a container to default it for all the autolinks inside the container.
+    Alternately, you can specify `link-for-hint=''` on a container,
+    which'll use the hint as the for value *if possible*
+    (if doing so wouldn't eliminate all the possible links).
+    This is useful if some container has a bunch of links for a given property, say,
+    but *some* of the links are to other things entirely;
+    using `link-for` means you have to manually specify the other links aren't for anything,
+    but `link-for-hint` is more "do what I mean".
 
 3. If multiple specs define the same property, you may need to declare which spec you're referring to.
     (The processor is smart enough to automatically figure out which one you probably want in many cases.)
