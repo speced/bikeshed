@@ -797,10 +797,10 @@ def decorateAutolink(doc, el, linkType, linkText):
 decorateAutolink.cache = {}
 
 
-def processIssues(doc):
+def processIssuesAndExamples(doc):
     import hashlib
-    # Add an auto-genned and stable-against-changes-elsewhere id to all issues, and
-    # link to remote issues if possible:
+    # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
+    # examples, and link to remote issues if possible:
     for el in findAll(".issue:not([id])", doc):
         el.set('id', "issue-"+hashContents(el))
         remoteIssueID = el.get('data-remote-issue-id')
@@ -814,7 +814,10 @@ def processIssues(doc):
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
             if remoteIssueURL:
                 appendChild(el, " ", E.a({"href": remoteIssueURL }, "<" + remoteIssueURL + ">"))
-    dedupIds(doc, findAll(".issue", doc))
+    for el in findAll(".example:not([id])", doc):
+        el.set('id', "example-"+hashContents(el))
+    dedupIds(doc, findAll(".issue, .example", doc))
+
 
 
 def addSelfLinks(doc):
@@ -1275,7 +1278,7 @@ class CSSSpec(object):
         formatPropertyNames(self)
         processHeadings(self)
         canonicalizeShortcuts(self)
-        processIssues(self)
+        processIssuesAndExamples(self)
         markupIDL(self)
 
 
