@@ -2,6 +2,7 @@
 from __future__ import division, unicode_literals
 import re
 import os
+from DefaultOrderedDict import DefaultOrderedDict
 from subprocess import check_output
 from collections import defaultdict
 from datetime import date, datetime
@@ -12,10 +13,6 @@ from .htmlhelpers import *
 
 class MetadataManager:
     @property
-    def hasMetadata(self):
-        return len(self.manuallySetKeys) > 0
-
-    @property
     def vshortname(self):
         if self.level is not None:
             return "{0}-{1}".format(self.shortname, self.level)
@@ -23,6 +20,7 @@ class MetadataManager:
 
     def __init__(self, doc):
         self.doc = doc
+        self.hasMetadata = False
 
         # required metadata
         self.status = None
@@ -56,9 +54,12 @@ class MetadataManager:
         self.useIAutolinks = False
         self.noEditor = False
         self.defaultBiblioStatus = "dated"
+        self.markupShorthands = set(["css", "biblio", "markup", "idl"])
+        self.customTextMacros = []
         self.issues = []
+        self.issueTrackerTemplate = None
 
-        self.otherMetadata = defaultdict(list)
+        self.otherMetadata = DefaultOrderedDict(list)
 
         self.overrides = set()
 
@@ -87,7 +88,8 @@ class MetadataManager:
             "Indent": "indent",
             "Use <I> Autolinks": "useIAutolinks",
             "No Editor": "noEditor",
-            "Default Biblio Status": "defaultBiblioStatus"
+            "Default Biblio Status": "defaultBiblioStatus",
+            "Issue Tracker Template": "issueTrackerTemplate"
         }
 
         # Some keys are multi-value:
@@ -104,7 +106,9 @@ class MetadataManager:
             "At Risk": "atRisk",
             "Ignored Terms": "ignoredTerms",
             "Link Defaults": "linkDefaults",
-            "Issue Tracking": "issues"
+            "Issue Tracking": "issues",
+            "Markup Shorthands": "markupShorthands",
+            "Text Macro": "customTextMacros"
         }
 
         self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
@@ -128,12 +132,15 @@ class MetadataManager:
             "Use <I> Autolinks": parseBoolean,
             "No Editor": parseBoolean,
             "Default Biblio Status": parseBiblioStatus,
-            "Issue Tracking": parseIssues
+            "Issue Tracking": parseIssues,
+            "Markup Shorthands": parseMarkupShorthands,
+            "Text Macro": parseTextMacro
         }
 
         # Alternate output handlers, passed key/value/doc.
         # The "default" output assigns the value to self.key.
         self.customOutput = {
+            "Markup Shorthands": glomMarkupShorthands
         }
 
     def addData(self, key, val, default=False):
@@ -247,7 +254,7 @@ class MetadataManager:
             macros["spectitle"] = self.h1
         macros["shortname"] = self.shortname
         if self.status:
-            macros["statusText"] = self.statusText
+            macros["statustext"] = self.statusText
         macros["vshortname"] = self.vshortname
         if self.status in config.shortToLongStatus:
             macros["longstatus"] = config.shortToLongStatus[self.status]
@@ -284,6 +291,16 @@ class MetadataManager:
         macros["logo"] = self.logo
         # get GH repo from remote
         macros["repository"] = getSpecRepository(doc)
+        # W3C stylesheets are *mostly* of the form W3C-[status], except for *one*. Ugh.
+        if self.status == "UD":
+            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/w3c-unofficial"
+        elif self.status == "FPWD":
+            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/W3C-WD"
+        else:
+            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/W3C-{0}".format(self.status)
+        # Custom macros
+        for name, text in self.customTextMacros:
+            macros[name.lower()] = text
 
 
 def convertGroup(key, val):
@@ -336,6 +353,7 @@ def parseEditor(key, val):
         return re.match(r".+@.+\..+", string)
     data = {
         'name'   : pieces[0],
+        'id'     : None,
         'org'    : None,
         'orglink': None,
         'link'   : None,
@@ -380,6 +398,11 @@ def parseEditor(key, val):
         pieces = data['org'].split()
         data['orglink'] = pieces[-1]
         data['org'] = ' '.join(pieces[:-1])
+    # Check if the name ends with an ID.
+    if data['name'] and re.search(r"\s\d+$", data['name']):
+        pieces = data['name'].split()
+        data['id'] = pieces[-1]
+        data['name'] = ' '.join(pieces[:-1])
     return data
 
 
@@ -426,6 +449,49 @@ def parseIssues(key, val):
         issues.append(v.rsplit(" ", 1))
     return issues
 
+def parseMarkupShorthands(key, val):
+    # Format is comma-separated list of shorthand category followed by boolean.
+    # Output is a dict of the shorthand categories with boolean values.
+    vals = [v.strip() for v in val.lower().split(",")]
+    ret = {}
+    validCategories = frozenset(["css", "markup", "biblio", "idl"])
+    for v in vals:
+        pieces = v.split()
+        if len(pieces) != 2:
+            die("Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}", v)
+            return {}
+        name, boolstring = pieces
+        if name not in validCategories:
+            die("Unknown Markup Shorthand category '{0}'.", name)
+            return {}
+        onoff = parseBoolean(key, boolstring)
+        if onoff is None:
+            # parsing failed
+            return {}
+        ret[name] = onoff
+    return ret
+
+def glomMarkupShorthands(key, val, doc):
+    ms = doc.md.markupShorthands
+    for name, onoff in val.items():
+        if onoff:
+            ms.add(name)
+        else:
+            ms.discard(name)
+
+def parseTextMacro(key, val):
+    # Each Text Macro line is just a macro name (must be uppercase)
+    # followed by the text it expands to.
+    try:
+        name, text = val.lstrip().split(None, 1)
+    except:
+        die("Text Macro lines must contain a macro name followed by the macro text. Got:\n{0}", val)
+        return None
+    if not re.match(r"[A-Z0-9-]+$", name):
+        die("Text Macro names must be all-caps and alphanumeric. Got '{0}'", name)
+        return None
+    return (name, text)
+
 
 def parse(md, lines):
     # Given a MetadataManager and HTML document text, in the form of an array of text lines,
@@ -438,12 +504,14 @@ def parse(md, lines):
     for line in lines:
         if not inMetadata and re.match(r"<pre .*class=.*metadata.*>", line):
             inMetadata = True
+            md.hasMetadata = True
             continue
         elif inMetadata and re.match(r"</pre>\s*", line):
             inMetadata = False
             continue
         elif inMetadata:
-            if lastKey and (line.strip() == "") or re.match(r"\s+", line):
+            if lastKey and (line.strip() == "" or re.match(r"\s+", line)):
+                # empty lines, or lines that start with 1+ spaces, continue previous key
                 md.addData(lastKey, line.lstrip())
             elif re.match(r"([^:]+):\s*(.*)", line):
                 match = re.match(r"([^:]+):\s*(.*)", line)
@@ -468,6 +536,8 @@ def smooshValues(container, val):
     (container should be a defaultdict(list) in this case).
     '''
     if isinstance(container, list):
+        if val is None:
+            return
         if isinstance(val, list):
             container.extend(val)
         else:
@@ -486,19 +556,20 @@ def getSpecRepository(doc):
     '''
     if doc and doc.inputSource and doc.inputSource != "-":
         source_dir = os.path.dirname(os.path.abspath(doc.inputSource))
+        old_dir = os.getcwd()
         try:
-            old_dir = os.getcwd()
             os.chdir(source_dir)
             with open(os.devnull, "wb") as fnull:
                 remotes = check_output(["git", "remote", "-v"], stderr=fnull)
+            os.chdir(old_dir)
             search = re.search('origin\tgit@github\.com:(.*?)\.git \(\w+\)', remotes)
             if search:
                 return search.group(1)
             else:
                 return ""
-            os.chdir(old_dir)
         except:
             # check_output will throw CalledProcessError when not in a git repo
+            os.chdir(old_dir)
             return ""
 
 def parseDoc(doc):

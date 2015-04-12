@@ -24,9 +24,10 @@ from . import update
 from . import markdown
 from . import test
 from . import MetadataManager as metadata
+from . import HTMLSerializer
 from .datablocks import transformDataBlocks
 from .ReferenceManager import ReferenceManager
-from .ReferenceManager import linkTextsFromElement
+from .ReferenceManager import linkTextsFromElement, splitForValues
 from .globalnames import *
 from .htmlhelpers import *
 from .messages import *
@@ -141,6 +142,8 @@ def main():
                                metavar="LEAFFUNC",
                                help="Prune the graph to only show ancestors of the specified leaf node.")
 
+    profileParser = subparsers.add_parser('template', help="Outputs a skeleton .bs file for you to start with.")
+
     options, extras = argparser.parse_known_args()
 
     config.quiet = options.quiet
@@ -186,7 +189,7 @@ def main():
         config.quiet = True
         doc = CSSSpec(inputFilename=options.infile)
         doc.preprocess()
-        refs = list(doc.refs.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
+        refs,_ = list(doc.refs.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
         print config.printjson(refs)
     elif options.subparserName == "issues-list":
         from . import issuelist as il
@@ -207,14 +210,17 @@ def main():
         else:
             config.debug = True
             config.quiet = True
-            test.runAllTests(constructor=CSSSpec)
+            result = test.runAllTests(constructor=CSSSpec)
+            sys.exit(0 if result else 1)
     elif options.subparserName == "profile":
         root = "--root=\"{0}\"".format(options.root) if options.root else ""
         leaf = "--leaf=\"{0}\"".format(options.leaf) if options.leaf else ""
         os.system("python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o callgraph.svg && rm stat.prof".format(root=root, leaf=leaf))
+    elif options.subparserName == "template":
+        print specTemplate()
 
 def stripBOM(doc):
-    if doc.lines[0][0] == "\ufeff":
+    if len(doc.lines) >= 1 and doc.lines[0][0:1] == "\ufeff":
         doc.lines[0] = doc.lines[0][1:]
         warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
 
@@ -260,7 +266,7 @@ def addHeadingIds(doc, headings):
     for header in headings:
         if header.get('id') is None:
             neededIds.add(header)
-            header.set('id', simplifyText(textContent(find(".content", header))))
+            header.set('id', simplifyText(textContent(find(".content", header)), convertDashes=True))
     if len(neededIds) > 0:
         warn("You should manually provide IDs for your headings:\n{0}",
             "\n".join("  "+outerHTML(el) for el in neededIds))
@@ -346,13 +352,15 @@ def canonicalizeShortcuts(doc):
         "status":"data-link-status",
         "dfn-for":"data-dfn-for",
         "link-for":"data-link-for",
+        "link-for-hint":"data-link-for-hint",
         "dfn-type":"data-dfn-type",
         "link-type":"data-link-type",
         "force":"data-dfn-force",
         "section":"data-section",
         "attribute-info":"data-attribute-info",
         "dict-member-info":"data-dict-member-info",
-        "local-title":"data-local-title"
+        "lt":"data-lt",
+        "local-lt":"data-local-lt"
     }
     for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys()), doc):
         for attr, fixedAttr in attrFixup.items():
@@ -385,10 +393,10 @@ def fixIntraDocumentReferences(doc):
     for el in findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
         targetID = el.get("href")[1:]
         if el.get('data-section') is not None and targetID not in headingIDs:
-            die("Couldn't find target document section {0}:\n{1}", sectionID, outerHTML(el))
+            die("Couldn't find target document section {0}:\n{1}", targetID, outerHTML(el))
             continue
         elif targetID not in ids:
-            die("Couldn't find target anchor {0}:\n{1}", sectionID, outerHTML(el))
+            die("Couldn't find target anchor {0}:\n{1}", targetID, outerHTML(el))
             continue
         if (el.text is None or el.text.strip() == '') and len(el) == 0:
             # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
@@ -437,14 +445,14 @@ def fillAttributeInfoSpans(doc):
                 continue
             if "/" in referencedAttribute:
                 interface, referencedAttribute = referencedAttribute.split("/")
-                target = findAll('[data-link-type={2}][title="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface, refType), doc)
+                target = findAll('[data-link-type={2}][data-lt="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface, refType), doc)
             else:
-                target = findAll('[data-link-type={1}][title="{0}"]'.format(referencedAttribute, refType), doc)
+                target = findAll('[data-link-type={1}][data-lt="{0}"]'.format(referencedAttribute, refType), doc)
             if len(target) == 0:
-                die("Couldn't find target {1} {0}:\n{2}", referencedAttribute, refType, outerHTML(el))
+                die("Couldn't find target {1} '{0}':\n{2}", referencedAttribute, refType, outerHTML(el))
                 continue
             elif len(target) > 1:
-                die("Multiple potential target {1}s {0}:\n{2}", referencedAttribute, refType, outerHTML(el))
+                die("Multiple potential target {1}s '{0}':\n{2}", referencedAttribute, refType, outerHTML(el))
                 continue
             target = target[0]
             datatype = target.get("data-type").strip()
@@ -477,7 +485,7 @@ def processDfns(doc):
     dfns = findAll("dfn", doc)
     classifyDfns(doc, dfns)
     dedupIds(doc, dfns)
-    doc.refs.addLocalDfns(dfns)
+    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
 
 
 def determineDfnType(dfn):
@@ -518,8 +526,8 @@ def determineDfnType(dfn):
 def determineDfnText(el):
     dfnType = el.get('data-dfn-type')
     contents = textContent(el)
-    if el.get('title'):
-        dfnText = el.get('title')
+    if el.get('data-lt'):
+        dfnText = el.get('data-lt')
     elif dfnType in config.functionishTypes and re.match(r"^[\w-]+\(.*\)$", contents):
         dfnText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1)+"()"
     else:
@@ -531,7 +539,8 @@ def classifyDfns(doc, dfns):
     for el in dfns:
         dfnType = determineDfnType(el)
         # TODO Why am I using linkTextsFromElement here, but determineDfnText further down?
-        dfnTexts = linkTextsFromElement(el, preserveCasing=True)
+        dfnTexts = linkTextsFromElement(el)
+        dfnFor = treeAttr(el, "data-dfn-for")
         if len(dfnTexts):
             primaryDfnText = dfnTexts[0]
         else:
@@ -545,40 +554,38 @@ def classifyDfns(doc, dfns):
             if not re.match(r"^[\w-]+\(.*\)$", primaryDfnText):
                 die("Functions/methods must end with () in their linking text, got '{0}'.", primaryDfnText)
                 continue
-            elif el.get('title') is None:
-                # Make sure that functionish dfns have their title set up right.
+            elif el.get('data-lt') is None:
+                # Make sure that functionish dfns have their linking text set up right.
                 # Need to fix this to use the idl parser instead.
-                el.set('title', re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1)+"()")
+                el.set('data-lt', re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1)+"()")
         # If type=argument, try to infer what it's for.
         if dfnType == "argument" and el.get('data-dfn-for') is None:
             parent = el.getparent()
             if parent.get('data-dfn-type') in config.functionishTypes and parent.get('data-dfn-for') is not None:
-                el.set('data-dfn-for', "{0}/{1} {1}".format(parent.get('data-dfn-for'), linkTextsFromElement(parent, preserveCasing=True)[0]))
+                el.set('data-dfn-for', "{0}/{1} {1}".format(parent.get('data-dfn-for'), linkTextsFromElement(parent)[0]))
             elif treeAttr(el, "data-dfn-for") is None:
                 die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el))
                 continue
-        if dfnType in config.typesUsingFor:
-            if el.get('data-dfn-for'):
-                dfnFor = el.get('data-dfn-for')
-            else:
-                dfnFor = treeAttr(el, "data-dfn-for")
-                if dfnFor:
-                    el.set('data-dfn-for', dfnFor)
-                else:
-                    die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
-                    continue
+        if dfnFor:
+            el.set('data-dfn-for', dfnFor)
+        elif dfnType in config.typesUsingFor:
+            die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
+            continue
         # Automatically fill in id if necessary.
         if el.get('id') is None:
-            id = simplifyText(determineDfnText(el).split('|')[0])
+            convertDashes = dfnType == "dfn"
+            id = simplifyText(determineDfnText(el).split('|')[0], convertDashes=convertDashes)
+            if dfnFor:
+                singleFor = splitForValues(dfnFor)[0]
             if dfnType == "dfn":
                 pass
             elif dfnType == "interface":
-                id = "dom-" + id
+                pass
             elif dfnType in config.idlTypes.intersection(config.typesUsingFor):
-                id = simplifyText("dom-{_for}-{id}".format(_for=dfnFor, id=id))
+                id = simplifyText("dom-{_for}-{id}".format(_for=singleFor, id=id))
             elif dfnType in config.typesUsingFor:
                 # Prepend property name to value to avoid ID duplication
-                id = simplifyText("{type}-{_for}-{id}".format(type=dfnTypeToPrefix[dfnType], _for=dfnFor, id=id))
+                id = simplifyText("{type}-{_for}-{id}".format(type=dfnTypeToPrefix[dfnType], _for=singleFor, id=id))
             else:
                 id = "{type}-{id}".format(type=dfnTypeToPrefix[dfnType], id=id)
             el.set('id', id)
@@ -605,14 +612,16 @@ def dedupIds(doc, els):
     ids = Counter(el.get('id') for el in findAll("[id]", doc))
     dupes = [id for id,count in ids.items() if count > 1]
     for dupe in dupes:
+        warnAboutDupes = True
         if re.match(r"issue-[0-9a-fA-F]{8}$", dupe):
             # Don't warn about issues, it's okay if they have the same ID because they're identical text.
-            continue
+            warnAboutDupes = False
         els = findAll("#"+dupe, doc)
         ints = iter.imap(str, iter.count(0))
         for el in els[1:]:
             # Try to de-dup the id by appending an integer after it.
-            warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupe)
+            if warnAboutDupes:
+                warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupe)
             for x in ints:
                 if not findId(dupe+x):
                     el.set("id", dupe+x)
@@ -644,8 +653,8 @@ def determineLinkType(el):
 def determineLinkText(el):
     linkType = el.get('data-link-type')
     contents = textContent(el)
-    if el.get('title'):
-        linkText = el.get('title')
+    if el.get('data-lt'):
+        linkText = el.get('data-lt')
     elif linkType in config.functionishTypes.union(["functionish"]) and re.match(r"^[\w-]+\(.*\)$", contents):
         linkText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1)+"()"
         # Need to fix this using the idl parser.
@@ -662,8 +671,8 @@ def classifyLink(el):
     el.set('data-link-type', linkType)
     linkText = determineLinkText(el)
 
-    el.set('title', linkText)
-    for attr in ["data-link-status", "data-link-for", "data-link-spec"]:
+    el.set('data-lt', linkText)
+    for attr in ["data-link-status", "data-link-for", "data-link-spec", "data-link-for-hint"]:
         val = treeAttr(el, attr)
         if val is not None:
             el.set(attr, val)
@@ -687,13 +696,13 @@ def classifyLink(el):
 def processBiblioLinks(doc):
     biblioLinks = findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:
-        type = el.get('data-biblio-type')
-        if type == "normative":
+        biblioType = el.get('data-biblio-type')
+        if biblioType == "normative":
             storage = doc.normativeRefs
-        elif type == "informative":
+        elif biblioType == "informative":
             storage = doc.informativeRefs
         else:
-            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", type, outerHTML(el))
+            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", biblioType, outerHTML(el))
             continue
 
         linkText = determineLinkText(el)
@@ -704,9 +713,13 @@ def processBiblioLinks(doc):
         if not biblioStatus:
             biblioStatus = doc.md.defaultBiblioStatus
 
-        ref = doc.refs.getBiblioRef(linkText, status=biblioStatus, el=el)
+        okayToFail = el.get('data-okay-to-fail') is not None
+
+        ref = doc.refs.getBiblioRef(linkText, status=biblioStatus, generateFakeRef=okayToFail, el=el)
         if not ref:
-            die("Couldn't find '{0}' in bibliography data.", linkText)
+            if not okayToFail:
+                closeBiblios = biblio.findCloseBiblios(doc.refs.biblios, linkText)
+                die("Couldn't find '{0}' in bibliography data. Did you mean:\n{1}", linkText, '\n'.join("  "+b for b in closeBiblios))
             el.tag = "span"
             continue
 
@@ -718,47 +731,93 @@ def processBiblioLinks(doc):
 def processAutolinks(doc):
     # An <a> without an href is an autolink.
     # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
+    # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
+    query = "a:not([href]):not([data-link-type='biblio'])"
     if doc.md.useIAutolinks:
-        autolinks = findAll("a:not([href]), i", doc)
-    else:
-        autolinks = findAll("a:not([href])", doc)
+        query += ", i"
+    autolinks = findAll(query, doc)
     for el in autolinks:
-        # Explicitly empty title indicates this shouldn't be an autolink.
-        if el.get('title') == '':
+        # Explicitly empty linking text indicates this shouldn't be an autolink.
+        if el.get('data-lt') == '':
             continue
 
         classifyLink(el)
         linkType = el.get('data-link-type')
-        linkText = el.get('title')
+        linkText = el.get('data-lt')
 
         # Properties and descriptors are often written like 'foo-*'. Just ignore these.
         if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
             continue
 
-        url = doc.refs.getRef(linkType, linkText,
+        ref = doc.refs.getRef(linkType, linkText,
                               spec=el.get('data-link-spec'),
                               status=el.get('data-link-status'),
                               linkFor=el.get('data-link-for'),
+                              linkForHint=el.get('data-link-for-hint'),
                               el=el,
                               error=(linkText.lower() not in doc.md.ignoredTerms))
-        if url is not None:
-            el.set('href', url)
+        # Capture the reference (and ensure we add a biblio entry) if it
+        # points to an external specification. We check the spec name here
+        # rather than checking `status == "local"`, as "local" refs include
+        # those defined in `<pre class="anchor">` datablocks, which we do
+        # want to capture here.
+        if ref and ref.spec is not None and ref.spec is not "" and ref.spec != doc.refs.specVName:
+            if ref.text not in doc.externalRefsUsed[ref.spec]:
+                doc.externalRefsUsed[ref.spec][ref.text] = ref
+            biblioRef = doc.refs.getBiblioRef(ref.spec, status="normative")
+            if biblioRef:
+                doc.normativeRefs[biblioRef.linkText] = biblioRef
+
+        if ref:
+            el.set('href', ref.url)
             el.tag = "a"
+            decorateAutolink(doc, el, linkType=linkType, linkText=linkText)
         else:
             if linkType == "maybe":
                 el.tag = "css"
                 if el.get("data-link-type"):
                     del el.attrib["data-link-type"]
-                if el.get("title"):
-                    del el.attrib["title"]
+                if el.get("data-lt"):
+                    del el.attrib["data-lt"]
+
+def decorateAutolink(doc, el, linkType, linkText):
+    # Add additional effects to some autolinks.
+    if linkType == "type":
+        # Get all the values that the type expands to, add it as a title.
+        # TODO: Make this not have quite as sucky perf.
+        if linkText in decorateAutolink.cache:
+            titleText = decorateAutolink.cache[linkText]
+            error = False
+        else:
+            refs, error = doc.refs.queryRefs(linkFor=linkText)
+            titleText = "Expands to: " + ' | '.join(ref.text for ref in refs)
+            decorateAutolink.cache[linkText] = titleText
+        if not error:
+            el.set('title', titleText)
+decorateAutolink.cache = {}
 
 
-def processIssues(doc):
+def processIssuesAndExamples(doc):
     import hashlib
-    # Add an auto-genned and stable-against-changes-elsewhere id to all issues.
+    # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
+    # examples, and link to remote issues if possible:
     for el in findAll(".issue:not([id])", doc):
         el.set('id', "issue-"+hashContents(el))
-    dedupIds(doc, findAll(".issue", doc))
+        remoteIssueID = el.get('data-remote-issue-id')
+        if remoteIssueID:
+            del el.attrib['data-remote-issue-id']
+            githubMatch = re.match(r"\s*([\w-]+)/([\w-]+)#(\d+)\s*$", remoteIssueID)
+            remoteIssueURL = None
+            if githubMatch:
+                remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(githubMatch.group(1), githubMatch.group(2), githubMatch.group(3))
+            elif doc.md.issueTrackerTemplate:
+                remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
+            if remoteIssueURL:
+                appendChild(el, " ", E.a({"href": remoteIssueURL }, "<" + remoteIssueURL + ">"))
+    for el in findAll(".example:not([id])", doc):
+        el.set('id', "example-"+hashContents(el))
+    dedupIds(doc, findAll(".issue, .example", doc))
+
 
 
 def addSelfLinks(doc):
@@ -782,6 +841,24 @@ def addSelfLinks(doc):
         appendChild(el, makeSelfLink(el))
 
 
+class DebugMarker(object):
+    # Debugging tool for IDL markup
+
+    def markupConstruct(self, text, construct):
+        return ('<' + construct.idlType + '>', '</' + construct.idlType + '>')
+
+    def markupType(self, text, construct):
+        return ('<TYPE for=' + construct.idlType + '>', '</TYPE>')
+
+    def markupTypeName(self, text, construct):
+        return ('<TYPE-NAME for=' + construct.idlType + '>', '</TYPE-NAME>')
+
+    def markupName(self, text, construct):
+        return ('<NAME for=' + construct.idlType + '>', '</NAME>')
+
+    def markupKeyword(self, text, construct):
+        return ('<KEYWORD for=' + construct.idlType + '>', '</KEYWORD>')
+
 class IDLMarker(object):
     def markupConstruct(self, text, construct):
         # Fires for every 'construct' in the WebIDL.
@@ -789,14 +866,29 @@ class IDLMarker(object):
         return (None, None)
 
     def markupType(self, text, construct):
-        # Fires for "types", but dunno what this is used for.
-        # It includes things like whole unions, or whole parametrized type statements.
-        # Think it's probably everything that matches the "type" grammar in WebIDL.
+        # Fires for entire type definitions.
+        # It'll contain keywords or names, or sometimes more types.
+        # For example, a "type" wrapper surrounds an entire union type,
+        # as well as its component types.
         return (None, None)
 
     def markupTypeName(self, text, construct):
         # Fires for non-defining type names, such as arg types.
         return ('<a data-link-type="idl-name">', '</a>')
+
+    def markupKeyword(self, text, construct):
+        # Fires on the various "keywords" of WebIDL -
+        # words that are part of the WebIDL syntax,
+        # rather than names exposed to JS.
+        # Examples: "interface", "stringifier", the IDL-defined type names like "DOMString" and "long".
+        if text == "stringifier":
+            if construct.name is None:
+                # If no name was defined, you're required to define stringification behavior.
+                return ("<a dfn for='{0}' data-lt='stringification behavior'>".format(construct.parent.fullName), "</a>")
+            else:
+                # Otherwise, you *can* point to/dfn stringification behavior if you want.
+                return ("<idl data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
+        return (None, None)
 
     def markupName(self, text, construct):
         # Fires for defining names: method names, arg names, interface names, etc.
@@ -806,6 +898,7 @@ class IDLMarker(object):
         idlType = construct.idlType
         extraParameters = ''
         idlTitle = construct.normalName
+        refType="idl"
         if idlType in config.functionishTypes:
             idlTitle = '|'.join(self.methodLinkingTexts(construct))
         elif idlType == "attribute":
@@ -825,12 +918,20 @@ class IDLMarker(object):
             if construct.default is not None:
                 value = escapeAttr("{0}".format(construct.default.value))
                 extraParameters += ' data-default="{0}"'.format(value)
+        elif idlType == "interface":
+            if construct.partial:
+                refType="link"
+
+        if refType == "link":
+            elementName = "a"
+        else:
+            elementName = "idl"
 
         if idlType in config.typesUsingFor:
-            idlFor = "data-idl-for='{0}'".format(construct.fullName.rpartition("/")[0])
+            idlFor = "data-idl-for='{0}'".format(construct.parent.fullName)
         else:
             idlFor = ""
-        return ('<idl title="{0}" data-idl-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters), '</idl>')
+        return ('<{name} data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters, name=elementName, refType=refType), '</{0}>'.format(elementName))
 
     def encode(self, text):
         return escapeHTML(text)
@@ -844,7 +945,7 @@ class IDLMarker(object):
         So, if both were optional,
         "foo(bar)" and "foo()" would both also be valid linking texts.
         '''
-        if method.arguments is None:
+        if getattr(method, "arguments", None) is None:
             return [method.normalName]
         for i,arg in enumerate(method.arguments):
             if arg.optional or arg.variadic:
@@ -882,13 +983,14 @@ def processIDL(doc):
         for el in findAll("idl", pre):
             idlType = el.get('data-idl-type')
             url = None
-            for idlText in el.get('title').split('|'):
-                url = doc.refs.getRef(idlType, idlText.lower(),
+            for idlText in el.get('data-lt').split('|'):
+                ref = doc.refs.getRef(idlType, idlText,
                                       linkFor=el.get('data-idl-for'),
                                       el=el,
                                       error=False)
-                if url:
-                    break
+                if ref:
+                    url = ref.url
+                    break;
             globalNames = GlobalNames.fromEl(el)
             el.set("data-global-name", str(globalNames))
             if url is None or globalNames.matches(forcedDfns):
@@ -901,15 +1003,18 @@ def processIDL(doc):
             else:
                 el.tag = "a"
                 el.set('data-link-type', idlType)
-                el.set('title', idlText)
+                el.set('data-lt', idlText)
                 del el.attrib['data-idl-type']
                 if el.get('data-idl-for'):
                     el.set('data-link-for', el.get('data-idl-for'))
                     del el.attrib['data-idl-for']
+                if el.get('id'):
+                    # ID was defensively added by the Marker.
+                    del el.attrib['id']
     dfns = findAll("pre.idl:not([data-no-idl]) dfn", doc)
     classifyDfns(doc, dfns)
     dedupIds(doc, dfns)
-    doc.refs.addLocalDfns(dfns)
+    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
 
 
 
@@ -978,6 +1083,8 @@ def addSyntaxHighlighting(doc):
 
 
 def cleanupHTML(doc):
+    # Cleanup done immediately before serialization.
+
     # Move any stray <link>, <script>, <meta>, or <style> into the <head>.
     head = find("head", doc)
     for el in findAll("body link, body script, body meta, body style:not([scoped])", doc):
@@ -1005,10 +1112,10 @@ def cleanupHTML(doc):
         for comment in comments:
             removeNode(comment)
 
-    # Remove duplicate titles.
-    for el in findAll("dfn[title], a[title]", doc):
-        if el.get('title') == textContent(el):
-            del el.attrib['title']
+    # Remove duplicate linking texts.
+    for el in findAll("dfn[data-lt], a[data-lt]", doc):
+        if el.get('data-lt') == textContent(el):
+            del el.attrib['data-lt']
 
     # Transform the <css> fake tag into markup.
     # (Used when the ''foo'' shorthand doesn't work.)
@@ -1039,12 +1146,33 @@ def cleanupHTML(doc):
     else:
         addClass(h1, "allcaps")
 
+    # Remove a bunch of attributes
+    for el in findAll("[data-attribute-info], [data-dict-member-info]", doc):
+        removeAttr(el, 'data-attribute-info')
+        removeAttr(el, 'data-dict-member-info')
+        removeAttr(el, 'for')
+    for el in findAll("a, span", doc):
+        removeAttr(el, 'data-link-for')
+        removeAttr(el, 'data-link-for-hint')
+        removeAttr(el, 'data-link-status')
+        removeAttr(el, 'data-link-spec')
+        removeAttr(el, 'data-section')
+        removeAttr(el, 'data-biblio-type')
+        removeAttr(el, 'data-biblio-status')
+        removeAttr(el, 'data-okay-to-fail')
+        removeAttr(el, 'data-lt')
+    for el in findAll("[data-link-for]:not(a), [data-link-type]:not(a), [data-dfn-for]:not(dfn), [data-dfn-type]:not(dfn)", doc):
+        removeAttr(el, 'data-link-for')
+        removeAttr(el, 'data-link-type')
+        removeAttr(el, 'data-dfn-for')
+        removeAttr(el, 'data-dfn-type')
+    for el in findAll("[data-export]:not(dfn), [data-noexport]:not(dfn)", doc):
+        removeAttr(el, 'data-export')
+        removeAttr(el, 'data-noexport')
+
 
 def finalHackyCleanup(text):
     # For hacky last-minute string-based cleanups of the rendered html.
-
-    # Remove the </wbr> end tag until the serializer is fixed.
-    text = re.sub("</wbr>", "", text)
 
     return text
 
@@ -1070,6 +1198,7 @@ class CSSSpec(object):
         self.normativeRefs = {}
         self.informativeRefs = {}
         self.refs = ReferenceManager()
+        self.externalRefsUsed = defaultdict(dict)
         self.md = metadata.MetadataManager(doc=self)
         self.biblios = {}
         self.paragraphMode = "markdown"
@@ -1091,10 +1220,10 @@ class CSSSpec(object):
         try:
             if inputFilename == "-":
                 self.lines = [unicode(line, encoding="utf-8") for line in sys.stdin.readlines()]
-                self.date = datetime.today()
+                self.md.date = datetime.today()
             else:
                 self.lines = io.open(inputFilename, 'r', encoding="utf-8").readlines()
-                self.date = datetime.fromtimestamp(os.path.getmtime(inputFilename))
+                self.md.date = datetime.fromtimestamp(os.path.getmtime(inputFilename))
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
             return
@@ -1102,50 +1231,9 @@ class CSSSpec(object):
             die("Couldn't open the input file '{0}'.", inputFilename)
             return
 
-
-        self.refs.initializeRefs();
+        self.refs.initializeRefs(self);
         self.refs.initializeBiblio();
-
         self.testSuites = json.loads(config.retrieveCachedFile("test-suites.json", quiet=True, str=True))
-
-        if "css21Replacements" in self.refs.defaultSpecs:
-            self.refs.css21Replacements = set(self.refs.defaultSpecs["css21Replacements"])
-            del self.refs.defaultSpecs["css21Replacements"]
-        if "ignoredSpecs" in self.refs.defaultSpecs:
-            self.refs.ignoredSpecs = set(self.refs.defaultSpecs["ignoredSpecs"])
-            del self.refs.defaultSpecs["ignoredSpecs"]
-        if "customDfns" in self.refs.defaultSpecs:
-            for specName, specUrl, dfnText, dfnType, dfnUrl in self.refs.defaultSpecs["customDfns"]:
-                if specName not in self.refs.specs:
-                    levelMatch = re.match(r"(.*)-(\d+)", specName)
-                    if levelMatch:
-                        shortname = levelMatch.group(1)
-                        level = levelMatch.group(2)
-                    else:
-                        shortname = specName
-                        level = "1"
-                    self.refs.specs[specName] = {
-                        "description": "Custom Spec Link for {0}".format(specName),
-                        "title": "Custom Spec Link for {0}".format(specName),
-                        "level": config.HierarchicalNumber(level),
-                        "TR": specUrl,
-                        "shortname": shortname,
-                        "vshortname": specName
-                    }
-                spec = self.refs.specs[specName]
-                self.refs.refs[dfnText].append({
-                    "status": "TR",
-                    "export": True,
-                    "for": [],
-                    "level": spec['level'],
-                    "url": specUrl + dfnUrl,
-                    "normative": True,
-                    "shortname": spec['shortname'],
-                    "spec": spec['vshortname'],
-                    "type": dfnType
-                })
-            del self.refs.defaultSpecs["customDfns"]
-
         self.paragraphMode = paragraphMode
 
     def preprocess(self):
@@ -1157,12 +1245,13 @@ class CSSSpec(object):
         self.loadDefaultMetadata()
         self.md.finish()
         self.md.fillTextMacros(self.macros, doc=self)
-        self.refs.setSpecData(self.md)
 
         # Deal with further <pre> blocks, and markdown
         transformDataBlocks(self)
         if self.paragraphMode == "markdown":
             self.lines = markdown.parse(self.lines, self.md.indent)
+
+        self.refs.setSpecData(self.md)
 
         # Convert to a single string of html now, for convenience.
         self.html = ''.join(self.lines)
@@ -1174,6 +1263,7 @@ class CSSSpec(object):
         metadata.parseDoc(self)
 
         # Fill in and clean up a bunch of data
+        addBikeshedVersion(self)
         addStatusSection(self)
         addLogo(self)
         addCopyright(self)
@@ -1188,20 +1278,21 @@ class CSSSpec(object):
         formatPropertyNames(self)
         processHeadings(self)
         canonicalizeShortcuts(self)
-        processIssues(self)
+        processIssuesAndExamples(self)
         markupIDL(self)
 
 
         # Handle all the links
+        temporaryCheckForExcessiveTitle(self)
         processDfns(self)
         processIDL(self)
         fillAttributeInfoSpans(self)
         formatElementdefTables(self)
-        processBiblioLinks(self)
         processAutolinks(self)
-
-        addReferencesSection(self)
         addIndexSection(self)
+
+        processBiblioLinks(self)
+        addReferencesSection(self)
         addPropertyIndex(self)
         addIDLSection(self)
         addIssuesSection(self)
@@ -1221,7 +1312,7 @@ class CSSSpec(object):
 
 
     def serialize(self):
-        rendered = html5lib.serialize(self.document, tree="lxml", alphabetical_attributes=True)
+        rendered = HTMLSerializer.HTMLSerializer(self.document).serialize()
         rendered = finalHackyCleanup(rendered)
         return rendered
 
@@ -1263,22 +1354,42 @@ class CSSSpec(object):
         # Do several textual replacements that need to happen *before* the document is parsed as HTML.
 
         # Replace the [FOO] things.
-        for tag, replacement in self.macros.items():
-            text = text.replace("[{0}]".format(tag.upper()), replacement)
+        #for tag, replacement in self.macros.items():
+        #    text = text.replace("[{0}]".format(tag.upper()), replacement)
+        def macroReplacer(match):
+            fullText = match.group(0)
+            innerText = match.group(2) or ""
+            if fullText.startswith("\\"):
+                # Escaped
+                return fullText[1:]
+            if fullText.startswith("[["):
+                # Actually a biblio link
+                return fullText
+            if innerText.isdigit():
+                # No refs are all-digits (this is probably JS code).
+                return fullText
+            if innerText.lower() in self.macros:
+                # For some reason I store all the macros in lowercase,
+                # despite requiring them to be spelled with uppercase.
+                return self.macros[innerText.lower()]
+            die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
+            return fullText
+        text = re.sub(r"(\\|\[)?\[([A-Z0-9-]+)\]", macroReplacer, text)
         text = fixTypography(text)
-        # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
-        text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
-        # Replace the ''maybe link'' shortcuts.
-        # They'll survive the HTML parser, but they don't match if they contain an element.
-        # (The other shortcuts are "atomic" and can't contain elements.)
-        text = re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
+        if "css" in self.md.markupShorthands:
+            # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
+            text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
+            # Replace the ''maybe link'' shortcuts.
+            # They'll survive the HTML parser, but they don't match if they contain an element.
+            # (The other shortcuts are "atomic" and can't contain elements.)
+            text = re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
         return text
 
     def transformProductionPlaceholders(doc):
         propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
         funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
         atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
-        typeRe = re.compile(r"^(?:(\S*)/)?([\w-]+)$")
+        typeRe = re.compile(r"^(?:(\S*)/)?(\S+)$")
         for el in findAll("fake-production-placeholder", doc):
             text = textContent(el)
             clearContents(el)
@@ -1295,7 +1406,7 @@ class CSSSpec(object):
                     continue
                 el.tag = "a"
                 el.set("data-link-type", linkType)
-                el.set("title", match.group(2))
+                el.set("data-lt", match.group(2))
                 if match.group(1) is not None:
                     el.set("for", match.group(1))
                 el.text = "<‘" + match.group(2) + "’>"
@@ -1304,7 +1415,7 @@ class CSSSpec(object):
             if match:
                 el.tag = "a"
                 el.set("data-link-type", "function")
-                el.set("title", match.group(2))
+                el.set("data-lt", match.group(2))
                 if match.group(1) is not None:
                     el.set("for", match.group(1))
                 el.text = "<" + match.group(2) + ">"
@@ -1313,7 +1424,7 @@ class CSSSpec(object):
             if match:
                 el.tag = "a"
                 el.set("data-link-type", "at-rule")
-                el.set("title", match.group(2))
+                el.set("data-lt", match.group(2))
                 if match.group(1) is not None:
                     el.set("for", match.group(1))
                 el.text = "<" + match.group(2) + ">"
@@ -1340,7 +1451,7 @@ class CSSSpec(object):
                 el.tag = "a"
                 el.set("class", "css")
                 el.set("data-link-type", "propdesc")
-                el.set("title", match.group(1))
+                el.set("data-lt", match.group(1))
                 el.text = text
                 continue
             match = valRe.match(text)
@@ -1356,7 +1467,7 @@ class CSSSpec(object):
                 el.tag = "a"
                 el.set("class", "css")
                 el.set("data-link-type", linkType)
-                el.set("title", match.group(2))
+                el.set("data-lt", match.group(2))
                 if match.group(1) is not None:
                     el.set("for", match.group(1))
                 el.text = match.group(2)
@@ -1377,7 +1488,7 @@ class CSSSpec(object):
             else:
                 type = "informative"
             term = match.group(3)
-            attrs = {"title":term, "data-link-type":"biblio", "data-biblio-type":type}
+            attrs = {"data-lt":term, "data-link-type":"biblio", "data-biblio-type":type}
             if match.group(4) is not None:
                 attrs['data-biblio-status'] = match.group(4).strip()
             return E.a(attrs,
@@ -1414,6 +1525,12 @@ class CSSSpec(object):
             return E.code({"class":"idl"},
                 E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
 
+        elementRe = re.compile(r"<{(?:([\w-]+)/)?([\w-]+)}>")
+        def elementReplacer(match):
+            linkType = "element" if match.group(1) is None else "element-attr"
+            return E.code({},
+                E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
+
         def transformElement(parentEl):
             processContents = isElement(parentEl) and not isOpaqueElement(parentEl)
             if not processContents:
@@ -1430,10 +1547,15 @@ class CSSSpec(object):
 
         def transformText(text):
             nodes = [text]
-            config.processTextNodes(nodes, propdescRe, propdescReplacer)
-            config.processTextNodes(nodes, idlRe, idlReplacer)
-            config.processTextNodes(nodes, biblioRe, biblioReplacer)
-            config.processTextNodes(nodes, sectionRe, sectionReplacer)
+            if "css" in doc.md.markupShorthands:
+                config.processTextNodes(nodes, propdescRe, propdescReplacer)
+            if "idl" in doc.md.markupShorthands:
+                config.processTextNodes(nodes, idlRe, idlReplacer)
+            if "markup" in doc.md.markupShorthands:
+                config.processTextNodes(nodes, elementRe, elementReplacer)
+            if "biblio" in doc.md.markupShorthands:
+                config.processTextNodes(nodes, biblioRe, biblioReplacer)
+                config.processTextNodes(nodes, sectionRe, sectionReplacer)
             return nodes
 
         transformElement(doc.document.getroot())
@@ -1441,22 +1563,24 @@ class CSSSpec(object):
 
     def transformProductionGrammars(doc):
         # Link up the various grammar symbols in CSS grammars to their definitions.
+        if "css" not in doc.md.markupShorthands:
+            return
 
         hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
         def hashMultReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": "#", "for":""}, match.group(0))
+            return E.a({"data-link-type":"grammar", "data-lt": "#", "for":""}, match.group(0))
 
         multRe = re.compile(r"{\s*\d+\s*}")
         def multReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": "{A}", "for":""}, match.group(0))
+            return E.a({"data-link-type":"grammar", "data-lt": "{A}", "for":""}, match.group(0))
 
         multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
         def multRangeReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": "{A,B}", "for":""}, match.group(0))
+            return E.a({"data-link-type":"grammar", "data-lt": "{A,B}", "for":""}, match.group(0))
 
         simpleRe = re.compile(r"\?|!|#|\*|\+|\|\||\||&amp;&amp;|,")
         def simpleReplacer(match):
-            return E.a({"data-link-type":"grammar", "title": match.group(0), "for":""}, match.group(0))
+            return E.a({"data-link-type":"grammar", "data-lt": match.group(0), "for":""}, match.group(0))
 
         def transformElement(parentEl):
             children = childNodes(parentEl, clear=True)
@@ -1536,6 +1660,11 @@ config.specClass = CSSSpec
 
 
 
+def addBikeshedVersion(doc):
+    # Adds a <meta> containing the current Bikeshed semver.
+    head = find("head", doc)
+    appendChild(head,
+        E.meta({"name": "generator", "content": "Bikeshed 1.0.0"}))
 
 def formatElementdefTables(doc):
     for table in findAll("table.elementdef", doc):
@@ -1543,8 +1672,7 @@ def formatElementdefTables(doc):
         elementsFor = ' '.join(textContent(x) for x in elements)
         for el in findAll("a[data-element-attr-group]", table):
             groupName = textContent(el).strip()
-            groupFor = re.sub("\s+", "-", groupName)
-            groupAttrs = sorted(doc.refs.queryRefs(linkType="element-attr", linkFor=groupFor), key=lambda x:x[1])
+            groupAttrs = sorted(doc.refs.queryRefs(linkType="element-attr", linkFor=groupName)[0], key=lambda x:x.text)
             if len(groupAttrs) == 0:
                 die("The element-attr group '{0}' doesn't have any attributes defined for it.", groupName)
                 continue
@@ -1556,12 +1684,12 @@ def formatElementdefTables(doc):
                 E.summary(
                     E.a({"data-link-type":"dfn"}, groupName)),
                 E.ul())
-            for attrName,ref in groupAttrs:
+            for ref in groupAttrs:
                 appendChild(ul,
                     E.li(
-                        E.dfn({"id":"element-attrdef-"+simplifyText(textContent(elements[0]))+"-"+attrName, "for":elementsFor, "data-dfn-type":"element-attr"},
-                            E.a({"data-link-type":"element-attr", "for":groupFor},
-                                attrName.strip()))))
+                        E.dfn({"id":"element-attrdef-"+simplifyText(textContent(elements[0]))+"-"+ref.text, "for":elementsFor, "data-dfn-type":"element-attr"},
+                            E.a({"data-link-type":"element-attr", "for":groupName},
+                                ref.text.strip()))))
 
 
 
@@ -1665,7 +1793,7 @@ def addAnnotations(doc):
         appendContents(find("head", doc), parseHTML(html))
 
 def addIndexSection(doc):
-    if len(findAll("dfn", doc)) == 0:
+    if len(findAll("dfn", doc)) == 0 and len(doc.externalRefsUsed.keys()) == 0:
         return
     container = getFillContainer('index', doc=doc, default=True)
     if container is None:
@@ -1673,15 +1801,25 @@ def addIndexSection(doc):
     appendChild(container,
         E.h2({"class":"no-num", "id":"index"}, "Index"))
 
+    if len(findAll("dfn", doc)):
+        addIndexOfLocallyDefinedTerms(doc, container)
+
+    if len(doc.externalRefsUsed.keys()):
+        addIndexOfExternallyDefinedTerms(doc, container)
+
+def addIndexOfLocallyDefinedTerms(doc, container):
+    appendChild(container,
+        E.h3({"class":"no-num", "id":"index-defined-here"}, "Terms defined by this specification"))
+
     from collections import OrderedDict
     indexEntries = defaultdict(list)
     attemptedForRefs = defaultdict(list)
     seenGlobalNames = set()
-    for el in findAll("dfn", doc):
-        linkTexts = linkTextsFromElement(el, preserveCasing=True)
+    for el in findAll("dfn[id]", doc):
+        linkTexts = linkTextsFromElement(el)
         headingLevel = headingLevelOfElement(el) or "Unnumbered section"
         if el.get('data-dfn-for') is not None:
-            disambiguator = "{0} for {1}".format(el.get('data-dfn-type'), ', '.join(el.get('data-dfn-for').split()))
+            disambiguator = "{0} for {1}".format(el.get('data-dfn-type'), ', '.join(splitForValues(el.get('data-dfn-for'))))
         else:
             type = el.get('data-dfn-type')
             if type == "dfn":
@@ -1714,7 +1852,7 @@ def addIndexSection(doc):
             item = items[0]
             li = appendChild(topList,
                 E.li(item['text'], ", ",
-                    E.a({"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
+                    E.a({"href":"#"+item['id']}, item['level'])))
             if item['type'] == "property":
                 reffingDfns = []
                 for globalName in item['globalNames']:
@@ -1724,15 +1862,32 @@ def addIndexSection(doc):
                     for r in reffingDfns:
                         appendChild(dl,
                             E.dd(r.text, ", ",
-                                E.a({"href":"#"+r['id'], "title":"section "+r['level']}, r['level'])))
+                                E.a({"href":"#"+r['id']}, r['level'])))
         else:
             li = appendChild(topList, E.li(items[0]['text']))
             ul = appendChild(li, E.ul())
             for item in items:
                 appendChild(ul,
                     E.li(item['disambiguator'], ", ",
-                        E.a({"href":"#"+item['id'], "title":"section "+item['level']}, item['level'])))
+                        E.a({"href":"#"+item['id']}, item['level'])))
 
+def addIndexOfExternallyDefinedTerms(doc, container):
+    if not doc.externalRefsUsed:
+        return
+
+    ul = E.ul({"class": "indexlist"})
+    for spec, refs in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0]):
+        attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"normative", "data-okay-to-fail": "true"}
+        specLi = appendChild(ul,
+            E.li(
+                E.a(attrs, "[", spec, "]"), " defines the following terms:"))
+        termsUl = appendChild(specLi, E.ul())
+        for title, ref in sorted(refs.items(), key=lambda x:x[0]):
+            appendChild(termsUl, E.li(E.a({"href":ref.url}, title)))
+
+    appendChild(container,
+        E.h3({"class":"no-num", "id":"index-defined-elsewhere"}, "Terms defined by reference"))
+    appendChild(container, ul)
 
 
 def addPropertyIndex(doc):
@@ -1837,16 +1992,18 @@ def addPropertyIndex(doc):
                 E.h3({"class":"no-num", "id":simplifyText(atRuleName)+"-descriptor-table"},
                     E.a({"data-link-type":"at-rule"}, atRuleName),
                     " Descriptors"))
-            appendChild(html,
+            tbody = appendChild(html,
                 E.table({"class":"proptable data"},
                     E.thead(
                         E.tr(
-                            *[E.tr({"scope":"col"}, column) for column in columns])),
-                    E.tbody(
-                        E.tr(
-                            E.th({"scope":"row"},
-                                E.a({"data-link-type":"descriptor"}, desc['Name'])),
-                            *[E.td(desc.get(column, "")) for column in columns[1:]]))))
+                            *[E.th({"scope":"col"}, column) for column in columns])),
+                    E.tbody()))
+            for desc in descs:
+                appendChild(tbody,
+                    E.tr(
+                        E.th({"scope":"row"},
+                            E.a({"data-link-type":"descriptor"}, desc['Name'])),
+                        *[E.td(desc.get(column, "")) for column in columns[1:]]))
 
 
 def addIDLSection(doc):
@@ -1866,7 +2023,7 @@ def addIDLSection(doc):
         copy = deepcopy(block)
         appendContents(container, copy)
         appendChild(container, "\n")
-    for dfn in findAll("dfn", container):
+    for dfn in findAll("dfn[id]", container):
         dfn.tag = "a"
         dfn.set("href", "#"+dfn.get("id"))
         del dfn.attrib["id"]
@@ -1920,24 +2077,26 @@ def addTOCSection(doc):
 
 def addSpecMetadataSection(doc):
     def printEditor(editor):
-        div = E.div({"class":"p-author h-card vcard"})
+        dd = E.dd({"class":"editor p-author h-card vcard"})
+        if editor['id']:
+            dd.attrib['data-editor-id'] = editor['id']
         if editor['link']:
-            appendChild(div, E.a({"class":"p-name fn u-url url", "href":editor['link']}, editor['name']))
+            appendChild(dd, E.a({"class":"p-name fn u-url url", "href":editor['link']}, editor['name']))
         elif editor['email']:
-            appendChild(div, E.a({"class":"p-name fn u-email email", "href":"mailto:"+editor['email']}, editor['name']))
+            appendChild(dd, E.a({"class":"p-name fn u-email email", "href":"mailto:"+editor['email']}, editor['name']))
         else:
-            appendChild(div, E.span({"class":"p-name fn"}, editor['name']))
+            appendChild(dd, E.span({"class":"p-name fn"}, editor['name']))
         if editor['org']:
             if editor['orglink']:
                 el = E.a({"class":"p-org org", "href":editor['orglink']}, editor['org'])
             else:
                 el = E.span({"class":"p-org org"}, editor['org'])
-            appendChild(div, " (", el, ")")
+            appendChild(dd, " (", el, ")")
         if editor['email'] and editor['link']:
-            appendChild(div,
+            appendChild(dd,
                 " ",
                 E.a({"class":"u-email email", "href":"mailto:"+editor['email']}, editor['email']))
-        return div
+        return dd
 
     md = DefaultOrderedDict(list)
     mac = doc.macros
@@ -1987,9 +2146,13 @@ def addSpecMetadataSection(doc):
         attrs = {}
         if key in ("Editor", "Editors"):
             attrs["class"] = "editor"
-        appendChild(dl,
-            E.dt(attrs, key, ":"),
-            *[E.dd(attrs, val) for val in vals])
+            appendChild(dl,
+                E.dt(attrs, key, ":"),
+                *vals)
+        else:
+            appendChild(dl,
+                E.dt(attrs, key, ":"),
+                *[E.dd(attrs, val) for val in vals])
     fillWith('spec-metadata', E.div(dl), doc=doc)
 
 
@@ -2000,6 +2163,16 @@ def addReferencesSection(doc):
     if container is None:
         return
 
+    def formatBiblioTerm(linkText):
+        '''
+        If the term is all uppercase, leave it like that.
+        If it's all lowercase, uppercase it.
+        If it's mixed case, leave it like that.
+        '''
+        if linkText.islower():
+            return linkText.upper()
+        return linkText
+
     appendChild(container,
         E.h2({"class":"no-num", "id":"references"}, "References"))
 
@@ -2009,7 +2182,7 @@ def addReferencesSection(doc):
             E.h3({"class":"no-num", "id":"normative"}, "Normative References"),
             E.dl())
         for ref in normRefs:
-            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText), "title":ref.linkText}, "["+ref.linkText+"]"))
+            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText)}, "["+formatBiblioTerm(ref.linkText)+"]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
     informRefs = [x for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText) if x.linkText not in doc.normativeRefs]
@@ -2018,7 +2191,7 @@ def addReferencesSection(doc):
             E.h3({"class":"no-num", "id":"informative"}, "Informative References"),
             E.dl())
         for ref in informRefs:
-            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText), "title":ref.linkText}, "["+ref.linkText+"]"))
+            appendChild(dl, E.dt({"id":"biblio-"+simplifyText(ref.linkText)}, "["+formatBiblioTerm(ref.linkText)+"]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
 def addIssuesSection(doc):
@@ -2045,3 +2218,29 @@ def addIssuesSection(doc):
         del idel.attrib['id']
     for dfnel in findAll("dfn", container):
         dfnel.tag = "span"
+
+
+def temporaryCheckForExcessiveTitle(doc):
+    # This function is a migration aid, to help warn a spec if it uses a bunch of title attributes.
+    if len(findAll("dfn[title]:not([data-lt]), a[title]:not([data-lt])", doc)) > 0:
+        warn("Bikeshed now prefers you specify alternate linking texts with the 'lt' attribute, not 'title'. Please change your source.")
+
+
+def specTemplate():
+    # Generates a skeleton .bs file
+    return '''<pre class='metadata'>
+Title: Your Spec Title
+Shortname: your-spec
+Level: 1
+Status: ED
+Group: WGNAMEORWHATEVER
+URL: http://example.com/url-this-spec-will-live-at
+Editor: Your Name, Your Company http://example.com/your-company, your-email@example.com, http://example.com/your-personal-website
+Abstract: A short description of your spec, one or two sentences.
+</pre>
+
+Introduction {#intro}
+=====================
+
+Introduction here.
+'''

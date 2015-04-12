@@ -60,7 +60,6 @@ Autolink Shortcuts
 
 There are several shortcuts for writing autolinks of particular types, so you don't have to write the `<a>` element yourself:
 
-* `<i>` elements are treated as autolinks as well, for legacy reasons.
 * `'foo'` (apostophes/straight quotes) is an autolink to a property or descriptor named "foo"
 * `''foo''` (double apostrophes) is an autolink to any of the CSS definition types except property and descriptor
 * `<<foo>>` is an autolink to a type/production named "&lt;foo>"
@@ -71,6 +70,7 @@ There are several shortcuts for writing autolinks of particular types, so you do
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 * `[[#foo]]` is an autolink to the heading in the same document with that ID. This generates appropriate reference text in its place, like "§5.3 Baseline Self-Alignment"
+* `<i>` elements can be enabled as autolinks as well, using `Use <i> Autolinks: yes` metadata. (The CSSWG has this enabled by default.)
 
 If using the `''foo''`,
 `<<'descriptor'>>`,

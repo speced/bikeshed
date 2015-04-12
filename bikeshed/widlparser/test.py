@@ -211,12 +211,19 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
 [foo] partial dictionary FooDict:BarDict {
     [one "]" ( tricky ] test)] short bar;
     [two] sequence<(double or Foo)> foo = "hello";
+    required Foo baz;
 }
 
 callback callFoo = short();
 callback callFoo2 = unsigned long long(unrestricted double one, DOMString two, Fubar ... three);
 callback interface callMe {
     inherit attribute short round setraises (for the heck of it);
+};
+
+dictionary MyDictionary {
+    any value = null;
+    any[] value = null;
+    any [] value = null;
 };
 
 """
@@ -226,6 +233,7 @@ callback interface callMe {
     print repr(parser)
 
     testDifference(idl, unicode(parser))
+    assert(unicode(parser) == idl)
 
     print "MARKED UP:"
     marker = NullMarker()
@@ -260,4 +268,5 @@ callback interface callMe {
     print parser.normalizedMethodName('bob(xxx)', 'LinkStyle')
     print parser.normalizedMethodName('bob')
     print parser.normalizedMethodName('bob()')
+    print repr(parser.normalizedMethodNames('method', 'Foo'))
 

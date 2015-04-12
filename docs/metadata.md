@@ -53,7 +53,7 @@ There are several additional optional keys:
 * **At Risk** must contain an at-risk feature.  You can specify this key more than once for multiple entries.
 * **Group** must contain the name of the group the spec is being generated for.  This is used by the boilerplate generation to select the correct file.  It defaults to "csswg".
 * **Status Text** allows adding an additional customized sentence that can be used in the document status section.
-* **Ignored Terms** accepts a comma-separated list of terms and won't attempt to link them.  Use these to quiet spurious preprocessor warnings caused by you inventing terms (for example, the Variables spec invents custom properties like 'var-foo'), or as a temporary patch when the spec you want to link to doesn't set up its definitions correctly.
+* **Ignored Terms** accepts a comma-separated list of terms and makes Bikeshed not emit warnings or errors when attempting to autolink those terms.  Use this to quiet spurious preprocessor warnings caused by you inventing terms (for example, the Variables spec invents custom properties like 'var-foo'), or as a temporary patch when the spec you want to link to doesn't set up its definitions correctly.
 * **Link Defaults** lets you specify a default spec for particular autolinks to link to.  The value is a comma-separated list of entries, where each entry is a versioned spec shortname, followed by a link type, followed by a "/"-separated list of link phrases.
 * **Date** must contain a date in YYYY-MM-DD format, which is used instead of today's date for all the date-related stuff in the spec.
 * **Deadline** is also a YYYY-MM-DD date, which is used for things like the LCWD Status section, to indicate deadlines.
@@ -64,6 +64,8 @@ There are several additional optional keys:
 * **Use `<i>` Autolinks** turns on legacy support for using `<i>` elements as "dfn" autolinks.  It takes a bool-ish value: "yes/no", "y/n", "true/false", or "on/off".  (This only exists for legacy purposes; do not use in new documents. Instead, just use the `<a>` element like you're supposed to.)
 * **No Editor** lets you omit the `Editor` metadata without an error. It takes a bool-ish value.  This shouldn't generally be used; even if your organization doesn't privilege editors in any way, putting the organization itself in the `Editor` field meets the intent while still producing useful information for readers of the spec.
 * **Default Biblio Status** takes the values "current" or "dated", and selects which URL you want to default to for bibliography entries that have both "current" and "dated" URLs. (You can also specify this per-biblio entry.)
+* **Markup Shorthands** lets you specify which categories of markup shorthands you want to use; for example, you can turn off CSS shorthands and reclaim use of single quotes in your spec.  You can still link to things with explicit markup even if the shorthand is turned off.  Its value is a comma-separated list of markup categories and bool-ish values, like `css no, biblio yes`.  The currently-recognized categories are "css", "idl", "biblio" (including section links), and "markup".
+* **Text Macro** lets you specify custom text macros, like `[TITLE]` or `[DATE]`, letting you fill in different text when building a spec in multiple ways.  (This is mostly useful as a command-line option.)  Each `Text Macro` line consists of a macro name, which must be uppercase and alphanumeric, followed by the text it will get replaced with.
 
 You can also provide custom keys with whatever values you want,
 by prefixing the key with `!`,
@@ -106,4 +108,4 @@ run `bikeshed spec --md-status=ED`.
 
 1. You can't override the `Use <i> Autolinks` status, because you can't input the `<>` characters. I don't intend to fix this, as you shouldn't be specifying this in the first place.
 2. You can't supply custom metadata keys (ones with a `!` prefix). If you want to do this, let me know, and I'll work on it.
-3. You can't pass values with spaces in them.  This is [an issue with the argparse library](http://bugs.python.org/issue22909), and I don't know a way around it.
+3. Passing values with spaces in them is tricky.  This is [an issue with the argparse library](http://bugs.python.org/issue22909).  The only way around it is to specify both of the positional arguments (the input and output filenames), then put the offending argument after them.

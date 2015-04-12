@@ -1,19 +1,35 @@
 Quick-Start Guide
 =================
 
+Installing (or not!)
+--------------------
+
+Have you [installed](install.md) Bikeshed yet?
+If not, do so.
+
+Or, are you using Bikeshed infrequently?
+Are you okay with a network roundtrip when invoking it,
+in return for it always being up-to-date?
+If so, then you might want to just use the Bikeshed API: <https://api.csswg.org/bikeshed/>.
+The linked page contains several `curl` recipes,
+suitable to put into a shell alias/function for easy use.
+
+Starting the Spec
+-----------------
+
 Starting from an empty file, do the following:
 
-1. Add an `<h1>` with the spec's title as the very first line.
-2. Add a `<pre class='metadata'>` block, with at least the following keys (each line in the format "key: value"):
-	1. "Status" - the shortcode for the spec's status (ED, WD, UD, etc.)
-	2. "ED" - link to the Editor's Draft
-	3. "Shortname" - the spec's shortname, like "css-flexbox".
-	4. "Level" - an integer for the spec's level.  If you're unsure, just put "1".
-	5. "Editor" - an editor's personal information, in the format "[name], [company], [email or contact url]".
-	6. "Abstract" - a short (one or two sentences) description of what the spec is for.
-	7. "Group" - this defaults to "csswg", but can be changed to whatever group you're generating for.
-3. You *should* add an `<h2>Introduction</h2>` section.
-4. Write the rest of the spec!
+1. Add a `<pre class='metadata'>` block, with at least the following keys (each line in the format "key: value"):
+	1. "Title" - the title of the spec.
+	2. "Status" - the shortcode for the spec's status (ED, WD, UD, etc.)
+	3. "ED" - link to the Editor's Draft
+	4. "Shortname" - the spec's shortname, like "css-flexbox".
+	5. "Level" - an integer for the spec's level.  If you're unsure, just put "1".
+	6. "Editor" - an editor's personal information, in the format "[name], [company], [email or contact url]".
+	7. "Abstract" - a short (one or two sentences) description of what the spec is for.
+	8. "Group" - this defaults to "csswg", but can be changed to whatever group you're generating for.
+2. You *should* add an `<h2>Introduction</h2>` section.
+3. Write the rest of the spec!
 
 The processor expects that your headings are all `<h2>` or higher (`<h1>` is reserved for the spec title).
 You probably want to add explicit id attributes to your headings;
@@ -23,7 +39,9 @@ and often quite bad.
 
 You don't need to use `<p>` tags in most cases -
 plain paragraphs are automatically inferred by linebreaks,
-and starting one with "Note:" makes it add `class="note"`.
+and starting one with "Note:" or "Issue:" makes it add `class="note"` or `class="issue"`.
+In fact, you can use most Markdown block-level syntax:
+paragraphs, headings, lists.
 
 Linking
 -------
@@ -80,3 +98,5 @@ go ahead and put `dfn-type=value` and `dfn-for=property-name` attributes on the 
 where "property-name" is the name of the property.
 This'll automatically set up the correct types and references for the value definitions,
 so the processor won't balk at you as much.
+
+You can do similarly for element definitions.

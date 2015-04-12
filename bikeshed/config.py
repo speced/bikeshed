@@ -15,7 +15,7 @@ doc = None
 textMacros = {}
 
 TRStatuses = ["WD", "FPWD", "LCWD", "CR", "PR", "REC", "PER", "NOTE", "MO"]
-unlevelledStatuses = ["LS", "DREAM", "UD", "Commit", "Branch"]
+unlevelledStatuses = ["LS", "DREAM", "UD", "LS-COMMIT", "LS-BRANCH"]
 deadlineStatuses = ["LCWD", "PR"]
 noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH"]
 shortToLongStatus = {
@@ -68,12 +68,15 @@ dfnClassToType = {
 
 dfnTypes = frozenset(dfnClassToType.values())
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
+cssTypes = frozenset(["property", "value", "at-rule", "descriptor", "type", "function", "selector"])
+markupTypes = frozenset(["element", "element-attr"])
 idlTypes = frozenset(["event", "interface", "constructor", "method", "argument", "attribute", "callback", "dictionary", "dict-member", "exception", "except-field", "exception-code", "enum", "const", "typedef", "stringifier", "serializer", "iterator"])
 idlNameTypes = frozenset(["interface", "dictionary", "enum", "exception", "typedef", "callback"])
 functionishTypes = frozenset(["function", "method", "constructor", "stringifier"])
 idlMethodTypes = frozenset(["method", "constructor", "stringifier", "idl", "idl-name"])
 linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "idl-name", "maybe", "biblio"])
 typesUsingFor = frozenset(["descriptor", "value", "element-attr", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "except-field", "stringifier", "serializer", "iterator"])
+lowercaseTypes = cssTypes | markupTypes | frozenset(["propdesc", "maybe", "dfn"])
 
 linkTypeToDfnType = {
     "propdesc": frozenset(["property", "descriptor"]),
@@ -208,8 +211,12 @@ def reSubObject(pattern, string, repl=None):
     pieces.append(string[lastEnd:])
     return pieces
 
-def simplifyText(text):
+def simplifyText(text, convertDashes=False):
     # Remove anything that's not a name character.
+    # If convertDashes is True, turn dashes into underscores,
+    # so two terms that differ only by dashes generate different text.
+    if convertDashes:
+        text = text.replace("-", "_")
     text = text.strip().lower()
     text = re.sub(r"[\s/]+", "-", text)
     text = re.sub(r"[^a-z0-9_-]", "", text)

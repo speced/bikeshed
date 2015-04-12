@@ -58,6 +58,10 @@ Return a named construct. If a single name is provided, a breadth-first search t
 
 Provide a normalized version of a method name, including the names of all arguments, e.g. "drawCircle(long x, long y, long radius)" becomes: "drawCircle(x, y, radius)". If a valid set of arguments is passed, the passed argument names will be returned in the normalized form. Otherwise, a search is performed for a matching previously parsed method name. The search may be narrowed to a particular interface by passing the name fo the interface or callbak in interfaceName.
 
+**Parser.normalizedMethodNames(name [, interfaceName = None])**
+
+Return a list of all possible normalized names for the method. If the method has optional arguments, the list will contain all possible argument variants. The first item in the list will always be the value returned from normalizedMethodName.
+
 **Parser.markup(marker)**
 
 Returns a marked-up version of the WebIDL input text. For each Construct, Type, and Name, the 'marker' will get called with 'markupConstruct(text, construct)', 'markupType(text, construct)', 'markupTypeName(text, construct)', or 'markupName(text, construct)' repsectively, if implemented. Implementation of each method is optional. The 'markup*' methods must return a tuple of the prefix and suffix to inject as markup around the text, or '(None, None)'. 'markupConstruct' will get called for each construct, 'markupType' will get called for each type, 'markupTypeName' will get called for each interface name within a type, 'markupName' will get called for the defining name of a construct (at most one per construct). If the 'marker' also implements 'encode(text)' it will get called with each block of text to return in any encoding necessary for the output format. Markup and encode calls will happen in source order, the text will be split at markup boundaries.
@@ -143,6 +147,10 @@ The Type Production of the Argument.
 **Argument.variadic**
 
 The Symbol "variadic" or 'None'.
+
+**Argument.optional**
+
+The Symbol "optional" or 'None'.
 
 **Argument.default**
 

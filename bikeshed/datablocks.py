@@ -3,7 +3,7 @@ from __future__ import division, unicode_literals
 import re
 import json
 import copy
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 import config
 import biblio
@@ -32,6 +32,9 @@ def transformDataBlocks(doc):
         'railroad': transformRailroad,
         'biblio': transformBiblio,
         'anchors': transformAnchors,
+        'link-defaults': transformLinkDefaults,
+        'ignored-specs': transformIgnoredSpecs,
+        'info': transformInfo,
         'pre': transformPre
     }
     blockType = ""
@@ -153,16 +156,19 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     # they're displayed afterward in the order they were specified.
     # attrs with a value of None are required to be present in parsedAttrs;
     # attrs with any other value are optional, and use the specified value if not present in parsedAttrs
+    forHint = ""
+    if "Name" in parsedAttrs:
+        forHint = " data-link-for-hint='{0}'".format(parsedAttrs["Name"].split(",")[0].strip())
     if "partial" in firstLine or "New values" in parsedAttrs:
         attrs["Name"] = None
         attrs["New values"] = None
-        ret = ["<table class='definition propdef partial'>"]
+        ret = ["<table class='definition propdef partial'{forHint}>".format(forHint=forHint)]
     elif "shorthand" in firstLine:
         attrs["Name"] = None
         attrs["Value"] = None
         for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animatable"]:
             attrs[defaultKey] = "see individual properties"
-        ret = ["<table class='definition propdef'>"]
+        ret = ["<table class='definition propdef'{forHint}>".format(forHint=forHint)]
     else:
         attrs["Name"] = None
         attrs["Value"] = None
@@ -173,13 +179,13 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
         attrs["Media"] = "visual"
         attrs["Computed value"] = "as specified"
         attrs["Animatable"] = "no"
-        ret = ["<table class='definition propdef'>"]
+        ret = ["<table class='definition propdef'{forHint}>".format(forHint=forHint)]
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:
                 val = parsedAttrs[key]
             if key in ("Value", "New values"):
-                ret.append("<tr><th>{0}:<td class='prod'>{1}".format(key, val))
+                ret.append("<tr class='value'><th>{0}:<td class='prod'>{1}".format(key, val))
             else:
                 ret.append("<tr><th>{0}:<td>{1}".format(key, val))
         else:
@@ -322,107 +328,174 @@ def transformBiblio(lines, doc, **kwargs):
     return []
 
 def transformAnchors(lines, doc, **kwargs):
-    try:
-        anchors = json.loads(''.join(lines))
-    except Exception, e:
-        die("JSON parse error:\n{0}", e)
-        return []
+    anchors = parseInfoTree(lines, doc.md.indent)
+    return processAnchors(anchors, doc)
 
-    def checkTypes(anchor, key, field, *types):
-        if field not in anchor:
-            return True
-        val = anchor[field]
-        for fieldType in types:
-            if isinstance(val, fieldType):
-                break
-        else:
-            die("Field '{1}' of inline anchor for '{0}' must be a {3}. Got a '{2}'.", key, field, type(val), ' or '.join(str(t) for t in types))
-            return False
-        return True
-
+def processAnchors(anchors, doc):
     for anchor in anchors:
-        # Check all the mandatory fields
-        for field in ["linkingText", "type", "shortname", "level", "url"]:
-            if field not in anchor:
-                die("Inline anchor for '{0}' is missing the '{1}' field.", key, field)
-                continue
-        if "for" not in anchor:
-            anchor["for"] = []
-        key = anchor['linkingText'] if isinstance(anchor['linkingText'], basestring) else list(anchor['linkingText'])[0]
-        # String fields
-        for field in ["type", "shortname", "url"]:
-            if not checkTypes(anchor, key, field, basestring):
-                continue
-            anchor[field] = anchor[field].strip()+"\n"
-        if "status" in anchor:
-            if anchor['status'].strip() not in ["current", "dated", "local"]:
-                die("Field 'status' of inline anchor for '{0}' must be 'current', 'dated', or 'local'. Got '{1}'.", key, anchor['status'].strip())
-                continue
-            else:
-                # TODO Convert the internal representation from ED/TR to current/dated
-                anchor['status'] = "ED\n" if anchor['status'] == "current\n" else "TR\n"
+        if "type" not in anchor or len(anchor['type']) != 1:
+            die("Each anchor needs exactly one type. Got:\n{0}", config.printjson(anchor))
+            continue
+        if "text" not in anchor or len(anchor['text']) != 1:
+            die("Each anchor needs exactly one text. Got:\n{0}", config.printjson(anchor))
+            continue
+        if "url" not in anchor and "urlPrefix" not in anchor:
+            die("Each anchor needs a url and/or at least one urlPrefix. Got:\n{0}", config.printjson(anchor))
+            continue
+        if "urlPrefix" in anchor:
+            urlPrefix = ''.join(anchor['urlPrefix'])
         else:
-            anchor['status'] = "local"
-        # String or int fields, convert to string
-        for field in ["level"]:
-            if not checkTypes(anchor, key, field, basestring, int):
-                continue
-            anchor[field] = unicode(anchor[field]).strip() + "\n"
-        anchor['spec'] = "{0}-{1}\n".format(anchor['shortname'].strip(), anchor['level'].strip())
-        anchor['export'] = True
-        # String or list-of-strings fields, convert to list
-        for field in ["linkingText", "for"]:
-            if field not in anchor:
-                continue
-            if not checkTypes(anchor, key, field, basestring, list, dict):
-                continue
-            if isinstance(anchor[field], basestring):
-                anchor[field] = [anchor[field]]
-            if isinstance(anchor[field], list):
-                for i,line in enumerate(anchor[field]):
-                    if not isinstance(line, basestring):
-                        die("All of the values for field '{1}' of inline anchor for '{0}' must be strings. Got a '{2}'.", key, field, type(line))
-                        continue
-                    anchor[field][i] = re.sub(r'\s+', ' ', anchor[field][i].strip()) + "\n"
-            elif isinstance(anchor[field], dict):
-                for text,val in anchor[field].items():
-                    if not isinstance(val, basestring):
-                        die("All of the values for field '{1}' of inline anchor for '{0}' must be strings. Got a '{2}'.", key, field, type(line))
-                        continue
-                    fixedText = re.sub(r'\s+', ' ', text.strip()) + "\n"
-                    anchor[field][fixedText] = anchor[field][text]
-                    del anchor[field][text]
-
-
-        if anchor.get("anchor macro"):
-            # The anchor is actually a macro, defining a template for generating URLs for the real anchors.
-            texts = anchor['linkingText']
-            if isinstance(texts, dict):
-                # {term:suffix}
-                for text,suffix in texts.items():
-                    clone = copy.deepcopy(anchor)
-                    if '#' not in anchor['url'] and '#' not in suffix:
-                        shim = '#'
-                    else:
-                        shim = ''
-                    clone['url'] = anchor['url'] + shim + suffix
-                    doc.refs.refs[text.lower()].append(clone)
-            elif isinstance(texts, list):
-                # [term]
-                for text in texts:
-                    clone = copy.deepcopy(anchor)
-                    if '#' not in anchor['url']:
-                        shim = '#'
-                    else:
-                        shim = ''
-                    clone['url'] = anchor['url'] + shim + config.simplifyText(text)
-                    doc.refs.refs[text.lower()].append(clone)
-            # Now stash the anchor macro away, so any <a spec> anchors pointing to this spec
-            # can also still autogenerate, despite not being listed here.
-            doc.refs.anchorMacros[anchor['spec']] = anchor
-            doc.refs.anchorMacros[anchor['shortname']] = anchor
+            urlPrefix = ""
+        if "url" in anchor:
+            urlSuffix = anchor['url'][0]
         else:
-            for text in anchor['linkingText']:
-                doc.refs.refs[text.lower()].append(anchor)
-
+            urlSuffix = config.simplifyText(anchor['text'][0], convertDashes=anchor['type'][0] == "dfn")
+        url = urlPrefix + ("" if "#" in urlPrefix or "#" in urlSuffix else "#") + urlSuffix
+        if anchor['type'][0] in config.lowercaseTypes:
+            anchor['text'][0] = anchor['text'][0].lower()
+        doc.refs.refs[anchor['text'][0]].append({
+            "linkingText": anchor['text'][0],
+            "type": anchor['type'][0],
+            "url": url,
+            "for": anchor.get('for', []),
+            "export": True,
+            "status": "local",
+            "spec": anchor.get('spec', [''])[0]
+            })
     return []
+
+def transformLinkDefaults(lines, doc, **kwargs):
+    lds = parseInfoTree(lines, doc.md.indent)
+    return processLinkDefaults(lds, doc)
+
+def processLinkDefaults(lds, doc):
+    for ld in lds:
+        if len(ld.get('type', [])) != 1:
+            die("Every link default needs exactly one type. Got:\n{0}", config.printjson(ld))
+            continue
+        if len(ld.get('spec', [])) != 1:
+            die("Every link default needs exactly one spec. Got:\n{0}", config.printjson(ld))
+            continue
+        if len(ld.get('text', [])) != 1:
+            die("Every link default needs exactly one text. Got:\n{0}", config.printjson(ld))
+            continue
+        doc.md.linkDefaults[ld['text'][0]].append((ld['spec'][0], ld['type'][0], ld.get('status', None), ld.get('for', None)))
+    return []
+
+def transformIgnoredSpecs(lines, doc, **kwargs):
+    specs = parseInfoTree(lines, doc.md.indent)
+    return processIgnoredSpecs(specs, doc)
+
+def processIgnoredSpecs(specs, doc):
+    for spec in specs:
+        if len(spec.get('spec', [])) == 0:
+            die("Every ignored spec line needs at least one 'spec' value. Got:\n{0}", config.printjson(spec))
+            continue
+        specNames = spec.get('spec')
+        if len(spec.get('replacedBy', [])) > 1:
+            die("Every ignored spec line needs at most one 'replacedBy' value. Got:\n{0}", config.printjson(spec))
+            continue
+        replacedBy = spec.get('replacedBy')[0] if 'replacedBy' in spec else None
+        for specName in specNames:
+            if replacedBy:
+                doc.refs.replacedSpecs.add((specName, replacedBy))
+            else:
+                doc.refs.ignoredSpecs.add(specName)
+    return []
+
+
+def transformInfo(lines, doc, **kwargs):
+    # More generic InfoTree system.
+    # A <pre class=info> can contain any of the InfoTree collections,
+    # identified by an 'info' line.
+    infos = parseInfoTree(lines, doc.md.indent)
+    return processInfo(infos, doc)
+
+def processInfo(infos, doc):
+    knownInfoTypes = {
+        "anchors": processAnchors,
+        "link-defaults": processLinkDefaults,
+        "ignored-specs": processIgnoredSpecs
+    }
+    infoCollections = defaultdict(list)
+    for info in infos:
+        if len(info.get('info', [])) != 1:
+            die("Every info-block line needs exactly one 'info' type. Got:\n{0}", config.printjson(info))
+            continue
+        infoType = info.get('info')[0].lower()
+        if infoType not in knownInfoTypes:
+            die("Unknown info-block type '{0}'", infoType)
+            continue
+        infoCollections[infoType].append(info)
+    for infoType, infos in infoCollections.items():
+        knownInfoTypes[infoType](infos, doc)
+    return []
+
+
+
+def parseInfoTree(lines, indent=4):
+    # Parses sets of info, which can be arranged into trees.
+    # Each info is a set of key/value pairs, semicolon-separated:
+    # key1: val1; key2: val2; key3: val3
+    # Intead of semicolon-separating, pieces can be nested with higher indentation
+    # key1: val1
+    #     key2: val2
+    #         key3: val3
+    # Multiple fragments can be chained off of a single higher-level piece,
+    # to avoid repetition:
+    # key1: val1
+    #     key2: val2
+    #     key2a: val2a
+    # ===
+    # key1: val1; key2: val2
+    # key1: val1; key2a: val2a
+
+    def extendData(datas, infoLevels):
+        if not infoLevels:
+            return
+        newData = defaultdict(list)
+        for infos in infoLevels:
+            for k,v in infos.items():
+                newData[k].extend(v)
+        datas.append(newData)
+
+    # Determine the indents, separate the lines.
+    datas = []
+    infoLevels = []
+    lastIndent = -1
+    indentSpace = " " * indent
+    for line in lines:
+        if line.strip() == "":
+            continue
+        ws, text = re.match("(\s*)(.*)", line).groups()
+        wsLen = len(ws.replace("\t", indentSpace))
+        if wsLen % indent != 0:
+            die("Line has inconsistent indentation; use tabs or {1} spaces:\n{0}", text, indent)
+            return []
+        wsLen = wsLen // indent
+        if wsLen >= lastIndent+2:
+            die("Line jumps {1} indent levels:\n{0}", text, wsLen - lastIndent)
+            return []
+        if wsLen <= lastIndent:
+            # Previous line was a leaf node; build its full data and add to the list
+            extendData(datas, infoLevels[:lastIndent+1])
+        # Otherwise, chained data. Parse it, put it into infoLevels
+        info = defaultdict(list)
+        for piece in text.split(";"):
+            if piece.strip() == "":
+                continue
+            match = re.match("([^:]+):\s*(.*)", piece)
+            if not match:
+                die("Line doesn't match the grammar `k:v; k:v; k:v`:\n{0}", line)
+                return []
+            key = match.group(1).strip()
+            val = match.group(2).strip()
+            info[key].append(val)
+        if wsLen < len(infoLevels):
+            infoLevels[wsLen] = info
+        else:
+            infoLevels.append(info)
+        lastIndent = wsLen
+    # Grab the last bit of data.
+    extendData(datas, infoLevels[:lastIndent+1])
+    return datas

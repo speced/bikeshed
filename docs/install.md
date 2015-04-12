@@ -1,6 +1,12 @@
 Installing Bikeshed
 ===================
 
+If you use Bikeshed infrequently,
+or are okay with requiring a network roundtrip every time you invoke Bikeshed,
+you probably want to use the Bikeshed API instead <https://api.csswg.org/bikeshed/>.
+In return, the API version is always up-to-date,
+so you don't have to remember to update things yourself.
+
 If you want to run a local copy of Bikeshed rather than use the cgi version, it’s pretty easy to install.
 
 You need to install Python 2.7, PIP, and a few other support libraries before installing Bikeshed itself. Here is how to do this on Debian-based Linuxen (anything using `apt`), OS X, and Windows 7/8/10:

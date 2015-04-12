@@ -131,6 +131,10 @@ class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
         return None
 
     @property
+    def methodNames(self):
+        return []
+
+    @property
     def complexityFactor(self):
         return 0
     
@@ -356,6 +360,10 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | Spe
         return self.member.methodName
 
     @property
+    def methodNames(self):
+        return self.member.methodNames
+
+    @property
     def normalName(self):
         return self.methodName if (self.methodName) else self.name
 
@@ -529,11 +537,12 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
         return output + ']]'
 
 
-class DictionaryMember(Construct): # [ExtendedAttributes] Type identifier [Default] ";"
+class DictionaryMember(Construct): # [ExtendedAttributes] ["required"] Type identifier [Default] ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
+        Symbol.peek(tokens, 'required')
         if (Type.peek(tokens)):
             token = tokens.peek()
             if (token and token.isIdentifier()):
@@ -543,6 +552,7 @@ class DictionaryMember(Construct): # [ExtendedAttributes] Type identifier [Defau
     
     def __init__(self, tokens, parent = None):
         Construct.__init__(self, tokens, parent)
+        self.required = Symbol(tokens, 'required') if (Symbol.peek(tokens, 'required')) else None
         self.type = Type(tokens)
         self.name = tokens.next().text
         self.default = Default(tokens) if (Default.peek(tokens)) else None
@@ -554,10 +564,14 @@ class DictionaryMember(Construct): # [ExtendedAttributes] Type identifier [Defau
         return 'dict-member'
     
     def _unicode(self):
-        output = Construct._unicode(self) + unicode(self.type) + unicode(self.name)
+        output = Construct._unicode(self)
+        output += unicode(self.required) if (self.required) else ''
+        output += unicode(self.type) + unicode(self.name)
         return output + (unicode(self.default) if (self.default) else '')
     
     def _markup(self, generator):
+        if (self.required):
+            self.required.markup(generator)
         generator.addType(self.type)
         generator.addName(self.name)
         if (self.default):
@@ -565,8 +579,14 @@ class DictionaryMember(Construct): # [ExtendedAttributes] Type identifier [Defau
         return self
 
     def __repr__(self):
-        output = '[dict-member: ' + Construct.__repr__(self) + repr(self.type) + ' [name: ' + self.name.encode('ascii', 'replace') + ']'
-        return output + ((' = [default: ' + repr(self.default) + ']]') if (self.default) else ']')
+        output = '[dict-member: ' + Construct.__repr__(self)
+        output += '[required] ' if (self.required) else ''
+        output += repr(self.type)
+        output += ' [name: ' + self.name.encode('ascii', 'replace') + ']'
+        if (self.default):
+            output += ' = [default: ' + repr(self.default) + ']'
+        output += ']'
+        return output
 
 
 class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" identifier [Inheritance] "{" [DictionaryMember]... "}" ";"
@@ -892,6 +912,10 @@ class ExtendedAttributeNoArgs(Construct):   # identifier
     def _unicode(self):
         return self.attribute
     
+    def _markup(self, generator):
+        generator.addName(self.attribute)
+        return self
+
     def __repr__(self):
         return '[ExtendedAttributeNoArgs: ' + self.attribute.encode('ascii', 'replace') + ']'
 
@@ -934,7 +958,7 @@ class ExtendedAttributeArgList(Construct):  # identifier "(" [ArgumentList] ")"
         return self.attribute + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
     
     def _markup(self, generator):
-        generator.addText(self.attribute)
+        generator.addName(self.attribute)
         generator.addText(self._openParen)
         if (self.arguments):
             self.arguments.markup(generator)
@@ -981,12 +1005,9 @@ class ExtendedAttributeIdent(Construct):    # identifier "=" identifier
         return self.attribute + unicode(self._equals) + self.value
     
     def _markup(self, generator):
-        generator.addText(self.attribute)
+        generator.addName(self.attribute)
         generator.addText(self._equals)
-        if ('constructor' == self.idlType):
-            generator.addTypeName(self.value)
-        else:
-            generator.addName(self.value)
+        generator.addTypeName(self.value)
         return self
     
     def __repr__(self):
@@ -1037,12 +1058,9 @@ class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" 
         return output + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
     
     def _markup(self, generator):
-        generator.addText(self.attribute)
+        generator.addName(self.attribute)
         generator.addText(self._equals)
-        if ('constructor' == self.idlType):
-            generator.addTypeName(self.value)
-        else:
-            generator.addName(self.value)
+        generator.addTypeName(self.value)
         generator.addText(self._openParen)
         if (self.arguments):
             self.arguments.markup(generator)
@@ -1091,7 +1109,7 @@ class ExtendedAttributeTypePair(Construct): # identifier "(" Type "," Type ")"
         return output + unicode(self.valueType) + unicode(self._closeParen)
     
     def _markup(self, generator):
-        generator.addText(self.attribute)
+        generator.addName(self.attribute)
         generator.addText(self._openParen)
         self.keyType.markup(generator)
         generator.addText(self._comma)

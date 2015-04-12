@@ -15,7 +15,8 @@ def runAllTests(constructor):
 	numPassed = 0
 	total = 0
 	failures = []
-	for testname in glob.glob(config.scriptPath + "/../tests/*.bs"):
+	testFolder = config.scriptPath + "/../tests/"
+	for testname in glob.glob(testFolder + "*.bs"):
 		total += 1
 		doc = constructor(inputFilename=testname)
 		doc.preprocess()
@@ -27,7 +28,7 @@ def runAllTests(constructor):
 		else:
 			print testname
 	if total == 0:
-		print "No tests were found."
+		print "No tests were found in '{0}'.".format(testFolder)
 	elif numPassed == total:
 		print "\033[32;1m✔ All tests passed.\033[0m"
 		return True

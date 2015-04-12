@@ -18,8 +18,8 @@ Sometimes, the text of the definition isn't exactly what you want it to be linke
 or you may want it to be linkable with more than one phrase.
 For example, an algorithm named "Check if three characters would start an identifier"
 may also want to be linkable from the phrase "starts with an identifier".
-To alter the linking text, simply add a `title` attribute to the definition;
-the title text is used instead of the text content.
+To alter the linking text, simply add an `lt` attribute (for "Linking Text") to the definition;
+the linking text is used instead of the text content.
 You can separate multiple linking phrases by separating them with the pipe "|" character.
 
 Defining Extra-Short "Local" Linking Texts
@@ -27,11 +27,11 @@ Defining Extra-Short "Local" Linking Texts
 
 Sometimes you want to use an extra-short version of a term for within a spec,
 but don't want to confuse things by exporting it globally.
-To achieve this, add a `local-title` attribute with the terms you want to be only usable within the spec;
-the syntax is identical to that of the `title` attribute, described above.
+To achieve this, add a `local-lt` attribute with the terms you want to be only usable within the spec;
+the syntax is identical to that of the `lt` attribute, described above.
 
 Using local linking text does not disturb the normal linking-text process;
-that still takes from either the element text or the `title` attribute,
+that still takes from either the element text or the `lt` attribute,
 as normal.
 
 Definition Types
@@ -109,7 +109,7 @@ Just add the type as a boolean attribute to the definition, like
 ~~~~
 
 Alternately, if you've got several definitions of the same type that share some container element (such as a `<pre>` or `<dl>`),
-just add a `dfn-for="type-goes-here"` attribute to the container.
+just add a `dfn-type="type-goes-here"` attribute to the container.
 Anything which isn't explicitly tagged otherwise will take that type by default.
 
 (There are more methods to determine definition type, but they're only meant for legacy content, and so are not documented here.)
@@ -159,35 +159,41 @@ Providing Custom Definitions
 If you want to link to dfns in specs that aren't yet part of the autolinking database,
 you can provide your own definition data that Bikeshed can use.
 Within a `<pre class='anchors'>` element,
-provide a JSON array of the terms you want to link to,
-where each term is a JSON object with the following keys:
+define the anchors you need in [InfoTree format](infotree.md),
+with the following keys:
 
-* "linkingText", a string or array of strings with the linking text of the anchor
-* "type", a string matching one of the definition types listed above
-* optionally, "for", a string or array of strings denoting what the definition is scoped to (see above)
-* "url", a string with the url of the anchor you're linking to
-* "shortname", a string containing the shortname of the spec
-* "level", a string or int containing the level of the spec
-* "status", a string containing either "current" (if the spec is an Editor's Draft, Living Standard, etc) or "dated" (if the spec is a stable/dead snapshot)
+* **text** - the linking text for the definition. (Exactly 1 required.)
+* **type** - the definition's type (dfn, interface, etc)  (Exactly 1 required.)
+* **urlPrefix** and/or **url** - define the anchor's url, as described below.  (At least one of `urlPrefix` or `url` must be specified. 0+ `urlPrefix` entries allowed, 0 or 1 `url` entries allowed.)
+* **for** - what the definition is for.  (Any number allowed, including 0.)
+* **spec** - Which spec the definition comes from. (optional)
+
+To generate the url for the anchor,
+first all of the `urlPrefix` entries are concatenated.
+If a `url` is provided,
+it's appended to the prefixes;
+otherwise, the `text` is url-ified and appended.
+(Lowercased, spaces converted to dashes, non-alphanumeric characters dropped.)
+If neither `urlPrefix` nor `url` had a "#" character in them,
+one is inserted between them.
+
+The `spec` attribute is used only for index generation, and has no effect on URL generation.
 
 Example:
 
 ```html
 <pre class="anchors">
-[
-    {
-        "linkingText": "foo",
-        "type": "dfn",
-        "url": "http://example.com#foo",
-        "shortname": "example",
-        "level": 1,
-        "status": "current"
-    }
-]
+urlPrefix: https://encoding.spec.whatwg.org/; type: dfn; spec: ENCODING
+  text: ascii whitespace
+  text: decoder
+url: http://www.unicode.org/reports/tr46/#ToASCII; type: dfn; text: toascii
 </pre>
 
-<a>foo</a> links now!
+<a>ascii whitespace</a> links now!
 ```
+
+Alternately, this data can be provided in a file named `anchors.bsdata`,
+in the same folder as the spec source.
 
 
 Autolinking
@@ -202,11 +208,11 @@ It compares the text content of the link to the text content of all the definiti
 and if it finds a match,
 automatically sets the `href` appropriately to point at the relevant definition.
 
-Like definitions, you can override the linking text by setting a `title=''` attribute.
+Like definitions, you can override the linking text by setting a `lt=''` attribute.
 Unlike definitions, you can't separate multiple linking phrases by the bar "|" character,
 as that doesn't make sense for links.
 
-Setting an empty title attribute turns off autolinking entirely,
+Setting an empty lt attribute turns off autolinking entirely,
 if for whatever reason you need to do so.
 
 There are several additional shortcuts for writing an autolink:
@@ -220,6 +226,8 @@ There are several additional shortcuts for writing an autolink:
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 * `[[#foo]]` is an autolink to a heading in the same document with the given ID.  (See [Section Links](#section-links) for more detail.)
+* `<{element}>` is an autolink to the element named "element".
+* `<{element/attribute}>` is an autolink to the attribute named "attribute" for the element "element".
 
 For any of the above shorthands that can have a "for" value, you can indicate this inline by preceding the linking text with the "for" value and separating it with a slash. For example, to disambiguate that you want the "foo" value from the "prop1" property (rather than "prop2", which also has a "foo" value), you can write:
 
@@ -272,7 +280,7 @@ There are three things you might have to do to fix these:
     For example, many properties define an "auto" value;
     to link to the "auto" value of the 'width' property in particular,
     specify `<a value for=width>auto</a>`,
-    or the shorthand syntax `''width/auto''.
+    or the shorthand syntax `''width/auto''`.
     To refer to a value of a descriptor,
     you *can* be completely explicit and specify the at-rule as well,
     like `<a value for='@counter-style/system'>numeric</a>`,
@@ -282,6 +290,13 @@ There are three things you might have to do to fix these:
     but it keeps your links shorter for now.
 
     Again, you can specify a `link-for=''` attribute on a container to default it for all the autolinks inside the container.
+    Alternately, you can specify `link-for-hint=''` on a container,
+    which'll use the hint as the for value *if possible*
+    (if doing so wouldn't eliminate all the possible links).
+    This is useful if some container has a bunch of links for a given property, say,
+    but *some* of the links are to other things entirely;
+    using `link-for` means you have to manually specify the other links aren't for anything,
+    but `link-for-hint` is more "do what I mean".
 
 3. If multiple specs define the same property, you may need to declare which spec you're referring to.
     (The processor is smart enough to automatically figure out which one you probably want in many cases.)
@@ -317,6 +332,41 @@ but it's not marked for export
 (either intentionally, or because it was accidentally missed and fixing the spec would be time-consuming),
 using the `spec=''` attribute (defined above) will override the lack of an export declaration,
 and go ahead and link to it anyway.
+
+
+Configuring Linking Defaults
+----------------------------
+
+When there are multiple definitions for a given term
+and Bikeshed can't automatically tell which one you want,
+it'll emit a warning asking you to specify more explicitly.
+You can do this per-link,
+but you typically want to make the same choice every time the term is autolinked;
+this can be done by adding Link Defaults metadata.
+
+You can either add a Link Defaults metadata line to your `<pre class=metadata>`,
+as specified in [metadata](metadata.md),
+or add a `<pre class='link-defaults'>` block,
+written in the [InfoTree](infotree.md) format.
+For the latter,
+each piece of info must have a `spec`, `type`, and `text` line,
+and optionally a `for` line if necessary to further disambiguate.
+
+Sometimes this is too fine-grained,
+and you'd actually like to completely ignore a given spec when autolinking,
+always preferring to link to something else.
+To do this, add a `<pre class='ignored-specs'>` block,
+written in the [InfoTree](infotree.md) format.
+Each piece of info must have a `spec` line,
+and optionally a `replacedBy` line,
+both naming specs.
+If the info has just a `spec` line, that spec is ignored totally by default;
+linking to it requires you to manually specify a `spec=''` attribute on the autolink.
+If the info has a `replacedBy` line,
+then whenever an autolink has a choice between the two specs,
+it'll delete the `spec` value from consideration,
+leaving only the `replacedBy` value
+(plus any other specs that might be providing a definition).
 
 
 Section Links

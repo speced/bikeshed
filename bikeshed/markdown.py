@@ -50,12 +50,12 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 			# h2 underline
 			match = re.match(r"-{3,}\s*$", line)
 			token = {'type':'dash-line', 'raw': rawline}
-		elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[\w-]+\})?\s*$", line):
+		elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", line):
 			# single-line heading
-			match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[\w-]+\})?\s*$", line)
+			match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", line)
 			level = len(match.group(1))+1
 			token = {'type':'heading', 'text': match.group(2).strip(), 'raw':rawline, 'level': level}
-			match = re.search(r"\{#([\w-]+)\}\s*$", line)
+			match = re.search(r"\{#([^ }]+)\}\s*$", line)
 			if match:
 				token['id'] = match.group(1)
 		elif re.match(r"\d+\.\s", line):
@@ -77,7 +77,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 			type = 'dt' if len(match.group(1)) == 1 else 'dd'
 			token = {'type':type, 'text': "", 'raw':rawline}
 		elif re.match(r"<", line):
-			if re.match(r"<<", line) or re.match(r"</?({0})[ >]".format(allowedStartElements), line):
+			if re.match(r"<<|<\{", line) or re.match(r"</?({0})[ >]".format(allowedStartElements), line):
 				token = {'type':'text', 'text': line, 'raw': rawline}
 			else:
 				token = {'type':'htmlblock', 'raw': rawline}
@@ -197,7 +197,7 @@ def parseMultiLineHeading(stream):
 		level = 3
 	else:
 		die("Markdown parser error: tried to parse a multiline heading from:\n{0}{1}{2}", stream.prevraw(), stream.currraw(), stream.nextraw())
-	match = re.search(r"(.*?)\s*\{\s*#([\w-]+)\s*\}\s*$", stream.currtext())
+	match = re.search(r"(.*?)\s*\{\s*#([^ }]+)\s*\}\s*$", stream.currtext())
 	if match:
 		text = match.group(1)
 		idattr = "id='{0}'".format(match.group(2))
@@ -222,7 +222,12 @@ def parseParagraph(stream):
 		p = "<strong class='advisement'>"
 		endTag = "</strong>"
 	else:
-		p = "<p>"
+		match = re.match(r"issue\(([^)]+)\): (.+)", line, re.I)
+		if match:
+			line = match.group(2)
+                        p = "<p data-remote-issue-id='%s' class='issue'>" % match.group(1)
+                else:
+			p = "<p>"
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
 		stream.advance()
@@ -260,6 +265,8 @@ def parseBulleted(stream):
 			if stream.currtype() == 'eof':
 				return
 			if stream.currtype() == 'blank' and stream.nexttype() != 'bulleted' and stream.nextprefixlen() <= prefixLen:
+				return
+			if stream.currprefixlen() < prefixLen:
 				return
 			if stream.currtype() == 'blank':
 				stream.advance()
@@ -303,6 +310,8 @@ def parseNumbered(stream):
 				return
 			if stream.currtype() == 'blank' and stream.nexttype() != 'numbered' and stream.nextprefixlen() <= prefixLen:
 				return
+			if stream.currprefixlen() < prefixLen:
+				return
 			if stream.currtype() == 'blank':
 				stream.advance()
 			yield parseItem(stream)
@@ -345,6 +354,8 @@ def parseDl(stream):
 			if stream.currtype() == 'eof':
 				return
 			if stream.currtype() == 'blank' and stream.nexttype() not in ('dt', 'dd') and stream.nextprefixlen() <= prefixLen:
+				return
+			if stream.currprefixlen() < prefixLen:
 				return
 			if stream.currtype() == 'blank':
 				stream.advance()

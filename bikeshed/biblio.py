@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import re
-from collections import defaultdict
+from collections import defaultdict, deque
 from .messages import *
 from .htmlhelpers import *
 
@@ -34,17 +34,16 @@ class BiblioEntry(object):
         str = ""
         etAl = self.etAl
 
-        if len(self.authors) == 0:
-            str += "???"
-        elif len(self.authors) == 1:
+        if len(self.authors) == 1:
             str += self.authors[0]
         elif len(self.authors) < 4:
             str += "; ".join(self.authors)
-        else:
+        elif len(self.authors) != 0:
             str += self.authors[0]
             etAl = True
 
-        str += "; et al. " if etAl else ". "
+        if str != "":
+            str += "; et al. " if etAl else ". "
 
         if self.url:
             str += "<a href='{0}'>{1}</a>. ".format(self.url, self.title)
@@ -70,17 +69,16 @@ class BiblioEntry(object):
 
         str = ""
         etAl = self.etAl
-        if len(self.authors) == 0:
-            str += "???"
-        elif len(self.authors) == 1:
+        if len(self.authors) == 1:
             str += self.authors[0]
         elif len(self.authors) < 4:
             str += "; ".join(self.authors)
-        else:
+        elif len(self.authors) != 0:
             str += self.authors[0]
             etAl = True
 
-        str += "; et al. " if etAl else ". "
+        if str != "":
+            str += "; et al. " if etAl else ". "
         ret.append(str)
 
         if self.url:
@@ -108,6 +106,34 @@ class BiblioEntry(object):
         if self.title is None:
             return False
         return True
+
+class SpecBasedBiblioEntry(BiblioEntry):
+    '''
+    Generates a "fake" biblio entry from a spec reference,
+    for when we don't have "real" bibliography data for a reference.
+    '''
+
+    def __init__(self, spec, preferredURL="dated"):
+        self.spec = spec
+        self.linkText = spec['vshortname']
+        self._valid = True
+        if preferredURL == "dated" and spec.get("TR", None) is not None:
+            self.url = spec['TR']
+        elif 'ED' in spec:
+            self.url = spec['ED']
+        else:
+            self._valid = False
+
+    def valid(self):
+        return self._valid
+
+    def toHTML(self):
+        return [
+            self.spec['description'],
+            " URL: ",
+            E.a({"href":self.url}, self.url)
+        ]
+
 
 def processReferBiblioFile(lines, storage, order):
     singularReferCodes = {
@@ -193,3 +219,55 @@ def processSpecrefBiblioFile(text, storage, order):
             continue
         storage[biblioKey.lower()].append(biblio)
     return storage
+
+
+
+def levenshtein(a,b):
+    "Calculates the Levenshtein distance between a and b."
+    n, m = len(a), len(b)
+    if n > m:
+        # Make sure n <= m, to use O(min(n,m)) space
+        a,b = b,a
+        n,m = m,n
+
+    current = range(n+1)
+    for i in range(1,m+1):
+        previous, current = current, [i]+[0]*n
+        for j in range(1,n+1):
+            add, delete = previous[j]+1, current[j-1]+1
+            change = previous[j-1]
+            if a[j-1] != b[i-1]:
+                change = change + 1
+            current[j] = min(add, delete, change)
+
+    return current[n]
+
+def findCloseBiblios(biblios, target, n=5):
+    '''
+    Finds biblio entries close to the target.
+    Returns all biblios with target as the substring,
+    plus the 5 closest ones per levenshtein distance.
+    '''
+    target = target.lower()
+    names = []
+    superStrings = []
+    def addName(name, distance):
+        tuple = (name, distance)
+        if len(names) < n:
+            names.append(tuple)
+            names.sort(key=lambda x:x[1])
+        elif distance >= names[-1][1]:
+            pass
+        else:
+            for i, entry in enumerate(names):
+                if distance < entry[1]:
+                    names.insert(i, tuple)
+                    names.pop()
+                    break
+        return names
+    for name in biblios.keys():
+        if target in name:
+            superStrings.append(name)
+        else:
+            addName(name, levenshtein(name, target))
+    return sorted(s.strip() for s in superStrings) + [n.strip() for n,d in names]
