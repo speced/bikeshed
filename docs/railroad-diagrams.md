@@ -34,6 +34,7 @@ Elements are split into two groups: containers and text.
 The containers hold other elements, and modify their semantics:
 
 * **Sequence** (**And**, **Seq**) - used for sequences of elements which must all be selected in order.  Like concatenation in regexes. Takes 1 or more children.
+* **Stack** - A sequence that arranges its children vertically. Useful for preventing diagrams from becomming excessively wide. Takes 1 or more children.
 * **Choice** (**Or**) - used for a choice between elements.  Like the `|` character in regexes.  Takes 1 or more children.  Optionally, the "default" index may be provided in the prelude (defaulting to 0).
 * **Optional** (**Opt**)- used for an element that's optional.  Like the `?` character in regexes.  Takes 1 child.  Optionally, the word `skip` may be provided in the prelude to indicate that this term is skipped by default.
 * **OneOrMore** (**Plus**)- used for an element that can be chosen one or more times.  Like the `+` character in regexes.
