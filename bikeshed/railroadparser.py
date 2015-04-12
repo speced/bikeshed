@@ -42,7 +42,7 @@ def parse(string):
     lastIndent = 0
     tree = {"command":"Diagram", "prelude": "", "children": []}
     activeCommands = {"0": tree}
-    blockNames = "And|Seq|Sequence|Or|Choice|Opt|Optional|Plus|OneOrMore|Star|ZeroOrMore"
+    blockNames = "And|Seq|Sequence|Stack|Or|Choice|Opt|Optional|Plus|OneOrMore|Star|ZeroOrMore"
     textNames = "T|Terminal|N|NonTerminal|C|Comment|S|Skip"
     for i, line in enumerate(lines):
         indent = 0
@@ -114,6 +114,13 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
             return die("Line {0} - Sequence commands need at least one child.", line)
         children = filter(None, [_createDiagram(**child) for child in children])
         return rr.Sequence(*children)
+    elif command in ("Stack", ):
+        if prelude:
+            return die("Line {0} - Stack commands cannot have preludes.", line)
+        if not children:
+            return die("Line {0} - Stack commands need at least one child.", line)
+        children = filter(None, [_createDiagram(**child) for child in children])
+        return rr.Stack(*children)
     elif command in ("Or", "Choice"):
         if prelude == "":
             default = 0
