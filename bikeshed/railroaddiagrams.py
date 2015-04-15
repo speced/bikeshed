@@ -216,7 +216,8 @@ class Stack(DiagramItem):
         item.addTo(self)
         prevItem = item
         for item in self.items[1:]:
-            Path(x + space + prevItem.width, y).arc('ne').v(prevItem.down).arc('es') \
+            Path(x + space + prevItem.width, y + prevItem.yAdvance).arc('ne') \
+                .v(prevItem.down - prevItem.yAdvance).arc('es') \
                 .left((prevItem.width / 2) + (item.width / 2)).arc('nw').v(item.up).arc('ws').addTo(self)
             space = (width - item.width) / 2
             y += (ARC_RADIUS * 4) + prevItem.down + item.up
