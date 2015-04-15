@@ -47,7 +47,7 @@ class MetadataManager:
         self.mailingList = None
         self.mailingListArchives = None
         self.boilerplate = {'omitSections':set()}
-        self.versionHistory = None
+        self.versionHistory = []
         self.logo = ""
         self.indent = 4
         self.linkDefaults = defaultdict(list)
@@ -83,7 +83,6 @@ class MetadataManager:
             "Mailing List": "mailingList",
             "Mailing List Archives": "mailingListArchives",
             "Boilerplate": "boilerplate",
-            "Version History": "versionHistory",
             "Logo": "logo",
             "Indent": "indent",
             "Use <I> Autolinks": "useIAutolinks",
@@ -108,6 +107,7 @@ class MetadataManager:
             "Link Defaults": "linkDefaults",
             "Issue Tracking": "issues",
             "Markup Shorthands": "markupShorthands",
+            "Version History": "versionHistory",
             "Text Macro": "customTextMacros"
         }
 
