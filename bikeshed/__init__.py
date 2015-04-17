@@ -885,6 +885,12 @@ class IDLMarker(object):
 
     def markupTypeName(self, text, construct):
         # Fires for non-defining type names, such as arg types.
+
+        # The names in [Exposed=Foo] are [Global] tokens, not interface names.
+        # Since I don't track globals as a link target yet, don't link them at all.
+        if construct.idlType == "extended-attribute" and construct.name == "Exposed":
+            return (None, None)
+
         return ('<a data-link-type="idl-name">', '</a>')
 
     def markupKeyword(self, text, construct):
