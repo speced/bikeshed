@@ -201,6 +201,12 @@ This often isn't the best for complex heading texts,
 so it's not recommended to rely on this.
 (Bikeshed will warn you that it's generating IDs, and suggest you supply one manually.)
 
+If a heading changed significantly,
+so that you want to change the ID,
+but you want links to the old heading ID to still work,
+put the old ID in an `oldids=''` attribute on the heading element.
+If there are multiple, comma-separate them.
+
 Issues (elements with `class='issue'`) will generate IDs of the form "issue-###",
 where "###" is substring of a hash of the issue's contents.
 This means that an issue's ID will be stable against changes elsewhere in the document,

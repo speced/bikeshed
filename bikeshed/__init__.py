@@ -268,6 +268,10 @@ def addHeadingIds(doc, headings):
         if header.get('id') is None:
             neededIds.add(header)
             header.set('id', simplifyText(textContent(find(".content", header)), convertDashes=True))
+        if header.get("oldids"):
+            oldIDs = [h.strip() for h in header.get("oldids").strip().split(",")]
+            for oldID in oldIDs:
+                appendChild(header, E.span({"id":oldID}))
     if len(neededIds) > 0:
         warn("You should manually provide IDs for your headings:\n{0}",
             "\n".join("  "+outerHTML(el) for el in neededIds))
@@ -1177,6 +1181,8 @@ def cleanupHTML(doc):
     for el in findAll("[data-export]:not(dfn), [data-noexport]:not(dfn)", doc):
         removeAttr(el, 'data-export')
         removeAttr(el, 'data-noexport')
+    for el in findAll("[oldids]"):
+        removeAttr(el, 'oldids')
 
 
 def finalHackyCleanup(text):
