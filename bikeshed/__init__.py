@@ -1181,7 +1181,7 @@ def cleanupHTML(doc):
     for el in findAll("[data-export]:not(dfn), [data-noexport]:not(dfn)", doc):
         removeAttr(el, 'data-export')
         removeAttr(el, 'data-noexport')
-    for el in findAll("[oldids]"):
+    for el in findAll("[oldids]", doc):
         removeAttr(el, 'oldids')
 
 
