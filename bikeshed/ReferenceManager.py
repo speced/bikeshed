@@ -278,7 +278,7 @@ class ReferenceManager(object):
                 return localRefs[0]
             # And repeat for non-locals
             candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, linkFor=candidateFor, export=export, ignoreObsoletes=True)
-            remoteUrls = {c.url: c for c in candidates if c.text.startswith(forPrefix)}.values()
+            remoteRefs = {c.url: c for c in candidates if c.text.startswith(forPrefix)}.values()
             if len(remoteRefs) == 1:
                 return remoteRefs[0]
             if zeroRefsError and (len(localRefs) or len(remoteRefs)):
