@@ -44,7 +44,7 @@ def main():
     argparser = argparse.ArgumentParser(description="Processes spec source files into valid HTML.")
     argparser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
                             help="Suppresses everything but fatal errors from printing.")
-    argparser.add_argument("-f", "--force", dest="debug", action="store_true",
+    argparser.add_argument("-f", "--force", dest="force", action="store_true",
                            help="Force the preprocessor to run to completion; fatal errors don't stop processing.")
     argparser.add_argument("-d", "--dry-run", dest="dryRun", action="store_true",
                            help="Prevents the processor from actually saving anything to disk, but otherwise fully runs.")
@@ -148,7 +148,7 @@ def main():
     options, extras = argparser.parse_known_args()
 
     config.quiet = options.quiet
-    config.debug = options.debug
+    config.force = options.force
     config.dryRun = options.dryRun
     config.minify = getattr(options, 'minify', True)
 
@@ -160,7 +160,7 @@ def main():
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "debug":
-        config.debug = True
+        config.force = True
         config.quiet = True
         if options.printExports:
             doc = CSSSpec(inputFilename=options.infile)
@@ -186,7 +186,7 @@ def main():
                 ref['level'] = str(ref['level'])
             print json.dumps(refs, indent=2)
     elif options.subparserName == "refs":
-        config.debug = True
+        config.force = True
         config.quiet = True
         doc = CSSSpec(inputFilename=options.infile)
         doc.preprocess()
@@ -209,7 +209,7 @@ def main():
         if options.rebaseFiles is not None:
             test.rebase(options.rebaseFiles)
         else:
-            config.debug = True
+            config.force = True
             config.quiet = True
             result = test.runAllTests(constructor=CSSSpec)
             sys.exit(0 if result else 1)

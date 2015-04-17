@@ -12,7 +12,7 @@ def die(msg, *formatArgs, **namedArgs):
     if msg not in messages:
         messages.add(msg)
         print msg
-    if not config.debug:
+    if not config.force:
         sys.exit(1)
 
 def warn(msg, *formatArgs, **namedArgs):
