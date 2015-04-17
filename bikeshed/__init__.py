@@ -60,6 +60,7 @@ def main():
                             help="Path to the output file.")
     specParser.add_argument("--para", dest="paragraphMode", default="markdown",
                             help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %(default)s]")
+    specParser.add_argument("--debug", dest="debug", action="store_true", help="Switches on some debugging tools. Don't use for production!")
     minifyGroup = specParser.add_argument_group("Minification")
     specParser.set_defaults(minify=True)
     minifyGroup.add_argument("--minify", dest="minify", action="store_true",
@@ -154,7 +155,7 @@ def main():
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
-        doc = CSSSpec(inputFilename=options.infile, paragraphMode=options.paragraphMode)
+        doc = CSSSpec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug)
         doc.md.addOverrides(extras)
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
@@ -974,7 +975,8 @@ def markupIDL(doc):
         if el.get("data-no-idl") is not None:
             continue
         widl = parser.Parser(textContent(el), IDLUI())
-        text = unicode(widl.markup(IDLMarker()))
+        marker = DebugMarker() if doc.debug else IDLMarker()
+        text = unicode(widl.markup(marker))
         replaceContents(el, parseHTML(text))
 
 
@@ -1196,7 +1198,7 @@ def finalHackyCleanup(text):
 
 class CSSSpec(object):
 
-    def __init__(self, inputFilename, paragraphMode="markdown"):
+    def __init__(self, inputFilename, paragraphMode="markdown", debug=False):
         # internal state
         self.normativeRefs = {}
         self.informativeRefs = {}
@@ -1205,6 +1207,7 @@ class CSSSpec(object):
         self.md = metadata.MetadataManager(doc=self)
         self.biblios = {}
         self.paragraphMode = "markdown"
+        self.debug = debug
         self.inputSource = None
         self.macros = defaultdict(lambda x: "???")
 
