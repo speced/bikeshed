@@ -585,6 +585,9 @@ def classifyDfns(doc, dfns):
                 pass
             elif dfnType == "interface":
                 pass
+            elif dfnType == "attribute" and primaryDfnText.startswith("[["):
+                # Slots get their identifying [] stripped from their ID, so gotta dedup them some other way.
+                id = simplifyText("dom-{_for}-{id}-slot".format(_for=singleFor, id=id))
             elif dfnType in config.idlTypes.intersection(config.typesUsingFor):
                 id = simplifyText("dom-{_for}-{id}".format(_for=singleFor, id=id))
             elif dfnType in config.typesUsingFor:
