@@ -1088,9 +1088,9 @@ def addSyntaxHighlighting(doc):
 def cleanupHTML(doc):
     # Cleanup done immediately before serialization.
 
-    # Move any stray <link>, <script>, <meta>, or <style> into the <head>.
+    # Move any stray <link>, <meta>, or <style> into the <head>.
     head = find("head", doc)
-    for el in findAll("body link, body script, body meta, body style:not([scoped])", doc):
+    for el in findAll("body link, body meta, body style:not([scoped])", doc):
         head.append(el)
 
     # If we accidentally recognized an autolink shortcut in SVG, kill it.
