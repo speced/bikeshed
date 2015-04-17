@@ -1014,6 +1014,65 @@ class ExtendedAttributeIdent(Construct):    # identifier "=" identifier
         return ('[ExtendedAttributeIdent: ' + self.attribute.encode('ascii', 'replace') + ' [value: ' + self.value + ']]')
 
 
+class ExtendedAttributeIdentList(Construct):    # identifier "=" "(" identifier [Identifiers] ")"
+    @classmethod
+    def peek(cls, tokens):
+        token = tokens.pushPosition()
+        if (token and token.isIdentifier()):
+            if (Symbol.peek(tokens, '=')):
+                if (Symbol.peek(tokens, '(')):
+                    token = tokens.peek()
+                    if (token and token.isIdentifier()):
+                        Identifiers.peek(tokens)
+                        if (Symbol.peek(tokens, ')')):
+                            token = tokens.sneakPeek()
+                            return tokens.popPosition((not token) or token.isSymbol((',', ']')))
+        return tokens.popPosition(False)
+    
+    def __init__(self, tokens, parent):
+        Construct.__init__(self, tokens, parent, False)
+        self.attribute = tokens.next().text
+        self._equals = Symbol(tokens, '=')
+        self._openParen = Symbol(tokens, '(')
+        self.value = tokens.next().text
+        self.next = Identifiers(tokens) if (Identifiers.peek(tokens)) else None
+        self._closeParen = Symbol(tokens, ')')
+        self._didParse(tokens)
+    
+    @property
+    def idlType(self):
+        return 'constructor' if ('NamedConstructor' == self.attribute) else 'extended-attribute'
+    
+    @property
+    def name(self):
+        return self.value if ('constructor' == self.idlType) else self.attribute
+    
+    @property
+    def normalName(self):
+        return (self.value + '()') if ('constructor' == self.idlType) else self.attribute
+    
+    def _unicode(self):
+        return (self.attribute + unicode(self._equals) + unicode(self._openParen) + self.value +
+                (unicode(self.next) if (self.next) else '') + unicode(self._closeParen))
+    
+    def _markup(self, generator):
+        generator.addName(self.attribute)
+        generator.addText(self._equals)
+        generator.addText(self._openParen)
+        generator.addTypeName(self.value)
+        next = self.next
+        while (next):
+            generator.addText(next._comma)
+            generator.addTypeName(next.name)
+            next = next.next
+        generator.addText(self._closeParen)
+        return self
+    
+    def __repr__(self):
+        return ('[ExtendedAttributeIdentList: ' + self.attribute.encode('ascii', 'replace') + ' [value: ' + self.value + ']' +
+                (repr(self.next) if (self.next) else '') + ']')
+
+
 class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" [ArgumentList] ")"
     @classmethod
     def peek(cls, tokens):
@@ -1124,13 +1183,14 @@ class ExtendedAttributeTypePair(Construct): # identifier "(" Type "," Type ")"
 
 class ExtendedAttribute(Construct): # ExtendedAttributeNoArgs | ExtendedAttributeArgList |
                                     # ExtendedAttributeIdent | ExtendedAttributeNamedArgList |
-                                    # ExtendedAttributeTypePair
+                                    # ExtendedAttributeIdentList | ExtendedAttributeTypePair
     @classmethod
     def peek(cls, tokens):
         return (ExtendedAttributeNamedArgList.peek(tokens) or
                 ExtendedAttributeArgList.peek(tokens) or
                 ExtendedAttributeNoArgs.peek(tokens) or
                 ExtendedAttributeTypePair.peek(tokens) or
+                ExtendedAttributeIdentList(tokens) or
                 ExtendedAttributeIdent.peek(tokens))
     
     def __init__(self, tokens, parent):
@@ -1143,6 +1203,8 @@ class ExtendedAttribute(Construct): # ExtendedAttributeNoArgs | ExtendedAttribut
             self.attribute = ExtendedAttributeNoArgs(tokens, parent)
         elif (ExtendedAttributeTypePair.peek(tokens)):
             self.attribute = ExtendedAttributeTypePair(tokens, parent)
+        elif (ExtendedAttributeIdentList.peek(tokens)):
+            self.attribute = ExtendedAttributeIdentList(tokens, parent)
         elif (ExtendedAttributeIdent.peek(tokens)):
             self.attribute = ExtendedAttributeIdent(tokens, parent)
         else:
