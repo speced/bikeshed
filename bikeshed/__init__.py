@@ -427,6 +427,9 @@ def fillAttributeInfoSpans(doc):
         else:
             continue
         spanFor = determineDfnText(dfn).split('|')[0]
+        # Internal slots (denoted by [[foo]] naming scheme) don't have attribute info
+        if spanFor.startswith("[["):
+            continue
         if dfn.get("data-dfn-for"):
             spanFor = dfn.get("data-dfn-for") + "/" + spanFor
         insertAfter(dfn,
