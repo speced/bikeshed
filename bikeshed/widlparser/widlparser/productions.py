@@ -1152,6 +1152,18 @@ class ChildProduction(Production):
     def normalName(self):
         return self.name
 
+    @property
+    def methodName(self):
+        return None
+    
+    @property
+    def methodNames(self):
+        return []
+    
+    @property
+    def normalName(self):
+        return self.methodName if (self.methodName) else self.name
+
 
 class Attribute(ChildProduction):   # ["inherit"] AttributeRest
     @classmethod
@@ -1181,14 +1193,6 @@ class Attribute(ChildProduction):   # ["inherit"] AttributeRest
     @property
     def arguments(self):
         return None
-    
-    @property
-    def methodName(self):
-        return None
-    
-    @property
-    def methodNames(self):
-        return []
     
     def _unicode(self):
         output = unicode(self.inherit) if (self.inherit) else ''
@@ -1305,14 +1309,6 @@ class Iterable(ChildProduction):     # "iterable" "<" Type ["," Type] ">" ";" | 
     def arguments(self):
         return None
     
-    @property
-    def methodName(self):
-        return None
-    
-    @property
-    def methodNames(self):
-        return []
-    
     def _unicode(self):
         output = unicode(self._iterable) + unicode(self._openType)
         if (self.type):
@@ -1379,14 +1375,6 @@ class Maplike(ChildProduction):      # ["readonly"] "maplike" "<" Type "," Type 
     def arguments(self):
         return None
     
-    @property
-    def methodName(self):
-        return None
-    
-    @property
-    def methodNames(self):
-        return []
-    
     def _unicode(self):
         output = unicode(self.readonly) if (self.readonly) else ''
         output += unicode(self._maplike) + unicode(self._openType) + unicode(self.keyType) + unicode(self._comma)
@@ -1441,14 +1429,6 @@ class Setlike(ChildProduction):      # ["readonly"] "setlike" "<" Type ">" ";"
     @property
     def arguments(self):
         return None
-    
-    @property
-    def methodName(self):
-        return None
-    
-    @property
-    def methodNames(self):
-        return []
     
     def _unicode(self):
         output = unicode(self.readonly) if (self.readonly) else ''

@@ -220,7 +220,7 @@ callback interface callMe {
     inherit attribute short round setraises (for the heck of it);
 };
 
-dictionary MyDictionary {
+[Exposed=(Window, Worker)] dictionary MyDictionary {
     any value = null;
     any[] value = null;
     any [] value = null;
