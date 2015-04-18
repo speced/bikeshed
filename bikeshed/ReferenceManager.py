@@ -22,7 +22,6 @@ class ReferenceManager(object):
         self.refs = defaultdict(list)
         self.specs = dict()
         self.defaultSpecs = defaultdict(list)
-        self.css21Replacements = set()
         self.ignoredSpecs = set()
         self.replacedSpecs = set()
         self.status = specStatus
@@ -239,7 +238,7 @@ class ReferenceManager(object):
         if (not spec or not status):
             variedTexts = [v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs]
             if variedTexts:
-                for dfnSpec, dfnType, dfnStatus, dfnFor in self.defaultSpecs[variedTexts[0]]:
+                for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(self.defaultSpecs[variedTexts[0]]):
                     if dfnType in config.linkTypeToDfnType[linkType]:
                         spec = spec or dfnSpec
                         status = status or dfnStatus
@@ -480,18 +479,6 @@ class ReferenceManager(object):
             for oldSpec, newSpec in self.replacedSpecs:
                 if newSpec in possibleSpecs:
                     moreIgnores.add(oldSpec)
-            # All the individual CSS specs replace SVG.
-            if bool(possibleSpecs.intersection(self.css21Replacements)):
-                moreIgnores.add("css21")
-                moreIgnores.add("svg")
-                moreIgnores.add("svg2")
-            # CSS21 also replaces SVG
-            if "css21" in possibleSpecs:
-                moreIgnores.add("svg")
-                moreIgnores.add("svg2")
-            # SVG2 replaces SVG1
-            if "svg2" in possibleSpecs:
-                moreIgnores.add("svg")
             refs = [ref for ref in refs if ref.spec not in self.ignoredSpecs and ref.spec not in moreIgnores]
         if not refs:
             return refs, "ignored-specs"
