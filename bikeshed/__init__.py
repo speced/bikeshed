@@ -431,7 +431,7 @@ def fillAttributeInfoSpans(doc):
             attrName = "data-dict-member-info"
         else:
             continue
-        spanFor = determineDfnText(dfn).split('|')[0]
+        spanFor = linkTextsFromElement(dfn)[0]
         # Internal slots (denoted by [[foo]] naming scheme) don't have attribute info
         if spanFor.startswith("[["):
             continue
@@ -531,22 +531,10 @@ def determineDfnType(dfn):
     else:
         return "dfn"
 
-def determineDfnText(el):
-    dfnType = el.get('data-dfn-type')
-    contents = textContent(el)
-    if el.get('data-lt'):
-        dfnText = el.get('data-lt')
-    elif dfnType in config.functionishTypes and re.match(r"^[\w-]+\(.*\)$", contents):
-        dfnText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1)+"()"
-    else:
-        dfnText = contents
-    return dfnText
-
 def classifyDfns(doc, dfns):
     dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
     for el in dfns:
         dfnType = determineDfnType(el)
-        # TODO Why am I using linkTextsFromElement here, but determineDfnText further down?
         dfnTexts = linkTextsFromElement(el)
         dfnFor = treeAttr(el, "data-dfn-for")
         if len(dfnTexts):
@@ -563,14 +551,21 @@ def classifyDfns(doc, dfns):
                 die("Functions/methods must end with () in their linking text, got '{0}'.", primaryDfnText)
                 continue
             elif el.get('data-lt') is None:
-                # Make sure that functionish dfns have their linking text set up right.
-                # Need to fix this to use the idl parser instead.
-                el.set('data-lt', re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1)+"()")
+                if dfnType == "function":
+                    # CSS function, define it with no args in the text
+                    el.set('data-lt', re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1)+"()")
+                elif dfnType in config.idlTypes:
+                    # IDL methodish construct, ask the widlparser what it should have.
+                    # If the method isn't in any IDL, this tries its best to normalize it anyway.
+                    el.set('data-lt', "|".join(doc.widl.normalizedMethodNames(primaryDfnText, el.get('data-dfn-for'))))
+                else:
+                    die("BIKESHED ERROR: Unhandled functionish type '{0}' in classifyDfns. Please report this to Bikeshed's maintainer.", dfnType)
         # If type=argument, try to infer what it's for.
         if dfnType == "argument" and el.get('data-dfn-for') is None:
             parent = el.getparent()
-            if parent.get('data-dfn-type') in config.functionishTypes and parent.get('data-dfn-for') is not None:
-                el.set('data-dfn-for', "{0}/{1} {1}".format(parent.get('data-dfn-for'), linkTextsFromElement(parent)[0]))
+            parentFor = parent.get('data-dfn-for')
+            if parent.get('data-dfn-type') in config.functionishTypes and parentFor is not None:
+                dfnFor = ", ".join(parentFor+"/"+name for name in doc.widl.normalizedMethodNames(textContent(parent), parentFor))
             elif treeAttr(el, "data-dfn-for") is None:
                 die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el))
                 continue
@@ -582,7 +577,7 @@ def classifyDfns(doc, dfns):
         # Automatically fill in id if necessary.
         if el.get('id') is None:
             convertDashes = dfnType == "dfn"
-            id = simplifyText(determineDfnText(el).split('|')[0], convertDashes=convertDashes)
+            id = simplifyText(primaryDfnText, convertDashes=convertDashes)
             if dfnFor:
                 singleFor = splitForValues(dfnFor)[0]
             if dfnType == "dfn":
@@ -987,10 +982,15 @@ def markupIDL(doc):
     for el in findAll("pre.idl", doc):
         if el.get("data-no-idl") is not None:
             continue
-        widl = parser.Parser(textContent(el), IDLUI())
+        text = textContent(el)
+        # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
+        # Parse a second time with the global one, which collects all data in the doc.
+        widl = parser.Parser(text, IDLUI())
+        doc.widl.parse(text)
         marker = DebugMarker() if doc.debug else IDLMarker()
         text = unicode(widl.markup(marker))
         replaceContents(el, parseHTML(text))
+
 
 
 def processIDL(doc):
@@ -1225,6 +1225,7 @@ class CSSSpec(object):
         self.debug = debug
         self.inputSource = None
         self.macros = defaultdict(lambda x: "???")
+        self.widl = parser.Parser(ui=IDLUI())
 
         if inputFilename is None:
             # Default to looking for a *.bs file.
