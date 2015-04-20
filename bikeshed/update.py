@@ -58,13 +58,25 @@ def updateCrossRefs():
     for rawSpec in rawSpecData.values():
         spec = {
             'vshortname': rawSpec['name'],
+            'shortname': rawSpec.get('short_name'),
             'TR': rawSpec.get('base_uri'),
             'ED': rawSpec.get('draft_uri'),
             'title': rawSpec.get('title'),
             'description': rawSpec.get('description')
         }
-        match = re.match("(.*)-(\d+)", rawSpec['name'])
-        if match:
+        if spec['shortname'] is not None and spec['vshortname'].startswith(spec['shortname']):
+            # S = "foo", V = "foo-3"
+            # Strip the prefix
+            level = spec['vshortname'][len(spec['shortname']):]
+            if level.startswith("-"):
+                level = level[1:]
+            if level.isdigit():
+                spec['level'] = int(level)
+            else:
+                spec['level'] = 1
+        elif spec['shortname'] is None and re.match(r"(.*)-(\d+)", spec['vshortname']):
+            # S = None, V = "foo-3"
+            match = re.match(r"(.*)-(\d+)", spec['vshortname'])
             spec['shortname'] = match.group(1)
             spec['level'] = int(match.group(2))
         else:

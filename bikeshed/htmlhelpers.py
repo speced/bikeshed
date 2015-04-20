@@ -333,7 +333,7 @@ def isElement(node):
     return etree.iselement(node) and isinstance(node.tag, basestring)
 
 def isOpaqueElement(el):
-    return el.tag in ('pre', 'code', 'style', 'script')
+    return el.tag in ('pre', 'style', 'script')
 
 def fixTypography(text):
     # Replace straight aposes with curly quotes for possessives and contractions.
