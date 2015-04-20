@@ -419,9 +419,10 @@ class ReferenceManager(object):
             if exact:
                 refs = list(textRefsIterator(refs, [text]))
             else:
-                refs = list(textRefsIterator(refs, linkTextVariations(text, linkType)))
+                refsList = list(textRefsIterator(refs, linkTextVariations(text, linkType)))
                 if (linkType is None or linkType in config.lowercaseTypes) and text.lower() != text:
-                    refs += list(textRefsIterator(refs, linkTextVariations(text.lower(), linkType)))
+                    refsList += list(textRefsIterator(refs, linkTextVariations(text.lower(), linkType)))
+                refs = refsList
         else:
             refs = list(refsIterator(refs))
         if not refs:
