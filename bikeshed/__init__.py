@@ -1908,10 +1908,15 @@ def addIndexOfExternallyDefinedTerms(doc, container):
 
     ul = E.ul({"class": "indexlist"})
     for spec, refs in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0]):
+        # ref.spec is always lowercase; if the same string shows up in biblio data,
+        # use its casing instead.
+        biblioRef = doc.refs.getBiblioRef(spec, status="normative")
+        if biblioRef:
+            printableSpec = biblioRef.linkText
         attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"normative", "data-okay-to-fail": "true"}
         specLi = appendChild(ul,
             E.li(
-                E.a(attrs, "[", spec, "]"), " defines the following terms:"))
+                E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"))
         termsUl = appendChild(specLi, E.ul())
         for title, ref in sorted(refs.items(), key=lambda x:x[0]):
             appendChild(termsUl, E.li(E.a({"href":ref.url}, title)))
