@@ -1916,6 +1916,8 @@ def addIndexOfExternallyDefinedTerms(doc, container):
         biblioRef = doc.refs.getBiblioRef(spec, status="normative")
         if biblioRef:
             printableSpec = biblioRef.linkText
+        else:
+            printableSpec = spec
         attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"normative", "data-okay-to-fail": "true"}
         specLi = appendChild(ul,
             E.li(
