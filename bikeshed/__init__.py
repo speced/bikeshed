@@ -553,11 +553,14 @@ def classifyDfns(doc, dfns):
             elif el.get('data-lt') is None:
                 if dfnType == "function":
                     # CSS function, define it with no args in the text
-                    el.set('data-lt', re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1)+"()")
+                    primaryDfnText = re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1)+"()"
+                    el.set('data-lt', primaryDfnText)
                 elif dfnType in config.idlTypes:
                     # IDL methodish construct, ask the widlparser what it should have.
                     # If the method isn't in any IDL, this tries its best to normalize it anyway.
-                    el.set('data-lt', "|".join(doc.widl.normalizedMethodNames(primaryDfnText, el.get('data-dfn-for'))))
+                    names = doc.widl.normalizedMethodNames(primaryDfnText, el.get('data-dfn-for'))
+                    primaryDfnText = names[0]
+                    el.set('data-lt', "|".join(names))
                 else:
                     die("BIKESHED ERROR: Unhandled functionish type '{0}' in classifyDfns. Please report this to Bikeshed's maintainer.", dfnType)
         # If type=argument, try to infer what it's for.
