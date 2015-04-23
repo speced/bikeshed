@@ -342,7 +342,7 @@ def convertWarning(key, val):
     match = re.match(r"New Version +(.+)", val, re.I)
     if match:
         return "warning-new-version", match.group(1)
-    die('Unknown value for "{0}" metadata.', key)
+    die('Unknown value "{1}" for "{0}" metadata.', key, val)
 
 def parseEditor(key, val):
     match = re.match(r"([^,]+) ,\s* ([^,]*) ,?\s* ([^,]*) ,?\s* ([^,]*)", val, re.X)
