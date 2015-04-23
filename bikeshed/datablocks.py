@@ -357,6 +357,7 @@ def processAnchors(anchors, doc):
             "linkingText": anchor['text'][0],
             "type": anchor['type'][0],
             "url": url,
+            "shortname": doc.md.vshortname,
             "for": anchor.get('for', []),
             "export": True,
             "status": "local",

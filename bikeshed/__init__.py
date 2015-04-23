@@ -1256,8 +1256,6 @@ class CSSSpec(object):
             die("Couldn't open the input file '{0}'.", inputFilename)
             return
 
-        self.refs.initializeRefs(self);
-        self.refs.initializeBiblio();
         self.testSuites = json.loads(config.retrieveCachedFile("test-suites.json", quiet=True, str=True))
         self.paragraphMode = paragraphMode
 
@@ -1270,6 +1268,10 @@ class CSSSpec(object):
         self.loadDefaultMetadata()
         self.md.finish()
         self.md.fillTextMacros(self.macros, doc=self)
+
+        # Initialize things
+        self.refs.initializeRefs(self);
+        self.refs.initializeBiblio();
 
         # Deal with further <pre> blocks, and markdown
         transformDataBlocks(self)
