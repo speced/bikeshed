@@ -342,7 +342,13 @@ def convertWarning(key, val):
     match = re.match(r"New Version +(.+)", val, re.I)
     if match:
         return "warning-new-version", match.group(1)
-    die('Unknown value "{1}" for "{0}" metadata.', key, val)
+    die('''Unknown value "{1}" for "{0}" metadata. Expected one of:
+  obsolete
+  not ready
+  replaced by [new url]
+  new version [new url]
+  commit [snapshot id] [snapshot url] replaced by [master url]
+  branch [branch name] [branch url] replaced by [master url]''', key, val)
 
 def parseEditor(key, val):
     match = re.match(r"([^,]+) ,\s* ([^,]*) ,?\s* ([^,]*) ,?\s* ([^,]*)", val, re.X)
