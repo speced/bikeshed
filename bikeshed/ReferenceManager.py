@@ -124,14 +124,9 @@ class ReferenceManager(object):
 
     def setSpecData(self, md):
         self.status = md.status
-
         self.specName = md.shortname
-        if md.level is not None:
-            self.specLevel = md.level
-            self.specVName = "{0}-{1}".format(md.shortname, md.level)
-        else:
-            self.specLevel = 1
-            self.specVName = self.specName
+        self.specLevel = md.level
+        self.specVName = md.vshortname
 
         for term, defaults in md.linkDefaults.items():
             for default in defaults:
