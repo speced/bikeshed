@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import re
+import copy
 from collections import defaultdict, deque
 from .messages import *
 from .htmlhelpers import *
@@ -206,9 +207,16 @@ def processSpecrefBiblioFile(text, storage, order):
     # Required BiblioEntry fields
     requiredFields = ["url", "title"]
 
+    aliases = {}
     for biblioKey, data in datas.items():
         if isinstance(data, basestring):
             # Need to handle the preformatted string entries eventually
+            continue
+        if "aliasOf" in data:
+            if biblioKey.lower() != data["aliasOf"].lower():
+                # SpecRef uses aliases to handle capitalization differences,
+                # which I don't care about.
+                aliases[biblioKey] = data["aliasOf"]
             continue
         biblio = {"linkText": biblioKey, "order": order}
         for jsonField, biblioField in fields.items():
@@ -218,6 +226,13 @@ def processSpecrefBiblioFile(text, storage, order):
             # Aliases should hit this case, I'll deal with them later
             continue
         storage[biblioKey.lower()].append(biblio)
+    for biblioKey, aliasOf in aliases.items():
+        aliasedBiblios = storage.get(aliasOf.lower(), [])
+        for aliasedBiblio in aliasedBiblios:
+            copiedBiblio = copy.copy(aliasedBiblio)
+            copiedBiblio['linkText'] = biblioKey
+            storage[biblioKey.lower()].append(copiedBiblio)
+
     return storage
 
 
