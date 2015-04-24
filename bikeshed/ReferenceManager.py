@@ -140,7 +140,7 @@ class ReferenceManager(object):
         # Kill all the non-local anchors with the same shortname as the current spec,
         # so you don't end up accidentally linking to something that's been removed from the local copy.
         for term, refs in self.refs.items():
-            self.refs[term] = [ref for ref in refs if ref.get('shortname', '').rstrip("\n")!=self.specName]
+            self.refs[term] = [ref for ref in refs if ref['shortname'].rstrip("\n")!=self.specName or ref['status']=="local"]
             # TODO: OMIGOD WHY AM I DOING THIS FOR EVERY SINGLE REF EVER AT LEAST SEARCH FIRST
             # Or maybe just move this functionality into addLocalDfns, ffs
             # This damned thing is a whole 1.25% of runtime
