@@ -640,13 +640,13 @@ def dedupIds(doc, els):
 def determineLinkType(el):
     # 1. Look at data-link-type
     linkType = treeAttr(el, 'data-link-type')
-    text = textContent(el)
     if linkType:
         if linkType in config.linkTypes.union(["dfn"]):
             return linkType
         die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
         return "unknown-type"
     # 2. Introspect on the text
+    text = textContent(el)
     if config.typeRe["at-rule"].match(text):
         return "at-rule"
     elif config.typeRe["type"].match(text):
