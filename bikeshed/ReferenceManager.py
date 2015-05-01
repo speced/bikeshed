@@ -225,8 +225,6 @@ class ReferenceManager(object):
                      text,
                      localRefs[0].type,
                      "' or '".join(localRefs[0].for_))
-                if text == "encoding":
-                    warn("{0}", config.printjson(localRefs))
             return localRefs[0]
 
         # Take defaults into account
