@@ -1636,11 +1636,11 @@ class CSSSpec(object):
 
     def printTargets(self):
         print "Exported terms:"
-        for el in findAll("dfn[data-export]", doc):
+        for el in findAll("dfn[data-export]", self):
             for term in  linkTextsFromElement(el):
                 print "  ", term
         print "Unexported terms:"
-        for el in findAll("dfn[data-noexport]", doc):
+        for el in findAll("dfn[data-noexport]", self):
             for term in  linkTextsFromElement(el):
                 print "  ", term
 
