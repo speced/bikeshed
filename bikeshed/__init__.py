@@ -380,7 +380,7 @@ def canonicalizeShortcuts(doc):
                 el.set("data-dfn-type", dfnType)
                 break
     for el in findAll("a", doc):
-        for linkType in (config.linkTypes | set("dfn")):
+        for linkType in config.linkTypes.union(["dfn"]):
             if el.get(linkType) is not None:
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
