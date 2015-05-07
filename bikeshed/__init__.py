@@ -263,18 +263,13 @@ def resetHeadings(doc, headings):
         appendChild(header, content)
 
 def addHeadingIds(doc, headings):
-    neededIds = set()
     for header in headings:
         if header.get('id') is None:
-            neededIds.add(header)
             header.set('id', simplifyText(textContent(find(".content", header)), convertDashes=True))
         if header.get("oldids"):
             oldIDs = [h.strip() for h in header.get("oldids").strip().split(",")]
             for oldID in oldIDs:
                 appendChild(header, E.span({"id":oldID}))
-    if len(neededIds) > 0:
-        warn("You should manually provide IDs for your headings:\n{0}",
-            "\n".join("  "+outerHTML(el) for el in neededIds))
 
 def determineHeadingLevels(doc, headings):
     headerLevel = [0,0,0,0,0]
