@@ -20,6 +20,7 @@ However, to obtain correct boilerplate for a given standards body,
 Several groups are already accommodated with appropriate inclusion files:
 
 * "csswg", as mentioned.
+* “dap”, for the Device APIs Working Group
 * "fxtf", for the FX Task Force
 * "svg", for the SVG Working Group
 * "webappsec", for the WebApps Security Working Group
