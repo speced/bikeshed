@@ -380,7 +380,7 @@ def canonicalizeShortcuts(doc):
                 el.set("data-dfn-type", dfnType)
                 break
     for el in findAll("a", doc):
-        for linkType in (config.linkTypes | set("dfn")):
+        for linkType in config.linkTypes.union(["dfn"]):
             if el.get(linkType) is not None:
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
@@ -640,13 +640,13 @@ def dedupIds(doc, els):
 def determineLinkType(el):
     # 1. Look at data-link-type
     linkType = treeAttr(el, 'data-link-type')
-    text = textContent(el)
     if linkType:
         if linkType in config.linkTypes.union(["dfn"]):
             return linkType
         die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
         return "unknown-type"
     # 2. Introspect on the text
+    text = textContent(el)
     if config.typeRe["at-rule"].match(text):
         return "at-rule"
     elif config.typeRe["type"].match(text):
@@ -1636,11 +1636,11 @@ class CSSSpec(object):
 
     def printTargets(self):
         print "Exported terms:"
-        for el in findAll("dfn[data-export]", doc):
+        for el in findAll("dfn[data-export]", self):
             for term in  linkTextsFromElement(el):
                 print "  ", term
         print "Unexported terms:"
-        for el in findAll("dfn[data-noexport]", doc):
+        for el in findAll("dfn[data-noexport]", self):
             for term in  linkTextsFromElement(el):
                 print "  ", term
 

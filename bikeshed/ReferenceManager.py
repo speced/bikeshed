@@ -225,8 +225,6 @@ class ReferenceManager(object):
                      text,
                      localRefs[0].type,
                      "' or '".join(localRefs[0].for_))
-                if text == "encoding":
-                    warn("{0}", config.printjson(localRefs))
             return localRefs[0]
 
         # Take defaults into account
@@ -249,18 +247,34 @@ class ReferenceManager(object):
 
         if failure and linkType in config.idlMethodTypes and text.endswith("()"):
             # Allow foo(bar) to be linked to with just foo(), but only if it's completely unambiguous.
+            def multipleEmptyArgMethodRefs(refs, text):
+                # If there's a single ref, we're good.
+                if len(refs) == 1:
+                    return refs[0]
+                # If there's none, we might find more elsewhere
+                if len(refs) == 0:
+                    return None
+                # Otherwise, there's more than one ref.
+                # Need to distinguish between multiple overloads for the same method
+                # and multiple methods for different interfaces.
+                forValue = refs[0].for_
+                if all(ref.for_ == forValue for ref in refs):
+                    die("Too many possible '{0}' targets to disambiguate. Please specify the names of the required args, like 'foo(bar, baz)'.", text)
+                    return None
+                die("Multiple interfaces have the method '{0}'. Please specify the interface this is for.", text)
+                return None
             textPrefix = text[:-1]
             candidates, _ = self.queryRefs(linkType=linkType, status="local", linkFor=linkFor)
             candidateRefs = {c.url: c for c in candidates if c.text.startswith(textPrefix)}.values()
-            if len(candidateRefs) == 1:
-                return candidateRefs[0]
+            candidateRef = multipleEmptyArgMethodRefs(candidateRefs, text)
+            if candidateRef:
+                return candidateRef
             # And repeat for non-locals
             candidates, _ = self.queryRefs(linkType=linkType, spec=spec, status=status, linkFor=linkFor, export=export, ignoreObsoletes=True)
             candidateRefs = {c.url: c for c in candidates if c.text.startswith(textPrefix)}.values()
-            if len(candidateRefs) == 1:
-                return candidateRefs[0]
-            if len(candidateRefs) > 1 and zeroRefsError:
-                die("Too many possible '{0}' targets to disambiguate. Please specify the names of the required args, like 'foo(bar, baz)'.", text)
+            candidateRef = multipleEmptyArgMethodRefs(candidateRefs, text)
+            if candidateRef:
+                return candidateRef
 
         if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
             # Allow foo(bar) to be for'd to with just foo() if it's completely unambiguous.
