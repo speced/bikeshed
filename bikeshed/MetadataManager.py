@@ -253,8 +253,10 @@ class MetadataManager:
         if self.h1:
             macros["spectitle"] = self.h1
         macros["shortname"] = self.shortname
-        if self.status:
+        if self.statusText:
             macros["statustext"] = self.statusText
+        else:
+
         macros["vshortname"] = self.vshortname
         if self.status in config.shortToLongStatus:
             macros["longstatus"] = config.shortToLongStatus[self.status]
