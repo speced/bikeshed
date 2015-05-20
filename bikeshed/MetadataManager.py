@@ -254,10 +254,10 @@ class MetadataManager:
         macros["shortname"] = self.shortname
         if self.statusText:
             macros["statustext"] = self.statusText
-        else:
-
         macros["vshortname"] = self.vshortname
-        if self.status in config.shortToLongStatus:
+        if self.status == "FINDING" and self.group:
+            macros["longstatus"] = "Finding of the {0}".format(self.group)
+        elif self.status in config.shortToLongStatus:
             macros["longstatus"] = config.shortToLongStatus[self.status]
         else:
             die("Unknown status '{0}' used.", self.status)
@@ -292,11 +292,12 @@ class MetadataManager:
         macros["logo"] = self.logo
         # get GH repo from remote
         macros["repository"] = getSpecRepository(doc)
-        # W3C stylesheets are *mostly* of the form W3C-[status], except for *one*. Ugh.
         if self.status == "UD":
             macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/w3c-unofficial"
         elif self.status == "FPWD":
             macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/W3C-WD"
+        elif self.status == "FINDING":
+            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/W3C-NOTE"
         else:
             macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/W3C-{0}".format(self.status)
         # Custom macros
