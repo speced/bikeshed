@@ -254,6 +254,8 @@ class MetadataManager:
         macros["shortname"] = self.shortname
         if self.statusText:
             macros["statustext"] = self.statusText
+        else:
+            macros["statustext"] = ""
         macros["vshortname"] = self.vshortname
         if self.status == "FINDING" and self.group:
             macros["longstatus"] = "Finding of the {0}".format(self.group)
