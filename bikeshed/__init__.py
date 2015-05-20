@@ -1651,7 +1651,7 @@ class CSSSpec(object):
         # If that fails, grabs the most general file.
         # Filenames must be of the format NAME-GROUP-STATUS.include
         if group is None:
-            group = self.md.group
+            group = self.md.group.lower()
         if status is None:
             status = self.md.status
 

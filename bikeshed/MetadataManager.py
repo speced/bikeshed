@@ -118,7 +118,6 @@ class MetadataManager:
         # Input transformers, passed the key and string value.
         # The "default" input is a no-op that just returns the input string.
         self.customInput = {
-            "Group": convertGroup,
             "Date": parseDate,
             "Deadline": parseDate,
             "Level": parseLevel,
@@ -303,10 +302,6 @@ class MetadataManager:
         # Custom macros
         for name, text in self.customTextMacros:
             macros[name.lower()] = text
-
-
-def convertGroup(key, val):
-    return val.lower()
 
 def parseDate(key, val):
     try:
