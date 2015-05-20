@@ -2155,7 +2155,7 @@ def addSpecMetadataSection(doc):
         md["Version History"] = [E.a({"href":vh}, vh) for vh in doc.md.versionHistory]
     if doc.md.mailingList:
         span = E.span(
-            E.a({"href":"mailto:"+doc.md.mailingList+"?subject=%5B"+mac['shortname']+"%5D%20feedback"}, doc.md.mailingList),
+            E.a({"href":"mailto:"+doc.md.mailingList+"?subject=%5B"+mac['shortname']+"%5D%20YOUR%20TOPIC%20HERE"}, doc.md.mailingList),
             " with subject line “",
             E.kbd(
                 "[",
