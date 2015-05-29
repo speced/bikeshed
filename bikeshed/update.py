@@ -111,6 +111,18 @@ def updateCrossRefs():
                 text = re.sub(r'\s+', ' ', text)
                 anchors[text].append(anchor)
 
+    methods = defaultdict(list)
+    for key, anchors_ in anchors.items():
+        # Extract just the name, ignoring parens and arguments
+        methodName = re.match(r"[^(]+\(", key)
+        if not methodName:
+            continue
+        methodName = methodName.group(0) + ")"
+        for anchor in anchors_:
+            if anchor['type'] not in config.functionishTypes:
+                continue
+            methods[methodName].append(anchor)
+
     if not config.dryRun:
         try:
             with io.open(config.scriptPath+"/spec-data/specs.json", 'w', encoding="utf-8") as f:
@@ -123,6 +135,12 @@ def updateCrossRefs():
                 writeAnchorsFile(f, anchors)
         except Exception, e:
             die("Couldn't save anchor database to disk.\n{0}", e)
+            return
+        try:
+            with io.open(config.scriptPath+"/spec-data/methods.data", 'w', encoding="utf-8") as f:
+                writeAnchorsFile(f, methods)
+        except Exception, e:
+            die("Couldn't save methods database to disk.\n{0}", e)
             return
     say("Success!")
 

@@ -20,6 +20,7 @@ class ReferenceManager(object):
 
     def __init__(self, specStatus=None):
         self.refs = defaultdict(list)
+        self.methods = defaultdict(list)
         self.specs = dict()
         self.defaultSpecs = defaultdict(list)
         self.ignoredSpecs = set()
@@ -32,28 +33,9 @@ class ReferenceManager(object):
         # Load up the xref data
         self.specs.update(json.loads(config.retrieveCachedFile("specs.json", quiet=True, str=True)))
         with config.retrieveCachedFile("anchors.data", quiet=True) as lines:
-            try:
-                while True:
-                    key = lines.next().decode('utf-8')
-                    a = {
-                        "type": lines.next(),
-                        "spec": lines.next(),
-                        "shortname": lines.next(),
-                        "level": lines.next(),
-                        "status": lines.next(),
-                        "url": lines.next(),
-                        "export": lines.next() != "\n",
-                        "normative": lines.next() != "\n",
-                        "for": []
-                    }
-                    while True:
-                        line = lines.next()
-                        if line == b"-\n":
-                            break
-                        a['for'].append(line)
-                    self.refs[key].append(a)
-            except StopIteration:
-                pass
+            self.refs = decodeAnchors(lines)
+        with config.retrieveCachedFile("methods.data", quiet=True) as lines:
+            self.methods = decodeAnchors(lines)
         # Get local anchor data
         try:
             with io.open("anchors.bsdata", 'r', encoding="utf-8") as lines:
@@ -637,3 +619,30 @@ def simplifyPossibleRefs(refs):
         else:
             retRefs.append({'text':text, 'type':type, 'spec':spec, 'for_':None})
     return retRefs
+
+
+def decodeAnchors(linesIter):
+    # Decodes the anchor storage format into a list of dicts
+    anchors = defaultdict(list)
+    try:
+        while True:
+            key = linesIter.next().decode('utf-8')
+            a = {
+                "type": linesIter.next(),
+                "spec": linesIter.next(),
+                "shortname": linesIter.next(),
+                "level": linesIter.next(),
+                "status": linesIter.next(),
+                "url": linesIter.next(),
+                "export": linesIter.next() != "\n",
+                "normative": linesIter.next() != "\n",
+                "for": []
+            }
+            while True:
+                line = linesIter.next()
+                if line == b"-\n":
+                    break
+                a['for'].append(line)
+            anchors[key].append(a)
+    except StopIteration:
+        return anchors
