@@ -390,7 +390,6 @@ class ReferenceManager(object):
     def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, export=None, ignoreObsoletes=False, exact=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
-        refs = self.refs
         def refsIterator(refs):
             # Turns a dict of arrays of refs into an iterator of refs
             for key, group in refs.items():
@@ -404,16 +403,19 @@ class ReferenceManager(object):
                 for ref in refs.get(text+"\n", []):
                     yield RefWrapper(text, ref)
 
+        # Set up the initial list of refs to query
         if text:
             if exact:
-                refs = list(textRefsIterator(refs, [text]))
+                refs = list(textRefsIterator(self.refs, [text]))
             else:
-                refsList = list(textRefsIterator(refs, linkTextVariations(text, linkType)))
+                textsToSearch = list(linkTextVariations(text, linkType))
+                if text.endswith("()") and text in self.methods:
+                    textsToSearch += self.methods[text]
                 if (linkType is None or linkType in config.lowercaseTypes) and text.lower() != text:
-                    refsList += list(textRefsIterator(refs, linkTextVariations(text.lower(), linkType)))
-                refs = refsList
+                    textsToSearch += [t.lower() for t in textsToSearch]
+                refs = list(textRefsIterator(self.refs, textsToSearch))
         else:
-            refs = list(refsIterator(refs))
+            refs = list(refsIterator(self.refs))
         if not refs:
             return refs, "text"
 
@@ -479,6 +481,16 @@ class ReferenceManager(object):
             tempRefs = [x for x in refs if linkForHint in x.for_]
             if tempRefs:
                 refs = tempRefs
+
+        # With non-exact texts, you might have multiple "anchors"
+        # that point to the same url. Dedup them.
+        seenUrls = set()
+        tempRefs = []
+        for ref in copy.copy(refs):
+            if ref.url not in seenUrls:
+                tempRefs.append(ref)
+                seenUrls.add(ref.url)
+        refs = tempRefs
 
         return refs, None
 
