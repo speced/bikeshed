@@ -33,8 +33,6 @@ class ReferenceManager(object):
         self.replacedSpecs = set()
         # Dict of {biblio term => biblio data}
         self.biblios = defaultdict(list)
-        # Unused; needs to be deleted
-        self.anchorMacros = dict()
         self.status = specStatus
 
     def initializeRefs(self, doc):
@@ -284,16 +282,6 @@ class ReferenceManager(object):
         if failure == "text" or failure == "type":
             if linkType in ("property", "propdesc", "descriptor") and text.startswith("--"):
                 return None
-            if spec and spec in self.anchorMacros:
-                # If there's a macro registered for this spec, use it to generate a ref.
-                return {
-                    "spec": spec,
-                    "shortname": spec,
-                    "url": anchorMacros[spec]['url'] + config.simplifyText(text),
-                    "for": linkFor,
-                    "text": text,
-                    "type": linkType
-                }
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}'.", linkType, text)
             return None
@@ -302,16 +290,6 @@ class ReferenceManager(object):
                 die("No '{0}' refs found for '{1}' that are marked for export.", linkType, text)
             return None
         elif failure == "spec":
-            # If there's a macro registered for this spec, use it to generate a ref.
-            if spec in self.anchorMacros:
-                return {
-                    "spec": spec,
-                    "shortname": spec,
-                    "url": anchorMacros[spec]['url'] + config.simplifyText(text),
-                    "for": linkFor,
-                    "text": text,
-                    "type": linkType
-                }
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec)
             return None
