@@ -259,7 +259,7 @@ class ReferenceManager(object):
                 # and multiple methods for different interfaces.
                 forValue = refs[0].for_
                 if all(ref.for_ == forValue for ref in refs):
-                    die("Too many possible '{0}' targets to disambiguate. Please specify the names of the required args, like 'foo(bar, baz)'.", text)
+                    die("'{0}' has multiple overloads, and it's not clear which to link to.\n  Please specify the names of the required args, like 'foo(bar, baz)'.", text)
                     return None
                 die("Multiple interfaces have the method '{0}'. Please specify the interface this is for.", text)
                 return None
