@@ -19,15 +19,23 @@ from .htmlhelpers import *
 class ReferenceManager(object):
 
     def __init__(self, specStatus=None):
+        # Dict of {linking text => [anchor data]}
         self.refs = defaultdict(list)
+        # Dict of {argless method signatures => [full method signatures]}
         self.methods = defaultdict(list)
+        # Dict of {spec vshortname => spec data}
         self.specs = dict()
+        # Dict of {linking text => link-defaults data}
         self.defaultSpecs = defaultdict(list)
+        # Set of spec vshortnames to remove from consideration when there are other possible anchors
         self.ignoredSpecs = set()
+        # Set of (obsolete spec vshortname, replacing spec vshortname), when both obsolete and replacing specs are possible anchors
         self.replacedSpecs = set()
-        self.status = specStatus
+        # Dict of {biblio term => biblio data}
         self.biblios = defaultdict(list)
+        # Unused; needs to be deleted
         self.anchorMacros = dict()
+        self.status = specStatus
 
     def initializeRefs(self, doc):
         # Load up the xref data
