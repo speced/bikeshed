@@ -364,6 +364,10 @@ def processAnchors(anchors, doc):
             "status": "local",
             "spec": anchor.get('spec', [''])[0]
             })
+        methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
+        if methodishStart:
+            arglessName = methodishStart.group(1)+")"
+            doc.refs.methods[arglessName].append(anchor['text'][0])
     return []
 
 def transformLinkDefaults(lines, doc, **kwargs):

@@ -140,6 +140,9 @@ class ReferenceManager(object):
                 linkText = unfixTypography(linkText)
                 linkText = re.sub("\s+", " ", linkText)
                 linkType = treeAttr(el, 'data-dfn-type')
+                if linkType not in config.dfnTypes.union(["dfn"]):
+                    die("Unknown local dfn type '{0}':\n  {1}", linkType, outerHTML(el))
+                    continue
                 if linkType in config.lowercaseTypes:
                     linkText = linkText.lower()
                 dfnFor = treeAttr(el, 'data-dfn-for')
@@ -166,19 +169,21 @@ class ReferenceManager(object):
                         dfnFor.add(match.group(1).strip())
                 # convert back into a list now, for easier JSONing
                 dfnFor = list(dfnFor)
-                if linkType in config.dfnTypes.union(["dfn"]):
-                    existingAnchors = self.refs[linkText]
-                    ref = {
-                        "type":linkType,
-                        "status":"local",
-                        "spec":self.specVName,
-                        "shortname":self.specName,
-                        "level":self.specLevel,
-                        "url":"#"+el.get('id'),
-                        "export":True,
-                        "for": dfnFor
-                    }
-                    self.refs[linkText].append(ref)
+                ref = {
+                    "type":linkType,
+                    "status":"local",
+                    "spec":self.specVName,
+                    "shortname":self.specName,
+                    "level":self.specLevel,
+                    "url":"#"+el.get('id'),
+                    "export":True,
+                    "for": dfnFor
+                }
+                self.refs[linkText].append(ref)
+                methodishStart = re.match(r"([^(]+\()[^)]", linkText)
+                if methodishStart:
+                    arglessName = methodishStart.group(1) + ")"
+                    self.methods[arglessName].append(linkText)
 
     def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None):
         return self.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint)[0]
@@ -231,37 +236,6 @@ class ReferenceManager(object):
         else:
             export = None
         refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor=linkFor, linkForHint=linkForHint, export=export, ignoreObsoletes=True)
-
-        if failure and linkType in config.idlMethodTypes and text.endswith("()"):
-            # Allow foo(bar) to be linked to with just foo(), but only if it's completely unambiguous.
-            def multipleEmptyArgMethodRefs(refs, text):
-                # If there's a single ref, we're good.
-                if len(refs) == 1:
-                    return refs[0]
-                # If there's none, we might find more elsewhere
-                if len(refs) == 0:
-                    return None
-                # Otherwise, there's more than one ref.
-                # Need to distinguish between multiple overloads for the same method
-                # and multiple methods for different interfaces.
-                forValue = refs[0].for_
-                if all(ref.for_ == forValue for ref in refs):
-                    die("'{0}' has multiple overloads, and it's not clear which to link to.\n  Please specify the names of the required args, like 'foo(bar, baz)'.", text)
-                    return None
-                die("Multiple interfaces have the method '{0}'. Please specify the interface this is for.", text)
-                return None
-            textPrefix = text[:-1]
-            candidates, _ = self.queryRefs(linkType=linkType, status="local", linkFor=linkFor)
-            candidateRefs = {c.url: c for c in candidates if c.text.startswith(textPrefix)}.values()
-            candidateRef = multipleEmptyArgMethodRefs(candidateRefs, text)
-            if candidateRef:
-                return candidateRef
-            # And repeat for non-locals
-            candidates, _ = self.queryRefs(linkType=linkType, spec=spec, status=status, linkFor=linkFor, export=export, ignoreObsoletes=True)
-            candidateRefs = {c.url: c for c in candidates if c.text.startswith(textPrefix)}.values()
-            candidateRef = multipleEmptyArgMethodRefs(candidateRefs, text)
-            if candidateRef:
-                return candidateRef
 
         if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
             # Allow foo(bar) to be for'd to with just foo() if it's completely unambiguous.
