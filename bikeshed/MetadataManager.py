@@ -58,6 +58,7 @@ class MetadataManager:
         self.customTextMacros = []
         self.issues = []
         self.issueTrackerTemplate = None
+        self.workStatus = None
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -88,7 +89,8 @@ class MetadataManager:
             "Use <I> Autolinks": "useIAutolinks",
             "No Editor": "noEditor",
             "Default Biblio Status": "defaultBiblioStatus",
-            "Issue Tracker Template": "issueTrackerTemplate"
+            "Issue Tracker Template": "issueTrackerTemplate",
+            "Work Status": "workStatus"
         }
 
         # Some keys are multi-value:
@@ -133,7 +135,8 @@ class MetadataManager:
             "Default Biblio Status": parseBiblioStatus,
             "Issue Tracking": parseIssues,
             "Markup Shorthands": parseMarkupShorthands,
-            "Text Macro": parseTextMacro
+            "Text Macro": parseTextMacro,
+            "Work Status": parseWorkStatus
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -226,6 +229,8 @@ class MetadataManager:
             requiredSingularKeys['level'] = 'Level'
         if not self.noEditor:
             requiredMultiKeys['editors'] = "Editor"
+        if self.group and self.group.lower() == "csswg":
+            requiredSingularKeys['workStatus'] = "Work Status"
 
         errors = []
         warnings = []
@@ -267,6 +272,8 @@ class MetadataManager:
             macros["status"] = "WD"
         else:
             macros["status"] = self.status
+        if self.workStatus:
+            macros["workstatus"] = self.workStatus
         if self.TR:
             macros["latest"] = self.TR
         if self.abstract:
@@ -497,6 +504,14 @@ def parseTextMacro(key, val):
         die("Text Macro names must be all-caps and alphanumeric. Got '{0}'", name)
         return None
     return (name, text)
+
+def parseWorkStatus(key, val):
+    # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
+    val = val.strip().lower()
+    if val not in ('completed', 'stable', 'testing', 'refining', 'revising', 'exploring', 'rewriting', 'abandoned'):
+        die("Work Status must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned). Got '{0}'. See http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process for details.", val)
+        return None
+    return val
 
 
 def parse(md, lines):
