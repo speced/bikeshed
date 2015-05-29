@@ -399,18 +399,17 @@ class ReferenceManager(object):
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
         return biblio.BiblioEntry(preferredURL=status, **candidates[0])
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, refs=None, export=None, ignoreObsoletes=False, **kwargs):
-        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, refs, export, ignoreObsoletes, exact=True)
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, export=None, ignoreObsoletes=False, **kwargs):
+        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, export, ignoreObsoletes, exact=True)
         if error:
-            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, refs, export, ignoreObsoletes)
+            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, export, ignoreObsoletes)
         else:
             return results, error
 
-    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, refs=None, export=None, ignoreObsoletes=False, exact=False, **kwargs):
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, export=None, ignoreObsoletes=False, exact=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
-        if refs is None:
-            refs = self.refs
+        refs = self.refs
         def refsIterator(refs):
             # Turns a dict of arrays of refs into an iterator of refs
             for key, group in refs.items():
