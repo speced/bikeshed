@@ -34,8 +34,7 @@ class ReferenceManager(object):
         self.specs.update(json.loads(config.retrieveCachedFile("specs.json", quiet=True, str=True)))
         with config.retrieveCachedFile("anchors.data", quiet=True) as lines:
             self.refs = decodeAnchors(lines)
-        with config.retrieveCachedFile("methods.data", quiet=True) as lines:
-            self.methods = decodeAnchors(lines)
+        self.methods.update(json.loads(config.retrieveCachedFile("methods.json", quiet=True, str=True)))
         # Get local anchor data
         try:
             with io.open("anchors.bsdata", 'r', encoding="utf-8") as lines:
