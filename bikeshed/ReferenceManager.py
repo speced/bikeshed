@@ -148,14 +148,14 @@ class ReferenceManager(object):
                 dfnFor = treeAttr(el, 'data-dfn-for')
                 if dfnFor is None:
                     dfnFor = set()
-                    if self.getLocalRef(linkType, linkText):
+                    if self.getLocalRef(linkType, linkText, exact=True):
                         die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, linkType)
                         continue
                 else:
                     dfnFor = set(splitForValues(dfnFor))
                     encounteredError = False
                     for singleFor in dfnFor:
-                        if self.getLocalRef(linkType, linkText, linkFor=singleFor):
+                        if self.getLocalRef(linkType, linkText, linkFor=singleFor, exact=True):
                             encounteredError = True
                             die("Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, linkType, singleFor)
                             break
@@ -185,8 +185,8 @@ class ReferenceManager(object):
                     arglessName = methodishStart.group(1) + ")"
                     self.methods[arglessName].append(linkText)
 
-    def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None):
-        return self.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint)[0]
+    def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None, exact=False):
+        return self._queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]
 
     def getRef(self, linkType, text, spec=None, status=None, linkFor=None, linkForHint=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a reference or None
