@@ -169,7 +169,7 @@ class Nil(object):
             return True
         return False
     def __iter__(self):
-        return []
+        return iter([])
 
 
 
