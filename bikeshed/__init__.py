@@ -10,10 +10,12 @@ import sys
 import json
 import argparse
 import urllib
+import urllib2
 from urllib2 import urlopen
 from datetime import date, datetime
 from copy import deepcopy
 from collections import OrderedDict
+from contextlib import closing
 import html5lib
 import lxml
 import cProfile
@@ -815,10 +817,19 @@ def processIssuesAndExamples(doc):
         remoteIssueID = el.get('data-remote-issue-id')
         if remoteIssueID:
             del el.attrib['data-remote-issue-id']
+            # Eventually need to support a way to trigger other repo url structures,
+            # but defaulting to GH is fine for now.
             githubMatch = re.match(r"\s*([\w-]+)/([\w-]+)#(\d+)\s*$", remoteIssueID)
+            numberMatch = re.match(r"\s*(\d+)\s*$", remoteIssueID)
             remoteIssueURL = None
             if githubMatch:
-                remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(githubMatch.group(1), githubMatch.group(2), githubMatch.group(3))
+                remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(*githubMatch.groups())
+                if doc.md.inlineGithubIssues:
+                    el.set("data-inline-github", "{0} {1} {2}".format(*githubMatch.groups()))
+            elif numberMatch and doc.md.repository.type == "github":
+                remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
+                if doc.md.inlineGithubIssues:
+                    el.set("data-inline-github", "{0} {1} {2}".format(doc.md.repository.user, doc.md.repository.repo, numberMatch.group(1)))
             elif doc.md.issueTrackerTemplate:
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
             if remoteIssueURL:
@@ -1308,6 +1319,7 @@ class CSSSpec(object):
         canonicalizeShortcuts(self)
         processIssuesAndExamples(self)
         markupIDL(self)
+        inlineRemoteIssues(self)
 
 
         # Handle all the links
@@ -2261,6 +2273,32 @@ def addIssuesSection(doc):
         del idel.attrib['id']
     for dfnel in findAll("dfn", container):
         dfnel.tag = "span"
+
+
+def inlineRemoteIssues(doc):
+    # Finds properly-marked-up "remote issues",
+    # and inlines their contents into the issue.
+
+    # Right now, only github inline issues are supported.
+    # More can be supported when someone cares.
+    for el in findAll("[data-inline-github]", doc):
+        user, repo, id = el.get('data-inline-github').split()
+        removeAttr(el, "data-inline-github")
+        req = urllib2.Request(url="https://api.github.com/repos/{0}/{1}/issues/{2}".format(user, repo, id),
+            headers={"Accept": "application/vnd.github.v3.html+json"})
+        try:
+            with closing(urllib2.urlopen(req)) as fh:
+                issue = json.load(fh)
+                clearContents(el)
+                appendChild(el,
+                    E.a({"href":issue['html_url'], "class":"marker"},
+                        "Issue #{0} on GitHub: “{1}”".format(issue['number'], issue['title'])),
+                    *parseHTML(issue['body_html']))
+                if el.tag == "p":
+                    el.tag = "div"
+                addClass(el, "no-marker")
+        except:
+            pass
 
 
 def temporaryCheckForExcessiveTitle(doc):

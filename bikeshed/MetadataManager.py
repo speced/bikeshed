@@ -10,6 +10,7 @@ from . import config
 from . import markdown
 from .messages import *
 from .htmlhelpers import *
+from .repository import *
 
 class MetadataManager:
     @property
@@ -59,6 +60,8 @@ class MetadataManager:
         self.issues = []
         self.issueTrackerTemplate = None
         self.workStatus = None
+        self.inlineGithubIssues = False
+        self.repository = config.Nil()
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -90,7 +93,9 @@ class MetadataManager:
             "No Editor": "noEditor",
             "Default Biblio Status": "defaultBiblioStatus",
             "Issue Tracker Template": "issueTrackerTemplate",
-            "Work Status": "workStatus"
+            "Work Status": "workStatus",
+            "Inline Github Issues": "inlineGithubIssues",
+            "Repository": "repository"
         }
 
         # Some keys are multi-value:
@@ -136,7 +141,9 @@ class MetadataManager:
             "Issue Tracking": parseIssues,
             "Markup Shorthands": parseMarkupShorthands,
             "Text Macro": parseTextMacro,
-            "Work Status": parseWorkStatus
+            "Work Status": parseWorkStatus,
+            "Inline Github Issues": parseBoolean,
+            "Repository": parseRepository
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -202,6 +209,8 @@ class MetadataManager:
             self.overrides.add(key)
 
     def finish(self):
+        if not self.repository:
+            self.repository, self.repositoryUrl = getSpecRepository(self.doc)
         self.validate()
 
     def validate(self):
@@ -299,8 +308,9 @@ class MetadataManager:
         if self.warning and len(self.warning) >= 4:
             macros["snapshoturl"] = self.warning[3]
         macros["logo"] = self.logo
-        # get GH repo from remote
-        macros["repository"] = getSpecRepository(doc)
+        if self.repository:
+            macros["repository"] = self.repository.name
+            macros["repositoryurl"] = self.repository.url
         if self.status == "UD":
             macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/w3c-unofficial"
         elif self.status == "FPWD":
@@ -513,6 +523,28 @@ def parseWorkStatus(key, val):
         return None
     return val
 
+def parseRepository(key, val):
+    # Shortname followed by url, or just url.
+    # If just url, I'll try to recognize the shortname from it; otherwise it's the url again.
+    val = val.strip()
+    pieces = val.split(None, 1)
+    if len(pieces) == 2:
+        return Repository(url=pieces[0], name=pieces[1])
+    elif len(pieces) == 1:
+        # Try to recognize a GitHub url
+        match = re.match("https://github.com/([\w-]+)/([\w-]+)/?$", val)
+        if match:
+            return GithubRepository(*match.groups())
+        # If you just provide a user/repo pair, assume it's a github repo.
+        # Will provide ways to opt into other repos when people care.
+        match = re.match("([\w-]+)/([\w-]+)$", val)
+        if match:
+            return GithubRepository(*match.groups())
+        # Otherwise just use the url as the shortname
+        return Repository(url=val)
+    else:
+        die("Repository must be a url, optionally followed by a shortname. Got '{0}'", val)
+        return config.Nil()
 
 def parse(md, lines):
     # Given a MetadataManager and HTML document text, in the form of an array of text lines,
@@ -574,6 +606,7 @@ def getSpecRepository(doc):
     '''
     Attempts to find the name of the repository the spec is a part of.
     Currently only searches for GitHub repos.
+    Returns a "shortname" of the repo, and the full url.
     '''
     if doc and doc.inputSource and doc.inputSource != "-":
         source_dir = os.path.dirname(os.path.abspath(doc.inputSource))
@@ -585,13 +618,13 @@ def getSpecRepository(doc):
             os.chdir(old_dir)
             search = re.search('origin\tgit@github\.com:(.*?)\.git \(\w+\)', remotes)
             if search:
-                return search.group(1)
+                return search.group(1), "https://github.com/{0}/".format(search.group(1))
             else:
-                return ""
+                return None, None
         except:
             # check_output will throw CalledProcessError when not in a git repo
             os.chdir(old_dir)
-            return ""
+            return None, None
 
 def parseDoc(doc):
     # Look through the doc for any additional metadata information that might be needed.
