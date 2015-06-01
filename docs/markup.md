@@ -246,3 +246,25 @@ to get a link straight to what they care about.
 
 Self-links are currently auto-generated for headings, definitions, and issues,
 and notes, examples, `<li>`s, and `<dt>`s that have been given IDs.
+
+Remote Issues
+-------------
+
+As defined earlier, you can start a paragraph with `Issue: ` to cause Bikeshed to automatically format it as an inline issue paragraph.
+You can also refer to remote issues, which are tracked in some other issue tracker.
+To do so, instead start your paragraph with `Issue(###): `,
+where the `###` is some identifying value for the issue.
+
+If the identifying value is of the form `user/repo#number`,
+Bikeshed assumes you are referring to GitHub repository,
+and points the issue at the corresponding issue.
+
+If you have **Repository** set up to point to a GitHub repository
+(or it was auto-detected as such,
+because you're working on the spec from within one),
+then a numeric identifying value is assumed to be an issue number for your repository.
+
+Otherwise, you need to tell Bikeshed how to convert the identifying value into a remote issue link.
+Specify a format string in the **Issue Tracker Template** metadata,
+with a `{0}` in the place where the identifying value should go.
+Bikeshed will then point the issue at the generated url.
