@@ -212,17 +212,17 @@ def parseParagraph(stream):
 	line = stream.currtext()
 	initialPrefixLen = stream.currprefixlen()
 	endTag = "</p>"
-	if line.lower().startswith("note: ") or line.lower().startswith("note, "):
+	if line.lower().startswith("note:") or line.lower().startswith("note, "):
 		p = "<p class='note'>"
-	elif line.lower().startswith("issue: "):
-		line = line[7:]
+	elif line.lower().startswith("issue:"):
+		line = line[6:]
 		p = "<p class='issue'>"
-	elif line.lower().startswith("advisement: "):
-		line = line[12:]
+	elif line.lower().startswith("advisement:"):
+		line = line[11:]
 		p = "<strong class='advisement'>"
 		endTag = "</strong>"
 	else:
-		match = re.match(r"issue\(([^)]+)\): (.+)", line, re.I)
+		match = re.match(r"issue\(([^)]+)\):(.*)", line, re.I)
 		if match:
 			line = match.group(2)
                         p = "<p data-remote-issue-id='%s' class='issue'>" % match.group(1)
