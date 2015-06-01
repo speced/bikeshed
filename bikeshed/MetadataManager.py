@@ -210,7 +210,7 @@ class MetadataManager:
 
     def finish(self):
         if not self.repository:
-            self.repository, self.repositoryUrl = getSpecRepository(self.doc)
+            self.repository = getSpecRepository(self.doc)
         self.validate()
 
     def validate(self):
@@ -616,15 +616,15 @@ def getSpecRepository(doc):
             with open(os.devnull, "wb") as fnull:
                 remotes = check_output(["git", "remote", "-v"], stderr=fnull)
             os.chdir(old_dir)
-            search = re.search('origin\tgit@github\.com:(.*?)\.git \(\w+\)', remotes)
+            search = re.search(r"origin\tgit@github\.com:([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
             if search:
-                return search.group(1), "https://github.com/{0}/".format(search.group(1))
+                return GithubRepository(*search.groups())
             else:
-                return None, None
+                return config.Nil()
         except:
             # check_output will throw CalledProcessError when not in a git repo
             os.chdir(old_dir)
-            return None, None
+            return config.Nil()
 
 def parseDoc(doc):
     # Look through the doc for any additional metadata information that might be needed.
