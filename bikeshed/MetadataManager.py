@@ -211,6 +211,8 @@ class MetadataManager:
     def finish(self):
         if not self.repository:
             self.repository = getSpecRepository(self.doc)
+        if self.repository:
+            self.issues.append(("GitHub", self.repository.formatIssueUrl()))
         self.validate()
 
     def validate(self):

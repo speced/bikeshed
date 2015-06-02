@@ -33,5 +33,7 @@ class GithubRepository(Repository):
 		self.repo = repo
 		self.type = "github"
 
-	def formatIssueUrl(self, id):
+	def formatIssueUrl(self, id=None):
+		if id is None:
+			return "https://github.com/{0}/{1}/issues/".format(self.user, self.repo)
 		return "https://github.com/{0}/{1}/issues/{2}".format(self.user, self.repo, id)
