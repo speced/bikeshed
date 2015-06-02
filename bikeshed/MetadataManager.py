@@ -211,7 +211,7 @@ class MetadataManager:
     def finish(self):
         if not self.repository:
             self.repository = getSpecRepository(self.doc)
-        if self.repository:
+        if self.repository and "feedback-header" not in self.doc.md.boilerplate['omitSections']:
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
         self.validate()
 
@@ -630,7 +630,7 @@ def getSpecRepository(doc):
 
 def parseDoc(doc):
     # Look through the doc for any additional metadata information that might be needed.
-
-    if find(".issue", doc) is not None:
-        # There's at least one inline issue.
-        doc.md.issues.append(("Inline In Spec", "#issues-index"))
+    if "feedback-header" not in doc.md.boilerplate['omitSections']:
+        if find(".issue", doc) is not None:
+            # There's at least one inline issue.
+            doc.md.issues.append(("Inline In Spec", "#issues-index"))
