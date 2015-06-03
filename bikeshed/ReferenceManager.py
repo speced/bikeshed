@@ -148,7 +148,7 @@ class ReferenceManager(object):
                 dfnFor = treeAttr(el, 'data-dfn-for')
                 if dfnFor is None:
                     dfnFor = set()
-                    if self.getLocalRef(linkType, linkText, exact=True):
+                    if self.getLocalRef(linkType, linkText, linkFor="/", exact=True):
                         die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, linkType)
                         continue
                 else:
