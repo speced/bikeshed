@@ -1011,21 +1011,27 @@ def processIDL(doc):
     for pre in findAll("pre.idl", doc):
         if pre.get("data-no-idl") is not None:
             continue
-        forcedDfns = GlobalNames(text=treeAttr(pre, "data-dfn-force"))
+        forcedInterfaces = []
+        for x in (treeAttr(pre, "data-dfn-force") or "").split():
+            x = x.strip()
+            if x.endswith("<interface>"):
+                x = x[:-11]
+            forcedInterfaces.append(x)
         for el in findAll("idl", pre):
             idlType = el.get('data-idl-type')
             url = None
+            forceDfn = False
             for idlText in el.get('data-lt').split('|'):
+                if idlType == "interface" and idlText in forcedInterfaces:
+                    forceDfn = True
                 ref = doc.refs.getRef(idlType, idlText,
                                       linkFor=el.get('data-idl-for'),
                                       el=el,
                                       error=False)
                 if ref:
                     url = ref.url
-                    break;
-            globalNames = GlobalNames.fromEl(el)
-            el.set("data-global-name", str(globalNames))
-            if url is None or globalNames.matches(forcedDfns):
+                    break
+            if url is None or forceDfn:
                 el.tag = "dfn"
                 el.set('data-dfn-type', idlType)
                 del el.attrib['data-idl-type']
