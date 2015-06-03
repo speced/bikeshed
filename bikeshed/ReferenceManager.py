@@ -347,7 +347,7 @@ class ReferenceManager(object):
         else:
             return results, error
 
-    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, export=None, ignoreObsoletes=False, exact=False, **kwargs):
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         def refsIterator(refs):
@@ -389,7 +389,7 @@ class ReferenceManager(object):
             else:
                 if error:
                     die("Unknown link type '{0}'.",linkType)
-                return []
+                return [], "type"
             refs = [x for x in refs if x.type in linkTypes]
         if not refs:
             return refs, "type"
