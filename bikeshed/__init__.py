@@ -1257,7 +1257,8 @@ class CSSSpec(object):
             elif glob.glob("*.src.html"):
                 inputFilename = glob.glob("*.src.html")[0]
             else:
-                inputFilename = "-"
+                die("No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.")
+                return
         self.inputSource = inputFilename
         try:
             if inputFilename == "-":
