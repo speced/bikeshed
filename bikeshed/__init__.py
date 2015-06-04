@@ -1254,19 +1254,6 @@ def finalHackyCleanup(text):
 class CSSSpec(object):
 
     def __init__(self, inputFilename, paragraphMode="markdown", debug=False):
-        # internal state
-        self.normativeRefs = {}
-        self.informativeRefs = {}
-        self.refs = ReferenceManager()
-        self.externalRefsUsed = defaultdict(dict)
-        self.md = metadata.MetadataManager(doc=self)
-        self.biblios = {}
-        self.paragraphMode = "markdown"
-        self.debug = debug
-        self.inputSource = None
-        self.macros = defaultdict(lambda x: "???")
-        self.widl = parser.Parser(ui=IDLUI())
-
         if inputFilename is None:
             # Default to looking for a *.bs file.
             # Otherwise, look for a *.src.html file.
@@ -1280,23 +1267,34 @@ class CSSSpec(object):
                 die("No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.")
                 return
         self.inputSource = inputFilename
-        self.loadInput(inputFilename)
-        self.testSuites = json.loads(config.retrieveCachedFile("test-suites.json", quiet=True, str=True))
-        self.paragraphMode = paragraphMode
+        self.debug = debug
 
-    def loadInput(self, inputFilename):
+        self.initializeState()
+
+    def initializeState(self):
+        self.normativeRefs = {}
+        self.informativeRefs = {}
+        self.refs = ReferenceManager()
+        self.externalRefsUsed = defaultdict(dict)
+        self.md = metadata.MetadataManager(doc=self)
+        self.biblios = {}
+        self.paragraphMode = "markdown"
+        self.macros = defaultdict(lambda x: "???")
+        self.widl = parser.Parser(ui=IDLUI())
+        self.testSuites = json.loads(config.retrieveCachedFile("test-suites.json", quiet=True, str=True))
+
         try:
-            if inputFilename == "-":
+            if self.inputSource == "-":
                 self.lines = [unicode(line, encoding="utf-8") for line in sys.stdin.readlines()]
                 self.md.date = datetime.today()
             else:
-                self.lines = io.open(inputFilename, 'r', encoding="utf-8").readlines()
-                self.md.date = datetime.fromtimestamp(os.path.getmtime(inputFilename))
+                self.lines = io.open(self.inputSource, 'r', encoding="utf-8").readlines()
+                self.md.date = datetime.fromtimestamp(os.path.getmtime(self.inputSource))
         except OSError:
-            die("Couldn't find the input file at the specified location '{0}'.", inputFilename)
+            die("Couldn't find the input file at the specified location '{0}'.", self.inputSource)
             return
         except IOError:
-            die("Couldn't open the input file '{0}'.", inputFilename)
+            die("Couldn't open the input file '{0}'.", self.inputSource)
             return
 
     def preprocess(self):
@@ -1430,7 +1428,7 @@ class CSSSpec(object):
                     lastInputModified = inputModified
                     formattedTime = datetime.fromtimestamp(inputModified).strftime("%H:%M:%S")
                     print "Source file modified at {0}. Rebuilding...".format(formattedTime)
-                    self.loadInput(self.inputSource)
+                    self.initializeState()
                     self.preprocess()
                     self.finish(outputFilename)
                     print "==============DONE=============="
