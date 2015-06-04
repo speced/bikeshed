@@ -70,6 +70,20 @@ def main():
     minifyGroup.add_argument("--no-minify", dest="minify", action="store_false",
                             help="Turn off minification.")
 
+    watchParser = subparsers.add_parser('watch', help="Process a spec source file into a valid output file, automatically rebuilding when it changes.")
+    watchParser.add_argument("infile", nargs="?",
+                            default=None,
+                            help="Path to the source file.")
+    watchParser.add_argument("outfile", nargs="?",
+                            default=None,
+                            help="Path to the output file.")
+    minifyGroup = watchParser.add_argument_group("Minification")
+    watchParser.set_defaults(minify=True)
+    watchParser.add_argument("--minify", dest="minify", action="store_true",
+                             help="Turn on minification. [default]")
+    watchParser.add_argument("--no-minify", dest="minify", action="store_false",
+                            help="Turn off minification.")
+
     updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
@@ -161,6 +175,12 @@ def main():
         doc.md.addOverrides(extras)
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
+    elif options.subparserName == "watch":
+        # Can't have an error killing the watcher
+        config.force = True
+        doc = CSSSpec(inputFilename=options.infile)
+        doc.md.addOverrides(extras)
+        doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         config.force = True
         config.quiet = True
@@ -1260,6 +1280,11 @@ class CSSSpec(object):
                 die("No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.")
                 return
         self.inputSource = inputFilename
+        self.loadInput(inputFilename)
+        self.testSuites = json.loads(config.retrieveCachedFile("test-suites.json", quiet=True, str=True))
+        self.paragraphMode = paragraphMode
+
+    def loadInput(self, inputFilename):
         try:
             if inputFilename == "-":
                 self.lines = [unicode(line, encoding="utf-8") for line in sys.stdin.readlines()]
@@ -1273,9 +1298,6 @@ class CSSSpec(object):
         except IOError:
             die("Couldn't open the input file '{0}'.", inputFilename)
             return
-
-        self.testSuites = json.loads(config.retrieveCachedFile("test-suites.json", quiet=True, str=True))
-        self.paragraphMode = paragraphMode
 
     def preprocess(self):
         # Textual hacks
@@ -1365,8 +1387,7 @@ class CSSSpec(object):
         rendered = finalHackyCleanup(rendered)
         return rendered
 
-
-    def finish(self, outputFilename):
+    def fixMissingOutputFilename(self, outputFilename):
         if outputFilename is None:
             # More sensible defaults!
             if self.inputSource.endswith(".bs"):
@@ -1377,6 +1398,10 @@ class CSSSpec(object):
                 outputFilename = "-"
             else:
                 outputFilename = "-"
+        return outputFilename
+
+    def finish(self, outputFilename):
+        outputFilename = self.fixMissingOutputFilename(outputFilename)
         rendered = self.serialize()
         if not config.dryRun:
             try:
@@ -1387,6 +1412,34 @@ class CSSSpec(object):
                         f.write(rendered)
             except Exception, e:
                 die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)
+
+    def watch(self, outputFilename):
+        import time
+        outputFilename = self.fixMissingOutputFilename(outputFilename)
+        if self.inputSource == "-" or outputFilename == "-":
+            die("Watch mode doesn't support streaming from STDIN or to STDOUT.")
+            return
+        try:
+            lastInputModified = os.stat(self.inputSource).st_mtime
+            self.preprocess()
+            self.finish(outputFilename)
+            print "==============DONE=============="
+            while(True):
+                inputModified = os.stat(self.inputSource).st_mtime
+                if inputModified > lastInputModified:
+                    lastInputModified = inputModified
+                    formattedTime = datetime.fromtimestamp(inputModified).strftime("%H:%M:%S")
+                    print "Source file modified at {0}. Rebuilding...".format(formattedTime)
+                    self.loadInput(self.inputSource)
+                    self.preprocess()
+                    self.finish(outputFilename)
+                    print "==============DONE=============="
+                time.sleep(1)
+        except Exception, e:
+            die("Something went wrong while watching the file:\n{0}", e)
+
+
+
 
     def loadDefaultMetadata(self):
         data = self.getInclusion('defaults', error=False)
