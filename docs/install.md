@@ -84,15 +84,19 @@ For Linux/OSX:
 
 ~~~~
 $ sudo pip install --editable /path/to/cloned/bikeshed
+$ bikeshed update
 ~~~~
 
 On Windows:
 
 ~~~~
-python -m pip install --editable /path/to/cloned/bikeshed
+$ python -m pip install --editable /path/to/cloned/bikeshed
+$ bikeshed update
 ~~~~
 
-This’ll install Bikeshed, making it available to your Python environment as the `bikeshed` package, and automatically add a `bikeshed` command to your path.
+This’ll install Bikeshed, making it available to your Python environment as the `bikeshed` package,
+automatically add a `bikeshed` command to your path,
+and then update your data files to the latest versions.
 
 To update bikeshed to its latest version at any time, just enter Bikeshed’s folder, and run:
 
@@ -105,4 +109,4 @@ This’ll pull the latest version of Bikeshed, and ensure that you’re looking 
 
 See the [Quick Start Guide](quick-start.md) for a quick run-through of how to actually use the processor, and the rest of the docs for more detailed information.
 
-(If anything doesn’t work in here, let me know and I’ll fix it.  It’s very likely I’m accidentally skipping a step or two right now, as I’m writing this long after I’ve actually installed everything necessary myself.)
+(If anything doesn’t work in here, let me know and I’ll fix it.  These instructions have worked for a lot of people on all OSes, but it's possible that you'll run into a new error, because computers are terrible.)
