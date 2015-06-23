@@ -602,9 +602,13 @@ def classifyDfns(doc, dfns):
         # Automatically fill in id if necessary.
         if el.get('id') is None:
             convertDashes = dfnType == "dfn"
-            id = simplifyText(primaryDfnText, convertDashes=convertDashes)
             if dfnFor:
                 singleFor = splitForValues(dfnFor)[0]
+            if dfnType in config.functionishTypes.intersection(config.idlTypes):
+                id = simplifyText(re.match(r"[^(]*", primaryDfnText).group(0)+"()", convertDashes=convertDashes)
+                el.set("data-alternate-id", simplifyText("dom-{_for}-{id}".format(_for=singleFor, id=primaryDfnText), convertDashes=convertDashes))
+            else:
+                id = simplifyText(primaryDfnText, convertDashes=convertDashes)
             if dfnType == "dfn":
                 pass
             elif dfnType == "interface":
@@ -650,6 +654,10 @@ def dedupIds(doc, els):
         els = findAll("#"+dupe, doc)
         ints = iter.imap(str, iter.count(0))
         for el in els[1:]:
+            # If I registered an alternate ID, try to use that.
+            if el.get('data-alternate-id'):
+                el.set("id", el.get("data-alternate-id"))
+                continue
             # Try to de-dup the id by appending an integer after it.
             if warnAboutDupes:
                 warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupe)
@@ -1229,6 +1237,8 @@ def cleanupHTML(doc):
         removeAttr(el, 'data-noexport')
     for el in findAll("[oldids]", doc):
         removeAttr(el, 'oldids')
+    for el in findAll("[data-alternate-id]", doc):
+        removeAttr(el, 'data-alternate-id')
 
 
 def finalHackyCleanup(text):
