@@ -247,6 +247,10 @@ def simplifyText(text, convertDashes=False):
     if convertDashes:
         text = text.replace("-", "_")
     text = text.strip().lower()
+    # I convert ( to - so foo(bar) becomes foo-bar,
+    # but then I have to remove () because there's nothing to separate,
+    # otherwise I get a double-dash in some cases.
+    text = re.sub(r"\(\)", "", text)
     text = re.sub(r"[\s/(,]+", "-", text)
     text = re.sub(r"[^a-z0-9_-]", "", text)
     text = text.rstrip("-")
