@@ -1133,9 +1133,11 @@ def addSyntaxHighlighting(doc):
         replaceContents(el, highlighted)
         addClass(el, "highlight")
 
+    highlightingOccurred = False
 
     for el in findAll("[highlight]", doc):
         highlight(el, el.get('highlight'))
+        highlightingOccurred = True
 
     pygmentFromPrism = {"aspnet":"aspx-cs", "markup":"html"}
     for el in findAll("[class*=language-], [class*=lang-]", doc):
@@ -1143,16 +1145,18 @@ def addSyntaxHighlighting(doc):
         if match:
             lang = pygmentFromPrism.get(match.group(1), match.group(1))
             highlight(el, lang)
+            highlightingOccurred = True
 
-    style = formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
-    style += """
-    .highlight { background: hsl(24, 20%, 95%); }
-    pre.highlight { padding: 1em; margin: .5em 0; overflow: auto; }
-    :not(pre).highlight { padding: .1em; border-radius: .3em; }
-    """
-    body = find("body", doc)
-    appendChild(body,
-        E.style(style))
+    if highlightingOccurred:
+        style = formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
+        style += """
+        .highlight { background: hsl(24, 20%, 95%); }
+        pre.highlight { padding: 1em; margin: .5em 0; overflow: auto; }
+        :not(pre).highlight { padding: .1em; border-radius: .3em; }
+        """
+        body = find("body", doc)
+        appendChild(body,
+            E.style(style))
 
 
 def cleanupHTML(doc):
