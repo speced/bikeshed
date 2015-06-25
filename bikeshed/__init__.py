@@ -1085,67 +1085,63 @@ def processIDL(doc):
 
 
 def addSyntaxHighlighting(doc):
-    # Find what langs are requesting syntax highlighting
-    langs = set()
+    try:
+        import pygments as pyg
+        from pygments.lexers import get_lexer_by_name
+        from pygments import formatters
+        from pygments import token
+        from pygments import style
+    except ImportError:
+        die("Bikeshed now uses Pygments for syntax highlighting.\nPlease run `$ sudo pip install pygments` from your command line.")
+        return
+
+    class PrismStyle(style.Style):
+        default_style = "#000000"
+        styles = {
+            token.Name: "#0077aa",
+            token.Name.Builtin: "noinherit",
+            token.Name.Other: "noinherit",
+            token.Operator: "#999999",
+            token.Punctuation: "#999999",
+            token.Keyword: "#990055",
+            token.Literal: "#669900",
+            token.Literal.Number: "#990055",
+            token.Comment: "#708090"
+        }
+
+    def highlight(el, lang):
+        text = textContent(el)
+        try:
+            lexer = get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
+        except pyg.util.ClassNotFound:
+            die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/.")
+            return
+        highlighted = parseHTML(pyg.highlight(text, lexer, formatters.HtmlFormatter()))[0][0]
+        # Remove the trailing newline
+        highlighted[-1].tail = highlighted[-1].tail.rstrip()
+        replaceContents(el, highlighted)
+        addClass(el, "highlight")
+
+
+    for el in findAll("[highlight]", doc):
+        highlight(el, el.get('highlight'))
+
+    pygmentFromPrism = {"aspnet":"aspx-cs", "markup":"html"}
     for el in findAll("[class*=language-], [class*=lang-]", doc):
         match = re.search("(?:lang|language)-(\w+)", el.get("class"))
         if match:
-            langs.add(match.group(1))
-    if not langs:
-        return
-    langs.discard("none")
+            lang = pygmentFromPrism.get(match.group(1), match.group(1))
+            highlight(el, lang)
 
-    # If any of the langs have prereqs, put them in too.
-    dependencies = {
-        "aspnet": "markup",
-        "bash": "clike",
-        "c": "clike",
-        "coffeescript": "javascript",
-        "cpp": "c",
-        "csharp": "clike",
-        "go": "clike",
-        "groovy": "clike",
-        "java": "clike",
-        "javascript": "clike",
-        "objectivec": "c",
-        "php": "clike",
-        "ruby": "clike",
-        "scala": "java",
-        "scss": "css",
-        "swift": "clike"
-    }
-    langlist = list(langs)
-    prereqs = set()
-    while langs:
-        for lang in langs:
-            if lang in dependencies:
-                prereqs.add(dependencies[lang])
-        langlist = list(prereqs) + langlist
-        langs = prereqs
-        prereqs = set()
-
-    # Put together all the scripts and insert them.
-    pathPrefix = config.scriptPath + "/../prism/"
-    script = ""
-    style = ""
-    def read(filename):
-        return io.open(pathPrefix + filename, 'r', encoding="utf-8").read()
-    try:
-        script += read("prism.js")
-        style += read("prism.css")
-    except Exception, e:
-        die("Couldn't find the syntax highlighting files.\n{0}", e)
-        return
-    for lang in langlist:
-        try:
-            script += read(lang+".lang.js")
-        except Exception, e:
-            die("Can't find the language file for '{0}'.\n{1}", lang, e)
+    style = formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
+    style += """
+    .highlight { background: hsl(24, 20%, 95%); }
+    pre.highlight { padding: 1em; margin: .5em 0; overflow: auto; }
+    :not(pre).highlight { padding: .1em; border-radius: .3em; }
+    """
     body = find("body", doc)
     appendChild(body,
-        E.script(script),
         E.style(style))
-
 
 
 def cleanupHTML(doc):

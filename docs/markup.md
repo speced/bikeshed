@@ -138,6 +138,21 @@ The preprocessor will automatically convert it into:
 ~~~~
 
 
+Syntax Highlighting
+-------------------
+
+You can also syntax-highlight code blocks.
+Just add either a `highlight="foo"` attribute
+or a `lang-foo` class to the element,
+and the element will automatically be syntax-highlighted according to the "foo" language rules.
+
+The syntax highlighter uses Pygments, which supports a large set of languages.
+See <http://pygments.org/docs/lexers/> for the full list.
+(Use one of the "short names" of the language for the "foo" value.)
+
+Note: If you use "html", `<script>` and `<style>` elements are automatically highlighted with JS and CSS rules.
+
+
 Property/descriptor/element definition table expansion
 ------------------------------------------------------
 

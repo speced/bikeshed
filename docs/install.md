@@ -20,9 +20,10 @@ $ sudo apt-get install python2.7 python-dev python-pip libxslt1-dev libxml2-dev
 
 The `apt-get` command works on Debian-based systems like Ubuntu; if you work on some other type of system, and can figure out how to get things working on your own, let me know and I'll add instructions for your system.
 
-Then, we'll need to install lxml.
+Then, we'll need to install lxml and Pygments.
 
 ~~~~
+$ sudo pip install pygments
 $ sudo pip install lxml
 ~~~~
 
@@ -43,7 +44,7 @@ These instructions assume that you have [Mac Ports](https://www.macports.org/) i
 
 First, get the right packages installed onto your system:
 ~~~
-sudo port install python27 py27-pip py27-lxml py27-html5lib py27-cssselect py27-libxslt py27-libxml2
+sudo port install python27 py27-pip py27-lxml py27-html5lib py27-cssselect py27-libxslt py27-libxml2 py27-pygments
 ~~~
 
 Then, activate the python version you just installed as the one the system should use:
@@ -65,6 +66,7 @@ setx /m PATH "%PATH%;C:\Python27;C:\Python27\Scripts"
 ~~~
 3. Install [PIP](https://pip.pypa.io/en/latest/installing.html) by saving [get-pip.py](https://bootstrap.pypa.io/get-pip.py) and just double clicking the file.
 4. Install [LXML](http://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml) for your version of Python (it should be lxml-3.4.0win32-py2.7.exe)
+5. Run `$ python -m pip install pygments`.
 
 From here, you can follow the commons steps outlined below.
 
