@@ -1192,7 +1192,7 @@ def cleanupHTML(doc):
     # Remove duplicate linking texts.
     for el in findAll("dfn[data-lt], a[data-lt]", doc):
         if el.get('data-lt') == textContent(el):
-            pass#del el.attrib['data-lt']
+            del el.attrib['data-lt']
 
     # Transform the <css> fake tag into markup.
     # (Used when the ''foo'' shorthand doesn't work.)
