@@ -8,6 +8,7 @@ from collections import OrderedDict, defaultdict
 import config
 import biblio
 from .messages import *
+from .htmlhelpers import *
 
 # This function does a single pass through the doc,
 # finding all the "data blocks" and processing them.
@@ -29,6 +30,7 @@ def transformDataBlocks(doc):
         'propdef': transformPropdef,
         'descdef': transformDescdef,
         'elementdef': transformElementdef,
+        'argumentdef': transformArgumentdef,
         'railroad': transformRailroad,
         'biblio': transformBiblio,
         'anchors': transformAnchors,
@@ -283,9 +285,41 @@ def transformElementdef(lines, doc, **kwargs):
     ret.append("</table>")
     return ret
 
+def transformArgumentdef(lines, firstLine, **kwargs):
+    attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False)
+    el = parseHTML(firstLine+"</pre>")[0]
+    if "for" in el.attrib:
+        el.set("data-dfn-for", el.get("for"))
+        removeAttr(el, "for")
+    addClass(el, "data")
+    rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
+    lines = [
+            '''
+            <table {0}>
+                <thead>
+                    <tr>
+                        <th>Parameter
+                        <th>Type
+                        <th>Nullable
+                        <th>Optional
+                        <th>Description
+                <tbody>'''.format(rootAttrs)
+        ] + [
+            '''
+                <tr>
+                    <td><dfn argument>{0}</dfn>
+                    <td>
+                    <td>
+                    <td>
+                    <td>{1}'''.format(param, desc)
+                    for param,desc in attrs.items()
+        ] + ["</table>"]
+    return lines
 
 
-def parseDefBlock(lines, type):
+
+
+def parseDefBlock(lines, type, capitalizeKeys=True):
     vals = OrderedDict()
     lastKey = None
     for line in lines:
@@ -298,8 +332,9 @@ def parseDefBlock(lines, type):
                 die("Incorrectly formatted {2} line for '{0}':\n{1}", vals.get("Name", "???"), line, type)
                 continue
         else:
-
-            key = match.group(1).strip().capitalize()
+            key = match.group(1).strip()
+            if capitalizeKeys:
+                key.capitalize()
             lastKey = key
             val = match.group(2).strip()
         if key in vals:

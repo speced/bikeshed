@@ -368,7 +368,6 @@ def formatPropertyNames(doc):
         newContents = config.intersperse((createElement(tag, {type:""}, name) for name in names), ", ")
         replaceContents(cell, newContents)
 
-
 def canonicalizeShortcuts(doc):
     # Take all the invalid-HTML shortcuts and fix them.
 
@@ -788,10 +787,13 @@ def processAutolinks(doc):
         if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
             continue
 
+        linkFor = splitForValues(el.get('data-link-for'))
+        if linkFor:
+            linkFor = linkFor[0]
         ref = doc.refs.getRef(linkType, linkText,
                               spec=el.get('data-link-spec'),
                               status=el.get('data-link-status'),
-                              linkFor=el.get('data-link-for'),
+                              linkFor=linkFor,
                               linkForHint=el.get('data-link-for-hint'),
                               el=el,
                               error=(linkText.lower() not in doc.md.ignoredTerms))
@@ -982,7 +984,12 @@ class IDLMarker(object):
             elementName = "idl"
 
         if idlType in config.typesUsingFor:
-            idlFor = "data-idl-for='{0}'".format(construct.parent.fullName)
+            if idlType == "argument" and construct.parent.idlType == "method":
+                interfaceName = construct.parent.parent.name
+                methodNames = ["{0}/{1}".format(interfaceName, m) for m in construct.parent.methodNames]
+                idlFor = "data-idl-for='{0}'".format(", ".join(methodNames))
+            else:
+                idlFor = "data-idl-for='{0}'".format(construct.parent.fullName)
         else:
             idlFor = ""
         return ('<{name} data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters, name=elementName, refType=refType), '</{0}>'.format(elementName))
@@ -1049,15 +1056,19 @@ def processIDL(doc):
             idlType = el.get('data-idl-type')
             url = None
             forceDfn = False
+            ref = None
             for idlText in el.get('data-lt').split('|'):
                 if idlType == "interface" and idlText in forcedInterfaces:
                     forceDfn = True
-                ref = doc.refs.getRef(idlType, idlText,
-                                      linkFor=el.get('data-idl-for'),
-                                      el=el,
-                                      error=False)
+                for linkFor in splitForValues(el.get('data-idl-for', '')):
+                    ref = doc.refs.getRef(idlType, idlText,
+                                          linkFor=linkFor,
+                                          el=el,
+                                          error=False)
+                    if ref:
+                        url = ref.url
+                        break
                 if ref:
-                    url = ref.url
                     break
             if url is None or forceDfn:
                 el.tag = "dfn"
@@ -1177,7 +1188,7 @@ def cleanupHTML(doc):
     # Remove duplicate linking texts.
     for el in findAll("dfn[data-lt], a[data-lt]", doc):
         if el.get('data-lt') == textContent(el):
-            del el.attrib['data-lt']
+            pass#del el.attrib['data-lt']
 
     # Transform the <css> fake tag into markup.
     # (Used when the ''foo'' shorthand doesn't work.)
@@ -1360,6 +1371,7 @@ class CSSSpec(object):
         processDfns(self)
         processIDL(self)
         fillAttributeInfoSpans(self)
+        formatArgumentdefTables(self)
         formatElementdefTables(self)
         processAutolinks(self)
         addIndexSection(self)
@@ -1797,6 +1809,34 @@ def formatElementdefTables(doc):
                             E.a({"data-link-type":"element-attr", "for":groupName},
                                 ref.text.strip()))))
 
+def formatArgumentdefTables(doc):
+    for table in findAll("table.argumentdef", doc):
+        forMethod = doc.widl.normalizedMethodNames(table.get("data-dfn-for"))
+        method = doc.widl.find(table.get("data-dfn-for"))
+        if not method:
+            die("Can't find method '{0}'.", forMethod)
+            continue
+        for tr in findAll("tbody > tr", table):
+            tds = findAll("td", tr)
+            argName = textContent(tds[0]).strip()
+            arg = method.findArgument(argName)
+            if arg:
+                appendChild(tds[1], unicode(arg.type))
+                if unicode(arg.type).strip().endswith("?"):
+                    appendChild(tds[2],
+                        E.span({"class":"yes"}, "✔"))
+                else:
+                    appendChild(tds[2],
+                        E.span({"class":"no"}, "✘"))
+                if arg.optional:
+                    appendChild(tds[3],
+                        E.span({"class":"yes"}, "✔"))
+                else:
+                    appendChild(tds[3],
+                        E.span({"class":"no"}, "✘"))
+            else:
+                die("Can't find the '{0}' argument of method '{1}' in the argumentdef block.", argName, method.fullName)
+                continue
 
 
 def fillInBoilerplate(doc):

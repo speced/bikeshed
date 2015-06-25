@@ -544,6 +544,8 @@ def splitForValues(forValues):
     Respects function args, etc.
     Currently, for values are separated by commas.
     '''
+    if forValues is None:
+        return None
     return [value.strip() for value in re.split(r',(?![^()]*\))', forValues) if value.strip()]
 
 
