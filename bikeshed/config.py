@@ -247,6 +247,7 @@ def simplifyText(text, convertDashes=False):
     if convertDashes:
         text = text.replace("-", "_")
     text = text.strip().lower()
-    text = re.sub(r"[\s/]+", "-", text)
+    text = re.sub(r"[\s/(,]+", "-", text)
     text = re.sub(r"[^a-z0-9_-]", "", text)
+    text = text.rstrip("-")
     return text
