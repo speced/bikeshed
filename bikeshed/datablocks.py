@@ -301,6 +301,7 @@ def transformArgumentdef(lines, firstLine, **kwargs):
         die("Argumentdef blocks need a for='' attribute specifying their method.")
         return
     addClass(el, "data")
+    addClass(el, "definition-table")
     rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
     lines = [
             '''
