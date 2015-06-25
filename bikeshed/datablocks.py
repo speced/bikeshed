@@ -324,7 +324,7 @@ def transformArgumentdef(lines, firstLine, **kwargs):
                     for param,desc in attrs.items()
         ] + [
             '''
-                <caption>Arguments for the <code><a method lt='{method}' for='{interface}'>{interface}.{method}</a></code> method.</caption>
+                <caption>Arguments for the <a method lt='{method}' for='{interface}'>{interface}.{method}</a> method.</caption>
             </table>'''.format(interface=interface, method=method)
         ]
     return lines
