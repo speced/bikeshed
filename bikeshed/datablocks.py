@@ -291,8 +291,15 @@ def transformArgumentdef(lines, firstLine, **kwargs):
     if "for" in el.attrib:
         forValue = el.get('for')
         el.set("data-dfn-for", forValue)
-        interface, method = forValue.split("/")
+        if "/" in forValue:
+            interface, method = forValue.split("/")
+        else:
+            die("Argumentdef for='' values need to specify interface/method(). Got '{0}'.", forValue)
+            return
         removeAttr(el, "for")
+    else:
+        die("Argumentdef blocks need a for='' attribute specifying their method.")
+        return
     addClass(el, "data")
     rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
     lines = [
