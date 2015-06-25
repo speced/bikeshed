@@ -289,7 +289,9 @@ def transformArgumentdef(lines, firstLine, **kwargs):
     attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False)
     el = parseHTML(firstLine+"</pre>")[0]
     if "for" in el.attrib:
-        el.set("data-dfn-for", el.get("for"))
+        forValue = el.get('for')
+        el.set("data-dfn-for", forValue)
+        interface, method = forValue.split("/")
         removeAttr(el, "for")
     addClass(el, "data")
     rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
@@ -313,7 +315,11 @@ def transformArgumentdef(lines, firstLine, **kwargs):
                     <td>
                     <td>{1}'''.format(param, desc)
                     for param,desc in attrs.items()
-        ] + ["</table>"]
+        ] + [
+            '''
+                <caption>Arguments for the <code><a method lt='{method}' for='{interface}'>{interface}.{method}</a></code> method.</caption>
+            </table>'''.format(interface=interface, method=method)
+        ]
     return lines
 
 
