@@ -1379,7 +1379,7 @@ class CSSSpec(object):
         formatElementdefTables(self)
         processAutolinks(self)
         addIndexSection(self)
-
+        addStyles(self)
         processBiblioLinks(self)
         addReferencesSection(self)
         addPropertyIndex(self)
@@ -1927,6 +1927,11 @@ def addAtRisk(doc):
     for feature in doc.md.atRisk:
         html += "<li>"+doc.fixText(feature)
     fillWith('at-risk', parseHTML(html), doc=doc)
+
+def addStyles(doc):
+    el = getFillContainer('stylesheet', doc)
+    if el is not None:
+        fillWith('stylesheet', doc.getInclusion('stylesheet'), doc=doc)
 
 def addCustomBoilerplate(doc):
     for el in findAll('[boilerplate]', doc):
