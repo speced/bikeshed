@@ -62,6 +62,7 @@ class MetadataManager:
         self.workStatus = None
         self.inlineGithubIssues = False
         self.repository = config.Nil()
+        self.opaqueElements = []
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -115,7 +116,8 @@ class MetadataManager:
             "Issue Tracking": "issues",
             "Markup Shorthands": "markupShorthands",
             "Version History": "versionHistory",
-            "Text Macro": "customTextMacros"
+            "Text Macro": "customTextMacros",
+            "Opaque Elements": "opaqueElements"
         }
 
         self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
@@ -143,7 +145,8 @@ class MetadataManager:
             "Text Macro": parseTextMacro,
             "Work Status": parseWorkStatus,
             "Inline Github Issues": parseBoolean,
-            "Repository": parseRepository
+            "Repository": parseRepository,
+            "Opaque Elements": parseOpaqueElements
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -548,6 +551,9 @@ def parseRepository(key, val):
     else:
         die("Repository must be a url, optionally followed by a shortname. Got '{0}'", val)
         return config.Nil()
+
+def parseOpaqueElements(key, val):
+    return [x.strip() for x in val.split(",")]
 
 def parse(md, lines):
     # Given a MetadataManager and HTML document text, in the form of an array of text lines,

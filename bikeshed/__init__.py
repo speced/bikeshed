@@ -1335,7 +1335,7 @@ class CSSSpec(object):
         # Deal with further <pre> blocks, and markdown
         transformDataBlocks(self)
         if self.paragraphMode == "markdown":
-            self.lines = markdown.parse(self.lines, self.md.indent)
+            self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements)
 
         self.refs.setSpecData(self.md)
 

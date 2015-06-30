@@ -5,11 +5,11 @@ import json
 from itertools import *
 from .messages import *
 
-def parse(lines, numSpacesForIndentation, features=None):
-	tokens = tokenizeLines(lines, numSpacesForIndentation, features)
+def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None):
+	tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements)
 	return parseTokens(tokens, numSpacesForIndentation)
 
-def tokenizeLines(lines, numSpacesForIndentation, features=None):
+def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=None):
 	# Turns lines of text into block tokens,
 	# which'll be turned into MD blocks later.
 	# Every token *must* have 'type', 'raw', and 'prefix' keys.
@@ -24,6 +24,8 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 	tokens = []
 	preDepth = 0
 	rawElements = "pre|style|script|xmp"
+	if opaqueElements:
+		rawElements +="|" + "|".join(re.escape(x) for x in opaqueElements)
 
 	for i, rawline in enumerate(lines):
 		# Don't parse anything while you're inside certain elements
