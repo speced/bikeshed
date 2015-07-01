@@ -517,6 +517,12 @@ def linkTextVariations(str, linkType):
         else:
             yield str + "ed"
 
+        # Generated <-> Generate
+        if str[-1:] == "d":
+            yield str[:-1]
+        else:
+            yield str + "d"
+
         # Navigating <-> Navigate
         if str[-3:] == "ing":
             yield str[:-3]
