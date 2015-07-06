@@ -332,9 +332,6 @@ def isElement(node):
     # LXML HAS THE DUMBEST XML TREE DATA MODEL IN THE WORLD
     return etree.iselement(node) and isinstance(node.tag, basestring)
 
-def isOpaqueElement(el):
-    return el.tag in ('pre', 'style', 'script')
-
 def fixTypography(text):
     # Replace straight aposes with curly quotes for possessives and contractions.
     text = re.sub(r"([\w])'([\w])", r"\1’\2", text)

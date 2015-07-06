@@ -62,7 +62,7 @@ class MetadataManager:
         self.workStatus = None
         self.inlineGithubIssues = False
         self.repository = config.Nil()
-        self.opaqueElements = []
+        self.opaqueElements = ["pre", "xmp", "script", "style"]
 
         self.otherMetadata = DefaultOrderedDict(list)
 

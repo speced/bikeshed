@@ -23,9 +23,9 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
 	tokens = []
 	preDepth = 0
-	rawElements = "pre|style|script|xmp"
-	if opaqueElements:
-		rawElements +="|" + "|".join(re.escape(x) for x in opaqueElements)
+	if opaqueElements is None:
+		opaqueElements = ["pre", "xmp", "script", "style"]
+	rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
 	for i, rawline in enumerate(lines):
 		# Don't parse anything while you're inside certain elements

@@ -1654,7 +1654,7 @@ class CSSSpec(object):
                 E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
 
         def transformElement(parentEl):
-            processContents = isElement(parentEl) and not isOpaqueElement(parentEl)
+            processContents = isElement(parentEl) and not doc.isOpaqueElement(parentEl)
             if not processContents:
                 return
             children = childNodes(parentEl, clear=True)
@@ -1768,6 +1768,9 @@ class CSSSpec(object):
         except IOError:
             if error:
                 die("The include file for {0} disappeared underneath me.", name)
+
+    def isOpaqueElement(self, el):
+        return el.tag in self.md.opaqueElements
 
 config.specClass = CSSSpec
 
