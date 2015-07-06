@@ -431,7 +431,7 @@ def fixIntraDocumentReferences(doc):
             if content is None:
                 die("Tried to generate text for a section link, but the target isn't a heading:\n{0}", outerHTML(el))
                 continue
-            text = textContent(content)
+            text = textContent(content).strip()
             if target.get('data-level') is not None:
                 text = "§{1} {0}".format(text, target.get('data-level'))
             appendChild(el, text)
