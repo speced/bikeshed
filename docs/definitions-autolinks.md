@@ -128,10 +128,11 @@ This is specified with a `for=''` attribute on the definition.
 
 Specifically:
 
-* "attribute", "constructor", "method", and "const" definitions must define what interface they're relative to.
+* "attribute", "constructor", "method", "const", "event", "serializer", "stringifier", and "iterator" definitions must define what interface they're relative to.
 * "argument" definitions must define what method or constructor they're relative to.
 * "dict-member" definitions must define what dictionary they're relative to.
 * "except-field" and "exception-code" definitions must define what exception they're relative to.
+* "element-attr" definitions must define what element they're relative to.
 * "descriptor" definitions must define what at-rule they're relative to.
     (This happens automatically if you add a "For" line to the descdef table.)
 * "value" definitions must define what property, descriptor, at-rule, type, selector, or function they're relative to.

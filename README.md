@@ -11,7 +11,7 @@ with appropriate boilerplate, bibliography, indexes, etc all filled in.
 It's currently used on nearly all specs in the CSSWG,
 as well as various specs in the FXTF, SVGWG, WebAppSecurity, WHATWG, and elsewhere!
 
-[![Build Status](https://travis-ci.org/tabatkins/bikeshed.svg?branch=master)](https://travis-ci.org/tabatkins/bikeshed) 
+[![Build Status](https://travis-ci.org/tabatkins/bikeshed.svg?branch=master)](https://travis-ci.org/tabatkins/bikeshed)
 [![Gitter](https://img.shields.io/badge/Gitter-Join%20Chat%20↣-blue.svg)](https://gitter.im/tabatkins/bikeshed?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 The processor can be easily installed and run locally (requiring no network access unless you're updating),
@@ -58,6 +58,7 @@ Documentation Sections
 * [Railroad Diagrams](docs/railroad-diagrams.md) - describes the railroad-diagram feature, and its syntax.
 * [Boilerplate](docs/boilerplate.md) - describes the use and generation of a spec's boilerplate sections. You probably don't need to read this.
 * [Source-File Processing](docs/source.md) - describes the functions Bikeshed has for processing your *source file itself*.
+* [Anatomy of a Dfn](docs/dfn-contract.md) - describes the way Bikeshed formats `<dfn>` elements for processing by scrapers, so interoperating tools can do the same.
 
 Bikeshed File Extension
 -----------------------
