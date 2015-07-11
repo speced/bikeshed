@@ -21,8 +21,8 @@ class ReferenceManager(object):
     def __init__(self, specStatus=None):
         # Dict of {linking text => [anchor data]}
         self.refs = defaultdict(list)
-        # Dict of {argless method signatures => [full method signatures]}
-        self.methods = defaultdict(list)
+        # Dict of {argless method signatures => {"argfull signature": {"args":[args], "for":[fors]}}}
+        self.methods = defaultdict(dict)
         # Dict of {spec vshortname => spec data}
         self.specs = dict()
         # Dict of {linking text => link-defaults data}
@@ -182,8 +182,7 @@ class ReferenceManager(object):
                 self.refs[linkText].append(ref)
                 methodishStart = re.match(r"([^(]+\()[^)]", linkText)
                 if methodishStart:
-                    arglessName = methodishStart.group(1) + ")"
-                    self.methods[arglessName].append(linkText)
+                    self.addMethodVariants(linkText, dfnFor)
 
     def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None, exact=False):
         return self._queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]
@@ -238,20 +237,56 @@ class ReferenceManager(object):
         refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor=linkFor, linkForHint=linkForHint, export=export, ignoreObsoletes=True)
 
         if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
+            # foo()/bar failed, because foo() is technically the wrong signature
+            # let's see if we can find the right signature, and it's unambiguous
+            while True: # Hack for early exits
+                if "/" in linkFor:
+                    interfaceName, _, methodName = linkFor.partition("/")
+                else:
+                    methodName = linkFor
+                    interfaceName = None
+                methodSignatures = self.methods.get(methodName, None)
+                if methodSignatures is None:
+                    # Nope, foo() is just wrong entirely.
+                    # Jump out and fail in a normal way
+                    break
+                possibleMethods = []
+                for argfullName, metadata in methodSignatures.items():
+                    if text in metadata["args"] and (interfaceName in metadata["for"] or interfaceName is None):
+                        possibleMethods.append(argfullName)
+                if 0 == len(possibleMethods) >= 2 :
+                    # No method signatures with this argument/interface,
+                    # or too many to disambiguate
+                    # Jump out and fail in a normal way.
+                    break
+                # See if there are any results for the full Interface/method(arg) for value.
+                if interfaceName is not None:
+                    refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status="local", linkFor="{0}/{1}".format(interfaceName, possibleMethods[0]), ignoreObsoletes=True)
+                if refs is None and interfaceName is not None:
+                    refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor="{0}/{1}".format(interfaceName, possibleMethods[0]), export=export, ignoreObsoletes=True)
+                # See if there are any results with just a method(arg) for value.
+                if refs is None:
+                    refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status="local", linkFor=possibleMethods[0], ignoreObsoletes=True)
+                if refs is None:
+                    refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor=possibleMethods[0], export=export, ignoreObsoletes=True)
+                # Now we can break out and just let the normal error-handling machinery take over.
+                break
+
+
+
             # Allow foo(bar) to be for'd to with just foo() if it's completely unambiguous.
-            candidateFor, _, forPrefix = linkFor.partition("/") if "/" in linkFor else (None, None, '')
-            forPrefix = forPrefix[:-1]
-            candidates, _ = self.queryRefs(linkType="functionish", status="local", linkFor=candidateFor)
-            localRefs = {c.url: c for c in candidates if c.text.startswith(forPrefix)}.values()
-            if len(localRefs) == 1:
-                return localRefs[0]
-            # And repeat for non-locals
-            candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, linkFor=candidateFor, export=export, ignoreObsoletes=True)
-            remoteRefs = {c.url: c for c in candidates if c.text.startswith(forPrefix)}.values()
-            if len(remoteRefs) == 1:
-                return remoteRefs[0]
-            if zeroRefsError and (len(localRefs) or len(remoteRefs)):
+            methodPrefix = methodName[:-1]
+            candidates, _ = self.queryRefs(linkType="functionish", status="local", linkFor=interfaceName)
+            methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
+            if not methodRefs:
+                # Look for non-locals, then
+                candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, linkFor=interfaceName, export=export, ignoreObsoletes=True)
+                methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
+            if zeroRefsError and len(methodRefs) > 1:
+                # More than one possible foo() overload, can't tell which to link to
                 die("Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.", linkFor, text)
+                return
+            # Otherwise
 
         if failure == "text" or failure == "type":
             if linkType in ("property", "propdesc", "descriptor") and text.startswith("--"):
@@ -370,7 +405,7 @@ class ReferenceManager(object):
             else:
                 textsToSearch = list(linkTextVariations(text, linkType))
                 if text.endswith("()") and text in self.methods:
-                    textsToSearch += self.methods[text]
+                    textsToSearch += self.methods[text].keys()
                 if (linkType is None or linkType in config.lowercaseTypes) and text.lower() != text:
                     textsToSearch += [t.lower() for t in textsToSearch]
                 refs = list(textRefsIterator(self.refs, textsToSearch))
@@ -453,6 +488,17 @@ class ReferenceManager(object):
         refs = tempRefs
 
         return refs, None
+
+    def addMethodVariants(self, methodSig, forVals):
+        # Takes a full method signature, like "foo(bar)",
+        # and adds appropriate lines to self.methods for it
+        name, args = re.match(r"([^(]+)\((.*)\)", methodSig).groups()
+        arglessMethodSig = name + "()"
+        variants = self.methods[arglessMethodSig]
+        if methodSig not in variants:
+            args = [x.strip() for x in args.split(",")]
+            variants[methodSig] = {"args":args, "for":[]}
+        variants[methodSig]["for"].extend(forVals)
 
 
 def linkTextsFromElement(el, preserveCasing=False):

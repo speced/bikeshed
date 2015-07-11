@@ -111,19 +111,25 @@ def updateCrossRefs():
                 text = re.sub(r'\s+', ' ', text)
                 anchors[text].append(anchor)
 
-    methods = defaultdict(set)
+    methods = defaultdict(dict)
     for key, anchors_ in anchors.items():
-        # Extract just the name, ignoring parens and arguments
-        methodName = re.match(r"([^(]+\()[^)]", key)
-        if not methodName:
+        # Extract the name and arguments
+        match = re.match(r"([^(]+)\((.*)\)", key)
+        if not match:
             continue
-        methodName = methodName.group(1) + ")"
+        methodName, argstring = match.groups()
+        arglessMethod = methodName + "()"
+        args = [x.strip() for x in argstring.split(",")] if argstring else []
         for anchor in anchors_:
-            if anchor['type'] not in config.functionishTypes:
+            if anchor['type'] not in config.idlMethodTypes:
                 continue
-            methods[methodName].add(key)
-    for key, val in methods.items():
-        methods[key] = list(val)
+            if key not in methods[arglessMethod]:
+                methods[arglessMethod][key] = {"args":args, "for": set()}
+            methods[arglessMethod][key]["for"].update(anchor["for"])
+    # Translate the "for" set back to a list for JSONing
+    for signatures in methods.values():
+        for signature in signatures.values():
+            signature["for"] = list(signature["for"])
 
     if not config.dryRun:
         try:
