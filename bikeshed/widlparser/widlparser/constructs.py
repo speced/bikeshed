@@ -55,11 +55,20 @@ class Construct(ChildProduction):
     def findMember(self, name):
         return None
     
+    def findMembers(self, name):
+        return []
+    
     def findMethod(self, name):
         return None
     
+    def findMethods(self, name):
+        return []
+    
     def findArgument(self, name, searchMembers = True):
         return None
+
+    def findArguments(self, name, searchMembers = True):
+        return []
 
     @property
     def complexityFactor(self):
@@ -378,6 +387,11 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | Spe
                     return argument
         return None
 
+    def findArguments(self, name, searchMembers = True):
+        if (hasattr(self.member, 'arguments') and self.member.arguments):
+            return [argument for argument in self.member.arguments if (name == argument.name)]
+        return []
+
     def _unicode(self):
         return Construct._unicode(self) + unicode(self.member)
     
@@ -487,12 +501,18 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
                 return member
         return None
 
+    def findMembers(self, name):
+        return [member for member in self.members if (name == member.name)]
+
     def findMethod(self, name):
         for member in reversed(self.members):
             if (('method' == member.idlType) and (name == member.name)):
                 return member
         return None
-    
+
+    def findMethods(self, name):
+        return [member for member in self.members if (('method' == member.idlType) and (name == member.name))]
+
     def findArgument(self, name, searchMembers = True):
         if (searchMembers):
             for member in reversed(self.members):
@@ -500,6 +520,13 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
                 if (argument):
                     return argument
         return None
+
+    def findArguments(self, name, searchMembers = True):
+        result = []
+        if (searchMembers):
+            for member in self.members:
+                result += member.findArguments(name)
+        return result
 
     def _unicode(self):
         output = Construct._unicode(self)
@@ -661,6 +688,9 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
                 return member
         return None
 
+    def findMembers(self, name):
+        return [member for member in self.members if (name == member.name)]
+
     def _unicode(self):
         output = Construct._unicode(self)
         output += unicode(self.partial) if (self.partial) else ''
@@ -783,6 +813,11 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
                     return member
         return None
 
+    def findMembers(self, name):
+        if (self.interface):
+            return [member for member in self.interface.members if (name == member.name)]
+        return []
+
     def findArgument(self, name, searchMembers = True):
         if (self.arguments):
             for argument in self.arguments:
@@ -794,6 +829,15 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
                 if (argument):
                     return argument
         return None
+
+    def findArguments(self, name, searchMembers = True):
+        result = []
+        if (self.arguments):
+            result = [argument for argument in self.arguments if (name == argument.name)]
+        if (self.interface and searchMembers):
+            for member in self.interface.members:
+                result += member.findArguments(name)
+        return result
 
     def _unicode(self):
         output = Construct._unicode(self) + unicode(self._callback)
@@ -1229,6 +1273,11 @@ class ExtendedAttribute(Construct): # ExtendedAttributeNoArgs | ExtendedAttribut
                 if (name == argument.name):
                     return argument
         return None
+    
+    def findArguments(self, name, searchMembers = True):
+        if (hasattr(self.attribute, 'arguments') and self.attribute.arguments):
+            return [argument for argument in self.attribute.arguments if (name == argument.name)]
+        return []
     
     def _unicode(self):
         return unicode(self.attribute)

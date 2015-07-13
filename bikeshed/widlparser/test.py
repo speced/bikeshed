@@ -145,6 +145,7 @@ interface Multi : One  ,  Two   ,   Three     {
 typedef sequence<Foo[]>? fooType;
 typedef (short or Foo) maybeFoo;
 typedef sequence<(short or Foo)> maybeFoos;
+typedef FrozenArray<(short or Foo)> frozenMaybeFoos;
 interface foo {
   [one] attribute Foo one;
   [two] Foo two()bar;
@@ -192,6 +193,7 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
 
 [ Constructor , NamedConstructor = MyConstructor, Constructor (Foo one), NamedConstructor = MyOtherConstructor (Foo two , long long longest ) ] partial interface Foo: Bar {
     unsigned long long method(short x, unsigned long long y, optional double inf = Infinity, optional sequence<Foo> fooArg = 123.4) raises (hell);
+    unsigned long long method(DOMString string);
     void anotherMethod(short round);
     [ha!] attribute short bar getraises (an, exception);
     const short fortyTwo = 42;
@@ -259,6 +261,8 @@ callback interface callMe {
     print parser.find('Window').fullName
     print parser.find('mediaText').fullName
     print parser.find('Foo.method').markup(Marker())
+    for method in parser.findAll('Foo.method'):
+        print method.fullName
 
     print "NORMALIZE:"
     print parser.normalizedMethodName('foo')

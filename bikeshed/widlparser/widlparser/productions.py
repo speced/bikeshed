@@ -512,7 +512,8 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                                 # "USVString" TypeSuffix |
                                 # identifier [TypeSuffix] | "sequence" "<" Type ">" [Null] | "object" [TypeSuffix] |
                                 # "Date" [TypeSuffix] | "RegExp" [TypeSuffix] | "Error" TypeSuffix | 
-                                # "DOMException" TypeSuffix | "Promise" "<" ReturnType ">" [Null] | BufferRelatedType 
+                                # "DOMException" TypeSuffix | "Promise" "<" ReturnType ">" [Null] | BufferRelatedType
+                                # "FrozenArray" "<" Type ">" [Null]
                                 
     BufferRelatedTypes = frozenset(['ArrayBuffer', 'DataView', 'Int8Array', 'Int16Array', 'Int32Array', 
                                     'Uint8Array', 'Uint16Array', 'Uint32Array', 'Uint8ClampedArray', 
@@ -527,7 +528,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
         if (token and (token.isSymbol(('ByteString', 'DOMString', 'USVString', 'object', 'Date', 'RegExp', 'Error', 'DOMException')) or token.isIdentifier())):
             TypeSuffix.peek(tokens)
             return tokens.popPosition(True)
-        elif (token and token.isSymbol('sequence')):
+        elif (token and token.isSymbol(('sequence', 'FrozenArray'))):
             if (Symbol.peek(tokens, '<')):
                 if (Type.peek(tokens)):
                     if (Symbol.peek(tokens, '>')):
@@ -559,8 +560,8 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             if (token.isIdentifier()):
                 self.type = tokens.next().text
                 self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
-            elif (token.isSymbol('sequence')):
-                self.sequence = Symbol(tokens, 'sequence')
+            elif (token.isSymbol(('sequence', 'FrozenArray'))):
+                self.sequence = Symbol(tokens)
                 self._openType = Symbol(tokens, '<')
                 self.type = Type(tokens)
                 self._closeType = Symbol(tokens, '>', False)
@@ -1147,10 +1148,6 @@ class ChildProduction(Production):
     @property
     def fullName(self):
         return self.parent.fullName + '/' + self.normalName if (self.parent) else self.normalName
-
-    @property
-    def normalName(self):
-        return self.name
 
     @property
     def methodName(self):

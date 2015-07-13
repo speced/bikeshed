@@ -54,6 +54,10 @@ Clears all stored constructs.
 
 Return a named construct. If a single name is provided, a breadth-first search through all parsed constructs is performed. Alternatively, a path (names separated by "/" or ".") may be passed to target the search more narrowly. e.g.: find("Foo/bar/baz") looks for an Attribute 'baz', inside a Method 'bar', inside an Interface 'Foo'.
 
+**Parser.findAll(name)**
+
+Return a list of named constructs. Accepts the same search paths as Parser.find(name).
+
 **Parser.normalizedMethodName(name [, interfaceName = None])**
 
 Provide a normalized version of a method name, including the names of all arguments, e.g. "drawCircle(long x, long y, long radius)" becomes: "drawCircle(x, y, radius)". If a valid set of arguments is passed, the passed argument names will be returned in the normalized form. Otherwise, a search is performed for a matching previously parsed method name. The search may be narrowed to a particular interface by passing the name fo the interface or callbak in interfaceName.
@@ -83,6 +87,14 @@ Contains a string indicating the type of the construct. Possible values are: "co
 
 The name of the construct and all of its parents in path form, e.g.: 'Interface/methodName(argument)/argument'.
 
+**Construct.methodName**
+
+For 'method' Constructs, contains the normalized method name, otherwise None.
+
+**Construct.methodNames**
+
+For 'method' Constructs, contains the list of all possible normalized method names, otherwise None. Methods have multiple possible normalized names if they contain optional arguments or are variadic.
+
 **Construct.normalName**
 
 For 'method' Constructs, contains the normalized method name, otherwise the name of the construct.
@@ -107,13 +119,25 @@ An index of the complexity of the construct. See Parser.complexityFactor.
 
 Find a member of the construct. For 'callback' Constructs with an interface, will search the interface.
 
+**Construct.findMembers(name)**
+
+Return a list of members of the construct matching the name. For 'callback' Constructs with an interface, will search the interface.
+
 **Construct.findMethod(name)**
 
 Find a method within the construct.
 
+**Construct.findMethods(name)**
+
+Return a list of methods within the construct matching the name.
+
 **Construct.findArgument(name[, searchMembers = True])**
 
 Find an argument within the construct. If 'searchMembers' is true, all members will be searched as well. This allows distinguishing between arguments of a callback versus arguments of a callback interface's methods.
+
+**Construct.findArguments(name[, searchMembers = True])**
+
+Return a list of arguments within the construct mathcing the name. If 'searchMembers' is true, all members will be searched as well. This allows distinguishing between arguments of a callback versus arguments of a callback interface's methods.
 
 **Construct.markup(marker)**
 
