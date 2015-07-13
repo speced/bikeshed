@@ -254,7 +254,7 @@ class ReferenceManager(object):
                 for argfullName, metadata in methodSignatures.items():
                     if text in metadata["args"] and (interfaceName in metadata["for"] or interfaceName is None):
                         possibleMethods.append(argfullName)
-                if 0 == len(possibleMethods) >= 2 :
+                if len(possibleMethods) != 1:
                     # No method signatures with this argument/interface,
                     # or too many to disambiguate
                     # Jump out and fail in a normal way.
@@ -492,7 +492,11 @@ class ReferenceManager(object):
     def addMethodVariants(self, methodSig, forVals):
         # Takes a full method signature, like "foo(bar)",
         # and adds appropriate lines to self.methods for it
-        name, args = re.match(r"([^(]+)\((.*)\)", methodSig).groups()
+        match = re.match(r"([^(]+)\((.*)\)", methodSig)
+        if not match:
+            # Was fed something that's not a method signature.
+            return
+        name, args = match.groups()
         arglessMethodSig = name + "()"
         variants = self.methods[arglessMethodSig]
         if methodSig not in variants:
