@@ -182,7 +182,7 @@ class ReferenceManager(object):
                 self.refs[linkText].append(ref)
                 methodishStart = re.match(r"([^(]+\()[^)]", linkText)
                 if methodishStart:
-                    self.addMethodVariants(linkText, dfnFor)
+                    self.addMethodVariants(linkText, dfnFor, ref["url"])
 
     def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None, exact=False):
         return self._queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]
@@ -250,25 +250,34 @@ class ReferenceManager(object):
                     # Nope, foo() is just wrong entirely.
                     # Jump out and fail in a normal way
                     break
-                possibleMethods = []
+                # Find all method signatures that contain the arg in question
+                # and, if interface is specified, are for that interface.
+                # Dedup/collect by url, so I'll get all the signatures for a given dfn.
+                possibleMethods = defaultdict(list)
                 for argfullName, metadata in methodSignatures.items():
                     if text in metadata["args"] and (interfaceName in metadata["for"] or interfaceName is None):
-                        possibleMethods.append(argfullName)
-                if len(possibleMethods) != 1:
-                    # No method signatures with this argument/interface,
-                    # or too many to disambiguate
+                        possibleMethods[metadata["url"]].append(argfullName)
+                possibleMethods = possibleMethods.values()
+                if not possibleMethods:
+                    # No method signatures with this argument/interface.
                     # Jump out and fail in a normal way.
                     break
-                # See if there are any results for the full Interface/method(arg) for value.
-                if interfaceName is not None:
-                    refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status="local", linkFor="{0}/{1}".format(interfaceName, possibleMethods[0]), ignoreObsoletes=True)
-                if refs is None and interfaceName is not None:
-                    refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor="{0}/{1}".format(interfaceName, possibleMethods[0]), export=export, ignoreObsoletes=True)
-                # See if there are any results with just a method(arg) for value.
-                if refs is None:
-                    refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status="local", linkFor=possibleMethods[0], ignoreObsoletes=True)
-                if refs is None:
-                    refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor=possibleMethods[0], export=export, ignoreObsoletes=True)
+                if len(possibleMethods) > 1:
+                    # Too many to disambiguate.
+                    die("The argument autolink '{0}' for '{1}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for.", text, linkFor)
+                # Try out all the combinations of interface/status/signature
+                linkForPatterns = ["{i}/{m}", "{m}"]
+                statuses = ["local", status]
+                for p in linkForPatterns:
+                    for s in statuses:
+                        for m in possibleMethods[0]:
+                            refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=s, linkFor=p.format(i=interfaceName, m=m), ignoreObsoletes=True)
+                            if refs:
+                                break
+                        if refs:
+                            break
+                    if refs:
+                        break
                 # Now we can break out and just let the normal error-handling machinery take over.
                 break
 
@@ -489,7 +498,7 @@ class ReferenceManager(object):
 
         return refs, None
 
-    def addMethodVariants(self, methodSig, forVals):
+    def addMethodVariants(self, methodSig, forVals, url):
         # Takes a full method signature, like "foo(bar)",
         # and adds appropriate lines to self.methods for it
         match = re.match(r"([^(]+)\((.*)\)", methodSig)
@@ -501,7 +510,7 @@ class ReferenceManager(object):
         variants = self.methods[arglessMethodSig]
         if methodSig not in variants:
             args = [x.strip() for x in args.split(",")]
-            variants[methodSig] = {"args":args, "for":[]}
+            variants[methodSig] = {"args":args, "for":[], "url": url}
         variants[methodSig]["for"].extend(forVals)
 
 

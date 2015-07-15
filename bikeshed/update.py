@@ -124,7 +124,7 @@ def updateCrossRefs():
             if anchor['type'] not in config.idlMethodTypes:
                 continue
             if key not in methods[arglessMethod]:
-                methods[arglessMethod][key] = {"args":args, "for": set()}
+                methods[arglessMethod][key] = {"args":args, "for": set(), "url":anchor['url']}
             methods[arglessMethod][key]["for"].update(anchor["for"])
     # Translate the "for" set back to a list for JSONing
     for signatures in methods.values():
