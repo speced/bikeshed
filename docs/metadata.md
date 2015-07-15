@@ -51,7 +51,7 @@ There are several additional optional keys:
 * **Warning** must contain either "Obsolete", "Not Ready", "New Version XXX", "Replaced by XXX", "Commit deadb33f http://example.com/url/to/deadb33f replaced by XXX", or "Branch XXX http://example.com/url/to/XXX replaced by YYY" which triggers the appropriate warning message in the boilerplate.
 * **Previous Version** must contain a link that points to a previous (dated) version on /TR.  You can specify this key more than once for multiple entries.
 * **At Risk** must contain an at-risk feature.  You can specify this key more than once for multiple entries.
-* **Group** must contain the name of the group the spec is being generated for.  This is used by the boilerplate generation to select the correct file.  It defaults to "csswg".
+* **Group** must contain the name of the group the spec is being generated for.  This is used by the boilerplate generation to select the correct file.  If omitted, it defaults to a generic set of boilerplate.
 * **Status Text** allows adding an additional customized sentence that can be used in the document status section.
 * **Ignored Terms** accepts a comma-separated list of terms and makes Bikeshed not emit warnings or errors when attempting to autolink those terms.  Use this to quiet spurious preprocessor warnings caused by you inventing terms (for example, the Variables spec invents custom properties like 'var-foo'), or as a temporary patch when the spec you want to link to doesn't set up its definitions correctly.
 * **Link Defaults** lets you specify a default spec for particular autolinks to link to.  The value is a comma-separated list of entries, where each entry is a versioned spec shortname, followed by a link type, followed by a "/"-separated list of link phrases.
