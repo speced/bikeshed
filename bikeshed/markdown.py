@@ -19,7 +19,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
 	# Inline elements that are allowed to start a "normal" line of text.
 	# Any other element will instead be an HTML line and will close paragraphs, etc.
-	allowedStartElements = "a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|bdi|bdo|span|br|wbr|img|meter|progress"
+	allowedStartElements = "a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|bdi|bdo|span|br|wbr|img|meter|progress|css"
 
 	tokens = []
 	preDepth = 0
