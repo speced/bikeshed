@@ -373,8 +373,17 @@ class ReferenceManager(object):
             candidates = self.biblios[key]
         elif key+"\n" in self.biblios:
             candidates = self.biblios[key+"\n"]
-        elif key in self.specs and generateFakeRef:
-            return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=status)
+        elif key in self.specs:
+            # First see if the ref is just unnecessarily levelled
+            match = re.match(r"(.+?)-\d+", key)
+            if match:
+                ref = self.getBiblioRef(match.group(1), status, el=el)
+                if ref:
+                    return ref
+            if generateFakeRef:
+                return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=status)
+            else:
+                return None
         else:
             return None
 
