@@ -148,7 +148,7 @@ def printHeader(outfile, headerInfo):
 
 <h1>{title} Disposition of Comments for {date} {status}</h1>
 
-<p>Last call document: <a href="{url}">{url}</a>
+<p>Review document: <a href="{url}">{url}</a>
 
 <p>Editor's draft: <a href="http://dev.w3.org/csswg/{shortname}/">http://dev.w3.org/csswg/{shortname}/</a>
 
