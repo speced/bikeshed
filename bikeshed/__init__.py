@@ -1378,6 +1378,7 @@ class CSSSpec(object):
         formatElementdefTables(self)
         processAutolinks(self)
         addIndexSection(self)
+        addExplicitIndexes(self)
         addStyles(self)
         processBiblioLinks(self)
         addReferencesSection(self)
@@ -1974,7 +1975,6 @@ def addIndexOfLocallyDefinedTerms(doc, container):
     appendChild(container,
         E.h3({"class":"no-num", "id":"index-defined-here"}, "Terms defined by this specification"))
 
-    from collections import OrderedDict
     indexEntries = defaultdict(list)
     for el in findAll("dfn[id]", doc):
         linkTexts = linkTextsFromElement(el)
@@ -1991,19 +1991,91 @@ def addIndexOfLocallyDefinedTerms(doc, container):
         for linkText in linkTexts:
             entry = {
                 'url':"#"+id,
-                'level':headingLevel,
+                'label':headingLevel,
                 'disambiguator':disambiguator
                 }
             indexEntries[linkText].append(entry)
 
     # Now print the indexes
-    sortedEntries = OrderedDict(sorted(indexEntries.items(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower())))
-    indexHTML = htmlFromIndexTerms(sortedEntries)
+    indexHTML = htmlFromIndexTerms(indexEntries)
     appendChild(container, indexHTML)
 
+def addExplicitIndexes(doc):
+    # Explicit indexes can be requested for specs with <index for="example-spec-1"></index>
+
+    for container in findAll("index", doc):
+        indexEntries = defaultdict(list)
+        if container.get('for') is None:
+            die("<index> elements need a for='' attribute specifying one or more specs.")
+            continue
+        if container.get('type'):
+            types = [x.strip() for x in container.get('type').split(',')]
+        else:
+            types = None
+        status = container.get('status')
+        if status and status not in ["TR", "ED"]:
+            die("<index> has unknown value '{0}' for status. Must be TR or ED.", status)
+            continue
+        specs = set(x.strip() for x in container.get('for').split(','))
+        seenSpecs = set()
+        for text, refs in doc.refs.refs.items():
+            text = text.strip()
+            for ref in refs:
+                if not ref['export']:
+                    continue
+                if ref['spec'].strip() not in specs:
+                    continue
+                if types and ref['type'].strip() not in types:
+                    continue
+                seenSpecs.add(ref['spec'].strip())
+                label = ref['spec'].strip() # TODO: Record section numbers, use that instead
+                if ref['for']:
+                    disambiguator = "{0} for {1}".format(ref['type'].strip(), ', '.join(x.strip() for x in ref['for']))
+                else:
+                    if ref['type'] == "dfn":
+                        disambiguator = "definition of"
+                    else:
+                        disambiguator = "{0}".format(ref['type'].strip())
+                entry = {'url': ref['url'].strip(), 'disambiguator': disambiguator, 'label': label, 'status': ref['status'].strip()}
+                for i,existingEntry in enumerate(indexEntries[text]):
+                    if existingEntry['disambiguator'] != disambiguator or existingEntry['label'] != label:
+                        continue
+                    # Whoops, found an identical entry.
+                    if existingEntry['status'] != entry['status']:
+                        if status:
+                            if existingEntry['status'] == status:
+                                # Existing entry matches stated status, do nothing and don't add it.
+                                break
+                            elif entry['status'] == status:
+                                # New entry matches status, update and don't re-add it.
+                                indexEntries[text][i] = entry
+                                break
+                        else:
+                            # Default to preferring EDs
+                            if existingEntry['status'] == "ED":
+                                break
+                            elif entry['status'] == "ED":
+                                indexEntries[text][i] = entry
+                                break
+                    else:
+                        # Legit dupes. Shouldn't happen in a good spec, but whatever.
+                        pass
+                else:
+                    indexEntries[text].append(entry)
+        if specs - seenSpecs:
+            warn("Couldn't find any refs for {0} when generating an index.", ' or '.join("'{0}'".format(x) for x in specs - seenSpecs))
+        appendChild(container, htmlFromIndexTerms(indexEntries))
+        container.tag = "div"
+        removeAttr(container, "for")
+        removeAttr(container, "status")
+
+
 def htmlFromIndexTerms(entries):
-    # entries: dict (preferably OrderedDict, if you want stability) of linkText=>{url, level, disambiguator}
-    # level is heading level of section it appears in, disambiguator is phrase to when there are collisions
+    # entries: dict (preferably OrderedDict, if you want stability) of linkText=>{url, label, disambiguator}
+    # label is used for the actual link (normally heading level), disambiguator is phrase to use when there are collisions
+
+    from collections import OrderedDict
+    entries = OrderedDict(sorted(entries.items(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower())))
 
     topList = E.ul({"class":"indexlist"})
     for text, items in entries.items():
@@ -2011,14 +2083,14 @@ def htmlFromIndexTerms(entries):
             item = items[0]
             li = appendChild(topList,
                 E.li(text, ", ",
-                    E.a({"href":item['url']}, item['level'])))
+                    E.a({"href":item['url']}, item['label'])))
         else:
             li = appendChild(topList, E.li(text))
             ul = appendChild(li, E.ul())
             for item in items:
                 appendChild(ul,
                     E.li(item['disambiguator'], ", ",
-                        E.a({"href":item['url']}, item['level'])))
+                        E.a({"href":item['url']}, item['label'])))
     return topList
 
 def addIndexOfExternallyDefinedTerms(doc, container):
