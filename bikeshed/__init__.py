@@ -1990,7 +1990,7 @@ def addIndexOfLocallyDefinedTerms(doc, container):
         id = el.get('id')
         for linkText in linkTexts:
             entry = {
-                'id':id,
+                'url':"#"+id,
                 'level':headingLevel,
                 'disambiguator':disambiguator
                 }
@@ -2002,7 +2002,7 @@ def addIndexOfLocallyDefinedTerms(doc, container):
     appendChild(container, indexHTML)
 
 def htmlFromIndexTerms(entries):
-    # entries: dict (preferably OrderedDict, if you want stability) of linkText=>{id, level, disambiguator}
+    # entries: dict (preferably OrderedDict, if you want stability) of linkText=>{url, level, disambiguator}
     # level is heading level of section it appears in, disambiguator is phrase to when there are collisions
 
     topList = E.ul({"class":"indexlist"})
@@ -2011,14 +2011,14 @@ def htmlFromIndexTerms(entries):
             item = items[0]
             li = appendChild(topList,
                 E.li(text, ", ",
-                    E.a({"href":"#"+item['id']}, item['level'])))
+                    E.a({"href":item['url']}, item['level'])))
         else:
             li = appendChild(topList, E.li(text))
             ul = appendChild(li, E.ul())
             for item in items:
                 appendChild(ul,
                     E.li(item['disambiguator'], ", ",
-                        E.a({"href":"#"+item['id']}, item['level'])))
+                        E.a({"href":item['url']}, item['level'])))
     return topList
 
 def addIndexOfExternallyDefinedTerms(doc, container):
