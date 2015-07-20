@@ -30,7 +30,6 @@ from . import HTMLSerializer
 from .datablocks import transformDataBlocks
 from .ReferenceManager import ReferenceManager
 from .ReferenceManager import linkTextsFromElement, splitForValues
-from .globalnames import *
 from .htmlhelpers import *
 from .messages import *
 from .widlparser.widlparser import parser
@@ -1977,8 +1976,6 @@ def addIndexOfLocallyDefinedTerms(doc, container):
 
     from collections import OrderedDict
     indexEntries = defaultdict(list)
-    attemptedForRefs = defaultdict(list)
-    seenGlobalNames = set()
     for el in findAll("dfn[id]", doc):
         linkTexts = linkTextsFromElement(el)
         headingLevel = headingLevelOfElement(el) or "Unnumbered section"
@@ -1991,49 +1988,38 @@ def addIndexOfLocallyDefinedTerms(doc, container):
             else:
                 disambiguator = "({0})".format(el.get('data-dfn-type'))
         id = el.get('id')
-        seenGlobalNames.update(GlobalNames.fromEl(el))
         for linkText in linkTexts:
-            sort = re.sub(r'[^a-z0-9]', '', linkText.lower())
             entry = {
-                'text':linkText,
-                'type':el.get('data-dfn-type'),
                 'id':id,
                 'level':headingLevel,
-                'disambiguator':disambiguator,
-                'sort':sort,
-                'globalNames': GlobalNames.fromEl(el)
+                'disambiguator':disambiguator
                 }
             indexEntries[linkText].append(entry)
-            for ref in GlobalNames.refsFromEl(el):
-                attemptedForRefs[ref].append(entry)
-    unseenForRefs = set(attemptedForRefs.viewkeys()).difference(seenGlobalNames)
 
     # Now print the indexes
-    sortedEntries = OrderedDict(sorted(indexEntries.items(), key=lambda x:x[1][0]['sort']))
-    topList = appendChild(container, E.ul({"class":"indexlist"}))
-    for text, items in sortedEntries.items():
+    sortedEntries = OrderedDict(sorted(indexEntries.items(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower())))
+    indexHTML = htmlFromIndexTerms(sortedEntries)
+    appendChild(container, indexHTML)
+
+def htmlFromIndexTerms(entries):
+    # entries: dict (preferably OrderedDict, if you want stability) of linkText=>{id, level, disambiguator}
+    # level is heading level of section it appears in, disambiguator is phrase to when there are collisions
+
+    topList = E.ul({"class":"indexlist"})
+    for text, items in entries.items():
         if len(items) == 1:
             item = items[0]
             li = appendChild(topList,
-                E.li(item['text'], ", ",
+                E.li(text, ", ",
                     E.a({"href":"#"+item['id']}, item['level'])))
-            if item['type'] == "property":
-                reffingDfns = []
-                for globalName in item['globalNames']:
-                    reffingDfns += attemptedForRefs[globalName]
-                if reffingDfns:
-                    dl = appendChild(li, E.dl(E.dt("Property Values:")))
-                    for r in reffingDfns:
-                        appendChild(dl,
-                            E.dd(r.text, ", ",
-                                E.a({"href":"#"+r['id']}, r['level'])))
         else:
-            li = appendChild(topList, E.li(items[0]['text']))
+            li = appendChild(topList, E.li(text))
             ul = appendChild(li, E.ul())
             for item in items:
                 appendChild(ul,
                     E.li(item['disambiguator'], ", ",
                         E.a({"href":"#"+item['id']}, item['level'])))
+    return topList
 
 def addIndexOfExternallyDefinedTerms(doc, container):
     if not doc.externalRefsUsed:
