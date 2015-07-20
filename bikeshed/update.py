@@ -30,7 +30,7 @@ def updateCrossRefs():
         say("Downloading anchor data...")
         shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version = "vnd.csswg.shepherd.v1")
         res = shepherd.get("specifications", anchors = True, draft = True)
-        # http://test.csswg.org/shepherd/api/spec/?spec=css-flexbox-1&anchors&draft, for manual looking
+        # http://api.csswg.org/shepherd/spec/?spec=css-flexbox-1&anchors&draft, for manual looking
         if ((not res) or (406 == res.status)):
             die("This version of the anchor-data API is no longer supported. Please update Bikeshed.")
             return
