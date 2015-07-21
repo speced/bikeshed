@@ -1991,7 +1991,7 @@ def addIndexOfLocallyDefinedTerms(doc, container):
         for linkText in linkTexts:
             entry = {
                 'url':"#"+id,
-                'label':headingLevel,
+                'label':"§" + headingLevel,
                 'disambiguator':disambiguator
                 }
             indexEntries[linkText].append(entry)
@@ -2082,15 +2082,17 @@ def htmlFromIndexTerms(entries):
         if len(items) == 1:
             item = items[0]
             li = appendChild(topList,
-                E.li(text, ", ",
-                    E.a({"href":item['url']}, item['label'])))
+                E.li(
+                    E.a({"href":item['url']}, text),
+                    E.span(", in ", item['label'])))
         else:
             li = appendChild(topList, E.li(text))
             ul = appendChild(li, E.ul())
             for item in items:
                 appendChild(ul,
-                    E.li(item['disambiguator'], ", ",
-                        E.a({"href":item['url']}, item['label'])))
+                    E.li(
+                        E.a({"href":item['url']}, item['disambiguator']),
+                        E.span(", in ", item['label'])))
     return topList
 
 def addIndexOfExternallyDefinedTerms(doc, container):
