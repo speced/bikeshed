@@ -287,11 +287,25 @@ def childNodes(parentEl, clear=False):
     return ret
 
 def treeAttr(el, attrName):
-    if el.get(attrName) is not None:
-        return el.get(attrName)
-    for ancestor in el.iterancestors():
-        if ancestor.get(attrName) is not None:
-            return ancestor.get(attrName)
+    # Find the nearest instance of the given attr in the tree
+    # Useful for when you can put an attr on an ancestor and apply it to all contents.
+    # Returns attrValue or None if nothing is found.
+    import itertools as it
+    for target in it.chain([el], el.iterancestors()):
+        if target.get(attrName) is not None:
+            return target.get(attrName)
+
+def closestAttr(el, *attrs):
+    # Like treeAttr, but can provide multiple attr names, and returns the first one found.
+    # Useful with combos like highlight/nohighlight
+    # If multiple target attrs show up on same element, priority is calling order.
+    # Returns a tuple of (attrName, attrValue) or (None, None) if nothing is found.
+    import itertools as it
+    for target in it.chain([el], el.iterancestors()):
+        for attrName in attrs:
+            if target.get(attrName) is not None:
+                return attrName, target.get(attrName)
+    return None, None
 
 def removeAttr(el, attrName):
     # Remove an attribute, silently ignoring if attr doesn't exist.

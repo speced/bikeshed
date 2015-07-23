@@ -1124,7 +1124,7 @@ def addSyntaxHighlighting(doc):
         try:
             lexer = get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
         except pyg.util.ClassNotFound:
-            die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/.")
+            die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el))
             return
         highlighted = parseHTML(pyg.highlight(text, lexer, formatters.HtmlFormatter()))[0][0]
         # Remove the trailing newline
@@ -1134,17 +1134,32 @@ def addSyntaxHighlighting(doc):
 
     highlightingOccurred = False
 
-    for el in findAll("[highlight]", doc):
-        highlight(el, el.get('highlight'))
-        highlightingOccurred = True
+    def translateLang(lang):
+        # Translates some names to ones Pygment understands
+        if lang == "aspnet":
+            return "aspx-cs"
+        if lang in ["markup", "svg"]:
+            return "html"
+        return lang
 
-    pygmentFromPrism = {"aspnet":"aspx-cs", "markup":"html"}
+    # Translate Prism-style highlighting into Pygment-style
     for el in findAll("[class*=language-], [class*=lang-]", doc):
         match = re.search("(?:lang|language)-(\w+)", el.get("class"))
         if match:
-            lang = pygmentFromPrism.get(match.group(1), match.group(1))
-            highlight(el, lang)
-            highlightingOccurred = True
+            el.set("highlight", match.group(1))
+
+    # Highlight all the appropriate elements
+    for el in findAll("pre, code", doc):
+        if el.tag == "pre":
+            children = list(childElements(el))
+            if len(children):
+                # If there's any internal structure, don't override it with highlighting.
+                continue
+        attr, lang = closestAttr(el, "nohighlight", "highlight")
+        if attr == "nohighlight" or attr is None:
+            continue
+        highlight(el, translateLang(lang))
+        highlightingOccurred = True
 
     if highlightingOccurred:
         style = formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
