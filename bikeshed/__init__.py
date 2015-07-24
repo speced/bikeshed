@@ -1165,8 +1165,8 @@ def addSyntaxHighlighting(doc):
         style = formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
         style += """
         .highlight { background: hsl(24, 20%, 95%); }
-        pre.highlight { padding: 1em; margin: .5em 0; overflow: auto; }
-        :not(pre).highlight { padding: .1em; border-radius: .3em; }
+        code.highlight { padding: .1em; border-radius: .3em; }
+        pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
         """
         body = find("body", doc)
         appendChild(body,
