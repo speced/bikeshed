@@ -1059,7 +1059,7 @@ def processIDL(doc):
             for idlText in el.get('data-lt').split('|'):
                 if idlType == "interface" and idlText in forcedInterfaces:
                     forceDfn = True
-                for linkFor in splitForValues(el.get('data-idl-for', '')):
+                for linkFor in splitForValues(el.get('data-idl-for', '')) or [None]:
                     ref = doc.refs.getRef(idlType, idlText,
                                           linkFor=linkFor,
                                           el=el,
