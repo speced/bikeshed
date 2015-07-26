@@ -23,6 +23,8 @@ class ReferenceManager(object):
         self.refs = defaultdict(list)
         # Dict of {argless method signatures => {"argfull signature": {"args":[args], "for":[fors]}}}
         self.methods = defaultdict(dict)
+        # Dict of {for value => [terms]}
+        self.fors = defaultdict(list)
         # Dict of {spec vshortname => spec data}
         self.specs = dict()
         # Dict of {linking text => link-defaults data}
@@ -41,6 +43,7 @@ class ReferenceManager(object):
         with config.retrieveDataFile("anchors.data", quiet=True) as lines:
             self.refs = decodeAnchors(lines)
         self.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
+        self.fors.update(json.loads(config.retrieveDataFile("fors.json", quiet=True, str=True)))
         # Get local anchor data
         try:
             with io.open("anchors.bsdata", 'r', encoding="utf-8") as lines:
@@ -415,6 +418,14 @@ class ReferenceManager(object):
                     yield RefWrapper(text, ref)
                 for ref in refs.get(text+"\n", []):
                     yield RefWrapper(text, ref)
+        def forRefsIterator(refs, fors, targetFors):
+            # Same as above, but only grabs those for certain values
+            for for_ in targetFors:
+                for text in fors[for_]:
+                    for ref in refs.get(text, []):
+                        yield RefWrapper(text, ref)
+                    for ref in refs.get(text+"\n", []):
+                        yield RefWrapper(text, ref)
 
         # Set up the initial list of refs to query
         if text:
@@ -427,6 +438,8 @@ class ReferenceManager(object):
                 if (linkType is None or linkType in config.lowercaseTypes) and text.lower() != text:
                     textsToSearch += [t.lower() for t in textsToSearch]
                 refs = list(textRefsIterator(self.refs, textsToSearch))
+        elif linkFor:
+            refs = list(forRefsIterator(self.refs, self.fors, [linkFor]))
         else:
             refs = list(refsIterator(self.refs))
         if not refs:

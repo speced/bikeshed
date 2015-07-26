@@ -826,14 +826,14 @@ def decorateAutolink(doc, el, linkType, linkText):
     # Add additional effects to some autolinks.
     if linkType == "type":
         # Get all the values that the type expands to, add it as a title.
-        # TODO: Make this not have quite as sucky perf.
         if linkText in decorateAutolink.cache:
             titleText = decorateAutolink.cache[linkText]
             error = False
         else:
             refs, error = doc.refs.queryRefs(linkFor=linkText)
-            titleText = "Expands to: " + ' | '.join(ref.text for ref in refs)
-            decorateAutolink.cache[linkText] = titleText
+            if not error:
+                titleText = "Expands to: " + ' | '.join(ref.text for ref in refs)
+                decorateAutolink.cache[linkText] = titleText
         if not error:
             el.set('title', titleText)
 decorateAutolink.cache = {}

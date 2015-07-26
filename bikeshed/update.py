@@ -111,6 +111,7 @@ def updateCrossRefs():
                 text = re.sub(r'\s+', ' ', text)
                 anchors[text].append(anchor)
 
+    # Compile a db of {argless methods => {argfull method => {args, fors, url}}
     methods = defaultdict(dict)
     for key, anchors_ in anchors.items():
         # Extract the name and arguments
@@ -131,6 +132,19 @@ def updateCrossRefs():
         for signature in signatures.values():
             signature["for"] = list(signature["for"])
 
+    # Compile a db of {for value => dict terms that use that for value}
+    fors = defaultdict(set)
+    for key, anchors_ in anchors.items():
+        for anchor in anchors_:
+            for for_ in anchor["for"]:
+                if for_ == "":
+                    continue
+                fors[for_].add(key)
+            if not anchor["for"]:
+                fors["/"].add(key)
+    for key, val in fors.items():
+        fors[key] = list(val)
+
     if not config.dryRun:
         try:
             with io.open(config.scriptPath+"/spec-data/specs.json", 'w', encoding="utf-8") as f:
@@ -150,6 +164,13 @@ def updateCrossRefs():
         except Exception, e:
             die("Couldn't save methods database to disk.\n{0}", e)
             return
+        try:
+            with io.open(config.scriptPath+"/spec-data/fors.json", 'w', encoding="utf-8") as f:
+                f.write(unicode(json.dumps(fors, ensure_ascii=False, indent=2)))
+        except Exception, e:
+            die("Couldn't save fors database to disk.\n{0}", e)
+            return
+
     say("Success!")
 
 
