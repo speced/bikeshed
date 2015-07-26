@@ -37,10 +37,10 @@ class ReferenceManager(object):
 
     def initializeRefs(self, doc):
         # Load up the xref data
-        self.specs.update(json.loads(config.retrieveCachedFile("specs.json", quiet=True, str=True)))
-        with config.retrieveCachedFile("anchors.data", quiet=True) as lines:
+        self.specs.update(json.loads(config.retrieveDataFile("specs.json", quiet=True, str=True)))
+        with config.retrieveDataFile("anchors.data", quiet=True) as lines:
             self.refs = decodeAnchors(lines)
-        self.methods.update(json.loads(config.retrieveCachedFile("methods.json", quiet=True, str=True)))
+        self.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
         # Get local anchor data
         try:
             with io.open("anchors.bsdata", 'r', encoding="utf-8") as lines:
@@ -48,7 +48,7 @@ class ReferenceManager(object):
         except IOError:
             pass
 
-        datablocks.transformInfo(config.retrieveCachedFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
+        datablocks.transformInfo(config.retrieveDataFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
         # local info
         try:
             with io.open("link-defaults.infotree", 'r', encoding="utf-8") as lines:
@@ -57,7 +57,7 @@ class ReferenceManager(object):
             pass
 
     def initializeBiblio(self):
-        with config.retrieveCachedFile("biblio.data", quiet=True) as lines:
+        with config.retrieveDataFile("biblio.data", quiet=True) as lines:
             try:
                 while True:
                     key = lines.next()

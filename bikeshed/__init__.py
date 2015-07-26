@@ -167,6 +167,8 @@ def main():
     config.dryRun = options.dryRun
     config.minify = getattr(options, 'minify', True)
 
+    update.fixupDataFiles()
+
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
@@ -1316,7 +1318,7 @@ class CSSSpec(object):
         self.paragraphMode = "markdown"
         self.macros = defaultdict(lambda x: "???")
         self.widl = parser.Parser(ui=IDLUI())
-        self.testSuites = json.loads(config.retrieveCachedFile("test-suites.json", quiet=True, str=True))
+        self.testSuites = json.loads(config.retrieveDataFile("test-suites.json", quiet=True, str=True))
 
         try:
             if self.inputSource == "-":

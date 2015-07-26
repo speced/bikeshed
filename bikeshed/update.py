@@ -290,3 +290,32 @@ def writeAnchorsFile(fh, anchors):
                 if forValue: # skip empty strings
                     fh.write(forValue+"\n")
             fh.write("-" + "\n")
+
+def fixupDataFiles():
+    localPath = config.scriptPath + "/spec-data/"
+    remotePath = config.scriptPath + "/spec-data/readonly/"
+    try:
+        localVersion = int(open(localPath+"version.txt", 'r').read())
+    except IOError:
+        localVersion = None
+    try:
+        remoteVersion = int(open(remotePath+"version.txt", 'r').read())
+    except IOError, err:
+        warn("Couldn't check the datafile version. Bikeshed may be unstable.\n{0}", err)
+        return
+
+    if localVersion == remoteVersion:
+        # Cool
+        return
+
+    # If versions don't match, either the remote versions have been updated
+    # (and we should switch you to them, because formats may have changed),
+    # or you're using a historical version of Bikeshed (ditto).
+    try:
+        import os
+        import shutil
+        for filename in os.listdir(remotePath):
+            shutil.copy(remotePath+filename, localPath+filename)
+    except Exception, err:
+        warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
+        return

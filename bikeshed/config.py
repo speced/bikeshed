@@ -176,7 +176,7 @@ class Nil(object):
 
 
 
-def retrieveCachedFile(filename, quiet=False, str=False):
+def retrieveDataFile(filename, quiet=False, str=False):
     cacheLocation = scriptPath + "/spec-data/" + filename
     fallbackLocation = scriptPath + "/spec-data/readonly/" + filename
     try:
