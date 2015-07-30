@@ -40,6 +40,8 @@ From here, you can follow the commons steps outlined below.
 OS X steps
 ----------
 
+Note: If you're on a relatively modern Mac you should be able to proceed directly to [Common steps](#common-steps).
+
 These instructions assume that you have [Mac Ports](https://www.macports.org/) installed. If you successfully install Bikeshed using some other method, please contribute to this documentation.
 
 First, get the right packages installed onto your system:
