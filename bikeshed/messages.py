@@ -37,3 +37,6 @@ def progress(msg, val, total):
     if val == total:
         print
     sys.stdout.flush()
+
+def resetSeenMessages():
+    messages = set()

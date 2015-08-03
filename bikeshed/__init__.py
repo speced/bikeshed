@@ -1464,6 +1464,7 @@ class CSSSpec(object):
             while(True):
                 inputModified = os.stat(self.inputSource).st_mtime
                 if inputModified > lastInputModified:
+                    resetSeenMessages()
                     lastInputModified = inputModified
                     formattedTime = datetime.fromtimestamp(inputModified).strftime("%H:%M:%S")
                     print "Source file modified at {0}. Rebuilding...".format(formattedTime)
