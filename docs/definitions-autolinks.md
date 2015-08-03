@@ -248,6 +248,12 @@ Again, the type value won't be shown in the processed document.
 
 These two techniques can, of course, be combined.
 
+IDL types can also have their text overridden, when you want to refer to an IDL definition with more natural English text.  To do, append a pipe character `|` and the text you want to show, like:
+
+```
+{{SomeUglyInterfaceName|an ugly interface}}
+```
+
 Link Types
 ----------
 
