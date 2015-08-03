@@ -1652,7 +1652,7 @@ class CSSSpec(object):
                 return E.span(match.group(0))
             return E.a({"data-link-type":linkType, "class":"property", "for": match.group(1)}, match.group(2))
 
-        idlRe = re.compile(r"{{(?:([^ }]*)/)?((?:[^ }]|,\s)+?)(?:!!([\w-]+))?}}")
+        idlRe = re.compile(r"{{(?:([^ }]*)/)?((?:[^ }]|,\s)+?)(?:!!([\w-]+))?(\|[^}]+)?}}")
         def idlReplacer(match):
             if match.group(3) is None:
                 linkType = "idl"
@@ -1661,8 +1661,12 @@ class CSSSpec(object):
             else:
                 die("Shorthand {0} gives type as '{1}', but only IDL types are allowed.", match.group(0), match.group(3))
                 return E.span(match.group(0))
+            if match.group(4) is not None:
+                linkText = match.group(4).strip("|")
+            else:
+                linkText = match.group(2)
             return E.code({"class":"idl"},
-                E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
+                E.a({"data-link-type":linkType, "for": match.group(1), "lt":match.group(2)}, linkText))
 
         elementRe = re.compile(r"<{(?:([\w-]+)/)?([\w-]+)}>")
         def elementReplacer(match):
