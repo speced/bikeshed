@@ -1387,7 +1387,6 @@ class CSSSpec(object):
 
 
         # Handle all the links
-        temporaryCheckForExcessiveTitle(self)
         processDfns(self)
         processIDL(self)
         fillAttributeInfoSpans(self)
@@ -2498,12 +2497,6 @@ def inlineRemoteIssues(doc):
                 addClass(el, "no-marker")
         except:
             pass
-
-
-def temporaryCheckForExcessiveTitle(doc):
-    # This function is a migration aid, to help warn a spec if it uses a bunch of title attributes.
-    if len(findAll("dfn[title]:not([data-lt]), a[title]:not([data-lt])", doc)) > 0:
-        warn("Bikeshed now prefers you specify alternate linking texts with the 'lt' attribute, not 'title'. Please change your source.")
 
 
 def specTemplate():
