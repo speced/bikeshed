@@ -512,7 +512,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                                 # "USVString" TypeSuffix |
                                 # identifier [TypeSuffix] | "sequence" "<" Type ">" [Null] | "object" [TypeSuffix] |
                                 # "Date" [TypeSuffix] | "RegExp" [TypeSuffix] | "Error" TypeSuffix | 
-                                # "DOMException" TypeSuffix | "Promise" "<" ReturnType ">" [Null] | BufferRelatedType
+                                # "DOMException" TypeSuffix | "Promise" "<" ReturnType ">" [Null] | BufferRelatedType [Nulls]
                                 # "FrozenArray" "<" Type ">" [Null]
                                 
     BufferRelatedTypes = frozenset(['ArrayBuffer', 'DataView', 'Int8Array', 'Int16Array', 'Int32Array', 
@@ -541,6 +541,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                         Symbol.peek(tokens, '?')
                         return tokens.popPosition(True)
         elif (token and token.isSymbol(cls.BufferRelatedTypes)):
+            Symbol.peek(tokens, '?')
             return tokens.popPosition(True)
         return tokens.popPosition(False)
 
@@ -574,6 +575,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                 self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
             elif (token.isSymbol(self.BufferRelatedTypes)):
                 self.type = Symbol(tokens, None, False)
+                self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
             else:
                 self.type = Symbol(tokens, None, False)  # "ByteString" | "DOMString" | "USVString" | "object" | "Date" | "RegExp"
                 self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
@@ -587,6 +589,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             output = unicode(self.promise) + unicode(self._openType) + unicode(self.type) + unicode(self._closeType)
             return output + (unicode(self.null) if (self.null) else '')
         output = unicode(self.type)
+        output = output + (unicode(self.null) if (self.null) else '')
         return output + (unicode(self.suffix) if (self.suffix) else '')
 
     def _markup(self, generator):
@@ -610,6 +613,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                 self.suffix.markup(generator)
             return self
         self.type._markup(generator)
+        generator.addText(self.null)
         if (self.suffix):
             self.suffix.markup(generator)
         return self

@@ -228,6 +228,13 @@ callback interface callMe {
     any [] value = null;
 };
 
+interface Int {
+    readonly attribute long? service;
+    readonly attribute ArrayBuffer? value;
+    readonly attribute ArrayBuffer value2;
+    attribute ArrayBuffer? value3;
+};
+
 """
 #    idl = idl.replace(' ', '  ')
     print "IDL >>>\n" + idl + "\n<<<"
