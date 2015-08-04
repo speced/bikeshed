@@ -114,6 +114,9 @@ def clearContents(el):
     el.text = ''
     return el
 
+def parentElement(el):
+    return el.getparent()
+
 
 def appendChild(parent, *children):
     # Appends either text or an element.
@@ -145,6 +148,7 @@ def prependChild(parent, child):
         else:
             parent.text = child + parent.text
     else:
+        removeNode(child)
         parent.insert(0, child)
         if parent.text is not None:
             child.tail = (child.tail or '') + parent.text
@@ -166,23 +170,26 @@ def insertAfter(target, *els):
 
 
 def removeNode(node):
-    text = node.tail or ''
     parent = node.getparent()
+    if parent is None:
+        return node
     index = parent.index(node)
+    text = node.tail or ''
     if index == 0:
         parent.text = (parent.text or '') + text
     else:
         prevsibling = parent[index-1]
         prevsibling.tail = (prevsibling.tail or '') + text
     parent.remove(node)
+    node.tail = None
+    return node
 
 
-def appendContents(el, newElements):
+def appendContents(el, container):
     # Accepts either an iterable *or* a container element
-    if(isElement(newElements) and newElements.text is not None):
-        appendChild(el, newElements.text)
-    for new in newElements:
-        appendChild(el, new)
+    if isElement(container):
+        container = childNodes(container, clear=True)
+    appendChild(el, *container)
     return el
 
 
