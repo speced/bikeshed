@@ -39,4 +39,5 @@ def progress(msg, val, total):
     sys.stdout.flush()
 
 def resetSeenMessages():
+    global messages
     messages = set()
