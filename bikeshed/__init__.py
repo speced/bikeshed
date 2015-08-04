@@ -1271,6 +1271,9 @@ def cleanupHTML(doc):
         removeAttr(el, 'oldids')
     for el in findAll("[data-alternate-id]", doc):
         removeAttr(el, 'data-alternate-id')
+    for el in findAll("[highlight], [nohighlight]"):
+        removeAttr(el, 'highlight')
+        removeAttr(el, 'nohiglight')
 
 
 def finalHackyCleanup(text):
