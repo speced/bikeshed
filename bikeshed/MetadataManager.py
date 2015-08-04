@@ -638,6 +638,6 @@ def getSpecRepository(doc):
 def parseDoc(doc):
     # Look through the doc for any additional metadata information that might be needed.
     if "feedback-header" not in doc.md.boilerplate['omitSections']:
-        if find(".issue", doc) is not None:
+        if "issues-index" not in doc.md.boilerplate['omitSections'] and find(".issue", doc) is not None:
             # There's at least one inline issue.
             doc.md.issues.append(("Inline In Spec", "#issues-index"))
