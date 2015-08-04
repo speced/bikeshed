@@ -1381,6 +1381,7 @@ class CSSSpec(object):
         addAbstract(self)
         addObsoletionNotice(self)
         addAtRisk(self)
+        addNoteHeaders(self)
         removeUnwantedBoilerplate(self)
         self.transformProductionPlaceholders()
         self.transformMaybePlaceholders()
@@ -2505,6 +2506,22 @@ def inlineRemoteIssues(doc):
                 addClass(el, "no-marker")
         except:
             pass
+
+def addNoteHeaders(doc):
+    # Finds <foo heading="bar"> and turns it into a marker-heading
+    for el in findAll("[heading]", doc):
+        addClass(el, "no-marker")
+        if hasClass(el, "note"):
+            preText = "NOTE: "
+        elif hasClass(el, "issue"):
+            preText = "ISSUE: "
+        elif hasClass(el, "example"):
+            preText = "EXAMPLE: "
+        else:
+            preText = ""
+        prependChild(el,
+            E.div({"class":"marker"}, preText, *parseHTML(el.get('heading'))))
+        removeAttr(el, "heading")
 
 
 def specTemplate():
