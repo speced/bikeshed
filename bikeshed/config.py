@@ -31,6 +31,8 @@ shortToLongStatus = {
     "MO": "W3C Member-only Draft",
     "UD": "Unofficial Proposal Draft",
     "DREAM": "A Collection of Interesting Ideas",
+    "CG-DRAFT": "Draft Community Group Report",
+    "CG-FINAL": "Final Community Group Report",
     "LS": "Living Standard",
     "LS-COMMIT": "Commit Snapshot",
     "LS-BRANCH": "Branch Snapshot",
