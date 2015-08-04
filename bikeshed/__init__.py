@@ -1183,6 +1183,11 @@ def cleanupHTML(doc):
     for el in findAll("body link, body meta, body style:not([scoped])", doc):
         head.append(el)
 
+    # Move any <style scoped> to be the first child of their parent.
+    for el in findAll("style[scoped]", doc):
+        parent = parentElement(el)
+        prependChild(parent, el)
+
     # If we accidentally recognized an autolink shortcut in SVG, kill it.
     for el in findAll("svg|a[data-link-type]", doc):
         del el.attrib["data-link-type"]
