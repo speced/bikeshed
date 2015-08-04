@@ -120,8 +120,10 @@ class SpecBasedBiblioEntry(BiblioEntry):
         self._valid = True
         if preferredURL == "dated" and spec.get("TR", None) is not None:
             self.url = spec['TR']
-        elif 'ED' in spec:
+        elif spec.get('ED', None) is not None:
             self.url = spec['ED']
+        elif spec.get('TR', None) is not None:
+            self.url = spec['TR']
         else:
             self._valid = False
 
