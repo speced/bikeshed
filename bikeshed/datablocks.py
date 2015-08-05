@@ -84,11 +84,12 @@ def transformDataBlocks(doc):
             else:
                 # End tag was at the end of line of useful content.
                 # Process the stuff before it, preserve the stuff after it.
-                newLines.extend(blockTypes[blockType](
+                repl = blockTypes[blockType](
                         lines=doc.lines[startLine+1:i]+[match.group(1)],
                         tagName=tagName,
                         firstLine=doc.lines[startLine],
-                        doc=doc))
+                        doc=doc)
+                newLines.extend(repl)
                 newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
                 newLines.append(match.group(2))
             tagName = ""
