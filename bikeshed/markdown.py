@@ -27,12 +27,13 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 		opaqueElements = ["pre", "xmp", "script", "style"]
 	rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
+	lineCountCorrection = 0
 	for i, rawline in enumerate(lines):
 		# Don't parse anything while you're inside certain elements
 		if re.search(r"<({0})[ >]".format(rawElements), rawline):
 			preDepth += 1
 		if preDepth:
-			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': float('inf'), 'line': i})
+			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': float('inf'), 'line': i+lineCountCorrection})
 		if re.search(r"</({0})>".format(rawElements), rawline):
 			preDepth = max(0, preDepth - 1)
 			continue
@@ -40,6 +41,12 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 			continue
 
 		line = rawline.strip()
+		match = re.match("<!--line count correction (-?\d+)-->", line)
+		if match:
+			# Previous edits changed the number of lines
+			# Kill this line, and adjust the line number for adding to tokens
+			lineCountCorrection += int(match.group(1))
+			continue
 
 		if line == "":
 			token = {'type':'blank', 'raw': '\n'}
@@ -90,7 +97,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 			token['prefixlen'] = float('inf')
 		else:
 			token['prefixlen'] = prefixLen(rawline, numSpacesForIndentation)
-		token['line'] = i
+		token['line'] = i+lineCountCorrection
 		tokens.append(token)
 		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 

@@ -563,15 +563,20 @@ def parse(md, lines):
     newlines = []
     inMetadata = False
     lastKey = None
+    blockSize = 0
     for line in lines:
         if not inMetadata and re.match(r"<pre .*class=.*metadata.*>", line):
+            blockSize = 1
             inMetadata = True
             md.hasMetadata = True
             continue
         elif inMetadata and re.match(r"</pre>\s*", line):
+            newlines.append("<!--line count correction {0}-->".format(blockSize+1))
+            blockSize = 0
             inMetadata = False
             continue
         elif inMetadata:
+            blockSize += 1
             if lastKey and (line.strip() == "" or re.match(r"\s+", line)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
                 md.addData(lastKey, line.lstrip())

@@ -68,6 +68,7 @@ def transformDataBlocks(doc):
                         firstLine=match.group(1),
                         doc=doc)
                 newLines.extend(repl)
+                newLines.append("<!--line count correction {0}-->".format(-len(repl)-1))
                 newLines.append(match.group(3))
             elif re.match(r"^\s*$", match.group(1)):
                 # End tag was the first tag on the line.
@@ -78,6 +79,7 @@ def transformDataBlocks(doc):
                         firstLine=doc.lines[startLine],
                         doc=doc)
                 newLines.extend(repl)
+                newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
                 newLines.append(match.group(2))
             else:
                 # End tag was at the end of line of useful content.
@@ -87,6 +89,7 @@ def transformDataBlocks(doc):
                         tagName=tagName,
                         firstLine=doc.lines[startLine],
                         doc=doc))
+                newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
                 newLines.append(match.group(2))
             tagName = ""
             blockType = ""
