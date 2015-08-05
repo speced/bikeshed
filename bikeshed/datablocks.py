@@ -42,7 +42,7 @@ def transformDataBlocks(doc):
     blockType = ""
     tagName = ""
     startLine = 0
-    replacements = []
+    newLines = []
     for (i, line) in enumerate(doc.lines):
         # Look for the start of a block.
         match = re.match(r"\s*<(pre|xmp)(.*)", line, re.I)
@@ -62,48 +62,40 @@ def transformDataBlocks(doc):
             if startLine == i:
                 # Single-line <pre>.
                 match = re.match(r"\s*(<{0}[^>]*>)(.+)</{0}>(.*)".format(tagName), line, re.I)
-                doc.lines[i] = match.group(3)
-                replacements.append({
-                    'start': i,
-                    'end': i,
-                    'value': blockTypes[blockType](
+                repl = blockTypes[blockType](
                         lines=[match.group(2)],
                         tagName=tagName,
                         firstLine=match.group(1),
-                        doc=doc)})
+                        doc=doc)
+                newLines.extend(repl)
+                newLines.append(match.group(3))
             elif re.match(r"^\s*$", match.group(1)):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
-                doc.lines[i] = match.group(2)
-                replacements.append({
-                    'start': startLine,
-                    'end': i,
-                    'value': blockTypes[blockType](
+                repl = blockTypes[blockType](
                         lines=doc.lines[startLine+1:i],
                         tagName=tagName,
                         firstLine=doc.lines[startLine],
-                        doc=doc)})
+                        doc=doc)
+                newLines.extend(repl)
+                newLines.append(match.group(2))
             else:
                 # End tag was at the end of line of useful content.
-                # Trim this line to be only the block content.
-                doc.lines[i] = match.group(1)
-                # Put the after-tag content on the next line.
-                doc.lines.insert(i+1, match.group(2))
-                replacements.append({
-                    'start': startLine,
-                    'end': i+1,
-                    'value': blockTypes[blockType](
-                        lines=doc.lines[startLine+1:i+1],
+                # Process the stuff before it, preserve the stuff after it.
+                newLines.extend(blockTypes[blockType](
+                        lines=doc.lines[startLine+1:i]+[match.group(1)],
                         tagName=tagName,
                         firstLine=doc.lines[startLine],
-                        doc=doc)})
+                        doc=doc))
+                newLines.append(match.group(2))
             tagName = ""
             blockType = ""
+            continue
+        if inBlock:
+            continue
+        newLines.append(line)
 
-    # Make the replacements, starting from the bottom up so I
-    # don't have to worry about offsets becoming invalid.
-    for rep in reversed(replacements):
-        doc.lines[rep['start']:rep['end']] = rep['value']
+    doc.lines = newLines
 
 
 def transformPre(lines, tagName, firstLine, **kwargs):
