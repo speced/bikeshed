@@ -410,10 +410,10 @@ def canonicalizeShortcuts(doc):
                 el.set("data-link-type", linkType)
                 break
     for el in findAll(",".join("{0}[for]".format(x) for x in config.dfnElements.union(["a"])), doc):
-        if el.tag in config.dfnElements:
-            el.set("data-dfn-for", el.get('for'))
-        else:
+        if el.tag == "a":
             el.set("data-link-for", el.get('for'))
+        else:
+            el.set("data-dfn-for", el.get('for'))
         del el.attrib['for']
 
 def fixIntraDocumentReferences(doc):
