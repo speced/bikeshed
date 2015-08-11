@@ -194,7 +194,8 @@ url: http://www.unicode.org/reports/tr46/#ToASCII; type: dfn; text: toascii
 ```
 
 Alternately, this data can be provided in a file named `anchors.bsdata`,
-in the same folder as the spec source.
+in the same folder as the spec source, but this prevents you from using
+[the web service](https://api.csswg.org/bikeshed/).
 
 
 Autolinking
@@ -469,5 +470,7 @@ following the SpecRef JSON format:
 Only the "title" field is strictly necessary;
 the rest can be omitted if desired.
 
-This JSON should either be inline, in a `<pre class=biblio>` block,
-or in a `biblio.json` file in the same folder as the spec file.
+This JSON should be inline, in a `<pre class=biblio>` block.  It can
+also be in a `biblio.json` file in the same folder as the spec file,
+but this is incompatible with
+[the web service](https://api.csswg.org/bikeshed/).
