@@ -357,6 +357,12 @@ def addHeadingBonuses(doc, headings):
 
 def formatPropertyNames(doc):
     for table in findAll("table.propdef, table.descdef, table.elementdef", doc):
+        if hasClass(table, "partial"):
+            tag = "a"
+            attr = "data-link-type"
+        else:
+            tag = "dfn"
+            attr = "data-dfn-type"
         tag = "a" if hasClass(table, "partial") else "dfn"
         if hasClass(table, "propdef"):
             type = "property"
@@ -366,7 +372,7 @@ def formatPropertyNames(doc):
             type = "element"
         cell = findAll("tr:first-child > :nth-child(2)", table)[0]
         names = [x.strip() for x in textContent(cell).split(',')]
-        newContents = config.intersperse((createElement(tag, {type:""}, name) for name in names), ", ")
+        newContents = config.intersperse((createElement(tag, {attr:type}, name) for name in names), ", ")
         replaceContents(cell, newContents)
 
 def canonicalizeShortcuts(doc):
@@ -1394,9 +1400,9 @@ class CSSSpec(object):
         self.transformMaybePlaceholders()
         self.transformAutolinkShortcuts()
         self.transformProductionGrammars()
+        canonicalizeShortcuts(self)
         formatPropertyNames(self)
         processHeadings(self)
-        canonicalizeShortcuts(self)
         processIssuesAndExamples(self)
         markupIDL(self)
         inlineRemoteIssues(self)
