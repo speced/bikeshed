@@ -92,6 +92,11 @@ linkTypeToDfnType = {
 for dfnType in dfnClassToType.values():
     linkTypeToDfnType[dfnType] = frozenset([dfnType])
 
+# Elements that are allowed to provide definitions to Shepherd
+dfnElements = frozenset(["dfn", "h2[data-dfn-type]", "h3[data-dfn-type]", "h4[data-dfn-type]", "h5[data-dfn-type]", "h6[data-dfn-type]"])
+anchorishElements = dfnElements.union(["a"])
+dfnElementsSelector = ", ".join(dfnElements)
+
 # Some of the more significant types and their patterns
 trivialPattern = re.compile(".+")
 typeRe = defaultdict(lambda:trivialPattern)

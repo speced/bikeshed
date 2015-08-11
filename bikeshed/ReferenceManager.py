@@ -543,7 +543,10 @@ def linkTextsFromElement(el, preserveCasing=False):
     elif el.get('data-lt'):
         texts = [x.strip() for x in el.get('data-lt').split('|')]
     else:
-        texts = [textContent(el).strip()]
+        if el.tag in ("dfn", "a"):
+            texts = [textContent(el).strip()]
+        elif el.tag in ("h2", "h3", "h4", "h5", "h6"):
+            texts = [textContent(find(".content", el)).strip()]
     if el.get('data-local-lt'):
         texts += [x.strip() for x in el.get('data-local-lt').split('|')]
     texts = [x for x in texts if x != '']

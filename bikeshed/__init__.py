@@ -395,7 +395,9 @@ def canonicalizeShortcuts(doc):
                 el.set(fixedAttr, el.get(attr))
                 del el.attrib[attr]
 
-    for el in findAll("dfn", doc):
+    # The next two aren't in the above dict because some of the words conflict with existing attributes on some elements.
+    # Instead, limit the search/transforms to the relevant elements.
+    for el in findAll("dfn, h2, h3, h4, h5, h6", doc):
         for dfnType in config.dfnTypes.union(["dfn"]):
             if el.get(dfnType) == "":
                 del el.attrib[dfnType]
@@ -407,8 +409,8 @@ def canonicalizeShortcuts(doc):
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
                 break
-    for el in findAll("dfn[for], a[for]", doc):
-        if el.tag == "dfn":
+    for el in findAll(",".join("{0}[for]".format(x) for x in config.dfnElements.union(["a"])), doc):
+        if el.tag in config.dfnElements:
             el.set("data-dfn-for", el.get('for'))
         else:
             el.set("data-link-for", el.get('for'))
@@ -512,7 +514,7 @@ def fillAttributeInfoSpans(doc):
                     *decorations)
 
 def processDfns(doc):
-    dfns = findAll("dfn", doc)
+    dfns = findAll(config.dfnElementsSelector, doc)
     classifyDfns(doc, dfns)
     dedupIds(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
@@ -624,6 +626,9 @@ def classifyDfns(doc, dfns):
             else:
                 id = "{type}-{id}".format(type=dfnTypeToPrefix[dfnType], id=id)
             el.set('id', id)
+        # Set lt if it's not set, and textContent doesn't match
+        if el.get('data-lt') is None and textContent(el) != primaryDfnText:
+            el.set('data-lt', primaryDfnText)
         # Push export/noexport down to the definition
         if el.get('data-export') is None and el.get('data-noexport') is None:
             for ancestor in el.iterancestors():
@@ -1195,7 +1200,8 @@ def cleanupHTML(doc):
 
     # Tag classes on wide types of dfns/links
     def selectorForTypes(types):
-        return ",".join("dfn[data-dfn-type={0}],a[data-link-type={0}]".format(type) for type in types)
+        return (",".join("{0}[data-dfn-type={1}]".format(elName,type) for elName in config.dfnElements for type in types)
+            + "," + ",".join("a[data-link-type={0}]".format(type) for type in types))
     for el in findAll(selectorForTypes(config.idlTypes), doc):
         addClass(el, 'idl-code')
     for el in findAll(selectorForTypes(config.maybeTypes.union(config.linkTypeToDfnType['propdesc'])), doc):
@@ -1211,7 +1217,7 @@ def cleanupHTML(doc):
             removeNode(comment)
 
     # Remove duplicate linking texts.
-    for el in findAll("dfn[data-lt], a[data-lt]", doc):
+    for el in findAll(",".join(x+"[data-lt]" for x in config.anchorishElements), doc):
         if el.get('data-lt') == textContent(el):
             del el.attrib['data-lt']
 
@@ -1259,12 +1265,13 @@ def cleanupHTML(doc):
         removeAttr(el, 'data-biblio-status')
         removeAttr(el, 'data-okay-to-fail')
         removeAttr(el, 'data-lt')
-    for el in findAll("[data-link-for]:not(a), [data-link-type]:not(a), [data-dfn-for]:not(dfn), [data-dfn-type]:not(dfn)", doc):
+    for el in findAll("[data-link-for]:not(a), [data-link-type]:not(a)", doc):
         removeAttr(el, 'data-link-for')
         removeAttr(el, 'data-link-type')
+    for el in findAll("[data-dfn-for]{0}, [data-dfn-type]{0}".format("".join(":not({0})".format(x) for x in config.dfnElements)), doc):
         removeAttr(el, 'data-dfn-for')
         removeAttr(el, 'data-dfn-type')
-    for el in findAll("[data-export]:not(dfn), [data-noexport]:not(dfn)", doc):
+    for el in findAll("[data-export]{0}, [data-noexport]{0}".format("".join(":not({0})".format(x) for x in config.dfnElements)), doc):
         removeAttr(el, 'data-export')
         removeAttr(el, 'data-noexport')
     for el in findAll("[oldids]", doc):
@@ -1758,11 +1765,11 @@ class CSSSpec(object):
 
     def printTargets(self):
         print "Exported terms:"
-        for el in findAll("dfn[data-export]", self):
+        for el in findAll("[data-export]", self):
             for term in  linkTextsFromElement(el):
                 print "  ", term
         print "Unexported terms:"
-        for el in findAll("dfn[data-noexport]", self):
+        for el in findAll("[data-noexport]", self):
             for term in  linkTextsFromElement(el):
                 print "  ", term
 
@@ -1988,7 +1995,7 @@ def addAnnotations(doc):
         appendContents(find("head", doc), parseHTML(html))
 
 def addIndexSection(doc):
-    if len(findAll("dfn", doc)) == 0 and len(doc.externalRefsUsed.keys()) == 0:
+    if len(findAll(config.dfnElementsSelector, doc)) == 0 and len(doc.externalRefsUsed.keys()) == 0:
         return
     container = getFillContainer('index', doc=doc, default=True)
     if container is None:
@@ -1996,7 +2003,7 @@ def addIndexSection(doc):
     appendChild(container,
         E.h2({"class":"no-num", "id":"index"}, "Index"))
 
-    if len(findAll("dfn", doc)):
+    if len(findAll(config.dfnElementsSelector, doc)):
         addIndexOfLocallyDefinedTerms(doc, container)
 
     if len(doc.externalRefsUsed.keys()):
@@ -2007,7 +2014,7 @@ def addIndexOfLocallyDefinedTerms(doc, container):
         E.h3({"class":"no-num", "id":"index-defined-here"}, "Terms defined by this specification"))
 
     indexEntries = defaultdict(list)
-    for el in findAll("dfn[id]", doc):
+    for el in findAll(",".join(x+"[id]" for x in config.dfnElements), doc):
         linkTexts = linkTextsFromElement(el)
         headingLevel = headingLevelOfElement(el) or "Unnumbered section"
         if el.get('data-dfn-for') is not None:
@@ -2478,7 +2485,7 @@ def addIssuesSection(doc):
             E.a({"href":"#"+issue.get('id')}, " ↵ "))
     for idel in findAll("[id]", container):
         del idel.attrib['id']
-    for dfnel in findAll("dfn", container):
+    for dfnel in findAll(config.dfnElementsSelector, container):
         dfnel.tag = "span"
 
 
