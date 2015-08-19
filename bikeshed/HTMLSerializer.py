@@ -23,21 +23,21 @@ class HTMLSerializer(object):
 		return str
 
 	def _serializeEl(self, el, write, indent=0, pre=False, prevSiblingHadNewline=False):
+		def unfuckName(n):
+			# LXML does namespaces stupidly
+			if n.startswith("{"):
+				return n.partition("}")[2]
+			return n
+
 		if el.tag not in self.inlineEls:
 			if not prevSiblingHadNewline:
 				write("\n")
 			write(" "*indent)
 		write("<")
-		if el.tag.startswith("{"):
-			write(el.tag.partition("}")[2])
-		else:
-			write(el.tag)
+		write(unfuckName(el.tag))
 		for attrName, attrVal in sorted(el.items()):
 			write(" ")
-			if attrName.startswith("{"):
-				write(attrName.partition("}")[2])
-			else:
-				write(attrName)
+			write(unfuckName(attrName))
 			write('="')
 			write(self.escapeAttrVal(attrVal))
 			write('"')
@@ -67,10 +67,7 @@ class HTMLSerializer(object):
 				write("\n")
 				write(" "*indent)
 			write("</")
-			if el.tag.startswith("{"):
-				write(el.tag.partition("}")[2])
-			else:
-				write(el.tag)
+			write(unfuckName(el.tag))
 			write(">")
 
 	def escapeAttrVal(self, val):
