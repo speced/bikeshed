@@ -289,8 +289,10 @@ def addHeadingIds(doc, headings):
     neededIds = set()
     for header in headings:
         if header.get('id') is None:
-            neededIds.add(header)
-            header.set('id', simplifyText(textContent(find(".content", header)), convertDashes=True))
+            if header.get("data-dfn-type") is None:
+                # dfn headings will get their IDs assigned by the dfn code
+                neededIds.add(header)
+                header.set('id', simplifyText(textContent(find(".content", header)), convertDashes=True))
         if header.get("oldids"):
             oldIDs = [h.strip() for h in header.get("oldids").strip().split(",")]
             for oldID in oldIDs:
