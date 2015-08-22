@@ -22,6 +22,7 @@ Several groups are already accommodated with appropriate inclusion files:
 * "csswg", as mentioned.
 * "dap", for the Device APIs Working Group
 * "fxtf", for the FX Task Force
+* "houdini", for the Houdini Task Force
 * "svg", for the SVG Working Group
 * "webappsec", for the WebApps Security Working Group
 * "whatwg", for the WHATWG
