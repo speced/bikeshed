@@ -3,7 +3,7 @@
 from __future__ import division, unicode_literals
 import re
 import StringIO
-from .htmlhelpers import childNodes, isElement, outerHTML
+from .htmlhelpers import childNodes, isElement, outerHTML, escapeHTML, escapeAttr
 
 class HTMLSerializer(object):
 	inlineEls = frozenset(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "[]"])
@@ -45,6 +45,14 @@ class HTMLSerializer(object):
 				else:
 					collect.append(node)
 			yield collect
+		def fixWS(text):
+			t1 = text.lstrip()
+			if text != t1:
+				t1 = " " + t1
+			t2 = t1.rstrip()
+			if t1 != t2:
+				t2 = t2 + " "
+			return t2
 		def startTag():
 			if not isElement(el): # Is an array
 				return
@@ -54,7 +62,7 @@ class HTMLSerializer(object):
 				write(" ")
 				write(unfuckName(attrName))
 				write('="')
-				write(self.escapeAttrVal(attrVal))
+				write(escapeAttr(attrVal))
 				write('"')
 			write(">")
 		def endTag():
@@ -80,18 +88,16 @@ class HTMLSerializer(object):
 				if isElement(node):
 					self._serializeEl(node, write, indent=indent, pre=True)
 				else:
-					write(node)
+					write(escapeHTML(node))
 			endTag()
 			return
 		if inline or tag in self.inlineEls:
 			startTag()
 			for i, node in enumerate(childNodes(el)):
-				if i != 0:
-					write(" ")
 				if isElement(node):
 					self._serializeEl(node, write, inline=inline)
 				else:
-					write(node.strip())
+					write(escapeHTML(fixWS(node)))
 			endTag()
 			return
 		# Otherwise I'm a block element
@@ -122,9 +128,3 @@ class HTMLSerializer(object):
 			write(" "*indent)
 			endTag()
 		return
-
-	def escapeAttrVal(self, val):
-		return val.replace("&", "&amp;").replace('"', "&quot;")
-
-	def escapeText(self, val):
-		return val.replace('&', "&amp;").replace("<", "&lt;")
