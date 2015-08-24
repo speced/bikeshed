@@ -91,6 +91,11 @@ class HTMLSerializer(object):
 					write(escapeHTML(node))
 			endTag()
 			return
+		if tag in self.rawEls and el.text is not None:
+			startTag()
+			write(el.text)
+			endTag()
+			return
 		if inline or tag in self.inlineEls:
 			startTag()
 			for i, node in enumerate(childNodes(el)):
