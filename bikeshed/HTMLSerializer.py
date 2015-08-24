@@ -98,7 +98,7 @@ class HTMLSerializer(object):
 			return
 		if inline or tag in self.inlineEls:
 			startTag()
-			for i, node in enumerate(childNodes(el)):
+			for node in childNodes(el):
 				if isElement(node):
 					self._serializeEl(node, write, inline=inline)
 				else:
