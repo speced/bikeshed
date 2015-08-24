@@ -253,7 +253,7 @@ def previousElements(startEl, tag=None, *tags):
 def childElements(parentEl, tag="*", *tags, **stuff):
     return parentEl.iterchildren(tag=tag, *tags, **stuff)
 
-def childNodes(parentEl, clear=False):
+def childNodes(parentEl, clear=False, skipWS=False):
     '''
     This function returns all the nodes in a parent element in the DOM sense,
     mixing text nodes (strings) and other nodes together
@@ -278,15 +278,19 @@ def childNodes(parentEl, clear=False):
     to avoid doing extra computation when not needed,
     and to match the DOM method's behavior.
     '''
+    if isinstance(parentEl, list):
+        return parentEl
     ret = []
     if parentEl.text is not None:
-        ret.append(parentEl.text)
+        if parentEl.text.strip() != "" or not skipWS:
+            ret.append(parentEl.text)
         if clear:
             parentEl.text = None
     for c in childElements(parentEl, tag=None):
         ret.append(c)
         if c.tail is not None:
-            ret.append(c.tail)
+            if c.tail.strip() != "" or not skipWS:
+                ret.append(c.tail)
             if clear:
                 c.tail = None
     if clear:
