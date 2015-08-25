@@ -10,17 +10,13 @@ class HTMLSerializer(object):
 	rawEls = frozenset(["xmp", "script", "style"])
 	voidEls = frozenset(["area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"])
 	omitEndTagEls = frozenset(["td", "th", "tr", "thead", "tbody", "tfoot", "li", "dt", "dd"])
-	def __init__(self, tree):
+	def __init__(self, tree, opaqueElements):
 		self.tree = tree
+		self.opaqueElements = opaqueElements
 
 	def serialize(self):
 		output = StringIO.StringIO()
 		writer = output.write
-		def write(x):
-			output.write("{")
-			output.write(x)
-			output.write("}")
-			output.write("\n")
 		writer("<!doctype html>")
 		root = self.tree.getroot()
 		self._serializeEl(root, writer)
@@ -82,18 +78,13 @@ class HTMLSerializer(object):
 			write(" "*indent)
 			startTag()
 			return
-		if pre or tag == "pre":
+		if pre or tag in self.rawEls or tag in self.opaqueElements:
 			startTag()
 			for node in childNodes(el):
 				if isElement(node):
 					self._serializeEl(node, write, indent=indent, pre=True)
 				else:
 					write(escapeHTML(node))
-			endTag()
-			return
-		if tag in self.rawEls and el.text is not None:
-			startTag()
-			write(el.text)
 			endTag()
 			return
 		if inline or tag in self.inlineEls:

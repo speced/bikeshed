@@ -1443,7 +1443,7 @@ class CSSSpec(object):
 
 
     def serialize(self):
-        rendered = HTMLSerializer.HTMLSerializer(self.document).serialize()
+        rendered = HTMLSerializer.HTMLSerializer(self.document, self.md.opaqueElements).serialize()
         rendered = finalHackyCleanup(rendered)
         return rendered
 
