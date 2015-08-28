@@ -17,7 +17,7 @@ here's the full definition data model and how to properly expose it.
 	If the desired text content isn't suitable for linking text,
 	or you wish to provide multiple linking texts,
 	a `data-lt` attribute containing one or more pipe-separated linking texts will override the text content.
-4. `data-dfn-type` MUST be provided, and set to [one of the accepted values](definitions-autolinks.md#definition-types).
+4. `data-dfn-type` MUST be provided, and set to [one of the accepted values](definitions-autolinks.md#definition-types).  (The `<dfn>` element, specifically, actually allows this to be omitted, and defaults to the "dfn" type. But headings require a type, and `<dfn>`s are clearer with it specified.)
 5. Either `data-export` or `data-noexport` MAY be provided (both boolean attributes).  If neither is provided, "dfn" type definitions default to noexport, while all others default to export.  Unexported definitions aren't linkable by default.
 6. [Several types](definitions-autolinks.md#specifying-what-a-definition-is-for) of definitions are namespaced to another construct; for example, attribute names are namespaced to an interface.  These definitions MUST contain a `data-dfn-for` attribute, containing a comma-separated list of one or more definitions they're namespaced to.
 
