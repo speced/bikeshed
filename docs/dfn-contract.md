@@ -11,9 +11,9 @@ If you're writing a spec processor or related tool
 and would like to interoperate with the Bikeshed ecosystem,
 here's the full definition data model and how to properly expose it.
 
-1. The defining element MUST be a `<dfn>`.  No other element is recognized as defining a term.
+1. The defining element MUST be a `<dfn>` or `<h1-6>`.  No other element is recognized as defining a term.
 2. The element MUST have an `id` attribute.
-3. The linking text defaults to the **text content** of the `<dfn>`.
+3. The linking text defaults to the **text content** of the `<dfn>`/heading.
 	If the desired text content isn't suitable for linking text,
 	or you wish to provide multiple linking texts,
 	a `data-lt` attribute containing one or more pipe-separated linking texts will override the text content.
