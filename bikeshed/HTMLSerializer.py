@@ -101,7 +101,7 @@ class HTMLSerializer(object):
 		def justWS(block):
 			if isElement(block):
 				return False
-			return len(block) == 1 and block[0].strip() == ""
+			return len(block) == 1 and not isElement(block[0]) and block[0].strip() == ""
 		# Dropping pure-WS anonymous blocks.
 		# This maintains whitespace between *inline* elements, which is required.
 		# It just avoids serializing a line of "inline content" that's just WS.
