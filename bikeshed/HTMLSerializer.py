@@ -50,23 +50,23 @@ class HTMLSerializer(object):
 				t2 = t2 + " "
 			return t2
 		def startTag():
-			if not isElement(el): # Is an array
-				return
-			write("<")
-			write(unfuckName(el.tag))
-			for attrName, attrVal in sorted(el.items()):
-				write(" ")
-				write(unfuckName(attrName))
-				write('="')
-				write(escapeAttr(attrVal))
-				write('"')
-			write(">")
+			if isElement(el):
+				write("<")
+				write(unfuckName(el.tag))
+				for attrName, attrVal in sorted(el.items()):
+					write(" ")
+					write(unfuckName(attrName))
+					write('="')
+					write(escapeAttr(attrVal))
+					write('"')
+				write(">")
 		def endTag():
-			if not isElement(el): # Is an array
-				return
-			write("</")
-			write(unfuckName(el.tag))
-			write(">")
+			if isElement(el):
+				write("</")
+				write(unfuckName(el.tag))
+				write(">")
+		def isAnonBlock(block):
+			return not isElement(block)
 
 		if isElement(el):
 			tag = unfuckName(el.tag)
@@ -96,9 +96,25 @@ class HTMLSerializer(object):
 					write(escapeHTML(fixWS(node)))
 			endTag()
 			return
+
 		# Otherwise I'm a block element
-		blocks = list(groupIntoBlocks(childNodes(el, skipWS=True)))
-		if len(blocks) == 1 and not isElement(blocks[0]):
+		def justWS(block):
+			if isElement(block):
+				return False
+			return len(block) == 1 and block[0].strip() == ""
+		# Dropping pure-WS anonymous blocks.
+		# This maintains whitespace between *inline* elements, which is required.
+		# It just avoids serializing a line of "inline content" that's just WS.
+		blocks = [block for block in groupIntoBlocks(childNodes(el)) if not justWS(block)]
+
+		# Handle all the possibilities
+		if len(blocks) == 0:
+			write(" "*indent)
+			startTag()
+			if el.tag not in self.omitEndTagEls:
+				endTag()
+			return
+		elif len(blocks) == 1 and isAnonBlock(blocks[0]):
 			# Contains only inlines, print accordingly
 			write(" "*indent)
 			startTag()
@@ -106,21 +122,22 @@ class HTMLSerializer(object):
 			if el.tag not in self.omitEndTagEls:
 				endTag()
 			return
-		# Otherwise I'm a block that contains at least one block
-		write(" "*indent)
-		startTag()
-		for block in blocks:
-			if isElement(block):
-				write("\n")
-				self._serializeEl(block, write, indent=indent+1)
-			else:
-				# is an array of inlines
-				if len(block) > 0:
-					write("\n")
-					write(" "*(indent+1))
-					self._serializeEl(block, write, inline=True)
-		if el.tag not in self.omitEndTagEls:
-			write("\n")
+		else:
+			# Otherwise I'm a block that contains at least one block
 			write(" "*indent)
-			endTag()
+			startTag()
+			for block in blocks:
+				if isElement(block):
+					write("\n")
+					self._serializeEl(block, write, indent=indent+1)
+				else:
+					# is an array of inlines
+					if len(block) > 0:
+						write("\n")
+						write(" "*(indent+1))
+						self._serializeEl(block, write, inline=True)
+			if el.tag not in self.omitEndTagEls:
+				write("\n")
+				write(" "*indent)
+				endTag()
 		return
