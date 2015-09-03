@@ -63,6 +63,9 @@ class MetadataManager:
         self.inlineGithubIssues = False
         self.repository = config.Nil()
         self.opaqueElements = ["pre", "xmp", "script", "style"]
+        self.issueClass = "issue"
+        self.noteClass = "note"
+        self.advisementClass = "advisement"
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -96,7 +99,10 @@ class MetadataManager:
             "Issue Tracker Template": "issueTrackerTemplate",
             "Work Status": "workStatus",
             "Inline Github Issues": "inlineGithubIssues",
-            "Repository": "repository"
+            "Repository": "repository",
+            "Issue Class": "issueClass",
+            "Note Class": "noteClass",
+            "Advisement Class": "advisementClass"
         }
 
         # Some keys are multi-value:
@@ -646,3 +652,13 @@ def parseDoc(doc):
         if "issues-index" not in doc.md.boilerplate['omitSections'] and find(".issue", doc) is not None:
             # There's at least one inline issue.
             doc.md.issues.append(("Inline In Spec", "#issues-index"))
+
+    for el in findAll(".replace-with-note-class", doc):
+        removeClass(el, "replace-with-note-class")
+        addClass(el, doc.md.noteClass)
+    for el in findAll(".replace-with-issue-class", doc):
+        removeClass(el, "replace-with-issue-class")
+        addClass(el, doc.md.issueClass)
+    for el in findAll(".replace-with-advisement-class", doc):
+        removeClass(el, "replace-with-advisement-class")
+        addClass(el, doc.md.advisementClass)

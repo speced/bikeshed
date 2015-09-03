@@ -222,19 +222,19 @@ def parseParagraph(stream):
 	initialPrefixLen = stream.currprefixlen()
 	endTag = "</p>"
 	if line.lower().startswith("note:") or line.lower().startswith("note, "):
-		p = "<p class='note'>"
+		p = "<p class='replace-with-note-class'>"
 	elif line.lower().startswith("issue:"):
 		line = line[6:]
-		p = "<p class='issue'>"
+		p = "<p class='replace-with-issue-class'>"
 	elif line.lower().startswith("advisement:"):
 		line = line[11:]
-		p = "<strong class='advisement'>"
+		p = "<strong class='replace-with-advisement-class'>"
 		endTag = "</strong>"
 	else:
 		match = re.match(r"issue\(([^)]+)\):(.*)", line, re.I)
 		if match:
 			line = match.group(2)
-                        p = "<p data-remote-issue-id='%s' class='issue'>" % match.group(1)
+                        p = "<p data-remote-issue-id='%s' class='replace-with-issue-class'>" % match.group(1)
                 else:
 			p = "<p>"
 	lines = ["{0}{1}\n".format(p, line)]
