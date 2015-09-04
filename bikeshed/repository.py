@@ -21,7 +21,7 @@ class Repository(object):
 		else:
 			self.type = "unknown"
 
-	def formatIssueUrl(*args, **kwargs):
+	def formatIssueUrl(self, *args, **kwargs):
 		# Dunno how to format an arbitrary issue url,
 		# so give up and just point to the repo.
 		return self.url
