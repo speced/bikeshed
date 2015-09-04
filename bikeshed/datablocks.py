@@ -394,7 +394,7 @@ def processAnchors(anchors, doc):
         if "url" in anchor:
             urlSuffix = anchor['url'][0]
         else:
-            urlSuffix = config.simplifyText(anchor['text'][0], convertDashes=anchor['type'][0] == "dfn")
+            urlSuffix = config.simplifyText(anchor['text'][0])
         url = urlPrefix + ("" if "#" in urlPrefix or "#" in urlSuffix else "#") + urlSuffix
         if anchor['type'][0] in config.lowercaseTypes:
             anchor['text'][0] = anchor['text'][0].lower()

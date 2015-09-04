@@ -247,12 +247,8 @@ def reSubObject(pattern, string, repl=None):
     pieces.append(string[lastEnd:])
     return pieces
 
-def simplifyText(text, convertDashes=False):
+def simplifyText(text):
     # Remove anything that's not a name character.
-    # If convertDashes is True, turn dashes into underscores,
-    # so two terms that differ only by dashes generate different text.
-    if convertDashes:
-        text = text.replace("-", "_")
     text = text.strip().lower()
     # I convert ( to - so foo(bar) becomes foo-bar,
     # but then I have to remove () because there's nothing to separate,
