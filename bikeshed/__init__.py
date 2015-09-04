@@ -292,7 +292,7 @@ def addHeadingIds(doc, headings):
             if header.get("data-dfn-type") is None:
                 # dfn headings will get their IDs assigned by the dfn code
                 neededIds.add(header)
-                header.set('id', simplifyText(textContent(find(".content", header)), convertDashes=True))
+                header.set('id', simplifyText(textContent(find(".content", header))))
         if header.get("oldids"):
             oldIDs = [h.strip() for h in header.get("oldids").strip().split(",")]
             for oldID in oldIDs:
@@ -611,14 +611,13 @@ def classifyDfns(doc, dfns):
             continue
         # Automatically fill in id if necessary.
         if el.get('id') is None:
-            convertDashes = dfnType == "dfn"
             if dfnFor:
                 singleFor = splitForValues(dfnFor)[0]
             if dfnType in config.functionishTypes.intersection(config.idlTypes):
-                id = simplifyText(re.match(r"[^(]*", primaryDfnText).group(0)+"()", convertDashes=convertDashes)
-                el.set("data-alternate-id", simplifyText("dom-{_for}-{id}".format(_for=singleFor, id=primaryDfnText), convertDashes=convertDashes))
+                id = simplifyText(re.match(r"[^(]*", primaryDfnText).group(0)+"()")
+                el.set("data-alternate-id", simplifyText("dom-{_for}-{id}".format(_for=singleFor, id=primaryDfnText)))
             else:
-                id = simplifyText(primaryDfnText, convertDashes=convertDashes)
+                id = simplifyText(primaryDfnText)
             if dfnType == "dfn":
                 pass
             elif dfnType == "interface":
