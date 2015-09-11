@@ -1288,6 +1288,8 @@ def cleanupHTML(doc):
     for el in findAll("[highlight], [nohighlight]", doc):
         removeAttr(el, 'highlight')
         removeAttr(el, 'nohiglight')
+    for el in findAll("[data-opaque]", doc):
+        removeAttr(el, 'data-opaque')
 
 
 def finalHackyCleanup(text):
@@ -1515,6 +1517,14 @@ class CSSSpec(object):
     def fixText(self, text):
         # Do several textual replacements that need to happen *before* the document is parsed as HTML.
 
+        # If markdown shorthands are on, temporarily remove `foo` while processing.
+        codeSpanReplacements = []
+        if "markdown" in self.md.markupShorthands:
+            def replaceCodeSpans(m):
+                codeSpanReplacements.append(m.group(2))
+                return "\ue0ff"
+            text = re.sub(r"(`+)(.*?[^`])\1(?=[^`])", replaceCodeSpans, text, flags=re.DOTALL)
+
         # Replace the [FOO] things.
         #for tag, replacement in self.macros.items():
         #    text = text.replace("[{0}]".format(tag.upper()), replacement)
@@ -1545,6 +1555,17 @@ class CSSSpec(object):
             # They'll survive the HTML parser, but they don't match if they contain an element.
             # (The other shortcuts are "atomic" and can't contain elements.)
             text = re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
+
+        if codeSpanReplacements:
+            def codeSpanReviver(_):
+                # Match object is the PUA character, which I can ignore.
+                # Instead, sub back the replacement in order,
+                # massaged per the Commonmark rules.
+                import string
+                t = escapeHTML(codeSpanReplacements.pop()).strip(string.whitespace)
+                t = re.sub("["+string.whitespace+"]{2,}", " ", t)
+                return "<code data-opaque>"+t+"</code>"
+            text = re.sub("\ue0ff", codeSpanReviver, text)
         return text
 
     def transformProductionPlaceholders(doc):
@@ -1814,7 +1835,11 @@ class CSSSpec(object):
                 die("The include file for {0} disappeared underneath me.", name)
 
     def isOpaqueElement(self, el):
-        return el.tag in self.md.opaqueElements
+        if el.tag in self.md.opaqueElements:
+            return True
+        if el.get("data-opaque") is not None:
+            return True
+        return False
 
 config.specClass = CSSSpec
 
