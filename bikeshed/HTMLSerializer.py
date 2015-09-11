@@ -42,10 +42,11 @@ class HTMLSerializer(object):
 					collect.append(node)
 			yield collect
 		def fixWS(text):
-			t1 = text.lstrip()
+			import string
+			t1 = text.lstrip(string.whitespace)
 			if text != t1:
 				t1 = " " + t1
-			t2 = t1.rstrip()
+			t2 = t1.rstrip(string.whitespace)
 			if t1 != t2:
 				t2 = t2 + " "
 			return t2
