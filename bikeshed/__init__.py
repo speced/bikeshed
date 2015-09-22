@@ -990,13 +990,9 @@ class IDLMarker(object):
         elif idlType == "interface":
             if construct.partial:
                 refType="link"
-            else:
-                refType="dfn"
 
         if refType == "link":
             elementName = "a"
-        elif refType == "dfn":
-            elementName = "dfn"
         else:
             elementName = "idl"
 
