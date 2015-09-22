@@ -1079,14 +1079,15 @@ def processIDL(doc):
                         url = ref.url
                     else:
                         forceDfn = True
-                for linkFor in splitForValues(el.get('data-idl-for', '')) or [None]:
-                    ref = doc.refs.getRef(idlType, idlText,
-                                          linkFor=linkFor,
-                                          el=el,
-                                          error=False)
-                    if ref:
-                        url = ref.url
-                        break
+                else:
+                    for linkFor in splitForValues(el.get('data-idl-for', '')) or [None]:
+                        ref = doc.refs.getRef(idlType, idlText,
+                                              linkFor=linkFor,
+                                              el=el,
+                                              error=False)
+                        if ref:
+                            url = ref.url
+                            break
                 if ref:
                     break
             if url is None or forceDfn:
