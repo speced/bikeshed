@@ -1564,6 +1564,7 @@ class CSSSpec(object):
             text = re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
 
         if codeSpanReplacements:
+            codeSpanReplacements.reverse()
             def codeSpanReviver(_):
                 # Match object is the PUA character, which I can ignore.
                 # Instead, sub back the replacement in order,
