@@ -230,6 +230,7 @@ class ReferenceManager(object):
                         spec = spec or dfnSpec
                         status = status or dfnStatus
                         linkFor = linkFor or dfnFor
+                        linkType = dfnType
                         break
 
         # Get the relevant refs
