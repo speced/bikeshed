@@ -79,7 +79,17 @@ class HTMLSerializer(object):
 			write(" "*indent)
 			startTag()
 			return
-		if pre or tag in self.rawEls or tag in self.opaqueElements:
+		if tag in self.rawEls:
+			startTag()
+			for node in childNodes(el):
+				if isElement(node):
+					die("Somehow a CDATA element got an element child:\n{0}", outerHTML(el))
+					return
+				else:
+					write(node)
+			endTag()
+			return
+		if pre or tag in self.opaqueElements:
 			startTag()
 			for node in childNodes(el):
 				if isElement(node):
