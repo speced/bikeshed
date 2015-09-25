@@ -344,7 +344,7 @@ def parseDefBlock(lines, type, capitalizeKeys=True):
         else:
             key = match.group(1).strip()
             if capitalizeKeys:
-                key.capitalize()
+                key = key.capitalize()
             lastKey = key
             val = match.group(2).strip()
         if key in vals:
