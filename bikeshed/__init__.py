@@ -182,7 +182,7 @@ def main():
     elif options.subparserName == "watch":
         # Can't have an error killing the watcher
         config.force = True
-        doc = CSSSpec(inputFilename=options.infile)
+        doc = CSSSpec(inputFilename=options.infile, token=options.ghToken)
         doc.md.addOverrides(extras)
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
