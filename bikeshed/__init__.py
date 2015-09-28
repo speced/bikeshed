@@ -2561,12 +2561,15 @@ def inlineRemoteIssues(doc):
         except urllib2.HTTPError as err:
             if doc.token and err.code == 401:
                 die("Unauthorized Access to GitHub's API. There might be an issue with your token.")
-            elif doc.token is None and err.code == 403:
-                die("You've reached GitHub API's rate limit. Please provide an auth token.")
-            else:
-                die("{0}", err)
+                return
+            if doc.token is None and err.code == 403:
+                die("You've reached GitHub API's rate limit for unauthenticated requests.\nTo increase it, please provide an auth token. Tokens can be generated from https://github.com/settings/tokens.")
+                return
+            die("Error inlining GitHub issues:\n{0}", err)
+            return
         except Exception as err:
-            die("{0}", err)
+            die("Error inlining GitHub issues:\n{0}", err)
+            return
 
 def addNoteHeaders(doc):
     # Finds <foo heading="bar"> and turns it into a marker-heading
