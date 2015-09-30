@@ -62,6 +62,8 @@ def main():
     specParser.add_argument("--para", dest="paragraphMode", default="markdown",
                             help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %(default)s]")
     specParser.add_argument("--debug", dest="debug", action="store_true", help="Switches on some debugging tools. Don't use for production!")
+    specParser.add_argument("--gh-token", dest="ghToken", nargs="?",
+                           help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
     minifyGroup = specParser.add_argument_group("Minification")
     specParser.set_defaults(minify=True)
     minifyGroup.add_argument("--minify", dest="minify", action="store_true",
@@ -82,6 +84,8 @@ def main():
                              help="Turn on minification. [default]")
     watchParser.add_argument("--no-minify", dest="minify", action="store_false",
                             help="Turn off minification.")
+    watchParser.add_argument("--gh-token", dest="ghToken", nargs="?",
+                           help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
 
     updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
@@ -168,18 +172,17 @@ def main():
     config.minify = getattr(options, 'minify', True)
 
     update.fixupDataFiles()
-
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
-        doc = CSSSpec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug)
+        doc = CSSSpec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug, token=options.ghToken)
         doc.md.addOverrides(extras)
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "watch":
         # Can't have an error killing the watcher
         config.force = True
-        doc = CSSSpec(inputFilename=options.infile)
+        doc = CSSSpec(inputFilename=options.infile, token=options.ghToken)
         doc.md.addOverrides(extras)
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
@@ -1321,7 +1324,7 @@ def finalHackyCleanup(text):
 
 class CSSSpec(object):
 
-    def __init__(self, inputFilename, paragraphMode="markdown", debug=False):
+    def __init__(self, inputFilename, paragraphMode="markdown", debug=False, token=None):
         if inputFilename is None:
             # Default to looking for a *.bs file.
             # Otherwise, look for a *.src.html file.
@@ -1336,6 +1339,7 @@ class CSSSpec(object):
                 return
         self.inputSource = inputFilename
         self.debug = debug
+        self.token = token
 
         self.initializeState()
 
@@ -2537,9 +2541,12 @@ def inlineRemoteIssues(doc):
     # More can be supported when someone cares.
     for el in findAll("[data-inline-github]", doc):
         user, repo, id = el.get('data-inline-github').split()
+        headers = {"Accept": "application/vnd.github.v3.html+json"}
+        if doc.token is not None:
+            headers["Authorization"] = "token " + doc.token
         removeAttr(el, "data-inline-github")
         req = urllib2.Request(url="https://api.github.com/repos/{0}/{1}/issues/{2}".format(user, repo, id),
-            headers={"Accept": "application/vnd.github.v3.html+json"})
+            headers=headers)
         try:
             with closing(urllib2.urlopen(req)) as fh:
                 issue = json.load(fh)
@@ -2551,8 +2558,18 @@ def inlineRemoteIssues(doc):
                 if el.tag == "p":
                     el.tag = "div"
                 addClass(el, "no-marker")
-        except:
-            pass
+        except urllib2.HTTPError as err:
+            if doc.token and err.code == 401:
+                die("Unauthorized Access to GitHub's API. There might be an issue with your token.")
+                break
+            if doc.token is None and err.code == 403:
+                die("You've reached GitHub API's rate limit for unauthenticated requests.\nTo increase it, please provide an auth token. Tokens can be generated from https://github.com/settings/tokens.")
+                break
+            die("Error inlining GitHub issues:\n{0}", err)
+            continue
+        except Exception as err:
+            die("Error inlining GitHub issues:\n{0}", err)
+            continue
 
 def addNoteHeaders(doc):
     # Finds <foo heading="bar"> and turns it into a marker-heading
