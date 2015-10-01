@@ -150,7 +150,7 @@ def main():
                             nargs="*",
                             help="Rebase the specified files. If called with no args, rebases everything.")
 
-    profileParser = subparsers.add_parser('profile', help="Profiling Bikeshed. Needs graphviz, gprof2dot installed.")
+    profileParser = subparsers.add_parser('profile', help="Profiling Bikeshed. Needs graphviz, gprof2dot, and xdot installed.")
     profileParser.add_argument("--root",
                                dest="root",
                                default=None,
@@ -161,6 +161,7 @@ def main():
                                default=None,
                                metavar="LEAFFUNC",
                                help="Prune the graph to only show ancestors of the specified leaf node.")
+    profileParser.add_argument("--svg", dest="svgFile", default=None, help="Save the graph to a specified SVG file, rather than outputting with xdot immediately.")
 
     profileParser = subparsers.add_parser('template', help="Outputs a skeleton .bs file for you to start with.")
 
@@ -242,7 +243,10 @@ def main():
     elif options.subparserName == "profile":
         root = "--root=\"{0}\"".format(options.root) if options.root else ""
         leaf = "--leaf=\"{0}\"".format(options.leaf) if options.leaf else ""
-        os.system("python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o callgraph.svg && rm stat.prof".format(root=root, leaf=leaf))
+        if options.svgFile:
+            os.system("python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {svg} && rm stat.prof".format(root=root, leaf=leaf, svg=options.svgFile))
+        else:
+            os.system("python -m cProfile -o /tmp/stat.prof ~/bikeshed/bikeshed.py && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &".format(root=root, leaf=leaf))
     elif options.subparserName == "template":
         print specTemplate()
 
