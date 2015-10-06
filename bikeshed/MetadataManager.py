@@ -639,8 +639,10 @@ def getSpecRepository(doc):
             search = re.search(r"origin\tgit@github\.com:([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
             if search:
                 return GithubRepository(*search.groups())
-            else:
-                return config.Nil()
+            search = re.search(r"origin\thttps://github.com/([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
+            if search:
+                return GithubRepository(*search.groups())
+            return config.Nil()
         except:
             # check_output will throw CalledProcessError when not in a git repo
             os.chdir(old_dir)
