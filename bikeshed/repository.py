@@ -37,3 +37,6 @@ class GithubRepository(Repository):
 		if id is None:
 			return "https://github.com/{0}/{1}/issues/".format(self.user, self.repo)
 		return "https://github.com/{0}/{1}/issues/{2}".format(self.user, self.repo, id)
+
+	def __str__(self):
+		return "{0}/{1}".format(self.user, self.repo)
