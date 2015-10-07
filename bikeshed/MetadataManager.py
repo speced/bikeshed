@@ -220,7 +220,7 @@ class MetadataManager:
     def finish(self):
         if not self.repository:
             self.repository = getSpecRepository(self.doc)
-        if self.repository and "feedback-header" not in self.doc.md.boilerplate['omitSections']:
+        if self.repository and self.repository.type == "github" and "feedback-header" not in self.doc.md.boilerplate['omitSections'] and "repository-issue-tracking" not in self.doc.md.boilerplate['omitSections']:
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
         self.validate()
 
