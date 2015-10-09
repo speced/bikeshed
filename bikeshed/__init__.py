@@ -1734,7 +1734,7 @@ class CSSSpec(object):
             return E.code({},
                 E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
 
-        varRe = re.compile(r"\|([\w\s-]+)\|")
+        varRe = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
         def varReplacer(match):
             return E.var(match.group(1))
 
