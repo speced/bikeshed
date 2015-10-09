@@ -1734,6 +1734,10 @@ class CSSSpec(object):
             return E.code({},
                 E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
 
+        varRe = re.compile(r"\|([\w\s-]+)\|")
+        def varReplacer(match):
+            return E.var(match.group(1))
+
         def transformElement(parentEl):
             processContents = isElement(parentEl) and not doc.isOpaqueElement(parentEl)
             if not processContents:
@@ -1759,6 +1763,8 @@ class CSSSpec(object):
             if "biblio" in doc.md.markupShorthands:
                 config.processTextNodes(nodes, biblioRe, biblioReplacer)
                 config.processTextNodes(nodes, sectionRe, sectionReplacer)
+            if "algorithm" in doc.md.markupShorthands:
+                config.processTextNodes(nodes, varRe, varReplacer)
             return nodes
 
         transformElement(doc.document.getroot())
