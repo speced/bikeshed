@@ -431,6 +431,16 @@ def canonicalizeShortcuts(doc):
             el.set("data-dfn-for", el.get('for'))
         del el.attrib['for']
 
+
+def checkVarHygiene(doc):
+    singularVars = []
+    for var,count in Counter(textContent(el) for el in findAll("var", doc)).items():
+        if count == 1 and var.lower() not in doc.md.ignoredVars:
+            singularVars.append(var)
+    if singularVars:
+        warn("The following <var>s were only used once in the document:\n{0}\nIf these are not typos, please add them to the 'Ignored Vars' metadata.", "\n".join(singularVars))
+
+
 def fixIntraDocumentReferences(doc):
     ids = {el.get('id'):el for el in findAll("[id]", doc)}
     headingIDs = {el.get('id'):el for el in findAll("[id].heading", doc)}
@@ -1419,6 +1429,7 @@ class CSSSpec(object):
         self.transformAutolinkShortcuts()
         self.transformProductionGrammars()
         canonicalizeShortcuts(self)
+        checkVarHygiene(self)
         formatPropertyNames(self)
         processHeadings(self)
         processIssuesAndExamples(self)

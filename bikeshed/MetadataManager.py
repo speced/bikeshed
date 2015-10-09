@@ -44,6 +44,7 @@ class MetadataManager:
         self.warning = None
         self.atRisk = []
         self.ignoredTerms = []
+        self.ignoredVars = []
         self.testSuite = None
         self.mailingList = None
         self.mailingListArchives = None
@@ -118,6 +119,7 @@ class MetadataManager:
             "Previous Version": "previousVersions",
             "At Risk": "atRisk",
             "Ignored Terms": "ignoredTerms",
+            "Ignored Vars": "ignoredVars",
             "Link Defaults": "linkDefaults",
             "Issue Tracking": "issues",
             "Markup Shorthands": "markupShorthands",
@@ -140,6 +142,7 @@ class MetadataManager:
             "Editor": parseEditor,
             "Former Editor": parseEditor,
             "Ignored Terms": parseIgnoredTerms,
+            "Ignored Vars": parseIgnoredTerms,
             "Link Defaults": parseLinkDefaults,
             "Boilerplate": parseBoilerplate,
             "Indent": parseInteger,
