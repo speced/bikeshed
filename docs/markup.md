@@ -91,6 +91,28 @@ Remember that if you need to write out the `<a>` tag explicitly,
 you can add the type as a boolean attribute.
 
 
+`<var>` and Algorithms
+----------------------
+
+The `<var>` element (or its shorthand equivalent, `|foo|`) is often used to mark up "arguments" to a prose algorithm.
+Bikeshed explicitly recognizes this,
+and has several features related to this.
+
+**Algorithms** can be explicitly indicated in your markup
+by putting the `algorithm="to foo a bar"` attribute on a container element
+or a heading.
+All vars within an algorithm are "scoped" to that algorithm.
+
+Generally, vars are used at least twice in an algorithm:
+once to define them,
+and at least once to actually use them for something.
+If you use a var only once,
+there's a good chance it's actually a typo.
+Bikeshed will emit a warning if it finds any vars used only once in an algorithm.
+If this singular usage is correct,
+you can instruct Bikeshed to ignore the error by listing it in the `Ignored Vars` metadata.
+
+
 `<pre>` whitespace stripping
 ----------------------------
 Using a `<pre>` element in HTML is unsatisfying,
