@@ -460,7 +460,7 @@ def checkVarHygiene(doc):
         warn("The following <var>s were only used once in the document:\n{0}If these are not typos, please add them to the 'Ignored Vars' metadata.", printVars)
 
     # Look for algorithms that show up twice; these are errors.
-    for algo, count in Counter(el.get('algorithm') for el in findAll("[algorithm]", doc)).items:
+    for algo, count in Counter(el.get('algorithm') for el in findAll("[algorithm]", doc)).items():
         if count > 1:
             die("Multiple declarations of the '{0}' algorithm.", algo)
             return
