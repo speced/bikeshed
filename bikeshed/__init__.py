@@ -275,6 +275,7 @@ def processHeadings(doc, scope="doc"):
     resetHeadings(doc, headings)
     determineHeadingLevels(doc, headings)
     addHeadingIds(doc, headings)
+    addHeadingAlgorithms(doc, headings)
     dedupIds(doc, headings)
     addHeadingBonuses(doc, headings)
     for el in headings:
@@ -307,6 +308,11 @@ def addHeadingIds(doc, headings):
     if len(neededIds) > 0:
         warn("You should manually provide IDs for your headings:\n{0}",
             "\n".join("  "+outerHTML(el) for el in neededIds))
+
+def addHeadingAlgorithms(doc, headings):
+    for header in headings:
+        if header.get('data-algorithm') == "":
+            header.set('data-algorithm', textContent(header).strip())
 
 def determineHeadingLevels(doc, headings):
     headerLevel = [0,0,0,0,0]
@@ -402,7 +408,8 @@ def canonicalizeShortcuts(doc):
         "attribute-info":"data-attribute-info",
         "dict-member-info":"data-dict-member-info",
         "lt":"data-lt",
-        "local-lt":"data-local-lt"
+        "local-lt":"data-local-lt",
+        "algorithm":"data-algorithm"
     }
     for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys()), doc):
         for attr, fixedAttr in attrFixup.items():
@@ -436,11 +443,11 @@ def checkVarHygiene(doc):
     def nearestAlgo(var):
         # Find the nearest "algorithm" container,
         # either an ancestor with [algorithm] or the nearest heading with same.
-        algo = treeAttr(var, "algorithm")
+        algo = treeAttr(var, "data-algorithm")
         if algo:
             return algo or None
         for h in relevantHeadings(var):
-            algo = h.get("algorithm")
+            algo = h.get("data-algorithm")
             if algo is not None and algo is not "":
                 return algo
 
@@ -460,7 +467,7 @@ def checkVarHygiene(doc):
         warn("The following <var>s were only used once in the document:\n{0}If these are not typos, please add them to the 'Ignored Vars' metadata.", printVars)
 
     # Look for algorithms that show up twice; these are errors.
-    for algo, count in Counter(el.get('algorithm') for el in findAll("[algorithm]", doc)).items():
+    for algo, count in Counter(el.get('data-algorithm') for el in findAll("[data-algorithm]", doc)).items():
         if count > 1:
             die("Multiple declarations of the '{0}' algorithm.", algo)
             return
@@ -1456,9 +1463,9 @@ class CSSSpec(object):
         self.transformAutolinkShortcuts()
         self.transformProductionGrammars()
         canonicalizeShortcuts(self)
-        checkVarHygiene(self)
         formatPropertyNames(self)
         processHeadings(self)
+        checkVarHygiene(self)
         processIssuesAndExamples(self)
         markupIDL(self)
         inlineRemoteIssues(self)
