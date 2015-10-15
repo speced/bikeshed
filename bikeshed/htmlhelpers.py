@@ -76,6 +76,10 @@ def outerHTML(el):
     return html.tostring(el, with_tail=False, encoding="unicode")
 
 
+def foldWhitespace(text):
+    return re.sub("\s+", " ", text)
+
+
 def parseHTML(text):
     doc = html5lib.parse(text, treebuilder='lxml', namespaceHTMLElements=False)
     head = doc.getroot()[0]

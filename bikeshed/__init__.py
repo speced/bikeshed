@@ -453,7 +453,7 @@ def checkVarHygiene(doc):
 
     # Look for vars that only show up once. These are probably typos.
     singularVars = []
-    varCounts = Counter((textContent(el), nearestAlgo(el)) for el in findAll("var", doc))
+    varCounts = Counter((foldWhitespace(textContent(el)), nearestAlgo(el)) for el in findAll("var", doc))
     for var,count in varCounts.items():
         if count == 1 and var[0].lower() not in doc.md.ignoredVars:
             singularVars.append(var)
@@ -762,7 +762,7 @@ def determineLinkText(el):
         # Need to fix this using the idl parser.
     else:
         linkText = contents
-    linkText = re.sub("\s+", " ", linkText)
+    linkText = foldWhitespace(linkText)
     if len(linkText) == 0:
         die("Autolink {0} has no linktext.", outerHTML(el))
     return linkText
