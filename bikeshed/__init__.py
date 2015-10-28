@@ -2329,6 +2329,10 @@ def addPropertyIndex(doc):
                 return "Inh."
             if name == "Percentages":
                 return "%ages"
+            if name == "Animatable":
+                return "Ani\xadmat\xadable"
+            if name == "Computed value":
+                return "Com\xadputed value"
             return name
         def createPropRow(prop):
             return E.tr(
