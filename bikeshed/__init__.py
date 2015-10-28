@@ -2336,12 +2336,13 @@ def addPropertyIndex(doc):
                     E.a({"data-link-type":"property"}, prop['Name'])),
                 *[E.td(prop.get(column,"")) for column in columns[1:]])
         appendChild(html,
-            E.table({"class":"proptable data"},
-                E.thead(
-                    E.tr(
-                        *[E.th({"scope":"col"}, formatColumnName(column)) for column in columns])),
-                E.tbody(
-                    *[createPropRow(prop) for prop in props])))
+            E.div({"class":"big-element-wrapper"},
+                E.table({"class":"proptable data"},
+                    E.thead(
+                        E.tr(
+                            *[E.th({"scope":"col"}, formatColumnName(column)) for column in columns])),
+                    E.tbody(
+                        *[createPropRow(prop) for prop in props]))))
     else:
         appendChild(html, E.p("No properties defined."))
 
@@ -2361,11 +2362,12 @@ def addPropertyIndex(doc):
                     E.a({"data-link-type":"at-rule"}, atRuleName),
                     " Descriptors"))
             tbody = appendChild(html,
-                E.table({"class":"proptable data"},
-                    E.thead(
-                        E.tr(
-                            *[E.th({"scope":"col"}, column) for column in columns])),
-                    E.tbody()))
+                E.div({"class":"big-element-wrapper"},
+                    E.table({"class":"proptable data"},
+                        E.thead(
+                            E.tr(
+                                *[E.th({"scope":"col"}, column) for column in columns])),
+                        E.tbody())))
             for desc in descs:
                 appendChild(tbody,
                     E.tr(
