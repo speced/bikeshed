@@ -2492,7 +2492,7 @@ def addSpecMetadataSection(doc):
                 "[",
                 mac['shortname'],
                 "] ",
-                E.i("… message topic …")),
+                E.i({"lt":""}, "… message topic …")),
             "”")
         if doc.md.mailingListArchives:
             appendChild(span,
