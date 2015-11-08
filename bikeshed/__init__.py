@@ -2520,14 +2520,16 @@ def addSpecMetadataSection(doc):
     if len(doc.md.editors):
         md["Editor" if len(doc.md.editors) == 1 else "Editors"] = map(printEditor, doc.md.editors)
     if len(doc.md.previousEditors):
-        md["Former Editor" if len(doc.md.editors) == 1 else "Former Editors"] = map(printEditor, doc.md.previousEditors)
+        md["Former Editor" if len(doc.md.previousEditors) == 1 else "Former Editors"] = map(printEditor, doc.md.previousEditors)
     for key, vals in doc.md.otherMetadata.items():
         md[key].extend(parseHTML("<span>"+doc.fixText(val)+"</span>")[0] for val in vals)
 
     dl = E.dl()
     for key, vals in md.items():
         attrs = {}
-        if key in ("Editor", "Editors"):
+        if key in ("Editor", "Editors", "Former Editor", "Former Editors"):
+            # A bunch of Microformats stuff is preloading on the <dd>s,
+            # so this prevents code from genning an extra wrapper <dd>.
             attrs["class"] = "editor"
             appendChild(dl,
                 E.dt(attrs, key, ":"),
