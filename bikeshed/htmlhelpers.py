@@ -369,6 +369,13 @@ def fixTypography(text):
     text = re.sub(r"([^<][^!])(—|--)\r?\n\s*(\S)", r"\1—<wbr>\3", text)
     return text
 
+def fixSurroundingTypography(el):
+    # Applies some of the fixTypography changes to the content surrounding an element.
+    # Used when a shorthand prevented fixTypography from firing previously.
+    if el.tail.startswith("'"):
+        el.tail = "’" + el.tail[1:]
+    return el
+
 def unfixTypography(text):
     # Replace curly quotes with straight quotes, and emdashes with double dashes.
     text = re.sub(r"’", r"'", text)

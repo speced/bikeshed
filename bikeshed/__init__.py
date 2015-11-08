@@ -1824,6 +1824,9 @@ class CSSSpec(object):
 
         transformElement(doc.document.getroot())
 
+        for el in findAll("var", doc):
+            fixSurroundingTypography(el)
+
 
     def transformProductionGrammars(doc):
         # Link up the various grammar symbols in CSS grammars to their definitions.
