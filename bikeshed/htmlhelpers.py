@@ -77,7 +77,7 @@ def outerHTML(el):
 
 
 def foldWhitespace(text):
-    return re.sub("\s+", " ", text)
+    return re.sub(r"(\s|\xa0)+", " ", text)
 
 
 def parseHTML(text):
