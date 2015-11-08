@@ -372,7 +372,7 @@ def fixTypography(text):
 def fixSurroundingTypography(el):
     # Applies some of the fixTypography changes to the content surrounding an element.
     # Used when a shorthand prevented fixTypography from firing previously.
-    if el.tail.startswith("'"):
+    if el.tail is not None and el.tail.startswith("'"):
         el.tail = "’" + el.tail[1:]
     return el
 
