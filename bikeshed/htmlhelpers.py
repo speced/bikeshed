@@ -158,9 +158,20 @@ def prependChild(parent, child):
             child.tail = (child.tail or '') + parent.text
             parent.text = None
 
-def insertBefore(target, el):
+def insertBefore(target, *els):
     parent = target.getparent()
-    parent.insert(parent.index(target), el)
+    index = parent.index(target)
+    prevSibling = parent[index-1] if index > 0 else None
+    for el in els:
+        if isinstance(el, basestring):
+            if prevSibling:
+                prevSibling.tail = (prevSibling.tail or '') + el
+            else:
+                parent.text = (parent.text or '') + el
+        else:
+            parent.insert(index, el)
+            prevSibling = el
+    return target
 
 def insertAfter(target, *els):
     parent = target.getparent()
@@ -172,22 +183,26 @@ def insertAfter(target, *els):
             target = el
     return target
 
-
 def removeNode(node):
     parent = node.getparent()
     if parent is None:
         return node
     index = parent.index(node)
     text = node.tail or ''
+    node.tail = None
     if index == 0:
         parent.text = (parent.text or '') + text
     else:
         prevsibling = parent[index-1]
         prevsibling.tail = (prevsibling.tail or '') + text
     parent.remove(node)
-    node.tail = None
     return node
 
+def replaceNode(node, *replacements):
+    insertBefore(node, *replacements)
+    removeNode(node)
+    if replacements:
+        return replacements[0]
 
 def appendContents(el, container):
     # Accepts either an iterable *or* a container element
