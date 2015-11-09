@@ -1455,6 +1455,7 @@ class CSSSpec(object):
 
         # Build the document
         self.document = parseDocument(self.html)
+        processInclusions(self)
         metadata.parseDoc(self)
 
         # Fill in and clean up a bunch of data
@@ -1931,6 +1932,38 @@ config.specClass = CSSSpec
 
 
 
+
+def processInclusions(doc):
+    import hashlib
+    includeHashes = set()
+    while True:
+        els = findAll("include", doc)
+        if not els:
+            break
+        for el in els:
+            if el.get("path"):
+                path = el.get("path")
+                try:
+                    with io.open(path, 'r', encoding="utf-8") as f:
+                        contents = f.read()
+                except Exception, err:
+                    die("Couldn't find include file '{0}'. Error was:\n{1}", path, err)
+                    removeNode(el)
+                    continue
+                hash = hashlib.md5(contents.encode("ascii", "xmlcharrefreplace")).hexdigest()
+                if hash in includeHashes:
+                    die("<include> loop detected: '{0}' was already included.", path)
+                    removeNode(el)
+                    continue
+                else:
+                    includeHashes.add(hash)
+                subtree = parseHTML(contents)
+                replaceNode(el, *subtree)
+    else:
+        die("<include> recursion depth exceeded")
+        for el in findAll("include", doc):
+            removeNode(el)
+        return
 
 
 
