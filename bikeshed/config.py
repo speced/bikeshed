@@ -39,6 +39,10 @@ shortToLongStatus = {
     "FINDING": "Finding"
 }
 
+groupsInW3C = frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini",
+                         "ricg", "svg", "texttracks", "web-bluetooth-cg",
+                         "webappsec", "webspecs", "whatwg"])
+
 dfnClassToType = {
     "propdef"            : "property",
     "valdef"             : "value",

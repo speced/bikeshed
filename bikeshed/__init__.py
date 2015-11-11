@@ -280,6 +280,8 @@ def processHeadings(doc, scope="doc"):
     addHeadingBonuses(doc, headings)
     for el in headings:
         addClass(el, 'settled')
+    if scope == "all" and doc.md.groupIsW3C:
+        checkPrivacySecurityHeadings(findAll(".heading", doc))
 
 def resetHeadings(doc, headings):
     for header in headings:
@@ -295,6 +297,8 @@ def resetHeadings(doc, headings):
 
 def addHeadingIds(doc, headings):
     neededIds = set()
+    hadSecurity = False
+    hadPrivacy = False
     for header in headings:
         if header.get('id') is None:
             if header.get("data-dfn-type") is None:
@@ -308,6 +312,22 @@ def addHeadingIds(doc, headings):
     if len(neededIds) > 0:
         warn("You should manually provide IDs for your headings:\n{0}",
             "\n".join("  "+outerHTML(el) for el in neededIds))
+
+def checkPrivacySecurityHeadings(headings):
+    security = False
+    privacy = False
+    for header in headings:
+        text = simplifyText(textContent(find(".content", header)))
+        if text == "security-considerations":
+            security = True
+        if text == "privacy-considerations":
+            privacy = True
+    if not security and not privacy:
+        warn("This specification has neither a 'Security Considerations' nor a 'Privacy Considerations' section. Please consider adding both.")
+    elif not security:
+        warn("This specification does not have a 'Security Considerations' section. Please consider adding one.")
+    elif not privacy:
+        warn("This specification does not have a 'Privacy Considerations' section. Please consider adding one.")
 
 def addHeadingAlgorithms(doc, headings):
     for header in headings:

@@ -19,6 +19,10 @@ class MetadataManager:
             return "{0}-{1}".format(self.shortname, self.level)
         return self.shortname
 
+    @property
+    def groupIsW3C(self):
+        return self.group in config.groupsInW3C
+
     def __init__(self, doc):
         self.doc = doc
         self.hasMetadata = False
