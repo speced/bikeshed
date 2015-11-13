@@ -2400,10 +2400,10 @@ def addPropertyIndex(doc):
             if name == "Computed value":
                 return "Com\xadputed value"
             return name
-        def createPropRow(prop):
+        def createRow(prop, linkType):
             return E.tr(
                 E.th({"scope":"row"},
-                    E.a({"data-link-type":"property"}, prop['Name'])),
+                    E.a({"data-link-type":linkType}, prop['Name'])),
                 *[E.td(prop.get(column,"")) for column in columns[1:]])
         appendChild(html,
             E.div({"class":"big-element-wrapper"},
@@ -2412,7 +2412,7 @@ def addPropertyIndex(doc):
                         E.tr(
                             *[E.th({"scope":"col"}, formatColumnName(column)) for column in columns])),
                     E.tbody(
-                        *[createPropRow(prop) for prop in props]))))
+                        *[createRow(prop, "property") for prop in props]))))
     else:
         appendChild(html, E.p("No properties defined."))
 
@@ -2431,19 +2431,14 @@ def addPropertyIndex(doc):
                 E.h3({"class":"no-num", "id":simplifyText(atRuleName)+"-descriptor-table"},
                     E.a({"data-link-type":"at-rule"}, atRuleName),
                     " Descriptors"))
-            tbody = appendChild(html,
+            appendChild(html,
                 E.div({"class":"big-element-wrapper"},
                     E.table({"class":"proptable data"},
                         E.thead(
                             E.tr(
                                 *[E.th({"scope":"col"}, column) for column in columns])),
-                        E.tbody())))
-            for desc in descs:
-                appendChild(tbody,
-                    E.tr(
-                        E.th({"scope":"row"},
-                            E.a({"data-link-type":"descriptor"}, desc['Name'])),
-                        *[E.td(desc.get(column, "")) for column in columns[1:]]))
+                        E.tbody(
+                            *[createRow(desc, "descriptor") for desc in descs]))))
 
 
 def addIDLSection(doc):
