@@ -2340,7 +2340,7 @@ def addPropertyIndex(doc):
         # Extract the key, minus the trailing :
         result = re.match(r'(.*):', textContent(row[0]).strip())
         if result is None:
-            die("Propdef row headers need be a word followed by a colon. Got:\n{0}", textContent(row[0]).strip())
+            die("Propdef row headers must be a word followed by a colon. Got:\n{0}", textContent(row[0]).strip())
             return '',''
         key = result.group(1).strip().capitalize()
         # Extract the value from the second cell
