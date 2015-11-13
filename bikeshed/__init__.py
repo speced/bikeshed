@@ -2381,6 +2381,11 @@ def addPropertyIndex(doc):
             atRules[atRule].append(tempDesc)
 
 
+    def createRow(prop, linkType):
+        return E.tr(
+            E.th({"scope":"row"},
+                E.a({"data-link-type":linkType}, prop['Name'])),
+            *[E.td(prop.get(column,"")) for column in columns[1:]])
     if len(props):
         # Set up the initial table columns for properties
         columns = ["Name", "Value", "Initial", "Applies to", "Inherited", "Percentages", "Media"]
@@ -2400,11 +2405,6 @@ def addPropertyIndex(doc):
             if name == "Computed value":
                 return "Com\xadputed value"
             return name
-        def createRow(prop, linkType):
-            return E.tr(
-                E.th({"scope":"row"},
-                    E.a({"data-link-type":linkType}, prop['Name'])),
-                *[E.td(prop.get(column,"")) for column in columns[1:]])
         appendChild(html,
             E.div({"class":"big-element-wrapper"},
                 E.table({"class":"proptable data"},
