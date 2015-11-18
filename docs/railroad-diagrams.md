@@ -45,6 +45,6 @@ The containers hold other elements, and modify their semantics:
 The text elements only contain text, not other elements.  Their values are given in their preludes.
 
 * **Terminal** (**T**) - represents a "terminal" in the grammar, something that can't be expanded any more.  Generally represents literal text.
-* **NonTerminal (**N**)** - represents a "non-terminal" in the grammar, something that can be expanded further.
+* **NonTerminal** (**N**) - represents a "non-terminal" in the grammar, something that can be expanded further.
 * **Comment** (**C**) - represents a comment in the railroad diagram, to aid in reading or provide additional information.  This is often used as the repetition value of a OneOrMore or ZeroOrMore to provide information about the repetitions, like how many are allowed.
 * **Skip** (**S**) - represents nothing, an empty option.  This is rarely necessary to use explicitly, as containers like Optional use it automatically, but it's occasionally useful when writing out a Choice element where one option is to do nothing.
