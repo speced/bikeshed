@@ -178,33 +178,33 @@ def main():
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
-        doc = CSSSpec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug, token=options.ghToken)
+        doc = Spec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug, token=options.ghToken)
         doc.md.addOverrides(extras)
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "watch":
         # Can't have an error killing the watcher
         config.force = True
-        doc = CSSSpec(inputFilename=options.infile, token=options.ghToken)
+        doc = Spec(inputFilename=options.infile, token=options.ghToken)
         doc.md.addOverrides(extras)
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         config.force = True
         config.quiet = True
         if options.printExports:
-            doc = CSSSpec(inputFilename=options.infile)
+            doc = Spec(inputFilename=options.infile)
             doc.preprocess()
             doc.printTargets()
         elif options.jsonCode:
-            doc = CSSSpec(inputFilename=options.infile)
+            doc = Spec(inputFilename=options.infile)
             doc.preprocess()
             exec("print json.dumps({0}, indent=2)".format(options.jsonCode))
         elif options.code:
-            doc = CSSSpec(inputFilename=options.infile)
+            doc = Spec(inputFilename=options.infile)
             doc.preprocess()
             exec("print {0}".format(options.code))
         elif options.linkText:
-            doc = CSSSpec(inputFilename=options.infile)
+            doc = Spec(inputFilename=options.infile)
             doc.preprocess()
             refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText+"\n"]
             config.quiet = options.quiet
@@ -217,7 +217,7 @@ def main():
     elif options.subparserName == "refs":
         config.force = True
         config.quiet = True
-        doc = CSSSpec(inputFilename=options.infile)
+        doc = Spec(inputFilename=options.infile)
         doc.preprocess()
         refs,_ = list(doc.refs.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
         print config.printjson(refs)
@@ -240,7 +240,7 @@ def main():
         else:
             config.force = True
             config.quiet = True
-            result = test.runAllTests(constructor=CSSSpec)
+            result = test.runAllTests(constructor=Spec)
             sys.exit(0 if result else 1)
     elif options.subparserName == "profile":
         root = "--root=\"{0}\"".format(options.root) if options.root else ""
@@ -252,7 +252,7 @@ def main():
     elif options.subparserName == "template":
         print specTemplate()
 
-class CSSSpec(object):
+class Spec(object):
 
     def __init__(self, inputFilename, paragraphMode="markdown", debug=False, token=None):
         if inputFilename is None:
@@ -562,7 +562,7 @@ class CSSSpec(object):
             return True
         return False
 
-config.specClass = CSSSpec
+config.specClass = Spec
 
 
 
