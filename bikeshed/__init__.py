@@ -447,7 +447,7 @@ class Spec(object):
 
 
     def loadDefaultMetadata(self):
-        data = self.getInclusion('defaults', error=False)
+        data = config.retrieveBoilerplateFile(self, 'defaults', error=False)
         try:
             defaults = json.loads(data)
         except Exception, e:
@@ -521,39 +521,6 @@ class Spec(object):
         for el in findAll("[data-noexport]", self):
             for term in  linkTextsFromElement(el):
                 print "  ", term
-
-    def getInclusion(self, name, group=None, status=None, error=True):
-        # First looks for a file specialized on the group and status.
-        # If that fails, specializes only on the group.
-        # If that fails, specializes only on the status.
-        # If that fails, grabs the most general file.
-        # Filenames must be of the format NAME-GROUP-STATUS.include
-        if group is None and self.md.group is not None:
-            group = self.md.group.lower()
-        if status is None:
-            status = self.md.status
-
-        pathprefix = config.scriptPath + "/include"
-        for filename in [
-            "{0}/{1}.include".format(os.path.dirname(os.path.abspath(self.inputSource)), name),
-            "{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status),
-            "{0}/{1}-{2}.include".format(pathprefix, name, group),
-            "{0}/{1}-{2}.include".format(pathprefix, name, status),
-            "{0}/{1}.include".format(pathprefix, name),
-        ]:
-            if os.path.isfile(filename):
-                break
-        else:
-            if error:
-                die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
-            filename = "/dev/null"
-
-        try:
-            with io.open(filename, 'r', encoding="utf-8") as fh:
-                return fh.read()
-        except IOError:
-            if error:
-                die("The include file for {0} disappeared underneath me.", name)
 
     def isOpaqueElement(self, el):
         if el.tag in self.md.opaqueElements:
@@ -1658,8 +1625,8 @@ def fillInBoilerplate(doc):
     if not doc.md.title:
         die("Can't generate the spec without a title.\nAdd a 'Title' metadata entry, or an <h1> on the first line.")
 
-    header = doc.getInclusion('header') if "header" not in doc.md.boilerplate['omitSections'] else ""
-    footer = doc.getInclusion('footer') if "footer" not in doc.md.boilerplate['omitSections'] else ""
+    header = config.retrieveBoilerplateFile(doc, 'header') if "header" not in doc.md.boilerplate['omitSections'] else ""
+    footer = config.retrieveBoilerplateFile(doc, 'footer') if "footer" not in doc.md.boilerplate['omitSections'] else ""
 
     doc.html = '\n'.join([header, doc.html, footer])
 
@@ -1694,32 +1661,32 @@ def getFillContainer(tag, doc, default=False):
 
 
 def addLogo(doc):
-    html = doc.getInclusion('logo')
+    html = config.retrieveBoilerplateFile(doc, 'logo')
     html = doc.fixText(html)
     fillWith('logo', parseHTML(html), doc=doc)
 
 
 def addCopyright(doc):
-    html = doc.getInclusion('copyright')
+    html = config.retrieveBoilerplateFile(doc, 'copyright')
     html = doc.fixText(html)
     fillWith('copyright', parseHTML(html), doc=doc)
 
 
 def addAbstract(doc):
-    html = doc.getInclusion('abstract')
+    html = config.retrieveBoilerplateFile(doc, 'abstract')
     html = doc.fixText(html)
     fillWith('abstract', parseHTML(html), doc=doc)
 
 
 def addStatusSection(doc):
-    html = doc.getInclusion('status')
+    html = config.retrieveBoilerplateFile(doc, 'status')
     html = doc.fixText(html)
     fillWith('status', parseHTML(html), doc=doc)
 
 
 def addObsoletionNotice(doc):
     if doc.md.warning:
-        html = doc.getInclusion(doc.md.warning[0])
+        html = config.retrieveBoilerplateFile(doc, doc.md.warning[0])
         html = doc.fixText(html)
         fillWith('warning', parseHTML(html), doc=doc)
 
@@ -1735,7 +1702,7 @@ def addAtRisk(doc):
 def addStyles(doc):
     el = getFillContainer('stylesheet', doc)
     if el is not None:
-        fillWith('stylesheet', doc.getInclusion('stylesheet'), doc=doc)
+        fillWith('stylesheet', config.retrieveBoilerplateFile(doc, 'stylesheet'), doc=doc)
 
 def addCustomBoilerplate(doc):
     for el in findAll('[boilerplate]', doc):
@@ -1753,7 +1720,7 @@ def removeUnwantedBoilerplate(doc):
 
 def addAnnotations(doc):
     if (doc.md.vshortname in doc.testSuites):
-        html = doc.getInclusion('annotations')
+        html = config.retrieveBoilerplateFile(doc, 'annotations')
         html = doc.fixText(html)
         appendContents(find("head", doc), parseHTML(html))
 
