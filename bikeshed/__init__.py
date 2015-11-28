@@ -252,33 +252,327 @@ def main():
     elif options.subparserName == "template":
         print specTemplate()
 
+class CSSSpec(object):
+
+    def __init__(self, inputFilename, paragraphMode="markdown", debug=False, token=None):
+        if inputFilename is None:
+            # Default to looking for a *.bs file.
+            # Otherwise, look for a *.src.html file.
+            # Otherwise, use standard input.
+            import glob
+            if glob.glob("*.bs"):
+                inputFilename = glob.glob("*.bs")[0]
+            elif glob.glob("*.src.html"):
+                inputFilename = glob.glob("*.src.html")[0]
+            else:
+                die("No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.")
+                return
+        self.inputSource = inputFilename
+        self.debug = debug
+        self.token = token
+
+        self.initializeState()
+
+    def initializeState(self):
+        self.normativeRefs = {}
+        self.informativeRefs = {}
+        self.refs = ReferenceManager()
+        self.externalRefsUsed = defaultdict(dict)
+        self.md = metadata.MetadataManager(doc=self)
+        self.biblios = {}
+        self.paragraphMode = "markdown"
+        self.macros = defaultdict(lambda x: "???")
+        self.widl = parser.Parser(ui=IDLUI())
+        self.testSuites = json.loads(config.retrieveDataFile("test-suites.json", quiet=True, str=True))
+
+        try:
+            if self.inputSource == "-":
+                self.lines = [unicode(line, encoding="utf-8") for line in sys.stdin.readlines()]
+                self.md.date = datetime.today()
+            else:
+                self.lines = io.open(self.inputSource, 'r', encoding="utf-8").readlines()
+                self.md.date = datetime.fromtimestamp(os.path.getmtime(self.inputSource))
+        except OSError:
+            die("Couldn't find the input file at the specified location '{0}'.", self.inputSource)
+            return
+        except IOError:
+            die("Couldn't open the input file '{0}'.", self.inputSource)
+            return
+
+    def preprocess(self):
+        # Textual hacks
+        stripBOM(self)
+
+        # Extract and process metadata
+        self.lines = metadata.parse(md = self.md, lines=self.lines)
+        self.loadDefaultMetadata()
+        self.md.finish()
+        self.md.fillTextMacros(self.macros, doc=self)
+
+        # Initialize things
+        self.refs.initializeRefs(self);
+        self.refs.initializeBiblio();
+
+        # Deal with further <pre> blocks, and markdown
+        transformDataBlocks(self)
+        if self.paragraphMode == "markdown":
+            self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements)
+
+        self.refs.setSpecData(self.md)
+
+        # Convert to a single string of html now, for convenience.
+        self.html = ''.join(self.lines)
+        fillInBoilerplate(self)
+        self.html = self.fixText(self.html)
+
+        # Build the document
+        self.document = parseDocument(self.html)
+        processInclusions(self)
+        metadata.parseDoc(self)
+
+        # Fill in and clean up a bunch of data
+        addBikeshedVersion(self)
+        addStatusSection(self)
+        addLogo(self)
+        addCopyright(self)
+        addSpecMetadataSection(self)
+        addAbstract(self)
+        addObsoletionNotice(self)
+        addAtRisk(self)
+        addNoteHeaders(self)
+        removeUnwantedBoilerplate(self)
+        shorthands.transformProductionPlaceholders(self)
+        shorthands.transformMaybePlaceholders(self)
+        shorthands.transformAutolinkShortcuts(self)
+        shorthands.transformProductionGrammars(self)
+        canonicalizeShortcuts(self)
+        fixManualDefTables(self)
+        headings.processHeadings(self)
+        checkVarHygiene(self)
+        processIssuesAndExamples(self)
+        markupIDL(self)
+        inlineRemoteIssues(self)
+
+
+        # Handle all the links
+        processDfns(self)
+        processIDL(self)
+        fillAttributeInfoSpans(self)
+        formatArgumentdefTables(self)
+        formatElementdefTables(self)
+        processAutolinks(self)
+        addIndexSection(self)
+        addExplicitIndexes(self)
+        addStyles(self)
+        processBiblioLinks(self)
+        addReferencesSection(self)
+        addPropertyIndex(self)
+        addIDLSection(self)
+        addIssuesSection(self)
+        addCustomBoilerplate(self)
+        headings.processHeadings(self, "all") # again
+        removeUnwantedBoilerplate(self)
+        addTOCSection(self)
+        addSelfLinks(self)
+        processAutolinks(self)
+        addAnnotations(self)
+        addSyntaxHighlighting(self)
+        removeUnwantedBoilerplate(self)
+        fixIntraDocumentReferences(self)
+
+        # Any final HTML cleanups
+        cleanupHTML(self)
+
+        return self
+
+
+    def serialize(self):
+        rendered = HTMLSerializer.HTMLSerializer(self.document, self.md.opaqueElements).serialize()
+        rendered = finalHackyCleanup(rendered)
+        return rendered
+
+    def fixMissingOutputFilename(self, outputFilename):
+        if outputFilename is None:
+            # More sensible defaults!
+            if self.inputSource.endswith(".bs"):
+                outputFilename = self.inputSource[0:-3] + ".html"
+            elif self.inputSource.endswith(".src.html"):
+                outputFilename = self.inputSource[0:-9] + ".html"
+            elif self.inputSource == "-":
+                outputFilename = "-"
+            else:
+                outputFilename = "-"
+        return outputFilename
+
+    def finish(self, outputFilename):
+        outputFilename = self.fixMissingOutputFilename(outputFilename)
+        rendered = self.serialize()
+        if not config.dryRun:
+            try:
+                if outputFilename == "-":
+                    outputFile = sys.stdout.write(rendered)
+                else:
+                    with io.open(outputFilename, "w", encoding="utf-8") as f:
+                        f.write(rendered)
+            except Exception, e:
+                die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)
+
+    def watch(self, outputFilename):
+        import time
+        outputFilename = self.fixMissingOutputFilename(outputFilename)
+        if self.inputSource == "-" or outputFilename == "-":
+            die("Watch mode doesn't support streaming from STDIN or to STDOUT.")
+            return
+        try:
+            lastInputModified = os.stat(self.inputSource).st_mtime
+            self.preprocess()
+            self.finish(outputFilename)
+            print "==============DONE=============="
+            while(True):
+                inputModified = os.stat(self.inputSource).st_mtime
+                if inputModified > lastInputModified:
+                    resetSeenMessages()
+                    lastInputModified = inputModified
+                    formattedTime = datetime.fromtimestamp(inputModified).strftime("%H:%M:%S")
+                    print "Source file modified at {0}. Rebuilding...".format(formattedTime)
+                    self.initializeState()
+                    self.preprocess()
+                    self.finish(outputFilename)
+                    print "==============DONE=============="
+                time.sleep(1)
+        except Exception, e:
+            die("Something went wrong while watching the file:\n{0}", e)
+
+
+
+
+    def loadDefaultMetadata(self):
+        data = self.getInclusion('defaults', error=False)
+        try:
+            defaults = json.loads(data)
+        except Exception, e:
+            if data != "":
+                die("Error loading defaults:\n{0}", str(e))
+            return
+        for key,val in defaults.items():
+            self.md.addDefault(key, val)
+
+    def fixText(self, text):
+        # Do several textual replacements that need to happen *before* the document is parsed as HTML.
+
+        # If markdown shorthands are on, temporarily remove `foo` while processing.
+        codeSpanReplacements = []
+        if "markdown" in self.md.markupShorthands:
+            def replaceCodeSpans(m):
+                codeSpanReplacements.append(m.group(2))
+                return "\ue0ff"
+            text = re.sub(r"(`+)(.*?[^`])\1(?=[^`])", replaceCodeSpans, text, flags=re.DOTALL)
+
+        # Replace the [FOO] things.
+        #for tag, replacement in self.macros.items():
+        #    text = text.replace("[{0}]".format(tag.upper()), replacement)
+        def macroReplacer(match):
+            fullText = match.group(0)
+            innerText = match.group(2) or ""
+            if fullText.startswith("\\"):
+                # Escaped
+                return fullText[1:]
+            if fullText.startswith("[["):
+                # Actually a biblio link
+                return fullText
+            if innerText.isdigit():
+                # No refs are all-digits (this is probably JS code).
+                return fullText
+            if innerText.lower() in self.macros:
+                # For some reason I store all the macros in lowercase,
+                # despite requiring them to be spelled with uppercase.
+                return self.macros[innerText.lower()]
+            die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
+            return fullText
+        text = re.sub(r"(\\|\[)?\[([A-Z0-9-]+)\]", macroReplacer, text)
+        text = fixTypography(text)
+        if "css" in self.md.markupShorthands:
+            # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
+            text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
+            # Replace the ''maybe link'' shortcuts.
+            # They'll survive the HTML parser, but they don't match if they contain an element.
+            # (The other shortcuts are "atomic" and can't contain elements.)
+            text = re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
+
+        if codeSpanReplacements:
+            codeSpanReplacements.reverse()
+            def codeSpanReviver(_):
+                # Match object is the PUA character, which I can ignore.
+                # Instead, sub back the replacement in order,
+                # massaged per the Commonmark rules.
+                import string
+                t = escapeHTML(codeSpanReplacements.pop()).strip(string.whitespace)
+                t = re.sub("["+string.whitespace+"]{2,}", " ", t)
+                return "<code data-opaque>"+t+"</code>"
+            text = re.sub("\ue0ff", codeSpanReviver, text)
+        return text
+
+    def printTargets(self):
+        print "Exported terms:"
+        for el in findAll("[data-export]", self):
+            for term in  linkTextsFromElement(el):
+                print "  ", term
+        print "Unexported terms:"
+        for el in findAll("[data-noexport]", self):
+            for term in  linkTextsFromElement(el):
+                print "  ", term
+
+    def getInclusion(self, name, group=None, status=None, error=True):
+        # First looks for a file specialized on the group and status.
+        # If that fails, specializes only on the group.
+        # If that fails, specializes only on the status.
+        # If that fails, grabs the most general file.
+        # Filenames must be of the format NAME-GROUP-STATUS.include
+        if group is None and self.md.group is not None:
+            group = self.md.group.lower()
+        if status is None:
+            status = self.md.status
+
+        pathprefix = config.scriptPath + "/include"
+        for filename in [
+            "{0}/{1}.include".format(os.path.dirname(os.path.abspath(self.inputSource)), name),
+            "{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status),
+            "{0}/{1}-{2}.include".format(pathprefix, name, group),
+            "{0}/{1}-{2}.include".format(pathprefix, name, status),
+            "{0}/{1}.include".format(pathprefix, name),
+        ]:
+            if os.path.isfile(filename):
+                break
+        else:
+            if error:
+                die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
+            filename = "/dev/null"
+
+        try:
+            with io.open(filename, 'r', encoding="utf-8") as fh:
+                return fh.read()
+        except IOError:
+            if error:
+                die("The include file for {0} disappeared underneath me.", name)
+
+    def isOpaqueElement(self, el):
+        if el.tag in self.md.opaqueElements:
+            return True
+        if el.get("data-opaque") is not None:
+            return True
+        return False
+
+config.specClass = CSSSpec
+
+
+
+
+
+
 def stripBOM(doc):
     if len(doc.lines) >= 1 and doc.lines[0][0:1] == "\ufeff":
         doc.lines[0] = doc.lines[0][1:]
         warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # Definitions and the like
@@ -1252,338 +1546,6 @@ def finalHackyCleanup(text):
     # For hacky last-minute string-based cleanups of the rendered html.
 
     return text
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class CSSSpec(object):
-
-    def __init__(self, inputFilename, paragraphMode="markdown", debug=False, token=None):
-        if inputFilename is None:
-            # Default to looking for a *.bs file.
-            # Otherwise, look for a *.src.html file.
-            # Otherwise, use standard input.
-            import glob
-            if glob.glob("*.bs"):
-                inputFilename = glob.glob("*.bs")[0]
-            elif glob.glob("*.src.html"):
-                inputFilename = glob.glob("*.src.html")[0]
-            else:
-                die("No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.")
-                return
-        self.inputSource = inputFilename
-        self.debug = debug
-        self.token = token
-
-        self.initializeState()
-
-    def initializeState(self):
-        self.normativeRefs = {}
-        self.informativeRefs = {}
-        self.refs = ReferenceManager()
-        self.externalRefsUsed = defaultdict(dict)
-        self.md = metadata.MetadataManager(doc=self)
-        self.biblios = {}
-        self.paragraphMode = "markdown"
-        self.macros = defaultdict(lambda x: "???")
-        self.widl = parser.Parser(ui=IDLUI())
-        self.testSuites = json.loads(config.retrieveDataFile("test-suites.json", quiet=True, str=True))
-
-        try:
-            if self.inputSource == "-":
-                self.lines = [unicode(line, encoding="utf-8") for line in sys.stdin.readlines()]
-                self.md.date = datetime.today()
-            else:
-                self.lines = io.open(self.inputSource, 'r', encoding="utf-8").readlines()
-                self.md.date = datetime.fromtimestamp(os.path.getmtime(self.inputSource))
-        except OSError:
-            die("Couldn't find the input file at the specified location '{0}'.", self.inputSource)
-            return
-        except IOError:
-            die("Couldn't open the input file '{0}'.", self.inputSource)
-            return
-
-    def preprocess(self):
-        # Textual hacks
-        stripBOM(self)
-
-        # Extract and process metadata
-        self.lines = metadata.parse(md = self.md, lines=self.lines)
-        self.loadDefaultMetadata()
-        self.md.finish()
-        self.md.fillTextMacros(self.macros, doc=self)
-
-        # Initialize things
-        self.refs.initializeRefs(self);
-        self.refs.initializeBiblio();
-
-        # Deal with further <pre> blocks, and markdown
-        transformDataBlocks(self)
-        if self.paragraphMode == "markdown":
-            self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements)
-
-        self.refs.setSpecData(self.md)
-
-        # Convert to a single string of html now, for convenience.
-        self.html = ''.join(self.lines)
-        fillInBoilerplate(self)
-        self.html = self.fixText(self.html)
-
-        # Build the document
-        self.document = parseDocument(self.html)
-        processInclusions(self)
-        metadata.parseDoc(self)
-
-        # Fill in and clean up a bunch of data
-        addBikeshedVersion(self)
-        addStatusSection(self)
-        addLogo(self)
-        addCopyright(self)
-        addSpecMetadataSection(self)
-        addAbstract(self)
-        addObsoletionNotice(self)
-        addAtRisk(self)
-        addNoteHeaders(self)
-        removeUnwantedBoilerplate(self)
-        shorthands.transformProductionPlaceholders(self)
-        shorthands.transformMaybePlaceholders(self)
-        shorthands.transformAutolinkShortcuts(self)
-        shorthands.transformProductionGrammars(self)
-        canonicalizeShortcuts(self)
-        fixManualDefTables(self)
-        headings.processHeadings(self)
-        checkVarHygiene(self)
-        processIssuesAndExamples(self)
-        markupIDL(self)
-        inlineRemoteIssues(self)
-
-
-        # Handle all the links
-        processDfns(self)
-        processIDL(self)
-        fillAttributeInfoSpans(self)
-        formatArgumentdefTables(self)
-        formatElementdefTables(self)
-        processAutolinks(self)
-        addIndexSection(self)
-        addExplicitIndexes(self)
-        addStyles(self)
-        processBiblioLinks(self)
-        addReferencesSection(self)
-        addPropertyIndex(self)
-        addIDLSection(self)
-        addIssuesSection(self)
-        addCustomBoilerplate(self)
-        headings.processHeadings(self, "all") # again
-        removeUnwantedBoilerplate(self)
-        addTOCSection(self)
-        addSelfLinks(self)
-        processAutolinks(self)
-        addAnnotations(self)
-        addSyntaxHighlighting(self)
-        removeUnwantedBoilerplate(self)
-        fixIntraDocumentReferences(self)
-
-        # Any final HTML cleanups
-        cleanupHTML(self)
-
-        return self
-
-
-    def serialize(self):
-        rendered = HTMLSerializer.HTMLSerializer(self.document, self.md.opaqueElements).serialize()
-        rendered = finalHackyCleanup(rendered)
-        return rendered
-
-    def fixMissingOutputFilename(self, outputFilename):
-        if outputFilename is None:
-            # More sensible defaults!
-            if self.inputSource.endswith(".bs"):
-                outputFilename = self.inputSource[0:-3] + ".html"
-            elif self.inputSource.endswith(".src.html"):
-                outputFilename = self.inputSource[0:-9] + ".html"
-            elif self.inputSource == "-":
-                outputFilename = "-"
-            else:
-                outputFilename = "-"
-        return outputFilename
-
-    def finish(self, outputFilename):
-        outputFilename = self.fixMissingOutputFilename(outputFilename)
-        rendered = self.serialize()
-        if not config.dryRun:
-            try:
-                if outputFilename == "-":
-                    outputFile = sys.stdout.write(rendered)
-                else:
-                    with io.open(outputFilename, "w", encoding="utf-8") as f:
-                        f.write(rendered)
-            except Exception, e:
-                die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)
-
-    def watch(self, outputFilename):
-        import time
-        outputFilename = self.fixMissingOutputFilename(outputFilename)
-        if self.inputSource == "-" or outputFilename == "-":
-            die("Watch mode doesn't support streaming from STDIN or to STDOUT.")
-            return
-        try:
-            lastInputModified = os.stat(self.inputSource).st_mtime
-            self.preprocess()
-            self.finish(outputFilename)
-            print "==============DONE=============="
-            while(True):
-                inputModified = os.stat(self.inputSource).st_mtime
-                if inputModified > lastInputModified:
-                    resetSeenMessages()
-                    lastInputModified = inputModified
-                    formattedTime = datetime.fromtimestamp(inputModified).strftime("%H:%M:%S")
-                    print "Source file modified at {0}. Rebuilding...".format(formattedTime)
-                    self.initializeState()
-                    self.preprocess()
-                    self.finish(outputFilename)
-                    print "==============DONE=============="
-                time.sleep(1)
-        except Exception, e:
-            die("Something went wrong while watching the file:\n{0}", e)
-
-
-
-
-    def loadDefaultMetadata(self):
-        data = self.getInclusion('defaults', error=False)
-        try:
-            defaults = json.loads(data)
-        except Exception, e:
-            if data != "":
-                die("Error loading defaults:\n{0}", str(e))
-            return
-        for key,val in defaults.items():
-            self.md.addDefault(key, val)
-
-    def fixText(self, text):
-        # Do several textual replacements that need to happen *before* the document is parsed as HTML.
-
-        # If markdown shorthands are on, temporarily remove `foo` while processing.
-        codeSpanReplacements = []
-        if "markdown" in self.md.markupShorthands:
-            def replaceCodeSpans(m):
-                codeSpanReplacements.append(m.group(2))
-                return "\ue0ff"
-            text = re.sub(r"(`+)(.*?[^`])\1(?=[^`])", replaceCodeSpans, text, flags=re.DOTALL)
-
-        # Replace the [FOO] things.
-        #for tag, replacement in self.macros.items():
-        #    text = text.replace("[{0}]".format(tag.upper()), replacement)
-        def macroReplacer(match):
-            fullText = match.group(0)
-            innerText = match.group(2) or ""
-            if fullText.startswith("\\"):
-                # Escaped
-                return fullText[1:]
-            if fullText.startswith("[["):
-                # Actually a biblio link
-                return fullText
-            if innerText.isdigit():
-                # No refs are all-digits (this is probably JS code).
-                return fullText
-            if innerText.lower() in self.macros:
-                # For some reason I store all the macros in lowercase,
-                # despite requiring them to be spelled with uppercase.
-                return self.macros[innerText.lower()]
-            die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
-            return fullText
-        text = re.sub(r"(\\|\[)?\[([A-Z0-9-]+)\]", macroReplacer, text)
-        text = fixTypography(text)
-        if "css" in self.md.markupShorthands:
-            # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
-            text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
-            # Replace the ''maybe link'' shortcuts.
-            # They'll survive the HTML parser, but they don't match if they contain an element.
-            # (The other shortcuts are "atomic" and can't contain elements.)
-            text = re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
-
-        if codeSpanReplacements:
-            codeSpanReplacements.reverse()
-            def codeSpanReviver(_):
-                # Match object is the PUA character, which I can ignore.
-                # Instead, sub back the replacement in order,
-                # massaged per the Commonmark rules.
-                import string
-                t = escapeHTML(codeSpanReplacements.pop()).strip(string.whitespace)
-                t = re.sub("["+string.whitespace+"]{2,}", " ", t)
-                return "<code data-opaque>"+t+"</code>"
-            text = re.sub("\ue0ff", codeSpanReviver, text)
-        return text
-
-    def printTargets(self):
-        print "Exported terms:"
-        for el in findAll("[data-export]", self):
-            for term in  linkTextsFromElement(el):
-                print "  ", term
-        print "Unexported terms:"
-        for el in findAll("[data-noexport]", self):
-            for term in  linkTextsFromElement(el):
-                print "  ", term
-
-    def getInclusion(self, name, group=None, status=None, error=True):
-        # First looks for a file specialized on the group and status.
-        # If that fails, specializes only on the group.
-        # If that fails, specializes only on the status.
-        # If that fails, grabs the most general file.
-        # Filenames must be of the format NAME-GROUP-STATUS.include
-        if group is None and self.md.group is not None:
-            group = self.md.group.lower()
-        if status is None:
-            status = self.md.status
-
-        pathprefix = config.scriptPath + "/include"
-        for filename in [
-            "{0}/{1}.include".format(os.path.dirname(os.path.abspath(self.inputSource)), name),
-            "{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status),
-            "{0}/{1}-{2}.include".format(pathprefix, name, group),
-            "{0}/{1}-{2}.include".format(pathprefix, name, status),
-            "{0}/{1}.include".format(pathprefix, name),
-        ]:
-            if os.path.isfile(filename):
-                break
-        else:
-            if error:
-                die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
-            filename = "/dev/null"
-
-        try:
-            with io.open(filename, 'r', encoding="utf-8") as fh:
-                return fh.read()
-        except IOError:
-            if error:
-                die("The include file for {0} disappeared underneath me.", name)
-
-    def isOpaqueElement(self, el):
-        if el.tag in self.md.opaqueElements:
-            return True
-        if el.get("data-opaque") is not None:
-            return True
-        return False
-
-config.specClass = CSSSpec
-
-
-
-
-
 
 
 
