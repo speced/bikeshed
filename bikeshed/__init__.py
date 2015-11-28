@@ -282,7 +282,9 @@ def stripBOM(doc):
 
 # Definitions and the like
 
-def formatPropertyNames(doc):
+def fixManualDefTables(doc):
+    # Def tables generated via datablocks are guaranteed correct,
+    # but manually-written ones often don't link up the names in the first row.
     for table in findAll("table.propdef, table.descdef, table.elementdef", doc):
         if hasClass(table, "partial"):
             tag = "a"
@@ -1359,7 +1361,7 @@ class CSSSpec(object):
         self.transformAutolinkShortcuts()
         self.transformProductionGrammars()
         canonicalizeShortcuts(self)
-        formatPropertyNames(self)
+        fixManualDefTables(self)
         headings.processHeadings(self)
         checkVarHygiene(self)
         processIssuesAndExamples(self)
