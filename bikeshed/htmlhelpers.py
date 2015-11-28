@@ -7,6 +7,7 @@ from html5lib.serializer import htmlserializer
 from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
+from collections import Counter
 import re
 import HTMLParser
 
@@ -402,6 +403,32 @@ def hashContents(el):
     # Hash the contents of an element into an 8-character alphanum string.
     # Generally used for generating probably-unique IDs.
     return hashlib.md5(innerHTML(el).strip().encode("ascii", "xmlcharrefreplace")).hexdigest()[0:8]
+
+def dedupIds(doc, els):
+    import itertools as iter
+    def findId(id):
+        return find("#"+id, doc) is not None
+    ids = Counter(el.get('id') for el in findAll("[id]", doc))
+    dupes = [id for id,count in ids.items() if count > 1]
+    for dupe in dupes:
+        warnAboutDupes = True
+        if re.match(r"issue-[0-9a-fA-F]{8}$", dupe):
+            # Don't warn about issues, it's okay if they have the same ID because they're identical text.
+            warnAboutDupes = False
+        els = findAll("#"+dupe, doc)
+        ints = iter.imap(str, iter.count(0))
+        for el in els[1:]:
+            # If I registered an alternate ID, try to use that.
+            if el.get('data-alternate-id'):
+                el.set("id", el.get("data-alternate-id"))
+                continue
+            # Try to de-dup the id by appending an integer after it.
+            if warnAboutDupes:
+                warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupe)
+            for x in ints:
+                if not findId(dupe+x):
+                    el.set("id", dupe+x)
+                    break
 
 def createElement(tag, attrs={}, *children):
     el = etree.Element(tag, {n:v for n,v in attrs.items() if v is not None})
