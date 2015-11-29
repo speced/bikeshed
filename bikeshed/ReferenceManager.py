@@ -139,7 +139,7 @@ class ReferenceManager(object):
         for el in dfns:
             if hasClass(el, "no-ref"):
                 continue
-            for linkText in linkTextsFromElement(el):
+            for linkText in config.linkTextsFromElement(el):
                 linkText = unfixTypography(linkText)
                 linkText = re.sub("\s+", " ", linkText)
                 linkType = treeAttr(el, 'data-dfn-type')
@@ -155,7 +155,7 @@ class ReferenceManager(object):
                         die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, linkType)
                         continue
                 else:
-                    dfnFor = set(splitForValues(dfnFor))
+                    dfnFor = set(config.splitForValues(dfnFor))
                     encounteredError = False
                     for singleFor in dfnFor:
                         if self.getLocalRef(linkType, linkText, linkFor=singleFor, exact=True):
@@ -537,23 +537,6 @@ class ReferenceManager(object):
         variants[methodSig]["for"].extend(forVals)
 
 
-def linkTextsFromElement(el, preserveCasing=False):
-    from .htmlhelpers import textContent
-    if el.get('data-lt') == '':
-        return []
-    elif el.get('data-lt'):
-        texts = [x.strip() for x in el.get('data-lt').split('|')]
-    else:
-        if el.tag in ("dfn", "a"):
-            texts = [textContent(el).strip()]
-        elif el.tag in ("h2", "h3", "h4", "h5", "h6"):
-            texts = [textContent(find(".content", el)).strip()]
-    if el.get('data-local-lt'):
-        texts += [x.strip() for x in el.get('data-local-lt').split('|')]
-    texts = [x for x in texts if x != '']
-    return texts
-
-
 def linkTextVariations(str, linkType):
     # Generate intelligent variations of the provided link text,
     # so explicitly adding an lt attr isn't usually necessary.
@@ -628,16 +611,6 @@ def stripLineBreaks(obj):
         elif isinstance(val, dict) or isinstance(val, list):
             stripLineBreaks(val)
     return obj
-
-def splitForValues(forValues):
-    '''
-    Splits a string of 1+ "for" values into an array of individual value.
-    Respects function args, etc.
-    Currently, for values are separated by commas.
-    '''
-    if forValues is None:
-        return None
-    return [value.strip() for value in re.split(r',(?![^()]*\))', forValues) if value.strip()]
 
 
 class RefWrapper(object):

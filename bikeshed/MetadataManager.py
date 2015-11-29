@@ -239,7 +239,8 @@ class MetadataManager:
         # { MetadataManager attr : metadata name (for printing) }
         requiredSingularKeys = {
             'status': 'Status',
-            'shortname': 'Shortname'
+            'shortname': 'Shortname',
+            'title': 'Title'
         }
         recommendedSingularKeys = {}
         requiredMultiKeys = {
@@ -600,6 +601,9 @@ def parse(md, lines):
             else:
                 die("Incorrectly formatted metadata line:\n{0}", line)
                 continue
+        elif re.match(r"\s*<h1>.*?</h1>", line):
+            title = re.match(r"\s*<h1>(.*?)</h1>", line).group(1)
+            md.addData("Title", title)
         else:
             newlines.append(line)
     return newlines

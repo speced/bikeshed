@@ -296,3 +296,31 @@ def simplifyText(text):
     text = re.sub(r"[^a-z0-9_-]", "", text)
     text = text.rstrip("-")
     return text
+
+
+def linkTextsFromElement(el, preserveCasing=False):
+    from .htmlhelpers import textContent
+    if el.get('data-lt') == '':
+        return []
+    elif el.get('data-lt'):
+        texts = [x.strip() for x in el.get('data-lt').split('|')]
+    else:
+        if el.tag in ("dfn", "a"):
+            texts = [textContent(el).strip()]
+        elif el.tag in ("h2", "h3", "h4", "h5", "h6"):
+            texts = [textContent(find(".content", el)).strip()]
+    if el.get('data-local-lt'):
+        texts += [x.strip() for x in el.get('data-local-lt').split('|')]
+    texts = [x for x in texts if x != '']
+    return texts
+
+
+def splitForValues(forValues):
+    '''
+    Splits a string of 1+ "for" values into an array of individual value.
+    Respects function args, etc.
+    Currently, for values are separated by commas.
+    '''
+    if forValues is None:
+        return None
+    return [value.strip() for value in re.split(r',(?![^()]*\))', forValues) if value.strip()]
