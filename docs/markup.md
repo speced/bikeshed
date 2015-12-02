@@ -67,6 +67,7 @@ There are several shortcuts for writing autolinks of particular types, so you do
 * `<<foo()>>` is an autolink to the function named "foo" (same)
 * `<<@foo>>` is an autolink to the at-rule named "@foo" (same)
 * `{{Foo}}` is an autolink to an IDL term named "Foo". (Accepts interfaces, attributes, methods, etc)
+* `<{Foo}>` is an autolink to an element named "Foo".
 * `|foo|` is a variable reference (`<var>`). (Vars created this way will shortly be checked for typos, so look out for new warnings/errors soon.)
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
