@@ -241,7 +241,22 @@ def main():
         else:
             os.system("python -m cProfile -o /tmp/stat.prof ~/bikeshed/bikeshed.py && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &".format(root=root, leaf=leaf))
     elif options.subparserName == "template":
-        print specTemplate()
+        print return '''<pre class='metadata'>
+Title: Your Spec Title
+Shortname: your-spec
+Level: 1
+Status: ED
+Group: WGNAMEORWHATEVER
+URL: http://example.com/url-this-spec-will-live-at
+Editor: Your Name, Your Company http://example.com/your-company, your-email@example.com, http://example.com/your-personal-website
+Abstract: A short description of your spec, one or two sentences.
+</pre>
+
+Introduction {#intro}
+=====================
+
+Introduction here.
+'''
 
 class Spec(object):
 
@@ -1648,23 +1663,3 @@ def addNoteHeaders(doc):
         prependChild(el,
             E.div({"class":"marker"}, preText, *parseHTML(el.get('heading'))))
         removeAttr(el, "heading")
-
-
-def specTemplate():
-    # Generates a skeleton .bs file
-    return '''<pre class='metadata'>
-Title: Your Spec Title
-Shortname: your-spec
-Level: 1
-Status: ED
-Group: WGNAMEORWHATEVER
-URL: http://example.com/url-this-spec-will-live-at
-Editor: Your Name, Your Company http://example.com/your-company, your-email@example.com, http://example.com/your-personal-website
-Abstract: A short description of your spec, one or two sentences.
-</pre>
-
-Introduction {#intro}
-=====================
-
-Introduction here.
-'''
