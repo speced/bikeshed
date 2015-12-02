@@ -241,7 +241,7 @@ def main():
         else:
             os.system("python -m cProfile -o /tmp/stat.prof ~/bikeshed/bikeshed.py && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &".format(root=root, leaf=leaf))
     elif options.subparserName == "template":
-        print return '''<pre class='metadata'>
+        print '''<pre class='metadata'>
 Title: Your Spec Title
 Shortname: your-spec
 Level: 1
