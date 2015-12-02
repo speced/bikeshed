@@ -174,14 +174,17 @@ def addExplicitIndexes(doc):
         if status and status not in ["TR", "ED"]:
             die("<index> has unknown value '{0}' for status. Must be TR or ED.", status)
             continue
-        specs = set(x.strip() for x in container.get('for').split(','))
+        if container.get('for').strip() == "*":
+            specs = None
+        else:
+            specs = set(x.strip() for x in container.get('for').split(','))
         seenSpecs = set()
         for text, refs in doc.refs.refs.items():
             text = text.strip()
             for ref in refs:
                 if not ref['export']:
                     continue
-                if ref['spec'].strip() not in specs:
+                if specs is not None and ref['spec'].strip() not in specs:
                     continue
                 if types and ref['type'].strip() not in types:
                     continue
@@ -220,7 +223,7 @@ def addExplicitIndexes(doc):
                         pass
                 else:
                     indexEntries[text].append(entry)
-        if specs - seenSpecs:
+        if specs is not None and specs - seenSpecs:
             warn("Couldn't find any refs for {0} when generating an index.", ' or '.join("'{0}'".format(x) for x in specs - seenSpecs))
         appendChild(container, htmlFromIndexTerms(indexEntries))
         container.tag = "div"
