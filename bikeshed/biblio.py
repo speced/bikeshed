@@ -137,6 +137,25 @@ class SpecBasedBiblioEntry(BiblioEntry):
             E.a({"href":self.url}, self.url)
         ]
 
+class StringBiblioEntry(BiblioEntry):
+    '''
+    Generates a barebones biblio entry from a preformatted biblio string.
+    This only exists because SpecRef still has a few of them;
+    don't use it on purpose for real things in the future.
+    '''
+
+    def __init__(self, data, linkText, **kwargs):
+        self.data = data
+        self.linkText = linkText
+
+    def valid(self):
+        return True
+
+    def toHTML(self):
+        return parseHTML(self.data)
+
+    def __str__(self):
+        return self.data
 
 def processReferBiblioFile(lines, storage, order):
     singularReferCodes = {
@@ -168,6 +187,7 @@ def processReferBiblioFile(lines, storage, order):
             if biblio is None:
                 biblio = defaultdict(list)
                 biblio['order'] = order
+                biblio['biblioFormat'] = "dict"
 
         match = re.match("\s*%(\w)\s+(.*)", line)
         if match:
@@ -211,9 +231,6 @@ def processSpecrefBiblioFile(text, storage, order):
 
     aliases = {}
     for biblioKey, data in datas.items():
-        if isinstance(data, basestring):
-            # Need to handle the preformatted string entries eventually
-            continue
         if "aliasOf" in data:
             if biblioKey.lower() != data["aliasOf"].lower():
                 # SpecRef uses aliases to handle capitalization differences,
@@ -221,12 +238,14 @@ def processSpecrefBiblioFile(text, storage, order):
                 aliases[biblioKey] = data["aliasOf"]
             continue
         biblio = {"linkText": biblioKey, "order": order}
-        for jsonField, biblioField in fields.items():
-            if jsonField in data:
-                biblio[biblioField] = data[jsonField]
-        if "title" not in biblio:
-            # Aliases should hit this case, I'll deal with them later
-            continue
+        if isinstance(data, basestring):
+            biblio['biblioFormat'] = "string"
+            biblio['data'] = data.replace("\n", " ")
+        else:
+            biblio['biblioFormat'] = "dict"
+            for jsonField, biblioField in fields.items():
+                if jsonField in data:
+                    biblio[biblioField] = data[jsonField]
         storage[biblioKey.lower()].append(biblio)
     for biblioKey, aliasOf in aliases.items():
         aliasedBiblios = storage.get(aliasOf.lower(), [])

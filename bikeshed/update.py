@@ -268,17 +268,29 @@ def writeBiblioFile(fh, biblios):
 
     Each entry (including last) is ended by a line containing a single - character.
     '''
+    typePrefixes = {
+        "dict": "d",
+        "string": "s"
+    }
     for key, entries in biblios.items():
         b = sorted(entries, key=lambda x:x['order'])[0]
-        fh.write(key.lower() + "\n")
-        for field in ["linkText", "date", "status", "title", "dated_url", "current_url", "other"]:
-            fh.write(b.get(field, "") + "\n")
-        if b.get("etAl", False):
-            fh.write("1\n")
+        format = b['biblioFormat']
+        fh.write("{prefix}:{key}\n".format(prefix=typePrefixes[format], key=key.lower()))
+        if format == "dict":
+            for field in ["linkText", "date", "status", "title", "dated_url", "current_url", "other"]:
+                fh.write(b.get(field, "") + "\n")
+            if b.get("etAl", False):
+                fh.write("1\n")
+            else:
+                fh.write("\n")
+            for author in b.get("authors", []):
+                fh.write(author+"\n")
+        elif format == "string":
+            fh.write(b['linkText'] + "\n")
+            fh.write(b['data'] + "\n")
         else:
-            fh.write("\n")
-        for author in b.get("authors", []):
-            fh.write(author+"\n")
+            die("The biblio key '{0}' has an unknown biblio type '{1}'.", key, format)
+            continue
         fh.write("-" + "\n")
 
 def writeAnchorsFile(fh, anchors):

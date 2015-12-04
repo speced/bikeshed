@@ -63,24 +63,41 @@ class ReferenceManager(object):
         with config.retrieveDataFile("biblio.data", quiet=True) as lines:
             try:
                 while True:
-                    key = lines.next()
-                    b = {
-                        "linkText": lines.next(),
-                        "date": lines.next(),
-                        "status": lines.next(),
-                        "title": lines.next(),
-                        "dated_url": lines.next(),
-                        "current_url": lines.next(),
-                        "other": lines.next(),
-                        "etAl": lines.next() != "\n",
-                        "order": 3,
-                        "authors": []
-                    }
-                    while True:
-                        line = lines.next()
-                        if line == b"-\n":
-                            break
-                        b['authors'].append(line)
+                    fullKey = lines.next()
+                    prefix, key = fullKey[0], fullKey[2:]
+                    if prefix == "d":
+                        b = {
+                            "linkText": lines.next(),
+                            "date": lines.next(),
+                            "status": lines.next(),
+                            "title": lines.next(),
+                            "dated_url": lines.next(),
+                            "current_url": lines.next(),
+                            "other": lines.next(),
+                            "etAl": lines.next() != "\n",
+                            "order": 3,
+                            "biblioFormat": "dict",
+                            "authors": []
+                        }
+                        while True:
+                            line = lines.next()
+                            if line == b"-\n":
+                                break
+                            b['authors'].append(line)
+                    elif prefix == "s":
+                        b = {
+                            "linkText": lines.next(),
+                            "data": lines.next(),
+                            "biblioFormat": "string",
+                            "order": 3
+                        }
+                        line = lines.next() # Eat the -
+                        if line != "-\n":
+                            print fullKey[:-1]
+                            print line[:-1]
+                    else:
+                        die("Unknown biblio prefix '{0}' on key '{1}'", prefix, fullKey)
+                        continue
                     self.biblios[key].append(b)
             except StopIteration:
                 pass
@@ -391,11 +408,14 @@ class ReferenceManager(object):
         else:
             return None
 
-        candidates = sorted(stripLineBreaks(candidates), key=itemgetter('order'))
+        candidate = sorted(stripLineBreaks(candidates), key=itemgetter('order'))[0]
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
         # if candidates[0]['order'] > 3: # 3 is SpecRef level
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
-        return biblio.BiblioEntry(preferredURL=status, **candidates[0])
+        if candidate['biblioFormat'] == "string":
+            return biblio.StringBiblioEntry(**candidate)
+        else:
+            return biblio.BiblioEntry(preferredURL=status, **candidate)
 
     def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, export=None, ignoreObsoletes=False, **kwargs):
         results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, export, ignoreObsoletes, exact=True)
