@@ -189,14 +189,19 @@ def addExplicitIndexes(doc):
                 if types and ref['type'].strip() not in types:
                     continue
                 seenSpecs.add(ref['spec'].strip())
-                label = ref['spec'].strip() # TODO: Record section numbers, use that instead
+                label = None # TODO: Record section numbers, use that instead
+                disambInfo = []
+                if types is None or len(types) > 1:
+                    disambInfo.append(ref['type'].strip())
+                if specs is None or len(specs) > 1:
+                    disambInfo.append("in " + ref['spec'].strip())
                 if ref['for']:
-                    disambiguator = "{0} for {1}".format(ref['type'].strip(), ', '.join(x.strip() for x in ref['for']))
-                else:
-                    if ref['type'] == "dfn":
-                        disambiguator = "definition of"
-                    else:
-                        disambiguator = "{0}".format(ref['type'].strip())
+                    try:
+                        disambInfo.append("for {0}".format(', '.join(x.strip() for x in ref['for'])))
+                    except:
+                        # todo: The TR version of Position triggers this
+                        pass
+                disambiguator = ", ".join(disambInfo)
                 entry = {'url': ref['url'].strip(), 'disambiguator': disambiguator, 'label': label, 'status': ref['status'].strip()}
                 for i,existingEntry in enumerate(indexEntries[text]):
                     if existingEntry['disambiguator'] != disambiguator or existingEntry['label'] != label:
