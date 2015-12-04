@@ -245,7 +245,7 @@ def htmlFromIndexTerms(entries):
             li = appendChild(topList,
                 E.li(
                     E.a({"href":item['url']}, text),
-                    E.span(", in ", item['label'])))
+                    E.span(", in ", item['label']) if item['label'] else ""))
         else:
             li = appendChild(topList, E.li(text))
             ul = appendChild(li, E.ul())
@@ -253,7 +253,7 @@ def htmlFromIndexTerms(entries):
                 appendChild(ul,
                     E.li(
                         E.a({"href":item['url']}, item['disambiguator']),
-                        E.span(", in ", item['label'])))
+                        E.span(", in ", item['label']) if item['label'] else ""))
     return topList
 
 def addIndexOfExternallyDefinedTerms(doc, container):
