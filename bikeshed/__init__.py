@@ -748,7 +748,6 @@ def fillAttributeInfoSpans(doc):
                     *decorations)
             elif re.match(r"(\w+)<(\w+)>", datatype):
                 # Sequence type
-                print datatype
                 match = re.match(r"(\w+)<(\w+)>", datatype)
                 appendChild(el,
                     " of type ",

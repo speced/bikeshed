@@ -92,9 +92,6 @@ class ReferenceManager(object):
                             "order": 3
                         }
                         line = lines.next() # Eat the -
-                        if line != "-\n":
-                            print fullKey[:-1]
-                            print line[:-1]
                     else:
                         die("Unknown biblio prefix '{0}' on key '{1}'", prefix, fullKey)
                         continue
