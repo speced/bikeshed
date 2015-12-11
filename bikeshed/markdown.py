@@ -67,11 +67,11 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 			match = re.search(r"\{#([^ }]+)\}\s*$", line)
 			if match:
 				token['id'] = match.group(1)
-		elif re.match(r"\d+\.\s", line):
-			match = re.match(r"\d+\.\s+(.*)", line)
-			token = {'type':'numbered', 'text': match.group(1), 'raw':rawline}
-		elif re.match(r"\d+\.$", line):
-			token = {'type':'numbered', 'text': "", 'raw':rawline}
+		elif re.match(r"-?\d+\.\s", line):
+			match = re.match(r"(-?\d+)\.\s+(.*)", line)
+			token = {'type':'numbered', 'text': match.group(2), 'raw':rawline, 'num': int(match.group(1))}
+		elif re.match(r"-?\d+\.$", line):
+			token = {'type':'numbered', 'text': "", 'raw':rawline, 'num': int(line[:-1])}
 		elif re.match(r"[*+-]\s", line):
 			match = re.match(r"[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
@@ -173,7 +173,7 @@ def parseTokens(tokens, numSpacesForIndentation):
 		elif stream.currtype() == 'bulleted':
 			lines += parseBulleted(stream)
 		elif stream.currtype() == 'numbered':
-			lines += parseNumbered(stream)
+			lines += parseNumbered(stream, start=stream.currnum())
 		elif stream.currtype() in ("dt", "dd"):
 			lines += parseDl(stream)
 		else:
@@ -289,7 +289,7 @@ def parseBulleted(stream):
 	lines.append("</ul>")
 	return lines
 
-def parseNumbered(stream):
+def parseNumbered(stream, start=1):
 	prefixLen = stream.currprefixlen()
         numSpacesForIndentation = stream.numSpacesForIndentation
 
@@ -325,7 +325,10 @@ def parseNumbered(stream):
 				stream.advance()
 			yield parseItem(stream)
 
-	lines = ["<ol>"]
+	if start == 1:
+		lines = ["<ol>"]
+	else:
+		lines = ["<ol start='{0}'>".format(start)]
 	for li_lines in getItems(stream):
 		lines.append("<li data-md>")
 		lines.extend(parse(li_lines, numSpacesForIndentation))
