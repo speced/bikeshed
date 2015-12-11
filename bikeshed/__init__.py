@@ -1422,6 +1422,11 @@ def cleanupHTML(doc):
         parent = parentElement(el)
         prependChild(parent, el)
 
+    # Convert the technically-invalid <nobr> element to an appropriate <span>
+    for el in findAll("nobr", doc):
+        el.tag = "span"
+        el.set("style", el.get('style', '') + ";white-space:nowrap")
+
     # If we accidentally recognized an autolink shortcut in SVG, kill it.
     for el in findAll("svg|a[data-link-type]", doc):
         del el.attrib["data-link-type"]
