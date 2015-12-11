@@ -10,7 +10,7 @@ messages = set()
 def p(msg):
     try:
         print msg
-    except UnicodeEncodingError:
+    except UnicodeEncodeError:
         warning = "\033[1;33mWARNING:\033[0m Your console does not understand Unicode.\n  Messages may be slightly corrupted."
         if warning not in messages:
             print warning
