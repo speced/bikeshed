@@ -39,8 +39,6 @@ def resetHeadings(doc, headings):
 
 def addHeadingIds(doc, headings):
     neededIds = set()
-    hadSecurity = False
-    hadPrivacy = False
     for header in headings:
         if header.get('id') is None:
             if header.get("data-dfn-type") is None:
