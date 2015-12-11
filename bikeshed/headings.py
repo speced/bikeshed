@@ -62,6 +62,9 @@ def checkPrivacySecurityHeadings(headings):
             security = True
         if text == "privacy-considerations":
             privacy = True
+        if text == "privacy-and-security-considerations" or text == "security-and-privacy-considerations":
+            security = True
+            privacy = True
     if not security and not privacy:
         warn("This specification has neither a 'Security Considerations' nor a 'Privacy Considerations' section. Please consider adding both.")
     elif not security:
