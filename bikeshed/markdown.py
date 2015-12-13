@@ -172,7 +172,7 @@ def parseTokens(tokens, numSpacesForIndentation):
 			lines += parseMultiLineHeading(stream)
 		elif stream.currtype() == 'text' and stream.prevtype() == 'blank':
 			lines += parseParagraph(stream)
-		elif stream.currtype() == 'rule':
+		elif stream.currtype() == 'rule' or stream.prevtype() == 'blank' and stream.currtype() == 'dash-line':
 			lines += parseHorizontalRule(stream)
 		elif stream.currtype() == 'bulleted':
 			lines += parseBulleted(stream)
