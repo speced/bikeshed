@@ -67,7 +67,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 			match = re.search(r"\{#([^ }]+)\}\s*$", line)
 			if match:
 				token['id'] = match.group(1)
-		elif re.match(r"([*_-])(?:\s*\1){2,}$", line):
+		elif re.match(r"([*_-])\s*\1\s*\1(\s*\1)*$", line):
 			token = {'type':'rule', 'raw': rawline}
 		elif re.match(r"-?\d+\.\s", line):
 			match = re.match(r"(-?\d+)\.\s+(.*)", line)
