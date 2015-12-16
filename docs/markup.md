@@ -14,6 +14,7 @@ Bikeshed currently recognizes a subset of Markdown:
 * paragraphs
 * lists
 * headings
+* horizontal rules
 
 It also recognizes **definition lists**, with the following format:
 
