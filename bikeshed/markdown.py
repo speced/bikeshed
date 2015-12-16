@@ -67,6 +67,8 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 			match = re.search(r"\{#([^ }]+)\}\s*$", line)
 			if match:
 				token['id'] = match.group(1)
+		elif re.match(r"((\*\s*){3,})|((-\s*){3,})|((_\s*){3,})$", line):
+			token = {'type':'rule', 'raw': rawline}
 		elif re.match(r"-?\d+\.\s", line):
 			match = re.match(r"(-?\d+)\.\s+(.*)", line)
 			token = {'type':'numbered', 'text': match.group(2), 'raw':rawline, 'num': int(match.group(1))}
@@ -149,6 +151,7 @@ def parseTokens(tokens, numSpacesForIndentation):
 	equals-line
 	dash-line
 	heading
+	rule
 	numbered
 	bulleted
 	text
@@ -170,6 +173,8 @@ def parseTokens(tokens, numSpacesForIndentation):
 			lines += parseMultiLineHeading(stream)
 		elif stream.currtype() == 'text' and stream.prevtype() == 'blank':
 			lines += parseParagraph(stream)
+		elif stream.currtype() == 'rule' or stream.currtype() == 'dash-line':
+			lines += parseHorizontalRule(stream)
 		elif stream.currtype() == 'bulleted':
 			lines += parseBulleted(stream)
 		elif stream.currtype() == 'numbered':
@@ -217,6 +222,11 @@ def parseMultiLineHeading(stream):
 	stream.advance(2)
 	return lines
 
+def parseHorizontalRule(stream):
+	lines =  ["<hr>\n"]
+	stream.advance()
+	return lines
+
 def parseParagraph(stream):
 	line = stream.currtext()
 	initialPrefixLen = stream.currprefixlen()
@@ -234,8 +244,8 @@ def parseParagraph(stream):
 		match = re.match(r"issue\(([^)]+)\):(.*)", line, re.I)
 		if match:
 			line = match.group(2)
-                        p = "<p data-remote-issue-id='%s' class='replace-with-issue-class'>" % match.group(1)
-                else:
+			p = "<p data-remote-issue-id='%s' class='replace-with-issue-class'>" % match.group(1)
+		else:
 			p = "<p>"
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
