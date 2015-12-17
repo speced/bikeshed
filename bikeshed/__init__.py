@@ -691,17 +691,21 @@ def fixInterDocumentReferences(doc):
         if section is None:
             die("Spec-section autolink doesn't have a 'spec-section' attribute:\n{0}", outerHTML(el))
             continue
-        removeAttr(el, 'data-link-spec')
-        removeAttr(el, 'spec-section')
-        if spec in doc.refs.specs:
-            specData = doc.refs.specs[spec]
-            url = specData["ED"] if "ED" in specData else specData["TR"]
-            el.set("href", url + section)
-            el.text = "{0} § {1}".format(specData["title"], section[1:])
+        if spec in doc.refs.headings:
+            specData = doc.refs.headings[spec]
+            if section in specData:
+                heading = specData[section]
+            else:
+                die("Couldn't find section '{0}' in spec '{1}':\n{2}", section, spec, outerHTML(el))
+                continue
             el.tag = "a"
+            el.set("href", heading['url'])
+            el.text = "{specTitle} §{number} {title}".format(**heading)
         else:
             die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el))
             continue
+        removeAttr(el, 'data-link-spec')
+        removeAttr(el, 'spec-section')
 
 def fillAttributeInfoSpans(doc):
     # Auto-add <span attribute-info> to <dt><dfn> when it's an attribute or dict-member.

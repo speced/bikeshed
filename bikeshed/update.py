@@ -47,7 +47,7 @@ def updateCrossRefs():
             list = []
         # Call with multiTree being a list of trees
         for item in multiTree:
-            if item['type'] in config.dfnTypes.union(["dfn"]):
+            if item['type'] in config.dfnTypes.union(["dfn", "heading"]):
                 list.append(item)
             if item.get('children'):
                 linearizeAnchorTree(item['children'], list)
@@ -55,6 +55,7 @@ def updateCrossRefs():
 
     specs = dict()
     anchors = defaultdict(list)
+    headings = defaultdict(dict)
     for rawSpec in rawSpecData.values():
         spec = {
             'vshortname': rawSpec['name'],
@@ -94,22 +95,36 @@ def updateCrossRefs():
             linkingTexts = rawAnchor.get('linking_text', [rawAnchor.get('title')])
             if linkingTexts[0] is None:
                 continue
-            anchor = {
-                'status': rawAnchor['status'],
-                'type': rawAnchor['type'],
-                'spec': spec['vshortname'],
-                'shortname': spec['shortname'],
-                'level': int(spec['level']),
-                'export': rawAnchor.get('export', False),
-                'normative': rawAnchor.get('normative', False),
-                'url': spec[rawAnchor['status']] + rawAnchor['uri'],
-                'for': rawAnchor.get('for', [])
-            }
-            for text in linkingTexts:
-                if anchor['type'] in config.lowercaseTypes:
-                    text = text.lower()
-                text = re.sub(r'\s+', ' ', text)
-                anchors[text].append(anchor)
+            if rawAnchor['type'] == "heading":
+                heading = {
+                    'status': rawAnchor['status'],
+                    'spec': spec['vshortname'],
+                    'shortname': spec['shortname'],
+                    'level': int(spec['level']),
+                    'url': spec[rawAnchor['status']] + rawAnchor['uri'],
+                    'anchor': rawAnchor['uri'],
+                    'number': rawAnchor['name'],
+                    'title': rawAnchor['title'],
+                    'specTitle': spec['title']
+                }
+                headings[spec['vshortname']][rawAnchor['uri']] = heading
+            else:
+                anchor = {
+                    'status': rawAnchor['status'],
+                    'type': rawAnchor['type'],
+                    'spec': spec['vshortname'],
+                    'shortname': spec['shortname'],
+                    'level': int(spec['level']),
+                    'export': rawAnchor.get('export', False),
+                    'normative': rawAnchor.get('normative', False),
+                    'url': spec[rawAnchor['status']] + rawAnchor['uri'],
+                    'for': rawAnchor.get('for', [])
+                }
+                for text in linkingTexts:
+                    if anchor['type'] in config.lowercaseTypes:
+                        text = text.lower()
+                    text = re.sub(r'\s+', ' ', text)
+                    anchors[text].append(anchor)
 
     # Compile a db of {argless methods => {argfull method => {args, fors, url}}
     methods = defaultdict(dict)
@@ -151,6 +166,12 @@ def updateCrossRefs():
                 f.write(unicode(json.dumps(specs, ensure_ascii=False, indent=2)))
         except Exception, e:
             die("Couldn't save spec database to disk.\n{0}", e)
+            return
+        try:
+            with io.open(config.scriptPath+"/spec-data/headings.json", 'w', encoding="utf-8") as f:
+                f.write(unicode(json.dumps(headings, ensure_ascii=False, indent=2)))
+        except Exception, e:
+            die("Couldn't save headings database to disk.\n{0}", e)
             return
         try:
             with io.open(config.scriptPath+"/spec-data/anchors.data", 'w', encoding="utf-8") as f:

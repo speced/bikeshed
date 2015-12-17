@@ -35,11 +35,14 @@ class ReferenceManager(object):
         self.replacedSpecs = set()
         # Dict of {biblio term => biblio data}
         self.biblios = defaultdict(list)
+        # Dict of {spec vshortname => headings}
+        self.headings = dict()
         self.status = specStatus
 
     def initializeRefs(self, doc):
         # Load up the xref data
         self.specs.update(json.loads(config.retrieveDataFile("specs.json", quiet=True, str=True)))
+        self.headings.update(json.loads(config.retrieveDataFile("headings.json", quiet=True, str=True)))
         with config.retrieveDataFile("anchors.data", quiet=True) as lines:
             self.refs = decodeAnchors(lines)
         self.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
