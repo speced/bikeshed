@@ -616,6 +616,10 @@ def linkTextVariations(str, linkType):
             yield str[:-1] + "ing"
         else:
             yield str + "ing"
+    elif config.linkTypeIn(linkType, "idl"):
+        # Let people refer to escaped IDL names with their "real" names (without the underscore)
+        if str[0] != "_":
+            yield "_" + str
 
 
 def stripLineBreaks(obj):
