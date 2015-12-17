@@ -115,9 +115,13 @@ def transformAutolinkShortcuts(doc):
             term,
             "]")
 
-    sectionRe = re.compile(r"\[\[(#[\w-]+)\]\]")
+    sectionRe = re.compile(r"\[\[([\w-]*)(#[\w-]+)\]\]")
     def sectionReplacer(match):
-        return E.a({"section":"", "href":match.group(1)})
+        spec,section = match.groups()
+        if spec == "":
+            return E.a({"section":"", "href":section})
+        else:
+            return E.span({"spec-section":section, "spec":spec})
 
     propdescRe = re.compile(r"'(?:([^\s']*)/)?([\w*-]+)(?:!!([\w-]+))?'")
     def propdescReplacer(match):

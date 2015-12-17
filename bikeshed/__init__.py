@@ -385,6 +385,7 @@ class Spec(object):
         boilerplate.removeUnwantedBoilerplate(self)
         addSyntaxHighlighting(self)
         fixIntraDocumentReferences(self)
+        fixInterDocumentReferences(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
@@ -679,6 +680,28 @@ def fixIntraDocumentReferences(doc):
             if target.get('data-level') is not None:
                 text = "§{1} {0}".format(text, target.get('data-level'))
             appendChild(el, text)
+
+def fixInterDocumentReferences(doc):
+    for el in findAll("[spec-section]", doc):
+        spec = el.get('data-link-spec')
+        section = el.get('spec-section')
+        if spec is None:
+            die("Spec-section autolink doesn't have a 'spec' attribute:\n{0}", outerHTML(el))
+            continue
+        if section is None:
+            die("Spec-section autolink doesn't have a 'spec-section' attribute:\n{0}", outerHTML(el))
+            continue
+        removeAttr(el, 'data-link-spec')
+        removeAttr(el, 'spec-section')
+        if spec in doc.refs.specs:
+            specData = doc.refs.specs[spec]
+            url = specData["ED"] if "ED" in specData else specData["TR"]
+            el.set("href", url + section)
+            el.text = "{0} § {1}".format(specData["title"], section[1:])
+            el.tag = "a"
+        else:
+            die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el))
+            continue
 
 def fillAttributeInfoSpans(doc):
     # Auto-add <span attribute-info> to <dt><dfn> when it's an attribute or dict-member.
