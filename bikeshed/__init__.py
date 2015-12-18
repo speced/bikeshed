@@ -701,6 +701,14 @@ def fixInterDocumentReferences(doc):
             el.tag = "a"
             el.set("href", heading['url'])
             el.text = "{specTitle} §{number} {title}".format(**heading)
+        elif doc.refs.getBiblioRef(spec):
+            bib = doc.refs.getBiblioRef(spec)
+            if isinstance(bib, biblio.StringBiblioEntry):
+                die("Can't generate a cross-spec section ref for '{0}', because the biblio entry has no url.", spec)
+                continue
+            el.tag = "a"
+            el.set("href", bib.url + section)
+            el.text = bib.title + " §" + section[1:]
         else:
             die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el))
             continue

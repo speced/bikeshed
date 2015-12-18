@@ -388,7 +388,7 @@ class ReferenceManager(object):
                  '\n'.join(possibleRefs))
         return defaultRef
 
-    def getBiblioRef(self, text, status, generateFakeRef=False, el=None):
+    def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None):
         key = text.lower()
         if key in self.biblios:
             candidates = self.biblios[key]
