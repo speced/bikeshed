@@ -23,7 +23,7 @@ from . import HTMLSerializer
 from . import headings
 from . import shorthands
 from . import boilerplate
-from .datablocks import transformDataBlocks
+from . import datablocks
 from .ReferenceManager import ReferenceManager
 from .htmlhelpers import *
 from .messages import *
@@ -320,9 +320,8 @@ class Spec(object):
         self.refs.initializeBiblio();
 
         # Deal with further <pre> blocks, and markdown
-        transformDataBlocks(self)
-        if self.paragraphMode == "markdown":
-            self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements)
+        self.lines = datablocks.transformDataBlocks(self, self.lines)
+        self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements)
 
         self.refs.setSpecData(self.md)
 

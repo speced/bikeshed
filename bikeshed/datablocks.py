@@ -24,7 +24,7 @@ from .htmlhelpers import *
 #
 # Additionally, we pass in the tag-name used (pre or xmp)
 # and the line with the content, in case it has useful data in it.
-def transformDataBlocks(doc):
+def transformDataBlocks(doc, lines):
     inBlock = False
     blockTypes = {
         'propdef': transformPropdef,
@@ -43,7 +43,7 @@ def transformDataBlocks(doc):
     tagName = ""
     startLine = 0
     newLines = []
-    for (i, line) in enumerate(doc.lines):
+    for (i, line) in enumerate(lines):
         # Look for the start of a block.
         match = re.match(r"\s*<(pre|xmp)(.*)", line, re.I)
         if match and not inBlock:
@@ -74,9 +74,9 @@ def transformDataBlocks(doc):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
                 repl = blockTypes[blockType](
-                        lines=doc.lines[startLine+1:i],
+                        lines=lines[startLine+1:i],
                         tagName=tagName,
-                        firstLine=doc.lines[startLine],
+                        firstLine=lines[startLine],
                         doc=doc)
                 newLines.extend(repl)
                 newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
@@ -85,9 +85,9 @@ def transformDataBlocks(doc):
                 # End tag was at the end of line of useful content.
                 # Process the stuff before it, preserve the stuff after it.
                 repl = blockTypes[blockType](
-                        lines=doc.lines[startLine+1:i]+[match.group(1)],
+                        lines=lines[startLine+1:i]+[match.group(1)],
                         tagName=tagName,
-                        firstLine=doc.lines[startLine],
+                        firstLine=lines[startLine],
                         doc=doc)
                 newLines.extend(repl)
                 newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
@@ -99,7 +99,7 @@ def transformDataBlocks(doc):
             continue
         newLines.append(line)
 
-    doc.lines = newLines
+    return newLines
 
 
 def transformPre(lines, tagName, firstLine, **kwargs):
