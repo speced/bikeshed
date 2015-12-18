@@ -1572,19 +1572,20 @@ def processInclusions(doc):
                 path = el.get("path")
                 try:
                     with io.open(path, 'r', encoding="utf-8") as f:
-                        contents = f.read()
+                        contents = f.readlines()
                 except Exception, err:
                     die("Couldn't find include file '{0}'. Error was:\n{1}", path, err)
                     removeNode(el)
                     continue
-                hash = hashlib.md5(contents.encode("ascii", "xmlcharrefreplace")).hexdigest()
+                hash = hashlib.md5(''.join(contents).encode("ascii", "xmlcharrefreplace")).hexdigest()
                 if hash in includeHashes:
                     die("<include> loop detected: '{0}' was already included.", path)
                     removeNode(el)
                     continue
                 else:
                     includeHashes.add(hash)
-                subtree = parseHTML(contents)
+                contents = markdown.parse(contents, doc.md.indent, opaqueElements=doc.md.opaqueElements)
+                subtree = parseHTML('\n'.join(contents))
                 replaceNode(el, *subtree)
     else:
         die("<include> recursion depth exceeded")
