@@ -1585,7 +1585,7 @@ def processInclusions(doc):
                     includeHashes.add(hash)
                 lines = datablocks.transformDataBlocks(doc, lines)
                 lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
-                subtree = parseHTML('\n'.join(lines))
+                subtree = parseHTML(''.join(lines))
                 replaceNode(el, *subtree)
     else:
         die("<include> recursion depth exceeded")
