@@ -406,10 +406,30 @@ Also, the section titles are often long and annoying to type,
 and they move around,
 so numbering isn't stable.
 
-Note how Section Links have a similar syntax to Bibliography Links;
-these will soonish merge,
-allowing you to link to sections in other documents
-(at least, when Bikeshed has section information for them).
+You can also use **cross-spec** section links,
+as long as the spec is either in Bikeshed's linking database,
+or the biblio database.
+The syntax is a mixture of a biblio reference and a section link:
+
+```html
+[[css-flexbox-1#auto-margins]]
+[[CSS-access-19990804#Features]]
+```
+
+which renders as:
+
+```html
+<a href="https://drafts.csswg.org/css-flexbox-1/#auto-margins">CSS Flexbox 1 §8.1 Aligning with auto margins</a>
+<a href="http://www.w3.org/1999/08/NOTE-CSS-access-19990804#Features">Accessibility Features of CSS §Features</a>
+```
+
+If Bikeshed knows about the spec,
+it link-checks you,
+and fills in the section number and heading in the generated text.
+If the spec is only in the bibliography database,
+Bikeshed just assumes that the link target exists
+and uses it directly in the text,
+because it has no way to tell what the section is named.
 
 
 Bibliography
