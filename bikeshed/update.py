@@ -84,6 +84,7 @@ def updateCrossRefs():
             spec['shortname'] = spec['vshortname']
             spec['level'] = 1
         specs[spec['vshortname']] = spec
+        specHeadings = headings[spec['vshortname']]
 
         def setStatus(status):
             def temp(obj):
@@ -96,18 +97,58 @@ def updateCrossRefs():
             if linkingTexts[0] is None:
                 continue
             if rawAnchor['type'] == "heading":
-                heading = {
-                    'status': rawAnchor['status'],
-                    'spec': spec['vshortname'],
-                    'shortname': spec['shortname'],
-                    'level': int(spec['level']),
-                    'url': spec[rawAnchor['status']] + rawAnchor['uri'],
-                    'anchor': rawAnchor['uri'],
-                    'number': rawAnchor['name'],
-                    'title': rawAnchor['title'],
-                    'specTitle': spec['title']
-                }
-                headings[spec['vshortname']][rawAnchor['uri']] = heading
+                uri = rawAnchor['uri']
+                if uri.startswith("??"):
+                    # css3-tables has this a bunch, for some strange reason
+                    uri = uri[2:]
+                if uri[0] == "#":
+                    # Either single-page spec, or link on the top page of a multi-page spec
+                    heading = {
+                        'url': spec[rawAnchor['status']] + uri,
+                        'number': rawAnchor['name'] if re.match(r"[\d.]+$", rawAnchor['name']) else "",
+                        'text': rawAnchor['title'],
+                        'spec': spec['title']
+                    }
+                    if uri in specHeadings and isinstance(specHeadings[uri], list):
+                        # Okay, multipage already squatted here.
+                        specHeadings[uri].append(spec['vshortname']+"/"+uri)
+                        specHeadings["/"+uri] = heading
+                    else:
+                        specHeadings[uri] = heading
+                else:
+                    # Multi-page spec, need to guard against colliding IDs
+                    if "#" in uri:
+                        # url to a heading in the page, like "foo.html#bar"
+                        match = re.match(r"([\w-]+).*?(#.*)", uri)
+                        if not match:
+                            die("Unexpected URI pattern '{0}' for spec '{1}'. Please report this to the Bikeshed maintainer.", uri, spec['vshortname'])
+                            continue
+                        page, fragment = match.groups()
+                        page = "/"+page
+                    else:
+                        # url to a page itself, like "foo.html"
+                        page, _, _ = uri.partition(".")
+                        page = "/"+page
+                        fragment = "#"
+                    shorthand = page + fragment
+                    heading = {
+                        'url': spec[rawAnchor['status']] + uri,
+                        'number': rawAnchor['name'] if re.match(r"[\d.]+$", rawAnchor['name']) else "",
+                        'text': rawAnchor['title'],
+                        'spec': spec['title']
+                    }
+                    specHeadings[shorthand] = heading
+                    if fragment not in specHeadings:
+                        specHeadings[fragment] = []
+                    if isinstance(specHeadings[fragment], dict):
+                        # Ugh, heading on the top-level page already squatted here.
+                        # Push it to /#foo
+                        shorthand = "/" + fragment
+                        specHeadings[shorthand] = specHeadings[fragment]
+                        specHeadings[fragment] = []
+                    if shorthand not in specHeadings[fragment]:
+                        # The heading data has a bunch of headings showing up twice, for some reason?
+                        specHeadings[fragment].append(shorthand)
             else:
                 anchor = {
                     'status': rawAnchor['status'],

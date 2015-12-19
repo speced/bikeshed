@@ -683,7 +683,7 @@ def fixIntraDocumentReferences(doc):
 def fixInterDocumentReferences(doc):
     for el in findAll("[spec-section]", doc):
         spec = el.get('data-link-spec')
-        section = el.get('spec-section')
+        section = el.get('spec-section', '')
         if spec is None:
             die("Spec-section autolink doesn't have a 'spec' attribute:\n{0}", outerHTML(el))
             continue
@@ -691,16 +691,27 @@ def fixInterDocumentReferences(doc):
             die("Spec-section autolink doesn't have a 'spec-section' attribute:\n{0}", outerHTML(el))
             continue
         if spec in doc.refs.headings:
+            # Bikeshed recognizes the spec
             specData = doc.refs.headings[spec]
             if section in specData:
                 heading = specData[section]
             else:
                 die("Couldn't find section '{0}' in spec '{1}':\n{2}", section, spec, outerHTML(el))
                 continue
+            if isinstance(heading, list):
+                # Multipage spec
+                if len(heading) == 1:
+                    # only one heading of this name, no worries
+                    heading = specData[heading[0]]
+                else:
+                    # multiple headings of this id, user needs to disambiguate
+                    die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  "+spec+x for x in heading))
+                    continue
             el.tag = "a"
             el.set("href", heading['url'])
-            el.text = "{specTitle} §{number} {title}".format(**heading)
+            el.text = "{spec} §{number} {text}".format(**heading)
         elif doc.refs.getBiblioRef(spec):
+            # Bikeshed doesn't know the spec, but it's in biblio
             bib = doc.refs.getBiblioRef(spec)
             if isinstance(bib, biblio.StringBiblioEntry):
                 die("Can't generate a cross-spec section ref for '{0}', because the biblio entry has no url.", spec)
@@ -709,6 +720,7 @@ def fixInterDocumentReferences(doc):
             el.set("href", bib.url + section)
             el.text = bib.title + " §" + section[1:]
         else:
+            # Unknown spec
             die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el))
             continue
         removeAttr(el, 'data-link-spec')

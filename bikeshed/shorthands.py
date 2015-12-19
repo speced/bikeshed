@@ -115,12 +115,24 @@ def transformAutolinkShortcuts(doc):
             term,
             "]")
 
-    sectionRe = re.compile(r"\[\[([\w-]*)(#[\w-]+)\]\]")
+    sectionRe = re.compile(r"""
+                            \[\[
+                            ([\w-]+)?
+                            (?:
+                                ((?:\/[\w-]*)?(?:\#[\w-]+)) |
+                                (\/[\w-]+)
+                            )
+                            \]\]""", re.X)
     def sectionReplacer(match):
-        spec,section = match.groups()
-        if spec == "":
+        spec, section, justPage = match.groups()
+        if spec is None:
+            # local section link
             return E.a({"section":"", "href":section})
+        elif justPage is not None:
+            # foreign link, to an actual page from a multipage spec
+            return E.span({"spec-section":justPage+"#", "spec":spec})
         else:
+            # foreign link
             return E.span({"spec-section":section, "spec":spec})
 
     propdescRe = re.compile(r"'(?:([^\s']*)/)?([\w*-]+)(?:!!([\w-]+))?'")
