@@ -705,7 +705,7 @@ def fixInterDocumentReferences(doc):
                     heading = specData[heading[0]]
                 else:
                     # multiple headings of this id, user needs to disambiguate
-                    die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  "+spec+x for x in heading))
+                    die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  [[{0}]]".format(spec+x) for x in heading))
                     continue
             el.tag = "a"
             el.set("href", heading['url'])
