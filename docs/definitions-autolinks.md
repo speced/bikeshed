@@ -431,6 +431,19 @@ Bikeshed just assumes that the link target exists
 and uses it directly in the text,
 because it has no way to tell what the section is named.
 
+If the spec is multipage, like SVG,
+and Bikeshed knows about it,
+*most* of the time you don't need to do anything different -
+Bikeshed will find the correct page for the heading you're linking to.
+On the rare occasions that the same heading id exists in multiple pages of the same spec, tho,
+specify the page like `[[svg/intro#toc]]`
+(which indicates the #toc heading on the intro.html page).
+If the desired heading is on the top-level page,
+use an empty page name, like `[[html/#living-standard]]`.
+In any case, Bikeshed will throw an error,
+and tell you what names it knows about so you can easily correct your link.
+
+
 
 Bibliography
 ============
