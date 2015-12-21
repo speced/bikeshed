@@ -142,7 +142,7 @@ In other words, you can now write:
 		&lt;ul>
 			&lt;li>one
 			&lt;li>two
-		&lt;</ul>
+		&lt;/ul>
 	</pre>
 </div>
 ~~~~
@@ -158,7 +158,7 @@ The preprocessor will automatically convert it into:
 &lt;ul>
 	&lt;li>one
 	&lt;li>two
-&lt;</ul></pre>
+&lt;/ul></pre>
 </div>
 ~~~~
 
