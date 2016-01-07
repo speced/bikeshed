@@ -1613,7 +1613,7 @@ def processInclusions(doc):
                 lines = datablocks.transformDataBlocks(doc, lines)
                 lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
                 text = ''.join(lines)
-                text = doc.fixText(text, moreMacros=macros, allMacrosRequired=False)
+                text = doc.fixText(text, moreMacros=macros)
                 subtree = parseHTML(text)
                 replaceNode(el, *subtree)
     else:
