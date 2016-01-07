@@ -35,11 +35,14 @@ class ReferenceManager(object):
         self.replacedSpecs = set()
         # Dict of {biblio term => biblio data}
         self.biblios = defaultdict(list)
+        # Dict of {spec vshortname => headings}
+        self.headings = dict()
         self.status = specStatus
 
     def initializeRefs(self, doc):
         # Load up the xref data
         self.specs.update(json.loads(config.retrieveDataFile("specs.json", quiet=True, str=True)))
+        self.headings.update(json.loads(config.retrieveDataFile("headings.json", quiet=True, str=True)))
         with config.retrieveDataFile("anchors.data", quiet=True) as lines:
             self.refs = decodeAnchors(lines)
         self.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
@@ -385,7 +388,7 @@ class ReferenceManager(object):
                  '\n'.join(possibleRefs))
         return defaultRef
 
-    def getBiblioRef(self, text, status, generateFakeRef=False, el=None):
+    def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None):
         key = text.lower()
         if key in self.biblios:
             candidates = self.biblios[key]
@@ -616,6 +619,10 @@ def linkTextVariations(str, linkType):
             yield str[:-1] + "ing"
         else:
             yield str + "ing"
+    elif config.linkTypeIn(linkType, "idl"):
+        # Let people refer to escaped IDL names with their "real" names (without the underscore)
+        if str[0] != "_":
+            yield "_" + str
 
 
 def stripLineBreaks(obj):

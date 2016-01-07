@@ -14,6 +14,7 @@ Bikeshed currently recognizes a subset of Markdown:
 * paragraphs
 * lists
 * headings
+* horizontal rules
 
 It also recognizes **definition lists**, with the following format:
 
@@ -141,7 +142,7 @@ In other words, you can now write:
 		&lt;ul>
 			&lt;li>one
 			&lt;li>two
-		&lt;</ul>
+		&lt;/ul>
 	</pre>
 </div>
 ~~~~
@@ -157,7 +158,7 @@ The preprocessor will automatically convert it into:
 &lt;ul>
 	&lt;li>one
 	&lt;li>two
-&lt;</ul></pre>
+&lt;/ul></pre>
 </div>
 ~~~~
 

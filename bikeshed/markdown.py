@@ -67,7 +67,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 			match = re.search(r"\{#([^ }]+)\}\s*$", line)
 			if match:
 				token['id'] = match.group(1)
-		elif re.match(r"([*_-])\s*\1\s*\1(\s*\1)*$", line):
+		elif re.match(r"((\*\s*){3,})|((-\s*){3,})|((_\s*){3,})$", line):
 			token = {'type':'rule', 'raw': rawline}
 		elif re.match(r"-?\d+\.\s", line):
 			match = re.match(r"(-?\d+)\.\s+(.*)", line)
@@ -173,7 +173,7 @@ def parseTokens(tokens, numSpacesForIndentation):
 			lines += parseMultiLineHeading(stream)
 		elif stream.currtype() == 'text' and stream.prevtype() == 'blank':
 			lines += parseParagraph(stream)
-		elif stream.currtype() == 'rule' or stream.prevtype() == 'blank' and stream.currtype() == 'dash-line':
+		elif stream.currtype() == 'rule' or stream.currtype() == 'dash-line':
 			lines += parseHorizontalRule(stream)
 		elif stream.currtype() == 'bulleted':
 			lines += parseBulleted(stream)

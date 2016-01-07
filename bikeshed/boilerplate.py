@@ -137,14 +137,17 @@ def addIndexOfLocallyDefinedTerms(doc, container):
     for el in findAll(",".join(x+"[id]" for x in config.dfnElements), doc):
         linkTexts = config.linkTextsFromElement(el)
         headingLevel = headingLevelOfElement(el) or "Unnumbered section"
+        type = el.get('data-dfn-type')
+        if type == "argument":
+            # Don't generate index entries for arguments.
+            continue
         if el.get('data-dfn-for') is not None:
             disambiguator = "{0} for {1}".format(el.get('data-dfn-type'), ', '.join(config.splitForValues(el.get('data-dfn-for'))))
+        elif type == "dfn":
+            disambiguator = "definition of"
         else:
-            type = el.get('data-dfn-type')
-            if type == "dfn":
-                disambiguator = "definition of"
-            else:
-                disambiguator = "({0})".format(el.get('data-dfn-type'))
+            disambiguator = "({0})".format(el.get('data-dfn-type'))
+
         id = el.get('id')
         for linkText in linkTexts:
             entry = {

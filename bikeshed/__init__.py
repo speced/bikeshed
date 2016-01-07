@@ -23,7 +23,7 @@ from . import HTMLSerializer
 from . import headings
 from . import shorthands
 from . import boilerplate
-from .datablocks import transformDataBlocks
+from . import datablocks
 from .ReferenceManager import ReferenceManager
 from .htmlhelpers import *
 from .messages import *
@@ -320,9 +320,8 @@ class Spec(object):
         self.refs.initializeBiblio();
 
         # Deal with further <pre> blocks, and markdown
-        transformDataBlocks(self)
-        if self.paragraphMode == "markdown":
-            self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements)
+        self.lines = datablocks.transformDataBlocks(self, self.lines)
+        self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements)
 
         self.refs.setSpecData(self.md)
 
@@ -385,6 +384,7 @@ class Spec(object):
         boilerplate.removeUnwantedBoilerplate(self)
         addSyntaxHighlighting(self)
         fixIntraDocumentReferences(self)
+        fixInterDocumentReferences(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
@@ -463,7 +463,7 @@ class Spec(object):
         for key,val in defaults.items():
             self.md.addDefault(key, val)
 
-    def fixText(self, text):
+    def fixText(self, text, moreMacros=None, allMacrosRequired=True):
         # Do several textual replacements that need to happen *before* the document is parsed as HTML.
 
         # If markdown shorthands are on, temporarily remove `foo` while processing.
@@ -474,12 +474,14 @@ class Spec(object):
                 return "\ue0ff"
             text = re.sub(r"(`+)(.*?[^`])\1(?=[^`])", replaceCodeSpans, text, flags=re.DOTALL)
 
-        # Replace the [FOO] things.
-        #for tag, replacement in self.macros.items():
-        #    text = text.replace("[{0}]".format(tag.upper()), replacement)
+        # Replace the [FOO] text macros.
+        # If allMacrosRequired is False, then macros like [foo] are optional
+        # (replaced with empty string if unmatched)
+        # while [!foo] makes them required (fatal error if unmatched)
         def macroReplacer(match):
             fullText = match.group(0)
-            innerText = match.group(2) or ""
+            required = match.group(2) == "!"
+            innerText = match.group(3).lower() or ""
             if fullText.startswith("\\"):
                 # Escaped
                 return fullText[1:]
@@ -489,13 +491,16 @@ class Spec(object):
             if innerText.isdigit():
                 # No refs are all-digits (this is probably JS code).
                 return fullText
-            if innerText.lower() in self.macros:
+            if innerText in self.macros:
                 # For some reason I store all the macros in lowercase,
                 # despite requiring them to be spelled with uppercase.
                 return self.macros[innerText.lower()]
-            die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
+            if moreMacros and innerText in moreMacros:
+                return moreMacros[innerText.lower]
+            if required or allMacrosRequired:
+                die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
             return fullText
-        text = re.sub(r"(\\|\[)?\[([A-Z0-9-]+)\]", macroReplacer, text)
+        text = re.sub(r"(\\|\[)?\[(!?)([A-Z0-9-]+)\]", macroReplacer, text)
         text = fixTypography(text)
         if "css" in self.md.markupShorthands:
             # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
@@ -679,6 +684,52 @@ def fixIntraDocumentReferences(doc):
             if target.get('data-level') is not None:
                 text = "§{1} {0}".format(text, target.get('data-level'))
             appendChild(el, text)
+
+def fixInterDocumentReferences(doc):
+    for el in findAll("[spec-section]", doc):
+        spec = el.get('data-link-spec')
+        section = el.get('spec-section', '')
+        if spec is None:
+            die("Spec-section autolink doesn't have a 'spec' attribute:\n{0}", outerHTML(el))
+            continue
+        if section is None:
+            die("Spec-section autolink doesn't have a 'spec-section' attribute:\n{0}", outerHTML(el))
+            continue
+        if spec in doc.refs.headings:
+            # Bikeshed recognizes the spec
+            specData = doc.refs.headings[spec]
+            if section in specData:
+                heading = specData[section]
+            else:
+                die("Couldn't find section '{0}' in spec '{1}':\n{2}", section, spec, outerHTML(el))
+                continue
+            if isinstance(heading, list):
+                # Multipage spec
+                if len(heading) == 1:
+                    # only one heading of this name, no worries
+                    heading = specData[heading[0]]
+                else:
+                    # multiple headings of this id, user needs to disambiguate
+                    die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  [[{0}]]".format(spec+x) for x in heading))
+                    continue
+            el.tag = "a"
+            el.set("href", heading['url'])
+            el.text = "{spec} §{number} {text}".format(**heading)
+        elif doc.refs.getBiblioRef(spec):
+            # Bikeshed doesn't know the spec, but it's in biblio
+            bib = doc.refs.getBiblioRef(spec)
+            if isinstance(bib, biblio.StringBiblioEntry):
+                die("Can't generate a cross-spec section ref for '{0}', because the biblio entry has no url.", spec)
+                continue
+            el.tag = "a"
+            el.set("href", bib.url + section)
+            el.text = bib.title + " §" + section[1:]
+        else:
+            # Unknown spec
+            die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el))
+            continue
+        removeAttr(el, 'data-link-spec')
+        removeAttr(el, 'spec-section')
 
 def fillAttributeInfoSpans(doc):
     # Auto-add <span attribute-info> to <dt><dfn> when it's an attribute or dict-member.
@@ -1537,19 +1588,21 @@ def processInclusions(doc):
                 path = el.get("path")
                 try:
                     with io.open(path, 'r', encoding="utf-8") as f:
-                        contents = f.read()
+                        lines = f.readlines()
                 except Exception, err:
                     die("Couldn't find include file '{0}'. Error was:\n{1}", path, err)
                     removeNode(el)
                     continue
-                hash = hashlib.md5(contents.encode("ascii", "xmlcharrefreplace")).hexdigest()
+                hash = hashlib.md5(''.join(lines).encode("ascii", "xmlcharrefreplace")).hexdigest()
                 if hash in includeHashes:
                     die("<include> loop detected: '{0}' was already included.", path)
                     removeNode(el)
                     continue
                 else:
                     includeHashes.add(hash)
-                subtree = parseHTML(contents)
+                lines = datablocks.transformDataBlocks(doc, lines)
+                lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
+                subtree = parseHTML(''.join(lines))
                 replaceNode(el, *subtree)
     else:
         die("<include> recursion depth exceeded")

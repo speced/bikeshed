@@ -165,12 +165,13 @@ def insertBefore(target, *els):
     prevSibling = parent[index-1] if index > 0 else None
     for el in els:
         if isinstance(el, basestring):
-            if prevSibling:
+            if prevSibling is not None:
                 prevSibling.tail = (prevSibling.tail or '') + el
             else:
                 parent.text = (parent.text or '') + el
         else:
             parent.insert(index, el)
+            index += 1
             prevSibling = el
     return target
 

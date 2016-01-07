@@ -21,7 +21,7 @@ class MetadataManager:
 
     @property
     def groupIsW3C(self):
-        return self.group in config.groupsInW3C
+        return self.group.lower() in config.groupsInW3C
 
     def __init__(self, doc):
         self.doc = doc

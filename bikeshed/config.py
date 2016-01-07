@@ -92,10 +92,24 @@ linkTypeToDfnType = {
     "idl": idlTypes,
     "idl-name": idlNameTypes,
     "maybe": maybeTypes,
-    "dfn": frozenset(["dfn"])
+    "dfn": frozenset(["dfn"]),
+    "all": linkTypes
 }
 for dfnType in dfnClassToType.values():
     linkTypeToDfnType[dfnType] = frozenset([dfnType])
+
+def linkTypeIn(linkTypes, targetTypes="all"):
+    # Tests if a link type (which might be a shorthand type like "idl")
+    # matches against a given set of types.
+    if isinstance(linkTypes, basestring):
+        linkTypes = linkTypeToDfnType[linkTypes]
+    else:
+        linkTypes = set(linkTypes)
+    if isinstance(targetTypes, basestring):
+        targetTypes = linkTypeToDfnType[targetTypes]
+    else:
+        targetTypes = set(targetTypes)
+    return bool(linkTypes & targetTypes)
 
 # Elements that are allowed to provide definitions to Shepherd
 dfnElements = frozenset(["dfn", "h2[data-dfn-type]", "h3[data-dfn-type]", "h4[data-dfn-type]", "h5[data-dfn-type]", "h6[data-dfn-type]"])
