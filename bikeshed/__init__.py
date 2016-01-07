@@ -463,7 +463,7 @@ class Spec(object):
         for key,val in defaults.items():
             self.md.addDefault(key, val)
 
-    def fixText(self, text):
+    def fixText(self, text, moreMacros=None, allMacrosRequired=True):
         # Do several textual replacements that need to happen *before* the document is parsed as HTML.
 
         # If markdown shorthands are on, temporarily remove `foo` while processing.
@@ -474,12 +474,14 @@ class Spec(object):
                 return "\ue0ff"
             text = re.sub(r"(`+)(.*?[^`])\1(?=[^`])", replaceCodeSpans, text, flags=re.DOTALL)
 
-        # Replace the [FOO] things.
-        #for tag, replacement in self.macros.items():
-        #    text = text.replace("[{0}]".format(tag.upper()), replacement)
+        # Replace the [FOO] text macros.
+        # If allMacrosRequired is False, then macros like [foo] are optional
+        # (replaced with empty string if unmatched)
+        # while [!foo] makes them required (fatal error if unmatched)
         def macroReplacer(match):
             fullText = match.group(0)
-            innerText = match.group(2) or ""
+            required = match.group(2) == "!"
+            innerText = match.group(3).lower() or ""
             if fullText.startswith("\\"):
                 # Escaped
                 return fullText[1:]
@@ -489,13 +491,16 @@ class Spec(object):
             if innerText.isdigit():
                 # No refs are all-digits (this is probably JS code).
                 return fullText
-            if innerText.lower() in self.macros:
+            if innerText in self.macros:
                 # For some reason I store all the macros in lowercase,
                 # despite requiring them to be spelled with uppercase.
                 return self.macros[innerText.lower()]
-            die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
+            if moreMacros and innerText in moreMacros:
+                return moreMacros[innerText.lower]
+            if required or allMacrosRequired:
+                die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
             return fullText
-        text = re.sub(r"(\\|\[)?\[([A-Z0-9-]+)\]", macroReplacer, text)
+        text = re.sub(r"(\\|\[)?\[(!?)([A-Z0-9-]+)\]", macroReplacer, text)
         text = fixTypography(text)
         if "css" in self.md.markupShorthands:
             # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
