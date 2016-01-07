@@ -158,17 +158,21 @@ def transformAutolinkShortcuts(doc):
             die("Shorthand {0} gives type as '{1}', but only IDL types are allowed.", match.group(0), match.group(3))
             return E.span(match.group(0))
         if match.group(4) is not None:
-            linkText = match.group(4).strip("|")
+            linkText = match.group(4)[1:]
         else:
             linkText = match.group(2)
         return E.code({"class":"idl"},
             E.a({"data-link-type":linkType, "for": match.group(1), "lt":match.group(2)}, linkText))
 
-    elementRe = re.compile(r"<{(?:([\w*-]+)/)?([\w*-]+)}>")
+    elementRe = re.compile(r"<{(?:([\w*-]+)/)?([\w*-]+)(\|[^}]+)?}>")
     def elementReplacer(match):
         linkType = "element" if match.group(1) is None else "element-attr"
+        if match.group(3) is not None:
+            linkText = match.group(3)[1:]
+        else:
+            linkText = match.group(2)
         return E.code({},
-            E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
+            E.a({"data-link-type":linkType, "for": match.group(1), "lt":match.group(2)}, linkText))
 
     varRe = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
     def varReplacer(match):
