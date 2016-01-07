@@ -79,8 +79,6 @@ dfnClassToType = {
     "schemedef"          : "scheme",
     "statedef"           : "state",
     "modedef"            : "mode",
-    "conceptdef"         : "concept",
-    "eventhandlerdef"    : "eventhandler",
     "contextdef"         : "context",
     "facetdef"           : "facet" }
 
@@ -93,7 +91,7 @@ idlNameTypes = frozenset(["interface", "dictionary", "enum", "exception", "typed
 functionishTypes = frozenset(["function", "method", "constructor", "stringifier"])
 idlMethodTypes = frozenset(["method", "constructor", "stringifier", "idl", "idl-name"])
 linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "idl-name", "maybe", "biblio"])
-typesUsingFor = frozenset(["descriptor", "value", "element-attr", "attr-value", "element-state", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "except-field", "stringifier", "serializer", "iterator", "state", "mode", "concept", "eventhandler", "context", "facet"])
+typesUsingFor = frozenset(["descriptor", "value", "element-attr", "attr-value", "element-state", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "except-field", "stringifier", "serializer", "iterator", "state", "mode", "context", "facet"])
 lowercaseTypes = cssTypes | markupTypes | frozenset(["propdesc", "maybe", "dfn", "grammar"])
 
 linkTypeToDfnType = {
