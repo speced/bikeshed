@@ -8,6 +8,7 @@ import sys
 import subprocess
 import pipes
 from itertools import *
+from .messages import *
 from .htmlhelpers import parseDocument, outerHTML
 from . import config
 
@@ -26,14 +27,14 @@ def runAllTests(constructor):
 		if compare(outputText, goldenText):
 			numPassed += 1
 		else:
-			print testname
+			p(testname)
 	if total == 0:
-		print "No tests were found in '{0}'.".format(testFolder)
+		p("No tests were found in '{0}'.".format(testFolder))
 	elif numPassed == total:
-		print "\033[32;1m✔ All tests passed.\033[0m"
+		p("\033[32;1m✔ All tests passed.\033[0m")
 		return True
 	else:
-		print "\033[31;1m✘ {0}/{1} tests passed.\033[0m".format(numPassed, total)
+		p("\033[31;1m✘ {0}/{1} tests passed.\033[0m".format(numPassed, total))
 
 def compare(suspect, golden):
 	suspectDoc = parseDocument(suspect)
@@ -46,12 +47,12 @@ def compare(suspect, golden):
 		differ = difflib.SequenceMatcher(None, fromText, toText)
 		for tag, i1, i2, j1, j2 in differ.get_opcodes():
 			if tag == "equal":
-				sys.stdout.write(fromText[i1:i2])
+				p(fromText[i1:i2])
 			if tag in ("delete", "replace"):
-				sys.stdout.write("\033[41m\033[30m" + fromText[i1:i2] + "\033[0m")
+				p("\033[41m\033[30m" + fromText[i1:i2] + "\033[0m")
 			if tag in ("insert", "replace"):
-				sys.stdout.write("\033[42m\033[30m" + toText[j1:j2] + "\033[0m")
-		print
+				p("\033[42m\033[30m" + toText[j1:j2] + "\033[0m")
+		p("")
 		return False
 	return True
 
@@ -60,5 +61,5 @@ def rebase(files=None):
 		files = glob.glob(config.scriptPath + "/../tests/*.bs")
 	numfiles = len(files)
 	for file in files:
-		print "Rebasing {0}".format(file)
+		p("Rebasing {0}".format(file))
 		subprocess.call("bikeshed -qf spec {0}".format(pipes.quote(file)), shell=True)

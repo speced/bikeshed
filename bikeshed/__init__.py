@@ -200,18 +200,18 @@ def main():
             refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText+"\n"]
             config.quiet = options.quiet
             if not config.quiet:
-                print "Refs for '{0}':".format(options.linkText)
+                p("Refs for '{0}':".format(options.linkText))
             # Get ready for JSONing
             for ref in refs:
                 ref['level'] = str(ref['level'])
-            print config.printjson(refs)
+            p(config.printjson(refs))
     elif options.subparserName == "refs":
         config.force = True
         config.quiet = True
         doc = Spec(inputFilename=options.infile)
         doc.preprocess()
         refs,_ = list(doc.refs.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
-        print config.printjson(refs)
+        p(config.printjson(refs))
     elif options.subparserName == "issues-list":
         from . import issuelist as il
         if options.printTemplate:
@@ -241,7 +241,7 @@ def main():
         else:
             os.system("python -m cProfile -o /tmp/stat.prof ~/bikeshed/bikeshed.py && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &".format(root=root, leaf=leaf))
     elif options.subparserName == "template":
-        print '''<pre class='metadata'>
+        p('''<pre class='metadata'>
 Title: Your Spec Title
 Shortname: your-spec
 Level: 1
@@ -256,7 +256,7 @@ Introduction {#intro}
 =====================
 
 Introduction here.
-'''
+''')
 
 class Spec(object):
 
@@ -433,18 +433,18 @@ class Spec(object):
             lastInputModified = os.stat(self.inputSource).st_mtime
             self.preprocess()
             self.finish(outputFilename)
-            print "==============DONE=============="
+            p("==============DONE==============")
             while(True):
                 inputModified = os.stat(self.inputSource).st_mtime
                 if inputModified > lastInputModified:
                     resetSeenMessages()
                     lastInputModified = inputModified
                     formattedTime = datetime.fromtimestamp(inputModified).strftime("%H:%M:%S")
-                    print "Source file modified at {0}. Rebuilding...".format(formattedTime)
+                    p("Source file modified at {0}. Rebuilding...".format(formattedTime))
                     self.initializeState()
                     self.preprocess()
                     self.finish(outputFilename)
-                    print "==============DONE=============="
+                    p("==============DONE==============")
                 time.sleep(1)
         except Exception, e:
             die("Something went wrong while watching the file:\n{0}", e)
@@ -524,14 +524,14 @@ class Spec(object):
         return text
 
     def printTargets(self):
-        print "Exported terms:"
+        p("Exported terms:")
         for el in findAll("[data-export]", self):
             for term in  config.linkTextsFromElement(el):
-                print "  ", term
-        print "Unexported terms:"
+                p("  ", term)
+        p("Unexported terms:")
         for el in findAll("[data-noexport]", self):
             for term in  config.linkTextsFromElement(el):
-                print "  ", term
+                p("  ", term)
 
     def isOpaqueElement(self, el):
         if el.tag in self.md.opaqueElements:
