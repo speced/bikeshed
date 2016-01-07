@@ -907,25 +907,25 @@ def classifyDfns(doc, dfns):
             if dfnFor:
                 singleFor = config.splitForValues(dfnFor)[0]
             if dfnType in config.functionishTypes.intersection(config.idlTypes):
-                id = config.simplifyText(re.match(r"[^(]*", primaryDfnText).group(0)+"()")
+                id = config.simplifyText("{_for}-{id}".format(_for=singleFor, id=re.match(r"[^(]*", primaryDfnText).group(0)+"()"))
                 el.set("data-alternate-id", config.simplifyText("dom-{_for}-{id}".format(_for=singleFor, id=primaryDfnText)))
             else:
-                id = config.simplifyText(primaryDfnText)
+                if dfnFor:
+                    id = config.simplifyText("{_for}-{id}".format(_for=singleFor, id=primaryDfnText))
+                else:
+                    id = config.simplifyText(primaryDfnText)
             if dfnType == "dfn":
                 pass
             elif dfnType == "interface":
                 pass
             elif dfnType == "event":
                 # Special case 'event' because it needs a different format from IDL types
-                id = config.simplifyText("{type}-{_for}-{id}".format(type=dfnTypeToPrefix[dfnType], _for=singleFor, id=id))
+                id = config.simplifyText("{type}-{id}".format(type=dfnTypeToPrefix[dfnType], _for=singleFor, id=id))
             elif dfnType == "attribute" and primaryDfnText.startswith("[["):
                 # Slots get their identifying [] stripped from their ID, so gotta dedup them some other way.
-                id = config.simplifyText("dom-{_for}-{id}-slot".format(_for=singleFor, id=id))
+                id = config.simplifyText("dom-{id}-slot".format(_for=singleFor, id=id))
             elif dfnType in config.idlTypes.intersection(config.typesUsingFor):
-                id = config.simplifyText("dom-{_for}-{id}".format(_for=singleFor, id=id))
-            elif dfnType in config.typesUsingFor:
-                # Prepend property name to value to avoid ID duplication
-                id = config.simplifyText("{type}-{_for}-{id}".format(type=dfnTypeToPrefix[dfnType], _for=singleFor, id=id))
+                id = config.simplifyText("dom-{id}".format(id=id))
             else:
                 id = "{type}-{id}".format(type=dfnTypeToPrefix[dfnType], id=id)
             el.set('id', id)
