@@ -501,7 +501,7 @@ def transformInclude(lines, doc, **kwargs):
                     macros[k] = v[0]
                 else:
                     die("Include block defines the '{0}' local macro more than once.", k)
-    el = "<include path='{0}'".format(escapeAttr(path))
+    el = "<include data-from-block path='{0}'".format(escapeAttr(path))
     for i,(k,v) in enumerate(macros.items()):
         el += " data-macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
     el += "></include>"

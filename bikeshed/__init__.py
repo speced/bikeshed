@@ -1585,6 +1585,8 @@ def processInclusions(doc):
         if not els:
             break
         for el in els:
+            if el.get("data-from-block") is None:
+                warn("The <include> element is going away. Please switch to <pre class=include>.")
             macros = {}
             for i in itertools.count(0):
                 m = el.get("data-macro-"+str(i))
