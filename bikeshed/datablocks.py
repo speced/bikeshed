@@ -489,17 +489,21 @@ def transformInclude(lines, doc, **kwargs):
     macros = {}
     for info in infos:
         if "path" in info:
-            if path is not None:
+            if path is None:
+                path = info['path'][0]
+            else:
                 die("Include blocks must only contain a single 'path'.")
-            path = info['path'][0]
         if "macros" in info:
             for k,v in info.items():
                 if k == "macros":
                     continue
-                macros[k] = v
+                if k not in macros and len(v) == 1:
+                    macros[k] = v[0]
+                else:
+                    die("Include block defines the '{0}' local macro more than once.", k)
     el = "<include path='{0}'".format(escapeAttr(path))
-    for k,v in macros.items():
-        el += "{0}='{1}'".format(k, escapeAttr(v))
+    for i,(k,v) in enumerate(macros.items()):
+        el += " data-macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
     el += "></include>"
     return [el]
 
