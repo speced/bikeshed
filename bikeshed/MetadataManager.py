@@ -21,6 +21,8 @@ class MetadataManager:
 
     @property
     def groupIsW3C(self):
+        if self.group is None:
+            return False
         return self.group.lower() in config.groupsInW3C
 
     def __init__(self, doc):
