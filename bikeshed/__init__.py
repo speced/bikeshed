@@ -915,6 +915,9 @@ def classifyDfns(doc, dfns):
                 pass
             elif dfnType == "interface":
                 pass
+            elif dfnType == "event":
+                # Special case 'event' because it needs a different format from IDL types
+                id = config.simplifyText("{type}-{_for}-{id}".format(type=dfnTypeToPrefix[dfnType], _for=singleFor, id=id))
             elif dfnType == "attribute" and primaryDfnText.startswith("[["):
                 # Slots get their identifying [] stripped from their ID, so gotta dedup them some other way.
                 id = config.simplifyText("dom-{_for}-{id}-slot".format(_for=singleFor, id=id))
