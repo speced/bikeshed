@@ -464,7 +464,7 @@ class Spec(object):
         for key,val in defaults.items():
             self.md.addDefault(key, val)
 
-    def fixText(self, text, moreMacros=None, allMacrosRequired=True):
+    def fixText(self, text, moreMacros=None):
         # Do several textual replacements that need to happen *before* the document is parsed as HTML.
 
         # If markdown shorthands are on, temporarily remove `foo` while processing.
@@ -476,13 +476,11 @@ class Spec(object):
             text = re.sub(r"(`+)(.*?[^`])\1(?=[^`])", replaceCodeSpans, text, flags=re.DOTALL)
 
         # Replace the [FOO] text macros.
-        # If allMacrosRequired is False, then macros like [foo] are optional
-        # (replaced with empty string if unmatched)
-        # while [!foo] makes them required (fatal error if unmatched)
+        # [FOO?] macros are optional; failure just removes them.
         def macroReplacer(match):
             fullText = match.group(0)
-            required = match.group(2) == "!"
-            innerText = match.group(3).lower() or ""
+            innerText = match.group(2).lower() or ""
+            optional = match.group(3) == "?"
             if fullText.startswith("\\"):
                 # Escaped
                 return fullText[1:]
@@ -498,11 +496,12 @@ class Spec(object):
                 return self.macros[innerText.lower()]
             if moreMacros and innerText in moreMacros:
                 return moreMacros[innerText.lower()]
-            if required or allMacrosRequired:
-                die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
-                return fullText
-            return ""
-        text = re.sub(r"(\\|\[)?\[(!?)([A-Z0-9-]+)\]", macroReplacer, text)
+            # Nothing has matched, so start failing the macros.
+            if optional:
+                return ""
+            die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
+            return fullText
+        text = re.sub(r"(\\|\[)?\[([A-Z0-9-]+)(\??)\]", macroReplacer, text)
         text = fixTypography(text)
         if "css" in self.md.markupShorthands:
             # Replace the <<production>> shortcuts, because they won't survive the HTML parser.

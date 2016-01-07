@@ -308,3 +308,46 @@ Otherwise, you need to tell Bikeshed how to convert the identifying value into a
 Specify a format string in the **Issue Tracker Template** metadata,
 with a `{0}` in the place where the identifying value should go.
 Bikeshed will then point the issue at the generated url.
+
+
+Including Other Files
+---------------------
+
+Sometimes a spec is too large to easily work with in one file.
+Sometimes there's lots of repetitive markup that only changes in a few standard ways.
+For whatever reason,
+Bikeshed has the ability to include additional files directly into your spec
+with a `<pre class=include>` block:
+
+```
+<pre class=include>
+path: relative/to/spec
+</pre>
+```
+
+The included document is parsed just like if it were written in locally,
+except that metadata blocks aren't processed.
+(For various reasons, they have to be parsed before *any* other processing occurs).
+This means that the include file can use markdown,
+data blocks of various kinds (`<pre class=anchors>`, `<pre class=railroad-diagram>`, etc),
+and both provide definitions for the outer document
+and refer to ones defined by the outer document.
+
+If you're including a block of repetitive markup multiple times,
+and want to vary how it's displayed,
+you can pass additional "local" text macros in the block,
+which are valid only inside the included file:
+
+```
+<pre class=include>
+path: template.md
+macros:
+	foo: bar
+	baz: qux qux qux
+</pre>
+```
+
+With the above code, you can use `[FOO]` and `[BAZ]` macros inside the include file,
+and they'll be substituted with "bar" and "qux qux qux", respectively.
+(Remember that you can mark text macros as optional by appending a `?`, like `[FOO?]`,
+in which case they'll be replaced with the empty string if Bikeshed can't find a definition.)
