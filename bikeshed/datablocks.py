@@ -37,6 +37,7 @@ def transformDataBlocks(doc, lines):
         'link-defaults': transformLinkDefaults,
         'ignored-specs': transformIgnoredSpecs,
         'info': transformInfo,
+        'include': transformInclude,
         'pre': transformPre
     }
     blockType = ""
@@ -481,6 +482,26 @@ def processInfo(infos, doc):
     for infoType, infos in infoCollections.items():
         knownInfoTypes[infoType](infos, doc)
     return []
+
+def transformInclude(lines, doc, **kwargs):
+    infos = parseInfoTree(lines, doc.md.indent)
+    path = None
+    macros = {}
+    for info in infos:
+        if "path" in info:
+            if path is not None:
+                die("Include blocks must only contain a single 'path'.")
+            path = info['path'][0]
+        if "macros" in info:
+            for k,v in info.items():
+                if k == "macros":
+                    continue
+                macros[k] = v
+    el = "<include path='{0}'".format(escapeAttr(path))
+    for k,v in macros.items():
+        el += "{0}='{1}'".format(k, escapeAttr(v))
+    el += "></include>"
+    return [el]
 
 
 
