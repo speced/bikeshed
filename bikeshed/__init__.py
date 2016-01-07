@@ -6,12 +6,13 @@ from collections import defaultdict
 import io
 import os
 import sys
+import lxml
 import json
-import argparse
 import urllib
 import urllib2
+import argparse
+import itertools
 from datetime import date, datetime
-import lxml
 
 from . import config
 from . import biblio
@@ -496,10 +497,11 @@ class Spec(object):
                 # despite requiring them to be spelled with uppercase.
                 return self.macros[innerText.lower()]
             if moreMacros and innerText in moreMacros:
-                return moreMacros[innerText.lower]
+                return moreMacros[innerText.lower()]
             if required or allMacrosRequired:
                 die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
-            return fullText
+                return fullText
+            return ""
         text = re.sub(r"(\\|\[)?\[(!?)([A-Z0-9-]+)\]", macroReplacer, text)
         text = fixTypography(text)
         if "css" in self.md.markupShorthands:
@@ -1584,6 +1586,13 @@ def processInclusions(doc):
         if not els:
             break
         for el in els:
+            macros = {}
+            for i in itertools.count(0):
+                m = el.get("data-macro-"+str(i))
+                if m is None:
+                    break
+                k,_,v = m.partition(" ")
+                macros[k.lower()] = v
             if el.get("path"):
                 path = el.get("path")
                 try:
@@ -1602,7 +1611,9 @@ def processInclusions(doc):
                     includeHashes.add(hash)
                 lines = datablocks.transformDataBlocks(doc, lines)
                 lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
-                subtree = parseHTML(''.join(lines))
+                text = ''.join(lines)
+                text = doc.fixText(text, moreMacros=macros, allMacrosRequired=False)
+                subtree = parseHTML(text)
                 replaceNode(el, *subtree)
     else:
         die("<include> recursion depth exceeded")
