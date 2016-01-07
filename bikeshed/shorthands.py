@@ -148,11 +148,15 @@ def transformAutolinkShortcuts(doc):
         return E.code({"class":"idl"},
             E.a({"data-link-type":linkType, "for": match.group(1), "lt":match.group(2)}, linkText))
 
-    elementRe = re.compile(r"<{(?:([\w*-]+)/)?([\w*-]+)}>")
+    elementRe = re.compile(r"<{(?:([\w*-]+)/)?([\w*-]+)(\|[^}]+)?}>")
     def elementReplacer(match):
         linkType = "element" if match.group(1) is None else "element-attr"
+        if match.group(3) is not None:
+            linkText = match.group(3).strip("|")
+        else:
+            linkText = match.group(2)
         return E.code({},
-            E.a({"data-link-type":linkType, "for": match.group(1)}, match.group(2)))
+            E.a({"data-link-type":linkType, "for": match.group(1), "lt":match.group(2)}, linkText))
 
     varRe = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
     def varReplacer(match):
