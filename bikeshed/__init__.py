@@ -25,6 +25,7 @@ from . import headings
 from . import shorthands
 from . import boilerplate
 from . import datablocks
+from . import lexers
 from .ReferenceManager import ReferenceManager
 from .htmlhelpers import *
 from .messages import *
@@ -1400,23 +1401,32 @@ def addSyntaxHighlighting(doc):
         default_style = "#000000"
         styles = {
             token.Name: "#0077aa",
+            token.Name.Tag: "#669900",
             token.Name.Builtin: "noinherit",
             token.Name.Other: "noinherit",
             token.Operator: "#999999",
             token.Punctuation: "#999999",
             token.Keyword: "#990055",
-            token.Literal: "#669900",
-            token.Literal.Number: "#990055",
+            token.Literal: "#000000",
+            token.Literal.Number: "#000000",
+            token.Literal.String: "#a67f59",
             token.Comment: "#708090"
         }
 
+    customLexers = {
+        "css": lexers.CSSLexer()
+    }
+
     def highlight(el, lang):
         text = textContent(el)
-        try:
-            lexer = get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
-        except pyg.util.ClassNotFound:
-            die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el))
-            return
+        if lang in customLexers:
+            lexer = customLexers[lang]
+        else:
+            try:
+                lexer = get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
+            except pyg.util.ClassNotFound:
+                die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el))
+                return
         highlighted = parseHTML(pyg.highlight(text, lexer, formatters.HtmlFormatter()))[0][0]
         # Remove the trailing newline
         if len(highlighted):
