@@ -1419,7 +1419,8 @@ def addSyntaxHighlighting(doc):
             return
         highlighted = parseHTML(pyg.highlight(text, lexer, formatters.HtmlFormatter()))[0][0]
         # Remove the trailing newline
-        highlighted[-1].tail = highlighted[-1].tail.rstrip()
+        if len(highlighted):
+            highlighted[-1].tail = highlighted[-1].tail.rstrip()
         replaceContents(el, highlighted)
         addClass(el, "highlight")
 
