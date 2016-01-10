@@ -240,7 +240,7 @@ def updateBiblio():
     say("Downloading biblio data...")
     biblios = defaultdict(list)
     try:
-        with closing(urllib2.urlopen("https://specref.jit.su/bibrefs")) as fh:
+        with closing(urllib2.urlopen("https://specref.herokuapp.com/bibrefs")) as fh:
             biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
         with closing(urllib2.urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
             lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
