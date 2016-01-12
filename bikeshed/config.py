@@ -75,7 +75,6 @@ dfnClassToType = {
     "serialdef"          : "serializer",
     "iterdef"            : "iterator",
     "grammardef"         : "grammar",
-    "termdef"            : "term",
     "schemedef"          : "scheme",
     "statedef"           : "state",
     "modedef"            : "mode",
