@@ -320,7 +320,7 @@ def simplifyText(text):
 
 
 def linkTextsFromElement(el, preserveCasing=False):
-    from .htmlhelpers import textContent
+    from .htmlhelpers import find, textContent
     if el.get('data-lt') == '':
         return []
     elif el.get('data-lt'):
