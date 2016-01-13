@@ -466,7 +466,7 @@ def addTOCSection(doc):
                         E.span({"class":"secno"},header.get('data-level', '')),
                         " ",
                         copy.deepcopy(find(".content", header)))))
-            containers[level+1] = appendChild(li, E.ol())
+            containers[level+1] = appendChild(li, E.ol({"class":"toc"}))
         previousLevel = level
 
     container = containers[1]
