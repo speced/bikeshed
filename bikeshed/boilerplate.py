@@ -246,7 +246,7 @@ def htmlFromIndexTerms(entries):
     from collections import OrderedDict
     entries = OrderedDict(sorted(entries.items(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower())))
 
-    topList = E.ul({"class":"indexlist"})
+    topList = E.ul({"class":"index"})
     for text, items in entries.items():
         if len(items) == 1:
             item = items[0]
@@ -268,7 +268,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
     if not doc.externalRefsUsed:
         return
 
-    ul = E.ul({"class": "indexlist"})
+    ul = E.ul({"class": "index"})
     for spec, refs in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0]):
         # ref.spec is always lowercase; if the same string shows up in biblio data,
         # use its casing instead.
@@ -373,7 +373,7 @@ def addPropertyIndex(doc):
             return name
         appendChild(html,
             E.div({"class":"big-element-wrapper"},
-                E.table({"class":"proptable data"},
+                E.table({"class":"index"},
                     E.thead(
                         E.tr(
                             *[E.th({"scope":"col"}, formatColumnName(column)) for column in columns])),
@@ -399,7 +399,7 @@ def addPropertyIndex(doc):
                     " Descriptors"))
             appendChild(html,
                 E.div({"class":"big-element-wrapper"},
-                    E.table({"class":"proptable data"},
+                    E.table({"class":"index"},
                         E.thead(
                             E.tr(
                                 *[E.th({"scope":"col"}, column) for column in columns])),
@@ -430,11 +430,17 @@ def addIDLSection(doc):
 
 
 def addTOCSection(doc):
+    toc = getFillContainer("table-of-contents", doc=doc, default=False)
+    if toc is None:
+        return
+    appendChild(toc,
+        E.h2({"class": "no-num no-toc no-ref", "id":"contents"}, "Table of Contents"))
+
     skipLevel = float('inf')
     previousLevel = 1
     containers = [0, 1, 2, 3, 4, 5, 6, 7]
-    containers[1] = E.div()
-    containers[2] = appendChild(containers[1], E.ul({"class":"toc", "role":"directory"}))
+    containers[1] = toc
+    containers[2] = appendChild(containers[1], E.ol({"class":"toc", "role":"directory"}))
     for header in findAll('h2, h3, h4, h5, h6', doc):
         level = int(header.tag[-1])
         container = containers[level]
@@ -460,7 +466,7 @@ def addTOCSection(doc):
                         E.span({"class":"secno"},header.get('data-level', '')),
                         " ",
                         copy.deepcopy(find(".content", header)))))
-            containers[level+1] = appendChild(li, E.ul({"class":"toc"}))
+            containers[level+1] = appendChild(li, E.ol())
         previousLevel = level
 
     container = containers[1]
@@ -470,9 +476,8 @@ def addTOCSection(doc):
             del el.attrib["href"]
     for el in findAll(".content [id]", container):
         del el.attrib["id"]
-    for el in findAll("ul:empty", container):
+    for el in findAll("ol:empty", container):
         removeNode(el)
-    fillWith("table-of-contents", container, doc=doc)
 
 
 def addSpecMetadataSection(doc):
