@@ -161,13 +161,13 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     if "partial" in firstLine or "New values" in parsedAttrs:
         attrs["Name"] = None
         attrs["New values"] = None
-        ret = ["<table class='definition propdef partial'{forHint}>".format(forHint=forHint)]
+        ret = ["<table class='def propdef partial'{forHint}>".format(forHint=forHint)]
     elif "shorthand" in firstLine:
         attrs["Name"] = None
         attrs["Value"] = None
         for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animatable"]:
             attrs[defaultKey] = "see individual properties"
-        ret = ["<table class='definition propdef'{forHint}>".format(forHint=forHint)]
+        ret = ["<table class='def propdef'{forHint}>".format(forHint=forHint)]
     else:
         attrs["Name"] = None
         attrs["Value"] = None
@@ -178,7 +178,7 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
         attrs["Media"] = "visual"
         attrs["Computed value"] = "as specified"
         attrs["Animatable"] = "no"
-        ret = ["<table class='definition propdef'{forHint}>".format(forHint=forHint)]
+        ret = ["<table class='def propdef'{forHint}>".format(forHint=forHint)]
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:
@@ -202,13 +202,13 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
     vals = parseDefBlock(lines, "descdef")
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
-        ret = ["<table class='definition descdef partial' data-dfn-for='{0}'>".format(vals.get("For", ""))]
+        ret = ["<table class='def descdef partial' data-dfn-for='{0}'>".format(vals.get("For", ""))]
     if "mq" in firstLine:
         requiredKeys = ["Name", "For", "Value"]
-        ret = ["<table class='definition descdef mq' data-dfn-for='{0}'>".format(vals.get("For",""))]
+        ret = ["<table class='def descdef mq' data-dfn-for='{0}'>".format(vals.get("For",""))]
     else:
         requiredKeys = ["Name", "For", "Value", "Initial"]
-        ret = ["<table class='definition descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
+        ret = ["<table class='def descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
     for key in requiredKeys:
         if key == "For":
             ret.append("<tr><th>{0}:<td><a at-rule>{1}</a>".format(key, vals.get(key,'')))
@@ -253,7 +253,7 @@ def transformElementdef(lines, doc, **kwargs):
     attrs["Content model"] = None
     attrs["Attributes"] = None
     attrs["Dom interfaces"] = None
-    ret = ["<table class='definition-table elementdef'>"]
+    ret = ["<table class='def elementdef'>"]
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:
@@ -298,7 +298,6 @@ def transformArgumentdef(lines, firstLine, **kwargs):
         die("Argumentdef blocks need a for='' attribute specifying their method.")
         return
     addClass(el, "data")
-    addClass(el, "definition-table")
     rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
     lines = [
             '''
