@@ -188,7 +188,7 @@ and let the processor automatically generate a `<table>` from it:
 ~~~~html
 	<pre class='propdef'>
 	Name: var-*
-	Values: [ <value> | <CDO> | <CDC> ]
+	Value: [ < value > | < CDO > | < CDC > ]
 	Initial: (nothing, see prose)
 	Applies To: all elements
 	Inherited: yes
