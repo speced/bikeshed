@@ -187,13 +187,15 @@ and let the processor automatically generate a `<table>` from it:
 
 ~~~~html
 	<pre class='propdef'>
-	Name: var-*
-	Values: [ <value> | <CDO> | <CDC> ]
-	Initial: (nothing, see prose)
-	Applies To: all elements
-	Inherited: yes
-	Computed Value: specified value with variables substituted (but see prose for "invalid variables")
-	Media: all
+	Name: flex-basis
+	Value: content | <<'width'>>
+	Initial: auto
+	Applies to: <a>flex items</a>
+	Inherited: no
+	Computed value: as specified, with lengths made absolute
+	Percentages: relative to the <a>flex container's</a> inner <a>main size</a>
+	Media: visual
+	Animatable: as 'width'
 	</pre>
 ~~~~
 
