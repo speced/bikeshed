@@ -236,10 +236,10 @@ class ReferenceManager(object):
         elif len(localRefs) > 1:
             if error:
                 warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
-                    linkType,
-                    text,
-                    localRefs[0].type,
-                    "' or '".join(localRefs[0].for_))
+                     linkType,
+                     text,
+                     localRefs[0].type,
+                     "' or '".join(localRefs[0].for_))
             return localRefs[0]
 
         # Take defaults into account
