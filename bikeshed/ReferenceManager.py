@@ -226,7 +226,11 @@ class ReferenceManager(object):
             return None
 
         # Local refs always get precedence, no matter what.
-        localRefs = self.getLocalRef(linkType, text, linkFor, linkForHint, el)
+        # At first let's try with "exact=true"...
+        localRefs = self.getLocalRef(linkType, text, linkFor, linkForHint, el, True)
+        # ... then if we don't find what we need, we can extend to inexact matches
+        if len(localRefs) == 0: localRefs = self.getLocalRef(linkType, text, linkFor, linkForHint, el, False)
+        # If any of those yielded something, return it
         if len(localRefs) == 1:
             return localRefs[0]
         elif len(localRefs) > 1:
