@@ -450,9 +450,11 @@ class ReferenceManager(object):
 
         # Set up the initial list of refs to query
         if text:
-            if exact:
-                refs = list(textRefsIterator(self.refs, [text]))
-            else:
+            refs = list(textRefsIterator(self.refs, [text]))
+            if not refs and not exact:
+                # "exact" means don't use any variations.
+                # If you're allowed to use variations,
+                # only do so if exact text fails.
                 textsToSearch = list(linkTextVariations(text, linkType))
                 if text.endswith("()") and text in self.methods:
                     textsToSearch += self.methods[text].keys()
