@@ -529,11 +529,11 @@ class Spec(object):
         p("Exported terms:")
         for el in findAll("[data-export]", self):
             for term in  config.linkTextsFromElement(el):
-                p("  ", term)
+                p("  " + term)
         p("Unexported terms:")
         for el in findAll("[data-noexport]", self):
             for term in  config.linkTextsFromElement(el):
-                p("  ", term)
+                p("  " + term)
 
     def isOpaqueElement(self, el):
         if el.tag in self.md.opaqueElements:
