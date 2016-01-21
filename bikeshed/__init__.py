@@ -30,6 +30,7 @@ from .ReferenceManager import ReferenceManager
 from .htmlhelpers import *
 from .messages import *
 from .widlparser.widlparser import parser
+from contextlib import closing
 
 
 def main():
