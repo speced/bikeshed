@@ -1215,6 +1215,11 @@ class IDLMarker(object):
         if construct.idlType == "extended-attribute" and construct.name == "Exposed":
             return (None, None)
 
+        # The name in [PutForwards=foo] is an attribute of the same interface.
+        if construct.idlType == "extended-attribute" and construct.name == "PutForwards":
+            interface = construct.parent.parent.name
+            return ('<a data-link-type="attribute" for="{0}">'.format(interface), "</a>")
+
         return ('<a data-link-type="idl-name">', '</a>')
 
     def markupKeyword(self, text, construct):
