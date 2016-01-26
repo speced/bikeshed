@@ -42,7 +42,9 @@ OS X steps
 
 Note: If you're on a relatively modern Mac you should be able to proceed directly to [Common steps](#common-steps).
 
-These instructions assume that you have [Mac Ports](https://www.macports.org/) installed. If you successfully install Bikeshed using some other method, please contribute to this documentation.
+These instructions assume that you have [Mac Ports](https://www.macports.org/) or [Homebrew](http://brew.sh/) installed. If you successfully install Bikeshed using some other method, please contribute to this documentation.
+
+### Mac ports
 
 First, get the right packages installed onto your system:
 ~~~
@@ -55,6 +57,28 @@ sudo port select --set python python27
 ~~~
 
 (If you get `ImportError: No module named six` when you first run Bikeshed, additionally run `sudo port install py27-six`.)
+
+### Homebrew
+
+Install the Homebrew version of Python and Pip:
+~~~
+brew install python
+~~~
+
+Install the XCode command-line tools:
+~~~
+xcode-select --install
+~~~
+
+Install or update lxml and Pygments.
+
+~~~~
+$ pip install pygments lxml --upgrade
+~~~~
+
+That'll spew a lot of console trash, but don't worry about it.
+
+From here, you can follow the commons steps outlined below.
 
 Windows steps
 -----------
@@ -84,7 +108,7 @@ $ git clone https://github.com/tabatkins/bikeshed.git
 
 Finally, run:
 
-For Linux/OSX:
+For Linux/OSX (Omit the `sudo` for OSX under Homebrew):
 
 ~~~~
 $ sudo pip install --editable /path/to/cloned/bikeshed
