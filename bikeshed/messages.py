@@ -19,22 +19,23 @@ def p(msg):
 
 
 def die(msg, *formatArgs, **namedArgs):
-    msg = "\033[1;31mFATAL ERROR:\033[0m "+msg.format(*formatArgs, **namedArgs)
-    if msg not in messages:
-        messages.add(msg)
-        p(msg)
+    if config.quiet < 2:
+        msg = "\033[1;31mFATAL ERROR:\033[0m "+msg.format(*formatArgs, **namedArgs)
+        if msg not in messages:
+            messages.add(msg)
+            p(msg)
     if not config.force:
         sys.exit(1)
 
 def warn(msg, *formatArgs, **namedArgs):
-    if not config.quiet:
+    if config.quiet < 1:
         msg = "\033[1;33mWARNING:\033[0m "+msg.format(*formatArgs, **namedArgs)
         if msg not in messages:
             messages.add(msg)
             p(msg)
 
 def say(msg, *formatArgs, **namedArgs):
-    if not config.quiet:
+    if config.quiet < 1:
         p(msg.format(*formatArgs, **namedArgs))
 
 def resetSeenMessages():

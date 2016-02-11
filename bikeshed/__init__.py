@@ -39,7 +39,7 @@ def main():
         sys.argv.append("spec")
 
     argparser = argparse.ArgumentParser(description="Processes spec source files into valid HTML.")
-    argparser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
+    argparser.add_argument("-q", "--quiet", dest="quiet", action="count", default=0,
                             help="Suppresses everything but fatal errors from printing.")
     argparser.add_argument("-f", "--force", dest="force", action="store_true",
                            help="Force the preprocessor to run to completion; fatal errors don't stop processing.")
@@ -184,7 +184,7 @@ def main():
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         config.force = True
-        config.quiet = True
+        config.quiet = 2
         if options.printExports:
             doc = Spec(inputFilename=options.infile)
             doc.preprocess()
@@ -210,7 +210,7 @@ def main():
             p(config.printjson(refs))
     elif options.subparserName == "refs":
         config.force = True
-        config.quiet = True
+        config.quiet = 2
         doc = Spec(inputFilename=options.infile)
         doc.preprocess()
         refs,_ = list(doc.refs.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
@@ -233,7 +233,7 @@ def main():
             test.rebase(options.rebaseFiles)
         else:
             config.force = True
-            config.quiet = True
+            config.quiet = 2
             result = test.runAllTests(constructor=Spec)
             sys.exit(0 if result else 1)
     elif options.subparserName == "profile":
