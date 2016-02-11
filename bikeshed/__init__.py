@@ -873,6 +873,12 @@ def classifyDfns(doc, dfns):
         # Push the dfn type down to the <dfn> itself.
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', dfnType)
+        # Push the for value too.
+        if dfnFor:
+            el.set('data-dfn-for', dfnFor)
+        elif dfnType in config.typesUsingFor:
+            die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
+            continue
         # Some error checking
         if dfnType in config.functionishTypes:
             if not re.match(r"^[\w-]+\(.*\)$", primaryDfnText):
@@ -900,11 +906,6 @@ def classifyDfns(doc, dfns):
             elif treeAttr(el, "data-dfn-for") is None:
                 die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el))
                 continue
-        if dfnFor:
-            el.set('data-dfn-for', dfnFor)
-        elif dfnType in config.typesUsingFor:
-            die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
-            continue
         # Automatically fill in id if necessary.
         if el.get('id') is None:
             if dfnFor:
