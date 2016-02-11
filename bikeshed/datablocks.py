@@ -424,13 +424,23 @@ def processLinkDefaults(lds, doc):
         if len(ld.get('type', [])) != 1:
             die("Every link default needs exactly one type. Got:\n{0}", config.printjson(ld))
             continue
+        else:
+            type = ld['type'][0]
         if len(ld.get('spec', [])) != 1:
             die("Every link default needs exactly one spec. Got:\n{0}", config.printjson(ld))
             continue
+        else:
+            spec = ld['spec'][0]
         if len(ld.get('text', [])) != 1:
             die("Every link default needs exactly one text. Got:\n{0}", config.printjson(ld))
             continue
-        doc.md.linkDefaults[ld['text'][0]].append((ld['spec'][0], ld['type'][0], ld.get('status', None), ld.get('for', None)))
+        else:
+            text = ld['text'][0]
+        if 'for' in ld:
+            for _for in ld['for']:
+                doc.md.linkDefaults[text].append((spec, type, ld.get('status', None), _for))
+        else:
+            doc.md.linkDefaults[text].append((spec, type, ld.get('status', None), None))
     return []
 
 def transformIgnoredSpecs(lines, doc, **kwargs):

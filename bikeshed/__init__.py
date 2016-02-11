@@ -1217,8 +1217,17 @@ class IDLMarker(object):
 
         # The name in [PutForwards=foo] is an attribute of the same interface.
         if construct.idlType == "extended-attribute" and construct.name == "PutForwards":
-            interface = construct.parent.parent.name
-            return ('<a data-link-type="attribute" for="{0}">'.format(interface), "</a>")
+            # In [PutForwards=value] attribute DOMString foo
+            # the "value" is a DOMString attr
+            attr = construct.parent
+            if hasattr(attr.member, "rest"):
+                type = attr.member.rest.type
+            elif hasattr(attr.member, "attribute"):
+                type = attr.member.attribute.type
+            typeName = str(type).strip()
+            if typeName.endswith("?"):
+                typeName = typeName[:-1]
+            return ('<a data-link-type=attribute data-link-for="{0}">'.format(typeName), '</a>')
 
         return ('<a data-link-type="idl-name">', '</a>')
 
