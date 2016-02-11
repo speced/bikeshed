@@ -41,8 +41,8 @@ shortToLongStatus = {
 }
 
 groupsInW3C = frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini",
-                         "html","ricg", "svg", "texttracks", "web-bluetooth-cg",
-                         "webappsec", "webspecs", "whatwg"])
+                         "html","ricg", "svg", "texttracks", "uievents",
+                         "web-bluetooth-cg", "webappsec", "webspecs", "whatwg"])
 
 dfnClassToType = {
     "propdef"            : "property",
