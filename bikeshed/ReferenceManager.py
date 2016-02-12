@@ -339,7 +339,7 @@ class ReferenceManager(object):
             return None
         elif failure == "status":
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
+                die("No '{0}' refs found for '{1}' compatible with status '{2}' in '{3}'.", linkType, text, status, spec)
             return None
         elif failure == "ignored-specs":
             if zeroRefsError:
