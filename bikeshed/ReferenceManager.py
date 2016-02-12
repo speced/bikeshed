@@ -225,21 +225,22 @@ class ReferenceManager(object):
                 die("Unknown spec status '{0}'. Status must be ED, TR, or local.", status)
             return None
 
-        # Local refs always get precedence, no matter what.
-        localRefs = self.getLocalRef(linkType, text, linkFor, linkForHint, el)
-        if len(localRefs) == 1:
-            return localRefs[0]
-        elif len(localRefs) > 1:
-            if error:
-                warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
-                     linkType,
-                     text,
-                     localRefs[0].type,
-                     "' or '".join(localRefs[0].for_))
-            return localRefs[0]
+        # Local refs always get precedence, unless you manually specified a spec.
+        if spec is None:
+            localRefs = self.getLocalRef(linkType, text, linkFor, linkForHint, el)
+            if len(localRefs) == 1:
+                return localRefs[0]
+            elif len(localRefs) > 1:
+                if error:
+                    warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
+                         linkType,
+                         text,
+                         localRefs[0].type,
+                         "' or '".join(localRefs[0].for_))
+                return localRefs[0]
 
         # Take defaults into account
-        if (not spec or not status):
+        if not spec or not status:
             variedTexts = [v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs]
             if variedTexts:
                 for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(self.defaultSpecs[variedTexts[0]]):
