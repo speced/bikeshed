@@ -336,11 +336,17 @@ class ReferenceManager(object):
             return None
         elif failure == "for":
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
+                if spec is None:
+                    die("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
+                else:
+                    die("No '{0}' refs found for '{1}' with for='{2}' in spec '{3}'.", linkType, text, linkFor, spec)
             return None
         elif failure == "status":
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
+                if spec is None:
+                    die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
+                else:
+                    die("No '{0}' refs found for '{1}' compatible with status '{2}' in spec '{3}'.", linkType, text, status, spec)
             return None
         elif failure == "ignored-specs":
             if zeroRefsError:
