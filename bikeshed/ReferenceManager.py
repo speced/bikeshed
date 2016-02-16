@@ -321,6 +321,7 @@ class ReferenceManager(object):
 
         if failure == "text" or failure == "type":
             if linkType in ("property", "propdesc", "descriptor") and text.startswith("--"):
+                # Custom properties/descriptors aren't ever defined anywhere
                 return None
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}'.", linkType, text)
