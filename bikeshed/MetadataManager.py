@@ -334,6 +334,10 @@ class MetadataManager:
         if self.repository:
             macros["repository"] = self.repository.name
             macros["repositoryurl"] = self.repository.url
+        if self.mailingList:
+            macros["mailinglist"] = self.mailingList
+        if self.mailingListArchives:
+            macros["mailinglistarchives"] = self.mailingListArchives
         if self.status == "UD":
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/w3c-unofficial"
         elif self.status == "FPWD":
