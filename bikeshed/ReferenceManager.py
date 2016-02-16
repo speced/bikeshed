@@ -350,7 +350,7 @@ class ReferenceManager(object):
             return None
         elif failure == "ignored-specs":
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}':\n{2}", linkType, text, outerHTML(el))
+                die("The only '{0}' refs for '{1}' were in ignored specs:\n{2} refs found for '{1}':\n{2}", linkType, text, outerHTML(el))
             return None
         elif failure:
             die("Programming error - I'm not catching '{0}'-type link failures. Please report!", failure)
