@@ -539,26 +539,36 @@ def addSpecMetadataSection(doc):
     if len(doc.md.issues):
         md["Issue Tracking"] = [E.a({"href":url}, text) for text,url in doc.md.issues]
     if len(doc.md.editors):
-        md["Editor" if len(doc.md.editors) == 1 else "Editors"] = map(printEditor, doc.md.editors)
+        md["Editor"] = map(printEditor, doc.md.editors)
     if len(doc.md.previousEditors):
-        md["Former Editor" if len(doc.md.previousEditors) == 1 else "Former Editors"] = map(printEditor, doc.md.previousEditors)
+        md["Former Editor"] = map(printEditor, doc.md.previousEditors)
     for key, vals in doc.md.otherMetadata.items():
         md[key].extend(parseHTML("<span>"+doc.fixText(val)+"</span>")[0] for val in vals)
 
+    pluralization = {
+        "Previous Version": "Previous Versions",
+        "Test Suite": "Test Suites",
+        "Editor": "Editors",
+        "Former Editor": "Former Editors"
+    }
+
     dl = E.dl()
     for key, vals in md.items():
-        attrs = {}
-        if key in ("Editor", "Editors", "Former Editor", "Former Editors"):
+        # Pluralize appropriate words
+        if len(vals) > 1 and key in pluralization:
+            displayKey = pluralization[key]
+        else:
+            displayKey = key
+        if key in ("Editor", "Former Editor"):
             # A bunch of Microformats stuff is preloading on the <dd>s,
             # so this prevents code from genning an extra wrapper <dd>.
-            attrs["class"] = "editor"
             appendChild(dl,
-                E.dt(attrs, key, ":"),
+                E.dt({"class": "editor"}, displayKey, ":"),
                 *vals)
         else:
             appendChild(dl,
-                E.dt(attrs, key, ":"),
-                *[E.dd(attrs, val) for val in vals])
+                E.dt(displayKey, ":"),
+                *[E.dd(val) for val in vals])
     fillWith('spec-metadata', E.div(dl), doc=doc)
 
 
