@@ -277,7 +277,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             printableSpec = biblioRef.linkText
         else:
             printableSpec = spec
-        attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"normative", "data-okay-to-fail": "true"}
+        attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"informative", "data-okay-to-fail": "true"}
         specLi = appendChild(ul,
             E.li(
                 E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"))

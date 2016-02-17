@@ -1091,9 +1091,15 @@ def processAutolinks(doc):
         if ref and ref.spec is not None and ref.spec is not "" and ref.spec != doc.refs.specVName:
             if ref.text not in doc.externalRefsUsed[ref.spec]:
                 doc.externalRefsUsed[ref.spec][ref.text] = ref
-            biblioRef = doc.refs.getBiblioRef(ref.spec, status="normative")
+            if isNormative(el):
+                biblioStatus = "normative"
+                biblioStorage = doc.normativeRefs
+            else:
+                biblioStatus = "informative"
+                biblioStorage = doc.informativeRefs
+            biblioRef = doc.refs.getBiblioRef(ref.spec, status=biblioStatus)
             if biblioRef:
-                doc.normativeRefs[biblioRef.linkText] = biblioRef
+                biblioStorage[biblioRef.linkText] = biblioRef
 
         if ref:
             el.set('href', ref.url)
