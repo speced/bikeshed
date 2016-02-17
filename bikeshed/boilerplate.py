@@ -542,6 +542,8 @@ def addSpecMetadataSection(doc):
         md["Editor"] = map(printEditor, doc.md.editors)
     if len(doc.md.previousEditors):
         md["Former Editor"] = map(printEditor, doc.md.previousEditors)
+    if len(doc.md.translations):
+        md["Translation" if len(doc.md.translations) == 1 else "Translations"] = [E.a({"href":url}, text) for text,url in doc.md.translations]
     for key, vals in doc.md.otherMetadata.items():
         md[key].extend(parseHTML("<span>"+doc.fixText(val)+"</span>")[0] for val in vals)
 
@@ -565,6 +567,12 @@ def addSpecMetadataSection(doc):
             appendChild(dl,
                 E.dt({"class": "editor"}, displayKey, ":"),
                 *vals)
+        elif key == "Translation":
+            appendChild(dl,
+                E.dt(displayKey, " ",
+                    E.small("(non-normative and likely out-of-date)"),
+                    ":"),
+                *[E.dd(val) for val in vals])
         else:
             appendChild(dl,
                 E.dt(displayKey, ":"),

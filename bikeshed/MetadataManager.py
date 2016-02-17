@@ -73,6 +73,7 @@ class MetadataManager:
         self.issueClass = "issue"
         self.noteClass = "note"
         self.advisementClass = "advisement"
+        self.translations = []
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -131,7 +132,8 @@ class MetadataManager:
             "Markup Shorthands": "markupShorthands",
             "Version History": "versionHistory",
             "Text Macro": "customTextMacros",
-            "Opaque Elements": "opaqueElements"
+            "Opaque Elements": "opaqueElements",
+            "Translations": "translations"
         }
 
         self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
@@ -155,13 +157,14 @@ class MetadataManager:
             "Use <I> Autolinks": parseBoolean,
             "No Editor": parseBoolean,
             "Default Biblio Status": parseBiblioStatus,
-            "Issue Tracking": parseIssues,
+            "Issue Tracking": parseLinkedText,
             "Markup Shorthands": parseMarkupShorthands,
             "Text Macro": parseTextMacro,
             "Work Status": parseWorkStatus,
             "Inline Github Issues": parseBoolean,
             "Repository": parseRepository,
-            "Opaque Elements": parseOpaqueElements
+            "Opaque Elements": parseOpaqueElements,
+            "Translations": parseLinkedText,
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -492,12 +495,13 @@ def parseBiblioStatus(key, val):
         die("'{0}' must be either 'current' or 'dated'. Got '{1}'", key, val)
         return "dated"
 
-def parseIssues(key, val):
-    issues = []
+def parseLinkedText(key, val):
+    # Parses anything defined as "text url, text url, text url" into a list of 2-tuples.
+    entries = []
     vals = [v.strip() for v in val.split(",")]
     for v in vals:
-        issues.append(v.rsplit(" ", 1))
-    return issues
+        entries.append(v.rsplit(" ", 1))
+    return entries
 
 def parseMarkupShorthands(key, val):
     # Format is comma-separated list of shorthand category followed by boolean.
