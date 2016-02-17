@@ -405,7 +405,16 @@ def hashContents(el):
     # Generally used for generating probably-unique IDs.
     return hashlib.md5(innerHTML(el).strip().encode("ascii", "xmlcharrefreplace")).hexdigest()[0:8]
 
-def dedupIds(doc, els):
+def fixupIDs(doc, els):
+    translateIDs(doc.md.translateIDs, els)
+    dedupIDs(doc)
+
+def translateIDs(trans, els):
+    for el in els:
+        if el.get('id') in trans:
+            el.set('id', trans[el.get('id')][0])
+
+def dedupIDs(doc):
     import itertools as iter
     def findId(id):
         return find("#"+id, doc) is not None

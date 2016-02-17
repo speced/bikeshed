@@ -74,6 +74,7 @@ class MetadataManager:
         self.noteClass = "note"
         self.advisementClass = "advisement"
         self.translations = []
+        self.translateIDs = defaultdict(list)
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -133,7 +134,8 @@ class MetadataManager:
             "Version History": "versionHistory",
             "Text Macro": "customTextMacros",
             "Opaque Elements": "opaqueElements",
-            "Translations": "translations"
+            "Translations": "translations",
+            "Translate Ids": "translateIDs"
         }
 
         self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
@@ -165,6 +167,7 @@ class MetadataManager:
             "Repository": parseRepository,
             "Opaque Elements": parseOpaqueElements,
             "Translations": parseLinkedText,
+            "Translate Ids": parseTranslateIDs
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -579,6 +582,17 @@ def parseRepository(key, val):
 
 def parseOpaqueElements(key, val):
     return [x.strip() for x in val.split(",")]
+
+def parseTranslateIDs(key, val):
+    translations = {}
+    for v in val.split(","):
+        pieces = v.strip().split()
+        if len(pieces) != 2:
+            die("‘Translate IDs’ values must be an old ID followed by a new ID. Got '{0}'", v)
+            continue
+        old,new = pieces
+        translations[old] = new
+    return translations
 
 def parse(md, lines):
     # Given a MetadataManager and HTML document text, in the form of an array of text lines,

@@ -820,7 +820,7 @@ def fillAttributeInfoSpans(doc):
 def processDfns(doc):
     dfns = findAll(config.dfnElementsSelector, doc)
     classifyDfns(doc, dfns)
-    dedupIds(doc, dfns)
+    fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
 
 
@@ -1152,7 +1152,7 @@ def processIssuesAndExamples(doc):
                 appendChild(el, " ", E.a({"href": remoteIssueURL }, "<" + remoteIssueURL + ">"))
     for el in findAll(".example:not([id])", doc):
         el.set('id', "example-"+hashContents(el))
-    dedupIds(doc, findAll(".issue, .example", doc))
+    fixupIDs(doc, findAll(".issue, .example", doc))
 
 
 
@@ -1397,7 +1397,7 @@ def processIDL(doc):
                     del el.attrib['id']
     dfns = findAll("pre.idl:not([data-no-idl]) dfn", doc)
     classifyDfns(doc, dfns)
-    dedupIds(doc, dfns)
+    fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
 
 
