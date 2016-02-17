@@ -1331,6 +1331,8 @@ def markupIDL(doc):
     for el in findAll("pre.idl", doc):
         if el.get("data-no-idl") is not None:
             continue
+        if not isNormative(el):
+            continue
         text = textContent(el)
         # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
         # Parse a second time with the global one, which collects all data in the doc.
@@ -1345,6 +1347,8 @@ def markupIDL(doc):
 def processIDL(doc):
     for pre in findAll("pre.idl", doc):
         if pre.get("data-no-idl") is not None:
+            continue
+        if not isNormative(pre):
             continue
         forcedInterfaces = []
         for x in (treeAttr(pre, "data-dfn-force") or "").split():

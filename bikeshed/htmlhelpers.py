@@ -378,6 +378,21 @@ def isElement(node):
     # LXML HAS THE DUMBEST XML TREE DATA MODEL IN THE WORLD
     return etree.iselement(node) and isinstance(node.tag, basestring)
 
+def isNormative(el):
+    # Returns whether the element is "informative" or "normative" with a crude algo.
+    # Currently just tests whether the element is in a class=example or class=note block, or not.
+    if hasClass(el, "note") or hasClass(el, "example"):
+        # Definitey informative.
+        return False
+    parent = parentElement(el)
+    if not isElement(parent):
+        # Went past the root without finding any indicator,
+        # so normative by default.
+        return True
+    # Otherwise, walk the tree
+    return isNormative(parent)
+
+
 def fixTypography(text):
     # Replace straight aposes with curly quotes for possessives and contractions.
     text = re.sub(r"([\w])'([\w])", r"\1’\2", text)
