@@ -75,7 +75,7 @@ class MetadataManager:
         self.advisementClass = "advisement"
         self.translations = []
         self.translateIDs = defaultdict(list)
-        useDfnPanels = False
+        self.useDfnPanels = False
 
         self.otherMetadata = DefaultOrderedDict(list)
 
