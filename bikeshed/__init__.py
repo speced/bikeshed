@@ -1243,7 +1243,7 @@ def addDfnPanels(doc):
                 el = el.parentElement;
             }
             if(!el.parentElement) return;
-            var dfnPanel = document.querySelector(".dfn-panel", el);
+            var dfnPanel = el.querySelector(".dfn-panel");
             if(dfnPanel) {
                 dfnPanel.classList.add("on");
             }
