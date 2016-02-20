@@ -892,7 +892,9 @@ def classifyDfns(doc, dfns):
                 elif dfnType in config.idlTypes:
                     # IDL methodish construct, ask the widlparser what it should have.
                     # If the method isn't in any IDL, this tries its best to normalize it anyway.
+                    print primaryDfnText
                     names = doc.widl.normalizedMethodNames(primaryDfnText, el.get('data-dfn-for'))
+                    print names
                     primaryDfnText = names[0]
                     el.set('data-lt', "|".join(names))
                 else:
@@ -1176,11 +1178,106 @@ def addSelfLinks(doc):
             # Skipping - element is inside a figure and is part of an example.
             continue
         prependChild(el, makeSelfLink(el))
-    for el in findAll("dfn", doc):
-        if list(el.iterancestors("a")):
-            warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el))
+    if doc.md.useDfnPanels:
+        addDfnPanels(doc)
+    else:
+        for el in findAll("dfn", doc):
+            if list(el.iterancestors("a")):
+                warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el))
+                continue
+            appendChild(el, makeSelfLink(el))
+
+def addDfnPanels(doc):
+    from .DefaultOrderedDict import DefaultOrderedDict
+    # Constructs "dfn panels" which show all the local references to a term
+    atLeastOnePanel = False
+    for dfn in findAll("dfn", doc):
+        id = dfn.get("id")
+        if not id:
+            # Something went wrong, bail.
             continue
-        appendChild(el, makeSelfLink(el))
+        refs = DefaultOrderedDict(list)
+        for link in findAll("a[href='#{0}']".format(id), doc):
+            h = relevantHeadings(link).next()
+            if hasClass(h, "no-ref"):
+                continue
+            sectionText = textContent(h)
+            refs[sectionText].append(link)
+        if not refs:
+            # Just insert a self-link instead
+            appendChild(dfn,
+                E.a({"href": "#" + urllib.quote(id), "class":"self-link"}))
+            continue
+        atLeastOnePanel = True
+        panel = E.span({"class": "dfn-panel"},
+            E.b(
+                E.a({"href":"#"+id}, "#"+id)),
+            E.b("Referenced in:"))
+        for text,els in refs.items():
+            li = appendChild(panel, E.span())
+            for i,el in enumerate(els):
+                refID = el.get("id")
+                if refID is None:
+                    refID = "ref-for-{0}-{1}".format(id, i)
+                    el.set("id", refID)
+                if i == 0:
+                    appendChild(li,
+                        E.a({"href": "#"+refID}, text))
+                else:
+                    appendChild(li,
+                        " ",
+                        E.a({"href": "#"+refID}, "("+str(i+1)+")"))
+        appendChild(dfn, panel)
+    if atLeastOnePanel:
+        script = '''
+        document.body.addEventListener("click", function(e) {
+            // Turn off any currently "on" dfn-panels.
+            [].slice.call(document.querySelectorAll(".dfn-panel.on")).forEach(function(el){
+                el.classList.remove("on");
+                });
+            // Find the dfn element, if any, that was clicked on.
+            var el = e.target;
+            while(el.parentElement) {
+                if(el.tagName == "DFN") break;
+                if(el.classList.has("dfn-panel")) return;
+                el = el.parentElement;
+            }
+            if(!el.parentElement) return;
+            var dfnPanel = document.querySelector(".dfn-panel", el);
+            if(dfnPanel) {
+                dfnPanel.classList.add("on");
+            }
+        });
+        '''
+        style = '''
+        .dfn-panel {
+            display: inline-block;
+            position: absolute;
+            z-index: 35;
+            height: auto;
+            width: auto;
+            max-width: 300px;
+            max-height: 500px;
+            overflow: auto;
+            padding: 0.5em 0.75em;
+            font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+            background: #DDDDDD;
+            color: black;
+            border: outset 0.2em;
+        }
+        .dfn-panel:not(.on) { display: none; }
+        .dfn-panel * { margin: 0; padding: 0; text-indent: 0; }
+        .dfn-panel > b { display: block; }
+        .dfn-panel a { color: black; }
+        .dfn-panel a:not(:hover) { text-decoration: none !important; border-bottom: none !important; }
+        .dfn-panel > b + b { margin-top: 0.25em; }
+        .dfn-panel > span { display: block; }
+        .dfn-panel > span::before { content: "• "; }
+        '''
+        body = find("body", doc)
+        appendChild(body, E.script(script), E.style(style))
+
+
 
 
 class DebugMarker(object):
@@ -1236,6 +1333,11 @@ class IDLMarker(object):
                 typeName = typeName[:-1]
             return ('<a data-link-type=attribute data-link-for="{0}">'.format(typeName), '</a>')
 
+        if construct.idlType == "constructor":
+            # This shows up for the method name in a [NamedConstructor] extended attribute.
+            # The "NamedConstructor" Name already got markup up, so ignore this one.
+            return (None, None)
+
         return ('<a data-link-type="idl-name">', '</a>')
 
     def markupKeyword(self, text, construct):
@@ -1262,7 +1364,9 @@ class IDLMarker(object):
         idlTitle = construct.normalName
         refType="idl"
         if idlType in config.functionishTypes:
+            print text
             idlTitle = '|'.join(self.methodLinkingTexts(construct))
+            print idlTitle
         elif idlType == "attribute":
             if hasattr(construct.member, "rest"):
                 rest = construct.member.rest

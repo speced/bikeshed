@@ -75,6 +75,7 @@ class MetadataManager:
         self.advisementClass = "advisement"
         self.translations = []
         self.translateIDs = defaultdict(list)
+        useDfnPanels = False
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -111,7 +112,8 @@ class MetadataManager:
             "Repository": "repository",
             "Issue Class": "issueClass",
             "Note Class": "noteClass",
-            "Advisement Class": "advisementClass"
+            "Advisement Class": "advisementClass",
+            "Use Dfn Panels": "useDfnPanels"
         }
 
         # Some keys are multi-value:
@@ -167,7 +169,8 @@ class MetadataManager:
             "Repository": parseRepository,
             "Opaque Elements": parseOpaqueElements,
             "Translations": parseLinkedText,
-            "Translate Ids": parseTranslateIDs
+            "Translate Ids": parseTranslateIDs,
+            "Use Dfn Panels": parseBoolean
         }
 
         # Alternate output handlers, passed key/value/doc.
