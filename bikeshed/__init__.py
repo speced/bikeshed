@@ -892,9 +892,7 @@ def classifyDfns(doc, dfns):
                 elif dfnType in config.idlTypes:
                     # IDL methodish construct, ask the widlparser what it should have.
                     # If the method isn't in any IDL, this tries its best to normalize it anyway.
-                    print primaryDfnText
                     names = doc.widl.normalizedMethodNames(primaryDfnText, el.get('data-dfn-for'))
-                    print names
                     primaryDfnText = names[0]
                     el.set('data-lt', "|".join(names))
                 else:
