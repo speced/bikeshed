@@ -1166,9 +1166,14 @@ def addSelfLinks(doc):
     def makeSelfLink(el):
         return E.a({"href": "#" + urllib.quote(el.get('id', '')), "class":"self-link"})
 
+    dfnElements = findAll(config.dfnElementsSelector, doc)
+
     foundFirstNumberedSection = False
     for el in findAll("h2, h3, h4, h5, h6", doc):
         foundFirstNumberedSection = foundFirstNumberedSection or (el.get('data-level') is not None)
+        if el in dfnElements:
+            # It'll get a self-link or dfn-panel later.
+            continue
         if foundFirstNumberedSection:
             appendChild(el, makeSelfLink(el))
     for el in findAll(".issue[id], .example[id], .note[id], li[id], dt[id]", doc):
@@ -1177,19 +1182,19 @@ def addSelfLinks(doc):
             continue
         prependChild(el, makeSelfLink(el))
     if doc.md.useDfnPanels:
-        addDfnPanels(doc)
+        addDfnPanels(doc, dfnElements)
     else:
-        for el in findAll("dfn", doc):
+        for el in dfnElements:
             if list(el.iterancestors("a")):
                 warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el))
                 continue
             appendChild(el, makeSelfLink(el))
 
-def addDfnPanels(doc):
+def addDfnPanels(doc, dfns):
     from .DefaultOrderedDict import DefaultOrderedDict
     # Constructs "dfn panels" which show all the local references to a term
     atLeastOnePanel = False
-    for dfn in findAll("dfn", doc):
+    for dfn in dfns:
         id = dfn.get("id")
         if not id:
             # Something went wrong, bail.
@@ -1237,7 +1242,8 @@ def addDfnPanels(doc):
             var el = e.target;
             while(el.parentElement) {
                 if(el.tagName == "DFN") break;
-                if(el.classList.has("dfn-panel")) return;
+                if(/H\d/.test(el.tagName) && el.getAttribute('data-dfn-type') != null) break;
+                if(el.classList.contains("dfn-panel")) return;
                 el = el.parentElement;
             }
             if(!el.parentElement) return;
