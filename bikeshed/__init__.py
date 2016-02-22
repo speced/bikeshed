@@ -1209,7 +1209,7 @@ def addDfnPanels(doc):
                 E.a({"href": "#" + urllib.quote(id), "class":"self-link"}))
             continue
         atLeastOnePanel = True
-        panel = E.span({"class": "dfn-panel"},
+        panel = E.span({"class": "dfn-panel", "bs-decorative": ""},
             E.b(
                 E.a({"href":"#"+id}, "#"+id)),
             E.b("Referenced in:"))
@@ -1713,6 +1713,8 @@ def cleanupHTML(doc):
         removeAttr(el, 'nohiglight')
     for el in findAll("[data-opaque]", doc):
         removeAttr(el, 'data-opaque')
+    for el in findAll("[bs-decorative]", doc):
+        removeAttr(el, 'bs-decorative')
 
 
 def finalHackyCleanup(text):

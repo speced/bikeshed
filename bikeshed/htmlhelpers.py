@@ -61,8 +61,22 @@ def escapeCSSIdent(val):
             ident += r"\{0}".format(chr(code))
     return ident
 
-def textContent(el):
-    return html.tostring(el, method='text', with_tail=False, encoding="unicode")
+def textContent(el, exact=False):
+    # If exact is False, then any elements with bs-decorative attribute
+    # get ignored in the textContent.
+    # This allows me to ignore things added by Bikeshed by default.
+    if exact or find("[bs-decorative]", el) is None:
+        return html.tostring(el, method='text', with_tail=False, encoding="unicode")
+    else:
+        return textContentIgnoringDecorative(el)
+
+def textContentIgnoringDecorative(el):
+    str = el.text or ''
+    for child in childElements(el):
+        if child.get("bs-decorative") is None:
+            str += textContentIgnoringDecorative(child)
+        str += child.tail or ''
+    return str
 
 
 def innerHTML(el):
