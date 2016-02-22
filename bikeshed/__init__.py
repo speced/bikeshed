@@ -1364,9 +1364,7 @@ class IDLMarker(object):
         idlTitle = construct.normalName
         refType="idl"
         if idlType in config.functionishTypes:
-            print text
             idlTitle = '|'.join(self.methodLinkingTexts(construct))
-            print idlTitle
         elif idlType == "attribute":
             if hasattr(construct.member, "rest"):
                 rest = construct.member.rest
