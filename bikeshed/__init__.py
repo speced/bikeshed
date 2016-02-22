@@ -1258,18 +1258,25 @@ def addDfnPanels(doc, dfns):
         style = '''
         .dfn-panel {
             display: inline-block;
-            position: absolute;
+            position: fixed;
+            left: 0;
+            right: 0;
+            margin: 0 auto;
+            bottom: 0;
             z-index: 35;
             height: auto;
-            width: auto;
-            max-width: 300px;
-            max-height: 500px;
+            width: -webkit-fit-content;
+            width: -moz-fit-content;
+            width: fit-content;
+            max-width: calc(100vw - 1.5em - .4em);
+            max-height: 40vh;
             overflow: auto;
             padding: 0.5em 0.75em;
             font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
             background: #DDDDDD;
             color: black;
             border: outset 0.2em;
+            border-bottom: none;
         }
         .dfn-panel:not(.on) { display: none; }
         .dfn-panel * { margin: 0; padding: 0; text-indent: 0; }
