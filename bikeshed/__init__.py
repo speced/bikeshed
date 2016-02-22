@@ -1216,12 +1216,14 @@ def addDfnPanels(doc, dfns):
             E.b(
                 E.a({"href":"#"+id}, "#"+id)),
             E.b("Referenced in:"))
+        counter = 0
         for text,els in refs.items():
             li = appendChild(panel, E.span())
             for i,el in enumerate(els):
+                counter += 1
                 refID = el.get("id")
                 if refID is None:
-                    refID = "ref-for-{0}-{1}".format(id, i)
+                    refID = "ref-for-{0}-{1}".format(id, counter)
                     el.set("id", refID)
                 if i == 0:
                     appendChild(li,
