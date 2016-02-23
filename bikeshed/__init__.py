@@ -1211,6 +1211,7 @@ def addDfnPanels(doc, dfns):
             appendChild(dfn,
                 E.a({"href": "#" + urllib.quote(id), "class":"self-link"}))
             continue
+        addClass(dfn, "dfn-paneled")
         atLeastOnePanel = True
         panel = E.span({"class": "dfn-panel", "bs-decorative": ""},
             E.b(
@@ -1286,6 +1287,8 @@ def addDfnPanels(doc, dfns):
         .dfn-panel > b + b { margin-top: 0.25em; }
         .dfn-panel > span { display: block; }
         .dfn-panel > span::before { content: "• "; }
+
+        .dfn-paneled { cursor: pointer; }
         '''
         body = find("body", doc)
         appendChild(body, E.script(script), E.style(style))
