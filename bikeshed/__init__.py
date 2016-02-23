@@ -212,8 +212,13 @@ def main():
         config.force = True
         config.quiet = 2
         doc = Spec(inputFilename=options.infile)
-        doc.preprocess()
-        refs,_ = list(doc.refs.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
+        if doc.valid:
+            doc.preprocess()
+            rm = doc.refs
+        else:
+            rm = ReferenceManager()
+            rm.initializeRefs()
+        refs,_ = list(rm.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
         p(config.printjson(refs))
     elif options.subparserName == "issues-list":
         from . import issuelist as il
@@ -264,6 +269,7 @@ Introduction here.
 class Spec(object):
 
     def __init__(self, inputFilename, paragraphMode="markdown", debug=False, token=None):
+        self.valid = False
         if inputFilename is None:
             # Default to looking for a *.bs file.
             # Otherwise, look for a *.src.html file.
@@ -280,7 +286,7 @@ class Spec(object):
         self.debug = debug
         self.token = token
 
-        self.initializeState()
+        self.valid = self.initializeState()
 
     def initializeState(self):
         self.normativeRefs = {}
@@ -303,10 +309,11 @@ class Spec(object):
                 self.md.date = datetime.fromtimestamp(os.path.getmtime(self.inputSource))
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", self.inputSource)
-            return
+            return False
         except IOError:
             die("Couldn't open the input file '{0}'.", self.inputSource)
-            return
+            return False
+        return True
 
     def preprocess(self):
         # Textual hacks

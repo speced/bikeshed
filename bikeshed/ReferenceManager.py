@@ -39,7 +39,7 @@ class ReferenceManager(object):
         self.headings = dict()
         self.status = specStatus
 
-    def initializeRefs(self, doc):
+    def initializeRefs(self, doc=None):
         # Load up the xref data
         self.specs.update(json.loads(config.retrieveDataFile("specs.json", quiet=True, str=True)))
         self.headings.update(json.loads(config.retrieveDataFile("headings.json", quiet=True, str=True)))
@@ -47,20 +47,21 @@ class ReferenceManager(object):
             self.refs = decodeAnchors(lines)
         self.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
         self.fors.update(json.loads(config.retrieveDataFile("fors.json", quiet=True, str=True)))
-        # Get local anchor data
-        try:
-            with io.open("anchors.bsdata", 'r', encoding="utf-8") as lines:
-                datablocks.transformAnchors(lines, doc)
-        except IOError:
-            pass
+        if doc is not None:
+            # Get local anchor data
+            try:
+                with io.open("anchors.bsdata", 'r', encoding="utf-8") as lines:
+                    datablocks.transformAnchors(lines, doc)
+            except IOError:
+                pass
 
-        datablocks.transformInfo(config.retrieveDataFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
-        # local info
-        try:
-            with io.open("link-defaults.infotree", 'r', encoding="utf-8") as lines:
-                datablocks.transformInfo(lines, doc)
-        except IOError:
-            pass
+            datablocks.transformInfo(config.retrieveDataFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
+            # local info
+            try:
+                with io.open("link-defaults.infotree", 'r', encoding="utf-8") as lines:
+                    datablocks.transformInfo(lines, doc)
+            except IOError:
+                pass
 
     def initializeBiblio(self):
         with config.retrieveDataFile("biblio.data", quiet=True) as lines:
