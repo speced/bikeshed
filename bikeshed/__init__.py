@@ -1237,47 +1237,60 @@ def addDfnPanels(doc, dfns):
     if atLeastOnePanel:
         script = '''
         document.body.addEventListener("click", function(e) {
-            // Turn off any currently "on" dfn-panels.
-            [].slice.call(document.querySelectorAll(".dfn-panel.on")).forEach(function(el){
-                el.classList.remove("on");
-                });
-            // Find the dfn element, if any, that was clicked on.
+            var queryAll = function(sel) { return [].slice.call(document.querySelectorAll(sel)); }
+            // Find the dfn element or panel, if any, that was clicked on.
             var el = e.target;
+            var target;
             while(el.parentElement) {
-                if(el.tagName == "DFN") break;
-                if(/H\d/.test(el.tagName) && el.getAttribute('data-dfn-type') != null) break;
-                if(el.classList.contains("dfn-panel")) return;
+                if(el.tagName == "DFN") {
+                    target = "dfn";
+                    break;
+                }
+                if(/H\d/.test(el.tagName) && el.getAttribute('data-dfn-type') != null) {
+                    target = "dfn";
+                    break;
+                }
+                if(el.classList.contains("dfn-panel")) {
+                    target = "dfn-panel";
+                    break;
+                }
                 el = el.parentElement;
             }
-            if(!el.parentElement) return;
-            var dfnPanel = el.querySelector(".dfn-panel");
-            if(dfnPanel) {
-                dfnPanel.classList.add("on");
+            if(target != "dfn-panel") {
+                // Turn off any currently "on" or "activated" panels.
+                queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(function(el){
+                    el.classList.remove("on");
+                    el.classList.remove("activated");
+                });
             }
+            if(target == "dfn") {
+                // open the panel
+                var dfnPanel = el.querySelector(".dfn-panel");
+                if(dfnPanel) {
+                    dfnPanel.classList.add("on");
+                }
+            } else if(target == "dfn-panel") {
+                // Switch it to "activated" state, which pins it.
+                el.classList.add("activated");
+            }
+
         });
         '''
         style = '''
         .dfn-panel {
             display: inline-block;
-            position: fixed;
-            left: 0;
-            right: 0;
-            margin: 0 auto;
-            bottom: 0;
+            position: absolute;
             z-index: 35;
             height: auto;
             width: -webkit-fit-content;
-            width: -moz-fit-content;
-            width: fit-content;
-            max-width: calc(100vw - 1.5em - .4em);
-            max-height: 40vh;
+            max-width: 300px;
+            max-height: 500px;
             overflow: auto;
             padding: 0.5em 0.75em;
             font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
             background: #DDDDDD;
             color: black;
             border: outset 0.2em;
-            border-bottom: none;
         }
         .dfn-panel:not(.on) { display: none; }
         .dfn-panel * { margin: 0; padding: 0; text-indent: 0; }
@@ -1287,6 +1300,27 @@ def addDfnPanels(doc, dfns):
         .dfn-panel > b + b { margin-top: 0.25em; }
         .dfn-panel > span { display: block; }
         .dfn-panel > span::before { content: "• "; }
+        @media (max-width: 600px) {
+            .dfn-panel {
+                position: fixed;
+                left: 0;
+                right: 0;
+                margin: 0 auto;
+                bottom: 0;
+                max-width: calc(100vw - 1.5em - .4em);
+                max-height: 50vh;
+                border-bottom: none;
+            }
+        }
+        .dfn-panel.activated {
+            display: inline-block;
+            position: fixed;
+            left: .5em;
+            bottom: .5em;
+            margin: 0 auto;
+            max-width: calc(100vw - 1.5em - .4em - .5em);
+            max-height: 30vh;
+        }
 
         .dfn-paneled { cursor: pointer; }
         '''
