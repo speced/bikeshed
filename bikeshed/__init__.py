@@ -1676,6 +1676,10 @@ def cleanupHTML(doc):
         del el.attrib["data-link-type"]
         el.tag = "{http://www.w3.org/2000/svg}tspan"
 
+    # Mark pre.idl blocks as .def, for styling
+    for el in findAll("pre.idl:not(.def)", doc):
+        addClass(el, "def")
+
     # Tag classes on wide types of dfns/links
     def selectorForTypes(types):
         return (",".join("{0}[data-dfn-type={1}]".format(elName,type) for elName in config.dfnElements for type in types)
