@@ -299,6 +299,7 @@ class Spec(object):
         self.macros = defaultdict(lambda x: "???")
         self.widl = parser.Parser(ui=IDLUI())
         self.testSuites = json.loads(config.retrieveDataFile("test-suites.json", quiet=True, str=True))
+        self.languages = json.loads(config.retrieveDataFile("languages.json", quiet=True, str=True))
 
         try:
             if self.inputSource == "-":

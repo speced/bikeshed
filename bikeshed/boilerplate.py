@@ -503,6 +503,27 @@ def addSpecMetadataSection(doc):
                 E.a({"class":"u-email email", "href":"mailto:"+editor['email']}, editor['email']))
         return dd
 
+    def printTranslation(tr):
+        lang = tr['lang-code']
+        name = tr['name']
+        nativeName = tr['native-name']
+        url = tr['url']
+        if name is None and lang in doc.languages:
+            name = doc.languages[lang]['name']
+        if nativeName is None and lang in doc.languages:
+            nativeName = doc.languages[lang]['native-name']
+        if nativeName:
+            return E.span({"title": name or lang},
+                E.a({"href": url, "hreflang": lang, "rel": "alternate", "lang": lang},
+                    nativeName))
+        elif name:
+            return E.a({"href": url, "hreflang": lang, "rel": "alternate", "title": lang},
+                name)
+        else:
+            return E.a({"href": url, "hreflang": lang, "rel": "alternate"},
+                lang)
+
+
     md = DefaultOrderedDict(list)
     mac = doc.macros
     if mac.get('version'):
@@ -543,7 +564,7 @@ def addSpecMetadataSection(doc):
     if len(doc.md.previousEditors):
         md["Former Editor"] = map(printEditor, doc.md.previousEditors)
     if len(doc.md.translations):
-        md["Translations"] = [E.a({"href":url}, text) for text,url in doc.md.translations]
+        md["Translations"] = map(printTranslation, doc.md.translations)
     for key, vals in doc.md.otherMetadata.items():
         md[key].extend(parseHTML("<span>"+doc.fixText(val)+"</span>")[0] for val in vals)
 

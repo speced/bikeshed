@@ -136,7 +136,7 @@ class MetadataManager:
             "Version History": "versionHistory",
             "Text Macro": "customTextMacros",
             "Opaque Elements": "opaqueElements",
-            "Translations": "translations",
+            "Translation": "translations",
             "Translate Ids": "translateIDs"
         }
 
@@ -168,7 +168,7 @@ class MetadataManager:
             "Inline Github Issues": parseBoolean,
             "Repository": parseRepository,
             "Opaque Elements": parseOpaqueElements,
-            "Translations": parseLinkedText,
+            "Translation": parseTranslation,
             "Translate Ids": parseTranslateIDs,
             "Use Dfn Panels": parseBoolean
         }
@@ -596,6 +596,30 @@ def parseTranslateIDs(key, val):
         old,new = pieces
         translations[old] = new
     return translations
+
+def parseTranslation(key, val):
+    # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
+    pieces = val.split(",")
+    if not(1 <= len(pieces) <= 3):
+        die("Format of a Translation line is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?. Got:\n{0}", val)
+        return
+    firstParts = pieces[0].split()
+    if len(firstParts) != 2:
+        die("First part of a Translation line must be a lang-code followed by a url. Got:\n{0}", pieces[0])
+        return
+    langCode, url = firstParts
+    name = None
+    nativeName = None
+    for piece in pieces[1:]:
+        k,v = piece.split(None, 1)
+        if k.lower() == "name":
+            name = v
+        elif k.lower() == "native-name":
+            nativeName = v
+        else:
+            die("Later parts of a Translation line must start with 'name' or 'native-name'. Got:\n{0}", piece)
+    return {"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}
+
 
 def parse(md, lines):
     # Given a MetadataManager and HTML document text, in the form of an array of text lines,
