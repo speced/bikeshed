@@ -1104,7 +1104,7 @@ def processAutolinks(doc):
             else:
                 biblioStatus = "informative"
                 biblioStorage = doc.informativeRefs
-            biblioRef = doc.refs.getBiblioRef(ref.spec, status=biblioStatus)
+            biblioRef = doc.refs.getBiblioRef(ref.spec, status=biblioStatus, generateFakeRef=True)
             if biblioRef:
                 biblioStorage[biblioRef.linkText] = biblioRef
 
