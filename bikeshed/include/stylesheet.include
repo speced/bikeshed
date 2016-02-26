@@ -58,8 +58,7 @@
  *     Note that this styling basically doesn't help at all when printing,
  *     since A4 paper isn't much wider than the max-width here.
  *     It's better to design things to fit into a narrower measure if possible.
- *   - back-to-top link:
- *     <p role=navigation id="back-to-top"><a href="#toc"><abbr title="Back to Top">&uarr;</abbr>
+ *   - js-added ToC jump links (see fixup.js)
  *
  ******************************************************************************/
 
@@ -114,6 +113,34 @@
 		margin: 0;
 	}
 
+	@media screen {
+		.head > p:first-child > a {
+			display: inline-block;
+			margin: 0.4rem 0 0.2rem .4rem;
+		}
+
+		.head img[src*="logos/W3C"] {
+			display: block;
+			border: solid #1a5e9a;
+			border-width: .65rem .7rem .6rem;
+			border-radius: .4rem;
+			background: #1a5e9a;
+			color: white;
+			font-weight: bold;
+		}
+
+		.head a:hover > img[src*="logos/W3C"],
+		.head a:focus > img[src*="logos/W3C"] {
+			background: #457cad;
+			border-color: #457cad;
+		}
+
+		.head a:active > img[src*="logos/W3C"] {
+			background: #c00;
+			border-color: #c00;
+		}
+	}
+
 
 	p.copyright,
 	p.copyright small { font-size: small }
@@ -121,48 +148,60 @@
 /** Back to Top / ToC Toggle **************************************************/
 
 	@media print {
-		#back-to-top,
-		.toc-toggle {
+		#toc-nav {
 			display: none;
 		}
 	}
 	@media not print {
-		#back-to-top,
-		body > #toc-toggle {
+		#toc-nav {
 			position: fixed;
 			z-index: 2;
 			bottom: 0; left: 0;
 			margin: 0;
-			width: 26px;
-			text-align: center;
-			border-top-right-radius: 26px;
+			min-width: 1.33em;
+			border-top-right-radius: 2rem;
 			box-shadow: 0 0 2px;
-			font: 1em monospace;
-			font: 1rem monospace;
+			font-size: 1.5em;
 			color: black;
 		}
-		#back-to-top a,
-		body > #toc-toggle {
+		#toc-nav > a {
 			display: block;
-			width: 22px;
-			height: 22px;
-			padding: 4px 4px 0 0;
+			white-space: nowrap;
+
+			height: 1.33em;
+			padding: .1em 0.3em;
 			margin: 0;
-			border: none;
-			border-top-right-radius: 26px;
-		}
-		#back-to-top :first-child {
-			display: block;
-			padding-bottom: 22px;
-			margin-bottom: -22px;
-		}
-		#back-to-top > a {
+
 			background: white;
 			box-shadow: 0 0 2px;
+			border: none;
+			border-top-right-radius: 1.33em;
+			background: white;
 		}
-		#back-to-top > a:hover,
-		#back-to-top > a:focus {
+		#toc-nav > #toc-jump {
+			padding-bottom: 2em;
+			margin-bottom: -1.9em;
+		}
+
+		#toc-nav > a:hover,
+		#toc-nav > a:focus {
 			background: #f8f8f8;
+		}
+		#toc-nav > a:not(:hover):not(:focus) {
+			color: #707070;
+		}
+
+		/* statusbar gets in the way on keyboard focus; remove once browsers fix */
+		#toc-nav > a[href="#toc"]:not(:hover):focus:last-child {
+			padding-bottom: 1.5rem;
+		}
+
+		#toc-nav:not(:hover) > a:not(:focus) > span + span {
+			/* Ideally this uses :focus-within on #toc-nav */
+			display: none;
+		}
+		#toc-nav > a > span + span {
+			padding-right: 0.2em;
 		}
 
 		#toc-toggle-inline {
@@ -181,14 +220,8 @@
 			left: -1px;
 		}
 
-		.toc-toggle:active,
-		#back-to-top :active {
+		#toc-nav :active {
 			color: #C00;
-		}
-
-		#back-to-top abbr {
-			border: none;
-			text-decoration: none;
 		}
 	}
 
@@ -201,6 +234,8 @@
 			top: 0; bottom: 0;
 			left: 0;
 			width: 23.5em;
+			max-width: 80%;
+			max-width: calc(100% - 2em - 26px);
 			overflow: auto;
 			padding: 0 1em;
 			padding-left: 42px;
@@ -219,8 +254,18 @@
 			color: gray;
 			color: hsla(203,20%,40%,.7);
 		}
-		body.toc-sidebar #back-to-top :first-child {
-			display: none;
+		body.toc-sidebar #toc-jump:not(:focus) {
+			width: 0;
+			height: 0;
+			padding: 0;
+			position: absolute;
+			overflow: hidden;
+		}
+	}
+	/* Hide main scroller when only the ToC is visible anyway */
+	@media screen and (max-width: 28em) {
+		body.toc-sidebar {
+			overflow: hidden;
 		}
 	}
 
@@ -255,8 +300,12 @@
 		}
 		/* See also Overflow section at the bottom */
 
-		body:not(.toc-inline) #back-to-top :first-child {
-			display: none;
+		body:not(.toc-inline) #toc-jump:not(:focus) {
+			width: 0;
+			height: 0;
+			padding: 0;
+			position: absolute;
+			overflow: hidden;
 		}
 	}
 	@media screen and (min-width: 90em) {
@@ -348,15 +397,11 @@
 	}
 
 	dl dd {
-		margin: 0 0 1em 2em;
+		margin: 0 0 .5em 2em;
 	}
 
-	.head dd + dt {
-		margin-top: .5em;
-	}
-
-	.head dd { /* undo for header */
-		margin-bottom: 0;
+	.head dd + dd { /* compact for header */
+		margin-top: -.5em;
 	}
 
 	/* Style for algorithms */
@@ -735,6 +780,7 @@
 		font-style: italic;
 		font-weight: normal;
 		padding-left: 1em;
+		width: 3em;
 	}
 
 	/* For when values are extra-complex and need formatting for readability */
@@ -799,11 +845,6 @@
 		border: 0;
 	}
 
-	table.data  thead th[scope="row"],
-	table.index thead th[scope="row"] {
-		text-align: right;
-	}
-
 	table.data  thead,
 	table.index thead,
 	table.data  tbody,
@@ -818,7 +859,6 @@
 
 	table.data  tbody th:first-child,
 	table.index tbody th:first-child  {
-		text-align: right;
 		border-right: 2px solid;
 		border-top: 1px solid silver;
 		padding-right: 1em;
@@ -847,10 +887,7 @@
 
 
 /*
-	a.property {
-		font-weight: bold;
-		color: hsla(203, 90%, 30%,.8);
-	}
+Alternate table alignment rules
 
 	table.data,
 	table.index {
@@ -866,6 +903,8 @@
 	table.index tbody th:first-child  {
 		text-align: right;
 	}
+
+Possible extra rowspan handling
 
 	table.data  tbody th[rowspan]:not([rowspan='1']),
 	table.index tbody th[rowspan]:not([rowspan='1']),
@@ -890,22 +929,7 @@
 
 /** Table of Contents *********************************************************/
 
-	.toc, .toc ol, .toc ul, .toc li {
-		list-style: none; /* Numbers must be inlined into source */
-		/* because generated content isn't search/selectable and markers can't do multilevel yet */
-		margin:  0;
-		padding: 0;
-		line-height: 1.2rem; /* consistent spacing */
-	}
-
-	/* ToC not indented until third level, but font style & margins show hierarchy */
-	.toc > li             { margin: 1.2em 0;   font-weight: bold;   }
-	.toc > li li          { margin: 0;         font-weight: normal; }
-	.toc > li li li       { margin-left:  1em; font-style:  italic; }
-	.toc > li li li li    { margin-left:  1em; font-style:  normal; }
-	.toc > li li li li li { margin-left: 1rem; font-style:  italic; font-size: 85%; }
-
-	.toc a {
+	#toc a {
 		/* More spacing; use padding to make it part of the click target. */
 		padding-top: 0.1em;
 		/* Larger, more consistently-sized click target */
@@ -914,41 +938,82 @@
 		color: black;
 		border-color: #3980B5;
 	}
-	.toc a:visited {
+	#toc a:visited {
 		border-color: #054572;
 	}
-	.toc a:not(:focus):not(:hover) {
+	#toc a:not(:focus):not(:hover) {
 		/* Allow colors to cascade through from link styling */
 		border-bottom-color: transparent;
 	}
 
-	/* Section numbers in a column of their own */
-	:not(li) > .toc {
-		margin-left: 4em;
+	.toc, .toc li {
+		list-style: none; /* Numbers must be inlined into source */
+		/* because generated content isn't search/selectable and markers can't do multilevel yet */
+		margin:  0.3rem 0;
+		padding: 0;
+		line-height: 1.1rem; /* consistent spacing */
 	}
 
-	.toc .secno {
+	/* ToC not indented until third level, but font style & margins show hierarchy */
+	#toc li             { font-weight: bold;   }
+	#toc li li          { font-weight: normal; }
+	#toc li li li       { font-style:  italic; }
+	#toc li li li li    { font-style:  normal; }
+	#toc li li li li li { font-style:  italic;
+	                      font-size:   85%;    }
+
+	#toc > .toc > li    { margin: 1.5em 0;     }
+	#toc li li li       { margin-left: 2em;
+	                      margin-left: 2rem;   }
+
+	/* Section numbers in a column of their own */
+	#toc > .toc {
+		margin-left: 5em;
+	}
+
+	#toc .secno {
 		float: left;
 		width: 4em;
-		margin-left: -4em;
 		white-space: nowrap;
 	}
-
-	.toc > li li li .secno {
-		margin-left: -5em;
-	}
-	.toc > li li li li .secno {
+	#toc li li li li .secno {
 		font-size: 85%;
-		margin-left: -7.06em;
-		margin-left: -6rem;
 	}
-	.toc > li li li li li .secno {
-		margin-left: -8.24em;
-		margin-left: -7rem;
+	#toc li li li li li .secno {
 		font-size: 100%;
 	}
 
-	.toc li {
+	#toc > .toc                { margin-left:  5rem; }
+	#toc .secno                { margin-left: -5rem; }
+	#toc li li li .secno       { margin-left: -7rem; }
+	#toc li li li li .secno    { margin-left: -9rem; }
+	#toc li li li li li .secno { margin-left: -11rem; }
+
+	/* Tighten up indentation in narrow ToCs */
+	@media (max-width: 30em) {
+		#toc > .toc            { margin-left:  4rem; }
+		#toc .secno                { margin-left: -4rem; }
+		#toc li li li              { margin-left:  1rem; }
+		#toc li li li .secno       { margin-left: -5rem; }
+		#toc li li li li .secno    { margin-left: -6rem; }
+		#toc li li li li li .secno { margin-left: -7rem; }
+	}
+	@media screen and (min-width: 78em) {
+		body:not(.toc-inline) #toc > .toc                { margin-left:  4rem; }
+		body:not(.toc-inline) #toc .secno                { margin-left: -4rem; }
+		body:not(.toc-inline) #toc li li li              { margin-left:  1rem; }
+		body:not(.toc-inline) #toc li li li .secno       { margin-left: -5rem; }
+		body:not(.toc-inline) #toc li li li li .secno    { margin-left: -6rem; }
+		body:not(.toc-inline) #toc li li li li li .secno { margin-left: -7rem; }
+	}
+	body.toc-sidebar #toc > .toc                { margin-left:  4rem; }
+	body.toc-sidebar #toc .secno                { margin-left: -4rem; }
+	body.toc-sidebar #toc li li li              { margin-left:  1rem; }
+	body.toc-sidebar #toc li li li .secno       { margin-left: -5rem; }
+	body.toc-sidebar #toc li li li li .secno    { margin-left: -6rem; }
+	body.toc-sidebar #toc li li li li li .secno { margin-left: -7rem; }
+
+	#toc li {
 		clear: both;
 	}
 
