@@ -62,7 +62,7 @@ class MetadataManager:
         self.useIAutolinks = False
         self.noEditor = False
         self.defaultBiblioStatus = "dated"
-        self.markupShorthands = set(["css", "biblio", "markup", "idl", "algorithm"])
+        self.markupShorthands = set(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
         self.customTextMacros = []
         self.issues = []
         self.issueTrackerTemplate = None

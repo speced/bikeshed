@@ -164,6 +164,14 @@ def transformAutolinkShortcuts(doc):
         return E.code({"class":"idl"},
             E.a({"data-link-type":linkType, "for": match.group(1), "lt":match.group(2)}, linkText))
 
+    dfnRe = re.compile(r"=(?:([^=]*)/)?([^=]+?)(\|[^=]+)?=")
+    def dfnReplacer(match):
+        if match.group(3) is not None:
+            linkText = match.group(3)[1:]
+        else:
+            linkText = match.group(2)
+        return E.a({"data-link-type":"dfn", "for": match.group(1), "lt":match.group(2)}, linkText)
+
     elementRe = re.compile(r"<{(?:([\w*-]+)/)?([\w*-]+)(?:!!([\w-]+))?(\|[^}]+)?}>")
     def elementReplacer(match):
         if match.group(3) is not None:
@@ -201,6 +209,8 @@ def transformAutolinkShortcuts(doc):
         nodes = [text]
         if "css" in doc.md.markupShorthands:
             config.processTextNodes(nodes, propdescRe, propdescReplacer)
+        if "dfn" in doc.md.markupShorthands:
+            config.processTextNodes(nodes, dfnRe, dfnReplacer)
         if "idl" in doc.md.markupShorthands:
             config.processTextNodes(nodes, idlRe, idlReplacer)
         if "markup" in doc.md.markupShorthands:
