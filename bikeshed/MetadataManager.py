@@ -347,14 +347,12 @@ class MetadataManager:
             macros["mailinglist"] = self.mailingList
         if self.mailingListArchives:
             macros["mailinglistarchives"] = self.mailingListArchives
-        if self.status == "UD":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/w3c-unofficial"
-        elif self.status == "FPWD":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/W3C-WD"
+        if self.status == "FPWD":
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-WD"
         elif self.status == "FINDING":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/W3C-NOTE"
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-NOTE"
         else:
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/W3C-{0}".format(self.status)
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(self.status)
         # Custom macros
         for name, text in self.customTextMacros:
             macros[name.lower()] = text
