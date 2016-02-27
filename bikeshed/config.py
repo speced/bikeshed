@@ -270,9 +270,73 @@ def retrieveBoilerplateFile(self, name, group=None, status=None, error=True):
         if error:
             die("The include file for {0} disappeared underneath me.", name)
 
-def printjson(obj):
-    import json
-    return json.dumps(obj, indent=2, default=lambda x:x.__json__())
+def printjson(x, indent=2, level=0):
+    if isinstance(indent, int):
+        # Convert into a number of spaces.
+        indent = " "*indent
+    x = getjson(x)
+    if isinstance(x, dict):
+        ret = printjsonobject(x, indent, level)
+    elif isinstance(x, list):
+        if len(x) > 0 and isinstance(getjson(x[0]), dict):
+            ret = printjsonobjectarray(x, indent, level)
+        else:
+            ret = printjsonsimplearray(x, indent, level)
+    else:
+        ret = printjsonprimitive(x)
+    if level == 0 and ret.startswith("\n"):
+        ret = ret[1:]
+    return ret
+    #return json.dumps(obj, indent=2, default=lambda x:x.__json__())
+
+def getjson(x):
+    try:
+        return x.__json__()
+    except:
+        return x
+
+def printjsonobject(x, indent, level):
+    x = getjson(x)
+    ret = ""
+    maxKeyLength = 0
+    for k in x.keys():
+        maxKeyLength = max(maxKeyLength, len(k))
+    for k,v in x.items():
+        ret += "\n" + (indent*level) + printColor((k + ": ").ljust(maxKeyLength+2), CYAN) + printjson(v, indent, level+1)
+    return ret
+
+def printjsonobjectarray(x, indent, level):
+    # Prints an array of objects
+    x = getjson(x)
+    ret = ""
+    for i,v in enumerate(x):
+        if i != 0:
+            ret += "\n" + (indent*level) + printColor("="*10, BLUE)
+        ret += printjsonobject(v, indent, level)
+    return ret
+
+def printjsonsimplearray(x, indent, level):
+    x = getjson(x)
+    ret = printColor("[", BLUE)
+    for i,v in enumerate(x):
+        if i != 0:
+            ret += ", "
+        ret += printjsonprimitive(v)
+    ret += printColor("]", BLUE)
+    return ret
+
+def printjsonprimitive(x):
+    x = getjson(x)
+    if isinstance(x, int):
+        return unicode(x)
+    if isinstance(x, basestring):
+        return x
+    if isinstance(x, bool):
+        return unicode(x)
+
+BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
+def printColor(text, color=WHITE):
+    return "\x1b[1;%dm" % (30+color) + text + "\x1b[0m"
 
 
 def processTextNodes(nodes, regex, replacer):
