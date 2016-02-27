@@ -1306,20 +1306,7 @@ def addDfnPanels(doc, dfns):
         .dfn-panel a { color: black; }
         .dfn-panel a:not(:hover) { text-decoration: none !important; border-bottom: none !important; }
         .dfn-panel > b + b { margin-top: 0.25em; }
-        .dfn-panel > span { display: block; }
-        .dfn-panel > span::before { content: "• "; }
-        @media (max-width: 600px) {
-            .dfn-panel {
-                position: fixed;
-                left: 0;
-                right: 0;
-                margin: 0 auto;
-                bottom: 0;
-                max-width: calc(100vw - 1.5em - .4em);
-                max-height: 50vh;
-                border-bottom: none;
-            }
-        }
+        .dfn-panel > span { display: list-item; list-style: inside; }
         .dfn-panel.activated {
             display: inline-block;
             position: fixed;
