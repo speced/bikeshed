@@ -39,7 +39,7 @@ class ReferenceManager(object):
         self.headings = dict()
         self.status = specStatus
 
-    def initializeRefs(self, doc):
+    def initializeRefs(self, doc=None):
         # Load up the xref data
         self.specs.update(json.loads(config.retrieveDataFile("specs.json", quiet=True, str=True)))
         self.headings.update(json.loads(config.retrieveDataFile("headings.json", quiet=True, str=True)))
@@ -47,20 +47,21 @@ class ReferenceManager(object):
             self.refs = decodeAnchors(lines)
         self.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
         self.fors.update(json.loads(config.retrieveDataFile("fors.json", quiet=True, str=True)))
-        # Get local anchor data
-        try:
-            with io.open("anchors.bsdata", 'r', encoding="utf-8") as lines:
-                datablocks.transformAnchors(lines, doc)
-        except IOError:
-            pass
+        if doc is not None:
+            # Get local anchor data
+            try:
+                with io.open("anchors.bsdata", 'r', encoding="utf-8") as lines:
+                    datablocks.transformAnchors(lines, doc)
+            except IOError:
+                pass
 
-        datablocks.transformInfo(config.retrieveDataFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
-        # local info
-        try:
-            with io.open("link-defaults.infotree", 'r', encoding="utf-8") as lines:
-                datablocks.transformInfo(lines, doc)
-        except IOError:
-            pass
+            datablocks.transformInfo(config.retrieveDataFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
+            # local info
+            try:
+                with io.open("link-defaults.infotree", 'r', encoding="utf-8") as lines:
+                    datablocks.transformInfo(lines, doc)
+            except IOError:
+                pass
 
     def initializeBiblio(self):
         with config.retrieveDataFile("biblio.data", quiet=True) as lines:
@@ -225,21 +226,22 @@ class ReferenceManager(object):
                 die("Unknown spec status '{0}'. Status must be ED, TR, or local.", status)
             return None
 
-        # Local refs always get precedence, no matter what.
-        localRefs = self.getLocalRef(linkType, text, linkFor, linkForHint, el)
-        if len(localRefs) == 1:
-            return localRefs[0]
-        elif len(localRefs) > 1:
-            if error:
-                warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
-                     linkType,
-                     text,
-                     localRefs[0].type,
-                     "' or '".join(localRefs[0].for_))
-            return localRefs[0]
+        # Local refs always get precedence, unless you manually specified a spec.
+        if spec is None:
+            localRefs = self.getLocalRef(linkType, text, linkFor, linkForHint, el)
+            if len(localRefs) == 1:
+                return localRefs[0]
+            elif len(localRefs) > 1:
+                if error:
+                    warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
+                         linkType,
+                         text,
+                         localRefs[0].type,
+                         "' or '".join(localRefs[0].for_))
+                return localRefs[0]
 
         # Take defaults into account
-        if (not spec or not status):
+        if not spec or not status:
             variedTexts = [v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs]
             if variedTexts:
                 for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(self.defaultSpecs[variedTexts[0]]):
@@ -320,6 +322,7 @@ class ReferenceManager(object):
 
         if failure == "text" or failure == "type":
             if linkType in ("property", "propdesc", "descriptor") and text.startswith("--"):
+                # Custom properties/descriptors aren't ever defined anywhere
                 return None
             if zeroRefsError:
                 die("No '{0}' refs found for '{1}'.", linkType, text)
@@ -334,15 +337,21 @@ class ReferenceManager(object):
             return None
         elif failure == "for":
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
+                if spec is None:
+                    die("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
+                else:
+                    die("No '{0}' refs found for '{1}' with for='{2}' in spec '{3}'.", linkType, text, linkFor, spec)
             return None
         elif failure == "status":
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
+                if spec is None:
+                    die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
+                else:
+                    die("No '{0}' refs found for '{1}' compatible with status '{2}' in spec '{3}'.", linkType, text, status, spec)
             return None
         elif failure == "ignored-specs":
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}':\n{2}", linkType, text, outerHTML(el))
+                die("The only '{0}' refs for '{1}' were in ignored specs:\n{2} refs found for '{1}':\n{2}", linkType, text, outerHTML(el))
             return None
         elif failure:
             die("Programming error - I'm not catching '{0}'-type link failures. Please report!", failure)
@@ -381,11 +390,19 @@ class ReferenceManager(object):
                     possibleRefs.append('spec:{spec}; type:{type}; for:{for_}; text:{text}'.format(**ref))
                 else:
                     possibleRefs.append('spec:{spec}; type:{type}; text:{text}'.format(**ref))
-            warn("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
-                 linkType,
-                 text,
-                 defaultRef.spec,
-                 '\n'.join(possibleRefs))
+            if len(possibleRefs) == 1:
+                # Only happens when the refs can't be disambiguated under Bikeshed's data model.
+                warn("Multiple possible '{0}' refs for '{1}' in {2}, but they're not distinguishable with Bikeshed's data model. Either create a manual link, or ask the spec maintainer to add sufficient disambiguating attributes to make them distinguishable. Usually this means adding a for='' value to at least one of them.\nArbitrarily chose the {3} one to link to for now.",
+                    linkType,
+                    text,
+                    defaultRef.spec,
+                    defaultRef.url)
+            else:
+                warn("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
+                     linkType,
+                     text,
+                     defaultRef.spec,
+                     '\n'.join(possibleRefs))
         return defaultRef
 
     def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None):

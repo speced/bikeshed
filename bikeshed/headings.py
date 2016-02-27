@@ -18,7 +18,7 @@ def processHeadings(doc, scope="doc"):
     determineHeadingLevels(doc, headings)
     addHeadingIds(doc, headings)
     addHeadingAlgorithms(doc, headings)
-    dedupIds(doc, headings)
+    fixupIDs(doc, headings)
     addHeadingBonuses(doc, headings)
     for el in headings:
         addClass(el, 'settled')

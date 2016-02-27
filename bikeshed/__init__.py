@@ -39,7 +39,7 @@ def main():
         sys.argv.append("spec")
 
     argparser = argparse.ArgumentParser(description="Processes spec source files into valid HTML.")
-    argparser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
+    argparser.add_argument("-q", "--quiet", dest="quiet", action="count", default=0,
                             help="Suppresses everything but fatal errors from printing.")
     argparser.add_argument("-f", "--force", dest="force", action="store_true",
                            help="Force the preprocessor to run to completion; fatal errors don't stop processing.")
@@ -184,7 +184,7 @@ def main():
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         config.force = True
-        config.quiet = True
+        config.quiet = 2
         if options.printExports:
             doc = Spec(inputFilename=options.infile)
             doc.preprocess()
@@ -210,10 +210,15 @@ def main():
             p(config.printjson(refs))
     elif options.subparserName == "refs":
         config.force = True
-        config.quiet = True
+        config.quiet = 2
         doc = Spec(inputFilename=options.infile)
-        doc.preprocess()
-        refs,_ = list(doc.refs.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
+        if doc.valid:
+            doc.preprocess()
+            rm = doc.refs
+        else:
+            rm = ReferenceManager()
+            rm.initializeRefs()
+        refs,_ = list(rm.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
         p(config.printjson(refs))
     elif options.subparserName == "issues-list":
         from . import issuelist as il
@@ -233,7 +238,7 @@ def main():
             test.rebase(options.rebaseFiles)
         else:
             config.force = True
-            config.quiet = True
+            config.quiet = 2
             result = test.runAllTests(constructor=Spec)
             sys.exit(0 if result else 1)
     elif options.subparserName == "profile":
@@ -264,6 +269,7 @@ Introduction here.
 class Spec(object):
 
     def __init__(self, inputFilename, paragraphMode="markdown", debug=False, token=None):
+        self.valid = False
         if inputFilename is None:
             # Default to looking for a *.bs file.
             # Otherwise, look for a *.src.html file.
@@ -280,7 +286,7 @@ class Spec(object):
         self.debug = debug
         self.token = token
 
-        self.initializeState()
+        self.valid = self.initializeState()
 
     def initializeState(self):
         self.normativeRefs = {}
@@ -293,6 +299,7 @@ class Spec(object):
         self.macros = defaultdict(lambda x: "???")
         self.widl = parser.Parser(ui=IDLUI())
         self.testSuites = json.loads(config.retrieveDataFile("test-suites.json", quiet=True, str=True))
+        self.languages = json.loads(config.retrieveDataFile("languages.json", quiet=True, str=True))
 
         try:
             if self.inputSource == "-":
@@ -303,10 +310,11 @@ class Spec(object):
                 self.md.date = datetime.fromtimestamp(os.path.getmtime(self.inputSource))
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", self.inputSource)
-            return
+            return False
         except IOError:
             die("Couldn't open the input file '{0}'.", self.inputSource)
-            return
+            return False
+        return True
 
     def preprocess(self):
         # Textual hacks
@@ -820,7 +828,7 @@ def fillAttributeInfoSpans(doc):
 def processDfns(doc):
     dfns = findAll(config.dfnElementsSelector, doc)
     classifyDfns(doc, dfns)
-    dedupIds(doc, dfns)
+    fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
 
 
@@ -873,6 +881,12 @@ def classifyDfns(doc, dfns):
         # Push the dfn type down to the <dfn> itself.
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', dfnType)
+        # Push the for value too.
+        if dfnFor:
+            el.set('data-dfn-for', dfnFor)
+        elif dfnType in config.typesUsingFor:
+            die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
+            continue
         # Some error checking
         if dfnType in config.functionishTypes:
             if not re.match(r"^[\w-]+\(.*\)$", primaryDfnText):
@@ -900,11 +914,6 @@ def classifyDfns(doc, dfns):
             elif treeAttr(el, "data-dfn-for") is None:
                 die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el))
                 continue
-        if dfnFor:
-            el.set('data-dfn-for', dfnFor)
-        elif dfnType in config.typesUsingFor:
-            die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
-            continue
         # Automatically fill in id if necessary.
         if el.get('id') is None:
             if dfnFor:
@@ -1090,9 +1099,15 @@ def processAutolinks(doc):
         if ref and ref.spec is not None and ref.spec is not "" and ref.spec != doc.refs.specVName:
             if ref.text not in doc.externalRefsUsed[ref.spec]:
                 doc.externalRefsUsed[ref.spec][ref.text] = ref
-            biblioRef = doc.refs.getBiblioRef(ref.spec, status="normative")
+            if isNormative(el):
+                biblioStatus = "normative"
+                biblioStorage = doc.normativeRefs
+            else:
+                biblioStatus = "informative"
+                biblioStorage = doc.informativeRefs
+            biblioRef = doc.refs.getBiblioRef(ref.spec, status=biblioStatus, generateFakeRef=True)
             if biblioRef:
-                doc.normativeRefs[biblioRef.linkText] = biblioRef
+                biblioStorage[biblioRef.linkText] = biblioRef
 
         if ref:
             el.set('href', ref.url)
@@ -1151,7 +1166,7 @@ def processIssuesAndExamples(doc):
                 appendChild(el, " ", E.a({"href": remoteIssueURL }, "<" + remoteIssueURL + ">"))
     for el in findAll(".example:not([id])", doc):
         el.set('id', "example-"+hashContents(el))
-    dedupIds(doc, findAll(".issue, .example", doc))
+    fixupIDs(doc, findAll(".issue, .example", doc))
 
 
 
@@ -1159,9 +1174,14 @@ def addSelfLinks(doc):
     def makeSelfLink(el):
         return E.a({"href": "#" + urllib.quote(el.get('id', '')), "class":"self-link"})
 
+    dfnElements = findAll(config.dfnElementsSelector, doc)
+
     foundFirstNumberedSection = False
     for el in findAll("h2, h3, h4, h5, h6", doc):
         foundFirstNumberedSection = foundFirstNumberedSection or (el.get('data-level') is not None)
+        if el in dfnElements:
+            # It'll get a self-link or dfn-panel later.
+            continue
         if foundFirstNumberedSection:
             appendChild(el, makeSelfLink(el))
     for el in findAll(".issue[id], .example[id], .note[id], li[id], dt[id]", doc):
@@ -1169,11 +1189,153 @@ def addSelfLinks(doc):
             # Skipping - element is inside a figure and is part of an example.
             continue
         prependChild(el, makeSelfLink(el))
-    for el in findAll("dfn", doc):
-        if list(el.iterancestors("a")):
-            warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el))
+    if doc.md.useDfnPanels:
+        addDfnPanels(doc, dfnElements)
+    else:
+        for el in dfnElements:
+            if list(el.iterancestors("a")):
+                warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el))
+                continue
+            appendChild(el, makeSelfLink(el))
+
+def addDfnPanels(doc, dfns):
+    from .DefaultOrderedDict import DefaultOrderedDict
+    # Constructs "dfn panels" which show all the local references to a term
+    atLeastOnePanel = False
+    for dfn in dfns:
+        id = dfn.get("id")
+        if not id:
+            # Something went wrong, bail.
             continue
-        appendChild(el, makeSelfLink(el))
+        refs = DefaultOrderedDict(list)
+        for link in findAll("a[href='#{0}']".format(id), doc):
+            h = relevantHeadings(link).next()
+            if hasClass(h, "no-ref"):
+                continue
+            sectionText = textContent(h)
+            refs[sectionText].append(link)
+        if not refs:
+            # Just insert a self-link instead
+            appendChild(dfn,
+                E.a({"href": "#" + urllib.quote(id), "class":"self-link"}))
+            continue
+        addClass(dfn, "dfn-paneled")
+        atLeastOnePanel = True
+        panel = E.span({"class": "dfn-panel", "bs-decorative": ""},
+            E.b(
+                E.a({"href":"#"+id}, "#"+id)),
+            E.b("Referenced in:"))
+        counter = 0
+        for text,els in refs.items():
+            li = appendChild(panel, E.span())
+            for i,el in enumerate(els):
+                counter += 1
+                refID = el.get("id")
+                if refID is None:
+                    refID = "ref-for-{0}-{1}".format(id, counter)
+                    el.set("id", refID)
+                if i == 0:
+                    appendChild(li,
+                        E.a({"href": "#"+refID}, text))
+                else:
+                    appendChild(li,
+                        " ",
+                        E.a({"href": "#"+refID}, "("+str(i+1)+")"))
+        appendChild(dfn, panel)
+    if atLeastOnePanel:
+        script = '''
+        document.body.addEventListener("click", function(e) {
+            var queryAll = function(sel) { return [].slice.call(document.querySelectorAll(sel)); }
+            // Find the dfn element or panel, if any, that was clicked on.
+            var el = e.target;
+            var target;
+            while(el.parentElement) {
+                if(el.tagName == "DFN") {
+                    target = "dfn";
+                    break;
+                }
+                if(/H\d/.test(el.tagName) && el.getAttribute('data-dfn-type') != null) {
+                    target = "dfn";
+                    break;
+                }
+                if(el.classList.contains("dfn-panel")) {
+                    target = "dfn-panel";
+                    break;
+                }
+                el = el.parentElement;
+            }
+            if(target != "dfn-panel") {
+                // Turn off any currently "on" or "activated" panels.
+                queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(function(el){
+                    el.classList.remove("on");
+                    el.classList.remove("activated");
+                });
+            }
+            if(target == "dfn") {
+                // open the panel
+                var dfnPanel = el.querySelector(".dfn-panel");
+                if(dfnPanel) {
+                    dfnPanel.classList.add("on");
+                }
+            } else if(target == "dfn-panel") {
+                // Switch it to "activated" state, which pins it.
+                el.classList.add("activated");
+            }
+
+        });
+        '''
+        style = '''
+        .dfn-panel {
+            display: inline-block;
+            position: absolute;
+            z-index: 35;
+            height: auto;
+            width: -webkit-fit-content;
+            max-width: 300px;
+            max-height: 500px;
+            overflow: auto;
+            padding: 0.5em 0.75em;
+            font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+            background: #DDDDDD;
+            color: black;
+            border: outset 0.2em;
+        }
+        .dfn-panel:not(.on) { display: none; }
+        .dfn-panel * { margin: 0; padding: 0; text-indent: 0; }
+        .dfn-panel > b { display: block; }
+        .dfn-panel a { color: black; }
+        .dfn-panel a:not(:hover) { text-decoration: none !important; border-bottom: none !important; }
+        .dfn-panel > b + b { margin-top: 0.25em; }
+        .dfn-panel > span { display: block; }
+        .dfn-panel > span::before { content: "• "; }
+        @media (max-width: 600px) {
+            .dfn-panel {
+                position: fixed;
+                left: 0;
+                right: 0;
+                margin: 0 auto;
+                bottom: 0;
+                max-width: calc(100vw - 1.5em - .4em);
+                max-height: 50vh;
+                border-bottom: none;
+            }
+        }
+        .dfn-panel.activated {
+            display: inline-block;
+            position: fixed;
+            left: .5em;
+            bottom: .5em;
+            margin: 0 auto;
+            max-width: calc(100vw - 1.5em - .4em - .5em);
+            max-height: 30vh;
+        }
+
+        .dfn-paneled { cursor: pointer; }
+        '''
+        body = find("body", doc)
+        appendChild(body, E.script(script), E.style(style))
+
+
 
 
 class DebugMarker(object):
@@ -1228,6 +1390,11 @@ class IDLMarker(object):
             if typeName.endswith("?"):
                 typeName = typeName[:-1]
             return ('<a data-link-type=attribute data-link-for="{0}">'.format(typeName), '</a>')
+
+        if construct.idlType == "constructor":
+            # This shows up for the method name in a [NamedConstructor] extended attribute.
+            # The "NamedConstructor" Name already got markup up, so ignore this one.
+            return (None, None)
 
         return ('<a data-link-type="idl-name">', '</a>')
 
@@ -1330,6 +1497,8 @@ def markupIDL(doc):
     for el in findAll("pre.idl", doc):
         if el.get("data-no-idl") is not None:
             continue
+        if not isNormative(el):
+            continue
         text = textContent(el)
         # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
         # Parse a second time with the global one, which collects all data in the doc.
@@ -1344,6 +1513,8 @@ def markupIDL(doc):
 def processIDL(doc):
     for pre in findAll("pre.idl", doc):
         if pre.get("data-no-idl") is not None:
+            continue
+        if not isNormative(pre):
             continue
         forcedInterfaces = []
         for x in (treeAttr(pre, "data-dfn-force") or "").split():
@@ -1396,7 +1567,7 @@ def processIDL(doc):
                     del el.attrib['id']
     dfns = findAll("pre.idl:not([data-no-idl]) dfn", doc)
     classifyDfns(doc, dfns)
-    dedupIds(doc, dfns)
+    fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
 
 
@@ -1513,6 +1684,10 @@ def cleanupHTML(doc):
         del el.attrib["data-link-type"]
         el.tag = "{http://www.w3.org/2000/svg}tspan"
 
+    # Mark pre.idl blocks as .def, for styling
+    for el in findAll("pre.idl:not(.def)", doc):
+        addClass(el, "def")
+
     # Tag classes on wide types of dfns/links
     def selectorForTypes(types):
         return (",".join("{0}[data-dfn-type={1}]".format(elName,type) for elName in config.dfnElements for type in types)
@@ -1598,6 +1773,8 @@ def cleanupHTML(doc):
         removeAttr(el, 'nohiglight')
     for el in findAll("[data-opaque]", doc):
         removeAttr(el, 'data-opaque')
+    for el in findAll("[bs-decorative]", doc):
+        removeAttr(el, 'bs-decorative')
 
 
 def finalHackyCleanup(text):

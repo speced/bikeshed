@@ -61,8 +61,22 @@ def escapeCSSIdent(val):
             ident += r"\{0}".format(chr(code))
     return ident
 
-def textContent(el):
-    return html.tostring(el, method='text', with_tail=False, encoding="unicode")
+def textContent(el, exact=False):
+    # If exact is False, then any elements with bs-decorative attribute
+    # get ignored in the textContent.
+    # This allows me to ignore things added by Bikeshed by default.
+    if exact or find("[bs-decorative]", el) is None:
+        return html.tostring(el, method='text', with_tail=False, encoding="unicode")
+    else:
+        return textContentIgnoringDecorative(el)
+
+def textContentIgnoringDecorative(el):
+    str = el.text or ''
+    for child in childElements(el):
+        if child.get("bs-decorative") is None:
+            str += textContentIgnoringDecorative(child)
+        str += child.tail or ''
+    return str
 
 
 def innerHTML(el):
@@ -378,6 +392,21 @@ def isElement(node):
     # LXML HAS THE DUMBEST XML TREE DATA MODEL IN THE WORLD
     return etree.iselement(node) and isinstance(node.tag, basestring)
 
+def isNormative(el):
+    # Returns whether the element is "informative" or "normative" with a crude algo.
+    # Currently just tests whether the element is in a class=example or class=note block, or not.
+    if hasClass(el, "note") or hasClass(el, "example"):
+        # Definitey informative.
+        return False
+    parent = parentElement(el)
+    if not isElement(parent):
+        # Went past the root without finding any indicator,
+        # so normative by default.
+        return True
+    # Otherwise, walk the tree
+    return isNormative(parent)
+
+
 def fixTypography(text):
     # Replace straight aposes with curly quotes for possessives and contractions.
     text = re.sub(r"([\w])'([\w])", r"\1’\2", text)
@@ -405,7 +434,16 @@ def hashContents(el):
     # Generally used for generating probably-unique IDs.
     return hashlib.md5(innerHTML(el).strip().encode("ascii", "xmlcharrefreplace")).hexdigest()[0:8]
 
-def dedupIds(doc, els):
+def fixupIDs(doc, els):
+    translateIDs(doc.md.translateIDs, els)
+    dedupIDs(doc)
+
+def translateIDs(trans, els):
+    for el in els:
+        if el.get('id') in trans:
+            el.set('id', trans[el.get('id')][0])
+
+def dedupIDs(doc):
     import itertools as iter
     def findId(id):
         return find("#"+id, doc) is not None

@@ -185,6 +185,8 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
                 val = parsedAttrs[key]
             if key in ("Value", "New values"):
                 ret.append("<tr class='value'><th>{0}:<td class='prod'>{1}".format(key, val))
+            elif key == "Applies to" and val.lower() == "all elements":
+                ret.append("<tr><th>Applies to:<td><a href='https://drafts.csswg.org/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>")
             else:
                 ret.append("<tr><th>{0}:<td>{1}".format(key, val))
         else:
@@ -412,7 +414,7 @@ def processAnchors(anchors, doc):
         methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
         if methodishStart:
             arglessName = methodishStart.group(1)+")"
-            doc.refs.methods[arglessName].append(anchor['text'][0])
+            doc.refs.addMethodVariants(anchor['text'][0], anchor.get('for', []), url)
     return []
 
 def transformLinkDefaults(lines, doc, **kwargs):

@@ -42,6 +42,7 @@ class CSSLexer(RegexLexer):
             (r".+", Text)
         ],
         b"values": [
+            (r"/\*", Comment, b"comment"),
             (r"[(),/]", Punctuation),
             (r"(\d+)([\w-]+)", bygroups(Literal.Number, Literal)),
             (r"\d+%?", Literal.Number),

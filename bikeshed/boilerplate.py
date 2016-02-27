@@ -121,7 +121,7 @@ def addIndexSection(doc):
     if container is None:
         return
     appendChild(container,
-        E.h2({"class":"no-num", "id":"index"}, "Index"))
+        E.h2({"class":"no-num no-ref", "id":"index"}, "Index"))
 
     if len(findAll(config.dfnElementsSelector, doc)):
         addIndexOfLocallyDefinedTerms(doc, container)
@@ -131,7 +131,7 @@ def addIndexSection(doc):
 
 def addIndexOfLocallyDefinedTerms(doc, container):
     appendChild(container,
-        E.h3({"class":"no-num", "id":"index-defined-here"}, "Terms defined by this specification"))
+        E.h3({"class":"no-num no-ref", "id":"index-defined-here"}, "Terms defined by this specification"))
 
     indexEntries = defaultdict(list)
     for el in findAll(",".join(x+"[id]" for x in config.dfnElements), doc):
@@ -277,7 +277,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             printableSpec = biblioRef.linkText
         else:
             printableSpec = spec
-        attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"normative", "data-okay-to-fail": "true"}
+        attrs = {"data-lt":spec, "data-link-type":"biblio", "data-biblio-type":"informative", "data-okay-to-fail": "true"}
         specLi = appendChild(ul,
             E.li(
                 E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"))
@@ -286,7 +286,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
             appendChild(termsUl, E.li(E.a({"href":ref.url}, title)))
 
     appendChild(container,
-        E.h3({"class":"no-num", "id":"index-defined-elsewhere"}, "Terms defined by reference"))
+        E.h3({"class":"no-num no-ref", "id":"index-defined-elsewhere"}, "Terms defined by reference"))
     appendChild(container, ul)
 
 
@@ -300,7 +300,7 @@ def addPropertyIndex(doc):
         return
 
     appendChild(html,
-        E.h2({"class":"no-num", "id":"property-index"}, "Property Index"))
+        E.h2({"class":"no-num no-ref", "id":"property-index"}, "Property Index"))
 
     def extractKeyValFromRow(tr):
         # Extract the key, minus the trailing :
@@ -394,7 +394,7 @@ def addPropertyIndex(doc):
                 allKeys |= set(desc.keys())
             columns.extend(sorted(allKeys - set(columns)))
             appendChild(html,
-                E.h3({"class":"no-num", "id":config.simplifyText(atRuleName)+"-descriptor-table"},
+                E.h3({"class":"no-num no-ref", "id":config.simplifyText(atRuleName)+"-descriptor-table"},
                     E.a({"data-link-type":"at-rule"}, atRuleName),
                     " Descriptors"))
             appendChild(html,
@@ -408,7 +408,7 @@ def addPropertyIndex(doc):
 
 
 def addIDLSection(doc):
-    idlBlocks = findAll("pre.idl", doc)
+    idlBlocks = filter(isNormative, findAll("pre.idl", doc))
     if len(idlBlocks) == 0:
         return
     html = getFillContainer('idl-index', doc=doc, default=True)
@@ -416,7 +416,7 @@ def addIDLSection(doc):
         return
 
     appendChild(html,
-        E.h2({"class":"no-num", "id":"idl-index"}, "IDL Index"))
+        E.h2({"class":"no-num no-ref", "id":"idl-index"}, "IDL Index"))
 
     container = appendChild(html, E.pre({"class":"idl"}))
     for block in idlBlocks:
@@ -503,6 +503,27 @@ def addSpecMetadataSection(doc):
                 E.a({"class":"u-email email", "href":"mailto:"+editor['email']}, editor['email']))
         return dd
 
+    def printTranslation(tr):
+        lang = tr['lang-code']
+        name = tr['name']
+        nativeName = tr['native-name']
+        url = tr['url']
+        if name is None and lang in doc.languages:
+            name = doc.languages[lang]['name']
+        if nativeName is None and lang in doc.languages:
+            nativeName = doc.languages[lang]['native-name']
+        if nativeName:
+            return E.span({"title": name or lang},
+                E.a({"href": url, "hreflang": lang, "rel": "alternate", "lang": lang},
+                    nativeName))
+        elif name:
+            return E.a({"href": url, "hreflang": lang, "rel": "alternate", "title": lang},
+                name)
+        else:
+            return E.a({"href": url, "hreflang": lang, "rel": "alternate"},
+                lang)
+
+
     md = DefaultOrderedDict(list)
     mac = doc.macros
     if mac.get('version'):
@@ -539,26 +560,44 @@ def addSpecMetadataSection(doc):
     if len(doc.md.issues):
         md["Issue Tracking"] = [E.a({"href":url}, text) for text,url in doc.md.issues]
     if len(doc.md.editors):
-        md["Editor" if len(doc.md.editors) == 1 else "Editors"] = map(printEditor, doc.md.editors)
+        md["Editor"] = map(printEditor, doc.md.editors)
     if len(doc.md.previousEditors):
-        md["Former Editor" if len(doc.md.previousEditors) == 1 else "Former Editors"] = map(printEditor, doc.md.previousEditors)
+        md["Former Editor"] = map(printEditor, doc.md.previousEditors)
+    if len(doc.md.translations):
+        md["Translations"] = map(printTranslation, doc.md.translations)
     for key, vals in doc.md.otherMetadata.items():
         md[key].extend(parseHTML("<span>"+doc.fixText(val)+"</span>")[0] for val in vals)
 
+    pluralization = {
+        "Previous Version": "Previous Versions",
+        "Test Suite": "Test Suites",
+        "Editor": "Editors",
+        "Former Editor": "Former Editors"
+    }
+
     dl = E.dl()
     for key, vals in md.items():
-        attrs = {}
-        if key in ("Editor", "Editors", "Former Editor", "Former Editors"):
+        # Pluralize appropriate words
+        if len(vals) > 1 and key in pluralization:
+            displayKey = pluralization[key]
+        else:
+            displayKey = key
+        if key in ("Editor", "Former Editor"):
             # A bunch of Microformats stuff is preloading on the <dd>s,
             # so this prevents code from genning an extra wrapper <dd>.
-            attrs["class"] = "editor"
             appendChild(dl,
-                E.dt(attrs, key, ":"),
+                E.dt({"class": "editor"}, displayKey, ":"),
                 *vals)
+        elif key == "Translations":
+            appendChild(dl,
+                E.dt(displayKey, " ",
+                    E.small("(non-normative and likely out-of-date)"),
+                    ":"),
+                *[E.dd(val) for val in vals])
         else:
             appendChild(dl,
-                E.dt(attrs, key, ":"),
-                *[E.dd(attrs, val) for val in vals])
+                E.dt(displayKey, ":"),
+                *[E.dd(val) for val in vals])
     fillWith('spec-metadata', E.div(dl), doc=doc)
 
 
@@ -580,12 +619,12 @@ def addReferencesSection(doc):
         return linkText
 
     appendChild(container,
-        E.h2({"class":"no-num", "id":"references"}, "References"))
+        E.h2({"class":"no-num no-ref", "id":"references"}, "References"))
 
     normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText)
     if len(normRefs):
         dl = appendChild(container,
-            E.h3({"class":"no-num", "id":"normative"}, "Normative References"),
+            E.h3({"class":"no-num no-ref", "id":"normative"}, "Normative References"),
             E.dl())
         for ref in normRefs:
             appendChild(dl, E.dt({"id":"biblio-"+config.simplifyText(ref.linkText)}, "["+formatBiblioTerm(ref.linkText)+"]"))
@@ -594,7 +633,7 @@ def addReferencesSection(doc):
     informRefs = [x for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText) if x.linkText not in doc.normativeRefs]
     if len(informRefs):
         dl = appendChild(container,
-            E.h3({"class":"no-num", "id":"informative"}, "Informative References"),
+            E.h3({"class":"no-num no-ref", "id":"informative"}, "Informative References"),
             E.dl())
         for ref in informRefs:
             appendChild(dl, E.dt({"id":"biblio-"+config.simplifyText(ref.linkText)}, "["+formatBiblioTerm(ref.linkText)+"]"))
@@ -609,7 +648,7 @@ def addIssuesSection(doc):
         return
 
     appendChild(container,
-        E.h2({"class":"no-num", "id":"issues-index"}, "Issues Index"))
+        E.h2({"class":"no-num no-ref", "id":"issues-index"}, "Issues Index"))
     container = appendChild(container,
         E.div({"style":"counter-reset:issue"}))
     for issue in issues:

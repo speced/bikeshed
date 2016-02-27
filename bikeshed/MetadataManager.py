@@ -62,7 +62,7 @@ class MetadataManager:
         self.useIAutolinks = False
         self.noEditor = False
         self.defaultBiblioStatus = "dated"
-        self.markupShorthands = set(["css", "biblio", "markup", "idl", "algorithm"])
+        self.markupShorthands = set(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
         self.customTextMacros = []
         self.issues = []
         self.issueTrackerTemplate = None
@@ -73,6 +73,9 @@ class MetadataManager:
         self.issueClass = "issue"
         self.noteClass = "note"
         self.advisementClass = "advisement"
+        self.translations = []
+        self.translateIDs = defaultdict(list)
+        self.useDfnPanels = False
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -109,7 +112,8 @@ class MetadataManager:
             "Repository": "repository",
             "Issue Class": "issueClass",
             "Note Class": "noteClass",
-            "Advisement Class": "advisementClass"
+            "Advisement Class": "advisementClass",
+            "Use Dfn Panels": "useDfnPanels"
         }
 
         # Some keys are multi-value:
@@ -131,7 +135,9 @@ class MetadataManager:
             "Markup Shorthands": "markupShorthands",
             "Version History": "versionHistory",
             "Text Macro": "customTextMacros",
-            "Opaque Elements": "opaqueElements"
+            "Opaque Elements": "opaqueElements",
+            "Translation": "translations",
+            "Translate Ids": "translateIDs"
         }
 
         self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
@@ -155,13 +161,16 @@ class MetadataManager:
             "Use <I> Autolinks": parseBoolean,
             "No Editor": parseBoolean,
             "Default Biblio Status": parseBiblioStatus,
-            "Issue Tracking": parseIssues,
+            "Issue Tracking": parseLinkedText,
             "Markup Shorthands": parseMarkupShorthands,
             "Text Macro": parseTextMacro,
             "Work Status": parseWorkStatus,
             "Inline Github Issues": parseBoolean,
             "Repository": parseRepository,
-            "Opaque Elements": parseOpaqueElements
+            "Opaque Elements": parseOpaqueElements,
+            "Translation": parseTranslation,
+            "Translate Ids": parseTranslateIDs,
+            "Use Dfn Panels": parseBoolean
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -334,14 +343,16 @@ class MetadataManager:
         if self.repository:
             macros["repository"] = self.repository.name
             macros["repositoryurl"] = self.repository.url
-        if self.status == "UD":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/w3c-unofficial"
-        elif self.status == "FPWD":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/W3C-WD"
+        if self.mailingList:
+            macros["mailinglist"] = self.mailingList
+        if self.mailingListArchives:
+            macros["mailinglistarchives"] = self.mailingListArchives
+        if self.status == "FPWD":
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-WD"
         elif self.status == "FINDING":
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/W3C-NOTE"
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-NOTE"
         else:
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/W3C-{0}".format(self.status)
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(self.status)
         # Custom macros
         for name, text in self.customTextMacros:
             macros[name.lower()] = text
@@ -488,12 +499,13 @@ def parseBiblioStatus(key, val):
         die("'{0}' must be either 'current' or 'dated'. Got '{1}'", key, val)
         return "dated"
 
-def parseIssues(key, val):
-    issues = []
+def parseLinkedText(key, val):
+    # Parses anything defined as "text url, text url, text url" into a list of 2-tuples.
+    entries = []
     vals = [v.strip() for v in val.split(",")]
     for v in vals:
-        issues.append(v.rsplit(" ", 1))
-    return issues
+        entries.append(v.rsplit(" ", 1))
+    return entries
 
 def parseMarkupShorthands(key, val):
     # Format is comma-separated list of shorthand category followed by boolean.
@@ -571,6 +583,41 @@ def parseRepository(key, val):
 
 def parseOpaqueElements(key, val):
     return [x.strip() for x in val.split(",")]
+
+def parseTranslateIDs(key, val):
+    translations = {}
+    for v in val.split(","):
+        pieces = v.strip().split()
+        if len(pieces) != 2:
+            die("‘Translate IDs’ values must be an old ID followed by a new ID. Got '{0}'", v)
+            continue
+        old,new = pieces
+        translations[old] = new
+    return translations
+
+def parseTranslation(key, val):
+    # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
+    pieces = val.split(",")
+    if not(1 <= len(pieces) <= 3):
+        die("Format of a Translation line is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?. Got:\n{0}", val)
+        return
+    firstParts = pieces[0].split()
+    if len(firstParts) != 2:
+        die("First part of a Translation line must be a lang-code followed by a url. Got:\n{0}", pieces[0])
+        return
+    langCode, url = firstParts
+    name = None
+    nativeName = None
+    for piece in pieces[1:]:
+        k,v = piece.split(None, 1)
+        if k.lower() == "name":
+            name = v
+        elif k.lower() == "native-name":
+            nativeName = v
+        else:
+            die("Later parts of a Translation line must start with 'name' or 'native-name'. Got:\n{0}", piece)
+    return {"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}
+
 
 def parse(md, lines):
     # Given a MetadataManager and HTML document text, in the form of an array of text lines,
