@@ -407,6 +407,9 @@ class ReferenceManager(object):
 
     def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None):
         key = text.lower()
+        if key in ["notifications", "fullscreen", "dom", "url", "encoding"]:
+            # A handful of specs where W3C is squatting with an out-of-date fork.
+            key = "whatwg-" + key
         if key in self.biblios:
             candidates = self.biblios[key]
         elif key+"\n" in self.biblios:
