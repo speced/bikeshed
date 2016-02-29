@@ -505,6 +505,8 @@ def addSpecMetadataSection(doc):
 
     def printTranslation(tr):
         lang = tr['lang-code']
+        # canonicalize the lang-code structure
+        lang = lang.lower().replace("_", "-")
         name = tr['name']
         nativeName = tr['native-name']
         url = tr['url']
