@@ -92,7 +92,7 @@ def addAtRisk(doc):
 def addStyles(doc):
     el = getFillContainer('stylesheet', doc)
     if el is not None:
-        fillWith('stylesheet', config.retrieveBoilerplateFile(doc, 'stylesheet'), doc=doc)
+        el.text = config.retrieveBoilerplateFile(doc, 'stylesheet')
 
 def addCustomBoilerplate(doc):
     for el in findAll('[boilerplate]', doc):
