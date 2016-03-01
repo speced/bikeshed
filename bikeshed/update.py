@@ -248,12 +248,22 @@ def updateBiblio():
     except Exception, e:
         die("Couldn't download the biblio data.\n{0}", e)
     if not config.dryRun:
-        try:
-            with io.open(config.scriptPath + "/spec-data/biblio.data", 'w', encoding="utf-8") as fh:
-                writeBiblioFile(fh, biblios)
-        except Exception, e:
-            die("Couldn't save biblio database to disk.\n{0}", e)
-            return
+        # Group the biblios by the first two letters of their keys
+        groupedBiblios = defaultdict(dict)
+        allNames = []
+        for k,v in biblios.items():
+            allNames.append(k)
+            group = k[0:2]
+            groupedBiblios[group][k] = v
+        for group, biblios in groupedBiblios.items():
+            try:
+                with io.open(config.scriptPath + "/spec-data/biblio/biblio-{0}.data".format(group), 'w', encoding="utf-8") as fh:
+                    writeBiblioFile(fh, biblios)
+                with io.open(config.scriptPath + "/spec-data/biblio-keys.json", 'w', encoding="utf-8") as fh:
+                    fh.write(unicode(json.dumps(allNames, ensure_ascii=False)))
+            except Exception, e:
+                die("Couldn't save biblio database to disk.\n{0}", e)
+                return
     say("Success!")
 
 

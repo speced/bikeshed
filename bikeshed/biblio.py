@@ -257,6 +257,44 @@ def processSpecrefBiblioFile(text, storage, order):
 
     return storage
 
+def loadBiblioDataFile(lines, storage):
+    try:
+        while True:
+            fullKey = lines.next()
+            prefix, key = fullKey[0], fullKey[2:].strip()
+            if prefix == "d":
+                b = {
+                    "linkText": lines.next(),
+                    "date": lines.next(),
+                    "status": lines.next(),
+                    "title": lines.next(),
+                    "dated_url": lines.next(),
+                    "current_url": lines.next(),
+                    "other": lines.next(),
+                    "etAl": lines.next() != "\n",
+                    "order": 3,
+                    "biblioFormat": "dict",
+                    "authors": []
+                }
+                while True:
+                    line = lines.next()
+                    if line == b"-\n":
+                        break
+                    b['authors'].append(line)
+            elif prefix == "s":
+                b = {
+                    "linkText": lines.next(),
+                    "data": lines.next(),
+                    "biblioFormat": "string",
+                    "order": 3
+                }
+                line = lines.next() # Eat the -
+            else:
+                die("Unknown biblio prefix '{0}' on key '{1}'", prefix, fullKey)
+                continue
+            storage[key].append(b)
+    except StopIteration:
+        pass
 
 
 def levenshtein(a,b):
@@ -279,7 +317,7 @@ def levenshtein(a,b):
 
     return current[n]
 
-def findCloseBiblios(biblios, target, n=5):
+def findCloseBiblios(biblioKeys, target, n=5):
     '''
     Finds biblio entries close to the target.
     Returns all biblios with target as the substring,
@@ -302,7 +340,7 @@ def findCloseBiblios(biblios, target, n=5):
                     names.pop()
                     break
         return names
-    for name in biblios.keys():
+    for name in biblioKeys:
         if target in name:
             superStrings.append(name)
         else:

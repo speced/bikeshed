@@ -34,7 +34,10 @@ class ReferenceManager(object):
         # Set of (obsolete spec vshortname, replacing spec vshortname), when both obsolete and replacing specs are possible anchors
         self.replacedSpecs = set()
         # Dict of {biblio term => biblio data}
+        # Sparsely populated, with more loaded on demand
         self.biblios = defaultdict(list)
+        # All the biblio keys
+        self.biblioKeys = set()
         # Dict of {spec vshortname => headings}
         self.headings = dict()
         self.status = specStatus
@@ -64,53 +67,19 @@ class ReferenceManager(object):
                 pass
 
     def initializeBiblio(self):
-        with config.retrieveDataFile("biblio.data", quiet=True) as lines:
-            try:
-                while True:
-                    fullKey = lines.next()
-                    prefix, key = fullKey[0], fullKey[2:]
-                    if prefix == "d":
-                        b = {
-                            "linkText": lines.next(),
-                            "date": lines.next(),
-                            "status": lines.next(),
-                            "title": lines.next(),
-                            "dated_url": lines.next(),
-                            "current_url": lines.next(),
-                            "other": lines.next(),
-                            "etAl": lines.next() != "\n",
-                            "order": 3,
-                            "biblioFormat": "dict",
-                            "authors": []
-                        }
-                        while True:
-                            line = lines.next()
-                            if line == b"-\n":
-                                break
-                            b['authors'].append(line)
-                    elif prefix == "s":
-                        b = {
-                            "linkText": lines.next(),
-                            "data": lines.next(),
-                            "biblioFormat": "string",
-                            "order": 3
-                        }
-                        line = lines.next() # Eat the -
-                    else:
-                        die("Unknown biblio prefix '{0}' on key '{1}'", prefix, fullKey)
-                        continue
-                    self.biblios[key].append(b)
-            except StopIteration:
-                pass
-
+        self.biblioKeys.update(json.loads(config.retrieveDataFile("biblio-keys.json", quiet=True, str=True)))
 
         # Get local bibliography data
         try:
+            storage = defaultdict(list)
             with io.open("biblio.json", 'r', encoding="utf-8") as fh:
-                biblio.processSpecrefBiblioFile(fh.read(), self.biblios, order=2)
+                biblio.processSpecrefBiblioFile(fh.read(), storage, order=2)
         except IOError:
             # Missing file is fine
             pass
+        for k,v in storage.items():
+            self.biblioKeys.add(k)
+            self.biblios[k].append(v)
 
 
     @property
@@ -410,10 +379,14 @@ class ReferenceManager(object):
         if key in ["notifications", "fullscreen", "dom", "url", "encoding"]:
             # A handful of specs where W3C is squatting with an out-of-date fork.
             key = "whatwg-" + key
-        if key in self.biblios:
+        if key in self.biblioKeys:
+            # Key exists in biblio db
+            if key not in self.biblios:
+                # ...but data isn't loaded yet
+                group = key[0:2]
+                with config.retrieveDataFile("biblio/biblio-{0}.data".format(group), quiet=True) as lines:
+                    biblio.loadBiblioDataFile(lines, self.biblios)
             candidates = self.biblios[key]
-        elif key+"\n" in self.biblios:
-            candidates = self.biblios[key+"\n"]
         elif key in self.specs:
             # First see if the ref is just unnecessarily levelled
             match = re.match(r"(.+?)-\d+", key)

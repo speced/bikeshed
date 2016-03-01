@@ -1050,7 +1050,7 @@ def processBiblioLinks(doc):
         ref = doc.refs.getBiblioRef(linkText, status=biblioStatus, generateFakeRef=okayToFail, el=el)
         if not ref:
             if not okayToFail:
-                closeBiblios = biblio.findCloseBiblios(doc.refs.biblios, linkText)
+                closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)
                 die("Couldn't find '{0}' in bibliography data. Did you mean:\n{1}", linkText, '\n'.join("  "+b for b in closeBiblios))
             el.tag = "span"
             continue
