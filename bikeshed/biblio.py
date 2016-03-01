@@ -174,13 +174,14 @@ def processReferBiblioFile(lines, storage, order):
 
     biblio = None
     for i,line in enumerate(lines):
-        if re.match("\s*$", line):
+        line = line.strip()
+        if line == "":
             # Empty line
             if biblio is not None:
                 storage[biblio['linkText'].lower()].append(biblio)
                 biblio = None
             continue
-        elif re.match("\s*%?#", line):
+        elif line.startswith("#") or line.startswith("%#"):
             # Comment
             continue
         else:
@@ -189,7 +190,7 @@ def processReferBiblioFile(lines, storage, order):
                 biblio['order'] = order
                 biblio['biblioFormat'] = "dict"
 
-        match = re.match("\s*%(\w)\s+(.*)", line)
+        match = re.match(r"%(\w)\s+(.*)", line)
         if match:
             letter, value = match.groups()
         else:
