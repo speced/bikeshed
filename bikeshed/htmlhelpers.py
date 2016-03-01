@@ -65,7 +65,7 @@ def textContent(el, exact=False):
     # If exact is False, then any elements with bs-decorative attribute
     # get ignored in the textContent.
     # This allows me to ignore things added by Bikeshed by default.
-    if exact or find("[bs-decorative]", el) is None:
+    if exact:
         return html.tostring(el, method='text', with_tail=False, encoding="unicode")
     else:
         return textContentIgnoringDecorative(el)
