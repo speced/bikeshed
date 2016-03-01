@@ -711,10 +711,6 @@ def getSpecRepository(doc):
 
 def parseDoc(doc):
     # Look through the doc for any additional metadata information that might be needed.
-    if "feedback-header" not in doc.md.boilerplate['omitSections']:
-        if "issues-index" not in doc.md.boilerplate['omitSections'] and find(".issue", doc) is not None:
-            # There's at least one inline issue.
-            doc.md.issues.append(("Inline In Spec", "#issues-index"))
 
     for el in findAll(".replace-with-note-class", doc):
         removeClass(el, "replace-with-note-class")
@@ -725,3 +721,8 @@ def parseDoc(doc):
     for el in findAll(".replace-with-advisement-class", doc):
         removeClass(el, "replace-with-advisement-class")
         addClass(el, doc.md.advisementClass)
+
+    if "feedback-header" not in doc.md.boilerplate['omitSections']:
+        if "issues-index" not in doc.md.boilerplate['omitSections'] and find("." + doc.md.issueClass, doc) is not None:
+            # There's at least one inline issue.
+            doc.md.issues.append(("Inline In Spec", "#issues-index"))
