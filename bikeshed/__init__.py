@@ -1055,7 +1055,7 @@ def processBiblioLinks(doc):
             el.tag = "span"
             continue
 
-        id = config.simplifyText(linkText)
+        id = config.simplifyText(ref.linkText)
         el.set('href', '#biblio-'+id)
         storage[ref.linkText] = ref
 
