@@ -416,11 +416,21 @@ def fixupDataFiles():
     # If versions don't match, either the remote versions have been updated
     # (and we should switch you to them, because formats may have changed),
     # or you're using a historical version of Bikeshed (ditto).
+    def copyanything(src, dst):
+        import shutil
+        import errno
+        try:
+            shutil.rmtree(dst, ignore_errors=True)
+            shutil.copytree(src, dst)
+        except OSError as exc:
+            if exc.errno == errno.ENOTDIR:
+                shutil.copy(src, dst)
+            else:
+                raise
     try:
         import os
-        import shutil
         for filename in os.listdir(remotePath):
-            shutil.copy(remotePath+filename, localPath+filename)
+            copyanything(remotePath+filename, localPath+filename)
     except Exception, err:
         warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
         return
