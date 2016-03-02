@@ -1760,16 +1760,12 @@ def cleanupHTML(doc):
     for el in findAll("[data-export]{0}, [data-noexport]{0}".format("".join(":not({0})".format(x) for x in config.dfnElements)), doc):
         removeAttr(el, 'data-export')
         removeAttr(el, 'data-noexport')
-    for el in findAll("[oldids]", doc):
+    for el in findAll("[oldids], [data-alternate-id], [highlight], [nohighlight], [data-opaque], [bs-decorative]", doc):
         removeAttr(el, 'oldids')
-    for el in findAll("[data-alternate-id]", doc):
         removeAttr(el, 'data-alternate-id')
-    for el in findAll("[highlight], [nohighlight]", doc):
         removeAttr(el, 'highlight')
         removeAttr(el, 'nohiglight')
-    for el in findAll("[data-opaque]", doc):
         removeAttr(el, 'data-opaque')
-    for el in findAll("[bs-decorative]", doc):
         removeAttr(el, 'bs-decorative')
 
 
