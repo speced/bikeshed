@@ -1721,7 +1721,7 @@ def cleanupHTML(doc):
         el.set("id", "assert-" + hashContents(el))
 
     # Add ARIA role of "note" to class="note" elements
-    for el in findAll(".note", doc):
+    for el in findAll("."+doc.md.noteClass, doc):
         el.set("role", "note")
 
     # Look for nested <a> elements, and warn about them.
