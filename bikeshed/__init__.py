@@ -1223,7 +1223,7 @@ def addDfnPanels(doc, dfns):
         atLeastOnePanel = True
         panel = E.span({"class": "dfn-panel", "bs-decorative": ""},
             E.b(
-                E.a({"href":"#"+id}, "#"+id)),
+                E.a({"href":"#"+urllib.quote(id)}, "#"+id)),
             E.b("Referenced in:"))
         counter = 0
         for text,els in refs.items():
@@ -1236,11 +1236,11 @@ def addDfnPanels(doc, dfns):
                     el.set("id", refID)
                 if i == 0:
                     appendChild(li,
-                        E.a({"href": "#"+refID}, text))
+                        E.a({"href": "#"+urllib.quote(refID)}, text))
                 else:
                     appendChild(li,
                         " ",
-                        E.a({"href": "#"+refID}, "("+str(i+1)+")"))
+                        E.a({"href": "#"+urllib.quote(refID)}, "("+str(i+1)+")"))
         appendChild(dfn, panel)
     if atLeastOnePanel:
         script = '''
