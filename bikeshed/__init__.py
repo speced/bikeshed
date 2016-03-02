@@ -1202,13 +1202,22 @@ def addDfnPanels(doc, dfns):
     from .DefaultOrderedDict import DefaultOrderedDict
     # Constructs "dfn panels" which show all the local references to a term
     atLeastOnePanel = False
+    # Gather all the <a href>s together
+    allRefs = DefaultOrderedDict(list)
+    for a in findAll("a", doc):
+        href = a.get("href")
+        if href is None:
+            continue
+        if not href.startswith("#"):
+            continue
+        allRefs[href[1:]].append(a)
     for dfn in dfns:
         id = dfn.get("id")
         if not id:
             # Something went wrong, bail.
             continue
         refs = DefaultOrderedDict(list)
-        for link in findAll("a[href='#{0}']".format(id), doc):
+        for link in allRefs[id]:
             h = relevantHeadings(link).next()
             if hasClass(h, "no-ref"):
                 continue
