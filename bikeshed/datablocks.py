@@ -371,7 +371,11 @@ def transformRailroad(lines, doc, **kwargs):
     return ret
 
 def transformBiblio(lines, doc, **kwargs):
-    biblio.processSpecrefBiblioFile(''.join(lines), doc.refs.biblios, order=1)
+    storage = defaultdict(list)
+    biblio.processSpecrefBiblioFile(''.join(lines), storage, order=1)
+    for k,vs in storage.items():
+        doc.refs.biblioKeys.add(k)
+        doc.refs.biblios[k].extend(vs)
     return []
 
 def transformAnchors(lines, doc, **kwargs):

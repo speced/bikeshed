@@ -77,9 +77,9 @@ class ReferenceManager(object):
         except IOError:
             # Missing file is fine
             pass
-        for k,v in storage.items():
+        for k,vs in storage.items():
             self.biblioKeys.add(k)
-            self.biblios[k].append(v)
+            self.biblios[k].extend(vs)
 
 
     @property
