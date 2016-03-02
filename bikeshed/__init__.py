@@ -941,8 +941,8 @@ def classifyDfns(doc, dfns):
             else:
                 id = "{type}-{id}".format(type=dfnTypeToPrefix[dfnType], id=id)
             el.set('id', id)
-        # Set lt if it's not set, and textContent doesn't match
-        if el.get('data-lt') is None and textContent(el) != primaryDfnText:
+        # Set lt if it's not set
+        if el.get('data-lt') is None:
             el.set('data-lt', primaryDfnText)
         # Push export/noexport down to the definition
         if el.get('data-export') is None and el.get('data-noexport') is None:
@@ -1704,7 +1704,7 @@ def cleanupHTML(doc):
 
     # Remove duplicate linking texts.
     for el in findAll(",".join(x+"[data-lt]" for x in config.anchorishElements), doc):
-        if el.get('data-lt') == textContent(el):
+        if el.get('data-lt') == textContent(el, exact=True):
             del el.attrib['data-lt']
 
     # Transform the <css> fake tag into markup.
