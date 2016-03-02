@@ -263,17 +263,15 @@ def scopingElements(startEl, *tags):
     # Elements that could form a "scope" for the startEl
     # Ancestors, and preceding siblings of ancestors.
     # Maps to the things that can establish a counter scope.
-    els = []
     tagFilter = set(tags)
 
     for el in startEl.itersiblings(preceding=True, *tags):
-        els.append(el)
+        yield el
     for el in startEl.iterancestors():
         if el.tag in tagFilter:
-            els.append(el)
+            yield el
         for el in el.itersiblings(preceding=True, *tags):
-            els.append(el)
-    return els
+            yield el
 
 def previousElements(startEl, tag=None, *tags):
     # Elements preceding the startEl in document order.
