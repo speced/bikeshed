@@ -623,7 +623,7 @@ def addReferencesSection(doc):
     appendChild(container,
         E.h2({"class":"no-num no-ref", "id":"references"}, "References"))
 
-    normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText)
+    normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText.lower())
     if len(normRefs):
         dl = appendChild(container,
             E.h3({"class":"no-num no-ref", "id":"normative"}, "Normative References"),
@@ -632,7 +632,7 @@ def addReferencesSection(doc):
             appendChild(dl, E.dt({"id":"biblio-"+config.simplifyText(ref.linkText), "data-no-self-link":""}, "["+formatBiblioTerm(ref.linkText)+"]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
-    informRefs = [x for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText) if x.linkText not in doc.normativeRefs]
+    informRefs = [x for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText.lower()) if x.linkText not in doc.normativeRefs]
     if len(informRefs):
         dl = appendChild(container,
             E.h3({"class":"no-num no-ref", "id":"informative"}, "Informative References"),
