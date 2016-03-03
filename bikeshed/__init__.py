@@ -1188,6 +1188,8 @@ def addSelfLinks(doc):
         if list(el.iterancestors("figure")):
             # Skipping - element is inside a figure and is part of an example.
             continue
+        if el.get("data-no-self-link") is not None:
+            continue
         prependChild(el, makeSelfLink(el))
     if doc.md.useDfnPanels:
         addDfnPanels(doc, dfnElements)
@@ -1760,13 +1762,14 @@ def cleanupHTML(doc):
     for el in findAll("[data-export]{0}, [data-noexport]{0}".format("".join(":not({0})".format(x) for x in config.dfnElements)), doc):
         removeAttr(el, 'data-export')
         removeAttr(el, 'data-noexport')
-    for el in findAll("[oldids], [data-alternate-id], [highlight], [nohighlight], [data-opaque], [bs-decorative]", doc):
+    for el in findAll("[oldids], [data-alternate-id], [highlight], [nohighlight], [data-opaque], [bs-decorative], [data-no-self-link]", doc):
         removeAttr(el, 'oldids')
         removeAttr(el, 'data-alternate-id')
         removeAttr(el, 'highlight')
         removeAttr(el, 'nohiglight')
         removeAttr(el, 'data-opaque')
         removeAttr(el, 'bs-decorative')
+        removeAttr(el, 'data-no-self-link')
 
 
 def finalHackyCleanup(text):

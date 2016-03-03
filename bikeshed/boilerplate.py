@@ -629,7 +629,7 @@ def addReferencesSection(doc):
             E.h3({"class":"no-num no-ref", "id":"normative"}, "Normative References"),
             E.dl())
         for ref in normRefs:
-            appendChild(dl, E.dt({"id":"biblio-"+config.simplifyText(ref.linkText)}, "["+formatBiblioTerm(ref.linkText)+"]"))
+            appendChild(dl, E.dt({"id":"biblio-"+config.simplifyText(ref.linkText), "data-no-self-link":""}, "["+formatBiblioTerm(ref.linkText)+"]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
     informRefs = [x for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText) if x.linkText not in doc.normativeRefs]
