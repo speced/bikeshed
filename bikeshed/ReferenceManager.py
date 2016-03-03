@@ -504,8 +504,9 @@ class ReferenceManager(object):
         if not refs:
             return refs, "status"
 
-        if ignoreObsoletes:
+        if ignoreObsoletes and not spec:
             # Remove any ignored or obsoleted specs
+            # If you specified the spec, don't filter things - you know what you're doing.
             possibleSpecs = set(ref.spec for ref in refs)
             moreIgnores = set()
             for oldSpec, newSpec in self.replacedSpecs:
