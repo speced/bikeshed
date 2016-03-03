@@ -638,7 +638,7 @@ def addReferencesSection(doc):
             E.h3({"class":"no-num no-ref", "id":"informative"}, "Informative References"),
             E.dl())
         for ref in informRefs:
-            appendChild(dl, E.dt({"id":"biblio-"+config.simplifyText(ref.linkText)}, "["+formatBiblioTerm(ref.linkText)+"]"))
+            appendChild(dl, E.dt({"id":"biblio-"+config.simplifyText(ref.linkText), "data-no-self-link":""}, "["+formatBiblioTerm(ref.linkText)+"]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
 def addIssuesSection(doc):
