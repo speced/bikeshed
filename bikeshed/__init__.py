@@ -1232,7 +1232,7 @@ def addDfnPanels(doc, dfns):
             continue
         addClass(dfn, "dfn-paneled")
         atLeastOnePanel = True
-        panel = E.span({"class": "dfn-panel", "bs-decorative": ""},
+        panel = E.span({"class": "dfn-panel", "data-deco": ""},
             E.b(
                 E.a({"href":"#"+urllib.quote(id)}, "#"+id)),
             E.b("Referenced in:"))
@@ -1762,13 +1762,12 @@ def cleanupHTML(doc):
     for el in findAll("[data-export]{0}, [data-noexport]{0}".format("".join(":not({0})".format(x) for x in config.dfnElements)), doc):
         removeAttr(el, 'data-export')
         removeAttr(el, 'data-noexport')
-    for el in findAll("[oldids], [data-alternate-id], [highlight], [nohighlight], [data-opaque], [bs-decorative], [data-no-self-link]", doc):
+    for el in findAll("[oldids], [data-alternate-id], [highlight], [nohighlight], [data-opaque], [data-no-self-link]", doc):
         removeAttr(el, 'oldids')
         removeAttr(el, 'data-alternate-id')
         removeAttr(el, 'highlight')
         removeAttr(el, 'nohiglight')
         removeAttr(el, 'data-opaque')
-        removeAttr(el, 'bs-decorative')
         removeAttr(el, 'data-no-self-link')
 
 

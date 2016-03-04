@@ -62,7 +62,7 @@ def escapeCSSIdent(val):
     return ident
 
 def textContent(el, exact=False):
-    # If exact is False, then any elements with bs-decorative attribute
+    # If exact is False, then any elements with data-deco attribute
     # get ignored in the textContent.
     # This allows me to ignore things added by Bikeshed by default.
     if exact:
@@ -73,7 +73,7 @@ def textContent(el, exact=False):
 def textContentIgnoringDecorative(el):
     str = el.text or ''
     for child in childElements(el):
-        if child.get("bs-decorative") is None:
+        if child.get("data-deco") is None:
             str += textContentIgnoringDecorative(child)
         str += child.tail or ''
     return str
