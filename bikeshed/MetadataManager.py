@@ -236,9 +236,11 @@ class MetadataManager:
             self.overrides.add(key)
 
     def finish(self):
+        # Do some "computed metadata", based on the value of other metadata.
+        # Only call this when you're sure all metadata sources are parsed.
         if not self.repository:
             self.repository = getSpecRepository(self.doc)
-        if self.repository and self.repository.type == "github" and "feedback-header" not in self.doc.md.boilerplate['omitSections'] and "repository-issue-tracking" not in self.doc.md.boilerplate['omitSections']:
+        if self.repository.type == "github" and "feedback-header" not in self.doc.md.boilerplate['omitSections'] and "repository-issue-tracking" not in self.doc.md.boilerplate['omitSections']:
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
         self.validate()
 
