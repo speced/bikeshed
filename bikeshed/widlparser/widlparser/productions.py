@@ -596,7 +596,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
         if (self.sequence):
             self.sequence.markup(generator)
             generator.addText(self._openType)
-            self.type.markup(generator)
+            generator.addType(self.type)
             generator.addText(self._closeType)
             generator.addText(self.null)
             return self

@@ -1267,6 +1267,12 @@ class ExtendedAttribute(Construct): # ExtendedAttributeNoArgs | ExtendedAttribut
     def normalName(self):
         return self.attribute.normalName
     
+    @property
+    def arguments(self):
+        if (hasattr(self.attribute, 'arguments')):
+            return self.attribute.arguments
+        return None
+    
     def findArgument(self, name, searchMembers = True):
         if (hasattr(self.attribute, 'arguments') and self.attribute.arguments):
             for argument in self.attribute.arguments:
