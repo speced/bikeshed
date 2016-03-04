@@ -556,7 +556,9 @@ def linkTextVariations(str, linkType):
     # so explicitly adding an lt attr isn't usually necessary.
     yield str
 
-    if linkType == "dfn":
+    if linkType is None:
+        return
+    elif linkType == "dfn":
         # Berries <-> Berry
         if str[-3:] == "ies":
             yield str[:-3] + "y"
