@@ -389,7 +389,11 @@ def linkTextsFromElement(el, preserveCasing=False):
     if el.get('data-lt') == '':
         return []
     elif el.get('data-lt'):
-        texts = [x.strip() for x in el.get('data-lt').split('|')]
+        rawText = el.get('data-lt')
+        if rawText in ["|", "||", "|||"]:
+            texts = [rawText]
+        else:
+            texts = [x.strip() for x in rawText.split('|')]
     else:
         if el.tag in ("dfn", "a"):
             texts = [textContent(el).strip()]
