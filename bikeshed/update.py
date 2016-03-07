@@ -397,14 +397,15 @@ def writeAnchorsFile(fh, anchors):
             fh.write("-" + "\n")
 
 def fixupDataFiles():
-    localPath = config.scriptPath + "/spec-data/"
-    remotePath = config.scriptPath + "/spec-data/readonly/"
+    import os
+    localPath = os.path.join(config.scriptPath, "spec-data")
+    remotePath = os.path.join(config.scriptPath, "spec-data", "readonly")
     try:
-        localVersion = int(open(localPath+"version.txt", 'r').read())
+        localVersion = int(open(os.path.join(localPath, "version.txt"), 'r').read())
     except IOError:
         localVersion = None
     try:
-        remoteVersion = int(open(remotePath+"version.txt", 'r').read())
+        remoteVersion = int(open(os.path.join(remotePath, "version.txt"), 'r').read())
     except IOError, err:
         warn("Couldn't check the datafile version. Bikeshed may be unstable.\n{0}", err)
         return
@@ -428,9 +429,8 @@ def fixupDataFiles():
             else:
                 raise
     try:
-        import os
         for filename in os.listdir(remotePath):
-            copyanything(remotePath+filename, localPath+filename)
+            copyanything(os.path.join(remotePath, filename), os.path.join(localPath, filename))
     except Exception, err:
         warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
         return
