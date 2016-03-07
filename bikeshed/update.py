@@ -424,7 +424,7 @@ def fixupDataFiles():
             shutil.rmtree(dst, ignore_errors=True)
             shutil.copytree(src, dst)
         except OSError as exc:
-            if exc.errno == errno.ENOTDIR:
+            if exc.errno in [errno.ENOTDIR, errno.EINVAL]:
                 shutil.copy(src, dst)
             else:
                 raise
