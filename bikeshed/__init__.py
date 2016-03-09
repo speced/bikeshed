@@ -46,7 +46,7 @@ def main():
     argparser.add_argument("-d", "--dry-run", dest="dryRun", action="store_true",
                            help="Prevents the processor from actually saving anything to disk, but otherwise fully runs.")
     argparser.add_argument("--print", dest="printMode", action="store", default="console",
-                           help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'html'.")
+                           help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup'.")
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
 

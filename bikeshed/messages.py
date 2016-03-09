@@ -11,7 +11,7 @@ def p(msg):
     try:
         print msg
     except UnicodeEncodeError:
-        warning = printHeading("WARNING", "light cyan", "Your console does not understand Unicode.\n  Messages may be slightly corrupted.")
+        warning = formatMessage("warning", "Your console does not understand Unicode.\n  Messages may be slightly corrupted.")
         if warning not in messages:
             print warning
             messages.add(warning)
@@ -20,7 +20,7 @@ def p(msg):
 
 def die(msg, *formatArgs, **namedArgs):
     if config.quiet < 2:
-        msg = printHeading("FATAL ERROR", "red", msg.format(*formatArgs, **namedArgs))
+        msg = formatMessage("fatal", msg.format(*formatArgs, **namedArgs))
         if msg not in messages:
             messages.add(msg)
             p(msg)
@@ -29,14 +29,14 @@ def die(msg, *formatArgs, **namedArgs):
 
 def linkerror(msg, *formatArgs, **namedArgs):
     if config.quiet < 1:
-        msg = printHeading("LINK ERROR", "yellow", msg.format(*formatArgs, **namedArgs))
+        msg = formatMessage("link", msg.format(*formatArgs, **namedArgs))
         if msg not in messages:
             messages.add(msg)
             p(msg)
 
 def warn(msg, *formatArgs, **namedArgs):
     if config.quiet < 1:
-        msg = printHeading("WARNING", "light cyan", msg.format(*formatArgs, **namedArgs))
+        msg = formatMessage("warning", msg.format(*formatArgs, **namedArgs))
         if msg not in messages:
             messages.add(msg)
             p(msg)
@@ -88,8 +88,30 @@ def printColor(text, color="white", *styles):
         styleNum = ";".join(str(stylesConverter[style.lower()]) for style in styles)
         return "\033[{0};{1}m{text}\033[0m".format(styleNum, colorNum, text=text)
 
-def printHeading(headingText, color, text):
-    x  = printColor(headingText + ":", color, "bold")
-    x += " "
-    x += text
-    return x
+def formatMessage(type, text):
+    if config.printMode == "markup":
+        text = text.replace("<", "&lt;")
+        if type == "fatal":
+            return "<fatal>{0}</fatal>".format(text)
+        elif type == "link":
+            return "<link>{0}</link>".format(text)
+        elif type == "warning":
+            return "<warning>{0}</warning>".format(text)
+        elif type == "message":
+            return "<message>{0}</message>".format(text)
+    else:
+        if type == "message":
+            return text
+        if type == "fatal":
+            headingText = "FATAL ERROR"
+            color = "red"
+        elif type == "link":
+            headingText = "LINK ERROR"
+            color = "yellow"
+        elif type == "warning":
+            headingText = "WARNING"
+            color = "light cyan"
+        x  = printColor(headingText + ":", color, "bold")
+        x += " "
+        x += text
+        return x
