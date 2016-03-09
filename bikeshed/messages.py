@@ -94,7 +94,7 @@ def formatMessage(type, text):
         if type == "fatal":
             return "<fatal>{0}</fatal>".format(text)
         elif type == "link":
-            return "<link>{0}</link>".format(text)
+            return "<linkerror>{0}</linkerror>".format(text)
         elif type == "warning":
             return "<warning>{0}</warning>".format(text)
         elif type == "message":
