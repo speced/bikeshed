@@ -444,10 +444,14 @@ def addTOCSection(doc):
     for header in findAll('h2, h3, h4, h5, h6', doc):
         level = int(header.tag[-1])
         container = containers[level]
-
+        if isinstance(container, int):
+            # Saw a low-level heading without first seeing a higher heading.
+            die("Saw an <h{0}> without seeing an <h{1}> first. Please order your headings properly.\n{2}", level, level-1, outerHTML(header))
+            return
         if level > previousLevel + 1:
             # Jumping two levels is a no-no.
             die("Heading level jumps more than one level, from h{0} to h{1}:\n  {2}", previousLevel, level, textContent(header).replace("\n", " "))
+            return
 
         # Hit a no-toc, suppress the entire section.
         addToTOC = True
