@@ -1354,6 +1354,9 @@ class DebugMarker(object):
     def markupKeyword(self, text, construct):
         return ('<KEYWORD for=' + construct.idlType + '>', '</KEYWORD>')
 
+    def markupEnumValue(self, text, construct):
+        return ('<ENUM-VALUE for=' + construct.name + '>', '</ENUM-VALUE>')
+
 class IDLMarker(object):
     def markupConstruct(self, text, construct):
         # Fires for every 'construct' in the WebIDL.
@@ -1457,6 +1460,9 @@ class IDLMarker(object):
         else:
             idlFor = ""
         return ('<{name} data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters, name=elementName, refType=refType), '</{0}>'.format(elementName))
+
+    def markupEnumValue(self, text, construct):
+        return ("<idl data-idl-type=enum-value data-idl-for='{0}' data-lt='{1}'>".format(construct.name, escapeAttr(text)), "</idl>")
 
     def encode(self, text):
         return escapeHTML(text)
