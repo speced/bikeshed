@@ -36,7 +36,7 @@ def linkerror(msg, *formatArgs, **namedArgs):
 
 def warn(msg, *formatArgs, **namedArgs):
     if config.quiet < 1:
-        msg = printHeading("WARNING", "white", msg.format(*formatArgs, **namedArgs))
+        msg = printHeading("WARNING", "light cyan", msg.format(*formatArgs, **namedArgs))
         if msg not in messages:
             messages.add(msg)
             p(msg)
