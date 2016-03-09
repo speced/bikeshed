@@ -48,7 +48,7 @@ def warn(msg, *formatArgs, **namedArgs):
 
 def say(msg, *formatArgs, **namedArgs):
     if config.quiet < 1:
-        p(msg.format(*formatArgs, **namedArgs))
+        p(formatMessage("message", msg.format(*formatArgs, **namedArgs)))
 
 def resetSeenMessages():
     global messages
