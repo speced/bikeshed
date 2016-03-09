@@ -618,13 +618,13 @@ def canonicalizeShortcuts(doc):
     # The next two aren't in the above dict because some of the words conflict with existing attributes on some elements.
     # Instead, limit the search/transforms to the relevant elements.
     for el in findAll("dfn, h2, h3, h4, h5, h6", doc):
-        for dfnType in config.dfnTypes.union(["dfn"]):
+        for dfnType in config.dfnTypes:
             if el.get(dfnType) == "":
                 del el.attrib[dfnType]
                 el.set("data-dfn-type", dfnType)
                 break
     for el in findAll("a", doc):
-        for linkType in config.linkTypes.union(["dfn"]):
+        for linkType in config.linkTypes:
             if el.get(linkType) is not None:
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
@@ -967,7 +967,7 @@ def determineLinkType(el):
     # 1. Look at data-link-type
     linkType = treeAttr(el, 'data-link-type')
     if linkType:
-        if linkType in config.linkTypes.union(["dfn"]):
+        if linkType in config.linkTypes:
             return linkType
         die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
         return "unknown-type"

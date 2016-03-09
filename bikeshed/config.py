@@ -82,7 +82,7 @@ dfnClassToType = {
     "contextdef"         : "context",
     "facetdef"           : "facet" }
 
-dfnTypes = frozenset(dfnClassToType.values())
+dfnTypes = frozenset(dfnClassToType.values() + ["dfn"])
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
 cssTypes = frozenset(["property", "value", "at-rule", "descriptor", "type", "function", "selector"])
 markupTypes = frozenset(["element", "element-attr", "element-state", "attr-value"])
