@@ -303,7 +303,7 @@ def printjsonobject(x, indent, level):
     for k in x.keys():
         maxKeyLength = max(maxKeyLength, len(k))
     for k,v in x.items():
-        ret += "\n" + (indent*level) + printColor((k + ": ").ljust(maxKeyLength+2), CYAN) + printjson(v, indent, level+1)
+        ret += "\n" + (indent*level) + printColor((k + ": ").ljust(maxKeyLength+2), "cyan") + printjson(v, indent, level+1)
     return ret
 
 def printjsonobjectarray(x, indent, level):
@@ -312,18 +312,18 @@ def printjsonobjectarray(x, indent, level):
     ret = ""
     for i,v in enumerate(x):
         if i != 0:
-            ret += "\n" + (indent*level) + printColor("="*10, BLUE)
+            ret += "\n" + (indent*level) + printColor("="*10, "blue")
         ret += printjsonobject(v, indent, level)
     return ret
 
 def printjsonsimplearray(x, indent, level):
     x = getjson(x)
-    ret = printColor("[", BLUE)
+    ret = printColor("[", "blue")
     for i,v in enumerate(x):
         if i != 0:
             ret += ", "
         ret += printjsonprimitive(v)
-    ret += printColor("]", BLUE)
+    ret += printColor("]", "blue")
     return ret
 
 def printjsonprimitive(x):
@@ -334,10 +334,6 @@ def printjsonprimitive(x):
         return x
     if isinstance(x, bool):
         return unicode(x)
-
-BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
-def printColor(text, color=WHITE):
-    return "\x1b[1;%dm" % (30+color) + text + "\x1b[0m"
 
 
 def processTextNodes(nodes, regex, replacer):
