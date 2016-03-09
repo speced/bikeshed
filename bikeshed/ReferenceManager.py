@@ -202,7 +202,7 @@ class ReferenceManager(object):
                 return localRefs[0]
             elif len(localRefs) > 1:
                 if error:
-                    warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
+                    linkerror("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
                          linkType,
                          text,
                          localRefs[0].type,
@@ -256,7 +256,7 @@ class ReferenceManager(object):
                     break
                 if len(possibleMethods) > 1:
                     # Too many to disambiguate.
-                    die("The argument autolink '{0}' for '{1}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for.", text, linkFor)
+                    linkerror("The argument autolink '{0}' for '{1}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for.", text, linkFor)
                 # Try out all the combinations of interface/status/signature
                 linkForPatterns = ["{i}/{m}", "{m}"]
                 statuses = ["local", status]
@@ -285,7 +285,7 @@ class ReferenceManager(object):
                 methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
             if zeroRefsError and len(methodRefs) > 1:
                 # More than one possible foo() overload, can't tell which to link to
-                die("Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.", linkFor, text)
+                linkerror("Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.", linkFor, text)
                 return
             # Otherwise
 
@@ -294,33 +294,33 @@ class ReferenceManager(object):
                 # Custom properties/descriptors aren't ever defined anywhere
                 return None
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}'.", linkType, text)
+                linkerror("No '{0}' refs found for '{1}'.", linkType, text)
             return None
         elif failure == "export":
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}' that are marked for export.", linkType, text)
+                linkerror("No '{0}' refs found for '{1}' that are marked for export.", linkType, text)
             return None
         elif failure == "spec":
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec)
+                linkerror("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec)
             return None
         elif failure == "for":
             if zeroRefsError:
                 if spec is None:
-                    die("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
+                    linkerror("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
                 else:
-                    die("No '{0}' refs found for '{1}' with for='{2}' in spec '{3}'.", linkType, text, linkFor, spec)
+                    linkerror("No '{0}' refs found for '{1}' with for='{2}' in spec '{3}'.", linkType, text, linkFor, spec)
             return None
         elif failure == "status":
             if zeroRefsError:
                 if spec is None:
-                    die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
+                    linkerror("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
                 else:
-                    die("No '{0}' refs found for '{1}' compatible with status '{2}' in spec '{3}'.", linkType, text, status, spec)
+                    linkerror("No '{0}' refs found for '{1}' compatible with status '{2}' in spec '{3}'.", linkType, text, status, spec)
             return None
         elif failure == "ignored-specs":
             if zeroRefsError:
-                die("The only '{0}' refs for '{1}' were in ignored specs:\n{2}", linkType, text, outerHTML(el))
+                linkerror("The only '{0}' refs for '{1}' were in ignored specs:\n{2}", linkType, text, outerHTML(el))
             return None
         elif failure:
             die("Programming error - I'm not catching '{0}'-type link failures. Please report!", failure)
@@ -361,13 +361,13 @@ class ReferenceManager(object):
                     possibleRefs.append('spec:{spec}; type:{type}; text:{text}'.format(**ref))
             if len(possibleRefs) == 1:
                 # Only happens when the refs can't be disambiguated under Bikeshed's data model.
-                warn("Multiple possible '{0}' refs for '{1}' in {2}, but they're not distinguishable with Bikeshed's data model. Either create a manual link, or ask the spec maintainer to add sufficient disambiguating attributes to make them distinguishable. Usually this means adding a for='' value to at least one of them.\nArbitrarily chose the {3} one to link to for now.",
+                linkerror("Multiple possible '{0}' refs for '{1}' in {2}, but they're not distinguishable with Bikeshed's data model. Either create a manual link, or ask the spec maintainer to add sufficient disambiguating attributes to make them distinguishable. Usually this means adding a for='' value to at least one of them.\nArbitrarily chose the {3} one to link to for now.",
                     linkType,
                     text,
                     defaultRef.spec,
                     defaultRef.url)
             else:
-                warn("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
+                linkerror("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
                      linkType,
                      text,
                      defaultRef.spec,
@@ -462,13 +462,11 @@ class ReferenceManager(object):
         if linkType:
             if linkType in config.dfnTypes:
                 linkTypes = [linkType]
-            elif linkType == "dfn":
-                linkTypes = ["dfn"]
             elif linkType in config.linkTypeToDfnType:
                 linkTypes = list(config.linkTypeToDfnType[linkType])
             else:
                 if error:
-                    die("Unknown link type '{0}'.",linkType)
+                    linkerror("Unknown link type '{0}'.",linkType)
                 return [], "type"
             refs = [x for x in refs if x.type in linkTypes]
         if not refs:
