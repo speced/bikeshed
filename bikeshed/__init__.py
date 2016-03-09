@@ -871,6 +871,9 @@ def classifyDfns(doc, dfns):
     dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
     for el in dfns:
         dfnType = determineDfnType(el)
+        if dfnType not in config.dfnTypes:
+            die("Unknown dfn type '{0}' on:\n{1}", dfnType, outerHTML(el))
+            continue
         dfnTexts = config.linkTextsFromElement(el)
         dfnFor = treeAttr(el, "data-dfn-for")
         if len(dfnTexts):
