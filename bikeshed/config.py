@@ -46,6 +46,7 @@ groupsInW3C = frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini",
                          "web-bluetooth-cg", "webappsec", "webspecs", "whatwg"])
 
 dfnClassToType = {
+    "abstract-opdef"     : "abstract-op",
     "propdef"            : "property",
     "valdef"             : "value",
     "at-ruledef"         : "at-rule",
