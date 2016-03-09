@@ -11,6 +11,7 @@ force = True
 quiet = True
 dryRun = False
 minify = True
+printMode = "console"
 scriptPath = unicode(os.path.dirname(os.path.realpath(__file__)), encoding="utf-8")
 doc = None
 textMacros = {}
