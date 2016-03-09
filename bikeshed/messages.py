@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import sys
+from collections import Counter
 
 import config
 
 
 messages = set()
+messageCounts = Counter()
 
 def p(msg):
     try:
@@ -19,6 +21,7 @@ def p(msg):
 
 
 def die(msg, *formatArgs, **namedArgs):
+    messageCounts["fatal"] += 1
     if config.quiet < 2:
         msg = formatMessage("fatal", msg.format(*formatArgs, **namedArgs))
         if msg not in messages:
@@ -28,6 +31,7 @@ def die(msg, *formatArgs, **namedArgs):
         sys.exit(1)
 
 def linkerror(msg, *formatArgs, **namedArgs):
+    messageCounts["linkerror"] += 1
     if config.quiet < 1:
         msg = formatMessage("link", msg.format(*formatArgs, **namedArgs))
         if msg not in messages:
@@ -35,6 +39,7 @@ def linkerror(msg, *formatArgs, **namedArgs):
             p(msg)
 
 def warn(msg, *formatArgs, **namedArgs):
+    messageCounts["warning"] += 1
     if config.quiet < 1:
         msg = formatMessage("warning", msg.format(*formatArgs, **namedArgs))
         if msg not in messages:
@@ -48,6 +53,8 @@ def say(msg, *formatArgs, **namedArgs):
 def resetSeenMessages():
     global messages
     messages = set()
+    global messageCounts
+    messageCounts = Counter()
 
 def printColor(text, color="white", *styles):
     if config.printMode == "plain":
