@@ -1521,7 +1521,7 @@ class IDLMarker(object):
 
 class IDLUI(object):
     def warn(self, msg):
-        die("{0}", msg)
+        die("{0}", msg.rstrip())
 
 def markupIDL(doc):
     for el in findAll("pre.idl", doc):
