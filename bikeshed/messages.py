@@ -10,7 +10,7 @@ messages = set()
 messageCounts = Counter()
 
 def p(msg):
-    if config.quiet > 3:
+    if config.quiet == float("infinity"):
         return
     try:
         print msg
@@ -23,34 +23,45 @@ def p(msg):
 
 
 def die(msg, *formatArgs, **namedArgs):
-    messageCounts["fatal"] += 1
-    if config.quiet < 3:
-        msg = formatMessage("fatal", msg.format(*formatArgs, **namedArgs))
-        if msg not in messages:
-            messages.add(msg)
+    msg = formatMessage("fatal", msg.format(*formatArgs, **namedArgs))
+    if msg not in messages:
+        messageCounts["fatal"] += 1
+        messages.add(msg)
+        if config.quiet < 3:
             p(msg)
     if not config.force:
+        failure("Did not generate, due to fatal errors")
         sys.exit(1)
 
 def linkerror(msg, *formatArgs, **namedArgs):
-    messageCounts["linkerror"] += 1
-    if config.quiet < 2:
-        msg = formatMessage("link", msg.format(*formatArgs, **namedArgs))
-        if msg not in messages:
-            messages.add(msg)
-            p(msg)
+    msg = formatMessage("link", msg.format(*formatArgs, **namedArgs))
+    if msg not in messages:
+        messageCounts["linkerror"] += 1
+        messages.add(msg)
+        if config.quiet < 2:
+                p(msg)
 
 def warn(msg, *formatArgs, **namedArgs):
-    messageCounts["warning"] += 1
-    if config.quiet < 1:
-        msg = formatMessage("warning", msg.format(*formatArgs, **namedArgs))
-        if msg not in messages:
-            messages.add(msg)
-            p(msg)
+    msg = formatMessage("warning", msg.format(*formatArgs, **namedArgs))
+    if msg not in messages:
+        messageCounts["warning"] += 1
+        messages.add(msg)
+        if config.quiet < 1:
+                p(msg)
 
 def say(msg, *formatArgs, **namedArgs):
     if config.quiet < 1:
         p(formatMessage("message", msg.format(*formatArgs, **namedArgs)))
+
+def success(msg, *formatArgs, **namedArgs):
+    if config.quiet < 4:
+        msg = formatMessage("success", msg.format(*formatArgs, **namedArgs))
+        p(msg)
+
+def failure(msg, *formatArgs, **namedArgs):
+    if config.quiet < 4:
+        msg = formatMessage("failure", msg.format(*formatArgs, **namedArgs))
+        p(msg)
 
 def resetSeenMessages():
     global messages
@@ -108,9 +119,17 @@ def formatMessage(type, text):
             return "<warning>{0}</warning>".format(text)
         elif type == "message":
             return "<message>{0}</message>".format(text)
+        elif type == "success":
+            return "<final-success>{0}</final-success>".format(text)
+        elif type == "failure":
+            return "<final-failure>{0}</final-failure>".format(text)
     else:
         if type == "message":
             return text
+        if type == "success":
+            return printColor(" ✔ ", "green", "invert") + " " + text
+        if type == "failure":
+            return printColor(" ✘ ", "red", "invert") + " " + text
         if type == "fatal":
             headingText = "FATAL ERROR"
             color = "red"

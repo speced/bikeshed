@@ -429,6 +429,7 @@ class Spec(object):
         return outputFilename
 
     def finish(self, outputFilename):
+        self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         rendered = self.serialize()
         if not config.dryRun:
@@ -440,6 +441,21 @@ class Spec(object):
                         f.write(rendered)
             except Exception, e:
                 die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)
+
+    def printResultMessage(self):
+        # If I reach this point, I've succeeded, but maybe with reservations.
+        fatals = messageCounts['fatal']
+        links = messageCounts['linkerror']
+        warnings = messageCounts['warning']
+        if fatals:
+            success("Successfully generated, but fatal errors were suppressed")
+            return
+        if links:
+            success("Successfully generated, with {0} linking errors", links)
+            return
+        if warnings:
+            success("Successfully generated, with warnings")
+            return
 
     def watch(self, outputFilename):
         import time
