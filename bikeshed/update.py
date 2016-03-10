@@ -93,6 +93,7 @@ def updateCrossRefs():
             return temp
         rawAnchorData = map(setStatus('TR'), linearizeAnchorTree(rawSpec.get('anchors', []))) + map(setStatus('ED'), linearizeAnchorTree(rawSpec.get('draft_anchors',[])))
         for rawAnchor in rawAnchorData:
+            rawAnchor = fixupAnchor(rawAnchor)
             linkingTexts = rawAnchor.get('linking_text', [rawAnchor.get('title')])
             if linkingTexts[0] is None:
                 continue
@@ -434,3 +435,9 @@ def fixupDataFiles():
     except Exception, err:
         warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
         return
+
+def fixupAnchor(anchor):
+    # Miscellaneous fixes
+    if anchor.get('title', None) == "'@import'":
+        anchor['title'] = "@import"
+    return anchor
