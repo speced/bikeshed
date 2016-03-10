@@ -10,6 +10,8 @@ messages = set()
 messageCounts = Counter()
 
 def p(msg):
+    if config.quiet > 3:
+        return
     try:
         print msg
     except UnicodeEncodeError:
@@ -22,7 +24,7 @@ def p(msg):
 
 def die(msg, *formatArgs, **namedArgs):
     messageCounts["fatal"] += 1
-    if config.quiet < 2:
+    if config.quiet < 3:
         msg = formatMessage("fatal", msg.format(*formatArgs, **namedArgs))
         if msg not in messages:
             messages.add(msg)
@@ -32,7 +34,7 @@ def die(msg, *formatArgs, **namedArgs):
 
 def linkerror(msg, *formatArgs, **namedArgs):
     messageCounts["linkerror"] += 1
-    if config.quiet < 1:
+    if config.quiet < 2:
         msg = formatMessage("link", msg.format(*formatArgs, **namedArgs))
         if msg not in messages:
             messages.add(msg)

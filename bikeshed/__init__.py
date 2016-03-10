@@ -40,7 +40,9 @@ def main():
 
     argparser = argparse.ArgumentParser(description="Processes spec source files into valid HTML.")
     argparser.add_argument("-q", "--quiet", dest="quiet", action="count", default=0,
-                            help="Suppresses everything but fatal errors from printing.")
+                            help="Silences one level of message, least-important first.")
+    argparser.add_argument("-s", "--silent", dest="silent", action="store_true",
+                           help="Shorthand for 'as many -q as you need to shut it up'")
     argparser.add_argument("-f", "--force", dest="force", action="store_true",
                            help="Force the preprocessor to run to completion; fatal errors don't stop processing.")
     argparser.add_argument("-d", "--dry-run", dest="dryRun", action="store_true",
@@ -166,6 +168,8 @@ def main():
     options, extras = argparser.parse_known_args()
 
     config.quiet = options.quiet
+    if options.silent:
+        config.quiet = float("infinity")
     config.force = options.force
     config.dryRun = options.dryRun
     config.minify = getattr(options, 'minify', True)
