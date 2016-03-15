@@ -247,8 +247,8 @@ class ReferenceManager(object):
                 # Dedup/collect by url, so I'll get all the signatures for a given dfn.
                 possibleMethods = defaultdict(list)
                 for argfullName, metadata in methodSignatures.items():
-                    if text in metadata["args"] and (interfaceName in metadata["for"] or interfaceName is None):
-                        possibleMethods[metadata["url"]].append(argfullName)
+                    if text in metadata["args"] and (interfaceName in metadata["for"] or interfaceName is None) and metadata["shortname"] != self.specName:
+                        possibleMethods[metadata["shortname"]].append(argfullName)
                 possibleMethods = possibleMethods.values()
                 if not possibleMethods:
                     # No method signatures with this argument/interface.
