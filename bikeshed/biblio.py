@@ -247,6 +247,10 @@ def processSpecrefBiblioFile(text, storage, order):
             for jsonField, biblioField in fields.items():
                 if jsonField in data:
                     biblio[biblioField] = data[jsonField]
+                if "versionOf" in data:
+                    # "versionOf" entries are all dated urls,
+                    # so you want the href *all* the time.
+                    biblio["current_url"] = data["href"]
         storage[biblioKey.lower()].append(biblio)
     for biblioKey, aliasOf in aliases.items():
         aliasedBiblios = storage.get(aliasOf.lower(), [])
