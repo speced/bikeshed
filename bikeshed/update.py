@@ -9,6 +9,7 @@ import urllib2
 
 from . import config
 from . import biblio
+from DefaultOrderedDict import DefaultOrderedDict
 from .messages import *
 
 from .apiclient.apiclient import apiclient
@@ -250,9 +251,9 @@ def updateBiblio():
         die("Couldn't download the biblio data.\n{0}", e)
     if not config.dryRun:
         # Group the biblios by the first two letters of their keys
-        groupedBiblios = defaultdict(dict)
+        groupedBiblios = DefaultOrderedDict(DefaultOrderedDict)
         allNames = []
-        for k,v in biblios.items():
+        for k,v in sorted(biblios.items(), key=lambda x:x[0].lower()):
             allNames.append(k)
             group = k[0:2]
             groupedBiblios[group][k] = v
@@ -260,11 +261,15 @@ def updateBiblio():
             try:
                 with io.open(config.scriptPath + "/spec-data/biblio/biblio-{0}.data".format(group), 'w', encoding="utf-8") as fh:
                     writeBiblioFile(fh, biblios)
-                with io.open(config.scriptPath + "/spec-data/biblio-keys.json", 'w', encoding="utf-8") as fh:
-                    fh.write(unicode(json.dumps(allNames, ensure_ascii=False)))
             except Exception, e:
                 die("Couldn't save biblio database to disk.\n{0}", e)
                 return
+        try:
+            with io.open(config.scriptPath + "/spec-data/biblio-keys.json", 'w', encoding="utf-8") as fh:
+                fh.write(unicode(json.dumps(allNames, indent=0, ensure_ascii=False)))
+        except Exception, e:
+            die("Couldn't save biblio database to disk.\n{0}", e)
+            return
     say("Success!")
 
 
