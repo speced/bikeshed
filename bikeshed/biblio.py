@@ -210,6 +210,38 @@ def processReferBiblioFile(lines, storage, order):
     return storage
 
 def processSpecrefBiblioFile(text, storage, order):
+    '''
+    A SpecRef file is a JSON object, where keys are ids
+    and values are either <alia>, <legacyRef>, or <ref>.
+
+    <alias>: {
+        *aliasOf: <id>,
+        *id: <id>
+    }
+
+    <legacyRef>: <string>
+
+    <ref>: {
+        id: <id>,
+        authors: [<string>],
+        etAl: <bool>,
+        href: <url>,
+        *title: <string>,
+        date: <date>,
+        deliveredBy: [<wg>],
+        status: <string>,
+        publisher: <string>,
+        obsoletes: [<id>],
+        obsoletedBy: [<id>],
+        versionOf: <id>,
+        versions: [<id>],
+        edDraft: <url>
+    }
+
+    <date>: /^([1-3]?\d\s)?((?:January|February|March|April|May|June|July|August|September|October|November|December)\s)?\d+$/
+
+    <wg>: {*url:<url>, *shortname:<string>}
+    '''
     import json
     try:
         datas = json.loads(text)
