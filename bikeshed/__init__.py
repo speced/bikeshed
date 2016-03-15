@@ -199,7 +199,7 @@ def main():
         elif options.jsonCode:
             doc = Spec(inputFilename=options.infile)
             doc.preprocess()
-            exec("print json.dumps({0}, indent=2)".format(options.jsonCode))
+            exec("print config.printjson({0})".format(options.jsonCode))
         elif options.code:
             doc = Spec(inputFilename=options.infile)
             doc.preprocess()
