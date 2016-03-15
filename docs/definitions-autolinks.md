@@ -65,6 +65,7 @@ There are additional types for WebIDL definitions:
 * except-field
 * exception-code
 * enum
+* enum-value
 * const
 * typedef
 * stringifier
@@ -74,16 +75,19 @@ There are additional types for WebIDL definitions:
 And for HTML/SVG/etc element definitions:
 
 * element
+* element-state (a spec concept, like `<input>` being in the "password state")
 * element-attr
+* attr-value
 
 A special type just for definitions of operators used in grammar definitions,
 like `||` and similar:
 
 * grammar
 
-And finally, a catch-all category for general terms and phrases, and anything that doesn't fall into one of the above categories:
+And finally, some categories for "English" terms:
 
-* dfn
+* abstract-op
+* dfn (for general terms and phrases, and a catch-all for anything else)
 
 The processor will attempt to infer your definition type from the context and text content of the definition:
 
@@ -95,6 +99,8 @@ The processor will attempt to infer your definition type from the context and te
 * Does it end with `()`?  Then it's a **function**.
 * Is it surrounded by double single quotes in the source, like `''foo''`?  Then it's a **value**.
 * Otherwise, it's a **dfn**.
+
+(This auto-detection is obviously skewed towards CSS types; Bikeshed started as a CSS spec preprocessor, and the CSS types are easier to auto-detect syntactically than anything else.)
 
 Note that this auto-detection is a **last-resort** operation.
 There are methods (defined below) to explicitly indicate what type a definition is,
@@ -132,7 +138,9 @@ Specifically:
 * "argument" definitions must define what method or constructor they're relative to.
 * "dict-member" definitions must define what dictionary they're relative to.
 * "except-field" and "exception-code" definitions must define what exception they're relative to.
-* "element-attr" definitions must define what element they're relative to.
+* "enum-value" definitions must define what enum they're relative to
+* "element-attr" and "element-state" definitions must define what element they're relative to.
+* "attr-value" definitions must define what element and attribute they're relative to.
 * "descriptor" definitions must define what at-rule they're relative to.
     (This happens automatically if you add a "For" line to the descdef table.)
 * "value" definitions must define what property, descriptor, at-rule, type, selector, or function they're relative to.
