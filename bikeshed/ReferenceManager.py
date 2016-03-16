@@ -401,7 +401,7 @@ class ReferenceManager(object):
         else:
             return None
 
-        candidate = sorted(stripLineBreaks(candidates), key=itemgetter('order'))[0]
+        candidate = stripLineBreaks(sorted(candidates, key=itemgetter('order'))[0])
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
         # if candidates[0]['order'] > 3: # 3 is SpecRef level
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
