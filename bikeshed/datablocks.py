@@ -418,7 +418,7 @@ def processAnchors(anchors, doc):
         methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
         if methodishStart:
             arglessName = methodishStart.group(1)+")"
-            doc.refs.addMethodVariants(anchor['text'][0], anchor.get('for', []), url)
+            doc.refs.addMethodVariants(anchor['text'][0], anchor.get('for', []), doc.md.shortname)
     return []
 
 def transformLinkDefaults(lines, doc, **kwargs):

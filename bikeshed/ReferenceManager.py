@@ -172,7 +172,7 @@ class ReferenceManager(object):
                 self.refs[linkText].append(ref)
                 methodishStart = re.match(r"([^(]+\()[^)]", linkText)
                 if methodishStart:
-                    self.addMethodVariants(linkText, dfnFor, ref["url"])
+                    self.addMethodVariants(linkText, dfnFor, ref["shortname"])
 
     def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None, exact=False):
         return self._queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]
@@ -541,7 +541,7 @@ class ReferenceManager(object):
 
         return refs, None
 
-    def addMethodVariants(self, methodSig, forVals, url):
+    def addMethodVariants(self, methodSig, forVals, shortname):
         # Takes a full method signature, like "foo(bar)",
         # and adds appropriate lines to self.methods for it
         match = re.match(r"([^(]+)\((.*)\)", methodSig)
@@ -553,7 +553,7 @@ class ReferenceManager(object):
         variants = self.methods[arglessMethodSig]
         if methodSig not in variants:
             args = [x.strip() for x in args.split(",")]
-            variants[methodSig] = {"args":args, "for":[], "url": url}
+            variants[methodSig] = {"args":args, "for":[], "shortname": shortname}
         variants[methodSig]["for"].extend(forVals)
 
 
