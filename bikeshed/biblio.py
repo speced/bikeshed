@@ -264,20 +264,19 @@ def processSpecrefBiblioFile(text, storage, order):
 
     aliases = {}
     for biblioKey, data in datas.items():
-        # Handle <alias>
-        if "aliasOf" in data:
+        biblio = {"linkText": biblioKey, "order": order}
+        if isinstance(data, basestring):
+            # Handle <legacyRef>
+            biblio['biblioFormat'] = "string"
+            biblio['data'] = data.replace("\n", " ")
+        elif "aliasOf" in data:
+            # Handle <alias>
             if biblioKey.lower() == data["aliasOf"].lower():
                 # SpecRef uses aliases to handle capitalization differences,
                 # which I don't care about.
-                pass
-            else:
-                aliases[biblioKey] = data["aliasOf"]
-            continue
-        biblio = {"linkText": biblioKey, "order": order}
-        # Handle <legacyRef>
-        if isinstance(data, basestring):
-            biblio['biblioFormat'] = "string"
-            biblio['data'] = data.replace("\n", " ")
+                continue
+            biblio["biblioFormat"] = "alias"
+            biblio["aliasOf"] = data["aliasOf"].lower()
         else:
             # Handle <ref>
             biblio['biblioFormat'] = "dict"
@@ -289,14 +288,6 @@ def processSpecrefBiblioFile(text, storage, order):
                     # so you want the href *all* the time.
                     biblio["current_url"] = data["href"]
         storage[biblioKey.lower()].append(biblio)
-    # Process all the aliases, copying the data they're reffing to them.
-    for biblioKey, aliasOf in aliases.items():
-        aliasedBiblios = storage.get(aliasOf.lower(), [])
-        for aliasedBiblio in aliasedBiblios:
-            copiedBiblio = copy.copy(aliasedBiblio)
-            copiedBiblio['linkText'] = biblioKey
-            storage[biblioKey.lower()].append(copiedBiblio)
-
     return storage
 
 def loadBiblioDataFile(lines, storage):
@@ -328,6 +319,14 @@ def loadBiblioDataFile(lines, storage):
                     "linkText": lines.next(),
                     "data": lines.next(),
                     "biblioFormat": "string",
+                    "order": 3
+                }
+                line = lines.next() # Eat the -
+            elif prefix == "a":
+                b = {
+                    "linkText": lines.next(),
+                    "aliasOf": lines.next(),
+                    "biblioFormat": "alias",
                     "order": 3
                 }
                 line = lines.next() # Eat the -

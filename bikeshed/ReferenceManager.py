@@ -374,7 +374,7 @@ class ReferenceManager(object):
                      '\n'.join(possibleRefs))
         return defaultRef
 
-    def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None):
+    def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None, quiet=False):
         key = text.lower()
         if key in ["notifications", "fullscreen", "dom", "url", "encoding"]:
             # A handful of specs where W3C is squatting with an out-of-date fork.
@@ -391,7 +391,7 @@ class ReferenceManager(object):
             # First see if the ref is just unnecessarily levelled
             match = re.match(r"(.+?)-\d+", key)
             if match:
-                ref = self.getBiblioRef(match.group(1), status, el=el)
+                ref = self.getBiblioRef(match.group(1), status, el=el, quiet=True)
                 if ref:
                     return ref
             if generateFakeRef:
@@ -407,6 +407,14 @@ class ReferenceManager(object):
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
         if candidate['biblioFormat'] == "string":
             return biblio.StringBiblioEntry(**candidate)
+        elif candidate['biblioFormat'] == "alias":
+            # Follow the chain to the real candidate, but set the name to what you actually asked for.
+            linkText = candidate["linkText"]
+            ref = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True)
+            if ref is None:
+                return None
+            ref.linkText = linkText
+            return ref
         else:
             return biblio.BiblioEntry(preferredURL=status, **candidate)
 

@@ -348,7 +348,8 @@ def writeBiblioFile(fh, biblios):
     '''
     typePrefixes = {
         "dict": "d",
-        "string": "s"
+        "string": "s",
+        "alias": "a"
     }
     for key, entries in biblios.items():
         b = sorted(entries, key=lambda x:x['order'])[0]
@@ -366,6 +367,9 @@ def writeBiblioFile(fh, biblios):
         elif format == "string":
             fh.write(b['linkText'] + "\n")
             fh.write(b['data'] + "\n")
+        elif format == "alias":
+            fh.write(b['linkText'] + "\n")
+            fh.write(b['aliasOf'] + "\n")
         else:
             die("The biblio key '{0}' has an unknown biblio type '{1}'.", key, format)
             continue
