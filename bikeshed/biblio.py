@@ -264,17 +264,22 @@ def processSpecrefBiblioFile(text, storage, order):
 
     aliases = {}
     for biblioKey, data in datas.items():
+        # Handle <alias>
         if "aliasOf" in data:
-            if biblioKey.lower() != data["aliasOf"].lower():
+            if biblioKey.lower() == data["aliasOf"].lower():
                 # SpecRef uses aliases to handle capitalization differences,
                 # which I don't care about.
+                pass
+            else:
                 aliases[biblioKey] = data["aliasOf"]
             continue
         biblio = {"linkText": biblioKey, "order": order}
+        # Handle <legacyRef>
         if isinstance(data, basestring):
             biblio['biblioFormat'] = "string"
             biblio['data'] = data.replace("\n", " ")
         else:
+            # Handle <ref>
             biblio['biblioFormat'] = "dict"
             for jsonField, biblioField in fields.items():
                 if jsonField in data:
@@ -284,6 +289,7 @@ def processSpecrefBiblioFile(text, storage, order):
                     # so you want the href *all* the time.
                     biblio["current_url"] = data["href"]
         storage[biblioKey.lower()].append(biblio)
+    # Process all the aliases, copying the data they're reffing to them.
     for biblioKey, aliasOf in aliases.items():
         aliasedBiblios = storage.get(aliasOf.lower(), [])
         for aliasedBiblio in aliasedBiblios:
