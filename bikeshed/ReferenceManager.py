@@ -379,13 +379,13 @@ class ReferenceManager(object):
         if key in ["notifications", "fullscreen", "dom", "url", "encoding"]:
             # A handful of specs where W3C is squatting with an out-of-date fork.
             key = "whatwg-" + key
-        if key in self.biblioKeys:
-            # Key exists in biblio db
-            if key not in self.biblios:
-                # ...but data isn't loaded yet
-                group = key[0:2]
-                with config.retrieveDataFile("biblio/biblio-{0}.data".format(group), quiet=True) as lines:
-                    biblio.loadBiblioDataFile(lines, self.biblios)
+        if key in self.biblios:
+            candidates = self.biblios[key]
+        elif key in self.biblioKeys:
+            # Key exists in biblio db, but its data isn't loaded yet.
+            group = key[0:2]
+            with config.retrieveDataFile("biblio/biblio-{0}.data".format(group), quiet=True) as lines:
+                biblio.loadBiblioDataFile(lines, self.biblios)
             candidates = self.biblios[key]
         elif key in self.specs:
             # First see if the ref is just unnecessarily levelled
