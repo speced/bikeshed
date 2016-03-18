@@ -341,6 +341,8 @@ def printjsonprimitive(x):
         return x
     if isinstance(x, bool):
         return unicode(x)
+    if x is None:
+        return "null"
 
 
 def processTextNodes(nodes, regex, replacer):
