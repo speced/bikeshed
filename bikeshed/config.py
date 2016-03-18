@@ -12,7 +12,7 @@ quiet = True
 dryRun = False
 minify = True
 printMode = "console"
-scriptPath = unicode(os.path.dirname(os.path.realpath(__file__)), encoding="utf-8")
+scriptPath = os.path.dirname(os.path.realpath(__file__))
 doc = None
 textMacros = {}
 
@@ -241,37 +241,42 @@ def retrieveDataFile(filename, quiet=False, str=False):
         return fh
 
 def retrieveBoilerplateFile(self, name, group=None, status=None, error=True):
-    # First looks for a file specialized on the group and status.
-    # If that fails, specializes only on the group.
-    # If that fails, specializes only on the status.
-    # If that fails, grabs the most general file.
-    # Filenames must be of the format NAME-GROUP-STATUS.include
+    # Looks in three locations, in order:
+    # the folder the spec source is in, the group's boilerplate folder, and the generic boilerplate folder.
+    # In each location, it first looks for the file specialized on status, and then for the generic file.
+    # Filenames must be of the format NAME.include or NAME-STATUS.include
     if group is None and self.md.group is not None:
         group = self.md.group.lower()
     if status is None:
         status = self.md.status
 
-    pathprefix = config.scriptPath + "/include"
-    for filename in [
-        "{0}/{1}.include".format(os.path.dirname(os.path.abspath(self.inputSource)), name),
-        "{0}/{1}-{2}-{3}.include".format(pathprefix, name, group, status),
-        "{0}/{1}-{2}.include".format(pathprefix, name, group),
-        "{0}/{1}-{2}.include".format(pathprefix, name, status),
-        "{0}/{1}.include".format(pathprefix, name),
-    ]:
+    localFolder = os.path.dirname(os.path.abspath(self.inputSource))
+    includeFolder = os.path.join(config.scriptPath, "include")
+    statusFile = "{0}-{1}.include".format(name, status)
+    genericFile = "{0}.include".format(name)
+    filenames = []
+    filenames.append(os.path.join(localFolder, statusFile))
+    filenames.append(os.path.join(localFolder, genericFile))
+    if group:
+        filenames.append(os.path.join(includeFolder, group, statusFile))
+        filenames.append(os.path.join(includeFolder, group, genericFile))
+    filenames.append(os.path.join(includeFolder, statusFile))
+    filenames.append(os.path.join(includeFolder, genericFile))
+
+    for filename in filenames:
         if os.path.isfile(filename):
+            try:
+                with io.open(filename, 'r', encoding="utf-8") as fh:
+                    return fh.read()
+            except IOError:
+                if error:
+                    die("The include file for {0} disappeared underneath me.", name)
+                return ""
             break
     else:
         if error:
             die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
-        filename = "/dev/null"
-
-    try:
-        with io.open(filename, 'r', encoding="utf-8") as fh:
-            return fh.read()
-    except IOError:
-        if error:
-            die("The include file for {0} disappeared underneath me.", name)
+        return ""
 
 def printjson(x, indent=2, level=0):
     if isinstance(indent, int):
