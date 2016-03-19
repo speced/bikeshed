@@ -330,19 +330,6 @@ class ReferenceManager(object):
             # Success!
             return refs[0]
 
-        # If all the refs are for the same shortname,
-        # assume you want to link to the latest one (highest level).
-        if all(ref.shortname == refs[0].shortname for ref in refs):
-            maxLevel = config.HierarchicalNumber("-1")
-            for ref in refs:
-                if ref.level > maxLevel:
-                    maxLevel = ref.level
-            leveledRefs = [ref for ref in refs if ref.level == maxLevel]
-            # Still potentially possible for a non-Bikeshed spec to have duplicate refs here,
-            # so I have to check for singularity.
-            if len(leveledRefs) == 1:
-                return leveledRefs[0]
-
         # If we hit this point, there are >1 possible refs to choose from.
         # Default to linking to the first one.
         defaultRef = refs[0]
@@ -538,6 +525,16 @@ class ReferenceManager(object):
                 tempRefs.append(ref)
                 seenUrls.add(ref.url)
         refs = tempRefs
+
+        # If multiple levels of the same shortname exist,
+        # remove the smaller levels.
+        shortnameLevels = defaultdict(lambda:defaultdict(list))
+        for ref in refs:
+            shortnameLevels[ref.shortname][ref.level].append(ref)
+        refs = []
+        for levelSet in shortnameLevels.values():
+            maxLevel = max(levelSet.keys())
+            refs.extend(levelSet[maxLevel])
 
         return refs, None
 
