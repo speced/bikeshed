@@ -1668,11 +1668,9 @@ def addSyntaxHighlighting(doc):
 
     # Highlight all the appropriate elements
     for el in findAll("pre, code", doc):
-        if el.tag == "pre":
-            children = list(childElements(el))
-            if len(children):
-                # If there's any internal structure, don't override it with highlighting.
-                continue
+        if list(childElements(el)):
+            # If there's any internal structure, don't override it with highlighting.
+            continue
         attr, lang = closestAttr(el, "nohighlight", "highlight")
         if attr == "nohighlight" or attr is None:
             continue
