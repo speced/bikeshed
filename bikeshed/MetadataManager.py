@@ -40,7 +40,7 @@ class MetadataManager:
         self.TR = None
         self.title = None
         self.h1 = None
-        self.statusText = ""
+        self.statusText = []
         self.date = datetime.utcnow().date()
         self.deadline = None
         self.group = None
@@ -87,7 +87,6 @@ class MetadataManager:
             "Title": "title",
             "H1": "h1",
             "Status": "status",
-            "Status Text": "statusText",
             "ED": "ED",
             "URL": "ED", # URL is a synonym for ED
             "Shortname": "shortname",
@@ -137,7 +136,8 @@ class MetadataManager:
             "Text Macro": "customTextMacros",
             "Opaque Elements": "opaqueElements",
             "Translation": "translations",
-            "Translate Ids": "translateIDs"
+            "Translate Ids": "translateIDs",
+            "Status Text": "statusText"
         }
 
         self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
@@ -299,7 +299,7 @@ class MetadataManager:
             macros["spectitle"] = self.h1
         macros["shortname"] = self.shortname
         if self.statusText:
-            macros["statustext"] = self.statusText
+            macros["statustext"] = "\n".join(markdown.parse(self.statusText, self.indent))
         else:
             macros["statustext"] = ""
         macros["level"] = str(self.level)
