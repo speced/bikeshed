@@ -38,6 +38,8 @@ class ReferenceManager(object):
         self.biblios = defaultdict(list)
         # All the biblio keys
         self.biblioKeys = set()
+        # Dict of {base key name => preferred display name}
+        self.preferredBiblioNames = dict()
         # Dict of {spec vshortname => headings}
         self.headings = dict()
         self.status = specStatus
@@ -393,17 +395,18 @@ class ReferenceManager(object):
         # if candidates[0]['order'] > 3: # 3 is SpecRef level
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
         if candidate['biblioFormat'] == "string":
-            return biblio.StringBiblioEntry(**candidate)
+            bib = biblio.StringBiblioEntry(**candidate)
         elif candidate['biblioFormat'] == "alias":
-            # Follow the chain to the real candidate, but set the name to what you actually asked for.
-            linkText = candidate["linkText"]
-            ref = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True)
-            if ref is None:
-                return None
-            ref.linkText = linkText
-            return ref
+            # Follow the chain to the real candidate
+            bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True)
         else:
-            return biblio.BiblioEntry(preferredURL=status, **candidate)
+            bib = biblio.BiblioEntry(preferredURL=status, **candidate)
+
+        # If a canonical name has been established, use it.
+        if bib.linkText in self.preferredBiblioNames:
+            bib.originalLinkText, bib.linkText = bib.linkText, self.preferredBiblioNames[bib.linkText]
+
+        return bib
 
     def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, export=None, ignoreObsoletes=False, **kwargs):
         results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, export, ignoreObsoletes, exact=True)

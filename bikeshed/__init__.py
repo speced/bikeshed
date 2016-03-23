@@ -378,6 +378,7 @@ class Spec(object):
 
 
         # Handle all the links
+        processBiblioLinks(self)
         processDfns(self)
         processIDL(self)
         fillAttributeInfoSpans(self)
@@ -387,7 +388,6 @@ class Spec(object):
         boilerplate.addIndexSection(self)
         boilerplate.addExplicitIndexes(self)
         boilerplate.addStyles(self)
-        processBiblioLinks(self)
         boilerplate.addReferencesSection(self)
         boilerplate.addPropertyIndex(self)
         boilerplate.addIDLSection(self)
@@ -1080,6 +1080,24 @@ def processBiblioLinks(doc):
                 die("Couldn't find '{0}' in bibliography data. Did you mean:\n{1}", linkText, '\n'.join("  "+b for b in closeBiblios))
             el.tag = "span"
             continue
+
+        # Need to register that I have a preferred way to refer to this biblio,
+        # in case aliases show up - they all need to use my preferred key!
+        if hasattr(ref, "originalLinkText"):
+            # Okay, so this particular ref has been reffed before...
+            if linkText == ref.linkText:
+                # Whew, and with the same name I'm using now. Ship it.
+                pass
+            else:
+                # Oh no! I'm using two different names to refer to the same biblio!
+                die("The biblio refs [[{0}]] and [[{1}]] are both aliases of the same base reference [[{2}]]. Please choose one name and use it consistently.", linkText, ref.linkText, ref.originalLinkText)
+                # I can keep going, tho - no need to skip this ref
+        else:
+            # This is the first time I've reffed this particular biblio.
+            # Register this as the preferred name...
+            doc.refs.preferredBiblioNames[ref.linkText] = linkText
+            # Use it on the current ref. Future ones will use the preferred name automatically.
+            ref.linkText = linkText
 
         id = config.simplifyText(ref.linkText)
         el.set('href', '#biblio-'+id)
