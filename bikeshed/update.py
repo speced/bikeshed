@@ -14,14 +14,15 @@ from .messages import *
 
 from .apiclient.apiclient import apiclient
 
-
-def update(anchors=False, biblio=False, linkDefaults=False, testSuites=False):
+def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False):
     # If all are False, update everything
-    updateAnyway = not (anchors or biblio or linkDefaults or testSuites)
+    updateAnyway = not (anchors or biblio or caniuse or linkDefaults or testSuites)
     if anchors or updateAnyway:
         updateCrossRefs()
     if biblio or updateAnyway:
         updateBiblio()
+    if caniuse or updateAnyway:
+        updateCanIUse()
     if linkDefaults or updateAnyway:
         updateLinkDefaults()
     if testSuites or updateAnyway:
@@ -281,6 +282,26 @@ def updateBiblio():
                 fh.write(unicode(json.dumps(allNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception, e:
             die("Couldn't save biblio database to disk.\n{0}", e)
+            return
+    say("Success!")
+
+
+def updateCanIUse():
+    say("Downloading Can I Use data...")
+    try:
+        with closing(urllib2.urlopen("https://raw.githubusercontent.com/Fyrd/caniuse/master/fulldata-json/data-2.0.json")) as fh:
+            jsonString = fh.read()
+        # Check that the data is valid JSON
+        json.loads(jsonString)
+    except Exception, e:
+        die("Couldn't download the Can I Use data.\n{0}", e)
+        return
+    if not config.dryRun:
+        try:
+            with closing(io.open(config.scriptPath + "/spec-data/caniuse.json", 'wb')) as fh:
+                fh.write(jsonString)
+        except Exception, e:
+            die("Couldn't save Can I Use database to disk.\n{0}", e)
             return
     say("Success!")
 
