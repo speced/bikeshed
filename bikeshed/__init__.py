@@ -2,7 +2,7 @@
 
 from __future__ import division, unicode_literals
 import re
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import io
 import os
 import sys
@@ -96,6 +96,7 @@ def main():
     updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
+    updateParser.add_argument("--caniuse", action="store_true", help="Download Can I Use... data.")
     updateParser.add_argument("--link-defaults", dest="linkDefaults", action="store_true", help="Download link default data.")
     updateParser.add_argument("--test-suites", dest="testSuites", action="store_true", help="Download test suite data.")
 
@@ -185,7 +186,7 @@ def main():
 
     update.fixupDataFiles()
     if options.subparserName == "update":
-        update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
+        update.update(anchors=options.anchors, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
         doc = Spec(inputFilename=options.infile, debug=options.debug, token=options.ghToken, lineNumbers=options.lineNumbers)
         doc.md = metadata.fromCommandLine(extras, doc)
@@ -329,6 +330,7 @@ class Spec(object):
         self.biblios = {}
         self.typeExpansions = {}
         self.macros = defaultdict(lambda x: "???")
+        self.canIUse = json.loads(config.retrieveDataFile("caniuse.json", quiet=True, str=True), object_pairs_hook=OrderedDict)
         self.widl = parser.Parser(ui=IDLSilent())
         self.testSuites = json.loads(config.retrieveDataFile("test-suites.json", quiet=True, str=True))
         self.languages = json.loads(config.retrieveDataFile("languages.json", quiet=True, str=True))
@@ -568,6 +570,7 @@ class Spec(object):
         formatArgumentdefTables(self)
         formatElementdefTables(self)
         processAutolinks(self)
+        addCanIUsePanels(self)
         boilerplate.addIndexSection(self)
         boilerplate.addExplicitIndexes(self)
         boilerplate.addStyles(self)
@@ -1620,6 +1623,143 @@ def addDfnPanels(doc, dfns):
 
         .dfn-paneled { cursor: pointer; }
         '''
+
+def addCanIUsePanels(doc):
+    # Constructs "Can I Use panels" which show a compatibility data summary
+    # for a term's feature.
+    if not doc.md.includeCanIUsePanels:
+        return
+
+    features = doc.canIUse["data"]
+    lastUpdated = datetime.utcfromtimestamp(doc.canIUse["updated"]).date().isoformat()
+
+    # e.g. 'ios_saf' -> 'iOS Safari'
+    codeNameToFullName = OrderedDict( # sorted by full name
+        sorted(
+            [
+                (agentCodeName, agent["browser"])
+                for agentCodeName, agent
+                in doc.canIUse["agents"].iteritems()
+            ],
+            key=lambda p: p[1]
+        )
+    )
+    atLeastOnePanel = False
+    caniuseDfnElementsSelector = ",".join(
+        selector + "[caniuse]"
+        for selector in config.dfnElementsSelector.split(",")
+    )
+    for dfn in findAll(caniuseDfnElementsSelector, doc):
+        featId = dfn.get("caniuse")
+        if not featId:
+            continue
+        del dfn.attrib["caniuse"]
+
+        featId = featId.lower()
+        if featId not in features:
+            die("Unrecognized Can I Use feature ID: {0}", featId)
+        feature = features[featId]
+
+        addClass(dfn, "caniuse-paneled")
+        panel = canIUsePanelFor(codeNameToFullName, featId, feature['stats'], lastUpdated)
+        appendChild(dfn, panel)
+        atLeastOnePanel = True
+
+    if atLeastOnePanel:
+        doc.extraScripts['script-caniuse-panel'] = '''
+        document.body.addEventListener("click", function(e) {
+            if(e.target.classList.contains("caniuse-panel-btn")) {
+                e.target.parentNode.classList.toggle("wrapped");
+            }
+        });
+        '''
+        doc.extraStyles['style-caniuse-panel'] = ''
+
+
+def canIUsePanelFor(codeNameToFullName, featId, featStats, lastUpdated):
+    panel = E.div({"class": "status", "data-deco": ""})
+    appendChild(panel, E.input({"value": u"\u22F0", "type": "button", "class":"caniuse-panel-btn"}))
+    mainPara = E.p({"class": "support"})
+    strong = E.strong({}, "Support:")
+    appendChild(mainPara, strong)
+    for browserCodeName, browserFullName in codeNameToFullName.iteritems():
+        statusCode, minVersion = compatSummaryFor(featStats[browserCodeName])
+        if statusCode == "u":
+            continue
+        appendChild(
+            mainPara,
+            browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion))
+    appendChild(panel, mainPara)
+    attribution = E.p({"class": "caniuse"}, "Source: ")
+    anchor = E.a({"href": "http://caniuse.com/#feat=" + featId}, "caniuse.com")
+    anchor.tail = " as of " + lastUpdated
+    appendChild(attribution, anchor)
+    appendChild(panel, attribution)
+    return panel
+
+
+def compatSummaryFor(versionToStatus):
+    bestStatusYet = "u"
+    lowestGoodVersion = None
+    versionsDescending = versionToStatus.keys()
+    versionsDescending.reverse()  # In the original JSON, they're in ascending order.
+    for version in versionsDescending:
+        status = versionToStatus[version]
+        if "u" in status:
+            continue
+        # Simplify vendor-prefi(x)ed/(d)isabled-by-default/(p)olyfilled to u(n)supported
+        # And remove notes etc. by canonicalizing to single char.
+        if "x" in status or "d" in status or "n" in status or "p" in status:
+            status = "n"
+        elif "a" in status:
+            status = "a"
+        elif "y" in status:
+            status = "y"
+        # assert status in "nay"
+
+        if bestStatusYet == "u":
+            # 1st datapoint
+            bestStatusYet = status
+            lowestGoodVersion = version
+            continue
+
+        if "n" in status:  # It Got Worse (or is still unsupported)
+            break
+
+        if status == bestStatusYet:
+            # New winner
+            lowestGoodVersion = version
+        else:
+            # Either: Old version was buggy, new version is fixed.
+            # Or: New version introduced bug(s); you can be no better than your last release.
+            break
+
+    return bestStatusYet, lowestGoodVersion
+
+
+def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion=None):
+    if statusCode == "n" or minVersion is None:
+        minVersion = "None"
+    elif minVersion == "all":
+        minVersion = "All"
+    else:
+        # If the version is a range (e.g. "9.0-9.2"), just use the lower bound (e.g. "9.0").
+        minVersion = minVersion.partition('-')[0] + "+"
+    # browserCodeName: e.g. and_chr, ios_saf, ie, etc...
+    # browserFullName: e.g. "Chrome for Android"
+    statusClass = {"y": "yes", "n": "no", "a": "partial"}[statusCode]
+    outer = E.span({"class": "{} {}".format(browserCodeName, statusClass)})
+    nameSpan = E.span({}, browserFullName)
+    if statusCode == "a":
+        nameSpan.tail = " (limited)"
+        nameWrapper = E.span()
+        appendChild(nameWrapper, nameSpan)
+        appendChild(outer, nameWrapper)
+    else:
+        appendChild(outer, nameSpan)
+    versionSpan = E.span({}, minVersion)
+    appendChild(outer, versionSpan)
+    return outer
 
 
 class DebugMarker(object):
