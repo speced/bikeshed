@@ -30,16 +30,6 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
 	lineCountCorrection = 0
 	for i, rawline in enumerate(lines):
-		# Eagerly strip comments, because the serializer can't output them right now anyway,
-		# and they trigger some funky errors
-		strippedLine, inComment = stripComments(rawline, inComment)
-		if (rawline != strippedLine and strippedLine.strip() == "") or (rawline.strip() == "" and inComment):
-			# We want to entirely skip lines who are completely composed of comments (and maybe whitespace).
-			# That way we don't, say, break paragraphs when we comment out their middle.
-			continue
-		else:
-			# Otherwise, just process whatever's left as normal.
-			rawline = strippedLine
 
 		# Don't parse anything while you're inside certain elements
 		if re.search(r"<({0})[ >]".format(rawElements), rawline):
@@ -117,7 +107,25 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
 	return tokens
 
-def stripComments(line, inComment=False):
+def stripComments(lines):
+	output = []
+	inComment = False
+	for line in lines:
+		# Eagerly strip comments, because the serializer can't output them right now anyway,
+		# and they trigger some funky errors
+		strippedLine, inComment = stripCommentsFromLine(line, inComment)
+		if (line != strippedLine and strippedLine.strip() == "") or (line.strip() == "" and inComment):
+			# We want to entirely skip lines who are completely composed of comments (and maybe whitespace).
+			# That way we don't, say, break paragraphs when we comment out their middle.
+			continue
+		else:
+			# Otherwise, just process whatever's left as normal.
+			if line.endswith("\n") and not strippedLine.endswith("\n"):
+				strippedLine += "\n"
+			output.append(strippedLine)
+	return output
+
+def stripCommentsFromLine(line, inComment=False):
 	# Removes HTML comments from the line.
 	# Returns true if the comment wasn't closed by the end of the line
 	if inComment:
@@ -128,7 +136,7 @@ def stripComments(line, inComment=False):
 			return "", True
 		else:
 			# Drop the comment part, see if there are any more
-			return stripComments(post)
+			return stripCommentsFromLine(post)
 	else:
 		# The line starts out as non-comment content.
 		pre,sep,post = line.partition("<!--")
@@ -137,7 +145,7 @@ def stripComments(line, inComment=False):
 			return pre, False
 		else:
 			# Keep the non-comment part, see if there's any more to do
-			res,inComment = stripComments(post, inComment=True)
+			res,inComment = stripCommentsFromLine(post, inComment=True)
 			return pre+res, inComment
 
 

@@ -313,6 +313,7 @@ class Spec(object):
     def preprocess(self):
         # Textual hacks
         stripBOM(self)
+        self.lines = markdown.stripComments(self.lines)
 
         # Extract and process metadata
         self.lines = metadata.parse(md = self.md, lines=self.lines)
