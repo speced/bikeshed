@@ -23,12 +23,24 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
 	tokens = []
 	preDepth = 0
+	inComment = False
 	if opaqueElements is None:
 		opaqueElements = ["pre", "xmp", "script", "style"]
 	rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
 	lineCountCorrection = 0
 	for i, rawline in enumerate(lines):
+		# Eagerly strip comments, because the serializer can't output them right now anyway,
+		# and they trigger some funky errors
+		strippedLine, inComment = stripComments(rawline, inComment)
+		if (rawline != strippedLine and strippedLine.strip() == "") or (rawline.strip() == "" and inComment):
+			# We want to entirely skip lines who are completely composed of comments (and maybe whitespace).
+			# That way we don't, say, break paragraphs when we comment out their middle.
+			continue
+		else:
+			# Otherwise, just process whatever's left as normal.
+			rawline = strippedLine
+
 		# Don't parse anything while you're inside certain elements
 		if re.search(r"<({0})[ >]".format(rawElements), rawline):
 			preDepth += 1
@@ -104,6 +116,30 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
 	return tokens
+
+def stripComments(line, inComment=False):
+	# Removes HTML comments from the line.
+	# Returns true if the comment wasn't closed by the end of the line
+	if inComment:
+		# The line starts out in a comment.
+		pre,sep,post = line.partition("-->")
+		if sep == "":
+			# The entire line is a comment
+			return "", True
+		else:
+			# Drop the comment part, see if there are any more
+			return stripComments(post)
+	else:
+		# The line starts out as non-comment content.
+		pre,sep,post = line.partition("<!--")
+		if sep == "":
+			# No comments in the line
+			return pre, False
+		else:
+			# Keep the non-comment part, see if there's any more to do
+			res,inComment = stripComments(post, inComment=True)
+			return pre+res, inComment
+
 
 def prefixLen(text, numSpacesForIndentation):
 	i = 0
