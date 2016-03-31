@@ -393,9 +393,10 @@ def isElement(node):
 def isNormative(el):
     # Returns whether the element is "informative" or "normative" with a crude algo.
     # Currently just tests whether the element is in a class=example or class=note block, or not.
-    if hasClass(el, "note") or hasClass(el, "example"):
-        # Definitey informative.
+    if hasClass(el, "note") or hasClass(el, "example") or hasClass("non-normative"):
         return False
+    if hasClass(el, "normative"):
+        return True
     parent = parentElement(el)
     if not isElement(parent):
         # Went past the root without finding any indicator,
