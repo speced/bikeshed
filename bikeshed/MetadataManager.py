@@ -70,6 +70,7 @@ class MetadataManager:
         self.inlineGithubIssues = False
         self.repository = config.Nil()
         self.opaqueElements = ["pre", "xmp", "script", "style"]
+        self.blockElements = []
         self.issueClass = "issue"
         self.noteClass = "note"
         self.advisementClass = "advisement"
@@ -135,6 +136,7 @@ class MetadataManager:
             "Version History": "versionHistory",
             "Text Macro": "customTextMacros",
             "Opaque Elements": "opaqueElements",
+            "Block Elements": "blockElements",
             "Translation": "translations",
             "Translate Ids": "translateIDs",
             "Status Text": "statusText"
@@ -153,8 +155,8 @@ class MetadataManager:
             "Warning": convertWarning,
             "Editor": parseEditor,
             "Former Editor": parseEditor,
-            "Ignored Terms": parseIgnoredTerms,
-            "Ignored Vars": parseIgnoredTerms,
+            "Ignored Terms": parseCommaSeparated,
+            "Ignored Vars": parseCommaSeparated,
             "Link Defaults": parseLinkDefaults,
             "Boilerplate": parseBoilerplate,
             "Indent": parseInteger,
@@ -167,7 +169,8 @@ class MetadataManager:
             "Work Status": parseWorkStatus,
             "Inline Github Issues": parseBoolean,
             "Repository": parseRepository,
-            "Opaque Elements": parseOpaqueElements,
+            "Opaque Elements": parseCommaSeparated,
+            "Block Elements": parseCommaSeparated,
             "Translation": parseTranslation,
             "Translate Ids": parseTranslateIDs,
             "Use Dfn Panels": parseBoolean
@@ -465,7 +468,7 @@ def parseEditor(key, val):
     return data
 
 
-def parseIgnoredTerms(key, val):
+def parseCommaSeparated(key, val):
     return [term.strip().lower() for term in val.split(',')]
 
 def parseLinkDefaults(key, val):
@@ -582,9 +585,6 @@ def parseRepository(key, val):
     else:
         die("Repository must be a url, optionally followed by a shortname. Got '{0}'", val)
         return config.Nil()
-
-def parseOpaqueElements(key, val):
-    return [x.strip() for x in val.split(",")]
 
 def parseTranslateIDs(key, val):
     translations = {}

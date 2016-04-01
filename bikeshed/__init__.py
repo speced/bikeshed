@@ -327,7 +327,7 @@ class Spec(object):
 
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
-        self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements)
+        self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements, blockElements=self.md.blockElements)
 
         self.refs.setSpecData(self.md)
 
@@ -399,7 +399,7 @@ class Spec(object):
 
 
     def serialize(self):
-        rendered = HTMLSerializer.HTMLSerializer(self.document, self.md.opaqueElements).serialize()
+        rendered = HTMLSerializer.HTMLSerializer(self.document, self.md.opaqueElements, self.md.blockElements).serialize()
         rendered = finalHackyCleanup(rendered)
         return rendered
 

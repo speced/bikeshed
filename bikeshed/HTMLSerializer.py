@@ -10,9 +10,10 @@ class HTMLSerializer(object):
 	rawEls = frozenset(["xmp", "script", "style"])
 	voidEls = frozenset(["area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"])
 	omitEndTagEls = frozenset(["td", "th", "tr", "thead", "tbody", "tfoot", "colgroup", "col", "li", "dt", "dd", "html", "head", "body"])
-	def __init__(self, tree, opaqueElements):
+	def __init__(self, tree, opaqueElements, blockElements):
 		self.tree = tree
-		self.opaqueElements = opaqueElements
+		self.opaqueEls = frozenset(opaqueElements)
+		self.blockEls = frozenset(blockElements)
 
 	def serialize(self):
 		output = StringIO.StringIO()
@@ -33,7 +34,7 @@ class HTMLSerializer(object):
 		def groupIntoBlocks(nodes):
 			collect = []
 			for node in nodes:
-				if isElement(node) and node.tag not in self.inlineEls:
+				if isElement(node) and not isInlineElement(node.tag):
 					yield collect
 					collect = []
 					yield node
@@ -68,6 +69,14 @@ class HTMLSerializer(object):
 				write(">")
 		def isAnonBlock(block):
 			return not isElement(block)
+		def isVoidElement(tag):
+			return tag in self.voidEls
+		def isRawElement(tag):
+			return tag in self.rawEls
+		def isOpaqueElement(tag):
+			return tag in self.opaqueEls
+		def isInlineElement(tag):
+			return (tag in self.inlineEls) or ("-" in tag and tag not in self.blockEls)
 
 		if isElement(el):
 			tag = unfuckName(el.tag)
@@ -75,11 +84,11 @@ class HTMLSerializer(object):
 			# el is an array
 			tag = "[]"
 
-		if tag in self.voidEls:
+		if isVoidElement(tag):
 			write(" "*indent)
 			startTag()
 			return
-		if tag in self.rawEls:
+		if isRawElement(tag):
 			startTag()
 			for node in childNodes(el):
 				if isElement(node):
@@ -89,7 +98,7 @@ class HTMLSerializer(object):
 					write(node)
 			endTag()
 			return
-		if pre or tag in self.opaqueElements:
+		if pre or isOpaqueElement(tag):
 			startTag()
 			for node in childNodes(el):
 				if isElement(node):
@@ -98,7 +107,7 @@ class HTMLSerializer(object):
 					write(escapeHTML(node))
 			endTag()
 			return
-		if inline or tag in self.inlineEls:
+		if inline or isInlineElement(el):
 			startTag()
 			for node in childNodes(el):
 				if isElement(node):

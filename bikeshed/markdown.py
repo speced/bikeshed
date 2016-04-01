@@ -5,11 +5,11 @@ import json
 from itertools import *
 from .messages import *
 
-def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None):
-	tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements)
+def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
+	tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements, blockElements=blockElements)
 	return parseTokens(tokens, numSpacesForIndentation)
 
-def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=None):
+def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
 	# Turns lines of text into block tokens,
 	# which'll be turned into MD blocks later.
 	# Every token *must* have 'type', 'raw', and 'prefix' keys.
@@ -19,7 +19,21 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
 	# Inline elements that are allowed to start a "normal" line of text.
 	# Any other element will instead be an HTML line and will close paragraphs, etc.
-	allowedStartElements = "a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|bdi|bdo|span|br|wbr|img|meter|progress|css"
+	inlineElements = set(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "css"])
+	if blockElements is None:
+		blockElements = []
+	def inlineElementStart(line):
+		# Whether or not the line starts with an inline element
+		match = re.match(r"\s*</?([\w-]+)", line)
+		if not match:
+			return True
+		tagname = match.group(1)
+		if tagname in inlineElements:
+			return True
+		if "-" in tagname and tagname not in blockElements:
+			# Assume custom elements are inline by default
+			return True
+		return False
 
 	tokens = []
 	preDepth = 0
@@ -90,7 +104,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 			type = 'dt' if len(match.group(1)) == 1 else 'dd'
 			token = {'type':type, 'text': "", 'raw':rawline}
 		elif re.match(r"<", line):
-			if re.match(r"<<|<\{", line) or re.match(r"</?({0})[ >]".format(allowedStartElements), line):
+			if re.match(r"<<|<\{", line) or inlineElementStart(line):
 				token = {'type':'text', 'text': line, 'raw': rawline}
 			else:
 				token = {'type':'htmlblock', 'raw': rawline}
