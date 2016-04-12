@@ -10,7 +10,6 @@ from .messages import *
 force = True
 quiet = True
 dryRun = False
-minify = True
 printMode = "console"
 scriptPath = os.path.dirname(os.path.realpath(__file__))
 doc = None

@@ -5,11 +5,11 @@ import json
 from itertools import *
 from .messages import *
 
-def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None):
-	tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements)
+def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
+	tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements, blockElements=blockElements)
 	return parseTokens(tokens, numSpacesForIndentation)
 
-def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=None):
+def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
 	# Turns lines of text into block tokens,
 	# which'll be turned into MD blocks later.
 	# Every token *must* have 'type', 'raw', and 'prefix' keys.
@@ -19,16 +19,32 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
 	# Inline elements that are allowed to start a "normal" line of text.
 	# Any other element will instead be an HTML line and will close paragraphs, etc.
-	allowedStartElements = "a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|bdi|bdo|span|br|wbr|img|meter|progress|css"
+	inlineElements = set(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "css"])
+	if blockElements is None:
+		blockElements = []
+	def inlineElementStart(line):
+		# Whether or not the line starts with an inline element
+		match = re.match(r"\s*</?([\w-]+)", line)
+		if not match:
+			return True
+		tagname = match.group(1)
+		if tagname in inlineElements:
+			return True
+		if "-" in tagname and tagname not in blockElements:
+			# Assume custom elements are inline by default
+			return True
+		return False
 
 	tokens = []
 	preDepth = 0
+	inComment = False
 	if opaqueElements is None:
 		opaqueElements = ["pre", "xmp", "script", "style"]
 	rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
 	lineCountCorrection = 0
 	for i, rawline in enumerate(lines):
+
 		# Don't parse anything while you're inside certain elements
 		if re.search(r"<({0})[ >]".format(rawElements), rawline):
 			preDepth += 1
@@ -88,7 +104,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 			type = 'dt' if len(match.group(1)) == 1 else 'dd'
 			token = {'type':type, 'text': "", 'raw':rawline}
 		elif re.match(r"<", line):
-			if re.match(r"<<|<\{", line) or re.match(r"</?({0})[ >]".format(allowedStartElements), line):
+			if re.match(r"<<|<\{", line) or inlineElementStart(line):
 				token = {'type':'text', 'text': line, 'raw': rawline}
 			else:
 				token = {'type':'htmlblock', 'raw': rawline}
@@ -104,6 +120,48 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
 	return tokens
+
+def stripComments(lines):
+	output = []
+	inComment = False
+	for line in lines:
+		# Eagerly strip comments, because the serializer can't output them right now anyway,
+		# and they trigger some funky errors
+		strippedLine, inComment = stripCommentsFromLine(line, inComment)
+		if (line != strippedLine and strippedLine.strip() == "") or (line.strip() == "" and inComment):
+			# We want to entirely skip lines who are completely composed of comments (and maybe whitespace).
+			# That way we don't, say, break paragraphs when we comment out their middle.
+			continue
+		else:
+			# Otherwise, just process whatever's left as normal.
+			if line.endswith("\n") and not strippedLine.endswith("\n"):
+				strippedLine += "\n"
+			output.append(strippedLine)
+	return output
+
+def stripCommentsFromLine(line, inComment=False):
+	# Removes HTML comments from the line.
+	# Returns true if the comment wasn't closed by the end of the line
+	if inComment:
+		# The line starts out in a comment.
+		pre,sep,post = line.partition("-->")
+		if sep == "":
+			# The entire line is a comment
+			return "", True
+		else:
+			# Drop the comment part, see if there are any more
+			return stripCommentsFromLine(post)
+	else:
+		# The line starts out as non-comment content.
+		pre,sep,post = line.partition("<!--")
+		if sep == "":
+			# No comments in the line
+			return pre, False
+		else:
+			# Keep the non-comment part, see if there's any more to do
+			res,inComment = stripCommentsFromLine(post, inComment=True)
+			return pre+res, inComment
+
 
 def prefixLen(text, numSpacesForIndentation):
 	i = 0

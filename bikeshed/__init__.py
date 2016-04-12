@@ -64,12 +64,6 @@ def main():
     specParser.add_argument("--debug", dest="debug", action="store_true", help="Switches on some debugging tools. Don't use for production!")
     specParser.add_argument("--gh-token", dest="ghToken", nargs="?",
                            help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
-    minifyGroup = specParser.add_argument_group("Minification")
-    specParser.set_defaults(minify=True)
-    minifyGroup.add_argument("--minify", dest="minify", action="store_true",
-                             help="Turn on minification. [default]")
-    minifyGroup.add_argument("--no-minify", dest="minify", action="store_false",
-                            help="Turn off minification.")
 
     watchParser = subparsers.add_parser('watch', help="Process a spec source file into a valid output file, automatically rebuilding when it changes.")
     watchParser.add_argument("infile", nargs="?",
@@ -78,12 +72,6 @@ def main():
     watchParser.add_argument("outfile", nargs="?",
                             default=None,
                             help="Path to the output file.")
-    minifyGroup = watchParser.add_argument_group("Minification")
-    watchParser.set_defaults(minify=True)
-    watchParser.add_argument("--minify", dest="minify", action="store_true",
-                             help="Turn on minification. [default]")
-    watchParser.add_argument("--no-minify", dest="minify", action="store_false",
-                            help="Turn off minification.")
     watchParser.add_argument("--gh-token", dest="ghToken", nargs="?",
                            help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
 
@@ -172,7 +160,6 @@ def main():
         config.quiet = float("infinity")
     config.force = options.force
     config.dryRun = options.dryRun
-    config.minify = getattr(options, 'minify', True)
     config.printMode = options.printMode
 
     update.fixupDataFiles()
@@ -326,6 +313,7 @@ class Spec(object):
     def preprocess(self):
         # Textual hacks
         stripBOM(self)
+        self.lines = markdown.stripComments(self.lines)
 
         # Extract and process metadata
         self.lines = metadata.parse(md = self.md, lines=self.lines)
@@ -339,7 +327,7 @@ class Spec(object):
 
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
-        self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements)
+        self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements, blockElements=self.md.blockElements)
 
         self.refs.setSpecData(self.md)
 
@@ -411,7 +399,7 @@ class Spec(object):
 
 
     def serialize(self):
-        rendered = HTMLSerializer.HTMLSerializer(self.document, self.md.opaqueElements).serialize()
+        rendered = HTMLSerializer.HTMLSerializer(self.document, self.md.opaqueElements, self.md.blockElements).serialize()
         rendered = finalHackyCleanup(rendered)
         return rendered
 
@@ -1745,12 +1733,6 @@ def cleanupHTML(doc):
     # Correct over-application of the .css class
     for el in findAll("pre .css", doc):
         removeClass(el, 'css')
-
-    # Remove comments from the generated HTML
-    if config.minify:
-        comments = list(doc.document.iter(lxml.etree.Comment))
-        for comment in comments:
-            removeNode(comment)
 
     # Remove duplicate linking texts.
     for el in findAll(",".join(x+"[data-lt]" for x in config.anchorishElements), doc):
