@@ -66,9 +66,6 @@ dfnClassToType = {
     "callbackdef"        : "callback",
     "dictdef"            : "dictionary",
     "dict-memberdef"     : "dict-member",
-    "exceptdef"          : "exception",
-    "except-fielddef"    : "except-field",
-    "exception-codedef"  : "exception-code",
     "enumdef"            : "enum",
     "enum-valuedef"      : "enum-value",
     "constdef"           : "const",
@@ -90,12 +87,12 @@ dfnTypes = frozenset(dfnClassToType.values() + ["dfn"])
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
 cssTypes = frozenset(["property", "value", "at-rule", "descriptor", "type", "function", "selector"])
 markupTypes = frozenset(["element", "element-attr", "element-state", "attr-value"])
-idlTypes = frozenset(["event", "interface", "constructor", "method", "argument", "attribute", "callback", "dictionary", "dict-member", "exception", "except-field", "exception-code", "enum", "enum-value", "const", "typedef", "stringifier", "serializer", "iterator", "maplike", "setlike"])
-idlNameTypes = frozenset(["interface", "dictionary", "enum", "exception", "typedef", "callback"])
+idlTypes = frozenset(["event", "interface", "constructor", "method", "argument", "attribute", "callback", "dictionary", "dict-member", "enum", "enum-value", "const", "typedef", "stringifier", "serializer", "iterator", "maplike", "setlike"])
+idlNameTypes = frozenset(["interface", "dictionary", "enum", "typedef", "callback"])
 functionishTypes = frozenset(["function", "method", "constructor", "stringifier"])
 idlMethodTypes = frozenset(["method", "constructor", "stringifier", "idl", "idl-name"])
 linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "idl-name", "element-sub", "maybe", "biblio"])
-typesUsingFor = frozenset(["descriptor", "value", "element-attr", "attr-value", "element-state", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "except-field", "enum-value", "stringifier", "serializer", "iterator", "maplike", "setlike", "state", "mode", "context", "facet"])
+typesUsingFor = frozenset(["descriptor", "value", "element-attr", "attr-value", "element-state", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "enum-value", "stringifier", "serializer", "iterator", "maplike", "setlike", "state", "mode", "context", "facet"])
 lowercaseTypes = cssTypes | markupTypes | frozenset(["propdesc", "element-sub", "maybe", "dfn", "grammar", "http-header"])
 
 linkTypeToDfnType = {
