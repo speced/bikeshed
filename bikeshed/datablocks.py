@@ -303,7 +303,8 @@ def transformArgumentdef(lines, firstLine, **kwargs):
     rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
     lines = [
             '''
-            <table {0}>
+            <table {attrs}>
+                <caption>Arguments for the <a method lt='{method}' for='{interface}'>{interface}.{method}</a> method.</caption>
                 <thead>
                     <tr>
                         <th>Parameter
@@ -311,7 +312,7 @@ def transformArgumentdef(lines, firstLine, **kwargs):
                         <th>Nullable
                         <th>Optional
                         <th>Description
-                <tbody>'''.format(rootAttrs)
+                <tbody>'''.format(attrs=rootAttrs, interface=interface, method=method)
         ] + [
             '''
                 <tr>
@@ -323,8 +324,8 @@ def transformArgumentdef(lines, firstLine, **kwargs):
                     for param,desc in attrs.items()
         ] + [
             '''
-                <caption>Arguments for the <a method lt='{method}' for='{interface}'>{interface}.{method}</a> method.</caption>
-            </table>'''.format(interface=interface, method=method)
+            </table>
+            '''
         ]
     return lines
 
