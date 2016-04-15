@@ -61,9 +61,6 @@ There are additional types for WebIDL definitions:
 * callback
 * dictionary
 * dict-member
-* exception
-* except-field
-* exception-code
 * enum
 * enum-value
 * const
@@ -71,6 +68,8 @@ There are additional types for WebIDL definitions:
 * stringifier
 * serializer
 * iterator
+* maplike
+* setlike
 
 And for HTML/SVG/etc element definitions:
 
@@ -79,6 +78,14 @@ And for HTML/SVG/etc element definitions:
 * element-attr
 * attr-value
 
+A special type for URL schemes, like "http" or "blob":
+
+* scheme
+
+A special type for HTTP headers:
+
+* http-header
+
 A special type just for definitions of operators used in grammar definitions,
 like `||` and similar:
 
@@ -86,7 +93,7 @@ like `||` and similar:
 
 And finally, some categories for "English" terms:
 
-* abstract-op
+* abstract-op (for "English-language algorithms")
 * dfn (for general terms and phrases, and a catch-all for anything else)
 
 The processor will attempt to infer your definition type from the context and text content of the definition:
