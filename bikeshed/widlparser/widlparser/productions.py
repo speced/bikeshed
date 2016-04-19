@@ -956,10 +956,7 @@ class ArgumentName(Production):   # identifier | ArgumentNameKeyword
         return self.name
 
     def _markup(self, generator):
-        if (self.name in self.ArgumentNameKeywords):
-            generator.addKeyword(self.name)
-        else:
-            generator.addName(self.name)
+        generator.addName(self.name)
         return self
 
     def __repr__(self):
@@ -1118,12 +1115,7 @@ class AttributeRest(Production):   # ["readonly"] "attribute" Type ("required" |
         self.readonly = Symbol(tokens, 'readonly') if (Symbol.peek(tokens, 'readonly')) else None
         self._attribute = Symbol(tokens, 'attribute')
         self.type = Type(tokens)
-        if (Symbol.peek(tokens, 'required')):
-            self.required = Symbol(tokens, 'required')
-            self.name = None
-        else:
-            self.name = tokens.next().text
-            self.required = None
+        self.name = tokens.next().text
         self._ignore = Ignore(tokens) if (Ignore.peek(tokens)) else None
         self._consumeSemicolon(tokens)
         self._didParse(tokens)
@@ -1131,7 +1123,7 @@ class AttributeRest(Production):   # ["readonly"] "attribute" Type ("required" |
     def _unicode(self):
         output = unicode(self.readonly) if (self.readonly) else ''
         output += unicode(self._attribute) + unicode(self.type)
-        output += unicode(self.required) if (self.required) else self.name
+        output += self.name
         return output + (unicode(self._ignore) if (self._ignore) else '')
 
     def _markup(self, generator):
@@ -1139,10 +1131,7 @@ class AttributeRest(Production):   # ["readonly"] "attribute" Type ("required" |
             self.readonly.markup(generator)
         self._attribute.markup(generator)
         generator.addType(self.type)
-        if (self.required):
-            self.required.markup(generator)
-        else:
-            generator.addName(self.name)
+        generator.addName(self.name)
         if (self._ignore):
             self._ignore.markup(generator)
         return self
@@ -1151,7 +1140,7 @@ class AttributeRest(Production):   # ["readonly"] "attribute" Type ("required" |
         output = '[AttributeRest: '
         output += '[readonly] ' if (self.readonly) else ''
         output += repr(self.type)
-        output += ' [required]' if (self.required) else ' [name: ' + self.name + ']'
+        output += ' [name: ' + self.name + ']'
         return output + ']'
 
 
