@@ -46,7 +46,7 @@ There are several types for CSS values:
 * property
 * descriptor (the things inside at-rules like @font-face)
 * value (any value that goes inside of a property, at-rule, etc.)
-* type (an abstract type, like `<length>` or `<image>`)
+* type (an abstract type for CSS grammars, like `<length>` or `<image>`)
 * at-rule
 * function (like counter() or linear-gradient())
 * selector
@@ -63,6 +63,7 @@ There are additional types for WebIDL definitions:
 * dict-member
 * enum
 * enum-value
+* exception (for new DOMException names)
 * const
 * typedef
 * stringifier
