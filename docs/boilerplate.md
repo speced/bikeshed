@@ -20,7 +20,7 @@ However, to obtain correct boilerplate for a given standards body,
 Several groups are already accommodated with appropriate inclusion files:
 
 * "csswg", as mentioned.
-* "dap", for the Device APIs Working Group
+* "dap", for the Device and Sensors Working Group
 * "fxtf", for the FX Task Force
 * "houdini", for the Houdini Task Force
 * "svg", for the SVG Working Group
