@@ -535,7 +535,7 @@ def addSpecMetadataSection(doc):
     if mac.get('version'):
         md["This version"].append(E.a({"href":mac['version'], "class":"u-url"}, mac['version']))
     if doc.md.TR:
-        md["Latest version"].append(E.a({"href": doc.md.TR}, doc.md.TR))
+        md["Latest published version"].append(E.a({"href": doc.md.TR}, doc.md.TR))
     if doc.md.ED and doc.md.status in config.TRStatuses:
         md["Editor's Draft"].append(E.a({"href": doc.md.ED}, doc.md.ED))
     if len(doc.md.previousVersions):
