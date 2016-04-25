@@ -359,9 +359,8 @@ def parseDefBlock(lines, type, capitalizeKeys=True):
 def transformRailroad(lines, doc, **kwargs):
     import StringIO
     import railroadparser
-    ret = [
-        "<div class='railroad'>",
-        "<style>svg.railroad-diagram{background-color:hsl(30,20%,95%);}svg.railroad-diagram path{stroke-width:3;stroke:black;fill:rgba(0,0,0,0);}svg.railroad-diagram text{font:bold 14px monospace;text-anchor:middle;}svg.railroad-diagram text.label{text-anchor:start;}svg.railroad-diagram text.comment{font:italic 12px monospace;}svg.railroad-diagram rect{stroke-width:3;stroke:black;fill:hsl(120,100%,90%);}</style>"]
+    ret = ["<div class='railroad'>"]
+    doc.extraStyles['style-railroad'] = "svg.railroad-diagram{background-color:hsl(30,20%,95%);}svg.railroad-diagram path{stroke-width:3;stroke:black;fill:rgba(0,0,0,0);}svg.railroad-diagram text{font:bold 14px monospace;text-anchor:middle;}svg.railroad-diagram text.label{text-anchor:start;}svg.railroad-diagram text.comment{font:italic 12px monospace;}svg.railroad-diagram rect{stroke-width:3;stroke:black;fill:hsl(120,100%,90%);}"
     code = ''.join(lines)
     diagram = railroadparser.parse(code)
     temp = StringIO.StringIO()

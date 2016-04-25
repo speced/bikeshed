@@ -114,6 +114,26 @@ def addAnnotations(doc):
         html = doc.fixText(html)
         appendContents(find("head", doc), parseHTML(html))
 
+def addBikeshedBoilerplate(doc):
+    for k,v in doc.extraStyles.items():
+        if k in doc.md.doc.md.boilerplate['omitSections']:
+            continue
+        container = getFillContainer(k, doc)
+        if container is None:
+            container = getFillContainer("bs-styles", doc, default=True)
+        if container is not None:
+            appendChild(container,
+                E.style("/* {0} */\n".format(k) + v))
+    for k,v in doc.extraScripts.items():
+        if k in doc.md.doc.md.boilerplate['omitSections']:
+            continue
+        container = getFillContainer(k, doc)
+        if container is None:
+            container = getFillContainer("bs-scripts", doc, default=True)
+        if container is not None:
+            appendChild(container,
+                E.script("/* {0} */\n".format(k) + v))
+
 def addIndexSection(doc):
     if len(findAll(config.dfnElementsSelector, doc)) == 0 and len(doc.externalRefsUsed.keys()) == 0:
         return
