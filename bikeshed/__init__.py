@@ -1628,7 +1628,9 @@ class IDLMarker(object):
         return ('<{name} data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters, name=elementName, refType=refType), '</{0}>'.format(elementName))
 
     def markupEnumValue(self, text, construct):
-        return ("<idl data-idl-type=enum-value data-idl-for='{0}' data-lt='{1}'>".format(construct.name, escapeAttr(text)), "</idl>")
+        texts = [text, text.strip("\"")]
+        lt = "|".join(escapeAttr(t) for t in texts)
+        return ("<idl data-idl-type=enum-value data-idl-for='{0}' data-lt='{1}'>".format(escapeAttr(construct.name), lt), "</idl>")
 
     def encode(self, text):
         return escapeHTML(text)
