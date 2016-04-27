@@ -1425,6 +1425,10 @@ def addDfnPanels(doc, dfns):
             var el = e.target;
             var target;
             while(el.parentElement) {
+                if(el.tagName == "A") {
+                    // Clicked on a link; intercept this early in case it was nested in a <dfn>
+                    return true;
+                }
                 if(el.tagName == "DFN") {
                     target = "dfn";
                     break;
