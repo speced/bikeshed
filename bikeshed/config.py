@@ -406,9 +406,30 @@ def linkTextsFromElement(el, preserveCasing=False):
         elif el.tag in ("h2", "h3", "h4", "h5", "h6"):
             texts = [textContent(find(".content", el)).strip()]
     if el.get('data-local-lt'):
-        texts += [x.strip() for x in el.get('data-local-lt').split('|')]
+        localTexts = [x.strip() for x in el.get('data-local-lt').split('|')]
+        for text in localTexts:
+            if text in texts:
+                # lt and local-lt both specify the same thing
+                raise DuplicatedLinkText(text, texts+localTexts, el)
+        texts += localTexts
+
     texts = [x for x in texts if x != '']
     return texts
+
+class DuplicatedLinkText(Exception):
+    def __init__(self, offendingText, allTexts, el):
+        self.offendingText = offendingText
+        self.allTexts = allTexts
+        self.el = el
+    def __unicode__(self):
+        return "<Text '{0}' shows up in both lt and local-lt>".format(self.offendingText)
+
+def firstLinkTextFromElement(el):
+    try:
+        texts = linkTextsFromElement(el)
+    except DuplicatedLinkText as e:
+        texts = e.allTexts
+    return texts[0] if len(texts) else None
 
 
 def splitForValues(forValues):

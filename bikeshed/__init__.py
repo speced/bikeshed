@@ -901,7 +901,9 @@ def fillAttributeInfoSpans(doc):
             attrName = "data-dict-member-info"
         else:
             continue
-        spanFor = config.linkTextsFromElement(dfn)[0]
+        spanFor = config.firstLinkTextFromElement(dfn)
+        if spanFor is None:
+            continue
         # Internal slots (denoted by [[foo]] naming scheme) don't have attribute info
         if spanFor.startswith("[["):
             continue
@@ -1017,11 +1019,9 @@ def classifyDfns(doc, dfns):
         if dfnType not in config.dfnTypes:
             die("Unknown dfn type '{0}' on:\n{1}", dfnType, outerHTML(el))
             continue
-        dfnTexts = config.linkTextsFromElement(el)
         dfnFor = treeAttr(el, "data-dfn-for")
-        if len(dfnTexts):
-            primaryDfnText = dfnTexts[0]
-        else:
+        primaryDfnText = config.firstLinkTextFromElement(el)
+        if primaryDfnText is None:
             die("Dfn has no linking text:\n{0}", outerHTML(el))
             continue
         # Push the dfn type down to the <dfn> itself.

@@ -128,7 +128,12 @@ class ReferenceManager(object):
         for el in dfns:
             if hasClass(el, "no-ref"):
                 continue
-            for linkText in config.linkTextsFromElement(el):
+            try:
+                linkTexts = config.linkTextsFromElement(el)
+            except config.DuplicatedLinkText as e:
+                die("The term '{0}' is in both lt and local-lt of the element {1}.", e.offendingText, outerHTML(e.el))
+                linkTexts = e.allTexts
+            for linkText in linkTexts:
                 linkText = unfixTypography(linkText)
                 linkText = re.sub("\s+", " ", linkText)
                 linkType = treeAttr(el, 'data-dfn-type')
