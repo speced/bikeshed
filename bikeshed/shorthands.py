@@ -148,7 +148,7 @@ def transformAutolinkShortcuts(doc):
             return E.span(match.group(0))
         return E.a({"data-link-type":linkType, "class":"property", "for": match.group(1)}, match.group(2))
 
-    idlRe = re.compile(r"{{(?:([^ }]*)/)?((?:[^ }]|,\s)+?)(?:!!([\w-]+))?(\|[^}]+)?}}")
+    idlRe = re.compile(r"{{(?:([^}]*)/)?((?:[^}]|,\s)+?)(?:!!([\w-]+))?(\|[^}]+)?}}")
     def idlReplacer(match):
         if match.group(3) is None:
             linkType = "idl"
