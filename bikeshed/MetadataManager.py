@@ -2,6 +2,7 @@
 from __future__ import division, unicode_literals
 import re
 import os
+import collections
 from DefaultOrderedDict import DefaultOrderedDict
 from subprocess import check_output
 from collections import defaultdict
@@ -100,7 +101,6 @@ class MetadataManager:
             "Test Suite": "testSuite",
             "Mailing List": "mailingList",
             "Mailing List Archives": "mailingListArchives",
-            "Boilerplate": "boilerplate",
             "Logo": "logo",
             "Indent": "indent",
             "Use <I> Autolinks": "useIAutolinks",
@@ -125,6 +125,7 @@ class MetadataManager:
         self.multiValueKeys = {
             "Editor": "editors",
             "Former Editor": "previousEditors",
+            "Boilerplate": "boilerplate",
             "Abstract": "abstract",
             "Previous Version": "previousVersions",
             "At Risk": "atRisk",
@@ -671,19 +672,33 @@ def smooshValues(container, val):
     which is merged in dict-wise same as lists.
     (container should be a defaultdict(list) in this case).
     '''
-    if isinstance(container, list):
-        if val is None:
-            return
-        if isinstance(val, list):
-            container.extend(val)
-        else:
-            container.append(val)
+    if val is None:
+        return
+    if isinstance(container, list) or isinstance(container, set):
+        addTo(container, val)
     elif isinstance(container, dict):
         for k,v in val.items():
-            if isinstance(v, list):
-                container[k].extend(v)
-            else:
-                container[k].append(v)
+            if v is None:
+                continue
+            addTo(container[k], v)
+
+def addTo(container, val):
+    '''Generalized method for adding something to a container,
+    since every damn container type does something different.'''
+    def singleValue(v):
+        return not (isinstance(v, list) or isinstance(v, set))
+    if isinstance(container, list):
+        if singleValue(val):
+            container.append(val)
+        else:
+            container.extend(val)
+    elif isinstance(container, set):
+        if singleValue(val):
+            container.add(val)
+        else:
+            container.update(val)
+    else:
+        raise
 
 def getSpecRepository(doc):
     '''
