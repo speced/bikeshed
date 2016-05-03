@@ -1601,7 +1601,7 @@ class IDLMarker(object):
                 readonly = 'data-readonly'
             else:
                 readonly = ''
-            extraParameters = '{0} data-type="{1}"'.format(readonly, rest.type)
+            extraParameters = '{0} data-type="{1}"'.format(readonly, unicode(rest.type).strip())
         elif idlType == "dict-member":
             extraParameters = 'data-type="{0}"'.format(construct.type)
             if construct.default is not None:
