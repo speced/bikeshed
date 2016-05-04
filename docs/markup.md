@@ -14,6 +14,7 @@ Bikeshed currently recognizes a subset of Markdown:
 * paragraphs
 * lists
 * headings
+* horizontal rules
 
 It also recognizes **definition lists**, with the following format:
 
@@ -67,6 +68,8 @@ There are several shortcuts for writing autolinks of particular types, so you do
 * `<<foo()>>` is an autolink to the function named "foo" (same)
 * `<<@foo>>` is an autolink to the at-rule named "@foo" (same)
 * `{{Foo}}` is an autolink to an IDL term named "Foo". (Accepts interfaces, attributes, methods, etc)
+* `<{Foo}>` is an autolink to an element named "Foo".
+* `|foo|` is a variable reference (`<var>`). (Vars created this way will shortly be checked for typos, so look out for new warnings/errors soon.)
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 * `[[#foo]]` is an autolink to the heading in the same document with that ID. This generates appropriate reference text in its place, like "§5.3 Baseline Self-Alignment"
@@ -88,6 +91,28 @@ which is equivalent to `<a argument><code>family</code></a>`
 
 Remember that if you need to write out the `<a>` tag explicitly,
 you can add the type as a boolean attribute.
+
+
+`<var>` and Algorithms
+----------------------
+
+The `<var>` element (or its shorthand equivalent, `|foo|`) is often used to mark up "arguments" to a prose algorithm.
+Bikeshed explicitly recognizes this,
+and has several features related to this.
+
+**Algorithms** can be explicitly indicated in your markup
+by putting the `algorithm="to foo a bar"` attribute on a container element
+or a heading.
+All vars within an algorithm are "scoped" to that algorithm.
+
+Generally, vars are used at least twice in an algorithm:
+once to define them,
+and at least once to actually use them for something.
+If you use a var only once,
+there's a good chance it's actually a typo.
+Bikeshed will emit a warning if it finds any vars used only once in an algorithm.
+If this singular usage is correct,
+you can instruct Bikeshed to ignore the error by listing it in the `Ignored Vars` metadata.
 
 
 `<pre>` whitespace stripping
@@ -117,7 +142,7 @@ In other words, you can now write:
 		&lt;ul>
 			&lt;li>one
 			&lt;li>two
-		&lt;</ul>
+		&lt;/ul>
 	</pre>
 </div>
 ~~~~
@@ -133,9 +158,24 @@ The preprocessor will automatically convert it into:
 &lt;ul>
 	&lt;li>one
 	&lt;li>two
-&lt;</ul></pre>
+&lt;/ul></pre>
 </div>
 ~~~~
+
+
+Syntax Highlighting
+-------------------
+
+You can also syntax-highlight code blocks.
+Just add either a `highlight="foo"` attribute
+or a `lang-foo` class to the element,
+and the element will automatically be syntax-highlighted according to the "foo" language rules.
+
+The syntax highlighter uses Pygments, which supports a large set of languages.
+See <http://pygments.org/docs/lexers/> for the full list.
+(Use one of the "short names" of the language for the "foo" value.)
+
+Note: If you use "html", `<script>` and `<style>` elements are automatically highlighted with JS and CSS rules.
 
 
 Property/descriptor/element definition table expansion
@@ -147,13 +187,15 @@ and let the processor automatically generate a `<table>` from it:
 
 ~~~~html
 	<pre class='propdef'>
-	Name: var-*
-	Values: [ <value> | <CDO> | <CDC> ]
-	Initial: (nothing, see prose)
-	Applies To: all elements
-	Inherited: yes
-	Computed Value: specified value with variables substituted (but see prose for "invalid variables")
-	Media: all
+	Name: flex-basis
+	Value: content | <<'width'>>
+	Initial: auto
+	Applies to: <a>flex items</a>
+	Inherited: no
+	Computed value: as specified, with lengths made absolute
+	Percentages: relative to the <a>flex container's</a> inner <a>main size</a>
+	Media: visual
+	Animatable: as 'width'
 	</pre>
 ~~~~
 
@@ -201,6 +243,12 @@ This often isn't the best for complex heading texts,
 so it's not recommended to rely on this.
 (Bikeshed will warn you that it's generating IDs, and suggest you supply one manually.)
 
+If a heading changed significantly,
+so that you want to change the ID,
+but you want links to the old heading ID to still work,
+put the old ID in an `oldids=''` attribute on the heading element.
+If there are multiple, comma-separate them.
+
 Issues (elements with `class='issue'`) will generate IDs of the form "issue-###",
 where "###" is substring of a hash of the issue's contents.
 This means that an issue's ID will be stable against changes elsewhere in the document,
@@ -240,3 +288,68 @@ to get a link straight to what they care about.
 
 Self-links are currently auto-generated for headings, definitions, and issues,
 and notes, examples, `<li>`s, and `<dt>`s that have been given IDs.
+
+Remote Issues
+-------------
+
+As defined earlier, you can start a paragraph with `Issue: ` to cause Bikeshed to automatically format it as an inline issue paragraph.
+You can also refer to remote issues, which are tracked in some other issue tracker.
+To do so, instead start your paragraph with `Issue(###): `,
+where the `###` is some identifying value for the issue.
+
+If the identifying value is of the form `user/repo#number`,
+Bikeshed assumes you are referring to GitHub repository,
+and points the issue at the corresponding issue.
+
+If you have **Repository** set up to point to a GitHub repository
+(or it was auto-detected as such,
+because you're working on the spec from within one),
+then a numeric identifying value is assumed to be an issue number for your repository.
+
+Otherwise, you need to tell Bikeshed how to convert the identifying value into a remote issue link.
+Specify a format string in the **Issue Tracker Template** metadata,
+with a `{0}` in the place where the identifying value should go.
+Bikeshed will then point the issue at the generated url.
+
+
+Including Other Files
+---------------------
+
+Sometimes a spec is too large to easily work with in one file.
+Sometimes there's lots of repetitive markup that only changes in a few standard ways.
+For whatever reason,
+Bikeshed has the ability to include additional files directly into your spec
+with a `<pre class=include>` block:
+
+```
+<pre class=include>
+path: relative/to/spec
+</pre>
+```
+
+The included document is parsed just like if it were written in locally,
+except that metadata blocks aren't processed.
+(For various reasons, they have to be parsed before *any* other processing occurs).
+This means that the include file can use markdown,
+data blocks of various kinds (`<pre class=anchors>`, `<pre class=railroad-diagram>`, etc),
+and both provide definitions for the outer document
+and refer to ones defined by the outer document.
+
+If you're including a block of repetitive markup multiple times,
+and want to vary how it's displayed,
+you can pass additional "local" text macros in the block,
+which are valid only inside the included file:
+
+```
+<pre class=include>
+path: template.md
+macros:
+	foo: bar
+	baz: qux qux qux
+</pre>
+```
+
+With the above code, you can use `[FOO]` and `[BAZ]` macros inside the include file,
+and they'll be substituted with "bar" and "qux qux qux", respectively.
+(Remember that you can mark text macros as optional by appending a `?`, like `[FOO?]`,
+in which case they'll be replaced with the empty string if Bikeshed can't find a definition.)

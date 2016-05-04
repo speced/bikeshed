@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import re
+import copy
 from collections import defaultdict, deque
 from .messages import *
 from .htmlhelpers import *
@@ -119,8 +120,10 @@ class SpecBasedBiblioEntry(BiblioEntry):
         self._valid = True
         if preferredURL == "dated" and spec.get("TR", None) is not None:
             self.url = spec['TR']
-        elif 'ED' in spec:
+        elif spec.get('ED', None) is not None:
             self.url = spec['ED']
+        elif spec.get('TR', None) is not None:
+            self.url = spec['TR']
         else:
             self._valid = False
 
@@ -134,6 +137,25 @@ class SpecBasedBiblioEntry(BiblioEntry):
             E.a({"href":self.url}, self.url)
         ]
 
+class StringBiblioEntry(BiblioEntry):
+    '''
+    Generates a barebones biblio entry from a preformatted biblio string.
+    This only exists because SpecRef still has a few of them;
+    don't use it on purpose for real things in the future.
+    '''
+
+    def __init__(self, data, linkText, **kwargs):
+        self.data = data
+        self.linkText = linkText
+
+    def valid(self):
+        return True
+
+    def toHTML(self):
+        return parseHTML(self.data)
+
+    def __str__(self):
+        return self.data
 
 def processReferBiblioFile(lines, storage, order):
     singularReferCodes = {
@@ -152,21 +174,23 @@ def processReferBiblioFile(lines, storage, order):
 
     biblio = None
     for i,line in enumerate(lines):
-        if re.match("\s*$", line):
+        line = line.strip()
+        if line == "":
             # Empty line
             if biblio is not None:
                 storage[biblio['linkText'].lower()].append(biblio)
                 biblio = None
             continue
-        elif re.match("\s*%?#", line):
+        elif line.startswith("#") or line.startswith("%#"):
             # Comment
             continue
         else:
             if biblio is None:
                 biblio = defaultdict(list)
                 biblio['order'] = order
+                biblio['biblioFormat'] = "dict"
 
-        match = re.match("\s*%(\w)\s+(.*)", line)
+        match = re.match(r"%(\w)\s+(.*)", line)
         if match:
             letter, value = match.groups()
         else:
@@ -186,6 +210,38 @@ def processReferBiblioFile(lines, storage, order):
     return storage
 
 def processSpecrefBiblioFile(text, storage, order):
+    '''
+    A SpecRef file is a JSON object, where keys are ids
+    and values are either <alia>, <legacyRef>, or <ref>.
+
+    <alias>: {
+        *aliasOf: <id>,
+        *id: <id>
+    }
+
+    <legacyRef>: <string>
+
+    <ref>: {
+        id: <id>,
+        authors: [<string>],
+        etAl: <bool>,
+        href: <url>,
+        *title: <string>,
+        date: <date>,
+        deliveredBy: [<wg>],
+        status: <string>,
+        publisher: <string>,
+        obsoletes: [<id>],
+        obsoletedBy: [<id>],
+        versionOf: <id>,
+        versions: [<id>],
+        edDraft: <url>
+    }
+
+    <date>: /^([1-3]?\d\s)?((?:January|February|March|April|May|June|July|August|September|October|November|December)\s)?\d+$/
+
+    <wg>: {*url:<url>, *shortname:<string>}
+    '''
     import json
     try:
         datas = json.loads(text)
@@ -206,20 +262,80 @@ def processSpecrefBiblioFile(text, storage, order):
     # Required BiblioEntry fields
     requiredFields = ["url", "title"]
 
+    aliases = {}
     for biblioKey, data in datas.items():
-        if isinstance(data, basestring):
-            # Need to handle the preformatted string entries eventually
-            continue
         biblio = {"linkText": biblioKey, "order": order}
-        for jsonField, biblioField in fields.items():
-            if jsonField in data:
-                biblio[biblioField] = data[jsonField]
-        if "title" not in biblio:
-            # Aliases should hit this case, I'll deal with them later
-            continue
+        if isinstance(data, basestring):
+            # Handle <legacyRef>
+            biblio['biblioFormat'] = "string"
+            biblio['data'] = data.replace("\n", " ")
+        elif "aliasOf" in data:
+            # Handle <alias>
+            if biblioKey.lower() == data["aliasOf"].lower():
+                # SpecRef uses aliases to handle capitalization differences,
+                # which I don't care about.
+                continue
+            biblio["biblioFormat"] = "alias"
+            biblio["aliasOf"] = data["aliasOf"].lower()
+        else:
+            # Handle <ref>
+            biblio['biblioFormat'] = "dict"
+            for jsonField, biblioField in fields.items():
+                if jsonField in data:
+                    biblio[biblioField] = data[jsonField]
+                if "versionOf" in data:
+                    # "versionOf" entries are all dated urls,
+                    # so you want the href *all* the time.
+                    biblio["current_url"] = data["href"]
         storage[biblioKey.lower()].append(biblio)
     return storage
 
+def loadBiblioDataFile(lines, storage):
+    try:
+        while True:
+            fullKey = lines.next()
+            prefix, key = fullKey[0], fullKey[2:].strip()
+            if prefix == "d":
+                b = {
+                    "linkText": lines.next(),
+                    "date": lines.next(),
+                    "status": lines.next(),
+                    "title": lines.next(),
+                    "dated_url": lines.next(),
+                    "current_url": lines.next(),
+                    "other": lines.next(),
+                    "etAl": lines.next() != "\n",
+                    "order": 3,
+                    "biblioFormat": "dict",
+                    "authors": []
+                }
+                while True:
+                    line = lines.next()
+                    if line == b"-\n":
+                        break
+                    b['authors'].append(line)
+            elif prefix == "s":
+                b = {
+                    "linkText": lines.next(),
+                    "data": lines.next(),
+                    "biblioFormat": "string",
+                    "order": 3
+                }
+                line = lines.next() # Eat the -
+            elif prefix == "a":
+                b = {
+                    "linkText": lines.next(),
+                    "aliasOf": lines.next(),
+                    "biblioFormat": "alias",
+                    "order": 3
+                }
+                line = lines.next() # Eat the -
+            else:
+                die("Unknown biblio prefix '{0}' on key '{1}'", prefix, fullKey)
+                continue
+            storage[key].append(b)
+    except StopIteration:
+        pass
 
 
 def levenshtein(a,b):
@@ -242,7 +358,7 @@ def levenshtein(a,b):
 
     return current[n]
 
-def findCloseBiblios(biblios, target, n=5):
+def findCloseBiblios(biblioKeys, target, n=5):
     '''
     Finds biblio entries close to the target.
     Returns all biblios with target as the substring,
@@ -265,7 +381,7 @@ def findCloseBiblios(biblios, target, n=5):
                     names.pop()
                     break
         return names
-    for name in biblios.keys():
+    for name in biblioKeys:
         if target in name:
             superStrings.append(name)
         else:

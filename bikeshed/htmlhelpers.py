@@ -7,6 +7,7 @@ from html5lib.serializer import htmlserializer
 from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
+from collections import Counter
 import re
 import HTMLParser
 
@@ -60,8 +61,22 @@ def escapeCSSIdent(val):
             ident += r"\{0}".format(chr(code))
     return ident
 
-def textContent(el):
-    return html.tostring(el, method='text', with_tail=False, encoding="unicode")
+def textContent(el, exact=False):
+    # If exact is False, then any elements with data-deco attribute
+    # get ignored in the textContent.
+    # This allows me to ignore things added by Bikeshed by default.
+    if exact:
+        return html.tostring(el, method='text', with_tail=False, encoding="unicode")
+    else:
+        return textContentIgnoringDecorative(el)
+
+def textContentIgnoringDecorative(el):
+    str = el.text or ''
+    for child in childElements(el):
+        if child.get("data-deco") is None:
+            str += textContentIgnoringDecorative(child)
+        str += child.tail or ''
+    return str
 
 
 def innerHTML(el):
@@ -74,6 +89,10 @@ def outerHTML(el):
     if el is None:
         return ''
     return html.tostring(el, with_tail=False, encoding="unicode")
+
+
+def foldWhitespace(text):
+    return re.sub(r"(\s|\xa0)+", " ", text)
 
 
 def parseHTML(text):
@@ -114,6 +133,9 @@ def clearContents(el):
     el.text = ''
     return el
 
+def parentElement(el):
+    return el.getparent()
+
 
 def appendChild(parent, *children):
     # Appends either text or an element.
@@ -145,14 +167,27 @@ def prependChild(parent, child):
         else:
             parent.text = child + parent.text
     else:
+        removeNode(child)
         parent.insert(0, child)
         if parent.text is not None:
             child.tail = (child.tail or '') + parent.text
             parent.text = None
 
-def insertBefore(target, el):
+def insertBefore(target, *els):
     parent = target.getparent()
-    parent.insert(parent.index(target), el)
+    index = parent.index(target)
+    prevSibling = parent[index-1] if index > 0 else None
+    for el in els:
+        if isinstance(el, basestring):
+            if prevSibling is not None:
+                prevSibling.tail = (prevSibling.tail or '') + el
+            else:
+                parent.text = (parent.text or '') + el
+        else:
+            parent.insert(index, el)
+            index += 1
+            prevSibling = el
+    return target
 
 def insertAfter(target, *els):
     parent = target.getparent()
@@ -164,25 +199,32 @@ def insertAfter(target, *els):
             target = el
     return target
 
-
 def removeNode(node):
-    text = node.tail or ''
     parent = node.getparent()
+    if parent is None:
+        return node
     index = parent.index(node)
+    text = node.tail or ''
+    node.tail = None
     if index == 0:
         parent.text = (parent.text or '') + text
     else:
         prevsibling = parent[index-1]
         prevsibling.tail = (prevsibling.tail or '') + text
     parent.remove(node)
+    return node
 
+def replaceNode(node, *replacements):
+    insertBefore(node, *replacements)
+    removeNode(node)
+    if replacements:
+        return replacements[0]
 
-def appendContents(el, newElements):
+def appendContents(el, container):
     # Accepts either an iterable *or* a container element
-    if(isElement(newElements) and newElements.text is not None):
-        appendChild(el, newElements.text)
-    for new in newElements:
-        appendChild(el, new)
+    if isElement(container):
+        container = childNodes(container, clear=True)
+    appendChild(el, *container)
     return el
 
 
@@ -221,17 +263,15 @@ def scopingElements(startEl, *tags):
     # Elements that could form a "scope" for the startEl
     # Ancestors, and preceding siblings of ancestors.
     # Maps to the things that can establish a counter scope.
-    els = []
     tagFilter = set(tags)
 
     for el in startEl.itersiblings(preceding=True, *tags):
-        els.append(el)
+        yield el
     for el in startEl.iterancestors():
         if el.tag in tagFilter:
-            els.append(el)
+            yield el
         for el in el.itersiblings(preceding=True, *tags):
-            els.append(el)
-    return els
+            yield el
 
 def previousElements(startEl, tag=None, *tags):
     # Elements preceding the startEl in document order.
@@ -246,7 +286,7 @@ def previousElements(startEl, tag=None, *tags):
 def childElements(parentEl, tag="*", *tags, **stuff):
     return parentEl.iterchildren(tag=tag, *tags, **stuff)
 
-def childNodes(parentEl, clear=False):
+def childNodes(parentEl, clear=False, skipWS=False):
     '''
     This function returns all the nodes in a parent element in the DOM sense,
     mixing text nodes (strings) and other nodes together
@@ -271,15 +311,19 @@ def childNodes(parentEl, clear=False):
     to avoid doing extra computation when not needed,
     and to match the DOM method's behavior.
     '''
+    if isinstance(parentEl, list):
+        return parentEl
     ret = []
     if parentEl.text is not None:
-        ret.append(parentEl.text)
+        if parentEl.text.strip() != "" or not skipWS:
+            ret.append(parentEl.text)
         if clear:
             parentEl.text = None
     for c in childElements(parentEl, tag=None):
         ret.append(c)
         if c.tail is not None:
-            ret.append(c.tail)
+            if c.tail.strip() != "" or not skipWS:
+                ret.append(c.tail)
             if clear:
                 c.tail = None
     if clear:
@@ -287,11 +331,25 @@ def childNodes(parentEl, clear=False):
     return ret
 
 def treeAttr(el, attrName):
-    if el.get(attrName) is not None:
-        return el.get(attrName)
-    for ancestor in el.iterancestors():
-        if ancestor.get(attrName) is not None:
-            return ancestor.get(attrName)
+    # Find the nearest instance of the given attr in the tree
+    # Useful for when you can put an attr on an ancestor and apply it to all contents.
+    # Returns attrValue or None if nothing is found.
+    import itertools as it
+    for target in it.chain([el], el.iterancestors()):
+        if target.get(attrName) is not None:
+            return target.get(attrName)
+
+def closestAttr(el, *attrs):
+    # Like treeAttr, but can provide multiple attr names, and returns the first one found.
+    # Useful with combos like highlight/nohighlight
+    # If multiple target attrs show up on same element, priority is calling order.
+    # Returns a tuple of (attrName, attrValue) or (None, None) if nothing is found.
+    import itertools as it
+    for target in it.chain([el], el.iterancestors()):
+        for attrName in attrs:
+            if target.get(attrName) is not None:
+                return attrName, target.get(attrName)
+    return None, None
 
 def removeAttr(el, attrName):
     # Remove an attribute, silently ignoring if attr doesn't exist.
@@ -332,16 +390,36 @@ def isElement(node):
     # LXML HAS THE DUMBEST XML TREE DATA MODEL IN THE WORLD
     return etree.iselement(node) and isinstance(node.tag, basestring)
 
-def isOpaqueElement(el):
-    return el.tag in ('pre', 'code', 'style', 'script')
+def isNormative(el):
+    # Returns whether the element is "informative" or "normative" with a crude algo.
+    # Currently just tests whether the element is in a class=example or class=note block, or not.
+    if hasClass(el, "note") or hasClass(el, "example") or hasClass(el, "non-normative"):
+        return False
+    if hasClass(el, "normative"):
+        return True
+    parent = parentElement(el)
+    if not isElement(parent):
+        # Went past the root without finding any indicator,
+        # so normative by default.
+        return True
+    # Otherwise, walk the tree
+    return isNormative(parent)
+
 
 def fixTypography(text):
     # Replace straight aposes with curly quotes for possessives and contractions.
     text = re.sub(r"([\w])'([\w])", r"\1’\2", text)
     text = re.sub(r"(</[\w]+>)'([\w])", r"\1’\2", text)
     # Fix line-ending em dashes, or --, by moving the previous line up, so no space.
-    text = re.sub(r"([^<][^!])(—|--)\r?\n\s+(\S)", r"\1—<wbr>\3", text)
+    text = re.sub(r"([^<][^!])(—|--)\r?\n\s*(\S)", r"\1—<wbr>\3", text)
     return text
+
+def fixSurroundingTypography(el):
+    # Applies some of the fixTypography changes to the content surrounding an element.
+    # Used when a shorthand prevented fixTypography from firing previously.
+    if el.tail is not None and el.tail.startswith("'"):
+        el.tail = "’" + el.tail[1:]
+    return el
 
 def unfixTypography(text):
     # Replace curly quotes with straight quotes, and emdashes with double dashes.
@@ -354,6 +432,41 @@ def hashContents(el):
     # Hash the contents of an element into an 8-character alphanum string.
     # Generally used for generating probably-unique IDs.
     return hashlib.md5(innerHTML(el).strip().encode("ascii", "xmlcharrefreplace")).hexdigest()[0:8]
+
+def fixupIDs(doc, els):
+    translateIDs(doc.md.translateIDs, els)
+    dedupIDs(doc)
+
+def translateIDs(trans, els):
+    for el in els:
+        if el.get('id') in trans:
+            el.set('id', trans[el.get('id')][0])
+
+def dedupIDs(doc):
+    import itertools as iter
+    def findId(id):
+        return find("#"+id, doc) is not None
+    ids = Counter(el.get('id') for el in findAll("[id]", doc))
+    dupes = [id for id,count in ids.items() if count > 1]
+    for dupe in dupes:
+        warnAboutDupes = True
+        if re.match(r"issue-[0-9a-fA-F]{8}$", dupe):
+            # Don't warn about issues, it's okay if they have the same ID because they're identical text.
+            warnAboutDupes = False
+        els = findAll("#"+dupe, doc)
+        ints = iter.imap(str, iter.count(0))
+        for el in els[1:]:
+            # If I registered an alternate ID, try to use that.
+            if el.get('data-alternate-id'):
+                el.set("id", el.get("data-alternate-id"))
+                continue
+            # Try to de-dup the id by appending an integer after it.
+            if warnAboutDupes:
+                warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupe)
+            for x in ints:
+                if not findId(dupe+x):
+                    el.set("id", dupe+x)
+                    break
 
 def createElement(tag, attrs={}, *children):
     el = etree.Element(tag, {n:v for n,v in attrs.items() if v is not None})

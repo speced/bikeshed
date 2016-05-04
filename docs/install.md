@@ -20,9 +20,10 @@ $ sudo apt-get install python2.7 python-dev python-pip libxslt1-dev libxml2-dev
 
 The `apt-get` command works on Debian-based systems like Ubuntu; if you work on some other type of system, and can figure out how to get things working on your own, let me know and I'll add instructions for your system.
 
-Then, we'll need to install lxml.
+Then, we'll need to install lxml and Pygments.
 
 ~~~~
+$ sudo pip install pygments
 $ sudo pip install lxml
 ~~~~
 
@@ -39,11 +40,15 @@ From here, you can follow the commons steps outlined below.
 OS X steps
 ----------
 
-These instructions assume that you have [Mac Ports](https://www.macports.org/) installed. If you successfully install Bikeshed using some other method, please contribute to this documentation.
+Note: If you're on a relatively modern Mac you should be able to proceed directly to [Common steps](#common-steps).
+
+These instructions assume that you have [Mac Ports](https://www.macports.org/) or [Homebrew](http://brew.sh/) installed. If you successfully install Bikeshed using some other method, please contribute to this documentation.
+
+### Mac ports
 
 First, get the right packages installed onto your system:
 ~~~
-sudo port install python27 py27-pip py27-lxml py27-html5lib py27-cssselect py27-libxslt py27-libxml2
+sudo port install python27 py27-pip py27-lxml py27-html5lib py27-cssselect py27-libxslt py27-libxml2 py27-pygments
 ~~~
 
 Then, activate the python version you just installed as the one the system should use:
@@ -52,6 +57,28 @@ sudo port select --set python python27
 ~~~
 
 (If you get `ImportError: No module named six` when you first run Bikeshed, additionally run `sudo port install py27-six`.)
+
+### Homebrew
+
+Install the Homebrew version of Python and Pip:
+~~~
+brew install python
+~~~
+
+Install the XCode command-line tools:
+~~~
+xcode-select --install
+~~~
+
+Install or update lxml and Pygments.
+
+~~~~
+$ pip install pygments lxml --upgrade
+~~~~
+
+That'll spew a lot of console trash, but don't worry about it.
+
+From here, you can follow the commons steps outlined below.
 
 Windows steps
 -----------
@@ -64,7 +91,8 @@ Tested on Windows 7, 8/8.1 & 10
 setx /m PATH "%PATH%;C:\Python27;C:\Python27\Scripts"
 ~~~
 3. Install [PIP](https://pip.pypa.io/en/latest/installing.html) by saving [get-pip.py](https://bootstrap.pypa.io/get-pip.py) and just double clicking the file.
-4. Install [LXML](http://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml) for your version of Python (it should be lxml-3.4.0win32-py2.7.exe)
+4. Install [LXML](https://pypi.python.org/pypi/lxml/3.4.4) for your version of Python (it should be lxml-3.4.0win32-py2.7.exe)
+5. Run `$ python -m pip install pygments`.
 
 From here, you can follow the commons steps outlined below.
 
@@ -80,19 +108,23 @@ $ git clone https://github.com/tabatkins/bikeshed.git
 
 Finally, run:
 
-For Linux/OSX:
+For Linux/OSX (Omit the `sudo` for OSX under Homebrew):
 
 ~~~~
 $ sudo pip install --editable /path/to/cloned/bikeshed
+$ bikeshed update
 ~~~~
 
 On Windows:
 
 ~~~~
-python -m pip install --editable /path/to/cloned/bikeshed
+$ python -m pip install --editable /path/to/cloned/bikeshed
+$ bikeshed update
 ~~~~
 
-This’ll install Bikeshed, making it available to your Python environment as the `bikeshed` package, and automatically add a `bikeshed` command to your path.
+This’ll install Bikeshed, making it available to your Python environment as the `bikeshed` package,
+automatically add a `bikeshed` command to your path,
+and then update your data files to the latest versions.
 
 To update bikeshed to its latest version at any time, just enter Bikeshed’s folder, and run:
 
@@ -105,4 +137,4 @@ This’ll pull the latest version of Bikeshed, and ensure that you’re looking 
 
 See the [Quick Start Guide](quick-start.md) for a quick run-through of how to actually use the processor, and the rest of the docs for more detailed information.
 
-(If anything doesn’t work in here, let me know and I’ll fix it.  It’s very likely I’m accidentally skipping a step or two right now, as I’m writing this long after I’ve actually installed everything necessary myself.)
+(If anything doesn’t work in here, let me know and I’ll fix it.  These instructions have worked for a lot of people on all OSes, but it's possible that you'll run into a new error, because computers are terrible.)

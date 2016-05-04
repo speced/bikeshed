@@ -148,7 +148,7 @@ def printHeader(outfile, headerInfo):
 
 <h1>{title} Disposition of Comments for {date} {status}</h1>
 
-<p>Last call document: <a href="{url}">{url}</a>
+<p>Review document: <a href="{url}">{url}</a>
 
 <p>Editor's draft: <a href="http://dev.w3.org/csswg/{shortname}/">http://dev.w3.org/csswg/{shortname}/</a>
 
@@ -188,7 +188,7 @@ def printIssues(outfile, lines):
 			die("Issues must contain a line like 'Issue 1.'. Got:\n{0}", originaltext)
 
 		# Color coding
-		if re.search(r"\nVerified:\s+http", issue):
+		if re.search(r"\nVerified:\s*\S+", issue):
 			code = 'a'
 		elif re.search(r"\n(Closed|Open):\s+\S+", issue):
 			match = re.search(r"\n(Closed|Open):\s+(\S+)", issue)

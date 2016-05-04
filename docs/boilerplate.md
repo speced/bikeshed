@@ -20,7 +20,9 @@ However, to obtain correct boilerplate for a given standards body,
 Several groups are already accommodated with appropriate inclusion files:
 
 * "csswg", as mentioned.
+* "dap", for the Device and Sensors Working Group
 * "fxtf", for the FX Task Force
+* "houdini", for the Houdini Task Force
 * "svg", for the SVG Working Group
 * "webappsec", for the WebApps Security Working Group
 * "whatwg", for the WHATWG
@@ -37,7 +39,7 @@ Text Macros
 
 Several text "macros" are defined by the spec's metadata,
 and can be used anywhere in the spec to substitute in the spec they stand for by using the syntax `[FOO]`.
-Note that this is similar to the syntax for bibliography references, but it has only a single set of `[]` characters.
+Note that this is similar to the syntax for bibliography references, but it has only a single set of `[]` characters, and the text must be uppercase.
 The following macros are defined:
 
 * [TITLE] gives the spec's full title, as extracted from either the `<h1>` or the spec metadata.
@@ -60,6 +62,21 @@ The following macros are defined:
 * [REPOSITORY] gives the name of the VCS repository the spec is located in; this is currently only filled when the spec source is in a GitHub repository. (Patches welcome for more repo-extraction code!)
 
 As these are substituted at the text level, not the higher HTML level, you can use them *anywhere*, including in attribute values.
+
+You can mark a macro as "optional" by appending a `?` to its name,
+like `[DATE?]`.
+This will cause Bikeshed to just remove it
+(replace it with the empty string)
+if it can't find a definition,
+rather than throwing an error.
+
+Like most other markup shorthands,
+text macros can be "escaped" by prepending a backslash,
+like `\[TITLE]`.
+When Bikeshed sees this,
+it will remove the slash and leave the text alone.
+This is sometimes necessary when code examples in your doc (such as a regex)
+accidentally look like text macros.
 
 
 Boilerplate Sections

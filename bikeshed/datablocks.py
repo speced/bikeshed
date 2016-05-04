@@ -8,6 +8,7 @@ from collections import OrderedDict, defaultdict
 import config
 import biblio
 from .messages import *
+from .htmlhelpers import *
 
 # This function does a single pass through the doc,
 # finding all the "data blocks" and processing them.
@@ -23,25 +24,27 @@ from .messages import *
 #
 # Additionally, we pass in the tag-name used (pre or xmp)
 # and the line with the content, in case it has useful data in it.
-def transformDataBlocks(doc):
+def transformDataBlocks(doc, lines):
     inBlock = False
     blockTypes = {
         'propdef': transformPropdef,
         'descdef': transformDescdef,
         'elementdef': transformElementdef,
+        'argumentdef': transformArgumentdef,
         'railroad': transformRailroad,
         'biblio': transformBiblio,
         'anchors': transformAnchors,
         'link-defaults': transformLinkDefaults,
         'ignored-specs': transformIgnoredSpecs,
         'info': transformInfo,
+        'include': transformInclude,
         'pre': transformPre
     }
     blockType = ""
     tagName = ""
     startLine = 0
-    replacements = []
-    for (i, line) in enumerate(doc.lines):
+    newLines = []
+    for (i, line) in enumerate(lines):
         # Look for the start of a block.
         match = re.match(r"\s*<(pre|xmp)(.*)", line, re.I)
         if match and not inBlock:
@@ -59,49 +62,45 @@ def transformDataBlocks(doc):
             inBlock = False
             if startLine == i:
                 # Single-line <pre>.
-                match = re.match(r"\s*(<{0}[^>]*>)(.+)</{0}>(.*)".format(tagName), line, re.I)
-                doc.lines[i] = match.group(3)
-                replacements.append({
-                    'start': i,
-                    'end': i,
-                    'value': blockTypes[blockType](
+                match = re.match(r"\s*(<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line, re.I)
+                repl = blockTypes[blockType](
                         lines=[match.group(2)],
                         tagName=tagName,
                         firstLine=match.group(1),
-                        doc=doc)})
+                        doc=doc)
+                newLines.extend(repl)
+                newLines.append("<!--line count correction {0}-->".format(-len(repl)-1))
+                newLines.append(match.group(3))
             elif re.match(r"^\s*$", match.group(1)):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
-                doc.lines[i] = match.group(2)
-                replacements.append({
-                    'start': startLine,
-                    'end': i,
-                    'value': blockTypes[blockType](
-                        lines=doc.lines[startLine+1:i],
+                repl = blockTypes[blockType](
+                        lines=lines[startLine+1:i],
                         tagName=tagName,
-                        firstLine=doc.lines[startLine],
-                        doc=doc)})
+                        firstLine=lines[startLine],
+                        doc=doc)
+                newLines.extend(repl)
+                newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
+                newLines.append(match.group(2))
             else:
                 # End tag was at the end of line of useful content.
-                # Trim this line to be only the block content.
-                doc.lines[i] = match.group(1)
-                # Put the after-tag content on the next line.
-                doc.lines.insert(i+1, match.group(2))
-                replacements.append({
-                    'start': startLine,
-                    'end': i+1,
-                    'value': blockTypes[blockType](
-                        lines=doc.lines[startLine+1:i+1],
+                # Process the stuff before it, preserve the stuff after it.
+                repl = blockTypes[blockType](
+                        lines=lines[startLine+1:i]+[match.group(1)],
                         tagName=tagName,
-                        firstLine=doc.lines[startLine],
-                        doc=doc)})
+                        firstLine=lines[startLine],
+                        doc=doc)
+                newLines.extend(repl)
+                newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
+                newLines.append(match.group(2))
             tagName = ""
             blockType = ""
+            continue
+        if inBlock:
+            continue
+        newLines.append(line)
 
-    # Make the replacements, starting from the bottom up so I
-    # don't have to worry about offsets becoming invalid.
-    for rep in reversed(replacements):
-        doc.lines[rep['start']:rep['end']] = rep['value']
+    return newLines
 
 
 def transformPre(lines, tagName, firstLine, **kwargs):
@@ -162,13 +161,13 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     if "partial" in firstLine or "New values" in parsedAttrs:
         attrs["Name"] = None
         attrs["New values"] = None
-        ret = ["<table class='definition propdef partial'{forHint}>".format(forHint=forHint)]
+        ret = ["<table class='def propdef partial'{forHint}>".format(forHint=forHint)]
     elif "shorthand" in firstLine:
         attrs["Name"] = None
         attrs["Value"] = None
         for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animatable"]:
             attrs[defaultKey] = "see individual properties"
-        ret = ["<table class='definition propdef'{forHint}>".format(forHint=forHint)]
+        ret = ["<table class='def propdef'{forHint}>".format(forHint=forHint)]
     else:
         attrs["Name"] = None
         attrs["Value"] = None
@@ -179,13 +178,15 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
         attrs["Media"] = "visual"
         attrs["Computed value"] = "as specified"
         attrs["Animatable"] = "no"
-        ret = ["<table class='definition propdef'{forHint}>".format(forHint=forHint)]
+        ret = ["<table class='def propdef'{forHint}>".format(forHint=forHint)]
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:
                 val = parsedAttrs[key]
             if key in ("Value", "New values"):
                 ret.append("<tr class='value'><th>{0}:<td class='prod'>{1}".format(key, val))
+            elif key == "Applies to" and val.lower() == "all elements":
+                ret.append("<tr><th>Applies to:<td><a href='https://drafts.csswg.org/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>")
             else:
                 ret.append("<tr><th>{0}:<td>{1}".format(key, val))
         else:
@@ -203,13 +204,13 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
     vals = parseDefBlock(lines, "descdef")
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
-        ret = ["<table class='definition descdef partial' data-dfn-for='{0}'>".format(vals.get("For", ""))]
+        ret = ["<table class='def descdef partial' data-dfn-for='{0}'>".format(vals.get("For", ""))]
     if "mq" in firstLine:
         requiredKeys = ["Name", "For", "Value"]
-        ret = ["<table class='definition descdef mq' data-dfn-for='{0}'>".format(vals.get("For",""))]
+        ret = ["<table class='def descdef mq' data-dfn-for='{0}'>".format(vals.get("For",""))]
     else:
         requiredKeys = ["Name", "For", "Value", "Initial"]
-        ret = ["<table class='definition descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
+        ret = ["<table class='def descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
     for key in requiredKeys:
         if key == "For":
             ret.append("<tr><th>{0}:<td><a at-rule>{1}</a>".format(key, vals.get(key,'')))
@@ -254,7 +255,7 @@ def transformElementdef(lines, doc, **kwargs):
     attrs["Content model"] = None
     attrs["Attributes"] = None
     attrs["Dom interfaces"] = None
-    ret = ["<table class='definition-table elementdef'>"]
+    ret = ["<table class='def elementdef'>"]
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:
@@ -283,9 +284,55 @@ def transformElementdef(lines, doc, **kwargs):
     ret.append("</table>")
     return ret
 
+def transformArgumentdef(lines, firstLine, **kwargs):
+    attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False)
+    el = parseHTML(firstLine+"</pre>")[0]
+    if "for" in el.attrib:
+        forValue = el.get('for')
+        el.set("data-dfn-for", forValue)
+        if "/" in forValue:
+            interface, method = forValue.split("/")
+        else:
+            die("Argumentdef for='' values need to specify interface/method(). Got '{0}'.", forValue)
+            return
+        removeAttr(el, "for")
+    else:
+        die("Argumentdef blocks need a for='' attribute specifying their method.")
+        return
+    addClass(el, "data")
+    rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
+    lines = [
+            '''
+            <table {attrs}>
+                <caption>Arguments for the <a method lt='{method}' for='{interface}'>{interface}.{method}</a> method.</caption>
+                <thead>
+                    <tr>
+                        <th>Parameter
+                        <th>Type
+                        <th>Nullable
+                        <th>Optional
+                        <th>Description
+                <tbody>'''.format(attrs=rootAttrs, interface=interface, method=method)
+        ] + [
+            '''
+                <tr>
+                    <td><dfn argument>{0}</dfn>
+                    <td>
+                    <td>
+                    <td>
+                    <td>{1}'''.format(param, desc)
+                    for param,desc in attrs.items()
+        ] + [
+            '''
+            </table>
+            '''
+        ]
+    return lines
 
 
-def parseDefBlock(lines, type):
+
+
+def parseDefBlock(lines, type, capitalizeKeys=True):
     vals = OrderedDict()
     lastKey = None
     for line in lines:
@@ -298,8 +345,9 @@ def parseDefBlock(lines, type):
                 die("Incorrectly formatted {2} line for '{0}':\n{1}", vals.get("Name", "???"), line, type)
                 continue
         else:
-
-            key = match.group(1).strip().capitalize()
+            key = match.group(1).strip()
+            if capitalizeKeys:
+                key = key.capitalize()
             lastKey = key
             val = match.group(2).strip()
         if key in vals:
@@ -311,9 +359,8 @@ def parseDefBlock(lines, type):
 def transformRailroad(lines, doc, **kwargs):
     import StringIO
     import railroadparser
-    ret = [
-        "<div class='railroad'>",
-        "<style>svg.railroad-diagram{background-color:hsl(30,20%,95%);}svg.railroad-diagram path{stroke-width:3;stroke:black;fill:rgba(0,0,0,0);}svg.railroad-diagram text{font:bold 14px monospace;text-anchor:middle;}svg.railroad-diagram text.label{text-anchor:start;}svg.railroad-diagram text.comment{font:italic 12px monospace;}svg.railroad-diagram rect{stroke-width:3;stroke:black;fill:hsl(120,100%,90%);}</style>"]
+    ret = ["<div class='railroad'>"]
+    doc.extraStyles['style-railroad'] = "svg.railroad-diagram{background-color:hsl(30,20%,95%);}svg.railroad-diagram path{stroke-width:3;stroke:black;fill:rgba(0,0,0,0);}svg.railroad-diagram text{font:bold 14px monospace;text-anchor:middle;}svg.railroad-diagram text.label{text-anchor:start;}svg.railroad-diagram text.comment{font:italic 12px monospace;}svg.railroad-diagram rect{stroke-width:3;stroke:black;fill:hsl(120,100%,90%);}"
     code = ''.join(lines)
     diagram = railroadparser.parse(code)
     temp = StringIO.StringIO()
@@ -324,7 +371,11 @@ def transformRailroad(lines, doc, **kwargs):
     return ret
 
 def transformBiblio(lines, doc, **kwargs):
-    biblio.processSpecrefBiblioFile(''.join(lines), doc.refs.biblios, order=1)
+    storage = defaultdict(list)
+    biblio.processSpecrefBiblioFile(''.join(lines), storage, order=1)
+    for k,vs in storage.items():
+        doc.refs.biblioKeys.add(k)
+        doc.refs.biblios[k].extend(vs)
     return []
 
 def transformAnchors(lines, doc, **kwargs):
@@ -349,7 +400,7 @@ def processAnchors(anchors, doc):
         if "url" in anchor:
             urlSuffix = anchor['url'][0]
         else:
-            urlSuffix = config.simplifyText(anchor['text'][0], convertDashes=anchor['type'][0] == "dfn")
+            urlSuffix = config.simplifyText(anchor['text'][0])
         url = urlPrefix + ("" if "#" in urlPrefix or "#" in urlSuffix else "#") + urlSuffix
         if anchor['type'][0] in config.lowercaseTypes:
             anchor['text'][0] = anchor['text'][0].lower()
@@ -357,11 +408,17 @@ def processAnchors(anchors, doc):
             "linkingText": anchor['text'][0],
             "type": anchor['type'][0],
             "url": url,
+            "shortname": doc.md.shortname,
+            "level": doc.md.level,
             "for": anchor.get('for', []),
             "export": True,
             "status": "local",
             "spec": anchor.get('spec', [''])[0]
             })
+        methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
+        if methodishStart:
+            arglessName = methodishStart.group(1)+")"
+            doc.refs.addMethodVariants(anchor['text'][0], anchor.get('for', []), doc.md.shortname)
     return []
 
 def transformLinkDefaults(lines, doc, **kwargs):
@@ -373,13 +430,23 @@ def processLinkDefaults(lds, doc):
         if len(ld.get('type', [])) != 1:
             die("Every link default needs exactly one type. Got:\n{0}", config.printjson(ld))
             continue
+        else:
+            type = ld['type'][0]
         if len(ld.get('spec', [])) != 1:
             die("Every link default needs exactly one spec. Got:\n{0}", config.printjson(ld))
             continue
+        else:
+            spec = ld['spec'][0]
         if len(ld.get('text', [])) != 1:
             die("Every link default needs exactly one text. Got:\n{0}", config.printjson(ld))
             continue
-        doc.md.linkDefaults[ld['text'][0]].append((ld['spec'][0], ld['type'][0], ld.get('status', None), ld.get('for', None)))
+        else:
+            text = ld['text'][0]
+        if 'for' in ld:
+            for _for in ld['for']:
+                doc.md.linkDefaults[text].append((spec, type, ld.get('status', None), _for))
+        else:
+            doc.md.linkDefaults[text].append((spec, type, ld.get('status', None), None))
     return []
 
 def transformIgnoredSpecs(lines, doc, **kwargs):
@@ -430,6 +497,30 @@ def processInfo(infos, doc):
     for infoType, infos in infoCollections.items():
         knownInfoTypes[infoType](infos, doc)
     return []
+
+def transformInclude(lines, doc, **kwargs):
+    infos = parseInfoTree(lines, doc.md.indent)
+    path = None
+    macros = {}
+    for info in infos:
+        if "path" in info:
+            if path is None:
+                path = info['path'][0]
+            else:
+                die("Include blocks must only contain a single 'path'.")
+        if "macros" in info:
+            for k,v in info.items():
+                if k == "macros":
+                    continue
+                if k not in macros and len(v) == 1:
+                    macros[k] = v[0]
+                else:
+                    die("Include block defines the '{0}' local macro more than once.", k)
+    el = "<include data-from-block path='{0}'".format(escapeAttr(path))
+    for i,(k,v) in enumerate(macros.items()):
+        el += " data-macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
+    el += "></include>"
+    return [el]
 
 
 

@@ -46,7 +46,7 @@ There are several types for CSS values:
 * property
 * descriptor (the things inside at-rules like @font-face)
 * value (any value that goes inside of a property, at-rule, etc.)
-* type (an abstract type, like `<length>` or `<image>`)
+* type (an abstract type for CSS grammars, like `<length>` or `<image>`)
 * at-rule
 * function (like counter() or linear-gradient())
 * selector
@@ -61,29 +61,41 @@ There are additional types for WebIDL definitions:
 * callback
 * dictionary
 * dict-member
-* exception
-* except-field
-* exception-code
 * enum
+* enum-value
+* exception (for new DOMException names)
 * const
 * typedef
 * stringifier
 * serializer
 * iterator
+* maplike
+* setlike
 
 And for HTML/SVG/etc element definitions:
 
 * element
+* element-state (a spec concept, like `<input>` being in the "password state")
 * element-attr
+* attr-value
+
+A special type for URL schemes, like "http" or "blob":
+
+* scheme
+
+A special type for HTTP headers:
+
+* http-header
 
 A special type just for definitions of operators used in grammar definitions,
 like `||` and similar:
 
 * grammar
 
-And finally, a catch-all category for general terms and phrases, and anything that doesn't fall into one of the above categories:
+And finally, some categories for "English" terms:
 
-* dfn
+* abstract-op (for "English-language algorithms")
+* dfn (for general terms and phrases, and a catch-all for anything else)
 
 The processor will attempt to infer your definition type from the context and text content of the definition:
 
@@ -95,6 +107,8 @@ The processor will attempt to infer your definition type from the context and te
 * Does it end with `()`?  Then it's a **function**.
 * Is it surrounded by double single quotes in the source, like `''foo''`?  Then it's a **value**.
 * Otherwise, it's a **dfn**.
+
+(This auto-detection is obviously skewed towards CSS types; Bikeshed started as a CSS spec preprocessor, and the CSS types are easier to auto-detect syntactically than anything else.)
 
 Note that this auto-detection is a **last-resort** operation.
 There are methods (defined below) to explicitly indicate what type a definition is,
@@ -128,10 +142,13 @@ This is specified with a `for=''` attribute on the definition.
 
 Specifically:
 
-* "attribute", "constructor", "method", and "const" definitions must define what interface they're relative to.
+* "attribute", "constructor", "method", "const", "event", "serializer", "stringifier", and "iterator" definitions must define what interface they're relative to.
 * "argument" definitions must define what method or constructor they're relative to.
 * "dict-member" definitions must define what dictionary they're relative to.
 * "except-field" and "exception-code" definitions must define what exception they're relative to.
+* "enum-value" definitions must define what enum they're relative to
+* "element-attr" and "element-state" definitions must define what element they're relative to.
+* "attr-value" definitions must define what element and attribute they're relative to.
 * "descriptor" definitions must define what at-rule they're relative to.
     (This happens automatically if you add a "For" line to the descdef table.)
 * "value" definitions must define what property, descriptor, at-rule, type, selector, or function they're relative to.
@@ -193,7 +210,8 @@ url: http://www.unicode.org/reports/tr46/#ToASCII; type: dfn; text: toascii
 ```
 
 Alternately, this data can be provided in a file named `anchors.bsdata`,
-in the same folder as the spec source.
+in the same folder as the spec source, but this prevents you from using
+[the web service](https://api.csswg.org/bikeshed/).
 
 
 Autolinking
@@ -246,6 +264,12 @@ Similarly, any of the above types except biblio links can have their type specif
 Again, the type value won't be shown in the processed document.
 
 These two techniques can, of course, be combined.
+
+IDL types can also have their text overridden, when you want to refer to an IDL definition with more natural English text.  To do, append a pipe character `|` and the text you want to show, like:
+
+```
+{{SomeUglyInterfaceName|an ugly interface}}
+```
 
 Link Types
 ----------
@@ -398,10 +422,43 @@ Also, the section titles are often long and annoying to type,
 and they move around,
 so numbering isn't stable.
 
-Note how Section Links have a similar syntax to Bibliography Links;
-these will soonish merge,
-allowing you to link to sections in other documents
-(at least, when Bikeshed has section information for them).
+You can also use **cross-spec** section links,
+as long as the spec is either in Bikeshed's linking database,
+or the biblio database.
+The syntax is a mixture of a biblio reference and a section link:
+
+```html
+[[css-flexbox-1#auto-margins]]
+[[CSS-access-19990804#Features]]
+```
+
+which renders as:
+
+```html
+<a href="https://drafts.csswg.org/css-flexbox-1/#auto-margins">CSS Flexbox 1 §8.1 Aligning with auto margins</a>
+<a href="http://www.w3.org/1999/08/NOTE-CSS-access-19990804#Features">Accessibility Features of CSS §Features</a>
+```
+
+If Bikeshed knows about the spec,
+it link-checks you,
+and fills in the section number and heading in the generated text.
+If the spec is only in the bibliography database,
+Bikeshed just assumes that the link target exists
+and uses it directly in the text,
+because it has no way to tell what the section is named.
+
+If the spec is multipage, like SVG,
+and Bikeshed knows about it,
+*most* of the time you don't need to do anything different -
+Bikeshed will find the correct page for the heading you're linking to.
+On the rare occasions that the same heading id exists in multiple pages of the same spec, tho,
+specify the page like `[[svg/intro#toc]]`
+(which indicates the #toc heading on the intro.html page).
+If the desired heading is on the top-level page,
+use an empty page name, like `[[html/#living-standard]]`.
+In any case, Bikeshed will throw an error,
+and tell you what names it knows about so you can easily correct your link.
+
 
 
 Bibliography
@@ -462,5 +519,7 @@ following the SpecRef JSON format:
 Only the "title" field is strictly necessary;
 the rest can be omitted if desired.
 
-This JSON should either be inline, in a `<pre class=biblio>` block,
-or in a `biblio.json` file in the same folder as the spec file.
+This JSON should be inline, in a `<pre class=biblio>` block.  It can
+also be in a `biblio.json` file in the same folder as the spec file,
+but this is incompatible with
+[the web service](https://api.csswg.org/bikeshed/).

@@ -10,6 +10,7 @@ from . import config
 from . import markdown
 from .messages import *
 from .htmlhelpers import *
+from .repository import *
 
 class MetadataManager:
     @property
@@ -17,6 +18,12 @@ class MetadataManager:
         if self.level is not None:
             return "{0}-{1}".format(self.shortname, self.level)
         return self.shortname
+
+    @property
+    def groupIsW3C(self):
+        if self.group is None:
+            return False
+        return self.group.lower() in config.groupsInW3C
 
     def __init__(self, doc):
         self.doc = doc
@@ -33,7 +40,7 @@ class MetadataManager:
         self.TR = None
         self.title = None
         self.h1 = None
-        self.statusText = ""
+        self.statusText = []
         self.date = datetime.utcnow().date()
         self.deadline = None
         self.group = None
@@ -43,21 +50,33 @@ class MetadataManager:
         self.warning = None
         self.atRisk = []
         self.ignoredTerms = []
+        self.ignoredVars = []
         self.testSuite = None
         self.mailingList = None
         self.mailingListArchives = None
         self.boilerplate = {'omitSections':set()}
-        self.versionHistory = None
+        self.versionHistory = []
         self.logo = ""
         self.indent = 4
         self.linkDefaults = defaultdict(list)
         self.useIAutolinks = False
         self.noEditor = False
         self.defaultBiblioStatus = "dated"
-        self.markupShorthands = set(["css", "biblio", "markup", "idl"])
+        self.markupShorthands = set(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
         self.customTextMacros = []
         self.issues = []
         self.issueTrackerTemplate = None
+        self.workStatus = None
+        self.inlineGithubIssues = False
+        self.repository = config.Nil()
+        self.opaqueElements = ["pre", "xmp", "script", "style"]
+        self.blockElements = []
+        self.issueClass = "issue"
+        self.noteClass = "note"
+        self.advisementClass = "advisement"
+        self.translations = []
+        self.translateIDs = defaultdict(list)
+        self.useDfnPanels = True
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -69,7 +88,6 @@ class MetadataManager:
             "Title": "title",
             "H1": "h1",
             "Status": "status",
-            "Status Text": "statusText",
             "ED": "ED",
             "URL": "ED", # URL is a synonym for ED
             "Shortname": "shortname",
@@ -83,13 +101,19 @@ class MetadataManager:
             "Mailing List": "mailingList",
             "Mailing List Archives": "mailingListArchives",
             "Boilerplate": "boilerplate",
-            "Version History": "versionHistory",
             "Logo": "logo",
             "Indent": "indent",
             "Use <I> Autolinks": "useIAutolinks",
             "No Editor": "noEditor",
             "Default Biblio Status": "defaultBiblioStatus",
-            "Issue Tracker Template": "issueTrackerTemplate"
+            "Issue Tracker Template": "issueTrackerTemplate",
+            "Work Status": "workStatus",
+            "Inline Github Issues": "inlineGithubIssues",
+            "Repository": "repository",
+            "Issue Class": "issueClass",
+            "Note Class": "noteClass",
+            "Advisement Class": "advisementClass",
+            "Use Dfn Panels": "useDfnPanels"
         }
 
         # Some keys are multi-value:
@@ -105,10 +129,17 @@ class MetadataManager:
             "Previous Version": "previousVersions",
             "At Risk": "atRisk",
             "Ignored Terms": "ignoredTerms",
+            "Ignored Vars": "ignoredVars",
             "Link Defaults": "linkDefaults",
             "Issue Tracking": "issues",
             "Markup Shorthands": "markupShorthands",
-            "Text Macro": "customTextMacros"
+            "Version History": "versionHistory",
+            "Text Macro": "customTextMacros",
+            "Opaque Elements": "opaqueElements",
+            "Block Elements": "blockElements",
+            "Translation": "translations",
+            "Translate Ids": "translateIDs",
+            "Status Text": "statusText"
         }
 
         self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
@@ -118,23 +149,31 @@ class MetadataManager:
         # Input transformers, passed the key and string value.
         # The "default" input is a no-op that just returns the input string.
         self.customInput = {
-            "Group": convertGroup,
             "Date": parseDate,
             "Deadline": parseDate,
             "Level": parseLevel,
             "Warning": convertWarning,
             "Editor": parseEditor,
             "Former Editor": parseEditor,
-            "Ignored Terms": parseIgnoredTerms,
+            "Ignored Terms": parseCommaSeparated,
+            "Ignored Vars": parseCommaSeparated,
             "Link Defaults": parseLinkDefaults,
             "Boilerplate": parseBoilerplate,
             "Indent": parseInteger,
             "Use <I> Autolinks": parseBoolean,
             "No Editor": parseBoolean,
             "Default Biblio Status": parseBiblioStatus,
-            "Issue Tracking": parseIssues,
+            "Issue Tracking": parseLinkedText,
             "Markup Shorthands": parseMarkupShorthands,
-            "Text Macro": parseTextMacro
+            "Text Macro": parseTextMacro,
+            "Work Status": parseWorkStatus,
+            "Inline Github Issues": parseBoolean,
+            "Repository": parseRepository,
+            "Opaque Elements": parseCommaSeparated,
+            "Block Elements": parseCommaSeparated,
+            "Translation": parseTranslation,
+            "Translate Ids": parseTranslateIDs,
+            "Use Dfn Panels": parseBoolean
         }
 
         # Alternate output handlers, passed key/value/doc.
@@ -200,6 +239,12 @@ class MetadataManager:
             self.overrides.add(key)
 
     def finish(self):
+        # Do some "computed metadata", based on the value of other metadata.
+        # Only call this when you're sure all metadata sources are parsed.
+        if not self.repository:
+            self.repository = getSpecRepository(self.doc)
+        if self.repository.type == "github" and "feedback-header" not in self.doc.md.boilerplate['omitSections'] and "repository-issue-tracking" not in self.doc.md.boilerplate['omitSections']:
+            self.issues.append(("GitHub", self.repository.formatIssueUrl()))
         self.validate()
 
     def validate(self):
@@ -210,7 +255,8 @@ class MetadataManager:
         # { MetadataManager attr : metadata name (for printing) }
         requiredSingularKeys = {
             'status': 'Status',
-            'shortname': 'Shortname'
+            'shortname': 'Shortname',
+            'title': 'Title'
         }
         recommendedSingularKeys = {}
         requiredMultiKeys = {
@@ -227,6 +273,8 @@ class MetadataManager:
             requiredSingularKeys['level'] = 'Level'
         if not self.noEditor:
             requiredMultiKeys['editors'] = "Editor"
+        if self.group and self.group.lower() == "csswg":
+            requiredSingularKeys['workStatus'] = "Work Status"
 
         errors = []
         warnings = []
@@ -253,10 +301,15 @@ class MetadataManager:
         if self.h1:
             macros["spectitle"] = self.h1
         macros["shortname"] = self.shortname
-        if self.status:
-            macros["statustext"] = self.statusText
+        if self.statusText:
+            macros["statustext"] = "\n".join(markdown.parse(self.statusText, self.indent))
+        else:
+            macros["statustext"] = ""
+        macros["level"] = str(self.level)
         macros["vshortname"] = self.vshortname
-        if self.status in config.shortToLongStatus:
+        if self.status == "FINDING" and self.group:
+            macros["longstatus"] = "Finding of the {0}".format(self.group)
+        elif self.status in config.shortToLongStatus:
             macros["longstatus"] = config.shortToLongStatus[self.status]
         else:
             die("Unknown status '{0}' used.", self.status)
@@ -264,6 +317,8 @@ class MetadataManager:
             macros["status"] = "WD"
         else:
             macros["status"] = self.status
+        if self.workStatus:
+            macros["workstatus"] = self.workStatus
         if self.TR:
             macros["latest"] = self.TR
         if self.abstract:
@@ -275,6 +330,7 @@ class MetadataManager:
         macros["isodate"] = unicode(self.date.strftime("%Y-%m-%d"), encoding="utf-8")
         if self.deadline:
             macros["deadline"] = unicode(self.deadline.strftime("{0} %B %Y".format(self.deadline.day)), encoding="utf-8")
+            macros["isodeadline"] = unicode(self.deadline.strftime("%Y-%m-%d"), encoding="utf-8")
         if self.status in config.TRStatuses:
             macros["version"] = "http://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
         elif self.ED:
@@ -289,22 +345,22 @@ class MetadataManager:
         if self.warning and len(self.warning) >= 4:
             macros["snapshoturl"] = self.warning[3]
         macros["logo"] = self.logo
-        # get GH repo from remote
-        macros["repository"] = getSpecRepository(doc)
-        # W3C stylesheets are *mostly* of the form W3C-[status], except for *one*. Ugh.
-        if self.status == "UD":
-            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/w3c-unofficial"
-        elif self.status == "FPWD":
-            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/W3C-WD"
+        if self.repository:
+            macros["repository"] = self.repository.name
+            macros["repositoryurl"] = self.repository.url
+        if self.mailingList:
+            macros["mailinglist"] = self.mailingList
+        if self.mailingListArchives:
+            macros["mailinglistarchives"] = self.mailingListArchives
+        if self.status == "FPWD":
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-WD"
+        elif self.status == "FINDING":
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-NOTE"
         else:
-            macros["w3c-stylesheet-url"] = "http://www.w3.org/StyleSheets/TR/W3C-{0}".format(self.status)
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(self.status)
         # Custom macros
         for name, text in self.customTextMacros:
             macros[name.lower()] = text
-
-
-def convertGroup(key, val):
-    return val.lower()
 
 def parseDate(key, val):
     try:
@@ -342,7 +398,13 @@ def convertWarning(key, val):
     match = re.match(r"New Version +(.+)", val, re.I)
     if match:
         return "warning-new-version", match.group(1)
-    die('Unknown value for "{0}" metadata.', key)
+    die('''Unknown value "{1}" for "{0}" metadata. Expected one of:
+  obsolete
+  not ready
+  replaced by [new url]
+  new version [new url]
+  commit [snapshot id] [snapshot url] replaced by [master url]
+  branch [branch name] [branch url] replaced by [master url]''', key, val)
 
 def parseEditor(key, val):
     match = re.match(r"([^,]+) ,\s* ([^,]*) ,?\s* ([^,]*) ,?\s* ([^,]*)", val, re.X)
@@ -406,7 +468,7 @@ def parseEditor(key, val):
     return data
 
 
-def parseIgnoredTerms(key, val):
+def parseCommaSeparated(key, val):
     return [term.strip().lower() for term in val.split(',')]
 
 def parseLinkDefaults(key, val):
@@ -442,19 +504,20 @@ def parseBiblioStatus(key, val):
         die("'{0}' must be either 'current' or 'dated'. Got '{1}'", key, val)
         return "dated"
 
-def parseIssues(key, val):
-    issues = []
+def parseLinkedText(key, val):
+    # Parses anything defined as "text url, text url, text url" into a list of 2-tuples.
+    entries = []
     vals = [v.strip() for v in val.split(",")]
     for v in vals:
-        issues.append(v.rsplit(" ", 1))
-    return issues
+        entries.append(v.rsplit(" ", 1))
+    return entries
 
 def parseMarkupShorthands(key, val):
     # Format is comma-separated list of shorthand category followed by boolean.
     # Output is a dict of the shorthand categories with boolean values.
     vals = [v.strip() for v in val.lower().split(",")]
     ret = {}
-    validCategories = frozenset(["css", "markup", "biblio", "idl"])
+    validCategories = frozenset(["css", "markup", "biblio", "idl", "markdown", "algorithm"])
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:
@@ -492,6 +555,71 @@ def parseTextMacro(key, val):
         return None
     return (name, text)
 
+def parseWorkStatus(key, val):
+    # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
+    val = val.strip().lower()
+    if val not in ('completed', 'stable', 'testing', 'refining', 'revising', 'exploring', 'rewriting', 'abandoned'):
+        die("Work Status must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned). Got '{0}'. See http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process for details.", val)
+        return None
+    return val
+
+def parseRepository(key, val):
+    # Shortname followed by url, or just url.
+    # If just url, I'll try to recognize the shortname from it; otherwise it's the url again.
+    val = val.strip()
+    pieces = val.split(None, 1)
+    if len(pieces) == 2:
+        return Repository(url=pieces[0], name=pieces[1])
+    elif len(pieces) == 1:
+        # Try to recognize a GitHub url
+        match = re.match("https://github.com/([\w-]+)/([\w-]+)/?$", val)
+        if match:
+            return GithubRepository(*match.groups())
+        # If you just provide a user/repo pair, assume it's a github repo.
+        # Will provide ways to opt into other repos when people care.
+        match = re.match("([\w-]+)/([\w-]+)$", val)
+        if match:
+            return GithubRepository(*match.groups())
+        # Otherwise just use the url as the shortname
+        return Repository(url=val)
+    else:
+        die("Repository must be a url, optionally followed by a shortname. Got '{0}'", val)
+        return config.Nil()
+
+def parseTranslateIDs(key, val):
+    translations = {}
+    for v in val.split(","):
+        pieces = v.strip().split()
+        if len(pieces) != 2:
+            die("‘Translate IDs’ values must be an old ID followed by a new ID. Got '{0}'", v)
+            continue
+        old,new = pieces
+        translations[old] = new
+    return translations
+
+def parseTranslation(key, val):
+    # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
+    pieces = val.split(",")
+    if not(1 <= len(pieces) <= 3):
+        die("Format of a Translation line is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?. Got:\n{0}", val)
+        return
+    firstParts = pieces[0].split()
+    if len(firstParts) != 2:
+        die("First part of a Translation line must be a lang-code followed by a url. Got:\n{0}", pieces[0])
+        return
+    langCode, url = firstParts
+    name = None
+    nativeName = None
+    for piece in pieces[1:]:
+        k,v = piece.split(None, 1)
+        if k.lower() == "name":
+            name = v
+        elif k.lower() == "native-name":
+            nativeName = v
+        else:
+            die("Later parts of a Translation line must start with 'name' or 'native-name'. Got:\n{0}", piece)
+    return {"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}
+
 
 def parse(md, lines):
     # Given a MetadataManager and HTML document text, in the form of an array of text lines,
@@ -501,15 +629,20 @@ def parse(md, lines):
     newlines = []
     inMetadata = False
     lastKey = None
+    blockSize = 0
     for line in lines:
         if not inMetadata and re.match(r"<pre .*class=.*metadata.*>", line):
+            blockSize = 1
             inMetadata = True
             md.hasMetadata = True
             continue
         elif inMetadata and re.match(r"</pre>\s*", line):
+            newlines.append("<!--line count correction {0}-->".format(blockSize+1))
+            blockSize = 0
             inMetadata = False
             continue
         elif inMetadata:
+            blockSize += 1
             if lastKey and (line.strip() == "" or re.match(r"\s+", line)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
                 md.addData(lastKey, line.lstrip())
@@ -520,6 +653,9 @@ def parse(md, lines):
             else:
                 die("Incorrectly formatted metadata line:\n{0}", line)
                 continue
+        elif re.match(r"\s*<h1>.*?</h1>", line):
+            title = re.match(r"\s*<h1>(.*?)</h1>", line).group(1)
+            md.addData("Title", title)
         else:
             newlines.append(line)
     return newlines
@@ -553,6 +689,7 @@ def getSpecRepository(doc):
     '''
     Attempts to find the name of the repository the spec is a part of.
     Currently only searches for GitHub repos.
+    Returns a "shortname" of the repo, and the full url.
     '''
     if doc and doc.inputSource and doc.inputSource != "-":
         source_dir = os.path.dirname(os.path.abspath(doc.inputSource))
@@ -562,19 +699,32 @@ def getSpecRepository(doc):
             with open(os.devnull, "wb") as fnull:
                 remotes = check_output(["git", "remote", "-v"], stderr=fnull)
             os.chdir(old_dir)
-            search = re.search('origin\tgit@github\.com:(.*?)\.git \(\w+\)', remotes)
+            search = re.search(r"origin\tgit@github\.com:([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
             if search:
-                return search.group(1)
-            else:
-                return ""
+                return GithubRepository(*search.groups())
+            search = re.search(r"origin\thttps://github.com/([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
+            if search:
+                return GithubRepository(*search.groups())
+            return config.Nil()
         except:
             # check_output will throw CalledProcessError when not in a git repo
             os.chdir(old_dir)
-            return ""
+            return config.Nil()
 
 def parseDoc(doc):
     # Look through the doc for any additional metadata information that might be needed.
 
-    if find(".issue", doc) is not None:
-        # There's at least one inline issue.
-        doc.md.issues.append(("Inline In Spec", "#issues-index"))
+    for el in findAll(".replace-with-note-class", doc):
+        removeClass(el, "replace-with-note-class")
+        addClass(el, doc.md.noteClass)
+    for el in findAll(".replace-with-issue-class", doc):
+        removeClass(el, "replace-with-issue-class")
+        addClass(el, doc.md.issueClass)
+    for el in findAll(".replace-with-advisement-class", doc):
+        removeClass(el, "replace-with-advisement-class")
+        addClass(el, doc.md.advisementClass)
+
+    if "feedback-header" not in doc.md.boilerplate['omitSections']:
+        if "issues-index" not in doc.md.boilerplate['omitSections'] and find("." + doc.md.issueClass, doc) is not None:
+            # There's at least one inline issue.
+            doc.md.issues.append(("Inline In Spec", "#issues-index"))

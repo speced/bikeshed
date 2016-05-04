@@ -5,11 +5,11 @@ import json
 from itertools import *
 from .messages import *
 
-def parse(lines, numSpacesForIndentation, features=None):
-	tokens = tokenizeLines(lines, numSpacesForIndentation, features)
+def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
+	tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements, blockElements=blockElements)
 	return parseTokens(tokens, numSpacesForIndentation)
 
-def tokenizeLines(lines, numSpacesForIndentation, features=None):
+def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
 	# Turns lines of text into block tokens,
 	# which'll be turned into MD blocks later.
 	# Every token *must* have 'type', 'raw', and 'prefix' keys.
@@ -19,18 +19,37 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 
 	# Inline elements that are allowed to start a "normal" line of text.
 	# Any other element will instead be an HTML line and will close paragraphs, etc.
-	allowedStartElements = "a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|bdi|bdo|span|br|wbr|img|meter|progress"
+	inlineElements = set(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "css"])
+	if blockElements is None:
+		blockElements = []
+	def inlineElementStart(line):
+		# Whether or not the line starts with an inline element
+		match = re.match(r"\s*</?([\w-]+)", line)
+		if not match:
+			return True
+		tagname = match.group(1)
+		if tagname in inlineElements:
+			return True
+		if "-" in tagname and tagname not in blockElements:
+			# Assume custom elements are inline by default
+			return True
+		return False
 
 	tokens = []
 	preDepth = 0
-	rawElements = "pre|style|script|xmp"
+	inComment = False
+	if opaqueElements is None:
+		opaqueElements = ["pre", "xmp", "script", "style"]
+	rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
+	lineCountCorrection = 0
 	for i, rawline in enumerate(lines):
+
 		# Don't parse anything while you're inside certain elements
 		if re.search(r"<({0})[ >]".format(rawElements), rawline):
 			preDepth += 1
 		if preDepth:
-			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': float('inf'), 'line': i})
+			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': float('inf'), 'line': i+lineCountCorrection})
 		if re.search(r"</({0})>".format(rawElements), rawline):
 			preDepth = max(0, preDepth - 1)
 			continue
@@ -38,6 +57,12 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 			continue
 
 		line = rawline.strip()
+		match = re.match("<!--line count correction (-?\d+)-->", line)
+		if match:
+			# Previous edits changed the number of lines
+			# Kill this line, and adjust the line number for adding to tokens
+			lineCountCorrection += int(match.group(1))
+			continue
 
 		if line == "":
 			token = {'type':'blank', 'raw': '\n'}
@@ -58,11 +83,13 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 			match = re.search(r"\{#([^ }]+)\}\s*$", line)
 			if match:
 				token['id'] = match.group(1)
-		elif re.match(r"\d+\.\s", line):
-			match = re.match(r"\d+\.\s+(.*)", line)
-			token = {'type':'numbered', 'text': match.group(1), 'raw':rawline}
-		elif re.match(r"\d+\.$", line):
-			token = {'type':'numbered', 'text': "", 'raw':rawline}
+		elif re.match(r"((\*\s*){3,})|((-\s*){3,})|((_\s*){3,})$", line):
+			token = {'type':'rule', 'raw': rawline}
+		elif re.match(r"-?\d+\.\s", line):
+			match = re.match(r"(-?\d+)\.\s+(.*)", line)
+			token = {'type':'numbered', 'text': match.group(2), 'raw':rawline, 'num': int(match.group(1))}
+		elif re.match(r"-?\d+\.$", line):
+			token = {'type':'numbered', 'text': "", 'raw':rawline, 'num': int(line[:-1])}
 		elif re.match(r"[*+-]\s", line):
 			match = re.match(r"[*+-]\s+(.*)", line)
 			token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
@@ -77,7 +104,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 			type = 'dt' if len(match.group(1)) == 1 else 'dd'
 			token = {'type':type, 'text': "", 'raw':rawline}
 		elif re.match(r"<", line):
-			if re.match(r"<<|<\{", line) or re.match(r"</?({0})[ >]".format(allowedStartElements), line):
+			if re.match(r"<<|<\{", line) or inlineElementStart(line):
 				token = {'type':'text', 'text': line, 'raw': rawline}
 			else:
 				token = {'type':'htmlblock', 'raw': rawline}
@@ -88,11 +115,53 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None):
 			token['prefixlen'] = float('inf')
 		else:
 			token['prefixlen'] = prefixLen(rawline, numSpacesForIndentation)
-		token['line'] = i
+		token['line'] = i+lineCountCorrection
 		tokens.append(token)
 		#print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
 	return tokens
+
+def stripComments(lines):
+	output = []
+	inComment = False
+	for line in lines:
+		# Eagerly strip comments, because the serializer can't output them right now anyway,
+		# and they trigger some funky errors
+		strippedLine, inComment = stripCommentsFromLine(line, inComment)
+		if (line != strippedLine and strippedLine.strip() == "") or (line.strip() == "" and inComment):
+			# We want to entirely skip lines who are completely composed of comments (and maybe whitespace).
+			# That way we don't, say, break paragraphs when we comment out their middle.
+			continue
+		else:
+			# Otherwise, just process whatever's left as normal.
+			if line.endswith("\n") and not strippedLine.endswith("\n"):
+				strippedLine += "\n"
+			output.append(strippedLine)
+	return output
+
+def stripCommentsFromLine(line, inComment=False):
+	# Removes HTML comments from the line.
+	# Returns true if the comment wasn't closed by the end of the line
+	if inComment:
+		# The line starts out in a comment.
+		pre,sep,post = line.partition("-->")
+		if sep == "":
+			# The entire line is a comment
+			return "", True
+		else:
+			# Drop the comment part, see if there are any more
+			return stripCommentsFromLine(post)
+	else:
+		# The line starts out as non-comment content.
+		pre,sep,post = line.partition("<!--")
+		if sep == "":
+			# No comments in the line
+			return pre, False
+		else:
+			# Keep the non-comment part, see if there's any more to do
+			res,inComment = stripCommentsFromLine(post, inComment=True)
+			return pre+res, inComment
+
 
 def prefixLen(text, numSpacesForIndentation):
 	i = 0
@@ -140,6 +209,7 @@ def parseTokens(tokens, numSpacesForIndentation):
 	equals-line
 	dash-line
 	heading
+	rule
 	numbered
 	bulleted
 	text
@@ -161,10 +231,12 @@ def parseTokens(tokens, numSpacesForIndentation):
 			lines += parseMultiLineHeading(stream)
 		elif stream.currtype() == 'text' and stream.prevtype() == 'blank':
 			lines += parseParagraph(stream)
+		elif stream.currtype() == 'rule' or stream.currtype() == 'dash-line':
+			lines += parseHorizontalRule(stream)
 		elif stream.currtype() == 'bulleted':
 			lines += parseBulleted(stream)
 		elif stream.currtype() == 'numbered':
-			lines += parseNumbered(stream)
+			lines += parseNumbered(stream, start=stream.currnum())
 		elif stream.currtype() in ("dt", "dd"):
 			lines += parseDl(stream)
 		else:
@@ -208,25 +280,30 @@ def parseMultiLineHeading(stream):
 	stream.advance(2)
 	return lines
 
+def parseHorizontalRule(stream):
+	lines =  ["<hr>\n"]
+	stream.advance()
+	return lines
+
 def parseParagraph(stream):
 	line = stream.currtext()
 	initialPrefixLen = stream.currprefixlen()
 	endTag = "</p>"
-	if line.lower().startswith("note: ") or line.lower().startswith("note, "):
-		p = "<p class='note'>"
-	elif line.lower().startswith("issue: "):
-		line = line[7:]
-		p = "<p class='issue'>"
-	elif line.lower().startswith("advisement: "):
-		line = line[12:]
-		p = "<strong class='advisement'>"
+	if line.lower().startswith("note:") or line.lower().startswith("note, "):
+		p = "<p class='replace-with-note-class'>"
+	elif line.lower().startswith("issue:"):
+		line = line[6:]
+		p = "<p class='replace-with-issue-class'>"
+	elif line.lower().startswith("advisement:"):
+		line = line[11:]
+		p = "<strong class='replace-with-advisement-class'>"
 		endTag = "</strong>"
 	else:
-		match = re.match(r"issue\(([^)]+)\): (.+)", line, re.I)
+		match = re.match(r"issue\(([^)]+)\):(.*)", line, re.I)
 		if match:
 			line = match.group(2)
-                        p = "<p data-remote-issue-id='%s' class='issue'>" % match.group(1)
-                else:
+			p = "<p data-remote-issue-id='%s' class='replace-with-issue-class'>" % match.group(1)
+		else:
 			p = "<p>"
 	lines = ["{0}{1}\n".format(p, line)]
 	while True:
@@ -280,7 +357,7 @@ def parseBulleted(stream):
 	lines.append("</ul>")
 	return lines
 
-def parseNumbered(stream):
+def parseNumbered(stream, start=1):
 	prefixLen = stream.currprefixlen()
         numSpacesForIndentation = stream.numSpacesForIndentation
 
@@ -316,7 +393,10 @@ def parseNumbered(stream):
 				stream.advance()
 			yield parseItem(stream)
 
-	lines = ["<ol>"]
+	if start == 1:
+		lines = ["<ol>"]
+	else:
+		lines = ["<ol start='{0}'>".format(start)]
 	for li_lines in getItems(stream):
 		lines.append("<li data-md>")
 		lines.extend(parse(li_lines, numSpacesForIndentation))

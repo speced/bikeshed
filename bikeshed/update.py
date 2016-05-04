@@ -9,6 +9,7 @@ import urllib2
 
 from . import config
 from . import biblio
+from DefaultOrderedDict import DefaultOrderedDict
 from .messages import *
 
 from .apiclient.apiclient import apiclient
@@ -30,7 +31,7 @@ def updateCrossRefs():
         say("Downloading anchor data...")
         shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version = "vnd.csswg.shepherd.v1")
         res = shepherd.get("specifications", anchors = True, draft = True)
-        # http://test.csswg.org/shepherd/api/spec/?spec=css-flexbox-1&anchors&draft, for manual looking
+        # http://api.csswg.org/shepherd/spec/?spec=css-flexbox-1&anchors&draft, for manual looking
         if ((not res) or (406 == res.status)):
             die("This version of the anchor-data API is no longer supported. Please update Bikeshed.")
             return
@@ -47,7 +48,7 @@ def updateCrossRefs():
             list = []
         # Call with multiTree being a list of trees
         for item in multiTree:
-            if item['type'] in config.dfnTypes.union(["dfn"]):
+            if item['type'] in config.dfnTypes.union(["dfn", "heading"]):
                 list.append(item)
             if item.get('children'):
                 linearizeAnchorTree(item['children'], list)
@@ -55,22 +56,36 @@ def updateCrossRefs():
 
     specs = dict()
     anchors = defaultdict(list)
+    headings = defaultdict(dict)
     for rawSpec in rawSpecData.values():
         spec = {
             'vshortname': rawSpec['name'],
+            'shortname': rawSpec.get('short_name'),
             'TR': rawSpec.get('base_uri'),
             'ED': rawSpec.get('draft_uri'),
             'title': rawSpec.get('title'),
             'description': rawSpec.get('description')
         }
-        match = re.match("(.*)-(\d+)", rawSpec['name'])
-        if match:
+        if spec['shortname'] is not None and spec['vshortname'].startswith(spec['shortname']):
+            # S = "foo", V = "foo-3"
+            # Strip the prefix
+            level = spec['vshortname'][len(spec['shortname']):]
+            if level.startswith("-"):
+                level = level[1:]
+            if level.isdigit():
+                spec['level'] = int(level)
+            else:
+                spec['level'] = 1
+        elif spec['shortname'] is None and re.match(r"(.*)-(\d+)", spec['vshortname']):
+            # S = None, V = "foo-3"
+            match = re.match(r"(.*)-(\d+)", spec['vshortname'])
             spec['shortname'] = match.group(1)
             spec['level'] = int(match.group(2))
         else:
             spec['shortname'] = spec['vshortname']
             spec['level'] = 1
         specs[spec['vshortname']] = spec
+        specHeadings = headings[spec['vshortname']]
 
         def setStatus(status):
             def temp(obj):
@@ -79,25 +94,114 @@ def updateCrossRefs():
             return temp
         rawAnchorData = map(setStatus('TR'), linearizeAnchorTree(rawSpec.get('anchors', []))) + map(setStatus('ED'), linearizeAnchorTree(rawSpec.get('draft_anchors',[])))
         for rawAnchor in rawAnchorData:
+            rawAnchor = fixupAnchor(rawAnchor)
             linkingTexts = rawAnchor.get('linking_text', [rawAnchor.get('title')])
             if linkingTexts[0] is None:
                 continue
-            anchor = {
-                'status': rawAnchor['status'],
-                'type': rawAnchor['type'],
-                'spec': spec['vshortname'],
-                'shortname': spec['shortname'],
-                'level': int(spec['level']),
-                'export': rawAnchor.get('export', False),
-                'normative': rawAnchor.get('normative', False),
-                'url': spec[rawAnchor['status']] + rawAnchor['uri'],
-                'for': rawAnchor.get('for', [])
-            }
-            for text in linkingTexts:
-                if anchor['type'] in config.lowercaseTypes:
-                    text = text.lower()
-                text = re.sub(r'\s+', ' ', text)
-                anchors[text].append(anchor)
+            if rawAnchor['type'] == "heading":
+                uri = rawAnchor['uri']
+                if uri.startswith("??"):
+                    # css3-tables has this a bunch, for some strange reason
+                    uri = uri[2:]
+                if uri[0] == "#":
+                    # Either single-page spec, or link on the top page of a multi-page spec
+                    heading = {
+                        'url': spec[rawAnchor['status']] + uri,
+                        'number': rawAnchor['name'] if re.match(r"[\d.]+$", rawAnchor['name']) else "",
+                        'text': rawAnchor['title'],
+                        'spec': spec['title']
+                    }
+                    if uri in specHeadings and isinstance(specHeadings[uri], list):
+                        # Okay, multipage already squatted here.
+                        specHeadings[uri].append(spec['vshortname']+"/"+uri)
+                        specHeadings["/"+uri] = heading
+                    else:
+                        specHeadings[uri] = heading
+                else:
+                    # Multi-page spec, need to guard against colliding IDs
+                    if "#" in uri:
+                        # url to a heading in the page, like "foo.html#bar"
+                        match = re.match(r"([\w-]+).*?(#.*)", uri)
+                        if not match:
+                            die("Unexpected URI pattern '{0}' for spec '{1}'. Please report this to the Bikeshed maintainer.", uri, spec['vshortname'])
+                            continue
+                        page, fragment = match.groups()
+                        page = "/"+page
+                    else:
+                        # url to a page itself, like "foo.html"
+                        page, _, _ = uri.partition(".")
+                        page = "/"+page
+                        fragment = "#"
+                    shorthand = page + fragment
+                    heading = {
+                        'url': spec[rawAnchor['status']] + uri,
+                        'number': rawAnchor['name'] if re.match(r"[\d.]+$", rawAnchor['name']) else "",
+                        'text': rawAnchor['title'],
+                        'spec': spec['title']
+                    }
+                    specHeadings[shorthand] = heading
+                    if fragment not in specHeadings:
+                        specHeadings[fragment] = []
+                    if isinstance(specHeadings[fragment], dict):
+                        # Ugh, heading on the top-level page already squatted here.
+                        # Push it to /#foo
+                        shorthand = "/" + fragment
+                        specHeadings[shorthand] = specHeadings[fragment]
+                        specHeadings[fragment] = []
+                    if shorthand not in specHeadings[fragment]:
+                        # The heading data has a bunch of headings showing up twice, for some reason?
+                        specHeadings[fragment].append(shorthand)
+            else:
+                anchor = {
+                    'status': rawAnchor['status'],
+                    'type': rawAnchor['type'],
+                    'spec': spec['vshortname'],
+                    'shortname': spec['shortname'],
+                    'level': int(spec['level']),
+                    'export': rawAnchor.get('export', False),
+                    'normative': rawAnchor.get('normative', False),
+                    'url': spec[rawAnchor['status']] + rawAnchor['uri'],
+                    'for': rawAnchor.get('for', [])
+                }
+                for text in linkingTexts:
+                    if anchor['type'] in config.lowercaseTypes:
+                        text = text.lower()
+                    text = re.sub(r'\s+', ' ', text)
+                    anchors[text].append(anchor)
+
+    # Compile a db of {argless methods => {argfull method => {args, fors, url, shortname}}
+    methods = defaultdict(dict)
+    for key, anchors_ in anchors.items():
+        # Extract the name and arguments
+        match = re.match(r"([^(]+)\((.*)\)", key)
+        if not match:
+            continue
+        methodName, argstring = match.groups()
+        arglessMethod = methodName + "()"
+        args = [x.strip() for x in argstring.split(",")] if argstring else []
+        for anchor in anchors_:
+            if anchor['type'] not in config.idlMethodTypes:
+                continue
+            if key not in methods[arglessMethod]:
+                methods[arglessMethod][key] = {"args":args, "for": set(), "shortname":anchor['shortname']}
+            methods[arglessMethod][key]["for"].update(anchor["for"])
+    # Translate the "for" set back to a list for JSONing
+    for signatures in methods.values():
+        for signature in signatures.values():
+            signature["for"] = list(signature["for"])
+
+    # Compile a db of {for value => dict terms that use that for value}
+    fors = defaultdict(set)
+    for key, anchors_ in anchors.items():
+        for anchor in anchors_:
+            for for_ in anchor["for"]:
+                if for_ == "":
+                    continue
+                fors[for_].add(key)
+            if not anchor["for"]:
+                fors["/"].add(key)
+    for key, val in fors.items():
+        fors[key] = list(val)
 
     if not config.dryRun:
         try:
@@ -107,11 +211,30 @@ def updateCrossRefs():
             die("Couldn't save spec database to disk.\n{0}", e)
             return
         try:
+            with io.open(config.scriptPath+"/spec-data/headings.json", 'w', encoding="utf-8") as f:
+                f.write(unicode(json.dumps(headings, ensure_ascii=False, indent=2)))
+        except Exception, e:
+            die("Couldn't save headings database to disk.\n{0}", e)
+            return
+        try:
             with io.open(config.scriptPath+"/spec-data/anchors.data", 'w', encoding="utf-8") as f:
                 writeAnchorsFile(f, anchors)
         except Exception, e:
             die("Couldn't save anchor database to disk.\n{0}", e)
             return
+        try:
+            with io.open(config.scriptPath+"/spec-data/methods.json", 'w', encoding="utf-8") as f:
+                f.write(unicode(json.dumps(methods, ensure_ascii=False, indent=2)))
+        except Exception, e:
+            die("Couldn't save methods database to disk.\n{0}", e)
+            return
+        try:
+            with io.open(config.scriptPath+"/spec-data/fors.json", 'w', encoding="utf-8") as f:
+                f.write(unicode(json.dumps(fors, ensure_ascii=False, indent=2)))
+        except Exception, e:
+            die("Couldn't save fors database to disk.\n{0}", e)
+            return
+
     say("Success!")
 
 
@@ -119,17 +242,31 @@ def updateBiblio():
     say("Downloading biblio data...")
     biblios = defaultdict(list)
     try:
-        with closing(urllib2.urlopen("http://specref.jit.su/bibrefs")) as fh:
+        with closing(urllib2.urlopen("https://specref.herokuapp.com/bibrefs")) as fh:
             biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
-        with closing(urllib2.urlopen("http://dev.w3.org/csswg/biblio.ref")) as fh:
+        with closing(urllib2.urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
             lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
             biblio.processReferBiblioFile(lines, biblios, order=4)
     except Exception, e:
         die("Couldn't download the biblio data.\n{0}", e)
     if not config.dryRun:
+        # Group the biblios by the first two letters of their keys
+        groupedBiblios = DefaultOrderedDict(DefaultOrderedDict)
+        allNames = []
+        for k,v in sorted(biblios.items(), key=lambda x:x[0].lower()):
+            allNames.append(k)
+            group = k[0:2]
+            groupedBiblios[group][k] = v
+        for group, biblios in groupedBiblios.items():
+            try:
+                with io.open(config.scriptPath + "/spec-data/biblio/biblio-{0}.data".format(group), 'w', encoding="utf-8") as fh:
+                    writeBiblioFile(fh, biblios)
+            except Exception, e:
+                die("Couldn't save biblio database to disk.\n{0}", e)
+                return
         try:
-            with io.open(config.scriptPath + "/spec-data/biblio.data", 'w', encoding="utf-8") as fh:
-                writeBiblioFile(fh, biblios)
+            with io.open(config.scriptPath + "/spec-data/biblio-keys.json", 'w', encoding="utf-8") as fh:
+                fh.write(unicode(json.dumps(allNames, indent=0, ensure_ascii=False)))
         except Exception, e:
             die("Couldn't save biblio database to disk.\n{0}", e)
             return
@@ -209,17 +346,33 @@ def writeBiblioFile(fh, biblios):
 
     Each entry (including last) is ended by a line containing a single - character.
     '''
+    typePrefixes = {
+        "dict": "d",
+        "string": "s",
+        "alias": "a"
+    }
     for key, entries in biblios.items():
         b = sorted(entries, key=lambda x:x['order'])[0]
-        fh.write(key.lower() + "\n")
-        for field in ["linkText", "date", "status", "title", "dated_url", "current_url", "other"]:
-            fh.write(b.get(field, "") + "\n")
-        if b.get("etAl", False):
-            fh.write("1\n")
+        format = b['biblioFormat']
+        fh.write("{prefix}:{key}\n".format(prefix=typePrefixes[format], key=key.lower()))
+        if format == "dict":
+            for field in ["linkText", "date", "status", "title", "dated_url", "current_url", "other"]:
+                fh.write(b.get(field, "") + "\n")
+            if b.get("etAl", False):
+                fh.write("1\n")
+            else:
+                fh.write("\n")
+            for author in b.get("authors", []):
+                fh.write(author+"\n")
+        elif format == "string":
+            fh.write(b['linkText'] + "\n")
+            fh.write(b['data'] + "\n")
+        elif format == "alias":
+            fh.write(b['linkText'] + "\n")
+            fh.write(b['aliasOf'] + "\n")
         else:
-            fh.write("\n")
-        for author in b.get("authors", []):
-            fh.write(author+"\n")
+            die("The biblio key '{0}' has an unknown biblio type '{1}'.", key, format)
+            continue
         fh.write("-" + "\n")
 
 def writeAnchorsFile(fh, anchors):
@@ -249,5 +402,51 @@ def writeAnchorsFile(fh, anchors):
                 else:
                     fh.write("\n")
             for forValue in e.get("for", []):
-                fh.write(forValue+"\n")
+                if forValue: # skip empty strings
+                    fh.write(forValue+"\n")
             fh.write("-" + "\n")
+
+def fixupDataFiles():
+    import os
+    localPath = os.path.join(config.scriptPath, "spec-data")
+    remotePath = os.path.join(config.scriptPath, "spec-data", "readonly")
+    try:
+        localVersion = int(open(os.path.join(localPath, "version.txt"), 'r').read())
+    except IOError:
+        localVersion = None
+    try:
+        remoteVersion = int(open(os.path.join(remotePath, "version.txt"), 'r').read())
+    except IOError, err:
+        warn("Couldn't check the datafile version. Bikeshed may be unstable.\n{0}", err)
+        return
+
+    if localVersion == remoteVersion:
+        # Cool
+        return
+
+    # If versions don't match, either the remote versions have been updated
+    # (and we should switch you to them, because formats may have changed),
+    # or you're using a historical version of Bikeshed (ditto).
+    def copyanything(src, dst):
+        import shutil
+        import errno
+        try:
+            shutil.rmtree(dst, ignore_errors=True)
+            shutil.copytree(src, dst)
+        except OSError as exc:
+            if exc.errno in [errno.ENOTDIR, errno.EINVAL]:
+                shutil.copy(src, dst)
+            else:
+                raise
+    try:
+        for filename in os.listdir(remotePath):
+            copyanything(os.path.join(remotePath, filename), os.path.join(localPath, filename))
+    except Exception, err:
+        warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
+        return
+
+def fixupAnchor(anchor):
+    # Miscellaneous fixes
+    if anchor.get('title', None) == "'@import'":
+        anchor['title'] = "@import"
+    return anchor
