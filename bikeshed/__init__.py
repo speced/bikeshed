@@ -167,14 +167,14 @@ def main():
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
         doc = Spec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug, token=options.ghToken)
-        doc.md.addOverrides(extras)
+        doc.md = metadata.parseOverrides(extras, doc)
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "watch":
         # Can't have an error killing the watcher
         config.force = True
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
-        doc.md.addOverrides(extras)
+        doc.md = metadata.parseOverrides(extras, doc)
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         config.force = True
@@ -447,8 +447,10 @@ class Spec(object):
         self.lines = markdown.stripComments(self.lines)
 
         # Extract and process metadata
-        self.lines = metadata.parse(md = self.md, lines=self.lines)
-        self.loadDefaultMetadata()
+        overrideMd = self.md
+        self.lines, documentMd = metadata.parse(lines=self.lines, doc=self)
+        defaultMd = metadata.parseDefaults(data=config.retrieveBoilerplateFile(self, 'defaults', error=False), doc=self)
+        self.md = metadata.join(defaultMd, documentMd, overrideMd)
         self.md.finish()
         self.md.fillTextMacros(self.macros, doc=self)
 
@@ -527,6 +529,8 @@ class Spec(object):
         # Any final HTML cleanups
         cleanupHTML(self)
 
+        print self.md.boilerplate['omitSections']
+
         return self
 
 
@@ -603,19 +607,6 @@ class Spec(object):
         except Exception, e:
             die("Something went wrong while watching the file:\n{0}", e)
 
-
-
-
-    def loadDefaultMetadata(self):
-        data = config.retrieveBoilerplateFile(self, 'defaults', error=False)
-        try:
-            defaults = json.loads(data)
-        except Exception, e:
-            if data != "":
-                die("Error loading defaults:\n{0}", str(e))
-            return
-        for key,val in defaults.items():
-            self.md.addDefault(key, val)
 
     def fixText(self, text, moreMacros=None):
         # Do several textual replacements that need to happen *before* the document is parsed as HTML.
