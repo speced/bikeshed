@@ -628,7 +628,7 @@ def linkTextVariations(str, linkType):
             yield str + "ing"
     elif config.linkTypeIn(linkType, "idl"):
         # Let people refer to escaped IDL names with their "real" names (without the underscore)
-        if str[0] != "_":
+        if str[:1] != "_":
             yield "_" + str
 
 
