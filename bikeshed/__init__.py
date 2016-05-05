@@ -1710,10 +1710,10 @@ def processIDL(doc):
                         forceDfn = True
                 else:
                     for linkFor in config.splitForValues(el.get('data-idl-for', '')) or [None]:
-                        ref = doc.refs.getRef(idlType, idlText,
-                                              linkFor=linkFor,
-                                              el=el,
-                                              error=False)
+                        try:
+                            ref = doc.refs.getRef(idlType, idlText, linkFor=linkFor, el=el, error=False)
+                        except IndexError:
+                            break
                         if ref:
                             url = ref.url
                             break
