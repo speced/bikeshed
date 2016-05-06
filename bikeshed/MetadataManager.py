@@ -16,7 +16,7 @@ from .repository import *
 class MetadataManager:
     @property
     def vshortname(self):
-        if self.level is not None:
+        if self.level is not None and len(self.level.nums):
             return "{0}-{1}".format(self.shortname, self.level)
         return self.shortname
 

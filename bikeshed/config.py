@@ -148,7 +148,7 @@ testAnnotationURL = "//test.csswg.org/harness/annotate.js"
 @total_ordering
 class HierarchicalNumber(object):
     def __init__(self, valString):
-        self.nums = re.split(r"\D+", valString)
+        self.nums = [num for num in re.split(r"\D+", valString) if num != ""]
         self.originalVal = valString
 
     def __lt__(self, other):
