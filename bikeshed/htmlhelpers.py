@@ -286,7 +286,7 @@ def previousElements(startEl, tag=None, *tags):
 def childElements(parentEl, tag="*", *tags, **stuff):
     return parentEl.iterchildren(tag=tag, *tags, **stuff)
 
-def childNodes(parentEl, clear=False, skipWS=False):
+def childNodes(parentEl, clear=False, skipWS=False, skipOddNodes=True):
     '''
     This function returns all the nodes in a parent element in the DOM sense,
     mixing text nodes (strings) and other nodes together
@@ -320,6 +320,8 @@ def childNodes(parentEl, clear=False, skipWS=False):
         if clear:
             parentEl.text = None
     for c in childElements(parentEl, tag=None):
+        if skipOddNodes and isOddNode(c):
+            continue
         ret.append(c)
         if c.tail is not None:
             if c.tail.strip() != "" or not skipWS:
@@ -389,6 +391,14 @@ def removeClass(el, cls):
 def isElement(node):
     # LXML HAS THE DUMBEST XML TREE DATA MODEL IN THE WORLD
     return etree.iselement(node) and isinstance(node.tag, basestring)
+
+def isOddNode(node):
+    # Something other than an element node or string.
+    if isinstance(node, basestring):
+        return False
+    if isElement(node):
+        return False
+    return True
 
 def isNormative(el):
     # Returns whether the element is "informative" or "normative" with a crude algo.
