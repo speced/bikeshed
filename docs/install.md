@@ -85,7 +85,7 @@ Windows steps
 
 Tested on Windows 7, 8/8.1 & 10
 
-1. Install the latest [Python 2.7](https://www.python.org/download/releases/2.7.8/)
+1. Install the latest [Python 2.7](https://www.python.org/download/releases/2.7.8/). Pick the 32bit version, even on 64bit Windows, as LXML only looks for the 32bit version.
 2. Run the following in an elevated command prompt (change the path if your location is different)
 ~~~
 setx /m PATH "%PATH%;C:\Python27;C:\Python27\Scripts"
