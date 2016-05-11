@@ -321,8 +321,9 @@ def childNodes(parentEl, clear=False, skipWS=False, skipOddNodes=True):
             parentEl.text = None
     for c in childElements(parentEl, tag=None):
         if skipOddNodes and isOddNode(c):
-            continue
-        ret.append(c)
+            pass
+        else:
+            ret.append(c)
         if c.tail is not None:
             if c.tail.strip() != "" or not skipWS:
                 ret.append(c.tail)
