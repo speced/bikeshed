@@ -14,7 +14,7 @@ as well as various specs in the FXTF, SVGWG, WebAppSecurity, WHATWG, and elsewhe
 [![Build Status](https://travis-ci.org/tabatkins/bikeshed.svg?branch=master)](https://travis-ci.org/tabatkins/bikeshed)
 [![Gitter](https://img.shields.io/badge/Gitter-Join%20Chat%20↣-blue.svg)](https://gitter.im/tabatkins/bikeshed?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
-The processor can be easily installed and run locally (requiring no network access unless you're updating),
+The processor can be easily [installed](docs/install.md) and run locally (requiring no network access unless you're updating),
 or accessed as a CGI without any installation at all: <https://api.csswg.org/bikeshed/>
 
 A short overview of some of Bikeshed's features:
