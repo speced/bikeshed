@@ -15,7 +15,7 @@ Linux steps
 -----------
 
 ~~~~
-$ sudo apt-get install python2.7 python-dev python-pip libxslt1-dev libxml2-dev
+$ sudo apt-get install python2.7 python-dev python-pip python-wheel libxslt1-dev libxml2-dev
 ~~~~
 
 The `apt-get` command works on Debian-based systems like Ubuntu; if you work on some other type of system, and can figure out how to get things working on your own, let me know and I'll add instructions for your system.
