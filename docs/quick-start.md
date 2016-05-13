@@ -17,19 +17,29 @@ suitable to put into a shell alias/function for easy use.
 Starting the Spec
 -----------------
 
-Starting from an empty file, do the following:
+Put the following into an empty document:
 
-1. Add a `<pre class='metadata'>` block, with at least the following keys (each line in the format "key: value"):
-	1. "Title" - the title of the spec.
-	2. "Status" - the shortcode for the spec's status (ED, WD, UD, etc.)
-	3. "ED" - link to the Editor's Draft
-	4. "Shortname" - the spec's shortname, like "css-flexbox".
-	5. "Level" - an integer for the spec's level.  If you're unsure, just put "1".
-	6. "Editor" - an editor's personal information, in the format "[name], [company], [email or contact url]".
-	7. "Abstract" - a short (one or two sentences) description of what the spec is for.
-	8. "Group" - this defaults to "csswg", but can be changed to whatever group you're generating for.
-2. You *should* add an `<h2>Introduction</h2>` section.
-3. Write the rest of the spec!
+```
+<pre class='metadata'>
+Title: Your Spec Title
+Shortname: your-spec
+Level: 1
+Status: ED
+Group: WGNAMEORWHATEVER
+URL: http://example.com/url-this-spec-will-live-at
+Editor: Your Name, Your Company http://example.com/your-company, your-email@example.com, http://example.com/your-personal-website
+Abstract: A short description of your spec, one or two sentences.
+</pre>
+
+Introduction {#intro}
+=====================
+
+Introduction here.
+```
+
+(Or, if you're running Bikeshed locally, run `bikeshed template > mydoc.bs`.)
+
+Fill in the metadata appropriately, then write the rest of your spec!
 
 The processor expects that your headings are all `<h2>` or higher (`<h1>` is reserved for the spec title).
 You probably want to add explicit id attributes to your headings;
@@ -58,14 +68,12 @@ Definitions and autolinks have a few extra attributes that you can specify;
 check out the details in the [Definitions and Linking](definitions-autolinks.md) doc.
 
 There are a few textual shortcuts to use as well:
-* `'foo'` (apostophes/straight quotes) is an autolink to a property or descriptor named "foo"
-* `''foo''` (double apostrophes) is an autolink to any of the CSS definition types except property and descriptor
-* `<<foo>>` is an autolink to a type/production named "&lt;foo>"
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
+* A number of autolink types have corresponding textual shorthands: for example, `'foo'` is an autolink to the "foo" CSS property; `{{Foo}}` is an autolink to the WebIDL "Foo" interface.
 
 When you first preprocess, there's a good chance you'll get several errors.
-While the preprocessor is forgiving about most things and will gladly to automatic fixup,
+While the preprocessor is forgiving about most things and will gladly do automatic fixup,
 there are some things that it needs to be strict about to ensure it can generate correct documents.
 In particular, all of your "value" type definitions *must* have a `for=''` attribute naming what they're a value for:
 the name of the property they're a value of, the name of the type they're defined as a part of, etc.
@@ -81,7 +89,7 @@ If defining a property/descriptor, rather than writing out the table markup expl
 ~~~~html
 <pre class='propdef'> (or 'descdef')
 Name: var-*
-Value: [ <<value>> | <<CDO>> | <<CDC>> ]
+Value: <<value>> | <<CDO>> | <<CDC>>
 Initial: (nothing, see prose)
 Applies to: all elements
 Inherited: yes
