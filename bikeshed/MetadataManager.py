@@ -78,6 +78,7 @@ class MetadataManager:
         self.translations = []
         self.translateIDs = defaultdict(list)
         self.useDfnPanels = True
+        self.prepTR = False
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -113,7 +114,8 @@ class MetadataManager:
             "Issue Class": "issueClass",
             "Note Class": "noteClass",
             "Advisement Class": "advisementClass",
-            "Use Dfn Panels": "useDfnPanels"
+            "Use Dfn Panels": "useDfnPanels",
+            "Prepare For Tr": "prepTR"
         }
 
         # Some keys are multi-value:
@@ -174,7 +176,8 @@ class MetadataManager:
             "Block Elements": parseCommaSeparated,
             "Translation": parseTranslation,
             "Translate Ids": parseTranslateIDs,
-            "Use Dfn Panels": parseBoolean
+            "Use Dfn Panels": parseBoolean,
+            "Prepare For Tr": parseBoolean
         }
 
         # Alternate output handlers, passed key/value/doc.

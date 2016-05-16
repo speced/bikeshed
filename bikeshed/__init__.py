@@ -12,6 +12,7 @@ import urllib
 import urllib2
 import argparse
 import itertools
+import importlib
 from datetime import date, datetime
 
 from . import config
@@ -465,6 +466,7 @@ class Spec(object):
         self.loadDefaultMetadata()
         self.md.finish()
         self.md.fillTextMacros(self.macros, doc=self)
+        exec config.retrieveBoilerplateFile(self, "bs-extensions")
 
         # Initialize things
         self.refs.initializeRefs(self);
@@ -540,6 +542,8 @@ class Spec(object):
 
         # Any final HTML cleanups
         cleanupHTML(self)
+        if self.md.prepTR:
+            BSPrepTR(self)
 
         return self
 
