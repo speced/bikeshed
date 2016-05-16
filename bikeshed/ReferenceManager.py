@@ -535,14 +535,25 @@ class ReferenceManager(object):
         refs = tempRefs
 
         # If multiple levels of the same shortname exist,
-        # remove the smaller levels.
+        # only use the latest level.
+        # If generating for TR, prefer the latest TR level,
+        # unless that doesn't exist, in which case just prefer the latest level.
         shortnameLevels = defaultdict(lambda:defaultdict(list))
+        TRShortnameLevels = defaultdict(lambda:defaultdict(list))
         for ref in refs:
             shortnameLevels[ref.shortname][ref.level].append(ref)
+            if status == "TR" and ref.status == "TR":
+                TRShortnameLevels[ref.shortname][ref.level].append(ref)
         refs = []
-        for levelSet in shortnameLevels.values():
-            maxLevel = max(levelSet.keys())
-            refs.extend(levelSet[maxLevel])
+        for shortname, levelSet in shortnameLevels.items():
+            if status == "TR" and TRShortnameLevels[shortname]:
+                # Get the latest TR refs if they exist and you're generating for TR...
+                maxLevel = max(TRShortnameLevels[shortname].keys())
+                refs.extend(TRShortnameLevels[shortname][maxLevel])
+            else:
+                # Otherwise just grab the latest refs regardless.
+                maxLevel = max(levelSet.keys())
+                refs.extend(levelSet[maxLevel])
 
         return refs, None
 
