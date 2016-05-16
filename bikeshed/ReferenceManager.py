@@ -41,6 +41,8 @@ class ReferenceManager(object):
         # Dict of {base key name => preferred display name}
         self.preferredBiblioNames = dict()
         # Dict of {spec vshortname => headings}
+        # Each heading is either {#foo => heading-dict}, {/foo#bar => heading-dict} or {#foo => [page-heading-keys]}
+        # In the latter, it's a list of the heading keys (of the form /foo#bar) that collide for that id.
         self.headings = dict()
         self.status = specStatus
 

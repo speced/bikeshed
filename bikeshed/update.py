@@ -112,8 +112,11 @@ def updateCrossRefs():
                         'spec': spec['title']
                     }
                     if uri in specHeadings and isinstance(specHeadings[uri], list):
-                        # Okay, multipage already squatted here.
-                        specHeadings[uri].append(spec['vshortname']+"/"+uri)
+                        # A multipage heading already squatted here, putting this ID into multipage mode.
+                        # That means the #frag is just a list /page#frag values that all have #frag,
+                        # and this particular one is on the front-page, thus no /page.
+                        # We'll work with that, treating this as /#frag instead.
+                        specHeadings[uri].append("/"+uri)
                         specHeadings["/"+uri] = heading
                     else:
                         specHeadings[uri] = heading
@@ -143,8 +146,11 @@ def updateCrossRefs():
                     if fragment not in specHeadings:
                         specHeadings[fragment] = []
                     if isinstance(specHeadings[fragment], dict):
-                        # Ugh, heading on the top-level page already squatted here.
-                        # Push it to /#foo
+                        # Heading on the top-level page already squatted here, and put this ID into singlepage mode,
+                        # where #frag stores the actual heading information.
+                        # We'll work with that, pushing the actual heading information to /#frag
+                        # and making #frag be a list of just [/#frag],
+                        # so we can append to that properly immediately below.
                         shorthand = "/" + fragment
                         specHeadings[shorthand] = specHeadings[fragment]
                         specHeadings[fragment] = []
