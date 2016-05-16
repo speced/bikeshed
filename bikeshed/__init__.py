@@ -411,18 +411,32 @@ class Spec(object):
             .heading > a.self-link::before { content: "§"; }
             dfn > a.self-link::before      { content: "#"; }'''
         self.extraStyles['style-counters'] = '''
+            body {
+                counter-reset: example figure issue;
+            }
+            .issue {
+                counter-increment: issue;
+            }
             .issue:not(.no-marker)::before {
                 content: "Issue " counter(issue);
             }
 
+            .example {
+                counter-increment: example;
+            }
             .example:not(.no-marker)::before {
-                content: "Example";
                 content: "Example " counter(example);
             }
             .invalid.example:not(.no-marker)::before,
             .illegal.example:not(.no-marker)::before {
-                content: "Invalid Example";
                 content: "Invalid Example" counter(example);
+            }
+
+            figure {
+                counter-increment: figure;
+            }
+            figcaption:not(.no-marker)::before {
+                content: "Figure " counter(figure);
             }'''
         self.extraScripts = defaultdict(str);
 
