@@ -28,8 +28,10 @@ class BiblioEntry(object):
                 setattr(self, key, val)
         if preferredURL == "dated":
             self.url = self.dated_url or self.current_url
-        else:
+        elif preferredURL == "current":
             self.url = self.current_url or self.dated_url
+        else:
+            die("Programming error: when trying to build the biblio entry for '{0}', got unknown status '{1}'.", self.linkText, preferredURL)
 
     def __str__(self):
         str = ""

@@ -406,7 +406,7 @@ class ReferenceManager(object):
             # Follow the chain to the real candidate
             bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True)
         else:
-            bib = biblio.BiblioEntry(preferredURL=status, **candidate)
+            bib = biblio.BiblioEntry(preferredURL="dated" if self.status == "TR" else "current", **candidate)
 
         # If a canonical name has been established, use it.
         if bib.linkText in self.preferredBiblioNames:
