@@ -111,15 +111,8 @@ def updateCrossRefs():
                         'text': rawAnchor['title'],
                         'spec': spec['title']
                     }
-                    if uri in specHeadings and isinstance(specHeadings[uri], list):
-                        # A multipage heading already squatted here, putting this ID into multipage mode.
-                        # That means the #frag is just a list /page#frag values that all have #frag,
-                        # and this particular one is on the front-page, thus no /page.
-                        # We'll work with that, treating this as /#frag instead.
-                        specHeadings[uri].append("/"+uri)
-                        specHeadings["/"+uri] = heading
-                    else:
-                        specHeadings[uri] = heading
+                    fragment = uri
+                    shorthand = "/"+fragment
                 else:
                     # Multi-page spec, need to guard against colliding IDs
                     if "#" in uri:
@@ -142,21 +135,11 @@ def updateCrossRefs():
                         'text': rawAnchor['title'],
                         'spec': spec['title']
                     }
-                    specHeadings[shorthand] = heading
-                    if fragment not in specHeadings:
-                        specHeadings[fragment] = []
-                    if isinstance(specHeadings[fragment], dict):
-                        # Heading on the top-level page already squatted here, and put this ID into singlepage mode,
-                        # where #frag stores the actual heading information.
-                        # We'll work with that, pushing the actual heading information to /#frag
-                        # and making #frag be a list of just [/#frag],
-                        # so we can append to that properly immediately below.
-                        shorthand = "/" + fragment
-                        specHeadings[shorthand] = specHeadings[fragment]
-                        specHeadings[fragment] = []
-                    if shorthand not in specHeadings[fragment]:
-                        # The heading data has a bunch of headings showing up twice, for some reason?
-                        specHeadings[fragment].append(shorthand)
+                specHeadings[shorthand] = heading
+                if fragment not in specHeadings:
+                    specHeadings[fragment] = []
+                if shorthand not in specHeadings[fragment]:
+                    specHeadings[fragment].append(shorthand)
             else:
                 anchor = {
                     'status': rawAnchor['status'],
@@ -174,6 +157,17 @@ def updateCrossRefs():
                         text = text.lower()
                     text = re.sub(r'\s+', ' ', text)
                     anchors[text].append(anchor)
+
+    # Headings data was purposely verbose, assuming collisions even when there wasn't one.
+    # Want to keep the collision data for multi-page, so I can tell when you request a non-existent page,
+    # but need to collapse away the collision stuff for single-page.
+    for specHeadings in headings.values():
+        for k, v in specHeadings.items():
+            if k[0] == "#" and len(v) == 1 and v[0][0:2] == "/#":
+                # No collision, and this is either a single-page spec or a non-colliding front-page link
+                # Go ahead and collapse them.
+                specHeadings[k] = specHeadings[v[0]]
+                del specHeadings[v[0]]
 
     # Compile a db of {argless methods => {argfull method => {args, fors, url, shortname}}
     methods = defaultdict(dict)
@@ -212,13 +206,13 @@ def updateCrossRefs():
     if not config.dryRun:
         try:
             with io.open(config.scriptPath+"/spec-data/specs.json", 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(specs, ensure_ascii=False, indent=2)))
+                f.write(unicode(json.dumps(specs, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save spec database to disk.\n{0}", e)
             return
         try:
             with io.open(config.scriptPath+"/spec-data/headings.json", 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(headings, ensure_ascii=False, indent=2)))
+                f.write(unicode(json.dumps(headings, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save headings database to disk.\n{0}", e)
             return
@@ -230,13 +224,13 @@ def updateCrossRefs():
             return
         try:
             with io.open(config.scriptPath+"/spec-data/methods.json", 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(methods, ensure_ascii=False, indent=2)))
+                f.write(unicode(json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save methods database to disk.\n{0}", e)
             return
         try:
             with io.open(config.scriptPath+"/spec-data/fors.json", 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(fors, ensure_ascii=False, indent=2)))
+                f.write(unicode(json.dumps(fors, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save fors database to disk.\n{0}", e)
             return
@@ -272,7 +266,7 @@ def updateBiblio():
                 return
         try:
             with io.open(config.scriptPath + "/spec-data/biblio-keys.json", 'w', encoding="utf-8") as fh:
-                fh.write(unicode(json.dumps(allNames, indent=0, ensure_ascii=False)))
+                fh.write(unicode(json.dumps(allNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception, e:
             die("Couldn't save biblio database to disk.\n{0}", e)
             return
@@ -328,7 +322,7 @@ def updateTestSuites():
     if not config.dryRun:
         try:
             with io.open(config.scriptPath+"/spec-data/test-suites.json", 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(testSuites, ensure_ascii=False, indent=2)))
+                f.write(unicode(json.dumps(testSuites, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save test-suite database to disk.\n{0}", e)
     say("Success!")
