@@ -109,7 +109,7 @@ def removeUnwantedBoilerplate(doc):
             removeNode(el)
 
 def addAnnotations(doc):
-    if (doc.md.vshortname in doc.testSuites):
+    if doc.md.vshortname in doc.testSuites and not doc.md.prepTR:
         html = config.retrieveBoilerplateFile(doc, 'annotations')
         html = doc.fixText(html)
         appendContents(find("head", doc), parseHTML(html))
