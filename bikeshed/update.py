@@ -135,7 +135,9 @@ def updateCrossRefs():
                         'text': rawAnchor['title'],
                         'spec': spec['title']
                     }
-                specHeadings[shorthand] = heading
+                if shorthand not in specHeadings:
+                    specHeadings[shorthand] = {}
+                specHeadings[shorthand][rawAnchor['status']] = heading
                 if fragment not in specHeadings:
                     specHeadings[fragment] = []
                 if shorthand not in specHeadings[fragment]:

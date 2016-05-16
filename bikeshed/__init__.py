@@ -884,6 +884,16 @@ def fixInterDocumentReferences(doc):
                     # multiple headings of this id, user needs to disambiguate
                     die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  [[{0}]]".format(spec+x) for x in heading))
                     continue
+            if doc.md.status == "ED":
+                if "ED" in heading:
+                    heading = heading["ED"]
+                else:
+                    heading = heading["TR"]
+            else:
+                if "TR" in heading:
+                    heading = heading["TR"]
+                else:
+                    heading = heading["ED"]
             el.tag = "a"
             el.set("href", heading['url'])
             el.text = "{spec} §{number} {text}".format(**heading)
