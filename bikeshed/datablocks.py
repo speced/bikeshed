@@ -165,7 +165,7 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     elif "shorthand" in firstLine:
         attrs["Name"] = None
         attrs["Value"] = None
-        for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animatable"]:
+        for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animation type"]:
             attrs[defaultKey] = "see individual properties"
         ret = ["<table class='def propdef'{forHint}>".format(forHint=forHint)]
     else:
@@ -177,8 +177,13 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
         attrs["Percentages"] = "n/a"
         attrs["Media"] = "visual"
         attrs["Computed value"] = "as specified"
-        attrs["Animatable"] = "no"
+        attrs["Animation type"] = "discrete"
         ret = ["<table class='def propdef'{forHint}>".format(forHint=forHint)]
+    # We are in the process of migrating specs from using 'Animatable' to
+    # using 'Animation type'. If we find 'Animatable' in the parsed attributes,
+    # drop the default 'Animation type' entry.
+    if "Animatable" in parsedAttrs:
+      attrs.pop("Animation type")
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:
