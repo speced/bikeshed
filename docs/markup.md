@@ -195,7 +195,7 @@ and let the processor automatically generate a `<table>` from it:
 	Computed value: as specified, with lengths made absolute
 	Percentages: relative to the <a>flex container's</a> inner <a>main size</a>
 	Media: visual
-	Animatable: as 'width'
+	Animation type: length
 	</pre>
 ~~~~
 

@@ -388,6 +388,8 @@ def addPropertyIndex(doc):
                 return "%ages"
             if name == "Animatable":
                 return "Ani\xadmat\xadable"
+            if name == "Animation type":
+                return "Anim\xadation type"
             if name == "Computed value":
                 return "Com\xadputed value"
             return name
