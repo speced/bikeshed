@@ -370,6 +370,7 @@ class ReferenceManager(object):
         return defaultRef
 
     def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None, quiet=False):
+        specStatus = "dated" if self.status == "TR" else "current"
         key = text.lower()
         if key in ["notifications", "fullscreen", "dom", "url", "encoding"]:
             # A handful of specs where W3C is squatting with an out-of-date fork.
@@ -390,7 +391,7 @@ class ReferenceManager(object):
                 if ref:
                     return ref
             if generateFakeRef:
-                return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=status)
+                return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=specStatus)
             else:
                 return None
         else:
@@ -406,7 +407,7 @@ class ReferenceManager(object):
             # Follow the chain to the real candidate
             bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True)
         else:
-            bib = biblio.BiblioEntry(preferredURL="dated" if self.status == "TR" else "current", **candidate)
+            bib = biblio.BiblioEntry(preferredURL=specStatus, **candidate)
 
         # If a canonical name has been established, use it.
         if bib.linkText in self.preferredBiblioNames:
