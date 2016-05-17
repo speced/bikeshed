@@ -27,6 +27,8 @@ from . import shorthands
 from . import boilerplate
 from . import datablocks
 from . import lexers
+from . import publish
+from . import extensions
 from .ReferenceManager import ReferenceManager
 from .htmlhelpers import *
 from .messages import *
@@ -65,6 +67,16 @@ def main():
     specParser.add_argument("--debug", dest="debug", action="store_true", help="Switches on some debugging tools. Don't use for production!")
     specParser.add_argument("--gh-token", dest="ghToken", nargs="?",
                            help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
+
+    echidnaParser = subparsers.add_parser('echidna', help="Process a spec source file into a valid output file and publish it according to certain automatic protocols.")
+    echidnaParser.add_argument("infile", nargs="?",
+                            default=None,
+                            help="Path to the source file.")
+    echidnaParser.add_argument("--gh-token", dest="ghToken", nargs="?",
+                           help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
+    echidnaParser.add_argument("--u", dest="un", metavar="USERNAME", required=True, help="W3C username.")
+    echidnaParser.add_argument("--p", dest="pw", metavar="PASSWORD", required=True, help="W3C password.")
+    echidnaParser.add_argument("--d", dest="decision", metavar="DECISION_URL", required=True, help="URL recording the decision to publish.")
 
     watchParser = subparsers.add_parser('watch', help="Process a spec source file into a valid output file, automatically rebuilding when it changes.")
     watchParser.add_argument("infile", nargs="?",
@@ -171,6 +183,12 @@ def main():
         doc.md.addOverrides(extras)
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
+    elif options.subparserName == "echidna":
+        doc = Spec(inputFilename=options.infile, token=options.ghToken)
+        doc.md.addOverrides(extras)
+        doc.md.addOverrides(["--md-prepare-for-tr=yes"])
+        doc.preprocess()
+        publish.publishEchidna(doc, username=options.un, password=options.pw, decision=options.decision)
     elif options.subparserName == "watch":
         # Can't have an error killing the watcher
         config.force = True
@@ -465,8 +483,8 @@ class Spec(object):
         self.lines = metadata.parse(md = self.md, lines=self.lines)
         self.loadDefaultMetadata()
         self.md.finish()
+        extensions.load(self)
         self.md.fillTextMacros(self.macros, doc=self)
-        exec config.retrieveBoilerplateFile(self, "bs-extensions")
 
         # Initialize things
         self.refs.initializeRefs(self);
@@ -543,7 +561,7 @@ class Spec(object):
         # Any final HTML cleanups
         cleanupHTML(self)
         if self.md.prepTR:
-            BSPrepTR(self)
+            extensions.BSPrepTR(self)
 
         return self
 
