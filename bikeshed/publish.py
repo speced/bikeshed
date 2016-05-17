@@ -17,9 +17,13 @@ def publishEchidna(doc, username, password, decision):
 	# curl 'https://labs.w3.org/echidna/api/request' --user '<username>:<password>' -F "tar=@/some/path/spec.tar" -F "decision=<decisionUrl>"
 	r = requests.post("https://labs.w3.org/echidna/api/request", auth=(username, password), data={"decision": decision}, files={"tar": tar})
 	os.remove(tar.name)
-	print r.text
-	print r.headers
-	print r.status_code
+	if r.status_code == 202:
+		print "https://labs.w3.org/echidna/api/status?id=" + r.text
+	else:
+		print "There was an error publishing your spec. Here's some information that might help?"
+		print r.status_code
+		print r.text
+		print r.headers
 
 def prepareTar(doc):
 	# Finish the spec
