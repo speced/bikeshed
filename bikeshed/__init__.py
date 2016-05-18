@@ -1423,6 +1423,7 @@ def addDfnPanels(doc, dfns):
         if not href.startswith("#"):
             continue
         allRefs[href[1:]].append(a)
+    body = find("body", doc)
     for dfn in dfns:
         id = dfn.get("id")
         if not id:
@@ -1442,13 +1443,14 @@ def addDfnPanels(doc, dfns):
             continue
         addClass(dfn, "dfn-paneled")
         atLeastOnePanel = True
-        panel = E.span({"class": "dfn-panel", "data-deco": ""},
+        panel = E.aside({"class": "dfn-panel", "data-for": id},
             E.b(
                 E.a({"href":"#"+urllib.quote(id)}, "#"+id)),
             E.b("Referenced in:"))
         counter = 0
+        ul = appendChild(panel, E.ul())
         for text,els in refs.items():
-            li = appendChild(panel, E.span())
+            li = appendChild(ul, E.li())
             for i,el in enumerate(els):
                 counter += 1
                 refID = el.get("id")
@@ -1462,7 +1464,7 @@ def addDfnPanels(doc, dfns):
                     appendChild(li,
                         " ",
                         E.a({"href": "#"+urllib.quote(refID)}, "("+str(i+1)+")"))
-        appendChild(dfn, panel)
+        appendChild(body, panel)
     if atLeastOnePanel:
         doc.extraScripts['script-dfn-panel'] = '''
         document.body.addEventListener("click", function(e) {
@@ -1475,11 +1477,7 @@ def addDfnPanels(doc, dfns):
                     // Clicked on a link; intercept this early in case it was nested in a <dfn>
                     return true;
                 }
-                if(el.tagName == "DFN") {
-                    target = "dfn";
-                    break;
-                }
-                if(/H\d/.test(el.tagName) && el.getAttribute('data-dfn-type') != null) {
+                if(el.classList.contains("dfn-paneled")) {
                     target = "dfn";
                     break;
                 }
@@ -1498,24 +1496,38 @@ def addDfnPanels(doc, dfns):
             }
             if(target == "dfn") {
                 // open the panel
-                var dfnPanel = el.querySelector(".dfn-panel");
+                var dfnPanel = document.querySelector(".dfn-panel[data-for='" + el.id + "']");
                 if(dfnPanel) {
+                    console.log(dfnPanel);
                     dfnPanel.classList.add("on");
+                    var rect = el.getBoundingClientRect();
+                    dfnPanel.style.left = window.scrollX + rect.right + 5 + "px";
+                    dfnPanel.style.top = window.scrollY + rect.top + "px";
+                    var panelRect = dfnPanel.getBoundingClientRect();
+                    var panelWidth = panelRect.right - panelRect.left;
+                    if(panelRect.right > document.body.scrollWidth && (rect.left - (panelWidth + 5)) > 0) {
+                        // Reposition, because the panel is overflowing
+                        dfnPanel.style.left = window.scrollX + rect.left - (panelWidth + 5) + "px";
+                    }
+                } else {
+                    console.log("Couldn't find .dfn-panel[data-for='" + el.id + "']");
                 }
             } else if(target == "dfn-panel") {
                 // Switch it to "activated" state, which pins it.
                 el.classList.add("activated");
+                el.style.left = null;
+                el.style.top = null;
             }
 
         });
         '''
         doc.extraStyles['style-dfn-panel'] = '''
         .dfn-panel {
-            display: inline-block;
             position: absolute;
             z-index: 35;
             height: auto;
             width: -webkit-fit-content;
+            width: fit-content;
             max-width: 300px;
             max-height: 500px;
             overflow: auto;
@@ -1531,7 +1543,8 @@ def addDfnPanels(doc, dfns):
         .dfn-panel a { color: black; }
         .dfn-panel a:not(:hover) { text-decoration: none !important; border-bottom: none !important; }
         .dfn-panel > b + b { margin-top: 0.25em; }
-        .dfn-panel > span { display: list-item; list-style: inside; }
+        .dfn-panel ul { padding: 0; }
+        .dfn-panel li { list-style: inside; }
         .dfn-panel.activated {
             display: inline-block;
             position: fixed;
