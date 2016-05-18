@@ -1472,10 +1472,11 @@ def addDfnPanels(doc, dfns):
             // Find the dfn element or panel, if any, that was clicked on.
             var el = e.target;
             var target;
+            var hitALink = false;
             while(el.parentElement) {
                 if(el.tagName == "A") {
-                    // Clicked on a link; intercept this early in case it was nested in a <dfn>
-                    return true;
+                    // Clicking on a link in a <dfn> shouldn't summon the panel
+                    hitALink = true;
                 }
                 if(el.classList.contains("dfn-paneled")) {
                     target = "dfn";
@@ -1494,7 +1495,7 @@ def addDfnPanels(doc, dfns):
                     el.classList.remove("activated");
                 });
             }
-            if(target == "dfn") {
+            if(target == "dfn" && !hitALink) {
                 // open the panel
                 var dfnPanel = document.querySelector(".dfn-panel[data-for='" + el.id + "']");
                 if(dfnPanel) {
