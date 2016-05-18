@@ -25,14 +25,16 @@ def publishEchidna(doc, username, password, decision):
 		print r.text
 		print r.headers
 
-def prepareTar(doc):
+def prepareTar(doc, visibleTar=False):
 	# Finish the spec
 	specOutput = tempfile.NamedTemporaryFile(delete=False)
 	doc.finish(outputFilename=specOutput.name)
 	# Build the TAR file
-	f = tempfile.NamedTemporaryFile(delete=False)
-	tar = tarfile.open(fileobj=f, mode='w')
-	#tar = tarfile.open(name="test.tar", mode='w')
+	if visibleTar:
+		tar = tarfile.open(name="test.tar", mode='w')
+	else:
+		f = tempfile.NamedTemporaryFile(delete=False)
+		tar = tarfile.open(fileobj=f, mode='w')
 	tar.add(specOutput.name, arcname="Overview.html")
 	additionalFiles = extensions.BSPublishAdditionalFiles(["images", "diagrams", "examples"])
 	for fname in additionalFiles:
@@ -46,4 +48,7 @@ def prepareTar(doc):
 	tar.close()
 	specOutput.close()
 	os.remove(specOutput.name)
-	return f
+	if visibleTar:
+		return None
+	else:
+		return f

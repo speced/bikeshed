@@ -77,6 +77,7 @@ def main():
     echidnaParser.add_argument("--u", dest="un", metavar="USERNAME", required=True, help="W3C username.")
     echidnaParser.add_argument("--p", dest="pw", metavar="PASSWORD", required=True, help="W3C password.")
     echidnaParser.add_argument("--d", dest="decision", metavar="DECISION_URL", required=True, help="URL recording the decision to publish.")
+    echidnaParser.add_argument("--just-tar", dest="justTar", action="store_true")
 
     watchParser = subparsers.add_parser('watch', help="Process a spec source file into a valid output file, automatically rebuilding when it changes.")
     watchParser.add_argument("infile", nargs="?",
@@ -188,7 +189,10 @@ def main():
         doc.md.addOverrides(extras)
         doc.md.addOverrides(["--md-prepare-for-tr=yes"])
         doc.preprocess()
-        publish.publishEchidna(doc, username=options.un, password=options.pw, decision=options.decision)
+        if options.justTar:
+            publish.prepareTar(doc, visibleTar=True)
+        else:
+            publish.publishEchidna(doc, username=options.un, password=options.pw, decision=options.decision)
     elif options.subparserName == "watch":
         # Can't have an error killing the watcher
         config.force = True
