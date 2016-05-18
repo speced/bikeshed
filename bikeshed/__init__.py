@@ -74,9 +74,9 @@ def main():
                             help="Path to the source file.")
     echidnaParser.add_argument("--gh-token", dest="ghToken", nargs="?",
                            help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
-    echidnaParser.add_argument("--u", dest="un", metavar="USERNAME", required=True, help="W3C username.")
-    echidnaParser.add_argument("--p", dest="pw", metavar="PASSWORD", required=True, help="W3C password.")
-    echidnaParser.add_argument("--d", dest="decision", metavar="DECISION_URL", required=True, help="URL recording the decision to publish.")
+    echidnaParser.add_argument("--u", dest="un", metavar="USERNAME", required=False, help="W3C username.")
+    echidnaParser.add_argument("--p", dest="pw", metavar="PASSWORD", required=False, help="W3C password.")
+    echidnaParser.add_argument("--d", dest="decision", metavar="DECISION_URL", required=False, help="URL recording the decision to publish.")
     echidnaParser.add_argument("--just-tar", dest="justTar", action="store_true")
 
     watchParser = subparsers.add_parser('watch', help="Process a spec source file into a valid output file, automatically rebuilding when it changes.")
