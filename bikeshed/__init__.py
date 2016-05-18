@@ -1550,7 +1550,7 @@ def addDfnPanels(doc, dfns):
             display: inline-block;
             position: fixed;
             left: .5em;
-            bottom: .5em;
+            bottom: 2em;
             margin: 0 auto;
             max-width: calc(100vw - 1.5em - .4em - .5em);
             max-height: 30vh;
