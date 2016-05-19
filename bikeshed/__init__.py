@@ -1747,7 +1747,7 @@ def markupIDL(doc):
 
 
 def processIDL(doc):
-    for pre in findAll("pre.idl", doc):
+    for pre in findAll("pre.idl, xmp.idl", doc):
         if pre.get("data-no-idl") is not None:
             continue
         if not isNormative(pre):
@@ -1873,7 +1873,7 @@ def addSyntaxHighlighting(doc):
             el.set("highlight", match.group(1))
 
     # Highlight all the appropriate elements
-    for el in findAll("pre, code", doc):
+    for el in findAll("xmp, pre, code", doc):
         if list(childElements(el)):
             # If there's any internal structure, don't override it with highlighting.
             continue
@@ -1888,7 +1888,7 @@ def addSyntaxHighlighting(doc):
         doc.extraStyles['style-syntax-highlighting'] += """
         .highlight { background: hsl(24, 20%, 95%); }
         code.highlight { padding: .1em; border-radius: .3em; }
-        pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
+        xmp.highlight, pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
         """
 
 
