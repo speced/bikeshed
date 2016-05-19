@@ -26,6 +26,7 @@ Several groups are already accommodated with appropriate inclusion files:
 * "svg", for the SVG Working Group
 * "webappsec", for the WebApps Security Working Group
 * "whatwg", for the WHATWG
+* "wg21", for the C++ Standards Committee
 
 You can put whatever value you want into the "Group" value, though.
 Unrecognized values will just use the default boilerplate files.
