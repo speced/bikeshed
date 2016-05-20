@@ -10,6 +10,8 @@ from .DefaultOrderedDict import DefaultOrderedDict
 
 def addBikeshedVersion(doc):
     # Adds a <meta> containing the current Bikeshed semver.
+    if "generator" in doc.md.boilerplate['omitSections']:
+        return
     head = find("head", doc)
     appendChild(head,
         E.meta({"name": "generator", "content": "Bikeshed 1.0.0"}))
@@ -45,7 +47,10 @@ def getFillContainer(tag, doc, default=False):
     if find("[data-fill-with='{0}']".format(tag), doc) is not None:
         return find("[data-fill-with='{0}']".format(tag), doc)
 
-    # Otherwise, append to the end of the document
+    # Otherwise, append to the end of the document,
+    # unless you're in the byos group
+    if doc.md.group == "byos":
+        return None
     if default:
         return find("body", doc)
 

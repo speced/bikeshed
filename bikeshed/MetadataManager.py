@@ -252,6 +252,9 @@ class MetadataManager:
         self.validate()
 
     def validate(self):
+        if self.group == "byos":
+            return True
+
         if not self.hasMetadata:
             die("The document requires at least one metadata block.")
             return

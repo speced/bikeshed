@@ -67,6 +67,8 @@ def main():
     specParser.add_argument("--debug", dest="debug", action="store_true", help="Switches on some debugging tools. Don't use for production!")
     specParser.add_argument("--gh-token", dest="ghToken", nargs="?",
                            help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
+    specParser.add_argument("--byos", dest="byos", action="store_true",
+                            help="Bring-Your-Own-Spec: turns off all the Bikeshed auto-niceties, so you can piecemeal its features into your existing doc instead. Experimental, let me know if things get crashy or weird.")
 
     echidnaParser = subparsers.add_parser('echidna', help="Process a spec source file into a valid output file and publish it according to certain automatic protocols.")
     echidnaParser.add_argument("infile", nargs="?",
@@ -88,6 +90,8 @@ def main():
                             help="Path to the output file.")
     watchParser.add_argument("--gh-token", dest="ghToken", nargs="?",
                            help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
+    watchParser.add_argument("--byos", dest="byos", action="store_true",
+                            help="Bring-Your-Own-Spec: turns off all the Bikeshed auto-niceties, so you can piecemeal its features into your existing doc instead. Experimental, let me know if things get crashy or weird.")
 
     updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
@@ -181,6 +185,8 @@ def main():
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
         doc = Spec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug, token=options.ghToken)
+        if options.byos:
+            doc.md.addOverrides(["--md-Group=byos"])
         doc.md.addOverrides(extras)
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
@@ -197,6 +203,8 @@ def main():
         # Can't have an error killing the watcher
         config.force = True
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
+        if options.byos:
+            doc.md.addOverrides(["--md-Group=byos"])
         doc.md.addOverrides(extras)
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
