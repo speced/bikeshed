@@ -521,7 +521,7 @@ def parseMarkupShorthands(key, val):
     # Output is a dict of the shorthand categories with boolean values.
     vals = [v.strip() for v in val.lower().split(",")]
     ret = {}
-    validCategories = frozenset(["css", "markup", "biblio", "idl", "markdown", "algorithm"])
+    validCategories = frozenset(["css", "markup", "dfn", "biblio", "idl", "markdown", "algorithm"])
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:
