@@ -1959,11 +1959,12 @@ def cleanupHTML(doc):
 
     # If the <h1> contains only capital letters, add a class=allcaps for styling hook
     h1 = find("h1", doc)
-    for letter in textContent(h1):
-        if letter.isalpha() and letter.islower():
-            break
-    else:
-        addClass(h1, "allcaps")
+    if h1 is not None:
+        for letter in textContent(h1):
+            if letter.isalpha() and letter.islower():
+                break
+        else:
+            addClass(h1, "allcaps")
 
     # Remove a bunch of attributes
     for el in findAll("[data-attribute-info], [data-dict-member-info]", doc):
