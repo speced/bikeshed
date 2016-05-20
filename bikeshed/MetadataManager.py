@@ -275,6 +275,8 @@ class MetadataManager:
             recommendedSingularKeys['date'] = 'Date'
         if self.status not in config.unlevelledStatuses:
             requiredSingularKeys['level'] = 'Level'
+        if self.status not in config.shortToLongStatus:
+            die("Unknown Status '{0}' used.", self.status)
         if not self.noEditor:
             requiredMultiKeys['editors'] = "Editor"
         if self.group and self.group.lower() == "csswg":
@@ -316,7 +318,7 @@ class MetadataManager:
         elif self.status in config.shortToLongStatus:
             macros["longstatus"] = config.shortToLongStatus[self.status]
         else:
-            die("Unknown status '{0}' used.", self.status)
+            macros["longstatus"] = ""
         if self.status in ("LCWD", "FPWD"):
             macros["status"] = "WD"
         else:
