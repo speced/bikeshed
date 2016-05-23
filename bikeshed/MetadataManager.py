@@ -584,7 +584,7 @@ def join(*sources):
     for mdsource in sources:
         for k in mdsource.manuallySetKeys:
             if k in knownKeys: # A built-in key
-                md.addData(knownKeys[k], getattr(mdsource, knownKeys[k]))
+                md.addData(k, getattr(mdsource, knownKeys[k]))
             else: # A custom key
                 md.addData("!"+k, mdsource.otherMetadata[k])
     return md
