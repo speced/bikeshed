@@ -114,6 +114,9 @@ class MetadataManager:
             customOutput[key](key, val, doc=self.doc)
             return
 
+        self.addParsedData(key, val)
+
+    def addParsedData(self, key, val):
         result = joinValues(key, getattr(self, knownKeys[key]), val)
         setattr(self, knownKeys[key], result)
 
@@ -584,9 +587,9 @@ def join(*sources):
     for mdsource in sources:
         for k in mdsource.manuallySetKeys:
             if k in knownKeys: # A built-in key
-                md.addData(k, getattr(mdsource, knownKeys[k]))
+                md.addParsedData(k, getattr(mdsource, knownKeys[k]))
             else: # A custom key
-                md.addData("!"+k, mdsource.otherMetadata[k])
+                md.addParsedData("!"+k, mdsource.otherMetadata[k])
     return md
 
 def joinValues(key, val1, val2):
