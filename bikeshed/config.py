@@ -413,7 +413,7 @@ def linkTextsFromElement(el, preserveCasing=False):
                 raise DuplicatedLinkText(text, texts+localTexts, el)
         texts += localTexts
 
-    texts = [x for x in texts if x != '']
+    texts = [re.sub(r"\s+", " ", x) for x in texts if x != '']
     return texts
 
 class DuplicatedLinkText(Exception):
