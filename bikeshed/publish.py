@@ -13,10 +13,14 @@ def publishEchidna(doc, username, password, decision):
 		import requests
 	except:
 		pass #do better later
-	tar = prepareTar(doc)
+	tar = prepareTar(doc, visibleTar=False)
 	# curl 'https://labs.w3.org/echidna/api/request' --user '<username>:<password>' -F "tar=@/some/path/spec.tar" -F "decision=<decisionUrl>"
-	r = requests.post("https://labs.w3.org/echidna/api/request", auth=(username, password), data={"decision": decision}, files={"tar": tar})
+	tar.seek(0)
+	c = tar.read()
+	print len(c)
+	r = requests.post("https://labs.w3.org/echidna/api/request", auth=(username, password), data={"decision": decision}, files={"tar": c})
 	os.remove(tar.name)
+
 	if r.status_code == 202:
 		print "https://labs.w3.org/echidna/api/status?id=" + r.text
 	else:
@@ -49,6 +53,6 @@ def prepareTar(doc, visibleTar=False):
 	specOutput.close()
 	os.remove(specOutput.name)
 	if visibleTar:
-		return None
+		return open("test.tar", "rb")
 	else:
 		return f
