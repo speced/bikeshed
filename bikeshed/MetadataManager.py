@@ -584,6 +584,8 @@ def join(*sources):
     MetadataManager is a monoid
     '''
     md = MetadataManager(sources[0].doc)
+    if any(x.hasMetadata for x in sources):
+        md.hasMetadata = True
     for mdsource in sources:
         for k in mdsource.manuallySetKeys:
             if k in knownKeys: # A built-in key
