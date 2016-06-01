@@ -529,8 +529,6 @@ class Spec(object):
         # Any final HTML cleanups
         cleanupHTML(self)
 
-        print self.md.boilerplate['omitSections']
-
         return self
 
 
