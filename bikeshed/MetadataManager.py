@@ -607,6 +607,7 @@ def joinValues(key, val1, val2):
         d.update(val1)
         for k,v in val2.items():
             d[k] = joinSingleValue(d.get(k, None), v)
+        return d
     else:
         return joinSingleValue(val1, val2)
 
