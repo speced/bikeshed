@@ -447,10 +447,10 @@ class Spec(object):
         self.lines = markdown.stripComments(self.lines)
 
         # Extract and process metadata
-        overrideMd = self.md
         self.lines, documentMd = metadata.parse(lines=self.lines, doc=self)
-        defaultMd = metadata.parseDefaults(data=config.retrieveBoilerplateFile(self, 'defaults', error=False), doc=self)
-        self.md = metadata.join(defaultMd, documentMd, overrideMd)
+        self.md = metadata.join(documentMd, self.md)
+        defaultMd = metadata.fromJson(data=config.retrieveBoilerplateFile(self, 'defaults', error=True), doc=self)
+        self.md = metadata.join(defaultMd, self.md)
         self.md.finish()
         self.md.fillTextMacros(self.macros, doc=self)
 
