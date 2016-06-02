@@ -3,6 +3,8 @@ from __future__ import division, unicode_literals
 import re
 import os
 import collections
+import copy
+import json
 from DefaultOrderedDict import DefaultOrderedDict
 from subprocess import check_output
 from collections import defaultdict
@@ -31,167 +33,63 @@ class MetadataManager:
         self.hasMetadata = False
 
         # required metadata
-        self.status = None
-        self.ED = None
         self.abstract = []
-        self.shortname = None
+        self.ED = None
         self.level = None
+        self.shortname = None
+        self.status = None
 
         # optional metadata
-        self.TR = None
-        self.title = None
-        self.h1 = None
-        self.statusText = []
+        self.advisementClass = "advisement"
+        self.atRisk = []
+        self.blockElements = []
+        self.boilerplate = config.BoolSet(default=True)
+        self.customTextMacros = []
         self.date = datetime.utcnow().date()
         self.deadline = None
-        self.group = None
+        self.defaultBiblioStatus = "dated"
         self.editors = []
-        self.previousEditors = []
-        self.previousVersions = []
-        self.warning = None
-        self.atRisk = []
+        self.group = None
+        self.h1 = None
         self.ignoredTerms = []
         self.ignoredVars = []
-        self.testSuite = None
-        self.mailingList = None
-        self.mailingListArchives = None
-        self.boilerplate = {'omitSections':set()}
-        self.versionHistory = []
-        self.logo = ""
         self.indent = 4
-        self.linkDefaults = defaultdict(list)
-        self.useIAutolinks = False
-        self.noEditor = False
-        self.defaultBiblioStatus = "dated"
-        self.markupShorthands = set(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
-        self.customTextMacros = []
+        self.inlineGithubIssues = False
+        self.issueClass = "issue"
         self.issues = []
         self.issueTrackerTemplate = None
-        self.workStatus = None
-        self.inlineGithubIssues = False
-        self.repository = config.Nil()
-        self.opaqueElements = ["pre", "xmp", "script", "style"]
-        self.blockElements = []
-        self.issueClass = "issue"
+        self.linkDefaults = defaultdict(list)
+        self.logo = ""
+        self.mailingList = None
+        self.mailingListArchives = None
+        self.markupShorthands = config.BoolSet(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
+        self.noEditor = False
         self.noteClass = "note"
-        self.advisementClass = "advisement"
-        self.translations = []
+        self.opaqueElements = ["pre", "xmp", "script", "style"]
+        self.previousEditors = []
+        self.previousVersions = []
+        self.repository = config.Nil()
+        self.statusText = []
+        self.testSuite = None
+        self.title = None
+        self.TR = None
         self.translateIDs = defaultdict(list)
+        self.translations = []
         self.useDfnPanels = True
         self.prepTR = False
+        self.useIAutolinks = False
+        self.versionHistory = []
+        self.warning = None
+        self.workStatus = None
 
         self.otherMetadata = DefaultOrderedDict(list)
 
-        self.overrides = set()
-
-        # Some keys are single-value:
-        # the result of parsing is simply assigned to them.
-        self.singleValueKeys = {
-            "Title": "title",
-            "H1": "h1",
-            "Status": "status",
-            "ED": "ED",
-            "URL": "ED", # URL is a synonym for ED
-            "Shortname": "shortname",
-            "Level": "level",
-            "TR": "TR",
-            "Warning": "warning",
-            "Group": "group",
-            "Date": "date",
-            "Deadline": "deadline",
-            "Test Suite": "testSuite",
-            "Mailing List": "mailingList",
-            "Mailing List Archives": "mailingListArchives",
-            "Logo": "logo",
-            "Indent": "indent",
-            "Use <I> Autolinks": "useIAutolinks",
-            "No Editor": "noEditor",
-            "Default Biblio Status": "defaultBiblioStatus",
-            "Issue Tracker Template": "issueTrackerTemplate",
-            "Work Status": "workStatus",
-            "Inline Github Issues": "inlineGithubIssues",
-            "Repository": "repository",
-            "Issue Class": "issueClass",
-            "Note Class": "noteClass",
-            "Advisement Class": "advisementClass",
-            "Use Dfn Panels": "useDfnPanels",
-            "Prepare For Tr": "prepTR"
-        }
-
-        # Some keys are multi-value:
-        # they *must* already be established as lists or dicts in __init__.
-        # If a list, result of parsing can be a single value (appended) or a list (extended).
-        # If a dict, result of parsing must be a dict of either single values or lists.
-        # (Note that a multi-valued key might only allow a single value *per key instance*, like Editor,
-        #  or multiple values per key, like Ignored Terms, which are agglomerated across keys.)
-        self.multiValueKeys = {
-            "Editor": "editors",
-            "Former Editor": "previousEditors",
-            "Boilerplate": "boilerplate",
-            "Abstract": "abstract",
-            "Previous Version": "previousVersions",
-            "At Risk": "atRisk",
-            "Ignored Terms": "ignoredTerms",
-            "Ignored Vars": "ignoredVars",
-            "Link Defaults": "linkDefaults",
-            "Issue Tracking": "issues",
-            "Markup Shorthands": "markupShorthands",
-            "Version History": "versionHistory",
-            "Text Macro": "customTextMacros",
-            "Opaque Elements": "opaqueElements",
-            "Block Elements": "blockElements",
-            "Translation": "translations",
-            "Translate Ids": "translateIDs",
-            "Status Text": "statusText"
-        }
-
-        self.knownKeys = self.singleValueKeys.viewkeys() | self.multiValueKeys.viewkeys()
-
         self.manuallySetKeys = set()
 
-        # Input transformers, passed the key and string value.
-        # The "default" input is a no-op that just returns the input string.
-        self.customInput = {
-            "Date": parseDate,
-            "Deadline": parseDate,
-            "Level": parseLevel,
-            "Warning": convertWarning,
-            "Editor": parseEditor,
-            "Former Editor": parseEditor,
-            "Ignored Terms": parseCommaSeparated,
-            "Ignored Vars": parseCommaSeparated,
-            "Link Defaults": parseLinkDefaults,
-            "Boilerplate": parseBoilerplate,
-            "Indent": parseInteger,
-            "Use <I> Autolinks": parseBoolean,
-            "No Editor": parseBoolean,
-            "Default Biblio Status": parseBiblioStatus,
-            "Issue Tracking": parseLinkedText,
-            "Markup Shorthands": parseMarkupShorthands,
-            "Text Macro": parseTextMacro,
-            "Work Status": parseWorkStatus,
-            "Inline Github Issues": parseBoolean,
-            "Repository": parseRepository,
-            "Opaque Elements": parseCommaSeparated,
-            "Block Elements": parseCommaSeparated,
-            "Translation": parseTranslation,
-            "Translate Ids": parseTranslateIDs,
-            "Use Dfn Panels": parseBoolean,
-            "Prepare For Tr": parseBoolean
-        }
-
-        # Alternate output handlers, passed key/value/doc.
-        # The "default" output assigns the value to self.key.
-        self.customOutput = {
-            "Markup Shorthands": glomMarkupShorthands
-        }
-
-    def addData(self, key, val, default=False):
+    def addData(self, key, val):
         key = key.strip()
-        val = val.strip()
-
-        if key in self.overrides:
-            return
+        if isinstance(val, basestring):
+            val = val.strip()
 
         if key.startswith("!"):
             key = key[1:]
@@ -201,53 +99,29 @@ class MetadataManager:
         if key not in ("ED", "TR", "URL"):
             key = key.title()
 
-        if not (key in self.knownKeys or key.startswith("!")):
+        if key not in knownKeys:
             die('Unknown metadata key "{0}". Prefix custom keys with "!".', key)
             return
+        md = knownKeys[key]
 
-        if key in self.knownKeys and not default:
-            self.manuallySetKeys.add(key)
+        self.manuallySetKeys.add(key)
 
-        if default and key in self.manuallySetKeys:
-            return
+        val = md.parse(key, val)
 
-        if key in self.customInput:
-            val = self.customInput[key](key, val)
+        self.addParsedData(key, val)
 
-        if key in self.customOutput:
-            self.customOutput[key](key, val, doc=self.doc)
-            return
+    def addParsedData(self, key, val):
+        md = knownKeys[key]
+        result = md.join(getattr(self, md.attrName), val)
+        setattr(self, md.attrName, result)
 
-        if key in self.singleValueKeys:
-            setattr(self, self.singleValueKeys[key], val)
-        elif key in self.multiValueKeys:
-            attr = getattr(self, self.multiValueKeys[key])
-            smooshValues(attr, val)
-
-
-    def addDefault(self, key, val):
-        self.addData(key, val, default=True)
-
-    def addOverrides(self, overrides):
-        for o in overrides:
-            match = re.match("--md-([^ =]+)=(.+)", o)
-            if not match:
-                # Not a metadata key
-                continue
-            # Convert the key into a metadata name
-            key = match.group(1).replace("-", " ")
-            if key not in ("ED", "TR"):
-                key = key.title()
-            val = match.group(2).strip()
-            self.addData(key, val)
-            self.overrides.add(key)
 
     def finish(self):
         # Do some "computed metadata", based on the value of other metadata.
         # Only call this when you're sure all metadata sources are parsed.
         if not self.repository:
             self.repository = getSpecRepository(self.doc)
-        if self.repository.type == "github" and "feedback-header" not in self.doc.md.boilerplate['omitSections'] and "repository-issue-tracking" not in self.doc.md.boilerplate['omitSections']:
+        if self.repository.type == "github" and "feedback-header" in self.boilerplate and "repository-issue-tracking" in self.boilerplate:
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
         self.validate()
 
@@ -376,6 +250,7 @@ def parseDate(key, val):
         return datetime.strptime(val, "%Y-%m-%d").date()
     except:
         die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", key, val)
+        return None
 
 def parseLevel(key, val):
     return config.HierarchicalNumber(val)
@@ -388,9 +263,10 @@ def parseBoolean(key, val):
         return True
     if val.lower() in ("false", "no", "n", "off"):
         return False
-    die("The {0} field must be true/false, yes/no, y/n, or on/off. Got '{1}' instead.", key, val);
+    die("The {0} field must be true/false, yes/no, y/n, or on/off. Got '{1}' instead.", key, val)
+    return None
 
-def convertWarning(key, val):
+def parseWarning(key, val):
     if val.lower() == "obsolete":
         return "warning-obsolete",
     if val.lower() == "not ready":
@@ -414,6 +290,7 @@ def convertWarning(key, val):
   new version [new url]
   commit [snapshot id] [snapshot url] replaced by [master url]
   branch [branch name] [branch url] replaced by [master url]''', key, val)
+    return None
 
 def parseEditor(key, val):
     match = re.match(r"([^,]+) ,\s* ([^,]*) ,?\s* ([^,]*) ,?\s* ([^,]*)", val, re.X)
@@ -464,6 +341,7 @@ def parseEditor(key, val):
         pass
     else:
         die("'{0}' format is '<name>, <company>?, <email-or-contact-page>?. Got:\n{1}", key, val)
+        return []
     # Check if the org ends with a link
     if data['org'] is not None and " " in data['org'] and looksLinkish(data['org'].split()[-1]):
         pieces = data['org'].split()
@@ -474,7 +352,7 @@ def parseEditor(key, val):
         pieces = data['name'].split()
         data['id'] = pieces[-1]
         data['name'] = ' '.join(pieces[:-1])
-    return data
+    return [data]
 
 
 def parseCommaSeparated(key, val):
@@ -498,11 +376,21 @@ def parseLinkDefaults(key, val):
     return defaultSpecs
 
 def parseBoilerplate(key, val):
-    boilerplate = {'omitSections':set()}
+    boilerplate = config.BoolSet(default=True)
     for command in val.split(","):
-        command = command.strip()
-        if re.match(r"omit [\w-]+$", command):
-            boilerplate['omitSections'].add(command[5:])
+        pieces = command.lower().strip().split()
+        if len(pieces) != 2:
+            die("Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{0}", command)
+            continue
+        if pieces[0] == "omit":
+            # legacy syntax; allows "omit foo" in addition to the normal "foo off"/etc
+            boilerplate[pieces[1]] = False
+        else:
+            onoff = parseBoolean(pieces[1])
+            if onoff is None:
+                die("Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{0}", command)
+                continue
+            boilerplate[pieces[0]] = onoff
     return boilerplate
 
 def parseBiblioStatus(key, val):
@@ -525,31 +413,23 @@ def parseMarkupShorthands(key, val):
     # Format is comma-separated list of shorthand category followed by boolean.
     # Output is a dict of the shorthand categories with boolean values.
     vals = [v.strip() for v in val.lower().split(",")]
-    ret = {}
+    ret = config.BoolSet(default=False)
     validCategories = frozenset(["css", "markup", "dfn", "biblio", "idl", "markdown", "algorithm"])
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:
             die("Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}", v)
-            return {}
+            continue
         name, boolstring = pieces
         if name not in validCategories:
             die("Unknown Markup Shorthand category '{0}'.", name)
-            return {}
+            continue
         onoff = parseBoolean(key, boolstring)
         if onoff is None:
-            # parsing failed
-            return {}
+            die("Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}", v)
+            continue
         ret[name] = onoff
     return ret
-
-def glomMarkupShorthands(key, val, doc):
-    ms = doc.md.markupShorthands
-    for name, onoff in val.items():
-        if onoff:
-            ms.add(name)
-        else:
-            ms.discard(name)
 
 def parseTextMacro(key, val):
     # Each Text Macro line is just a macro name (must be uppercase)
@@ -558,11 +438,11 @@ def parseTextMacro(key, val):
         name, text = val.lstrip().split(None, 1)
     except:
         die("Text Macro lines must contain a macro name followed by the macro text. Got:\n{0}", val)
-        return None
+        return []
     if not re.match(r"[A-Z0-9-]+$", name):
         die("Text Macro names must be all-caps and alphanumeric. Got '{0}'", name)
-        return None
-    return (name, text)
+        return []
+    return [(name, text)]
 
 def parseWorkStatus(key, val):
     # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
@@ -627,18 +507,20 @@ def parseTranslation(key, val):
             nativeName = v
         else:
             die("Later parts of a Translation line must start with 'name' or 'native-name'. Got:\n{0}", piece)
-    return {"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}
+    return [{"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}]
 
 
-def parse(md, lines):
-    # Given a MetadataManager and HTML document text, in the form of an array of text lines,
+def parse(lines, doc):
+    # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
-    # Returns the text lines, with the metadata-related lines removed.
+    # Returns the text lines, with the metadata-related lines removed,
+    # and a filled MetadataManager object
 
     newlines = []
     inMetadata = False
     lastKey = None
     blockSize = 0
+    md = MetadataManager(doc)
     for line in lines:
         if not inMetadata and re.match(r"<pre .*class=.*metadata.*>", line):
             blockSize = 1
@@ -667,46 +549,37 @@ def parse(md, lines):
             md.addData("Title", title)
         else:
             newlines.append(line)
-    return newlines
+    return newlines, md
 
-def smooshValues(container, val):
-    '''
-    "Smooshes" the values into the container.
-    If container is a list,
-    val must be either a single item or a list;
-    it's merged into the container.
-    If container is a dict with list values,
-    val must be a dict,
-    which is merged in dict-wise same as lists.
-    (container should be a defaultdict(list) in this case).
-    '''
-    if val is None:
-        return
-    if isinstance(container, list) or isinstance(container, set):
-        addTo(container, val)
-    elif isinstance(container, dict):
-        for k,v in val.items():
-            if v is None:
-                continue
-            addTo(container[k], v)
+def fromCommandLine(overrides, doc):
+    # Given a list of strings representing command-line arguments,
+    # finds the args that correspond to metadata keys
+    # and fills a MetadataManager accordingly.
+    md = MetadataManager(doc)
+    for o in overrides:
+        match = re.match("--md-([^ =]+)=(.+)", o)
+        if not match:
+            # Not a metadata key
+            continue
+        # Convert the key into a metadata name
+        key = match.group(1).replace("-", " ")
+        if key not in ("ED", "TR"):
+            key = key.title()
+        val = match.group(2).strip()
+        md.addData(key, val)
+    return md
 
-def addTo(container, val):
-    '''Generalized method for adding something to a container,
-    since every damn container type does something different.'''
-    def singleValue(v):
-        return not (isinstance(v, list) or isinstance(v, set))
-    if isinstance(container, list):
-        if singleValue(val):
-            container.append(val)
-        else:
-            container.extend(val)
-    elif isinstance(container, set):
-        if singleValue(val):
-            container.add(val)
-        else:
-            container.update(val)
-    else:
-        raise
+def fromJson(data, doc):
+    md = MetadataManager(doc)
+    try:
+        defaults = json.loads(data)
+    except Exception, e:
+        if data != "":
+            die("Error loading default metadata:\n{0}", str(e))
+        return md
+    for key,val in defaults.items():
+        md.addData(key, val)
+    return md
 
 def getSpecRepository(doc):
     '''
@@ -747,7 +620,89 @@ def parseDoc(doc):
         removeClass(el, "replace-with-advisement-class")
         addClass(el, doc.md.advisementClass)
 
-    if "feedback-header" not in doc.md.boilerplate['omitSections']:
-        if "issues-index" not in doc.md.boilerplate['omitSections'] and find("." + doc.md.issueClass, doc) is not None:
+    if "feedback-header" in doc.md.boilerplate and "issues-index" in doc.md.boilerplate and find("." + doc.md.issueClass, doc) is not None:
             # There's at least one inline issue.
             doc.md.issues.append(("Inline In Spec", "#issues-index"))
+
+
+def join(*sources):
+    '''
+    MetadataManager is a monoid
+    '''
+    md = MetadataManager(sources[0].doc)
+    if any(x.hasMetadata for x in sources):
+        md.hasMetadata = True
+    for mdsource in sources:
+        md.manuallySetKeys |= mdsource.manuallySetKeys
+        for k in mdsource.manuallySetKeys:
+            mdentry = knownKeys[k]
+            md.addParsedData(k, getattr(mdsource, mdentry.attrName))
+        for k,v in mdsource.otherMetadata.items():
+            md.otherMetadata[k] = v
+    return md
+
+Metadata = collections.namedtuple('Metadata', ['humanName', 'attrName', 'join', 'parse'])
+
+joinValue = lambda a,b: b
+joinList = lambda a,b: a+b
+def joinBoolSet(a,b):
+    x = copy.deepcopy(a)
+    x.update(b)
+    return x
+def joinDdList(a,b):
+    x = defaultdict(list)
+    x.update(a)
+    x.update(b)
+    return x
+parseLiteral = lambda k,v: v
+parseLiteralList = lambda k,v: [v]
+
+knownKeys = {
+    "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
+    "Advisement Class": Metadata("Advisement Class", "advisementClass", joinValue, parseLiteral),
+    "At Risk": Metadata("At Risk", "atRisk", joinList, parseLiteralList),
+    "Block Elements": Metadata("Block Elements", "blockElements", joinList, parseCommaSeparated),
+    "Boilerplate": Metadata("Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate),
+    "Date": Metadata("Date", "date", joinValue, parseDate),
+    "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
+    "Default Biblio Status": Metadata("Default Biblio Status", "defaultBiblioStatus", joinValue, parseBiblioStatus),
+    "ED": Metadata("ED", "ED", joinValue, parseLiteral),
+    "Editor": Metadata("Editor", "editors", joinList, parseEditor),
+    "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),
+    "Group": Metadata("Group", "group", joinValue, parseLiteral),
+    "H1": Metadata("H1", "h1", joinValue, parseLiteral),
+    "Ignored Terms": Metadata("Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated),
+    "Ignored Vars": Metadata("Ignored Vars", "ignoredVars", joinList, parseCommaSeparated),
+    "Indent": Metadata("Indent", "indent", joinValue, parseInteger),
+    "Inline Github Issues": Metadata("Inline Github Issues", "inlineGithubIssues", joinValue, parseBoolean),
+    "Issue Class": Metadata("Issue Class", "issueClass", joinValue, parseLiteral),
+    "Issue Tracker Template": Metadata("Issue Tracker Template", "issueTrackerTemplate", joinValue, parseLiteral),
+    "Issue Tracking": Metadata("Issue Tracking", "issues", joinList, parseLinkedText),
+    "Level": Metadata("Level", "level", joinValue, parseLevel),
+    "Link Defaults": Metadata("Link Defaults", "linkDefaults", joinDdList, parseLinkDefaults),
+    "Logo": Metadata("Logo", "logo", joinValue, parseLiteral),
+    "Mailing List Archives": Metadata("Mailing List Archives", "mailingListArchives", joinValue, parseLiteral),
+    "Mailing List": Metadata("Mailing List", "mailingList", joinValue, parseLiteral),
+    "Markup Shorthands": Metadata("Markup Shorthands", "markupShorthands", joinBoolSet, parseMarkupShorthands),
+    "No Editor": Metadata("No Editor", "noEditor", joinValue, parseBoolean),
+    "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),
+    "Opaque Elements": Metadata("Opaque Elements", "opaqueElements", joinList, parseCommaSeparated),
+    "Prepare For Tr": Metadata("Prepare For Tr", "prepTR", joinValue, parseBoolean),
+    "Previous Version": Metadata("Previous Version", "previousVersions", joinList, parseLiteralList),
+    "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
+    "Shortname": Metadata("Shortname", "shortname", joinValue, parseLiteral),
+    "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
+    "Status": Metadata("Status", "status", joinValue, parseLiteral),
+    "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),
+    "Text Macro": Metadata("Text Macro", "customTextMacros", joinList, parseTextMacro),
+    "Title": Metadata("Title", "title", joinValue, parseLiteral),
+    "TR": Metadata("TR", "TR", joinValue, parseLiteral),
+    "Translate Ids": Metadata("Translate Ids", "translateIDs", joinDdList, parseTranslateIDs),
+    "Translation": Metadata("Translation", "translations", joinList, parseTranslation),
+    "URL": Metadata("URL", "ED", joinValue, parseLiteral), # URL is a synonym for ED
+    "Use <I> Autolinks": Metadata("Use <I> Autolinks", "useIAutolinks", joinValue, parseBoolean),
+    "Use Dfn Panels": Metadata("Use Dfn Panels", "useDfnPanels", joinValue, parseBoolean),
+    "Version History": Metadata("Version History", "versionHistory", joinList, parseLiteralList),
+    "Warning": Metadata("Warning", "warning", joinValue, parseWarning),
+    "Work Status": Metadata("Work Status",  "workStatus", joinValue, parseWorkStatus)
+}

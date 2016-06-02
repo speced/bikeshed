@@ -187,7 +187,7 @@ def main():
         doc = Spec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug, token=options.ghToken)
         if options.byos:
             doc.md.addOverrides(["--md-Group=byos"])
-        doc.md.addOverrides(extras)
+        doc.md = metadata.fromCommandLine(extras, doc)
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "echidna":
@@ -205,7 +205,7 @@ def main():
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
         if options.byos:
             doc.md.addOverrides(["--md-Group=byos"])
-        doc.md.addOverrides(extras)
+        doc.md = metadata.fromCommandLine(extras, doc)
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         config.force = True
@@ -492,8 +492,10 @@ class Spec(object):
         self.lines = markdown.stripComments(self.lines)
 
         # Extract and process metadata
-        self.lines = metadata.parse(md = self.md, lines=self.lines)
-        self.loadDefaultMetadata()
+        self.lines, documentMd = metadata.parse(lines=self.lines, doc=self)
+        self.md = metadata.join(documentMd, self.md)
+        defaultMd = metadata.fromJson(data=config.retrieveBoilerplateFile(self, 'defaults', error=True), doc=self)
+        self.md = metadata.join(defaultMd, self.md)
         self.md.finish()
         extensions.load(self)
         self.md.fillTextMacros(self.macros, doc=self)
@@ -651,19 +653,6 @@ class Spec(object):
         except Exception, e:
             die("Something went wrong while watching the file:\n{0}", e)
 
-
-
-
-    def loadDefaultMetadata(self):
-        data = config.retrieveBoilerplateFile(self, 'defaults', error=False)
-        try:
-            defaults = json.loads(data)
-        except Exception, e:
-            if data != "":
-                die("Error loading defaults:\n{0}", str(e))
-            return
-        for key,val in defaults.items():
-            self.md.addDefault(key, val)
 
     def fixText(self, text, moreMacros=None):
         # Do several textual replacements that need to happen *before* the document is parsed as HTML.

@@ -17,8 +17,8 @@ def addBikeshedVersion(doc):
         E.meta({"name": "generator", "content": "Bikeshed 1.0.0"}))
 
 def addHeaderFooter(doc):
-    header = config.retrieveBoilerplateFile(doc, 'header') if "header" not in doc.md.boilerplate['omitSections'] else ""
-    footer = config.retrieveBoilerplateFile(doc, 'footer') if "footer" not in doc.md.boilerplate['omitSections'] else ""
+    header = config.retrieveBoilerplateFile(doc, 'header') if "header" in doc.md.boilerplate else ""
+    footer = config.retrieveBoilerplateFile(doc, 'footer') if "footer" in doc.md.boilerplate else ""
 
     doc.html = '\n'.join([header, doc.html, footer])
 
@@ -40,7 +40,7 @@ def getFillContainer(tag, doc, default=False):
     '''
 
     # If you've explicitly suppressed that section, don't do anything
-    if tag in doc.md.boilerplate['omitSections']:
+    if tag not in doc.md.boilerplate:
         return None
 
     # If a fill-with is found, fill that
@@ -110,7 +110,7 @@ def addCustomBoilerplate(doc):
 def removeUnwantedBoilerplate(doc):
     for el in findAll('[data-fill-with]', doc):
         tag = el.get('data-fill-with')
-        if tag in doc.md.boilerplate['omitSections']:
+        if tag not in doc.md.boilerplate:
             removeNode(el)
 
 def addAnnotations(doc):
@@ -121,7 +121,7 @@ def addAnnotations(doc):
 
 def addBikeshedBoilerplate(doc):
     for k,v in doc.extraStyles.items():
-        if k in doc.md.doc.md.boilerplate['omitSections']:
+        if k not in doc.md.doc.md.boilerplate:
             continue
         container = getFillContainer(k, doc)
         if container is None:
@@ -130,7 +130,7 @@ def addBikeshedBoilerplate(doc):
             appendChild(container,
                 E.style("/* {0} */\n".format(k) + v))
     for k,v in doc.extraScripts.items():
-        if k in doc.md.doc.md.boilerplate['omitSections']:
+        if k not in doc.md.doc.md.boilerplate:
             continue
         container = getFillContainer(k, doc)
         if container is None:
