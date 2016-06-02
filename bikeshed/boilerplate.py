@@ -10,7 +10,7 @@ from .DefaultOrderedDict import DefaultOrderedDict
 
 def addBikeshedVersion(doc):
     # Adds a <meta> containing the current Bikeshed semver.
-    if "generator" in doc.md.boilerplate['omitSections']:
+    if "generator" not in doc.md.boilerplate:
         return
     head = find("head", doc)
     appendChild(head,
