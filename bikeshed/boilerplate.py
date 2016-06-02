@@ -463,7 +463,24 @@ def addTOCSection(doc):
     appendChild(toc,
         E.h2({"class": "no-num no-toc no-ref", "id":"contents"}, "Table of Contents"))
 
-    skipLevel = float('inf')
+    # containers[n] holds the current <ol> for inserting each heading's <li> into.
+    # containers[1] is initialized with something arbitrary
+    # (anything non-int and non-None will do, to avoid tripping error-handling),
+    # and containers[2] is initialized with the top-level <ol>
+    # (because <h2>s and below are all that should show up in your doc)
+    # and whenever we hit a heading of level N,
+    # we append an <li> for it to containers[N],
+    # and create a new <ol> at containers[N+1] to hold its child sections
+    # (nested inside the <li>).
+    # We'll clean up empty subsections at the end.
+    # There's a containers[0] just to make the levels map directly to indexes,
+    # and a containers[7] just to avoid IndexErrors when dealing with <h6>s.
+    # Aside from the above initialization,
+    # containers[N] is initialized to an int,
+    # arbitrarily set to the index just for readability.
+    # If a heading specifies it shouldn't be in the ToC,
+    # it sets containers[N+1] to None
+    # to indicate that no children should go there.
     previousLevel = 1
     containers = [0, 1, 2, 3, 4, 5, 6, 7]
     containers[1] = toc
@@ -480,16 +497,12 @@ def addTOCSection(doc):
             die("Heading level jumps more than one level, from h{0} to h{1}:\n  {2}", previousLevel, level, textContent(header).replace("\n", " "))
             return
 
-        # Hit a no-toc, suppress the entire section.
         addToTOC = True
         if hasClass(header, "no-toc"):
-            skipLevel = min(level, skipLevel)
+            # Hit a no-toc, suppress the entire section.
             addToTOC = False
-        if skipLevel < level:
+        if container is None:
             addToTOC = False
-        else:
-            skipLevel = float('inf')
-
         if addToTOC:
             li = appendChild(container,
                 E.li(
@@ -498,6 +511,8 @@ def addTOCSection(doc):
                         " ",
                         copy.deepcopy(find(".content", header)))))
             containers[level+1] = appendChild(li, E.ol({"class":"toc"}))
+        else:
+            containers[level+1] = None
         previousLevel = level
 
     container = containers[1]
