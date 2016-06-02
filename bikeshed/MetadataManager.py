@@ -549,7 +549,7 @@ def parse(lines, doc):
             newlines.append(line)
     return newlines, md
 
-def parseOverrides(overrides, doc):
+def fromCommandLine(overrides, doc):
     # Given a list of strings representing command-line arguments,
     # finds the args that correspond to metadata keys
     # and fills a MetadataManager accordingly.
@@ -567,31 +567,16 @@ def parseOverrides(overrides, doc):
         md.addData(key, val)
     return md
 
-def parseDefaults(data, doc):
+def fromJson(data, doc):
     md = MetadataManager(doc)
     try:
         defaults = json.loads(data)
     except Exception, e:
         if data != "":
-            die("Error loading defaults:\n{0}", str(e))
-        return
+            die("Error loading default metadata:\n{0}", str(e))
+        return md
     for key,val in defaults.items():
-        md.addDefault(key, val)
-    return md
-
-def join(*sources):
-    '''
-    MetadataManager is a monoid
-    '''
-    md = MetadataManager(sources[0].doc)
-    if any(x.hasMetadata for x in sources):
-        md.hasMetadata = True
-    for mdsource in sources:
-        for k in mdsource.manuallySetKeys:
-            if k in knownKeys: # A built-in key
-                md.addParsedData(k, getattr(mdsource, knownKeys[k]))
-            else: # A custom key
-                md.addParsedData("!"+k, mdsource.otherMetadata[k])
+        md.addData(key, val)
     return md
 
 def joinValues(key, val1, val2):

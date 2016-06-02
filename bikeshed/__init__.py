@@ -167,14 +167,14 @@ def main():
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
         doc = Spec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug, token=options.ghToken)
-        doc.md = metadata.parseOverrides(extras, doc)
+        doc.md = metadata.fromCommandLine(extras, doc)
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "watch":
         # Can't have an error killing the watcher
         config.force = True
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
-        doc.md = metadata.parseOverrides(extras, doc)
+        doc.md = metadata.fromCommandLine(extras, doc)
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         config.force = True
