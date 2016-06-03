@@ -245,7 +245,7 @@ def transformProductionGrammars(doc):
     def multRangeReplacer(match):
         return E.a({"data-link-type":"grammar", "data-lt": "{A,B}", "for":""}, match.group(0))
 
-    simpleRe = re.compile(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|,)(?!')")
+    simpleRe = re.compile(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|&&|,)(?!')")
     # Note the negative-lookahead, to avoid matching delim tokens.
     def simpleReplacer(match):
         return E.a({"data-link-type":"grammar", "data-lt": match.group(0), "for":""}, match.group(0))
