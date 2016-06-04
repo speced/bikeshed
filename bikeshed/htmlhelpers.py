@@ -416,6 +416,11 @@ def isNormative(el):
     # Otherwise, walk the tree
     return isNormative(parent)
 
+def isEmpty(el):
+    # Returns whether the element is empty - no text or children.
+    return (el.text is None or el.text.strip() == "") and len(el) == 0
+
+
 
 def fixTypography(text):
     # Replace straight aposes with curly quotes for possessives and contractions.

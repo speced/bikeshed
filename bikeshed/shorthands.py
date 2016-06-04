@@ -122,20 +122,25 @@ def transformAutolinkShortcuts(doc):
                                 ((?:\/[\w-]*)?(?:\#[\w-]+)) |
                                 (\/[\w-]+)
                             )
+                            (\|[^\]]+)?
                             \]\]""", re.X)
     def sectionReplacer(match):
-        spec, section, justPage = match.groups()
+        spec, section, justPage, linkText = match.groups()
+        if linkText is None:
+            linkText = ""
+        else:
+            linkText = linkText[1:]
         if spec is None:
             # local section link
-            return E.a({"section":"", "href":section})
+            return E.a({"section":"", "href":section}, linkText)
         elif justPage is not None:
             # foreign link, to an actual page from a multipage spec
-            return E.span({"spec-section":justPage+"#", "spec":spec})
+            return E.span({"spec-section":justPage+"#", "spec":spec}, linkText)
         else:
             # foreign link
-            return E.span({"spec-section":section, "spec":spec})
+            return E.span({"spec-section":section, "spec":spec}, linkText)
 
-    propdescRe = re.compile(r"'(?:([^\s']*)/)?([\w*-]+)(?:!!([\w-]+))?'")
+    propdescRe = re.compile(r"'(?:([^\s']*)/)?([\w*-]+)(?:!!([\w-]+))?(\|[^']+)?'")
     def propdescReplacer(match):
         if match.group(1) == "":
             linkFor = "/"
@@ -150,7 +155,11 @@ def transformAutolinkShortcuts(doc):
         else:
             die("Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3))
             return E.span(match.group(0))
-        return E.a({"data-link-type":linkType, "class":"property", "for": linkFor}, match.group(2))
+        if match.group(4) is not None:
+            linkText = match.group(4)[1:]
+        else:
+            linkText = match.group(2)
+        return E.a({"data-link-type":linkType, "class":"property", "for": linkFor, "lt": match.group(2)}, linkText)
 
     idlRe = re.compile(r"{{(?:([^}]*)/)?((?:[^}]|,\s)+?)(?:!!([\w-]+))?(\|[^}]+)?}}")
     def idlReplacer(match):

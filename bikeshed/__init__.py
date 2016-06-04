@@ -865,7 +865,7 @@ def fixIntraDocumentReferences(doc):
         elif targetID not in ids:
             die("Couldn't find target anchor {0}:\n{1}", targetID, outerHTML(el))
             continue
-        if (el.text is None or el.text.strip() == '') and len(el) == 0:
+        if isEmpty(el):
             # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
             target = ids[targetID]
             content = find(".content", target)
@@ -916,7 +916,8 @@ def fixInterDocumentReferences(doc):
                     heading = heading["ED"]
             el.tag = "a"
             el.set("href", heading['url'])
-            el.text = "{spec} §{number} {text}".format(**heading)
+            if isEmpty(el):
+                el.text = "{spec} §{number} {text}".format(**heading)
         elif doc.refs.getBiblioRef(spec):
             # Bikeshed doesn't know the spec, but it's in biblio
             bib = doc.refs.getBiblioRef(spec)
@@ -925,7 +926,8 @@ def fixInterDocumentReferences(doc):
                 continue
             el.tag = "a"
             el.set("href", bib.url + section)
-            el.text = bib.title + " §" + section[1:]
+            if isEmpty(el):
+                el.text = bib.title + " §" + section[1:]
         else:
             # Unknown spec
             die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el))
