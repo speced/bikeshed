@@ -237,20 +237,20 @@ There are several additional shortcuts for writing an autolink.
 
 The Dfn variety (controlled by `Markup Shorthands: dfn yes`):
 
-* `[=foo=]` is an autolink to the "dfn" type definition "foo" (`[=bar/foo=]` to disambiguate). If you want to show a different text, append `|text` to the inner value like `[=do foo|when foo is done=]`.
+* `[=foo=]` is an autolink to the "dfn" type definition "foo". If you want to show a different text, append `|text` to the inner value like `[=do foo|when foo is done=]`.
 
 The CSS varieties (controlled by `Markup Shorthands: css yes`):
 
-* `'foo'` (apostophes/straight quotes) is an autolink to a property or descriptor named "foo" (`'@bar/foo'` to disambiguate when there are multiple descriptors of that name). If there is both a property and a descriptor of a given name, this defaults to linking to the property if used in its bare (`'foo'`) form.
-* `''foo''` (double apostrophes) is an autolink to any of the CSS definition types except property and descriptor (`''bar/foo''` or `''@baz/bar/foo''` to disambiguate)
+* `'foo'` (apostophes/straight quotes) is an autolink to a property or descriptor named "foo". If there is both a property and a descriptor of a given name, this defaults to linking to the property if used in its bare (`'foo'`) form.
+* `''foo''` (double apostrophes) is an autolink to any of the CSS definition types except property and descriptor
 * `<<foo>>` is an autolink to a type/production named "&lt;foo>"
-* `<<'foo'>>` is an autolink to the the property or descriptor named "foo" (used in grammars, where you need `<foo>` for non-terminals) (`<<'@bar/foo'>>` to disambiguate)
+* `<<'foo'>>` is an autolink to the the property or descriptor named "foo" (used in grammars, where you need `<foo>` for non-terminals).
 * `<<foo()>>` is an autolink to the function named "foo" (used in grammars)
 * `<<@foo>>` is an autolink to the at-rule named "@foo" (used in grammars)
 
 The IDL variety (controlled by `Markup Shorthands: idl yes`):
 
-* `{{foo}}` or `{{foo()}}` is an autolink to one of the IDL types for the term "foo" (`{{Bar/foo}}`/etc to disambiguate). If you want to show a different text, append `|text` to the inner value like `{{Bar/foo|the foo() method of Bar}}`.
+* `{{foo}}` or `{{foo()}}` is an autolink to one of the IDL types (interface, method, dictionary, etc) for the term "foo". If you want to show a different text, append `|text` to the inner value like `{{Bar/foo|the foo() method of Bar}}`.
 
 The markup (HTML/etc) varieties (controlled by `Markup Shorthands: markup yes`):
 
@@ -261,7 +261,20 @@ Both of these can show a different text by appending `|text` to the inner value 
 
 ---
 
-Any of the above types can have their type specified explicitly, by *appending* the type and separating it with a double bang, like the following to indicate that you want the *IDL attribute* named "bar", rather than the dictionary member of the same name:
+Any of the above shorthands can, if they're specifying a link type that can have a for='' value, specify that explicitly by prepending the for='' value and separating it with a "/", like the following to indicate that you want the "bar" attribute of the "Foo" interface (rather than of some other interface):
+
+```
+{{Foo/bar}}
+```
+
+If the for='' value is itself of a type that can have a for='' value, you can prepend more specifiers if necessary, like `''@foo/bar/baz''` to refer to the "baz" value for the "bar" descriptor of the "@foo" at-rule.
+
+If you need to explicitly refer to the definition instance *without* a for='' value
+(which would be written as `<a for="/">foo</a>` in normal markup),
+just use the slash with nothing preceding it,
+like `[=/foo=]`
+
+Any of the above shorthands that encompass multiple types can have their type specified explicitly, by *appending* the type and separating it with a double bang, like the following to indicate that you want the *IDL attribute* named "bar", rather than the dictionary member of the same name:
 
 ```
 {{bar!!attribute}}
