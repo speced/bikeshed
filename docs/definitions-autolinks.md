@@ -237,7 +237,7 @@ There are several additional shortcuts for writing an autolink.
 
 The Dfn variety (controlled by `Markup Shorthands: dfn yes`):
 
-* `[=foo=]` is an autolink to the "dfn" type definition "foo". If you want to show a different text, append `|text` to the inner value like `[=do foo|when foo is done=]`.
+* `[=foo=]` is an autolink to the "dfn" type definition "foo".
 
 The CSS varieties (controlled by `Markup Shorthands: css yes`):
 
@@ -250,18 +250,28 @@ The CSS varieties (controlled by `Markup Shorthands: css yes`):
 
 The IDL variety (controlled by `Markup Shorthands: idl yes`):
 
-* `{{foo}}` or `{{foo()}}` is an autolink to one of the IDL types (interface, method, dictionary, etc) for the term "foo". If you want to show a different text, append `|text` to the inner value like `{{Bar/foo|the foo() method of Bar}}`.
+* `{{foo}}` or `{{foo()}}` is an autolink to one of the IDL types (interface, method, dictionary, etc) for the term "foo".
 
 The markup (HTML/etc) varieties (controlled by `Markup Shorthands: markup yes`):
 
 * `<{element}>` is an autolink to the element named "element".
 * `<{element/attribute}>` is an autolink to the attribute or element-state named "attribute" for the element "element".
 
-Both of these can show a different text by appending `|text` to the inner value like `<{div|the DIV element}>`.
+The bibliography/spec varieties (controlled by `Markup Shorthands: biblio yes`):
+
+* `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
+    Add a leading exclamation point to the value, like `[[!foo]]`, for a normative reference.
+    If both a "current" and "dated" bibliography entry exists for that entry,
+    Bikeshed will prefer the "current" one by default
+    (but this can be controlled by the `Default Biblio Status` metadata).
+    To explicitly link to one or the other, specify it after the name,
+    like `[[foo current]]`.
+* `[[#foo]]` is an autolink to a heading in the same document with the given ID.  (See [Section Links](#section-links) for more detail.)
+* `[[foo#bar]]` is an autolink to the heading with ID "bar" in the spec whose leveled shortname is "foo". (This only works for specs known to Bikeshed's autolinking database, which is distinct from its bibliography database.)  If linking into a multi-page spec and the desired ID shows up on multiple pages, write it like `[[spec/page#id]]`, where `page` is the filename (without extension) of the page being linked to. Or to link just to the page itself, rather than any particular heading, write `[[spec/page]]`.
 
 ---
 
-Any of the above shorthands can, if they're specifying a link type that can have a for='' value, specify that explicitly by prepending the for='' value and separating it with a "/", like the following to indicate that you want the "bar" attribute of the "Foo" interface (rather than of some other interface):
+Any of the above shorthands (besides the biblio varieties) can, if they're specifying a link type that can have a for='' value, specify that explicitly by prepending the for='' value and separating it with a `/`, like the following to indicate that you want the "bar" attribute of the "Foo" interface (rather than of some other interface):
 
 ```
 {{Foo/bar}}
@@ -274,29 +284,25 @@ If you need to explicitly refer to the definition instance *without* a for='' va
 just use the slash with nothing preceding it,
 like `[=/foo=]`
 
-Any of the above shorthands that encompass multiple types can have their type specified explicitly, by *appending* the type and separating it with a double bang, like the following to indicate that you want the *IDL attribute* named "bar", rather than the dictionary member of the same name:
+Any of the above shorthands (besides the biblio varieties) that encompass multiple types can have their type specified explicitly, by *appending* the type and separating it with a `!!`, like the following to indicate that you want the *IDL attribute* named "bar", rather than the dictionary member of the same name:
 
 ```
 {{bar!!attribute}}
 ```
 
-If also overriding the display text, put the type-specifier first *then* the desired display text, like:
+Any of the above shorthands (**including** the biblio varieties) can override their default display text (the term you're autolinking) with some other explicitly specified text, by appending the new text and separating it with a `|`, like the following to indicate you want to link to the "do foo" term but display "when foo is done":
+
+```
+[=do foo|when foo is done=]
+```
+
+If both specifying the type and overriding the display text, put the type-specifier first *then* the desired display text, like:
 
 ```
 {{bar!!attribute|the bar attribute}}
 ```
 
-Related, there's also bibliography autolinks (controlled by `Markup Shorthands: biblio yes`):
 
-* `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
-    Add a leading exclamation point to the value, like `[[!foo]]`, for a normative reference.
-    If both a "current" and "dated" bibliography entry exists for that entry,
-    Bikeshed will prefer the "current" one by default
-    (but this can be controlled by the `Default Biblio Status` metadata).
-    To explicitly link to one or the other, specify it after the name,
-    like `[[foo current]]`.
-* `[[#foo]]` is an autolink to a heading in the same document with the given ID.  (See [Section Links](#section-links) for more detail.)
-* `[[foo#bar]]` is an autolink to the heading with ID "bar" in the spec whose leveled shortname is "foo". (This only works for specs known to Bikeshed's autolinking database, which is distinct from its bibliography database.)  If linking into a multi-page spec and the desired ID shows up on multiple pages, write it like `[[spec/page#id]]`, where `page` is the filename (without extension) of the page being linked to. Or to link just to the page itself, rather than any particular heading, write `[[spec/page]]`.
 
 
 
@@ -309,10 +315,13 @@ they'll show up in error messages sometimes,
 so here's a list of them:
 
 * "propdesc" - used by the `'foo'` shorthand.  A union of "property" and "descriptor".
-* "functionish" - used by the `''foo''` shorthand for things that look like functions.  A union of "function" and "method".
+* "functionish" - used by the `''foo()''` shorthand for things that look like functions.  A union of "function", "method", "constructor", and "stringifier".
 * "maybe" - used by the rest of the `''foo''` shorthand values.  A union of "dfn" and all the CSS types except "property" and "descriptor".
     For legacy reasons, this link type has the additional magic that it doesn't flag an error if it can't find any matches,
     because it's also used to annotate inline CSS code fragments.
+* "idl" - used by the `{{foo}}` shorthand. A union of all the IDL types.
+* "idl-name" - used by the IDL auto-parser. A union of all the IDL types that can declare IDL argument types, like "interface", "enum", or "dictionary".
+* "element-sub" - used by the `<{foo/bar}>` shorthand. A union of "element-attr" and "element-state".
 
 Additionally, there's an "idl" link type which *is* intended to be used by authors.
 It's a union of all the WebIDL types,
