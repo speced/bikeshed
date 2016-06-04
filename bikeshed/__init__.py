@@ -187,7 +187,7 @@ def main():
         doc = Spec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug, token=options.ghToken)
         doc.md = metadata.fromCommandLine(extras, doc)
         if options.byos:
-            doc.md.group = "byos"
+            doc.md.addData("Group", "byos")
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "echidna":
@@ -204,7 +204,7 @@ def main():
         config.force = True
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
         if options.byos:
-            doc.md.group = "byos"
+            doc.md.addData("Group", "byos")
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         config.force = True
@@ -495,6 +495,8 @@ class Spec(object):
         self.md = metadata.join(documentMd, self.md)
         defaultMd = metadata.fromJson(data=config.retrieveBoilerplateFile(self, 'defaults', error=True), doc=self)
         self.md = metadata.join(defaultMd, self.md)
+        if self.md.group == "byos":
+            self.md.boilerplate.default = False
         self.md.finish()
         extensions.load(self)
         self.md.fillTextMacros(self.macros, doc=self)
