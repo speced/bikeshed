@@ -137,6 +137,10 @@ def transformAutolinkShortcuts(doc):
 
     propdescRe = re.compile(r"'(?:([^\s']*)/)?([\w*-]+)(?:!!([\w-]+))?'")
     def propdescReplacer(match):
+        if match.group(1) == "":
+            linkFor = "/"
+        else:
+            linkFor = match.group(1)
         if match.group(2) == "-":
             return "'-'"
         if match.group(3) is None:
@@ -146,10 +150,14 @@ def transformAutolinkShortcuts(doc):
         else:
             die("Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3))
             return E.span(match.group(0))
-        return E.a({"data-link-type":linkType, "class":"property", "for": match.group(1)}, match.group(2))
+        return E.a({"data-link-type":linkType, "class":"property", "for": linkFor}, match.group(2))
 
     idlRe = re.compile(r"{{(?:([^}]*)/)?((?:[^}]|,\s)+?)(?:!!([\w-]+))?(\|[^}]+)?}}")
     def idlReplacer(match):
+        if match.group(1) == "":
+            linkFor = "/"
+        else:
+            linkFor = match.group(1)
         if match.group(3) is None:
             linkType = "idl"
         elif match.group(3) in config.idlTypes:
@@ -162,18 +170,26 @@ def transformAutolinkShortcuts(doc):
         else:
             linkText = match.group(2)
         return E.code({"class":"idl"},
-            E.a({"data-link-type":linkType, "for": match.group(1), "lt":match.group(2)}, linkText))
+            E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
 
     dfnRe = re.compile(r"\[=(?!\s)(?:([^=]*)/)?([^\"=]+?)(\|[^\"=]+)?=\]")
     def dfnReplacer(match):
+        if match.group(1) == "":
+            linkFor = "/"
+        else:
+            linkFor = match.group(1)
         if match.group(3) is not None:
             linkText = match.group(3)[1:]
         else:
             linkText = match.group(2)
-        return E.a({"data-link-type":"dfn", "for": match.group(1), "lt":match.group(2)}, linkText)
+        return E.a({"data-link-type":"dfn", "for": linkFor, "lt":match.group(2)}, linkText)
 
     elementRe = re.compile(r"<{(?:([\w*-]+)/)?([\w*-]+)(?:!!([\w-]+))?(\|[^}]+)?}>")
     def elementReplacer(match):
+        if match.group(1) == "":
+            linkFor = "/"
+        else:
+            linkFor = match.group(1)
         if match.group(3) is not None:
             linkType = match.group(3)
         elif match.group(1) is None:
@@ -185,7 +201,7 @@ def transformAutolinkShortcuts(doc):
         else:
             linkText = match.group(2)
         return E.code({},
-            E.a({"data-link-type":linkType, "for": match.group(1), "lt":match.group(2)}, linkText))
+            E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
 
     varRe = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
     def varReplacer(match):
