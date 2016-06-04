@@ -185,15 +185,15 @@ def main():
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
         doc = Spec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug, token=options.ghToken)
-        if options.byos:
-            doc.md.addOverrides(["--md-Group=byos"])
         doc.md = metadata.fromCommandLine(extras, doc)
+        if options.byos:
+            doc.md.group = "byos"
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "echidna":
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
-        doc.md.addOverrides(extras)
-        doc.md.addOverrides(["--md-prepare-for-tr=yes"])
+        doc.md = metadata.fromCommandLine(extras, doc)
+        doc.md.prepTR = True
         doc.preprocess()
         if options.justTar:
             publish.prepareTar(doc, visibleTar=True)
@@ -204,8 +204,7 @@ def main():
         config.force = True
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
         if options.byos:
-            doc.md.addOverrides(["--md-Group=byos"])
-        doc.md = metadata.fromCommandLine(extras, doc)
+            doc.md.group = "byos"
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "debug":
         config.force = True
