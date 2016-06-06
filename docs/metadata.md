@@ -31,14 +31,16 @@ Several keys are required information, and will cause the processor to flag an e
 * **Shortname** must contain the spec's shortname, like "css-lists" or "css-backgrounds".
 * **Level** must contain the spec's level as an integer.
 * **Editor** must contain an editor's information.
-	This has a special format:
-	it must contain the editor's name,
-	optionally followed by the editor's affiliation
-	(composed of a company name, optionally followed by a link to the company homepage),
-	optionally followed by an email address and/or a link to their contact page,
-	all comma-separated.
-	(To put a comma *in* one of these values, use an HTML character reference: `&#44;`.)
-	For example: `Editor: Tab Atkins Jr., Google http://google.com, http://xanthir.com/contact/`
+	This has a special format of comma-separated clauses
+	the first is required and must contain the editor's name;
+	all the rest are optional.
+
+	* If editing a W3C document, your W3C ID (the number at the end of the url when you navigate to <https://www.w3.org/users/myprofile>) can be added as a `w3cid ####` clause.
+	* Your affiliation (company you work for, etc), optionally followed by a link to their homepage, like `Example Company http://example.com`. If your affiliation contains a comma, HTML-escape it (`&#44;`).
+	* Your email address.
+	* Your homepage.
+
+	All of the optional clauses can occur in any order, except that affiliation must occur before email or homepage.
 
 	Multiple "Editor" lines can be used to supply multiple editors.
 * **Abstract** must contain an abstract for the spec, a 1-2 sentence description of what the spec is about.
