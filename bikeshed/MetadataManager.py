@@ -293,7 +293,6 @@ def parseWarning(key, val):
     return None
 
 def parseEditor(key, val):
-    match = re.match(r"([^,]+) ,\s* ([^,]*) ,?\s* ([^,]*) ,?\s* ([^,]*)", val, re.X)
     pieces = [unescape(piece.strip()) for piece in val.split(',')]
     def looksLinkish(string):
         return re.match(r"\w+:", string) or looksEmailish(string)
@@ -301,43 +300,54 @@ def parseEditor(key, val):
         return re.match(r".+@.+\..+", string)
     data = {
         'name'   : pieces[0],
-        'id'     : None,
+        'w3cid'     : None,
         'org'    : None,
         'orglink': None,
         'link'   : None,
-        'email'  : None
+        'email'  : None,
+        'w3cid'  : None
     }
-    if len(pieces) == 4 and looksLinkish(pieces[2]) and looksLinkish(pieces[3]):
-        data['org'] = pieces[1]
-        if looksEmailish(pieces[2]):
-            data['email'] = pieces[2]
-            data['link'] = pieces[3]
+    # Handle well-known pieces, split off the ambiguous ones
+    ambiguousPieces = []
+    for piece in pieces[1:]:
+        if re.match(r"w3cid \d+$", piece) and data['w3cid'] is None:
+            data['w3cid'] = piece[6:]
         else:
-            data['link'] = pieces[2]
-            data['email'] = pieces[3]
-    elif len(pieces) == 3 and looksLinkish(pieces[1]) and looksLinkish(pieces[2]):
+            ambiguousPieces.append(piece)
+    if len(ambiguousPieces) == 3 and looksLinkish(ambiguousPieces[1]) and looksLinkish(ambiguousPieces[2]):
+        # [org, email, url] or [org, url, email]
+        data['org'] = ambiguousPieces[0]
         if looksEmailish(pieces[1]):
-            data['email'] = pieces[1]
-            data['link'] = pieces[2]
+            data['email'] = ambiguousPieces[1]
+            data['link'] = ambiguousPieces[2]
         else:
-            data['link'] = pieces[1]
-            data['email'] = pieces[2]
-    elif len(pieces) == 3 and looksLinkish(pieces[2]):
-        data['org'] = pieces[1]
-        if looksEmailish(pieces[2]):
-            data['email'] = pieces[2]
+            data['link'] = ambiguousPieces[1]
+            data['email'] = ambiguousPieces[2]
+    elif len(ambiguousPieces) == 2 and looksLinkish(ambiguousPieces[0]) and looksLinkish(ambiguousPieces[1]):
+        # [email, url] or [url, email]
+        if looksEmailish(ambiguousPieces[0]):
+            data['email'] = ambiguousPieces[0]
+            data['link'] = ambiguousPieces[1]
         else:
-            data['link'] = pieces[2]
-    elif len(pieces) == 2:
-        # See if the piece looks like a link/email
-        if looksLinkish(pieces[1]):
-            if looksEmailish(pieces[1]):
-                data['email'] = pieces[1]
+            data['link'] = ambiguousPieces[0]
+            data['email'] = ambiguousPieces[1]
+    elif len(ambiguousPieces) == 2 and looksLinkish(ambiguousPieces[1]):
+        # [org, email] or [org, url]
+        data['org'] = ambiguousPieces[0]
+        if looksEmailish(ambiguousPieces[1]):
+            data['email'] = ambiguousPieces[1]
+        else:
+            data['link'] = ambiguousPieces[1]
+    elif len(ambiguousPieces) == 1:
+        # [org], [email], or [url]
+        if looksLinkish(ambiguousPieces[0]):
+            if looksEmailish(ambiguousPieces[0]):
+                data['email'] = ambiguousPieces[0]
             else:
-                data['link'] = pieces[1]
+                data['link'] = ambiguousPieces[0]
         else:
-            data['org'] = pieces[1]
-    elif len(pieces) == 1:
+            data['org'] = ambiguousPieces[0]
+    elif len(ambiguousPieces) == 0:
         pass
     else:
         die("'{0}' format is '<name>, <company>?, <email-or-contact-page>?. Got:\n{1}", key, val)
@@ -348,9 +358,10 @@ def parseEditor(key, val):
         data['orglink'] = pieces[-1]
         data['org'] = ' '.join(pieces[:-1])
     # Check if the name ends with an ID.
+    # TODO: remove this, it's redundant with the "w3cid ####" piece
     if data['name'] and re.search(r"\s\d+$", data['name']):
         pieces = data['name'].split()
-        data['id'] = pieces[-1]
+        data['w3cid'] = pieces[-1]
         data['name'] = ' '.join(pieces[:-1])
     return [data]
 

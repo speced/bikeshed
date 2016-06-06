@@ -529,8 +529,8 @@ def addTOCSection(doc):
 def addSpecMetadataSection(doc):
     def printEditor(editor):
         dd = E.dd({"class":"editor p-author h-card vcard"})
-        if editor['id']:
-            dd.attrib['data-editor-id'] = editor['id']
+        if editor['w3cid']:
+            dd.attrib['data-editor-id'] = editor['w3cid']
         if editor['link']:
             appendChild(dd, E.a({"class":"p-name fn u-url url", "href":editor['link']}, editor['name']))
         elif editor['email']:
