@@ -300,7 +300,7 @@ def parseEditor(key, val):
         return re.match(r".+@.+\..+", string)
     data = {
         'name'   : pieces[0],
-        'w3cid'     : None,
+        'w3cid'  : None,
         'org'    : None,
         'orglink': None,
         'link'   : None,
