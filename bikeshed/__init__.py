@@ -1897,8 +1897,11 @@ def cleanupHTML(doc):
 
     # Move any stray <link>, <meta>, or <style> into the <head>.
     head = find("head", doc)
-    for el in findAll("body link, body meta, body style:not([scoped])", doc):
+    for el in findAll("body link, body meta, body style", doc):
         head.append(el)
+
+    if find("style[scoped]", doc) is not None:
+        die("<style scoped> is no longer part of HTML. Ensure your styles can apply document-globally and remove the scoped attribute.")
 
     # Move any <style scoped> to be the first child of their parent.
     for el in findAll("style[scoped]", doc):
