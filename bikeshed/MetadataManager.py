@@ -317,7 +317,7 @@ def parseEditor(key, val):
     if len(ambiguousPieces) == 3 and looksLinkish(ambiguousPieces[1]) and looksLinkish(ambiguousPieces[2]):
         # [org, email, url] or [org, url, email]
         data['org'] = ambiguousPieces[0]
-        if looksEmailish(pieces[1]):
+        if looksEmailish(ambiguousPieces[1]):
             data['email'] = ambiguousPieces[1]
             data['link'] = ambiguousPieces[2]
         else:
