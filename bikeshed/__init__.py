@@ -193,7 +193,7 @@ def main():
     elif options.subparserName == "echidna":
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
         doc.md = metadata.fromCommandLine(extras, doc)
-        doc.md.prepTR = True
+        doc.md.addData("Prepare For TR", "yes")
         doc.preprocess()
         if options.justTar:
             publish.prepareTar(doc, visibleTar=True)
