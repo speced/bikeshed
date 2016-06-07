@@ -1994,7 +1994,7 @@ def cleanupHTML(doc):
         removeAttr(el, 'oldids')
         removeAttr(el, 'data-alternate-id')
         removeAttr(el, 'highlight')
-        removeAttr(el, 'nohiglight')
+        removeAttr(el, 'nohighlight')
         removeAttr(el, 'data-opaque')
         removeAttr(el, 'data-no-self-link')
 
