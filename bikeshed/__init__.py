@@ -67,6 +67,8 @@ def main():
                            help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
     specParser.add_argument("--byos", dest="byos", action="store_true",
                             help="Bring-Your-Own-Spec: turns off all the Bikeshed auto-niceties, so you can piecemeal its features into your existing doc instead. Experimental, let me know if things get crashy or weird.")
+    specParser.add_argument("-l", "--line-numbers", dest="lineNumbers", action="store_true",
+                            help="Hacky support for outputting line numbers on all error messages. Disables output, as this is hacky and might mess up your source.")
 
     echidnaParser = subparsers.add_parser('echidna', help="Process a spec source file into a valid output file and publish it according to certain automatic protocols.")
     echidnaParser.add_argument("infile", nargs="?",
@@ -182,7 +184,7 @@ def main():
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
-        doc = Spec(inputFilename=options.infile, debug=options.debug, token=options.ghToken)
+        doc = Spec(inputFilename=options.infile, debug=options.debug, token=options.ghToken, lineNumbers=options.lineNumbers)
         doc.md = metadata.fromCommandLine(extras, doc)
         if options.byos:
             doc.md.addData("Group", "byos")
@@ -290,8 +292,12 @@ Introduction here.
 
 class Spec(object):
 
-    def __init__(self, inputFilename, debug=False, token=None):
+    def __init__(self, inputFilename, debug=False, token=None, lineNumbers=False):
         self.valid = False
+        self.lineNumbers = lineNumbers
+        if lineNumbers:
+            # line-numbers are too hacky, so force this to be a dry run
+            config.dryRun = True
         if inputFilename is None:
             # Default to looking for a *.bs file.
             # Otherwise, look for a *.src.html file.
@@ -485,6 +491,7 @@ class Spec(object):
     def preprocess(self):
         # Textual hacks
         stripBOM(self)
+        self.lines = hackyLineNumbers(self.lines)
         self.lines = markdown.stripComments(self.lines)
 
         # Extract and process metadata
@@ -2003,6 +2010,13 @@ def finalHackyCleanup(text):
     # For hacky last-minute string-based cleanups of the rendered html.
 
     return text
+
+def hackyLineNumbers(lines):
+    # Hackily adds line-number information to each thing that looks like an open tag.
+    # This is just regex text-munging, so potentially dangerous!
+    for i,line in enumerate(lines):
+        lines[i] = re.sub(r"(?:^|[^<])(<[\w-]+)([ >])", r"\1 line-number={0}\2".format(i+1), line)
+    return lines
 
 
 def processInclusions(doc):

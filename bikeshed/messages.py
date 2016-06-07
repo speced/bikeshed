@@ -23,7 +23,10 @@ def p(msg):
 
 
 def die(msg, *formatArgs, **namedArgs):
-    msg = formatMessage("fatal", msg.format(*formatArgs, **namedArgs))
+    lineNum = None
+    if 'el' in namedArgs:
+        lineNum = namedArgs['el'].get("line-number")
+    msg = formatMessage("fatal", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
     if msg not in messages:
         messageCounts["fatal"] += 1
         messages.add(msg)
@@ -34,7 +37,10 @@ def die(msg, *formatArgs, **namedArgs):
         sys.exit(1)
 
 def linkerror(msg, *formatArgs, **namedArgs):
-    msg = formatMessage("link", msg.format(*formatArgs, **namedArgs))
+    lineNum = None
+    if 'el' in namedArgs:
+        lineNum = namedArgs['el'].get("line-number")
+    msg = formatMessage("link", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
     if msg not in messages:
         messageCounts["linkerror"] += 1
         messages.add(msg)
@@ -42,7 +48,10 @@ def linkerror(msg, *formatArgs, **namedArgs):
                 p(msg)
 
 def warn(msg, *formatArgs, **namedArgs):
-    msg = formatMessage("warning", msg.format(*formatArgs, **namedArgs))
+    lineNum = None
+    if 'el' in namedArgs:
+        lineNum = namedArgs['el'].get("line-number")
+    msg = formatMessage("warning", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
     if msg not in messages:
         messageCounts["warning"] += 1
         messages.add(msg)
@@ -108,7 +117,7 @@ def printColor(text, color="white", *styles):
         styleNum = ";".join(str(stylesConverter[style.lower()]) for style in styles)
         return "\033[{0};{1}m{text}\033[0m".format(styleNum, colorNum, text=text)
 
-def formatMessage(type, text):
+def formatMessage(type, text, lineNum=None):
     if config.printMode == "markup":
         text = text.replace("<", "&lt;")
         if type == "fatal":
@@ -139,6 +148,8 @@ def formatMessage(type, text):
         elif type == "warning":
             headingText = "WARNING"
             color = "light cyan"
+        if lineNum is not None:
+            headingText = "LINE {0}".format(lineNum)
         x  = printColor(headingText + ":", color, "bold")
         x += " "
         x += text
