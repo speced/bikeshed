@@ -62,8 +62,6 @@ def main():
     specParser.add_argument("outfile", nargs="?",
                             default=None,
                             help="Path to the output file.")
-    specParser.add_argument("--para", dest="paragraphMode", default="markdown",
-                            help="Pass 'markdown' for Markdown-style paragraph, or 'html' for normal HTML paragraphs. [default: %(default)s]")
     specParser.add_argument("--debug", dest="debug", action="store_true", help="Switches on some debugging tools. Don't use for production!")
     specParser.add_argument("--gh-token", dest="ghToken", nargs="?",
                            help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
@@ -184,7 +182,7 @@ def main():
     if options.subparserName == "update":
         update.update(anchors=options.anchors, biblio=options.biblio, linkDefaults=options.linkDefaults, testSuites=options.testSuites)
     elif options.subparserName == "spec":
-        doc = Spec(inputFilename=options.infile, paragraphMode=options.paragraphMode, debug=options.debug, token=options.ghToken)
+        doc = Spec(inputFilename=options.infile, debug=options.debug, token=options.ghToken)
         doc.md = metadata.fromCommandLine(extras, doc)
         if options.byos:
             doc.md.addData("Group", "byos")
@@ -292,7 +290,7 @@ Introduction here.
 
 class Spec(object):
 
-    def __init__(self, inputFilename, paragraphMode="markdown", debug=False, token=None):
+    def __init__(self, inputFilename, debug=False, token=None):
         self.valid = False
         if inputFilename is None:
             # Default to looking for a *.bs file.
@@ -319,7 +317,6 @@ class Spec(object):
         self.externalRefsUsed = defaultdict(dict)
         self.md = metadata.MetadataManager(doc=self)
         self.biblios = {}
-        self.paragraphMode = "markdown"
         self.macros = defaultdict(lambda x: "???")
         self.widl = parser.Parser(ui=IDLUI())
         self.testSuites = json.loads(config.retrieveDataFile("test-suites.json", quiet=True, str=True))
