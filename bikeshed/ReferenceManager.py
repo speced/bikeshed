@@ -132,14 +132,14 @@ class ReferenceManager(object):
             try:
                 linkTexts = config.linkTextsFromElement(el)
             except config.DuplicatedLinkText as e:
-                die("The term '{0}' is in both lt and local-lt of the element {1}.", e.offendingText, outerHTML(e.el))
+                die("The term '{0}' is in both lt and local-lt of the element {1}.", e.offendingText, outerHTML(e.el), el=e.el)
                 linkTexts = e.allTexts
             for linkText in linkTexts:
                 linkText = unfixTypography(linkText)
                 linkText = re.sub("\s+", " ", linkText)
                 linkType = treeAttr(el, 'data-dfn-type')
                 if linkType not in config.dfnTypes.union(["dfn"]):
-                    die("Unknown local dfn type '{0}':\n  {1}", linkType, outerHTML(el))
+                    die("Unknown local dfn type '{0}':\n  {1}", linkType, outerHTML(el), el=el)
                     continue
                 if linkType in config.lowercaseTypes:
                     linkText = linkText.lower()
@@ -147,7 +147,7 @@ class ReferenceManager(object):
                 if dfnFor is None:
                     dfnFor = set()
                     if self.getLocalRef(linkType, linkText, linkFor="/", exact=True):
-                        die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, linkType)
+                        die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, linkType, el=el)
                         continue
                 else:
                     dfnFor = set(config.splitForValues(dfnFor))
@@ -155,7 +155,7 @@ class ReferenceManager(object):
                     for singleFor in dfnFor:
                         if self.getLocalRef(linkType, linkText, linkFor=singleFor, exact=True):
                             encounteredError = True
-                            die("Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, linkType, singleFor)
+                            die("Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, linkType, singleFor, el=el)
                             break
                     if encounteredError:
                         continue
@@ -200,7 +200,7 @@ class ReferenceManager(object):
         status = status or self.status
         if status not in ("ED", "TR", "local"):
             if error:
-                die("Unknown spec status '{0}'. Status must be ED, TR, or local.", status)
+                die("Unknown spec status '{0}'. Status must be ED, TR, or local.", status, el=el)
             return None
 
         # Local refs always get precedence, unless you manually specified a spec.
@@ -214,7 +214,8 @@ class ReferenceManager(object):
                          linkType,
                          text,
                          localRefs[0].type,
-                         "' or '".join(localRefs[0].for_))
+                         "' or '".join(localRefs[0].for_),
+                         el=el)
                 return localRefs[0]
 
         # Take defaults into account
@@ -264,7 +265,7 @@ class ReferenceManager(object):
                     break
                 if len(possibleMethods) > 1:
                     # Too many to disambiguate.
-                    linkerror("The argument autolink '{0}' for '{1}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for.", text, linkFor)
+                    linkerror("The argument autolink '{0}' for '{1}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for.", text, linkFor, el=el)
                 # Try out all the combinations of interface/status/signature
                 linkForPatterns = ["{i}/{m}", "{m}"]
                 statuses = ["local", status]
@@ -293,7 +294,7 @@ class ReferenceManager(object):
                 methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
             if zeroRefsError and len(methodRefs) > 1:
                 # More than one possible foo() overload, can't tell which to link to
-                linkerror("Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.", linkFor, text)
+                linkerror("Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.", linkFor, text, el=el)
                 return
             # Otherwise
 
@@ -302,36 +303,36 @@ class ReferenceManager(object):
                 # Custom properties/descriptors aren't ever defined anywhere
                 return None
             if zeroRefsError:
-                linkerror("No '{0}' refs found for '{1}'.", linkType, text)
+                linkerror("No '{0}' refs found for '{1}'.", linkType, text, el=el)
             return None
         elif failure == "export":
             if zeroRefsError:
-                linkerror("No '{0}' refs found for '{1}' that are marked for export.", linkType, text)
+                linkerror("No '{0}' refs found for '{1}' that are marked for export.", linkType, text, el=el)
             return None
         elif failure == "spec":
             if zeroRefsError:
-                linkerror("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec)
+                linkerror("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec, el=el)
             return None
         elif failure == "for":
             if zeroRefsError:
                 if spec is None:
-                    linkerror("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
+                    linkerror("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor, el=el)
                 else:
-                    linkerror("No '{0}' refs found for '{1}' with for='{2}' in spec '{3}'.", linkType, text, linkFor, spec)
+                    linkerror("No '{0}' refs found for '{1}' with for='{2}' in spec '{3}'.", linkType, text, linkFor, spec, el=el)
             return None
         elif failure == "status":
             if zeroRefsError:
                 if spec is None:
-                    linkerror("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
+                    linkerror("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status, el=el)
                 else:
-                    linkerror("No '{0}' refs found for '{1}' compatible with status '{2}' in spec '{3}'.", linkType, text, status, spec)
+                    linkerror("No '{0}' refs found for '{1}' compatible with status '{2}' in spec '{3}'.", linkType, text, status, spec, el=el)
             return None
         elif failure == "ignored-specs":
             if zeroRefsError:
-                linkerror("The only '{0}' refs for '{1}' were in ignored specs:\n{2}", linkType, text, outerHTML(el))
+                linkerror("The only '{0}' refs for '{1}' were in ignored specs:\n{2}", linkType, text, outerHTML(el), el=el)
             return None
         elif failure:
-            die("Programming error - I'm not catching '{0}'-type link failures. Please report!", failure)
+            die("Programming error - I'm not catching '{0}'-type link failures. Please report!", failure, el=el)
             return None
 
         if len(refs) == 1:
@@ -360,13 +361,15 @@ class ReferenceManager(object):
                     linkType,
                     text,
                     defaultRef.spec,
-                    defaultRef.url)
+                    defaultRef.url,
+                    el=el)
             else:
                 linkerror("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
                      linkType,
                      text,
                      defaultRef.spec,
-                     '\n'.join(possibleRefs))
+                     '\n'.join(possibleRefs),
+                     el=el)
         return defaultRef
 
     def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None, quiet=False):

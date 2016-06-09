@@ -478,7 +478,7 @@ def dedupIDs(doc):
                 continue
             # Try to de-dup the id by appending an integer after it.
             if warnAboutDupes:
-                warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupe)
+                warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupe, el=el)
             for x in ints:
                 if not findId(dupe+x):
                     el.set("id", dupe+x)

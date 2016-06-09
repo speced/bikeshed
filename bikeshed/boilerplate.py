@@ -192,7 +192,7 @@ def addExplicitIndexes(doc):
     for container in findAll("index", doc):
         indexEntries = defaultdict(list)
         if container.get('for') is None:
-            die("<index> elements need a for='' attribute specifying one or more specs.")
+            die("<index> elements need a for='' attribute specifying one or more specs.", el=container)
             continue
         if container.get('type'):
             types = [x.strip() for x in container.get('type').split(',')]
@@ -200,7 +200,7 @@ def addExplicitIndexes(doc):
             types = None
         status = container.get('status')
         if status and status not in ["TR", "ED"]:
-            die("<index> has unknown value '{0}' for status. Must be TR or ED.", status)
+            die("<index> has unknown value '{0}' for status. Must be TR or ED.", status, el=container)
             continue
         if container.get('for').strip() == "*":
             specs = None
@@ -257,7 +257,7 @@ def addExplicitIndexes(doc):
                 else:
                     indexEntries[text].append(entry)
         if specs is not None and specs - seenSpecs:
-            warn("Couldn't find any refs for {0} when generating an index.", ' or '.join("'{0}'".format(x) for x in specs - seenSpecs))
+            warn("Couldn't find any refs for {0} when generating an index.", ' or '.join("'{0}'".format(x) for x in specs - seenSpecs), el=container)
         appendChild(container, htmlFromIndexTerms(indexEntries))
         container.tag = "div"
         removeAttr(container, "for")
@@ -327,11 +327,11 @@ def addPropertyIndex(doc):
     appendChild(html,
         E.h2({"class":"no-num no-ref", "id":"property-index"}, "Property Index"))
 
-    def extractKeyValFromRow(tr):
+    def extractKeyValFromRow(tr, table):
         # Extract the key, minus the trailing :
         result = re.match(r'(.*):', textContent(row[0]).strip())
         if result is None:
-            die("Propdef row headers must be a word followed by a colon. Got:\n{0}", textContent(row[0]).strip())
+            die("Propdef row headers must be a word followed by a colon. Got:\n{0}", textContent(row[0]).strip(), el=table)
             return '',''
         key = result.group(1).strip().capitalize()
         # Extract the value from the second cell
@@ -343,7 +343,7 @@ def addPropertyIndex(doc):
         prop = {}
         names = []
         for row in findAll('tr', table):
-            key, val = extractKeyValFromRow(row)
+            key, val = extractKeyValFromRow(row, table)
             if key == "Name":
                 names = [textContent(x) for x in findAll('dfn', row[1])]
             else:
@@ -490,11 +490,11 @@ def addTOCSection(doc):
         container = containers[level]
         if isinstance(container, int):
             # Saw a low-level heading without first seeing a higher heading.
-            die("Saw an <h{0}> without seeing an <h{1}> first. Please order your headings properly.\n{2}", level, level-1, outerHTML(header))
+            die("Saw an <h{0}> without seeing an <h{1}> first. Please order your headings properly.\n{2}", level, level-1, outerHTML(header), el=header)
             return
         if level > previousLevel + 1:
             # Jumping two levels is a no-no.
-            die("Heading level jumps more than one level, from h{0} to h{1}:\n  {2}", previousLevel, level, textContent(header).replace("\n", " "))
+            die("Heading level jumps more than one level, from h{0} to h{1}:\n  {2}", previousLevel, level, textContent(header).replace("\n", " "), el=header)
             return
 
         addToTOC = True

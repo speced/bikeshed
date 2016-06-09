@@ -491,7 +491,8 @@ class Spec(object):
     def preprocess(self):
         # Textual hacks
         stripBOM(self)
-        self.lines = hackyLineNumbers(self.lines)
+        if self.lineNumbers:
+            self.lines = hackyLineNumbers(self.lines)
         self.lines = markdown.stripComments(self.lines)
 
         # Extract and process metadata
@@ -864,17 +865,17 @@ def fixIntraDocumentReferences(doc):
     for el in findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
         targetID = el.get("href")[1:]
         if el.get('data-section') is not None and targetID not in headingIDs:
-            die("Couldn't find target document section {0}:\n{1}", targetID, outerHTML(el))
+            die("Couldn't find target document section {0}:\n{1}", targetID, outerHTML(el), el=el)
             continue
         elif targetID not in ids:
-            die("Couldn't find target anchor {0}:\n{1}", targetID, outerHTML(el))
+            die("Couldn't find target anchor {0}:\n{1}", targetID, outerHTML(el), el=el)
             continue
         if isEmpty(el):
             # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
             target = ids[targetID]
             content = find(".content", target)
             if content is None:
-                die("Tried to generate text for a section link, but the target isn't a heading:\n{0}", outerHTML(el))
+                die("Tried to generate text for a section link, but the target isn't a heading:\n{0}", outerHTML(el), el=el)
                 continue
             text = textContent(content).strip()
             if target.get('data-level') is not None:
@@ -886,10 +887,10 @@ def fixInterDocumentReferences(doc):
         spec = el.get('data-link-spec')
         section = el.get('spec-section', '')
         if spec is None:
-            die("Spec-section autolink doesn't have a 'spec' attribute:\n{0}", outerHTML(el))
+            die("Spec-section autolink doesn't have a 'spec' attribute:\n{0}", outerHTML(el), el=el)
             continue
         if section is None:
-            die("Spec-section autolink doesn't have a 'spec-section' attribute:\n{0}", outerHTML(el))
+            die("Spec-section autolink doesn't have a 'spec-section' attribute:\n{0}", outerHTML(el), el=el)
             continue
         if spec in doc.refs.headings:
             # Bikeshed recognizes the spec
@@ -897,7 +898,7 @@ def fixInterDocumentReferences(doc):
             if section in specData:
                 heading = specData[section]
             else:
-                die("Couldn't find section '{0}' in spec '{1}':\n{2}", section, spec, outerHTML(el))
+                die("Couldn't find section '{0}' in spec '{1}':\n{2}", section, spec, outerHTML(el), el=el)
                 continue
             if isinstance(heading, list):
                 # Multipage spec
@@ -906,7 +907,7 @@ def fixInterDocumentReferences(doc):
                     heading = specData[heading[0]]
                 else:
                     # multiple headings of this id, user needs to disambiguate
-                    die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  [[{0}]]".format(spec+x) for x in heading))
+                    die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  [[{0}]]".format(spec+x) for x in heading), el=el)
                     continue
             if doc.md.status == "ED":
                 if "ED" in heading:
@@ -926,7 +927,7 @@ def fixInterDocumentReferences(doc):
             # Bikeshed doesn't know the spec, but it's in biblio
             bib = doc.refs.getBiblioRef(spec)
             if isinstance(bib, biblio.StringBiblioEntry):
-                die("Can't generate a cross-spec section ref for '{0}', because the biblio entry has no url.", spec)
+                die("Can't generate a cross-spec section ref for '{0}', because the biblio entry has no url.", spec, el=el)
                 continue
             el.tag = "a"
             el.set("href", bib.url + section)
@@ -934,7 +935,7 @@ def fixInterDocumentReferences(doc):
                 el.text = bib.title + " §" + section[1:]
         else:
             # Unknown spec
-            die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el))
+            die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el), el=el)
             continue
         removeAttr(el, 'data-link-spec')
         removeAttr(el, 'spec-section')
@@ -975,7 +976,7 @@ def fillAttributeInfoSpans(doc):
         if (el.text is None or el.text.strip() == '') and len(el) == 0:
             referencedAttribute = el.get("for")
             if referencedAttribute is None or referencedAttribute == "":
-                die("Missing for reference in attribute info span.")
+                die("Missing for reference in attribute info span.", el=el)
                 continue
             if "/" in referencedAttribute:
                 interface, referencedAttribute = referencedAttribute.split("/")
@@ -983,10 +984,10 @@ def fillAttributeInfoSpans(doc):
             else:
                 target = findAll('[data-link-type={1}][data-lt="{0}"]'.format(referencedAttribute, refType), doc)
             if len(target) == 0:
-                die("Couldn't find target {1} '{0}':\n{2}", referencedAttribute, refType, outerHTML(el))
+                die("Couldn't find target {1} '{0}':\n{2}", referencedAttribute, refType, outerHTML(el), el=el)
                 continue
             elif len(target) > 1:
-                die("Multiple potential target {1}s '{0}':\n{2}", referencedAttribute, refType, outerHTML(el))
+                die("Multiple potential target {1}s '{0}':\n{2}", referencedAttribute, refType, outerHTML(el), el=el)
                 continue
             target = target[0]
             datatype = target.get("data-type").strip()
@@ -1071,12 +1072,12 @@ def classifyDfns(doc, dfns):
     for el in dfns:
         dfnType = determineDfnType(el)
         if dfnType not in config.dfnTypes:
-            die("Unknown dfn type '{0}' on:\n{1}", dfnType, outerHTML(el))
+            die("Unknown dfn type '{0}' on:\n{1}", dfnType, outerHTML(el), el=el)
             continue
         dfnFor = treeAttr(el, "data-dfn-for")
         primaryDfnText = config.firstLinkTextFromElement(el)
         if primaryDfnText is None:
-            die("Dfn has no linking text:\n{0}", outerHTML(el))
+            die("Dfn has no linking text:\n{0}", outerHTML(el), el=el)
             continue
         # Push the dfn type down to the <dfn> itself.
         if el.get('data-dfn-type') is None:
@@ -1085,12 +1086,12 @@ def classifyDfns(doc, dfns):
         if dfnFor:
             el.set('data-dfn-for', dfnFor)
         elif dfnType in config.typesUsingFor:
-            die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el))
+            die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el), el=el)
             continue
         # Some error checking
         if dfnType in config.functionishTypes:
             if not re.match(r"^[\w-]+\(.*\)$", primaryDfnText):
-                die("Functions/methods must end with () in their linking text, got '{0}'.", primaryDfnText)
+                die("Functions/methods must end with () in their linking text, got '{0}'.", primaryDfnText, el=el)
                 continue
             elif el.get('data-lt') is None:
                 if dfnType == "function":
@@ -1104,7 +1105,7 @@ def classifyDfns(doc, dfns):
                     primaryDfnText = names[0]
                     el.set('data-lt', "|".join(names))
                 else:
-                    die("BIKESHED ERROR: Unhandled functionish type '{0}' in classifyDfns. Please report this to Bikeshed's maintainer.", dfnType)
+                    die("BIKESHED ERROR: Unhandled functionish type '{0}' in classifyDfns. Please report this to Bikeshed's maintainer.", dfnType, el=el)
         # If type=argument, try to infer what it's for.
         if dfnType == "argument" and el.get('data-dfn-for') is None:
             parent = el.getparent()
@@ -1112,7 +1113,7 @@ def classifyDfns(doc, dfns):
             if parent.get('data-dfn-type') in config.functionishTypes and parentFor is not None:
                 dfnFor = ", ".join(parentFor+"/"+name for name in doc.widl.normalizedMethodNames(textContent(parent), parentFor))
             elif treeAttr(el, "data-dfn-for") is None:
-                die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el))
+                die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el), el=el)
                 continue
         # Automatically fill in id if necessary.
         if el.get('id') is None:
@@ -1166,7 +1167,7 @@ def determineLinkType(el):
     if linkType:
         if linkType in config.linkTypes:
             return linkType
-        die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el))
+        die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el), el=el)
         return "unknown-type"
     # 2. Introspect on the text
     text = textContent(el)
@@ -1194,7 +1195,7 @@ def determineLinkText(el):
         linkText = contents
     linkText = foldWhitespace(linkText)
     if len(linkText) == 0:
-        die("Autolink {0} has no linktext.", outerHTML(el))
+        die("Autolink {0} has no linktext.", outerHTML(el), el=el)
     return linkText
 
 
@@ -1234,7 +1235,7 @@ def processBiblioLinks(doc):
         elif biblioType == "informative":
             storage = doc.informativeRefs
         else:
-            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", biblioType, outerHTML(el))
+            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", biblioType, outerHTML(el), el=el)
             continue
 
         linkText = determineLinkText(el)
@@ -1251,7 +1252,7 @@ def processBiblioLinks(doc):
         if not ref:
             if not okayToFail:
                 closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)
-                die("Couldn't find '{0}' in bibliography data. Did you mean:\n{1}", linkText, '\n'.join("  "+b for b in closeBiblios))
+                die("Couldn't find '{0}' in bibliography data. Did you mean:\n{1}", linkText, '\n'.join("  "+b for b in closeBiblios), el=el)
             el.tag = "span"
             continue
 
@@ -1264,7 +1265,7 @@ def processBiblioLinks(doc):
                 pass
             else:
                 # Oh no! I'm using two different names to refer to the same biblio!
-                die("The biblio refs [[{0}]] and [[{1}]] are both aliases of the same base reference [[{2}]]. Please choose one name and use it consistently.", linkText, ref.linkText, ref.originalLinkText)
+                die("The biblio refs [[{0}]] and [[{1}]] are both aliases of the same base reference [[{2}]]. Please choose one name and use it consistently.", linkText, ref.linkText, ref.originalLinkText, el=el)
                 # I can keep going, tho - no need to skip this ref
         else:
             # This is the first time I've reffed this particular biblio.
@@ -1414,7 +1415,7 @@ def addSelfLinks(doc):
     else:
         for el in dfnElements:
             if list(el.iterancestors("a")):
-                warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el))
+                warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el), el=el)
                 continue
             appendChild(el, makeSelfLink(el))
 
@@ -1851,7 +1852,7 @@ def addSyntaxHighlighting(doc):
             try:
                 lexer = get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
             except pyg.util.ClassNotFound:
-                die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el))
+                die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
                 return
         highlighted = parseHTML(pyg.highlight(text, lexer, formatters.HtmlFormatter()))[0][0]
         # Remove the trailing newline
@@ -1904,8 +1905,8 @@ def cleanupHTML(doc):
     for el in findAll("body link, body meta, body style", doc):
         head.append(el)
 
-    if find("style[scoped]", doc) is not None:
-        die("<style scoped> is no longer part of HTML. Ensure your styles can apply document-globally and remove the scoped attribute.")
+    for el in findAll("style[scoped]", doc):
+        die("<style scoped> is no longer part of HTML. Ensure your styles can apply document-globally and remove the scoped attribute.", el=el)
 
     # Move any <style scoped> to be the first child of their parent.
     for el in findAll("style[scoped]", doc):
@@ -1962,7 +1963,7 @@ def cleanupHTML(doc):
 
     # Look for nested <a> elements, and warn about them.
     for el in findAll("a a", doc):
-        warn("The following (probably auto-generated) link is illegally nested in another link:\n{0}", outerHTML(el))
+        warn("The following (probably auto-generated) link is illegally nested in another link:\n{0}", outerHTML(el), el=el)
 
     # If the <h1> contains only capital letters, add a class=allcaps for styling hook
     h1 = find("h1", doc)
@@ -2028,7 +2029,7 @@ def processInclusions(doc):
             break
         for el in els:
             if el.get("data-from-block") is None:
-                warn("The <include> element is going away. Please switch to <pre class=include>.")
+                warn("The <include> element is going away. Please switch to <pre class=include>.", el=el)
             macros = {}
             for i in itertools.count(0):
                 m = el.get("data-macro-"+str(i))
@@ -2042,12 +2043,12 @@ def processInclusions(doc):
                     with io.open(path, 'r', encoding="utf-8") as f:
                         lines = f.readlines()
                 except Exception, err:
-                    die("Couldn't find include file '{0}'. Error was:\n{1}", path, err)
+                    die("Couldn't find include file '{0}'. Error was:\n{1}", path, err, el=el)
                     removeNode(el)
                     continue
                 hash = hashlib.md5(''.join(lines).encode("ascii", "xmlcharrefreplace")).hexdigest()
                 if hash in includeHashes:
-                    die("<include> loop detected: '{0}' was already included.", path)
+                    die("<include> loop detected: '{0}' was already included.", path, el=el)
                     removeNode(el)
                     continue
                 else:
@@ -2073,7 +2074,7 @@ def formatElementdefTables(doc):
             groupName = textContent(el).strip()
             groupAttrs = sorted(doc.refs.queryRefs(linkType="element-attr", linkFor=groupName)[0], key=lambda x:x.text)
             if len(groupAttrs) == 0:
-                die("The element-attr group '{0}' doesn't have any attributes defined for it.", groupName)
+                die("The element-attr group '{0}' doesn't have any attributes defined for it.", groupName, el=el)
                 continue
             el.tag = "details"
             clearContents(el)
@@ -2096,7 +2097,7 @@ def formatArgumentdefTables(doc):
         forMethod = doc.widl.normalizedMethodNames(table.get("data-dfn-for"))
         method = doc.widl.find(table.get("data-dfn-for"))
         if not method:
-            die("Can't find method '{0}'.", forMethod)
+            die("Can't find method '{0}'.", forMethod, el=table)
             continue
         for tr in findAll("tbody > tr", table):
             tds = findAll("td", tr)
@@ -2117,7 +2118,7 @@ def formatArgumentdefTables(doc):
                     appendChild(tds[3],
                         E.span({"class":"no"}, "✘"))
             else:
-                die("Can't find the '{0}' argument of method '{1}' in the argumentdef block.", argName, method.fullName)
+                die("Can't find the '{0}' argument of method '{1}' in the argumentdef block.", argName, method.fullName, el=table)
                 continue
 
 
@@ -2148,15 +2149,15 @@ def inlineRemoteIssues(doc):
                 addClass(el, "no-marker")
         except urllib2.HTTPError as err:
             if doc.token and err.code == 401:
-                die("Unauthorized Access to GitHub's API. There might be an issue with your token.")
+                die("Unauthorized Access to GitHub's API. There might be an issue with your token.", el=el)
                 break
             if doc.token is None and err.code == 403:
-                die("You've reached GitHub API's rate limit for unauthenticated requests.\nTo increase it, please provide an auth token. Tokens can be generated from https://github.com/settings/tokens.")
+                die("You've reached GitHub API's rate limit for unauthenticated requests.\nTo increase it, please provide an auth token. Tokens can be generated from https://github.com/settings/tokens.", el=el)
                 break
-            die("Error inlining GitHub issues:\n{0}", err)
+            die("Error inlining GitHub issues:\n{0}", err, el=el)
             continue
         except Exception as err:
-            die("Error inlining GitHub issues:\n{0}", err)
+            die("Error inlining GitHub issues:\n{0}", err, el=el)
             continue
 
 def addNoteHeaders(doc):
