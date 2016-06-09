@@ -86,7 +86,7 @@ class MetadataManager:
 
         self.manuallySetKeys = set()
 
-    def addData(self, key, val):
+    def addData(self, key, val, lineNum=None):
         key = key.strip()
         if isinstance(val, basestring):
             val = val.strip()
@@ -100,13 +100,13 @@ class MetadataManager:
             key = key.title()
 
         if key not in knownKeys:
-            die('Unknown metadata key "{0}". Prefix custom keys with "!".', key)
+            die('Unknown metadata key "{0}". Prefix custom keys with "!".', key, lineNum=lineNum)
             return
         md = knownKeys[key]
 
         self.manuallySetKeys.add(key)
 
-        val = md.parse(key, val)
+        val = md.parse(key, val, lineNum)
 
         self.addParsedData(key, val)
 
@@ -245,28 +245,33 @@ class MetadataManager:
         for name, text in self.customTextMacros:
             macros[name.lower()] = text
 
-def parseDate(key, val):
+def parseDate(key, val, lineNum):
     try:
         return datetime.strptime(val, "%Y-%m-%d").date()
     except:
-        die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", key, val)
+        die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", key, val, lineNum=lineNum)
         return None
 
-def parseLevel(key, val):
+def parseLevel(key, val, lineNum):
     return config.HierarchicalNumber(val)
 
-def parseInteger(key, val):
+def parseInteger(key, val, lineNum):
     return int(val)
 
-def parseBoolean(key, val):
+def parseBoolean(key, val, lineNum):
+    b = boolish(val)
+    if b is None:
+        die("The {0} field must be true/false, yes/no, y/n, or on/off. Got '{1}' instead.", key, val, lineNum=lineNum)
+    return b
+
+def boolish(val):
     if val.lower() in ("true", "yes", "y", "on"):
         return True
     if val.lower() in ("false", "no", "n", "off"):
         return False
-    die("The {0} field must be true/false, yes/no, y/n, or on/off. Got '{1}' instead.", key, val)
     return None
 
-def parseWarning(key, val):
+def parseWarning(key, val, lineNum):
     if val.lower() == "obsolete":
         return "warning-obsolete",
     if val.lower() == "not ready":
@@ -289,10 +294,10 @@ def parseWarning(key, val):
   replaced by [new url]
   new version [new url]
   commit [snapshot id] [snapshot url] replaced by [master url]
-  branch [branch name] [branch url] replaced by [master url]''', key, val)
+  branch [branch name] [branch url] replaced by [master url]''', key, val, lineNum=lineNum)
     return None
 
-def parseEditor(key, val):
+def parseEditor(key, val, lineNum):
     pieces = [unescape(piece.strip()) for piece in val.split(',')]
     def looksLinkish(string):
         return re.match(r"\w+:", string) or looksEmailish(string)
@@ -350,7 +355,7 @@ def parseEditor(key, val):
     elif len(ambiguousPieces) == 0:
         pass
     else:
-        die("'{0}' format is '<name>, <company>?, <email-or-contact-page>?. Got:\n{1}", key, val)
+        die("'{0}' format is '<name>, <company>?, <email-or-contact-page>?. Got:\n{1}", key, val, lineNum=lineNum)
         return []
     # Check if the org ends with a link
     if data['org'] is not None and " " in data['org'] and looksLinkish(data['org'].split()[-1]):
@@ -366,10 +371,10 @@ def parseEditor(key, val):
     return [data]
 
 
-def parseCommaSeparated(key, val):
+def parseCommaSeparated(key, val, lineNum):
     return [term.strip().lower() for term in val.split(',')]
 
-def parseLinkDefaults(key, val):
+def parseLinkDefaults(key, val, lineNum):
     defaultSpecs = defaultdict(list)
     for default in val.split(","):
         match = re.match(r"^([\w\d-]+)  (?:\s+\( ({0}) (?:\s+(TR|ED))? \) )  \s+(.*)$".format("|".join(config.dfnTypes.union(["dfn"]))), default.strip(), re.X)
@@ -382,37 +387,37 @@ def parseLinkDefaults(key, val):
             for term in terms:
                 defaultSpecs[term.strip()].append((spec, type, status, dfnFor))
         else:
-            die("'{0}' is a comma-separated list of '<spec> (<dfn-type>) <terms>'. Got:\n{1}", key, default)
+            die("'{0}' is a comma-separated list of '<spec> (<dfn-type>) <terms>'. Got:\n{1}", key, default, lineNum=lineNum)
             continue
     return defaultSpecs
 
-def parseBoilerplate(key, val):
+def parseBoilerplate(key, val, lineNum):
     boilerplate = config.BoolSet(default=True)
     for command in val.split(","):
         pieces = command.lower().strip().split()
         if len(pieces) != 2:
-            die("Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{0}", command)
+            die("Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{0}", command, lineNum=lineNum)
             continue
         if pieces[0] == "omit":
             # legacy syntax; allows "omit foo" in addition to the normal "foo off"/etc
             boilerplate[pieces[1]] = False
         else:
-            onoff = parseBoolean(pieces[1])
+            onoff = boolish(pieces[1])
             if onoff is None:
-                die("Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{0}", command)
+                die("Boilerplate metadata pieces are a boilerplate label and a boolean. Got:\n{0}", command, lineNum=lineNum)
                 continue
             boilerplate[pieces[0]] = onoff
     return boilerplate
 
-def parseBiblioStatus(key, val):
+def parseBiblioStatus(key, val, lineNum):
     val = val.strip().lower()
     if val in ("current", "dated"):
         return val
     else:
-        die("'{0}' must be either 'current' or 'dated'. Got '{1}'", key, val)
+        die("'{0}' must be either 'current' or 'dated'. Got '{1}'", key, val, lineNum=lineNum)
         return "dated"
 
-def parseLinkedText(key, val):
+def parseLinkedText(key, val, lineNum):
     # Parses anything defined as "text url, text url, text url" into a list of 2-tuples.
     entries = []
     vals = [v.strip() for v in val.split(",")]
@@ -420,7 +425,7 @@ def parseLinkedText(key, val):
         entries.append(v.rsplit(" ", 1))
     return entries
 
-def parseMarkupShorthands(key, val):
+def parseMarkupShorthands(key, val, lineNum):
     # Format is comma-separated list of shorthand category followed by boolean.
     # Output is a dict of the shorthand categories with boolean values.
     vals = [v.strip() for v in val.lower().split(",")]
@@ -429,41 +434,41 @@ def parseMarkupShorthands(key, val):
     for v in vals:
         pieces = v.split()
         if len(pieces) != 2:
-            die("Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}", v)
+            die("Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}", v, lineNum=lineNum)
             continue
         name, boolstring = pieces
         if name not in validCategories:
-            die("Unknown Markup Shorthand category '{0}'.", name)
+            die("Unknown Markup Shorthand category '{0}'.", name, lineNum=lineNum)
             continue
-        onoff = parseBoolean(key, boolstring)
+        onoff = boolish(boolstring)
         if onoff is None:
-            die("Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}", v)
+            die("Markup Shorthand metadata pieces are a shorthand category and a boolean. Got:\n{0}", v, lineNum=lineNum)
             continue
         ret[name] = onoff
     return ret
 
-def parseTextMacro(key, val):
+def parseTextMacro(key, val, lineNum):
     # Each Text Macro line is just a macro name (must be uppercase)
     # followed by the text it expands to.
     try:
         name, text = val.lstrip().split(None, 1)
     except:
-        die("Text Macro lines must contain a macro name followed by the macro text. Got:\n{0}", val)
+        die("Text Macro lines must contain a macro name followed by the macro text. Got:\n{0}", val, lineNum=lineNum)
         return []
     if not re.match(r"[A-Z0-9-]+$", name):
-        die("Text Macro names must be all-caps and alphanumeric. Got '{0}'", name)
+        die("Text Macro names must be all-caps and alphanumeric. Got '{0}'", name, lineNum=lineNum)
         return []
     return [(name, text)]
 
-def parseWorkStatus(key, val):
+def parseWorkStatus(key, val, lineNum):
     # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
     val = val.strip().lower()
     if val not in ('completed', 'stable', 'testing', 'refining', 'revising', 'exploring', 'rewriting', 'abandoned'):
-        die("Work Status must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned). Got '{0}'. See http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process for details.", val)
+        die("Work Status must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned). Got '{0}'. See http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process for details.", val, lineNum=lineNum)
         return None
     return val
 
-def parseRepository(key, val):
+def parseRepository(key, val, lineNum):
     # Shortname followed by url, or just url.
     # If just url, I'll try to recognize the shortname from it; otherwise it's the url again.
     val = val.strip()
@@ -483,29 +488,29 @@ def parseRepository(key, val):
         # Otherwise just use the url as the shortname
         return Repository(url=val)
     else:
-        die("Repository must be a url, optionally followed by a shortname. Got '{0}'", val)
+        die("Repository must be a url, optionally followed by a shortname. Got '{0}'", val, lineNum=lineNum)
         return config.Nil()
 
-def parseTranslateIDs(key, val):
+def parseTranslateIDs(key, val, lineNum):
     translations = {}
     for v in val.split(","):
         pieces = v.strip().split()
         if len(pieces) != 2:
-            die("‘Translate IDs’ values must be an old ID followed by a new ID. Got '{0}'", v)
+            die("‘Translate IDs’ values must be an old ID followed by a new ID. Got '{0}'", v, lineNum=lineNum)
             continue
         old,new = pieces
         translations[old] = new
     return translations
 
-def parseTranslation(key, val):
+def parseTranslation(key, val, lineNum):
     # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
     pieces = val.split(",")
     if not(1 <= len(pieces) <= 3):
-        die("Format of a Translation line is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?. Got:\n{0}", val)
+        die("Format of a Translation line is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?. Got:\n{0}", val, lineNum=lineNum)
         return
     firstParts = pieces[0].split()
     if len(firstParts) != 2:
-        die("First part of a Translation line must be a lang-code followed by a url. Got:\n{0}", pieces[0])
+        die("First part of a Translation line must be a lang-code followed by a url. Got:\n{0}", pieces[0], lineNum=lineNum)
         return
     langCode, url = firstParts
     name = None
@@ -517,7 +522,7 @@ def parseTranslation(key, val):
         elif k.lower() == "native-name":
             nativeName = v
         else:
-            die("Later parts of a Translation line must start with 'name' or 'native-name'. Got:\n{0}", piece)
+            die("Later parts of a Translation line must start with 'name' or 'native-name'. Got:\n{0}", piece, lineNum=lineNum)
     return [{"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}]
 
 
@@ -532,7 +537,7 @@ def parse(lines, doc):
     lastKey = None
     blockSize = 0
     md = MetadataManager(doc)
-    for line in lines:
+    for i,line in enumerate(lines):
         if not inMetadata and re.match(r"<pre .*class=.*metadata.*>", line):
             blockSize = 1
             inMetadata = True
@@ -547,17 +552,17 @@ def parse(lines, doc):
             blockSize += 1
             if lastKey and (line.strip() == "" or re.match(r"\s+", line)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
-                md.addData(lastKey, line.lstrip())
+                md.addData(lastKey, line.lstrip(), lineNum=i+1)
             elif re.match(r"([^:]+):\s*(.*)", line):
                 match = re.match(r"([^:]+):\s*(.*)", line)
-                md.addData(match.group(1), match.group(2))
+                md.addData(match.group(1), match.group(2), lineNum=i+1)
                 lastKey = match.group(1)
             else:
-                die("Incorrectly formatted metadata line:\n{0}", line)
+                die("Incorrectly formatted metadata line:\n{0}", line, lineNum=i+1)
                 continue
         elif re.match(r"\s*<h1>.*?</h1>", line):
             title = re.match(r"\s*<h1>(.*?)</h1>", line).group(1)
-            md.addData("Title", title)
+            md.addData("Title", title, lineNum=i+1)
         else:
             newlines.append(line)
     return newlines, md
@@ -665,8 +670,8 @@ def joinDdList(a,b):
     x.update(a)
     x.update(b)
     return x
-parseLiteral = lambda k,v: v
-parseLiteralList = lambda k,v: [v]
+parseLiteral = lambda k,v,l: v
+parseLiteralList = lambda k,v,l: [v]
 
 knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
