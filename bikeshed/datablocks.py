@@ -159,7 +159,7 @@ def transformPre(lines, tagName, firstLine, **kwargs):
     return lines
 
 
-def transformPropdef(lines, doc, firstLine, lineNum, **kwargs):
+def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
     attrs = OrderedDict()
     parsedAttrs = parseDefBlock(lines, "propdef")
     # Displays entries in the order specified in attrs,
@@ -220,7 +220,7 @@ def transformPropdef(lines, doc, firstLine, lineNum, **kwargs):
     return ret
 
 # TODO: Make these functions match transformPropdef's new structure
-def transformDescdef(lines, doc, firstLine, lineNum, **kwargs):
+def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = " line-number={0}".format(lineNum)
@@ -249,7 +249,7 @@ def transformDescdef(lines, doc, firstLine, lineNum, **kwargs):
     ret.append("</table>")
     return ret
 
-def transformElementdef(lines, doc, lineNum, **kwargs):
+def transformElementdef(lines, doc, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = " line-number={0}".format(lineNum)
@@ -310,7 +310,7 @@ def transformElementdef(lines, doc, lineNum, **kwargs):
     ret.append("</table>")
     return ret
 
-def transformArgumentdef(lines, firstLine, lineNum, **kwargs):
+def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = " line-number={0}".format(lineNum)
@@ -407,11 +407,11 @@ def transformBiblio(lines, doc, **kwargs):
         doc.refs.biblios[k].extend(vs)
     return []
 
-def transformAnchors(lines, doc, lineNum, **kwargs):
+def transformAnchors(lines, doc, lineNum=None, **kwargs):
     anchors = parseInfoTree(lines, doc.md.indent, lineNum)
     return processAnchors(anchors, doc, lineNum)
 
-def processAnchors(anchors, doc, lineNum):
+def processAnchors(anchors, doc, lineNum=None):
     for anchor in anchors:
         if "type" not in anchor or len(anchor['type']) != 1:
             die("Each anchor needs exactly one type. Got:\n{0}", config.printjson(anchor), lineNum=lineNum)
@@ -450,11 +450,11 @@ def processAnchors(anchors, doc, lineNum):
             doc.refs.addMethodVariants(anchor['text'][0], anchor.get('for', []), doc.md.shortname)
     return []
 
-def transformLinkDefaults(lines, doc, lineNum, **kwargs):
+def transformLinkDefaults(lines, doc, lineNum=None, **kwargs):
     lds = parseInfoTree(lines, doc.md.indent, lineNum)
     return processLinkDefaults(lds, doc, lineNum)
 
-def processLinkDefaults(lds, doc, lineNum):
+def processLinkDefaults(lds, doc, lineNum=None):
     for ld in lds:
         if len(ld.get('type', [])) != 1:
             die("Every link default needs exactly one type. Got:\n{0}", config.printjson(ld), lineNum=lineNum)
@@ -478,11 +478,11 @@ def processLinkDefaults(lds, doc, lineNum):
             doc.md.linkDefaults[text].append((spec, type, ld.get('status', None), None))
     return []
 
-def transformIgnoredSpecs(lines, doc, lineNum, **kwargs):
+def transformIgnoredSpecs(lines, doc, lineNum=None, **kwargs):
     specs = parseInfoTree(lines, doc.md.indent, lineNum)
     return processIgnoredSpecs(specs, doc, lineNum)
 
-def processIgnoredSpecs(specs, doc, lineNum):
+def processIgnoredSpecs(specs, doc, lineNum=None):
     for spec in specs:
         if len(spec.get('spec', [])) == 0:
             die("Every ignored spec line needs at least one 'spec' value. Got:\n{0}", config.printjson(spec), lineNum=lineNum)
@@ -500,14 +500,14 @@ def processIgnoredSpecs(specs, doc, lineNum):
     return []
 
 
-def transformInfo(lines, doc, lineNum, **kwargs):
+def transformInfo(lines, doc, lineNum=None, **kwargs):
     # More generic InfoTree system.
     # A <pre class=info> can contain any of the InfoTree collections,
     # identified by an 'info' line.
     infos = parseInfoTree(lines, doc.md.indent, lineNum)
     return processInfo(infos, doc, lineNum)
 
-def processInfo(infos, doc, lineNum):
+def processInfo(infos, doc, lineNum=None):
     knownInfoTypes = {
         "anchors": processAnchors,
         "link-defaults": processLinkDefaults,
@@ -527,7 +527,7 @@ def processInfo(infos, doc, lineNum):
         knownInfoTypes[infoType](infos, doc, lineNum=0)
     return []
 
-def transformInclude(lines, doc, lineNum, **kwargs):
+def transformInclude(lines, doc, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = " line-number={0}".format(lineNum)
