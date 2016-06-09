@@ -24,8 +24,10 @@ def p(msg):
 
 def die(msg, *formatArgs, **namedArgs):
     lineNum = None
-    if 'el' in namedArgs:
+    if 'el' in namedArgs and namedArgs['el'].get("line-number"):
         lineNum = namedArgs['el'].get("line-number")
+    elif namedArgs.get("lineNum", None):
+        lineNum = namedArgs['lineNum']
     msg = formatMessage("fatal", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
     if msg not in messages:
         messageCounts["fatal"] += 1
@@ -38,8 +40,10 @@ def die(msg, *formatArgs, **namedArgs):
 
 def linkerror(msg, *formatArgs, **namedArgs):
     lineNum = None
-    if 'el' in namedArgs:
+    if 'el' in namedArgs and namedArgs['el'].get("line-number"):
         lineNum = namedArgs['el'].get("line-number")
+    elif namedArgs.get("lineNum", None):
+        lineNum = namedArgs['lineNum']
     msg = formatMessage("link", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
     if msg not in messages:
         messageCounts["linkerror"] += 1
@@ -49,8 +53,10 @@ def linkerror(msg, *formatArgs, **namedArgs):
 
 def warn(msg, *formatArgs, **namedArgs):
     lineNum = None
-    if 'el' in namedArgs:
+    if 'el' in namedArgs and namedArgs['el'].get("line-number"):
         lineNum = namedArgs['el'].get("line-number")
+    elif namedArgs.get("lineNum", None):
+        lineNum = namedArgs['lineNum']
     msg = formatMessage("warning", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
     if msg not in messages:
         messageCounts["warning"] += 1
