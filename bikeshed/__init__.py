@@ -2016,7 +2016,7 @@ def hackyLineNumbers(lines):
     # Hackily adds line-number information to each thing that looks like an open tag.
     # This is just regex text-munging, so potentially dangerous!
     for i,line in enumerate(lines):
-        lines[i] = re.sub(r"(?:^|[^<])(<[\w-]+)([ >])", r"\1 line-number={0}\2".format(i+1), line)
+        lines[i] = re.sub(r"(^|[^<])(<[\w-]+)([ >])", r"\1\2 line-number={0}\3".format(i+1), line)
     return lines
 
 
