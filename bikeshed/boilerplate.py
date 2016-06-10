@@ -359,7 +359,7 @@ def addPropertyIndex(doc):
         names = []
         atRule = ""
         for row in findAll('tr', table):
-            key, val = extractKeyValFromRow(row)
+            key, val = extractKeyValFromRow(row, table)
             if key == "Name":
                 names = [textContent(x) for x in findAll('dfn', row[1])]
             elif key == "For":
