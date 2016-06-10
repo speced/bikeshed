@@ -1933,6 +1933,10 @@ def cleanupHTML(doc):
         el.tag = "span"
         el.set("style", el.get('style', '') + ";white-space:nowrap")
 
+    # Some of the datablocks still put a line-number on their generated content.
+    for el in findAll("[line-number]", doc):
+        del el.attrib["line-number"]
+
     # If we accidentally recognized an autolink shortcut in SVG, kill it.
     for el in findAll("svg|a[data-link-type]", doc):
         del el.attrib["data-link-type"]
