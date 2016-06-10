@@ -523,6 +523,7 @@ class Spec(object):
 
         # Build the document
         self.document = parseDocument(self.html)
+        correctH1(self)
         processInclusions(self)
         metadata.parseDoc(self)
 
@@ -2037,6 +2038,13 @@ def hackyLineNumbers(lines):
     for i,line in enumerate(lines):
         lines[i] = re.sub(r"(^|[^<])(<[\w-]+)([ >])", r"\1\2 line-number={0}\3".format(i+1), line)
     return lines
+
+
+def correctH1(doc):
+    # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
+    h1s = findAll("h1", doc)
+    if len(h1s) == 2:
+        replaceNode(h1s[0], h1s[1])
 
 
 def processInclusions(doc):
