@@ -54,12 +54,15 @@ def parse(string):
             return rr.Diagram()
         lastIndent = indent
         if re.match(r"\s*({0})\W".format(blockNames), line):
-            match = re.match(r"\s*(\w+)\s*:\s*(.*)", line)
+            match = re.match(r"\s*(\w+)(\s[\w\s]+)?:\s*(.*)", line)
             if not match:
                 die("Line {0} doesn't match the grammar 'Command: optional-prelude'. Got:\n{1}", i, line.strip())
                 return rr.Diagram()
             command = match.group(1)
-            prelude = match.group(2).strip()
+            prelude = match.group(2).strip() if (match.group(2)) else ''
+            text = match.group(3).strip() if (match.group(3)) else ''
+            if (text):
+                prelude = (prelude + ' ' + text) if (prelude) else text
             node = {"command": command, "prelude": prelude, "children": [], "line": i}
         elif re.match(r"\s*({0})\W".format(textNames), line):
             match = re.match(r"\s*(\w+)(\s[\w\s]+)?:\s*(.*)", line)
@@ -67,11 +70,8 @@ def parse(string):
                 die("Line {0} doesn't match the grammar 'Command [optional prelude]: text'. Got:\n{1},", i, line.strip())
                 return rr.Diagram()
             command = match.group(1)
-            if match.group(2):
-                prelude = match.group(2).strip()
-            else:
-                prelude = ""
-            text = match.group(3).strip()
+            prelude = match.group(2).strip() if (match.group(2)) else ''
+            text = match.group(3).strip() if (match.group(3)) else ''
             node = {"command": command, "prelude": prelude, "text":text, "children": [], "line": i}
 
         activeCommands[str(indent)]['children'].append(node)
@@ -144,16 +144,16 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
     elif command in ("Plus", "OneOrMore"):
         if prelude:
             return die("Line {0} - OneOrMore commands cannot have preludes.", line)
-        if 0 == len(children) > 2:
+        if (not children) or (2 < len(children)):
             return die("Line {0} - OneOrMore commands must have one or two children.", line)
         children = filter(None, [_createDiagram(**child) for child in children])
         return rr.OneOrMore(*children)
     elif command in ("Star", "ZeroOrMore"):
-        if prelude:
-            return die("Line {0} - ZeroOrMore commands cannot have preludes.", line)
-        if 0 == len(children) > 2:
+        if prelude not in ("", "skip"):
+            return die("Line {0} - ZeroOrMore preludes must be nothing or 'skip'. Got:\n{1}", line, prelude)
+        if (not children) or (2 < len(children)):
             return die("Line {0} - ZeroOrMore commands must have one or two children.", line)
         children = filter(None, [_createDiagram(**child) for child in children])
-        return rr.ZeroOrMore(*children)
+        return rr.ZeroOrMore(*children, skip=(prelude=="skip"))
     else:
         return die("Line {0} - Unknown command '{1}'.", line, command)
