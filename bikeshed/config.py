@@ -149,8 +149,14 @@ testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
 @total_ordering
 class HierarchicalNumber(object):
     def __init__(self, valString):
-        self.nums = re.split(r"\D+", valString)
+        if valString.lower() == "none":
+            self.nums = None
+        else:
+            self.nums = [int(x) for x in re.split(r"\D+", valString)]
         self.originalVal = valString
+
+    def __nonzero__(self):
+        return bool(self.nums)
 
     def __lt__(self, other):
         try:
