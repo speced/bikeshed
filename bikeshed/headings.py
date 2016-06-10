@@ -66,11 +66,11 @@ def checkPrivacySecurityHeadings(headings):
             security = True
             privacy = True
     if not security and not privacy:
-        warn("This specification has neither a 'Security Considerations' nor a 'Privacy Considerations' section. Please consider adding both.")
+        warn("This specification has neither a 'Security Considerations' nor a 'Privacy Considerations' section. Please consider adding both, see https://w3ctag.github.io/security-questionnaire/.")
     elif not security:
-        warn("This specification does not have a 'Security Considerations' section. Please consider adding one.")
+        warn("This specification does not have a 'Security Considerations' section. Please consider adding one, see https://w3ctag.github.io/security-questionnaire/.")
     elif not privacy:
-        warn("This specification does not have a 'Privacy Considerations' section. Please consider adding one.")
+        warn("This specification does not have a 'Privacy Considerations' section. Please consider adding one, see https://w3ctag.github.io/security-questionnaire/.")
 
 def addHeadingAlgorithms(doc, headings):
     for header in headings:
