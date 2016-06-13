@@ -1608,6 +1608,21 @@ class DebugMarker(object):
     def markupEnumValue(self, text, construct):
         return ('<ENUM-VALUE for=' + construct.name + '>', '</ENUM-VALUE>')
 
+class HighlightMarker(object):
+    # Just applies highlighting classes to IDL stuff.
+
+    def markupTypeName(self, text, construct):
+        return ('<span class=n idlType=' + construct.idlType + '>', '</span>')
+
+    def markupName(self, text, construct):
+        return ('<span class=nv idlType=' + construct.idlType + '>', '</span>')
+
+    def markupKeyword(self, text, construct):
+        return ('<span class=kt>', '</span>')
+
+    def markupEnumValue(self, text, construct):
+        return ('<span class=s for=' + construct.name + '>', '</span>')
+
 class IDLMarker(object):
     def markupConstruct(self, text, construct):
         # Fires for every 'construct' in the WebIDL.
@@ -1627,7 +1642,7 @@ class IDLMarker(object):
         # The names in [Exposed=Foo] are [Global] tokens, not interface names.
         # Since I don't track globals as a link target yet, don't link them at all.
         if construct.idlType == "extended-attribute" and construct.name == "Exposed":
-            return (None, None)
+            return ("<span class=n>", "</span>")
 
         # The name in [PutForwards=foo] is an attribute of the same interface.
         if construct.idlType == "extended-attribute" and construct.name == "PutForwards":
@@ -1641,14 +1656,14 @@ class IDLMarker(object):
             typeName = str(type).strip()
             if typeName.endswith("?"):
                 typeName = typeName[:-1]
-            return ('<a data-link-type=attribute data-link-for="{0}">'.format(typeName), '</a>')
+            return ('<a class=n data-link-type=attribute data-link-for="{0}">'.format(typeName), '</a>')
 
         if construct.idlType == "constructor":
             # This shows up for the method name in a [NamedConstructor] extended attribute.
             # The "NamedConstructor" Name already got markup up, so ignore this one.
-            return (None, None)
+            return ("<span class=n>", "</span>")
 
-        return ('<a data-link-type="idl-name">', '</a>')
+        return ('<a class=n data-link-type="idl-name">', '</a>')
 
     def markupKeyword(self, text, construct):
         # Fires on the various "keywords" of WebIDL -
@@ -1658,16 +1673,16 @@ class IDLMarker(object):
         if text == "stringifier":
             if construct.name is None:
                 # If no name was defined, you're required to define stringification behavior.
-                return ("<a dfn for='{0}' data-lt='stringification behavior'>".format(construct.parent.fullName), "</a>")
+                return ("<a class=kt dfn for='{0}' data-lt='stringification behavior'>".format(construct.parent.fullName), "</a>")
             else:
                 # Otherwise, you *can* point to/dfn stringification behavior if you want.
-                return ("<idl data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
-        return (None, None)
+                return ("<idl class=kt data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
+        return ("<span class=kt>", "</span>")
 
     def markupName(self, text, construct):
         # Fires for defining names: method names, arg names, interface names, etc.
         if construct.idlType not in config.idlTypes:
-            return (None,None)
+            return ("<span class=nv>", "</span>")
 
         idlType = construct.idlType
         extraParameters = ''
@@ -1712,12 +1727,12 @@ class IDLMarker(object):
                 idlFor = "data-idl-for='{0}'".format(construct.parent.fullName)
         else:
             idlFor = ""
-        return ('<{name} data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters, name=elementName, refType=refType), '</{0}>'.format(elementName))
+        return ('<{name} class=nv data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters, name=elementName, refType=refType), '</{0}>'.format(elementName))
 
     def markupEnumValue(self, text, construct):
         texts = [text, text.strip("\"")]
         lt = "|".join(escapeAttr(t) for t in texts)
-        return ("<idl data-idl-type=enum-value data-idl-for='{0}' data-lt='{1}'>".format(escapeAttr(construct.name), lt), "</idl>")
+        return ("<idl class=s data-idl-type=enum-value data-idl-for='{0}' data-lt='{1}'>".format(escapeAttr(construct.name), lt), "</idl>")
 
     def encode(self, text):
         return escapeHTML(text)
@@ -1753,10 +1768,14 @@ class IDLUI(object):
         die("{0}", msg.rstrip())
 
 def markupIDL(doc):
+    highlightingOccurred = False
     for el in findAll("pre.idl, xmp.idl", doc):
         if el.get("data-no-idl") is not None:
             continue
         if not isNormative(el):
+            replaceContents(parseHTML(unicode(widl.markup(HighlightMarker))))
+            addClass(el, "highlight")
+            highlightingOccurred = True
             continue
         text = textContent(el)
         # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
@@ -1766,6 +1785,10 @@ def markupIDL(doc):
         marker = DebugMarker() if doc.debug else IDLMarker()
         text = unicode(widl.markup(marker))
         replaceContents(el, parseHTML(text))
+        addClass(el, "highlight")
+        highlightingOccurred = True
+    if highlightingOccurred:
+        doc.extraStyles['style-syntax-highlighting'] += "pre.idl.highlight { color: #708090; }"
 
 
 
@@ -1836,27 +1859,9 @@ def addSyntaxHighlighting(doc):
         import pygments as pyg
         from pygments.lexers import get_lexer_by_name
         from pygments import formatters
-        from pygments import token
-        from pygments import style
     except ImportError:
         die("Bikeshed now uses Pygments for syntax highlighting.\nPlease run `$ sudo pip install pygments` from your command line.")
         return
-
-    class PrismStyle(style.Style):
-        default_style = "#000000"
-        styles = {
-            token.Name: "#0077aa",
-            token.Name.Tag: "#669900",
-            token.Name.Builtin: "noinherit",
-            token.Name.Other: "noinherit",
-            token.Operator: "#999999",
-            token.Punctuation: "#999999",
-            token.Keyword: "#990055",
-            token.Literal: "#000000",
-            token.Literal.Number: "#000000",
-            token.Literal.String: "#a67f59",
-            token.Comment: "#708090"
-        }
 
     customLexers = {
         "css": lexers.CSSLexer()
@@ -1880,6 +1885,9 @@ def addSyntaxHighlighting(doc):
         addClass(el, "highlight")
 
     highlightingOccurred = False
+
+    if find("pre.idl, xmp.idl", doc) is not None:
+        highlightingOccurred = True
 
     def translateLang(lang):
         # Translates some names to ones Pygment understands
@@ -1907,12 +1915,83 @@ def addSyntaxHighlighting(doc):
         highlightingOccurred = True
 
     if highlightingOccurred:
-        doc.extraStyles['style-syntax-highlighting'] += formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
-        doc.extraStyles['style-syntax-highlighting'] += """
-        .highlight { background: hsl(24, 20%, 95%); }
+        # To regen the styles, edit and run the below
+        #from pygments import token
+        #from pygments import style
+        #class PrismStyle(style.Style):
+        #    default_style = "#000000"
+        #    styles = {
+        #        token.Name: "#0077aa",
+        #        token.Name.Tag: "#669900",
+        #        token.Name.Builtin: "noinherit",
+        #        token.Name.Variable: "#222222",
+        #        token.Name.Other: "noinherit",
+        #        token.Operator: "#999999",
+        #        token.Punctuation: "#999999",
+        #        token.Keyword: "#990055",
+        #        token.Literal: "#000000",
+        #        token.Literal.Number: "#000000",
+        #        token.Literal.String: "#a67f59",
+        #        token.Comment: "#708090"
+        #    }
+        #print formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
+        doc.extraStyles['style-syntax-highlighting'] += '''
+        .highlight:not(.idl) { background: hsl(24, 20%, 95%); }
         code.highlight { padding: .1em; border-radius: .3em; }
-        xmp.highlight, pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
-        """
+        pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
+        .highlight .c { color: #708090 } /* Comment */
+        .highlight .k { color: #990055 } /* Keyword */
+        .highlight .l { color: #000000 } /* Literal */
+        .highlight .n { color: #0077aa } /* Name */
+        .highlight .o { color: #999999 } /* Operator */
+        .highlight .p { color: #999999 } /* Punctuation */
+        .highlight .cm { color: #708090 } /* Comment.Multiline */
+        .highlight .cp { color: #708090 } /* Comment.Preproc */
+        .highlight .c1 { color: #708090 } /* Comment.Single */
+        .highlight .cs { color: #708090 } /* Comment.Special */
+        .highlight .kc { color: #990055 } /* Keyword.Constant */
+        .highlight .kd { color: #990055 } /* Keyword.Declaration */
+        .highlight .kn { color: #990055 } /* Keyword.Namespace */
+        .highlight .kp { color: #990055 } /* Keyword.Pseudo */
+        .highlight .kr { color: #990055 } /* Keyword.Reserved */
+        .highlight .kt { color: #990055 } /* Keyword.Type */
+        .highlight .ld { color: #000000 } /* Literal.Date */
+        .highlight .m { color: #000000 } /* Literal.Number */
+        .highlight .s { color: #a67f59 } /* Literal.String */
+        .highlight .na { color: #0077aa } /* Name.Attribute */
+        .highlight .nc { color: #0077aa } /* Name.Class */
+        .highlight .no { color: #0077aa } /* Name.Constant */
+        .highlight .nd { color: #0077aa } /* Name.Decorator */
+        .highlight .ni { color: #0077aa } /* Name.Entity */
+        .highlight .ne { color: #0077aa } /* Name.Exception */
+        .highlight .nf { color: #0077aa } /* Name.Function */
+        .highlight .nl { color: #0077aa } /* Name.Label */
+        .highlight .nn { color: #0077aa } /* Name.Namespace */
+        .highlight .py { color: #0077aa } /* Name.Property */
+        .highlight .nt { color: #669900 } /* Name.Tag */
+        .highlight .nv { color: #222222 } /* Name.Variable */
+        .highlight .ow { color: #999999 } /* Operator.Word */
+        .highlight .mb { color: #000000 } /* Literal.Number.Bin */
+        .highlight .mf { color: #000000 } /* Literal.Number.Float */
+        .highlight .mh { color: #000000 } /* Literal.Number.Hex */
+        .highlight .mi { color: #000000 } /* Literal.Number.Integer */
+        .highlight .mo { color: #000000 } /* Literal.Number.Oct */
+        .highlight .sb { color: #a67f59 } /* Literal.String.Backtick */
+        .highlight .sc { color: #a67f59 } /* Literal.String.Char */
+        .highlight .sd { color: #a67f59 } /* Literal.String.Doc */
+        .highlight .s2 { color: #a67f59 } /* Literal.String.Double */
+        .highlight .se { color: #a67f59 } /* Literal.String.Escape */
+        .highlight .sh { color: #a67f59 } /* Literal.String.Heredoc */
+        .highlight .si { color: #a67f59 } /* Literal.String.Interpol */
+        .highlight .sx { color: #a67f59 } /* Literal.String.Other */
+        .highlight .sr { color: #a67f59 } /* Literal.String.Regex */
+        .highlight .s1 { color: #a67f59 } /* Literal.String.Single */
+        .highlight .ss { color: #a67f59 } /* Literal.String.Symbol */
+        .highlight .vc { color: #0077aa } /* Name.Variable.Class */
+        .highlight .vg { color: #0077aa } /* Name.Variable.Global */
+        .highlight .vi { color: #0077aa } /* Name.Variable.Instance */
+        .highlight .il { color: #000000 } /* Literal.Number.Integer.Long */
+        '''
 
 
 def cleanupHTML(doc):
