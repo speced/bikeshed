@@ -90,6 +90,7 @@ There are additional types for WebIDL definitions:
 * iterator
 * maplike
 * setlike
+* extended-attribute (things like `[EnforceRange]`)
 
 And for HTML/SVG/etc element definitions:
 
