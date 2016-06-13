@@ -1936,6 +1936,10 @@ def cleanupHTML(doc):
         el.tag = "span"
         el.set("style", el.get('style', '') + ";white-space:nowrap")
 
+    # And convert <xmp> to <pre>
+    for el in findAll("xmp", doc):
+        el.tag = "pre"
+
     # Some of the datablocks still put a line-number on their generated content.
     for el in findAll("[line-number]", doc):
         del el.attrib["line-number"]
