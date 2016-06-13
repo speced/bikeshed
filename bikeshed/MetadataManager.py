@@ -561,10 +561,10 @@ def parse(lines, doc):
                 die("Incorrectly formatted metadata line:\n{0}", line, lineNum=i+1)
                 continue
         elif re.match(r"\s*<h1[^>]*>.*?</h1>", line):
-            if doc.md.title is None:
+            if md.title is None:
                 title = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line).group(1)
                 md.addData("Title", title, lineNum=i+1)
-                newlines.append(line)
+            newlines.append(line)
         else:
             newlines.append(line)
     return newlines, md

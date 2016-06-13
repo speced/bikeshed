@@ -2042,7 +2042,7 @@ def hackyLineNumbers(lines):
 
 def correctH1(doc):
     # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
-    h1s = findAll("h1", doc)
+    h1s = [h1 for h1 in findAll("h1", doc) if isNormative(h1)]
     if len(h1s) == 2:
         replaceNode(h1s[0], h1s[1])
 
