@@ -1675,6 +1675,8 @@ class IDLMarker(object):
         refType="idl"
         if idlType in config.functionishTypes:
             idlTitle = '|'.join(self.methodLinkingTexts(construct))
+        elif idlType == "extended-attribute":
+            refType = "link"
         elif idlType == "attribute":
             if hasattr(construct.member, "rest"):
                 rest = construct.member.rest

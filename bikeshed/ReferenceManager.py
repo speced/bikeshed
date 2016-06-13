@@ -191,7 +191,7 @@ class ReferenceManager(object):
 
         # 'maybe' links might not link up, so it's fine for them to have no references.
         # The relevent errors are gated by this variable.
-        zeroRefsError = error and linkType!="maybe"
+        zeroRefsError = error and linkType not in ["maybe", "extended-attribute"]
 
         text = unfixTypography(text)
         if linkType in config.lowercaseTypes:
