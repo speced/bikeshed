@@ -234,7 +234,7 @@ def main():
             p(config.printjson(refs))
     elif options.subparserName == "refs":
         config.force = True
-        config.quiet = 2
+        config.quiet = 10
         doc = Spec(inputFilename=options.infile)
         if doc.valid:
             doc.preprocess()
