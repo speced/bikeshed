@@ -1594,16 +1594,16 @@ class DebugMarker(object):
         return ('<' + construct.idlType + '>', '</' + construct.idlType + '>')
 
     def markupType(self, text, construct):
-        return ('<TYPE for=' + construct.idlType + '>', '</TYPE>')
+        return ('<TYPE idlType=' + construct.idlType + '>', '</TYPE>')
 
     def markupTypeName(self, text, construct):
-        return ('<TYPE-NAME for=' + construct.idlType + '>', '</TYPE-NAME>')
+        return ('<TYPE-NAME idlType=' + construct.idlType + '>', '</TYPE-NAME>')
 
     def markupName(self, text, construct):
-        return ('<NAME for=' + construct.idlType + '>', '</NAME>')
+        return ('<NAME idlType=' + construct.idlType + '>', '</NAME>')
 
     def markupKeyword(self, text, construct):
-        return ('<KEYWORD for=' + construct.idlType + '>', '</KEYWORD>')
+        return ('<KEYWORD idlType=' + construct.idlType + '>', '</KEYWORD>')
 
     def markupEnumValue(self, text, construct):
         return ('<ENUM-VALUE for=' + construct.name + '>', '</ENUM-VALUE>')
