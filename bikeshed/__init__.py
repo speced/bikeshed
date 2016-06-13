@@ -1753,7 +1753,7 @@ class IDLUI(object):
         die("{0}", msg.rstrip())
 
 def markupIDL(doc):
-    for el in findAll("pre.idl", doc):
+    for el in findAll("pre.idl, xmp.idl", doc):
         if el.get("data-no-idl") is not None:
             continue
         if not isNormative(el):
