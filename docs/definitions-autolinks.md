@@ -11,6 +11,25 @@ Instead, the text of the link is matched against the text of the definitions,
 and if a match is found,
 the link's `href` is set up to connect the two.
 
+Conjugating/Pluralizing/etc the Linking Text
+--------------------------------------------
+
+Bikeshed can automatically handle a wide range of English conjugations and pluralizations.
+For example, if you define the term "snap",
+you can link to it with "snapping" or "snapped"
+without having to manually add those variations to your `<dfn>` manually.
+
+As such, it's best to define your term in the "base" form,
+singular and present tense.
+Use `lt='...'` if necessary to set up the correct "base" linking text,
+if your visible text needs to be in a conjugated form due to the surrounding text.
+
+These variations only work for the *last* word in a phrase.
+If you have a longer phrase where it's a middle word that conjugates differently,
+you do still have to manually handle that,
+either by defining multiple linking texts on the `<dfn>`,
+or by manually specifying the linking text on the `<a>`.
+
 Changing the Linking Text
 -------------------------
 
