@@ -1773,7 +1773,7 @@ def markupIDL(doc):
         if el.get("data-no-idl") is not None:
             continue
         if not isNormative(el):
-            replaceContents(parseHTML(unicode(widl.markup(HighlightMarker))))
+            replaceContents(el, parseHTML(unicode(widl.markup(HighlightMarker()))))
             addClass(el, "highlight")
             highlightingOccurred = True
             continue
