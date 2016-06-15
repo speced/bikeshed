@@ -13,6 +13,7 @@ import urllib2
 import argparse
 import itertools
 import importlib
+import collections
 from datetime import date, datetime
 
 from . import config
@@ -1879,9 +1880,10 @@ def addSyntaxHighlighting(doc):
                 return
         highlighted = parseHTML(pyg.highlight(text, lexer, formatters.HtmlFormatter()))[0][0]
         # Remove the trailing newline
-        if len(highlighted):
-            highlighted[-1].tail = highlighted[-1].tail.rstrip()
-        replaceContents(el, highlighted)
+        if hasChildElements(el):
+            mergeHighlighting(el, highlighted)
+        else:
+            replaceContents(el, highlighted)
         addClass(el, "highlight")
 
     highlightingOccurred = False
@@ -1905,9 +1907,6 @@ def addSyntaxHighlighting(doc):
 
     # Highlight all the appropriate elements
     for el in findAll("xmp, pre, code", doc):
-        if list(childElements(el)):
-            # If there's any internal structure, don't override it with highlighting.
-            continue
         attr, lang = closestAttr(el, "nohighlight", "highlight")
         if attr == "nohighlight" or attr is None:
             continue
@@ -1992,6 +1991,59 @@ def addSyntaxHighlighting(doc):
         .highlight .vi { color: #0077aa } /* Name.Variable.Instance */
         .highlight .il { color: #000000 } /* Literal.Number.Integer.Long */
         '''
+
+def mergeHighlighting(el, hi):
+    # Merges a tree of Pygment-highlighted HTML
+    # into the original element's markup.
+    # This works because Pygment effectively colors each character with a highlight class,
+    # merging them together into runs of text for convenience/efficiency only;
+    # the markup structure is a flat list of sibling elements containing raw text
+    # (and maybe some un-highlighted raw text between them).
+    def colorizeEl(el, coloredText):
+        for node in childNodes(el, clear=True):
+            if isElement(node):
+                appendChild(el, colorizeEl(node, coloredText))
+            else:
+                appendChild(el, *colorizeText(node, coloredText))
+        return el
+    def colorizeText(text, coloredText):
+        nodes = []
+        while text != '':
+            try:
+                nextColor = coloredText.popleft();
+            except:
+                print "“{0}”".format(text)
+                break
+            if len(nextColor.text) <= len(text):
+                if not text.startswith(nextColor.text):
+                    print nextColor.text, text
+                if nextColor.color is None:
+                    nodes.append(nextColor.text)
+                else:
+                    nodes.append(E.span({"class":nextColor.color}, nextColor.text))
+                text = text[len(nextColor.text):]
+            else: # Need to use only part of the nextColor node
+                if nextColor.color is None:
+                    nodes.append(text)
+                else:
+                    nodes.append(E.span({"class":nextColor.color}, text))
+                # Truncate the nextColor text to what's unconsumed,
+                # and put it back into the deque
+                nextColor.text = nextColor.text[len(text):]
+                coloredText.appendleft(nextColor)
+                text = ''
+        return nodes
+    coloredText = collections.deque()
+    ColoredText = collections.namedtuple('ColoredText', ['text', 'color'])
+    for n in childNodes(hi):
+        if isElement(n):
+            coloredText.append(ColoredText(n.text, n.get('class')))
+        else:
+            coloredText.append(ColoredText(n, None))
+    colorizeEl(el, coloredText)
+
+
+
 
 
 def cleanupHTML(doc):
