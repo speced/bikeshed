@@ -2009,11 +2009,7 @@ def mergeHighlighting(el, hi):
     def colorizeText(text, coloredText):
         nodes = []
         while text != '':
-            try:
-                nextColor = coloredText.popleft();
-            except:
-                print "“{0}”".format(text)
-                break
+            nextColor = coloredText.popleft();
             if len(nextColor.text) <= len(text):
                 if not text.startswith(nextColor.text):
                     print nextColor.text, text
