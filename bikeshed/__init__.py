@@ -2204,18 +2204,33 @@ def processInclusions(doc):
                     die("Couldn't find include file '{0}'. Error was:\n{1}", path, err, el=el)
                     removeNode(el)
                     continue
-                hash = hashlib.md5(''.join(lines).encode("ascii", "xmlcharrefreplace")).hexdigest()
-                if hash in includeHashes:
-                    die("Possible <include> loop detected: '{0}' was already included.", path, el=el)
+                # hash the content + path together for identity
+                # can't use just path, because they're relative; including "foo/bar.txt" might use "foo/bar.txt" further nested
+                # can't use just content, because then you can't do the same thing twice.
+                # combined does a good job unless you purposely pervert it
+                hash = hashlib.md5(path + ''.join(lines).encode("ascii", "xmlcharrefreplace")).hexdigest()
+                if el.get('hash'):
+                    # This came from another included file, check if it's a loop-include
+                    if hash in el.get('hash'):
+                        # WHOOPS
+                        die("Include loop detected - “{0}” is included in itself.", path)
+                        removeNode(el)
+                        continue
+                    hash += " " + el.get('hash')
+                depth = int(el.get('depth')) if el.get('depth') is not None else 0
+                if depth > 100:
+                    # Just in case you slip past the nesting restriction
+                    die("Nesting depth > 100, literally wtf are you doing.")
                     removeNode(el)
                     continue
-                else:
-                    includeHashes.add(hash)
                 lines = datablocks.transformDataBlocks(doc, lines)
                 lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
                 text = ''.join(lines)
                 text = doc.fixText(text, moreMacros=macros)
                 subtree = parseHTML(text)
+                for childInclude in findAll("pre.include", E.div({}, *subtree)):
+                    childInclude.set("hash", hash)
+                    childInclude.set("depth", str(depth+1))
                 replaceNode(el, *subtree)
 
 
