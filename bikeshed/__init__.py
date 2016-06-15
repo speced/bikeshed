@@ -2184,15 +2184,13 @@ def processInclusions(doc):
     import hashlib
     includeHashes = set()
     while True:
-        els = findAll("include", doc)
+        els = findAll("pre.include", doc)
         if not els:
             break
         for el in els:
-            if el.get("data-from-block") is None:
-                warn("The <include> element is going away. Please switch to <pre class=include>.", el=el)
             macros = {}
             for i in itertools.count(0):
-                m = el.get("data-macro-"+str(i))
+                m = el.get("macro-"+str(i))
                 if m is None:
                     break
                 k,_,v = m.partition(" ")
@@ -2208,7 +2206,7 @@ def processInclusions(doc):
                     continue
                 hash = hashlib.md5(''.join(lines).encode("ascii", "xmlcharrefreplace")).hexdigest()
                 if hash in includeHashes:
-                    die("<include> loop detected: '{0}' was already included.", path, el=el)
+                    die("Possible <include> loop detected: '{0}' was already included.", path, el=el)
                     removeNode(el)
                     continue
                 else:
@@ -2219,11 +2217,6 @@ def processInclusions(doc):
                 text = doc.fixText(text, moreMacros=macros)
                 subtree = parseHTML(text)
                 replaceNode(el, *subtree)
-    else:
-        die("<include> recursion depth exceeded")
-        for el in findAll("include", doc):
-            removeNode(el)
-        return
 
 
 def formatElementdefTables(doc):
