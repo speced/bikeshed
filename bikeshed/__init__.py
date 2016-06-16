@@ -2011,8 +2011,6 @@ def mergeHighlighting(el, hi):
         while text != '':
             nextColor = coloredText.popleft();
             if len(nextColor.text) <= len(text):
-                if not text.startswith(nextColor.text):
-                    print nextColor.text, text
                 if nextColor.color is None:
                     nodes.append(nextColor.text)
                 else:
