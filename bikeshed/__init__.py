@@ -2023,7 +2023,7 @@ def mergeHighlighting(el, hi):
                     nodes.append(E.span({"class":nextColor.color}, text))
                 # Truncate the nextColor text to what's unconsumed,
                 # and put it back into the deque
-                nextColor.text = nextColor.text[len(text):]
+                nextColor = ColoredText(nextColor.text[len(text):], nextColor.color)
                 coloredText.appendleft(nextColor)
                 text = ''
         return nodes
