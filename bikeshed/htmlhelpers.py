@@ -290,7 +290,7 @@ def childNodes(parentEl, clear=False, skipOddNodes=True):
     '''
     This function returns all the nodes in a parent element in the DOM sense,
     mixing text nodes (strings) and other nodes together
-    (rather than LXML's default handling of text).
+    (rather than LXML's default stupid handling of text).
 
     If you set "clear" to True, it'll
     1. remove all of parentEl's children,
@@ -303,13 +303,10 @@ def childNodes(parentEl, clear=False, skipOddNodes=True):
     appendChild(parentEl, *childNodes(parentEl, clear=True))
     ```
 
-    But omitting the clear=True argument will, generally,
-    have stupid and nonsensical results,
-    as text is duplicated and placed in weird spots.
-
-    Nonetheless, clear is False by default,
-    to avoid doing extra computation when not needed,
-    and to match the DOM method's behavior.
+    Using clear=True is required if you're going to be modifying the element or its children,
+    otherwise you'll get weird results (repeated/misplaced text).
+    But if you're just reading nodes,
+    it's not necessary.
 
     skipOddNodes ensures that the return value will only be text and Element nodes;
     if it's false, there might be comments, PIs, etc.
