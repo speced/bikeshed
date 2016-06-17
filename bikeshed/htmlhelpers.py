@@ -310,12 +310,19 @@ def childNodes(parentEl, clear=False, skipWS=False, skipOddNodes=True):
     Nonetheless, clear is False by default,
     to avoid doing extra computation when not needed,
     and to match the DOM method's behavior.
+
+    skipOddNodes ensures that the return value will only be text and Element nodes;
+    if it's false, there might be comments, PIs, etc.
+
+    skipWS will omit text nodes that are just whitespace.
     '''
     if isinstance(parentEl, list):
         return parentEl
     ret = []
     if parentEl.text is not None:
-        if parentEl.text.strip() != "" or not skipWS:
+        if skipWS and parentEl.text.strip() == "":
+            pass
+        else:
             ret.append(parentEl.text)
         if clear:
             parentEl.text = None
@@ -325,7 +332,9 @@ def childNodes(parentEl, clear=False, skipWS=False, skipOddNodes=True):
         else:
             ret.append(c)
         if c.tail is not None:
-            if c.tail.strip() != "" or not skipWS:
+            if skipWS and c.tail.strip() == "":
+                pass
+            else:
                 ret.append(c.tail)
             if clear:
                 c.tail = None
