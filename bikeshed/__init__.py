@@ -2030,10 +2030,8 @@ def mergeHighlighting(el, hi):
     coloredText = collections.deque()
     ColoredText = collections.namedtuple('ColoredText', ['text', 'color'])
     for n in childNodes(hi):
-        if isElement(n) and n.text is None:
-            continue
-        elif isElement(n):
-            coloredText.append(ColoredText(n.text, n.get('class')))
+        if isElement(n):
+            coloredText.append(ColoredText(textContent(n), n.get('class')))
         else:
             coloredText.append(ColoredText(n, None))
     colorizeEl(el, coloredText)
