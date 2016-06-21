@@ -57,14 +57,14 @@ def checkPrivacySecurityHeadings(headings):
     security = False
     privacy = False
     for header in headings:
-        text = simplifyText(textContent(find(".content", header)))
-        if text == "security-considerations":
+        text = textContent(find(".content", header)).lower()
+        if "security" in text and "considerations" in text:
             security = True
-        if text == "privacy-considerations":
+        if "privacy" in text and "considerations" in text:
             privacy = True
-        if text == "privacy-and-security-considerations" or text == "security-and-privacy-considerations":
-            security = True
-            privacy = True
+        if security and privacy:
+            # No need to look any further!
+            return
     if not security and not privacy:
         warn("This specification has neither a 'Security Considerations' nor a 'Privacy Considerations' section. Please consider adding both, see https://w3ctag.github.io/security-questionnaire/.")
     elif not security:
