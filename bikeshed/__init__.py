@@ -9,6 +9,7 @@ import sys
 import lxml
 import json
 import urllib
+import logging
 import urllib2
 import argparse
 import itertools
@@ -30,6 +31,7 @@ from . import datablocks
 from . import lexers
 from . import publish
 from . import extensions
+from .requests import requests
 from .ReferenceManager import ReferenceManager
 from .htmlhelpers import *
 from .messages import *
@@ -2294,37 +2296,70 @@ def inlineRemoteIssues(doc):
 
     # Right now, only github inline issues are supported.
     # More can be supported when someone cares.
+
+    # Collect all the inline issues in the document
+    inlineIssues = []
+    GitHubIssue = collections.namedtuple('GitHubIssue', ['user', 'repo', 'num', 'el'])
     for el in findAll("[data-inline-github]", doc):
-        user, repo, id = el.get('data-inline-github').split()
+        inlineIssues.append(GitHubIssue(*el.get('data-inline-github').split(), el=el))
+        removeAttr(el, "data-inline-github")
+    if not inlineIssues:
+        return
+
+    logging.captureWarnings(True)
+
+    responses = json.load(config.retrieveDataFile("github-issues.json", quiet=True))
+    for issue in inlineIssues:
+        # Fetch the issues
         headers = {"Accept": "application/vnd.github.v3.html+json"}
         if doc.token is not None:
             headers["Authorization"] = "token " + doc.token
-        removeAttr(el, "data-inline-github")
-        req = urllib2.Request(url="https://api.github.com/repos/{0}/{1}/issues/{2}".format(user, repo, id),
-            headers=headers)
-        try:
-            with closing(urllib2.urlopen(req)) as fh:
-                issue = json.load(fh)
-                clearContents(el)
-                appendChild(el,
-                    E.a({"href":issue['html_url'], "class":"marker"},
-                        "Issue #{0} on GitHub: “{1}”".format(issue['number'], issue['title'])),
-                    *parseHTML(issue['body_html']))
-                if el.tag == "p":
-                    el.tag = "div"
-                addClass(el, "no-marker")
-        except urllib2.HTTPError as err:
-            if doc.token and err.code == 401:
-                die("Unauthorized Access to GitHub's API. There might be an issue with your token.", el=el)
-                break
-            if doc.token is None and err.code == 403:
-                die("You've reached GitHub API's rate limit for unauthenticated requests.\nTo increase it, please provide an auth token. Tokens can be generated from https://github.com/settings/tokens.", el=el)
-                break
-            die("Error inlining GitHub issues:\n{0}", err, el=el)
+        url = "https://api.github.com/repos/{user}/{repo}/issues/{num}".format(user=issue.user, repo=issue.repo, num=issue.num)
+        key = "{0}/{1}/{2}".format(issue.user, issue.repo, issue.num)
+        if key in responses:
+            # Have a cached response, see if it changed
+            headers["If-None-Match"] = responses[key]["ETag"]
+
+        res = requests.get(url, headers=headers)
+        if res.status_code == 304:
+            # Unchanged, I can use the cache
+            data = responses[key]
+        elif res.status_code == 200:
+            # Fresh data, prep it for storage
+            data = res.json()
+            data["ETag"] = res.headers["ETag"]
+        elif res.status_code == 401:
+            error = res.json()
+            if error["message"] == "Bad credentials":
+                die("'{0}' is not a valid GitHub OAuth token. See https://github.com/settings/tokens", doc.token)
+            else:
+                die("401 error when fetching GitHub Issues:\n{0}", config.printjson(error))
             continue
-        except Exception as err:
-            die("Error inlining GitHub issues:\n{0}", err, el=el)
+        elif res.status_code >= 400:
+            die("{0} error when fetching GitHub Issues:\n{1}", res.status_code, config.printjson(res.json()))
             continue
+        responses[key] = data
+        # Put the issue data into the DOM
+        el = issue.el
+        data = responses[key]
+        clearContents(el)
+        appendChild(el,
+            E.a({"href":issue['html_url'], "class":"marker"},
+                "Issue #{0} on GitHub: “{1}”".format(data['number'], data['title'])),
+            *parseHTML(data['body_html']))
+        if el.tag == "p":
+            el.tag = "div"
+        addClass(el, "no-marker")
+    # Save the cache for later
+    try:
+        with io.open(config.scriptPath+"/spec-data/github-issues.json", 'w', encoding="utf-8") as f:
+            f.write(unicode(json.dumps(responses, ensure_ascii=False, indent=2, sort_keys=True)))
+    except Exception, e:
+        die("Couldn't save GitHub Issues cache to disk.\n{0}", e)
+    return
+
+
+
 
 def addNoteHeaders(doc):
     # Finds <foo heading="bar"> and turns it into a marker-heading
