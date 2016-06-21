@@ -2335,6 +2335,13 @@ def inlineRemoteIssues(doc):
             else:
                 die("401 error when fetching GitHub Issues:\n{0}", config.printjson(error))
             continue
+        elif res.status_code == 403:
+            error = res.json()
+            if error["message"].startswith("API rate limit exceeded"):
+                die("GitHub Issues API rate limit exceeded. Get an OAuth token from https://github.com/settings/tokens to increase your limit, or just wait an hour for your limit to refresh; Bikeshed has cached all the issues so far and will resume from where it left off.")
+            else:
+                die("403 error when fetching GitHub Issues:\n{0}", config.printjson(error))
+            continue
         elif res.status_code >= 400:
             die("{0} error when fetching GitHub Issues:\n{1}", res.status_code, config.printjson(res.json()))
             continue
