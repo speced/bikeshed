@@ -650,7 +650,7 @@ def addSpecMetadataSection(doc):
 
 
 def addReferencesSection(doc):
-    if len(doc.normativeRefs) == 0 and len(doc.informativeRefs) is None:
+    if not doc.normativeRefs and not doc.informativeRefs:
         return
     container = getFillContainer('references', doc=doc, default=True)
     if container is None:
