@@ -68,7 +68,8 @@ def updateCrossRefs():
             'work_status': rawSpec.get('work_status'),
             'working_group': rawSpec.get('working_group'),
             'domain': rawSpec.get('domain'),
-            'status': rawSpec.get('status')
+            'status': rawSpec.get('status'),
+            'abstract': rawSpec.get('abstract')
         }
         if spec['shortname'] is not None and spec['vshortname'].startswith(spec['shortname']):
             # S = "foo", V = "foo-3"
