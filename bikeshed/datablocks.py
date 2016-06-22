@@ -182,6 +182,7 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
         attrs["Value"] = None
         for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animation type"]:
             attrs[defaultKey] = "see individual properties"
+        attrs["Canonical order"] = "per grammar"
         ret = ["<table class='def propdef'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)]
     else:
         attrs["Name"] = None
@@ -192,6 +193,7 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
         attrs["Percentages"] = "n/a"
         attrs["Media"] = "visual"
         attrs["Computed value"] = "as specified"
+        attrs["Canonical order"] = "per grammar"
         attrs["Animation type"] = "discrete"
         ret = ["<table class='def propdef'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)]
     # We are in the process of migrating specs from using 'Animatable' to
