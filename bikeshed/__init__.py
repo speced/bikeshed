@@ -688,8 +688,8 @@ class Spec(object):
             if fullText.startswith("[["):
                 # Actually a biblio link
                 return fullText
-            if innerText.isdigit():
-                # No refs are all-digits (this is probably JS code).
+            if re.match("[\d-]+$", innerText):
+                # No refs are all-digits (this is probably JS code, or a regex/grammar).
                 return fullText
             if innerText in self.macros:
                 # For some reason I store all the macros in lowercase,
