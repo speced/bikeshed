@@ -430,6 +430,36 @@ def processAnchors(anchors, doc, lineNum=None):
             urlSuffix = anchor['url'][0]
         else:
             urlSuffix = config.simplifyText(anchor['text'][0])
+        status = "local"
+        shortname = None
+        level = None
+        spec = None
+        if "status" in anchor:
+            status = anchor["status"][0]
+            if status == "local":
+                pass
+            elif status in ["TR","ED"]:
+                if "shortname" in anchor and "level" in anchor:
+                    shortname = anchor['shortname'][0]
+                    level = config.HierarchicalNumber(anchor['level'][0])
+                if "spec" in anchor:
+                    spec = anchor['spec'][0]
+                if shortname and not spec:
+                    if level:
+                        spec = "{0}-{1}".format(shortname, level)
+                    else:
+                        spec = shortname
+                elif spec and not shortname:
+                    match = re.match("(.*)-(\d+)$", spec)
+                    if match:
+                        shortname = match.group(1)
+                        level = config.HierarchicalNumber(match.group(2))
+                    else:
+                        shortname = spec
+                        level = config.HierarchicalNumber("")
+            else:
+                die("Anchor statuses must be 'local', 'ED', or 'TR'. Got '{0}'.", status, lineNum=lineNum)
+                continue
         url = urlPrefix + ("" if "#" in urlPrefix or "#" in urlSuffix else "#") + urlSuffix
         if anchor['type'][0] in config.lowercaseTypes:
             anchor['text'][0] = anchor['text'][0].lower()
@@ -437,12 +467,12 @@ def processAnchors(anchors, doc, lineNum=None):
             "linkingText": anchor['text'][0],
             "type": anchor['type'][0],
             "url": url,
-            "shortname": doc.md.shortname,
-            "level": doc.md.level,
+            "shortname": shortname if shortname is not None else doc.md.shortname,
+            "level": level if level is not None else doc.md.level,
             "for": anchor.get('for', []),
             "export": True,
-            "status": "local",
-            "spec": anchor.get('spec', [''])[0]
+            "status": status,
+            "spec": spec if spec is not None else ''
             })
         methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
         if methodishStart:
