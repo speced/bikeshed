@@ -1775,19 +1775,18 @@ def markupIDL(doc):
     for el in findAll("pre.idl, xmp.idl", doc):
         if el.get("data-no-idl") is not None:
             continue
-        if not isNormative(el):
-            replaceContents(el, parseHTML(unicode(widl.markup(HighlightMarker()))))
-            addClass(el, "highlight")
-            highlightingOccurred = True
-            continue
         text = textContent(el)
-        # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
-        # Parse a second time with the global one, which collects all data in the doc.
         widl = parser.Parser(text, IDLUI())
-        doc.widl.parse(text)
-        marker = DebugMarker() if doc.debug else IDLMarker()
-        text = unicode(widl.markup(marker))
-        replaceContents(el, parseHTML(text))
+        if not isNormative(el):
+            # Just highlight with the widl parser
+            marker = HighlightMarker()
+            replaceContents(el, parseHTML(unicode(widl.markup(marker))))
+        else:
+            # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
+            # Parse a second time with the global one, which collects all data in the doc.
+            marker = DebugMarker() if doc.debug else IDLMarker()
+            replaceContents(el, parseHTML(unicode(widl.markup(marker))))
+            doc.widl.parse(text)
         addClass(el, "highlight")
         highlightingOccurred = True
     if highlightingOccurred:
