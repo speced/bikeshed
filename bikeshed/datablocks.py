@@ -435,7 +435,7 @@ def processAnchors(anchors, doc, lineNum=None):
         status = "local"
         shortname = None
         level = None
-        spec = None
+        spec = anchor["status"][0] if "status" in anchor else None
         if "status" in anchor:
             status = anchor["status"][0]
             if status == "local":
@@ -444,8 +444,6 @@ def processAnchors(anchors, doc, lineNum=None):
                 if "shortname" in anchor and "level" in anchor:
                     shortname = anchor['shortname'][0]
                     level = config.HierarchicalNumber(anchor['level'][0])
-                if "spec" in anchor:
-                    spec = anchor['spec'][0]
                 if shortname and not spec:
                     if level:
                         spec = "{0}-{1}".format(shortname, level)
