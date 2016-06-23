@@ -435,7 +435,7 @@ def processAnchors(anchors, doc, lineNum=None):
         status = "local"
         shortname = None
         level = None
-        spec = anchor["status"][0] if "status" in anchor else None
+        spec = anchor["spec"][0] if "spec" in anchor else None
         if "status" in anchor:
             status = anchor["status"][0]
             if status == "local":
