@@ -42,6 +42,7 @@ class MetadataManager:
         # optional metadata
         self.advisementClass = "advisement"
         self.atRisk = []
+        self.audience = []
         self.blockElements = []
         self.boilerplate = config.BoolSet(default=True)
         self.customTextMacros = []
@@ -526,6 +527,28 @@ def parseTranslation(key, val, lineNum):
             die("Later parts of a Translation line must start with 'name' or 'native-name'. Got:\n{0}", piece, lineNum=lineNum)
     return [{"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}]
 
+def parseAudience(key, val, lineNum):
+    # WG21 value
+    values = [x.strip().upper() for x in val.strip().split(",")]
+    if not values:
+        die("Audience metadata must have at least one value if specified.")
+        return []
+    elif len(values) == 1 and values[0] == "ALL":
+        return ["all"]
+    elif len(values) >= 1:
+        ret = []
+        validAudiences = set(["CWG", "LWG", "EWG", "LEWG"])
+        for v in values:
+            if v in validAudiences:
+                ret.append(v)
+            elif re.match(r"WG\d+|SG\d+", v):
+                ret.append(v)
+            else:
+                die("Unknown 'Audience' value '{0}'.", v, lineNum=lineNum)
+                continue
+        return ret
+
+
 
 def parse(lines, doc):
     # Given HTML document text, in the form of an array of text lines,
@@ -680,6 +703,7 @@ knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
     "Advisement Class": Metadata("Advisement Class", "advisementClass", joinValue, parseLiteral),
     "At Risk": Metadata("At Risk", "atRisk", joinList, parseLiteralList),
+    "Audience": Metadata("Audience", "audience", joinList, parseAudience),
     "Block Elements": Metadata("Block Elements", "blockElements", joinList, parseCommaSeparated),
     "Boilerplate": Metadata("Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate),
     "Date": Metadata("Date", "date", joinValue, parseDate),

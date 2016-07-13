@@ -613,6 +613,8 @@ def addSpecMetadataSection(doc):
         md["Former Editor"] = map(printEditor, doc.md.previousEditors)
     if len(doc.md.translations):
         md["Translations"] = map(printTranslation, doc.md.translations)
+    if len(doc.md.audience):
+        md["Audience"] = [", ".join(doc.md.audience)]
     for key, vals in doc.md.otherMetadata.items():
         md[key].extend(parseHTML("<span>"+doc.fixText(val)+"</span>")[0] for val in vals)
 
