@@ -4,17 +4,14 @@ from __future__ import division, unicode_literals
 import tempfile
 import tarfile
 import os
+import logging
 
 from .messages import *
 from . import extensions
+from .requests import requests
 
 def publishEchidna(doc, username, password, decision):
-    try:
-        import requests
-    except ImportError:
-        die("Echidna auto-pub uses the Requests library.\nPlease run `$ sudo pip install requests` from your command line.")
-        return
-
+    logging.captureWarnings(True) # Silence SNIMissingWarning
     tar = prepareTar(doc, visibleTar=False)
     # curl 'https://labs.w3.org/echidna/api/request' --user '<username>:<password>' -F "tar=@/some/path/spec.tar" -F "decision=<decisionUrl>"
     r = requests.post("https://labs.w3.org/echidna/api/request", auth=(username, password), data={"decision": decision}, files={"tar": tar.read()})
