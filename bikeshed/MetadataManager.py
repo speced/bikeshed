@@ -48,6 +48,7 @@ class MetadataManager:
         self.date = datetime.utcnow().date()
         self.deadline = None
         self.defaultBiblioStatus = "dated"
+        self.defaultHighlight = None
         self.editors = []
         self.group = None
         self.h1 = None
@@ -684,6 +685,7 @@ knownKeys = {
     "Date": Metadata("Date", "date", joinValue, parseDate),
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
     "Default Biblio Status": Metadata("Default Biblio Status", "defaultBiblioStatus", joinValue, parseBiblioStatus),
+    "Default Highlight": Metadata("Default Highlight", "defaultHighlight", joinValue, parseLiteral),
     "ED": Metadata("ED", "ED", joinValue, parseLiteral),
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),

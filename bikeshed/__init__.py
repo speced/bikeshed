@@ -1909,8 +1909,13 @@ def addSyntaxHighlighting(doc):
     # Highlight all the appropriate elements
     for el in findAll("xmp, pre, code", doc):
         attr, lang = closestAttr(el, "nohighlight", "highlight")
-        if attr == "nohighlight" or attr is None:
+        if attr == "nohighlight":
             continue
+        if attr is None:
+            if doc.md.defaultHighlight is None:
+                continue
+            else:
+                lang = doc.md.defaultHighlight
         highlight(el, translateLang(lang))
         highlightingOccurred = True
 
