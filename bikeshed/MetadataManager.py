@@ -160,6 +160,8 @@ class MetadataManager:
             requiredMultiKeys['editors'] = "Editor"
         if self.group and self.group.lower() == "csswg":
             requiredSingularKeys['workStatus'] = "Work Status"
+        if self.group and self.group.lower() == "wg21":
+            requiredSingularKeys['audience'] = "Audience"
 
         errors = []
         warnings = []
