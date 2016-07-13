@@ -29,7 +29,7 @@ Several keys are required information, and will cause the processor to flag an e
 * **Status** is the spec's status, as one of the standard abbreviations ("WD", "ED", "CR", etc.)
 * **ED** must contain a link that points to the editor's draft.
 * **Shortname** must contain the spec's shortname, like "css-lists" or "css-backgrounds".
-* **Level** must contain the spec's level as an integer.
+* **Level** (or **Revision**, an alias) must contain the spec's level as an integer.
 * **Editor** must contain an editor's information.
 	This has a special format of comma-separated clauses
 	the first is required and must contain the editor's name;

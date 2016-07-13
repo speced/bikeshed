@@ -710,6 +710,7 @@ knownKeys = {
     "Prepare For Tr": Metadata("Prepare For Tr", "prepTR", joinValue, parseBoolean),
     "Previous Version": Metadata("Previous Version", "previousVersions", joinList, parseLiteralList),
     "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
+    "Revision": Metadata("Revision", "level", joinValue, parseLevel),
     "Shortname": Metadata("Shortname", "shortname", joinValue, parseLiteral),
     "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
     "Status": Metadata("Status", "status", joinValue, parseLiteral),
