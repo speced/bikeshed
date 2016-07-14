@@ -26,7 +26,7 @@ Or if you're adding multiple lines with the same key, you can just start the sub
 Several keys are required information, and will cause the processor to flag an error if you omit them:
 
 * **Title** is the spec's full title.  This can alternately be specified by adding an `<h1>` element as the first line of the spec.
-* **Status** is the spec's status, as one of the standard abbreviations ("WD", "ED", "CR", etc.)
+* **Status** is the spec's status. There are a few general abbreviations, and several that are restricted to particular groups. **TODO: Document this properly.**
 * **ED** must contain a link that points to the editor's draft.
 * **Shortname** must contain the spec's shortname, like "css-lists" or "css-backgrounds".
 * **Level** (or **Revision**, an alias) must contain the spec's level as an integer.
