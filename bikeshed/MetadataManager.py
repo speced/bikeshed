@@ -51,6 +51,7 @@ class MetadataManager:
         self.defaultBiblioStatus = "dated"
         self.defaultHighlight = None
         self.editors = []
+        self.editorTerm = {"singular": "Editor", "plural": "Editors"}
         self.group = None
         self.h1 = None
         self.ignoredTerms = []
@@ -550,6 +551,14 @@ def parseAudience(key, val, lineNum):
                 continue
         return ret
 
+def parseEditorTerm(key, val, lineNum):
+    values = [x.strip() for x in val.strip().split(",")]
+    if len(values) == 2:
+        return {"singular": values[0], "plural": values[1]}
+    else:
+        die("Editor Term metadata must be two comma-separated terms, giving the singular and plural term for editors. Got '{0}'.", val)
+        return {"singular": "Editor", "plural": "Editors"}
+
 
 
 def parse(lines, doc):
@@ -714,6 +723,7 @@ knownKeys = {
     "Default Highlight": Metadata("Default Highlight", "defaultHighlight", joinValue, parseLiteral),
     "ED": Metadata("ED", "ED", joinValue, parseLiteral),
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
+    "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),
     "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),
     "Group": Metadata("Group", "group", joinValue, parseLiteral),
     "H1": Metadata("H1", "h1", joinValue, parseLiteral),

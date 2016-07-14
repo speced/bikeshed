@@ -608,9 +608,11 @@ def addSpecMetadataSection(doc):
     if len(doc.md.issues):
         md["Issue Tracking"] = [E.a({"href":url}, text) for text,url in doc.md.issues]
     if len(doc.md.editors):
-        md["Editor"] = map(printEditor, doc.md.editors)
+        editorTerm = doc.md.editorTerm['singular']
+        md[editorTerm] = map(printEditor, doc.md.editors)
     if len(doc.md.previousEditors):
-        md["Former Editor"] = map(printEditor, doc.md.previousEditors)
+        editorTerm = doc.md.editorTerm['singular']
+        md["Former " + editorTerm] = map(printEditor, doc.md.previousEditors)
     if len(doc.md.translations):
         md["Translations"] = map(printTranslation, doc.md.translations)
     if len(doc.md.audience):
@@ -621,8 +623,8 @@ def addSpecMetadataSection(doc):
     pluralization = {
         "Previous Version": "Previous Versions",
         "Test Suite": "Test Suites",
-        "Editor": "Editors",
-        "Former Editor": "Former Editors"
+        doc.md.editorTerm['singular']: doc.md.editorTerm['plural'],
+        "Former "+doc.md.editorTerm['singular']: "Former "+doc.md.editorTerm['plural']
     }
 
     dl = E.dl()
