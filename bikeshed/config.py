@@ -86,7 +86,8 @@ megaGroups = {
 }
 
 def canonicalizeStatus(status, group):
-    status = status.upper()
+    if status is not None:
+        status = status.upper()
     if group is not None:
         group = group.lower()
     if status in shortToLongStatus:
