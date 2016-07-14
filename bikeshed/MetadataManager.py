@@ -22,12 +22,6 @@ class MetadataManager:
             return "{0}-{1}".format(self.shortname, self.level)
         return self.shortname
 
-    @property
-    def groupIsW3C(self):
-        if self.group is None:
-            return False
-        return self.group.lower() in config.groupsInW3C
-
     def __init__(self, doc):
         self.doc = doc
         self.hasMetadata = False
@@ -38,6 +32,7 @@ class MetadataManager:
         self.level = None
         self.shortname = None
         self.status = None
+        self.rawStatus = None
 
         # optional metadata
         self.advisementClass = "advisement"
@@ -126,6 +121,7 @@ class MetadataManager:
             self.repository = getSpecRepository(self.doc)
         if self.repository.type == "github" and "feedback-header" in self.boilerplate and "repository-issue-tracking" in self.boilerplate:
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
+        self.status = config.canonicalizeStatus(self.rawStatus, self.group)
         self.validate()
 
     def validate(self):
@@ -201,10 +197,10 @@ class MetadataManager:
             macros["longstatus"] = config.shortToLongStatus[self.status]
         else:
             macros["longstatus"] = ""
-        if self.status in ("LCWD", "FPWD"):
+        if self.status in ("w3c/LCWD", "w3c/FPWD"):
             macros["status"] = "WD"
         else:
-            macros["status"] = self.status
+            macros["status"] = self.rawStatus
         if self.workStatus:
             macros["workstatus"] = self.workStatus
         if self.TR:
@@ -240,12 +236,12 @@ class MetadataManager:
             macros["mailinglist"] = self.mailingList
         if self.mailingListArchives:
             macros["mailinglistarchives"] = self.mailingListArchives
-        if self.status == "FPWD":
+        if self.status == "w3c/FPWD":
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-WD"
         elif self.status == "FINDING":
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-NOTE"
         else:
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(self.status)
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(self.rawStatus)
         # Custom macros
         for name, text in self.customTextMacros:
             macros[name.lower()] = text
@@ -749,7 +745,7 @@ knownKeys = {
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
     "Shortname": Metadata("Shortname", "shortname", joinValue, parseLiteral),
     "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
-    "Status": Metadata("Status", "status", joinValue, parseLiteral),
+    "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),
     "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),
     "Text Macro": Metadata("Text Macro", "customTextMacros", joinList, parseTextMacro),
     "Title": Metadata("Title", "title", joinValue, parseLiteral),

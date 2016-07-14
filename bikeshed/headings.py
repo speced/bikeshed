@@ -22,7 +22,7 @@ def processHeadings(doc, scope="doc"):
     addHeadingBonuses(doc, headings)
     for el in headings:
         addClass(el, 'settled')
-    if scope == "all" and doc.md.groupIsW3C:
+    if scope == "all" and doc.md.group in config.megaGroups['priv-sec']:
         checkPrivacySecurityHeadings(findAll(".heading", doc))
 
 def resetHeadings(doc, headings):

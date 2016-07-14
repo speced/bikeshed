@@ -16,34 +16,86 @@ scriptPath = os.path.dirname(os.path.realpath(__file__))
 doc = None
 textMacros = {}
 
-TRStatuses = ["WD", "FPWD", "LCWD", "CR", "PR", "REC", "PER", "NOTE", "MO"]
-unlevelledStatuses = ["LS", "DREAM", "UD", "LS-COMMIT", "LS-BRANCH", "FINDING"]
-deadlineStatuses = ["LCWD", "PR"]
-noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "FINDING", "DREAM"]
 shortToLongStatus = {
-    "ED": "Editor's Draft",
-    "WD": "W3C Working Draft",
-    "FPWD": "W3C First Public Working Draft",
-    "LCWD": "W3C Last Call Working Draft",
-    "CR": "W3C Candidate Recommendation",
-    "PR": "W3C Proposed Recommendation",
-    "REC": "W3C Recommendation",
-    "PER": "W3C Proposed Edited Recommendation",
-    "NOTE": "W3C Working Group Note",
-    "MO": "W3C Member-only Draft",
-    "UD": "Unofficial Proposal Draft",
     "DREAM": "A Collection of Interesting Ideas",
-    "CG-DRAFT": "Draft Community Group Report",
-    "CG-FINAL": "Final Community Group Report",
     "LS": "Living Standard",
     "LS-COMMIT": "Commit Snapshot",
     "LS-BRANCH": "Branch Snapshot",
-    "FINDING": "Finding"
+    "FINDING": "Finding",
+    "w3c/ED": "Editor's Draft",
+    "w3c/WD": "W3C Working Draft",
+    "w3c/FPWD": "W3C First Public Working Draft",
+    "w3c/LCWD": "W3C Last Call Working Draft",
+    "w3c/CR": "W3C Candidate Recommendation",
+    "w3c/PR": "W3C Proposed Recommendation",
+    "w3c/REC": "W3C Recommendation",
+    "w3c/PER": "W3C Proposed Edited Recommendation",
+    "w3c/NOTE": "W3C Working Group Note",
+    "w3c/MO": "W3C Member-only Draft",
+    "w3c/UD": "Unofficial Proposal Draft",
+    "w3c/CG-DRAFT": "Draft Community Group Report",
+    "w3c/CG-FINAL": "Final Community Group Report","iso/I": "Issue",
+    "iso/DR": "Defect Report",
+    "iso/D": "Draft Proposal ",
+    "iso/P": "Published Proposal ",
+    "iso/MEET": "Meeting Announcements",
+    "iso/RESP": "Records of Response",
+    "iso/MIN": "Minutes",
+    "iso/ER": "Editor's Report",
+    "iso/SD": "Standing Document",
+    "iso/PWI": "Preliminary Work Item",
+    "iso/NP": "New Proposal",
+    "iso/NWIP": "New Work Item Proposal",
+    "iso/WD": "Working Draft",
+    "iso/CD": "Committee Draft",
+    "iso/FCD": "Final Committee Draft",
+    "iso/DIS": "Draft International Standard",
+    "iso/FDIS": "Final Draft International Standard",
+    "iso/PRF": "Proof of a new International Standard",
+    "iso/IS": "International Standard",
+    "iso/TR": "Technical Report",
+    "iso/DTR": "Draft Technical Report",
+    "iso/TS": "Technical Specification",
+    "iso/DTS": "Draft Technical Specification",
+    "iso/PAS": "Publicly Available Specification",
+    "iso/TTA": "Technology Trends Assessment",
+    "iso/IWA": "International Workshop Agreement",
+    "iso/COR": "Technical Corrigendum",
+    "iso/GUIDE": "Guidance to Technical Committees",
+    "iso/NP-AMD": "New Proposal Amendment",
+    "iso/AWI-AMD": "Approved new Work Item Amendment",
+    "iso/WD-AMD": "Working Draft Amendment",
+    "iso/CD-AMD": "Committe Draft Amendment",
+    "iso/PD-AMD": "Proposed Draft Amendment",
+    "iso/FPD-AMD": "Final Proposed Draft Amendment",
+    "iso/D-AMD": "Draft Amendment",
+    "iso/FD-AMD": "Final Draft Amendment",
+    "iso/PRF-AMD": "Proof Amendment",
+    "iso/AMD": "Amendment"
+}
+TRStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/NOTE", "w3c/MO"]
+unlevelledStatuses = ["LS", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING"]
+deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
+noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "FINDING", "DREAM"]
+
+megaGroups = {
+    "w3c": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webspecs"]),
+    "iso": frozenset(["wg21"]),
+    "priv-sec": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webspecs", "whatwg"])
 }
 
-groupsInW3C = frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini",
-                         "html","ricg", "svg", "texttracks", "uievents",
-                         "web-bluetooth-cg", "webappsec", "webspecs", "whatwg"])
+def canonicalizeStatus(status, group):
+    status = status.upper()
+    if group is not None:
+        group = group.lower()
+    if status in shortToLongStatus:
+        return status
+    for mg,gs in megaGroups.items():
+        s = "{0}/{1}".format(mg, status)
+        if group in gs and s in shortToLongStatus:
+            return s
+    return status
+
 
 dfnClassToType = {
     "abstract-opdef"     : "abstract-op",
