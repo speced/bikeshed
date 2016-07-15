@@ -653,6 +653,12 @@ def addSpecMetadataSection(doc):
     fillWith('spec-metadata', E.div(dl), doc=doc)
 
 
+def addHideDeletedButton(doc):
+    if doc.md.showHideDeletedButton:
+      hideDel = "<input type='checkbox' id='hidedel'>Hide deleted text</input>"
+      fillWith('hide-deleted-button', parseHTML(hideDel), doc=doc)
+
+
 def addReferencesSection(doc):
     if not doc.normativeRefs and not doc.informativeRefs:
         return
@@ -715,4 +721,3 @@ def addIssuesSection(doc):
         del idel.attrib['id']
     for dfnel in findAll(config.dfnElementsSelector, container):
         dfnel.tag = "span"
-

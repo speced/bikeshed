@@ -79,6 +79,7 @@ class MetadataManager:
         self.versionHistory = []
         self.warning = None
         self.workStatus = None
+        self.showHideDeletedButton = None
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -757,5 +758,6 @@ knownKeys = {
     "Use Dfn Panels": Metadata("Use Dfn Panels", "useDfnPanels", joinValue, parseBoolean),
     "Version History": Metadata("Version History", "versionHistory", joinList, parseLiteralList),
     "Warning": Metadata("Warning", "warning", joinValue, parseWarning),
-    "Work Status": Metadata("Work Status",  "workStatus", joinValue, parseWorkStatus)
+    "Work Status": Metadata("Work Status",  "workStatus", joinValue, parseWorkStatus),
+    "Show Hide Deleted Button": Metadata("Show 'Hide deleted text' button", "showHideDeletedButton", joinValue, parseBoolean)
 }
