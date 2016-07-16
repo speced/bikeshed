@@ -617,6 +617,13 @@ def addSpecMetadataSection(doc):
         md["Translations"] = map(printTranslation, doc.md.translations)
     if len(doc.md.audience):
         md["Audience"] = [", ".join(doc.md.audience)]
+    if doc.md.showHideDeletedButton is not None:
+        md["Hide deleted text"] = [E.label({"for": "hidedel"}, "Hide deleted text")]
+        prependChild(find("body", doc),
+                     E.input({"type": "checkbox",
+                              "id": "hidedel",
+                              "style": "display:none"}))
+        doc.extraStyles['style-hidedel'] = "#hidedel:checked ~ del, #hidedel:checked ~ * del { display:none; }"
     for key, vals in doc.md.otherMetadata.items():
         md[key].extend(parseHTML("<span>"+doc.fixText(val)+"</span>")[0] for val in vals)
 
@@ -651,12 +658,6 @@ def addSpecMetadataSection(doc):
                 E.dt(displayKey, ":"),
                 *[E.dd(val) for val in vals])
     fillWith('spec-metadata', E.div(dl), doc=doc)
-
-
-def addHideDeletedButton(doc):
-    if doc.md.showHideDeletedButton:
-      hideDel = "<input type='checkbox' id='hidedel'>Hide deleted text</input>"
-      fillWith('hide-deleted-button', parseHTML(hideDel), doc=doc)
 
 
 def addReferencesSection(doc):

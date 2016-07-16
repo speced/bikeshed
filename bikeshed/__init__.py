@@ -536,7 +536,6 @@ class Spec(object):
         boilerplate.addLogo(self)
         boilerplate.addCopyright(self)
         boilerplate.addSpecMetadataSection(self)
-        boilerplate.addHideDeletedButton(self)
         boilerplate.addAbstract(self)
         boilerplate.addObsoletionNotice(self)
         boilerplate.addAtRisk(self)

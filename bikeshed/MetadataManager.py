@@ -745,6 +745,7 @@ knownKeys = {
     "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
     "Shortname": Metadata("Shortname", "shortname", joinValue, parseLiteral),
+    "Show Hide Deleted Button": Metadata("Show 'Hide deleted text' button", "showHideDeletedButton", joinValue, parseBoolean),
     "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
     "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),
     "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),
@@ -758,6 +759,5 @@ knownKeys = {
     "Use Dfn Panels": Metadata("Use Dfn Panels", "useDfnPanels", joinValue, parseBoolean),
     "Version History": Metadata("Version History", "versionHistory", joinList, parseLiteralList),
     "Warning": Metadata("Warning", "warning", joinValue, parseWarning),
-    "Work Status": Metadata("Work Status",  "workStatus", joinValue, parseWorkStatus),
-    "Show Hide Deleted Button": Metadata("Show 'Hide deleted text' button", "showHideDeletedButton", joinValue, parseBoolean)
+    "Work Status": Metadata("Work Status",  "workStatus", joinValue, parseWorkStatus)
 }
