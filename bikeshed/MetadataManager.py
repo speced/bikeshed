@@ -67,6 +67,7 @@ class MetadataManager:
         self.previousEditors = []
         self.previousVersions = []
         self.repository = config.Nil()
+        self.showHideDeletedButton = None
         self.statusText = []
         self.testSuite = None
         self.title = None
@@ -79,7 +80,6 @@ class MetadataManager:
         self.versionHistory = []
         self.warning = None
         self.workStatus = None
-        self.showHideDeletedButton = None
 
         self.otherMetadata = DefaultOrderedDict(list)
 
