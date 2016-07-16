@@ -1615,16 +1615,16 @@ class HighlightMarker(object):
     # Just applies highlighting classes to IDL stuff.
 
     def markupTypeName(self, text, construct):
-        return ('<span class=n idlType=' + construct.idlType + '>', '</span>')
+        return ('<span class=n>', '</span>')
 
     def markupName(self, text, construct):
-        return ('<span class=nv idlType=' + construct.idlType + '>', '</span>')
+        return ('<span class=nv>', '</span>')
 
     def markupKeyword(self, text, construct):
         return ('<span class=kt>', '</span>')
 
     def markupEnumValue(self, text, construct):
-        return ('<span class=s for=' + construct.name + '>', '</span>')
+        return ('<span class=s>', '</span>')
 
 class IDLMarker(object):
     def markupConstruct(self, text, construct):

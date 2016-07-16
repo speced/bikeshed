@@ -80,13 +80,14 @@ deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
 noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "FINDING", "DREAM"]
 
 megaGroups = {
-    "w3c": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webspecs"]),
+    "w3c": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs"]),
     "iso": frozenset(["wg21"]),
-    "priv-sec": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webspecs", "whatwg"])
+    "priv-sec": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"])
 }
 
 def canonicalizeStatus(status, group):
-    status = status.upper()
+    if status is not None:
+        status = status.upper()
     if group is not None:
         group = group.lower()
     if status in shortToLongStatus:
@@ -321,7 +322,7 @@ def retrieveBoilerplateFile(self, name, group=None, status=None, error=True):
     if group is None and self.md.group is not None:
         group = self.md.group.lower()
     if status is None:
-        status = self.md.status
+        status = self.md.rawStatus
 
     localFolder = os.path.dirname(os.path.abspath(self.inputSource))
     includeFolder = os.path.join(config.scriptPath, "include")
