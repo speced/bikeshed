@@ -322,7 +322,7 @@ def retrieveBoilerplateFile(self, name, group=None, status=None, error=True):
     if group is None and self.md.group is not None:
         group = self.md.group.lower()
     if status is None:
-        status = self.md.status
+        status = self.md.rawStatus
 
     localFolder = os.path.dirname(os.path.abspath(self.inputSource))
     includeFolder = os.path.join(config.scriptPath, "include")
