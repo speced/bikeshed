@@ -618,12 +618,16 @@ def addSpecMetadataSection(doc):
     if len(doc.md.audience):
         md["Audience"] = [", ".join(doc.md.audience)]
     if doc.md.showHideDeletedButton is not None:
-        md["Hide deleted text"] = [E.label({"for": "hidedel"}, "Hide deleted text")]
+        md["Hide deleted text"] = [E.label({"for": "hidedel", "id": "hidedel-label"}, "Hide deleted text")]
         prependChild(find("body", doc),
                      E.input({"type": "checkbox",
                               "id": "hidedel",
                               "style": "display:none"}))
-        doc.extraStyles['style-hidedel'] = "#hidedel:checked ~ del, #hidedel:checked ~ * del { display:none; }"
+        doc.extraStyles['style-hidedel'] = """
+            #hidedel:checked ~ del, #hidedel:checked ~ * del { display:none; }
+            #hidedel ~ #hidedel-label::before, #hidedel ~ * #hidedel-label::before { content: "☐ "; }
+            #hidedel:checked ~ #hidedel-label::before, #hidedel:checked ~ * #hidedel-label::before { content: "☑ "; }
+        """
     for key, vals in doc.md.otherMetadata.items():
         md[key].extend(parseHTML("<span>"+doc.fixText(val)+"</span>")[0] for val in vals)
 
