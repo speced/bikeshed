@@ -472,7 +472,7 @@ class Spec(object):
                 counter-increment: figure;
             }
             figcaption:not(.no-marker)::before {
-                content: "Figure " counter(figure);
+                content: "Figure " counter(figure) " ";
             }'''
         self.extraScripts = defaultdict(str);
 
