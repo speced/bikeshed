@@ -2014,7 +2014,7 @@ def mergeHighlighting(el, hi):
         return el
     def colorizeText(text, coloredText):
         nodes = []
-        while text != '':
+        while text and coloredText:
             nextColor = coloredText.popleft();
             if len(nextColor.text) <= len(text):
                 if nextColor.color is None:
