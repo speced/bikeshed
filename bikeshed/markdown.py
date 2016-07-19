@@ -36,7 +36,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 		return False
 
 	tokens = []
-	preDepth = 0
+	rawStack = []
 	inComment = False
 	if opaqueElements is None:
 		opaqueElements = ["pre", "xmp", "script", "style"]
@@ -45,15 +45,58 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 	lineCountCorrection = 0
 	for i, rawline in enumerate(lines):
 
-		# Don't parse anything while you're inside certain elements
-		if re.search(r"<({0})[ >]".format(rawElements), rawline):
-			preDepth += 1
-		if preDepth:
-			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen': float('inf'), 'line': i+lineCountCorrection})
-		if re.search(r"</({0})>".format(rawElements), rawline):
-			preDepth = max(0, preDepth - 1)
+		# Three kinds of "raw" elements, which prevent markdown processing inside of them.
+		# 1. <pre> and manual opaque elements, which can contain markup and so can nest.
+		# 2. <xmp>, <script>, and <style>, which contain raw text, can't nest.
+		# 3. Markdown code blocks, which contain raw text, can't nest.
+		#
+		# The rawStack holds tokens like
+		# {"type":"fenced", "tag":"````", "nest":False}
+
+		if rawStack:
+			# Inside at least one raw element that turns off markdown.
+			# First see if this line will *end* the raw element.
+			endTag = rawStack[-1]
+			if endTag['type'] == "element" and re.search(endTag['tag'], rawline):
+				rawStack.pop()
+				tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i+lineCountCorrection})
+				continue
+			elif endTag['type'] == "fenced" and re.match(r"\s*{0}{1}*\s*$".format(endTag['tag'], endTag['tag'][0]), rawline):
+				rawStack.pop()
+				tokens.append({'type':'raw', 'raw':"</xmp>", 'prefixlen':float('inf'), 'line':i+lineCountCorrection})
+				continue
+			elif not endTag['nest']:
+				# Just an internal line, but for the no-nesting elements,
+				# so guaranteed no more work needs to be done.
+				tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i+lineCountCorrection})
+				continue
+
+		# We're either in a nesting raw element or not in a raw element at all,
+		# so check if the line starts a new element.
+		match = re.match("\s*(`{3,}|~{3,})([^`]*)$", rawline)
+		if match:
+			rawStack.append({"type":"fenced", "tag":match.group(1), "nest":False})
+			infoString = match.group(2).strip()
+			if infoString:
+				# For now, I only care about lang
+				lang = infoString.split(" ")[0]
+				classAttr = " class='language-{0}'".format(escapeAttr(lang))
+			else:
+				classAttr = ""
+			tokens.append({'type':'raw', 'raw':'<xmp{0}>'.format(classAttr), 'prefixline':float('inf'), 'line':i+lineCountCorrection})
 			continue
-		if preDepth:
+		match = re.search(r"<({0})[ >]".format(rawElements), rawline)
+		if match:
+			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i+lineCountCorrection})
+			if re.search(r"</({0})>".format(match.group(1)), rawline):
+				# Element started and ended on same line, cool, don't need to do anything.
+				pass
+			else:
+				nest = match.group(1) not in ["xmp", "script", "style"]
+				rawStack.append({'type':'element', 'tag':match.group(1), 'nest':nest})
+			continue
+		if rawStack:
+			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i+lineCountCorrection})
 			continue
 
 		line = rawline.strip()
