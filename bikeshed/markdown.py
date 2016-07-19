@@ -93,7 +93,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 				pass
 			else:
 				nest = match.group(1) not in ["xmp", "script", "style"]
-				rawStack.append({'type':'element', 'tag':match.group(1), 'nest':nest})
+				rawStack.append({'type':'element', 'tag':"</{0}>".format(match.group(1)), 'nest':nest})
 			continue
 		if rawStack:
 			tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i+lineCountCorrection})
