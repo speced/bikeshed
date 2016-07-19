@@ -67,10 +67,10 @@ class MetadataManager:
         self.previousEditors = []
         self.previousVersions = []
         self.repository = config.Nil()
-        self.showHideDeletedButton = None
         self.statusText = []
         self.testSuite = None
         self.title = None
+        self.toggleDiffs = None
         self.TR = None
         self.translateIDs = defaultdict(list)
         self.translations = []
@@ -745,12 +745,12 @@ knownKeys = {
     "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
     "Shortname": Metadata("Shortname", "shortname", joinValue, parseLiteral),
-    "Show Hide Deleted Button": Metadata("Show 'Hide deleted text' button", "showHideDeletedButton", joinValue, parseBoolean),
     "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
     "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),
     "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),
     "Text Macro": Metadata("Text Macro", "customTextMacros", joinList, parseTextMacro),
     "Title": Metadata("Title", "title", joinValue, parseLiteral),
+    "Toggle Diffs": Metadata("Toggle Diffs", "toggleDiffs", joinValue, parseBoolean),
     "TR": Metadata("TR", "TR", joinValue, parseLiteral),
     "Translate Ids": Metadata("Translate Ids", "translateIDs", joinDdList, parseTranslateIDs),
     "Translation": Metadata("Translation", "translations", joinList, parseTranslation),

@@ -617,8 +617,8 @@ def addSpecMetadataSection(doc):
         md["Translations"] = map(printTranslation, doc.md.translations)
     if len(doc.md.audience):
         md["Audience"] = [", ".join(doc.md.audience)]
-    if doc.md.showHideDeletedButton is not None:
-        md["Hide deleted text"] = [E.label({"for": "hidedel", "id": "hidedel-label"}, "Hide deleted text")]
+    if doc.md.toggleDiffs is not None:
+        md["Toggle Diffs"] = [E.label({"for": "hidedel", "id": "hidedel-label"}, "Hide deleted text")]
         prependChild(find("body", doc),
                      E.input({"type": "checkbox",
                               "id": "hidedel",
