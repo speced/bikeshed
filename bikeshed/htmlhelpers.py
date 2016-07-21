@@ -459,7 +459,7 @@ def fixupIDs(doc, els):
 def translateIDs(trans, els):
     for el in els:
         if el.get('id') in trans:
-            el.set('id', trans[el.get('id')][0])
+            el.set('id', trans[el.get('id')])
 
 def dedupIDs(doc):
     import itertools as iter
