@@ -70,7 +70,7 @@ class MetadataManager:
         self.statusText = []
         self.testSuite = None
         self.title = None
-        self.toggleDiffs = None
+        self.toggleDiffs = False
         self.TR = None
         self.translateIDs = defaultdict(list)
         self.translations = []
