@@ -726,3 +726,4 @@ def addIssuesSection(doc):
         del idel.attrib['id']
     for dfnel in findAll(config.dfnElementsSelector, container):
         dfnel.tag = "span"
+
