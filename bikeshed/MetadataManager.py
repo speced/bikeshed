@@ -70,6 +70,7 @@ class MetadataManager:
         self.statusText = []
         self.testSuite = None
         self.title = None
+        self.toggleDiffs = False
         self.TR = None
         self.translateIDs = defaultdict(list)
         self.translations = []
@@ -749,6 +750,7 @@ knownKeys = {
     "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),
     "Text Macro": Metadata("Text Macro", "customTextMacros", joinList, parseTextMacro),
     "Title": Metadata("Title", "title", joinValue, parseLiteral),
+    "Toggle Diffs": Metadata("Toggle Diffs", "toggleDiffs", joinValue, parseBoolean),
     "TR": Metadata("TR", "TR", joinValue, parseLiteral),
     "Translate Ids": Metadata("Translate Ids", "translateIDs", joinDdList, parseTranslateIDs),
     "Translation": Metadata("Translation", "translations", joinList, parseTranslation),
