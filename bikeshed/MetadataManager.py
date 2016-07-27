@@ -35,6 +35,7 @@ class MetadataManager:
         self.rawStatus = None
 
         # optional metadata
+        self.assertionClass = "assertion"
         self.advisementClass = "advisement"
         self.atRisk = []
         self.audience = []
@@ -666,6 +667,9 @@ def parseDoc(doc):
     for el in findAll(".replace-with-issue-class", doc):
         removeClass(el, "replace-with-issue-class")
         addClass(el, doc.md.issueClass)
+    for el in findAll(".replace-with-assertion-class", doc):
+        removeClass(el, "replace-with-assertion-class")
+        addClass(el, doc.md.assertionClass)
     for el in findAll(".replace-with-advisement-class", doc):
         removeClass(el, "replace-with-advisement-class")
         addClass(el, doc.md.advisementClass)
@@ -710,6 +714,7 @@ parseLiteralList = lambda k,v,l: [v]
 knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
     "Advisement Class": Metadata("Advisement Class", "advisementClass", joinValue, parseLiteral),
+    "Assertion Class": Metadata("Assertion Class", "assertionClass", joinValue, parseLiteral),
     "At Risk": Metadata("At Risk", "atRisk", joinList, parseLiteralList),
     "Audience": Metadata("Audience", "audience", joinList, parseAudience),
     "Block Elements": Metadata("Block Elements", "blockElements", joinList, parseCommaSeparated),

@@ -337,6 +337,8 @@ def parseParagraph(stream):
 	elif line.lower().startswith("issue:"):
 		line = line[6:]
 		p = "<p class='replace-with-issue-class'>"
+	elif line.lower().startswith("assert:"):
+		p = "<p class='replace-with-assertion-class'>"
 	elif line.lower().startswith("advisement:"):
 		line = line[11:]
 		p = "<strong class='replace-with-advisement-class'>"
