@@ -15,6 +15,7 @@ Bikeshed currently recognizes a subset of Markdown:
 * lists
 * headings
 * horizontal rules
+* fenced code blocks
 
 It also recognizes **definition lists**, with the following format:
 
@@ -27,6 +28,20 @@ Here's the dl syntax:
 : key 2
 :: more vals
 ```
+
+For all three list formats,
+on the rare occasions you need to add a class or attribute to the list,
+you can wrap it in the appropriate list container, like:
+
+```
+<ol class=foo>
+	1. first
+	2. second
+</ol>
+```
+
+Bikeshed will use the container you provided,
+rather than generating a fresh one like it does by default.
 
 It supports adding IDs to headings,
 via the Markdown Extra syntax:
@@ -42,6 +57,7 @@ Additionally, starting a paragraph with "Note: " or "Note, " will add a `class='
 which triggers special formatting in the CSS stylesheet.
 Starting one with "Issue: " will add a `class='issue'` to the paragraph.
 Starting one with "Advisement: " will add a `<strong class=advisement>` around the contents of the paragraph.
+Starting one with "Assertion: " will add a `class=assertion` to the paragraph.
 
 More of Markdown will be supported in the future,
 as is adherence to the CommonMark specification.
