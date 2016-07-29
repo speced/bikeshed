@@ -2084,6 +2084,21 @@ def cleanupHTML(doc):
     for el in findAll("[data-algorithm]:not(.algorithm)", doc):
         addClass(el, "algorithm")
 
+    # Allow MD-generated lists to be surrounded by HTML list containers,
+    # so you can add classes/etc without an extraneous wrapper.
+    for el in findAll("ol > ol[data-md]:only-child, ul > ul[data-md]:only-child, dl > dl[data-md]:only-child", doc):
+        # The md-generated list container is featureless,
+        # so we can just throw it away and move its children into its parent.
+        children = childNodes(el, clear=True)
+        parent = parentElement(el)
+        clearContents(parent)
+        appendChild(parent, *children)
+
+    # Remove any lingering data-md attributes on lists that weren't using this container replacement thing.
+    for el in findAll("ol[data-md], ul[data-md], dl[data-md]", doc):
+        removeAttr(el, "data-md")
+
+
     # Mark pre.idl blocks as .def, for styling
     for el in findAll("pre.idl:not(.def)", doc):
         addClass(el, "def")

@@ -394,7 +394,7 @@ def parseBulleted(stream):
 				stream.advance()
 			yield parseItem(stream)
 
-	lines = ["<ul>"]
+	lines = ["<ul data-md>"]
 	for li_lines in getItems(stream):
 		lines.append("<li data-md>")
 		lines.extend(parse(li_lines, numSpacesForIndentation))
@@ -439,9 +439,9 @@ def parseNumbered(stream, start=1):
 			yield parseItem(stream)
 
 	if start == 1:
-		lines = ["<ol>"]
+		lines = ["<ol data-md>"]
 	else:
-		lines = ["<ol start='{0}'>".format(start)]
+		lines = ["<ol data-md start='{0}'>".format(start)]
 	for li_lines in getItems(stream):
 		lines.append("<li data-md>")
 		lines.extend(parse(li_lines, numSpacesForIndentation))
@@ -486,7 +486,7 @@ def parseDl(stream):
 				stream.advance()
 			yield parseItem(stream)
 
-	lines = ["<dl>"]
+	lines = ["<dl data-md>"]
 	for type, di_lines in getItems(stream):
 		lines.append("<{0} data-md>".format(type))
 		lines.extend(parse(di_lines, numSpacesForIndentation))
