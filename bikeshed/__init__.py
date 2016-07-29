@@ -2080,6 +2080,10 @@ def cleanupHTML(doc):
         del el.attrib["data-link-type"]
         el.tag = "{http://www.w3.org/2000/svg}tspan"
 
+    # Add .algorithm to [algorithm] elements, for styling
+    for el in findAll("[data-algorithm]:not(.algorithm)", doc):
+        addClass(el, "algorithm")
+
     # Mark pre.idl blocks as .def, for styling
     for el in findAll("pre.idl:not(.def)", doc):
         addClass(el, "def")
