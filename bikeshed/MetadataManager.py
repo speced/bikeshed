@@ -218,7 +218,7 @@ class MetadataManager:
             macros["deadline"] = unicode(self.deadline.strftime("{0} %B %Y".format(self.deadline.day)), encoding="utf-8")
             macros["isodeadline"] = unicode(self.deadline.strftime("%Y-%m-%d"), encoding="utf-8")
         if self.status in config.TRStatuses:
-            macros["version"] = "http://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
+            macros["version"] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
         elif self.ED:
             macros["version"] = self.ED
         macros["annotations"] = config.testAnnotationURL
