@@ -556,10 +556,19 @@ def addSpecMetadataSection(doc):
         name = tr['name']
         nativeName = tr['native-name']
         url = tr['url']
-        if name is None and lang in doc.languages:
-            name = doc.languages[lang]['name']
-        if nativeName is None and lang in doc.languages:
-            nativeName = doc.languages[lang]['native-name']
+        missingInfo = False
+        if name is None:
+            if lang in doc.languages:
+                name = doc.languages[lang]['name']
+            else:
+                missingInfo = True
+        if nativeName is None:
+            if lang in doc.languages:
+                nativeName = doc.languages[lang]['native-name']
+            else:
+                missingInfo = True
+        if missingInfo:
+            warn("Bikeshed doesn't have all the translation info for '{0}'. Please add to bikeshed/spec-data/readonly/languages.json and submit a PR!", lang)
         if nativeName:
             return E.span({"title": name or lang},
                 E.a({"href": url, "hreflang": lang, "rel": "alternate", "lang": lang},
