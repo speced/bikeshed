@@ -266,9 +266,9 @@ class Choice(DiagramItem):
         if above:
             distanceFromY = max(
                 ARC_RADIUS * 2,
-                self.items[self.default].up
-                    + VERTICAL_SEPARATION
-                    + self.items[self.default - 1].down)
+                (self.items[self.default].up +
+                 VERTICAL_SEPARATION +
+                 self.items[self.default - 1].down))
         for i, item in list(enumerate(above))[::-1]:
             Path(x, y).arc('se').up(distanceFromY - (ARC_RADIUS * 2)).arc('wn').addTo(self)
             item.format(x + (ARC_RADIUS * 2), y - distanceFromY, innerWidth)
@@ -277,9 +277,9 @@ class Choice(DiagramItem):
             item.addTo(self)
             distanceFromY += max(
                 ARC_RADIUS,
-                item.up
-                    + VERTICAL_SEPARATION
-                    + (self.items[i - 1].down if i > 0 else 0))
+                (item.up +
+                 VERTICAL_SEPARATION +
+                 (self.items[i - 1].down if i > 0 else 0)))
 
         # Do the straight-line path.
         Path(x, y).right(ARC_RADIUS * 2).addTo(self)
@@ -293,9 +293,9 @@ class Choice(DiagramItem):
             if i == 0:
                 distanceFromY = max(
                     ARC_RADIUS * 2,
-                    self.items[self.default].down
-                        + VERTICAL_SEPARATION
-                        + item.up)
+                    (self.items[self.default].down +
+                     VERTICAL_SEPARATION +
+                     item.up))
             Path(x, y).arc('ne').down(distanceFromY - (ARC_RADIUS * 2)).arc('ws').addTo(self)
             item.format(x + (ARC_RADIUS * 2), y + distanceFromY, innerWidth)
             Path(x + (ARC_RADIUS * 2) + innerWidth, y + distanceFromY + item.yAdvance).arc('se') \
@@ -303,9 +303,9 @@ class Choice(DiagramItem):
             item.addTo(self)
             distanceFromY += max(
                 ARC_RADIUS,
-                item.down
-                    + VERTICAL_SEPARATION
-                    + (below[i + 1].up if i+1 < len(below) else 0))
+                (item.down +
+                 VERTICAL_SEPARATION +
+                 (below[i + 1].up if i+1 < len(below) else 0)))
         return self
 
 
