@@ -606,7 +606,7 @@ def addSpecMetadataSection(doc):
         url = doc.testSuites[doc.md.vshortname]['url']
         md["Test Suite"].append(E.a({"href":url}, url))
     if len(doc.md.issues):
-        md["Issue Tracking"] = [E.a({"href":url}, text) for text,url in doc.md.issues]
+        md["Issue Tracking"] = [E.a({"href":href}, text) for text,href in doc.md.issues]
     if len(doc.md.editors):
         editorTerm = doc.md.editorTerm['singular']
         md[editorTerm] = map(printEditor, doc.md.editors)
@@ -726,4 +726,3 @@ def addIssuesSection(doc):
         del idel.attrib['id']
     for dfnel in findAll(config.dfnElementsSelector, container):
         dfnel.tag = "span"
-
