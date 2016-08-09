@@ -2099,8 +2099,8 @@ def cleanupHTML(doc):
 
     # Tag classes on wide types of dfns/links
     def selectorForTypes(types):
-        return (",".join("{0}[data-dfn-type={1}]".format(elName,type) for elName in config.dfnElements for type in types)
-            + "," + ",".join("a[data-link-type={0}]".format(type) for type in types))
+        return (",".join("{0}[data-dfn-type={1}]".format(elName,type) for elName in config.dfnElements for type in types) +
+                "," + ",".join("a[data-link-type={0}]".format(type) for type in types))
     for el in findAll(selectorForTypes(config.idlTypes), doc):
         addClass(el, 'idl-code')
     for el in findAll(selectorForTypes(config.maybeTypes.union(config.linkTypeToDfnType['propdesc'])), doc):
