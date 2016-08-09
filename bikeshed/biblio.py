@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import re
-import copy
-from collections import defaultdict, deque
+from collections import defaultdict
 from .messages import *
 from .htmlhelpers import *
 
@@ -261,10 +260,7 @@ def processSpecrefBiblioFile(text, storage, order):
         "date": "date",
         "status": "status"
     }
-    # Required BiblioEntry fields
-    requiredFields = ["url", "title"]
 
-    aliases = {}
     for biblioKey, data in datas.items():
         biblio = {"linkText": biblioKey, "order": order}
         if isinstance(data, basestring):
@@ -388,4 +384,4 @@ def findCloseBiblios(biblioKeys, target, n=5):
             superStrings.append(name)
         else:
             addName(name, levenshtein(name, target))
-    return sorted(s.strip() for s in superStrings) + [n.strip() for n,d in names]
+    return sorted(s.strip() for s in superStrings) + [name.strip() for name,d in names]

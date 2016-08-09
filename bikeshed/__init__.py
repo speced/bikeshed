@@ -6,16 +6,13 @@ from collections import defaultdict
 import io
 import os
 import sys
-import lxml
 import json
 import urllib
 import logging
-import urllib2
 import argparse
 import itertools
-import importlib
 import collections
-from datetime import date, datetime
+from datetime import datetime
 
 from . import config
 from . import biblio
@@ -36,7 +33,6 @@ from .ReferenceManager import ReferenceManager
 from .htmlhelpers import *
 from .messages import *
 from .widlparser.widlparser import parser
-from contextlib import closing
 
 
 def main():
@@ -616,7 +612,7 @@ class Spec(object):
         if not config.dryRun:
             try:
                 if outputFilename == "-":
-                    outputFile = sys.stdout.write(rendered)
+                    sys.stdout.write(rendered)
                 else:
                     with io.open(outputFilename, "w", encoding="utf-8") as f:
                         f.write(rendered)
@@ -1065,7 +1061,6 @@ def determineDfnType(dfn):
     for ancestor in dfn.iterancestors():
         if ancestor.get('data-dfn-type'):
             return ancestor.get('data-dfn-type')
-        classList = ancestor.get('class') or ''
         for cls, type in config.dfnClassToType.items():
             if hasClass(ancestor, cls):
                 return type
@@ -1377,7 +1372,6 @@ decorateAutolink.cache = {}
 
 
 def processIssuesAndExamples(doc):
-    import hashlib
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
     # examples, and link to remote issues if possible:
     for el in findAll(".issue:not([id])", doc):
@@ -2205,7 +2199,6 @@ def correctH1(doc):
 
 def processInclusions(doc):
     import hashlib
-    includeHashes = set()
     while True:
         els = findAll("pre.include", doc)
         if not els:

@@ -186,7 +186,7 @@ def writeOutputLines(outputFilename, inputFilename, lines):
         outputFilename = inputFilename
     try:
         if outputFilename == "-":
-            outputFile = sys.stdout.write(''.join(lines))
+            sys.stdout.write(''.join(lines))
         else:
             with io.open(outputFilename, "w", encoding="utf-8") as f:
                 f.write(''.join(lines))

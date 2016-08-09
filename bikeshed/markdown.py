@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import re
-import json
 from itertools import *
 from .messages import *
 
@@ -37,7 +36,6 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
 	tokens = []
 	rawStack = []
-	inComment = False
 	if opaqueElements is None:
 		opaqueElements = ["pre", "xmp", "script", "style"]
 	rawElements = "|".join(re.escape(x) for x in opaqueElements)
@@ -546,5 +544,5 @@ class TokenStream:
 					return tok[attrName]
 				else:
 					return tok['raw']
-					raise AttributeError, attrName
+					raise AttributeError(attrName)
 			return _missing

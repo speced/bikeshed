@@ -259,7 +259,6 @@ class Choice(DiagramItem):
         Path(x + leftGap + self.width, y).h(rightGap).addTo(self)
         x += leftGap
 
-        last = len(self.items) - 1
         innerWidth = self.width - (ARC_RADIUS * 4)
 
         # Do the elements that curve above

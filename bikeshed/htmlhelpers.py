@@ -2,7 +2,6 @@
 from __future__ import division, unicode_literals
 import hashlib
 import html5lib
-from html5lib import treewalkers
 from lxml import html
 from lxml import etree
 from lxml.cssselect import CSSSelector
@@ -38,7 +37,7 @@ def escapeCSSIdent(val):
     if len(val) == 0:
         die("Programming error: can't escape an empty ident.")
         return ""
-    ident = "";
+    ident = ""
     firstCode = val[0]
     for i,code in enumerate(ord(x) for x in val):
         if code == 0:
@@ -50,11 +49,11 @@ def escapeCSSIdent(val):
             (i == 1 and 0x30 <= code <= 0x39 and firstCode == 0x2d)):
             ident += r"\{0:x} ".format(code)
         elif (code >= 0x80 or
-            code == 0x2d or
-            code == 0x5f or
-            0x30 <= code <= 0x39 or
-            0x41 <= code <= 0x5a or
-            0x61 <= code <= 0x7a):
+              code == 0x2d or
+              code == 0x5f or
+              0x30 <= code <= 0x39 or
+              0x41 <= code <= 0x5a or
+              0x61 <= code <= 0x7a):
             ident += chr(code)
         else:
             ident += r"\{0}".format(chr(code))

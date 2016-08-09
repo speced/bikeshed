@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
-import urllib2
-from contextlib import closing
 
 class Repository(object):
 	'''

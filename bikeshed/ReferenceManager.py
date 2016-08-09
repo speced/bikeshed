@@ -3,16 +3,12 @@ from __future__ import division, unicode_literals
 import re
 import json
 import io
-import collections
 import copy
-import collections
 from collections import defaultdict
 from operator import itemgetter
 from . import config
 from . import biblio
-from . import enum
 from . import datablocks
-from .SortedList import SortedList
 from .messages import *
 from .htmlhelpers import *
 
