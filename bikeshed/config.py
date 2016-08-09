@@ -560,10 +560,10 @@ class BoolSet(collections.MutableMapping):
         return len(self._internal)
 
     def __repr__(self):
-        if self.default == False:
-            trueVals = [k for k,v in self._internal.items() if v == True]
+        if self.default is False:
+            trueVals = [k for k,v in self._internal.items() if v is True]
             vrepr = "[" + ", ".join(repr(x) for x in trueVals) + "]"
         else:
-            falseVals = [k for k,v in self._internal.items() if v == False]
+            falseVals = [k for k,v in self._internal.items() if v is False]
             vrepr = "{" + ", ".join(repr(x) + ":False" for x in falseVals) + "}"
         return "BoolSet({0}, default={1})".format(vrepr, self.default)

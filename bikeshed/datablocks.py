@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import re
-import json
-import copy
 from collections import OrderedDict, defaultdict
 
 import config

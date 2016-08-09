@@ -260,7 +260,6 @@ class EnumMeta(type):
         # things break (such as pickle)
         for name in ('__repr__', '__str__', '__format__', '__reduce_ex__'):
             class_method = getattr(enum_class, name)
-            obj_method = getattr(member_type, name, None)
             enum_method = getattr(first_enum, name, None)
             if name not in classdict and class_method is not enum_method:
                 if name == '__reduce_ex__' and unpicklable:

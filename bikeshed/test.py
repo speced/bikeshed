@@ -4,7 +4,6 @@ from __future__ import division, unicode_literals
 import glob
 import io
 import difflib
-import sys
 import subprocess
 import pipes
 from itertools import *
@@ -15,7 +14,6 @@ from . import config
 def runAllTests(constructor):
 	numPassed = 0
 	total = 0
-	failures = []
 	testFolder = config.scriptPath + "/../tests/"
 	for testname in glob.glob(testFolder + "*.bs"):
 		total += 1
@@ -59,7 +57,6 @@ def compare(suspect, golden):
 def rebase(files=None):
 	if not files:
 		files = glob.glob(config.scriptPath + "/../tests/*.bs")
-	numfiles = len(files)
 	for file in files:
 		p("Rebasing {0}".format(file))
 		subprocess.call("bikeshed -qf spec {0}".format(pipes.quote(file)), shell=True)

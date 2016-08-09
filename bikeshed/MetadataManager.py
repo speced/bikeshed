@@ -8,7 +8,7 @@ import json
 from DefaultOrderedDict import DefaultOrderedDict
 from subprocess import check_output
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import datetime
 from . import config
 from . import markdown
 from .messages import *

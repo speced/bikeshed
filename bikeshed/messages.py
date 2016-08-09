@@ -156,7 +156,4 @@ def formatMessage(type, text, lineNum=None):
             color = "light cyan"
         if lineNum is not None:
             headingText = "LINE {0}".format(lineNum)
-        x  = printColor(headingText + ":", color, "bold")
-        x += " "
-        x += text
-        return x
+        return printColor(headingText + ":", color, "bold") + " " + text
