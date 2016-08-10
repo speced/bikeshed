@@ -492,8 +492,6 @@ def parseDl(stream):
     lines.append("</dl>")
     return lines
 
-
-
 class TokenStream:
     def __init__(self, tokens, numSpacesForIndentation, before={'type':'blank','raw':'\n','prefixlen':0}, after={'type':'eof','raw':'','prefixlen':0}):
         self.tokens = tokens

@@ -334,8 +334,6 @@ def updateTestSuites():
             die("Couldn't save test-suite database to disk.\n{0}", e)
     say("Success!")
 
-
-
 def writeBiblioFile(fh, biblios):
     '''
     Each line is a value for a specific key, in the order:

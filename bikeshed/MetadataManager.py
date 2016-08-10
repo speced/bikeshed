@@ -115,7 +115,6 @@ class MetadataManager:
         result = md.join(getattr(self, md.attrName), val)
         setattr(self, md.attrName, result)
 
-
     def finish(self):
         # Do some "computed metadata", based on the value of other metadata.
         # Only call this when you're sure all metadata sources are parsed.
@@ -556,8 +555,6 @@ def parseEditorTerm(key, val, lineNum):
     else:
         die("Editor Term metadata must be two comma-separated terms, giving the singular and plural term for editors. Got '{0}'.", val)
         return {"singular": "Editor", "plural": "Editors"}
-
-
 
 def parse(lines, doc):
     # Given HTML document text, in the form of an array of text lines,

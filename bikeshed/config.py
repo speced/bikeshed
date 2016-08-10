@@ -282,11 +282,6 @@ class Nil(object):
     def __iter__(self):
         return iter([])
 
-
-
-
-
-
 def retrieveDataFile(filename, quiet=False, str=False):
     cacheLocation = scriptPath + "/spec-data/" + filename
     fallbackLocation = scriptPath + "/spec-data/readonly/" + filename

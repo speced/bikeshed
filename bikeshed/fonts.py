@@ -143,11 +143,6 @@ def replaceComments(font, inputFilename=None, outputFilename=None):
         lines[r['line']:r['line']+1] = r['content']
     writeOutputLines(outputFilename, inputFilename, lines)
 
-
-
-
-
-
 # Some utility functions
 
 def grouper(iterable, n, fillvalue=None):

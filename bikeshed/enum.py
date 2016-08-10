@@ -235,7 +235,6 @@ class EnumMeta(type):
             except TypeError:
                 pass
 
-
         # If a custom type is mixed into the Enum, and it does not know how
         # to pickle itself, pickle.dumps will succeed but pickle.loads will
         # fail.  Rather than have the error show up later and possibly far
@@ -254,7 +253,6 @@ class EnumMeta(type):
                 if not any(m in member_type.__dict__ for m in methods):
                     _make_class_unpicklable(enum_class)
                     unpicklable = True
-
 
         # double check that repr and friends are not the mixin's or various
         # things break (such as pickle)
@@ -451,7 +449,6 @@ class EnumMeta(type):
         """
         if not bases or Enum is None:
             return object, Enum
-
 
         # double check that we are not subclassing a class with existing
         # enumeration members; while we're at it, see if any other data

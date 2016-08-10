@@ -180,8 +180,6 @@ class GlobalName(object):
                 return False
         return True
 
-
-
 class GlobalNames(col.Set, col.Hashable):
     def __init__(self, text=None, type=None, childType=None):
         self.__names = set()

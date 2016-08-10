@@ -81,7 +81,6 @@ class ReferenceManager(object):
             self.biblioKeys.add(k)
             self.biblios[k].extend(vs)
 
-
     @property
     def status(self):
         return self._status
@@ -277,8 +276,6 @@ class ReferenceManager(object):
                         break
                 # Now we can break out and just let the normal error-handling machinery take over.
                 break
-
-
 
             # Allow foo(bar) to be for'd to with just foo() if it's completely unambiguous.
             methodPrefix = methodName[:-1]

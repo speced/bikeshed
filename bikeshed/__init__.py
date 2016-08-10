@@ -550,7 +550,6 @@ class Spec(object):
         markupIDL(self)
         inlineRemoteIssues(self)
 
-
         # Handle all the links
         processBiblioLinks(self)
         processDfns(self)
@@ -585,7 +584,6 @@ class Spec(object):
             extensions.BSPrepTR(self)
 
         return self
-
 
     def serialize(self):
         rendered = HTMLSerializer.HTMLSerializer(self.document, self.md.opaqueElements, self.md.blockElements).serialize()
@@ -659,7 +657,6 @@ class Spec(object):
                 time.sleep(1)
         except Exception, e:
             die("Something went wrong while watching the file:\n{0}", e)
-
 
     def fixText(self, text, moreMacros=None):
         # Do several textual replacements that need to happen *before* the document is parsed as HTML.
@@ -739,11 +736,6 @@ class Spec(object):
         return False
 
 config.specClass = Spec
-
-
-
-
-
 
 def stripBOM(doc):
     if len(doc.lines) >= 1 and doc.lines[0][0:1] == "\ufeff":
@@ -870,9 +862,6 @@ def checkVarHygiene(doc):
         if count > 1:
             die("Multiple declarations of the '{0}' algorithm.", algo)
             return
-
-
-
 
 def fixIntraDocumentReferences(doc):
     ids = {el.get('id'):el for el in findAll("[id]", doc)}
@@ -1225,20 +1214,7 @@ def classifyLink(el):
             el.set(attr, val)
     return el
 
-
-
-
-
-
-
-
-
-
-
-
-
 # Additional Processing
-
 
 def processBiblioLinks(doc):
     biblioLinks = findAll("a[data-link-type='biblio']", doc)
@@ -1399,8 +1375,6 @@ def processIssuesAndExamples(doc):
     for el in findAll(".example:not([id])", doc):
         el.set('id', "example-"+hashContents(el))
     fixupIDs(doc, findAll(".issue, .example", doc))
-
-
 
 def addSelfLinks(doc):
     def makeSelfLink(el):
@@ -1580,9 +1554,6 @@ def addDfnPanels(doc, dfns):
 
         .dfn-paneled { cursor: pointer; }
         '''
-
-
-
 
 class DebugMarker(object):
     # Debugging tool for IDL markup
@@ -1786,8 +1757,6 @@ def markupIDL(doc):
     if highlightingOccurred:
         doc.extraStyles['style-syntax-highlighting'] += "pre.idl.highlight { color: #708090; }"
 
-
-
 def processIDL(doc):
     for pre in findAll("pre.idl, xmp.idl", doc):
         if pre.get("data-no-idl") is not None:
@@ -1847,8 +1816,6 @@ def processIDL(doc):
     classifyDfns(doc, dfns)
     fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
-
-
 
 def addSyntaxHighlighting(doc):
     try:
@@ -2036,10 +2003,6 @@ def mergeHighlighting(el, hi):
             coloredText.append(ColoredText(n, None))
     colorizeEl(el, coloredText)
 
-
-
-
-
 def cleanupHTML(doc):
     # Cleanup done immediately before serialization.
 
@@ -2091,7 +2054,6 @@ def cleanupHTML(doc):
     # Remove any lingering data-md attributes on lists that weren't using this container replacement thing.
     for el in findAll("ol[data-md], ul[data-md], dl[data-md]", doc):
         removeAttr(el, "data-md")
-
 
     # Mark pre.idl blocks as .def, for styling
     for el in findAll("pre.idl:not(.def)", doc):
@@ -2380,9 +2342,6 @@ def inlineRemoteIssues(doc):
     except Exception, e:
         die("Couldn't save GitHub Issues cache to disk.\n{0}", e)
     return
-
-
-
 
 def addNoteHeaders(doc):
     # Finds <foo heading="bar"> and turns it into a marker-heading

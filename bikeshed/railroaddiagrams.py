@@ -23,8 +23,6 @@ def determineGaps(outer, inner):
     else:
         return diff/2, diff/2
 
-
-
 class DiagramItem(object):
     def __init__(self, name, attrs=None, text=None):
         self.name = name
@@ -95,7 +93,6 @@ class Path(DiagramItem):
         self.attrs['d'] += 'a{0} {0} 0 0 {1} {2} {3}'.format(ARC_RADIUS, cw, x, y)
         return self
 
-
     def format(self):
         self.attrs['d'] += 'h.5'
         return self
@@ -148,7 +145,6 @@ class Diagram(DiagramItem):
         g.addTo(self)
         self.formatted = True
         return self
-
 
     def writeSvg(self, write):
         if not self.formatted:

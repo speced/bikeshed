@@ -371,7 +371,6 @@ def addPropertyIndex(doc):
             tempDesc['Name'] = name
             atRules[atRule].append(tempDesc)
 
-
     def createRow(prop, linkType):
         return E.tr(
             E.th({"scope":"row"},
@@ -579,7 +578,6 @@ def addSpecMetadataSection(doc):
         else:
             return E.a({"href": url, "hreflang": lang, "rel": "alternate"},
                 lang)
-
 
     md = DefaultOrderedDict(list)
     mac = doc.macros

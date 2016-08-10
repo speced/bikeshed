@@ -269,7 +269,6 @@ def transformElementdef(lines, doc, lineNum=None, **kwargs):
         html += "</ul>"
         parsedAttrs["Attributes"] = html
 
-
     # Displays entries in the order specified in attrs,
     # then if there are any unknown parsedAttrs values,
     # they're displayed afterward in the order they were specified.
@@ -357,9 +356,6 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
             '''
         ]
     return lines
-
-
-
 
 def parseDefBlock(lines, type, capitalizeKeys=True):
     vals = OrderedDict()
@@ -581,8 +577,6 @@ def transformInclude(lines, doc, lineNum=None, **kwargs):
         el += " macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
     el += "{lineNumAttr}></pre>".format(lineNumAttr=lineNumAttr)
     return [el]
-
-
 
 def parseInfoTree(lines, indent=4, lineNum=0):
     # Parses sets of info, which can be arranged into trees.
