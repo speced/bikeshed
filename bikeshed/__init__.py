@@ -1671,7 +1671,7 @@ class IDLMarker(object):
         idlType = construct.idlType
         extraParameters = ''
         idlTitle = construct.normalName
-        refType="idl"
+        refType = "idl"
         if idlType in config.functionishTypes:
             idlTitle = '|'.join(self.methodLinkingTexts(construct))
         elif idlType == "extended-attribute":
@@ -1695,7 +1695,7 @@ class IDLMarker(object):
                 extraParameters += ' data-default="{0}"'.format(value)
         elif idlType == "interface":
             if construct.partial:
-                refType="link"
+                refType = "link"
 
         if refType == "link":
             elementName = "a"

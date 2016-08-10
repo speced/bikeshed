@@ -244,7 +244,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
         elif text[offset:offset+numSpacesForIndentation] == " " * numSpacesForIndentation:
             offset += numSpacesForIndentation
         else:
-            die("Line {i} isn't indented enough (needs {0} indent{plural}) to be valid Markdown:\n\"{1}\"", len, text[:-1], plural="" if len==1 else "s", i=token['line'])
+            die("Line {i} isn't indented enough (needs {0} indent{plural}) to be valid Markdown:\n\"{1}\"", len, text[:-1], plural="" if len == 1 else "s", i=token['line'])
     return text[offset:]
 
 

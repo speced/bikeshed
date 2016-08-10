@@ -9,7 +9,7 @@ class CSSLexer(RegexLexer):
     name = "CSS"
     aliases = ['css']
     filenames = ['*.css']
-    flags=re.DOTALL
+    flags = re.DOTALL
 
     tokens = {
         b"root": [

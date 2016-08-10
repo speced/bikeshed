@@ -93,7 +93,7 @@ def transformMaybePlaceholders(doc):
                 el.set("for", match.group(1))
             el.text = match.group(2)
             continue
-        el.tag="css"
+        el.tag = "css"
         el.text = text
 
 
