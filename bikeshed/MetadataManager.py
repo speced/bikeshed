@@ -697,8 +697,10 @@ def join(*sources):
 
 Metadata = collections.namedtuple('Metadata', ['humanName', 'attrName', 'join', 'parse'])
 
-joinValue = lambda a,b: b
-joinList = lambda a,b: a+b
+def joinValue(a, b):
+  return b
+def joinList(a, b):
+  return a + b
 def joinBoolSet(a,b):
     x = copy.deepcopy(a)
     x.update(b)
@@ -708,8 +710,10 @@ def joinDdList(a,b):
     x.update(a)
     x.update(b)
     return x
-parseLiteral = lambda k,v,l: v
-parseLiteralList = lambda k,v,l: [v]
+def parseLiteral(k, v, l):
+  return v
+def parseLiteralList(k, v, l):
+  return [v]
 
 knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
