@@ -331,7 +331,7 @@ def parseMultiLineHeading(stream):
 
 
 def parseHorizontalRule(stream):
-    lines =  ["<hr>\n"]
+    lines = ["<hr>\n"]
     stream.advance()
     return lines
 
