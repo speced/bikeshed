@@ -459,7 +459,7 @@ class EnumMeta(type):
         # type has been mixed in so we can use the correct __new__
         member_type = first_enum = None
         for base in bases:
-            if  (base is not Enum and
+            if (base is not Enum and
                     issubclass(base, Enum) and
                     base._member_names_):
                 raise TypeError("Cannot extend enumerations")

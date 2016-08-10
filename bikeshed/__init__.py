@@ -723,11 +723,11 @@ class Spec(object):
     def printTargets(self):
         p("Exported terms:")
         for el in findAll("[data-export]", self):
-            for term in  config.linkTextsFromElement(el):
+            for term in config.linkTextsFromElement(el):
                 p("  " + term)
         p("Unexported terms:")
         for el in findAll("[data-noexport]", self):
-            for term in  config.linkTextsFromElement(el):
+            for term in config.linkTextsFromElement(el):
                 p("  " + term)
 
     def isOpaqueElement(self, el):
