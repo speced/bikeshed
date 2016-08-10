@@ -31,8 +31,8 @@ def update(anchors=False, biblio=False, linkDefaults=False, testSuites=False):
 def updateCrossRefs():
     try:
         say("Downloading anchor data...")
-        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version = "vnd.csswg.shepherd.v1")
-        res = shepherd.get("specifications", anchors = True, draft = True)
+        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
+        res = shepherd.get("specifications", anchors=True, draft=True)
         # http://api.csswg.org/shepherd/spec/?spec=css-flexbox-1&anchors&draft, for manual looking
         if ((not res) or (406 == res.status)):
             die("This version of the anchor-data API is no longer supported. Please update Bikeshed.")
@@ -304,7 +304,7 @@ def updateLinkDefaults():
 def updateTestSuites():
     try:
         say("Downloading test suite data...")
-        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version = "vnd.csswg.shepherd.v1")
+        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
         res = shepherd.get("test_suites")
         if ((not res) or (406 == res.status)):
             die("This version of the test suite API is no longer supported. Please update Bikeshed.")

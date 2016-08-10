@@ -313,7 +313,7 @@ def Optional(item, skip=False):
 
 
 class OneOrMore(DiagramItem):
-    def __init__(self, item, repeat = None):
+    def __init__(self, item, repeat=None):
         DiagramItem.__init__(self, 'g')
         repeat = repeat or Skip()
         self.item = wrapString(item)
