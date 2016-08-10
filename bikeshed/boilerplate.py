@@ -16,6 +16,7 @@ def addBikeshedVersion(doc):
     appendChild(head,
         E.meta({"name": "generator", "content": "Bikeshed 1.0.0"}))
 
+
 def addHeaderFooter(doc):
     header = config.retrieveBoilerplateFile(doc, 'header') if "header" in doc.md.boilerplate else ""
     footer = config.retrieveBoilerplateFile(doc, 'footer') if "footer" in doc.md.boilerplate else ""
@@ -26,6 +27,7 @@ def addHeaderFooter(doc):
 def fillWith(tag, newElements, doc):
     for el in findAll("[data-fill-with='{0}']".format(tag), doc):
         replaceContents(el, newElements)
+
 
 def getFillContainer(tag, doc, default=False):
     '''
@@ -85,6 +87,7 @@ def addObsoletionNotice(doc):
         html = doc.fixText(html)
         fillWith('warning', parseHTML(html), doc=doc)
 
+
 def addAtRisk(doc):
     if len(doc.md.atRisk) == 0:
         return
@@ -94,10 +97,12 @@ def addAtRisk(doc):
     html += "</ul><p>“At-risk” is a W3C Process term-of-art, and does not necessarily imply that the feature is in danger of being dropped or delayed. It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, and marking it as such allows the WG to drop the feature if necessary when transitioning to the Proposed Rec stage, without having to publish a new Candidate Rec without the feature first."
     fillWith('at-risk', parseHTML(html), doc=doc)
 
+
 def addStyles(doc):
     el = getFillContainer('stylesheet', doc)
     if el is not None:
         el.text = config.retrieveBoilerplateFile(doc, 'stylesheet')
+
 
 def addCustomBoilerplate(doc):
     for el in findAll('[boilerplate]', doc):
@@ -107,17 +112,20 @@ def addCustomBoilerplate(doc):
             replaceContents(target, el)
             removeNode(el)
 
+
 def removeUnwantedBoilerplate(doc):
     for el in findAll('[data-fill-with]', doc):
         tag = el.get('data-fill-with')
         if tag not in doc.md.boilerplate:
             removeNode(el)
 
+
 def addAnnotations(doc):
     if doc.md.vshortname in doc.testSuites and not doc.md.prepTR:
         html = config.retrieveBoilerplateFile(doc, 'annotations')
         html = doc.fixText(html)
         appendContents(find("head", doc), parseHTML(html))
+
 
 def addBikeshedBoilerplate(doc):
     for k,v in doc.extraStyles.items():
@@ -139,6 +147,7 @@ def addBikeshedBoilerplate(doc):
             appendChild(container,
                 E.script("/* {0} */\n".format(k) + v))
 
+
 def addIndexSection(doc):
     if len(findAll(config.dfnElementsSelector, doc)) == 0 and len(doc.externalRefsUsed.keys()) == 0:
         return
@@ -153,6 +162,7 @@ def addIndexSection(doc):
 
     if len(doc.externalRefsUsed.keys()):
         addIndexOfExternallyDefinedTerms(doc, container)
+
 
 def addIndexOfLocallyDefinedTerms(doc, container):
     appendChild(container,
@@ -185,6 +195,7 @@ def addIndexOfLocallyDefinedTerms(doc, container):
     # Now print the indexes
     indexHTML = htmlFromIndexTerms(indexEntries)
     appendChild(container, indexHTML)
+
 
 def addExplicitIndexes(doc):
     # Explicit indexes can be requested for specs with <index for="example-spec-1"></index>
@@ -288,6 +299,7 @@ def htmlFromIndexTerms(entries):
                         E.a({"href":item['url']}, item['disambiguator']),
                         E.span(", in ", item['label']) if item['label'] else ""))
     return topList
+
 
 def addIndexOfExternallyDefinedTerms(doc, container):
     if not doc.externalRefsUsed:
@@ -708,6 +720,7 @@ def addReferencesSection(doc):
         for ref in informRefs:
             appendChild(dl, E.dt({"id":"biblio-"+config.simplifyText(ref.linkText), "data-no-self-link":""}, "["+formatBiblioTerm(ref.linkText)+"]"))
             appendChild(dl, E.dd(*ref.toHTML()))
+
 
 def addIssuesSection(doc):
     issues = findAll('.issue', doc)

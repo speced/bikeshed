@@ -54,6 +54,7 @@ This defines a font capable of rendering text composed of "A", "B", "a", "b", an
 
 '''
 
+
 class Font(object):
     def __init__(self, fontfilename=config.scriptPath + "/bigblocks.bsfont"):
         try:
@@ -105,6 +106,7 @@ def parseMetadata(lines):
         md[key] = val
     return md, lines[i:]
 
+
 def parseCharacters(md, lines):
     import string
     height = md['height']
@@ -128,6 +130,7 @@ def parseCharacters(md, lines):
             characters[char] = characters[char.upper()]
     return characters
 
+
 def replaceComments(font, inputFilename=None, outputFilename=None):
     lines, inputFilename = getInputLines(inputFilename)
     replacements = []
@@ -145,11 +148,13 @@ def replaceComments(font, inputFilename=None, outputFilename=None):
 
 # Some utility functions
 
+
 def grouper(iterable, n, fillvalue=None):
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n
     return (list(x) for x in izip_longest(fillvalue=fillvalue, *args))
+
 
 def getInputLines(inputFilename):
     if inputFilename is None:
@@ -175,6 +180,7 @@ def getInputLines(inputFilename):
         die("Couldn't open the input file '{0}'.", inputFilename)
         return []
     return lines, inputFilename
+
 
 def writeOutputLines(outputFilename, inputFilename, lines):
     if outputFilename is None:

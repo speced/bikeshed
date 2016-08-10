@@ -11,6 +11,7 @@ from .messages import *
 from .htmlhelpers import parseDocument, outerHTML
 from . import config
 
+
 def runAllTests(constructor):
     numPassed = 0
     total = 0
@@ -34,6 +35,7 @@ def runAllTests(constructor):
     else:
         p("\033[31;1m✘ {0}/{1} tests passed.\033[0m".format(numPassed, total))
 
+
 def compare(suspect, golden):
     suspectDoc = parseDocument(suspect)
     goldenDoc = parseDocument(golden)
@@ -53,6 +55,7 @@ def compare(suspect, golden):
         p("")
         return False
     return True
+
 
 def rebase(files=None):
     if not files:

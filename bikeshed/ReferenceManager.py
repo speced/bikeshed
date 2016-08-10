@@ -12,6 +12,7 @@ from . import datablocks
 from .messages import *
 from .htmlhelpers import *
 
+
 class ReferenceManager(object):
 
     def __init__(self, specStatus=None):
@@ -692,6 +693,7 @@ class RefWrapper(object):
 
     def __repr__(self):
         return "RefWrapper("+repr(self.text)+", "+repr(self.ref)+")"
+
 
 def simplifyPossibleRefs(refs):
     # "Simplifies" the set of possible refs according to their 'for' value;

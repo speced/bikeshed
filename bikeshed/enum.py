@@ -27,6 +27,7 @@ except NameError:
     # in Python 3 it's just str, but was missing in 3.1
     basestring = str
 
+
 class _RouteClassAttributeToGetattr(object):
     """Route attribute access on a class to __getattr__.
 
@@ -599,6 +600,7 @@ class EnumMeta(type):
 temp_enum_dict = {}
 temp_enum_dict['__doc__'] = "Generic enumeration.\n\n    Derive from this class to define new enumerations.\n\n"
 
+
 def __new__(cls, value):
     # all enum instances are actually created during class construction
     # without calling this method; this method is called by the metaclass'
@@ -621,22 +623,26 @@ def __new__(cls, value):
 temp_enum_dict['__new__'] = __new__
 del __new__
 
+
 def __repr__(self):
     return "<%s.%s: %r>" % (
             self.__class__.__name__, self._name_, self._value_)
 temp_enum_dict['__repr__'] = __repr__
 del __repr__
 
+
 def __str__(self):
     return "%s.%s" % (self.__class__.__name__, self._name_)
 temp_enum_dict['__str__'] = __str__
 del __str__
+
 
 def __dir__(self):
     added_behavior = [m for m in self.__class__.__dict__ if m[0] != '_']
     return (['__class__', '__doc__', '__module__', 'name', 'value'] + added_behavior)
 temp_enum_dict['__dir__'] = __dir__
 del __dir__
+
 
 def __format__(self, format_spec):
     # mixed-in Enums should use the mixed-in type's __format__, otherwise
@@ -701,6 +707,7 @@ def __eq__(self, other):
 temp_enum_dict['__eq__'] = __eq__
 del __eq__
 
+
 def __ne__(self, other):
     if type(other) is self.__class__:
         return self is not other
@@ -708,10 +715,12 @@ def __ne__(self, other):
 temp_enum_dict['__ne__'] = __ne__
 del __ne__
 
+
 def __hash__(self):
     return hash(self._name_)
 temp_enum_dict['__hash__'] = __hash__
 del __hash__
+
 
 def __reduce_ex__(self, proto):
     return self.__class__, (self._value_, )
@@ -725,11 +734,13 @@ del __reduce_ex__
 # members are not set directly on the enum class -- __getattr__ is
 # used to look them up.
 
+
 @_RouteClassAttributeToGetattr
 def name(self):
     return self._name_
 temp_enum_dict['name'] = name
 del name
+
 
 @_RouteClassAttributeToGetattr
 def value(self):
@@ -742,6 +753,7 @@ del temp_enum_dict
 
 # Enum has now been created
 ###########################
+
 
 class IntEnum(int, Enum):
     """Enum where members are also (and must be) ints"""
@@ -761,6 +773,7 @@ def unique(enumeration):
                 (enumeration, duplicate_names)
                 )
     return enumeration
+
 
 class OrderedEnum(Enum):
     """Enum where members can be compared by their value, but retains all other enum invariants"""

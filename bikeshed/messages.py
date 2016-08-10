@@ -9,6 +9,7 @@ import config
 messages = set()
 messageCounts = Counter()
 
+
 def p(msg):
     if config.quiet == float("infinity"):
         return
@@ -38,6 +39,7 @@ def die(msg, *formatArgs, **namedArgs):
         failure("Did not generate, due to fatal errors")
         sys.exit(1)
 
+
 def linkerror(msg, *formatArgs, **namedArgs):
     lineNum = None
     if 'el' in namedArgs and namedArgs['el'].get("line-number"):
@@ -50,6 +52,7 @@ def linkerror(msg, *formatArgs, **namedArgs):
         messages.add(msg)
         if config.quiet < 2:
                 p(msg)
+
 
 def warn(msg, *formatArgs, **namedArgs):
     lineNum = None
@@ -64,25 +67,30 @@ def warn(msg, *formatArgs, **namedArgs):
         if config.quiet < 1:
                 p(msg)
 
+
 def say(msg, *formatArgs, **namedArgs):
     if config.quiet < 1:
         p(formatMessage("message", msg.format(*formatArgs, **namedArgs)))
+
 
 def success(msg, *formatArgs, **namedArgs):
     if config.quiet < 4:
         msg = formatMessage("success", msg.format(*formatArgs, **namedArgs))
         p(msg)
 
+
 def failure(msg, *formatArgs, **namedArgs):
     if config.quiet < 4:
         msg = formatMessage("failure", msg.format(*formatArgs, **namedArgs))
         p(msg)
+
 
 def resetSeenMessages():
     global messages
     messages = set()
     global messageCounts
     messageCounts = Counter()
+
 
 def printColor(text, color="white", *styles):
     if config.printMode == "plain":
@@ -122,6 +130,7 @@ def printColor(text, color="white", *styles):
         colorNum = colorsConverter[color.lower()]
         styleNum = ";".join(str(stylesConverter[style.lower()]) for style in styles)
         return "\033[{0};{1}m{text}\033[0m".format(styleNum, colorNum, text=text)
+
 
 def formatMessage(type, text, lineNum=None):
     if config.printMode == "markup":

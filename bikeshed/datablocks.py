@@ -22,6 +22,8 @@ from .htmlhelpers import *
 #
 # Additionally, we pass in the tag-name used (pre or xmp)
 # and the line with the content, in case it has useful data in it.
+
+
 def transformDataBlocks(doc, lines):
     inBlock = False
     blockTypes = {
@@ -220,6 +222,8 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
     return ret
 
 # TODO: Make these functions match transformPropdef's new structure
+
+
 def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
@@ -248,6 +252,7 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
         ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
     ret.append("</table>")
     return ret
+
 
 def transformElementdef(lines, doc, lineNum=None, **kwargs):
     lineNumAttr = ""
@@ -309,6 +314,7 @@ def transformElementdef(lines, doc, lineNum=None, **kwargs):
     ret.append("</table>")
     return ret
 
+
 def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
@@ -357,6 +363,7 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
         ]
     return lines
 
+
 def parseDefBlock(lines, type, capitalizeKeys=True):
     vals = OrderedDict()
     lastKey = None
@@ -381,6 +388,7 @@ def parseDefBlock(lines, type, capitalizeKeys=True):
             vals[key] = val
     return vals
 
+
 def transformRailroad(lines, doc, **kwargs):
     import StringIO
     import railroadparser
@@ -395,6 +403,7 @@ def transformRailroad(lines, doc, **kwargs):
     ret.append("</div>")
     return ret
 
+
 def transformBiblio(lines, doc, **kwargs):
     storage = defaultdict(list)
     biblio.processSpecrefBiblioFile(''.join(lines), storage, order=1)
@@ -403,9 +412,11 @@ def transformBiblio(lines, doc, **kwargs):
         doc.refs.biblios[k].extend(vs)
     return []
 
+
 def transformAnchors(lines, doc, lineNum=None, **kwargs):
     anchors = parseInfoTree(lines, doc.md.indent, lineNum)
     return processAnchors(anchors, doc, lineNum)
+
 
 def processAnchors(anchors, doc, lineNum=None):
     for anchor in anchors:
@@ -474,9 +485,11 @@ def processAnchors(anchors, doc, lineNum=None):
             doc.refs.addMethodVariants(anchor['text'][0], anchor.get('for', []), doc.md.shortname)
     return []
 
+
 def transformLinkDefaults(lines, doc, lineNum=None, **kwargs):
     lds = parseInfoTree(lines, doc.md.indent, lineNum)
     return processLinkDefaults(lds, doc, lineNum)
+
 
 def processLinkDefaults(lds, doc, lineNum=None):
     for ld in lds:
@@ -502,9 +515,11 @@ def processLinkDefaults(lds, doc, lineNum=None):
             doc.md.linkDefaults[text].append((spec, type, ld.get('status', None), None))
     return []
 
+
 def transformIgnoredSpecs(lines, doc, lineNum=None, **kwargs):
     specs = parseInfoTree(lines, doc.md.indent, lineNum)
     return processIgnoredSpecs(specs, doc, lineNum)
+
 
 def processIgnoredSpecs(specs, doc, lineNum=None):
     for spec in specs:
@@ -531,6 +546,7 @@ def transformInfo(lines, doc, lineNum=None, **kwargs):
     infos = parseInfoTree(lines, doc.md.indent, lineNum)
     return processInfo(infos, doc, lineNum)
 
+
 def processInfo(infos, doc, lineNum=None):
     knownInfoTypes = {
         "anchors": processAnchors,
@@ -550,6 +566,7 @@ def processInfo(infos, doc, lineNum=None):
     for infoType, infos in infoCollections.items():
         knownInfoTypes[infoType](infos, doc, lineNum=0)
     return []
+
 
 def transformInclude(lines, doc, lineNum=None, **kwargs):
     lineNumAttr = ""
@@ -577,6 +594,7 @@ def transformInclude(lines, doc, lineNum=None, **kwargs):
         el += " macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
     el += "{lineNumAttr}></pre>".format(lineNumAttr=lineNumAttr)
     return [el]
+
 
 def parseInfoTree(lines, indent=4, lineNum=0):
     # Parses sets of info, which can be arranged into trees.

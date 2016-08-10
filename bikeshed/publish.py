@@ -10,6 +10,7 @@ from .messages import *
 from . import extensions
 from .requests import requests
 
+
 def publishEchidna(doc, username, password, decision):
     logging.captureWarnings(True) # Silence SNIMissingWarning
     tar = prepareTar(doc, visibleTar=False)
@@ -24,6 +25,7 @@ def publishEchidna(doc, username, password, decision):
         print r.status_code
         print r.text
         print r.headers
+
 
 def prepareTar(doc, visibleTar=False):
     # Finish the spec

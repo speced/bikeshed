@@ -85,6 +85,7 @@ megaGroups = {
     "priv-sec": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"])
 }
 
+
 def canonicalizeStatus(status, group):
     if status is not None:
         status = status.upper()
@@ -165,6 +166,7 @@ linkTypeToDfnType = {
 for dfnType in dfnClassToType.values():
     linkTypeToDfnType[dfnType] = frozenset([dfnType])
 
+
 def linkTypeIn(linkTypes, targetTypes="all"):
     # Tests if a link type (which might be a shorthand type like "idl")
     # matches against a given set of types.
@@ -200,6 +202,7 @@ anchorDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1
 testSuiteDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
 
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
+
 
 @total_ordering
 class HierarchicalNumber(object):
@@ -246,6 +249,7 @@ class HierarchicalNumber(object):
     def __repr__(self):
         return "HierarchicalNumber("+repr(self.originalVal)+")"
 
+
 def intersperse(iterable, delimiter):
     it = iter(iterable)
     yield next(it)
@@ -254,6 +258,8 @@ def intersperse(iterable, delimiter):
         yield x
 
 # Super-None, falsey and returns itself from every method/attribute/etc
+
+
 class Nil(object):
     def __repr__(self):
         return "Nil()"
@@ -282,6 +288,7 @@ class Nil(object):
     def __iter__(self):
         return iter([])
 
+
 def retrieveDataFile(filename, quiet=False, str=False):
     cacheLocation = scriptPath + "/spec-data/" + filename
     fallbackLocation = scriptPath + "/spec-data/readonly/" + filename
@@ -308,6 +315,7 @@ def retrieveDataFile(filename, quiet=False, str=False):
         return unicode(fh.read(), encoding="utf-8")
     else:
         return fh
+
 
 def retrieveBoilerplateFile(self, name, group=None, status=None, error=True):
     # Looks in three locations, in order:
@@ -347,6 +355,7 @@ def retrieveBoilerplateFile(self, name, group=None, status=None, error=True):
             die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
         return ""
 
+
 def printjson(x, indent=2, level=0):
     if isinstance(indent, int):
         # Convert into a number of spaces.
@@ -366,11 +375,13 @@ def printjson(x, indent=2, level=0):
     return ret
     #return json.dumps(obj, indent=2, default=lambda x:x.__json__())
 
+
 def getjson(x):
     try:
         return x.__json__()
     except:
         return x
+
 
 def printjsonobject(x, indent, level):
     x = getjson(x)
@@ -382,6 +393,7 @@ def printjsonobject(x, indent, level):
         ret += "\n" + (indent*level) + printColor((k + ": ").ljust(maxKeyLength+2), "cyan") + printjson(v, indent, level+1)
     return ret
 
+
 def printjsonobjectarray(x, indent, level):
     # Prints an array of objects
     x = getjson(x)
@@ -392,6 +404,7 @@ def printjsonobjectarray(x, indent, level):
         ret += printjsonobject(v, indent, level)
     return ret
 
+
 def printjsonsimplearray(x, indent, level):
     x = getjson(x)
     ret = printColor("[", "blue")
@@ -401,6 +414,7 @@ def printjsonsimplearray(x, indent, level):
         ret += printjsonprimitive(v)
     ret += printColor("]", "blue")
     return ret
+
 
 def printjsonprimitive(x):
     x = getjson(x)
@@ -427,6 +441,7 @@ def processTextNodes(nodes, regex, replacer):
             nodes[i:i+1] = reSubObject(regex, node, replacer)
     return nodes
 
+
 def reSubObject(pattern, string, repl=None):
     '''
     like re.sub, but replacements don't have to be text;
@@ -445,6 +460,7 @@ def reSubObject(pattern, string, repl=None):
         lastEnd = match.end()
     pieces.append(string[lastEnd:])
     return pieces
+
 
 def simplifyText(text):
     # Remove anything that's not a name character.
@@ -485,6 +501,7 @@ def linkTextsFromElement(el, preserveCasing=False):
     texts = [re.sub(r"\s+", " ", x) for x in texts if x != '']
     return texts
 
+
 class DuplicatedLinkText(Exception):
     def __init__(self, offendingText, allTexts, el):
         self.offendingText = offendingText
@@ -492,6 +509,7 @@ class DuplicatedLinkText(Exception):
         self.el = el
     def __unicode__(self):
         return "<Text '{0}' shows up in both lt and local-lt>".format(self.offendingText)
+
 
 def firstLinkTextFromElement(el):
     try:
@@ -510,6 +528,7 @@ def splitForValues(forValues):
     if forValues is None:
         return None
     return [value.strip() for value in re.split(r',(?![^()]*\))', forValues) if value.strip()]
+
 
 class BoolSet(collections.MutableMapping):
     '''

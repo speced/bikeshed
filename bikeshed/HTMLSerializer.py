@@ -5,6 +5,7 @@ import StringIO
 from .htmlhelpers import childNodes, isElement, outerHTML, escapeHTML, escapeAttr
 from .messages import *
 
+
 class HTMLSerializer(object):
     inlineEls = frozenset(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "[]"])
     rawEls = frozenset(["xmp", "script", "style"])

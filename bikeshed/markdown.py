@@ -4,9 +4,11 @@ import re
 from itertools import *
 from .messages import *
 
+
 def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
     tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements, blockElements=blockElements)
     return parseTokens(tokens, numSpacesForIndentation)
+
 
 def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
     # Turns lines of text into block tokens,
@@ -162,6 +164,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
     return tokens
 
+
 def stripComments(lines):
     output = []
     inComment = False
@@ -179,6 +182,7 @@ def stripComments(lines):
                 strippedLine += "\n"
             output.append(strippedLine)
     return output
+
 
 def stripCommentsFromLine(line, inComment=False):
     # Removes HTML comments from the line.
@@ -217,6 +221,7 @@ def prefixLen(text, numSpacesForIndentation):
         else:
             break
     return prefixLen
+
 
 def stripPrefix(token, numSpacesForIndentation, len):
     '''Removes len number of prefix groups'''
@@ -294,6 +299,7 @@ def parseTokens(tokens, numSpacesForIndentation):
 # The stream should be advanced to the *next* line,
 # after the lines you've used up dealing with the construct.
 
+
 def parseSingleLineHeading(stream):
     if "id" in stream.curr():
         idattr = " id='{0}'".format(stream.currid())
@@ -302,6 +308,7 @@ def parseSingleLineHeading(stream):
     lines = ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, **stream.curr())]
     stream.advance()
     return lines
+
 
 def parseMultiLineHeading(stream):
     if stream.nexttype() == "equals-line":
@@ -321,10 +328,12 @@ def parseMultiLineHeading(stream):
     stream.advance(2)
     return lines
 
+
 def parseHorizontalRule(stream):
     lines =  ["<hr>\n"]
     stream.advance()
     return lines
+
 
 def parseParagraph(stream):
     line = stream.currtext()
@@ -355,6 +364,7 @@ def parseParagraph(stream):
             lines[-1] = lines[-1].rstrip() + endTag + "\n"
             return lines
         lines.append(stream.currraw())
+
 
 def parseBulleted(stream):
     prefixLen = stream.currprefixlen()
@@ -399,6 +409,7 @@ def parseBulleted(stream):
         lines.append("</li>")
     lines.append("</ul>")
     return lines
+
 
 def parseNumbered(stream, start=1):
     prefixLen = stream.currprefixlen()
@@ -447,6 +458,7 @@ def parseNumbered(stream, start=1):
     lines.append("</ol>")
     return lines
 
+
 def parseDl(stream):
     prefixLen = stream.currprefixlen()
     numSpacesForIndentation = stream.numSpacesForIndentation
@@ -491,6 +503,7 @@ def parseDl(stream):
         lines.append("</{0}>".format(type))
     lines.append("</dl>")
     return lines
+
 
 class TokenStream:
     def __init__(self, tokens, numSpacesForIndentation, before={'type':'blank','raw':'\n','prefixlen':0}, after={'type':'eof','raw':'','prefixlen':0}):

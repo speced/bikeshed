@@ -16,6 +16,7 @@ statusStyle = {
   'outofscope': 'oi',
 }
 
+
 def printIssueList(infilename=None, outfilename=None):
     if infilename is None:
         if glob.glob("issues*.txt"):
@@ -211,6 +212,7 @@ def printIssues(outfile, lines):
         outfile.write("<pre class='{0}' id='issue-{1}'>\n".format(code, index))
         outfile.write(issue)
         outfile.write("</pre>\n")
+
 
 def printScript(outfile):
     outfile.write('''<script>

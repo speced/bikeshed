@@ -5,6 +5,7 @@ from collections import defaultdict
 from .messages import *
 from .htmlhelpers import *
 
+
 class BiblioEntry(object):
 
     def __init__(self, preferredURL="dated", **kwargs):
@@ -109,6 +110,7 @@ class BiblioEntry(object):
             return False
         return True
 
+
 class SpecBasedBiblioEntry(BiblioEntry):
     '''
     Generates a "fake" biblio entry from a spec reference,
@@ -138,6 +140,7 @@ class SpecBasedBiblioEntry(BiblioEntry):
             E.a({"href":self.url}, self.url)
         ]
 
+
 class StringBiblioEntry(BiblioEntry):
     '''
     Generates a barebones biblio entry from a preformatted biblio string.
@@ -157,6 +160,7 @@ class StringBiblioEntry(BiblioEntry):
 
     def __str__(self):
         return self.data
+
 
 def processReferBiblioFile(lines, storage, order):
     singularReferCodes = {
@@ -209,6 +213,7 @@ def processReferBiblioFile(lines, storage, order):
     if biblio is not None:
         storage[biblio['linkText'].lower()] = biblio
     return storage
+
 
 def processSpecrefBiblioFile(text, storage, order):
     '''
@@ -288,6 +293,7 @@ def processSpecrefBiblioFile(text, storage, order):
         storage[biblioKey.lower()].append(biblio)
     return storage
 
+
 def loadBiblioDataFile(lines, storage):
     try:
         while True:
@@ -355,6 +361,7 @@ def levenshtein(a,b):
             current[j] = min(add, delete, change)
 
     return current[n]
+
 
 def findCloseBiblios(biblioKeys, target, n=5):
     '''

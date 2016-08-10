@@ -4,6 +4,7 @@ import re
 from .messages import *
 from .htmlhelpers import *
 
+
 def transformProductionPlaceholders(doc):
     propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
     funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
@@ -59,6 +60,7 @@ def transformProductionPlaceholders(doc):
         die("Shorthand <<{0}>> does not match any recognized shorthand grammar.", text)
         continue
 
+
 def transformMaybePlaceholders(doc):
     propRe = re.compile(r"^([\w-]+): .+")
     valRe = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
@@ -93,6 +95,7 @@ def transformMaybePlaceholders(doc):
             continue
         el.tag="css"
         el.text = text
+
 
 def transformAutolinkShortcuts(doc):
     # Do the remaining textual replacements

@@ -14,6 +14,7 @@ from .messages import *
 
 from .apiclient.apiclient import apiclient
 
+
 def update(anchors=False, biblio=False, linkDefaults=False, testSuites=False):
     # If all are False, update everything
     updateAnyway = not (anchors or biblio or linkDefaults or testSuites)
@@ -25,6 +26,7 @@ def update(anchors=False, biblio=False, linkDefaults=False, testSuites=False):
         updateLinkDefaults()
     if testSuites or updateAnyway:
         updateTestSuites()
+
 
 def updateCrossRefs():
     try:
@@ -298,6 +300,7 @@ def updateLinkDefaults():
             return
     say("Success!")
 
+
 def updateTestSuites():
     try:
         say("Downloading test suite data...")
@@ -333,6 +336,7 @@ def updateTestSuites():
         except Exception, e:
             die("Couldn't save test-suite database to disk.\n{0}", e)
     say("Success!")
+
 
 def writeBiblioFile(fh, biblios):
     '''
@@ -380,6 +384,7 @@ def writeBiblioFile(fh, biblios):
             continue
         fh.write("-" + "\n")
 
+
 def writeAnchorsFile(fh, anchors):
     '''
     Keys may be duplicated.
@@ -410,6 +415,7 @@ def writeAnchorsFile(fh, anchors):
                 if forValue: # skip empty strings
                     fh.write(forValue+"\n")
             fh.write("-" + "\n")
+
 
 def fixupDataFiles():
     import os
@@ -449,6 +455,7 @@ def fixupDataFiles():
     except Exception, err:
         warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
         return
+
 
 def fixupAnchor(anchor):
     # Miscellaneous fixes

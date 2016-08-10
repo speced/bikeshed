@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 
+
 class Repository(object):
     '''
     A class for representing spec repositories.
@@ -23,6 +24,7 @@ class Repository(object):
         # Dunno how to format an arbitrary issue url,
         # so give up and just point to the repo.
         return self.url
+
 
 class GithubRepository(Repository):
     def __init__(self, user, repo):

@@ -289,6 +289,7 @@ Introduction {#intro}
 Introduction here.
 ''')
 
+
 class Spec(object):
 
     def __init__(self, inputFilename, debug=False, token=None, lineNumbers=False):
@@ -737,6 +738,7 @@ class Spec(object):
 
 config.specClass = Spec
 
+
 def stripBOM(doc):
     if len(doc.lines) >= 1 and doc.lines[0][0:1] == "\ufeff":
         doc.lines[0] = doc.lines[0][1:]
@@ -766,6 +768,7 @@ def fixManualDefTables(doc):
         names = [x.strip() for x in textContent(cell).split(',')]
         newContents = config.intersperse((createElement(tag, {attr:type}, name) for name in names), ", ")
         replaceContents(cell, newContents)
+
 
 def canonicalizeShortcuts(doc):
     # Take all the invalid-HTML shortcuts and fix them.
@@ -863,6 +866,7 @@ def checkVarHygiene(doc):
             die("Multiple declarations of the '{0}' algorithm.", algo)
             return
 
+
 def fixIntraDocumentReferences(doc):
     ids = {el.get('id'):el for el in findAll("[id]", doc)}
     headingIDs = {el.get('id'):el for el in findAll("[id].heading", doc)}
@@ -885,6 +889,7 @@ def fixIntraDocumentReferences(doc):
             if target.get('data-level') is not None:
                 text = "§{1} {0}".format(text, target.get('data-level'))
             appendChild(el, text)
+
 
 def fixInterDocumentReferences(doc):
     for el in findAll("[spec-section]", doc):
@@ -943,6 +948,7 @@ def fixInterDocumentReferences(doc):
             continue
         removeAttr(el, 'data-link-spec')
         removeAttr(el, 'spec-section')
+
 
 def fillAttributeInfoSpans(doc):
     # Auto-add <span attribute-info> to <dt><dfn> when it's an attribute or dict-member.
@@ -1029,6 +1035,7 @@ def fillAttributeInfoSpans(doc):
                     E.a({"data-link-type":"idl-name"}, datatype),
                     *decorations)
 
+
 def processDfns(doc):
     dfns = findAll(config.dfnElementsSelector, doc)
     classifyDfns(doc, dfns)
@@ -1069,6 +1076,7 @@ def determineDfnType(dfn):
         return "function"
     else:
         return "dfn"
+
 
 def classifyDfns(doc, dfns):
     dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
@@ -1216,6 +1224,7 @@ def classifyLink(el):
 
 # Additional Processing
 
+
 def processBiblioLinks(doc):
     biblioLinks = findAll("a[data-link-type='biblio']", doc)
     for el in biblioLinks:
@@ -1330,6 +1339,7 @@ def processAutolinks(doc):
                 if el.get("data-lt"):
                     del el.attrib["data-lt"]
 
+
 def decorateAutolink(doc, el, linkType, linkText):
     # Add additional effects to some autolinks.
     if linkType == "type":
@@ -1376,6 +1386,7 @@ def processIssuesAndExamples(doc):
         el.set('id', "example-"+hashContents(el))
     fixupIDs(doc, findAll(".issue, .example", doc))
 
+
 def addSelfLinks(doc):
     def makeSelfLink(el):
         return E.a({"href": "#" + urllib.quote(el.get('id', '')), "class":"self-link"})
@@ -1405,6 +1416,7 @@ def addSelfLinks(doc):
                 warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el), el=el)
                 continue
             appendChild(el, makeSelfLink(el))
+
 
 def addDfnPanels(doc, dfns):
     from .DefaultOrderedDict import DefaultOrderedDict
@@ -1555,6 +1567,7 @@ def addDfnPanels(doc, dfns):
         .dfn-paneled { cursor: pointer; }
         '''
 
+
 class DebugMarker(object):
     # Debugging tool for IDL markup
 
@@ -1576,6 +1589,7 @@ class DebugMarker(object):
     def markupEnumValue(self, text, construct):
         return ('<ENUM-VALUE for=' + construct.name + '>', '</ENUM-VALUE>')
 
+
 class HighlightMarker(object):
     # Just applies highlighting classes to IDL stuff.
 
@@ -1590,6 +1604,7 @@ class HighlightMarker(object):
 
     def markupEnumValue(self, text, construct):
         return ('<span class=s>', '</span>')
+
 
 class IDLMarker(object):
     def markupConstruct(self, text, construct):
@@ -1731,9 +1746,11 @@ class IDLMarker(object):
         texts.append(method.normalName)
         return reversed(texts)
 
+
 class IDLUI(object):
     def warn(self, msg):
         die("{0}", msg.rstrip())
+
 
 def markupIDL(doc):
     highlightingOccurred = False
@@ -1756,6 +1773,7 @@ def markupIDL(doc):
         highlightingOccurred = True
     if highlightingOccurred:
         doc.extraStyles['style-syntax-highlighting'] += "pre.idl.highlight { color: #708090; }"
+
 
 def processIDL(doc):
     for pre in findAll("pre.idl, xmp.idl", doc):
@@ -1816,6 +1834,7 @@ def processIDL(doc):
     classifyDfns(doc, dfns)
     fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
+
 
 def addSyntaxHighlighting(doc):
     try:
@@ -1959,6 +1978,7 @@ def addSyntaxHighlighting(doc):
         .highlight .il { color: #000000 } /* Literal.Number.Integer.Long */
         '''
 
+
 def mergeHighlighting(el, hi):
     # Merges a tree of Pygment-highlighted HTML
     # into the original element's markup.
@@ -2002,6 +2022,7 @@ def mergeHighlighting(el, hi):
         else:
             coloredText.append(ColoredText(n, None))
     colorizeEl(el, coloredText)
+
 
 def cleanupHTML(doc):
     # Cleanup done immediately before serialization.
@@ -2143,6 +2164,7 @@ def finalHackyCleanup(text):
     # For hacky last-minute string-based cleanups of the rendered html.
 
     return text
+
 
 def hackyLineNumbers(lines):
     # Hackily adds line-number information to each thing that looks like an open tag.
@@ -2342,6 +2364,7 @@ def inlineRemoteIssues(doc):
     except Exception, e:
         die("Couldn't save GitHub Issues cache to disk.\n{0}", e)
     return
+
 
 def addNoteHeaders(doc):
     # Finds <foo heading="bar"> and turns it into a marker-heading

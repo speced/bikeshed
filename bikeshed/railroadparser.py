@@ -1,6 +1,7 @@
 from .messages import *
 import railroaddiagrams as rr
 
+
 def parse(string):
     '''
     Parses a DSL for railroad diagrams,

@@ -4,6 +4,7 @@ import re
 from pygments.lexer import *
 from pygments.token import *
 
+
 class CSSLexer(RegexLexer):
     name = "CSS"
     aliases = ['css']
