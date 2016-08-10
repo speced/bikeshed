@@ -14,7 +14,7 @@ statusStyle = {
   'deferred'  : 'd',
   'invalid'   : 'oi',
   'outofscope': 'oi',
-};
+}
 
 def printIssueList(infilename=None, outfilename=None):
     if infilename is None:
@@ -30,7 +30,7 @@ def printIssueList(infilename=None, outfilename=None):
                 return
             infilename = filenames[0][1]
         else:
-            printHelpMessage();
+            printHelpMessage()
             return
     if infilename == "-":
         infile = sys.stdin
@@ -68,7 +68,7 @@ def printIssueList(infilename=None, outfilename=None):
     printHeader(outfile, headerInfo)
 
     printIssues(outfile, lines)
-    printScript(outfile);
+    printScript(outfile)
 
 
 def extractHeaderInfo(lines, infilename):
@@ -244,4 +244,4 @@ def printScript(outfile):
     ['a', 'd', 'fo', 'oi', 'r', 'open'].forEach(addCheckbox);
 }());
 </script>
-''');
+''')

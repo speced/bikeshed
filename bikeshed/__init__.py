@@ -326,7 +326,7 @@ class Spec(object):
         self.widl = parser.Parser(ui=IDLUI())
         self.testSuites = json.loads(config.retrieveDataFile("test-suites.json", quiet=True, str=True))
         self.languages = json.loads(config.retrieveDataFile("languages.json", quiet=True, str=True))
-        self.extraStyles = defaultdict(str);
+        self.extraStyles = defaultdict(str)
         self.extraStyles['style-md-lists'] = '''
             /* This is a weird hack for me not yet following the commonmark spec
                regarding paragraph and lists. */
@@ -470,7 +470,7 @@ class Spec(object):
             figcaption:not(.no-marker)::before {
                 content: "Figure " counter(figure) " ";
             }'''
-        self.extraScripts = defaultdict(str);
+        self.extraScripts = defaultdict(str)
 
         try:
             if self.inputSource == "-":
@@ -506,8 +506,8 @@ class Spec(object):
         self.md.fillTextMacros(self.macros, doc=self)
 
         # Initialize things
-        self.refs.initializeRefs(self);
-        self.refs.initializeBiblio();
+        self.refs.initializeRefs(self)
+        self.refs.initializeBiblio()
 
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
@@ -1006,7 +1006,7 @@ def fillAttributeInfoSpans(doc):
                 continue
             target = target[0]
             datatype = target.get("data-type").strip()
-            default = target.get("data-default");
+            default = target.get("data-default")
             decorations = []
             if target.get("data-readonly") is not None:
                 decorations.append(", readonly")
@@ -2009,7 +2009,7 @@ def mergeHighlighting(el, hi):
     def colorizeText(text, coloredText):
         nodes = []
         while text and coloredText:
-            nextColor = coloredText.popleft();
+            nextColor = coloredText.popleft()
             if len(nextColor.text) <= len(text):
                 if nextColor.color is None:
                     nodes.append(nextColor.text)
