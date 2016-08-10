@@ -37,6 +37,7 @@ class _RouteClassAttributeToGetattr(object):
     class's __getattr__ method; this is done by raising AttributeError.
 
     """
+
     def __init__(self, fget=None):
         self.fget = fget
 
@@ -78,6 +79,7 @@ def _is_sunder(name):
 
 def _make_class_unpicklable(cls):
     """Make the given class un-picklable."""
+
     def _break_on_call_reduce(self, protocol=None):
         raise TypeError('%r cannot be pickled' % self)
     cls.__reduce_ex__ = _break_on_call_reduce
@@ -91,6 +93,7 @@ class _EnumDict(dict):
     enumeration member names.
 
     """
+
     def __init__(self):
         super(_EnumDict, self).__init__()
         self._member_names = []
@@ -777,18 +780,22 @@ def unique(enumeration):
 
 class OrderedEnum(Enum):
     """Enum where members can be compared by their value, but retains all other enum invariants"""
+
     def __ge__(self, other):
         if self.__class__ is other.__class__:
             return self.value >= other.value
         return NotImplemented
+
     def __gt__(self, other):
         if self.__class__ is other.__class__:
             return self.value > other.value
         return NotImplemented
+
     def __le__(self, other):
         if self.__class__ is other.__class__:
             return self.value <= other.value
         return NotImplemented
+
     def __lt__(self, other):
         if self.__class__ is other.__class__:
             return self.value < other.value

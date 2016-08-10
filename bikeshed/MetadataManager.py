@@ -309,8 +309,10 @@ def parseWarning(key, val, lineNum):
 
 def parseEditor(key, val, lineNum):
     pieces = [unescape(piece.strip()) for piece in val.split(',')]
+
     def looksLinkish(string):
         return re.match(r"\w+:", string) or looksEmailish(string)
+
     def looksEmailish(string):
         return re.match(r".+@.+\..+", string)
     data = {

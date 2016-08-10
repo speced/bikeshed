@@ -101,6 +101,7 @@ def transformAutolinkShortcuts(doc):
     # Do the remaining textual replacements
 
     biblioRe = re.compile(r"(\\)?\[\[(!)?([\w.-]+)((?: +current)|(?: +dated))?\]\]")
+
     def biblioReplacer(match):
         # Allow escaping things that aren't actually biblio links, by preceding with a \
         if match.group(1) is not None:
@@ -127,6 +128,7 @@ def transformAutolinkShortcuts(doc):
                             )
                             (\|[^\]]+)?
                             \]\]""", re.X)
+
     def sectionReplacer(match):
         spec, section, justPage, linkText = match.groups()
         if linkText is None:
@@ -144,6 +146,7 @@ def transformAutolinkShortcuts(doc):
             return E.span({"spec-section":section, "spec":spec}, linkText)
 
     propdescRe = re.compile(r"'(?:([^\s']*)/)?([\w*-]+)(?:!!([\w-]+))?(\|[^']+)?'")
+
     def propdescReplacer(match):
         if match.group(1) == "":
             linkFor = "/"
@@ -165,6 +168,7 @@ def transformAutolinkShortcuts(doc):
         return E.a({"data-link-type":linkType, "class":"property", "for": linkFor, "lt": match.group(2)}, linkText)
 
     idlRe = re.compile(r"{{(?:([^}]*)/)?((?:[^}]|,\s)+?)(?:!!([\w-]+))?(\|[^}]+)?}}")
+
     def idlReplacer(match):
         if match.group(1) == "":
             linkFor = "/"
@@ -185,6 +189,7 @@ def transformAutolinkShortcuts(doc):
             E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
 
     dfnRe = re.compile(r"\[=(?!\s)(?:([^=]*)/)?([^\"=]+?)(\|[^\"=]+)?=\]")
+
     def dfnReplacer(match):
         if match.group(1) == "":
             linkFor = "/"
@@ -197,6 +202,7 @@ def transformAutolinkShortcuts(doc):
         return E.a({"data-link-type":"dfn", "for": linkFor, "lt":match.group(2)}, linkText)
 
     elementRe = re.compile(r"<{(?:([\w*-]+)/)?([\w*-]+)(?:!!([\w-]+))?(\|[^}]+)?}>")
+
     def elementReplacer(match):
         if match.group(1) == "":
             linkFor = "/"
@@ -216,6 +222,7 @@ def transformAutolinkShortcuts(doc):
             E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
 
     varRe = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
+
     def varReplacer(match):
         return E.var(match.group(1))
 
@@ -262,19 +269,23 @@ def transformProductionGrammars(doc):
         return
 
     hashMultRe = re.compile(r"#{\s*\d+(\s*,(\s*\d+)?)?\s*}")
+
     def hashMultReplacer(match):
         return E.a({"data-link-type":"grammar", "data-lt": "#", "for":""}, match.group(0))
 
     multRe = re.compile(r"{\s*\d+\s*}")
+
     def multReplacer(match):
         return E.a({"data-link-type":"grammar", "data-lt": "{A}", "for":""}, match.group(0))
 
     multRangeRe = re.compile(r"{\s*\d+\s*,(\s*\d+)?\s*}")
+
     def multRangeReplacer(match):
         return E.a({"data-link-type":"grammar", "data-lt": "{A,B}", "for":""}, match.group(0))
 
     simpleRe = re.compile(r"(\?|!|#|\*|\+|\|\||\||&amp;&amp;|&&|,)(?!')")
     # Note the negative-lookahead, to avoid matching delim tokens.
+
     def simpleReplacer(match):
         return E.a({"data-link-type":"grammar", "data-lt": match.group(0), "for":""}, match.group(0))
 

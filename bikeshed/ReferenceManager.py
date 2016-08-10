@@ -427,6 +427,7 @@ class ReferenceManager(object):
             for key, group in refs.items():
                 for ref in group:
                     yield RefWrapper(key, ref)
+
         def textRefsIterator(refs, texts):
             # Same as above, but only grabs those keyed to a given text
             for text in texts:
@@ -434,6 +435,7 @@ class ReferenceManager(object):
                     yield RefWrapper(text, ref)
                 for ref in refs.get(text+"\n", []):
                     yield RefWrapper(text, ref)
+
         def forRefsIterator(refs, fors, targetFors):
             # Same as above, but only grabs those for certain values
             for for_ in targetFors:

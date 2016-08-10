@@ -397,6 +397,7 @@ def addPropertyIndex(doc):
             allKeys |= set(prop.keys())
         columns.extend(sorted(allKeys - set(columns)))
         # Create the table
+
         def formatColumnName(name):
             if name == "Inherited":
                 return "Inh."

@@ -493,6 +493,7 @@ def translateIDs(trans, els):
 
 def dedupIDs(doc):
     import itertools as iter
+
     def findId(id):
         return find("#"+id, doc) is not None
     ids = Counter(el.get('id') for el in findAll("[id]", doc))

@@ -372,6 +372,7 @@ def findCloseBiblios(biblioKeys, target, n=5):
     target = target.lower()
     names = []
     superStrings = []
+
     def addName(name, distance):
         tuple = (name, distance)
         if len(names) < n:

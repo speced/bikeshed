@@ -263,28 +263,39 @@ def intersperse(iterable, delimiter):
 class Nil(object):
     def __repr__(self):
         return "Nil()"
+
     def __str__(self):
         return "Nil"
+
     def __nonzero__(self):
         return False
+
     def __call__(self, *args, **kwargs):
         return self
+
     def __getitem__(self, key):
         return self
+
     def __setitem__(self, key, val):
         return self
+
     def __delitem__(self, key, val):
         return self
+
     def __getattr__(self, name):
         return self
+
     def __setattr__(self, name, value):
         return self
+
     def __delattr__(self, name, value):
         return self
+
     def __eq__(self, other):
         if isinstance(other, Nil) or other is None:
             return True
         return False
+
     def __iter__(self):
         return iter([])
 
@@ -507,6 +518,7 @@ class DuplicatedLinkText(Exception):
         self.offendingText = offendingText
         self.allTexts = allTexts
         self.el = el
+
     def __unicode__(self):
         return "<Text '{0}' shows up in both lt and local-lt>".format(self.offendingText)
 

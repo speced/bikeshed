@@ -85,10 +85,12 @@ def addHeadingAlgorithms(doc, headings):
 
 def determineHeadingLevels(doc, headings):
     headerLevel = [0,0,0,0,0]
+
     def incrementLevel(level):
         headerLevel[level-2] += 1
         for i in range(level-1, 5):
             headerLevel[i] = 0
+
     def printLevel():
         return '.'.join(unicode(x) for x in headerLevel if x > 0)
 

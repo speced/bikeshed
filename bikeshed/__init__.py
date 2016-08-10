@@ -708,6 +708,7 @@ class Spec(object):
 
         if codeSpanReplacements:
             codeSpanReplacements.reverse()
+
             def codeSpanReviver(_):
                 # Match object is the PUA character, which I can ignore.
                 # Instead, sub back the replacement in order,
@@ -1993,6 +1994,7 @@ def mergeHighlighting(el, hi):
             else:
                 appendChild(el, *colorizeText(node, coloredText))
         return el
+
     def colorizeText(text, coloredText):
         nodes = []
         while text and coloredText:

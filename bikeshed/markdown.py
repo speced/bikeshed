@@ -23,6 +23,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
     inlineElements = set(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "css"])
     if blockElements is None:
         blockElements = []
+
     def inlineElementStart(line):
         # Whether or not the line starts with an inline element
         match = re.match(r"\s*</?([\w-]+)", line)
@@ -544,6 +545,7 @@ class TokenStream:
         if len(name) >= 5 and name[0:4] in ("prev", "curr", "next"):
             tokenDir = name[0:4]
             attrName = name[4:]
+
             def _missing(i=1):
                 if tokenDir == "prev":
                     tok = self.prev(i)
