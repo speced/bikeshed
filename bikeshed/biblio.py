@@ -325,7 +325,7 @@ def loadBiblioDataFile(lines, storage):
                     "biblioFormat": "string",
                     "order": 3
                 }
-                line = lines.next() # Eat the -
+                line = lines.next()  # Eat the -
             elif prefix == "a":
                 b = {
                     "linkText": lines.next(),
@@ -333,7 +333,7 @@ def loadBiblioDataFile(lines, storage):
                     "biblioFormat": "alias",
                     "order": 3
                 }
-                line = lines.next() # Eat the -
+                line = lines.next()  # Eat the -
             else:
                 die("Unknown biblio prefix '{0}' on key '{1}'", prefix, fullKey)
                 continue

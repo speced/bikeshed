@@ -236,7 +236,7 @@ class ReferenceManager(object):
         if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
             # foo()/bar failed, because foo() is technically the wrong signature
             # let's see if we can find the right signature, and it's unambiguous
-            while True: # Hack for early exits
+            while True:  # Hack for early exits
                 if "/" in linkFor:
                     interfaceName, _, methodName = linkFor.partition("/")
                 else:
@@ -704,7 +704,7 @@ def simplifyPossibleRefs(refs):
     forVals = defaultdict(list)
     for ref in refs:
         if ref.for_:
-            for for_ in ref.for_: # ref.for_ is a list
+            for for_ in ref.for_:  # ref.for_ is a list
                 forVals[(ref.text, ref.type, ref.spec)].append(for_)
         else:
             forVals[(ref.text, ref.type, ref.spec)].append(None)

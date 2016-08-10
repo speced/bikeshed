@@ -250,7 +250,7 @@ def main():
         else:
             il.printIssueList(options.infile, options.outfile)
     elif options.subparserName == "source":
-        if not options.bigText: # If no options are given, do all options.
+        if not options.bigText:  # If no options are given, do all options.
             options.bigText = True
         if options.bigText:
             from . import fonts
@@ -567,7 +567,7 @@ class Spec(object):
         boilerplate.addIDLSection(self)
         boilerplate.addIssuesSection(self)
         boilerplate.addCustomBoilerplate(self)
-        headings.processHeadings(self, "all") # again
+        headings.processHeadings(self, "all")  # again
         boilerplate.removeUnwantedBoilerplate(self)
         boilerplate.addTOCSection(self)
         addSelfLinks(self)
@@ -2005,7 +2005,7 @@ def mergeHighlighting(el, hi):
                 else:
                     nodes.append(E.span({"class":nextColor.color}, nextColor.text))
                 text = text[len(nextColor.text):]
-            else: # Need to use only part of the nextColor node
+            else:  # Need to use only part of the nextColor node
                 if nextColor.color is None:
                     nodes.append(text)
                 else:

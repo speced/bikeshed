@@ -412,7 +412,7 @@ def writeAnchorsFile(fh, anchors):
                 else:
                     fh.write("\n")
             for forValue in e.get("for", []):
-                if forValue: # skip empty strings
+                if forValue:  # skip empty strings
                     fh.write(forValue+"\n")
             fh.write("-" + "\n")
 

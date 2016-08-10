@@ -12,7 +12,7 @@ from .requests import requests
 
 
 def publishEchidna(doc, username, password, decision):
-    logging.captureWarnings(True) # Silence SNIMissingWarning
+    logging.captureWarnings(True)  # Silence SNIMissingWarning
     tar = prepareTar(doc, visibleTar=False)
     # curl 'https://labs.w3.org/echidna/api/request' --user '<username>:<password>' -F "tar=@/some/path/spec.tar" -F "decision=<decisionUrl>"
     r = requests.post("https://labs.w3.org/echidna/api/request", auth=(username, password), data={"decision": decision}, files={"tar": tar.read()})

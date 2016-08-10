@@ -228,7 +228,7 @@ def addExplicitIndexes(doc):
                 if types and ref['type'].strip() not in types:
                     continue
                 seenSpecs.add(ref['spec'].strip())
-                label = None # TODO: Record section numbers, use that instead
+                label = None  # TODO: Record section numbers, use that instead
                 disambInfo = []
                 if types is None or len(types) > 1:
                     disambInfo.append(ref['type'].strip())

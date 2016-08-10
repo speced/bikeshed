@@ -798,7 +798,7 @@ knownKeys = {
     "TR": Metadata("TR", "TR", joinValue, parseLiteral),
     "Translate Ids": Metadata("Translate Ids", "translateIDs", joinDdList, parseTranslateIDs),
     "Translation": Metadata("Translation", "translations", joinList, parseTranslation),
-    "URL": Metadata("URL", "ED", joinValue, parseLiteral), # URL is a synonym for ED
+    "URL": Metadata("URL", "ED", joinValue, parseLiteral),  # URL is a synonym for ED
     "Use <I> Autolinks": Metadata("Use <I> Autolinks", "useIAutolinks", joinValue, parseBoolean),
     "Use Dfn Panels": Metadata("Use Dfn Panels", "useDfnPanels", joinValue, parseBoolean),
     "Version History": Metadata("Version History", "versionHistory", joinList, parseLiteralList),
