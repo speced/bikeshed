@@ -803,5 +803,5 @@ knownKeys = {
     "Use Dfn Panels": Metadata("Use Dfn Panels", "useDfnPanels", joinValue, parseBoolean),
     "Version History": Metadata("Version History", "versionHistory", joinList, parseLiteralList),
     "Warning": Metadata("Warning", "warning", joinValue, parseWarning),
-    "Work Status": Metadata("Work Status",  "workStatus", joinValue, parseWorkStatus)
+    "Work Status": Metadata("Work Status", "workStatus", joinValue, parseWorkStatus)
 }
