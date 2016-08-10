@@ -448,7 +448,7 @@ def processTextNodes(nodes, regex, replacer):
     '''
     for i, node in enumerate(nodes):
         # Node list always alternates between text and elements
-        if i%2 == 0:
+        if i % 2 == 0:
             nodes[i:i+1] = reSubObject(regex, node, replacer)
     return nodes
 
