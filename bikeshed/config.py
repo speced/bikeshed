@@ -139,7 +139,7 @@ dfnClassToType = {
     "modedef"            : "mode",
     "contextdef"         : "context",
     "facetdef"           : "facet",
-    "http-headerdef"     : "http-header" }
+    "http-headerdef"     : "http-header"}
 
 dfnTypes = frozenset(dfnClassToType.values() + ["dfn"])
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
