@@ -14,6 +14,7 @@ from .messages import *
 
 from .apiclient.apiclient import apiclient
 
+
 def update(anchors=False, biblio=False, linkDefaults=False, testSuites=False):
     # If all are False, update everything
     updateAnyway = not (anchors or biblio or linkDefaults or testSuites)
@@ -26,11 +27,12 @@ def update(anchors=False, biblio=False, linkDefaults=False, testSuites=False):
     if testSuites or updateAnyway:
         updateTestSuites()
 
+
 def updateCrossRefs():
     try:
         say("Downloading anchor data...")
-        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version = "vnd.csswg.shepherd.v1")
-        res = shepherd.get("specifications", anchors = True, draft = True)
+        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
+        res = shepherd.get("specifications", anchors=True, draft=True)
         # http://api.csswg.org/shepherd/spec/?spec=css-flexbox-1&anchors&draft, for manual looking
         if ((not res) or (406 == res.status)):
             die("This version of the anchor-data API is no longer supported. Please update Bikeshed.")
@@ -298,10 +300,11 @@ def updateLinkDefaults():
             return
     say("Success!")
 
+
 def updateTestSuites():
     try:
         say("Downloading test suite data...")
-        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version = "vnd.csswg.shepherd.v1")
+        shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
         res = shepherd.get("test_suites")
         if ((not res) or (406 == res.status)):
             die("This version of the test suite API is no longer supported. Please update Bikeshed.")
@@ -333,7 +336,6 @@ def updateTestSuites():
         except Exception, e:
             die("Couldn't save test-suite database to disk.\n{0}", e)
     say("Success!")
-
 
 
 def writeBiblioFile(fh, biblios):
@@ -382,6 +384,7 @@ def writeBiblioFile(fh, biblios):
             continue
         fh.write("-" + "\n")
 
+
 def writeAnchorsFile(fh, anchors):
     '''
     Keys may be duplicated.
@@ -409,9 +412,10 @@ def writeAnchorsFile(fh, anchors):
                 else:
                     fh.write("\n")
             for forValue in e.get("for", []):
-                if forValue: # skip empty strings
+                if forValue:  # skip empty strings
                     fh.write(forValue+"\n")
             fh.write("-" + "\n")
+
 
 def fixupDataFiles():
     import os
@@ -451,6 +455,7 @@ def fixupDataFiles():
     except Exception, err:
         warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
         return
+
 
 def fixupAnchor(anchor):
     # Miscellaneous fixes

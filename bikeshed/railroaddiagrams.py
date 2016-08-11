@@ -11,8 +11,10 @@ DEBUG = True
 # Assume a monospace font with each char .5em wide, and the em is 16px
 CHARACTER_ADVANCE = 8
 
+
 def e(text):
     return str(text).replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;')
+
 
 def determineGaps(outer, inner):
     diff = outer - inner
@@ -22,7 +24,6 @@ def determineGaps(outer, inner):
         return diff, 0
     else:
         return diff/2, diff/2
-
 
 
 class DiagramItem(object):
@@ -95,7 +96,6 @@ class Path(DiagramItem):
         self.attrs['d'] += 'a{0} {0} 0 0 {1} {2} {3}'.format(ARC_RADIUS, cw, x, y)
         return self
 
-
     def format(self):
         self.attrs['d'] += 'h.5'
         return self
@@ -148,7 +148,6 @@ class Diagram(DiagramItem):
         g.addTo(self)
         self.formatted = True
         return self
-
 
     def writeSvg(self, write):
         if not self.formatted:
@@ -314,7 +313,7 @@ def Optional(item, skip=False):
 
 
 class OneOrMore(DiagramItem):
-    def __init__(self, item, repeat = None):
+    def __init__(self, item, repeat=None):
         DiagramItem.__init__(self, 'g')
         repeat = repeat or Skip()
         self.item = wrapString(item)

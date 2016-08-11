@@ -1,6 +1,7 @@
 from .messages import *
 import railroaddiagrams as rr
 
+
 def parse(string):
     '''
     Parses a DSL for railroad diagrams,
@@ -140,7 +141,7 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
         if len(children) != 1:
             return die("Line {0} - Optional commands need exactly one child.", line)
         children = filter(None, [_createDiagram(**child) for child in children])
-        return rr.Optional(*children, skip=(prelude=="skip"))
+        return rr.Optional(*children, skip=(prelude == "skip"))
     elif command in ("Plus", "OneOrMore"):
         if prelude:
             return die("Line {0} - OneOrMore commands cannot have preludes.", line)

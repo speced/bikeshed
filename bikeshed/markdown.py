@@ -4,9 +4,11 @@ import re
 from itertools import *
 from .messages import *
 
+
 def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
     tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements, blockElements=blockElements)
     return parseTokens(tokens, numSpacesForIndentation)
+
 
 def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
     # Turns lines of text into block tokens,
@@ -21,6 +23,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
     inlineElements = set(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "css"])
     if blockElements is None:
         blockElements = []
+
     def inlineElementStart(line):
         # Whether or not the line starts with an inline element
         match = re.match(r"\s*</?([\w-]+)", line)
@@ -162,6 +165,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
     return tokens
 
+
 def stripComments(lines):
     output = []
     inComment = False
@@ -179,6 +183,7 @@ def stripComments(lines):
                 strippedLine += "\n"
             output.append(strippedLine)
     return output
+
 
 def stripCommentsFromLine(line, inComment=False):
     # Removes HTML comments from the line.
@@ -218,6 +223,7 @@ def prefixLen(text, numSpacesForIndentation):
             break
     return prefixLen
 
+
 def stripPrefix(token, numSpacesForIndentation, len):
     '''Removes len number of prefix groups'''
 
@@ -238,7 +244,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
         elif text[offset:offset+numSpacesForIndentation] == " " * numSpacesForIndentation:
             offset += numSpacesForIndentation
         else:
-            die("Line {i} isn't indented enough (needs {0} indent{plural}) to be valid Markdown:\n\"{1}\"", len, text[:-1], plural="" if len==1 else "s", i=token['line'])
+            die("Line {i} isn't indented enough (needs {0} indent{plural}) to be valid Markdown:\n\"{1}\"", len, text[:-1], plural="" if len == 1 else "s", i=token['line'])
     return text[offset:]
 
 
@@ -294,6 +300,7 @@ def parseTokens(tokens, numSpacesForIndentation):
 # The stream should be advanced to the *next* line,
 # after the lines you've used up dealing with the construct.
 
+
 def parseSingleLineHeading(stream):
     if "id" in stream.curr():
         idattr = " id='{0}'".format(stream.currid())
@@ -302,6 +309,7 @@ def parseSingleLineHeading(stream):
     lines = ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, **stream.curr())]
     stream.advance()
     return lines
+
 
 def parseMultiLineHeading(stream):
     if stream.nexttype() == "equals-line":
@@ -321,10 +329,12 @@ def parseMultiLineHeading(stream):
     stream.advance(2)
     return lines
 
+
 def parseHorizontalRule(stream):
-    lines =  ["<hr>\n"]
+    lines = ["<hr>\n"]
     stream.advance()
     return lines
+
 
 def parseParagraph(stream):
     line = stream.currtext()
@@ -355,6 +365,7 @@ def parseParagraph(stream):
             lines[-1] = lines[-1].rstrip() + endTag + "\n"
             return lines
         lines.append(stream.currraw())
+
 
 def parseBulleted(stream):
     prefixLen = stream.currprefixlen()
@@ -399,6 +410,7 @@ def parseBulleted(stream):
         lines.append("</li>")
     lines.append("</ul>")
     return lines
+
 
 def parseNumbered(stream, start=1):
     prefixLen = stream.currprefixlen()
@@ -447,6 +459,7 @@ def parseNumbered(stream, start=1):
     lines.append("</ol>")
     return lines
 
+
 def parseDl(stream):
     prefixLen = stream.currprefixlen()
     numSpacesForIndentation = stream.numSpacesForIndentation
@@ -493,7 +506,6 @@ def parseDl(stream):
     return lines
 
 
-
 class TokenStream:
     def __init__(self, tokens, numSpacesForIndentation, before={'type':'blank','raw':'\n','prefixlen':0}, after={'type':'eof','raw':'','prefixlen':0}):
         self.tokens = tokens
@@ -533,6 +545,7 @@ class TokenStream:
         if len(name) >= 5 and name[0:4] in ("prev", "curr", "next"):
             tokenDir = name[0:4]
             attrName = name[4:]
+
             def _missing(i=1):
                 if tokenDir == "prev":
                     tok = self.prev(i)

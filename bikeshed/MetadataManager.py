@@ -15,6 +15,7 @@ from .messages import *
 from .htmlhelpers import *
 from .repository import *
 
+
 class MetadataManager:
     @property
     def vshortname(self):
@@ -114,7 +115,6 @@ class MetadataManager:
         md = knownKeys[key]
         result = md.join(getattr(self, md.attrName), val)
         setattr(self, md.attrName, result)
-
 
     def finish(self):
         # Do some "computed metadata", based on the value of other metadata.
@@ -248,6 +248,7 @@ class MetadataManager:
         for name, text in self.customTextMacros:
             macros[name.lower()] = text
 
+
 def parseDate(key, val, lineNum):
     try:
         return datetime.strptime(val, "%Y-%m-%d").date()
@@ -255,11 +256,14 @@ def parseDate(key, val, lineNum):
         die("The {0} field must be in the format YYYY-MM-DD - got \"{1}\" instead.", key, val, lineNum=lineNum)
         return None
 
+
 def parseLevel(key, val, lineNum):
     return config.HierarchicalNumber(val)
 
+
 def parseInteger(key, val, lineNum):
     return int(val)
+
 
 def parseBoolean(key, val, lineNum):
     b = boolish(val)
@@ -267,12 +271,14 @@ def parseBoolean(key, val, lineNum):
         die("The {0} field must be true/false, yes/no, y/n, or on/off. Got '{1}' instead.", key, val, lineNum=lineNum)
     return b
 
+
 def boolish(val):
     if val.lower() in ("true", "yes", "y", "on"):
         return True
     if val.lower() in ("false", "no", "n", "off"):
         return False
     return None
+
 
 def parseWarning(key, val, lineNum):
     if val.lower() == "obsolete":
@@ -300,10 +306,13 @@ def parseWarning(key, val, lineNum):
   branch [branch name] [branch url] replaced by [master url]''', key, val, lineNum=lineNum)
     return None
 
+
 def parseEditor(key, val, lineNum):
     pieces = [unescape(piece.strip()) for piece in val.split(',')]
+
     def looksLinkish(string):
         return re.match(r"\w+:", string) or looksEmailish(string)
+
     def looksEmailish(string):
         return re.match(r".+@.+\..+", string)
     data = {
@@ -377,6 +386,7 @@ def parseEditor(key, val, lineNum):
 def parseCommaSeparated(key, val, lineNum):
     return [term.strip().lower() for term in val.split(',')]
 
+
 def parseLinkDefaults(key, val, lineNum):
     defaultSpecs = defaultdict(list)
     for default in val.split(","):
@@ -393,6 +403,7 @@ def parseLinkDefaults(key, val, lineNum):
             die("'{0}' is a comma-separated list of '<spec> (<dfn-type>) <terms>'. Got:\n{1}", key, default, lineNum=lineNum)
             continue
     return defaultSpecs
+
 
 def parseBoilerplate(key, val, lineNum):
     boilerplate = config.BoolSet(default=True)
@@ -412,6 +423,7 @@ def parseBoilerplate(key, val, lineNum):
             boilerplate[pieces[0]] = onoff
     return boilerplate
 
+
 def parseBiblioStatus(key, val, lineNum):
     val = val.strip().lower()
     if val in ("current", "dated"):
@@ -420,6 +432,7 @@ def parseBiblioStatus(key, val, lineNum):
         die("'{0}' must be either 'current' or 'dated'. Got '{1}'", key, val, lineNum=lineNum)
         return "dated"
 
+
 def parseLinkedText(key, val, lineNum):
     # Parses anything defined as "text url, text url, text url" into a list of 2-tuples.
     entries = []
@@ -427,6 +440,7 @@ def parseLinkedText(key, val, lineNum):
     for v in vals:
         entries.append(v.rsplit(" ", 1))
     return entries
+
 
 def parseMarkupShorthands(key, val, lineNum):
     # Format is comma-separated list of shorthand category followed by boolean.
@@ -450,6 +464,7 @@ def parseMarkupShorthands(key, val, lineNum):
         ret[name] = onoff
     return ret
 
+
 def parseTextMacro(key, val, lineNum):
     # Each Text Macro line is just a macro name (must be uppercase)
     # followed by the text it expands to.
@@ -463,6 +478,7 @@ def parseTextMacro(key, val, lineNum):
         return []
     return [(name, text)]
 
+
 def parseWorkStatus(key, val, lineNum):
     # The Work Status is one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned).
     val = val.strip().lower()
@@ -470,6 +486,7 @@ def parseWorkStatus(key, val, lineNum):
         die("Work Status must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned). Got '{0}'. See http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process for details.", val, lineNum=lineNum)
         return None
     return val
+
 
 def parseRepository(key, val, lineNum):
     # Shortname followed by url, or just url.
@@ -494,6 +511,7 @@ def parseRepository(key, val, lineNum):
         die("Repository must be a url, optionally followed by a shortname. Got '{0}'", val, lineNum=lineNum)
         return config.Nil()
 
+
 def parseTranslateIDs(key, val, lineNum):
     translations = {}
     for v in val.split(","):
@@ -504,6 +522,7 @@ def parseTranslateIDs(key, val, lineNum):
         old,new = pieces
         translations[old] = new
     return translations
+
 
 def parseTranslation(key, val, lineNum):
     # Format is <lang-code> <url> [ [ , name <name-in-spec-lang> ] || [ , native-name <name-in-the-lang> ] ]?
@@ -528,6 +547,7 @@ def parseTranslation(key, val, lineNum):
             die("Later parts of a Translation line must start with 'name' or 'native-name'. Got:\n{0}", piece, lineNum=lineNum)
     return [{"lang-code": langCode, "url": url, "name": name, "native-name": nativeName}]
 
+
 def parseAudience(key, val, lineNum):
     # WG21 value
     values = [x.strip().upper() for x in val.strip().split(",")]
@@ -549,6 +569,7 @@ def parseAudience(key, val, lineNum):
                 continue
         return ret
 
+
 def parseEditorTerm(key, val, lineNum):
     values = [x.strip() for x in val.strip().split(",")]
     if len(values) == 2:
@@ -556,7 +577,6 @@ def parseEditorTerm(key, val, lineNum):
     else:
         die("Editor Term metadata must be two comma-separated terms, giving the singular and plural term for editors. Got '{0}'.", val)
         return {"singular": "Editor", "plural": "Editors"}
-
 
 
 def parse(lines, doc):
@@ -602,6 +622,7 @@ def parse(lines, doc):
             newlines.append(line)
     return newlines, md
 
+
 def fromCommandLine(overrides, doc):
     # Given a list of strings representing command-line arguments,
     # finds the args that correspond to metadata keys
@@ -620,6 +641,7 @@ def fromCommandLine(overrides, doc):
         md.addData(key, val)
     return md
 
+
 def fromJson(data, doc):
     md = MetadataManager(doc)
     try:
@@ -631,6 +653,7 @@ def fromJson(data, doc):
     for key,val in defaults.items():
         md.addData(key, val)
     return md
+
 
 def getSpecRepository(doc):
     '''
@@ -657,6 +680,7 @@ def getSpecRepository(doc):
             # check_output will throw CalledProcessError when not in a git repo
             os.chdir(old_dir)
             return config.Nil()
+
 
 def parseDoc(doc):
     # Look through the doc for any additional metadata information that might be needed.
@@ -697,19 +721,34 @@ def join(*sources):
 
 Metadata = collections.namedtuple('Metadata', ['humanName', 'attrName', 'join', 'parse'])
 
-joinValue = lambda a,b: b
-joinList = lambda a,b: a+b
+
+def joinValue(a, b):
+  return b
+
+
+def joinList(a, b):
+  return a + b
+
+
 def joinBoolSet(a,b):
     x = copy.deepcopy(a)
     x.update(b)
     return x
+
+
 def joinDdList(a,b):
     x = defaultdict(list)
     x.update(a)
     x.update(b)
     return x
-parseLiteral = lambda k,v,l: v
-parseLiteralList = lambda k,v,l: [v]
+
+
+def parseLiteral(k, v, l):
+  return v
+
+
+def parseLiteralList(k, v, l):
+  return [v]
 
 knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
@@ -759,10 +798,10 @@ knownKeys = {
     "TR": Metadata("TR", "TR", joinValue, parseLiteral),
     "Translate Ids": Metadata("Translate Ids", "translateIDs", joinDdList, parseTranslateIDs),
     "Translation": Metadata("Translation", "translations", joinList, parseTranslation),
-    "URL": Metadata("URL", "ED", joinValue, parseLiteral), # URL is a synonym for ED
+    "URL": Metadata("URL", "ED", joinValue, parseLiteral),  # URL is a synonym for ED
     "Use <I> Autolinks": Metadata("Use <I> Autolinks", "useIAutolinks", joinValue, parseBoolean),
     "Use Dfn Panels": Metadata("Use Dfn Panels", "useDfnPanels", joinValue, parseBoolean),
     "Version History": Metadata("Version History", "versionHistory", joinList, parseLiteralList),
     "Warning": Metadata("Warning", "warning", joinValue, parseWarning),
-    "Work Status": Metadata("Work Status",  "workStatus", joinValue, parseWorkStatus)
+    "Work Status": Metadata("Work Status", "workStatus", joinValue, parseWorkStatus)
 }

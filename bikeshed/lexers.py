@@ -4,11 +4,12 @@ import re
 from pygments.lexer import *
 from pygments.token import *
 
+
 class CSSLexer(RegexLexer):
     name = "CSS"
     aliases = ['css']
     filenames = ['*.css']
-    flags=re.DOTALL
+    flags = re.DOTALL
 
     tokens = {
         b"root": [

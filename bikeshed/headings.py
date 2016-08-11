@@ -4,6 +4,7 @@ from .messages import *
 from .htmlhelpers import *
 from .config import simplifyText
 
+
 def processHeadings(doc, scope="doc"):
     # scope arg can be "doc" or "all"
     # "doc" ignores things that are part of boilerplate
@@ -25,6 +26,7 @@ def processHeadings(doc, scope="doc"):
     if scope == "all" and doc.md.group in config.megaGroups['priv-sec']:
         checkPrivacySecurityHeadings(findAll(".heading", doc))
 
+
 def resetHeadings(doc, headings):
     for header in headings:
         # Reset to base, if this is a re-run
@@ -36,6 +38,7 @@ def resetHeadings(doc, headings):
         content = E.span({"class":"content"})
         moveContents(content, header)
         appendChild(header, content)
+
 
 def addHeadingIds(doc, headings):
     neededIds = set()
@@ -52,6 +55,7 @@ def addHeadingIds(doc, headings):
     if len(neededIds) > 0:
         warn("You should manually provide IDs for your headings:\n{0}",
             "\n".join("  "+outerHTML(el) for el in neededIds))
+
 
 def checkPrivacySecurityHeadings(headings):
     security = False
@@ -72,17 +76,21 @@ def checkPrivacySecurityHeadings(headings):
     elif not privacy:
         warn("This specification does not have a 'Privacy Considerations' section. Please consider adding one, see https://w3ctag.github.io/security-questionnaire/.")
 
+
 def addHeadingAlgorithms(doc, headings):
     for header in headings:
         if header.get('data-algorithm') == "":
             header.set('data-algorithm', textContent(header).strip())
 
+
 def determineHeadingLevels(doc, headings):
     headerLevel = [0,0,0,0,0]
+
     def incrementLevel(level):
         headerLevel[level-2] += 1
         for i in range(level-1, 5):
             headerLevel[i] = 0
+
     def printLevel():
         return '.'.join(unicode(x) for x in headerLevel if x > 0)
 
@@ -106,6 +114,7 @@ def determineHeadingLevels(doc, headings):
 
         incrementLevel(level)
         header.set('data-level', printLevel())
+
 
 def addHeadingBonuses(doc, headings):
     for header in headings:

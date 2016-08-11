@@ -2,6 +2,7 @@
 
 from bisect import bisect_left, bisect_right
 
+
 class SortedList(object):
     '''Sequence sorted by a key function.
 

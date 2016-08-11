@@ -12,6 +12,7 @@ from . import datablocks
 from .messages import *
 from .htmlhelpers import *
 
+
 class ReferenceManager(object):
 
     def __init__(self, specStatus=None):
@@ -80,7 +81,6 @@ class ReferenceManager(object):
         for k,vs in storage.items():
             self.biblioKeys.add(k)
             self.biblios[k].extend(vs)
-
 
     @property
     def status(self):
@@ -236,7 +236,7 @@ class ReferenceManager(object):
         if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
             # foo()/bar failed, because foo() is technically the wrong signature
             # let's see if we can find the right signature, and it's unambiguous
-            while True: # Hack for early exits
+            while True:  # Hack for early exits
                 if "/" in linkFor:
                     interfaceName, _, methodName = linkFor.partition("/")
                 else:
@@ -277,8 +277,6 @@ class ReferenceManager(object):
                         break
                 # Now we can break out and just let the normal error-handling machinery take over.
                 break
-
-
 
             # Allow foo(bar) to be for'd to with just foo() if it's completely unambiguous.
             methodPrefix = methodName[:-1]
@@ -429,6 +427,7 @@ class ReferenceManager(object):
             for key, group in refs.items():
                 for ref in group:
                     yield RefWrapper(key, ref)
+
         def textRefsIterator(refs, texts):
             # Same as above, but only grabs those keyed to a given text
             for text in texts:
@@ -436,6 +435,7 @@ class ReferenceManager(object):
                     yield RefWrapper(text, ref)
                 for ref in refs.get(text+"\n", []):
                     yield RefWrapper(text, ref)
+
         def forRefsIterator(refs, fors, targetFors):
             # Same as above, but only grabs those for certain values
             for for_ in targetFors:
@@ -696,6 +696,7 @@ class RefWrapper(object):
     def __repr__(self):
         return "RefWrapper("+repr(self.text)+", "+repr(self.ref)+")"
 
+
 def simplifyPossibleRefs(refs):
     # "Simplifies" the set of possible refs according to their 'for' value;
     # returns a list of text/type/spec/for objects,
@@ -703,7 +704,7 @@ def simplifyPossibleRefs(refs):
     forVals = defaultdict(list)
     for ref in refs:
         if ref.for_:
-            for for_ in ref.for_: # ref.for_ is a list
+            for for_ in ref.for_:  # ref.for_ is a list
                 forVals[(ref.text, ref.type, ref.spec)].append(for_)
         else:
             forVals[(ref.text, ref.type, ref.spec)].append(None)

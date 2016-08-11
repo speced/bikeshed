@@ -37,6 +37,7 @@ while "bar/baz<value>" would be canonicalized into "bar<property>/baz<value>".
 
 Seg = col.namedtuple('Seg', ['value', 'type'])
 
+
 class GlobalName(object):
     valid = True
 
@@ -179,7 +180,6 @@ class GlobalName(object):
             if s1.type is not None and s2.type is not None and s1.type != s2.type:
                 return False
         return True
-
 
 
 class GlobalNames(col.Set, col.Hashable):
