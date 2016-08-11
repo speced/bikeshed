@@ -42,7 +42,7 @@ def main():
 
     argparser = argparse.ArgumentParser(description="Processes spec source files into valid HTML.")
     argparser.add_argument("-q", "--quiet", dest="quiet", action="count", default=0,
-                            help="Silences one level of message, least-important first.")
+                           help="Silences one level of message, least-important first.")
     argparser.add_argument("-s", "--silent", dest="silent", action="store_true",
                            help="Shorthand for 'as many -q as you need to shut it up'")
     argparser.add_argument("-f", "--force", dest="force", action="store_true",
@@ -100,15 +100,15 @@ def main():
 
     issueParser = subparsers.add_parser('issues-list', help="Process a plain-text issues file into HTML. Call with no args to see an example input text.")
     issueParser.add_argument("-t",
-                              dest="printTemplate",
-                              action="store_true",
-                              help="Output example Issues List template.")
+                             dest="printTemplate",
+                             action="store_true",
+                             help="Output example Issues List template.")
     issueParser.add_argument("infile", nargs="?",
-                              default=None,
-                              help="Path to the plain-text issue file.")
+                             default=None,
+                             help="Path to the plain-text issue file.")
     issueParser.add_argument("outfile", nargs="?",
-                              default=None,
-                              help="Path to the output file. Default is file of the same name as input, with .html.")
+                             default=None,
+                             help="Path to the output file. Default is file of the same name as input, with .html.")
 
     debugParser = subparsers.add_parser('debug', help="Run various debugging commands.")
     debugParser.add_argument("infile", nargs="?",
@@ -126,8 +126,8 @@ def main():
 
     refParser = subparsers.add_parser('refs', help="Search Bikeshed's ref database.")
     refParser.add_argument("infile", nargs="?",
-                             default=None,
-                             help="Path to the source file.")
+                           default=None,
+                           help="Path to the source file.")
     refParser.add_argument("--text", dest="text", default=None)
     refParser.add_argument("--type", dest="linkType", default=None)
     refParser.add_argument("--for", dest="linkFor", default=None)
