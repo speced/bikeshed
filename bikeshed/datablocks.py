@@ -347,7 +347,7 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
                         <th>Optional
                         <th>Description
                 <tbody>'''.format(attrs=rootAttrs, interface=interface, method=method, lineNumAttr=lineNumAttr)
-        ] + [
+    ] + [
             '''
                 <tr>
                     <td><dfn argument{lineNumAttr}>{0}</dfn>
@@ -356,11 +356,11 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
                     <td>
                     <td>{1}'''.format(param, desc, lineNumAttr=lineNumAttr)
                     for param,desc in attrs.items()
-        ] + [
+    ] + [
             '''
             </table>
             '''
-        ]
+    ]
     return lines
 
 
