@@ -200,7 +200,7 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
     # using 'Animation type'. If we find 'Animatable' in the parsed attributes,
     # drop the default 'Animation type' entry.
     if "Animatable" in parsedAttrs:
-      attrs.pop("Animation type")
+        attrs.pop("Animation type")
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:

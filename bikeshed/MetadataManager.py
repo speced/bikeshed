@@ -723,11 +723,11 @@ Metadata = collections.namedtuple('Metadata', ['humanName', 'attrName', 'join', 
 
 
 def joinValue(a, b):
-  return b
+    return b
 
 
 def joinList(a, b):
-  return a + b
+    return a + b
 
 
 def joinBoolSet(a,b):
@@ -744,11 +744,11 @@ def joinDdList(a,b):
 
 
 def parseLiteral(k, v, l):
-  return v
+    return v
 
 
 def parseLiteralList(k, v, l):
-  return [v]
+    return [v]
 
 knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
