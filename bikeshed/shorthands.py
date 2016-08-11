@@ -226,15 +226,20 @@ def transformAutolinkShortcuts(doc):
     def varReplacer(match):
         return E.var(match.group(1))
 
-    strongRe = re.compile(r"([_\*])\1([\d\w\s]+)\1\1")
+    strongRe = re.compile(r"(?<!\\)([_*])\1(?!\s)([^\1]+)(?!\s)(?<!\\)\1\1")
 
     def strongReplacer(match):
         return E.strong(match.group(2))
 
-    emRe = re.compile(r"([_\*])([\d\w\s]+)\1")
+    emRe = re.compile(r"(?<!\\)([_*])(?!\s)([^\1]+)(?!\s)(?<!\\)\1")
 
     def emReplacer(match):
         return E.em(match.group(2))
+
+    escapedRe = re.compile(r"\\\*")
+
+    def escapedReplacer(match):
+        return "*"
 
     def transformElement(parentEl):
         processContents = isElement(parentEl) and not doc.isOpaqueElement(parentEl)
@@ -268,6 +273,7 @@ def transformAutolinkShortcuts(doc):
         if "markdown" in doc.md.markupShorthands:
             config.processTextNodes(nodes, strongRe, strongReplacer)
             config.processTextNodes(nodes, emRe, emReplacer)
+            config.processTextNodes(nodes, escapedRe, escapedReplacer)
         return nodes
 
     transformElement(doc.document.getroot())
