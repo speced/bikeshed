@@ -93,7 +93,7 @@ def addAtRisk(doc):
         return
     html = "<p>The following features are at-risk, and may be dropped during the CR period:\n<ul>"
     for feature in doc.md.atRisk:
-        html += "<li>"+doc.fixText(feature)
+        html += "<li>" + doc.fixText(feature)
     html += "</ul><p>“At-risk” is a W3C Process term-of-art, and does not necessarily imply that the feature is in danger of being dropped or delayed. It means that the WG believes the feature may have difficulty being interoperably implemented in a timely manner, and marking it as such allows the WG to drop the feature if necessary when transitioning to the Proposed Rec stage, without having to publish a new Candidate Rec without the feature first."
     fillWith('at-risk', parseHTML(html), doc=doc)
 
@@ -169,7 +169,7 @@ def addIndexOfLocallyDefinedTerms(doc, container):
                 E.h3({"class":"no-num no-ref", "id":"index-defined-here"}, "Terms defined by this specification"))
 
     indexEntries = defaultdict(list)
-    for el in findAll(",".join(x+"[id]" for x in config.dfnElements), doc):
+    for el in findAll(",".join(x + "[id]" for x in config.dfnElements), doc):
         linkTexts = config.linkTextsFromElement(el)
         headingLevel = headingLevelOfElement(el) or "Unnumbered section"
         type = el.get('data-dfn-type')
@@ -186,7 +186,7 @@ def addIndexOfLocallyDefinedTerms(doc, container):
         id = el.get('id')
         for linkText in linkTexts:
             entry = {
-                'url':"#"+id,
+                'url':"#" + id,
                 'label':"§" + headingLevel,
                 'disambiguator':disambiguator
             }
@@ -433,7 +433,7 @@ def addPropertyIndex(doc):
                 allKeys |= set(desc.keys())
             columns.extend(sorted(allKeys - set(columns)))
             appendChild(html,
-                        E.h3({"class":"no-num no-ref", "id":config.simplifyText(atRuleName)+"-descriptor-table"},
+                        E.h3({"class":"no-num no-ref", "id":config.simplifyText(atRuleName) + "-descriptor-table"},
                              E.a({"data-link-type":"at-rule"}, atRuleName),
                              " Descriptors"))
             appendChild(html,
@@ -464,7 +464,7 @@ def addIDLSection(doc):
         appendChild(container, "\n")
     for dfn in findAll("dfn[id]", container):
         dfn.tag = "a"
-        dfn.set("href", "#"+dfn.get("id"))
+        dfn.set("href", "#" + dfn.get("id"))
         del dfn.attrib["id"]
 
 
@@ -502,7 +502,7 @@ def addTOCSection(doc):
         container = containers[level]
         if isinstance(container, int):
             # Saw a low-level heading without first seeing a higher heading.
-            die("Saw an <h{0}> without seeing an <h{1}> first. Please order your headings properly.\n{2}", level, level-1, outerHTML(header), el=header)
+            die("Saw an <h{0}> without seeing an <h{1}> first. Please order your headings properly.\n{2}", level, level - 1, outerHTML(header), el=header)
             return
         if level > previousLevel + 1:
             # Jumping two levels is a no-no.
@@ -518,13 +518,13 @@ def addTOCSection(doc):
         if addToTOC:
             li = appendChild(container,
                              E.li(
-                                 E.a({"href":"#"+header.get('id')},
+                                 E.a({"href":"#" + header.get('id')},
                                      E.span({"class":"secno"},header.get('data-level', '')),
                                      " ",
                                      copy.deepcopy(find(".content", header)))))
-            containers[level+1] = appendChild(li, E.ol({"class":"toc"}))
+            containers[level + 1] = appendChild(li, E.ol({"class":"toc"}))
         else:
-            containers[level+1] = None
+            containers[level + 1] = None
         previousLevel = level
 
     container = containers[1]
@@ -546,7 +546,7 @@ def addSpecMetadataSection(doc):
         if editor['link']:
             appendChild(dd, E.a({"class":"p-name fn u-url url", "href":editor['link']}, editor['name']))
         elif editor['email']:
-            appendChild(dd, E.a({"class":"p-name fn u-email email", "href":"mailto:"+editor['email']}, editor['name']))
+            appendChild(dd, E.a({"class":"p-name fn u-email email", "href":"mailto:" + editor['email']}, editor['name']))
         else:
             appendChild(dd, E.span({"class":"p-name fn"}, editor['name']))
         if editor['org']:
@@ -558,7 +558,7 @@ def addSpecMetadataSection(doc):
         if editor['email'] and editor['link']:
             appendChild(dd,
                         " ",
-                        E.a({"class":"u-email email", "href":"mailto:"+editor['email']}, editor['email']))
+                        E.a({"class":"u-email email", "href":"mailto:" + editor['email']}, editor['email']))
         return dd
 
     def printTranslation(tr):
@@ -606,7 +606,7 @@ def addSpecMetadataSection(doc):
         md["Version History"] = [E.a({"href":vh}, vh) for vh in doc.md.versionHistory]
     if doc.md.mailingList:
         span = E.span(
-            E.a({"href":"mailto:"+doc.md.mailingList+"?subject=%5B"+mac['shortname']+"%5D%20YOUR%20TOPIC%20HERE"}, doc.md.mailingList),
+            E.a({"href":"mailto:" + doc.md.mailingList + "?subject=%5B" + mac['shortname'] + "%5D%20YOUR%20TOPIC%20HERE"}, doc.md.mailingList),
             " with subject line “",
             E.kbd(
                 "[",
@@ -649,13 +649,13 @@ def addSpecMetadataSection(doc):
             #hidedel:checked ~ #hidedel-label::before, #hidedel:checked ~ * #hidedel-label::before { content: "☑ "; }
         """
     for key, vals in doc.md.otherMetadata.items():
-        md[key].extend(parseHTML("<span>"+doc.fixText(val)+"</span>")[0] for val in vals)
+        md[key].extend(parseHTML("<span>" + doc.fixText(val) + "</span>")[0] for val in vals)
 
     pluralization = {
         "Previous Version": "Previous Versions",
         "Test Suite": "Test Suites",
         doc.md.editorTerm['singular']: doc.md.editorTerm['plural'],
-        "Former "+doc.md.editorTerm['singular']: "Former "+doc.md.editorTerm['plural']
+        "Former " + doc.md.editorTerm['singular']: "Former " + doc.md.editorTerm['plural']
     }
 
     dl = E.dl()
@@ -710,7 +710,7 @@ def addReferencesSection(doc):
                          E.h3({"class":"no-num no-ref", "id":"normative"}, "Normative References"),
                          E.dl())
         for ref in normRefs:
-            appendChild(dl, E.dt({"id":"biblio-"+config.simplifyText(ref.linkText), "data-no-self-link":""}, "["+formatBiblioTerm(ref.linkText)+"]"))
+            appendChild(dl, E.dt({"id":"biblio-" + config.simplifyText(ref.linkText), "data-no-self-link":""}, "[" + formatBiblioTerm(ref.linkText) + "]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
     informRefs = [x for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText.lower()) if x.linkText not in doc.normativeRefs]
@@ -719,7 +719,7 @@ def addReferencesSection(doc):
                          E.h3({"class":"no-num no-ref", "id":"informative"}, "Informative References"),
                          E.dl())
         for ref in informRefs:
-            appendChild(dl, E.dt({"id":"biblio-"+config.simplifyText(ref.linkText), "data-no-self-link":""}, "["+formatBiblioTerm(ref.linkText)+"]"))
+            appendChild(dl, E.dt({"id":"biblio-" + config.simplifyText(ref.linkText), "data-no-self-link":""}, "[" + formatBiblioTerm(ref.linkText) + "]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
 
@@ -742,7 +742,7 @@ def addIssuesSection(doc):
             el.tag = "div"
         appendChild(container, el)
         appendChild(el,
-                    E.a({"href":"#"+issue.get('id')}, " ↵ "))
+                    E.a({"href":"#" + issue.get('id')}, " ↵ "))
     for idel in findAll("[id]", container):
         del idel.attrib['id']
     for dfnel in findAll(config.dfnElementsSelector, container):

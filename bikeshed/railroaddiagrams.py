@@ -23,7 +23,7 @@ def determineGaps(outer, inner):
     elif INTERNAL_ALIGNMENT == 'right':
         return diff, 0
     else:
-        return diff/2, diff/2
+        return diff / 2, diff / 2
 
 
 class DiagramItem(object):
@@ -174,7 +174,7 @@ class Sequence(DiagramItem):
     def format(self, x, y, width):
         leftGap, rightGap = determineGaps(width, self.width)
         Path(x, y).h(leftGap).addTo(self)
-        Path(x+leftGap+self.width, y).h(rightGap).addTo(self)
+        Path(x + leftGap + self.width, y).h(rightGap).addTo(self)
         x += leftGap
         for item in self.items:
             if item.needsSpace:
@@ -304,7 +304,7 @@ class Choice(DiagramItem):
                 ARC_RADIUS,
                 (item.down +
                  VERTICAL_SEPARATION +
-                 (below[i + 1].up if i+1 < len(below) else 0)))
+                 (below[i + 1].up if i + 1 < len(below) else 0)))
         return self
 
 

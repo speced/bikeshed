@@ -169,7 +169,7 @@ class ReferenceManager(object):
                     "spec":self.specVName,
                     "shortname":self.specName,
                     "level":self.specLevel,
-                    "url":"#"+el.get('id'),
+                    "url":"#" + el.get('id'),
                     "export":True,
                     "for": dfnFor
                 }
@@ -433,7 +433,7 @@ class ReferenceManager(object):
             for text in texts:
                 for ref in refs.get(text, []):
                     yield RefWrapper(text, ref)
-                for ref in refs.get(text+"\n", []):
+                for ref in refs.get(text + "\n", []):
                     yield RefWrapper(text, ref)
 
         def forRefsIterator(refs, fors, targetFors):
@@ -442,7 +442,7 @@ class ReferenceManager(object):
                 for text in fors[for_]:
                     for ref in refs.get(text, []):
                         yield RefWrapper(text, ref)
-                    for ref in refs.get(text+"\n", []):
+                    for ref in refs.get(text + "\n", []):
                         yield RefWrapper(text, ref)
 
         # Set up the initial list of refs to query
@@ -642,7 +642,7 @@ def linkTextVariations(str, linkType):
         # Navigating <-> Navigate
         if last3 == "ing":
             yield str[:-3]
-            yield str[:-3]+"e"
+            yield str[:-3] + "e"
         elif last1 == "e":
             yield str[:-1] + "ing"
         else:
@@ -694,7 +694,7 @@ class RefWrapper(object):
         return refCopy
 
     def __repr__(self):
-        return "RefWrapper("+repr(self.text)+", "+repr(self.ref)+")"
+        return "RefWrapper(" + repr(self.text) + ", " + repr(self.ref) + ")"
 
 
 def simplifyPossibleRefs(refs):

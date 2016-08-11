@@ -414,7 +414,7 @@ class EnumMeta(type):
         if isinstance(names, basestring):
             names = names.replace(',', ' ').split()
         if isinstance(names, (tuple, list)) and isinstance(names[0], basestring):
-            names = [(e, i+1) for (i, e) in enumerate(names)]
+            names = [(e, i + 1) for (i, e) in enumerate(names)]
 
         # Here, names is either an iterable of (name, value) or a mapping.
         for item in names:

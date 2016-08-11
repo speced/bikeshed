@@ -223,7 +223,7 @@ def main():
         elif options.linkText:
             doc = Spec(inputFilename=options.infile)
             doc.preprocess()
-            refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText+"\n"]
+            refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText + "\n"]
             config.quiet = options.quiet
             if not config.quiet:
                 p("Refs for '{0}':".format(options.linkText))
@@ -715,8 +715,8 @@ class Spec(object):
                 # massaged per the Commonmark rules.
                 import string
                 t = escapeHTML(codeSpanReplacements.pop()).strip(string.whitespace)
-                t = re.sub("["+string.whitespace+"]{2,}", " ", t)
-                return "<code data-opaque>"+t+"</code>"
+                t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
+                return "<code data-opaque>" + t + "</code>"
             text = re.sub("\ue0ff", codeSpanReviver, text)
         return text
 
@@ -917,7 +917,7 @@ def fixInterDocumentReferences(doc):
                     heading = specData[heading[0]]
                 else:
                     # multiple headings of this id, user needs to disambiguate
-                    die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  [[{0}]]".format(spec+x) for x in heading), el=el)
+                    die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  [[{0}]]".format(spec + x) for x in heading), el=el)
                     continue
             if doc.md.status == "ED":
                 if "ED" in heading:
@@ -1108,7 +1108,7 @@ def classifyDfns(doc, dfns):
             elif el.get('data-lt') is None:
                 if dfnType == "function":
                     # CSS function, define it with no args in the text
-                    primaryDfnText = re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1)+"()"
+                    primaryDfnText = re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1) + "()"
                     el.set('data-lt', primaryDfnText)
                 elif dfnType in config.idlTypes:
                     # IDL methodish construct, ask the widlparser what it should have.
@@ -1123,7 +1123,7 @@ def classifyDfns(doc, dfns):
             parent = el.getparent()
             parentFor = parent.get('data-dfn-for')
             if parent.get('data-dfn-type') in config.functionishTypes and parentFor is not None:
-                dfnFor = ", ".join(parentFor+"/"+name for name in doc.widl.normalizedMethodNames(textContent(parent), parentFor))
+                dfnFor = ", ".join(parentFor + "/" + name for name in doc.widl.normalizedMethodNames(textContent(parent), parentFor))
             elif treeAttr(el, "data-dfn-for") is None:
                 die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el), el=el)
                 continue
@@ -1132,7 +1132,7 @@ def classifyDfns(doc, dfns):
             if dfnFor:
                 singleFor = config.splitForValues(dfnFor)[0]
             if dfnType in config.functionishTypes.intersection(config.idlTypes):
-                id = config.simplifyText("{_for}-{id}".format(_for=singleFor, id=re.match(r"[^(]*", primaryDfnText).group(0)+"()"))
+                id = config.simplifyText("{_for}-{id}".format(_for=singleFor, id=re.match(r"[^(]*", primaryDfnText).group(0) + "()"))
                 el.set("data-alternate-id", config.simplifyText("dom-{_for}-{id}".format(_for=singleFor, id=primaryDfnText)))
             else:
                 if dfnFor:
@@ -1201,7 +1201,7 @@ def determineLinkText(el):
     if el.get('data-lt'):
         linkText = el.get('data-lt')
     elif linkType in config.functionishTypes.union(["functionish"]) and re.match(r"^[\w-]+\(.*\)$", contents):
-        linkText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1)+"()"
+        linkText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1) + "()"
         # Need to fix this using the idl parser.
     else:
         linkText = contents
@@ -1252,7 +1252,7 @@ def processBiblioLinks(doc):
         if not ref:
             if not okayToFail:
                 closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)
-                die("Couldn't find '{0}' in bibliography data. Did you mean:\n{1}", linkText, '\n'.join("  "+b for b in closeBiblios), el=el)
+                die("Couldn't find '{0}' in bibliography data. Did you mean:\n{1}", linkText, '\n'.join("  " + b for b in closeBiblios), el=el)
             el.tag = "span"
             continue
 
@@ -1275,7 +1275,7 @@ def processBiblioLinks(doc):
             ref.linkText = linkText
 
         id = config.simplifyText(ref.linkText)
-        el.set('href', '#biblio-'+id)
+        el.set('href', '#biblio-' + id)
         storage[ref.linkText] = ref
 
 
@@ -1362,7 +1362,7 @@ def processIssuesAndExamples(doc):
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
     # examples, and link to remote issues if possible:
     for el in findAll(".issue:not([id])", doc):
-        el.set('id', "issue-"+hashContents(el))
+        el.set('id', "issue-" + hashContents(el))
         remoteIssueID = el.get('data-remote-issue-id')
         if remoteIssueID:
             del el.attrib['data-remote-issue-id']
@@ -1384,7 +1384,7 @@ def processIssuesAndExamples(doc):
             if remoteIssueURL:
                 appendChild(el, " ", E.a({"href": remoteIssueURL}, "<" + remoteIssueURL + ">"))
     for el in findAll(".example:not([id])", doc):
-        el.set('id', "example-"+hashContents(el))
+        el.set('id', "example-" + hashContents(el))
     fixupIDs(doc, findAll(".issue, .example", doc))
 
 
@@ -1454,7 +1454,7 @@ def addDfnPanels(doc, dfns):
         atLeastOnePanel = True
         panel = E.aside({"class": "dfn-panel", "data-for": id},
                         E.b(
-            E.a({"href":"#"+urllib.quote(id)}, "#"+id)),
+            E.a({"href":"#" + urllib.quote(id)}, "#" + id)),
             E.b("Referenced in:"))
         counter = 0
         ul = appendChild(panel, E.ul())
@@ -1468,11 +1468,11 @@ def addDfnPanels(doc, dfns):
                     el.set("id", refID)
                 if i == 0:
                     appendChild(li,
-                                E.a({"href": "#"+urllib.quote(refID)}, text))
+                                E.a({"href": "#" + urllib.quote(refID)}, text))
                 else:
                     appendChild(li,
                                 " ",
-                                E.a({"href": "#"+urllib.quote(refID)}, "("+str(i+1)+")"))
+                                E.a({"href": "#" + urllib.quote(refID)}, "(" + str(i + 1) + ")"))
         appendChild(body, panel)
     if atLeastOnePanel:
         doc.extraScripts['script-dfn-panel'] = '''
@@ -2095,7 +2095,7 @@ def cleanupHTML(doc):
         removeClass(el, 'css')
 
     # Remove duplicate linking texts.
-    for el in findAll(",".join(x+"[data-lt]" for x in config.anchorishElements), doc):
+    for el in findAll(",".join(x + "[data-lt]" for x in config.anchorishElements), doc):
         if el.get('data-lt') == textContent(el, exact=True):
             del el.attrib['data-lt']
 
@@ -2113,7 +2113,7 @@ def cleanupHTML(doc):
         el.set("id", "assert-" + hashContents(el))
 
     # Add ARIA role of "note" to class="note" elements
-    for el in findAll("."+doc.md.noteClass, doc):
+    for el in findAll("." + doc.md.noteClass, doc):
         el.set("role", "note")
 
     # Look for nested <a> elements, and warn about them.
@@ -2172,7 +2172,7 @@ def hackyLineNumbers(lines):
     # Hackily adds line-number information to each thing that looks like an open tag.
     # This is just regex text-munging, so potentially dangerous!
     for i,line in enumerate(lines):
-        lines[i] = re.sub(r"(^|[^<])(<[\w-]+)([ >])", r"\1\2 line-number={0}\3".format(i+1), line)
+        lines[i] = re.sub(r"(^|[^<])(<[\w-]+)([ >])", r"\1\2 line-number={0}\3".format(i + 1), line)
     return lines
 
 
@@ -2192,7 +2192,7 @@ def processInclusions(doc):
         for el in els:
             macros = {}
             for i in itertools.count(0):
-                m = el.get("macro-"+str(i))
+                m = el.get("macro-" + str(i))
                 if m is None:
                     break
                 k,_,v = m.partition(" ")
@@ -2232,7 +2232,7 @@ def processInclusions(doc):
                 subtree = parseHTML(text)
                 for childInclude in findAll("pre.include", E.div({}, *subtree)):
                     childInclude.set("hash", hash)
-                    childInclude.set("depth", str(depth+1))
+                    childInclude.set("depth", str(depth + 1))
                 replaceNode(el, *subtree)
 
 
@@ -2257,7 +2257,7 @@ def formatElementdefTables(doc):
             for ref in groupAttrs:
                 appendChild(ul,
                             E.li(
-                                E.dfn({"id":"element-attrdef-"+config.simplifyText(textContent(elements[0]))+"-"+ref.text, "for":elementsFor, "data-dfn-type":"element-attr"},
+                                E.dfn({"id":"element-attrdef-" + config.simplifyText(textContent(elements[0])) + "-" + ref.text, "for":elementsFor, "data-dfn-type":"element-attr"},
                                       E.a({"data-link-type":"element-attr", "for":groupName},
                                           ref.text.strip()))))
 
@@ -2361,7 +2361,7 @@ def inlineRemoteIssues(doc):
         addClass(el, "no-marker")
     # Save the cache for later
     try:
-        with io.open(config.scriptPath+"/spec-data/github-issues.json", 'w', encoding="utf-8") as f:
+        with io.open(config.scriptPath + "/spec-data/github-issues.json", 'w', encoding="utf-8") as f:
             f.write(unicode(json.dumps(responses, ensure_ascii=False, indent=2, sort_keys=True)))
     except Exception, e:
         die("Couldn't save GitHub Issues cache to disk.\n{0}", e)

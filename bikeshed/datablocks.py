@@ -66,7 +66,7 @@ def transformDataBlocks(doc, lines):
                 blockType = "pre"
             blockStartLine = i + lineCountCorrection
         # Look for the end of a block.
-        match = re.match(r"(.*)</"+tagName+">(.*)", line, re.I)
+        match = re.match(r"(.*)</" + tagName + ">(.*)", line, re.I)
         if match and inBlock:
             inBlock = False
             if startLine == i:
@@ -79,31 +79,31 @@ def transformDataBlocks(doc, lines):
                     lineNum=blockStartLine,
                     doc=doc)
                 newLines.extend(repl)
-                newLines.append("<!--line count correction {0}-->".format(-len(repl)-1))
+                newLines.append("<!--line count correction {0}-->".format(-len(repl) - 1))
                 newLines.append(match.group(3))
             elif re.match(r"^\s*$", match.group(1)):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
                 repl = blockTypes[blockType](
-                    lines=lines[startLine+1:i],
+                    lines=lines[startLine + 1:i],
                     tagName=tagName,
                     firstLine=lines[startLine],
                     lineNum=blockStartLine,
                     doc=doc)
                 newLines.extend(repl)
-                newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
+                newLines.append("<!--line count correction {0}-->".format((i - startLine) - len(repl) - 1))
                 newLines.append(match.group(2))
             else:
                 # End tag was at the end of line of useful content.
                 # Process the stuff before it, preserve the stuff after it.
                 repl = blockTypes[blockType](
-                    lines=lines[startLine+1:i]+[match.group(1)],
+                    lines=lines[startLine + 1:i] + [match.group(1)],
                     tagName=tagName,
                     firstLine=lines[startLine],
                     lineNum=blockStartLine,
                     doc=doc)
                 newLines.extend(repl)
-                newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
+                newLines.append("<!--line count correction {0}-->".format((i - startLine) - len(repl) - 1))
                 newLines.append(match.group(2))
             tagName = ""
             blockType = ""
@@ -320,7 +320,7 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     if lineNum is not None:
         lineNumAttr = " line-number={0}".format(lineNum)
     attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False)
-    el = parseHTML(firstLine+"</pre>")[0]
+    el = parseHTML(firstLine + "</pre>")[0]
     if "for" in el.attrib:
         forValue = el.get('for')
         el.set("data-dfn-for", forValue)
@@ -383,7 +383,7 @@ def parseDefBlock(lines, type, capitalizeKeys=True):
             lastKey = key
             val = match.group(2).strip()
         if key in vals:
-            vals[key] += "\n"+val
+            vals[key] += "\n" + val
         else:
             vals[key] = val
     return vals
@@ -629,7 +629,7 @@ def parseInfoTree(lines, indent=4, lineNum=0):
     indentSpace = " " * indent
     for i,line in enumerate(lines):
         if lineNum is not None:
-            thisLine = int(lineNum)+i+1
+            thisLine = int(lineNum) + i + 1
         else:
             thisLine = None
         if line.strip() == "":
@@ -640,12 +640,12 @@ def parseInfoTree(lines, indent=4, lineNum=0):
             die("Line has inconsistent indentation; use tabs or {1} spaces:\n{0}", text, indent, lineNum=thisLine)
             return []
         wsLen = wsLen // indent
-        if wsLen >= lastIndent+2:
+        if wsLen >= lastIndent + 2:
             die("Line jumps {1} indent levels:\n{0}", text, wsLen - lastIndent, lineNum=thisLine)
             return []
         if wsLen <= lastIndent:
             # Previous line was a leaf node; build its full data and add to the list
-            extendData(datas, infoLevels[:lastIndent+1])
+            extendData(datas, infoLevels[:lastIndent + 1])
         # Otherwise, chained data. Parse it, put it into infoLevels
         info = defaultdict(list)
         for piece in text.split(";"):
@@ -664,5 +664,5 @@ def parseInfoTree(lines, indent=4, lineNum=0):
             infoLevels.append(info)
         lastIndent = wsLen
     # Grab the last bit of data.
-    extendData(datas, infoLevels[:lastIndent+1])
+    extendData(datas, infoLevels[:lastIndent + 1])
     return datas

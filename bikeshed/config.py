@@ -247,7 +247,7 @@ class HierarchicalNumber(object):
         return self.originalVal
 
     def __repr__(self):
-        return "HierarchicalNumber("+repr(self.originalVal)+")"
+        return "HierarchicalNumber(" + repr(self.originalVal) + ")"
 
 
 def intersperse(iterable, delimiter):
@@ -370,7 +370,7 @@ def retrieveBoilerplateFile(self, name, group=None, status=None, error=True):
 def printjson(x, indent=2, level=0):
     if isinstance(indent, int):
         # Convert into a number of spaces.
-        indent = " "*indent
+        indent = " " * indent
     x = getjson(x)
     if isinstance(x, dict):
         ret = printjsonobject(x, indent, level)
@@ -401,7 +401,7 @@ def printjsonobject(x, indent, level):
     for k in x.keys():
         maxKeyLength = max(maxKeyLength, len(k))
     for k,v in x.items():
-        ret += "\n" + (indent*level) + printColor((k + ": ").ljust(maxKeyLength+2), "cyan") + printjson(v, indent, level+1)
+        ret += "\n" + (indent * level) + printColor((k + ": ").ljust(maxKeyLength + 2), "cyan") + printjson(v, indent, level + 1)
     return ret
 
 
@@ -411,7 +411,7 @@ def printjsonobjectarray(x, indent, level):
     ret = ""
     for i,v in enumerate(x):
         if i != 0:
-            ret += "\n" + (indent*level) + printColor("="*10, "blue")
+            ret += "\n" + (indent * level) + printColor("=" * 10, "blue")
         ret += printjsonobject(v, indent, level)
     return ret
 
@@ -449,7 +449,7 @@ def processTextNodes(nodes, regex, replacer):
     for i, node in enumerate(nodes):
         # Node list always alternates between text and elements
         if i % 2 == 0:
-            nodes[i:i+1] = reSubObject(regex, node, replacer)
+            nodes[i:i + 1] = reSubObject(regex, node, replacer)
     return nodes
 
 
@@ -506,7 +506,7 @@ def linkTextsFromElement(el, preserveCasing=False):
         for text in localTexts:
             if text in texts:
                 # lt and local-lt both specify the same thing
-                raise DuplicatedLinkText(text, texts+localTexts, el)
+                raise DuplicatedLinkText(text, texts + localTexts, el)
         texts += localTexts
 
     texts = [re.sub(r"\s+", " ", x) for x in texts if x != '']

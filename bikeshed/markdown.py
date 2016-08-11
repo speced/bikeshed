@@ -60,16 +60,16 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
             endTag = rawStack[-1]
             if endTag['type'] == "element" and re.search(endTag['tag'], rawline):
                 rawStack.pop()
-                tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i+lineCountCorrection})
+                tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
                 continue
             elif endTag['type'] == "fenced" and re.match(r"\s*{0}{1}*\s*$".format(endTag['tag'], endTag['tag'][0]), rawline):
                 rawStack.pop()
-                tokens.append({'type':'raw', 'raw':"</xmp>", 'prefixlen':float('inf'), 'line':i+lineCountCorrection})
+                tokens.append({'type':'raw', 'raw':"</xmp>", 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
                 continue
             elif not endTag['nest']:
                 # Just an internal line, but for the no-nesting elements,
                 # so guaranteed no more work needs to be done.
-                tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i+lineCountCorrection})
+                tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
                 continue
 
         # We're either in a nesting raw element or not in a raw element at all,
@@ -84,11 +84,11 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
                 classAttr = " class='language-{0}'".format(escapeAttr(lang))
             else:
                 classAttr = ""
-            tokens.append({'type':'raw', 'raw':'<xmp{0}>'.format(classAttr), 'prefixline':float('inf'), 'line':i+lineCountCorrection})
+            tokens.append({'type':'raw', 'raw':'<xmp{0}>'.format(classAttr), 'prefixline':float('inf'), 'line':i + lineCountCorrection})
             continue
         match = re.search(r"<({0})[ >]".format(rawElements), rawline)
         if match:
-            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i+lineCountCorrection})
+            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
             if re.search(r"</({0})>".format(match.group(1)), rawline):
                 # Element started and ended on same line, cool, don't need to do anything.
                 pass
@@ -97,7 +97,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
                 rawStack.append({'type':'element', 'tag':"</{0}>".format(match.group(1)), 'nest':nest})
             continue
         if rawStack:
-            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i+lineCountCorrection})
+            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
             continue
 
         line = rawline.strip()
@@ -122,7 +122,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
         elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", line):
             # single-line heading
             match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", line)
-            level = len(match.group(1))+1
+            level = len(match.group(1)) + 1
             token = {'type':'heading', 'text': match.group(2).strip(), 'raw':rawline, 'level': level}
             match = re.search(r"\{#([^ }]+)\}\s*$", line)
             if match:
@@ -159,7 +159,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
             token['prefixlen'] = float('inf')
         else:
             token['prefixlen'] = prefixLen(rawline, numSpacesForIndentation)
-        token['line'] = i+lineCountCorrection
+        token['line'] = i + lineCountCorrection
         tokens.append(token)
         #print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
@@ -206,7 +206,7 @@ def stripCommentsFromLine(line, inComment=False):
         else:
             # Keep the non-comment part, see if there's any more to do
             res,inComment = stripCommentsFromLine(post, inComment=True)
-            return pre+res, inComment
+            return pre + res, inComment
 
 
 def prefixLen(text, numSpacesForIndentation):
@@ -216,7 +216,7 @@ def prefixLen(text, numSpacesForIndentation):
         if text[i] == "\t":
             i += 1
             prefixLen += 1
-        elif text[i:i+numSpacesForIndentation] == " " * numSpacesForIndentation:
+        elif text[i:i + numSpacesForIndentation] == " " * numSpacesForIndentation:
             i += numSpacesForIndentation
             prefixLen += 1
         else:
@@ -241,7 +241,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
     for x in range(len):
         if text[offset] == "\t":
             offset += 1
-        elif text[offset:offset+numSpacesForIndentation] == " " * numSpacesForIndentation:
+        elif text[offset:offset + numSpacesForIndentation] == " " * numSpacesForIndentation:
             offset += numSpacesForIndentation
         else:
             die("Line {i} isn't indented enough (needs {0} indent{plural}) to be valid Markdown:\n\"{1}\"", len, text[:-1], plural="" if len == 1 else "s", i=token['line'])
@@ -388,7 +388,7 @@ def parseBulleted(stream):
             if stream.currtype() == 'eof':
                 return lines
             # Remove the prefix from each line before adding it.
-            lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen+1))
+            lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1))
 
     def getItems(stream):
         while True:
@@ -433,7 +433,7 @@ def parseNumbered(stream, start=1):
             if stream.currtype() == 'eof':
                 return lines
             # Remove the prefix from each line before adding it.
-            lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen+1))
+            lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1))
 
     def getItems(stream):
         while True:
@@ -482,7 +482,7 @@ def parseDl(stream):
             if stream.currtype() == 'eof':
                 return type, lines
             # Remove the prefix from each line before adding it.
-            lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen+1))
+            lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1))
 
     def getItems(stream):
         while True:
