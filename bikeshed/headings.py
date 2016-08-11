@@ -54,7 +54,7 @@ def addHeadingIds(doc, headings):
                 appendChild(header, E.span({"id":oldID}))
     if len(neededIds) > 0:
         warn("You should manually provide IDs for your headings:\n{0}",
-            "\n".join("  "+outerHTML(el) for el in neededIds))
+             "\n".join("  "+outerHTML(el) for el in neededIds))
 
 
 def checkPrivacySecurityHeadings(headings):

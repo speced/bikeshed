@@ -156,7 +156,7 @@ class EnumMeta(type):
 
         member_type, first_enum = metacls._get_mixins_(bases)
         __new__, save_new, use_args = metacls._find_new_(classdict, member_type,
-                                                        first_enum)
+                                                         first_enum)
         # save enum items into separate mapping so they don't get baked into
         # the new class
         members = dict((k, classdict[k]) for k in classdict._member_names)
@@ -253,7 +253,7 @@ class EnumMeta(type):
         if '__reduce_ex__' not in classdict:
             if member_type is not object:
                 methods = ('__getnewargs_ex__', '__getnewargs__',
-                        '__reduce_ex__', '__reduce__')
+                           '__reduce_ex__', '__reduce__')
                 if not any(m in member_type.__dict__ for m in methods):
                     _make_class_unpicklable(enum_class)
                     unpicklable = True
@@ -466,7 +466,7 @@ class EnumMeta(type):
         # base is now the last base in bases
         if not issubclass(base, Enum):
             raise TypeError("new enumerations must be created as "
-                    "`ClassName([mixin_type,] enum_type)`")
+                            "`ClassName([mixin_type,] enum_type)`")
 
         # get correct mix-in type (either mix-in type of Enum subclass, or
         # first base if last base is Enum)
@@ -773,8 +773,8 @@ def unique(enumeration):
             ["%s -> %s" % (alias, name) for (alias, name) in duplicates]
         )
         raise ValueError('duplicate names found in %r: %s' %
-                (enumeration, duplicate_names)
-        )
+                         (enumeration, duplicate_names)
+                         )
     return enumeration
 
 

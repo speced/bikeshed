@@ -207,11 +207,11 @@ class ReferenceManager(object):
             elif len(localRefs) > 1:
                 if error:
                     linkerror("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
-                         linkType,
-                         text,
-                         localRefs[0].type,
-                         "' or '".join(localRefs[0].for_),
-                         el=el)
+                              linkType,
+                              text,
+                              localRefs[0].type,
+                              "' or '".join(localRefs[0].for_),
+                              el=el)
                 return localRefs[0]
 
         # Take defaults into account
@@ -352,18 +352,18 @@ class ReferenceManager(object):
             if len(possibleRefs) == 1:
                 # Only happens when the refs can't be disambiguated under Bikeshed's data model.
                 linkerror("Multiple possible '{0}' refs for '{1}' in {2}, but they're not distinguishable with Bikeshed's data model. Either create a manual link, or ask the spec maintainer to add sufficient disambiguating attributes to make them distinguishable. Usually this means adding a for='' value to at least one of them.\nArbitrarily chose the {3} one to link to for now.",
-                    linkType,
-                    text,
-                    defaultRef.spec,
-                    defaultRef.url,
-                    el=el)
+                          linkType,
+                          text,
+                          defaultRef.spec,
+                          defaultRef.url,
+                          el=el)
             else:
                 linkerror("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
-                     linkType,
-                     text,
-                     defaultRef.spec,
-                     '\n'.join(possibleRefs),
-                     el=el)
+                          linkType,
+                          text,
+                          defaultRef.spec,
+                          '\n'.join(possibleRefs),
+                          el=el)
         return defaultRef
 
     def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None, quiet=False):
