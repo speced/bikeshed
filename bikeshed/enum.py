@@ -56,9 +56,9 @@ class _RouteClassAttributeToGetattr(object):
 def _is_descriptor(obj):
     """Returns True if obj is a descriptor, False otherwise."""
     return (
-            hasattr(obj, '__get__') or
-            hasattr(obj, '__set__') or
-            hasattr(obj, '__delete__'))
+        hasattr(obj, '__get__') or
+        hasattr(obj, '__set__') or
+        hasattr(obj, '__delete__'))
 
 
 def _is_dunder(name):
@@ -156,7 +156,7 @@ class EnumMeta(type):
 
         member_type, first_enum = metacls._get_mixins_(bases)
         __new__, save_new, use_args = metacls._find_new_(classdict, member_type,
-                                                        first_enum)
+                                                         first_enum)
         # save enum items into separate mapping so they don't get baked into
         # the new class
         members = dict((k, classdict[k]) for k in classdict._member_names)
@@ -253,7 +253,7 @@ class EnumMeta(type):
         if '__reduce_ex__' not in classdict:
             if member_type is not object:
                 methods = ('__getnewargs_ex__', '__getnewargs__',
-                        '__reduce_ex__', '__reduce__')
+                           '__reduce_ex__', '__reduce__')
                 if not any(m in member_type.__dict__ for m in methods):
                     _make_class_unpicklable(enum_class)
                     unpicklable = True
@@ -287,7 +287,7 @@ class EnumMeta(type):
                         '__eq__',
                         '__ne__',
                         '__hash__',
-                        ):
+                ):
                     setattr(enum_class, method, getattr(int, method))
 
         # replace any other __new__ with our own (as long as Enum is not None,
@@ -329,7 +329,7 @@ class EnumMeta(type):
         # (see issue19025).
         if attr in cls._member_map_:
             raise AttributeError(
-                    "%s: cannot delete Enum member." % cls.__name__)
+                "%s: cannot delete Enum member." % cls.__name__)
         super(EnumMeta, cls).__delattr__(attr)
 
     def __dir__(self):
@@ -414,7 +414,7 @@ class EnumMeta(type):
         if isinstance(names, basestring):
             names = names.replace(',', ' ').split()
         if isinstance(names, (tuple, list)) and isinstance(names[0], basestring):
-            names = [(e, i+1) for (i, e) in enumerate(names)]
+            names = [(e, i + 1) for (i, e) in enumerate(names)]
 
         # Here, names is either an iterable of (name, value) or a mapping.
         for item in names:
@@ -466,7 +466,7 @@ class EnumMeta(type):
         # base is now the last base in bases
         if not issubclass(base, Enum):
             raise TypeError("new enumerations must be created as "
-                    "`ClassName([mixin_type,] enum_type)`")
+                            "`ClassName([mixin_type,] enum_type)`")
 
         # get correct mix-in type (either mix-in type of Enum subclass, or
         # first base if last base is Enum)
@@ -524,7 +524,7 @@ class EnumMeta(type):
                             N__new__,
                             O__new__,
                             E__new__,
-                            ]:
+                    ]:
                         if method == '__member_new__':
                             classdict['__new__'] = target
                             return None, False, True
@@ -575,7 +575,7 @@ class EnumMeta(type):
                                 None.__new__,
                                 object.__new__,
                                 Enum.__new__,
-                                ):
+                        ):
                             __new__ = target
                             break
                     if __new__ is not None:
@@ -629,7 +629,7 @@ del __new__
 
 def __repr__(self):
     return "<%s.%s: %r>" % (
-            self.__class__.__name__, self._name_, self._value_)
+        self.__class__.__name__, self._name_, self._value_)
 temp_enum_dict['__repr__'] = __repr__
 del __repr__
 
@@ -770,11 +770,11 @@ def unique(enumeration):
             duplicates.append((name, member.name))
     if duplicates:
         duplicate_names = ', '.join(
-                ["%s -> %s" % (alias, name) for (alias, name) in duplicates]
-                )
+            ["%s -> %s" % (alias, name) for (alias, name) in duplicates]
+        )
         raise ValueError('duplicate names found in %r: %s' %
-                (enumeration, duplicate_names)
-                )
+                         (enumeration, duplicate_names)
+                         )
     return enumeration
 
 

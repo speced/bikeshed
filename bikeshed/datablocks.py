@@ -66,44 +66,44 @@ def transformDataBlocks(doc, lines):
                 blockType = "pre"
             blockStartLine = i + lineCountCorrection
         # Look for the end of a block.
-        match = re.match(r"(.*)</"+tagName+">(.*)", line, re.I)
+        match = re.match(r"(.*)</" + tagName + ">(.*)", line, re.I)
         if match and inBlock:
             inBlock = False
             if startLine == i:
                 # Single-line <pre>.
                 match = re.match(r"\s*(<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line, re.I)
                 repl = blockTypes[blockType](
-                        lines=[match.group(2)],
-                        tagName=tagName,
-                        firstLine=match.group(1),
-                        lineNum=blockStartLine,
-                        doc=doc)
+                    lines=[match.group(2)],
+                    tagName=tagName,
+                    firstLine=match.group(1),
+                    lineNum=blockStartLine,
+                    doc=doc)
                 newLines.extend(repl)
-                newLines.append("<!--line count correction {0}-->".format(-len(repl)-1))
+                newLines.append("<!--line count correction {0}-->".format(-len(repl) - 1))
                 newLines.append(match.group(3))
             elif re.match(r"^\s*$", match.group(1)):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
                 repl = blockTypes[blockType](
-                        lines=lines[startLine+1:i],
-                        tagName=tagName,
-                        firstLine=lines[startLine],
-                        lineNum=blockStartLine,
-                        doc=doc)
+                    lines=lines[startLine + 1:i],
+                    tagName=tagName,
+                    firstLine=lines[startLine],
+                    lineNum=blockStartLine,
+                    doc=doc)
                 newLines.extend(repl)
-                newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
+                newLines.append("<!--line count correction {0}-->".format((i - startLine) - len(repl) - 1))
                 newLines.append(match.group(2))
             else:
                 # End tag was at the end of line of useful content.
                 # Process the stuff before it, preserve the stuff after it.
                 repl = blockTypes[blockType](
-                        lines=lines[startLine+1:i]+[match.group(1)],
-                        tagName=tagName,
-                        firstLine=lines[startLine],
-                        lineNum=blockStartLine,
-                        doc=doc)
+                    lines=lines[startLine + 1:i] + [match.group(1)],
+                    tagName=tagName,
+                    firstLine=lines[startLine],
+                    lineNum=blockStartLine,
+                    doc=doc)
                 newLines.extend(repl)
-                newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
+                newLines.append("<!--line count correction {0}-->".format((i - startLine) - len(repl) - 1))
                 newLines.append(match.group(2))
             tagName = ""
             blockType = ""
@@ -200,7 +200,7 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
     # using 'Animation type'. If we find 'Animatable' in the parsed attributes,
     # drop the default 'Animation type' entry.
     if "Animatable" in parsedAttrs:
-      attrs.pop("Animation type")
+        attrs.pop("Animation type")
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:
@@ -320,7 +320,7 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     if lineNum is not None:
         lineNumAttr = " line-number={0}".format(lineNum)
     attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False)
-    el = parseHTML(firstLine+"</pre>")[0]
+    el = parseHTML(firstLine + "</pre>")[0]
     if "for" in el.attrib:
         forValue = el.get('for')
         el.set("data-dfn-for", forValue)
@@ -336,7 +336,7 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     addClass(el, "data")
     rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
     lines = [
-            '''
+        '''
             <table {attrs}{lineNumAttr}>
                 <caption>Arguments for the <a method lt='{method}' for='{interface}'{lineNumAttr}>{interface}.{method}</a> method.</caption>
                 <thead>
@@ -347,20 +347,20 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
                         <th>Optional
                         <th>Description
                 <tbody>'''.format(attrs=rootAttrs, interface=interface, method=method, lineNumAttr=lineNumAttr)
-        ] + [
-            '''
+    ] + [
+        '''
                 <tr>
                     <td><dfn argument{lineNumAttr}>{0}</dfn>
                     <td>
                     <td>
                     <td>
                     <td>{1}'''.format(param, desc, lineNumAttr=lineNumAttr)
-                    for param,desc in attrs.items()
-        ] + [
-            '''
+        for param,desc in attrs.items()
+    ] + [
+        '''
             </table>
             '''
-        ]
+    ]
     return lines
 
 
@@ -383,7 +383,7 @@ def parseDefBlock(lines, type, capitalizeKeys=True):
             lastKey = key
             val = match.group(2).strip()
         if key in vals:
-            vals[key] += "\n"+val
+            vals[key] += "\n" + val
         else:
             vals[key] = val
     return vals
@@ -479,7 +479,7 @@ def processAnchors(anchors, doc, lineNum=None):
             "export": True,
             "status": status,
             "spec": spec if spec is not None else ''
-            })
+        })
         methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
         if methodishStart:
             doc.refs.addMethodVariants(anchor['text'][0], anchor.get('for', []), doc.md.shortname)
@@ -629,7 +629,7 @@ def parseInfoTree(lines, indent=4, lineNum=0):
     indentSpace = " " * indent
     for i,line in enumerate(lines):
         if lineNum is not None:
-            thisLine = int(lineNum)+i+1
+            thisLine = int(lineNum) + i + 1
         else:
             thisLine = None
         if line.strip() == "":
@@ -640,12 +640,12 @@ def parseInfoTree(lines, indent=4, lineNum=0):
             die("Line has inconsistent indentation; use tabs or {1} spaces:\n{0}", text, indent, lineNum=thisLine)
             return []
         wsLen = wsLen // indent
-        if wsLen >= lastIndent+2:
+        if wsLen >= lastIndent + 2:
             die("Line jumps {1} indent levels:\n{0}", text, wsLen - lastIndent, lineNum=thisLine)
             return []
         if wsLen <= lastIndent:
             # Previous line was a leaf node; build its full data and add to the list
-            extendData(datas, infoLevels[:lastIndent+1])
+            extendData(datas, infoLevels[:lastIndent + 1])
         # Otherwise, chained data. Parse it, put it into infoLevels
         info = defaultdict(list)
         for piece in text.split(";"):
@@ -664,5 +664,5 @@ def parseInfoTree(lines, indent=4, lineNum=0):
             infoLevels.append(info)
         lastIndent = wsLen
     # Grab the last bit of data.
-    extendData(datas, infoLevels[:lastIndent+1])
+    extendData(datas, infoLevels[:lastIndent + 1])
     return datas

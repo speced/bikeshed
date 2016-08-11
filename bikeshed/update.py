@@ -119,7 +119,7 @@ def updateCrossRefs():
                         'spec': spec['title']
                     }
                     fragment = uri
-                    shorthand = "/"+fragment
+                    shorthand = "/" + fragment
                 else:
                     # Multi-page spec, need to guard against colliding IDs
                     if "#" in uri:
@@ -129,11 +129,11 @@ def updateCrossRefs():
                             die("Unexpected URI pattern '{0}' for spec '{1}'. Please report this to the Bikeshed maintainer.", uri, spec['vshortname'])
                             continue
                         page, fragment = match.groups()
-                        page = "/"+page
+                        page = "/" + page
                     else:
                         # url to a page itself, like "foo.html"
                         page, _, _ = uri.partition(".")
-                        page = "/"+page
+                        page = "/" + page
                         fragment = "#"
                     shorthand = page + fragment
                     heading = {
@@ -214,31 +214,31 @@ def updateCrossRefs():
 
     if not config.dryRun:
         try:
-            with io.open(config.scriptPath+"/spec-data/specs.json", 'w', encoding="utf-8") as f:
+            with io.open(config.scriptPath + "/spec-data/specs.json", 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(specs, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save spec database to disk.\n{0}", e)
             return
         try:
-            with io.open(config.scriptPath+"/spec-data/headings.json", 'w', encoding="utf-8") as f:
+            with io.open(config.scriptPath + "/spec-data/headings.json", 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(headings, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save headings database to disk.\n{0}", e)
             return
         try:
-            with io.open(config.scriptPath+"/spec-data/anchors.data", 'w', encoding="utf-8") as f:
+            with io.open(config.scriptPath + "/spec-data/anchors.data", 'w', encoding="utf-8") as f:
                 writeAnchorsFile(f, anchors)
         except Exception, e:
             die("Couldn't save anchor database to disk.\n{0}", e)
             return
         try:
-            with io.open(config.scriptPath+"/spec-data/methods.json", 'w', encoding="utf-8") as f:
+            with io.open(config.scriptPath + "/spec-data/methods.json", 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save methods database to disk.\n{0}", e)
             return
         try:
-            with io.open(config.scriptPath+"/spec-data/fors.json", 'w', encoding="utf-8") as f:
+            with io.open(config.scriptPath + "/spec-data/fors.json", 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(fors, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save fors database to disk.\n{0}", e)
@@ -293,7 +293,7 @@ def updateLinkDefaults():
 
     if not config.dryRun:
         try:
-            with io.open(config.scriptPath+"/spec-data/link-defaults.infotree", 'w', encoding="utf-8") as f:
+            with io.open(config.scriptPath + "/spec-data/link-defaults.infotree", 'w', encoding="utf-8") as f:
                 f.write(''.join(lines))
         except Exception, e:
             die("Couldn't save link-defaults database to disk.\n{0}", e)
@@ -331,7 +331,7 @@ def updateTestSuites():
 
     if not config.dryRun:
         try:
-            with io.open(config.scriptPath+"/spec-data/test-suites.json", 'w', encoding="utf-8") as f:
+            with io.open(config.scriptPath + "/spec-data/test-suites.json", 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(testSuites, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save test-suite database to disk.\n{0}", e)
@@ -372,7 +372,7 @@ def writeBiblioFile(fh, biblios):
             else:
                 fh.write("\n")
             for author in b.get("authors", []):
-                fh.write(author+"\n")
+                fh.write(author + "\n")
         elif format == "string":
             fh.write(b['linkText'] + "\n")
             fh.write(b['data'] + "\n")
@@ -413,7 +413,7 @@ def writeAnchorsFile(fh, anchors):
                     fh.write("\n")
             for forValue in e.get("for", []):
                 if forValue:  # skip empty strings
-                    fh.write(forValue+"\n")
+                    fh.write(forValue + "\n")
             fh.write("-" + "\n")
 
 

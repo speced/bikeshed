@@ -50,7 +50,7 @@ def escapeCSSIdent(val):
         if (0x1 <= code <= 0x1f or
             code == 0x7f or
             (i == 0 and 0x30 <= code <= 0x39) or
-            (i == 1 and 0x30 <= code <= 0x39 and firstCode == 0x2d)):
+                (i == 1 and 0x30 <= code <= 0x39 and firstCode == 0x2d)):
             ident += r"\{0:x} ".format(code)
         elif (code >= 0x80 or
               code == 0x2d or
@@ -183,7 +183,7 @@ def prependChild(parent, child):
 def insertBefore(target, *els):
     parent = target.getparent()
     index = parent.index(target)
-    prevSibling = parent[index-1] if index > 0 else None
+    prevSibling = parent[index - 1] if index > 0 else None
     for el in els:
         if isinstance(el, basestring):
             if prevSibling is not None:
@@ -203,7 +203,7 @@ def insertAfter(target, *els):
         if isinstance(el, basestring):
             target.tail = (target.tail or '') + el
         else:
-            parent.insert(parent.index(target)+1, el)
+            parent.insert(parent.index(target) + 1, el)
             target = el
     return target
 
@@ -218,7 +218,7 @@ def removeNode(node):
     if index == 0:
         parent.text = (parent.text or '') + text
     else:
-        prevsibling = parent[index-1]
+        prevsibling = parent[index - 1]
         prevsibling.tail = (prevsibling.tail or '') + text
     parent.remove(node)
     return node
@@ -259,7 +259,7 @@ def headingLevelOfElement(el):
 def relevantHeadings(startEl, levels=None):
     if levels is None:
         levels = [1,2,3,4,5,6]
-    levels = ["h"+str(level) for level in levels]
+    levels = ["h" + str(level) for level in levels]
     currentHeadingLevel = float('inf')
     for el in scopingElements(startEl, *levels):
         tagLevel = int(el.tag[1])
@@ -495,7 +495,7 @@ def dedupIDs(doc):
     import itertools as iter
 
     def findId(id):
-        return find("#"+id, doc) is not None
+        return find("#" + id, doc) is not None
     ids = Counter(el.get('id') for el in findAll("[id]", doc))
     dupes = [id for id,count in ids.items() if count > 1]
     for dupe in dupes:
@@ -503,7 +503,7 @@ def dedupIDs(doc):
         if re.match(r"issue-[0-9a-fA-F]{8}$", dupe):
             # Don't warn about issues, it's okay if they have the same ID because they're identical text.
             warnAboutDupes = False
-        els = findAll("#"+dupe, doc)
+        els = findAll("#" + dupe, doc)
         ints = iter.imap(str, iter.count(0))
         for el in els[1:]:
             # If I registered an alternate ID, try to use that.
@@ -514,8 +514,8 @@ def dedupIDs(doc):
             if warnAboutDupes:
                 warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupe, el=el)
             for x in ints:
-                if not findId(dupe+x):
-                    el.set("id", dupe+x)
+                if not findId(dupe + x):
+                    el.set("id", dupe + x)
                     break
 
 

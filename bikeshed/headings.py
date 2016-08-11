@@ -54,7 +54,7 @@ def addHeadingIds(doc, headings):
                 appendChild(header, E.span({"id":oldID}))
     if len(neededIds) > 0:
         warn("You should manually provide IDs for your headings:\n{0}",
-            "\n".join("  "+outerHTML(el) for el in neededIds))
+             "\n".join("  " + outerHTML(el) for el in neededIds))
 
 
 def checkPrivacySecurityHeadings(headings):
@@ -87,8 +87,8 @@ def determineHeadingLevels(doc, headings):
     headerLevel = [0,0,0,0,0]
 
     def incrementLevel(level):
-        headerLevel[level-2] += 1
-        for i in range(level-1, 5):
+        headerLevel[level - 2] += 1
+        for i in range(level - 1, 5):
             headerLevel[i] = 0
 
     def printLevel():

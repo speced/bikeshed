@@ -115,9 +115,9 @@ def transformAutolinkShortcuts(doc):
         if match.group(4) is not None:
             attrs['data-biblio-status'] = match.group(4).strip()
         return E.a(attrs,
-            "[",
-            term,
-            "]")
+                   "[",
+                   term,
+                   "]")
 
     sectionRe = re.compile(r"""
                             \[\[
@@ -140,7 +140,7 @@ def transformAutolinkShortcuts(doc):
             return E.a({"section":"", "href":section}, linkText)
         elif justPage is not None:
             # foreign link, to an actual page from a multipage spec
-            return E.span({"spec-section":justPage+"#", "spec":spec}, linkText)
+            return E.span({"spec-section":justPage + "#", "spec":spec}, linkText)
         else:
             # foreign link
             return E.span({"spec-section":section, "spec":spec}, linkText)
@@ -186,7 +186,7 @@ def transformAutolinkShortcuts(doc):
         else:
             linkText = match.group(2)
         return E.code({"class":"idl"},
-            E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
+                      E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
 
     dfnRe = re.compile(r"\[=(?!\s)(?:([^=]*)/)?([^\"=]+?)(\|[^\"=]+)?=\]")
 
@@ -219,7 +219,7 @@ def transformAutolinkShortcuts(doc):
         else:
             linkText = match.group(2)
         return E.code({},
-            E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
+                      E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
 
     varRe = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
 

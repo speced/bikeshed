@@ -96,7 +96,7 @@ class HTMLSerializer(object):
             tag = "[]"
 
         if isVoidElement(tag):
-            write(" "*indent)
+            write(" " * indent)
             startTag()
             return
         if isRawElement(tag):
@@ -140,14 +140,14 @@ class HTMLSerializer(object):
 
         # Handle all the possibilities
         if len(blocks) == 0:
-            write(" "*indent)
+            write(" " * indent)
             startTag()
             if el.tag not in self.omitEndTagEls:
                 endTag()
             return
         elif len(blocks) == 1 and isAnonBlock(blocks[0]):
             # Contains only inlines, print accordingly
-            write(" "*indent)
+            write(" " * indent)
             startTag()
             self._serializeEl(blocks[0], write, inline=True)
             if el.tag not in self.omitEndTagEls:
@@ -155,20 +155,20 @@ class HTMLSerializer(object):
             return
         else:
             # Otherwise I'm a block that contains at least one block
-            write(" "*indent)
+            write(" " * indent)
             startTag()
             for block in blocks:
                 if isElement(block):
                     write("\n")
-                    self._serializeEl(block, write, indent=indent+1)
+                    self._serializeEl(block, write, indent=indent + 1)
                 else:
                     # is an array of inlines
                     if len(block) > 0:
                         write("\n")
-                        write(" "*(indent+1))
+                        write(" " * (indent + 1))
                         self._serializeEl(block, write, inline=True)
             if el.tag not in self.omitEndTagEls:
                 write("\n")
-                write(" "*indent)
+                write(" " * indent)
                 endTag()
         return

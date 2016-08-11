@@ -50,7 +50,7 @@ def parse(string):
         while line.startswith(indentText):
             indent += 1
             line = line[len(indentText):]
-        if indent > lastIndent+1:
+        if indent > lastIndent + 1:
             die("Line {0} jumps more than 1 indent level from the previous line:\n{1}", i, line.strip())
             return rr.Diagram()
         lastIndent = indent
@@ -76,7 +76,7 @@ def parse(string):
             node = {"command": command, "prelude": prelude, "text":text, "children": [], "line": i}
 
         activeCommands[str(indent)]['children'].append(node)
-        activeCommands[str(indent+1)] = node
+        activeCommands[str(indent + 1)] = node
 
     return _createDiagram(**tree)
 

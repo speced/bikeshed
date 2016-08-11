@@ -7,13 +7,13 @@ import glob
 from .messages import *
 
 statusStyle = {
-  'accepted'  : 'a',
-  'retracted' : 'a',
-  'rejected'  : 'r',
-  'objection' : 'fo',
-  'deferred'  : 'd',
-  'invalid'   : 'oi',
-  'outofscope': 'oi',
+    'accepted'  : 'a',
+    'retracted' : 'a',
+    'rejected'  : 'r',
+    'objection' : 'fo',
+    'deferred'  : 'd',
+    'invalid'   : 'oi',
+    'outofscope': 'oi',
 }
 
 

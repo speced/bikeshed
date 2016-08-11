@@ -597,7 +597,7 @@ def parse(lines, doc):
             md.hasMetadata = True
             continue
         elif inMetadata and re.match(r"</pre>\s*", line):
-            newlines.append("<!--line count correction {0}-->".format(blockSize+1))
+            newlines.append("<!--line count correction {0}-->".format(blockSize + 1))
             blockSize = 0
             inMetadata = False
             continue
@@ -605,18 +605,18 @@ def parse(lines, doc):
             blockSize += 1
             if lastKey and (line.strip() == "" or re.match(r"\s+", line)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
-                md.addData(lastKey, line.lstrip(), lineNum=i+1)
+                md.addData(lastKey, line.lstrip(), lineNum=i + 1)
             elif re.match(r"([^:]+):\s*(.*)", line):
                 match = re.match(r"([^:]+):\s*(.*)", line)
-                md.addData(match.group(1), match.group(2), lineNum=i+1)
+                md.addData(match.group(1), match.group(2), lineNum=i + 1)
                 lastKey = match.group(1)
             else:
-                die("Incorrectly formatted metadata line:\n{0}", line, lineNum=i+1)
+                die("Incorrectly formatted metadata line:\n{0}", line, lineNum=i + 1)
                 continue
         elif re.match(r"\s*<h1[^>]*>.*?</h1>", line):
             if md.title is None:
                 title = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line).group(1)
-                md.addData("Title", title, lineNum=i+1)
+                md.addData("Title", title, lineNum=i + 1)
             newlines.append(line)
         else:
             newlines.append(line)
@@ -723,11 +723,11 @@ Metadata = collections.namedtuple('Metadata', ['humanName', 'attrName', 'join', 
 
 
 def joinValue(a, b):
-  return b
+    return b
 
 
 def joinList(a, b):
-  return a + b
+    return a + b
 
 
 def joinBoolSet(a,b):
@@ -744,11 +744,11 @@ def joinDdList(a,b):
 
 
 def parseLiteral(k, v, l):
-  return v
+    return v
 
 
 def parseLiteralList(k, v, l):
-  return [v]
+    return [v]
 
 knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),

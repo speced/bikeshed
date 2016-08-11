@@ -65,7 +65,7 @@ class Font(object):
         self.characters = parseCharacters(self.metadata, lines)
 
     def write(self, text):
-        output = ['']*self.metadata["height"]
+        output = [''] * self.metadata["height"]
         for letterIndex, letter in enumerate(text):
             if letter in self.characters:
                 for i, line in enumerate(self.characters[letter]):
@@ -112,8 +112,8 @@ def parseCharacters(md, lines):
     height = md['height']
     characters = {}
     if "space-width" in md:
-        characters[" "] = [" "*md['space-width']]*height
-    for bigcharlines in grouper(lines, height+1):
+        characters[" "] = [" " * md['space-width']] * height
+    for bigcharlines in grouper(lines, height + 1):
         littlechar = bigcharlines[0][0]
         bigchar = [line.strip("\n") for line in bigcharlines[1:]]
         width = max(len(l) for l in bigchar)
@@ -143,7 +143,7 @@ def replaceComments(font, inputFilename=None, outputFilename=None):
                 'content': newtext
             })
     for r in reversed(replacements):
-        lines[r['line']:r['line']+1] = r['content']
+        lines[r['line']:r['line'] + 1] = r['content']
     writeOutputLines(outputFilename, inputFilename, lines)
 
 # Some utility functions
