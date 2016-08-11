@@ -479,7 +479,7 @@ def processAnchors(anchors, doc, lineNum=None):
             "export": True,
             "status": status,
             "spec": spec if spec is not None else ''
-            })
+        })
         methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
         if methodishStart:
             doc.refs.addMethodVariants(anchor['text'][0], anchor.get('for', []), doc.md.shortname)

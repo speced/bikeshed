@@ -189,7 +189,7 @@ def addIndexOfLocallyDefinedTerms(doc, container):
                 'url':"#"+id,
                 'label':"§" + headingLevel,
                 'disambiguator':disambiguator
-                }
+            }
             indexEntries[linkText].append(entry)
 
     # Now print the indexes

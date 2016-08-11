@@ -287,7 +287,7 @@ class EnumMeta(type):
                         '__eq__',
                         '__ne__',
                         '__hash__',
-                        ):
+                ):
                     setattr(enum_class, method, getattr(int, method))
 
         # replace any other __new__ with our own (as long as Enum is not None,
@@ -524,7 +524,7 @@ class EnumMeta(type):
                             N__new__,
                             O__new__,
                             E__new__,
-                            ]:
+                    ]:
                         if method == '__member_new__':
                             classdict['__new__'] = target
                             return None, False, True
@@ -575,7 +575,7 @@ class EnumMeta(type):
                                 None.__new__,
                                 object.__new__,
                                 Enum.__new__,
-                                ):
+                        ):
                             __new__ = target
                             break
                     if __new__ is not None:
@@ -771,7 +771,7 @@ def unique(enumeration):
     if duplicates:
         duplicate_names = ', '.join(
                 ["%s -> %s" % (alias, name) for (alias, name) in duplicates]
-                )
+        )
         raise ValueError('duplicate names found in %r: %s' %
                 (enumeration, duplicate_names)
                 )
