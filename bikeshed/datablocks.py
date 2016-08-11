@@ -73,11 +73,11 @@ def transformDataBlocks(doc, lines):
                 # Single-line <pre>.
                 match = re.match(r"\s*(<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line, re.I)
                 repl = blockTypes[blockType](
-                        lines=[match.group(2)],
-                        tagName=tagName,
-                        firstLine=match.group(1),
-                        lineNum=blockStartLine,
-                        doc=doc)
+                    lines=[match.group(2)],
+                    tagName=tagName,
+                    firstLine=match.group(1),
+                    lineNum=blockStartLine,
+                    doc=doc)
                 newLines.extend(repl)
                 newLines.append("<!--line count correction {0}-->".format(-len(repl)-1))
                 newLines.append(match.group(3))
@@ -85,11 +85,11 @@ def transformDataBlocks(doc, lines):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
                 repl = blockTypes[blockType](
-                        lines=lines[startLine+1:i],
-                        tagName=tagName,
-                        firstLine=lines[startLine],
-                        lineNum=blockStartLine,
-                        doc=doc)
+                    lines=lines[startLine+1:i],
+                    tagName=tagName,
+                    firstLine=lines[startLine],
+                    lineNum=blockStartLine,
+                    doc=doc)
                 newLines.extend(repl)
                 newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
                 newLines.append(match.group(2))
@@ -97,11 +97,11 @@ def transformDataBlocks(doc, lines):
                 # End tag was at the end of line of useful content.
                 # Process the stuff before it, preserve the stuff after it.
                 repl = blockTypes[blockType](
-                        lines=lines[startLine+1:i]+[match.group(1)],
-                        tagName=tagName,
-                        firstLine=lines[startLine],
-                        lineNum=blockStartLine,
-                        doc=doc)
+                    lines=lines[startLine+1:i]+[match.group(1)],
+                    tagName=tagName,
+                    firstLine=lines[startLine],
+                    lineNum=blockStartLine,
+                    doc=doc)
                 newLines.extend(repl)
                 newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
                 newLines.append(match.group(2))
@@ -336,7 +336,7 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     addClass(el, "data")
     rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
     lines = [
-            '''
+        '''
             <table {attrs}{lineNumAttr}>
                 <caption>Arguments for the <a method lt='{method}' for='{interface}'{lineNumAttr}>{interface}.{method}</a> method.</caption>
                 <thead>
@@ -348,16 +348,16 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
                         <th>Description
                 <tbody>'''.format(attrs=rootAttrs, interface=interface, method=method, lineNumAttr=lineNumAttr)
     ] + [
-            '''
+        '''
                 <tr>
                     <td><dfn argument{lineNumAttr}>{0}</dfn>
                     <td>
                     <td>
                     <td>
                     <td>{1}'''.format(param, desc, lineNumAttr=lineNumAttr)
-                    for param,desc in attrs.items()
+        for param,desc in attrs.items()
     ] + [
-            '''
+        '''
             </table>
             '''
     ]

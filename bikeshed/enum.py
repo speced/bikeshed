@@ -56,9 +56,9 @@ class _RouteClassAttributeToGetattr(object):
 def _is_descriptor(obj):
     """Returns True if obj is a descriptor, False otherwise."""
     return (
-            hasattr(obj, '__get__') or
-            hasattr(obj, '__set__') or
-            hasattr(obj, '__delete__'))
+        hasattr(obj, '__get__') or
+        hasattr(obj, '__set__') or
+        hasattr(obj, '__delete__'))
 
 
 def _is_dunder(name):
@@ -329,7 +329,7 @@ class EnumMeta(type):
         # (see issue19025).
         if attr in cls._member_map_:
             raise AttributeError(
-                    "%s: cannot delete Enum member." % cls.__name__)
+                "%s: cannot delete Enum member." % cls.__name__)
         super(EnumMeta, cls).__delattr__(attr)
 
     def __dir__(self):
@@ -629,7 +629,7 @@ del __new__
 
 def __repr__(self):
     return "<%s.%s: %r>" % (
-            self.__class__.__name__, self._name_, self._value_)
+        self.__class__.__name__, self._name_, self._value_)
 temp_enum_dict['__repr__'] = __repr__
 del __repr__
 
@@ -770,11 +770,11 @@ def unique(enumeration):
             duplicates.append((name, member.name))
     if duplicates:
         duplicate_names = ', '.join(
-                ["%s -> %s" % (alias, name) for (alias, name) in duplicates]
+            ["%s -> %s" % (alias, name) for (alias, name) in duplicates]
         )
         raise ValueError('duplicate names found in %r: %s' %
                 (enumeration, duplicate_names)
-                )
+        )
     return enumeration
 
 
