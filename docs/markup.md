@@ -16,6 +16,7 @@ Bikeshed currently recognizes a subset of Markdown:
 * headings
 * horizontal rules
 * fenced code blocks
+* *emphasis* and **strong** span elements
 
 It also recognizes **definition lists**, with the following format:
 
