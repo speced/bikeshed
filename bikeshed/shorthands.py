@@ -226,6 +226,15 @@ def transformAutolinkShortcuts(doc):
     def varReplacer(match):
         return E.var(match.group(1))
 
+    inlineLinkRe = re.compile(r'\[([^\]]*)\]\(\s*([^\s)]*)\s*(?:"([^"]*)")?\s*\)')
+
+    def inlineLinkReplacer(match):
+        return (E.a({"href":match.group(2)}, match.group(1))
+                if len(match.groups()) < 3
+                else
+                E.a({"href":match.group(2), "title":match.group(3)}, match.group(1))
+                )
+
     strongRe = re.compile(r"(?<!\\)([_*])\1(?!\s)([^\1]+)(?!\s)(?<!\\)\1\1")
 
     def strongReplacer(match):
@@ -271,6 +280,7 @@ def transformAutolinkShortcuts(doc):
         if "algorithm" in doc.md.markupShorthands:
             config.processTextNodes(nodes, varRe, varReplacer)
         if "markdown" in doc.md.markupShorthands:
+            config.processTextNodes(nodes, inlineLinkRe, inlineLinkReplacer)
             config.processTextNodes(nodes, strongRe, strongReplacer)
             config.processTextNodes(nodes, emRe, emReplacer)
             config.processTextNodes(nodes, escapedRe, escapedReplacer)
