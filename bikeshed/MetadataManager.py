@@ -42,6 +42,7 @@ class MetadataManager:
         self.audience = []
         self.blockElements = []
         self.boilerplate = config.BoolSet(default=True)
+        self.complainAbout = config.BoolSet()
         self.customTextMacros = []
         self.date = datetime.utcnow().date()
         self.deadline = None
@@ -433,6 +434,41 @@ def parseBiblioStatus(key, val, lineNum):
         return "dated"
 
 
+def parseComplainAbout(key, val, lineNum):
+    ret = config.BoolSet(default=False)
+    validLabels = frozenset(["missing-example-ids"])
+    parseBoolishList(key, val.lower(), ret, validLabels)
+    return ret
+
+
+def parseBoolishList(key, val, boolset, validLabels=None, extraValues=None):
+    # Parses anything defined as "label <boolish>, label <boolish>" into a passed BoolSet
+    # Supply a list of valid labels if you want to have them checked,
+    # and a dict of {value=>bool} pairs you want in addition to the standard boolish values
+    if extraValues is None:
+        extraValues = {}
+    vals = [v.strip() for v in val.split(",")]
+    for v in vals:
+        pieces = v.split()
+        if len(pieces) != 2:
+            die("{0} metadata pieces are a label and a boolean. Got:\n{1}", key, v, lineNum=lineNum)
+            continue
+        name, boolstring = pieces
+        if validLabels and name not in validLabels:
+            die("Unknown {0} label '{1}'.", key, name, lineNum=lineNum)
+            continue
+        if boolstring in extraValues:
+            boolset[name] = extraValues[boolstring]
+        else:
+            onoff = boolish(boolstring)
+            if isinstance(onoff, bool):
+                boolset[name] = onoff
+            else:
+                die("{0} metadata pieces are a shorthand category and a boolean. Got:\n{1}", key, v, lineNum=lineNum)
+                continue
+    return boolset
+
+
 def parseLinkedText(key, val, lineNum):
     # Parses anything defined as "text url, text url, text url" into a list of 2-tuples.
     entries = []
@@ -758,6 +794,7 @@ knownKeys = {
     "Audience": Metadata("Audience", "audience", joinList, parseAudience),
     "Block Elements": Metadata("Block Elements", "blockElements", joinList, parseCommaSeparated),
     "Boilerplate": Metadata("Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate),
+    "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
     "Date": Metadata("Date", "date", joinValue, parseDate),
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
     "Default Biblio Status": Metadata("Default Biblio Status", "defaultBiblioStatus", joinValue, parseBiblioStatus),

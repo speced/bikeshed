@@ -28,6 +28,7 @@ from . import datablocks
 from . import lexers
 from . import publish
 from . import extensions
+from . import lint
 from .requests import requests
 from .ReferenceManager import ReferenceManager
 from .htmlhelpers import *
@@ -528,6 +529,7 @@ class Spec(object):
         metadata.parseDoc(self)
 
         # Fill in and clean up a bunch of data
+        lint.lintExampleIDs(self)
         boilerplate.addBikeshedVersion(self)
         boilerplate.addStatusSection(self)
         boilerplate.addLogo(self)
