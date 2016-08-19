@@ -461,4 +461,7 @@ def fixupAnchor(anchor):
     # Miscellaneous fixes
     if anchor.get('title', None) == "'@import'":
         anchor['title'] = "@import"
+    for k,v in anchor.items():
+        # Normalize whitespace
+        anchor[k] = re.sub(r"\s+", " ", v.strip())
     return anchor
