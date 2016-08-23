@@ -54,6 +54,7 @@ def updateCrossRefs():
                 list.append(item)
             if item.get('children'):
                 linearizeAnchorTree(item['children'], list)
+                del item['children']
         return list
 
     specs = dict()
@@ -461,4 +462,12 @@ def fixupAnchor(anchor):
     # Miscellaneous fixes
     if anchor.get('title', None) == "'@import'":
         anchor['title'] = "@import"
+    for k,v in anchor.items():
+        # Normalize whitespace
+        if isinstance(v, basestring):
+            anchor[k] = re.sub(r"\s+", " ", v.strip())
+        elif isinstance(v, list):
+            for k1, v1 in enumerate(v):
+                if isinstance(v1, basestring):
+                    anchor[k][k1] = re.sub(r"\s+", " ", v1.strip())
     return anchor
