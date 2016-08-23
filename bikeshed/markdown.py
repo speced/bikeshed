@@ -349,8 +349,8 @@ def parseParagraph(stream):
         p = "<p class='replace-with-assertion-class'>"
     elif line.lower().startswith("advisement:"):
         line = line[11:]
-        p = "<strong class='replace-with-advisement-class'>"
-        endTag = "</strong>"
+        p = "<p><strong class='replace-with-advisement-class'>"
+        endTag = "</strong></p>"
     else:
         match = re.match(r"issue\(([^)]+)\):(.*)", line, re.I)
         if match:
