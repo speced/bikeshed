@@ -664,13 +664,42 @@ class Spec(object):
     def fixText(self, text, moreMacros=None):
         # Do several textual replacements that need to happen *before* the document is parsed as HTML.
 
-        # If markdown shorthands are on, temporarily remove `foo` while processing.
+        # If markdown shorthands are on, remove all `foo`s while processing,
+        # so their contents don't accidentally trigger other stuff.
+        # Also handle markdown escapes.
         codeSpanReplacements = []
         if "markdown" in self.md.markupShorthands:
-            def replaceCodeSpans(m):
-                codeSpanReplacements.append(m.group(2))
-                return "\ue0ff"
-            text = re.sub(r"(`+)(.*?[^`])\1(?=[^`])", replaceCodeSpans, text, flags=re.DOTALL)
+            newText = ""
+            mode = "text"
+            indexSoFar = 0
+            escapeLen = 0
+            for m in re.finditer(r"(\\`)|((?<!\n)`+)", text):
+                if mode == "text":
+                    if m.group(1):
+                        newText += text[indexSoFar:m.start()] + m.group(1)[1]
+                        indexSoFar = m.end()
+                    elif m.group(2):
+                        mode = "escape"
+                        newText += text[indexSoFar:m.start()]
+                        indexSoFar = m.end()
+                        escapeLen = len(m.group(2))
+                elif mode == "escape":
+                    if m.group(1):
+                        pass
+                    elif m.group(2):
+                        if len(m.group(2)) != escapeLen:
+                            pass
+                        else:
+                            mode = "text"
+                            codeSpanReplacements.append(text[indexSoFar:m.start()])
+                            newText += "\ue0ff"
+                            indexSoFar = m.end()
+            if mode == "text":
+                newText += text[indexSoFar:]
+            elif mode == "escape":
+                newText += "\ue0ff"
+                codeSpanReplacements.append(text[indexSoFar:])
+            text = newText
 
         # Replace the [FOO] text macros.
         # [FOO?] macros are optional; failure just removes them.
