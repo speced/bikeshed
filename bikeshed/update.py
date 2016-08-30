@@ -106,6 +106,8 @@ def updateCrossRefs():
             linkingTexts = rawAnchor.get('linking_text', [rawAnchor.get('title')])
             if linkingTexts[0] is None:
                 continue
+            if len(linkingTexts) == 1 and linkingTexts[0].strip() == "":
+                continue
             if rawAnchor['type'] == "heading":
                 uri = rawAnchor['uri']
                 if uri.startswith("??"):
