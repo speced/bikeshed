@@ -1883,16 +1883,21 @@ def addSyntaxHighlighting(doc):
 
     def highlight(el, lang):
         text = textContent(el)
-        if lang in customLexers:
-            lexer = customLexers[lang]
+        if lang in ["idl", "webidl"]:
+            widl = parser.Parser(text, IDLUI())
+            marker = HighlightMarker()
+            nested = parseHTML(unicode(widl.markup(marker)))
+            highlighted = flattenHighlighting(nested)
         else:
-            try:
-                lexer = get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
-            except pyg.util.ClassNotFound:
-                die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
-                return
-        highlighted = parseHTML(pyg.highlight(text, lexer, formatters.HtmlFormatter()))[0][0]
-        # Remove the trailing newline
+            if lang in customLexers:
+                lexer = customLexers[lang]
+            else:
+                try:
+                    lexer = get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
+                except pyg.util.ClassNotFound:
+                    die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
+                    return
+            highlighted = parseHTML(pyg.highlight(text, lexer, formatters.HtmlFormatter()))[0][0]
         if hasChildElements(el):
             mergeHighlighting(el, highlighted)
         else:
@@ -2055,6 +2060,28 @@ def mergeHighlighting(el, hi):
         else:
             coloredText.append(ColoredText(n, None))
     colorizeEl(el, coloredText)
+
+def flattenHighlighting(el):
+    # Given a highlighted chunk of markup that is "nested",
+    # flattens it into a sequence of text and els with just text,
+    # by merging classes upward.
+    container = E.div()
+    for node in childNodes(el):
+        if not isElement(node):
+            # raw text
+            appendChild(container, node)
+        elif not hasChildElements(node):
+            # el with just text
+            appendChild(container, node)
+        else:
+            # el with internal structure
+            overclass = el.get("class", "")
+            flattened = flattenHighlighting(node)
+            for subnode in childNodes(flattened):
+                addClass(subnode, overclass)
+                appendChild(container, subnode)
+    return container
+
 
 
 def cleanupHTML(doc):
