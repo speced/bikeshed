@@ -16,7 +16,9 @@ def runAllTests(constructor):
     numPassed = 0
     total = 0
     testFolder = config.scriptPath + "/../tests/"
+    fails = []
     for testname in glob.glob(testFolder + "*.bs"):
+        p(testname)
         total += 1
         doc = constructor(inputFilename=testname)
         doc.preprocess()
@@ -26,14 +28,17 @@ def runAllTests(constructor):
         if compare(outputText, goldenText):
             numPassed += 1
         else:
-            p(testname)
+            fails.append(testname)
     if total == 0:
         p("No tests were found in '{0}'.".format(testFolder))
     elif numPassed == total:
-        p("\033[32;1m✔ All tests passed.\033[0m")
+        p(printColor("✔ All tests passed.", color="green"))
         return True
     else:
-        p("\033[31;1m✘ {0}/{1} tests passed.\033[0m".format(numPassed, total))
+        p(printColor("✘ {0}/{1} tests passed.".format(numPassed, total), color="red"))
+        p(printColor("Failed Tests:", color="red"))
+        for fail in fails:
+            p("* " + fail)
 
 
 def compare(suspect, golden):
