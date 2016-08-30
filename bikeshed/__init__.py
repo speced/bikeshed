@@ -679,11 +679,11 @@ class Spec(object):
                         newText += text[indexSoFar:m.start()] + m.group(1)[1]
                         indexSoFar = m.end()
                     elif m.group(2):
-                        mode = "escape"
+                        mode = "code"
                         newText += text[indexSoFar:m.start()]
                         indexSoFar = m.end()
                         escapeLen = len(m.group(2))
-                elif mode == "escape":
+                elif mode == "code":
                     if m.group(1):
                         pass
                     elif m.group(2):
