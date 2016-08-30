@@ -1790,11 +1790,7 @@ def markupIDL(doc):
             continue
         text = textContent(el)
         widl = parser.Parser(text, IDLUI())
-        if not isNormative(el):
-            # Just highlight with the widl parser
-            marker = HighlightMarker()
-            replaceContents(el, parseHTML(unicode(widl.markup(marker))))
-        else:
+        if isNormative(el):
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
             # Parse a second time with the global one, which collects all data in the doc.
             marker = DebugMarker() if doc.debug else IDLMarker()
@@ -1928,7 +1924,12 @@ def addSyntaxHighlighting(doc):
         if attr == "nohighlight":
             continue
         if attr is None:
-            if doc.md.defaultHighlight is None:
+            if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
+                if isNormative(el):
+                    # Already processed/highlighted.
+                    continue
+                lang = "idl"
+            elif doc.md.defaultHighlight is None:
                 continue
             else:
                 lang = doc.md.defaultHighlight
@@ -2077,8 +2078,11 @@ def flattenHighlighting(el):
             overclass = el.get("class", "")
             flattened = flattenHighlighting(node)
             for subnode in childNodes(flattened):
-                addClass(subnode, overclass)
-                appendChild(container, subnode)
+                if isElement(subnode):
+                    addClass(subnode, overclass)
+                    appendChild(container, subnode)
+                else:
+                    appendChild(container, E.span({"class":overclass},subnode))
     return container
 
 
