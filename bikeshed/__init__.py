@@ -696,9 +696,8 @@ class Spec(object):
                             indexSoFar = m.end()
             if mode == "text":
                 newText += text[indexSoFar:]
-            elif mode == "escape":
-                newText += "\ue0ff"
-                codeSpanReplacements.append(text[indexSoFar:])
+            elif mode == "code":
+                newText += "`"*escapeLen + text[indexSoFar:]
             text = newText
 
         # Replace the [FOO] text macros.
