@@ -673,7 +673,7 @@ class Spec(object):
             mode = "text"
             indexSoFar = 0
             escapeLen = 0
-            for m in re.finditer(r"(\\`)|((?<!\n)`+)", text):
+            for m in re.finditer(r"(\\`)|(`+)", text):
                 if mode == "text":
                     if m.group(1):
                         newText += text[indexSoFar:m.start()] + m.group(1)[1]
