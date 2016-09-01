@@ -241,6 +241,14 @@ interface Int {
     attribute ArrayBuffer? value3;
 };
 
+namespace Namespace1 {
+    [One] unsigned long long method(short x);
+    [Two] unsigned long long method(short x, short y);
+};
+partial namespace Namespace2 {
+    [One] unsigned long long method(short x);
+    [Two] unsigned long long method(short x, short y);
+};
 """
 #    idl = idl.replace(' ', '  ')
     print "IDL >>>\n" + idl + "\n<<<"

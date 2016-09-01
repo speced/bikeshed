@@ -1,13 +1,13 @@
 # coding=utf-8
 #
-#  Copyright © 2013 Hewlett-Packard Development Company, L.P. 
+#  Copyright © 2013 Hewlett-Packard Development Company, L.P.
 #
-#  This work is distributed under the W3C® Software License [1] 
-#  in the hope that it will be useful, but WITHOUT ANY 
-#  WARRANTY; without even the implied warranty of 
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+#  This work is distributed under the W3C® Software License [1]
+#  in the hope that it will be useful, but WITHOUT ANY
+#  WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #
-#  [1] http://www.w3.org/Consortium/Legal/2002/copyright-software-20021231 
+#  [1] http://www.w3.org/Consortium/Legal/2002/copyright-software-20021231
 #
 
 import re
@@ -17,7 +17,7 @@ class Token(object):
     def __init__(self, type, text):
         self.type = type
         self.text = text
-    
+
     def isSymbol(self, symbol = None):
         if ('symbol' == self.type):
             if (symbol):
@@ -29,19 +29,19 @@ class Token(object):
 
     def isIdentifier(self):
         return ('identifier' == self.type)
-    
+
     def isFloat(self):
         return ('float' == self.type)
-    
+
     def isInteger(self):
         return ('integer' == self.type)
-    
+
     def isString(self):
         return ('string' == self.type)
-    
+
     def isWhitespace(self):
         return ('whitespace' == self.type)
-    
+
     def __unicode__(self):
         return self.text
 
@@ -53,14 +53,14 @@ class Token(object):
 class Tokenizer(object):
     SymbolIdents = frozenset((
         'any', 'attribute', 'ArrayBuffer', 'boolean', 'byte', 'ByteString', 'callback', 'const', 'creator', 'DataView',
-        'Date', 'deleter', 'dictionary', 'DOMString', 'double', 'enum', 'Error', 'exception', 'false', 'float', 
+        'Date', 'deleter', 'dictionary', 'DOMString', 'double', 'enum', 'Error', 'exception', 'false', 'float',
         'Float32Array', 'Float64Array', 'FrozenArray', 'getter', 'implements', 'Infinity', '-Infinity', 'inherit', 'Int8Array',
-        'Int16Array', 'Int32Array', 'interface', 'iterable', 'legacycaller', 'legacyiterable', 'long', 'maplike', 
-        'NaN', 'null', 'object', 'octet', 'optional', 'or', 'partial', 'Promise', 'readonly', 'RegExp', 'required', 
-        'sequence', 'serializer', 'setlike', 'setter', 'short', 'static', 'stringifier', 'true', 'typedef', 
-        'Uint8Array', 'Uint16Array', 'Uint32Array', 'Uint8ClampedArray', 'unrestricted', 'unsigned', 'USVString', 
+        'Int16Array', 'Int32Array', 'interface', 'iterable', 'legacycaller', 'legacyiterable', 'long', 'maplike',
+        'namespace', 'NaN', 'null', 'object', 'octet', 'optional', 'or', 'partial', 'Promise', 'readonly', 'RegExp', 'required',
+        'sequence', 'serializer', 'setlike', 'setter', 'short', 'static', 'stringifier', 'true', 'typedef',
+        'Uint8Array', 'Uint16Array', 'Uint32Array', 'Uint8ClampedArray', 'unrestricted', 'unsigned', 'USVString',
         'void'))
-    
+
     def __init__(self, text, ui = None):
         self.ui = ui
         self.tokens = collections.deque()
@@ -121,7 +121,7 @@ class Tokenizer(object):
                 return (1 < len(self.tokens))
             return True
         return False
-    
+
     def next(self, skipWhitespace = True):
         "Remove and return next available token, optionally skipping whitespace"
         self.resetPeek()
@@ -134,7 +134,7 @@ class Tokenizer(object):
                     self.lineNumber += token.text.count('\n')
             return token
         return None
-    
+
     def restore(self, token):
         "Return token to the front of the stream"
         if (token):
@@ -154,14 +154,14 @@ class Tokenizer(object):
         "Save current lookahead index and optionally lookahead next token"
         self.positionStack.append(self.peekIndex)
         return self.peek() if (andPeek) else None
-    
+
     def popPosition(self, holdPosition):
         "Remove saved lookahead state and optionally rewind lookahead index"
         index = self.positionStack.pop()
         if (not holdPosition):
             self.peekIndex = index
         return holdPosition
-    
+
     def peek(self, skipWhitespace = True):
         "Return next available token without removing it, advance lookahead index, optionally skip whitespace"
         self.peekIndex += 1
@@ -172,7 +172,7 @@ class Tokenizer(object):
                 return self.tokens[self.peekIndex] if (self.peekIndex < len(self.tokens)) else None
             return token
         return None
-    
+
     def sneakPeek(self, skipWhitespace = True):
         "Return next available token without removing it or advancing lookahead index, optionally skip whitespace"
         if ((self.peekIndex + 1) < len(self.tokens)):
@@ -181,7 +181,7 @@ class Tokenizer(object):
                 return self.tokens[self.peekIndex + 2] if ((self.peekIndex + 2) < len(self.tokens)) else None
             return token
         return None
-    
+
     def peekSymbol(self, symbol):
         "Advance lookahead index until symbol token is found, respect nesting of (), {}, []"
         token = self.peek()
@@ -194,7 +194,7 @@ class Tokenizer(object):
                 self.peekSymbol(']')
             token = self.peek()
         return token
-    
+
     def resetPeek(self):
         "Reset lookahead index to first available token"
         assert (0 == len(self.positionStack))
@@ -225,11 +225,11 @@ class Tokenizer(object):
             message = u'IDL SYNTAX ERROR LINE: ' + unicode(lineNumber) + u' - '
             if (ending):
                 message += 'expected ";" '
-            
+
             skip = skipped[:-1] if (skipped and (0 < len(skipped)) and
                                     (skipped[-1].isSymbol(';') or
                                      ((1 < len(skipped)) and skipped[-1].isSymbol('}')))) else skipped
-            
+
             if (symbol):
                 if (0 < len(skip)):
                     self.ui.warn(message + u'skipped: "' + u''.join([unicode(token) for token in skip]) + '"\n')
