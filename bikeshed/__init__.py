@@ -1893,6 +1893,8 @@ def addSyntaxHighlighting(doc):
                     die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
                     return
             highlighted = parseHTML(pyg.highlight(text, lexer, formatters.HtmlFormatter()))[0][0]
+            if highlighted[-1].tail is not None:
+                highlighted[-1].tail = highlighted[-1].tail.strip()
         if hasChildElements(el):
             mergeHighlighting(el, highlighted)
         else:
