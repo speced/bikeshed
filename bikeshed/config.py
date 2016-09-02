@@ -86,18 +86,96 @@ megaGroups = {
 }
 
 
-def canonicalizeStatus(status, group):
-    if status is not None:
-        status = status.upper()
+def canonicalizeStatus(rawStatus, group):
+    if rawStatus is None:
+        return None
+
+    def megaGroupsForStatus(status):
+        # Returns a list of megagroups that recognize the given status
+        megaGroups = []
+        for key in shortToLongStatus.keys():
+            mg,_,s = key.partition("/")
+            if s == status:
+                megaGroups.append(mg)
+        return megaGroups
+
+    def printList(items):
+        # Format a list of strings into an English list.
+        items = list(items)
+        if len(items) == 1:
+            return items[0]
+        if len(items) == 2:
+            return "{0} or {1}".format(*items)
+        return "{0}, or {1}".format(", ".join(items[:-1]), items[-1])
+
+    # Canonicalize the rawStatus that was passed in, into a known form.
+    # Might be foo/BAR, or just BAR.
+    megaGroup,_,status = rawStatus.partition("/")
+    if status == "":
+        status = megaGroup
+        megaGroup = ""
+    megaGroup = megaGroup.lower()
+    status = status.upper()
+    if megaGroup:
+        canonStatus = megaGroup + "/" + status
+    else:
+        canonStatus = status
+
     if group is not None:
         group = group.lower()
-    if status in shortToLongStatus:
-        return status
-    for mg,gs in megaGroups.items():
-        s = "{0}/{1}".format(mg, status)
-        if group in gs and s in shortToLongStatus:
-            return s
-    return status
+
+    # Using a directly-recognized status is A-OK.
+    # (Either one of the unrestricted statuses,
+    # or one of the restricted statuses with the correct standards-org prefix.)
+    if canonStatus in shortToLongStatus:
+        return canonStatus
+
+    possibleMgs = megaGroupsForStatus(status)
+
+    # If they specified a standards-org prefix and it wasn't found,
+    # that's an error.
+    if megaGroup:
+        # Was the error because the megagroup doesn't exist?
+        if megaGroup not in megaGroups:
+            if possibleMgs:
+                msg = "Status metadata specified a non-existent '{0}' organization.".format(megaGroup)
+                if "" in possibleMgs:
+                    if len(possibleMgs) == 1:
+                        msg += " That status must be used without an org at all, like `Status: {0}`".format(status)
+                    else:
+                        msg += " That status can only be used with the org{0} {1}, or without an org at all.".format(
+                            "s" if len(possibleMgs)>1 else "",
+                            printList("'{0}'".format(x) for x in possibleMgs if x != ""))
+                else:
+                    if len(possibleMgs) == 1:
+                        msg += " That status can only be used with the org '{0}', like `Status: {0}/{1}`".format(possibleMgs[0], status)
+                    else:
+                        msg += " That status can only be used with the orgs {0}.".format(printList("'{0}'".format(x) for x in possibleMgs))
+            else:
+                die("Unknown Status metadata '{0}'. Check the docs for valid Status values.", canonStatus)
+        die("{0}", msg)
+        return canonStatus
+
+    # Otherwise, they provided a bare status.
+    # See if their group is compatible with any of the prefixed statuses matching the bare status.
+    assert "" not in possibleMgs # if it was here, the literal "in" test would have caught this bare status
+    for mg in possibleMgs:
+        if group in megaGroups[mg]:
+            return mg + "/" + status
+    # Group isn't in any compatible org, so suggest prefixing.
+    if possibleMgs:
+        msg = "You used Status: {0}, but that's limited to the {1} org{2}".format(
+            rawStatus,
+            printList("'{0}'".format(mg) for mg in possibleMgs),
+            "s" if len(possibleMgs)>1 else "")
+        if group:
+            msg += ", and your group '{0}' isn't recognized as being in {1}.".format(group, "any of those orgs" if len(possibleMgs)>1 else "that org")
+            msg += " If this is wrong, please file a Bikeshed issue to categorize your group properly, and/or try:\n"
+            msg += "\n".join("Status: {0}/{1}".format(mg, status) for mg in possibleMgs)
+        else:
+            msg += ", and you don't have a Group metadata. Please declare your Group, or check the docs for statuses that can be used by anyone."
+    die("{0}", msg)
+    return canonStatus
 
 
 dfnClassToType = {
