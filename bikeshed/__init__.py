@@ -1723,7 +1723,7 @@ class IDLMarker(object):
             if construct.default is not None:
                 value = escapeAttr("{0}".format(construct.default.value))
                 extraParameters += ' data-default="{0}"'.format(value)
-        elif idlType == "interface":
+        elif idlType in ["interface", "namespace"]:
             if construct.partial:
                 refType = "link"
 

@@ -115,6 +115,7 @@ dfnClassToType = {
     "element-statedef"   : "element-state",
     "eventdef"           : "event",
     "interfacedef"       : "interface",
+    "namespacedef"       : "namespace",
     "extendedattrdef"    : "extended-attribute",
     "constructordef"     : "constructor",
     "methoddef"          : "method",
@@ -145,8 +146,8 @@ dfnTypes = frozenset(dfnClassToType.values() + ["dfn"])
 maybeTypes = frozenset(["value", "type", "at-rule", "function", "selector"])
 cssTypes = frozenset(["property", "value", "at-rule", "descriptor", "type", "function", "selector"])
 markupTypes = frozenset(["element", "element-attr", "element-state", "attr-value"])
-idlTypes = frozenset(["event", "interface", "extended-attribute", "constructor", "method", "argument", "attribute", "callback", "dictionary", "dict-member", "enum", "enum-value", "exception", "const", "typedef", "stringifier", "serializer", "iterator", "maplike", "setlike"])
-idlNameTypes = frozenset(["interface", "dictionary", "enum", "typedef", "callback"])
+idlTypes = frozenset(["event", "interface", "namespace", "extended-attribute", "constructor", "method", "argument", "attribute", "callback", "dictionary", "dict-member", "enum", "enum-value", "exception", "const", "typedef", "stringifier", "serializer", "iterator", "maplike", "setlike"])
+idlNameTypes = frozenset(["interface", "namespace", "dictionary", "enum", "typedef", "callback"])
 functionishTypes = frozenset(["function", "method", "constructor", "stringifier"])
 idlMethodTypes = frozenset(["method", "constructor", "stringifier", "idl", "idl-name"])
 linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "idl-name", "element-sub", "maybe", "biblio"])
