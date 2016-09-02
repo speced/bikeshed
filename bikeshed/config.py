@@ -138,7 +138,7 @@ def canonicalizeStatus(rawStatus, group):
         # Was the error because the megagroup doesn't exist?
         if possibleMgs:
             if megaGroup not in megaGroups:
-                msg = "Status metadata specified a non-existent '{0}' organization.".format(megaGroup)
+                msg = "Status metadata specified an unrecognized '{0}' organization.".format(megaGroup)
             else:
                 msg = "Status '{0}' can't be used with the org '{1}'.".format(status, megaGroup)
             if "" in possibleMgs:
