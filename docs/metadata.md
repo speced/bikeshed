@@ -26,7 +26,84 @@ Or if you're adding multiple lines with the same key, you can just start the sub
 Several keys are required information, and will cause the processor to flag an error if you omit them:
 
 * **Title** is the spec's full title.  This can alternately be specified by adding an `<h1>` element as the first line of the spec.
-* **Status** is the spec's status. There are a few general abbreviations, and several that are restricted to particular groups. **TODO: Document this properly.**
+* **Status** is the spec's status. There are a few general abbreviations that can be used any group (or specs without a Group at all), and several that are restricted to particular groups.
+	<details>
+		<summary>Statuses usable by anyone</summary>
+		* DREAM: "A Collection of Interesting Ideas"
+		* LS: "Living Standard"
+		* LS-COMMIT: "Commit Snapshot"
+		* LS-BRANCH: "Branch Snapshot"
+		* FINDING: "Finding"
+	</details>
+	<details>
+		<summary>Statuses usable by W3C groups</summary>
+		* ED: "Editor's Draft"
+		* WD: "W3C Working Draft"
+		* FPWD: "W3C First Public Working Draft"
+		* LCWD: "W3C Last Call Working Draft"
+		* CR: "W3C Candidate Recommendation"
+		* PR: "W3C Proposed Recommendation"
+		* REC: "W3C Recommendation"
+		* PER: "W3C Proposed Edited Recommendation"
+		* NOTE: "W3C Working Group Note"
+		* MO: "W3C Member-only Draft"
+		* UD: "Unofficial Proposal Draft"
+		* CG-DRAFT: "Draft Community Group Report"
+		* CG-FINAL: "Final Community Group Report"
+
+		Bikeshed has a listing of what Groups are associated with the W3C.
+		If your Group isn't on that list,
+		it'll complain when you try to use a W3C status.
+		Please file a bug on Bikeshed to add your Group,
+		and/or prefix your status like `Status: w3c/ED`.
+	</details>
+	<details>
+		<summary>Statuses usable by ISO groups</summary>
+		* I: "Issue"
+		* DR: "Defect Report"
+		* D: "Draft Proposal"
+		* P: "Published Proposal"
+		* MEET: "Meeting Announcements"
+		* RESP: "Records of Response"
+		* MIN: "Minutes"
+		* ER: "Editor's Report"
+		* SD: "Standing Document"
+		* PWI: "Preliminary Work Item"
+		* NP: "New Proposal"
+		* NWIP: "New Work Item Proposal"
+		* WD: "Working Draft"
+		* CD: "Committee Draft"
+		* FCD: "Final Committee Draft"
+		* DIS: "Draft International Standard"
+		* FDIS: "Final Draft International Standard"
+		* PRF: "Proof of a new International Standard"
+		* IS: "International Standard"
+		* TR: "Technical Report"
+		* DTR: "Draft Technical Report"
+		* TS: "Technical Specification"
+		* DTS: "Draft Technical Specification"
+		* PAS: "Publicly Available Specification"
+		* TTA: "Technology Trends Assessment"
+		* IWA: "International Workshop Agreement"
+		* COR: "Technical Corrigendum"
+		* GUIDE: "Guidance to Technical Committees"
+		* NP-AMD: "New Proposal Amendment"
+		* AWI-AMD: "Approved new Work Item Amendment"
+		* WD-AMD: "Working Draft Amendment"
+		* CD-AMD: "Committe Draft Amendment"
+		* PD-AMD: "Proposed Draft Amendment"
+		* FPD-AMD: "Final Proposed Draft Amendment"
+		* D-AMD: "Draft Amendment"
+		* FD-AMD: "Final Draft Amendment"
+		* PRF-AMD: "Proof Amendment"
+		* AMD: "Amendment"
+
+		Bikeshed has a listing of what Groups are associated with ISO.
+		If your Group isn't on that list,
+		it'll complain when you try to use an ISO status.
+		Please file a bug on Bikeshed to add your Group,
+		and/or prefix your status like `Status: iso/ER`.
+	</details>
 * **ED** must contain a link that points to the editor's draft.
 * **Shortname** must contain the spec's shortname, like "css-lists" or "css-backgrounds".
 * **Level** (or **Revision**, an alias) must contain the spec's level as an integer.
