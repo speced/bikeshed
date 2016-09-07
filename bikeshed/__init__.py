@@ -1832,21 +1832,15 @@ def processIDL(doc):
             for idlText in el.get('data-lt').split('|'):
                 if idlType == "interface" and idlText in forcedInterfaces:
                     forceDfn = True
-                if idlType == "interface":
-                    ref = doc.refs.getRef("interface", idlText, status="local", el=el, error=False)
+                for linkFor in config.splitForValues(el.get('data-idl-for', '')) or [None]:
+                    ref = doc.refs.getRef(idlType, idlText,
+                                          linkFor=linkFor,
+                                          status="local",
+                                          el=el,
+                                          error=False)
                     if ref:
                         url = ref.url
-                    else:
-                        forceDfn = True
-                else:
-                    for linkFor in config.splitForValues(el.get('data-idl-for', '')) or [None]:
-                        ref = doc.refs.getRef(idlType, idlText,
-                                              linkFor=linkFor,
-                                              el=el,
-                                              error=False)
-                        if ref:
-                            url = ref.url
-                            break
+                        break
                 if ref:
                     break
             if url is None or forceDfn:
