@@ -237,6 +237,12 @@ class Tokenizer(object):
                 self.ui.warn(message + '\n')
         return skipped
 
+    def error(self, *args):
+        "Report non-syntax error"
+        if (self.ui and hasattr(self.ui, 'warn')):
+            message = u'IDL ERROR LINE: ' + unicode(self.lineNumber) + u' - ' + u''.join([unicode(arg) for arg in args])
+            self.ui.warn(message + '\n')
+
     def didIgnore(self, ignored):
         "Report ignored content"
         if (self.ui and hasattr(self.ui, 'note')):

@@ -17,8 +17,9 @@ from constructs import *
 
 
 class Parser(object):
-    def __init__(self, text = None, ui = None):
+    def __init__(self, text = None, ui = None, symbolTable = None):
         self.ui = ui
+        self.symbolTable = symbolTable if (symbolTable) else {}
         self.reset()
         if (text):
             self.parse(text)
@@ -38,23 +39,23 @@ class Parser(object):
 
         while (tokens.hasTokens()):
             if (Callback.peek(tokens)):
-                self.constructs.append(Callback(tokens))
+                self.constructs.append(Callback(tokens, parser = self))
             elif (Interface.peek(tokens)):
-                self.constructs.append(Interface(tokens))
+                self.constructs.append(Interface(tokens, parser = self))
             elif (Namespace.peek(tokens)):
-                self.constructs.append(Namespace(tokens))
+                self.constructs.append(Namespace(tokens, parser = self))
             elif (Dictionary.peek(tokens)):
-                self.constructs.append(Dictionary(tokens))
+                self.constructs.append(Dictionary(tokens, parser = self))
             elif (Enum.peek(tokens)):
-                self.constructs.append(Enum(tokens))
+                self.constructs.append(Enum(tokens, parser = self))
             elif (Typedef.peek(tokens)):
-                self.constructs.append(Typedef(tokens))
+                self.constructs.append(Typedef(tokens, parser = self))
             elif (Const.peek(tokens)):   # Legacy support (SVG spec)
-                self.constructs.append(Const(tokens))
+                self.constructs.append(Const(tokens, parser = self))
             elif (ImplementsStatement.peek(tokens)):
-                self.constructs.append(ImplementsStatement(tokens))
+                self.constructs.append(ImplementsStatement(tokens, parser = self))
             else:
-                self.constructs.append(SyntaxError(tokens, None))
+                self.constructs.append(SyntaxError(tokens, None, parser = self))
 
     def __str__(self):
         return self.__unicode__()
@@ -92,6 +93,12 @@ class Parser(object):
                     return True
             return False
         return (key in self.constructs)
+
+    def addType(self, type):
+        self.symbolTable[type.name] = type
+
+    def getType(self, name):
+        return self.symbolTable.get(name)
 
     def find(self, name):
         match = re.match('(.*)\(.*\)(.*)', name)    # strip ()'s

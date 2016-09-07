@@ -500,11 +500,17 @@ class SingleType(Production):    # NonAnyType | "any" [TypeSuffixStartingWithArr
         Production.__init__(self, tokens)
         if (NonAnyType.peek(tokens)):
             self.type = NonAnyType(tokens)
+            self.typeName = self.type.typeName
             self.suffix = None
         else:
             self.type = Symbol(tokens, 'any', False)
+            self.typeName = None
             self.suffix = TypeSuffixStartingWithArray(tokens) if (TypeSuffixStartingWithArray.peek(tokens)) else None
         self._didParse(tokens, False)
+
+    @property
+    def typeNames(self):
+        return [self.typeName]
 
     def _unicode(self):
         return unicode(self.type) + (unicode(self.suffix) if (self.suffix) else '')
@@ -564,6 +570,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
         self._closeType = None
         self.null = False
         self.suffix = None
+        self.typeName = None
         if (PrimitiveType.peek(tokens)):
             self.type = PrimitiveType(tokens)
             self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
@@ -571,6 +578,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             token = tokens.sneakPeek()
             if (token.isIdentifier()):
                 self.type = tokens.next().text
+                self.typeName = self.type
                 self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
             elif (token.isSymbol(('sequence', 'FrozenArray'))):
                 self.sequence = Symbol(tokens)
@@ -656,9 +664,11 @@ class UnionMemberType(Production):   # NonAnyType | UnionType [TypeSuffix] | "an
         self.any = None
         self._openBracket = None
         self._closeBracket = None
+        self.typeName = None
         if (NonAnyType.peek(tokens)):
             self.type = NonAnyType(tokens)
             self.suffix = None
+            self.typeName = self.type.typeName
         elif (UnionType.peek(tokens)):
             self.type = UnionType(tokens)
             self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
@@ -722,6 +732,10 @@ class UnionType(Production): # "(" UnionMemberType ["or" UnionMemberType]... ")"
         self._closeParen = Symbol(tokens, ')', False)
         self._didParse(tokens, False)
 
+    @property
+    def typeNames(self):
+        return [type.typeName for type in self.types]
+
     def _unicode(self):
         output = unicode(self._openParen)
         output += ''.join([unicode(type) + unicode(_or) for type, _or in itertools.izip_longest(self.types, self._ors, fillvalue = '')])
@@ -759,6 +773,10 @@ class Type(Production):  # SingleType | UnionType [TypeSuffix]
             self.type = UnionType(tokens)
             self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
         self._didParse(tokens)
+
+    @property
+    def typeNames(self):
+        return self.type.typeNames
 
     def _unicode(self):
         return unicode(self.type) + (self.suffix._unicode() if (self.suffix) else '')
@@ -940,7 +958,7 @@ class Default(Production):   # "=" ConstValue | "=" string | "=" "[" "]"
 class ArgumentName(Production):   # identifier | ArgumentNameKeyword
     ArgumentNameKeywords = frozenset(['attribute', 'callback', 'const', 'creator', 'deleter', 'dictionary', 'enum',
                                       'getter', 'implements', 'inherit', 'interface', 'iterable', 'legacycaller',
-                                      'legacyiterable', 'maplike', 'partial', 'required', 'serializer', 'setlike',
+                                      'legacyiterable', 'maplike', 'namespace', 'partial', 'required', 'serializer', 'setlike',
                                       'setter', 'static', 'stringifier', 'typedef', 'unrestricted'])
     @classmethod
     def peek(cls, tokens):
@@ -949,18 +967,22 @@ class ArgumentName(Production):   # identifier | ArgumentNameKeyword
 
     def __init__(self, tokens):
         Production.__init__(self, tokens)
-        self.name = tokens.next().text
+        self._name = tokens.next().text
         self._didParse(tokens)
 
+    @property
+    def name(self):
+        return self._name[1:] if ('_' == self._name[0]) else self._name
+
     def _unicode(self):
-        return self.name
+        return self._name
 
     def _markup(self, generator):
-        generator.addName(self.name)
+        generator.addName(self._name)
         return self
 
     def __repr__(self):
-        return '[ArgumentName: ' + repr(self.name) + ']'
+        return '[ArgumentName: ' + repr(self._name) + ']'
 
 
 class ArgumentList(Production):    # Argument ["," Argument]...
@@ -983,9 +1005,27 @@ class ArgumentList(Production):    # Argument ["," Argument]...
         token = tokens.sneakPeek()
         while (token and token.isSymbol(',')):
             self._commas.append(Symbol(tokens, ','))
-            self.arguments.append(constructs.Argument(tokens, parent))
+            argument = constructs.Argument(tokens, parent)
+            if (len(self.arguments)):
+                if (self.arguments[-1].variadic):
+                    tokens.error('Argument "', argument.name, '" not allowed to follow variadic argument "', self.arguments[-1].name, '"')
+                elif ((not self.arguments[-1].required) and argument.required):
+                    tokens.error('Required argument "', argument.name, '" cannot follow optional argument "', self.arguments[-1].name, '"')
+            self.arguments.append(argument)
             token = tokens.sneakPeek()
         self._didParse(tokens)
+        if (parent):
+            for index in range(0, len(self.arguments)):
+                argument = self.arguments[index]
+                if (argument.required):
+                    for typeName in argument.type.typeNames:
+                        type = parent.parser.getType(typeName)
+                        if (type and ('dictionary' == type.idlType) and (not type.required)):    # must be optional unless followed by required argument
+                            for index2 in range(index + 1, len(self.arguments)):
+                                if (self.arguments[index2].required):
+                                    break
+                            else:
+                                tokens.error('Dictionary argument "', argument.name, '" without required members must be marked optional')
 
     @property
     def name(self):
@@ -1164,6 +1204,10 @@ class ChildProduction(Production):
     @property
     def normalName(self):
         return self.methodName if (self.methodName) else self.name
+
+    @property
+    def parser(self):
+        return self.parent.parser
 
 
 class Attribute(ChildProduction):   # ["inherit"] AttributeRest
