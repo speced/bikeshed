@@ -325,7 +325,7 @@ class Spec(object):
         self.md = metadata.MetadataManager(doc=self)
         self.biblios = {}
         self.macros = defaultdict(lambda x: "???")
-        self.widl = parser.Parser(ui=IDLUI())
+        self.widl = parser.Parser(ui=IDLSilent())
         self.testSuites = json.loads(config.retrieveDataFile("test-suites.json", quiet=True, str=True))
         self.languages = json.loads(config.retrieveDataFile("languages.json", quiet=True, str=True))
         self.extraStyles = defaultdict(str)
@@ -1782,19 +1782,29 @@ class IDLUI(object):
     def warn(self, msg):
         die("{0}", msg.rstrip())
 
+class IDLSilent(object):
+    def warn(self, msg):
+        pass
+
 
 def markupIDL(doc):
     highlightingOccurred = False
-    for el in findAll("pre.idl, xmp.idl", doc):
-        if el.get("data-no-idl") is not None:
-            continue
-        text = textContent(el)
-        widl = parser.Parser(text, IDLUI())
+    idlEls = findAll("pre.idl:not([data-no-idl]), xmp.idl:not([data-no-idl])", doc)
+    # One pass with a silent parser to collect the symbol table.
+    symbolTable = None
+    for el in idlEls:
+        p = parser.Parser(textContent(el), ui=IDLSilent(), symbolTable=symbolTable)
+        symbolTable = p.symbolTable
+    # Then a real pass to actually mark up the IDL,
+    # and collect it for the index.
+    for el in idlEls:
         if isNormative(el):
+            text = textContent(el)
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
-            # Parse a second time with the global one, which collects all data in the doc.
+            widl = parser.Parser(text, ui=IDLUI(), symbolTable=symbolTable)
             marker = DebugMarker() if doc.debug else IDLMarker()
             replaceContents(el, parseHTML(unicode(widl.markup(marker))))
+            # Parse a second time with the global one, which collects all data in the doc.
             doc.widl.parse(text)
         addClass(el, "highlight")
         highlightingOccurred = True
