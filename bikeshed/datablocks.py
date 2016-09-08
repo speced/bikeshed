@@ -471,14 +471,14 @@ def processAnchors(anchors, doc, lineNum=None):
             anchor['text'][0] = anchor['text'][0].lower()
         doc.refs.refs[anchor['text'][0]].append({
             "linkingText": anchor['text'][0],
-            "type": anchor['type'][0],
+            "type": anchor['type'][0].lower(),
             "url": url,
-            "shortname": shortname if shortname is not None else doc.md.shortname,
+            "shortname": shortname.lower() if shortname is not None else doc.md.shortname,
             "level": level if level is not None else doc.md.level,
             "for": anchor.get('for', []),
             "export": True,
-            "status": status,
-            "spec": spec if spec is not None else ''
+            "status": status.lower(),
+            "spec": spec.lower() if spec is not None else ''
         })
         methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
         if methodishStart:

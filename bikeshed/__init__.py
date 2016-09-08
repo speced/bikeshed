@@ -1360,9 +1360,9 @@ def processAutolinks(doc):
         # rather than checking `status == "local"`, as "local" refs include
         # those defined in `<pre class="anchor">` datablocks, which we do
         # want to capture here.
-        if ref and ref.spec is not None and ref.spec is not "" and ref.spec != doc.refs.specVName:
-            if ref.text not in doc.externalRefsUsed[ref.spec]:
-                doc.externalRefsUsed[ref.spec][ref.text] = ref
+        if ref and ref.spec is not None and ref.spec is not "" and ref.spec.lower() != doc.refs.specVName.lower():
+            if ref.text not in doc.externalRefsUsed[ref.spec.lower()]:
+                doc.externalRefsUsed[ref.spec.lower()][ref.text] = ref
             if isNormative(el):
                 biblioStatus = "normative"
                 biblioStorage = doc.normativeRefs
