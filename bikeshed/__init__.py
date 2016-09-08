@@ -585,18 +585,20 @@ class Spec(object):
         cleanupHTML(self)
         if self.md.prepTR:
             # Don't try and override the W3C's icon.
-            for el in findAll("[rel ~= 'icon']", doc):
+            for el in findAll("[rel ~= 'icon']", self):
                 removeNode(el)
             # Make sure the W3C stylesheet is after all other styles.
-            for el in findAll("link", doc):
+            for el in findAll("link", self):
                 if el.get("href").startswith("https://www.w3.org/StyleSheets/TR"):
-                    appendChild(find("head", doc), el)
-            # Ensure that all "previous version" links are https.
-            for el in findAll("a[rel=previous]", doc):
-                if el.get("href").startswith("http://www.w3.org"):
-                    el.set("href", "https" + el.get("href")[4:])
-                if el.text.startswith("http://www.w3.org"):
-                    el.text = "https" + el.text[4:]
+                    appendChild(find("head", self), el)
+            # Ensure that all W3C links are https.
+            for el in findAll("a", self):
+                href = el.get("href", "")
+                if href.startswith("http://www.w3.org") or href.startswith("http://lists.w3.org"):
+                    el.set("href", "https" + href[4:])
+                text = el.text or ""
+                if text.startswith("http://www.w3.org") or text.startswith("http://lists.w3.org"):
+                    el.text = "https" + text[4:]
             extensions.BSPrepTR(self)
 
         return self
