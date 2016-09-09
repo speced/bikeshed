@@ -58,21 +58,14 @@ class HTMLSerializer(object):
 
         def startTag(tag):
             if tag != "[]":
-                write("<")
-                write(tag)
+                write("<" + tag)
                 for attrName, attrVal in sorted(el.items()):
-                    write(" ")
-                    write(unfuckName(attrName))
-                    write('="')
-                    write(escapeAttr(attrVal))
-                    write('"')
+                    write(" " + unfuckName(attrName) + '="' + escapeAttr(attrVal) + '"')
                 write(">")
 
         def endTag(tag):
             if tag != "[]":
-                write("</")
-                write(tag)
-                write(">")
+                write("</" + tag + ">")
 
         def isAnonBlock(block):
             return not isElement(block)
@@ -164,11 +157,9 @@ class HTMLSerializer(object):
                 else:
                     # is an array of inlines
                     if len(block) > 0:
-                        write("\n")
-                        write(" " * (indent + 1))
+                        write("\n" + (" " * (indent + 1)))
                         self._serializeEl(block, write, inline=True)
             if tag not in self.omitEndTagEls:
-                write("\n")
-                write(" " * indent)
+                write("\n" + (" " * indent))
                 endTag(tag)
         return
