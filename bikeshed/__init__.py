@@ -1914,6 +1914,9 @@ def addSyntaxHighlighting(doc):
             highlighted = parseHTML(pyg.highlight(text, lexer, formatters.HtmlFormatter()))[0][0]
             if highlighted[-1].tail is not None:
                 highlighted[-1].tail = highlighted[-1].tail.strip()
+        # Some versions of Pygments output an initial empty <span> for some reason.
+        if not highlighted[0].text:
+            removeNode(highlighted[0])
         if hasChildElements(el):
             mergeHighlighting(el, highlighted)
         else:
