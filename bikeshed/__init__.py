@@ -1882,6 +1882,8 @@ def processIDL(doc):
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
 
 
+ColoredText = collections.namedtuple('ColoredText', ['text', 'color'])
+
 def addSyntaxHighlighting(doc):
     try:
         import pygments as pyg
@@ -1901,7 +1903,12 @@ def addSyntaxHighlighting(doc):
             widl = parser.Parser(text, IDLUI())
             marker = HighlightMarker()
             nested = parseHTML(unicode(widl.markup(marker)))
-            highlighted = flattenHighlighting(nested)
+            coloredText = collections.deque()
+            for n in childNodes(flattenHighlighting(nested)):
+                if isElement(n):
+                    coloredText.append(ColoredText(textContent(n), n.get('class')))
+                else:
+                    coloredText.append(ColoredText(n, None))
         else:
             if lang in customLexers:
                 lexer = customLexers[lang]
@@ -1911,16 +1918,10 @@ def addSyntaxHighlighting(doc):
                 except pyg.util.ClassNotFound:
                     die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
                     return
-            highlighted = parseHTML(pyg.highlight(text, lexer, formatters.HtmlFormatter()))[0][0]
-            if highlighted[-1].tail is not None:
-                highlighted[-1].tail = highlighted[-1].tail.strip()
-        # Some versions of Pygments output an initial empty <span> for some reason.
-        if not highlighted[0].text:
-            removeNode(highlighted[0])
-        if hasChildElements(el):
-            mergeHighlighting(el, highlighted)
-        else:
-            replaceContents(el, highlighted)
+            coloredText = parsePygments(pyg.highlight(text, lexer, formatters.RawTokenFormatter()))
+            # empty span at beginning
+            # extra linebreak at the end
+        mergeHighlighting(el, coloredText)
         addClass(el, "highlight")
 
     highlightingOccurred = False
@@ -2040,7 +2041,7 @@ def addSyntaxHighlighting(doc):
         '''
 
 
-def mergeHighlighting(el, hi):
+def mergeHighlighting(el, coloredText):
     # Merges a tree of Pygment-highlighted HTML
     # into the original element's markup.
     # This works because Pygment effectively colors each character with a highlight class,
@@ -2076,13 +2077,6 @@ def mergeHighlighting(el, hi):
                 coloredText.appendleft(nextColor)
                 text = ''
         return nodes
-    coloredText = collections.deque()
-    ColoredText = collections.namedtuple('ColoredText', ['text', 'color'])
-    for n in childNodes(hi):
-        if isElement(n):
-            coloredText.append(ColoredText(textContent(n), n.get('class')))
-        else:
-            coloredText.append(ColoredText(n, None))
     colorizeEl(el, coloredText)
 
 def flattenHighlighting(el):
@@ -2108,6 +2102,77 @@ def flattenHighlighting(el):
                 else:
                     appendChild(container, E.span({"class":overclass},subnode))
     return container
+
+def parsePygments(text):
+    tokenClassFromName = {
+        "Token.Comment": "c",
+        "Token.Keyword": "k",
+        "Token.Literal": "l",
+        "Token.Name": "n",
+        "Token.Operator": "o",
+        "Token.Punctuation": "p",
+        "Token.Comment.Multiline": "cm",
+        "Token.Comment.Preproc": "cp",
+        "Token.Comment.Single": "c1",
+        "Token.Comment.Special": "cs",
+        "Token.Keyword.Constant": "kc",
+        "Token.Keyword.Declaration": "kd",
+        "Token.Keyword.Namespace": "kn",
+        "Token.Keyword.Pseudo": "kp",
+        "Token.Keyword.Reserved": "kr",
+        "Token.Keyword.Type": "kt",
+        "Token.Literal.Date": "ld",
+        "Token.Literal.Number": "m",
+        "Token.Literal.String": "s",
+        "Token.Name.Attribute": "na",
+        "Token.Name.Class": "nc",
+        "Token.Name.Constant": "no",
+        "Token.Name.Decorator": "nd",
+        "Token.Name.Entity": "ni",
+        "Token.Name.Exception": "ne",
+        "Token.Name.Function": "nf",
+        "Token.Name.Label": "nl",
+        "Token.Name.Namespace": "nn",
+        "Token.Name.Property": "py",
+        "Token.Name.Tag": "nt",
+        "Token.Name.Variable": "nv",
+        "Token.Operator.Word": "ow",
+        "Token.Literal.Number.Bin": "mb",
+        "Token.Literal.Number.Float": "mf",
+        "Token.Literal.Number.Hex": "mh",
+        "Token.Literal.Number.Integer": "mi",
+        "Token.Literal.Number.Oct": "mo",
+        "Token.Literal.String.Backtick": "sb",
+        "Token.Literal.String.Char": "sc",
+        "Token.Literal.String.Doc": "sd",
+        "Token.Literal.String.Double": "s2",
+        "Token.Literal.String.Escape": "se",
+        "Token.Literal.String.Heredoc": "sh",
+        "Token.Literal.String.Interpol": "si",
+        "Token.Literal.String.Other": "sx",
+        "Token.Literal.String.Regex": "sr",
+        "Token.Literal.String.Single": "s1",
+        "Token.Literal.String.Symbol": "ss",
+        "Token.Name.Variable.Class": "vc",
+        "Token.Name.Variable.Global": "vg",
+        "Token.Name.Variable.Instance": "vi",
+        "Token.Literal.Number.Integer.Long": "il"
+    }
+    coloredText = collections.deque()
+    for line in text.split("\n"):
+        if not line:
+            continue
+        tokenName,_,tokenTextRepr = line.partition("\t")
+        tokenText = eval(tokenTextRepr)
+        if not tokenText:
+            continue
+        if tokenName == "Token.Text":
+            tokenClass = None
+        else:
+            tokenClass = tokenClassFromName.get(tokenName, None)
+        coloredText.append(ColoredText(tokenText, tokenClass))
+    return coloredText
+
 
 
 
