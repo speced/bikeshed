@@ -56,10 +56,10 @@ class HTMLSerializer(object):
                 t2 = t2 + " "
             return t2
 
-        def startTag():
-            if isElement(el):
+        def startTag(tag):
+            if tag != "[]":
                 write("<")
-                write(unfuckName(el.tag))
+                write(tag)
                 for attrName, attrVal in sorted(el.items()):
                     write(" ")
                     write(unfuckName(attrName))
@@ -68,10 +68,10 @@ class HTMLSerializer(object):
                     write('"')
                 write(">")
 
-        def endTag():
-            if isElement(el):
+        def endTag(tag):
+            if tag != "[]":
                 write("</")
-                write(unfuckName(el.tag))
+                write(tag)
                 write(">")
 
         def isAnonBlock(block):
@@ -97,35 +97,35 @@ class HTMLSerializer(object):
 
         if isVoidElement(tag):
             write(" " * indent)
-            startTag()
+            startTag(tag)
             return
         if isRawElement(tag):
-            startTag()
+            startTag(tag)
             for node in childNodes(el):
                 if isElement(node):
                     die("Somehow a CDATA element got an element child:\n{0}", outerHTML(el))
                     return
                 else:
                     write(node)
-            endTag()
+            endTag(tag)
             return
         if pre or isOpaqueElement(tag):
-            startTag()
+            startTag(tag)
             for node in childNodes(el):
                 if isElement(node):
                     self._serializeEl(node, write, indent=indent, pre=True)
                 else:
                     write(escapeHTML(node))
-            endTag()
+            endTag(tag)
             return
         if inline or isInlineElement(el):
-            startTag()
+            startTag(tag)
             for node in childNodes(el):
                 if isElement(node):
                     self._serializeEl(node, write, inline=inline)
                 else:
                     write(escapeHTML(fixWS(node)))
-            endTag()
+            endTag(tag)
             return
 
         # Otherwise I'm a block element
@@ -141,22 +141,22 @@ class HTMLSerializer(object):
         # Handle all the possibilities
         if len(blocks) == 0:
             write(" " * indent)
-            startTag()
+            startTag(tag)
             if el.tag not in self.omitEndTagEls:
-                endTag()
+                endTag(tag)
             return
         elif len(blocks) == 1 and isAnonBlock(blocks[0]):
             # Contains only inlines, print accordingly
             write(" " * indent)
-            startTag()
+            startTag(tag)
             self._serializeEl(blocks[0], write, inline=True)
             if el.tag not in self.omitEndTagEls:
-                endTag()
+                endTag(tag)
             return
         else:
             # Otherwise I'm a block that contains at least one block
             write(" " * indent)
-            startTag()
+            startTag(tag)
             for block in blocks:
                 if isElement(block):
                     write("\n")
@@ -167,8 +167,8 @@ class HTMLSerializer(object):
                         write("\n")
                         write(" " * (indent + 1))
                         self._serializeEl(block, write, inline=True)
-            if el.tag not in self.omitEndTagEls:
+            if tag not in self.omitEndTagEls:
                 write("\n")
                 write(" " * indent)
-                endTag()
+                endTag(tag)
         return
