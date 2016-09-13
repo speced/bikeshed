@@ -11,6 +11,34 @@ If you want to run a local copy of Bikeshed rather than use the cgi version, itâ
 
 You need to install Python 2.7, PIP, and a few other support libraries before installing Bikeshed itself. Here is how to do this on Debian-based Linuxen (anything using `apt`), OS X, and Windows 7/8/10:
 
+Install steps with Docker
+-------------------------
+
+1. Install Docker
+2. Install Docker compose
+
+````bash
+git clone https://github.com/tabatkins/bikeshed.git
+cd bikeshed
+# Create environment variable used in docker-services.yml file
+# Save this to your .bashrc or something to save from doing it every time
+BIKESHED_CODE_PATH=/path/to/bikeshed/code
+docker-compose -f $BIKESHED_CODE_PATH/docker-services.yml build bikeshed
+docker-compose -f $BIKESHED_CODE_PATH/docker-services.yml run bikeshed pip install --editable /usr/bikeshed
+````
+
+````bash
+alias bikeshed='docker-compose -f $BIKESHED_CODE_PATH/docker-services.yml run bikeshed bikeshed'
+````
+
+````bash
+bikeshed update
+````
+
+
+
+
+
 Linux steps
 -----------
 
