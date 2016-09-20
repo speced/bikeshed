@@ -627,7 +627,7 @@ def parse(lines, doc):
     blockSize = 0
     md = MetadataManager(doc)
     for i,line in enumerate(lines):
-        if not inMetadata and re.match(r"<pre .*class=.*metadata.*>", line):
+        if not inMetadata and re.match(r"<pre [^>]*class=[^>]*metadata[^>]*>", line):
             blockSize = 1
             inMetadata = True
             md.hasMetadata = True
