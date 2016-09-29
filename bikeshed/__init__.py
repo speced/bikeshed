@@ -857,7 +857,9 @@ def canonicalizeShortcuts(doc):
                 del el.attrib[linkType]
                 el.set("data-link-type", linkType)
                 break
-    for el in findAll(",".join("{0}[for]".format(x) for x in config.dfnElements.union(["a"])), doc):
+    for el in findAll(config.dfnElementsSelector + ", a", doc):
+        if el.get("for") is None:
+            continue
         if el.tag == "a":
             el.set("data-link-for", el.get('for'))
         else:

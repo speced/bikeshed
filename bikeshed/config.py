@@ -268,9 +268,9 @@ def linkTypeIn(linkTypes, targetTypes="all"):
     return bool(linkTypes & targetTypes)
 
 # Elements that are allowed to provide definitions to Shepherd
-dfnElements = frozenset(["dfn", "h2[data-dfn-type]", "h3[data-dfn-type]", "h4[data-dfn-type]", "h5[data-dfn-type]", "h6[data-dfn-type]"])
+dfnElements = frozenset(["dfn", "h2", "h3", "h4", "h5", "h6"])
 anchorishElements = dfnElements.union(["a"])
-dfnElementsSelector = ", ".join(dfnElements)
+dfnElementsSelector = "dfn, h2[data-dfn-type], h3[data-dfn-type], h4[data-dfn-type], h5[data-dfn-type], h6[data-dfn-type]"
 
 # Some of the more significant types and their patterns
 trivialPattern = re.compile(".+")
