@@ -169,7 +169,9 @@ def addIndexOfLocallyDefinedTerms(doc, container):
                 E.h3({"class":"no-num no-ref", "id":"index-defined-here"}, "Terms defined by this specification"))
 
     indexEntries = defaultdict(list)
-    for el in findAll(",".join(x + "[id]" for x in config.dfnElements), doc):
+    for el in findAll(config.dfnElementsSelector, doc):
+        if el.get('id') is None or el.get('data-dfn-type') is None:
+            continue
         linkTexts = config.linkTextsFromElement(el)
         headingLevel = headingLevelOfElement(el) or "Unnumbered section"
         type = el.get('data-dfn-type')
