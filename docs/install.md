@@ -7,40 +7,54 @@ you probably want to use the Bikeshed API instead <https://api.csswg.org/bikeshe
 In return, the API version is always up-to-date,
 so you don't have to remember to update things yourself.
 
-If you want to run a local copy of Bikeshed rather than use the cgi version, it’s pretty easy to install.
+If you want to run a local copy of Bikeshed rather than use the cgi version, you can either use the [Docker image](#docker) or [install from bikeshed from source](#from-source)
+
+<!-- BEGIN-MARKDOWN-TOC -->
+* [Docker](#docker)
+* [From source](#from-source)
+	* [Linux steps](#linux-steps)
+	* [OS X steps](#os-x-steps)
+		* [Mac ports](#mac-ports)
+		* [Homebrew](#homebrew)
+	* [Windows steps](#windows-steps)
+	* [Common steps](#common-steps)
+
+<!-- END-MARKDOWN-TOC -->
+
+## Docker
+
+If you have [Docker installed](https://docs.docker.com/engine/installation/)
+you can run the [bikeshed Docker
+container](https://hub.docker.com/r/kbai/bikeshed):
+
+
+```sh
+docker run --rm -it -v /path/to/specs:/data kbai/bikeshed spec Overview.bs
+```
+
+To have the `bikeshed` command available in your shell but actually run the Docker container, add
+the following to your shell rc file (`$HOME/.bashrc` for bash, `$HOME/.zshrc` for zsh):
+
+```sh
+function bikeshed () { 
+  docker run --rm -it -v $PWD:/data kbai/bikeshed "$@"
+}
+```
+
+Then you can run `bikeshed update`, `bikeshed spec` as documented.
+
+To rebuild the Docker container image from source, have [docker-compose installed](https://docs.docker.com/compose/install/), change to the root of the git repository and run
+
+```sh
+docker-compose build
+```
+
+## From source
 
 You need to install Python 2.7, PIP, and a few other support libraries before installing Bikeshed itself. Here is how to do this on Debian-based Linuxen (anything using `apt`), OS X, and Windows 7/8/10:
 
-Install steps with Docker
--------------------------
 
-1. Install Docker
-2. Install Docker compose
-
-````bash
-git clone https://github.com/tabatkins/bikeshed.git
-cd bikeshed
-# Create environment variable used in docker-services.yml file
-# Save this to your .bashrc or something to save from doing it every time
-BIKESHED_CODE_PATH=/path/to/bikeshed/code
-docker-compose -f $BIKESHED_CODE_PATH/docker-services.yml build bikeshed
-docker-compose -f $BIKESHED_CODE_PATH/docker-services.yml run bikeshed pip install --editable /usr/bikeshed
-````
-
-````bash
-alias bikeshed='docker-compose -f $BIKESHED_CODE_PATH/docker-services.yml run bikeshed bikeshed'
-````
-
-````bash
-bikeshed update
-````
-
-
-
-
-
-Linux steps
------------
+### Linux steps
 
 ~~~~
 $ sudo apt-get install python2.7 python-dev python-pip python-wheel libxslt1-dev libxml2-dev
@@ -65,14 +79,13 @@ That'll spew a lot of console trash, but don't worry about it.
 
 From here, you can follow the commons steps outlined below.
 
-OS X steps
-----------
+### OS X steps
 
 Note: If you're on a relatively modern Mac you should be able to proceed directly to [Common steps](#common-steps).
 
 These instructions assume that you have [Mac Ports](https://www.macports.org/) or [Homebrew](http://brew.sh/) installed. If you successfully install Bikeshed using some other method, please contribute to this documentation.
 
-### Mac ports
+#### Mac ports
 
 First, get the right packages installed onto your system:
 ~~~
@@ -86,7 +99,7 @@ sudo port select --set python python27
 
 (If you get `ImportError: No module named six` when you first run Bikeshed, additionally run `sudo port install py27-six`.)
 
-### Homebrew
+#### Homebrew
 
 Install the Homebrew version of Python and Pip:
 ~~~
@@ -108,8 +121,7 @@ That'll spew a lot of console trash, but don't worry about it.
 
 From here, you can follow the commons steps outlined below.
 
-Windows steps
------------
+### Windows steps
 
 Tested on Windows 7, 8/8.1 & 10
 
@@ -124,8 +136,8 @@ setx /m PATH "%PATH%;C:\Python27;C:\Python27\Scripts"
 
 From here, you can follow the commons steps outlined below.
 
-Common steps
-------------
+### Common steps
+
 With the dependencies in place, you can now install the Bikeshed repository itself.  Run the following in your favorite command line:
 
 ~~~~
