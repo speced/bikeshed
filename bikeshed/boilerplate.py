@@ -29,6 +29,7 @@ def fillWith(tag, newElements, doc):
         replaceContents(el, newElements)
 
 
+bodyFillContainer = None
 def getFillContainer(tag, doc, default=False):
     '''
     Gets the element that should be filled with the stuff corresponding to tag.
@@ -40,21 +41,25 @@ def getFillContainer(tag, doc, default=False):
     Otherwise,
     it'll only be appended if explicitly requested with a data-fill-with attribute.
     '''
+    global bodyFillContainer
 
     # If you've explicitly suppressed that section, don't do anything
     if tag not in doc.md.boilerplate:
         return None
 
     # If a fill-with is found, fill that
-    if find("[data-fill-with='{0}']".format(tag), doc) is not None:
-        return find("[data-fill-with='{0}']".format(tag), doc)
+    el = find("[data-fill-with='{0}']".format(tag), doc)
+    if el is not None:
+        return el
 
     # Otherwise, append to the end of the document,
     # unless you're in the byos group
     if doc.md.group == "byos":
         return None
     if default:
-        return find("body", doc)
+        if bodyFillContainer is None:
+            bodyFillContainer = find("body", doc)
+        return bodyFillContainer
 
 
 def addLogo(doc):
