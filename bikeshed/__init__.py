@@ -2179,137 +2179,137 @@ def parsePygments(text):
 def cleanupHTML(doc):
     # Cleanup done immediately before serialization.
 
-    # Move any stray <link>, <meta>, or <style> into the <head>.
-    head = find("head", doc)
-    for el in findAll("body link, body meta, body style", doc):
-        head.append(el)
+    head = None
+    inBody = False
+    for el in doc.document.iter():
+        if head is None and el.tag == "head":
+            head = el
+            continue
+        if el.tag == "body":
+            inBody = True
 
-    for el in findAll("style[scoped]", doc):
-        die("<style scoped> is no longer part of HTML. Ensure your styles can apply document-globally and remove the scoped attribute.", el=el)
+        # Move any stray <link>, <meta>, or <style> into the <head>.
+        if inBody and el.tag in ["link", "meta", "style"]:
+            head.append(el)
 
-    # Move any <style scoped> to be the first child of their parent.
-    for el in findAll("style[scoped]", doc):
-        parent = parentElement(el)
-        prependChild(parent, el)
+        if el.tag == "style" and el.get("scoped") is not None:
+            die("<style scoped> is no longer part of HTML. Ensure your styles can apply document-globally and remove the scoped attribute.", el=el)
+            parent = parentElement(el)
+            prependChild(parent, el)
 
-    # Convert the technically-invalid <nobr> element to an appropriate <span>
-    for el in findAll("nobr", doc):
-        el.tag = "span"
-        el.set("style", el.get('style', '') + ";white-space:nowrap")
+        # Convert the technically-invalid <nobr> element to an appropriate <span>
+        if el.tag == "nobr":
+            el.tag == "span"
+            el.set("style", el.get('style', '') + ";white-space:nowrap")
 
-    # And convert <xmp> to <pre>
-    for el in findAll("xmp", doc):
-        el.tag = "pre"
+        # And convert <xmp> to <pre>
+        if el.tag == "xmp":
+            el.tag = "pre"
 
-    # Some of the datablocks still put a line-number on their generated content.
-    for el in findAll("[line-number]", doc):
-        del el.attrib["line-number"]
+        # If we accidentally recognized an autolink shortcut in SVG, kill it.
+        if el.tag == "{http://www.w3.org/2000/svg}a" and el.get("data-link-type") is not None:
+            removeAttr(el, "data-link-type")
+            el.tag = "{http://www.w3.org/2000/svg}tspan"
 
-    # If we accidentally recognized an autolink shortcut in SVG, kill it.
-    for el in findAll("svg|a[data-link-type]", doc):
-        del el.attrib["data-link-type"]
-        el.tag = "{http://www.w3.org/2000/svg}tspan"
+        # Add .algorithm to [algorithm] elements, for styling
+        if el.get("data-algorithm") is not None and not hasClass(el, "algorithm"):
+            addClass(el, "algorithm")
 
-    # Add .algorithm to [algorithm] elements, for styling
-    for el in findAll("[data-algorithm]:not(.algorithm)", doc):
-        addClass(el, "algorithm")
+        # Allow MD-generated lists to be surrounded by HTML list containers,
+        # so you can add classes/etc without an extraneous wrapper.
+        if el.tag in ["ol", "ul", "dl"]:
+            onlyChild = hasOnlyChild(el)
+            if onlyChild is not None and el.tag == onlyChild.tag and onlyChild.get("data-md") is not None:
+                # The md-generated list container is featureless,
+                # so we can just throw it away and move its children into its parent.
+                children = childNodes(onlyChild, clear=True)
+                clearContents(el)
+                appendChild(el, *children)
+            else:
+                # Remove any lingering data-md attributes on lists that weren't using this container replacement thing.
+                removeAttr(el, "data-md")
 
-    # Allow MD-generated lists to be surrounded by HTML list containers,
-    # so you can add classes/etc without an extraneous wrapper.
-    for el in findAll("ol > ol[data-md]:only-child, ul > ul[data-md]:only-child, dl > dl[data-md]:only-child", doc):
-        # The md-generated list container is featureless,
-        # so we can just throw it away and move its children into its parent.
-        children = childNodes(el, clear=True)
-        parent = parentElement(el)
-        clearContents(parent)
-        appendChild(parent, *children)
+        # Mark pre.idl blocks as .def, for styling
+        if el.tag == "pre" and hasClass(el, "idl") and not hasClass(el, "def"):
+            addClass(el, "def")
 
-    # Remove any lingering data-md attributes on lists that weren't using this container replacement thing.
-    for el in findAll("ol[data-md], ul[data-md], dl[data-md]", doc):
-        removeAttr(el, "data-md")
+        # Tag classes on wide types of dfns/links
+        if el.tag in config.dfnElements:
+            if el.get("data-dfn-type") in config.idlTypes:
+                addClass(el, "idl-code")
+            if el.get("data-dfn-type") in config.maybeTypes.union(config.linkTypeToDfnType['propdesc']):
+                if not hasAncestor(el, lambda x:x.tag=="pre"):
+                    addClass(el, "css")
+        if el.tag == "a":
+            if el.get("data-link-type") in config.idlTypes:
+                addClass(el, "idl-code")
+            if el.get("data-link-type") in config.maybeTypes.union(config.linkTypeToDfnType['propdesc']):
+                if not hasAncestor(el, lambda x:x.tag=="pre"):
+                    addClass(el, "css")
 
-    # Mark pre.idl blocks as .def, for styling
-    for el in findAll("pre.idl:not(.def)", doc):
-        addClass(el, "def")
+        # Remove duplicate linking texts.
+        if el.tag in config.anchorishElements and el.get("data-lt") is not None and el.get("data-lt") == textContent(el, exact=True):
+            removeAttr(el, "data-lt")
 
-    # Tag classes on wide types of dfns/links
-    def selectorForTypes(types):
-        return (",".join("{0}[data-dfn-type={1}]".format(elName,type) for elName in config.dfnElements for type in types) +
-                "," + ",".join("a[data-link-type={0}]".format(type) for type in types))
-    for el in findAll(selectorForTypes(config.idlTypes), doc):
-        addClass(el, 'idl-code')
-    for el in findAll(selectorForTypes(config.maybeTypes.union(config.linkTypeToDfnType['propdesc'])), doc):
-        addClass(el, 'css')
-    # Correct over-application of the .css class
-    for el in findAll("pre .css", doc):
-        removeClass(el, 'css')
+        # Transform the <css> fake tag into markup.
+        # (Used when the ''foo'' shorthand doesn't work.)
+        if el.tag == "css":
+            el.tag = "span"
+            addClass(el, "css")
 
-    # Remove duplicate linking texts.
-    for el in findAll(",".join(x + "[data-lt]" for x in config.anchorishElements), doc):
-        if el.get('data-lt') == textContent(el, exact=True):
-            del el.attrib['data-lt']
+        # Transform the <assert> fake tag into a span with a unique ID based on its contents.
+        # This is just used to tag arbitrary sections with an ID so you can point tests at it.
+        # (And the ID will be guaranteed stable across publications, but guaranteed to change when the text changes.)
+        if el.tag == "assert":
+            el.tag = "span"
+            el.set("id", "assert-" + hashContents(el))
 
-    # Transform the <css> fake tag into markup.
-    # (Used when the ''foo'' shorthand doesn't work.)
-    for el in findAll("css", doc):
-        el.tag = "span"
-        addClass(el, "css")
+        # Add ARIA role of "note" to class="note" elements
+        if el.tag in ["div", "p"] and hasClass(el, doc.md.noteClass):
+            el.set("role", "note")
 
-    # Transform the <assert> fake tag into a span with a unique ID based on its contents.
-    # This is just used to tag arbitrary sections with an ID so you can point tests at it.
-    # (And the ID will be guaranteed stable across publications, but guaranteed to change when the text changes.)
-    for el in findAll("assert", doc):
-        el.tag = "span"
-        el.set("id", "assert-" + hashContents(el))
+        # Look for nested <a> elements, and warn about them.
+        if el.tag == "a" and hasAncestor(el, lambda x:x.tag=="a"):
+            warn("The following (probably auto-generated) link is illegally nested in another link:\n{0}", outerHTML(el), el=el)
 
-    # Add ARIA role of "note" to class="note" elements
-    for el in findAll("." + doc.md.noteClass, doc):
-        el.set("role", "note")
+        # If the <h1> contains only capital letters, add a class=allcaps for styling hook
+        if el.tag == "h1":
+            for letter in textContent(el):
+                if letter.isalpha() and letter.islower():
+                    break
+            else:
+                addClass(el, "allcaps")
 
-    # Look for nested <a> elements, and warn about them.
-    for el in findAll("a a", doc):
-        warn("The following (probably auto-generated) link is illegally nested in another link:\n{0}", outerHTML(el), el=el)
-
-    # If the <h1> contains only capital letters, add a class=allcaps for styling hook
-    h1 = find("h1", doc)
-    if h1 is not None:
-        for letter in textContent(h1):
-            if letter.isalpha() and letter.islower():
-                break
-        else:
-            addClass(h1, "allcaps")
-
-    # Remove a bunch of attributes
-    for el in findAll("[data-attribute-info], [data-dict-member-info]", doc):
-        removeAttr(el, 'data-attribute-info')
-        removeAttr(el, 'data-dict-member-info')
-        removeAttr(el, 'for')
-    for el in findAll("a, span", doc):
-        removeAttr(el, 'data-link-for')
-        removeAttr(el, 'data-link-for-hint')
-        removeAttr(el, 'data-link-status')
-        removeAttr(el, 'data-link-spec')
-        removeAttr(el, 'data-section')
-        removeAttr(el, 'data-biblio-type')
-        removeAttr(el, 'data-biblio-status')
-        removeAttr(el, 'data-okay-to-fail')
-        removeAttr(el, 'data-lt')
-    for el in findAll("[data-link-for]:not(a), [data-link-type]:not(a)", doc):
-        removeAttr(el, 'data-link-for')
-        removeAttr(el, 'data-link-type')
-    for el in findAll("[data-dfn-for]{0}, [data-dfn-type]{0}".format("".join(":not({0})".format(x) for x in config.dfnElements)), doc):
-        removeAttr(el, 'data-dfn-for')
-        removeAttr(el, 'data-dfn-type')
-    for el in findAll("[data-export]{0}, [data-noexport]{0}".format("".join(":not({0})".format(x) for x in config.dfnElements)), doc):
-        removeAttr(el, 'data-export')
-        removeAttr(el, 'data-noexport')
-    for el in findAll("[oldids], [data-alternate-id], [highlight], [nohighlight], [data-opaque], [data-no-self-link]", doc):
+        # Remove a bunch of attributes
+        if el.get("data-attribute-info") is not None or el.get("data-dict-member-info") is not None:
+            removeAttr(el, 'data-attribute-info')
+            removeAttr(el, 'data-dict-member-info')
+            removeAttr(el, 'for')
+        if el.tag in ["a", "span"]:
+            removeAttr(el, 'data-link-for')
+            removeAttr(el, 'data-link-for-hint')
+            removeAttr(el, 'data-link-status')
+            removeAttr(el, 'data-link-spec')
+            removeAttr(el, 'data-section')
+            removeAttr(el, 'data-biblio-type')
+            removeAttr(el, 'data-biblio-status')
+            removeAttr(el, 'data-okay-to-fail')
+            removeAttr(el, 'data-lt')
+        if el.tag != "a":
+            removeAttr(el, 'data-link-for')
+            removeAttr(el, 'data-link-type')
+        if el.tag not in config.dfnElements:
+            removeAttr(el, 'data-dfn-for')
+            removeAttr(el, 'data-dfn-type')
+            removeAttr(el, 'data-export')
+            removeAttr(el, 'data-noexport')
         removeAttr(el, 'oldids')
         removeAttr(el, 'data-alternate-id')
         removeAttr(el, 'highlight')
         removeAttr(el, 'nohighlight')
         removeAttr(el, 'data-opaque')
         removeAttr(el, 'data-no-self-link')
+        removeAttr(el, "line-number")
 
 
 def finalHackyCleanup(text):

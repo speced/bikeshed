@@ -369,6 +369,24 @@ def closestAttr(el, *attrs):
     return None, None
 
 
+def closestAncestor(el, pred):
+    # Finds the nearest ancestor matching a predicate
+    for target in el.iterancestors():
+        if pred(target):
+            return target
+
+
+def filterAncestors(el, pred):
+    # Returns all ancestors that match the predicate
+    for target in el.iterancestors():
+        if pred(target):
+            yield target
+
+
+def hasAncestor(el, pred):
+    return closestAncestor(el, pred) is not None
+
+
 def removeAttr(el, attrName):
     # Remove an attribute, silently ignoring if attr doesn't exist.
     try:
@@ -447,6 +465,24 @@ def hasChildElements(el):
         return True
     except StopIteration:
         return False
+
+
+# If the element has one child element, returns it.
+# Otherwise, returns None
+def hasOnlyChild(el):
+    children = childElements(el)
+    try:
+        single = children.next()
+    except StopIteration:
+        # No children
+        return None
+    try:
+        children.next()
+        # At least two children
+        return None
+    except StopIteration:
+        # Exactly one child
+        return single
 
 
 def fixTypography(text):
