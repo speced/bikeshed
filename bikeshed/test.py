@@ -8,7 +8,7 @@ import subprocess
 import pipes
 from itertools import *
 from .messages import *
-from .htmlhelpers import parseDocument, outerHTML
+from .htmlhelpers import parseDocument, outerHTML, nodeIter, isElement, findAll
 from . import config
 
 
@@ -44,11 +44,21 @@ def runAllTests(constructor):
 def compare(suspect, golden):
     suspectDoc = parseDocument(suspect)
     goldenDoc = parseDocument(golden)
-    for s, g in izip(suspectDoc.iter(), goldenDoc.iter()):
-        if s.tag == g.tag and s.text == g.text and s.tail == g.tail and s.get('id') == g.get('id'):
-            continue
-        fromText = outerHTML(g)
-        toText = outerHTML(s)
+    for s, g in izip(nodeIter(suspectDoc), nodeIter(goldenDoc)):
+        if isElement(s) and isElement(g):
+            if s.tag == g.tag and s.get('id') == g.get('id'):
+                continue
+        elif isinstance(g, basestring) and isinstance(s, basestring):
+            if equalOrEmpty(s, g):
+                continue
+        if isinstance(g, basestring):
+            fromText = g
+        else:
+            fromText = outerHTML(g)
+        if isinstance(s, basestring):
+            toText = s
+        else:
+            toText = outerHTML(s)
         differ = difflib.SequenceMatcher(None, fromText, toText)
         for tag, i1, i2, j1, j2 in differ.get_opcodes():
             if tag == "equal":
@@ -60,6 +70,13 @@ def compare(suspect, golden):
         p("")
         return False
     return True
+
+def equalOrEmpty(a, b):
+    if a == b:
+        return True
+    if a is not None and b is not None and "" == a.strip() == b.strip():
+        return True
+    return False
 
 
 def rebase(files=None):
