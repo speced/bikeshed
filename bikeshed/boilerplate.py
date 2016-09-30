@@ -29,7 +29,6 @@ def fillWith(tag, newElements, doc):
         replaceContents(el, newElements)
 
 
-bodyFillContainer = None
 def getFillContainer(tag, doc, default=False):
     '''
     Gets the element that should be filled with the stuff corresponding to tag.
@@ -41,7 +40,6 @@ def getFillContainer(tag, doc, default=False):
     Otherwise,
     it'll only be appended if explicitly requested with a data-fill-with attribute.
     '''
-    global bodyFillContainer
 
     # If you've explicitly suppressed that section, don't do anything
     if tag not in doc.md.boilerplate:
@@ -57,9 +55,7 @@ def getFillContainer(tag, doc, default=False):
     if doc.md.group == "byos":
         return None
     if default:
-        if bodyFillContainer is None:
-            bodyFillContainer = find("body", doc)
-        return bodyFillContainer
+        return doc.body
 
 
 def addLogo(doc):

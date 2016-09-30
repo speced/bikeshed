@@ -524,6 +524,8 @@ class Spec(object):
 
         # Build the document
         self.document = parseDocument(self.html)
+        self.head = find("head", self)
+        self.body = find("body", self)
         correctH1(self)
         processInclusions(self)
         metadata.parseDoc(self)
