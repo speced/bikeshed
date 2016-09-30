@@ -46,7 +46,7 @@ def compare(suspect, golden):
     goldenDoc = parseDocument(golden)
     for s, g in izip(nodeIter(suspectDoc), nodeIter(goldenDoc)):
         if isElement(s) and isElement(g):
-            if s.tag == g.tag and s.get('id') == g.get('id'):
+            if s.tag == g.tag and compareDicts(s.attrib, g.attrib):
                 continue
         elif isinstance(g, basestring) and isinstance(s, basestring):
             if equalOrEmpty(s, g):
@@ -69,6 +69,16 @@ def compare(suspect, golden):
                 p("\033[42m\033[30m" + toText[j1:j2] + "\033[0m")
         p("")
         return False
+    return True
+
+def compareDicts(a, b):
+    aKeys = set(a.keys())
+    bKeys = set(b.keys())
+    if aKeys != bKeys:
+        return False
+    for key in aKeys:
+        if a[key] != b[key]:
+            return False
     return True
 
 def equalOrEmpty(a, b):
