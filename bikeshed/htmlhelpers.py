@@ -389,10 +389,8 @@ def hasAncestor(el, pred):
 
 def removeAttr(el, attrName):
     # Remove an attribute, silently ignoring if attr doesn't exist.
-    try:
+    if el.get(attrName) is not None:
         del el.attrib[attrName]
-    except:
-        pass
     return el
 
 
