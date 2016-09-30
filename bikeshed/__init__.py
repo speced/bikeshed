@@ -2183,6 +2183,9 @@ def cleanupHTML(doc):
 
     head = None
     inBody = False
+    strayHeadEls = []
+    styleScoped = []
+    nestedLists = []
     for el in doc.document.iter():
         if head is None and el.tag == "head":
             head = el
@@ -2192,12 +2195,11 @@ def cleanupHTML(doc):
 
         # Move any stray <link>, <meta>, or <style> into the <head>.
         if inBody and el.tag in ["link", "meta", "style"]:
-            head.append(el)
+            strayHeadEls.append(el)
 
         if el.tag == "style" and el.get("scoped") is not None:
             die("<style scoped> is no longer part of HTML. Ensure your styles can apply document-globally and remove the scoped attribute.", el=el)
-            parent = parentElement(el)
-            prependChild(parent, el)
+            styleScoped.append(el)
 
         # Convert the technically-invalid <nobr> element to an appropriate <span>
         if el.tag == "nobr":
@@ -2221,12 +2223,10 @@ def cleanupHTML(doc):
         # so you can add classes/etc without an extraneous wrapper.
         if el.tag in ["ol", "ul", "dl"]:
             onlyChild = hasOnlyChild(el)
-            if onlyChild is not None and el.tag == onlyChild.tag and onlyChild.get("data-md") is not None:
+            if onlyChild is not None and el.tag == onlyChild.tag and el.get("data-md") is None and onlyChild.get("data-md") is not None:
                 # The md-generated list container is featureless,
                 # so we can just throw it away and move its children into its parent.
-                children = childNodes(onlyChild, clear=True)
-                clearContents(el)
-                appendChild(el, *children)
+                nestedLists.append(onlyChild)
             else:
                 # Remove any lingering data-md attributes on lists that weren't using this container replacement thing.
                 removeAttr(el, "data-md")
@@ -2312,6 +2312,16 @@ def cleanupHTML(doc):
         removeAttr(el, 'data-opaque')
         removeAttr(el, 'data-no-self-link')
         removeAttr(el, "line-number")
+    for el in strayHeadEls:
+        head.append(el)
+    for el in styleScoped:
+        parent = parentElement(el)
+        prependChild(parent, el)
+    for el in nestedLists:
+        children = childNodes(el, clear=True)
+        parent = parentElement(el)
+        clearContents(parent)
+        appendChild(parent, *children)
 
 
 def finalHackyCleanup(text):
