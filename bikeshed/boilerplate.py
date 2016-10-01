@@ -46,7 +46,7 @@ def getFillContainer(tag, doc, default=False):
         return None
 
     # If a fill-with is found, fill that
-    if tag in doc.fillContainers:
+    if doc.fillContainers[tag]:
         return doc.fillContainers[tag][0]
 
     # Otherwise, append to the end of the document,
@@ -106,17 +106,16 @@ def addStyles(doc):
 
 def addCustomBoilerplate(doc):
     for el in findAll('[boilerplate]', doc):
-        bType = el.get('boilerplate')
-        if bType in doc.fillContainers:
-            replaceContents(target, el)
+        tag = el.get('boilerplate')
+        if doc.fillContainers[tag]:
+            replaceContents(doc.fillContainers[tag][0], el)
             removeNode(el)
 
 
 def removeUnwantedBoilerplate(doc):
-    for els in doc.fillContainers.values():
-        for el in els:
-            tag = el.get('data-fill-with')
-            if tag not in doc.md.boilerplate:
+    for tag,els in doc.fillContainers.items():
+        if tag not in doc.md.boilerplate:
+            for el in els:
                 removeNode(el)
 
 
