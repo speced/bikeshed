@@ -1041,9 +1041,9 @@ def fillAttributeInfoSpans(doc):
                 continue
             if "/" in referencedAttribute:
                 interface, referencedAttribute = referencedAttribute.split("/")
-                target = findAll('[data-link-type={2}][data-lt="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface, refType), doc)
+                target = findAll('a[data-link-type={2}][data-lt="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface, refType), doc)
             else:
-                target = findAll('[data-link-type={1}][data-lt="{0}"]'.format(referencedAttribute, refType), doc)
+                target = findAll('a[data-link-type={1}][data-lt="{0}"]'.format(referencedAttribute, refType), doc)
             if len(target) == 0:
                 die("Couldn't find target {1} '{0}':\n{2}", referencedAttribute, refType, outerHTML(el), el=el)
                 continue
