@@ -324,6 +324,7 @@ class Spec(object):
         self.externalRefsUsed = defaultdict(dict)
         self.md = metadata.MetadataManager(doc=self)
         self.biblios = {}
+        self.typeExpansions = {}
         self.macros = defaultdict(lambda x: "???")
         self.widl = parser.Parser(ui=IDLSilent())
         self.testSuites = json.loads(config.retrieveDataFile("test-suites.json", quiet=True, str=True))
@@ -1394,17 +1395,16 @@ def decorateAutolink(doc, el, linkType, linkText):
     # Add additional effects to some autolinks.
     if linkType == "type":
         # Get all the values that the type expands to, add it as a title.
-        if linkText in decorateAutolink.cache:
-            titleText = decorateAutolink.cache[linkText]
+        if linkText in doc.typeExpansions:
+            titleText = doc.typeExpansions[linkText]
             error = False
         else:
             refs, error = doc.refs.queryRefs(linkFor=linkText)
             if not error:
                 titleText = "Expands to: " + ' | '.join(ref.text for ref in refs)
-                decorateAutolink.cache[linkText] = titleText
+                doc.typeExpansions[linkText] = titleText
         if not error:
             el.set('title', titleText)
-decorateAutolink.cache = {}
 
 
 def processIssuesAndExamples(doc):
