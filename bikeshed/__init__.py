@@ -150,11 +150,14 @@ def main():
 
     testParser = subparsers.add_parser('test', help="Tools for running Bikeshed's testsuite.")
     testParser.add_argument("--rebase",
-                            dest="rebaseFiles",
-                            default=None,
+                            default=False,
+                            action="store_true",
+                            help="Rebase the specified files.")
+    testParser.add_argument('testFiles',
+                            default=[],
                             metavar="FILE",
                             nargs="*",
-                            help="Rebase the specified files. If called with no args, rebases everything.")
+                            help="Run these tests. If called with no args, tests everything.")
 
     profileParser = subparsers.add_parser('profile', help="Profiling Bikeshed. Needs graphviz, gprof2dot, and xdot installed.")
     profileParser.add_argument("--root",
@@ -258,12 +261,12 @@ def main():
             font = fonts.Font()
             fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
     elif options.subparserName == "test":
-        if options.rebaseFiles is not None:
-            test.rebase(options.rebaseFiles)
+        if options.rebase:
+            test.rebase(options.testFiles)
         else:
             config.force = True
             config.quiet = 2
-            result = test.runAllTests(constructor=Spec)
+            result = test.runAllTests(Spec, options.testFiles)
             sys.exit(0 if result else 1)
     elif options.subparserName == "profile":
         root = "--root=\"{0}\"".format(options.root) if options.root else ""
