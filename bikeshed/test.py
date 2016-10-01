@@ -12,12 +12,17 @@ from .htmlhelpers import parseDocument, outerHTML, nodeIter, isElement, findAll
 from . import config
 
 
-def runAllTests(constructor):
+def runAllTests(constructor, testFiles):
     numPassed = 0
+    if len(testFiles) == 0:
+        testFolder = config.scriptPath + "/../tests/"
+        testFiles = glob.glob(testFolder + "*.bs")
+        if len(testFiles) == 0:
+            p("No tests were found in '{0}'.".format(testFolder))
+            return True
     total = 0
-    testFolder = config.scriptPath + "/../tests/"
     fails = []
-    for testname in glob.glob(testFolder + "*.bs"):
+    for testname in testFiles:
         p(testname)
         total += 1
         doc = constructor(inputFilename=testname)
@@ -29,9 +34,7 @@ def runAllTests(constructor):
             numPassed += 1
         else:
             fails.append(testname)
-    if total == 0:
-        p("No tests were found in '{0}'.".format(testFolder))
-    elif numPassed == total:
+    if numPassed == total:
         p(printColor("✔ All tests passed.", color="green"))
         return True
     else:
