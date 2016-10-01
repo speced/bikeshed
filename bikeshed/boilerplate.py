@@ -25,7 +25,7 @@ def addHeaderFooter(doc):
 
 
 def fillWith(tag, newElements, doc):
-    for el in findAll("[data-fill-with='{0}']".format(tag), doc):
+    for el in doc.fillContainers[tag]:
         replaceContents(el, newElements)
 
 
@@ -46,9 +46,8 @@ def getFillContainer(tag, doc, default=False):
         return None
 
     # If a fill-with is found, fill that
-    el = find("[data-fill-with='{0}']".format(tag), doc)
-    if el is not None:
-        return el
+    if tag in doc.fillContainers:
+        return doc.fillContainers[tag][0]
 
     # Otherwise, append to the end of the document,
     # unless you're in the byos group
@@ -108,17 +107,17 @@ def addStyles(doc):
 def addCustomBoilerplate(doc):
     for el in findAll('[boilerplate]', doc):
         bType = el.get('boilerplate')
-        target = find('[data-fill-with="{0}"]'.format(bType), doc)
-        if target is not None:
+        if bType in doc.fillContainers:
             replaceContents(target, el)
             removeNode(el)
 
 
 def removeUnwantedBoilerplate(doc):
-    for el in findAll('[data-fill-with]', doc):
-        tag = el.get('data-fill-with')
-        if tag not in doc.md.boilerplate:
-            removeNode(el)
+    for els in doc.fillContainers.values():
+        for el in els:
+            tag = el.get('data-fill-with')
+            if tag not in doc.md.boilerplate:
+                removeNode(el)
 
 
 def addAnnotations(doc):

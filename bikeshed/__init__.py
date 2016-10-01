@@ -532,6 +532,7 @@ class Spec(object):
         metadata.parseDoc(self)
 
         # Fill in and clean up a bunch of data
+        self.fillContainers = locateFillContainers(self)
         lint.lintExampleIDs(self)
         boilerplate.addBikeshedVersion(self)
         boilerplate.addStatusSection(self)
@@ -2547,3 +2548,10 @@ def addNoteHeaders(doc):
         prependChild(el,
                      E.div({"class":"marker"}, preText, *parseHTML(el.get('heading'))))
         removeAttr(el, "heading")
+
+
+def locateFillContainers(doc):
+    fillContainers = defaultdict(list)
+    for el in findAll("[data-fill-with]", doc):
+        fillContainers[el.get("data-fill-width")].append(el)
+    return fillContainers
