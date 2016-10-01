@@ -2556,5 +2556,5 @@ def addNoteHeaders(doc):
 def locateFillContainers(doc):
     fillContainers = defaultdict(list)
     for el in findAll("[data-fill-with]", doc):
-        fillContainers[el.get("data-fill-width")].append(el)
+        fillContainers[el.get("data-fill-with")].append(el)
     return fillContainers
