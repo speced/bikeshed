@@ -107,7 +107,8 @@ def addStyles(doc):
 def addCustomBoilerplate(doc):
     for el in findAll('[boilerplate]', doc):
         bType = el.get('boilerplate')
-        if bType in doc.fillContainers:
+        if bType in doc.fillContainers and len(doc.fillContainers[bType]) > 0:
+            target = doc.fillContainers[bType][0]
             replaceContents(target, el)
             removeNode(el)
 
