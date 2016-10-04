@@ -22,18 +22,19 @@ def runAllTests(constructor, testFiles):
             return True
     total = 0
     fails = []
-    for testname in testFiles:
-        p(testname)
+    for testPath in testFiles:
+        _,_,testName = testPath.rpartition("/")
+        p(testName)
         total += 1
-        doc = constructor(inputFilename=testname)
+        doc = constructor(inputFilename=testPath)
         doc.preprocess()
         outputText = doc.serialize()
-        with io.open(testname[:-2] + "html", encoding="utf-8") as golden:
+        with io.open(testPath[:-2] + "html", encoding="utf-8") as golden:
             goldenText = golden.read()
         if compare(outputText, goldenText):
             numPassed += 1
         else:
-            fails.append(testname)
+            fails.append(testName)
     if numPassed == total:
         p(printColor("✔ All tests passed.", color="green"))
         return True
@@ -95,6 +96,7 @@ def equalOrEmpty(a, b):
 def rebase(files=None):
     if not files:
         files = glob.glob(config.scriptPath + "/../tests/*.bs")
-    for file in files:
-        p("Rebasing {0}".format(file))
-        subprocess.call("bikeshed -qf spec {0}".format(pipes.quote(file)), shell=True)
+    for path in files:
+        _,_,name = path.rpartition("/")
+        p("Rebasing {0}".format(name))
+        subprocess.call("bikeshed -qf spec {0}".format(pipes.quote(path)), shell=True)
