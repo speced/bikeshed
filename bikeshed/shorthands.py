@@ -235,12 +235,12 @@ def transformAutolinkShortcuts(doc):
                 E.a({"href":match.group(2), "title":match.group(3)}, match.group(1))
                 )
 
-    strongRe = re.compile(r"(?<!\\)([_*])\1(?!\s)([^\1]+)(?!\s)(?<!\\)\1\1")
+    strongRe = re.compile(r"(?<!\\)(\*\*)(?!\s)([^*]+)(?!\s)(?<!\\)\*\*")
 
     def strongReplacer(match):
         return E.strong(match.group(2))
 
-    emRe = re.compile(r"(?<!\\)([_*])(?!\s)([^\1]+)(?!\s)(?<!\\)\1")
+    emRe = re.compile(r"(?<!\\)(\*)(?!\s)([^*]+)(?!\s)(?<!\\)\*")
 
     def emReplacer(match):
         return E.em(match.group(2))
