@@ -36,7 +36,7 @@ def updateCrossRefs():
         res = shepherd.get("specifications", anchors=True, draft=True)
         # http://api.csswg.org/shepherd/spec/?spec=css-flexbox-1&anchors&draft, for manual looking
         if ((not res) or (406 == res.status)):
-            die("This version of the anchor-data API is no longer supported. Please update Bikeshed.")
+            die("Either this version of the anchor-data API is no longer supported, or (more likely) there was a transient network error. Try again in a little while, and/or update Bikeshed. If the error persists, please report it on GitHub.")
             return
         if res.contentType not in config.anchorDataContentTypes:
             die("Unrecognized anchor-data content-type '{0}'.", res.contentType)
