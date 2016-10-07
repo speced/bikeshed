@@ -296,13 +296,14 @@ def updateCanIUse():
         return
     try:
         # Check that the data is valid JSON
-        json.loads(jsonString)
+        data = json.loads(unicode(jsonString), encoding="utf-8")
     except Exception, e:
         die("The Can I Use data wasn't valid JSON for some reason. Try downloading again?\n{0}", e)
+        return
     if not config.dryRun:
         try:
-            with closing(io.open(config.scriptPath + "/spec-data/caniuse.json", 'wb')) as fh:
-                fh.write(jsonString)
+            with closing(io.open(config.scriptPath + "/spec-data/caniuse.json", 'w', encoding="utf-8")) as fh:
+                fh.write(unicode(json.dumps(data, indent=1, ensure_ascii=False, sort_keys=True)))
         except Exception, e:
             die("Couldn't save Can I Use database to disk.\n{0}", e)
             return
