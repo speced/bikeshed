@@ -1633,17 +1633,9 @@ def addCanIUsePanels(doc):
     features = doc.canIUse["data"]
     lastUpdated = datetime.utcfromtimestamp(doc.canIUse["updated"]).date().isoformat()
 
-    # e.g. 'ios_saf' -> 'iOS Safari'
-    codeNameToFullName = OrderedDict( # sorted by full name
-        sorted(
-            [
-                (agentCodeName, agent["browser"])
-                for agentCodeName, agent
-                in doc.canIUse["agents"].iteritems()
-            ],
-            key=lambda p: p[1]
-        )
-    )
+    # e.g. 'iOS Safari' -> 'ios_saf'
+    classFromBrowser = doc.canIUse["agents"]
+
     atLeastOnePanel = False
     caniuseDfnElementsSelector = ",".join(
         selector + "[caniuse]"
@@ -1661,7 +1653,7 @@ def addCanIUsePanels(doc):
         feature = features[featId]
 
         addClass(dfn, "caniuse-paneled")
-        panel = canIUsePanelFor(codeNameToFullName, featId, feature['stats'], lastUpdated)
+        panel = canIUsePanelFor(id=featId, data=feature, update=lastUpdated, classFromBrowser=classFromBrowser)
         panel.set("dfn-id", dfn.get("id"))
         appendChild(doc.body, panel)
         atLeastOnePanel = True
@@ -1724,62 +1716,24 @@ def addCanIUsePanels(doc):
             }'''
 
 
-def canIUsePanelFor(codeNameToFullName, featId, featStats, lastUpdated):
+def canIUsePanelFor(id, data, update, classFromBrowser):
     panel = E.aside({"class": "caniuse-status", "data-deco": ""},
         E.input({"value": u"\u22F0", "type": "button", "class":"caniuse-panel-btn"}))
     mainPara = E.p({"class": "support"}, E.b({}, "Support:"))
     appendChild(panel, mainPara)
-    for browserCodeName, browserFullName in codeNameToFullName.iteritems():
-        statusCode, minVersion = compatSummaryFor(featStats[browserCodeName])
+    for browser,support in data['support'].items():
+        statusCode = support[0]
         if statusCode == "u":
             continue
+        minVersion = support[2:]
         appendChild(mainPara,
-            browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion))
+            browserCompatSpan(classFromBrowser[browser], browser, statusCode, minVersion))
     appendChild(panel,
         E.p({"class": "caniuse"},
             "Source: ",
-            E.a({"href": "http://caniuse.com/#feat=" + featId}, "caniuse.com"),
-            " as of " + lastUpdated))
+            E.a({"href": "http://caniuse.com/#feat=" + id}, "caniuse.com"),
+            " as of " + update))
     return panel
-
-
-def compatSummaryFor(versionToStatus):
-    bestStatusYet = "u"
-    lowestGoodVersion = None
-    versionsDescending = versionToStatus.keys()
-    versionsDescending.reverse()  # In the original JSON, they're in ascending order.
-    for version in versionsDescending:
-        status = versionToStatus[version]
-        if "u" in status:
-            continue
-        # Simplify vendor-prefi(x)ed/(d)isabled-by-default/(p)olyfilled to u(n)supported
-        # And remove notes etc. by canonicalizing to single char.
-        if "x" in status or "d" in status or "n" in status or "p" in status:
-            status = "n"
-        elif "a" in status:
-            status = "a"
-        elif "y" in status:
-            status = "y"
-        # assert status in "nay"
-
-        if bestStatusYet == "u":
-            # 1st datapoint
-            bestStatusYet = status
-            lowestGoodVersion = version
-            continue
-
-        if "n" in status:  # It Got Worse (or is still unsupported)
-            break
-
-        if status == bestStatusYet:
-            # New winner
-            lowestGoodVersion = version
-        else:
-            # Either: Old version was buggy, new version is fixed.
-            # Or: New version introduced bug(s); you can be no better than your last release.
-            break
-
-    return bestStatusYet, lowestGoodVersion
 
 
 def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion=None):
@@ -1788,8 +1742,7 @@ def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion=N
     elif minVersion == "all":
         minVersion = "All"
     else:
-        # If the version is a range (e.g. "9.0-9.2"), just use the lower bound (e.g. "9.0").
-        minVersion = minVersion.partition('-')[0] + "+"
+        minVersion = minVersion + "+"
     # browserCodeName: e.g. and_chr, ios_saf, ie, etc...
     # browserFullName: e.g. "Chrome for Android"
     statusClass = {"y": "yes", "n": "no", "a": "partial"}[statusCode]
