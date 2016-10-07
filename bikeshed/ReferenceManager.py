@@ -192,6 +192,8 @@ class ReferenceManager(object):
         text = unfixTypography(text)
         if linkType in config.lowercaseTypes:
             text = text.lower()
+        if spec is not None:
+            spec = spec.lower()
 
         status = status or self.status
         if status not in ("ED", "TR", "local"):
