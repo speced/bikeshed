@@ -1693,7 +1693,7 @@ def addCanIUsePanels(doc):
             .caniuse-status > .support > span { padding: 0.2em 0; display: block; display: table; }
             .caniuse-status > .support > span.partial { color: #666666; filter: grayscale(50%); }
             .caniuse-status > .support > span.no { color: #CCCCCC; filter: grayscale(100%); }
-            .status > .support > span.no::before { opacity: 0.5; }
+            .canisue-status > .support > span.no::before { opacity: 0.5; }
             .caniuse-status > .support > span:first-of-type { padding-top: 0.5em; }
             .caniuse-status > .support > span > span { padding: 0 0.5em; display: table-cell; vertical-align: top; }
             .caniuse-status > .support > span > span:first-child { width: 100%; }
@@ -1714,7 +1714,7 @@ def addCanIUsePanels(doc):
             .caniuse-status > .support > .op_mob::before { background-image: url(https://resources.whatwg.org/browser-logos/opera.png); }
             .caniuse-status > .support > .opera::before { background-image: url(https://resources.whatwg.org/browser-logos/opera.png); }
             .caniuse-status > .support > .safari::before { background-image: url(https://resources.whatwg.org/browser-logos/safari.png); }
-            .status > .support > .samsung::before { background-image: url(https://resources.whatwg.org/browser-logos/samsung.png); }
+            .caniuse-status > .support > .samsung::before { background-image: url(https://resources.whatwg.org/browser-logos/samsung.png); }
             .caniuse-status > .caniuse { text-align: right; font-style: italic; }
             @media (max-width: 767px) {
                 .caniuse-status.wrapped { width: 9em; height: auto; }
