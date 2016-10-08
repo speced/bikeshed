@@ -55,7 +55,7 @@ language: python
 python:
   - "2.7"
 install:
-  - pip install sphinx pygments lxml setuptools --upgrade
+  - pip install pygments lxml setuptools --upgrade
   - git clone https://github.com/tabatkins/bikeshed.git
   - pip install --editable $PWD/bikeshed
   - bikeshed update
