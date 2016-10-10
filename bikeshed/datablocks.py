@@ -466,7 +466,7 @@ def processAnchors(anchors, doc, lineNum=None):
                 die("Anchor statuses must be 'local', 'ED', or 'TR'. Got '{0}'.", status, lineNum=lineNum)
                 continue
         else:
-            status = "local"
+            status = "anchor-block"
         if anchor['type'][0] in config.lowercaseTypes:
             anchor['text'][0] = anchor['text'][0].lower()
         doc.refs.refs[anchor['text'][0]].append({

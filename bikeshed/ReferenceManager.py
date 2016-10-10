@@ -216,6 +216,20 @@ class ReferenceManager(object):
                               el=el)
                 return localRefs[0]
 
+        # Then anchor-block refs get preference
+        blockRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el, status="anchor-block")
+        if len(blockRefs) == 1:
+            return blockRefs[0]
+        elif len(blockRefs) > 1:
+            if error:
+                linkerror("Multiple possible '{0}' anchor-block refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
+                          linkType,
+                          text,
+                          blockRefs[0].type,
+                          "' or '".join(blockRefs[0].for_),
+                          el=el)
+            return blockRefs[0]
+
         # Take defaults into account
         if not spec or not status:
             variedTexts = [v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs]
