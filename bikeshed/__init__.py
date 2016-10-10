@@ -246,7 +246,7 @@ def main():
         else:
             rm = ReferenceManager()
             rm.initializeRefs()
-        refs,_ = list(rm.queryRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
+        refs,_ = list(rm.queryRefs(text=unicode(options.text, encoding="utf-8"), linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
         p(config.printjson(refs))
     elif options.subparserName == "issues-list":
         from . import issuelist as il
