@@ -477,7 +477,7 @@ def processAnchors(anchors, doc, lineNum=None):
             "level": level if level is not None else doc.md.level,
             "for": anchor.get('for', []),
             "export": True,
-            "status": status.lower(),
+            "status": status,
             "spec": spec.lower() if spec is not None else ''
         })
         methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
