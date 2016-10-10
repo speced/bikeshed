@@ -35,7 +35,7 @@ $ sudo pip install lxml --upgrade
 
 That'll spew a lot of console trash, but don't worry about it.
 
-In some installations you'll need to also upgrade `setuptools` for `html5lib`'s entertainement:
+In some installations you'll need to also upgrade `setuptools` for `html5lib`'s entertainment:
 
 ~~~~
 $ sudo pip install lxml setuptools --upgrade
@@ -61,7 +61,7 @@ install:
   - bikeshed update
 script:
   # Invoke bikeshed here, at your own leisure. E.g.:
-  - find ./ -name "*.bs" -type f | xargs -I{} -t -n1 bikeshed spec {}
+  - bikeshed spec
 ~~~
 
 OS X steps
