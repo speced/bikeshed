@@ -307,7 +307,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
         return
 
     ul = E.ul({"class": "index"})
-    for spec, refs in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0]):
+    for spec, refGroups in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0]):
         # ref.spec is always lowercase; if the same string shows up in biblio data,
         # use its casing instead.
         biblioRef = doc.refs.getBiblioRef(spec, status="normative")
@@ -320,12 +320,25 @@ def addIndexOfExternallyDefinedTerms(doc, container):
                              E.li(
                                  E.a(attrs, "[", printableSpec, "]"), " defines the following terms:"))
         termsUl = appendChild(specLi, E.ul())
-        for title, ref in sorted(refs.items(), key=lambda x:x[0]):
-            appendChild(termsUl, E.li(E.a({"href":ref.url}, title)))
-
+        for text,refs in sorted(refGroups.items(), key=lambda x:x[0]):
+            if len(refs) == 1:
+                ref = refs.values()[0]
+                appendChild(termsUl,
+                            E.li(E.a({"href":ref.url}, ref.text)))
+            else:
+                for key,ref in sorted(refs.items(), key=lambda x:x[0]):
+                    if key:
+                        link = E.a({"href":ref.url},
+                                   ref.text,
+                                   " ",
+                                   E.small({}, "(for {0})".format(key)))
+                    else:
+                        link = E.a({"href":ref.url},
+                                   ref.text)
+                    appendChild(termsUl, E.li(link))
     appendChild(container,
-                E.h3({"class":"no-num no-ref", "id":"index-defined-elsewhere"}, "Terms defined by reference"))
-    appendChild(container, ul)
+                E.h3({"class":"no-num no-ref", "id":"index-defined-elsewhere"}, "Terms defined by reference"),
+                ul)
 
 
 def addPropertyIndex(doc):

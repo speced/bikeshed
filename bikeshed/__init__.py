@@ -325,7 +325,7 @@ class Spec(object):
         self.normativeRefs = {}
         self.informativeRefs = {}
         self.refs = ReferenceManager()
-        self.externalRefsUsed = defaultdict(dict)
+        self.externalRefsUsed = defaultdict(lambda:defaultdict(dict))
         self.md = metadata.MetadataManager(doc=self)
         self.biblios = {}
         self.typeExpansions = {}
@@ -1372,9 +1372,10 @@ def processAutolinks(doc):
         # rather than checking `status == "local"`, as "local" refs include
         # those defined in `<pre class="anchor">` datablocks, which we do
         # want to capture here.
-        if ref and ref.spec is not None and ref.spec is not "" and ref.spec.lower() != doc.refs.specVName.lower():
-            if ref.text not in doc.externalRefsUsed[ref.spec.lower()]:
-                doc.externalRefsUsed[ref.spec.lower()][ref.text] = ref
+        if ref and ref.spec and ref.spec.lower() != doc.refs.specVName.lower():
+            spec = ref.spec.lower()
+            key = ref.for_[0] if ref.for_ else ""
+            doc.externalRefsUsed[spec][ref.text][key] = ref
             if isNormative(el):
                 biblioStatus = "normative"
                 biblioStorage = doc.normativeRefs
