@@ -41,7 +41,8 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
     tokens = []
     rawStack = []
     if opaqueElements is None:
-        opaqueElements = ["pre", "xmp", "script", "style"]
+    	opaqueElements = []
+    opaqueElements += ["pre", "xmp", "script", "style"]
     rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
     lineCountCorrection = 0
@@ -87,7 +88,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
                 classAttr = ""
             tokens.append({'type':'raw', 'raw':'<xmp{0}>'.format(classAttr), 'prefixline':float('inf'), 'line':i + lineCountCorrection})
             continue
-        match = re.search(r"<({0})[ >]".format(rawElements), rawline)
+        match = re.match(r"\s*<({0})[ >]".format(rawElements), rawline)
         if match:
             tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
             if re.search(r"</({0})>".format(match.group(1)), rawline):
