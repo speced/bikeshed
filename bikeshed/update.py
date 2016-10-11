@@ -109,6 +109,14 @@ def updateCrossRefs():
                 continue
             if len(linkingTexts) == 1 and linkingTexts[0].strip() == "":
                 continue
+            # If any smart quotes crept in, replace them with ASCII.
+            for i,t in enumerate(linkingTexts):
+                if "’" in t or "‘" in t:
+                    t = re.sub(r"‘|’", "'", t)
+                    linkingTexts[i] = t
+                if "“" in t or "”" in t:
+                    t = re.sub(r"“|”", '"', t)
+                    linkingTexts[i] = t
             if rawAnchor['type'] == "heading":
                 uri = rawAnchor['uri']
                 if uri.startswith("??"):
