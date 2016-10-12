@@ -545,6 +545,7 @@ def hashContents(el):
 
 def fixupIDs(doc, els):
     translateIDs(doc.md.translateIDs, els)
+    addOldIDs(els)
     dedupIDs(doc)
 
 
@@ -552,6 +553,16 @@ def translateIDs(trans, els):
     for el in els:
         if el.get('id') in trans:
             el.set('id', trans[el.get('id')])
+
+
+def addOldIDs(els):
+    for el in els:
+        if not el.get("oldids"):
+            continue
+        oldIDs = [id.strip() for id in el.get("oldids").strip().split(",")]
+        for oldID in oldIDs:
+            appendChild(el, E.span({"id":oldID}))
+        removeAttr(el, "oldids")
 
 
 def dedupIDs(doc):

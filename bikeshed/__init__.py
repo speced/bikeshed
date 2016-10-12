@@ -2452,7 +2452,6 @@ def cleanupHTML(doc):
             removeAttr(el, 'data-dfn-type')
             removeAttr(el, 'data-export')
             removeAttr(el, 'data-noexport')
-        removeAttr(el, 'oldids')
         removeAttr(el, 'data-alternate-id')
         removeAttr(el, 'highlight')
         removeAttr(el, 'nohighlight')
