@@ -743,9 +743,9 @@ class Spec(object):
             if innerText in self.macros:
                 # For some reason I store all the macros in lowercase,
                 # despite requiring them to be spelled with uppercase.
-                return self.macros[innerText.lower()]
+                return self.macros[innerText]
             if moreMacros and innerText in moreMacros:
-                return moreMacros[innerText.lower()]
+                return moreMacros[innerText]
             # Nothing has matched, so start failing the macros.
             if optional:
                 return ""
