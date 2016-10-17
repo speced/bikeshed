@@ -211,8 +211,8 @@ def addExplicitIndexes(doc):
         else:
             types = None
         status = container.get('status')
-        if status and status not in ["TR", "ED"]:
-            die("<index> has unknown value '{0}' for status. Must be TR or ED.", status, el=container)
+        if status and status not in config.specStatuses:
+            die("<index> has unknown value '{0}' for status. Must be {1}.", status, config.englishFromList(config.specStatuses), el=container)
             continue
         if container.get('for').strip() == "*":
             specs = None
@@ -257,10 +257,10 @@ def addExplicitIndexes(doc):
                                 indexEntries[text][i] = entry
                                 break
                         else:
-                            # Default to preferring EDs
-                            if existingEntry['status'] == "ED":
+                            # Default to preferring current specs
+                            if existingEntry['status'] == "current":
                                 break
-                            elif entry['status'] == "ED":
+                            elif entry['status'] == "current":
                                 indexEntries[text][i] = entry
                                 break
                     else:
@@ -612,7 +612,7 @@ def addSpecMetadataSection(doc):
         md["This version"].append(E.a({"href":mac['version'], "class":"u-url"}, mac['version']))
     if doc.md.TR:
         md["Latest published version"].append(E.a({"href": doc.md.TR}, doc.md.TR))
-    if doc.md.ED and doc.md.status in config.TRStatuses:
+    if doc.md.ED and doc.md.status in config.snapshotStatuses:
         md["Editor's Draft"].append(E.a({"href": doc.md.ED}, doc.md.ED))
     if len(doc.md.previousVersions):
         md["Previous Versions"] = [E.a({"href":ver, "rel":"previous"}, ver) for ver in doc.md.previousVersions]

@@ -976,16 +976,16 @@ def fixInterDocumentReferences(doc):
                     # multiple headings of this id, user needs to disambiguate
                     die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  [[{0}]]".format(spec + x) for x in heading), el=el)
                     continue
-            if doc.md.status == "ED":
-                if "ED" in heading:
-                    heading = heading["ED"]
+            if doc.md.status == "current":
+                if "current" in heading:
+                    heading = heading["current"]
                 else:
-                    heading = heading["TR"]
+                    heading = heading["snapshot"]
             else:
-                if "TR" in heading:
-                    heading = heading["TR"]
+                if "snapshot" in heading:
+                    heading = heading["snapshot"]
                 else:
-                    heading = heading["ED"]
+                    heading = heading["current"]
             el.tag = "a"
             el.set("href", heading['url'])
             if isEmpty(el):
@@ -1357,12 +1357,28 @@ def processAutolinks(doc):
         if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
             continue
 
+        # Not super clear why I think links will specify multiple for values,
+        # or why it's okay to just use the first one in that case.
         linkFor = config.splitForValues(el.get('data-link-for'))
         if linkFor:
             linkFor = linkFor[0]
+
+        # Status used to use ED/TR, so convert those if they appear,
+        # and verify
+        status = el.get('data-link-status')
+        if status == "ED":
+            status = "current"
+        elif status == "TR":
+            status = "snapshot"
+        elif status in config.linkStatuses or status is None:
+            pass
+        else:
+            die("Unknown link status '{0}' on {1}", status, outerHTML(el))
+            continue
+
         ref = doc.refs.getRef(linkType, linkText,
                               spec=el.get('data-link-spec'),
-                              status=el.get('data-link-status'),
+                              status=status,
                               linkFor=linkFor,
                               linkForHint=el.get('data-link-for-hint'),
                               el=el,

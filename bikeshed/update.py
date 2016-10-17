@@ -65,8 +65,8 @@ def updateCrossRefs():
         spec = {
             'vshortname': rawSpec['name'],
             'shortname': rawSpec.get('short_name'),
-            'TR': rawSpec.get('base_uri'),
-            'ED': rawSpec.get('draft_uri'),
+            'snapshot_url': rawSpec.get('base_uri'),
+            'current_url': rawSpec.get('draft_uri'),
             'title': rawSpec.get('title'),
             'description': rawSpec.get('description'),
             'work_status': rawSpec.get('work_status'),
@@ -101,7 +101,7 @@ def updateCrossRefs():
                 obj['status'] = status
                 return obj
             return temp
-        rawAnchorData = map(setStatus('TR'), linearizeAnchorTree(rawSpec.get('anchors', []))) + map(setStatus('ED'), linearizeAnchorTree(rawSpec.get('draft_anchors',[])))
+        rawAnchorData = map(setStatus('snapshot'), linearizeAnchorTree(rawSpec.get('anchors', []))) + map(setStatus('current'), linearizeAnchorTree(rawSpec.get('draft_anchors',[])))
         for rawAnchor in rawAnchorData:
             rawAnchor = fixupAnchor(rawAnchor)
             linkingTexts = rawAnchor.get('linking_text', [rawAnchor.get('title')])
@@ -125,7 +125,7 @@ def updateCrossRefs():
                 if uri[0] == "#":
                     # Either single-page spec, or link on the top page of a multi-page spec
                     heading = {
-                        'url': spec[rawAnchor['status']] + uri,
+                        'url': spec["{0}_url".format(rawAnchor['status'])] + uri,
                         'number': rawAnchor['name'] if re.match(r"[\d.]+$", rawAnchor['name']) else "",
                         'text': rawAnchor['title'],
                         'spec': spec['title']
@@ -149,7 +149,7 @@ def updateCrossRefs():
                         fragment = "#"
                     shorthand = page + fragment
                     heading = {
-                        'url': spec[rawAnchor['status']] + uri,
+                        'url': spec["{0}_url".format(rawAnchor['status'])] + uri,
                         'number': rawAnchor['name'] if re.match(r"[\d.]+$", rawAnchor['name']) else "",
                         'text': rawAnchor['title'],
                         'spec': spec['title']
@@ -170,7 +170,7 @@ def updateCrossRefs():
                     'level': int(spec['level']),
                     'export': rawAnchor.get('export', False),
                     'normative': rawAnchor.get('normative', False),
-                    'url': spec[rawAnchor['status']] + rawAnchor['uri'],
+                    'url': spec["{0}_url".format(rawAnchor['status'])] + rawAnchor['uri'],
                     'for': rawAnchor.get('for', [])
                 }
                 for text in linkingTexts:
@@ -447,7 +447,7 @@ def writeBiblioFile(fh, biblios):
     date
     status
     title
-    dated url
+    snapshot url
     current url
     other
     etAl (as a boolish string)
@@ -465,7 +465,7 @@ def writeBiblioFile(fh, biblios):
         format = b['biblioFormat']
         fh.write("{prefix}:{key}\n".format(prefix=typePrefixes[format], key=key.lower()))
         if format == "dict":
-            for field in ["linkText", "date", "status", "title", "dated_url", "current_url", "other"]:
+            for field in ["linkText", "date", "status", "title", "snapshot_url", "current_url", "other"]:
                 fh.write(b.get(field, "") + "\n")
             if b.get("etAl", False):
                 fh.write("1\n")

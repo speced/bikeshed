@@ -90,10 +90,10 @@ class ReferenceManager(object):
     def status(self, val):
         if val is None:
             self._status = None
-        elif val in config.TRStatuses:
-            self._status = "TR"
+        elif val in config.snapshotStatuses:
+            self._status = "snapshot"
         elif val in config.shortToLongStatus:
-            self._status = "ED"
+            self._status = "current"
         else:
             die("Unknown spec status '{0}'.", val)
             self._status = None
@@ -196,9 +196,9 @@ class ReferenceManager(object):
             spec = spec.lower()
 
         status = status or self.status
-        if status not in ("ED", "TR", "local"):
+        if status not in config.linkStatuses:
             if error:
-                die("Unknown spec status '{0}'. Status must be ED, TR, or local.", status, el=el)
+                die("Unknown spec status '{0}'. Status must be {1}.", status, config.englishFromList(config.linkStatuses), el=el)
             return None
 
         # Local refs always get precedence, unless you manually specified a spec.
@@ -383,7 +383,6 @@ class ReferenceManager(object):
         return defaultRef
 
     def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None, quiet=False):
-        specStatus = "dated" if self.status == "TR" else "current"
         key = text.lower()
         if key in ["notifications", "fullscreen", "dom", "url", "encoding"]:
             # A handful of specs where W3C is squatting with an out-of-date fork.
@@ -404,7 +403,7 @@ class ReferenceManager(object):
                 if ref:
                     return ref
             if generateFakeRef:
-                return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=specStatus)
+                return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=self.status)
             else:
                 return None
         else:
@@ -420,7 +419,7 @@ class ReferenceManager(object):
             # Follow the chain to the real candidate
             bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True)
         else:
-            bib = biblio.BiblioEntry(preferredURL=specStatus, **candidate)
+            bib = biblio.BiblioEntry(preferredURL=self.status, **candidate)
 
         # If a canonical name has been established, use it.
         if bib.linkText in self.preferredBiblioNames:
@@ -510,13 +509,13 @@ class ReferenceManager(object):
             return refs, "for"
 
         if status:
-            # If status is ED, kill TR refs unless their spec *only* has a TR url
-            if status == "ED":
-                refs = [ref for ref in refs if ref.status == "ED" or (ref.status == "TR" and self.specs.get(ref.spec,{}).get('ED') is None)]
-            # If status is TR, kill ED refs if there's a corresponding TR ref for the same spec.
-            elif status == "TR":
-                TRRefSpecs = [ref.spec for ref in refs if ref.status == 'TR']
-                refs = [ref for ref in refs if ref.status == "TR" or (ref.status == "ED") and ref.spec not in TRRefSpecs]
+            # If status is "current'", kill snapshot refs unless their spec *only* has a snapshot_url
+            if status == "current":
+                refs = [ref for ref in refs if ref.status == "current" or (ref.status == "snapshot" and self.specs.get(ref.spec,{}).get('current_url') is None)]
+            # If status is "snapshot", kill current refs if there's a corresponding snapshot ref for the same spec.
+            elif status == "snapshot":
+                snapshotSpecs = [ref.spec for ref in refs if ref.status == 'snapshot']
+                refs = [ref for ref in refs if ref.status == "snapshot" or (ref.status == "current" and ref.spec not in snapshotSpecs)]
             else:
                 refs = [x for x in refs if x.status == status]
         if not refs:
@@ -553,20 +552,20 @@ class ReferenceManager(object):
 
         # If multiple levels of the same shortname exist,
         # only use the latest level.
-        # If generating for TR, prefer the latest TR level,
+        # If generating for a snapshot, prefer the latest snapshot level,
         # unless that doesn't exist, in which case just prefer the latest level.
         shortnameLevels = defaultdict(lambda:defaultdict(list))
-        TRShortnameLevels = defaultdict(lambda:defaultdict(list))
+        snapshotShortnameLevels = defaultdict(lambda:defaultdict(list))
         for ref in refs:
             shortnameLevels[ref.shortname][ref.level].append(ref)
-            if status == "TR" and ref.status == "TR":
-                TRShortnameLevels[ref.shortname][ref.level].append(ref)
+            if status == ref.status == "snapshot":
+                snapshotShortnameLevels[ref.shortname][ref.level].append(ref)
         refs = []
         for shortname, levelSet in shortnameLevels.items():
-            if status == "TR" and TRShortnameLevels[shortname]:
-                # Get the latest TR refs if they exist and you're generating for TR...
-                maxLevel = max(TRShortnameLevels[shortname].keys())
-                refs.extend(TRShortnameLevels[shortname][maxLevel])
+            if status == "snapshot" and snapshotShortnameLevels[shortname]:
+                # Get the latest snapshot refs if they exist and you're generating a snapshot...
+                maxLevel = max(snapshotShortnameLevels[shortname].keys())
+                refs.extend(snapshotShortnameLevels[shortname][maxLevel])
             else:
                 # Otherwise just grab the latest refs regardless.
                 maxLevel = max(levelSet.keys())

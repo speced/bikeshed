@@ -460,10 +460,10 @@ def processAnchors(anchors, doc, lineNum=None):
                 level = config.HierarchicalNumber("")
         if "status" in anchor:
             status = anchor["status"][0]
-            if status in ["local", "TR","ED"]:
+            if status in config.linkStatuses:
                 pass
             else:
-                die("Anchor statuses must be 'local', 'ED', or 'TR'. Got '{0}'.", status, lineNum=lineNum)
+                die("Anchor statuses must be {1}. Got '{0}'.", status, config.englishFromList(config.linkStatuses), lineNum=lineNum)
                 continue
         else:
             status = "anchor-block"

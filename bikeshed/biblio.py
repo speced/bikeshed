@@ -8,14 +8,14 @@ from .htmlhelpers import *
 
 class BiblioEntry(object):
 
-    def __init__(self, preferredURL="dated", **kwargs):
+    def __init__(self, preferredURL="snapshot", **kwargs):
         self.linkText = None
         self.title = None
         self.authors = []
         self.etAl = False
         self.status = None
         self.date = None
-        self.dated_url = None
+        self.snapshot_url = None
         self.current_url = None
         self.url = None
         self.other = None
@@ -26,10 +26,10 @@ class BiblioEntry(object):
                 self.etAl = val
             else:
                 setattr(self, key, val)
-        if preferredURL == "dated":
-            self.url = self.dated_url or self.current_url
+        if preferredURL == "snapshot":
+            self.url = self.snapshot_url or self.current_url
         elif preferredURL == "current":
-            self.url = self.current_url or self.dated_url
+            self.url = self.current_url or self.snapshot_url
         else:
             die("Programming error: when trying to build the biblio entry for '{0}', got unknown status '{1}'.", self.linkText, preferredURL)
 
@@ -117,11 +117,11 @@ class SpecBasedBiblioEntry(BiblioEntry):
     for when we don't have "real" bibliography data for a reference.
     '''
 
-    def __init__(self, spec, preferredURL="dated"):
+    def __init__(self, spec, preferredURL="snapshot"):
         self.spec = spec
         self.linkText = spec['vshortname']
         self._valid = True
-        if preferredURL == "dated" and spec.get("TR", None) is not None:
+        if preferredURL == "snapshot" and spec.get("TR", None) is not None:
             self.url = spec['TR']
         elif spec.get('ED', None) is not None:
             self.url = spec['ED']
@@ -164,7 +164,7 @@ class StringBiblioEntry(BiblioEntry):
 
 def processReferBiblioFile(lines, storage, order):
     singularReferCodes = {
-        "U": "dated_url",
+        "U": "snapshot_url",
         "T": "title",
         "D": "date",
         "S": "status",
@@ -259,7 +259,7 @@ def processSpecrefBiblioFile(text, storage, order):
     fields = {
         "authors": "authors",
         "etAl": "etAl",
-        "href": "dated_url",
+        "href": "snapshot_url",
         "edDraft": "current_url",
         "title": "title",
         "date": "date",
@@ -287,7 +287,7 @@ def processSpecrefBiblioFile(text, storage, order):
                 if jsonField in data:
                     biblio[biblioField] = data[jsonField]
                 if "versionOf" in data:
-                    # "versionOf" entries are all dated urls,
+                    # "versionOf" entries are all snapshot urls,
                     # so you want the href *all* the time.
                     biblio["current_url"] = data["href"]
         storage[biblioKey.lower()].append(biblio)
@@ -305,7 +305,7 @@ def loadBiblioDataFile(lines, storage):
                     "date": lines.next(),
                     "status": lines.next(),
                     "title": lines.next(),
-                    "dated_url": lines.next(),
+                    "snapshot_url": lines.next(),
                     "current_url": lines.next(),
                     "other": lines.next(),
                     "etAl": lines.next() != "\n",

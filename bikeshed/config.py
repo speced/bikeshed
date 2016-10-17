@@ -74,7 +74,7 @@ shortToLongStatus = {
     "iso/PRF-AMD": "Proof Amendment",
     "iso/AMD": "Amendment"
 }
-TRStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/NOTE", "w3c/MO"]
+snapshotStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/NOTE", "w3c/MO"]
 unlevelledStatuses = ["LS", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING"]
 deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
 noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "FINDING", "DREAM"]
@@ -98,15 +98,6 @@ def canonicalizeStatus(rawStatus, group):
             if s == status:
                 megaGroups.append(mg)
         return megaGroups
-
-    def printList(items):
-        # Format a list of strings into an English list.
-        items = list(items)
-        if len(items) == 1:
-            return items[0]
-        if len(items) == 2:
-            return "{0} or {1}".format(*items)
-        return "{0}, or {1}".format(", ".join(items[:-1]), items[-1])
 
     # Canonicalize the rawStatus that was passed in, into a known form.
     # Might be foo/BAR, or just BAR.
@@ -147,12 +138,12 @@ def canonicalizeStatus(rawStatus, group):
                 else:
                     msg += " That status can only be used with the org{0} {1}, or without an org at all.".format(
                         "s" if len(possibleMgs)>1 else "",
-                        printList("'{0}'".format(x) for x in possibleMgs if x != ""))
+                        englishFromList("'{0}'".format(x) for x in possibleMgs if x != ""))
             else:
                 if len(possibleMgs) == 1:
                     msg += " That status can only be used with the org '{0}', like `Status: {0}/{1}`".format(possibleMgs[0], status)
                 else:
-                    msg += " That status can only be used with the orgs {0}.".format(printList("'{0}'".format(x) for x in possibleMgs))
+                    msg += " That status can only be used with the orgs {0}.".format(englishFromList("'{0}'".format(x) for x in possibleMgs))
 
         else:
             if megaGroup not in megaGroups:
@@ -172,7 +163,7 @@ def canonicalizeStatus(rawStatus, group):
     if possibleMgs:
         msg = "You used Status: {0}, but that's limited to the {1} org{2}".format(
             rawStatus,
-            printList("'{0}'".format(mg) for mg in possibleMgs),
+            englishFromList("'{0}'".format(mg) for mg in possibleMgs),
             "s" if len(possibleMgs)>1 else "")
         if group:
             msg += ", and your group '{0}' isn't recognized as being in {1}.".format(group, "any of those orgs" if len(possibleMgs)>1 else "that org")
@@ -184,6 +175,15 @@ def canonicalizeStatus(rawStatus, group):
         msg = "Unknown Status metadata '{0}'. Check the docs for valid Status values.".format(canonStatus)
     die("{0}", msg)
     return canonStatus
+
+def englishFromList(items):
+    # Format a list of strings into an English list.
+    items = list(items)
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return "{0} or {1}".format(*items)
+    return "{0}, or {1}".format(", ".join(items[:-1]), items[-1])
 
 
 dfnClassToType = {
@@ -252,6 +252,9 @@ linkTypeToDfnType = {
 }
 for dfnType in dfnClassToType.values():
     linkTypeToDfnType[dfnType] = frozenset([dfnType])
+
+specStatuses = frozenset(["current", "snapshot"])
+linkStatuses = frozenset(["current", "snapshot", "local", "anchor-block"])
 
 
 def linkTypeIn(linkTypes, targetTypes="all"):
