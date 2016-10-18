@@ -181,7 +181,7 @@ class ReferenceManager(object):
     def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None, exact=False):
         return self._queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]
 
-    def getRef(self, linkType, text, spec=None, status=None, linkFor=None, linkForHint=None, error=True, el=None):
+    def getRef(self, linkType, text, spec=None, status=None, statusHint=None, linkFor=None, linkForHint=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a reference or None
         # Otherwise, it pops out debug messages for the user.
 
@@ -194,9 +194,9 @@ class ReferenceManager(object):
             text = text.lower()
         if spec is not None:
             spec = spec.lower()
-
-        status = status or self.status
-        if status not in config.linkStatuses:
+        if statusHint is None:
+            statusHint = self.status
+        if status not in config.linkStatuses and status is not None:
             if error:
                 die("Unknown spec status '{0}'. Status must be {1}.", status, config.englishFromList(config.linkStatuses), el=el)
             return None
@@ -247,7 +247,7 @@ class ReferenceManager(object):
             export = True
         else:
             export = None
-        refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor=linkFor, linkForHint=linkForHint, export=export, ignoreObsoletes=True)
+        refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, statusHint=statusHint, linkFor=linkFor, linkForHint=linkForHint, export=export, ignoreObsoletes=True)
 
         if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
             # foo()/bar failed, because foo() is technically the wrong signature
@@ -300,7 +300,7 @@ class ReferenceManager(object):
             methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
             if not methodRefs:
                 # Look for non-locals, then
-                candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, linkFor=interfaceName, export=export, ignoreObsoletes=True)
+                candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, statusHint=statusHint, linkFor=interfaceName, export=export, ignoreObsoletes=True)
                 methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
             if zeroRefsError and len(methodRefs) > 1:
                 # More than one possible foo() overload, can't tell which to link to
@@ -427,14 +427,14 @@ class ReferenceManager(object):
 
         return bib
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, export=None, ignoreObsoletes=False, **kwargs):
-        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, export, ignoreObsoletes, exact=True)
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, **kwargs):
+        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, exact=True)
         if error:
-            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, export, ignoreObsoletes)
+            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes)
         else:
             return results, error
 
-    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         def refsIterator(refs):
@@ -508,18 +508,25 @@ class ReferenceManager(object):
         if not refs:
             return refs, "for"
 
-        if status:
+        def filterByStatus(refs, status):
             # If status is "current'", kill snapshot refs unless their spec *only* has a snapshot_url
             if status == "current":
-                refs = [ref for ref in refs if ref.status == "current" or (ref.status == "snapshot" and self.specs.get(ref.spec,{}).get('current_url') is None)]
+                return [ref for ref in refs if ref.status == "current" or (ref.status == "snapshot" and self.specs.get(ref.spec,{}).get('current_url') is None)]
             # If status is "snapshot", kill current refs if there's a corresponding snapshot ref for the same spec.
             elif status == "snapshot":
                 snapshotSpecs = [ref.spec for ref in refs if ref.status == 'snapshot']
-                refs = [ref for ref in refs if ref.status == "snapshot" or (ref.status == "current" and ref.spec not in snapshotSpecs)]
+                return [ref for ref in refs if ref.status == "snapshot" or (ref.status == "current" and ref.spec not in snapshotSpecs)]
             else:
-                refs = [x for x in refs if x.status == status]
+                return [x for x in refs if x.status == status]
+        if status:
+            refs = filterByStatus(refs, status)
         if not refs:
             return refs, "status"
+
+        if status is None and statusHint:
+            tempRefs = filterByStatus(refs, statusHint)
+            if tempRefs:
+                refs = tempRefs
 
         if ignoreObsoletes and not spec:
             # Remove any ignored or obsoleted specs
