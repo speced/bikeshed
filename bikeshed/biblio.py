@@ -121,12 +121,12 @@ class SpecBasedBiblioEntry(BiblioEntry):
         self.spec = spec
         self.linkText = spec['vshortname']
         self._valid = True
-        if preferredURL == "snapshot" and spec.get("TR", None) is not None:
-            self.url = spec['TR']
-        elif spec.get('ED', None) is not None:
-            self.url = spec['ED']
-        elif spec.get('TR', None) is not None:
-            self.url = spec['TR']
+        if preferredURL == "snapshot" and "snapshot_url" in spec:
+            self.url = spec['snapshot_url']
+        elif "current_url" in spec:
+            self.url = spec['current_url']
+        elif "snapshot_url" in spec:
+            self.url = spec['snapshot_url']
         else:
             self._valid = False
 
