@@ -121,14 +121,15 @@ class SpecBasedBiblioEntry(BiblioEntry):
         self.spec = spec
         self.linkText = spec['vshortname']
         self._valid = True
-        if preferredURL == "snapshot" and "snapshot_url" in spec:
+        if preferredURL == "snapshot" and spec["snapshot_url"]:
             self.url = spec['snapshot_url']
-        elif "current_url" in spec:
+        elif spec["current_url"]:
             self.url = spec['current_url']
-        elif "snapshot_url" in spec:
+        elif spec["snapshot_url"]:
             self.url = spec['snapshot_url']
         else:
             self._valid = False
+        assert self.url
 
     def valid(self):
         return self._valid
