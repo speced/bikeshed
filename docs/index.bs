@@ -20,12 +20,12 @@ spec:html; type:element;
 </pre>
 
 <!--
-████ ██    ██  ██████  ████████    ███    ██       ██      
- ██  ███   ██ ██    ██    ██      ██ ██   ██       ██      
- ██  ████  ██ ██          ██     ██   ██  ██       ██      
- ██  ██ ██ ██  ██████     ██    ██     ██ ██       ██      
- ██  ██  ████       ██    ██    █████████ ██       ██      
- ██  ██   ███ ██    ██    ██    ██     ██ ██       ██      
+████ ██    ██  ██████  ████████    ███    ██       ██
+ ██  ███   ██ ██    ██    ██      ██ ██   ██       ██
+ ██  ████  ██ ██          ██     ██   ██  ██       ██
+ ██  ██ ██ ██  ██████     ██    ██     ██ ██       ██
+ ██  ██  ████       ██    ██    █████████ ██       ██
+ ██  ██   ███ ██    ██    ██    ██     ██ ██       ██
 ████ ██    ██  ██████     ██    ██     ██ ████████ ████████
 -->
 
@@ -225,6 +225,245 @@ script:
   # Invoke bikeshed here, at your own leisure. E.g.:
   - bikeshed spec
 ```
+
+<!-- Big Text: cli -->
+
+The Command Line Interface {#cli}
+=================================
+
+Locally-installed Bikeshed is invoked via the command-line.
+There's a bunch of options,
+but you'll only use a few in day-to-day use.
+
+Global Options {#cli-options}
+-----------------------------
+
+There are a few options that apply to many different options,
+so they're specified before the individual commands:
+
+: `-h` or `--help`
+:: Shows the help message for the current command.
+	Can be run without any command,
+	like `bikeshed -h`
+	to show the list of valid commands and the global flags,
+	or after a command,
+	like `bikeshed spec -h`
+	to show the help text for that command in particular.
+
+: `-f` or `--force`
+:: A very useful command,
+	`-f` makes fatal errors non-fatal.
+	Bikeshed's categorizes errors as "fatal" if they're clearly mistakes,
+	or will cause some variety of data loss in your spec;
+	regardless, it can generally recover gracefully from them.
+	If you just need to generate a spec quickly,
+	and will fix the error later,
+	`-f` will let you do that.
+
+	It's also quite useful when fixing a freshly-written (or ported) spec
+	that might have a lot of errors in it;
+	rather than seeing only the very first error,
+	running with `-f` will show you *all* the errors,
+	so you can fix them in whatever order you like.
+	(In that case, running with `-q` or `-qq` might also be useful,
+	to suppress the non-fatal errors temporarily.)
+
+: `-q` or `--quiet`
+:: The `-q` flag suppresses one level of error messages.
+	It can be passed multiple times to suppress additional levels,
+	in the order "warnings", then "link errors", then "fatal errors".
+
+: `-s` or `--silent`
+:: The `-s` flag suppresses *all* console output from Bikeshed,
+	regardless of source.
+	(It's more powerful than `-q`,
+	as it'll also suppresses things like the success/failure message.)
+
+: `-d` or `--dry-run`
+:: The `-d` flag prevents Bikeshed from actually writing anything to disk.
+	It does everything else,
+	just skips that final "save" operation.
+
+: `--print= [ plain | console | markup ]`
+:: Specifies how Bikeshed should output its messages.
+	Default is "console",
+	which outputs colored text using console color codes.
+	"plain" outputs the same text as "console",
+	but without any color codes
+	(which look like gibberish if you're not ouputting to a console).
+	"markup" outputs the text in a light markup structure
+	(suitable for parsing as HTML),
+	for easier parsing of the output by tools.
+
+
+`bikeshed spec` {#cli-spec}
+---------------------------
+
+The `spec` command is the most common one you'll use.
+It turns a Bikeshed source file
+into an output HTML file.
+
+Most of the time you can just run `bikeshed spec`
+and things will "just work"
+as long as your source file has the `.bs` extension.
+
+Relevant flags:
+
+: `--gh-token=TOKEN`
+:: If you're using <a>Inline GitHub Issues</a> heavily,
+	you might run into the GitHub rate limit.
+	You can generate an OAuth token at <a href="https://github.com/settings/tokens">https://github.com/settings/tokens</a>
+	and then pass it to Bikeshed via this flag
+	to raise your limit considerably.
+
+: `-l` or `--line-numbers`
+:: If you're having trouble locating the source of an error in your code,
+	run Bikeshed with this flag
+	and *almost* all errors will report the source line number they appear at
+	(or somewhere very close - it's per-element).
+
+	This code is unfortunately forced to be fairly hacky,
+	and has the potential to lightly corrupt your file
+	(inserting extra debugging info into plain text
+	that just happens to look like markup),
+	so it automatically triggers a dry-run,
+	as if you'd specified `--dry-run`.
+	When you're done debugging,
+	just run again without this flag to actually get some output.
+
+After any flags,
+you can optionally specify the input file path and output file path.
+Both of these can usually be omitted;
+if you omit the output file,
+it'll just output to a file with the same name as the input file,
+but with the extension changed to `.html`;
+if you omit the input file,
+it'll search thru the current directory
+and assume you want the first file with a Bikeshed extension (`.bs`).
+
+If you want to feed Bikeshed from stdin
+or have it output to stdout,
+just use `-` as the appropriate filename.
+
+
+`bikeshed watch` {#cli-watch}
+-----------------------------
+
+The `watch` command is identical to the `spec` command,
+except it sets up a watcher
+and auto-rebuilds the spec every time it changes.
+With this turned on,
+you can edit with a simple save->refresh cycle,
+rather than having to do save->build->refresh.
+
+It accepts all the same arguments as `spec`.
+(Tho using stdin/stdout might get a little weird.)
+
+Use Ctrl-C to stop the watcher
+(or whatever key combo kills the currently running process in your console).
+
+`bikeshed template` {#cli-template}
+-----------------------------------
+
+The `template` command outputs a minimal "skeleton" document to stdout.
+It's useful to get started with Bikeshed,
+without having to remember what all the required metadata is.
+
+On a Linux-like command line,
+it should be used like:
+
+```
+$ bikeshed template > index.bs
+```
+
+`bikeshed echidna` {#cli-echidna}
+---------------------------------
+
+The `echidna` command hooks into the W3C's Echidna auto-publishing system,
+letting you publish W3C specs from the command-line,
+rather than having to go thru a staff contact.
+
+Issue: Fill in details.
+
+
+`bikeshed update` {#cli-update}
+-------------------------------
+
+The `update` command updates Bikeshed's datafiles,
+which it uses for autolinking and similar things.
+By default it'll update all of its datafiles,
+but if you want to update only particular ones,
+you can pass any or all of the following flags:
+
+* `--anchors` to update Bikeshed's "anchor data" - a list of all the definitions and headers it knows about.
+* `--biblio` to update Bikeshed's bibliography database.
+* `--caniuse` to update Bikeshed's CanIUse.com information.
+* `--link-defaults` to update Bikeshed's manually-maintained list of special linking rules.
+* `--test-suites` to update Bikeshed's database of test-suite information from the Shepherd system.
+
+
+`bikeshed refs` {#cli-refs}
+---------------------------
+
+The `refs` command lets you search Bikeshed's anchor database,
+letting you see what sort of things it's looking at when doing autolinking.
+This can be very useful for debugging,
+or just for a quick check of where something is defined.
+
+It's flags are similar to the attributes used on autolinks:
+
+* `--text=FOO` to specify the linktext you want to filter for
+* `--type=FOO` to specify the link type
+* `--for=FOO` to specify the for value
+* `--spec=FOO` to specify the spec
+* `--status=foo` to specify the status
+* `--exact` to turn off the variations that Bikeshed applies to some link texts
+	(such as looking for "book" when you search for "books"),
+	and just search for the exact text you specified
+
+Any or all of these flags can be specified,
+and Bikeshed will display all the refs it can find matching the criteria.
+
+
+`bikeshed source` {#cli-source}
+-------------------------------
+
+The `source` command applies various transformations to the source document itself,
+rather than producing a separate output document.
+Its options are described in [[#source]].
+
+
+`bikeshed issues-list` {#cli-issues-list}
+-----------------------------------------
+
+The `issues-list` command processes a plain-text document
+in an "issues-list" format pioneered by the CSSWG
+into an equivalent HTML version.
+
+Relevant flags:
+
+* `-t` outputs a template issues-list file to stdout,
+	making it easier to start a new document
+	without having to reference an old one to remember the format.
+	Use it like `bikeshed issues-list -t > issues-19700101.txt`.
+
+After the command you can pass the input and output filenames.
+As usual, one or both can be omitted:
+if you omit the output,
+it'll write to a file with the same name as the input,
+but a `.html` extension;
+it you omit the input,
+it will look in the current folder
+for any files starting with "issues" and ending in ".txt",
+and then extract the digits from those filenames
+and select the one with the largest number.
+If you name your file as suggested above,
+with an ISO date,
+it'll correctly always choose the latest issues list.
+
+Issue: Define the issues-list format.
+The `-t` output is already more than enough to actually work with,
+but it would still be good to describe it more fully.
 
 
 <!--
