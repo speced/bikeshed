@@ -199,37 +199,56 @@ def addIndexOfLocallyDefinedTerms(doc, container):
 
 
 def addExplicitIndexes(doc):
-    # Explicit indexes can be requested for specs with <index for="example-spec-1"></index>
+    # Explicit indexes can be requested for specs with <index spec="example-spec-1"></index>
 
-    for container in findAll("index", doc):
+    for el in findAll("index", doc):
         indexEntries = defaultdict(list)
-        if container.get('for') is None:
-            die("<index> elements need a for='' attribute specifying one or more specs.", el=container)
+        status = el.get('status')
+        if status and status not in config.specStatuses:
+            die("<index> has unknown value '{0}' for status. Must be {1}.", status, config.englishFromList(config.specStatuses), el=el)
             continue
-        if container.get('type'):
-            types = [x.strip() for x in container.get('type').split(',')]
+        if el.get('type'):
+            types = set(x.strip() for x in el.get('type').split(','))
+            for t in types:
+                if t not in config.dfnTypes:
+                    die("Unknown type value '{0}' on {1}".format(t, outerHTML(el)), el=el)
+                    types.remove(t)
         else:
             types = None
-        status = container.get('status')
-        if status and status not in config.specStatuses:
-            die("<index> has unknown value '{0}' for status. Must be {1}.", status, config.englishFromList(config.specStatuses), el=container)
-            continue
-        if container.get('for').strip() == "*":
-            specs = None
+        if el.get('spec'):
+            specs = set(x.strip() for x in el.get('spec').split(','))
+            for s in specs:
+                if s not in doc.refs.specs:
+                    die("Unknown spec name '{0}' on {1}".format(s, outerHTML(el)), el=el)
+                    specs.remove(s)
         else:
-            specs = set(x.strip() for x in container.get('for').split(','))
-        seenSpecs = set()
+            specs = None
+        if el.get('for'):
+            fors = set(x.strip() for x in el.get('for').split(','))
+        else:
+            fors = None
+        if el.get('export'):
+            exportVal = el.get('export').lower().strip()
+            if exportVal in ["yes", "y", "true", "on"]:
+                export = True
+            elif exportVal in ["no", "n", "false", "off"]:
+                export = False
+            else:
+                die("Unknown export value '{0}' (should be boolish) on {1}".format(exportVal, outerHTML(el)), el=el)
+                export = None
+        else:
+            export = None
         for text, refs in doc.refs.refs.items():
             text = text.strip()
             for ref in refs:
-                if not ref['export']:
+                if export is not None and ref['export'] != export:
                     continue
                 if specs is not None and ref['spec'].strip() not in specs:
                     continue
-                if types and ref['type'].strip() not in types:
+                if types is not None and ref['type'].strip() not in types:
                     continue
-                seenSpecs.add(ref['spec'].strip())
-                label = None  # TODO: Record section numbers, use that instead
+                if fors is not None and not (set(x.strip() for x in ref['for']) & fors):
+                    continue
                 disambInfo = []
                 if types is None or len(types) > 1:
                     disambInfo.append(ref['type'].strip())
@@ -242,9 +261,10 @@ def addExplicitIndexes(doc):
                         # todo: The TR version of Position triggers this
                         pass
                 disambiguator = ", ".join(disambInfo)
-                entry = {'url': ref['url'].strip(), 'disambiguator': disambiguator, 'label': label, 'status': ref['status'].strip()}
+                entry = {'url': ref['url'].strip(), 'disambiguator': disambiguator, 'label': None, 'status': ref['status'].strip()}
+                # TODO: This is n^2, iterating over all the entries on every new addition.
                 for i,existingEntry in enumerate(indexEntries[text]):
-                    if existingEntry['disambiguator'] != disambiguator or existingEntry['label'] != label:
+                    if existingEntry['disambiguator'] != disambiguator:
                         continue
                     # Whoops, found an identical entry.
                     if existingEntry['status'] != entry['status']:
@@ -268,12 +288,13 @@ def addExplicitIndexes(doc):
                         pass
                 else:
                     indexEntries[text].append(entry)
-        if specs is not None and specs - seenSpecs:
-            warn("Couldn't find any refs for {0} when generating an index.", ' or '.join("'{0}'".format(x) for x in specs - seenSpecs), el=container)
-        appendChild(container, htmlFromIndexTerms(indexEntries))
-        container.tag = "div"
-        removeAttr(container, "for")
-        removeAttr(container, "status")
+        appendChild(el, htmlFromIndexTerms(indexEntries))
+        el.tag = "div"
+        removeAttr(el, "export")
+        removeAttr(el, "for")
+        removeAttr(el, "spec")
+        removeAttr(el, "status")
+        removeAttr(el, "type")
 
 
 def htmlFromIndexTerms(entries):
