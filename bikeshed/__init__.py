@@ -2677,8 +2677,9 @@ def inlineRemoteIssues(doc):
         el = issue.el
         data = responses[key]
         clearContents(el)
+        remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(*issue)
         appendChild(el,
-                    E.a({"href":issue['html_url'], "class":"marker"},
+                    E.a({"href":remoteIssueURL, "class":"marker"},
                         "Issue #{0} on GitHub: “{1}”".format(data['number'], data['title'])),
                     *parseHTML(data['body_html']))
         if el.tag == "p":
