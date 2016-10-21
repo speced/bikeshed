@@ -1447,11 +1447,11 @@ def processIssuesAndExamples(doc):
             remoteIssueURL = None
             if githubMatch:
                 remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(*githubMatch.groups())
-                if doc.md.inlineGithubIssues:
+                if doc.md.inlineGithubIssues or doc.md.inlineGithubIssueTitles:
                     el.set("data-inline-github", "{0} {1} {2}".format(*githubMatch.groups()))
             elif numberMatch and doc.md.repository.type == "github":
                 remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
-                if doc.md.inlineGithubIssues:
+                if doc.md.inlineGithubIssues or doc.md.inlineGithubIssueTitles:
                     el.set("data-inline-github", "{0} {1} {2}".format(doc.md.repository.user, doc.md.repository.repo, numberMatch.group(1)))
             elif doc.md.issueTrackerTemplate:
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
@@ -2677,13 +2677,19 @@ def inlineRemoteIssues(doc):
         el = issue.el
         data = responses[key]
         clearContents(el)
-        appendChild(el,
-                    E.a({"href":issue['html_url'], "class":"marker"},
-                        "Issue #{0} on GitHub: “{1}”".format(data['number'], data['title'])),
+        remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(*issue)
+        if doc.md.inlineGithubIssueTitles:
+            appendChild(el,
+                    E.a({"href":remoteIssueURL, "class":"marker", "style":"text-transform:none"}, "{0}/{1}#{2}".format(*issue)),
+                    E.a({"href":remoteIssueURL}, data['title']))
+        else:
+            appendChild(el,
+                    E.a({"href":remoteIssueURL, "class":"marker"},
+                    "Issue #{0} on GitHub: “{1}”".format(data['number'], data['title'])),
                     *parseHTML(data['body_html']))
+            addClass(el, "no-marker")
         if el.tag == "p":
             el.tag = "div"
-        addClass(el, "no-marker")
     # Save the cache for later
     try:
         with io.open(config.scriptPath + "/spec-data/github-issues.json", 'w', encoding="utf-8") as f:
