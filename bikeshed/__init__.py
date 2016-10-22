@@ -1447,11 +1447,11 @@ def processIssuesAndExamples(doc):
             remoteIssueURL = None
             if githubMatch:
                 remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(*githubMatch.groups())
-                if doc.md.inlineGithubIssues or doc.md.inlineGithubIssueTitles:
+                if doc.md.inlineGithubIssues:
                     el.set("data-inline-github", "{0} {1} {2}".format(*githubMatch.groups()))
             elif numberMatch and doc.md.repository.type == "github":
                 remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
-                if doc.md.inlineGithubIssues or doc.md.inlineGithubIssueTitles:
+                if doc.md.inlineGithubIssues:
                     el.set("data-inline-github", "{0} {1} {2}".format(doc.md.repository.user, doc.md.repository.repo, numberMatch.group(1)))
             elif doc.md.issueTrackerTemplate:
                 remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
@@ -2636,13 +2636,17 @@ def inlineRemoteIssues(doc):
     logging.captureWarnings(True)
 
     responses = json.load(config.retrieveDataFile("github-issues.json", quiet=True))
-    for issue in inlineIssues:
+    for i,issue in enumerate(inlineIssues):
+        issueUserRepo = "{0}/{1}".format(*issue) 
+        key = "{0}/{1}".format(issueUserRepo, issue.num)
+        href = "https://github.com/{0}/issues/{1}".format(issueUserRepo, issue.num)
+        url = "https://api.github.com/repos/{0}/issues/{1}".format(issueUserRepo, issue.num)
+        say("Fetching issue {:-3d}/{:d}: {:s}".format(i+1, len(inlineIssues), key))
+
         # Fetch the issues
         headers = {"Accept": "application/vnd.github.v3.html+json"}
         if doc.token is not None:
             headers["Authorization"] = "token " + doc.token
-        url = "https://api.github.com/repos/{user}/{repo}/issues/{num}".format(user=issue.user, repo=issue.repo, num=issue.num)
-        key = "{0}/{1}/{2}".format(issue.user, issue.repo, issue.num)
         if key in responses:
             # Have a cached response, see if it changed
             headers["If-None-Match"] = responses[key]["ETag"]
@@ -2677,14 +2681,13 @@ def inlineRemoteIssues(doc):
         el = issue.el
         data = responses[key]
         clearContents(el)
-        remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(*issue)
-        if doc.md.inlineGithubIssueTitles:
+        if doc.md.inlineGithubIssues == 'title':
             appendChild(el,
-                    E.a({"href":remoteIssueURL, "class":"marker", "style":"text-transform:none"}, "{0}/{1}#{2}".format(*issue)),
-                    E.a({"href":remoteIssueURL}, data['title']))
+                    E.a({"href":href, "class":"marker", "style":"text-transform:none"}, key),
+                    E.a({"href":href}, data['title']))
         else:
             appendChild(el,
-                    E.a({"href":remoteIssueURL, "class":"marker"},
+                    E.a({"href":href, "class":"marker"},
                     "Issue #{0} on GitHub: “{1}”".format(data['number'], data['title'])),
                     *parseHTML(data['body_html']))
             addClass(el, "no-marker")

@@ -58,7 +58,6 @@ class MetadataManager:
         self.indent = 4
         self.inferCSSDfns = False
         self.inlineGithubIssues = False
-        self.inlineGithubIssueTitles = False
         self.issueClass = "issue"
         self.issues = []
         self.issueTrackerTemplate = None
@@ -506,6 +505,14 @@ def parseMarkupShorthands(key, val, lineNum):
         ret[name] = onoff
     return ret
 
+def parseInlineGithubIssues(key, val, lineNum):
+    val = val.strip()
+    if not val in ['title', 'full']:
+        b = boolish(val)
+        if b is None or b:
+            die("Inline Github Issues must be 'title', 'full' or false/no/n/off. Got: '{0}'", val, lineNum=lineNum)
+            return
+    return val
 
 def parseTextMacro(key, val, lineNum):
     # Each Text Macro line is just a macro name (must be uppercase)
@@ -816,8 +823,7 @@ knownKeys = {
     "Include Can I Use Panels": Metadata("Include Can I Use Panels", "includeCanIUsePanels", joinValue, parseBoolean),
     "Indent": Metadata("Indent", "indent", joinValue, parseInteger),
     "Infer Css Dfns": Metadata("Infer Css Dfns", "inferCSSDfns", joinValue, parseBoolean),
-    "Inline Github Issues": Metadata("Inline Github Issues", "inlineGithubIssues", joinValue, parseBoolean),
-    "Inline Github Issue Titles": Metadata("Inline Github Issue Titles", "inlineGithubIssueTitles", joinValue, parseBoolean),
+    "Inline Github Issues": Metadata("Inline Github Issues", "inlineGithubIssues", joinValue, parseInlineGithubIssues),
     "Issue Class": Metadata("Issue Class", "issueClass", joinValue, parseLiteral),
     "Issue Tracker Template": Metadata("Issue Tracker Template", "issueTrackerTemplate", joinValue, parseLiteral),
     "Issue Tracking": Metadata("Issue Tracking", "issues", joinList, parseLinkedText),
