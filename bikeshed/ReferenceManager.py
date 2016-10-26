@@ -216,22 +216,8 @@ class ReferenceManager(object):
                               el=el)
                 return localRefs[0]
 
-        # Then anchor-block refs get preference
-        blockRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el, status="anchor-block")
-        if len(blockRefs) == 1:
-            return blockRefs[0]
-        elif len(blockRefs) > 1:
-            if error:
-                linkerror("Multiple possible '{0}' anchor-block refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
-                          linkType,
-                          text,
-                          blockRefs[0].type,
-                          "' or '".join(blockRefs[0].for_),
-                          el=el)
-            return blockRefs[0]
-
         # Take defaults into account
-        if not spec or not status:
+        if not spec or not status or not linkFor:
             variedTexts = [v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs]
             if variedTexts:
                 for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(self.defaultSpecs[variedTexts[0]]):
@@ -241,6 +227,26 @@ class ReferenceManager(object):
                         linkFor = linkFor or dfnFor
                         linkType = dfnType
                         break
+
+        # Then anchor-block refs get preference
+        blockRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el, status="anchor-block")
+        if len(blockRefs) == 1:
+            return blockRefs[0]
+        elif len(blockRefs) > 1:
+            possibleRefs = []
+            for ref in simplifyPossibleRefs(blockRefs):
+                if ref['for_']:
+                    possibleRefs.append('spec:{spec}; type:{type}; for:{for_}; text:{text}'.format(**ref))
+                else:
+                    possibleRefs.append('spec:{spec}; type:{type}; text:{text}'.format(**ref))
+            linkerror("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
+                      linkType,
+                      text,
+                      blockRefs[0].spec,
+                      '\n'.join(possibleRefs),
+                      el=el)
+            return blockRefs[0]
+
 
         # Get the relevant refs
         if spec is None:
