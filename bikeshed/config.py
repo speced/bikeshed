@@ -339,6 +339,9 @@ class HierarchicalNumber(object):
     def __repr__(self):
         return "HierarchicalNumber(" + repr(self.originalVal) + ")"
 
+    def __hash__(self):
+        return hash(self.originalVal)
+
 
 def intersperse(iterable, delimiter):
     it = iter(iterable)
