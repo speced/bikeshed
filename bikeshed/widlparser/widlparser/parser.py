@@ -1,13 +1,13 @@
 # coding=utf-8
 #
-#  Copyright © 2013 Hewlett-Packard Development Company, L.P. 
+#  Copyright © 2013 Hewlett-Packard Development Company, L.P.
 #
-#  This work is distributed under the W3C® Software License [1] 
-#  in the hope that it will be useful, but WITHOUT ANY 
-#  WARRANTY; without even the implied warranty of 
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+#  This work is distributed under the W3C® Software License [1]
+#  in the hope that it will be useful, but WITHOUT ANY
+#  WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #
-#  [1] http://www.w3.org/Consortium/Legal/2002/copyright-software-20021231 
+#  [1] http://www.w3.org/Consortium/Legal/2002/copyright-software-20021231
 #
 
 import re
@@ -17,12 +17,13 @@ from constructs import *
 
 
 class Parser(object):
-    def __init__(self, text = None, ui = None):
+    def __init__(self, text = None, ui = None, symbolTable = None):
         self.ui = ui
+        self.symbolTable = symbolTable if (symbolTable) else {}
         self.reset()
         if (text):
             self.parse(text)
-        
+
     def reset(self):
         self.constructs = []
 
@@ -32,31 +33,33 @@ class Parser(object):
         for construct in self.constructs:
             complexity += construct.complexityFactor
         return complexity
-    
+
     def parse(self, text):
         tokens = tokenizer.Tokenizer(text, self.ui)
 
         while (tokens.hasTokens()):
             if (Callback.peek(tokens)):
-                self.constructs.append(Callback(tokens))
+                self.constructs.append(Callback(tokens, parser = self))
             elif (Interface.peek(tokens)):
-                self.constructs.append(Interface(tokens))
+                self.constructs.append(Interface(tokens, parser = self))
+            elif (Namespace.peek(tokens)):
+                self.constructs.append(Namespace(tokens, parser = self))
             elif (Dictionary.peek(tokens)):
-                self.constructs.append(Dictionary(tokens))
+                self.constructs.append(Dictionary(tokens, parser = self))
             elif (Enum.peek(tokens)):
-                self.constructs.append(Enum(tokens))
+                self.constructs.append(Enum(tokens, parser = self))
             elif (Typedef.peek(tokens)):
-                self.constructs.append(Typedef(tokens))
+                self.constructs.append(Typedef(tokens, parser = self))
             elif (Const.peek(tokens)):   # Legacy support (SVG spec)
-                self.constructs.append(Const(tokens))
+                self.constructs.append(Const(tokens, parser = self))
             elif (ImplementsStatement.peek(tokens)):
-                self.constructs.append(ImplementsStatement(tokens))
+                self.constructs.append(ImplementsStatement(tokens, parser = self))
             else:
-                self.constructs.append(SyntaxError(tokens, None))
-        
+                self.constructs.append(SyntaxError(tokens, None, parser = self))
+
     def __str__(self):
         return self.__unicode__()
-                    
+
     def __unicode__(self):
         return u''.join([unicode(construct) for construct in self.constructs])
 
@@ -65,10 +68,10 @@ class Parser(object):
 
     def __len__(self):
         return len(self.constructs)
-    
+
     def keys(self):
         return [construct.name for construct in self.constructs]
-    
+
     def __getitem__(self, key):
         if (isinstance(key, basestring)):
             for construct in self.constructs:
@@ -76,13 +79,13 @@ class Parser(object):
                     return construct
             return None
         return self.constructs[key]
-    
+
     def __nonzero__(self):
         return True
-    
+
     def __iter__(self):
         return iter(self.constructs)
-    
+
     def __contains__(self, key):
         if (isinstance(key, basestring)):
             for construct in self.constructs:
@@ -91,18 +94,24 @@ class Parser(object):
             return False
         return (key in self.constructs)
 
+    def addType(self, type):
+        self.symbolTable[type.name] = type
+
+    def getType(self, name):
+        return self.symbolTable.get(name)
+
     def find(self, name):
         match = re.match('(.*)\(.*\)(.*)', name)    # strip ()'s
         while (match):
             name = match.group(1) + match.group(2)
             match = re.match('(.*)\(.*\)(.*)', name)
-        
+
         path = None
         if ('/' in name):
             path = name.split('/')
         elif ('.' in name):
             path = name.split('.')
-            
+
         if (path):
             constructName = path[0]
             memberName = path[1]
@@ -125,7 +134,7 @@ class Parser(object):
                             if (argument):
                                 return argument
             return None
-        
+
         for construct in reversed(self.constructs):
             if (name == construct.name):
                 return construct
@@ -149,7 +158,7 @@ class Parser(object):
         while (match):
             name = match.group(1) + match.group(2)
             match = re.match('(.*)\(.*\)(.*)', name)
-        
+
         path = None
         if ('/' in name):
             path = name.split('/')
@@ -181,7 +190,7 @@ class Parser(object):
                             if (argument):
                                 result.append(argument)
             return result
-        
+
         for construct in self.constructs:
             if (name == construct.name):
                 result.append(construct)
@@ -208,7 +217,7 @@ class Parser(object):
         else:
             name = methodText
             arguments = ''
-            
+
         if (interfaceName):
             interface = self.find(interfaceName)
             if (interface):
@@ -239,7 +248,7 @@ class Parser(object):
         else:
             name = methodText
             arguments = ''
-            
+
         if (interfaceName):
             interface = self.find(interfaceName)
             if (interface):

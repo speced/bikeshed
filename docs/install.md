@@ -15,7 +15,7 @@ Linux steps
 -----------
 
 ~~~~
-$ sudo apt-get install python2.7 python-dev python-pip libxslt1-dev libxml2-dev
+$ sudo apt-get install python2.7 python-dev python-pip python-wheel libxslt1-dev libxml2-dev
 ~~~~
 
 The `apt-get` command works on Debian-based systems like Ubuntu; if you work on some other type of system, and can figure out how to get things working on your own, let me know and I'll add instructions for your system.
@@ -35,7 +35,34 @@ $ sudo pip install lxml --upgrade
 
 That'll spew a lot of console trash, but don't worry about it.
 
+In some installations you'll need to also upgrade `setuptools` for `html5lib`'s entertainment:
+
+~~~~
+$ sudo pip install lxml setuptools --upgrade
+~~~~
+
 From here, you can follow the commons steps outlined below.
+
+
+Travis CI steps
+---------------
+
+To use bikeshed on [Travis CI](https://travis-ci.org/)'s github integration, you'll need the following `.travis.yml` commands:
+
+~~~
+sudo: false
+language: python
+python:
+  - "2.7"
+install:
+  - pip install pygments lxml setuptools --upgrade
+  - git clone https://github.com/tabatkins/bikeshed.git
+  - pip install --editable $PWD/bikeshed
+  - bikeshed update
+script:
+  # Invoke bikeshed here, at your own leisure. E.g.:
+  - bikeshed spec
+~~~
 
 OS X steps
 ----------
@@ -85,7 +112,7 @@ Windows steps
 
 Tested on Windows 7, 8/8.1 & 10
 
-1. Install the latest [Python 2.7](https://www.python.org/download/releases/2.7.8/)
+1. Install the latest [Python 2.7](https://www.python.org/download/releases/2.7.8/). Pick the 32bit version, even on 64bit Windows, as LXML only looks for the 32bit version.
 2. Run the following in an elevated command prompt (change the path if your location is different)
 ~~~
 setx /m PATH "%PATH%;C:\Python27;C:\Python27\Scripts"

@@ -7,115 +7,116 @@ import glob
 from .messages import *
 
 statusStyle = {
-  'accepted'  : 'a',
-  'retracted' : 'a',
-  'rejected'  : 'r',
-  'objection' : 'fo',
-  'deferred'  : 'd',
-  'invalid'   : 'oi',
-  'outofscope': 'oi',
-};
+    'accepted'  : 'a',
+    'retracted' : 'a',
+    'rejected'  : 'r',
+    'objection' : 'fo',
+    'deferred'  : 'd',
+    'invalid'   : 'oi',
+    'outofscope': 'oi',
+}
+
 
 def printIssueList(infilename=None, outfilename=None):
-	if infilename is None:
-		if glob.glob("issues*.txt"):
-			# Look for digits in the filename, and use the one with the largest number if it's unique.
-			def extractNumber(filename):
-				number = re.sub("\D", "", filename)
-				return number if number else None
-			filenames = [(extractNumber(fn), fn) for fn in glob.glob("issues*.txt") if extractNumber(fn) is not None]
-			filenames.sort(reverse=True)
-			if len(filenames) > 1 and filenames[0][0] == filenames[1][0]:
-				die("Can't tell which issues-list file is the most recent. Explicitly pass a filename.")
-				return
-			infilename = filenames[0][1]
-		else:
-			printHelpMessage();
-			return
-	if infilename == "-":
-		infile = sys.stdin
-	else:
-		for suffix in [".txt", "txt", ""]:
-			try:
-				infile = io.open(infilename + suffix, 'r', encoding="utf-8")
-				infilename += suffix
-				break
-			except Exception, e:
-				pass
-		else:
-			die("Couldn't read from the infile:\n  {0}", str(e))
-			return
+    if infilename is None:
+        if glob.glob("issues*.txt"):
+            # Look for digits in the filename, and use the one with the largest number if it's unique.
+            def extractNumber(filename):
+                number = re.sub("\D", "", filename)
+                return number if number else None
+            filenames = [(extractNumber(fn), fn) for fn in glob.glob("issues*.txt") if extractNumber(fn) is not None]
+            filenames.sort(reverse=True)
+            if len(filenames) > 1 and filenames[0][0] == filenames[1][0]:
+                die("Can't tell which issues-list file is the most recent. Explicitly pass a filename.")
+                return
+            infilename = filenames[0][1]
+        else:
+            printHelpMessage()
+            return
+    if infilename == "-":
+        infile = sys.stdin
+    else:
+        for suffix in [".txt", "txt", ""]:
+            try:
+                infile = io.open(infilename + suffix, 'r', encoding="utf-8")
+                infilename += suffix
+                break
+            except Exception, e:
+                pass
+        else:
+            die("Couldn't read from the infile:\n  {0}", str(e))
+            return
 
-	lines = infile.readlines()
-	headerInfo = extractHeaderInfo(lines, infilename)
+    lines = infile.readlines()
+    headerInfo = extractHeaderInfo(lines, infilename)
 
-	if outfilename is None:
-		if infilename == "-":
-			outfilename = "issues-{status}-{cdate}.html".format(**headerInfo).lower()
-		elif infilename.endswith(".txt"):
-			outfilename = infilename[:-4] + ".html"
-		else:
-			outfilename = infilename + ".html"
-	if outfilename == "-":
-		outfile = sys.stdout
-	else:
-		try:
-			outfile = io.open(outfilename, 'w', encoding="utf-8")
-		except Exception, e:
-			die("Couldn't write to outfile:\n{0}", str(e))
-			return
+    if outfilename is None:
+        if infilename == "-":
+            outfilename = "issues-{status}-{cdate}.html".format(**headerInfo).lower()
+        elif infilename.endswith(".txt"):
+            outfilename = infilename[:-4] + ".html"
+        else:
+            outfilename = infilename + ".html"
+    if outfilename == "-":
+        outfile = sys.stdout
+    else:
+        try:
+            outfile = io.open(outfilename, 'w', encoding="utf-8")
+        except Exception, e:
+            die("Couldn't write to outfile:\n{0}", str(e))
+            return
 
-	printHeader(outfile, headerInfo)
+    printHeader(outfile, headerInfo)
 
-	printIssues(outfile, lines)
-	printScript(outfile);
+    printIssues(outfile, lines)
+    printScript(outfile)
 
 
 def extractHeaderInfo(lines, infilename):
-	title = None
-	url = None
-	status = None
-	for line in lines:
-		match = re.match("(Draft|Title|Status):\s*(.*)", line)
-		if match:
-			if match.group(1) == "Draft":
-				url = match.group(2)
-			elif match.group(1) == "Title":
-				title = match.group(2)
-			elif match.group(1) == "Status":
-				status = match.group(2).upper()
-	if url is None:
-		die("Missing 'Draft' metadata.")
-		return
-	if title is None:
-		die("Missing 'Title' metadata.")
-		return
+    title = None
+    url = None
+    status = None
+    for line in lines:
+        match = re.match("(Draft|Title|Status):\s*(.*)", line)
+        if match:
+            if match.group(1) == "Draft":
+                url = match.group(2)
+            elif match.group(1) == "Title":
+                title = match.group(2)
+            elif match.group(1) == "Status":
+                status = match.group(2).upper()
+    if url is None:
+        die("Missing 'Draft' metadata.")
+        return
+    if title is None:
+        die("Missing 'Title' metadata.")
+        return
 
-	match = re.search("([A-Z]{2,})-([a-z0-9-]+)-(\d{8})", url)
-	if match:
-		if status is None:
-			# Auto-detect from the URL and filename.
-			status = match.group(1)
-			if status == "WD" and re.search("LC", infilename, re.I):
-				status = "LCWD"
-		shortname = match.group(2)
-		cdate = match.group(3)
-		date = "{0}-{1}-{2}".format(*re.match("(\d{4})(\d\d)(\d\d)", cdate).groups())
-	else:
-		die("Draft url needs to have the format /status-shortname-date/. Got:\n{0}", url)
-		return
-	return {
-		'title': title,
-		'date': date,
-		'cdate': cdate,
-		'shortname': shortname,
-		'status': status,
-		'url': url
-	}
+    match = re.search("([A-Z]{2,})-([a-z0-9-]+)-(\d{8})", url)
+    if match:
+        if status is None:
+            # Auto-detect from the URL and filename.
+            status = match.group(1)
+            if status == "WD" and re.search("LC", infilename, re.I):
+                status = "LCWD"
+        shortname = match.group(2)
+        cdate = match.group(3)
+        date = "{0}-{1}-{2}".format(*re.match("(\d{4})(\d\d)(\d\d)", cdate).groups())
+    else:
+        die("Draft url needs to have the format /status-shortname-date/. Got:\n{0}", url)
+        return
+    return {
+        'title': title,
+        'date': date,
+        'cdate': cdate,
+        'shortname': shortname,
+        'status': status,
+        'url': url
+    }
 
 
 def printHelpMessage():
-		say('''Draft:    http://www.w3.org/TR/2013/WD-css-foo-3-20130103/
+        say('''Draft:    http://www.w3.org/TR/2013/WD-css-foo-3-20130103/
 Title:    CSS Foo Level 3
 ... anything else you want here, except 4 dashes ...
 
@@ -134,7 +135,7 @@ Issue 2.
 
 
 def printHeader(outfile, headerInfo):
-	outfile.write('''<!DOCTYPE html>
+    outfile.write('''<!DOCTYPE html>
 <meta charset="utf-8">
 <title>{title} Disposition of Comments for {date} {status}</title>
 <style type="text/css">
@@ -167,81 +168,82 @@ def printHeader(outfile, headerInfo):
 <p>An issue can be closed as <code>Accepted</code>, <code>OutOfScope</code>,
 <code>Invalid</code>, <code>Rejected</code>, or <code>Retracted</code>.
 <code>Verified</code> indicates commentor's acceptance of the response.</p>
-		'''.format(**headerInfo))
+        '''.format(**headerInfo))
 
 
 def printIssues(outfile, lines):
-	text = ''.join(lines)
-	issues = text.split('----\n')[1:]
-	for issue in issues:
-		issue = issue.strip().replace("&", "&amp;").replace("<", "&lt;")
-		if issue == "":
-			continue
-		originaltext = issue[:]
+    text = ''.join(lines)
+    issues = text.split('----\n')[1:]
+    for issue in issues:
+        issue = issue.strip().replace("&", "&amp;").replace("<", "&lt;")
+        if issue == "":
+            continue
+        originaltext = issue[:]
 
-		# Issue number
-		issue = re.sub(r"Issue (\d+)\.", r"Issue \1. <a href='#issue-\1'>#</a>", issue)
-		match = re.search(r"Issue (\d+)\.", issue)
-		if match:
-			index = match.group(1)
-		else:
-			die("Issues must contain a line like 'Issue 1.'. Got:\n{0}", originaltext)
+        # Issue number
+        issue = re.sub(r"Issue (\d+)\.", r"Issue \1. <a href='#issue-\1'>#</a>", issue)
+        match = re.search(r"Issue (\d+)\.", issue)
+        if match:
+            index = match.group(1)
+        else:
+            die("Issues must contain a line like 'Issue 1.'. Got:\n{0}", originaltext)
 
-		# Color coding
-		if re.search(r"\nVerified:\s*\S+", issue):
-			code = 'a'
-		elif re.search(r"\n(Closed|Open):\s+\S+", issue):
-			match = re.search(r"\n(Closed|Open):\s+(\S+)", issue)
-			code = match.group(2)
-			if code.lower() in statusStyle:
-				code = statusStyle[code.lower()]
-			else:
-				code = ''
-				if match.group(1) == "Closed":
-					warn("Unknown status value found for issue #{num}: “{code}”", code=code, num=index)
-		else:
-			code = ''
-		if re.search(r"\nOpen", issue):
-			code += " open"
+        # Color coding
+        if re.search(r"\nVerified:\s*\S+", issue):
+            code = 'a'
+        elif re.search(r"\n(Closed|Open):\s+\S+", issue):
+            match = re.search(r"\n(Closed|Open):\s+(\S+)", issue)
+            code = match.group(2)
+            if code.lower() in statusStyle:
+                code = statusStyle[code.lower()]
+            else:
+                code = ''
+                if match.group(1) == "Closed":
+                    warn("Unknown status value found for issue #{num}: “{code}”", code=code, num=index)
+        else:
+            code = ''
+        if re.search(r"\nOpen", issue):
+            code += " open"
 
-		# Linkify urls
-		issue = re.sub(r"((http|https):\S+)", r"<a href='\1'>\1</a>", issue)
+        # Linkify urls
+        issue = re.sub(r"((http|https):\S+)", r"<a href='\1'>\1</a>", issue)
 
-		# And print it
-		outfile.write("<pre class='{0}' id='issue-{1}'>\n".format(code, index))
-		outfile.write(issue)
-		outfile.write("</pre>\n")
+        # And print it
+        outfile.write("<pre class='{0}' id='issue-{1}'>\n".format(code, index))
+        outfile.write(issue)
+        outfile.write("</pre>\n")
+
 
 def printScript(outfile):
-	outfile.write('''<script>
+    outfile.write('''<script>
 (function () {
-	var sheet = document.styleSheets[0];
-	function addCheckbox(className) {
-		var element = document.querySelector('*.' + className);
-		var label = document.createElement('label');
-		label.innerHTML = element.innerHTML;
-		element.innerHTML = null;
-		var check = document.createElement('input');
-		check.type = 'checkbox';
-		if (className == 'open') {
-			check.checked = false;
-			sheet.insertRule('pre:not(.open)' + '{}', sheet.cssRules.length);
-			check.onchange = function (e) {
-				rule.style.display = this.checked ? 'none' : 'block';
-			}
-		}
-		else {
-			check.checked = true;
-			sheet.insertRule('pre.' + className + '{}', sheet.cssRules.length);
-			check.onchange = function (e) {
-				rule.style.display = this.checked ? 'block' : 'none';
-			}
-		}
-		var rule = sheet.cssRules[sheet.cssRules.length - 1];
-		element.appendChild(label);
-		label.insertBefore(check, label.firstChild);
-	}
-	['a', 'd', 'fo', 'oi', 'r', 'open'].forEach(addCheckbox);
+    var sheet = document.styleSheets[0];
+    function addCheckbox(className) {
+        var element = document.querySelector('*.' + className);
+        var label = document.createElement('label');
+        label.innerHTML = element.innerHTML;
+        element.innerHTML = null;
+        var check = document.createElement('input');
+        check.type = 'checkbox';
+        if (className == 'open') {
+            check.checked = false;
+            sheet.insertRule('pre:not(.open)' + '{}', sheet.cssRules.length);
+            check.onchange = function (e) {
+                rule.style.display = this.checked ? 'none' : 'block';
+            }
+        }
+        else {
+            check.checked = true;
+            sheet.insertRule('pre.' + className + '{}', sheet.cssRules.length);
+            check.onchange = function (e) {
+                rule.style.display = this.checked ? 'block' : 'none';
+            }
+        }
+        var rule = sheet.cssRules[sheet.cssRules.length - 1];
+        element.appendChild(label);
+        label.insertBefore(check, label.firstChild);
+    }
+    ['a', 'd', 'fo', 'oi', 'r', 'open'].forEach(addCheckbox);
 }());
 </script>
-''');
+''')

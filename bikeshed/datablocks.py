@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import re
-import json
-import copy
 from collections import OrderedDict, defaultdict
 
 import config
@@ -24,6 +22,8 @@ from .htmlhelpers import *
 #
 # Additionally, we pass in the tag-name used (pre or xmp)
 # and the line with the content, in case it has useful data in it.
+
+
 def transformDataBlocks(doc, lines):
     inBlock = False
     blockTypes = {
@@ -43,8 +43,16 @@ def transformDataBlocks(doc, lines):
     blockType = ""
     tagName = ""
     startLine = 0
+    blockStartLine = None
+    lineCountCorrection = 0
     newLines = []
-    for (i, line) in enumerate(lines):
+    for i, line in enumerate(lines):
+        match = re.match("<!--line count correction (-?\d+)-->", line)
+        if match:
+            # Previous edits changed the number of lines
+            # Kill this line, and adjust the line number for adding to tokens
+            lineCountCorrection += int(match.group(1))
+            continue
         # Look for the start of a block.
         match = re.match(r"\s*<(pre|xmp)(.*)", line, re.I)
         if match and not inBlock:
@@ -56,42 +64,46 @@ def transformDataBlocks(doc, lines):
                 blockType = typeMatch.group(0)
             else:
                 blockType = "pre"
+            blockStartLine = i + lineCountCorrection
         # Look for the end of a block.
-        match = re.match(r"(.*)</"+tagName+">(.*)", line, re.I)
+        match = re.match(r"(.*)</" + tagName + ">(.*)", line, re.I)
         if match and inBlock:
             inBlock = False
             if startLine == i:
                 # Single-line <pre>.
                 match = re.match(r"\s*(<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line, re.I)
                 repl = blockTypes[blockType](
-                        lines=[match.group(2)],
-                        tagName=tagName,
-                        firstLine=match.group(1),
-                        doc=doc)
+                    lines=[match.group(2)],
+                    tagName=tagName,
+                    firstLine=match.group(1),
+                    lineNum=blockStartLine,
+                    doc=doc)
                 newLines.extend(repl)
-                newLines.append("<!--line count correction {0}-->".format(-len(repl)-1))
+                newLines.append("<!--line count correction {0}-->".format(-len(repl) - 1))
                 newLines.append(match.group(3))
             elif re.match(r"^\s*$", match.group(1)):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
                 repl = blockTypes[blockType](
-                        lines=lines[startLine+1:i],
-                        tagName=tagName,
-                        firstLine=lines[startLine],
-                        doc=doc)
+                    lines=lines[startLine + 1:i],
+                    tagName=tagName,
+                    firstLine=lines[startLine],
+                    lineNum=blockStartLine,
+                    doc=doc)
                 newLines.extend(repl)
-                newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
+                newLines.append("<!--line count correction {0}-->".format((i - startLine) - len(repl) - 1))
                 newLines.append(match.group(2))
             else:
                 # End tag was at the end of line of useful content.
                 # Process the stuff before it, preserve the stuff after it.
                 repl = blockTypes[blockType](
-                        lines=lines[startLine+1:i]+[match.group(1)],
-                        tagName=tagName,
-                        firstLine=lines[startLine],
-                        doc=doc)
+                    lines=lines[startLine + 1:i] + [match.group(1)],
+                    tagName=tagName,
+                    firstLine=lines[startLine],
+                    lineNum=blockStartLine,
+                    doc=doc)
                 newLines.extend(repl)
-                newLines.append("<!--line count correction {0}-->".format((i - startLine)-len(repl)-1))
+                newLines.append("<!--line count correction {0}-->".format((i - startLine) - len(repl) - 1))
                 newLines.append(match.group(2))
             tagName = ""
             blockType = ""
@@ -147,7 +159,7 @@ def transformPre(lines, tagName, firstLine, **kwargs):
     return lines
 
 
-def transformPropdef(lines, doc, firstLine, **kwargs):
+def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
     attrs = OrderedDict()
     parsedAttrs = parseDefBlock(lines, "propdef")
     # Displays entries in the order specified in attrs,
@@ -158,16 +170,20 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     forHint = ""
     if "Name" in parsedAttrs:
         forHint = " data-link-for-hint='{0}'".format(parsedAttrs["Name"].split(",")[0].strip())
+    lineNumAttr = ""
+    if lineNum is not None:
+        lineNumAttr = " line-number={0}".format(lineNum)
     if "partial" in firstLine or "New values" in parsedAttrs:
         attrs["Name"] = None
         attrs["New values"] = None
-        ret = ["<table class='def propdef partial'{forHint}>".format(forHint=forHint)]
+        ret = ["<table class='def propdef partial'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)]
     elif "shorthand" in firstLine:
         attrs["Name"] = None
         attrs["Value"] = None
-        for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animatable"]:
+        for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animation type"]:
             attrs[defaultKey] = "see individual properties"
-        ret = ["<table class='def propdef'{forHint}>".format(forHint=forHint)]
+        attrs["Canonical order"] = "per grammar"
+        ret = ["<table class='def propdef'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)]
     else:
         attrs["Name"] = None
         attrs["Value"] = None
@@ -177,8 +193,14 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
         attrs["Percentages"] = "n/a"
         attrs["Media"] = "visual"
         attrs["Computed value"] = "as specified"
-        attrs["Animatable"] = "no"
-        ret = ["<table class='def propdef'{forHint}>".format(forHint=forHint)]
+        attrs["Canonical order"] = "per grammar"
+        attrs["Animation type"] = "discrete"
+        ret = ["<table class='def propdef'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)]
+    # We are in the process of migrating specs from using 'Animatable' to
+    # using 'Animation type'. If we find 'Animatable' in the parsed attributes,
+    # drop the default 'Animation type' entry.
+    if "Animatable" in parsedAttrs:
+        attrs.pop("Animation type")
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:
@@ -190,7 +212,7 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
             else:
                 ret.append("<tr><th>{0}:<td>{1}".format(key, val))
         else:
-            die("The propdef for '{0}' is missing a '{1}' line.", parsedAttrs.get("Name", "???"), key)
+            die("The propdef for '{0}' is missing a '{1}' line.", parsedAttrs.get("Name", "???"), key, lineNum=lineNum)
             continue
     for key, val in parsedAttrs.items():
         if key in attrs:
@@ -200,17 +222,22 @@ def transformPropdef(lines, doc, firstLine, **kwargs):
     return ret
 
 # TODO: Make these functions match transformPropdef's new structure
-def transformDescdef(lines, doc, firstLine, **kwargs):
+
+
+def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
+    lineNumAttr = ""
+    if lineNum is not None:
+        lineNumAttr = " line-number={0}".format(lineNum)
     vals = parseDefBlock(lines, "descdef")
     if "partial" in firstLine or "New values" in vals:
         requiredKeys = ["Name", "For"]
-        ret = ["<table class='def descdef partial' data-dfn-for='{0}'>".format(vals.get("For", ""))]
+        ret = ["<table class='def descdef partial' data-dfn-for='{0}'{lineNumAttr}>".format(vals.get("For", ""), lineNumAttr=lineNumAttr)]
     if "mq" in firstLine:
         requiredKeys = ["Name", "For", "Value"]
-        ret = ["<table class='def descdef mq' data-dfn-for='{0}'>".format(vals.get("For",""))]
+        ret = ["<table class='def descdef mq' data-dfn-for='{0}'{lineNumAttr}>".format(vals.get("For",""), lineNumAttr=lineNumAttr)]
     else:
         requiredKeys = ["Name", "For", "Value", "Initial"]
-        ret = ["<table class='def descdef' data-dfn-for='{0}'>".format(vals.get("For", ""))]
+        ret = ["<table class='def descdef' data-dfn-for='{0}'{lineNumAttr}>".format(vals.get("For", ""), lineNumAttr=lineNumAttr)]
     for key in requiredKeys:
         if key == "For":
             ret.append("<tr><th>{0}:<td><a at-rule>{1}</a>".format(key, vals.get(key,'')))
@@ -219,14 +246,18 @@ def transformDescdef(lines, doc, firstLine, **kwargs):
         elif key in vals:
             ret.append("<tr><th>{0}:<td>{1}".format(key, vals.get(key,'')))
         else:
-            die("The descdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key)
+            die("The descdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key, lineNum=lineNum)
             continue
     for key in vals.viewkeys() - requiredKeys:
         ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
     ret.append("</table>")
     return ret
 
-def transformElementdef(lines, doc, **kwargs):
+
+def transformElementdef(lines, doc, lineNum=None, **kwargs):
+    lineNumAttr = ""
+    if lineNum is not None:
+        lineNumAttr = " line-number={0}".format(lineNum)
     attrs = OrderedDict()
     parsedAttrs = parseDefBlock(lines, "elementdef")
     if "Attribute groups" in parsedAttrs or "Attributes" in parsedAttrs:
@@ -234,15 +265,14 @@ def transformElementdef(lines, doc, **kwargs):
         if "Attribute groups" in parsedAttrs:
             groups = [x.strip() for x in parsedAttrs["Attribute groups"].split(",")]
             for group in groups:
-                html += "<li><a dfn data-element-attr-group>{0}</a>".format(group)
+                html += "<li><a dfn data-element-attr-group{lineNumAttr}>{0}</a>".format(group, lineNumAttr=lineNumAttr)
             del parsedAttrs["Attribute groups"]
         if "Attributes" in parsedAttrs:
             atts = [x.strip() for x in parsedAttrs["Attributes"].split(",")]
             for att in atts:
-                html += "<li><a element-attr for='{1}'>{0}</a>".format(att, parsedAttrs.get("Name", ""))
+                html += "<li><a element-attr for='{1}'{lineNumAttr}>{0}</a>".format(att, parsedAttrs.get("Name", ""), lineNumAttr=lineNumAttr)
         html += "</ul>"
         parsedAttrs["Attributes"] = html
-
 
     # Displays entries in the order specified in attrs,
     # then if there are any unknown parsedAttrs values,
@@ -255,27 +285,27 @@ def transformElementdef(lines, doc, **kwargs):
     attrs["Content model"] = None
     attrs["Attributes"] = None
     attrs["Dom interfaces"] = None
-    ret = ["<table class='def elementdef'>"]
+    ret = ["<table class='def elementdef'{lineNumAttr}>".format(lineNumAttr=lineNumAttr)]
     for key, val in attrs.items():
         if key in parsedAttrs or val is not None:
             if key in parsedAttrs:
                 val = parsedAttrs[key]
             if key == "Name":
                 ret.append("<tr><th>Name:<td>")
-                ret.append(', '.join("<dfn element>{0}</dfn>".format(x.strip()) for x in val.split(",")))
+                ret.append(', '.join("<dfn element{lineNumAttr}>{0}</dfn>".format(x.strip(), lineNumAttr=lineNumAttr) for x in val.split(",")))
             elif key == "Content model":
                 ret.append("<tr><th>{0}:<td>".format(key))
                 ret.extend(val.split("\n"))
             elif key == "Categories":
                 ret.append("<tr><th>Categories:<td>")
-                ret.append(', '.join("<a dfn>{0}</a>".format(x.strip()) for x in val.split(",")))
+                ret.append(', '.join("<a dfn{lineNumAttr}>{0}</a>".format(x.strip(), lineNumAttr=lineNumAttr) for x in val.split(",")))
             elif key == "Dom interfaces":
                 ret.append("<tr><th>DOM Interfaces:<td>")
-                ret.append(', '.join("<a interface>{0}</a>".format(x.strip()) for x in val.split(",")))
+                ret.append(', '.join("<a interface{lineNumAttr}>{0}</a>".format(x.strip(), lineNumAttr=lineNumAttr) for x in val.split(",")))
             else:
                 ret.append("<tr><th>{0}:<td>{1}".format(key, val))
         else:
-            die("The elementdef for '{0}' is missing a '{1}' line.", parsedAttrs.get("Name", "???"), key)
+            die("The elementdef for '{0}' is missing a '{1}' line.", parsedAttrs.get("Name", "???"), key, lineNum=lineNum)
             continue
     for key, val in parsedAttrs.items():
         if key in attrs:
@@ -284,26 +314,31 @@ def transformElementdef(lines, doc, **kwargs):
     ret.append("</table>")
     return ret
 
-def transformArgumentdef(lines, firstLine, **kwargs):
+
+def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
+    lineNumAttr = ""
+    if lineNum is not None:
+        lineNumAttr = " line-number={0}".format(lineNum)
     attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False)
-    el = parseHTML(firstLine+"</pre>")[0]
+    el = parseHTML(firstLine + "</pre>")[0]
     if "for" in el.attrib:
         forValue = el.get('for')
         el.set("data-dfn-for", forValue)
         if "/" in forValue:
             interface, method = forValue.split("/")
         else:
-            die("Argumentdef for='' values need to specify interface/method(). Got '{0}'.", forValue)
+            die("Argumentdef for='' values need to specify interface/method(). Got '{0}'.", forValue, lineNum=lineNum)
             return
         removeAttr(el, "for")
     else:
-        die("Argumentdef blocks need a for='' attribute specifying their method.")
+        die("Argumentdef blocks need a for='' attribute specifying their method.", lineNum=lineNum)
         return
     addClass(el, "data")
     rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
     lines = [
-            '''
-            <table {0}>
+        '''
+            <table {attrs}{lineNumAttr}>
+                <caption>Arguments for the <a method lt='{method}' for='{interface}'{lineNumAttr}>{interface}.{method}</a> method.</caption>
                 <thead>
                     <tr>
                         <th>Parameter
@@ -311,24 +346,22 @@ def transformArgumentdef(lines, firstLine, **kwargs):
                         <th>Nullable
                         <th>Optional
                         <th>Description
-                <tbody>'''.format(rootAttrs)
-        ] + [
-            '''
+                <tbody>'''.format(attrs=rootAttrs, interface=interface, method=method, lineNumAttr=lineNumAttr)
+    ] + [
+        '''
                 <tr>
-                    <td><dfn argument>{0}</dfn>
+                    <td><dfn argument{lineNumAttr}>{0}</dfn>
                     <td>
                     <td>
                     <td>
-                    <td>{1}'''.format(param, desc)
-                    for param,desc in attrs.items()
-        ] + [
+                    <td>{1}'''.format(param, desc, lineNumAttr=lineNumAttr)
+        for param,desc in attrs.items()
+    ] + [
+        '''
+            </table>
             '''
-                <caption>Arguments for the <a method lt='{method}' for='{interface}'>{interface}.{method}</a> method.</caption>
-            </table>'''.format(interface=interface, method=method)
-        ]
+    ]
     return lines
-
-
 
 
 def parseDefBlock(lines, type, capitalizeKeys=True):
@@ -350,17 +383,17 @@ def parseDefBlock(lines, type, capitalizeKeys=True):
             lastKey = key
             val = match.group(2).strip()
         if key in vals:
-            vals[key] += "\n"+val
+            vals[key] += "\n" + val
         else:
             vals[key] = val
     return vals
 
+
 def transformRailroad(lines, doc, **kwargs):
     import StringIO
     import railroadparser
-    ret = [
-        "<div class='railroad'>",
-        "<style>svg.railroad-diagram{background-color:hsl(30,20%,95%);}svg.railroad-diagram path{stroke-width:3;stroke:black;fill:rgba(0,0,0,0);}svg.railroad-diagram text{font:bold 14px monospace;text-anchor:middle;}svg.railroad-diagram text.label{text-anchor:start;}svg.railroad-diagram text.comment{font:italic 12px monospace;}svg.railroad-diagram rect{stroke-width:3;stroke:black;fill:hsl(120,100%,90%);}</style>"]
+    ret = ["<div class='railroad'>"]
+    doc.extraStyles['style-railroad'] = "svg.railroad-diagram{background-color:hsl(30,20%,95%);}svg.railroad-diagram path{stroke-width:3;stroke:black;fill:rgba(0,0,0,0);}svg.railroad-diagram text{font:bold 14px monospace;text-anchor:middle;}svg.railroad-diagram text.label{text-anchor:start;}svg.railroad-diagram text.comment{font:italic 12px monospace;}svg.railroad-diagram rect{stroke-width:3;stroke:black;fill:hsl(120,100%,90%);}"
     code = ''.join(lines)
     diagram = railroadparser.parse(code)
     temp = StringIO.StringIO()
@@ -370,24 +403,31 @@ def transformRailroad(lines, doc, **kwargs):
     ret.append("</div>")
     return ret
 
+
 def transformBiblio(lines, doc, **kwargs):
-    biblio.processSpecrefBiblioFile(''.join(lines), doc.refs.biblios, order=1)
+    storage = defaultdict(list)
+    biblio.processSpecrefBiblioFile(''.join(lines), storage, order=1)
+    for k,vs in storage.items():
+        doc.refs.biblioKeys.add(k)
+        doc.refs.biblios[k].extend(vs)
     return []
 
-def transformAnchors(lines, doc, **kwargs):
-    anchors = parseInfoTree(lines, doc.md.indent)
-    return processAnchors(anchors, doc)
 
-def processAnchors(anchors, doc):
+def transformAnchors(lines, doc, lineNum=None, **kwargs):
+    anchors = parseInfoTree(lines, doc.md.indent, lineNum)
+    return processAnchors(anchors, doc, lineNum)
+
+
+def processAnchors(anchors, doc, lineNum=None):
     for anchor in anchors:
         if "type" not in anchor or len(anchor['type']) != 1:
-            die("Each anchor needs exactly one type. Got:\n{0}", config.printjson(anchor))
+            die("Each anchor needs exactly one type. Got:\n{0}", config.printjson(anchor), lineNum=lineNum)
             continue
         if "text" not in anchor or len(anchor['text']) != 1:
-            die("Each anchor needs exactly one text. Got:\n{0}", config.printjson(anchor))
+            die("Each anchor needs exactly one text. Got:\n{0}", config.printjson(anchor), lineNum=lineNum)
             continue
         if "url" not in anchor and "urlPrefix" not in anchor:
-            die("Each anchor needs a url and/or at least one urlPrefix. Got:\n{0}", config.printjson(anchor))
+            die("Each anchor needs a url and/or at least one urlPrefix. Got:\n{0}", config.printjson(anchor), lineNum=lineNum)
             continue
         if "urlPrefix" in anchor:
             urlPrefix = ''.join(anchor['urlPrefix'])
@@ -398,43 +438,73 @@ def processAnchors(anchors, doc):
         else:
             urlSuffix = config.simplifyText(anchor['text'][0])
         url = urlPrefix + ("" if "#" in urlPrefix or "#" in urlSuffix else "#") + urlSuffix
+        status = "local"
+        shortname = None
+        level = None
+        if "shortname" in anchor and "level" in anchor:
+            shortname = anchor['shortname'][0]
+            level = config.HierarchicalNumber(anchor['level'][0])
+        spec = anchor["spec"][0] if "spec" in anchor else None
+        if shortname and not spec:
+            if level:
+                spec = "{0}-{1}".format(shortname, level)
+            else:
+                spec = shortname
+        elif spec and not shortname:
+            match = re.match("(.*)-(\d+)$", spec)
+            if match:
+                shortname = match.group(1)
+                level = config.HierarchicalNumber(match.group(2))
+            else:
+                shortname = spec
+                level = config.HierarchicalNumber("")
+        if "status" in anchor:
+            status = anchor["status"][0]
+            if status in config.linkStatuses:
+                pass
+            else:
+                die("Anchor statuses must be {1}. Got '{0}'.", status, config.englishFromList(config.linkStatuses), lineNum=lineNum)
+                continue
+        else:
+            status = "anchor-block"
         if anchor['type'][0] in config.lowercaseTypes:
             anchor['text'][0] = anchor['text'][0].lower()
         doc.refs.refs[anchor['text'][0]].append({
             "linkingText": anchor['text'][0],
-            "type": anchor['type'][0],
+            "type": anchor['type'][0].lower(),
             "url": url,
-            "shortname": doc.md.shortname,
-            "level": doc.md.level,
+            "shortname": shortname.lower() if shortname is not None else doc.md.shortname,
+            "level": level if level is not None else doc.md.level,
             "for": anchor.get('for', []),
             "export": True,
-            "status": "local",
-            "spec": anchor.get('spec', [''])[0]
-            })
+            "status": status,
+            "spec": spec.lower() if spec is not None else ''
+        })
         methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
         if methodishStart:
-            arglessName = methodishStart.group(1)+")"
-            doc.refs.addMethodVariants(anchor['text'][0], anchor.get('for', []), url)
+            doc.refs.addMethodVariants(anchor['text'][0], anchor.get('for', []), doc.md.shortname)
     return []
 
-def transformLinkDefaults(lines, doc, **kwargs):
-    lds = parseInfoTree(lines, doc.md.indent)
-    return processLinkDefaults(lds, doc)
 
-def processLinkDefaults(lds, doc):
+def transformLinkDefaults(lines, doc, lineNum=None, **kwargs):
+    lds = parseInfoTree(lines, doc.md.indent, lineNum)
+    return processLinkDefaults(lds, doc, lineNum)
+
+
+def processLinkDefaults(lds, doc, lineNum=None):
     for ld in lds:
         if len(ld.get('type', [])) != 1:
-            die("Every link default needs exactly one type. Got:\n{0}", config.printjson(ld))
+            die("Every link default needs exactly one type. Got:\n{0}", config.printjson(ld), lineNum=lineNum)
             continue
         else:
             type = ld['type'][0]
         if len(ld.get('spec', [])) != 1:
-            die("Every link default needs exactly one spec. Got:\n{0}", config.printjson(ld))
+            die("Every link default needs exactly one spec. Got:\n{0}", config.printjson(ld), lineNum=lineNum)
             continue
         else:
             spec = ld['spec'][0]
         if len(ld.get('text', [])) != 1:
-            die("Every link default needs exactly one text. Got:\n{0}", config.printjson(ld))
+            die("Every link default needs exactly one text. Got:\n{0}", config.printjson(ld), lineNum=lineNum)
             continue
         else:
             text = ld['text'][0]
@@ -445,18 +515,20 @@ def processLinkDefaults(lds, doc):
             doc.md.linkDefaults[text].append((spec, type, ld.get('status', None), None))
     return []
 
-def transformIgnoredSpecs(lines, doc, **kwargs):
-    specs = parseInfoTree(lines, doc.md.indent)
-    return processIgnoredSpecs(specs, doc)
 
-def processIgnoredSpecs(specs, doc):
+def transformIgnoredSpecs(lines, doc, lineNum=None, **kwargs):
+    specs = parseInfoTree(lines, doc.md.indent, lineNum)
+    return processIgnoredSpecs(specs, doc, lineNum)
+
+
+def processIgnoredSpecs(specs, doc, lineNum=None):
     for spec in specs:
         if len(spec.get('spec', [])) == 0:
-            die("Every ignored spec line needs at least one 'spec' value. Got:\n{0}", config.printjson(spec))
+            die("Every ignored spec line needs at least one 'spec' value. Got:\n{0}", config.printjson(spec), lineNum=lineNum)
             continue
         specNames = spec.get('spec')
         if len(spec.get('replacedBy', [])) > 1:
-            die("Every ignored spec line needs at most one 'replacedBy' value. Got:\n{0}", config.printjson(spec))
+            die("Every ignored spec line needs at most one 'replacedBy' value. Got:\n{0}", config.printjson(spec), lineNum=lineNum)
             continue
         replacedBy = spec.get('replacedBy')[0] if 'replacedBy' in spec else None
         for specName in specNames:
@@ -467,14 +539,15 @@ def processIgnoredSpecs(specs, doc):
     return []
 
 
-def transformInfo(lines, doc, **kwargs):
+def transformInfo(lines, doc, lineNum=None, **kwargs):
     # More generic InfoTree system.
     # A <pre class=info> can contain any of the InfoTree collections,
     # identified by an 'info' line.
-    infos = parseInfoTree(lines, doc.md.indent)
-    return processInfo(infos, doc)
+    infos = parseInfoTree(lines, doc.md.indent, lineNum)
+    return processInfo(infos, doc, lineNum)
 
-def processInfo(infos, doc):
+
+def processInfo(infos, doc, lineNum=None):
     knownInfoTypes = {
         "anchors": processAnchors,
         "link-defaults": processLinkDefaults,
@@ -483,19 +556,23 @@ def processInfo(infos, doc):
     infoCollections = defaultdict(list)
     for info in infos:
         if len(info.get('info', [])) != 1:
-            die("Every info-block line needs exactly one 'info' type. Got:\n{0}", config.printjson(info))
+            die("Every info-block line needs exactly one 'info' type. Got:\n{0}", config.printjson(info), lineNum=lineNum)
             continue
         infoType = info.get('info')[0].lower()
         if infoType not in knownInfoTypes:
-            die("Unknown info-block type '{0}'", infoType)
+            die("Unknown info-block type '{0}'", infoType, lineNum=lineNum)
             continue
         infoCollections[infoType].append(info)
     for infoType, infos in infoCollections.items():
-        knownInfoTypes[infoType](infos, doc)
+        knownInfoTypes[infoType](infos, doc, lineNum=0)
     return []
 
-def transformInclude(lines, doc, **kwargs):
-    infos = parseInfoTree(lines, doc.md.indent)
+
+def transformInclude(lines, doc, lineNum=None, **kwargs):
+    lineNumAttr = ""
+    if lineNum is not None:
+        lineNumAttr = " line-number={0}".format(lineNum)
+    infos = parseInfoTree(lines, doc.md.indent, lineNum)
     path = None
     macros = {}
     for info in infos:
@@ -503,7 +580,7 @@ def transformInclude(lines, doc, **kwargs):
             if path is None:
                 path = info['path'][0]
             else:
-                die("Include blocks must only contain a single 'path'.")
+                die("Include blocks must only contain a single 'path'.", lineNum=lineNum)
         if "macros" in info:
             for k,v in info.items():
                 if k == "macros":
@@ -511,16 +588,15 @@ def transformInclude(lines, doc, **kwargs):
                 if k not in macros and len(v) == 1:
                     macros[k] = v[0]
                 else:
-                    die("Include block defines the '{0}' local macro more than once.", k)
-    el = "<include data-from-block path='{0}'".format(escapeAttr(path))
+                    die("Include block defines the '{0}' local macro more than once.", k, lineNum=lineNum)
+    el = "<pre class=include path='{0}'".format(escapeAttr(path))
     for i,(k,v) in enumerate(macros.items()):
-        el += " data-macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
-    el += "></include>"
+        el += " macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
+    el += "{lineNumAttr}></pre>".format(lineNumAttr=lineNumAttr)
     return [el]
 
 
-
-def parseInfoTree(lines, indent=4):
+def parseInfoTree(lines, indent=4, lineNum=0):
     # Parses sets of info, which can be arranged into trees.
     # Each info is a set of key/value pairs, semicolon-separated:
     # key1: val1; key2: val2; key3: val3
@@ -551,21 +627,25 @@ def parseInfoTree(lines, indent=4):
     infoLevels = []
     lastIndent = -1
     indentSpace = " " * indent
-    for line in lines:
+    for i,line in enumerate(lines):
+        if lineNum is not None:
+            thisLine = int(lineNum) + i + 1
+        else:
+            thisLine = None
         if line.strip() == "":
             continue
         ws, text = re.match("(\s*)(.*)", line).groups()
         wsLen = len(ws.replace("\t", indentSpace))
         if wsLen % indent != 0:
-            die("Line has inconsistent indentation; use tabs or {1} spaces:\n{0}", text, indent)
+            die("Line has inconsistent indentation; use tabs or {1} spaces:\n{0}", text, indent, lineNum=thisLine)
             return []
         wsLen = wsLen // indent
-        if wsLen >= lastIndent+2:
-            die("Line jumps {1} indent levels:\n{0}", text, wsLen - lastIndent)
+        if wsLen >= lastIndent + 2:
+            die("Line jumps {1} indent levels:\n{0}", text, wsLen - lastIndent, lineNum=thisLine)
             return []
         if wsLen <= lastIndent:
             # Previous line was a leaf node; build its full data and add to the list
-            extendData(datas, infoLevels[:lastIndent+1])
+            extendData(datas, infoLevels[:lastIndent + 1])
         # Otherwise, chained data. Parse it, put it into infoLevels
         info = defaultdict(list)
         for piece in text.split(";"):
@@ -573,7 +653,7 @@ def parseInfoTree(lines, indent=4):
                 continue
             match = re.match("([^:]+):\s*(.*)", piece)
             if not match:
-                die("Line doesn't match the grammar `k:v; k:v; k:v`:\n{0}", line)
+                die("Line doesn't match the grammar `k:v; k:v; k:v`:\n{0}", line, lineNum=thisLine)
                 return []
             key = match.group(1).strip()
             val = match.group(2).strip()
@@ -584,5 +664,5 @@ def parseInfoTree(lines, indent=4):
             infoLevels.append(info)
         lastIndent = wsLen
     # Grab the last bit of data.
-    extendData(datas, infoLevels[:lastIndent+1])
+    extendData(datas, infoLevels[:lastIndent + 1])
     return datas

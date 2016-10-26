@@ -37,6 +37,7 @@ while "bar/baz<value>" would be canonicalized into "bar<property>/baz<value>".
 
 Seg = col.namedtuple('Seg', ['value', 'type'])
 
+
 class GlobalName(object):
     valid = True
 
@@ -137,8 +138,8 @@ class GlobalName(object):
                     return "exception"
                 return None
         for i, segment in enumerate(self.segments):
-            prevType = childType if i == 0 else self.segments[i-1].type
-            nextValue = '' if i+1 == len(self.segments) else self.segments[i+1].value
+            prevType = childType if i == 0 else self.segments[i - 1].type
+            nextValue = '' if i + 1 == len(self.segments) else self.segments[i + 1].value
             self.segments[i] = segment._replace(type=guessType(*segment, prevType=prevType, nextValue=nextValue))
         return self
 
@@ -179,7 +180,6 @@ class GlobalName(object):
             if s1.type is not None and s2.type is not None and s1.type != s2.type:
                 return False
         return True
-
 
 
 class GlobalNames(col.Set, col.Hashable):

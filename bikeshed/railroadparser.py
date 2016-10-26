@@ -1,6 +1,7 @@
 from .messages import *
 import railroaddiagrams as rr
 
+
 def parse(string):
     '''
     Parses a DSL for railroad diagrams,
@@ -49,7 +50,7 @@ def parse(string):
         while line.startswith(indentText):
             indent += 1
             line = line[len(indentText):]
-        if indent > lastIndent+1:
+        if indent > lastIndent + 1:
             die("Line {0} jumps more than 1 indent level from the previous line:\n{1}", i, line.strip())
             return rr.Diagram()
         lastIndent = indent
@@ -75,7 +76,7 @@ def parse(string):
             node = {"command": command, "prelude": prelude, "text":text, "children": [], "line": i}
 
         activeCommands[str(indent)]['children'].append(node)
-        activeCommands[str(indent+1)] = node
+        activeCommands[str(indent + 1)] = node
 
     return _createDiagram(**tree)
 
@@ -140,7 +141,7 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
         if len(children) != 1:
             return die("Line {0} - Optional commands need exactly one child.", line)
         children = filter(None, [_createDiagram(**child) for child in children])
-        return rr.Optional(*children, skip=(prelude=="skip"))
+        return rr.Optional(*children, skip=(prelude == "skip"))
     elif command in ("Plus", "OneOrMore"):
         if prelude:
             return die("Line {0} - OneOrMore commands cannot have preludes.", line)

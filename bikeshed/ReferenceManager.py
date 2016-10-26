@@ -3,18 +3,15 @@ from __future__ import division, unicode_literals
 import re
 import json
 import io
-import collections
 import copy
-import collections
 from collections import defaultdict
 from operator import itemgetter
 from . import config
 from . import biblio
-from . import enum
 from . import datablocks
-from .SortedList import SortedList
 from .messages import *
 from .htmlhelpers import *
+
 
 class ReferenceManager(object):
 
@@ -34,8 +31,15 @@ class ReferenceManager(object):
         # Set of (obsolete spec vshortname, replacing spec vshortname), when both obsolete and replacing specs are possible anchors
         self.replacedSpecs = set()
         # Dict of {biblio term => biblio data}
+        # Sparsely populated, with more loaded on demand
         self.biblios = defaultdict(list)
+        # All the biblio keys
+        self.biblioKeys = set()
+        # Dict of {base key name => preferred display name}
+        self.preferredBiblioNames = dict()
         # Dict of {spec vshortname => headings}
+        # Each heading is either {#foo => heading-dict}, {/foo#bar => heading-dict} or {#foo => [page-heading-keys]}
+        # In the latter, it's a list of the heading keys (of the form /foo#bar) that collide for that id.
         self.headings = dict()
         self.status = specStatus
 
@@ -64,54 +68,19 @@ class ReferenceManager(object):
                 pass
 
     def initializeBiblio(self):
-        with config.retrieveDataFile("biblio.data", quiet=True) as lines:
-            try:
-                while True:
-                    fullKey = lines.next()
-                    prefix, key = fullKey[0], fullKey[2:]
-                    if prefix == "d":
-                        b = {
-                            "linkText": lines.next(),
-                            "date": lines.next(),
-                            "status": lines.next(),
-                            "title": lines.next(),
-                            "dated_url": lines.next(),
-                            "current_url": lines.next(),
-                            "other": lines.next(),
-                            "etAl": lines.next() != "\n",
-                            "order": 3,
-                            "biblioFormat": "dict",
-                            "authors": []
-                        }
-                        while True:
-                            line = lines.next()
-                            if line == b"-\n":
-                                break
-                            b['authors'].append(line)
-                    elif prefix == "s":
-                        b = {
-                            "linkText": lines.next(),
-                            "data": lines.next(),
-                            "biblioFormat": "string",
-                            "order": 3
-                        }
-                        line = lines.next() # Eat the -
-                    else:
-                        die("Unknown biblio prefix '{0}' on key '{1}'", prefix, fullKey)
-                        continue
-                    self.biblios[key].append(b)
-            except StopIteration:
-                pass
-
+        self.biblioKeys.update(json.loads(config.retrieveDataFile("biblio-keys.json", quiet=True, str=True)))
 
         # Get local bibliography data
         try:
+            storage = defaultdict(list)
             with io.open("biblio.json", 'r', encoding="utf-8") as fh:
-                biblio.processSpecrefBiblioFile(fh.read(), self.biblios, order=2)
+                biblio.processSpecrefBiblioFile(fh.read(), storage, order=2)
         except IOError:
             # Missing file is fine
             pass
-
+        for k,vs in storage.items():
+            self.biblioKeys.add(k)
+            self.biblios[k].extend(vs)
 
     @property
     def status(self):
@@ -121,10 +90,10 @@ class ReferenceManager(object):
     def status(self, val):
         if val is None:
             self._status = None
-        elif val in config.TRStatuses:
-            self._status = "TR"
+        elif val in config.snapshotStatuses:
+            self._status = "snapshot"
         elif val in config.shortToLongStatus:
-            self._status = "ED"
+            self._status = "current"
         else:
             die("Unknown spec status '{0}'.", val)
             self._status = None
@@ -148,21 +117,25 @@ class ReferenceManager(object):
         # Kill all the non-local anchors with the same shortname as the current spec,
         # so you don't end up accidentally linking to something that's been removed from the local copy.
         for term, refs in self.refs.items():
-            self.refs[term] = [ref for ref in refs if ref['shortname'].rstrip("\n")!=self.specName or ref['status']=="local"]
-            # TODO: OMIGOD WHY AM I DOING THIS FOR EVERY SINGLE REF EVER AT LEAST SEARCH FIRST
-            # Or maybe just move this functionality into addLocalDfns, ffs
-            # This damned thing is a whole 1.25% of runtime
+            for ref in refs:
+                if ref['status'] != "local" and ref['shortname'].rstrip() == self.specName:
+                    ref['export'] = False
 
     def addLocalDfns(self, dfns):
         for el in dfns:
             if hasClass(el, "no-ref"):
                 continue
-            for linkText in config.linkTextsFromElement(el):
+            try:
+                linkTexts = config.linkTextsFromElement(el)
+            except config.DuplicatedLinkText as e:
+                die("The term '{0}' is in both lt and local-lt of the element {1}.", e.offendingText, outerHTML(e.el), el=e.el)
+                linkTexts = e.allTexts
+            for linkText in linkTexts:
                 linkText = unfixTypography(linkText)
                 linkText = re.sub("\s+", " ", linkText)
                 linkType = treeAttr(el, 'data-dfn-type')
                 if linkType not in config.dfnTypes.union(["dfn"]):
-                    die("Unknown local dfn type '{0}':\n  {1}", linkType, outerHTML(el))
+                    die("Unknown local dfn type '{0}':\n  {1}", linkType, outerHTML(el), el=el)
                     continue
                 if linkType in config.lowercaseTypes:
                     linkText = linkText.lower()
@@ -170,7 +143,7 @@ class ReferenceManager(object):
                 if dfnFor is None:
                     dfnFor = set()
                     if self.getLocalRef(linkType, linkText, linkFor="/", exact=True):
-                        die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, linkType)
+                        die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, linkType, el=el)
                         continue
                 else:
                     dfnFor = set(config.splitForValues(dfnFor))
@@ -178,7 +151,7 @@ class ReferenceManager(object):
                     for singleFor in dfnFor:
                         if self.getLocalRef(linkType, linkText, linkFor=singleFor, exact=True):
                             encounteredError = True
-                            die("Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, linkType, singleFor)
+                            die("Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, linkType, singleFor, el=el)
                             break
                     if encounteredError:
                         continue
@@ -196,34 +169,36 @@ class ReferenceManager(object):
                     "spec":self.specVName,
                     "shortname":self.specName,
                     "level":self.specLevel,
-                    "url":"#"+el.get('id'),
+                    "url":"#" + el.get('id'),
                     "export":True,
                     "for": dfnFor
                 }
                 self.refs[linkText].append(ref)
                 methodishStart = re.match(r"([^(]+\()[^)]", linkText)
                 if methodishStart:
-                    self.addMethodVariants(linkText, dfnFor, ref["url"])
+                    self.addMethodVariants(linkText, dfnFor, ref["shortname"])
 
     def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None, exact=False):
         return self._queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]
 
-    def getRef(self, linkType, text, spec=None, status=None, linkFor=None, linkForHint=None, error=True, el=None):
+    def getRef(self, linkType, text, spec=None, status=None, statusHint=None, linkFor=None, linkForHint=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a reference or None
         # Otherwise, it pops out debug messages for the user.
 
         # 'maybe' links might not link up, so it's fine for them to have no references.
         # The relevent errors are gated by this variable.
-        zeroRefsError = error and linkType!="maybe"
+        zeroRefsError = error and linkType not in ["maybe", "extended-attribute"]
 
         text = unfixTypography(text)
         if linkType in config.lowercaseTypes:
             text = text.lower()
-
-        status = status or self.status
-        if status not in ("ED", "TR", "local"):
+        if spec is not None:
+            spec = spec.lower()
+        if statusHint is None:
+            statusHint = self.status
+        if status not in config.linkStatuses and status is not None:
             if error:
-                die("Unknown spec status '{0}'. Status must be ED, TR, or local.", status)
+                die("Unknown spec status '{0}'. Status must be {1}.", status, config.englishFromList(config.linkStatuses), el=el)
             return None
 
         # Local refs always get precedence, unless you manually specified a spec.
@@ -233,12 +208,27 @@ class ReferenceManager(object):
                 return localRefs[0]
             elif len(localRefs) > 1:
                 if error:
-                    warn("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
-                         linkType,
-                         text,
-                         localRefs[0].type,
-                         "' or '".join(localRefs[0].for_))
+                    linkerror("Multiple possible '{0}' local refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
+                              linkType,
+                              text,
+                              localRefs[0].type,
+                              "' or '".join(localRefs[0].for_),
+                              el=el)
                 return localRefs[0]
+
+        # Then anchor-block refs get preference
+        blockRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el, status="anchor-block")
+        if len(blockRefs) == 1:
+            return blockRefs[0]
+        elif len(blockRefs) > 1:
+            if error:
+                linkerror("Multiple possible '{0}' anchor-block refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
+                          linkType,
+                          text,
+                          blockRefs[0].type,
+                          "' or '".join(blockRefs[0].for_),
+                          el=el)
+            return blockRefs[0]
 
         # Take defaults into account
         if not spec or not status:
@@ -257,12 +247,12 @@ class ReferenceManager(object):
             export = True
         else:
             export = None
-        refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, linkFor=linkFor, linkForHint=linkForHint, export=export, ignoreObsoletes=True)
+        refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, statusHint=statusHint, linkFor=linkFor, linkForHint=linkForHint, export=export, ignoreObsoletes=True)
 
         if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
             # foo()/bar failed, because foo() is technically the wrong signature
             # let's see if we can find the right signature, and it's unambiguous
-            while True: # Hack for early exits
+            while True:  # Hack for early exits
                 if "/" in linkFor:
                     interfaceName, _, methodName = linkFor.partition("/")
                 else:
@@ -278,8 +268,8 @@ class ReferenceManager(object):
                 # Dedup/collect by url, so I'll get all the signatures for a given dfn.
                 possibleMethods = defaultdict(list)
                 for argfullName, metadata in methodSignatures.items():
-                    if text in metadata["args"] and (interfaceName in metadata["for"] or interfaceName is None):
-                        possibleMethods[metadata["url"]].append(argfullName)
+                    if text in metadata["args"] and (interfaceName in metadata["for"] or interfaceName is None) and metadata["shortname"] != self.specName:
+                        possibleMethods[metadata["shortname"]].append(argfullName)
                 possibleMethods = possibleMethods.values()
                 if not possibleMethods:
                     # No method signatures with this argument/interface.
@@ -287,7 +277,7 @@ class ReferenceManager(object):
                     break
                 if len(possibleMethods) > 1:
                     # Too many to disambiguate.
-                    die("The argument autolink '{0}' for '{1}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for.", text, linkFor)
+                    linkerror("The argument autolink '{0}' for '{1}' has too many possible overloads to disambiguate. Please specify the full method signature this argument is for.", text, linkFor, el=el)
                 # Try out all the combinations of interface/status/signature
                 linkForPatterns = ["{i}/{m}", "{m}"]
                 statuses = ["local", status]
@@ -304,19 +294,17 @@ class ReferenceManager(object):
                 # Now we can break out and just let the normal error-handling machinery take over.
                 break
 
-
-
             # Allow foo(bar) to be for'd to with just foo() if it's completely unambiguous.
             methodPrefix = methodName[:-1]
             candidates, _ = self.queryRefs(linkType="functionish", status="local", linkFor=interfaceName)
             methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
             if not methodRefs:
                 # Look for non-locals, then
-                candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, linkFor=interfaceName, export=export, ignoreObsoletes=True)
+                candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, statusHint=statusHint, linkFor=interfaceName, export=export, ignoreObsoletes=True)
                 methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
             if zeroRefsError and len(methodRefs) > 1:
                 # More than one possible foo() overload, can't tell which to link to
-                die("Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.", linkFor, text)
+                linkerror("Too many possible method targets to disambiguate '{0}/{1}'. Please specify the names of the required args, like 'foo(bar, baz)', in the 'for' attribute.", linkFor, text, el=el)
                 return
             # Otherwise
 
@@ -325,54 +313,41 @@ class ReferenceManager(object):
                 # Custom properties/descriptors aren't ever defined anywhere
                 return None
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}'.", linkType, text)
+                linkerror("No '{0}' refs found for '{1}'.", linkType, text, el=el)
             return None
         elif failure == "export":
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}' that are marked for export.", linkType, text)
+                linkerror("No '{0}' refs found for '{1}' that are marked for export.", linkType, text, el=el)
             return None
         elif failure == "spec":
             if zeroRefsError:
-                die("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec)
+                linkerror("No '{0}' refs found for '{1}' with spec '{2}'.", linkType, text, spec, el=el)
             return None
         elif failure == "for":
             if zeroRefsError:
                 if spec is None:
-                    die("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor)
+                    linkerror("No '{0}' refs found for '{1}' with for='{2}'.", linkType, text, linkFor, el=el)
                 else:
-                    die("No '{0}' refs found for '{1}' with for='{2}' in spec '{3}'.", linkType, text, linkFor, spec)
+                    linkerror("No '{0}' refs found for '{1}' with for='{2}' in spec '{3}'.", linkType, text, linkFor, spec, el=el)
             return None
         elif failure == "status":
             if zeroRefsError:
                 if spec is None:
-                    die("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status)
+                    linkerror("No '{0}' refs found for '{1}' compatible with status '{2}'.", linkType, text, status, el=el)
                 else:
-                    die("No '{0}' refs found for '{1}' compatible with status '{2}' in spec '{3}'.", linkType, text, status, spec)
+                    linkerror("No '{0}' refs found for '{1}' compatible with status '{2}' in spec '{3}'.", linkType, text, status, spec, el=el)
             return None
         elif failure == "ignored-specs":
             if zeroRefsError:
-                die("The only '{0}' refs for '{1}' were in ignored specs:\n{2} refs found for '{1}':\n{2}", linkType, text, outerHTML(el))
+                linkerror("The only '{0}' refs for '{1}' were in ignored specs:\n{2}", linkType, text, outerHTML(el), el=el)
             return None
         elif failure:
-            die("Programming error - I'm not catching '{0}'-type link failures. Please report!", failure)
+            die("Programming error - I'm not catching '{0}'-type link failures. Please report!", failure, el=el)
             return None
 
         if len(refs) == 1:
             # Success!
             return refs[0]
-
-        # If all the refs are for the same shortname,
-        # assume you want to link to the latest one (highest level).
-        if all(ref.shortname == refs[0].shortname for ref in refs):
-            maxLevel = config.HierarchicalNumber("-1")
-            for ref in refs:
-                if ref.level > maxLevel:
-                    maxLevel = ref.level
-            leveledRefs = [ref for ref in refs if ref.level == maxLevel]
-            # Still potentially possible for a non-Bikeshed spec to have duplicate refs here,
-            # so I have to check for singularity.
-            if len(leveledRefs) == 1:
-                return leveledRefs[0]
 
         # If we hit this point, there are >1 possible refs to choose from.
         # Default to linking to the first one.
@@ -392,56 +367,74 @@ class ReferenceManager(object):
                     possibleRefs.append('spec:{spec}; type:{type}; text:{text}'.format(**ref))
             if len(possibleRefs) == 1:
                 # Only happens when the refs can't be disambiguated under Bikeshed's data model.
-                warn("Multiple possible '{0}' refs for '{1}' in {2}, but they're not distinguishable with Bikeshed's data model. Either create a manual link, or ask the spec maintainer to add sufficient disambiguating attributes to make them distinguishable. Usually this means adding a for='' value to at least one of them.\nArbitrarily chose the {3} one to link to for now.",
-                    linkType,
-                    text,
-                    defaultRef.spec,
-                    defaultRef.url)
+                linkerror("Multiple possible '{0}' refs for '{1}' in {2}, but they're not distinguishable with Bikeshed's data model. Either create a manual link, or ask the spec maintainer to add sufficient disambiguating attributes to make them distinguishable. Usually this means adding a for='' value to at least one of them.\nArbitrarily chose the {3} one to link to for now.",
+                          linkType,
+                          text,
+                          defaultRef.spec,
+                          defaultRef.url,
+                          el=el)
             else:
-                warn("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
-                     linkType,
-                     text,
-                     defaultRef.spec,
-                     '\n'.join(possibleRefs))
+                linkerror("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
+                          linkType,
+                          text,
+                          defaultRef.spec,
+                          '\n'.join(possibleRefs),
+                          el=el)
         return defaultRef
 
-    def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None):
+    def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None, quiet=False):
         key = text.lower()
+        if key in ["notifications", "fullscreen", "dom", "url", "encoding"]:
+            # A handful of specs where W3C is squatting with an out-of-date fork.
+            key = "whatwg-" + key
         if key in self.biblios:
             candidates = self.biblios[key]
-        elif key+"\n" in self.biblios:
-            candidates = self.biblios[key+"\n"]
+        elif key in self.biblioKeys:
+            # Key exists in biblio db, but its data isn't loaded yet.
+            group = key[0:2]
+            with config.retrieveDataFile("biblio/biblio-{0}.data".format(group), quiet=True) as lines:
+                biblio.loadBiblioDataFile(lines, self.biblios)
+            candidates = self.biblios[key]
         elif key in self.specs:
             # First see if the ref is just unnecessarily levelled
             match = re.match(r"(.+?)-\d+", key)
             if match:
-                ref = self.getBiblioRef(match.group(1), status, el=el)
+                ref = self.getBiblioRef(match.group(1), status, el=el, quiet=True)
                 if ref:
                     return ref
             if generateFakeRef:
-                return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=status)
+                return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=self.status)
             else:
                 return None
         else:
             return None
 
-        candidate = sorted(stripLineBreaks(candidates), key=itemgetter('order'))[0]
+        candidate = stripLineBreaks(sorted(candidates, key=itemgetter('order'))[0])
         # TODO: When SpecRef definitely has all the CSS specs, turn on this code.
         # if candidates[0]['order'] > 3: # 3 is SpecRef level
         #    warn("Bibliography term '{0}' wasn't found in SpecRef.\n         Please find the equivalent key in SpecRef, or submit a PR to SpecRef.", text)
         if candidate['biblioFormat'] == "string":
-            return biblio.StringBiblioEntry(**candidate)
+            bib = biblio.StringBiblioEntry(**candidate)
+        elif candidate['biblioFormat'] == "alias":
+            # Follow the chain to the real candidate
+            bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True)
         else:
-            return biblio.BiblioEntry(preferredURL=status, **candidate)
+            bib = biblio.BiblioEntry(preferredURL=self.status, **candidate)
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, export=None, ignoreObsoletes=False, **kwargs):
-        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, export, ignoreObsoletes, exact=True)
+        # If a canonical name has been established, use it.
+        if bib.linkText in self.preferredBiblioNames:
+            bib.originalLinkText, bib.linkText = bib.linkText, self.preferredBiblioNames[bib.linkText]
+
+        return bib
+
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, **kwargs):
+        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, exact=True)
         if error:
-            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, export, ignoreObsoletes)
+            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes)
         else:
             return results, error
 
-    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         def refsIterator(refs):
@@ -449,20 +442,22 @@ class ReferenceManager(object):
             for key, group in refs.items():
                 for ref in group:
                     yield RefWrapper(key, ref)
+
         def textRefsIterator(refs, texts):
             # Same as above, but only grabs those keyed to a given text
             for text in texts:
                 for ref in refs.get(text, []):
                     yield RefWrapper(text, ref)
-                for ref in refs.get(text+"\n", []):
+                for ref in refs.get(text + "\n", []):
                     yield RefWrapper(text, ref)
+
         def forRefsIterator(refs, fors, targetFors):
             # Same as above, but only grabs those for certain values
             for for_ in targetFors:
                 for text in fors[for_]:
                     for ref in refs.get(text, []):
                         yield RefWrapper(text, ref)
-                    for ref in refs.get(text+"\n", []):
+                    for ref in refs.get(text + "\n", []):
                         yield RefWrapper(text, ref)
 
         # Set up the initial list of refs to query
@@ -486,13 +481,11 @@ class ReferenceManager(object):
         if linkType:
             if linkType in config.dfnTypes:
                 linkTypes = [linkType]
-            elif linkType == "dfn":
-                linkTypes = ["dfn"]
             elif linkType in config.linkTypeToDfnType:
                 linkTypes = list(config.linkTypeToDfnType[linkType])
             else:
                 if error:
-                    die("Unknown link type '{0}'.",linkType)
+                    linkerror("Unknown link type '{0}'.",linkType)
                 return [], "type"
             refs = [x for x in refs if x.type in linkTypes]
         if not refs:
@@ -515,21 +508,29 @@ class ReferenceManager(object):
         if not refs:
             return refs, "for"
 
-        if status:
-            # If status is ED, kill TR refs unless their spec *only* has a TR url
-            if status == "ED":
-                refs = [ref for ref in refs if ref.status == "ED" or (ref.status == "TR" and self.specs.get(ref.spec,{}).get('ED') is None)]
-            # If status is TR, kill ED refs if there's a corresponding TR ref for the same spec.
-            elif status == "TR":
-                TRRefSpecs = [ref.spec for ref in refs if ref.status == 'TR']
-                refs = [ref for ref in refs if ref.status == "TR" or (ref.status == "ED") and ref.spec not in TRRefSpecs]
+        def filterByStatus(refs, status):
+            # If status is "current'", kill snapshot refs unless their spec *only* has a snapshot_url
+            if status == "current":
+                return [ref for ref in refs if ref.status == "current" or (ref.status == "snapshot" and self.specs.get(ref.spec,{}).get('current_url') is None)]
+            # If status is "snapshot", kill current refs if there's a corresponding snapshot ref for the same spec.
+            elif status == "snapshot":
+                snapshotSpecs = [ref.spec for ref in refs if ref.status == 'snapshot']
+                return [ref for ref in refs if ref.status == "snapshot" or (ref.status == "current" and ref.spec not in snapshotSpecs)]
             else:
-                refs = [x for x in refs if x.status == status]
+                return [x for x in refs if x.status == status]
+        if status:
+            refs = filterByStatus(refs, status)
         if not refs:
             return refs, "status"
 
-        if ignoreObsoletes:
+        if status is None and statusHint:
+            tempRefs = filterByStatus(refs, statusHint)
+            if tempRefs:
+                refs = tempRefs
+
+        if ignoreObsoletes and not spec:
             # Remove any ignored or obsoleted specs
+            # If you specified the spec, don't filter things - you know what you're doing.
             possibleSpecs = set(ref.spec for ref in refs)
             moreIgnores = set()
             for oldSpec, newSpec in self.replacedSpecs:
@@ -556,9 +557,30 @@ class ReferenceManager(object):
                 seenUrls.add(ref.url)
         refs = tempRefs
 
+        # If multiple levels of the same shortname exist,
+        # only use the latest level.
+        # If generating for a snapshot, prefer the latest snapshot level,
+        # unless that doesn't exist, in which case just prefer the latest level.
+        shortnameLevels = defaultdict(lambda:defaultdict(list))
+        snapshotShortnameLevels = defaultdict(lambda:defaultdict(list))
+        for ref in refs:
+            shortnameLevels[ref.shortname][ref.level].append(ref)
+            if status == ref.status == "snapshot":
+                snapshotShortnameLevels[ref.shortname][ref.level].append(ref)
+        refs = []
+        for shortname, levelSet in shortnameLevels.items():
+            if status == "snapshot" and snapshotShortnameLevels[shortname]:
+                # Get the latest snapshot refs if they exist and you're generating a snapshot...
+                maxLevel = max(snapshotShortnameLevels[shortname].keys())
+                refs.extend(snapshotShortnameLevels[shortname][maxLevel])
+            else:
+                # Otherwise just grab the latest refs regardless.
+                maxLevel = max(levelSet.keys())
+                refs.extend(levelSet[maxLevel])
+
         return refs, None
 
-    def addMethodVariants(self, methodSig, forVals, url):
+    def addMethodVariants(self, methodSig, forVals, shortname):
         # Takes a full method signature, like "foo(bar)",
         # and adds appropriate lines to self.methods for it
         match = re.match(r"([^(]+)\((.*)\)", methodSig)
@@ -570,7 +592,7 @@ class ReferenceManager(object):
         variants = self.methods[arglessMethodSig]
         if methodSig not in variants:
             args = [x.strip() for x in args.split(",")]
-            variants[methodSig] = {"args":args, "for":[], "url": url}
+            variants[methodSig] = {"args":args, "for":[], "shortname": shortname}
         variants[methodSig]["for"].extend(forVals)
 
 
@@ -579,66 +601,84 @@ def linkTextVariations(str, linkType):
     # so explicitly adding an lt attr isn't usually necessary.
     yield str
 
-    if linkType == "dfn":
+    if linkType is None:
+        return
+    elif linkType == "dfn":
+        last1 = str[-1] if len(str) >= 1 else None
+        last2 = str[-2:] if len(str) >= 2 else None
+        last3 = str[-3:] if len(str) >= 3 else None
         # Berries <-> Berry
-        if str[-3:] == "ies":
+        if last3 == "ies":
             yield str[:-3] + "y"
-        if str[-1:] == "y":
+        if last1 == "y":
             yield str[:-1] + "ies"
 
         # Blockified <-> Blockify
-        if str[-3:] == "ied":
+        if last3 == "ied":
             yield str[:-3] + "y"
-        if str[-1:] == "y":
+        if last1 == "y":
             yield str[:-1] + "ied"
 
         # Zeroes <-> Zero
-        if str[-2:] == "es":
+        if last2 == "es":
             yield str[:-2]
         else:
             yield str + "es"
 
         # Bikeshed's <-> Bikeshed
-        if str[-2:] == "'s" or str[-2:] == "’s":
+        if last2 == "'s" or last2 == "’s":
             yield str[:-2]
         else:
             yield str + "'s"
 
         # Bikesheds <-> Bikeshed
-        if str[-1:] == "s":
+        if last1 == "s":
             yield str[:-1]
         else:
             yield str + "s"
 
         # Bikesheds <-> Bikesheds'
-        if str[-1:] == "'" or str[-1:] == "’":
+        if last1 == "'" or last1 == "’":
             yield str[:-1]
         else:
             yield str + "'"
 
-        # Bikesheded (bikeshod?) <-> Bikeshed
-        if str[-2:] == "ed":
+        # Snapped <-> Snap
+        if last2 == "ed" and len(str) >= 4 and str[-3] == str[-4]:
+            yield str[:-3]
+        elif last1 in "bdfgklmnprstvz":
+            yield str + last1 + "ed"
+
+        # Zeroed <-> Zero
+        if last2 == "ed":
             yield str[:-2]
         else:
             yield str + "ed"
 
         # Generated <-> Generate
-        if str[-1:] == "d":
+        if last1 == "d":
             yield str[:-1]
         else:
             yield str + "d"
 
         # Navigating <-> Navigate
-        if str[-3:] == "ing":
+        if last3 == "ing":
             yield str[:-3]
-            yield str[:-3]+"e"
-        elif str[-1:] == "e":
+            yield str[:-3] + "e"
+        elif last1 == "e":
             yield str[:-1] + "ing"
         else:
             yield str + "ing"
+
+        # Snapping <-> Snap
+        if last3 == "ing" and len(str) >= 5 and str[-4] == str[-5]:
+            yield str[:-4]
+        elif last1 in "bdfgklmnprstvz":
+            yield str + last1 + "ing"
+
     elif config.linkTypeIn(linkType, "idl"):
         # Let people refer to escaped IDL names with their "real" names (without the underscore)
-        if str[0] != "_":
+        if str[:1] != "_":
             yield "_" + str
 
 
@@ -676,7 +716,8 @@ class RefWrapper(object):
         return refCopy
 
     def __repr__(self):
-        return "RefWrapper("+repr(self.text)+", "+repr(self.ref)+")"
+        return "RefWrapper(" + repr(self.text) + ", " + repr(self.ref) + ")"
+
 
 def simplifyPossibleRefs(refs):
     # "Simplifies" the set of possible refs according to their 'for' value;
@@ -685,10 +726,10 @@ def simplifyPossibleRefs(refs):
     forVals = defaultdict(list)
     for ref in refs:
         if ref.for_:
-            for for_ in ref.for_: # ref.for_ is a list
+            for for_ in ref.for_:  # ref.for_ is a list
                 forVals[(ref.text, ref.type, ref.spec)].append(for_)
         else:
-            forVals[(ref.text, ref.type, ref.spec)] = []
+            forVals[(ref.text, ref.type, ref.spec)].append(None)
     retRefs = []
     for (text, type, spec), fors in forVals.items():
         if len(fors) >= 2:

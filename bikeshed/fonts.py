@@ -54,6 +54,7 @@ This defines a font capable of rendering text composed of "A", "B", "a", "b", an
 
 '''
 
+
 class Font(object):
     def __init__(self, fontfilename=config.scriptPath + "/bigblocks.bsfont"):
         try:
@@ -64,7 +65,7 @@ class Font(object):
         self.characters = parseCharacters(self.metadata, lines)
 
     def write(self, text):
-        output = ['']*self.metadata["height"]
+        output = [''] * self.metadata["height"]
         for letterIndex, letter in enumerate(text):
             if letter in self.characters:
                 for i, line in enumerate(self.characters[letter]):
@@ -105,13 +106,14 @@ def parseMetadata(lines):
         md[key] = val
     return md, lines[i:]
 
+
 def parseCharacters(md, lines):
     import string
     height = md['height']
     characters = {}
     if "space-width" in md:
-        characters[" "] = [" "*md['space-width']]*height
-    for bigcharlines in grouper(lines, height+1):
+        characters[" "] = [" " * md['space-width']] * height
+    for bigcharlines in grouper(lines, height + 1):
         littlechar = bigcharlines[0][0]
         bigchar = [line.strip("\n") for line in bigcharlines[1:]]
         width = max(len(l) for l in bigchar)
@@ -128,6 +130,7 @@ def parseCharacters(md, lines):
             characters[char] = characters[char.upper()]
     return characters
 
+
 def replaceComments(font, inputFilename=None, outputFilename=None):
     lines, inputFilename = getInputLines(inputFilename)
     replacements = []
@@ -140,21 +143,18 @@ def replaceComments(font, inputFilename=None, outputFilename=None):
                 'content': newtext
             })
     for r in reversed(replacements):
-        lines[r['line']:r['line']+1] = r['content']
+        lines[r['line']:r['line'] + 1] = r['content']
     writeOutputLines(outputFilename, inputFilename, lines)
 
-
-
-
-
-
 # Some utility functions
+
 
 def grouper(iterable, n, fillvalue=None):
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n
     return (list(x) for x in izip_longest(fillvalue=fillvalue, *args))
+
 
 def getInputLines(inputFilename):
     if inputFilename is None:
@@ -181,12 +181,13 @@ def getInputLines(inputFilename):
         return []
     return lines, inputFilename
 
+
 def writeOutputLines(outputFilename, inputFilename, lines):
     if outputFilename is None:
         outputFilename = inputFilename
     try:
         if outputFilename == "-":
-            outputFile = sys.stdout.write(''.join(lines))
+            sys.stdout.write(''.join(lines))
         else:
             with io.open(outputFilename, "w", encoding="utf-8") as f:
                 f.write(''.join(lines))

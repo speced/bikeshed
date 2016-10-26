@@ -1,9 +1,10 @@
 from collections import OrderedDict, Callable
 
+
 class DefaultOrderedDict(OrderedDict):
     def __init__(self, default_factory=None, *a, **kw):
         if (default_factory is not None and
-            not isinstance(default_factory, Callable)):
+                not isinstance(default_factory, Callable)):
             raise TypeError('first argument must be callable')
         OrderedDict.__init__(self, *a, **kw)
         self.default_factory = default_factory
@@ -37,6 +38,7 @@ class DefaultOrderedDict(OrderedDict):
         import copy
         return type(self)(self.default_factory,
                           copy.deepcopy(self.items()))
+
     def __repr__(self):
         return 'OrderedDefaultDict(%s, %s)' % (self.default_factory,
-                                        OrderedDict.__repr__(self))
+                                               OrderedDict.__repr__(self))

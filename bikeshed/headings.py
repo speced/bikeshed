@@ -4,6 +4,7 @@ from .messages import *
 from .htmlhelpers import *
 from .config import simplifyText
 
+
 def processHeadings(doc, scope="doc"):
     # scope arg can be "doc" or "all"
     # "doc" ignores things that are part of boilerplate
@@ -22,8 +23,9 @@ def processHeadings(doc, scope="doc"):
     addHeadingBonuses(doc, headings)
     for el in headings:
         addClass(el, 'settled')
-    if scope == "all" and doc.md.groupIsW3C:
+    if scope == "all" and doc.md.group in config.megaGroups['priv-sec']:
         checkPrivacySecurityHeadings(findAll(".heading", doc))
+
 
 def resetHeadings(doc, headings):
     for header in headings:
@@ -37,6 +39,7 @@ def resetHeadings(doc, headings):
         moveContents(content, header)
         appendChild(header, content)
 
+
 def addHeadingIds(doc, headings):
     neededIds = set()
     for header in headings:
@@ -49,40 +52,46 @@ def addHeadingIds(doc, headings):
             oldIDs = [h.strip() for h in header.get("oldids").strip().split(",")]
             for oldID in oldIDs:
                 appendChild(header, E.span({"id":oldID}))
+            removeAttr(header, "oldids")
     if len(neededIds) > 0:
         warn("You should manually provide IDs for your headings:\n{0}",
-            "\n".join("  "+outerHTML(el) for el in neededIds))
+             "\n".join("  " + outerHTML(el) for el in neededIds))
+
 
 def checkPrivacySecurityHeadings(headings):
     security = False
     privacy = False
     for header in headings:
-        text = simplifyText(textContent(find(".content", header)))
-        if text == "security-considerations":
+        text = textContent(find(".content", header)).lower()
+        if "security" in text and "considerations" in text:
             security = True
-        if text == "privacy-considerations":
+        if "privacy" in text and "considerations" in text:
             privacy = True
-        if text == "privacy-and-security-considerations" or text == "security-and-privacy-considerations":
-            security = True
-            privacy = True
+        if security and privacy:
+            # No need to look any further!
+            return
     if not security and not privacy:
-        warn("This specification has neither a 'Security Considerations' nor a 'Privacy Considerations' section. Please consider adding both.")
+        warn("This specification has neither a 'Security Considerations' nor a 'Privacy Considerations' section. Please consider adding both, see https://w3ctag.github.io/security-questionnaire/.")
     elif not security:
-        warn("This specification does not have a 'Security Considerations' section. Please consider adding one.")
+        warn("This specification does not have a 'Security Considerations' section. Please consider adding one, see https://w3ctag.github.io/security-questionnaire/.")
     elif not privacy:
-        warn("This specification does not have a 'Privacy Considerations' section. Please consider adding one.")
+        warn("This specification does not have a 'Privacy Considerations' section. Please consider adding one, see https://w3ctag.github.io/security-questionnaire/.")
+
 
 def addHeadingAlgorithms(doc, headings):
     for header in headings:
         if header.get('data-algorithm') == "":
             header.set('data-algorithm', textContent(header).strip())
 
+
 def determineHeadingLevels(doc, headings):
     headerLevel = [0,0,0,0,0]
+
     def incrementLevel(level):
-        headerLevel[level-2] += 1
-        for i in range(level-1, 5):
+        headerLevel[level - 2] += 1
+        for i in range(level - 1, 5):
             headerLevel[i] = 0
+
     def printLevel():
         return '.'.join(unicode(x) for x in headerLevel if x > 0)
 
@@ -106,6 +115,7 @@ def determineHeadingLevels(doc, headings):
 
         incrementLevel(level)
         header.set('data-level', printLevel())
+
 
 def addHeadingBonuses(doc, headings):
     for header in headings:

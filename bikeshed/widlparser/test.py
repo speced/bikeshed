@@ -34,18 +34,21 @@ def debugHook(type, value, tb):
 class Marker(object):
     def markupConstruct(self, text, construct):
         return ('<' + construct.idlType + '>', '</' + construct.idlType + '>')
-    
+
     def markupType(self, text, construct):
         return ('<TYPE for=' + construct.idlType + '>', '</TYPE>')
-    
+
     def markupTypeName(self, text, construct):
         return ('<TYPE-NAME for=' + construct.idlType + '>', '</TYPE-NAME>')
-    
+
     def markupName(self, text, construct):
         return ('<NAME for=' + construct.idlType + '>', '</NAME>')
 
     def markupKeyword(self, text, construct):
         return ('<KEYWORD for=' + construct.idlType + '>', '</KEYWORD>')
+
+    def markupEnumValue(self, text, construct):
+        return ('<ENUM-VALUE for=' + construct.idlType + '>', '</ENUM-VALUE>')
 
     def encode(self, text):
         return cgi.escape(text)
@@ -54,13 +57,13 @@ class Marker(object):
 class NullMarker(object):
     def __init__(self):
         self.text = u''
-    
+
     def markupConstruct(self, text, construct):
         return (None, None)
-    
+
     def markupType(self, text, type):
         return (None, None)
-    
+
     def markupTypeName(self, text, construct):
         return ('', '')
 
@@ -68,6 +71,9 @@ class NullMarker(object):
         return ('', '')
 
     def markupKeyword(self, text, construct):
+        return ('', '')
+
+    def markupEnumValue(self, text, construct):
         return ('', '')
 
     def encode(self, text):
@@ -90,7 +96,7 @@ def testDifference(input, output):
         print "DIFFERENT"
         inputLines = input.split('\n')
         outputLines = output.split('\n')
-        
+
         for inputLine, outputLine in itertools.izip_longest(inputLines, outputLines, fillvalue = ''):
             if (inputLine != outputLine):
                 print "<" + inputLine
@@ -101,7 +107,7 @@ def testDifference(input, output):
 if __name__ == "__main__":      # called from the command line
     sys.excepthook = debugHook
     parser = parser.Parser(ui=ui())
-    
+
     if (1 < len(sys.argv)):
         for fileName in sys.argv[1:]:
             print "Parsing: " + fileName
@@ -111,9 +117,9 @@ if __name__ == "__main__":      # called from the command line
             parser.parse(text)
             assert (text == unicode(parser))
         quit()
-    
-    
-    idl = u"""dictionary CSSFontFaceLoadEventInit : EventInit { sequence<CSSFontFaceRule> fontfaces = [ ]; }; 
+
+
+    idl = u"""dictionary CSSFontFaceLoadEventInit : EventInit { sequence<CSSFontFaceRule> fontfaces = [ ]; };
 interface Simple{
     serializer;
     serializer = { foo };
@@ -160,7 +166,7 @@ typedef   short    shorttype  = error this is;
    const double notANumber = NaN;
    const double invalid = - Infinity;
  Window   implements     WindowInterface  ; // more comment
-       
+
 enum   foo    {"one"  ,    "two",    }     ;
 enum foo { "one" };
 enum bar{"one","two","three",}; // and another
@@ -235,6 +241,28 @@ interface Int {
     attribute ArrayBuffer? value3;
 };
 
+namespace Namespace1 {
+    [One] unsigned long long method(short x);
+    [Two] unsigned long long method(short x, short y);
+};
+partial namespace Namespace2 {
+    [One] unsigned long long method(short x);
+    [Two] unsigned long long method(short x, short y);
+};
+
+interface System {
+  object createObject(DOMString _interface);
+  sequence<object> getObjects(DOMString interface);
+  getter DOMString (DOMString keyName);
+  DOMString? lookupPrefix(DOMString? namespace);
+};
+
+interface OptionalTest {
+  long methodWithOptionalDict(long one, (long or MyDictionary or object) optionalDict);    // should error
+  long methodWithOptionalDict(long one, MyDictionary optionalDict, optional long three);    // should error
+  long methodWithRequiredDict(long one, FooDict requiredDict);
+  long methodWithRequiredDict(long one, FooDict requiredDict, long three);
+};
 """
 #    idl = idl.replace(' ', '  ')
     print "IDL >>>\n" + idl + "\n<<<"
@@ -251,8 +279,8 @@ interface Int {
     print parser.markup(Marker())
 
     print "Complexity: " + unicode(parser.complexityFactor)
-    
-    
+
+
     for construct in parser.constructs:
         print unicode(construct.idlType) + u': ' + unicode(construct.normalName)
         for member in construct:
