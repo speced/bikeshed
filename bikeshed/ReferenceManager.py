@@ -735,7 +735,7 @@ def simplifyPossibleRefs(refs):
             for for_ in ref.for_:  # ref.for_ is a list
                 forVals[(ref.text, ref.type, ref.spec)].append(for_)
         else:
-            forVals[(ref.text, ref.type, ref.spec)].append(None)
+            forVals[(ref.text, ref.type, ref.spec)].append("/")
     retRefs = []
     for (text, type, spec), fors in forVals.items():
         if len(fors) >= 2:
