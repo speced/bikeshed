@@ -1213,8 +1213,9 @@ def classifyDfns(doc, dfns):
             else:
                 id = "{type}-{id}".format(type=dfnTypeToPrefix[dfnType], id=id)
             el.set('id', id)
-        # Set lt if it's not set
-        if el.get('data-lt') is None:
+        # Set lt if it's not set,
+        # and doing so won't mess with anything else.
+        if el.get('data-lt') is None and "|" not in primaryDfnText:
             el.set('data-lt', primaryDfnText)
         # Push export/noexport down to the definition
         if el.get('data-export') is None and el.get('data-noexport') is None:
