@@ -590,6 +590,7 @@ class Spec(object):
         boilerplate.addBikeshedBoilerplate(self)
         fixIntraDocumentReferences(self)
         fixInterDocumentReferences(self)
+        lint.lintBrokenLinks(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
