@@ -21,12 +21,7 @@ class BiblioEntry(object):
         self.url = None
         self.other = None
         for key, val in kwargs.items():
-            if key == "authors":
-                setattr(self, key, val)
-            elif key == "etAl":
-                self.etAl = val
-            else:
-                setattr(self, key, val)
+            setattr(self, key, val)
         if preferredURL == "snapshot":
             self.url = self.snapshot_url or self.current_url
         elif preferredURL == "current":
