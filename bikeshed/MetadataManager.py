@@ -38,6 +38,7 @@ class MetadataManager:
         # optional metadata
         self.advisementClass = "advisement"
         self.assertionClass = "assertion"
+        self.assumeExplicitFor = False
         self.atRisk = []
         self.audience = []
         self.blockElements = []
@@ -795,6 +796,7 @@ knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
     "Advisement Class": Metadata("Advisement Class", "advisementClass", joinValue, parseLiteral),
     "Assertion Class": Metadata("Assertion Class", "assertionClass", joinValue, parseLiteral),
+    "Assume Explicit For": Metadata("Assume Explicit For", "assumeExplicitFor", joinValue, parseBoolean),
     "At Risk": Metadata("At Risk", "atRisk", joinList, parseLiteralList),
     "Audience": Metadata("Audience", "audience", joinList, parseAudience),
     "Block Elements": Metadata("Block Elements", "blockElements", joinList, parseCommaSeparated),

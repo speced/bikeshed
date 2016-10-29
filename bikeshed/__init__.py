@@ -1365,6 +1365,8 @@ def processAutolinks(doc):
         linkFor = config.splitForValues(el.get('data-link-for'))
         if linkFor:
             linkFor = linkFor[0]
+        if not linkFor and doc.md.assumeExplicitFor:
+            linkFor = "/"
 
         # Status used to use ED/TR, so convert those if they appear,
         # and verify
