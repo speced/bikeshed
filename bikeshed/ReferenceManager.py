@@ -204,6 +204,14 @@ class ReferenceManager(object):
         # Local refs always get precedence, unless you manually specified a spec.
         if spec is None:
             localRefs = self.getLocalRef(linkType, text, linkFor, linkForHint, el)
+            # If the autolink was for-less, it found a for-full local link,
+            # but there was a for-less version in a foreign spec,
+            # emit a warning (unless it was surpressed).
+            if localRefs and linkFor is None and any(x.for_ for x in localRefs):
+                forlessRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor="/", status=status, statusHint=statusHint, excludeStatuses=["local"], el=el)
+                if forlessRefs:
+                    linkerror("Ambiguous for-less link, please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\n{0}", outerHTML(el), el=el)
+                    return None
             if len(localRefs) == 1:
                 return localRefs[0]
             elif len(localRefs) > 1:
@@ -230,6 +238,11 @@ class ReferenceManager(object):
 
         # Then anchor-block refs get preference
         blockRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el, status="anchor-block")
+        if blockRefs and linkFor is None and any(x.for_ for x in blockRefs):
+            forlessRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor="/", status=status, statusHint=statusHint, excludeStatuses=["local", "anchor-block"], el=el)
+            if forlessRefs:
+                linkerror("Ambiguous for-less link, please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\n{0}", outerHTML(el), el=el)
+                return None
         if len(blockRefs) == 1:
             return blockRefs[0]
         elif len(blockRefs) > 1:
@@ -433,14 +446,14 @@ class ReferenceManager(object):
 
         return bib
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, **kwargs):
-        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, exact=True)
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, excludeStatuses=[], export=None, ignoreObsoletes=False, **kwargs):
+        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, excludeStatuses, export, ignoreObsoletes, exact=True)
         if error:
-            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes)
+            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, excludeStatuses, export, ignoreObsoletes)
         else:
             return results, error
 
-    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, excludeStatuses=[], export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         def refsIterator(refs):
@@ -483,6 +496,11 @@ class ReferenceManager(object):
             refs = list(refsIterator(self.refs))
         if not refs:
             return refs, "text"
+
+        if excludeStatuses:
+            refs = [x for x in refs if x.status not in excludeStatuses]
+        if not refs:
+            return refs, "exclude-statuses"
 
         if linkType:
             if linkType in config.dfnTypes:
