@@ -36,8 +36,8 @@ class MetadataManager:
         self.rawStatus = None
 
         # optional metadata
-        self.assertionClass = "assertion"
         self.advisementClass = "advisement"
+        self.assertionClass = "assertion"
         self.atRisk = []
         self.audience = []
         self.blockElements = []
