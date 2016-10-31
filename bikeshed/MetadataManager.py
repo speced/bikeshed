@@ -67,6 +67,7 @@ class MetadataManager:
         self.mailingList = None
         self.mailingListArchives = None
         self.markupShorthands = config.BoolSet(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
+        self.maxToCDepth = float('inf')
         self.noEditor = False
         self.noteClass = "note"
         self.opaqueElements = ["pre", "xmp", "script", "style"]
@@ -621,6 +622,21 @@ def parseEditorTerm(key, val, lineNum):
         return {"singular": "Editor", "plural": "Editors"}
 
 
+def parseMaxToCDepth(key, val, lineNum):
+    if val.lower() == "none":
+        return float('inf')
+    try:
+        v = int(val)
+    except ValueError, e:
+        die("Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.", val, lineNum=lineNum)
+        return float('inf')
+    if not (1 <= v <= 5):
+        die("Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.", val, lineNum=lineNum)
+        return float('inf')
+    return v
+
+
+
 def parse(lines, doc):
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
@@ -792,6 +808,7 @@ def parseLiteral(k, v, l):
 def parseLiteralList(k, v, l):
     return [v]
 
+
 knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
     "Advisement Class": Metadata("Advisement Class", "advisementClass", joinValue, parseLiteral),
@@ -827,6 +844,7 @@ knownKeys = {
     "Mailing List Archives": Metadata("Mailing List Archives", "mailingListArchives", joinValue, parseLiteral),
     "Mailing List": Metadata("Mailing List", "mailingList", joinValue, parseLiteral),
     "Markup Shorthands": Metadata("Markup Shorthands", "markupShorthands", joinBoolSet, parseMarkupShorthands),
+    "Max Toc Depth": Metadata("Max ToC Depth", "maxToCLevel", joinValue, parseMaxToCDepth),
     "No Editor": Metadata("No Editor", "noEditor", joinValue, parseBoolean),
     "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),
     "Opaque Elements": Metadata("Opaque Elements", "opaqueElements", joinList, parseCommaSeparated),

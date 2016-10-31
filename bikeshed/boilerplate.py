@@ -548,8 +548,11 @@ def addTOCSection(doc):
         if hasClass(header, "no-toc"):
             # Hit a no-toc, suppress the entire section.
             addToTOC = False
-        if container is None:
+        elif container is None:
             addToTOC = False
+        elif (level-1) > doc.md.maxToCDepth:
+            addToTOC = False
+
         if addToTOC:
             li = appendChild(container,
                              E.li(
