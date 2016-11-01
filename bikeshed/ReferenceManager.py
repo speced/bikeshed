@@ -208,7 +208,7 @@ class ReferenceManager(object):
             # but there was a for-less version in a foreign spec,
             # emit a warning (unless it was surpressed).
             if localRefs and linkFor is None and any(x.for_ for x in localRefs):
-                forlessRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor="/", status=status, statusHint=statusHint, excludeStatuses=["local"], el=el)
+                forlessRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor="/", status=status, statusHint=statusHint, excludeStatuses=["local"], export=True, el=el)
                 if forlessRefs:
                     linkerror("Ambiguous for-less link, please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\n{0}", outerHTML(el), el=el)
                     return None
@@ -239,7 +239,7 @@ class ReferenceManager(object):
         # Then anchor-block refs get preference
         blockRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el, status="anchor-block")
         if blockRefs and linkFor is None and any(x.for_ for x in blockRefs):
-            forlessRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor="/", status=status, statusHint=statusHint, excludeStatuses=["local", "anchor-block"], el=el)
+            forlessRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor="/", status=status, statusHint=statusHint, excludeStatuses=["local", "anchor-block"], export=True, el=el)
             if forlessRefs:
                 linkerror("Ambiguous for-less link, please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\n{0}", outerHTML(el), el=el)
                 return None
