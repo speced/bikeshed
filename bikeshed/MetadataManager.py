@@ -805,6 +805,10 @@ def parseLiteral(k, v, l):
     return v
 
 
+def parseLiteralCaseless(k, v, l):
+    return v.lower()
+
+
 def parseLiteralList(k, v, l):
     return [v]
 
@@ -852,7 +856,7 @@ knownKeys = {
     "Previous Version": Metadata("Previous Version", "previousVersions", joinList, parseLiteralList),
     "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
-    "Shortname": Metadata("Shortname", "shortname", joinValue, parseLiteral),
+    "Shortname": Metadata("Shortname", "shortname", joinValue, parseLiteralCaseless),
     "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
     "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),
     "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),
