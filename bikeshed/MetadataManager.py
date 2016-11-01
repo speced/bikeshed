@@ -844,7 +844,7 @@ knownKeys = {
     "Mailing List Archives": Metadata("Mailing List Archives", "mailingListArchives", joinValue, parseLiteral),
     "Mailing List": Metadata("Mailing List", "mailingList", joinValue, parseLiteral),
     "Markup Shorthands": Metadata("Markup Shorthands", "markupShorthands", joinBoolSet, parseMarkupShorthands),
-    "Max Toc Depth": Metadata("Max ToC Depth", "maxToCLevel", joinValue, parseMaxToCDepth),
+    "Max Toc Depth": Metadata("Max ToC Depth", "maxToCDepth", joinValue, parseMaxToCDepth),
     "No Editor": Metadata("No Editor", "noEditor", joinValue, parseBoolean),
     "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),
     "Opaque Elements": Metadata("Opaque Elements", "opaqueElements", joinList, parseCommaSeparated),
