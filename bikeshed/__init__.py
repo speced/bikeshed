@@ -1150,6 +1150,9 @@ def classifyDfns(doc, dfns):
         if primaryDfnText is None:
             die("Dfn has no linking text:\n{0}", outerHTML(el), el=el)
             continue
+        # Check for invalid fors, as it's usually some misnesting.
+        if dfnFor and dfnType in config.typesNotUsingFor:
+            die("'{0}' definitions don't use a 'for' attribute, but this one claims it's for '{1}' (perhaps inherited from an ancestor). This is probably a markup error.\n{2}", dfnType, dfnFor, outerHTML(el), el=el)
         # Push the dfn type down to the <dfn> itself.
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', dfnType)
