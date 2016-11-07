@@ -393,8 +393,89 @@ The `echidna` command hooks into the W3C's Echidna auto-publishing system,
 letting you publish W3C specs from the command-line,
 rather than having to go thru a staff contact.
 
-Issue: Fill in details.
+Note: Currently, only Working Drafts (**not** including FPWD) can be published via Echidna.
 
+It's invoked similarly to `bikeshed spec`,
+with three required flags:
+
+: `--u USERNAME`
+:: Your W3C username
+
+: `--p PASSWORD`
+:: Your W3C password
+
+: `--d DECISION_URL`
+:: A link to a publicly-visible message approving the publication of this draft.
+
+After the flags,
+you can optionally specify the input file path,
+just like for `bikeshed spec`;
+if omitted,
+it selects a file automatically in the same way.
+
+Bikeshed then builds the spec normally,
+performs a little bit of fixup for common issues that PubRules complains about,
+and submits the spec to Echidna.
+It will print out a URL for you to check on the progress of your publication;
+it should complete in a few seconds.
+
+Most likely you'll have some PubRules errors when you check your progress;
+fix those
+(ask in irc.w3.org#pub for help if needed)
+then just run `bikeshed echidna` again.
+
+### Echidna Hooks ### {#echidna-hooks}
+
+Bikeshed's default publication behavior is usually sufficient,
+but if you need to customize it in some way,
+there are a few hooks you can use
+(assuming you can write Python).
+In an include file named `bs-extensions.include`,
+provide an implementation of the following methods
+(check the default version of this file for the default implementations,
+for the methods you don't want to change):
+
+: `BSPrepTR(doc)`
+:: This method is called after processing is done,
+	when the document is ready to be packed up and sent to Echidna.
+	Here, you can perform whatever final post-processing is required.
+
+	<div class=example>
+		For example, the CSSWG EDs link to a stylesheet
+		in the parent directory of the server they're stored on.
+		In their `BSPrepTR()`,
+		they search for the link to that stylesheet,
+		and update it to point to the current directory instead.
+	</div>
+
+: `BSPublishAdditionalFiles(files)`
+:: This method allows you to specify what files should be included in the publishing bundle.
+	It must return an array of additional files/folders;
+	each entry must either be a string,
+	referring to a file/folder in the spec's directory or subdirectories,
+	or a tuple of 2 strings,
+	the first of which points to a file outside the spec's directory,
+	and the second of which provides the path the file should have within the spec's directory.
+
+	The `files` value provides the default values,
+	which you probably want to just extend,
+	rather than fully replace.
+	It defaults to `["images", "diagrams", "examples"]`,
+	indicating that those folders,
+	if present,
+	will be included.
+
+	<div class=example>
+		For example, as stated in the example for `BSPrepTR()`,
+		the CSSWG needs to include its stylesheet in with its specs.
+		To do so,
+		it just needs to add the entry `["../default.css", "default.css"]`
+		to the `files` array,
+		indicating that Bikeshed should grab the `default.css` file from the parent directory,
+		and put it in the spec's directory
+		(in the bundle)
+		with the same name.
+	</div>
 
 `bikeshed update` {#cli-update}
 -------------------------------

@@ -1473,7 +1473,11 @@ Parts of this work may be from another specification document.  If so, those par
       <li><a href="#cli-spec"><span class="secno">2.2</span> <span class="content"><code>bikeshed spec</code></span></a>
       <li><a href="#cli-watch"><span class="secno">2.3</span> <span class="content"><code>bikeshed watch</code></span></a>
       <li><a href="#cli-template"><span class="secno">2.4</span> <span class="content"><code>bikeshed template</code></span></a>
-      <li><a href="#cli-echidna"><span class="secno">2.5</span> <span class="content"><code>bikeshed echidna</code></span></a>
+      <li>
+       <a href="#cli-echidna"><span class="secno">2.5</span> <span class="content"><code>bikeshed echidna</code></span></a>
+       <ol class="toc">
+        <li><a href="#echidna-hooks"><span class="secno">2.5.1</span> <span class="content">Echidna Hooks</span></a>
+       </ol>
       <li><a href="#cli-update"><span class="secno">2.6</span> <span class="content"><code>bikeshed update</code></span></a>
       <li><a href="#cli-refs"><span class="secno">2.7</span> <span class="content"><code>bikeshed refs</code></span></a>
       <li><a href="#cli-source"><span class="secno">2.8</span> <span class="content"><code>bikeshed source</code></span></a>
@@ -1833,7 +1837,84 @@ it should be used like:</p>
    <p>The <code>echidna</code> command hooks into the W3C’s Echidna auto-publishing system,
 letting you publish W3C specs from the command-line,
 rather than having to go thru a staff contact.</p>
-   <p class="issue" id="issue-5b98d3ab"><a class="self-link" href="#issue-5b98d3ab"></a> Fill in details.</p>
+   <p class="note" role="note">Note: Currently, only Working Drafts (<strong>not</strong> including FPWD) can be published via Echidna.</p>
+   <p>It’s invoked similarly to <code>bikeshed spec</code>,
+with three required flags:</p>
+   <dl>
+    <dt data-md="">
+     <p><code>--u USERNAME</code></p>
+    <dd data-md="">
+     <p>Your W3C username</p>
+    <dt data-md="">
+     <p><code>--p PASSWORD</code></p>
+    <dd data-md="">
+     <p>Your W3C password</p>
+    <dt data-md="">
+     <p><code>--d DECISION_URL</code></p>
+    <dd data-md="">
+     <p>A link to a publicly-visible message approving the publication of this draft.</p>
+   </dl>
+   <p>After the flags,
+you can optionally specify the input file path,
+just like for <code>bikeshed spec</code>;
+if omitted,
+it selects a file automatically in the same way.</p>
+   <p>Bikeshed then builds the spec normally,
+performs a little bit of fixup for common issues that PubRules complains about,
+and submits the spec to Echidna.
+It will print out a URL for you to check on the progress of your publication;
+it should complete in a few seconds.</p>
+   <p>Most likely you’ll have some PubRules errors when you check your progress;
+fix those
+(ask in irc.w3.org#pub for help if needed)
+then just run <code>bikeshed echidna</code> again.</p>
+   <h4 class="heading settled" data-level="2.5.1" id="echidna-hooks"><span class="secno">2.5.1. </span><span class="content">Echidna Hooks</span><a class="self-link" href="#echidna-hooks"></a></h4>
+   <p>Bikeshed’s default publication behavior is usually sufficient,
+but if you need to customize it in some way,
+there are a few hooks you can use
+(assuming you can write Python).
+In an include file named <code>bs-extensions.include</code>,
+provide an implementation of the following methods
+(check the default version of this file for the default implementations,
+for the methods you don’t want to change):</p>
+   <dl>
+    <dt data-md="">
+     <p><code>BSPrepTR(doc)</code></p>
+    <dd data-md="">
+     <p>This method is called after processing is done,
+when the document is ready to be packed up and sent to Echidna.
+Here, you can perform whatever final post-processing is required.</p>
+     <div class="example" id="example-4cae679d"><a class="self-link" href="#example-4cae679d"></a> For example, the CSSWG EDs link to a stylesheet
+	in the parent directory of the server they’re stored on.
+	In their <code>BSPrepTR()</code>,
+	they search for the link to that stylesheet,
+	and update it to point to the current directory instead. </div>
+    <dt data-md="">
+     <p><code>BSPublishAdditionalFiles(files)</code></p>
+    <dd data-md="">
+     <p>This method allows you to specify what files should be included in the publishing bundle.
+It must return an array of additional files/folders;
+each entry must either be a string,
+referring to a file/folder in the spec’s directory or subdirectories,
+or a tuple of 2 strings,
+the first of which points to a file outside the spec’s directory,
+and the second of which provides the path the file should have within the spec’s directory.</p>
+     <p>The <code>files</code> value provides the default values,
+which you probably want to just extend,
+rather than fully replace.
+It defaults to <code>["images", "diagrams", "examples"]</code>,
+indicating that those folders,
+if present,
+will be included.</p>
+     <div class="example" id="example-148d8fd4"><a class="self-link" href="#example-148d8fd4"></a> For example, as stated in the example for <code>BSPrepTR()</code>,
+	the CSSWG needs to include its stylesheet in with its specs.
+	To do so,
+	it just needs to add the entry <code>["../default.css", "default.css"]</code> to the <code>files</code> array,
+	indicating that Bikeshed should grab the <code>default.css</code> file from the parent directory,
+	and put it in the spec’s directory
+	(in the bundle)
+	with the same name. </div>
+   </dl>
    <h3 class="heading settled" data-level="2.6" id="cli-update"><span class="secno">2.6. </span><span class="content"><code>bikeshed update</code></span><a class="self-link" href="#cli-update"></a></h3>
    <p>The <code>update</code> command updates Bikeshed’s datafiles,
 which it uses for autolinking and similar things.
@@ -4067,7 +4148,6 @@ in other words, empty entries get dropped, so you can put a final semicolon at t
   </dl>
   <h2 class="no-num no-ref heading settled" id="issues-index"><span class="content">Issues Index</span><a class="self-link" href="#issues-index"></a></h2>
   <div style="counter-reset:issue">
-   <div class="issue"> Fill in details.<a href="#issue-5b98d3ab"> ↵ </a></div>
    <div class="issue"> Define the issues-list format.
 The <code>-t</code> output is already more than enough to actually work with,
 but it would still be good to describe it more fully.<a href="#issue-dc7501ac"> ↵ </a></div>
