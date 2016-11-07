@@ -846,7 +846,8 @@ def canonicalizeShortcuts(doc):
         "dict-member-info":"data-dict-member-info",
         "lt":"data-lt",
         "local-lt":"data-local-lt",
-        "algorithm":"data-algorithm"
+        "algorithm":"data-algorithm",
+        "ignore":"data-var-ignore"
     }
     for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys()), doc):
         for attr, fixedAttr in attrFixup.items():
@@ -906,7 +907,7 @@ def checkVarHygiene(doc):
 
     # Look for vars that only show up once. These are probably typos.
     singularVars = []
-    varCounts = Counter((foldWhitespace(textContent(el)), nearestAlgo(el)) for el in findAll("var", doc))
+    varCounts = Counter((foldWhitespace(textContent(el)), nearestAlgo(el)) for el in findAll("var", doc) if el.get("data-var-ignore") is None)
     for var,count in varCounts.items():
         if count == 1 and var[0].lower() not in doc.md.ignoredVars:
             singularVars.append(var)
