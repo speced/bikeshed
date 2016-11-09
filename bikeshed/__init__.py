@@ -918,7 +918,7 @@ def checkVarHygiene(doc):
                 printVars += "  '{0}', in algorithm '{1}'\n".format(var, algo)
             else:
                 printVars += "  '{0}'\n".format(var)
-        warn("The following <var>s were only used once in the document:\n{0}If these are not typos, please add them to the 'Ignored Vars' metadata.", printVars)
+        warn("The following <var>s were only used once in the document:\n{0}If these are not typos, please add an ignore='' attribute to the <var>.", printVars)
 
     # Look for algorithms that show up twice; these are errors.
     for algo, count in Counter(el.get('data-algorithm') for el in findAll("[data-algorithm]", doc)).items():
