@@ -529,12 +529,14 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                                 # "USVString" TypeSuffix |
                                 # identifier [TypeSuffix] | "sequence" "<" Type ">" [Null] | "object" [TypeSuffix] |
                                 # "Date" [TypeSuffix] | "RegExp" [TypeSuffix] | "Error" TypeSuffix |
-                                # "DOMException" TypeSuffix | "Promise" "<" ReturnType ">" [Null] | BufferRelatedType [Nulls]
-                                # "FrozenArray" "<" Type ">" [Null]
+                                # "DOMException" TypeSuffix | "Promise" "<" ReturnType ">" [Null] | BufferRelatedType [Nulls] |
+                                # "FrozenArray" "<" Type ">" [Null] | "record" "<" StringType "," Type ">"
 
     BufferRelatedTypes = frozenset(['ArrayBuffer', 'DataView', 'Int8Array', 'Int16Array', 'Int32Array',
                                     'Uint8Array', 'Uint16Array', 'Uint32Array', 'Uint8ClampedArray',
                                     'Float32Array', 'Float64Array'])
+
+    StringTypes = frozenset(['ByteString', 'DOMString', 'USVString'])
 
     @classmethod
     def peek(cls, tokens):
@@ -560,12 +562,21 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
         elif (token and token.isSymbol(cls.BufferRelatedTypes)):
             Symbol.peek(tokens, '?')
             return tokens.popPosition(True)
+        elif (token and token.isSymbol('record')):
+            if (Symbol.peek(tokens, '<')):
+                if (Symbol.peek(tokens, cls.StringTypes)):
+                    if (Symbol.peek(tokens, ',')):
+                        if (Type.peek(tokens)):
+                            if (Symbol.peek(tokens, '>')):
+                                Symbol.peek(tokens, '?')
+                                return tokens.popPosition(True)
         return tokens.popPosition(False)
 
     def __init__(self, tokens):
         Production.__init__(self, tokens)
         self.sequence = None
         self.promise = None
+        self.record = None
         self._openType = None
         self._closeType = None
         self.null = False
@@ -595,6 +606,14 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             elif (token.isSymbol(self.BufferRelatedTypes)):
                 self.type = Symbol(tokens, None, False)
                 self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
+            elif (token.isSymbol('record')):
+                self.record = Symbol(tokens)
+                self._openType = Symbol(tokens, '<')
+                self.keyType = Symbol(tokens)
+                self._comma = Symbol(tokens, ',')
+                self.type = Type(tokens)
+                self._closeType = Symbol(tokens, '>', False)
+                self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
             else:
                 self.type = Symbol(tokens, None, False)  # "ByteString" | "DOMString" | "USVString" | "object" | "Date" | "RegExp"
                 self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
@@ -607,6 +626,10 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
         if (self.promise):
             output = unicode(self.promise) + unicode(self._openType) + unicode(self.type) + unicode(self._closeType)
             return output + (unicode(self.null) if (self.null) else '')
+        if (self.record):
+            output = unicode(self.record) + unicode(self._openType) + unicode(self.keyType) + unicode(self._comma) + unicode(self.type) + unicode(self._closeType)
+            return output + (unicode(self.null) if (self.null) else '')
+
         output = unicode(self.type)
         output = output + (unicode(self.null) if (self.null) else '')
         return output + (unicode(self.suffix) if (self.suffix) else '')
@@ -626,6 +649,15 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             generator.addText(self._closeType)
             generator.addText(self.null)
             return self
+        if (self.record):
+            self.record.markup(generator)
+            generator.addText(self._openType)
+            self.keyType.markup(generator)
+            generator.addText(self._comma)
+            self.type.markup(generator)
+            generator.addText(self._closeType)
+            generator.addText(self.null)
+            return self
         if (isinstance(self.type, basestring)):
             generator.addTypeName(self.type)
             if (self.suffix):
@@ -638,7 +670,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
         return self
 
     def __repr__(self):
-        output = '[NonAnyType: ' + ('[sequence] ' if (self.sequence) else '') + ('[Promise] ' if (self.promise) else '')
+        output = '[NonAnyType: ' + ('[sequence] ' if (self.sequence) else '') + ('[Promise] ' if (self.promise) else '') + ('[record] [StringType: ' + repr(self.keyType) + '] ' if (self.record) else '')
         output += repr(self.type) + ('[null]' if (self.null) else '')
         return output + (repr(self.suffix) if (self.suffix) else '') + ']'
 

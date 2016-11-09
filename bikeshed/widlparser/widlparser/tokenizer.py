@@ -56,7 +56,7 @@ class Tokenizer(object):
         'Date', 'deleter', 'dictionary', 'DOMString', 'double', 'enum', 'Error', 'exception', 'false', 'float',
         'Float32Array', 'Float64Array', 'FrozenArray', 'getter', 'implements', 'Infinity', '-Infinity', 'inherit', 'Int8Array',
         'Int16Array', 'Int32Array', 'interface', 'iterable', 'legacycaller', 'legacyiterable', 'long', 'maplike',
-        'namespace', 'NaN', 'null', 'object', 'octet', 'optional', 'or', 'partial', 'Promise', 'readonly', 'RegExp', 'required',
+        'namespace', 'NaN', 'null', 'object', 'octet', 'optional', 'or', 'partial', 'Promise', 'readonly', 'record', 'RegExp', 'required',
         'sequence', 'serializer', 'setlike', 'setter', 'short', 'static', 'stringifier', 'true', 'typedef',
         'Uint8Array', 'Uint16Array', 'Uint32Array', 'Uint8ClampedArray', 'unrestricted', 'unsigned', 'USVString',
         'void'))
