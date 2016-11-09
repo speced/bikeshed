@@ -43,6 +43,7 @@ class MetadataManager:
         self.audience = []
         self.blockElements = []
         self.boilerplate = config.BoolSet(default=True)
+        self.canIUseURLs = []
         self.complainAbout = config.BoolSet()
         self.customTextMacros = []
         self.date = datetime.utcnow().date()
@@ -636,7 +637,6 @@ def parseMaxToCDepth(key, val, lineNum):
     return v
 
 
-
 def parse(lines, doc):
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
@@ -822,6 +822,7 @@ knownKeys = {
     "Audience": Metadata("Audience", "audience", joinList, parseAudience),
     "Block Elements": Metadata("Block Elements", "blockElements", joinList, parseCommaSeparated),
     "Boilerplate": Metadata("Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate),
+    "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joinList, parseLiteralList),
     "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
     "Date": Metadata("Date", "date", joinValue, parseDate),
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
