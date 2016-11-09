@@ -707,8 +707,6 @@ There are several additional optional keys:
 	* <dfn>Group</dfn> must contain the name of the group the spec is being generated for.  This is used by the boilerplate generation to select the correct file.  If omitted, it defaults to a generic set of boilerplate.
 	* <dfn>Status Text</dfn> allows adding an additional customized sentence that can be used in the document status section.
 	* <dfn>Ignored Terms</dfn> accepts a comma-separated list of terms and makes Bikeshed not emit warnings or errors when attempting to autolink those terms.  Use this to quiet spurious preprocessor warnings caused by you inventing terms (for example, the Variables spec invents custom properties like 'var-foo'), or as a temporary patch when the spec you want to link to doesn't set up its definitions correctly.
-	* <dfn>Ignored Vars</dfn> accepts a comma-separated list of variable names, and makes Bikeshed not emit warnings or errors about them.  Use this to quiet spurious warnings about vars you only use a single time in the document.
-	* <dfn>Link Defaults</dfn> lets you specify a default spec for particular autolinks to link to.  The value is a comma-separated list of entries, where each entry is a versioned spec shortname, followed by a parenthesized link type, followed by a "/"-separated list of link phrases. For example, `Link Defaults: html (dfn) allowed to show a popup/in parallel`
 	* <dfn>Date</dfn> must contain a date in YYYY-MM-DD format, which is used instead of today's date for all the date-related stuff in the spec.
 	* <dfn>Deadline</dfn> is also a YYYY-MM-DD date, which is used for things like the LCWD Status section, to indicate deadlines.
 	* <dfn>Test Suite</dfn> must contain a link to the test suite nightly cover page (like <code>http://test.csswg.org/suites/css3-flexbox/nightly-unstable</code>).
@@ -730,7 +728,6 @@ There are several additional optional keys:
 		or just turn off the GitHub entry specifically with `Boilerplate: repository-issue-tracking off`.
 	* <dfn>Issue Tracker Template</dfn> specifies a url template used to point [remote issues](#remote-issues) at your issue tracker of choice. It takes a url, with `{0}` in the place where you want the remote identifier to go.
 	* <dfn>Translation</dfn> indicates a translation of the document. At minimum it consists of a language code (BCP47 format) and a url. Optionally, it can contain comma-separated `name [name-in-spec-language]` and `native-name [name-in-translation-language]`, but if Bikeshed knows about that language, these will be filled in for you.  (If Bikeshed doesn't know about a given language, let me know what it's name is in English and itself!)
-	* <dfn>Use &lt;i> Autolinks</dfn> turns on legacy support for using <{i}> elements as "dfn" autolinks.  It takes a <a>boolish</a> value.  (This only exists for legacy purposes; do not use in new documents. Instead, just use the <{a}> element like you're supposed to.)
 	* <dfn>No Editor</dfn> lets you omit the `Editor` metadata without an error. It takes a <a>boolish</a> value.  This shouldn't generally be used; even if your organization doesn't privilege editors in any way, putting the organization itself in the `Editor` field meets the intent while still producing useful information for readers of the spec.
 	* <dfn>Editor Term</dfn> is a pair of comma-separated terms giving the singular and plural terms to refer to editors with, if you want something other than the default "Editor(s)".
 	* <dfn>Default Biblio Status</dfn> takes the values "current" or "dated", and selects which URL you want to default to for bibliography entries that have both "current" and "dated" URLs. (You can also specify this per-biblio entry.)
@@ -811,6 +808,36 @@ by prefixing the key with `!`,
 like `!Issue Tracking: in spec`.
 Any custom keys are collected together and formatted as entries in the spec's boilerplate header <{dl}>.
 Specifying a custom key multiple times will put all the values as <{dd}>s under a single <{dt}> for the key.
+
+Some of the metadata keys are *deprecated*;
+you shouldn't use them,
+but just in case you run into them in the wild,
+they're documented here for understanding.
+Each one recommends what you should be using instead.
+
+<ul dfn-for=metadata>
+	* <dfn>Use &lt;i> Autolinks</dfn> turns on legacy support for using <{i}> elements as "dfn" autolinks.
+		It takes a <a>boolish</a> value.
+
+		Instead of using this,
+		just use the <{a}> element to autolink, as usual.
+	* <dfn>Link Defaults</dfn> lets you specify a default spec for particular autolinks to link to.
+		The value is a comma-separated list of entries,
+		where each entry is a versioned spec shortname,
+		followed by a parenthesized link type,
+		followed by a "/"-separated list of link phrases.
+		For example, `Link Defaults: html (dfn) allowed to show a popup/in parallel`.
+
+		Instead of using this,
+		use a `<pre class=link-defaults>` block,
+		as the error message suggests when this is necessary.
+	* <dfn>Ignored Vars</dfn> accepts a comma-separated list of variable names,
+		and makes Bikeshed not emit warnings or errors about them being used only once in the document/algorithm.
+
+		Instead of using this,
+		put an `ignore` attribute on the <{var}> in question.
+</ul>
+
 
 Default Metadata {#default-metadata}
 ------------------------------------
@@ -991,8 +1018,9 @@ If you use a var only once,
 there's a good chance it's actually a typo.
 Bikeshed will emit a warning if it finds any vars used only once in an algorithm.
 If this singular usage is correct,
-you can instruct Bikeshed to ignore the error by listing it in the `Ignored Vars` metadata,
-or by adding an `ignore` attribute to the <{var}> itself.
+you can instruct Bikeshed to ignore the error by adding an `ignore` attribute to the <{var}> itself.
+(There's no way to do this with the `|foo|` syntax;
+you have to convert it back to an actual <{var}> element.)
 
 
 <{pre}> whitespace stripping {#pre-whitespace-stripping}
@@ -1677,8 +1705,8 @@ There are three things you might have to do to fix these:
 3. If multiple specs define the same term, you may need to declare which spec you're referring to.
     (The processor is smart enough to automatically figure out which one you probably want in many cases.)
     Just add a `spec` attribute with the spec's shortname to either the link or a container.
-    This can also be specified in the spec's [metadata](#metadata) with "Link Defaults",
-    which applies document-wide.
+    This can also be specified document-wide,
+    as described in [[#link-defaults]].
     (There is no shorthand syntax for specifying this; if you need to add this to a shorthand autolink, you must first convert it into an explicit <{a}> element.)
 
 As a final note, the autolinking algorithm will link differently based on whether the spec being processed is a "current" (up-to-date) or "dated" (snapshot) draft.
@@ -1718,14 +1746,9 @@ and Bikeshed can't automatically tell which one you want,
 it'll emit a warning asking you to specify more explicitly.
 You can do this per-link,
 but you typically want to make the same choice every time the term is autolinked;
-this can be done by adding <a>Link Defaults</a> metadata.
-
-You can either add a <a>Link Defaults</a> metadata line to your <code>&lt;pre class=metadata></code>,
-as specified in [[#metadata]],
-or add a `<pre class='link-defaults'>` block,
+this can be done by adding a `<pre class='link-defaults'>` block,
 written in the [InfoTree](#infotree) format.
-For the latter,
-each piece of info must have a `spec`, `type`, and `text` line,
+Each piece of info must have a `spec`, `type`, and `text` line,
 and optionally a `for` line if necessary to further disambiguate.
 
 Sometimes this is too fine-grained,
