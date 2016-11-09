@@ -246,7 +246,7 @@ def main():
         else:
             rm = ReferenceManager()
             rm.initializeRefs()
-        refs,_ = list(rm.queryRefs(text=unicode(options.text, encoding="utf-8"), linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
+        refs = rm.queryAllRefs(text=unicode(options.text, encoding="utf-8"), linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact)
         p(config.printjson(refs))
     elif options.subparserName == "issues-list":
         from . import issuelist as il
@@ -1428,15 +1428,18 @@ def decorateAutolink(doc, el, linkType, linkText):
     # Add additional effects to some autolinks.
     if linkType == "type":
         # Get all the values that the type expands to, add it as a title.
+        titleText = None
         if linkText in doc.typeExpansions:
             titleText = doc.typeExpansions[linkText]
-            error = False
         else:
-            refs, error = doc.refs.queryRefs(linkFor=linkText)
-            if not error:
+            r1,_ = doc.refs.localRefs.queryRefs(linkFor=linkText)
+            r2,_ = doc.refs.anchorBlockRefs.queryRefs(linkFor=linkText)
+            r3,_ = doc.refs.foreignRefs.queryRefs(linkFor=linkText)
+            refs = r1 + r2 + r3
+            if refs:
                 titleText = "Expands to: " + ' | '.join(ref.text for ref in refs)
                 doc.typeExpansions[linkText] = titleText
-        if not error:
+        if titleText:
             el.set('title', titleText)
 
 
