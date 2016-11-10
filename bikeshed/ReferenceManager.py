@@ -13,7 +13,10 @@ from .messages import *
 from .htmlhelpers import *
 
 class RefSource(object):
-    def __init__(self, specs=None, ignored=None, replaced=None):
+    def __init__(self, source, specs=None, ignored=None, replaced=None):
+        # String identifying which refsource this is.
+        self.source = source
+
         # Dict of {linking text => [anchor data]}
         self.refs = defaultdict(list)
 
@@ -27,9 +30,9 @@ class RefSource(object):
         self.ignoredSpecs = set() if ignored is None else ignored
         self.replacedSpecs = set() if replaced is None else replaced
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, excludeStatuses=[], export=None, ignoreObsoletes=False, **kwargs):
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, excludeStatuses=[], export=None, ignoreObsoletes=False, exact=False, **kwargs):
         results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, excludeStatuses, export, ignoreObsoletes, exact=True)
-        if error:
+        if error and not exact:
             return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, excludeStatuses, export, ignoreObsoletes)
         else:
             return results, error
@@ -231,9 +234,9 @@ class ReferenceManager(object):
         self.headings = dict()
         self.status = specStatus
 
-        self.localRefs = RefSource()
-        self.anchorBlockRefs = RefSource()
-        self.foreignRefs = RefSource(specs=self.specs, ignored=self.ignoredSpecs, replaced=self.replacedSpecs)
+        self.localRefs = RefSource("local")
+        self.anchorBlockRefs = RefSource("anchor-block")
+        self.foreignRefs = RefSource("foreign", specs=self.specs, ignored=self.ignoredSpecs, replaced=self.replacedSpecs)
 
     def initializeRefs(self, doc=None):
         # Load up the xref data
@@ -377,7 +380,7 @@ class ReferenceManager(object):
         return r1+r2+r3
 
     def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None, exact=False):
-        return self.localRefs._queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]
+        return self.localRefs.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]
 
     def getRef(self, linkType, text, spec=None, status=None, statusHint=None, linkFor=None, linkForHint=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a reference or None
