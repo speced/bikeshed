@@ -1677,22 +1677,6 @@ class DebugMarker(object):
         return ('<ENUM-VALUE for=' + construct.name + '>', '</ENUM-VALUE>')
 
 
-class HighlightMarker(object):
-    # Just applies highlighting classes to IDL stuff.
-
-    def markupTypeName(self, text, construct):
-        return ('<span class=n>', '</span>')
-
-    def markupName(self, text, construct):
-        return ('<span class=nv>', '</span>')
-
-    def markupKeyword(self, text, construct):
-        return ('<span class=kt>', '</span>')
-
-    def markupEnumValue(self, text, construct):
-        return ('<span class=s>', '</span>')
-
-
 class IDLMarker(object):
     def markupConstruct(self, text, construct):
         # Fires for every 'construct' in the WebIDL.

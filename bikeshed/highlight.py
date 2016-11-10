@@ -5,8 +5,29 @@ from . import config
 from . import lexers
 from .messages import *
 from .htmlhelpers import *
+from .widlparser.widlparser import parser
 
 ColoredText = collections.namedtuple('ColoredText', ['text', 'color'])
+
+class IDLUI(object):
+    def warn(self, msg):
+        die("{0}", msg.rstrip())
+
+
+class HighlightMarker(object):
+    # Just applies highlighting classes to IDL stuff.
+
+    def markupTypeName(self, text, construct):
+        return ('<span class=n>', '</span>')
+
+    def markupName(self, text, construct):
+        return ('<span class=nv>', '</span>')
+
+    def markupKeyword(self, text, construct):
+        return ('<span class=kt>', '</span>')
+
+    def markupEnumValue(self, text, construct):
+        return ('<span class=s>', '</span>')
 
 def addSyntaxHighlighting(doc):
     try:
