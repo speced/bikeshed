@@ -2,6 +2,7 @@
 from __future__ import division, unicode_literals
 import sys
 from collections import Counter
+from lxml import html
 
 import config
 
@@ -42,11 +43,15 @@ def die(msg, *formatArgs, **namedArgs):
 
 def linkerror(msg, *formatArgs, **namedArgs):
     lineNum = None
-    if 'el' in namedArgs and namedArgs['el'].get("line-number"):
-        lineNum = namedArgs['el'].get("line-number")
+    suffix = ""
+    if 'el' in namedArgs:
+        if namedArgs['el'].get("line-number"):
+            lineNum = namedArgs['el'].get("line-number")
+        else:
+            suffix = "\n{0}".format(html.tostring(namedArgs['el'], with_tail=False, encoding="unicode"))
     elif namedArgs.get("lineNum", None):
         lineNum = namedArgs['lineNum']
-    msg = formatMessage("link", msg.format(*formatArgs, **namedArgs), lineNum=lineNum)
+    msg = formatMessage("link", msg.format(*formatArgs, **namedArgs)+suffix, lineNum=lineNum)
     if msg not in messages:
         messageCounts["linkerror"] += 1
         messages.add(msg)
