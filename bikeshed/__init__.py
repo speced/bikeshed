@@ -2038,6 +2038,8 @@ def cleanupHTML(doc):
             removeAttr(el, 'data-dfn-type')
             removeAttr(el, 'data-export')
             removeAttr(el, 'data-noexport')
+        if el.tag == "var":
+            removeAttr(el, 'data-var-ignore')
         removeAttr(el, 'data-alternate-id')
         removeAttr(el, 'highlight')
         removeAttr(el, 'nohighlight')
