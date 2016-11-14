@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
-import re
-import copy
 from collections import defaultdict
+import copy
+import os
+import re
+import subprocess
 from .messages import *
 from .htmlhelpers import *
 from .DefaultOrderedDict import DefaultOrderedDict
@@ -13,8 +15,9 @@ def addBikeshedVersion(doc):
     if "generator" not in doc.md.boilerplate:
         return
     head = find("head", doc)
+    bikeshedVersion = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=os.path.dirname(__file__)).rstrip()
     appendChild(head,
-                E.meta({"name": "generator", "content": "Bikeshed 1.0.0"}))
+                E.meta({"name": "generator", "content": "Bikeshed version %s" % bikeshedVersion}))
 
 
 def addHeaderFooter(doc):
