@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
-from collections import defaultdict
 import copy
 import os
 import re
 import subprocess
+from collections import defaultdict
 from .messages import *
 from .htmlhelpers import *
 from .DefaultOrderedDict import DefaultOrderedDict
@@ -17,7 +17,7 @@ def addBikeshedVersion(doc):
     head = find("head", doc)
     bikeshedVersion = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=os.path.dirname(__file__)).rstrip()
     appendChild(head,
-                E.meta({"name": "generator", "content": "Bikeshed version %s" % bikeshedVersion}))
+                E.meta({"name": "generator", "content": "Bikeshed version {0}".format(bikeshedVersion)}))
 
 
 def addHeaderFooter(doc):
