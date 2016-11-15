@@ -260,8 +260,12 @@ linkStatuses = frozenset(["current", "snapshot", "local", "anchor-block"])
 
 
 def linkTypeIn(linkTypes, targetTypes="all"):
-    # Tests if a link type (which might be a shorthand type like "idl")
-    # matches against a given set of types.
+    # Tests if two link/dfn types are "compatible",
+    # such that they share at least one base type when expanded.
+    # (All dfn types are "base"; link types like "idl" are shorthand,
+    #  and expand into one or more base types.)
+    # Called with no arguments,
+    # tests if the passed type is a valid dfn/link type.
     if isinstance(linkTypes, basestring):
         linkTypes = linkTypeToDfnType[linkTypes]
     else:
