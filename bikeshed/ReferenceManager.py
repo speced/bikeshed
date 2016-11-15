@@ -432,12 +432,15 @@ class ReferenceManager(object):
             variedTexts = [v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs]
             if variedTexts:
                 for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(self.defaultSpecs[variedTexts[0]]):
-                    if dfnType in config.linkTypeToDfnType[linkType]:
-                        spec = spec or dfnSpec
-                        status = status or dfnStatus
-                        linkFor = linkFor or dfnFor
-                        linkType = dfnType
-                        break
+                    if not config.linkTypeIn(dfnType, linkType):
+                        continue
+                    if linkFor and linkFor != dfnFor:
+                        continue
+                    spec = spec or dfnSpec
+                    status = status or dfnStatus
+                    linkFor = linkFor or dfnFor
+                    linkType = dfnType
+                    break
 
         # Then anchor-block refs get preference
         blockRefs,_ = self.anchorBlockRefs.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el, status="anchor-block")
