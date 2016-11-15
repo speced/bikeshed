@@ -21,6 +21,7 @@ shortToLongStatus = {
     "LS": "Living Standard",
     "LS-COMMIT": "Commit Snapshot",
     "LS-BRANCH": "Branch Snapshot",
+    "LD": "Living Document",
     "FINDING": "Finding",
     "w3c/ED": "Editor's Draft",
     "w3c/WD": "W3C Working Draft",
@@ -75,9 +76,9 @@ shortToLongStatus = {
     "iso/AMD": "Amendment"
 }
 snapshotStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/NOTE", "w3c/MO"]
-unlevelledStatuses = ["LS", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING"]
+unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING"]
 deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
-noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "FINDING", "DREAM"]
+noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DREAM"]
 
 megaGroups = {
     "w3c": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webauthn", "webperf", "webplatform", "webspecs", "webvr", "wicg"]),
