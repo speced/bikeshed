@@ -549,7 +549,6 @@ class Spec(object):
         boilerplate.addObsoletionNotice(self)
         boilerplate.addAtRisk(self)
         addNoteHeaders(self)
-        addImplicitAlgorithms(self)
         boilerplate.removeUnwantedBoilerplate(self)
         shorthands.transformProductionPlaceholders(self)
         shorthands.transformMaybePlaceholders(self)
@@ -558,6 +557,7 @@ class Spec(object):
         canonicalizeShortcuts(self)
         fixManualDefTables(self)
         headings.processHeadings(self)
+        addImplicitAlgorithms(self)
         checkVarHygiene(self)
         processIssuesAndExamples(self)
         markupIDL(self)
@@ -885,7 +885,7 @@ def addImplicitAlgorithms(doc):
     # but it contains only a single `<dfn>`,
     # assume that the dfn is a description of the algorithm.
     for el in findAll("[algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
-        dfns = findAll("dfn", el)
+        dfns = findAll(config.dfnElementsSelector, el)
         if len(dfns) == 1:
             el.set("algorithm", config.firstLinkTextFromElement(dfns[0]))
         elif len(dfns) == 0:
