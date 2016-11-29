@@ -12,45 +12,240 @@ from . import datablocks
 from .messages import *
 from .htmlhelpers import *
 
+class RefSource(object):
+    def __init__(self, source, specs=None, ignored=None, replaced=None):
+        # String identifying which refsource this is.
+        self.source = source
+
+        # Dict of {linking text => [anchor data]}
+        self.refs = defaultdict(list)
+
+        # Dict of {argless method signatures => {"argfull signature": {"args":[args], "for":[fors]}}}
+        self.methods = defaultdict(dict)
+
+        # Dict of {for value => [terms]}
+        self.fors = defaultdict(list)
+
+        self.specs = {} if specs is None else specs
+        self.ignoredSpecs = set() if ignored is None else ignored
+        self.replacedSpecs = set() if replaced is None else replaced
+
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, excludeStatuses=[], export=None, ignoreObsoletes=False, exact=False, **kwargs):
+        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, excludeStatuses, export, ignoreObsoletes, exact=True)
+        if error and not exact:
+            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, excludeStatuses, export, ignoreObsoletes)
+        else:
+            return results, error
+
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, excludeStatuses=[], export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
+        # Query the ref database.
+        # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
+        def refsIterator(refs):
+            # Turns a dict of arrays of refs into an iterator of refs
+            for key, group in refs.items():
+                for ref in group:
+                    yield RefWrapper(key, ref)
+
+        def textRefsIterator(refs, texts):
+            # Same as above, but only grabs those keyed to a given text
+            for text in texts:
+                for ref in refs.get(text, []):
+                    yield RefWrapper(text, ref)
+                for ref in refs.get(text + "\n", []):
+                    yield RefWrapper(text, ref)
+
+        def forRefsIterator(refs, fors, targetFors):
+            # Same as above, but only grabs those for certain values
+            for for_ in targetFors:
+                for text in fors[for_]:
+                    for ref in refs.get(text, []):
+                        yield RefWrapper(text, ref)
+                    for ref in refs.get(text + "\n", []):
+                        yield RefWrapper(text, ref)
+
+        # Set up the initial list of refs to query
+        if text:
+            if exact:
+                refs = list(textRefsIterator(self.refs, [text]))
+            else:
+                textsToSearch = list(linkTextVariations(text, linkType))
+                if text.endswith("()") and text in self.methods:
+                    textsToSearch += self.methods[text].keys()
+                if (linkType is None or linkType in config.lowercaseTypes) and text.lower() != text:
+                    textsToSearch += [t.lower() for t in textsToSearch]
+                refs = list(textRefsIterator(self.refs, textsToSearch))
+        elif linkFor:
+            refs = list(forRefsIterator(self.refs, self.fors, [linkFor]))
+        else:
+            refs = list(refsIterator(self.refs))
+        if not refs:
+            return refs, "text"
+
+        if excludeStatuses:
+            refs = [x for x in refs if x.status not in excludeStatuses]
+        if not refs:
+            return refs, "exclude-statuses"
+
+        if linkType:
+            if linkType in config.dfnTypes:
+                linkTypes = [linkType]
+            elif linkType in config.linkTypeToDfnType:
+                linkTypes = list(config.linkTypeToDfnType[linkType])
+            else:
+                if error:
+                    linkerror("Unknown link type '{0}'.",linkType)
+                return [], "type"
+            refs = [x for x in refs if x.type in linkTypes]
+        if not refs:
+            return refs, "type"
+
+        if export is not None:
+            refs = [x for x in refs if x.export == export]
+        if not refs:
+            return refs, "export"
+
+        if spec:
+            refs = [x for x in refs if x.spec == spec or x.shortname == spec]
+        if not refs:
+            return refs, "spec"
+
+        if linkFor == "/":
+            refs = [x for x in refs if not x.for_]
+        elif linkFor:
+            refs = [x for x in refs if linkFor in x.for_]
+        if not refs:
+            return refs, "for"
+
+        def filterByStatus(refs, status):
+            # If status is "current'", kill snapshot refs unless their spec *only* has a snapshot_url
+            if status == "current":
+                return [ref for ref in refs if ref.status == "current" or (ref.status == "snapshot" and self.specs.get(ref.spec,{}).get('current_url') is None)]
+            # If status is "snapshot", kill current refs if there's a corresponding snapshot ref for the same spec.
+            elif status == "snapshot":
+                snapshotSpecs = [ref.spec for ref in refs if ref.status == 'snapshot']
+                return [ref for ref in refs if ref.status == "snapshot" or (ref.status == "current" and ref.spec not in snapshotSpecs)]
+            else:
+                return [x for x in refs if x.status == status]
+        if status:
+            refs = filterByStatus(refs, status)
+        if not refs:
+            return refs, "status"
+
+        if status is None and statusHint:
+            tempRefs = filterByStatus(refs, statusHint)
+            if tempRefs:
+                refs = tempRefs
+
+        if ignoreObsoletes and not spec:
+            # Remove any ignored or obsoleted specs
+            # If you specified the spec, don't filter things - you know what you're doing.
+            possibleSpecs = set(ref.spec for ref in refs)
+            moreIgnores = set()
+            for oldSpec, newSpec in self.replacedSpecs:
+                if newSpec in possibleSpecs:
+                    moreIgnores.add(oldSpec)
+            refs = [ref for ref in refs if ref.spec not in self.ignoredSpecs and ref.spec not in moreIgnores]
+        if not refs:
+            return refs, "ignored-specs"
+
+        if linkForHint:
+            # If anything matches the linkForHint, filter to just those,
+            # but don't worry if nothing matches it.
+            tempRefs = [x for x in refs if linkForHint in x.for_]
+            if tempRefs:
+                refs = tempRefs
+
+        # With non-exact texts, you might have multiple "anchors"
+        # that point to the same url. Dedup them.
+        seenUrls = set()
+        tempRefs = []
+        for ref in copy.copy(refs):
+            if ref.url not in seenUrls:
+                tempRefs.append(ref)
+                seenUrls.add(ref.url)
+        refs = tempRefs
+
+        # If multiple levels of the same shortname exist,
+        # only use the latest level.
+        # If generating for a snapshot, prefer the latest snapshot level,
+        # unless that doesn't exist, in which case just prefer the latest level.
+        shortnameLevels = defaultdict(lambda:defaultdict(list))
+        snapshotShortnameLevels = defaultdict(lambda:defaultdict(list))
+        for ref in refs:
+            shortnameLevels[ref.shortname][ref.level].append(ref)
+            if status == ref.status == "snapshot":
+                snapshotShortnameLevels[ref.shortname][ref.level].append(ref)
+        refs = []
+        for shortname, levelSet in shortnameLevels.items():
+            if status == "snapshot" and snapshotShortnameLevels[shortname]:
+                # Get the latest snapshot refs if they exist and you're generating a snapshot...
+                maxLevel = max(snapshotShortnameLevels[shortname].keys())
+                refs.extend(snapshotShortnameLevels[shortname][maxLevel])
+            else:
+                # Otherwise just grab the latest refs regardless.
+                maxLevel = max(levelSet.keys())
+                refs.extend(levelSet[maxLevel])
+
+        return refs, None
+
+    def addMethodVariants(self, methodSig, forVals, shortname):
+        # Takes a full method signature, like "foo(bar)",
+        # and adds appropriate lines to self.methods for it
+        match = re.match(r"([^(]+)\((.*)\)", methodSig)
+        if not match:
+            # Was fed something that's not a method signature.
+            return
+        name, args = match.groups()
+        arglessMethodSig = name + "()"
+        variants = self.methods[arglessMethodSig]
+        if methodSig not in variants:
+            args = [x.strip() for x in args.split(",")]
+            variants[methodSig] = {"args":args, "for":[], "shortname": shortname}
+        variants[methodSig]["for"].extend(forVals)
 
 class ReferenceManager(object):
 
     def __init__(self, specStatus=None):
-        # Dict of {linking text => [anchor data]}
-        self.refs = defaultdict(list)
-        # Dict of {argless method signatures => {"argfull signature": {"args":[args], "for":[fors]}}}
-        self.methods = defaultdict(dict)
-        # Dict of {for value => [terms]}
-        self.fors = defaultdict(list)
         # Dict of {spec vshortname => spec data}
         self.specs = dict()
+
         # Dict of {linking text => link-defaults data}
         self.defaultSpecs = defaultdict(list)
+
         # Set of spec vshortnames to remove from consideration when there are other possible anchors
         self.ignoredSpecs = set()
+
         # Set of (obsolete spec vshortname, replacing spec vshortname), when both obsolete and replacing specs are possible anchors
         self.replacedSpecs = set()
+
         # Dict of {biblio term => biblio data}
         # Sparsely populated, with more loaded on demand
         self.biblios = defaultdict(list)
+
         # All the biblio keys
         self.biblioKeys = set()
+
         # Dict of {base key name => preferred display name}
         self.preferredBiblioNames = dict()
+
         # Dict of {spec vshortname => headings}
         # Each heading is either {#foo => heading-dict}, {/foo#bar => heading-dict} or {#foo => [page-heading-keys]}
         # In the latter, it's a list of the heading keys (of the form /foo#bar) that collide for that id.
         self.headings = dict()
         self.status = specStatus
 
+        self.localRefs = RefSource("local")
+        self.anchorBlockRefs = RefSource("anchor-block")
+        self.foreignRefs = RefSource("foreign", specs=self.specs, ignored=self.ignoredSpecs, replaced=self.replacedSpecs)
+
     def initializeRefs(self, doc=None):
         # Load up the xref data
         self.specs.update(json.loads(config.retrieveDataFile("specs.json", quiet=True, str=True)))
         self.headings.update(json.loads(config.retrieveDataFile("headings.json", quiet=True, str=True)))
         with config.retrieveDataFile("anchors.data", quiet=True) as lines:
-            self.refs = decodeAnchors(lines)
-        self.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
-        self.fors.update(json.loads(config.retrieveDataFile("fors.json", quiet=True, str=True)))
+            self.foreignRefs.refs = decodeAnchors(lines)
+        self.foreignRefs.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
+        self.foreignRefs.fors.update(json.loads(config.retrieveDataFile("fors.json", quiet=True, str=True)))
         if doc is not None:
             # Get local anchor data
             try:
@@ -116,7 +311,7 @@ class ReferenceManager(object):
     def removeSameSpecRefs(self):
         # Kill all the non-local anchors with the same shortname as the current spec,
         # so you don't end up accidentally linking to something that's been removed from the local copy.
-        for term, refs in self.refs.items():
+        for term, refs in self.foreignRefs.refs.items():
             for ref in refs:
                 if ref['status'] != "local" and ref['shortname'].rstrip() == self.specName:
                     ref['export'] = False
@@ -134,7 +329,7 @@ class ReferenceManager(object):
                 linkText = unfixTypography(linkText)
                 linkText = re.sub("\s+", " ", linkText)
                 linkType = treeAttr(el, 'data-dfn-type')
-                if linkType not in config.dfnTypes.union(["dfn"]):
+                if linkType not in config.dfnTypes:
                     die("Unknown local dfn type '{0}':\n  {1}", linkType, outerHTML(el), el=el)
                     continue
                 if linkType in config.lowercaseTypes:
@@ -173,13 +368,19 @@ class ReferenceManager(object):
                     "export":True,
                     "for": dfnFor
                 }
-                self.refs[linkText].append(ref)
+                self.localRefs.refs[linkText].append(ref)
                 methodishStart = re.match(r"([^(]+\()[^)]", linkText)
                 if methodishStart:
-                    self.addMethodVariants(linkText, dfnFor, ref["shortname"])
+                    self.localRefs.addMethodVariants(linkText, dfnFor, ref["shortname"])
+
+    def queryAllRefs(self, **kwargs):
+        r1,_ = self.localRefs.queryRefs(**kwargs)
+        r2,_ = self.anchorBlockRefs.queryRefs(**kwargs)
+        r3,_ = self.foreignRefs.queryRefs(**kwargs)
+        return r1+r2+r3
 
     def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None, exact=False):
-        return self._queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]
+        return self.localRefs.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]
 
     def getRef(self, linkType, text, spec=None, status=None, statusHint=None, linkFor=None, linkForHint=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a reference or None
@@ -204,6 +405,16 @@ class ReferenceManager(object):
         # Local refs always get precedence, unless you manually specified a spec.
         if spec is None:
             localRefs = self.getLocalRef(linkType, text, linkFor, linkForHint, el)
+            # If the autolink was for-less, it found a for-full local link,
+            # but there was a for-less version in a foreign spec,
+            # emit a warning (unless it was surpressed).
+            if localRefs and linkFor is None and any(x.for_ for x in localRefs):
+                forlessRefs,_ = self.anchorBlockRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
+                if not forlessRefs:
+                    forlessRefs,_ = self.foreignRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
+                if forlessRefs:
+                    linkerror("Ambiguous for-less link, please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\n{0}", outerHTML(el), el=el)
+                    return None
             if len(localRefs) == 1:
                 return localRefs[0]
             elif len(localRefs) > 1:
@@ -216,38 +427,52 @@ class ReferenceManager(object):
                               el=el)
                 return localRefs[0]
 
-        # Then anchor-block refs get preference
-        blockRefs,_ = self.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el, status="anchor-block")
-        if len(blockRefs) == 1:
-            return blockRefs[0]
-        elif len(blockRefs) > 1:
-            if error:
-                linkerror("Multiple possible '{0}' anchor-block refs for '{1}'.\nArbitrarily chose the one with type '{2}' and for '{3}'.",
-                          linkType,
-                          text,
-                          blockRefs[0].type,
-                          "' or '".join(blockRefs[0].for_),
-                          el=el)
-            return blockRefs[0]
-
         # Take defaults into account
-        if not spec or not status:
+        if not spec or not status or not linkFor:
             variedTexts = [v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs]
             if variedTexts:
                 for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(self.defaultSpecs[variedTexts[0]]):
-                    if dfnType in config.linkTypeToDfnType[linkType]:
-                        spec = spec or dfnSpec
-                        status = status or dfnStatus
-                        linkFor = linkFor or dfnFor
-                        linkType = dfnType
-                        break
+                    if not config.linkTypeIn(dfnType, linkType):
+                        continue
+                    if linkFor and linkFor != dfnFor:
+                        continue
+                    spec = spec or dfnSpec
+                    status = status or dfnStatus
+                    linkFor = linkFor or dfnFor
+                    linkType = dfnType
+                    break
+
+        # Then anchor-block refs get preference
+        blockRefs,_ = self.anchorBlockRefs.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el, status="anchor-block")
+        if blockRefs and linkFor is None and any(x.for_ for x in blockRefs):
+            forlessRefs,_ = self.foreignRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
+            if forlessRefs:
+                linkerror("Ambiguous for-less link, please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\n{0}", outerHTML(el), el=el)
+                return None
+        if len(blockRefs) == 1:
+            return blockRefs[0]
+        elif len(blockRefs) > 1:
+            possibleRefs = []
+            for ref in simplifyPossibleRefs(blockRefs):
+                if ref['for_']:
+                    possibleRefs.append('spec:{spec}; type:{type}; for:{for_}; text:{text}'.format(**ref))
+                else:
+                    possibleRefs.append('spec:{spec}; type:{type}; text:{text}'.format(**ref))
+            linkerror("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
+                      linkType,
+                      text,
+                      blockRefs[0].spec,
+                      '\n'.join(possibleRefs),
+                      el=el)
+            return blockRefs[0]
+
 
         # Get the relevant refs
         if spec is None:
             export = True
         else:
             export = None
-        refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=status, statusHint=statusHint, linkFor=linkFor, linkForHint=linkForHint, export=export, ignoreObsoletes=True)
+        refs, failure = self.foreignRefs.queryRefs(text=text, linkType=linkType, spec=spec, status=status, statusHint=statusHint, linkFor=linkFor, linkForHint=linkForHint, export=export, ignoreObsoletes=True)
 
         if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
             # foo()/bar failed, because foo() is technically the wrong signature
@@ -258,7 +483,7 @@ class ReferenceManager(object):
                 else:
                     methodName = linkFor
                     interfaceName = None
-                methodSignatures = self.methods.get(methodName, None)
+                methodSignatures = self.foreignRefs.methods.get(methodName, None)
                 if methodSignatures is None:
                     # Nope, foo() is just wrong entirely.
                     # Jump out and fail in a normal way
@@ -284,7 +509,7 @@ class ReferenceManager(object):
                 for p in linkForPatterns:
                     for s in statuses:
                         for m in possibleMethods[0]:
-                            refs, failure = self.queryRefs(text=text, linkType=linkType, spec=spec, status=s, linkFor=p.format(i=interfaceName, m=m), ignoreObsoletes=True)
+                            refs, failure = self.foreignRefs.queryRefs(text=text, linkType=linkType, spec=spec, status=s, linkFor=p.format(i=interfaceName, m=m), ignoreObsoletes=True)
                             if refs:
                                 break
                         if refs:
@@ -296,11 +521,13 @@ class ReferenceManager(object):
 
             # Allow foo(bar) to be for'd to with just foo() if it's completely unambiguous.
             methodPrefix = methodName[:-1]
-            candidates, _ = self.queryRefs(linkType="functionish", status="local", linkFor=interfaceName)
+            candidates, _ = self.localRefs.queryRefs(linkType="functionish", linkFor=interfaceName)
             methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
             if not methodRefs:
                 # Look for non-locals, then
-                candidates, _ = self.queryRefs(linkType="functionish", spec=spec, status=status, statusHint=statusHint, linkFor=interfaceName, export=export, ignoreObsoletes=True)
+                c1,_ = self.anchorBlockRefs.queryRefs(linkType="functionish", spec=spec, status=status, statusHint=statusHint, linkFor=interfaceName, export=export, ignoreObsoletes=True)
+                c2,_ = self.foreignRefs.queryRefs(linkType="functionish", spec=spec, status=status, statusHint=statusHint, linkFor=interfaceName, export=export, ignoreObsoletes=True)
+                candidates = c1 + c2
                 methodRefs = {c.url: c for c in candidates if c.text.startswith(methodPrefix)}.values()
             if zeroRefsError and len(methodRefs) > 1:
                 # More than one possible foo() overload, can't tell which to link to
@@ -426,174 +653,6 @@ class ReferenceManager(object):
             bib.originalLinkText, bib.linkText = bib.linkText, self.preferredBiblioNames[bib.linkText]
 
         return bib
-
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, **kwargs):
-        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, exact=True)
-        if error:
-            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes)
-        else:
-            return results, error
-
-    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
-        # Query the ref database.
-        # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
-        def refsIterator(refs):
-            # Turns a dict of arrays of refs into an iterator of refs
-            for key, group in refs.items():
-                for ref in group:
-                    yield RefWrapper(key, ref)
-
-        def textRefsIterator(refs, texts):
-            # Same as above, but only grabs those keyed to a given text
-            for text in texts:
-                for ref in refs.get(text, []):
-                    yield RefWrapper(text, ref)
-                for ref in refs.get(text + "\n", []):
-                    yield RefWrapper(text, ref)
-
-        def forRefsIterator(refs, fors, targetFors):
-            # Same as above, but only grabs those for certain values
-            for for_ in targetFors:
-                for text in fors[for_]:
-                    for ref in refs.get(text, []):
-                        yield RefWrapper(text, ref)
-                    for ref in refs.get(text + "\n", []):
-                        yield RefWrapper(text, ref)
-
-        # Set up the initial list of refs to query
-        if text:
-            if exact:
-                refs = list(textRefsIterator(self.refs, [text]))
-            else:
-                textsToSearch = list(linkTextVariations(text, linkType))
-                if text.endswith("()") and text in self.methods:
-                    textsToSearch += self.methods[text].keys()
-                if (linkType is None or linkType in config.lowercaseTypes) and text.lower() != text:
-                    textsToSearch += [t.lower() for t in textsToSearch]
-                refs = list(textRefsIterator(self.refs, textsToSearch))
-        elif linkFor:
-            refs = list(forRefsIterator(self.refs, self.fors, [linkFor]))
-        else:
-            refs = list(refsIterator(self.refs))
-        if not refs:
-            return refs, "text"
-
-        if linkType:
-            if linkType in config.dfnTypes:
-                linkTypes = [linkType]
-            elif linkType in config.linkTypeToDfnType:
-                linkTypes = list(config.linkTypeToDfnType[linkType])
-            else:
-                if error:
-                    linkerror("Unknown link type '{0}'.",linkType)
-                return [], "type"
-            refs = [x for x in refs if x.type in linkTypes]
-        if not refs:
-            return refs, "type"
-
-        if export is not None:
-            refs = [x for x in refs if x.export == export]
-        if not refs:
-            return refs, "export"
-
-        if spec:
-            refs = [x for x in refs if x.spec == spec or x.shortname == spec]
-        if not refs:
-            return refs, "spec"
-
-        if linkFor == "/":
-            refs = [x for x in refs if not x.for_]
-        elif linkFor:
-            refs = [x for x in refs if linkFor in x.for_]
-        if not refs:
-            return refs, "for"
-
-        def filterByStatus(refs, status):
-            # If status is "current'", kill snapshot refs unless their spec *only* has a snapshot_url
-            if status == "current":
-                return [ref for ref in refs if ref.status == "current" or (ref.status == "snapshot" and self.specs.get(ref.spec,{}).get('current_url') is None)]
-            # If status is "snapshot", kill current refs if there's a corresponding snapshot ref for the same spec.
-            elif status == "snapshot":
-                snapshotSpecs = [ref.spec for ref in refs if ref.status == 'snapshot']
-                return [ref for ref in refs if ref.status == "snapshot" or (ref.status == "current" and ref.spec not in snapshotSpecs)]
-            else:
-                return [x for x in refs if x.status == status]
-        if status:
-            refs = filterByStatus(refs, status)
-        if not refs:
-            return refs, "status"
-
-        if status is None and statusHint:
-            tempRefs = filterByStatus(refs, statusHint)
-            if tempRefs:
-                refs = tempRefs
-
-        if ignoreObsoletes and not spec:
-            # Remove any ignored or obsoleted specs
-            # If you specified the spec, don't filter things - you know what you're doing.
-            possibleSpecs = set(ref.spec for ref in refs)
-            moreIgnores = set()
-            for oldSpec, newSpec in self.replacedSpecs:
-                if newSpec in possibleSpecs:
-                    moreIgnores.add(oldSpec)
-            refs = [ref for ref in refs if ref.spec not in self.ignoredSpecs and ref.spec not in moreIgnores]
-        if not refs:
-            return refs, "ignored-specs"
-
-        if linkForHint:
-            # If anything matches the linkForHint, filter to just those,
-            # but don't worry if nothing matches it.
-            tempRefs = [x for x in refs if linkForHint in x.for_]
-            if tempRefs:
-                refs = tempRefs
-
-        # With non-exact texts, you might have multiple "anchors"
-        # that point to the same url. Dedup them.
-        seenUrls = set()
-        tempRefs = []
-        for ref in copy.copy(refs):
-            if ref.url not in seenUrls:
-                tempRefs.append(ref)
-                seenUrls.add(ref.url)
-        refs = tempRefs
-
-        # If multiple levels of the same shortname exist,
-        # only use the latest level.
-        # If generating for a snapshot, prefer the latest snapshot level,
-        # unless that doesn't exist, in which case just prefer the latest level.
-        shortnameLevels = defaultdict(lambda:defaultdict(list))
-        snapshotShortnameLevels = defaultdict(lambda:defaultdict(list))
-        for ref in refs:
-            shortnameLevels[ref.shortname][ref.level].append(ref)
-            if status == ref.status == "snapshot":
-                snapshotShortnameLevels[ref.shortname][ref.level].append(ref)
-        refs = []
-        for shortname, levelSet in shortnameLevels.items():
-            if status == "snapshot" and snapshotShortnameLevels[shortname]:
-                # Get the latest snapshot refs if they exist and you're generating a snapshot...
-                maxLevel = max(snapshotShortnameLevels[shortname].keys())
-                refs.extend(snapshotShortnameLevels[shortname][maxLevel])
-            else:
-                # Otherwise just grab the latest refs regardless.
-                maxLevel = max(levelSet.keys())
-                refs.extend(levelSet[maxLevel])
-
-        return refs, None
-
-    def addMethodVariants(self, methodSig, forVals, shortname):
-        # Takes a full method signature, like "foo(bar)",
-        # and adds appropriate lines to self.methods for it
-        match = re.match(r"([^(]+)\((.*)\)", methodSig)
-        if not match:
-            # Was fed something that's not a method signature.
-            return
-        name, args = match.groups()
-        arglessMethodSig = name + "()"
-        variants = self.methods[arglessMethodSig]
-        if methodSig not in variants:
-            args = [x.strip() for x in args.split(",")]
-            variants[methodSig] = {"args":args, "for":[], "shortname": shortname}
-        variants[methodSig]["for"].extend(forVals)
 
 
 def linkTextVariations(str, linkType):
@@ -729,7 +788,7 @@ def simplifyPossibleRefs(refs):
             for for_ in ref.for_:  # ref.for_ is a list
                 forVals[(ref.text, ref.type, ref.spec)].append(for_)
         else:
-            forVals[(ref.text, ref.type, ref.spec)].append(None)
+            forVals[(ref.text, ref.type, ref.spec)].append("/")
     retRefs = []
     for (text, type, spec), fors in forVals.items():
         if len(fors) >= 2:

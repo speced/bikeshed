@@ -469,7 +469,7 @@ def processAnchors(anchors, doc, lineNum=None):
             status = "anchor-block"
         if anchor['type'][0] in config.lowercaseTypes:
             anchor['text'][0] = anchor['text'][0].lower()
-        doc.refs.refs[anchor['text'][0]].append({
+        doc.refs.anchorBlockRefs.refs[anchor['text'][0]].append({
             "linkingText": anchor['text'][0],
             "type": anchor['type'][0].lower(),
             "url": url,
@@ -482,7 +482,7 @@ def processAnchors(anchors, doc, lineNum=None):
         })
         methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
         if methodishStart:
-            doc.refs.addMethodVariants(anchor['text'][0], anchor.get('for', []), doc.md.shortname)
+            doc.refs.anchorBlockRefs.addMethodVariants(anchor['text'][0], anchor.get('for', []), doc.md.shortname)
     return []
 
 

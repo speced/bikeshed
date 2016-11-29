@@ -72,13 +72,13 @@ In some installations you'll need to also upgrade `setuptools` for `html5lib`'s 
 $ sudo pip install lxml setuptools --upgrade
 ```
 
-From here, you can follow the commons steps outlined below.
+From here, you can proceed to [[#install-common]].
 
 
 OS X steps {#install-osx}
 -------------------------
 
-Note: If you're on a relatively modern Mac you should be able to proceed directly to [#install-common].
+Note: If you're on a relatively modern Mac you should be able to proceed directly to [[#install-common]].
 
 These instructions assume that you have [Mac Ports](https://www.macports.org/) or [Homebrew](http://brew.sh/) installed. If you successfully install Bikeshed using some other method, please contribute to this documentation.
 
@@ -122,7 +122,7 @@ $ pip install pygments lxml --upgrade
 
 That'll spew a lot of console trash, but don't worry about it.
 
-From here, you can follow the commons steps outlined below.
+From here, you can proceed to [[#install-common]].
 
 
 Windows steps {#install-windows}
@@ -148,7 +148,7 @@ Tested on Windows 7, 8/8.1 & 10
 	(it should be lxml-3.4.0win32-py2.7.exe)
 5. Run `$ python -m pip install pygments`.
 
-From here, you can follow the commons steps outlined below.
+From here, you can proceed to [[#install-common]].
 
 
 Common steps {#install-common}
@@ -393,8 +393,89 @@ The `echidna` command hooks into the W3C's Echidna auto-publishing system,
 letting you publish W3C specs from the command-line,
 rather than having to go thru a staff contact.
 
-Issue: Fill in details.
+Note: Currently, only Working Drafts (**not** including FPWD) can be published via Echidna.
 
+It's invoked similarly to `bikeshed spec`,
+with three required flags:
+
+: `--u USERNAME`
+:: Your W3C username
+
+: `--p PASSWORD`
+:: Your W3C password
+
+: `--d DECISION_URL`
+:: A link to a publicly-visible message approving the publication of this draft.
+
+After the flags,
+you can optionally specify the input file path,
+just like for `bikeshed spec`;
+if omitted,
+it selects a file automatically in the same way.
+
+Bikeshed then builds the spec normally,
+performs a little bit of fixup for common issues that PubRules complains about,
+and submits the spec to Echidna.
+It will print out a URL for you to check on the progress of your publication;
+it should complete in a few seconds.
+
+Most likely you'll have some PubRules errors when you check your progress;
+fix those
+(ask in irc.w3.org#pub for help if needed)
+then just run `bikeshed echidna` again.
+
+### Echidna Hooks ### {#echidna-hooks}
+
+Bikeshed's default publication behavior is usually sufficient,
+but if you need to customize it in some way,
+there are a few hooks you can use
+(assuming you can write Python).
+In an include file named `bs-extensions.include`,
+provide an implementation of the following methods
+(check the default version of this file for the default implementations,
+for the methods you don't want to change):
+
+: `BSPrepTR(doc)`
+:: This method is called after processing is done,
+	when the document is ready to be packed up and sent to Echidna.
+	Here, you can perform whatever final post-processing is required.
+
+	<div class=example>
+		For example, the CSSWG EDs link to a stylesheet
+		in the parent directory of the server they're stored on.
+		In their `BSPrepTR()`,
+		they search for the link to that stylesheet,
+		and update it to point to the current directory instead.
+	</div>
+
+: `BSPublishAdditionalFiles(files)`
+:: This method allows you to specify what files should be included in the publishing bundle.
+	It must return an array of additional files/folders;
+	each entry must either be a string,
+	referring to a file/folder in the spec's directory or subdirectories,
+	or a tuple of 2 strings,
+	the first of which points to a file outside the spec's directory,
+	and the second of which provides the path the file should have within the spec's directory.
+
+	The `files` value provides the default values,
+	which you probably want to just extend,
+	rather than fully replace.
+	It defaults to `["images", "diagrams", "examples"]`,
+	indicating that those folders,
+	if present,
+	will be included.
+
+	<div class=example>
+		For example, as stated in the example for `BSPrepTR()`,
+		the CSSWG needs to include its stylesheet in with its specs.
+		To do so,
+		it just needs to add the entry `["../default.css", "default.css"]`
+		to the `files` array,
+		indicating that Bikeshed should grab the `default.css` file from the parent directory,
+		and put it in the spec's directory
+		(in the bundle)
+		with the same name.
+	</div>
 
 `bikeshed update` {#cli-update}
 -------------------------------
@@ -521,6 +602,7 @@ Several keys are required information, and will cause the processor to flag an e
 			* LS: "Living Standard"
 			* LS-COMMIT: "Commit Snapshot"
 			* LS-BRANCH: "Branch Snapshot"
+			* LD: "Living Document"
 			* FINDING: "Finding"
 		</details>
 		<details>
@@ -626,18 +708,28 @@ There are several additional optional keys:
 	* <dfn>Group</dfn> must contain the name of the group the spec is being generated for.  This is used by the boilerplate generation to select the correct file.  If omitted, it defaults to a generic set of boilerplate.
 	* <dfn>Status Text</dfn> allows adding an additional customized sentence that can be used in the document status section.
 	* <dfn>Ignored Terms</dfn> accepts a comma-separated list of terms and makes Bikeshed not emit warnings or errors when attempting to autolink those terms.  Use this to quiet spurious preprocessor warnings caused by you inventing terms (for example, the Variables spec invents custom properties like 'var-foo'), or as a temporary patch when the spec you want to link to doesn't set up its definitions correctly.
-	* <dfn>Ignored Vars</dfn> accepts a comma-separated list of variable names, and makes Bikeshed not emit warnings or errors about them.  Use this to quiet spurious warnings about vars you only use a single time in the document.
-	* <dfn>Link Defaults</dfn> lets you specify a default spec for particular autolinks to link to.  The value is a comma-separated list of entries, where each entry is a versioned spec shortname, followed by a parenthesized link type, followed by a "/"-separated list of link phrases. For example, `Link Defaults: html (dfn) allowed to show a popup/in parallel`
 	* <dfn>Date</dfn> must contain a date in YYYY-MM-DD format, which is used instead of today's date for all the date-related stuff in the spec.
 	* <dfn>Deadline</dfn> is also a YYYY-MM-DD date, which is used for things like the LCWD Status section, to indicate deadlines.
 	* <dfn>Test Suite</dfn> must contain a link to the test suite nightly cover page (like <code>http://test.csswg.org/suites/css3-flexbox/nightly-unstable</code>).
 	* <dfn>Mailing List</dfn> must contain an email address to be used for mailing lists.
 	* <dfn>Mailing List Archives</dfn> must contain a link to the list archives.
-	* <dfn>Issue Tracking</dfn> indicates what and where you track issues. It must contain a comma-separated list of locations, each of which consists of the name of the location followed by the url.  (If you use any inline issues, Bikeshed will automatically indicate that as well.)
+	* <dfn>Issue Tracking</dfn> indicates what and where you track issues,
+		and will result in an "Issue Tracking" entry in your spec header.
+		It must contain a comma-separated list of locations,
+		each of which consists of the name of the location followed by the url.
+
+		Bikeshed will automatically add additional entries to this in some situations:
+		if you use any inline issues,
+		you'll automatically get an "In Spec" annotation;
+		if you develop from within a git repo with a GH remote,
+		or have the <a>Repository</a> metadata set,
+		you'll automatically get a "GitHub" annotation.
+
+		You can turn off the spec-header entry entirely with `Boilerplate: feedback-header off`,
+		or just turn off the GitHub entry specifically with `Boilerplate: repository-issue-tracking off`.
 	* <dfn>Issue Tracker Template</dfn> specifies a url template used to point [remote issues](#remote-issues) at your issue tracker of choice. It takes a url, with `{0}` in the place where you want the remote identifier to go.
 	* <dfn>Translation</dfn> indicates a translation of the document. At minimum it consists of a language code (BCP47 format) and a url. Optionally, it can contain comma-separated `name [name-in-spec-language]` and `native-name [name-in-translation-language]`, but if Bikeshed knows about that language, these will be filled in for you.  (If Bikeshed doesn't know about a given language, let me know what it's name is in English and itself!)
-	* <dfn>Use &lt;i> Autolinks</dfn> turns on legacy support for using <{i}> elements as "dfn" autolinks.  It takes a bool-ish value: "yes/no", "y/n", "true/false", or "on/off".  (This only exists for legacy purposes; do not use in new documents. Instead, just use the <{a}> element like you're supposed to.)
-	* <dfn>No Editor</dfn> lets you omit the `Editor` metadata without an error. It takes a bool-ish value.  This shouldn't generally be used; even if your organization doesn't privilege editors in any way, putting the organization itself in the `Editor` field meets the intent while still producing useful information for readers of the spec.
+	* <dfn>No Editor</dfn> lets you omit the `Editor` metadata without an error. It takes a <a>boolish</a> value.  This shouldn't generally be used; even if your organization doesn't privilege editors in any way, putting the organization itself in the `Editor` field meets the intent while still producing useful information for readers of the spec.
 	* <dfn>Editor Term</dfn> is a pair of comma-separated terms giving the singular and plural terms to refer to editors with, if you want something other than the default "Editor(s)".
 	* <dfn>Default Biblio Status</dfn> takes the values "current" or "dated", and selects which URL you want to default to for bibliography entries that have both "current" and "dated" URLs. (You can also specify this per-biblio entry.)
 	* <dfn>Markup Shorthands</dfn> lets you specify which categories of markup shorthands you want to use; for example, you can turn off CSS shorthands and reclaim use of single quotes in your spec.  You can still link to things with explicit markup even if the shorthand is turned off.  Its value is a comma-separated list of markup categories and <a>boolish</a> values, like `css no, biblio yes`.  The currently-recognized categories are:
@@ -652,11 +744,27 @@ There are several additional optional keys:
 
 		Everything but `markdown` defaults to "on".
 	* <dfn>Text Macro</dfn> lets you specify custom text macros, like `[TITLE]` or `[DATE]`, letting you fill in different text when building a spec in multiple ways.  (This is mostly useful as a command-line option.)  Each <a>Text Macro</a> line consists of a macro name, which must be uppercase and alphanumeric, followed by the text it will get replaced with.
-	* <dfn>Work Status</dfn> indicates the status of the document, in a way unrelated to the publication status of <a>Status</a>.  It must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned), with those terms defined in [Fantasai's blog](http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process). This just sets the `[WORKSTATUS]` text macro to the corresponding word, used in some of the boilerplates to pipe the metadata to scraping tools.
-	* <dfn>Repository</dfn> indicates the repository the spec is being tracked in.  You can specify a url followed by a "short name" for it, and it populates the `[REPOSITORY]` and `[REPOSITORYURL]` text macros accordingly.  If you are using GitHub, you can just specify `username/repo`, and Bikeshed will infer the rest for you.  If you're developing *from within a GitHub repo*, you don't need to specify this at all, as Bikeshed will figure it out automatically!  (That said, if you're working in a *fork*, you should still specify the main repo's information here, or else the spec will point to your fork instead.)
+	* <dfn>Work Status</dfn> indicates the status of the document, in a way unrelated to the publication status of <a for=metadata>Status</a>.  It must be one of (completed, stable, testing, refining, revising, exploring, rewriting, abandoned), with those terms defined in [Fantasai's blog](http://fantasai.inkedblade.net/weblog/2011/inside-csswg/process). This just sets the `[WORKSTATUS]` text macro to the corresponding word, used in some of the boilerplates to pipe the metadata to scraping tools.
+	* <dfn>Repository</dfn> indicates the repository the spec is being tracked in.
+		You can specify a url followed by a "short name" for it,
+		and it populates the `[REPOSITORY]` and `[REPOSITORYURL]` text macros accordingly.
+		If you are using GitHub,
+		you can just specify `username/repo`,
+		and Bikeshed will infer the rest for you.
+		If you're developing *from within a GitHub repo*,
+		you don't need to specify this at all,
+		as Bikeshed will figure it out automatically!
+		(That said, if you're working in a *fork*,
+		you should still specify the main repo's information here,
+		or else the spec will point to your fork instead.)
+
+		If using GitHub,
+		this metadata causes Bikeshed to automatically add a "GitHub" annotation
+		to the <a>Issue Tracking</a> entry in your spec header.
+		You can turn this off with `Boilerplate: repository-issue-tracking off`.
 	* <dfn>Inline Github Issues</dfn> tells Bikeshed whether
 		to fetch the text of GitHub issues and inline them into the document, or not.
-		It takes a bool-ish value.
+		It takes a <a>boolish</a> value.
 		If it's true,
 		any [remote issues](#remote-issues) of the form <code>user/repo#issuenumber</code>
 		will have their contents replaced by the contents of the corresponding issue from GitHub.
@@ -664,17 +772,39 @@ There are several additional optional keys:
 		[remote issues](#remote-issues) with just an issue number
 		will also be expanded to the corresponding issue from your repository.
 	* <dfn>Opaque Elements</dfn> and <dfn>Block Elements</dfn> are a comma-separated list of custom element names, to help control Bikeshed's parsing and serialization. By default, custom elements are treated as inline; marking an element as "opaque" makes it like <{pre}>, so shorthands and Markdown aren't processed in it, and it's serialized precisely as entered; marking an element as "block" makes it interrupt paragraphs when it starts a line, and causes the pretty-printer to serialize it in a block-like way.
-	* <dfn>Note Class</dfn>, <dfn>Issue Class</dfn>, and <dfn>Advisement Class</dfn> specify the class name given to paragraphs using the note/issue/advisement <a>markup shorthand</a>.  They default to "note", "issue", and "advisement".
+	* <dfn>Note Class</dfn>, <dfn>Issue Class</dfn>, <dfn>Assertion Class</dfn>, and <dfn>Advisement Class</dfn> specify the class name given to paragraphs using the note/issue/advisement <a>markup shorthand</a>.  They default to "note", "issue", and "advisement".
 	* <dfn>Translate IDs</dfn> maps Bikeshed-generated IDs to manually-specified IDs, for cases where you need to manually specify an ID but it's generated by Bikeshed in a hard-to-override way (like IDL blocks).  It takes a comma separated list of Bikeshed IDs and new IDs.
 	* <dfn>Default Highlight</dfn> specifies the default highlighting language. Every <{pre}>, <{xmp}>, and <{code}> will automatically be highlighted according to the specified language, unless they or an ancestor specifies a different `highlight=foo` or `nohighlight` attribute overriding it.
 	* <dfn>Toggle Diffs</dfn> includes a 'Hide deleted text' button to toggle hiding <{del}> elements.
-	* <dfn>Boilerplate</dfn> toggles the generation of inidividual [boilerplate sections](#bp-sections). Its value is a comma-separated list of section name and bool-ish value, e.g. `issues-index: no` to disable the list of issues.
+	* <dfn>Boilerplate</dfn> toggles the generation of individual [boilerplate sections](#bp-sections). Its value is a comma-separated list of section name and <a>boolish</a> value, e.g. `Boilerplate: issues-index no` to disable the list of issues.
 	* <dfn>Complain About</dfn> indicates what nits you'd like Bikeshed to complain about, that are normally too noisy to be turned on by default. Its value is a <a>boolish</a> list like <a>Markup Shorthands</a>. Accepted values are:
+
 		* `missing-example-ids` - complains about examples without a manually-specified ID. (Examples auto-generate an ID based on their contents otherwise, which might not be stable over time.)
+		* `broken-links` - checks all the external links in the document, and verifies that they result in a 200 response code. Might take a while if your document links out a lot!
 	* <dfn>Infer CSS Dfns</dfn> is a <a>boolish</a> that specifies whether Bikeshed should try to "infer" what type a <{dfn}> is by looking at the text,
 		using CSS-biased heuristics.
 		(In other words, this'll only auto-detect certain CSS types.)
 		Defaults to off.
+	* <dfn>Assume Explicit For</dfn> is a <a>boolish</a> that specifies whether an omitted `for` attribute on an autolink should imply `for="/"`
+		(that is, selecting a definition without a `for` value),
+		or just not express a `for` requirement at all
+		(that is, selecting a definition without caring about what its `for` value is).
+		Truthy values set the former,
+		falsey set the latter.
+		Defaults to off.
+
+		Note: Turning this on is a better match for some people's mental models,
+		but it requires you to specify more `for` values on your autolinks
+		even when it's not necessary to disambiguate things,
+		so it's off by default.
+	* <dfn>Max ToC Depth</dfn> specifies the maximum depth you want the ToC to generate to. It can be the value "none", meaning generate the ToC normally, or an integer between 1 and 5. It defaults to "none".
+	* <dfn>Include Can I Use Panels</dfn> is a <a>boolish</a> that specifies whether to include [Can I Use](http://caniuse.com/) usage-data panels or not. If it's turned on, <{dfn}> elements can take a `caniuse="featureID"` attribute, where the `featureID` is the value specified in the url like `http://caniuse.com/#feat=FEATUREIDHERE`, and the panel will be positioned to line up with that <{dfn}>.
+	* <dfn>Can I Use URL</dfn> automatically informs you when/if Can I Use starts tracking new features from your spec, so you don't have to check that yourself.
+		It takes a single URL prefix, and can be specified multiple times to provide multiple URLs.
+		These URLs are checked against the Can I Use data,
+		and if there are any Can I Use features whose URL includes one of the specified URLs as a prefix,
+		and the feature isn't already specified somewhere in your spec,
+		it will log a warning for you.
 </ul>
 
 Note: A <dfn>boolish</dfn> value is a string representing a boolean value (true or false).
@@ -686,6 +816,36 @@ by prefixing the key with `!`,
 like `!Issue Tracking: in spec`.
 Any custom keys are collected together and formatted as entries in the spec's boilerplate header <{dl}>.
 Specifying a custom key multiple times will put all the values as <{dd}>s under a single <{dt}> for the key.
+
+Some of the metadata keys are *deprecated*;
+you shouldn't use them,
+but just in case you run into them in the wild,
+they're documented here for understanding.
+Each one recommends what you should be using instead.
+
+<ul dfn-for=metadata>
+	* <dfn>Use &lt;i> Autolinks</dfn> turns on legacy support for using <{i}> elements as "dfn" autolinks.
+		It takes a <a>boolish</a> value.
+
+		Instead of using this,
+		just use the <{a}> element to autolink, as usual.
+	* <dfn>Link Defaults</dfn> lets you specify a default spec for particular autolinks to link to.
+		The value is a comma-separated list of entries,
+		where each entry is a versioned spec shortname,
+		followed by a parenthesized link type,
+		followed by a "/"-separated list of link phrases.
+		For example, `Link Defaults: html (dfn) allowed to show a popup/in parallel`.
+
+		Instead of using this,
+		use a `<pre class=link-defaults>` block,
+		as the error message suggests when this is necessary.
+	* <dfn>Ignored Vars</dfn> accepts a comma-separated list of variable names,
+		and makes Bikeshed not emit warnings or errors about them being used only once in the document/algorithm.
+
+		Instead of using this,
+		put an `ignore` attribute on the <{var}> in question.
+</ul>
+
 
 Default Metadata {#default-metadata}
 ------------------------------------
@@ -791,14 +951,37 @@ Header 1 {#header1}
 ### Header 2 ### {#header2}
 ```
 
-Additionally, starting a paragraph with "Note: " or "Note, " will add a `class='note'` to the paragraph,
-which triggers special formatting in the CSS stylesheet.
-Starting one with "Issue: " will add a `class='issue'` to the paragraph.
-Starting one with "Advisement: " will add a `<strong class=advisement>` around the contents of the paragraph.
-Starting one with "Assertion: " will add a `class=assertion` to the paragraph.
-
 More of Markdown will be supported in the future,
-as is adherence to the CommonMark specification.
+as I get closer to adhering to the CommonMark specification.
+
+
+Notes, Issues, Examples, Advisements {#notes-etc}
+-------------------------------------------------
+
+The Markdown processor specially recognizes paragraphs starting with
+"Issue: ",
+"Advisement: ",
+"Assertion: ",
+"Note: ",
+or "Note, ",
+and will add a matching class to the paragraph automatically.
+These classes default to `.issue`, `.advisement`, `.assertion`, and `.note`,
+but can be customized with the metadatas
+<a>Issue Class</a>, <a>Advisement Class</a>, <a>Assertion Class</a>, and <a>Note Class</a>.
+(However, the default classes receive styling from the default stylesheet,
+so make sure you provide your own styling if you change them.)
+
+The default styling of these blocks includes a generated-content "header"
+containing the word "NOTE:", etc.
+If you'd like to provide your own custom header,
+write out the container element yourself
+(rather than using the Markdown shorthand,
+just create any element with the appropriate class),
+and add a `heading="YOUR TEXT HERE"` attribute to the container.
+It will automatically have "NOTE: "/etc prepended to it.
+This also works on elements with the `.example` class.
+(This is used by [[#remote-issues]] to put the GitHub issue title on the issue containers.)
+
 
 
 Typography Fixes {#typography}
@@ -823,7 +1006,7 @@ There are several <dfn id=autolink-shortcut lt="shortcut|autolink shortcut">shor
 * `<<@foo>>` is an autolink to the at-rule named "@foo" (same)
 * `{{Foo}}` is an autolink to an IDL term named "Foo". (Accepts interfaces, attributes, methods, etc)
 * `<{Foo}>` is an autolink to an element named "Foo".
-* `|foo|` is a variable reference (`<var>`). (Vars created this way will shortly be checked for typos, so look out for new warnings/errors soon.)
+* `|foo|` is a variable reference (`<var>`).
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.
     Add a leading exclamation point to the value, like `[[!foo]]` for a normative reference.
 * `[[#foo]]` is an autolink to the heading in the same document with that ID. This generates appropriate reference text in its place, like "§5.3 Baseline Self-Alignment"
@@ -839,8 +1022,8 @@ which is much shorter than writing out `<a value for=width>auto</a>`.
 For the `{{foo}}` shortcut,
 you can also specify exactly which type of IDL link it is,
 in case of ambiguity,
-by appending a `!` and the type,
-like `{{family!argument}}`,
+by appending `!!` and the type,
+like `{{family!!argument}}`,
 which is equivalent to `<a argument><code>family</code></a>`
 
 Remember that if you need to write out the <{a}> tag explicitly,
@@ -866,7 +1049,9 @@ If you use a var only once,
 there's a good chance it's actually a typo.
 Bikeshed will emit a warning if it finds any vars used only once in an algorithm.
 If this singular usage is correct,
-you can instruct Bikeshed to ignore the error by listing it in the `Ignored Vars` metadata.
+you can instruct Bikeshed to ignore the error by adding an `ignore` attribute to the <{var}> itself.
+(There's no way to do this with the `|foo|` syntax;
+you have to convert it back to an actual <{var}> element.)
 
 
 <{pre}> whitespace stripping {#pre-whitespace-stripping}
@@ -1107,7 +1292,7 @@ which are valid only inside the included file:
 	</pre>
 </xmp>
 
-With the above code, you can use `\[FOO]` and `\[BAZ]` macros inside the include file,
+With the above code, you can use `[FOO]` and `[BAZ]` macros inside the include file,
 and they'll be substituted with "bar" and "qux qux qux", respectively.
 (Remember that you can mark text macros as optional by appending a `?`, like `[FOO?]`,
 in which case they'll be replaced with the empty string if Bikeshed can't find a definition.)
@@ -1377,7 +1562,7 @@ and how to properly expose it.
 1. The defining element MUST be a <{dfn}> or <{h2}>...<{h6}>.  No other element
 	is recognized as defining a term.
 2. The element MUST have an `id` attribute.
-3. The linking text defaults to the **text content** of the `<dfn>`/heading.
+3. The linking text defaults to the **text content** of the <{dfn}>/heading.
 	If the desired text content isn't suitable for linking text, or you wish to
 	provide multiple linking texts, a [`lt` attribute](#changing-lt) containing one or more
 	pipe-separated linking texts will override the text content. See also [[#local-lt]]
@@ -1551,8 +1736,8 @@ There are three things you might have to do to fix these:
 3. If multiple specs define the same term, you may need to declare which spec you're referring to.
     (The processor is smart enough to automatically figure out which one you probably want in many cases.)
     Just add a `spec` attribute with the spec's shortname to either the link or a container.
-    This can also be specified in the spec's [metadata](#metadata) with "Link Defaults",
-    which applies document-wide.
+    This can also be specified document-wide,
+    as described in [[#link-defaults]].
     (There is no shorthand syntax for specifying this; if you need to add this to a shorthand autolink, you must first convert it into an explicit <{a}> element.)
 
 As a final note, the autolinking algorithm will link differently based on whether the spec being processed is a "current" (up-to-date) or "dated" (snapshot) draft.
@@ -1592,14 +1777,9 @@ and Bikeshed can't automatically tell which one you want,
 it'll emit a warning asking you to specify more explicitly.
 You can do this per-link,
 but you typically want to make the same choice every time the term is autolinked;
-this can be done by adding <a>Link Defaults</a> metadata.
-
-You can either add a <a>Link Defaults</a> metadata line to your `<pre class=metadata>`,
-as specified in [[#metadata]],
-or add a `<pre class='link-defaults'>` block,
+this can be done by adding a `<pre class='link-defaults'>` block,
 written in the [InfoTree](#infotree) format.
-For the latter,
-each piece of info must have a `spec`, `type`, and `text` line,
+Each piece of info must have a `spec`, `type`, and `text` line,
 and optionally a `for` line if necessary to further disambiguate.
 
 Sometimes this is too fine-grained,
@@ -1611,12 +1791,53 @@ Each piece of info must have a `spec` line,
 and optionally a `replacedBy` line,
 both naming specs.
 If the info has just a `spec` line, that spec is ignored totally by default;
-linking to it requires you to manually specify a `spec=''` attribute on the autolink.
+linking to it requires you to manually specify a `spec=""` attribute on the autolink.
 If the info has a `replacedBy` line,
 then whenever an autolink has a choice between the two specs,
 it'll delete the `spec` value from consideration,
 leaving only the `replacedBy` value
 (plus any other specs that might be providing a definition).
+
+Potentially-ambiguous `for`-less Links {#ambi-for}
+--------------------------------------------------
+
+Advisement: If you were directed here by a Bikeshed error message,
+put an explicit `for` value on your autolink.
+(Use `for="/"` to link to a definition without a `for` value of its own).
+
+Bikeshed's autolinking functions as a series of filters,
+some of which are optional.
+For example,
+if you don't specify a `for` value,
+then Bikeshed simply doesn't care about the `for` values of definitions as it searches.
+However, this doesn't always match people's mental models--
+in particular, people sometimes implicitly assume that an autolink without a `for`
+will specifically match a *definition* without a `for`.
+
+Usually this is fine;
+if there are multiple possible definitions,
+Bikeshed will just throw up a linking error
+informing you of how to be more specific.
+But if you have a definition of that term *with* a `for` value in your local spec
+(or your anchors block),
+Bikeshed can silently select that as the correct definition to link to,
+causing accidental spec corruption if you meant to link to a cross-spec definition without a `for`.
+
+In other words,
+if some other spec defines <code>&lt;dfn>term&lt;/dfn></code>,
+and then you spec both defines <code>&lt;dfn for=foo>term&lt;/dfn></code>
+and links to <code>&lt;a>term&lt;/a></code>
+(expecting the link to go to the cross-spec definition),
+you'll be dissapointed,
+but won't know it's wrong unless you manually check your links.
+
+Bikeshed looks out for this situation,
+and flags it as a potentially-ambiguous link,
+requiring you to specify the `for` value explicitly.
+If you want to link to the `for`-less cross-spec definition,
+simply add `for="/"` to your autolink,
+to indicate explicitly that you want the definition without a `for` value.
+Otherwise, add the appropriate `for` value as normal.
 
 
 Section Links {#section-links}
@@ -1903,7 +2124,7 @@ For help in creating *new* boilerplate files for your organization, see [[#bp-ne
 Groups {#bp-groups}
 ------
 
-Much of the boilerplate is determined based on the <a>Group</a> metadata.
+Much of the boilerplate is determined based on the <a for=metadata>Group</a> metadata.
 If unspecified, it defaults to a generic set of boilerplate that is generally appropriate for most things,
 without making reference to any particular standards body or the like.
 However, to obtain correct boilerplate for a given standards body,

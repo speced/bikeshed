@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
-import re
 import copy
+import os
+import re
+import subprocess
 from collections import defaultdict
 from .messages import *
 from .htmlhelpers import *
@@ -13,8 +15,9 @@ def addBikeshedVersion(doc):
     if "generator" not in doc.md.boilerplate:
         return
     head = find("head", doc)
+    bikeshedVersion = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=os.path.dirname(__file__)).rstrip()
     appendChild(head,
-                E.meta({"name": "generator", "content": "Bikeshed 1.0.0"}))
+                E.meta({"name": "generator", "content": "Bikeshed version {0}".format(bikeshedVersion)}))
 
 
 def addHeaderFooter(doc):
@@ -548,8 +551,11 @@ def addTOCSection(doc):
         if hasClass(header, "no-toc"):
             # Hit a no-toc, suppress the entire section.
             addToTOC = False
-        if container is None:
+        elif container is None:
             addToTOC = False
+        elif (level-1) > doc.md.maxToCDepth:
+            addToTOC = False
+
         if addToTOC:
             li = appendChild(container,
                              E.li(

@@ -36,12 +36,14 @@ class MetadataManager:
         self.rawStatus = None
 
         # optional metadata
-        self.assertionClass = "assertion"
         self.advisementClass = "advisement"
+        self.assertionClass = "assertion"
+        self.assumeExplicitFor = False
         self.atRisk = []
         self.audience = []
         self.blockElements = []
         self.boilerplate = config.BoolSet(default=True)
+        self.canIUseURLs = []
         self.complainAbout = config.BoolSet()
         self.customTextMacros = []
         self.date = datetime.utcnow().date()
@@ -66,6 +68,7 @@ class MetadataManager:
         self.mailingList = None
         self.mailingListArchives = None
         self.markupShorthands = config.BoolSet(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
+        self.maxToCDepth = float('inf')
         self.noEditor = False
         self.noteClass = "note"
         self.opaqueElements = ["pre", "xmp", "script", "style"]
@@ -441,7 +444,7 @@ def parseBiblioStatus(key, val, lineNum):
 
 def parseComplainAbout(key, val, lineNum):
     ret = config.BoolSet(default=False)
-    validLabels = frozenset(["missing-example-ids"])
+    validLabels = frozenset(["missing-example-ids", "broken-links"])
     parseBoolishList(key, val.lower(), ret, validLabels)
     return ret
 
@@ -620,6 +623,20 @@ def parseEditorTerm(key, val, lineNum):
         return {"singular": "Editor", "plural": "Editors"}
 
 
+def parseMaxToCDepth(key, val, lineNum):
+    if val.lower() == "none":
+        return float('inf')
+    try:
+        v = int(val)
+    except ValueError, e:
+        die("Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.", val, lineNum=lineNum)
+        return float('inf')
+    if not (1 <= v <= 5):
+        die("Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.", val, lineNum=lineNum)
+        return float('inf')
+    return v
+
+
 def parse(lines, doc):
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
@@ -788,17 +805,24 @@ def parseLiteral(k, v, l):
     return v
 
 
+def parseLiteralCaseless(k, v, l):
+    return v.lower()
+
+
 def parseLiteralList(k, v, l):
     return [v]
+
 
 knownKeys = {
     "Abstract": Metadata("Abstract", "abstract", joinList, parseLiteralList),
     "Advisement Class": Metadata("Advisement Class", "advisementClass", joinValue, parseLiteral),
     "Assertion Class": Metadata("Assertion Class", "assertionClass", joinValue, parseLiteral),
+    "Assume Explicit For": Metadata("Assume Explicit For", "assumeExplicitFor", joinValue, parseBoolean),
     "At Risk": Metadata("At Risk", "atRisk", joinList, parseLiteralList),
     "Audience": Metadata("Audience", "audience", joinList, parseAudience),
     "Block Elements": Metadata("Block Elements", "blockElements", joinList, parseCommaSeparated),
     "Boilerplate": Metadata("Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate),
+    "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joinList, parseLiteralList),
     "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
     "Date": Metadata("Date", "date", joinValue, parseDate),
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
@@ -825,6 +849,7 @@ knownKeys = {
     "Mailing List Archives": Metadata("Mailing List Archives", "mailingListArchives", joinValue, parseLiteral),
     "Mailing List": Metadata("Mailing List", "mailingList", joinValue, parseLiteral),
     "Markup Shorthands": Metadata("Markup Shorthands", "markupShorthands", joinBoolSet, parseMarkupShorthands),
+    "Max Toc Depth": Metadata("Max ToC Depth", "maxToCDepth", joinValue, parseMaxToCDepth),
     "No Editor": Metadata("No Editor", "noEditor", joinValue, parseBoolean),
     "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),
     "Opaque Elements": Metadata("Opaque Elements", "opaqueElements", joinList, parseCommaSeparated),
@@ -832,7 +857,7 @@ knownKeys = {
     "Previous Version": Metadata("Previous Version", "previousVersions", joinList, parseLiteralList),
     "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
-    "Shortname": Metadata("Shortname", "shortname", joinValue, parseLiteral),
+    "Shortname": Metadata("Shortname", "shortname", joinValue, parseLiteralCaseless),
     "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
     "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),
     "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),

@@ -152,6 +152,10 @@ typedef sequence<Foo[]>? fooType;
 typedef (short or Foo) maybeFoo;
 typedef sequence<(short or Foo)> maybeFoos;
 typedef FrozenArray<(short or Foo)> frozenMaybeFoos;
+typedef record<DOMString, Foo[]>? recordFoo;
+typedef record<DOMString, (short or Foo)>? recordMaybeFoo;
+typedef record<USVString, any> recordAny;
+typedef record<any, any> recordBroken;
 interface foo {
   [one] attribute Foo one;
   [two] Foo two()bar;

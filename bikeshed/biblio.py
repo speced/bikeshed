@@ -17,15 +17,11 @@ class BiblioEntry(object):
         self.date = None
         self.snapshot_url = None
         self.current_url = None
+        self.preferred_url = preferredURL
         self.url = None
         self.other = None
         for key, val in kwargs.items():
-            if key == "authors":
-                setattr(self, key, val)
-            elif key == "etAl":
-                self.etAl = val
-            else:
-                setattr(self, key, val)
+            setattr(self, key, val)
         if preferredURL == "snapshot":
             self.url = self.snapshot_url or self.current_url
         elif preferredURL == "current":
@@ -53,11 +49,13 @@ class BiblioEntry(object):
         else:
             str += "{0}. ".format(self.title)
 
-        if self.date:
-            str += self.date + ". "
-
-        if self.status:
-            str += self.status + ". "
+        if self.preferred_url == "current" and self.current_url:
+            pass
+        else:
+            if self.date:
+                str += self.date + ". "
+            if self.status:
+                str += self.status + ". "
 
         if self.other:
             str += self.other + " "
@@ -91,10 +89,13 @@ class BiblioEntry(object):
             ret.append(self.title + ". ")
 
         str = ""
-        if self.date:
-            str += self.date + ". "
-        if self.status:
-            str += self.status + ". "
+        if self.preferred_url == "current" and self.current_url:
+            pass
+        else:
+            if self.date:
+                str += self.date + ". "
+            if self.status:
+                str += self.status + ". "
         if self.other:
             str += self.other + " "
         ret.append(str)

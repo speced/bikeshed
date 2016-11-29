@@ -21,6 +21,7 @@ shortToLongStatus = {
     "LS": "Living Standard",
     "LS-COMMIT": "Commit Snapshot",
     "LS-BRANCH": "Branch Snapshot",
+    "LD": "Living Document",
     "FINDING": "Finding",
     "w3c/ED": "Editor's Draft",
     "w3c/WD": "W3C Working Draft",
@@ -75,9 +76,9 @@ shortToLongStatus = {
     "iso/AMD": "Amendment"
 }
 snapshotStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/NOTE", "w3c/MO"]
-unlevelledStatuses = ["LS", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING"]
+unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING"]
 deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
-noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "FINDING", "DREAM"]
+noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DREAM"]
 
 megaGroups = {
     "w3c": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webauthn", "webperf", "webplatform", "webspecs", "webvr", "wicg"]),
@@ -238,6 +239,8 @@ functionishTypes = frozenset(["function", "method", "constructor", "stringifier"
 idlMethodTypes = frozenset(["method", "constructor", "stringifier", "idl", "idl-name"])
 linkTypes = dfnTypes | frozenset(["propdesc", "functionish", "idl", "idl-name", "element-sub", "maybe", "biblio"])
 typesUsingFor = frozenset(["descriptor", "value", "element-attr", "attr-value", "element-state", "method", "constructor", "argument", "attribute", "const", "dict-member", "event", "enum-value", "stringifier", "serializer", "iterator", "maplike", "setlike", "state", "mode", "context", "facet"])
+typesNotUsingFor = frozenset(["property", "element", "interface", "namespace", "callback", "dictionary", "enum", "exception", "typedef", "http-header"])
+assert not(typesUsingFor & typesNotUsingFor)
 lowercaseTypes = cssTypes | markupTypes | frozenset(["propdesc", "element-sub", "maybe", "dfn", "grammar", "http-header"])
 
 linkTypeToDfnType = {
@@ -258,8 +261,12 @@ linkStatuses = frozenset(["current", "snapshot", "local", "anchor-block"])
 
 
 def linkTypeIn(linkTypes, targetTypes="all"):
-    # Tests if a link type (which might be a shorthand type like "idl")
-    # matches against a given set of types.
+    # Tests if two link/dfn types are "compatible",
+    # such that they share at least one base type when expanded.
+    # (All dfn types are "base"; link types like "idl" are shorthand,
+    #  and expand into one or more base types.)
+    # Called with no arguments,
+    # tests if the passed type is a valid dfn/link type.
     if isinstance(linkTypes, basestring):
         linkTypes = linkTypeToDfnType[linkTypes]
     else:
@@ -338,6 +345,9 @@ class HierarchicalNumber(object):
 
     def __repr__(self):
         return "HierarchicalNumber(" + repr(self.originalVal) + ")"
+
+    def __hash__(self):
+        return hash(self.originalVal)
 
 
 def intersperse(iterable, delimiter):
