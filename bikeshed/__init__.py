@@ -640,7 +640,7 @@ class Spec(object):
         if not config.dryRun:
             try:
                 if outputFilename == "-":
-                    sys.stdout.write(rendered)
+                    sys.stdout.write(rendered.encode("utf-8"))
                 else:
                     with io.open(outputFilename, "w", encoding="utf-8") as f:
                         f.write(rendered)
