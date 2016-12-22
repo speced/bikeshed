@@ -81,9 +81,9 @@ deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
 noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DREAM"]
 
 megaGroups = {
-    "w3c": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "i18n", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webauthn", "webperf", "webplatform", "webspecs", "webvr", "wicg"]),
+    "w3c": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "i18n", "mediacapture", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webauthn", "webperf", "webplatform", "webspecs", "webvr", "wicg"]),
     "iso": frozenset(["wg21"]),
-    "priv-sec": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"])
+    "priv-sec": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "mediacapture", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"])
 }
 
 
