@@ -413,7 +413,7 @@ class ReferenceManager(object):
                 if not forlessRefs:
                     forlessRefs,_ = self.foreignRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
                 if forlessRefs:
-                    linkerror("Ambiguous for-less link, please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\n{0}", outerHTML(el), el=el)
+                    reportAmbiguousForlessLink(el, text, forlessRefs, localRefs)
                     return None
             if len(localRefs) == 1:
                 return localRefs[0]
@@ -447,7 +447,7 @@ class ReferenceManager(object):
         if blockRefs and linkFor is None and any(x.for_ for x in blockRefs):
             forlessRefs,_ = self.foreignRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
             if forlessRefs:
-                linkerror("Ambiguous for-less link, please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\n{0}", outerHTML(el), el=el)
+                reportAmbiguousForlessLink(el, text, forlessRefs, blockRefs)
                 return None
         if len(blockRefs) == 1:
             return blockRefs[0]
@@ -789,6 +789,9 @@ def reportMultiplePossibleRefs(possibleRefs, text, linkType, defaultRef, el):
                   defaultRef.spec,
                   '\n'.join(possibleRefs),
                   el=el)
+
+def reportAmbiguousForlessLink(el, text, forlessRefs, localRefs):
+    linkerror("Ambiguous for-less link, please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\n{0}", outerHTML(el), el=el)
 
 def decodeAnchors(linesIter):
     # Decodes the anchor storage format into a list of dicts
