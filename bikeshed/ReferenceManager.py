@@ -747,7 +747,7 @@ class RefWrapper(object):
         return "RefWrapper(" + repr(self.text) + ", " + repr(self.ref) + ")"
 
 
-def simplifyPossibleRefs(refs):
+def simplifyPossibleRefs(refs, alwaysShowFor=False):
     # "Simplifies" the set of possible refs according to their 'for' value;
     # returns a list of text/type/spec/for objects,
     # with the for value filled in *only if necessary for disambiguation*.
@@ -760,7 +760,7 @@ def simplifyPossibleRefs(refs):
             forVals[(ref.text, ref.type, ref.spec)].append("/")
     retRefs = []
     for (text, type, spec), fors in forVals.items():
-        if len(fors) >= 2:
+        if len(fors) >= 2 or alwaysShowFor:
             for for_ in fors:
                 retRefs.append({'text':text, 'type':type, 'spec':spec, 'for_':for_})
         else:
@@ -791,7 +791,7 @@ def reportMultiplePossibleRefs(possibleRefs, text, linkType, defaultRef, el):
                   el=el)
 
 def reportAmbiguousForlessLink(el, text, forlessRefs, localRefs):
-    linkerror("Ambiguous for-less link, please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\n{0}", outerHTML(el), el=el)
+    linkerror("Ambiguous for-less link for '{0}', please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\nLocal references:\n{1}\nfor-less references:\n{2}", text, "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)]), "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)]), el=el)
 
 def decodeAnchors(linesIter):
     # Decodes the anchor storage format into a list of dicts
