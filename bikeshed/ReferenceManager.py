@@ -452,12 +452,7 @@ class ReferenceManager(object):
         if len(blockRefs) == 1:
             return blockRefs[0]
         elif len(blockRefs) > 1:
-            possibleRefs = []
-            for ref in simplifyPossibleRefs(blockRefs):
-                if ref['for_']:
-                    possibleRefs.append('spec:{spec}; type:{type}; for:{for_}; text:{text}'.format(**ref))
-                else:
-                    possibleRefs.append('spec:{spec}; type:{type}; text:{text}'.format(**ref))
+            possibleRefs = [refToText(ref) for ref in simplifyPossibleRefs(blockRefs)]
             linkerror("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
                       linkType,
                       text,
@@ -586,12 +581,7 @@ class ReferenceManager(object):
                     defaultRef = ref
                     break
         if error:
-            possibleRefs = []
-            for ref in simplifyPossibleRefs(refs):
-                if ref['for_']:
-                    possibleRefs.append('spec:{spec}; type:{type}; for:{for_}; text:{text}'.format(**ref))
-                else:
-                    possibleRefs.append('spec:{spec}; type:{type}; text:{text}'.format(**ref))
+            possibleRefs = [refToText(ref) for ref in simplifyPossibleRefs(refs)]
             if len(possibleRefs) == 1:
                 # Only happens when the refs can't be disambiguated under Bikeshed's data model.
                 linkerror("Multiple possible '{0}' refs for '{1}' in {2}, but they're not distinguishable with Bikeshed's data model. Either create a manual link, or ask the spec maintainer to add sufficient disambiguating attributes to make them distinguishable. Usually this means adding a for='' value to at least one of them.\nArbitrarily chose the {3} one to link to for now.",
@@ -798,6 +788,11 @@ def simplifyPossibleRefs(refs):
             retRefs.append({'text':text, 'type':type, 'spec':spec, 'for_':None})
     return retRefs
 
+def refToText(ref):
+    if ref['for_']:
+        return 'spec:{spec}; type:{type}; for:{for_}; text:{text}'.format(**ref)
+    else:
+        return 'spec:{spec}; type:{type}; text:{text}'.format(**ref)
 
 def decodeAnchors(linesIter):
     # Decodes the anchor storage format into a list of dicts
