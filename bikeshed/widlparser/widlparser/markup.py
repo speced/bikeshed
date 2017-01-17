@@ -27,6 +27,22 @@ class MarkupGenerator(object):
             self.addText(type._semicolon)
             self.addText(type._trailingSpace)
 
+    def addPrimitiveType(self, type):
+        if (type):
+            self.children.append(MarkupPrimitiveType(self.construct, type))
+
+    def addStringType(self, type):
+        if (type):
+            self.children.append(MarkupStringType(self.construct, type))
+
+    def addBufferType(self, type):
+        if (type):
+            self.children.append(MarkupBufferType(self.construct, type))
+
+    def addObjectType(self, type):
+        if (type):
+            self.children.append(MarkupObjectType(self.construct, type))
+
     def addTypeName(self, typeName):
         if (typeName):
             self.children.append(MarkupTypeName(typeName))
@@ -74,6 +90,50 @@ class MarkupType(MarkupGenerator):
     def _markup(self, marker):
         if (self.construct and hasattr(marker, 'markupType')):
             return marker.markupType(self.text, self.construct)
+        return (None, None)
+
+
+class MarkupPrimitiveType(MarkupGenerator):
+    def __init__(self, construct, type):
+        MarkupGenerator.__init__(self, construct)
+        type._markup(self)
+
+    def _markup(self, marker):
+        if (self.construct and hasattr(marker, 'markupPrimitiveType')):
+            return marker.markupPrimitiveType(self.text, self.construct)
+        return (None, None)
+
+
+class MarkupBufferType(MarkupGenerator):
+    def __init__(self, construct, type):
+        MarkupGenerator.__init__(self, construct)
+        type._markup(self)
+
+    def _markup(self, marker):
+        if (self.construct and hasattr(marker, 'markupBufferType')):
+            return marker.markupBufferType(self.text, self.construct)
+        return (None, None)
+
+
+class MarkupStringType(MarkupGenerator):
+    def __init__(self, construct, type):
+        MarkupGenerator.__init__(self, construct)
+        type._markup(self)
+
+    def _markup(self, marker):
+        if (self.construct and hasattr(marker, 'markupStringType')):
+            return marker.markupStringType(self.text, self.construct)
+        return (None, None)
+
+
+class MarkupObjectType(MarkupGenerator):
+    def __init__(self, construct, type):
+        MarkupGenerator.__init__(self, construct)
+        type._markup(self)
+
+    def _markup(self, marker):
+        if (self.construct and hasattr(marker, 'markupObjectType')):
+            return marker.markupObjectType(self.text, self.construct)
         return (None, None)
 
 

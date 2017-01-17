@@ -63,10 +63,10 @@ class Construct(ChildProduction):
     def findMembers(self, name):
         return []
 
-    def findMethod(self, name):
+    def findMethod(self, name, argumentNames=None):
         return None
 
-    def findMethods(self, name):
+    def findMethods(self, name, argumentNames=None):
         return []
 
     def findArgument(self, name, searchMembers = True):
@@ -516,14 +516,16 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
     def findMembers(self, name):
         return [member for member in self.members if (name == member.name)]
 
-    def findMethod(self, name):
+    def findMethod(self, name, argumentNames=None):
         for member in reversed(self.members):
-            if (('method' == member.idlType) and (name == member.name)):
+            if (('method' == member.idlType) and (name == member.name)
+                    and ((argumentNames is None) or member.arguments.matchesNames(argumentNames))):
                 return member
         return None
 
-    def findMethods(self, name):
-        return [member for member in self.members if (('method' == member.idlType) and (name == member.name))]
+    def findMethods(self, name, argumentNames=None):
+        return [member for member in self.members if (('method' == member.idlType) and (name == member.name)
+                    and ((argumentNames is None) or member.arguments.matchesNames(argumentNames)))]
 
     def findArgument(self, name, searchMembers = True):
         if (searchMembers):
@@ -576,16 +578,22 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
         return output + ']]'
 
 
-class NamespaceMember(Construct): # [ExtendedAttributes] Operation
+class NamespaceMember(Construct): # [ExtendedAttributes] Operation | "readonly" Attribute
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
+        if (Symbol.peek(tokens, 'readonly')):
+            return tokens.popPosition(Attribute.peek(tokens))
         return tokens.popPosition(Operation.peek(tokens))
 
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent)
-        self.member = Operation(tokens, parent)
+        token = tokens.sneakPeek()
+        if (token.isSymbol('readonly')):
+            self.member = Attribute(tokens, parent)
+        else:
+            self.member = Operation(tokens, parent)
         self._didParse(tokens)
 
     @property
@@ -711,14 +719,16 @@ class Namespace(Construct):    # [ExtendedAttributes] ["partial"] "namespace" id
     def findMembers(self, name):
         return [member for member in self.members if (name == member.name)]
 
-    def findMethod(self, name):
+    def findMethod(self, name, argumentNames=None):
         for member in reversed(self.members):
-            if (('method' == member.idlType) and (name == member.name)):
+            if (('method' == member.idlType) and (name == member.name)
+                    and ((argumentNames is None) or member.arguments.matchesNames(argumentNames))):
                 return member
         return None
 
-    def findMethods(self, name):
-        return [member for member in self.members if (('method' == member.idlType) and (name == member.name))]
+    def findMethods(self, name, argumentNames=None):
+        return [member for member in self.members if (('method' == member.idlType) and (name == member.name)
+                    and ((argumentNames is None) or member.arguments.matchesNames(argumentNames)))]
 
     def findArgument(self, name, searchMembers = True):
         if (searchMembers):

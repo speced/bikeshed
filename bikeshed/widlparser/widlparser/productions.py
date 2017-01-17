@@ -287,7 +287,7 @@ class ConstType(Production): # PrimitiveType [Null] | identifier [Null]
                 generator.addText(self.null)
                 return self.null
             return self
-        self.type._markup(generator)
+        generator.addPrimitiveType(self.type)
         if (self.null):
             self.null.markup(generator)
         return self
@@ -529,14 +529,14 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                                 # "USVString" TypeSuffix |
                                 # identifier [TypeSuffix] | "sequence" "<" Type ">" [Null] | "object" [TypeSuffix] |
                                 # "Date" [TypeSuffix] | "RegExp" [TypeSuffix] | "Error" TypeSuffix |
-                                # "DOMException" TypeSuffix | "Promise" "<" ReturnType ">" [Null] | BufferRelatedType [Nulls] |
+                                # "DOMException" TypeSuffix | "Promise" "<" ReturnType ">" [Null] | BufferRelatedType [Null] |
                                 # "FrozenArray" "<" Type ">" [Null] | "record" "<" StringType "," Type ">"
 
     BufferRelatedTypes = frozenset(['ArrayBuffer', 'DataView', 'Int8Array', 'Int16Array', 'Int32Array',
                                     'Uint8Array', 'Uint16Array', 'Uint32Array', 'Uint8ClampedArray',
                                     'Float32Array', 'Float64Array'])
-
     StringTypes = frozenset(['ByteString', 'DOMString', 'USVString'])
+    ObjectTypes = frozenset(['object', 'Date', 'RegExp', 'Error', 'DOMException'])
 
     @classmethod
     def peek(cls, tokens):
@@ -544,7 +544,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             TypeSuffix.peek(tokens)
             return True
         token = tokens.pushPosition()
-        if (token and (token.isSymbol(('ByteString', 'DOMString', 'USVString', 'object', 'Date', 'RegExp', 'Error', 'DOMException')) or token.isIdentifier())):
+        if (token and (token.isSymbol(cls.StringTypes | cls.ObjectTypes) or token.isIdentifier())):
             TypeSuffix.peek(tokens)
             return tokens.popPosition(True)
         elif (token and token.isSymbol(('sequence', 'FrozenArray'))):
@@ -615,7 +615,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                 self._closeType = Symbol(tokens, '>', False)
                 self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
             else:
-                self.type = Symbol(tokens, None, False)  # "ByteString" | "DOMString" | "USVString" | "object" | "Date" | "RegExp"
+                self.type = Symbol(tokens, None, False)  # string or object
                 self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
         self._didParse(tokens, False)
 
@@ -663,7 +663,19 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             if (self.suffix):
                 self.suffix.markup(generator)
             return self
-        self.type._markup(generator)
+        if (isinstance(self.type, PrimitiveType)):
+            generator.addPrimitiveType(self.type)
+        elif (isinstance(self.type, Symbol)):
+            if (self.type.symbol in self.BufferRelatedTypes):
+                generator.addBufferType(self.type)
+            elif (self.type.symbol in self.StringTypes):
+                generator.addStringType(self.type)
+            elif (self.type.symbol in self.ObjectTypes):
+                generator.addObjectType(self.type)
+            else:
+                assert(False)
+        else:
+            self.type._markup(generator)
         generator.addText(self.null)
         if (self.suffix):
             self.suffix.markup(generator)
@@ -776,7 +788,7 @@ class UnionType(Production): # "(" UnionMemberType ["or" UnionMemberType]... ")"
     def _markup(self, generator):
         generator.addText(self._openParen)
         for type, _or in itertools.izip_longest(self.types, self._ors, fillvalue = ''):
-            type.markup(generator)
+            generator.addType(type)
             if (_or):
                 _or.markup(generator)
         generator.addText(self._closeParen)
@@ -1077,6 +1089,16 @@ class ArgumentList(Production):    # Argument ["," Argument]...
                 names.append(', '.join([argument.name for argument in args]))
             return names
         return ['']
+
+    def matchesNames(self, argumentNames):
+        for name, argument in itertools.izip_longest(argumentNames, self.arguments, fillvalue=None):
+            if (name):
+                if ((argument is None) or (argument.name != name)):
+                    return False
+            else:
+                if (argument and argument.required):
+                    return False
+        return True
 
     def __len__(self):
         return len(self.arguments)
