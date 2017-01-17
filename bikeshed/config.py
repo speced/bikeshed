@@ -202,6 +202,7 @@ dfnClassToType = {
     "element-statedef"   : "element-state",
     "eventdef"           : "event",
     "interfacedef"       : "interface",
+    "internal-slotdef"   : "internal-slot",
     "namespacedef"       : "namespace",
     "extendedattrdef"    : "extended-attribute",
     "constructordef"     : "constructor",
