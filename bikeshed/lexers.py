@@ -45,8 +45,8 @@ class CSSLexer(RegexLexer):
         b"values": [
             (r"/\*", Comment, b"comment"),
             (r"[(),/]", Punctuation),
-            (r"([+-]?(?:\d+(?:\.\d+)?[eE][+-]?\d+(?:\.\d+)?))([a-zA-Z-]+|%)", bygroups(Literal.Number, Literal)),
-            (r"[+-]?\d+(?:\.\d+)?[eE][+-]?\d+(?:\.\d+)?", Literal.Number),
+            (r"([+-]?(?:\d+(?:\.\d+)?|\d*\.\d+)[eE][+-]?(?:\d+(?:\.\d+)?|\d*\.\d+))([a-zA-Z-]+|%)", bygroups(Literal.Number, Literal)),
+            (r"[+-]?(?:\d+(?:\.\d+)?|\d*\.\d+)[eE][+-]?(?:\d+(?:\.\d+)?|\d*\.\d+)", Literal.Number),
             (r"([+-]?(?:\d+(?:\.\d+)?|\d*\.\d+))([a-zA-Z-]+|%)", bygroups(Literal.Number, Literal)),
             (r"[+-]?(?:\d+(?:\.\d+)?|\d*\.\d+)", Literal.Number),
             (r"(url)(\()([^)]*)(\))", bygroups(Name.Function, Punctuation, Literal.String, Punctuation)),
