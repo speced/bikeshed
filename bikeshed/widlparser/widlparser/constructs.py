@@ -403,6 +403,11 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | Spe
             return [argument for argument in self.member.arguments if (name == argument.name)]
         return []
 
+    def matchesArgumentNames(self, argumentNames):
+        if (self.arguments):
+            return self.arguments.matchesNames(argumentNames)
+        return (not argumentNames)
+
     def _unicode(self):
         return Construct._unicode(self) + unicode(self.member)
 
@@ -519,13 +524,13 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
     def findMethod(self, name, argumentNames=None):
         for member in reversed(self.members):
             if (('method' == member.idlType) and (name == member.name)
-                    and ((argumentNames is None) or member.arguments.matchesNames(argumentNames))):
+                    and ((argumentNames is None) or member.matchesArgumentNames(argumentNames))):
                 return member
         return None
 
     def findMethods(self, name, argumentNames=None):
         return [member for member in self.members if (('method' == member.idlType) and (name == member.name)
-                    and ((argumentNames is None) or member.arguments.matchesNames(argumentNames)))]
+                    and ((argumentNames is None) or member.matchesArgumentNames(argumentNames)))]
 
     def findArgument(self, name, searchMembers = True):
         if (searchMembers):
@@ -632,6 +637,11 @@ class NamespaceMember(Construct): # [ExtendedAttributes] Operation | "readonly" 
             return [argument for argument in self.member.arguments if (name == argument.name)]
         return []
 
+    def matchesArgumentNames(self, argumentNames):
+        if (self.arguments):
+            return self.arguments.matchesNames(argumentNames)
+        return (not argumentNames)
+
     def _unicode(self):
         return Construct._unicode(self) + unicode(self.member)
 
@@ -722,13 +732,13 @@ class Namespace(Construct):    # [ExtendedAttributes] ["partial"] "namespace" id
     def findMethod(self, name, argumentNames=None):
         for member in reversed(self.members):
             if (('method' == member.idlType) and (name == member.name)
-                    and ((argumentNames is None) or member.arguments.matchesNames(argumentNames))):
+                    and ((argumentNames is None) or member.matchesArgumentNames(argumentNames))):
                 return member
         return None
 
     def findMethods(self, name, argumentNames=None):
         return [member for member in self.members if (('method' == member.idlType) and (name == member.name)
-                    and ((argumentNames is None) or member.arguments.matchesNames(argumentNames)))]
+                    and ((argumentNames is None) or member.matchesArgumentNames(argumentNames)))]
 
     def findArgument(self, name, searchMembers = True):
         if (searchMembers):
@@ -1504,6 +1514,11 @@ class ExtendedAttribute(Construct): # ExtendedAttributeNoArgs | ExtendedAttribut
         if (hasattr(self.attribute, 'arguments') and self.attribute.arguments):
             return [argument for argument in self.attribute.arguments if (name == argument.name)]
         return []
+
+    def matchesArgumentNames(self, argumentNames):
+        if (self.arguments):
+            return self.arguments.matchesNames(argumentNames)
+        return (not argumentNames)
 
     def _unicode(self):
         return unicode(self.attribute)

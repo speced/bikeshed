@@ -228,6 +228,7 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
 [ Constructor , NamedConstructor = MyConstructor, Constructor (Foo one), NamedConstructor = MyOtherConstructor (Foo two , long long longest ) ] partial interface Foo: Bar {
     unsigned long long method(short x, unsigned long long y, optional double inf = Infinity, optional sequence<Foo> fooArg = 123.4) raises (hell);
     unsigned long long method(DOMString string);
+    void abort();
     void anotherMethod(short round);
     [ha!] attribute short bar getraises (an, exception);
     const short fortyTwo = 42;
@@ -342,4 +343,5 @@ interface OptionalTest {
     print ', '.join(parser.normalizedMethodNames('method(x)', 'Foo'))
     print ', '.join(parser.normalizedMethodNames('method(x, y)', 'Foo'))
     print ', '.join(parser.normalizedMethodNames('method(x, y, bar)', 'Foo'))
+    print ', '.join(parser.normalizedMethodNames('abort()', 'Foo'))
 
