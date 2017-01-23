@@ -37,6 +37,11 @@ shortToLongStatus = {
     "w3c/UD": "Unofficial Proposal Draft",
     "w3c/CG-DRAFT": "Draft Community Group Report",
     "w3c/CG-FINAL": "Final Community Group Report",
+    "tc39/STAGE0": "Stage 0: Strawman",
+    "tc39/STAGE1": "Stage 1: Proposal",
+    "tc39/STAGE2": "Stage 2: Draft",
+    "tc39/STAGE3": "Stage 3: Candidate",
+    "tc39/STAGE4": "Stage 4: Finished",
     "iso/I": "Issue",
     "iso/DR": "Defect Report",
     "iso/D": "Draft Proposal",
@@ -83,6 +88,7 @@ noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DRAFT-FINDING"
 
 megaGroups = {
     "w3c": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "i18n", "mediacapture", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webauthn", "webperf", "webplatform", "webspecs", "webvr", "wicg"]),
+    "tc39": frozenset(["tc39"]),
     "iso": frozenset(["wg21"]),
     "priv-sec": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "mediacapture", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"])
 }
