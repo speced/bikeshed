@@ -11,6 +11,7 @@
 #
 
 import re
+import itertools
 
 import tokenizer
 from constructs import *
@@ -213,28 +214,28 @@ class Parser(object):
                 arguments = ArgumentList(tokens, None)
                 return match.group(1) + '(' + arguments.argumentNames[0] + ')'
             name = match.group(1) + match.group(3)
-            arguments = match.group(2)
+            argumentNames = [argument.strip() for argument in match.group(2).split(',')]
         else:
             name = methodText
-            arguments = ''
+            argumentNames = None
 
         if (interfaceName):
             interface = self.find(interfaceName)
             if (interface):
-                method = interface.findMethod(name)
+                method = interface.findMethod(name, argumentNames)
                 if (method):
                     return method.methodName
-            return name + '(' + arguments + ')'
+            return name + '(' + ', '.join(argumentNames or []) + ')'
 
         for construct in self.constructs:
-            method = construct.findMethod(name)
+            method = construct.findMethod(name, argumentNames)
             if (method):
                 return method.methodName
 
         construct = self.find(name)
         if (construct and ('method' == construct.idlType)):
             return construct.methodName
-        return name + '(' + arguments + ')'
+        return name + '(' + ', '.join(argumentNames or []) + ')'
 
     def normalizedMethodNames(self, methodText, interfaceName = None):
         match = re.match(r'(.*)\((.*)\)(.*)', methodText)
@@ -244,28 +245,28 @@ class Parser(object):
                 arguments = ArgumentList(tokens, None)
                 return [match.group(1) + '(' + argumentName + ')' for argumentName in arguments.argumentNames]
             name = match.group(1) + match.group(3)
-            arguments = match.group(2)
+            argumentNames = [argument.strip() for argument in match.group(2).split(',')]
         else:
             name = methodText
-            arguments = ''
+            argumentNames = None
 
         if (interfaceName):
             interface = self.find(interfaceName)
             if (interface):
-                method = interface.findMethod(name)
-                if (method):
-                    return method.methodNames
-            return [name + '(' + arguments + ')']
+                methods = interface.findMethods(name, argumentNames)
+                if (methods):
+                    return itertools.chain(*[method.methodNames for method in methods])
+            return [name + '(' + ', '.join(argumentNames or []) + ')']
 
         for construct in self.constructs:
-            method = construct.findMethod(name)
-            if (method):
-                return method.methodNames
+            methods = construct.findMethods(name, argumentNames)
+            if (methods):
+                return itertools.chain(*[method.methodNames for method in methods])
 
         construct = self.find(name)
         if (construct and ('method' == construct.idlType)):
             return construct.methodNames
-        return [name + '(' + arguments + ')']
+        return [name + '(' + ', '.join(argumentNames or []) + ')']
 
     def markup(self, marker):
         if (marker):

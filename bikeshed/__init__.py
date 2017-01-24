@@ -52,7 +52,7 @@ def main():
     argparser.add_argument("-d", "--dry-run", dest="dryRun", action="store_true",
                            help="Prevents the processor from actually saving anything to disk, but otherwise fully runs.")
     argparser.add_argument("--print", dest="printMode", action="store", default="console",
-                           help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup'.")
+                           help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup', and 'json'.")
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
 
@@ -248,7 +248,10 @@ def main():
             rm = ReferenceManager()
             rm.initializeRefs()
         refs = rm.queryAllRefs(text=unicode(options.text, encoding="utf-8"), linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact)
-        p(config.printjson(refs))
+        if config.printMode == "json":
+            p(json.dumps(refs, indent=2, default=config.getjson))
+        else:
+            p(config.printjson(refs))
     elif options.subparserName == "issues-list":
         from . import issuelist as il
         if options.printTemplate:
@@ -549,6 +552,7 @@ class Spec(object):
         boilerplate.addObsoletionNotice(self)
         boilerplate.addAtRisk(self)
         addNoteHeaders(self)
+        addImplicitAlgorithms(self)
         boilerplate.removeUnwantedBoilerplate(self)
         shorthands.transformProductionPlaceholders(self)
         shorthands.transformMaybePlaceholders(self)
@@ -557,7 +561,6 @@ class Spec(object):
         canonicalizeShortcuts(self)
         fixManualDefTables(self)
         headings.processHeadings(self)
-        addImplicitAlgorithms(self)
         checkVarHygiene(self)
         processIssuesAndExamples(self)
         markupIDL(self)
@@ -640,7 +643,7 @@ class Spec(object):
         if not config.dryRun:
             try:
                 if outputFilename == "-":
-                    sys.stdout.write(rendered)
+                    sys.stdout.write(rendered.encode("utf-8"))
                 else:
                     with io.open(outputFilename, "w", encoding="utf-8") as f:
                         f.write(rendered)
@@ -885,7 +888,7 @@ def addImplicitAlgorithms(doc):
     # but it contains only a single `<dfn>`,
     # assume that the dfn is a description of the algorithm.
     for el in findAll("[algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
-        dfns = findAll(config.dfnElementsSelector, el)
+        dfns = findAll("dfn", el)
         if len(dfns) == 1:
             el.set("algorithm", config.firstLinkTextFromElement(dfns[0]))
         elif len(dfns) == 0:
@@ -1177,7 +1180,7 @@ def classifyDfns(doc, dfns):
                 elif dfnType in config.idlTypes:
                     # IDL methodish construct, ask the widlparser what it should have.
                     # If the method isn't in any IDL, this tries its best to normalize it anyway.
-                    names = doc.widl.normalizedMethodNames(primaryDfnText, el.get('data-dfn-for'))
+                    names = list(doc.widl.normalizedMethodNames(primaryDfnText, el.get('data-dfn-for')))
                     primaryDfnText = names[0]
                     el.set('data-lt', "|".join(names))
                 else:

@@ -22,6 +22,7 @@ shortToLongStatus = {
     "LS-COMMIT": "Commit Snapshot",
     "LS-BRANCH": "Branch Snapshot",
     "LD": "Living Document",
+    "DRAFT-FINDING": "Draft Finding",
     "FINDING": "Finding",
     "w3c/ED": "Editor's Draft",
     "w3c/WD": "W3C Working Draft",
@@ -36,6 +37,11 @@ shortToLongStatus = {
     "w3c/UD": "Unofficial Proposal Draft",
     "w3c/CG-DRAFT": "Draft Community Group Report",
     "w3c/CG-FINAL": "Final Community Group Report",
+    "tc39/STAGE0": "Stage 0: Strawman",
+    "tc39/STAGE1": "Stage 1: Proposal",
+    "tc39/STAGE2": "Stage 2: Draft",
+    "tc39/STAGE3": "Stage 3: Candidate",
+    "tc39/STAGE4": "Stage 4: Finished",
     "iso/I": "Issue",
     "iso/DR": "Defect Report",
     "iso/D": "Draft Proposal",
@@ -76,14 +82,15 @@ shortToLongStatus = {
     "iso/AMD": "Amendment"
 }
 snapshotStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/NOTE", "w3c/MO"]
-unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING"]
+unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING", "DRAFT-FINDING"]
 deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
-noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DREAM"]
+noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DRAFT-FINDING", "DREAM"]
 
 megaGroups = {
-    "w3c": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webauthn", "webperf", "webplatform", "webspecs", "webvr", "wicg"]),
+    "w3c": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "i18n", "mediacapture", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webauthn", "webperf", "webplatform", "webspecs", "webvr", "wicg"]),
+    "tc39": frozenset(["tc39"]),
     "iso": frozenset(["wg21"]),
-    "priv-sec": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"])
+    "priv-sec": frozenset(["csswg", "dap", "fxtf", "geolocation", "houdini", "html", "mediacapture", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"])
 }
 
 

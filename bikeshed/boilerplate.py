@@ -241,56 +241,55 @@ def addExplicitIndexes(doc):
                 export = None
         else:
             export = None
-        for text, refs in doc.refs.refs.items():
-            text = text.strip()
-            for ref in refs:
-                if export is not None and ref['export'] != export:
+        for ref in doc.refs.queryAllRefs():
+            text = ref.text.strip()
+            if export is not None and ref.export != export:
+                continue
+            if specs is not None and ref.spec not in specs:
+                continue
+            if types is not None and ref.type not in types:
+                continue
+            if fors is not None and not (set(ref.for_) & fors):
+                continue
+            disambInfo = []
+            if types is None or len(types) > 1:
+                disambInfo.append(ref.type)
+            if specs is None or len(specs) > 1:
+                disambInfo.append("in " + ref.spec)
+            if ref.for_:
+                try:
+                    disambInfo.append("for {0}".format(', '.join(x.strip() for x in ref.for_)))
+                except:
+                    # todo: The TR version of Position triggers this
+                    pass
+            disambiguator = ", ".join(disambInfo)
+            entry = {'url': ref.url, 'disambiguator': disambiguator, 'label': None, 'status': ref.status}
+            # TODO: This is n^2, iterating over all the entries on every new addition.
+            for i,existingEntry in enumerate(indexEntries[text]):
+                if existingEntry['disambiguator'] != disambiguator:
                     continue
-                if specs is not None and ref['spec'].strip() not in specs:
-                    continue
-                if types is not None and ref['type'].strip() not in types:
-                    continue
-                if fors is not None and not (set(x.strip() for x in ref['for']) & fors):
-                    continue
-                disambInfo = []
-                if types is None or len(types) > 1:
-                    disambInfo.append(ref['type'].strip())
-                if specs is None or len(specs) > 1:
-                    disambInfo.append("in " + ref['spec'].strip())
-                if ref['for']:
-                    try:
-                        disambInfo.append("for {0}".format(', '.join(x.strip() for x in ref['for'])))
-                    except:
-                        # todo: The TR version of Position triggers this
-                        pass
-                disambiguator = ", ".join(disambInfo)
-                entry = {'url': ref['url'].strip(), 'disambiguator': disambiguator, 'label': None, 'status': ref['status'].strip()}
-                # TODO: This is n^2, iterating over all the entries on every new addition.
-                for i,existingEntry in enumerate(indexEntries[text]):
-                    if existingEntry['disambiguator'] != disambiguator:
-                        continue
-                    # Whoops, found an identical entry.
-                    if existingEntry['status'] != entry['status']:
-                        if status:
-                            if existingEntry['status'] == status:
-                                # Existing entry matches stated status, do nothing and don't add it.
-                                break
-                            elif entry['status'] == status:
-                                # New entry matches status, update and don't re-add it.
-                                indexEntries[text][i] = entry
-                                break
-                        else:
-                            # Default to preferring current specs
-                            if existingEntry['status'] == "current":
-                                break
-                            elif entry['status'] == "current":
-                                indexEntries[text][i] = entry
-                                break
+                # Whoops, found an identical entry.
+                if existingEntry['status'] != entry['status']:
+                    if status:
+                        if existingEntry['status'] == status:
+                            # Existing entry matches stated status, do nothing and don't add it.
+                            break
+                        elif entry['status'] == status:
+                            # New entry matches status, update and don't re-add it.
+                            indexEntries[text][i] = entry
+                            break
                     else:
-                        # Legit dupes. Shouldn't happen in a good spec, but whatever.
-                        pass
+                        # Default to preferring current specs
+                        if existingEntry['status'] == "current":
+                            break
+                        elif entry['status'] == "current":
+                            indexEntries[text][i] = entry
+                            break
                 else:
-                    indexEntries[text].append(entry)
+                    # Legit dupes. Shouldn't happen in a good spec, but whatever.
+                    pass
+            else:
+                indexEntries[text].append(entry)
         appendChild(el, htmlFromIndexTerms(indexEntries))
         el.tag = "div"
         removeAttr(el, "export")
