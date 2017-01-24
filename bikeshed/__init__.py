@@ -248,7 +248,10 @@ def main():
             rm = ReferenceManager()
             rm.initializeRefs()
         refs = rm.queryAllRefs(text=unicode(options.text, encoding="utf-8"), linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact)
-        p(config.printjson(refs))
+        if config.printMode == "markup":
+            p(json.dumps(refs, indent=2, default=config.getjson))
+        else:
+            p(config.printjson(refs))
     elif options.subparserName == "issues-list":
         from . import issuelist as il
         if options.printTemplate:
