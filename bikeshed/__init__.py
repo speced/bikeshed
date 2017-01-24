@@ -52,7 +52,7 @@ def main():
     argparser.add_argument("-d", "--dry-run", dest="dryRun", action="store_true",
                            help="Prevents the processor from actually saving anything to disk, but otherwise fully runs.")
     argparser.add_argument("--print", dest="printMode", action="store", default="console",
-                           help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup'.")
+                           help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup', and 'json'.")
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
 
@@ -248,7 +248,7 @@ def main():
             rm = ReferenceManager()
             rm.initializeRefs()
         refs = rm.queryAllRefs(text=unicode(options.text, encoding="utf-8"), linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact)
-        if config.printMode == "markup":
+        if config.printMode == "json":
             p(json.dumps(refs, indent=2, default=config.getjson))
         else:
             p(config.printjson(refs))
