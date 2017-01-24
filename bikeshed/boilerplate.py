@@ -106,6 +106,10 @@ def addStyles(doc):
     if el is not None:
         el.text = config.retrieveBoilerplateFile(doc, 'stylesheet')
 
+    el = getFillContainer('stylesheet-extra', doc)
+    if el is not None:
+        el.text = config.retrieveBoilerplateFile(doc, 'stylesheet-extra')
+
 
 def addCustomBoilerplate(doc):
     for el in findAll('[boilerplate]', doc):
