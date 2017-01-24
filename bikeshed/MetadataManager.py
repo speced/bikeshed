@@ -506,8 +506,8 @@ def parseMarkupShorthands(key, val, lineNum):
     return ret
 
 def parseInlineGithubIssues(key, val, lineNum):
-    val = val.strip()
-    if not val in ['title', 'full']:
+    val = val.lower()
+    if val not in ['title', 'full']:
         b = boolish(val)
         if b is None or b:
             die("Inline Github Issues must be 'title', 'full' or false/no/n/off. Got: '{0}'", val, lineNum=lineNum)
