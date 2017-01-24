@@ -65,7 +65,7 @@ then link to them with `<a>` (no `href` attribute).
 It matches up the contained text by default,
 which can be overridden by using `title` on either the `<dfn>` or `<a>`.
 Definitions and autolinks have a few extra attributes that you can specify;
-check out the details in the [Definitions and Linking](definitions-autolinks.md) doc.
+check out the details in the [Autolinking](https://tabatkins.github.io/bikeshed/#autolinking) documentation.
 
 There are a few textual shortcuts to use as well:
 * `[[foo]]` is an autolink to a bibliography entry named "foo", and auto-generates an informative reference in the biblio section.

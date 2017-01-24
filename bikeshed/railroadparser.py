@@ -107,7 +107,7 @@ def _createDiagram(command, prelude, children, text=None, line=-1):
             return die("Line {0} - Skip commands cannot have children.", line)
         if text:
             return die("Line {0} - Skip commands cannot have text.", line)
-        return rr.Skip(prelude)
+        return rr.Skip()
     elif command in ("And", "Seq", "Sequence"):
         if prelude:
             return die("Line {0} - Sequence commands cannot have preludes.", line)

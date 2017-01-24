@@ -25,10 +25,11 @@ from . import headings
 from . import shorthands
 from . import boilerplate
 from . import datablocks
-from . import lexers
 from . import publish
 from . import extensions
 from . import lint
+from . import caniuse
+from . import highlight
 from .requests import requests
 from .ReferenceManager import ReferenceManager
 from .htmlhelpers import *
@@ -51,7 +52,7 @@ def main():
     argparser.add_argument("-d", "--dry-run", dest="dryRun", action="store_true",
                            help="Prevents the processor from actually saving anything to disk, but otherwise fully runs.")
     argparser.add_argument("--print", dest="printMode", action="store", default="console",
-                           help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup'.")
+                           help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup', and 'json'.")
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
 
@@ -246,8 +247,11 @@ def main():
         else:
             rm = ReferenceManager()
             rm.initializeRefs()
-        refs,_ = list(rm.queryRefs(text=unicode(options.text, encoding="utf-8"), linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact))
-        p(config.printjson(refs))
+        refs = rm.queryAllRefs(text=unicode(options.text, encoding="utf-8"), linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact)
+        if config.printMode == "json":
+            p(json.dumps(refs, indent=2, default=config.getjson))
+        else:
+            p(config.printjson(refs))
     elif options.subparserName == "issues-list":
         from . import issuelist as il
         if options.printTemplate:
@@ -570,7 +574,7 @@ class Spec(object):
         formatArgumentdefTables(self)
         formatElementdefTables(self)
         processAutolinks(self)
-        addCanIUsePanels(self)
+        caniuse.addCanIUsePanels(self)
         boilerplate.addIndexSection(self)
         boilerplate.addExplicitIndexes(self)
         boilerplate.addStyles(self)
@@ -586,10 +590,11 @@ class Spec(object):
         processAutolinks(self)
         boilerplate.addAnnotations(self)
         boilerplate.removeUnwantedBoilerplate(self)
-        addSyntaxHighlighting(self)
+        highlight.addSyntaxHighlighting(self)
         boilerplate.addBikeshedBoilerplate(self)
         fixIntraDocumentReferences(self)
         fixInterDocumentReferences(self)
+        lint.lintBrokenLinks(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
@@ -638,7 +643,7 @@ class Spec(object):
         if not config.dryRun:
             try:
                 if outputFilename == "-":
-                    sys.stdout.write(rendered)
+                    sys.stdout.write(rendered.encode("utf-8"))
                 else:
                     with io.open(outputFilename, "w", encoding="utf-8") as f:
                         f.write(rendered)
@@ -845,7 +850,8 @@ def canonicalizeShortcuts(doc):
         "dict-member-info":"data-dict-member-info",
         "lt":"data-lt",
         "local-lt":"data-local-lt",
-        "algorithm":"data-algorithm"
+        "algorithm":"data-algorithm",
+        "ignore":"data-var-ignore"
     }
     for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys()), doc):
         for attr, fixedAttr in attrFixup.items():
@@ -905,7 +911,7 @@ def checkVarHygiene(doc):
 
     # Look for vars that only show up once. These are probably typos.
     singularVars = []
-    varCounts = Counter((foldWhitespace(textContent(el)), nearestAlgo(el)) for el in findAll("var", doc))
+    varCounts = Counter((foldWhitespace(textContent(el)), nearestAlgo(el)) for el in findAll("var", doc) if el.get("data-var-ignore") is None)
     for var,count in varCounts.items():
         if count == 1 and var[0].lower() not in doc.md.ignoredVars:
             singularVars.append(var)
@@ -916,7 +922,7 @@ def checkVarHygiene(doc):
                 printVars += "  '{0}', in algorithm '{1}'\n".format(var, algo)
             else:
                 printVars += "  '{0}'\n".format(var)
-        warn("The following <var>s were only used once in the document:\n{0}If these are not typos, please add them to the 'Ignored Vars' metadata.", printVars)
+        warn("The following <var>s were only used once in the document:\n{0}If these are not typos, please add an ignore='' attribute to the <var>.", printVars)
 
     # Look for algorithms that show up twice; these are errors.
     for algo, count in Counter(el.get('data-algorithm') for el in findAll("[data-algorithm]", doc)).items():
@@ -1149,6 +1155,9 @@ def classifyDfns(doc, dfns):
         if primaryDfnText is None:
             die("Dfn has no linking text:\n{0}", outerHTML(el), el=el)
             continue
+        # Check for invalid fors, as it's usually some misnesting.
+        if dfnFor and dfnType in config.typesNotUsingFor:
+            die("'{0}' definitions don't use a 'for' attribute, but this one claims it's for '{1}' (perhaps inherited from an ancestor). This is probably a markup error.\n{2}", dfnType, dfnFor, outerHTML(el), el=el)
         # Push the dfn type down to the <dfn> itself.
         if el.get('data-dfn-type') is None:
             el.set('data-dfn-type', dfnType)
@@ -1171,7 +1180,7 @@ def classifyDfns(doc, dfns):
                 elif dfnType in config.idlTypes:
                     # IDL methodish construct, ask the widlparser what it should have.
                     # If the method isn't in any IDL, this tries its best to normalize it anyway.
-                    names = doc.widl.normalizedMethodNames(primaryDfnText, el.get('data-dfn-for'))
+                    names = list(doc.widl.normalizedMethodNames(primaryDfnText, el.get('data-dfn-for')))
                     primaryDfnText = names[0]
                     el.set('data-lt', "|".join(names))
                 else:
@@ -1212,8 +1221,9 @@ def classifyDfns(doc, dfns):
             else:
                 id = "{type}-{id}".format(type=dfnTypeToPrefix[dfnType], id=id)
             el.set('id', id)
-        # Set lt if it's not set
-        if el.get('data-lt') is None:
+        # Set lt if it's not set,
+        # and doing so won't mess with anything else.
+        if el.get('data-lt') is None and "|" not in primaryDfnText:
             el.set('data-lt', primaryDfnText)
         # Push export/noexport down to the definition
         if el.get('data-export') is None and el.get('data-noexport') is None:
@@ -1363,6 +1373,8 @@ def processAutolinks(doc):
         linkFor = config.splitForValues(el.get('data-link-for'))
         if linkFor:
             linkFor = linkFor[0]
+        if not linkFor and doc.md.assumeExplicitFor:
+            linkFor = "/"
 
         # Status used to use ED/TR, so convert those if they appear,
         # and verify
@@ -1420,15 +1432,18 @@ def decorateAutolink(doc, el, linkType, linkText):
     # Add additional effects to some autolinks.
     if linkType == "type":
         # Get all the values that the type expands to, add it as a title.
+        titleText = None
         if linkText in doc.typeExpansions:
             titleText = doc.typeExpansions[linkText]
-            error = False
         else:
-            refs, error = doc.refs.queryRefs(linkFor=linkText)
-            if not error:
+            r1,_ = doc.refs.localRefs.queryRefs(linkFor=linkText)
+            r2,_ = doc.refs.anchorBlockRefs.queryRefs(linkFor=linkText)
+            r3,_ = doc.refs.foreignRefs.queryRefs(linkFor=linkText)
+            refs = r1 + r2 + r3
+            if refs:
                 titleText = "Expands to: " + ' | '.join(ref.text for ref in refs)
                 doc.typeExpansions[linkText] = titleText
-        if not error:
+        if titleText:
             el.set('title', titleText)
 
 
@@ -1642,143 +1657,6 @@ def addDfnPanels(doc, dfns):
         .dfn-paneled { cursor: pointer; }
         '''
 
-def addCanIUsePanels(doc):
-    # Constructs "Can I Use panels" which show a compatibility data summary
-    # for a term's feature.
-    if not doc.md.includeCanIUsePanels:
-        return
-
-    features = doc.canIUse["data"]
-    lastUpdated = datetime.utcfromtimestamp(doc.canIUse["updated"]).date().isoformat()
-
-    # e.g. 'iOS Safari' -> 'ios_saf'
-    classFromBrowser = doc.canIUse["agents"]
-
-    atLeastOnePanel = False
-    caniuseDfnElementsSelector = ",".join(
-        selector + "[caniuse]"
-        for selector in config.dfnElementsSelector.split(",")
-    )
-    for dfn in findAll(caniuseDfnElementsSelector, doc):
-        featId = dfn.get("caniuse")
-        if not featId:
-            continue
-        del dfn.attrib["caniuse"]
-
-        featId = featId.lower()
-        if featId not in features:
-            die("Unrecognized Can I Use feature ID: {0}", featId)
-        feature = features[featId]
-
-        addClass(dfn, "caniuse-paneled")
-        panel = canIUsePanelFor(id=featId, data=feature, update=lastUpdated, classFromBrowser=classFromBrowser)
-        panel.set("dfn-id", dfn.get("id"))
-        appendChild(doc.body, panel)
-        atLeastOnePanel = True
-
-    if atLeastOnePanel:
-        doc.extraScripts['script-caniuse-panel'] = '''
-            window.addEventListener("load", function(){
-                var panels = [].slice.call(document.querySelectorAll(".caniuse-status"));
-                for(var i = 0; i < panels.length; i++) {
-                    var panel = panels[i];
-                    var dfn = document.querySelector("#" + panel.getAttribute("dfn-id"));
-                    var rect = dfn.getBoundingClientRect();
-                    panel.style.top = (window.scrollY + rect.top) + "px";
-                }
-            });
-            document.body.addEventListener("click", function(e) {
-                if(e.target.classList.contains("caniuse-panel-btn")) {
-                    e.target.parentNode.classList.toggle("wrapped");
-                }
-            });'''
-        doc.extraStyles['style-caniuse-panel'] = '''
-            .caniuse-status { font: 1em sans-serif; width: 9em; padding: 0.3em; position: absolute; z-index: 8; top: auto; right: 0.3em; background: #EEE; color: black; box-shadow: 0 0 3px #999; overflow: hidden; border-collapse: initial; border-spacing: initial; }
-            .caniuse-status.wrapped { width: 1em; height: 1em; }
-            .caniuse-status.wrapped > :not(input) { display: none; }
-            .caniuse-status > input { position: absolute; right: 0; top: 0; width: 1em; height: 1em; border: none; background: transparent; padding: 0; margin: 0; }
-            .caniuse-status > p { font-size: 0.6em; margin: 0; padding: 0; }
-            .caniuse-status > p + p { padding-top: 0.5em; }
-            .caniuse-status > .support { display: block; }
-            .caniuse-status > .support > span { padding: 0.2em 0; display: block; display: table; }
-            .caniuse-status > .support > span.partial { color: #666666; filter: grayscale(50%); }
-            .caniuse-status > .support > span.no { color: #CCCCCC; filter: grayscale(100%); }
-            .canisue-status > .support > span.no::before { opacity: 0.5; }
-            .caniuse-status > .support > span:first-of-type { padding-top: 0.5em; }
-            .caniuse-status > .support > span > span { padding: 0 0.5em; display: table-cell; vertical-align: top; }
-            .caniuse-status > .support > span > span:first-child { width: 100%; }
-            .caniuse-status > .support > span > span:last-child { width: 100%; white-space: pre; padding: 0; }
-            .caniuse-status > .support > span::before { content: ' '; display: table-cell; min-width: 1.5em; height: 1.5em; background: no-repeat center center; background-size: contain; text-align: right; font-size: 0.75em; font-weight: bold; }
-            .caniuse-status > .support > .and_chr::before { background-image: url(https://resources.whatwg.org/browser-logos/chrome.svg); }
-            .caniuse-status > .support > .and_ff::before { background-image: url(https://resources.whatwg.org/browser-logos/firefox.png); }
-            .caniuse-status > .support > .and_uc::before { background-image: url(https://resources.whatwg.org/browser-logos/uc.png); } /* UC Browser for Android */
-            .caniuse-status > .support > .android::before { background-image: url(https://resources.whatwg.org/browser-logos/android.svg); }
-            .caniuse-status > .support > .bb::before { background-image: url(https://resources.whatwg.org/browser-logos/bb.jpg); } /* Blackberry Browser */
-            .caniuse-status > .support > .chrome::before { background-image: url(https://resources.whatwg.org/browser-logos/chrome.svg); }
-            .caniuse-status > .support > .edge::before { background-image: url(https://resources.whatwg.org/browser-logos/edge.svg); }
-            .caniuse-status > .support > .firefox::before { background-image: url(https://resources.whatwg.org/browser-logos/firefox.png); }
-            .caniuse-status > .support > .ie::before { background-image: url(https://resources.whatwg.org/browser-logos/ie.png); }
-            .caniuse-status > .support > .ie_mob::before { background-image: url(https://resources.whatwg.org/browser-logos/ie-mobile.svg); }
-            .caniuse-status > .support > .ios_saf::before { background-image: url(https://resources.whatwg.org/browser-logos/safari-ios.svg); }
-            .caniuse-status > .support > .op_mini::before { background-image: url(https://resources.whatwg.org/browser-logos/opera-mini.png); }
-            .caniuse-status > .support > .op_mob::before { background-image: url(https://resources.whatwg.org/browser-logos/opera.png); }
-            .caniuse-status > .support > .opera::before { background-image: url(https://resources.whatwg.org/browser-logos/opera.png); }
-            .caniuse-status > .support > .safari::before { background-image: url(https://resources.whatwg.org/browser-logos/safari.png); }
-            .caniuse-status > .support > .samsung::before { background-image: url(https://resources.whatwg.org/browser-logos/samsung.png); }
-            .caniuse-status > .caniuse { text-align: right; font-style: italic; }
-            @media (max-width: 767px) {
-                .caniuse-status.wrapped { width: 9em; height: auto; }
-                .caniuse-status:not(.wrapped) { width: 1em; height: 1em; }
-                .caniuse-status.wrapped > :not(input) { display: block; }
-                .caniuse-status:not(.wrapped) > :not(input) { display: none; }
-            }'''
-
-
-def canIUsePanelFor(id, data, update, classFromBrowser):
-    panel = E.aside({"class": "caniuse-status", "data-deco": ""},
-        E.input({"value": u"\u22F0", "type": "button", "class":"caniuse-panel-btn"}))
-    mainPara = E.p({"class": "support"}, E.b({}, "Support:"))
-    appendChild(panel, mainPara)
-    for browser,support in data['support'].items():
-        statusCode = support[0]
-        if statusCode == "u":
-            continue
-        minVersion = support[2:]
-        appendChild(mainPara,
-            browserCompatSpan(classFromBrowser[browser], browser, statusCode, minVersion))
-    appendChild(panel,
-        E.p({"class": "caniuse"},
-            "Source: ",
-            E.a({"href": "http://caniuse.com/#feat=" + id}, "caniuse.com"),
-            " as of " + update))
-    return panel
-
-
-def browserCompatSpan(browserCodeName, browserFullName, statusCode, minVersion=None):
-    if statusCode == "n" or minVersion is None:
-        minVersion = "None"
-    elif minVersion == "all":
-        minVersion = "All"
-    else:
-        minVersion = minVersion + "+"
-    # browserCodeName: e.g. and_chr, ios_saf, ie, etc...
-    # browserFullName: e.g. "Chrome for Android"
-    statusClass = {"y": "yes", "n": "no", "a": "partial"}[statusCode]
-    outer = E.span({"class": browserCodeName + " " + statusClass})
-    if statusCode == "a":
-        appendChild(outer,
-            E.span({},
-                E.span({},
-                    browserFullName,
-                    " (limited)")))
-    else:
-        appendChild(outer,
-            E.span({}, browserFullName))
-    appendChild(outer,
-        E.span({},
-            minVersion))
-    return outer
-
 
 class DebugMarker(object):
     # Debugging tool for IDL markup
@@ -1800,22 +1678,6 @@ class DebugMarker(object):
 
     def markupEnumValue(self, text, construct):
         return ('<ENUM-VALUE for=' + construct.name + '>', '</ENUM-VALUE>')
-
-
-class HighlightMarker(object):
-    # Just applies highlighting classes to IDL stuff.
-
-    def markupTypeName(self, text, construct):
-        return ('<span class=n>', '</span>')
-
-    def markupName(self, text, construct):
-        return ('<span class=nv>', '</span>')
-
-    def markupKeyword(self, text, construct):
-        return ('<span class=kt>', '</span>')
-
-    def markupEnumValue(self, text, construct):
-        return ('<span class=s>', '</span>')
 
 
 class IDLMarker(object):
@@ -2048,296 +1910,6 @@ def processIDL(doc):
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
 
 
-ColoredText = collections.namedtuple('ColoredText', ['text', 'color'])
-
-def addSyntaxHighlighting(doc):
-    try:
-        import pygments as pyg
-        from pygments.lexers import get_lexer_by_name
-        from pygments import formatters
-    except ImportError:
-        die("Bikeshed now uses Pygments for syntax highlighting.\nPlease run `$ sudo pip install pygments` from your command line.")
-        return
-
-    customLexers = {
-        "css": lexers.CSSLexer()
-    }
-
-    def highlight(el, lang):
-        text = textContent(el)
-        if lang in ["idl", "webidl"]:
-            widl = parser.Parser(text, IDLUI())
-            marker = HighlightMarker()
-            nested = parseHTML(unicode(widl.markup(marker)))
-            coloredText = collections.deque()
-            for n in childNodes(flattenHighlighting(nested)):
-                if isElement(n):
-                    coloredText.append(ColoredText(textContent(n), n.get('class')))
-                else:
-                    coloredText.append(ColoredText(n, None))
-        else:
-            if lang in customLexers:
-                lexer = customLexers[lang]
-            else:
-                try:
-                    lexer = get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
-                except pyg.util.ClassNotFound:
-                    die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
-                    return
-            coloredText = parsePygments(pyg.highlight(text, lexer, formatters.RawTokenFormatter()))
-            # empty span at beginning
-            # extra linebreak at the end
-        mergeHighlighting(el, coloredText)
-        addClass(el, "highlight")
-
-    highlightingOccurred = False
-
-    if find("pre.idl, xmp.idl", doc) is not None:
-        highlightingOccurred = True
-
-    def translateLang(lang):
-        # Translates some names to ones Pygment understands
-        if lang == "aspnet":
-            return "aspx-cs"
-        if lang in ["markup", "svg"]:
-            return "html"
-        return lang
-
-    # Translate Prism-style highlighting into Pygment-style
-    for el in findAll("[class*=language-], [class*=lang-]", doc):
-        match = re.search("(?:lang|language)-(\w+)", el.get("class"))
-        if match:
-            el.set("highlight", match.group(1))
-
-    # Highlight all the appropriate elements
-    for el in findAll("xmp, pre, code", doc):
-        attr, lang = closestAttr(el, "nohighlight", "highlight")
-        if attr == "nohighlight":
-            continue
-        if attr is None:
-            if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
-                if isNormative(el):
-                    # Already processed/highlighted.
-                    continue
-                lang = "idl"
-            elif doc.md.defaultHighlight is None:
-                continue
-            else:
-                lang = doc.md.defaultHighlight
-        highlight(el, translateLang(lang))
-        highlightingOccurred = True
-
-    if highlightingOccurred:
-        # To regen the styles, edit and run the below
-        #from pygments import token
-        #from pygments import style
-        #class PrismStyle(style.Style):
-        #    default_style = "#000000"
-        #    styles = {
-        #        token.Name: "#0077aa",
-        #        token.Name.Tag: "#669900",
-        #        token.Name.Builtin: "noinherit",
-        #        token.Name.Variable: "#222222",
-        #        token.Name.Other: "noinherit",
-        #        token.Operator: "#999999",
-        #        token.Punctuation: "#999999",
-        #        token.Keyword: "#990055",
-        #        token.Literal: "#000000",
-        #        token.Literal.Number: "#000000",
-        #        token.Literal.String: "#a67f59",
-        #        token.Comment: "#708090"
-        #    }
-        #print formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
-        doc.extraStyles['style-syntax-highlighting'] += '''
-        .highlight:not(.idl) { background: hsl(24, 20%, 95%); }
-        code.highlight { padding: .1em; border-radius: .3em; }
-        pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
-        .highlight .c { color: #708090 } /* Comment */
-        .highlight .k { color: #990055 } /* Keyword */
-        .highlight .l { color: #000000 } /* Literal */
-        .highlight .n { color: #0077aa } /* Name */
-        .highlight .o { color: #999999 } /* Operator */
-        .highlight .p { color: #999999 } /* Punctuation */
-        .highlight .cm { color: #708090 } /* Comment.Multiline */
-        .highlight .cp { color: #708090 } /* Comment.Preproc */
-        .highlight .c1 { color: #708090 } /* Comment.Single */
-        .highlight .cs { color: #708090 } /* Comment.Special */
-        .highlight .kc { color: #990055 } /* Keyword.Constant */
-        .highlight .kd { color: #990055 } /* Keyword.Declaration */
-        .highlight .kn { color: #990055 } /* Keyword.Namespace */
-        .highlight .kp { color: #990055 } /* Keyword.Pseudo */
-        .highlight .kr { color: #990055 } /* Keyword.Reserved */
-        .highlight .kt { color: #990055 } /* Keyword.Type */
-        .highlight .ld { color: #000000 } /* Literal.Date */
-        .highlight .m { color: #000000 } /* Literal.Number */
-        .highlight .s { color: #a67f59 } /* Literal.String */
-        .highlight .na { color: #0077aa } /* Name.Attribute */
-        .highlight .nc { color: #0077aa } /* Name.Class */
-        .highlight .no { color: #0077aa } /* Name.Constant */
-        .highlight .nd { color: #0077aa } /* Name.Decorator */
-        .highlight .ni { color: #0077aa } /* Name.Entity */
-        .highlight .ne { color: #0077aa } /* Name.Exception */
-        .highlight .nf { color: #0077aa } /* Name.Function */
-        .highlight .nl { color: #0077aa } /* Name.Label */
-        .highlight .nn { color: #0077aa } /* Name.Namespace */
-        .highlight .py { color: #0077aa } /* Name.Property */
-        .highlight .nt { color: #669900 } /* Name.Tag */
-        .highlight .nv { color: #222222 } /* Name.Variable */
-        .highlight .ow { color: #999999 } /* Operator.Word */
-        .highlight .mb { color: #000000 } /* Literal.Number.Bin */
-        .highlight .mf { color: #000000 } /* Literal.Number.Float */
-        .highlight .mh { color: #000000 } /* Literal.Number.Hex */
-        .highlight .mi { color: #000000 } /* Literal.Number.Integer */
-        .highlight .mo { color: #000000 } /* Literal.Number.Oct */
-        .highlight .sb { color: #a67f59 } /* Literal.String.Backtick */
-        .highlight .sc { color: #a67f59 } /* Literal.String.Char */
-        .highlight .sd { color: #a67f59 } /* Literal.String.Doc */
-        .highlight .s2 { color: #a67f59 } /* Literal.String.Double */
-        .highlight .se { color: #a67f59 } /* Literal.String.Escape */
-        .highlight .sh { color: #a67f59 } /* Literal.String.Heredoc */
-        .highlight .si { color: #a67f59 } /* Literal.String.Interpol */
-        .highlight .sx { color: #a67f59 } /* Literal.String.Other */
-        .highlight .sr { color: #a67f59 } /* Literal.String.Regex */
-        .highlight .s1 { color: #a67f59 } /* Literal.String.Single */
-        .highlight .ss { color: #a67f59 } /* Literal.String.Symbol */
-        .highlight .vc { color: #0077aa } /* Name.Variable.Class */
-        .highlight .vg { color: #0077aa } /* Name.Variable.Global */
-        .highlight .vi { color: #0077aa } /* Name.Variable.Instance */
-        .highlight .il { color: #000000 } /* Literal.Number.Integer.Long */
-        '''
-
-
-def mergeHighlighting(el, coloredText):
-    # Merges a tree of Pygment-highlighted HTML
-    # into the original element's markup.
-    # This works because Pygment effectively colors each character with a highlight class,
-    # merging them together into runs of text for convenience/efficiency only;
-    # the markup structure is a flat list of sibling elements containing raw text
-    # (and maybe some un-highlighted raw text between them).
-    def colorizeEl(el, coloredText):
-        for node in childNodes(el, clear=True):
-            if isElement(node):
-                appendChild(el, colorizeEl(node, coloredText))
-            else:
-                appendChild(el, *colorizeText(node, coloredText))
-        return el
-
-    def colorizeText(text, coloredText):
-        nodes = []
-        while text and coloredText:
-            nextColor = coloredText.popleft()
-            if len(nextColor.text) <= len(text):
-                if nextColor.color is None:
-                    nodes.append(nextColor.text)
-                else:
-                    nodes.append(E.span({"class":nextColor.color}, nextColor.text))
-                text = text[len(nextColor.text):]
-            else:  # Need to use only part of the nextColor node
-                if nextColor.color is None:
-                    nodes.append(text)
-                else:
-                    nodes.append(E.span({"class":nextColor.color}, text))
-                # Truncate the nextColor text to what's unconsumed,
-                # and put it back into the deque
-                nextColor = ColoredText(nextColor.text[len(text):], nextColor.color)
-                coloredText.appendleft(nextColor)
-                text = ''
-        return nodes
-    colorizeEl(el, coloredText)
-
-def flattenHighlighting(el):
-    # Given a highlighted chunk of markup that is "nested",
-    # flattens it into a sequence of text and els with just text,
-    # by merging classes upward.
-    container = E.div()
-    for node in childNodes(el):
-        if not isElement(node):
-            # raw text
-            appendChild(container, node)
-        elif not hasChildElements(node):
-            # el with just text
-            appendChild(container, node)
-        else:
-            # el with internal structure
-            overclass = el.get("class", "")
-            flattened = flattenHighlighting(node)
-            for subnode in childNodes(flattened):
-                if isElement(subnode):
-                    addClass(subnode, overclass)
-                    appendChild(container, subnode)
-                else:
-                    appendChild(container, E.span({"class":overclass},subnode))
-    return container
-
-def parsePygments(text):
-    tokenClassFromName = {
-        "Token.Comment": "c",
-        "Token.Keyword": "k",
-        "Token.Literal": "l",
-        "Token.Name": "n",
-        "Token.Operator": "o",
-        "Token.Punctuation": "p",
-        "Token.Comment.Multiline": "cm",
-        "Token.Comment.Preproc": "cp",
-        "Token.Comment.Single": "c1",
-        "Token.Comment.Special": "cs",
-        "Token.Keyword.Constant": "kc",
-        "Token.Keyword.Declaration": "kd",
-        "Token.Keyword.Namespace": "kn",
-        "Token.Keyword.Pseudo": "kp",
-        "Token.Keyword.Reserved": "kr",
-        "Token.Keyword.Type": "kt",
-        "Token.Literal.Date": "ld",
-        "Token.Literal.Number": "m",
-        "Token.Literal.String": "s",
-        "Token.Name.Attribute": "na",
-        "Token.Name.Class": "nc",
-        "Token.Name.Constant": "no",
-        "Token.Name.Decorator": "nd",
-        "Token.Name.Entity": "ni",
-        "Token.Name.Exception": "ne",
-        "Token.Name.Function": "nf",
-        "Token.Name.Label": "nl",
-        "Token.Name.Namespace": "nn",
-        "Token.Name.Property": "py",
-        "Token.Name.Tag": "nt",
-        "Token.Name.Variable": "nv",
-        "Token.Operator.Word": "ow",
-        "Token.Literal.Number.Bin": "mb",
-        "Token.Literal.Number.Float": "mf",
-        "Token.Literal.Number.Hex": "mh",
-        "Token.Literal.Number.Integer": "mi",
-        "Token.Literal.Number.Oct": "mo",
-        "Token.Literal.String.Backtick": "sb",
-        "Token.Literal.String.Char": "sc",
-        "Token.Literal.String.Doc": "sd",
-        "Token.Literal.String.Double": "s2",
-        "Token.Literal.String.Escape": "se",
-        "Token.Literal.String.Heredoc": "sh",
-        "Token.Literal.String.Interpol": "si",
-        "Token.Literal.String.Other": "sx",
-        "Token.Literal.String.Regex": "sr",
-        "Token.Literal.String.Single": "s1",
-        "Token.Literal.String.Symbol": "ss",
-        "Token.Name.Variable.Class": "vc",
-        "Token.Name.Variable.Global": "vg",
-        "Token.Name.Variable.Instance": "vi",
-        "Token.Literal.Number.Integer.Long": "il"
-    }
-    coloredText = collections.deque()
-    for line in text.split("\n"):
-        if not line:
-            continue
-        tokenName,_,tokenTextRepr = line.partition("\t")
-        tokenText = eval(tokenTextRepr)
-        if not tokenText:
-            continue
-        if tokenName == "Token.Text":
-            tokenClass = None
-        else:
-            tokenClass = tokenClassFromName.get(tokenName, None)
-        coloredText.append(ColoredText(tokenText, tokenClass))
-    return coloredText
 
 
 
@@ -2469,6 +2041,8 @@ def cleanupHTML(doc):
             removeAttr(el, 'data-dfn-type')
             removeAttr(el, 'data-export')
             removeAttr(el, 'data-noexport')
+        if el.tag == "var":
+            removeAttr(el, 'data-var-ignore')
         removeAttr(el, 'data-alternate-id')
         removeAttr(el, 'highlight')
         removeAttr(el, 'nohighlight')

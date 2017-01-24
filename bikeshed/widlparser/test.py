@@ -36,7 +36,19 @@ class Marker(object):
         return ('<' + construct.idlType + '>', '</' + construct.idlType + '>')
 
     def markupType(self, text, construct):
-        return ('<TYPE for=' + construct.idlType + '>', '</TYPE>')
+        return ('<TYPE for=' + construct.idlType + ' type=' + text + '>', '</TYPE>')
+
+    def markupPrimitiveType(self, text, construct):
+        return ('<PRIMITIVE for=' + construct.idlType + ' type=' + text + '>', '</PRIMITIVE>')
+
+    def markupBufferType(self, text, construct):
+        return ('<BUFFER for=' + construct.idlType + ' type=' + text + '>', '</BUFFER>')
+
+    def markupStringType(self, text, construct):
+        return ('<STRING for=' + construct.idlType + ' type=' + text + '>', '</STRING>')
+
+    def markupObjectType(self, text, construct):
+        return ('<OBJECT for=' + construct.idlType + ' type=' + text + '>', '</OBJECT>')
 
     def markupTypeName(self, text, construct):
         return ('<TYPE-NAME for=' + construct.idlType + '>', '</TYPE-NAME>')
@@ -62,6 +74,18 @@ class NullMarker(object):
         return (None, None)
 
     def markupType(self, text, type):
+        return (None, None)
+
+    def markupPrimitiveType(self, text, type):
+        return (None, None)
+
+    def markupBufferType(self, text, type):
+        return (None, None)
+
+    def markupStringType(self, text, type):
+        return (None, None)
+
+    def markupObjectType(self, text, type):
         return (None, None)
 
     def markupTypeName(self, text, construct):
@@ -152,6 +176,10 @@ typedef sequence<Foo[]>? fooType;
 typedef (short or Foo) maybeFoo;
 typedef sequence<(short or Foo)> maybeFoos;
 typedef FrozenArray<(short or Foo)> frozenMaybeFoos;
+typedef record<DOMString, Foo[]>? recordFoo;
+typedef record<DOMString, (short or Foo)>? recordMaybeFoo;
+typedef record<USVString, any> recordAny;
+typedef record<any, any> recordBroken;
 interface foo {
   [one] attribute Foo one;
   [two] Foo two()bar;
@@ -200,6 +228,7 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
 [ Constructor , NamedConstructor = MyConstructor, Constructor (Foo one), NamedConstructor = MyOtherConstructor (Foo two , long long longest ) ] partial interface Foo: Bar {
     unsigned long long method(short x, unsigned long long y, optional double inf = Infinity, optional sequence<Foo> fooArg = 123.4) raises (hell);
     unsigned long long method(DOMString string);
+    void abort();
     void anotherMethod(short round);
     [ha!] attribute short bar getraises (an, exception);
     const short fortyTwo = 42;
@@ -244,6 +273,8 @@ interface Int {
 namespace Namespace1 {
     [One] unsigned long long method(short x);
     [Two] unsigned long long method(short x, short y);
+    readonly attribute long? value;
+    attribute long error;   // error, must be readonly
 };
 partial namespace Namespace2 {
     [One] unsigned long long method(short x);
@@ -307,5 +338,10 @@ interface OptionalTest {
     print parser.normalizedMethodName('bob(xxx)', 'LinkStyle')
     print parser.normalizedMethodName('bob')
     print parser.normalizedMethodName('bob()')
-    print repr(parser.normalizedMethodNames('method', 'Foo'))
+    print ', '.join(parser.normalizedMethodNames('method', 'Foo'))
+    print ', '.join(parser.normalizedMethodNames('method()', 'Foo'))
+    print ', '.join(parser.normalizedMethodNames('method(x)', 'Foo'))
+    print ', '.join(parser.normalizedMethodNames('method(x, y)', 'Foo'))
+    print ', '.join(parser.normalizedMethodNames('method(x, y, bar)', 'Foo'))
+    print ', '.join(parser.normalizedMethodNames('abort()', 'Foo'))
 

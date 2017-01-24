@@ -32,11 +32,11 @@ Parser class
 ------------
 **class parser.Parser([text[, ui]])**
 
-The Parser's constructor takes two optional arguments, text and ui. If present, text is a unicode string containing the WebIDL text to parse. ui.warn() will get called with any syntax errors encountered during parsing (if implemented). ui.note() will get called for any legacy WebIDL that was ignored during parsing (if implemented). 
+The Parser's constructor takes two optional arguments, text and ui. If present, text is a unicode string containing the WebIDL text to parse. ui.warn() will get called with any syntax errors encountered during parsing (if implemented). ui.note() will get called for any legacy WebIDL that was ignored during parsing (if implemented).
 
 **Parser.constructs**
 
-All top-level WebIDL constructs are stored in source order in the 'constructs' attribute. 
+All top-level WebIDL constructs are stored in source order in the 'constructs' attribute.
 
 **Parser.complexityFactor**
 
@@ -68,7 +68,7 @@ Return a list of all possible normalized names for the method. If the method has
 
 **Parser.markup(marker)**
 
-Returns a marked-up version of the WebIDL input text. For each Construct, Type, and Name, the 'marker' will get called with 'markupConstruct(text, construct)', 'markupType(text, construct)', 'markupTypeName(text, construct)', or 'markupName(text, construct)' repsectively, if implemented. Implementation of each method is optional. The 'markup*' methods must return a tuple of the prefix and suffix to inject as markup around the text, or '(None, None)'. 'markupConstruct' will get called for each construct, 'markupType' will get called for each type, 'markupTypeName' will get called for each interface name within a type, 'markupName' will get called for the defining name of a construct (at most one per construct). If the 'marker' also implements 'encode(text)' it will get called with each block of text to return in any encoding necessary for the output format. Markup and encode calls will happen in source order, the text will be split at markup boundaries.
+Returns a marked-up version of the WebIDL input text. The passed 'marker' object will get called back to markup individual elements of the WebIDL. See the Markup section for mroe detail.
 
 
 Constructs
@@ -267,6 +267,59 @@ Contains a list of tokens in ExtendedAttributes not matching one of the five bas
 **SyntaxError.tokens**
 
 Contains a list of tokens that did not match the WebIDL grammar.
+
+
+Markup
+------
+When calling the parser's 'markup(marker)' method, the passed 'marker' is an object that will get called to help generate the markup for each construct, several productions, and to encode the raw text.
+Markup and encode calls will happen in source order, the text will be split at markup boundaries.
+The markup methods will be passed the plain text content of the construct or primitive and the construct object in question.
+Each method must return a tuple of two values (string or None), the prefix and suffix to be injected into the resultant markup surrounding the construct or production.
+Implementation of all markup methods are optional.
+
+**markupConstruct(text, construct)**
+
+Will be called for each construct.
+
+**markupName(text, construct)**
+
+Will be called once per construct with the name of the construct.
+
+**markupType(text, construct)**
+
+Will be called for each Type prododuction. Note that types may be nested e.g. unions, sequences, etc.
+
+**markupPrimitiveType(text, construct)**
+
+Will be called for each PrimitiveType production within a Type, e.g. "unsigned long long", "float", "boolean", etc.
+
+**markupBufferType(text, construct)**
+
+Will be called for each BufferRelatedType production witin a Type, e.g. "ArrayBuffer", "DataView", "Int8Array", etc.
+
+**markupStringType(text, construct)**
+
+Will be called for each StringType production within a Type, e.g. "ByteString", "DOMString", or "USVString".
+
+**markupObjectType(text, construct)**
+
+Will be called for each ObjectType production within a Type, e.g. "object", "Date", "RegExp", "Error", or "DOMException".
+
+**markupTypeName(text, construct)**
+
+Will be called when user defined type names are referenced.
+
+**markupKeyword(text, construct)**
+
+Will be called for each keyword.
+
+**markupEnumValue(text, construct)**
+
+Will be called for each value in an enum declaration.
+
+**encode(text)**
+
+Will be called to encode each text run.
 
 
 Notes

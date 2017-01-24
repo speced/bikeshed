@@ -342,8 +342,12 @@ def parseParagraph(stream):
     line = stream.currtext()
     initialPrefixLen = stream.currprefixlen()
     endTag = "</p>"
-    if line.lower().startswith("note:") or line.lower().startswith("note, "):
+    if re.match(r"note[:,]\s*", line, re.I):
         p = "<p class='replace-with-note-class'>"
+        matchNote = re.match(r"(note[:,])(\s*)(.*)", line, re.I)
+        if matchNote:
+            line = matchNote.group(3)
+            p += "<span>{note}</span>{ws}".format(note=matchNote.group(1), ws=matchNote.group(2))
     elif line.lower().startswith("issue:"):
         line = line[6:]
         p = "<p class='replace-with-issue-class'>"

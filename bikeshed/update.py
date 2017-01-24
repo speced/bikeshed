@@ -344,6 +344,7 @@ def updateCanIUse():
     featureData = {}
     for featureName,feature in data["data"].items():
         notes = feature["notes"]
+        url = feature["spec"]
         browserData = {}
         for browser,versions in feature["stats"].items():
             descendingVersions = list(reversed(versions.items()))
@@ -369,7 +370,7 @@ def updateCanIUse():
                     else:
                         break
             browserData[codeNames[browser]] = "{0} {1}".format(status, version)
-        featureData[featureName] = {"notes":notes, "support":browserData}
+        featureData[featureName] = {"notes":notes, "url":url, "support":browserData}
     data["data"] = featureData
 
     if not config.dryRun:

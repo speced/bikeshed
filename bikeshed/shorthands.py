@@ -201,25 +201,30 @@ def transformAutolinkShortcuts(doc):
             linkText = match.group(2)
         return E.a({"data-link-type":"dfn", "for": linkFor, "lt":match.group(2)}, linkText)
 
-    elementRe = re.compile(r"<{(?:([\w*-]+)/)?([\w*-]+)(?:!!([\w-]+))?(\|[^}]+)?}>")
+    elementRe = re.compile(r"<{(?P<element>[\w*-]+)(?:/(?P<attr>[\w*-]+)(?:/(?P<value>[^}!|]+))?)?(?:!!(?P<linkType>[\w-]+))?(?:\|(?P<linkText>[^}]+))?}>")
 
     def elementReplacer(match):
-        if match.group(1) == "":
-            linkFor = "/"
-        else:
-            linkFor = match.group(1)
-        if match.group(3) is not None:
-            linkType = match.group(3)
-        elif match.group(1) is None:
+        groupdict = match.groupdict()
+        if groupdict["attr"] is None and groupdict["value"] is None:
             linkType = "element"
-        else:
+            linkFor = None
+            lt = groupdict["element"]
+        elif groupdict["value"] is None:
             linkType = "element-sub"
-        if match.group(4) is not None:
-            linkText = match.group(4)[1:]
+            linkFor = groupdict["element"]
+            lt = groupdict["attr"]
         else:
-            linkText = match.group(2)
+            linkType = "attr-value"
+            linkFor = groupdict["element"] + "/" + groupdict["attr"]
+            lt = groupdict["value"]
+        if groupdict["linkType"] is not None:
+            linkType = groupdict["linkType"]
+        if groupdict["linkText"] is not None:
+            linkText = groupdict["linkText"]
+        else:
+            linkText = lt
         return E.code({},
-                      E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
+                      E.a({"data-link-type":linkType, "for": linkFor, "lt": lt}, linkText))
 
     varRe = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
 
