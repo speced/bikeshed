@@ -175,7 +175,7 @@ def main():
                                help="Prune the graph to only show ancestors of the specified leaf node.")
     profileParser.add_argument("--svg", dest="svgFile", default=None, help="Save the graph to a specified SVG file, rather than outputting with xdot immediately.")
 
-    profileParser = subparsers.add_parser('template', help="Outputs a skeleton .bs file for you to start with.")
+    templateParser = subparsers.add_parser('template', help="Outputs a skeleton .bs file for you to start with.")
 
     options, extras = argparser.parse_known_args()
 
