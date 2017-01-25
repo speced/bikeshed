@@ -218,8 +218,9 @@ def addExplicitIndexes(doc):
                     types.remove(t)
         else:
             types = None
-        if el.get('spec'):
-            specs = set(x.strip() for x in el.get('spec').split(','))
+        if el.get('data-link-spec'):
+            # Yes, this is dumb. Accidental over-firing of a shortcut attribute. >_<
+            specs = set(x.strip() for x in el.get('data-link-spec').split(','))
             for s in specs:
                 if s not in doc.refs.specs:
                     die("Unknown spec name '{0}' on {1}".format(s, outerHTML(el)), el=el)
