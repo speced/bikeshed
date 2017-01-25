@@ -1169,13 +1169,13 @@ def classifyDfns(doc, dfns):
             continue
         # Some error checking
         if dfnType in config.functionishTypes:
-            if not re.match(r"^[\w-]+\(.*\)$", primaryDfnText):
+            if not re.match(r"^[\w\[\]-]+\(.*\)$", primaryDfnText):
                 die("Functions/methods must end with () in their linking text, got '{0}'.", primaryDfnText, el=el)
                 continue
             elif el.get('data-lt') is None:
                 if dfnType == "function":
                     # CSS function, define it with no args in the text
-                    primaryDfnText = re.match(r"^([\w-]+)\(.*\)$", primaryDfnText).group(1) + "()"
+                    primaryDfnText = re.match(r"^([\w\[\]-]+)\(.*\)$", primaryDfnText).group(1) + "()"
                     el.set('data-lt', primaryDfnText)
                 elif dfnType in config.idlTypes:
                     # IDL methodish construct, ask the widlparser what it should have.
@@ -2211,7 +2211,7 @@ def inlineRemoteIssues(doc):
 
     responses = json.load(config.retrieveDataFile("github-issues.json", quiet=True))
     for i,issue in enumerate(inlineIssues):
-        issueUserRepo = "{0}/{1}".format(*issue) 
+        issueUserRepo = "{0}/{1}".format(*issue)
         key = "{0}/{1}".format(issueUserRepo, issue.num)
         href = "https://github.com/{0}/issues/{1}".format(issueUserRepo, issue.num)
         url = "https://api.github.com/repos/{0}/issues/{1}".format(issueUserRepo, issue.num)
