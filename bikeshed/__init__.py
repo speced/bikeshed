@@ -1201,6 +1201,11 @@ def classifyDfns(doc, dfns):
             if dfnType in config.functionishTypes.intersection(config.idlTypes):
                 id = config.simplifyText("{_for}-{id}".format(_for=singleFor, id=re.match(r"[^(]*", primaryDfnText).group(0) + "()"))
                 el.set("data-alternate-id", config.simplifyText("dom-{_for}-{id}".format(_for=singleFor, id=primaryDfnText)))
+                if primaryDfnText.startswith("[["):
+                    # Slots get their identifying [] stripped from their ID,
+                    # so gotta dedup them some other way.
+                    id += "-slot"
+                    el.set("data-alternate-id", "{0}-slot".format(el.get("data-alternate-id")))
             else:
                 if dfnFor:
                     id = config.simplifyText("{_for}-{id}".format(_for=singleFor, id=primaryDfnText))
