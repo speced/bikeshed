@@ -14,9 +14,9 @@ from .messages import *
 
 from .apiclient.apiclient import apiclient
 
-def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False):
+def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False):
     # If all are False, update everything
-    updateAnyway = not (anchors or biblio or caniuse or linkDefaults or testSuites)
+    updateAnyway = not (anchors or biblio or caniuse or linkDefaults or testSuites or languages)
     if anchors or updateAnyway:
         updateCrossRefs()
     if biblio or updateAnyway:
@@ -27,6 +27,8 @@ def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testS
         updateLinkDefaults()
     if testSuites or updateAnyway:
         updateTestSuites()
+    if languages or updateAnyway:
+        updateLanguages()
 
 
 def updateCrossRefs():
@@ -436,6 +438,25 @@ def updateTestSuites():
                 f.write(unicode(json.dumps(testSuites, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save test-suite database to disk.\n{0}", e)
+    say("Success!")
+
+
+def updateLanguages():
+    try:
+        say("Downloading languages...")
+        with closing(urllib2.urlopen("https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/languages.json")) as fh:
+            lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
+    except Exception, e:
+        die("Couldn't download languages data.\n{0}", e)
+        return
+
+    if not config.dryRun:
+        try:
+            with io.open(config.scriptPath + "/spec-data/languages.json", 'w', encoding="utf-8") as f:
+                f.write(''.join(lines))
+        except Exception, e:
+            die("Couldn't save languages database to disk.\n{0}", e)
+            return
     say("Success!")
 
 
