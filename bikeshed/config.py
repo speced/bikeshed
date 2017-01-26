@@ -446,7 +446,7 @@ def retrieveBoilerplateFile(self, name, group=None, status=None, error=True):
         status = self.md.rawStatus
 
     localFolder = os.path.dirname(os.path.abspath(self.inputSource))
-    includeFolder = os.path.join(config.scriptPath, "include")
+    includeFolder = os.path.join(config.scriptPath, "boilerplate")
     statusFile = "{0}-{1}.include".format(name, status)
     genericFile = "{0}.include".format(name)
     filenames = []
