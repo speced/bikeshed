@@ -6,9 +6,9 @@ from .messages import *
 from .htmlhelpers import escapeAttr
 
 
-def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
+def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None, parentBeforeTokenContext={'type':'blank','raw':'\n','prefixlen':0}):
     tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements, blockElements=blockElements)
-    return parseTokens(tokens, numSpacesForIndentation)
+    return parseTokens(tokens, numSpacesForIndentation, parentBeforeTokenContext)
 
 
 def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
@@ -250,7 +250,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
     return text[offset:]
 
 
-def parseTokens(tokens, numSpacesForIndentation):
+def parseTokens(tokens, numSpacesForIndentation, parentBeforeTokenContext):
     '''
     Token types:
     eof
@@ -261,11 +261,13 @@ def parseTokens(tokens, numSpacesForIndentation):
     rule
     numbered
     bulleted
+    dt
+    dd
     text
     htmlblock
     raw
     '''
-    stream = TokenStream(tokens, numSpacesForIndentation)
+    stream = TokenStream(tokens, numSpacesForIndentation, parentBeforeTokenContext)
     lines = []
 
     while True:
@@ -412,7 +414,9 @@ def parseBulleted(stream):
     lines = ["<ul data-md>"]
     for li_lines in getItems(stream):
         lines.append("<li data-md>")
-        lines.extend(parse(li_lines, numSpacesForIndentation))
+        # passing an explicit parentBeforeTokenContext as 'bulleted' ensures that parseTokens's
+        # look-behind for paragraph detection doesn't see a 'blank' token type (for initial text only)
+        lines.extend(parse(li_lines, numSpacesForIndentation, parentBeforeTokenContext={'type':'bulleted','raw':'\n','prefixlen':0}))
         lines.append("</li>")
     lines.append("</ul>")
     return lines
@@ -460,7 +464,7 @@ def parseNumbered(stream, start=1):
         lines = ["<ol data-md start='{0}'>".format(start)]
     for li_lines in getItems(stream):
         lines.append("<li data-md>")
-        lines.extend(parse(li_lines, numSpacesForIndentation))
+        lines.extend(parse(li_lines, numSpacesForIndentation, parentBeforeTokenContext={'type':'numbered','raw':'\n','prefixlen':0}))
         lines.append("</li>")
     lines.append("</ol>")
     return lines
@@ -471,8 +475,8 @@ def parseDl(stream):
     numSpacesForIndentation = stream.numSpacesForIndentation
 
     def parseItem(stream):
-        # Assumes it's being called with curr being a numbered line.
-        # Remove the numbered part from the line
+        # Assumes it's being called with curr being a definition line.
+        # Remove the definition prefix part from the line (':' or '::')
         firstLine = stream.currtext() + "\n"
         type = stream.currtype()
         lines = [firstLine]
@@ -506,14 +510,14 @@ def parseDl(stream):
     lines = ["<dl data-md>"]
     for type, di_lines in getItems(stream):
         lines.append("<{0} data-md>".format(type))
-        lines.extend(parse(di_lines, numSpacesForIndentation))
+        lines.extend(parse(di_lines, numSpacesForIndentation, parentBeforeTokenContext={'type':'{0}'.format(type),'raw':'\n','prefixlen':0}))
         lines.append("</{0}>".format(type))
     lines.append("</dl>")
     return lines
 
 
 class TokenStream:
-    def __init__(self, tokens, numSpacesForIndentation, before={'type':'blank','raw':'\n','prefixlen':0}, after={'type':'eof','raw':'','prefixlen':0}):
+    def __init__(self, tokens, numSpacesForIndentation, before, after={'type':'eof','raw':'','prefixlen':0}):
         self.tokens = tokens
         self.i = 0
         self.numSpacesForIndentation = numSpacesForIndentation
