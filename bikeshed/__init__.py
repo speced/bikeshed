@@ -80,6 +80,8 @@ def main():
     echidnaParser.add_argument("--u", dest="un", metavar="USERNAME", required=False, help="W3C username.")
     echidnaParser.add_argument("--p", dest="pw", metavar="PASSWORD", required=False, help="W3C password.")
     echidnaParser.add_argument("--d", dest="decision", metavar="DECISION_URL", required=False, help="URL recording the decision to publish.")
+    echidnaParser.add_argument("--additional-directories", dest="additionalDirectories", required=False, nargs="*", help="Directories to bundle in the tar file. Defaults to examples/, diagrams/, and images/.")
+    echidnaParser.add_argument("--self-contained", dest="selfContained", action="store_true", help="The spec is self-contained, do not bundle any extra directories in the tar file.")
     echidnaParser.add_argument("--just-tar", dest="justTar", action="store_true")
 
     watchParser = subparsers.add_parser('watch', help="Process a spec source file into a valid output file, automatically rebuilding when it changes.")
@@ -201,10 +203,11 @@ def main():
         doc.md = metadata.fromCommandLine(extras, doc)
         doc.md.addData("Prepare For TR", "yes")
         doc.preprocess()
+        addDirs = [] if options.selfContained else options.additionalDirectories
         if options.justTar:
-            publish.prepareTar(doc, visibleTar=True)
+            publish.prepareTar(doc, visibleTar=True, additionalDirectories=addDirs)
         else:
-            publish.publishEchidna(doc, username=options.un, password=options.pw, decision=options.decision)
+            publish.publishEchidna(doc, username=options.un, password=options.pw, decision=options.decision, additionalDirectories=addDirs)
     elif options.subparserName == "watch":
         # Can't have an error killing the watcher
         config.force = True

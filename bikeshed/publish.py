@@ -11,9 +11,9 @@ from . import extensions
 from .requests import requests
 
 
-def publishEchidna(doc, username, password, decision):
+def publishEchidna(doc, username, password, decision, additionalDirectories):
     logging.captureWarnings(True)  # Silence SNIMissingWarning
-    tar = prepareTar(doc, visibleTar=False)
+    tar = prepareTar(doc, visibleTar=False, additionalDirectories=additionalDirectories)
     # curl 'https://labs.w3.org/echidna/api/request' --user '<username>:<password>' -F "tar=@/some/path/spec.tar" -F "decision=<decisionUrl>"
     r = requests.post("https://labs.w3.org/echidna/api/request", auth=(username, password), data={"decision": decision}, files={"tar": tar.read()})
     os.remove(tar.name)
@@ -27,7 +27,9 @@ def publishEchidna(doc, username, password, decision):
         print r.headers
 
 
-def prepareTar(doc, visibleTar=False):
+def prepareTar(doc, visibleTar=False, additionalDirectories=None):
+    if additionalDirectories is None:
+        additionalDirectories = ["images", "diagrams", "examples"]
     # Finish the spec
     specOutput = tempfile.NamedTemporaryFile(delete=False)
     doc.finish(outputFilename=specOutput.name)
@@ -38,7 +40,7 @@ def prepareTar(doc, visibleTar=False):
         f = tempfile.NamedTemporaryFile(delete=False)
         tar = tarfile.open(fileobj=f, mode='w')
     tar.add(specOutput.name, arcname="Overview.html")
-    additionalFiles = extensions.BSPublishAdditionalFiles(["images", "diagrams", "examples"])
+    additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories)
     for fname in additionalFiles:
         try:
             if isinstance(fname, basestring):
