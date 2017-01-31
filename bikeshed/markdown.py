@@ -414,9 +414,7 @@ def parseBulleted(stream):
     lines = ["<ul data-md>"]
     for li_lines in getItems(stream):
         lines.append("<li data-md>")
-        # passing an explicit parentBeforeTokenContext as 'bulleted' ensures that parseTokens's
-        # look-behind for paragraph detection doesn't see a 'blank' token type (for initial text only)
-        lines.extend(parse(li_lines, numSpacesForIndentation, parentBeforeTokenContext={'type':'bulleted','raw':'\n','prefixlen':0}))
+        lines.extend(parse(li_lines, numSpacesForIndentation))
         lines.append("</li>")
     lines.append("</ul>")
     return lines
@@ -464,7 +462,7 @@ def parseNumbered(stream, start=1):
         lines = ["<ol data-md start='{0}'>".format(start)]
     for li_lines in getItems(stream):
         lines.append("<li data-md>")
-        lines.extend(parse(li_lines, numSpacesForIndentation, parentBeforeTokenContext={'type':'numbered','raw':'\n','prefixlen':0}))
+        lines.extend(parse(li_lines, numSpacesForIndentation))
         lines.append("</li>")
     lines.append("</ol>")
     return lines
@@ -510,7 +508,13 @@ def parseDl(stream):
     lines = ["<dl data-md>"]
     for type, di_lines in getItems(stream):
         lines.append("<{0} data-md>".format(type))
-        lines.extend(parse(di_lines, numSpacesForIndentation, parentBeforeTokenContext={'type':'{0}'.format(type),'raw':'\n','prefixlen':0}))
+        if type == 'dt':
+            # passing the 'parentBeforeTokenContext' tells the nested parse function *not* to generate
+            # paragraphs when tokens of type 'text' are first encounterd (the default
+            # 'parentBeforeTokenContext' token is 'blank' and 'blank' followed by 'text' creates a <p>)
+            lines.extend(parse(di_lines, numSpacesForIndentation, parentBeforeTokenContext={'type':'dt','raw':'\n','prefixlen':0}))
+        else:
+            lines.extend(parse(di_lines, numSpacesForIndentation))
         lines.append("</{0}>".format(type))
     lines.append("</dl>")
     return lines
