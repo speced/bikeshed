@@ -510,12 +510,16 @@ def parseMarkupShorthands(key, val, lineNum):
 
 def parseInlineGithubIssues(key, val, lineNum):
     val = val.lower()
-    if val not in ['title', 'full']:
-        b = boolish(val)
-        if b is None or b:
-            die("Inline Github Issues must be 'title', 'full' or false/no/n/off. Got: '{0}'", val, lineNum=lineNum)
-            return
-    return val
+    if val in ["title", "full"]:
+        return val
+    b = boolish(val)
+    if b is None:
+        die("Inline Github Issues must be 'title', 'full' or a boolish value. Got: '{0}'", val, lineNum=lineNum)
+        return False
+    elif b is True:
+        return "full"
+    else:
+        return False
 
 def parseTextMacro(key, val, lineNum):
     # Each Text Macro line is just a macro name (must be uppercase)
