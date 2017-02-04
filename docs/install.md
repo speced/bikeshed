@@ -123,6 +123,22 @@ setx /m PATH "%PATH%;C:\Python27;C:\Python27\Scripts"
 
 From here, you can follow the commons steps outlined below.
 
+Android + Termux steps
+----------------------
+This is how to set up bikeshed on your android phone or tablet using <a href="https://termux.com/">Termux</a>.
+
+1. Install Termux from <a href="https://play.google.com/store/apps/details?id=com.termux">Google Play</a> or <a href="https://f-droid.org/repository/browse/?fdid=com.termux">F-Droid</a>.
+2. Install python, git, a c compiler, and the native dependencies:
+~~~
+$ apt install python2 python2-dev clang libxml2-dev libxslt-dev git
+~~~
+3. Install the phython dependencies:
+~~~
+$ pip2 install pygments lxml --upgrade
+~~~
+
+From here, you can follow the commons steps outlined below.
+
 Common steps
 ------------
 With the dependencies in place, you can now install the Bikeshed repository itself.  Run the following in your favorite command line:
@@ -148,6 +164,13 @@ On Windows:
 $ python -m pip install --editable /path/to/cloned/bikeshed
 $ bikeshed update
 ~~~~
+
+On Termux:
+
+~~~
+$ pip2 install --editable /path/to/cloned/bikeshed
+$ bikeshed update
+~~~
 
 This’ll install Bikeshed, making it available to your Python environment as the `bikeshed` package,
 automatically add a `bikeshed` command to your path,
