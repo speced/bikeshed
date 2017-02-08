@@ -131,7 +131,7 @@ This is how to set up bikeshed on your android phone or tablet using <a href="ht
 ~~~
 $ apt install python2 python2-dev clang libxml2-dev libxslt-dev git
 ~~~
-3. Install the phython dependencies:
+3. Install the Python dependencies:
 ~~~
 $ pip2 install pygments lxml --upgrade
 ~~~
