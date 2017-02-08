@@ -117,7 +117,7 @@ Tested on Windows 7, 8/8.1 & 10
 ~~~
 setx /m PATH "%PATH%;C:\Python27;C:\Python27\Scripts"
 ~~~
-3. Install [PIP](https://pip.pypa.io/en/latest/installing.html) by saving [get-pip.py](https://bootstrap.pypa.io/get-pip.py) and just double clicking the file.
+3. If using Python 2.7.8 or older, install [PIP](https://pip.pypa.io/en/latest/installing.html) by saving [get-pip.py](https://bootstrap.pypa.io/get-pip.py) and just double clicking the file.
 4. Run `$ python -m pip install pygments lxml==3.6.0`.
 
 From here, you can follow the commons steps outlined below.
