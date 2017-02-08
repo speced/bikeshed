@@ -16,6 +16,7 @@ def publishEchidna(doc, username, password, decision, additionalDirectories):
     tar = prepareTar(doc, visibleTar=False, additionalDirectories=additionalDirectories)
     # curl 'https://labs.w3.org/echidna/api/request' --user '<username>:<password>' -F "tar=@/some/path/spec.tar" -F "decision=<decisionUrl>"
     r = requests.post("https://labs.w3.org/echidna/api/request", auth=(username, password), data={"decision": decision}, files={"tar": tar.read()})
+    tar.close()
     os.remove(tar.name)
 
     if r.status_code == 202:
