@@ -112,14 +112,16 @@ Windows steps
 
 Tested on Windows 7, 8/8.1 & 10
 
-1. Install the latest [Python 2.7](https://www.python.org/download/releases/2.7.8/). Pick the 32bit version, even on 64bit Windows, as LXML only looks for the 32bit version.
+1. Install the latest [Python 2.7](https://www.python.org/downloads/release/python-2713/).
 2. Run the following in an elevated command prompt (change the path if your location is different)
 ~~~
 setx /m PATH "%PATH%;C:\Python27;C:\Python27\Scripts"
 ~~~
-3. Install [PIP](https://pip.pypa.io/en/latest/installing.html) by saving [get-pip.py](https://bootstrap.pypa.io/get-pip.py) and just double clicking the file.
-4. Install [LXML](https://pypi.python.org/pypi/lxml/3.4.4) for your version of Python (it should be lxml-3.4.0win32-py2.7.exe)
-5. Run `$ python -m pip install pygments`.
+3. If using Python 2.7.8 or older, install [PIP](https://pip.pypa.io/en/latest/installing.html) by saving [get-pip.py](https://bootstrap.pypa.io/get-pip.py) and just double clicking the file.
+4. Run the following in a command prompt to install or update lxml and Pygments
+~~~
+python -m pip install pygments lxml==3.6.0 --upgrade
+~~~
 
 From here, you can follow the commons steps outlined below.
 
@@ -132,7 +134,7 @@ This is how to set up bikeshed on your android phone or tablet using <a href="ht
 ~~~
 $ apt install python2 python2-dev clang libxml2-dev libxslt-dev git
 ~~~
-3. Install the phython dependencies:
+3. Install the Python dependencies:
 ~~~
 $ pip2 install pygments lxml --upgrade
 ~~~
