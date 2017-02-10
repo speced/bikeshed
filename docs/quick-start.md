@@ -4,7 +4,7 @@ Quick-Start Guide
 Installing (or not!)
 --------------------
 
-Have you [installed](install.md) Bikeshed yet?
+Have you [installed](https://tabatkins.github.io/bikeshed/#installing) Bikeshed yet?
 If not, do so.
 
 Or, are you using Bikeshed infrequently?
