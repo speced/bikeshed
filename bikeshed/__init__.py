@@ -1913,7 +1913,7 @@ def processIDL(doc):
                 if el.get('id'):
                     # ID was defensively added by the Marker.
                     del el.attrib['id']
-    dfns = findAll("pre.idl:not([data-no-idl]) dfn", doc)
+    dfns = findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc)
     classifyDfns(doc, dfns)
     fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
