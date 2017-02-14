@@ -96,6 +96,21 @@ def main():
     watchParser.add_argument("--byos", dest="byos", action="store_true",
                              help="Bring-Your-Own-Spec: turns off all the Bikeshed auto-niceties, so you can piecemeal its features into your existing doc instead. Experimental, let me know if things get crashy or weird.")
 
+
+    serveParser = subparsers.add_parser('serve', help="Identical to 'watch', but also serves the folder on localhost.")
+    serveParser.add_argument("infile", nargs="?",
+                             default=None,
+                             help="Path to the source file.")
+    serveParser.add_argument("outfile", nargs="?",
+                             default=None,
+                             help="Path to the output file.")
+    serveParser.add_argument("--port", dest="port", nargs="?", default="8000",
+                             help="Specify the port to serve it over.")
+    serveParser.add_argument("--gh-token", dest="ghToken", nargs="?",
+                             help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
+    serveParser.add_argument("--byos", dest="byos", action="store_true",
+                             help="Bring-Your-Own-Spec: turns off all the Bikeshed auto-niceties, so you can piecemeal its features into your existing doc instead. Experimental, let me know if things get crashy or weird.")
+
     updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
@@ -215,6 +230,12 @@ def main():
         if options.byos:
             doc.md.addData("Group", "byos")
         doc.watch(outputFilename=options.outfile)
+    elif options.subparserName == "serve":
+        config.force = True
+        doc = Spec(inputFilename=options.infile, token=options.ghToken)
+        if options.byos:
+            doc.md.addData("Group", "byos")
+        doc.watch(outputFilename=options.outfile, port=int(options.port))
     elif options.subparserName == "debug":
         config.force = True
         config.quiet = 2
@@ -669,29 +690,57 @@ class Spec(object):
             success("Successfully generated, with warnings")
             return
 
-    def watch(self, outputFilename):
+    def watch(self, outputFilename, port=None):
         import time
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         if self.inputSource == "-" or outputFilename == "-":
             die("Watch mode doesn't support streaming from STDIN or to STDOUT.")
             return
+
+        if port:
+            # Serve the folder on an HTTP server
+            import SimpleHTTPServer
+            import SocketServer
+            import threading
+
+            class SilentServer(SimpleHTTPServer.SimpleHTTPRequestHandler):
+                def log_message(*args):
+                    pass
+
+            SocketServer.TCPServer.allow_reuse_address = True
+            server = SocketServer.TCPServer(("", port), SilentServer)
+
+            print "Serving at port {0}".format(port)
+            thread = threading.Thread(target = server.serve_forever)
+            thread.daemon = True
+            thread.start()
+        else:
+            server = None
+
         try:
             lastInputModified = os.stat(self.inputSource).st_mtime
             self.preprocess()
             self.finish(outputFilename)
             p("==============DONE==============")
-            while(True):
-                inputModified = os.stat(self.inputSource).st_mtime
-                if inputModified > lastInputModified:
-                    resetSeenMessages()
-                    lastInputModified = inputModified
-                    formattedTime = datetime.fromtimestamp(inputModified).strftime("%H:%M:%S")
-                    p("Source file modified at {0}. Rebuilding...".format(formattedTime))
-                    self.initializeState()
-                    self.preprocess()
-                    self.finish(outputFilename)
-                    p("==============DONE==============")
-                time.sleep(1)
+            try:
+                while(True):
+                    inputModified = os.stat(self.inputSource).st_mtime
+                    if inputModified > lastInputModified:
+                        resetSeenMessages()
+                        lastInputModified = inputModified
+                        formattedTime = datetime.fromtimestamp(inputModified).strftime("%H:%M:%S")
+                        p("Source file modified at {0}. Rebuilding...".format(formattedTime))
+                        self.initializeState()
+                        self.preprocess()
+                        self.finish(outputFilename)
+                        p("==============DONE==============")
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                p("Exiting~")
+                if server:
+                    server.shutdown()
+                    thread.join()
+                sys.exit(0)
         except Exception, e:
             die("Something went wrong while watching the file:\n{0}", e)
 
