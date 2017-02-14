@@ -6,9 +6,9 @@ from .messages import *
 from .htmlhelpers import escapeAttr
 
 
-def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
+def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None, parentBeforeTokenContext={'type':'blank','raw':'\n','prefixlen':0}):
     tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements, blockElements=blockElements)
-    return parseTokens(tokens, numSpacesForIndentation)
+    return parseTokens(tokens, numSpacesForIndentation, parentBeforeTokenContext)
 
 
 def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
@@ -250,7 +250,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
     return text[offset:]
 
 
-def parseTokens(tokens, numSpacesForIndentation):
+def parseTokens(tokens, numSpacesForIndentation, parentBeforeTokenContext):
     '''
     Token types:
     eof
@@ -261,11 +261,13 @@ def parseTokens(tokens, numSpacesForIndentation):
     rule
     numbered
     bulleted
+    dt
+    dd
     text
     htmlblock
     raw
     '''
-    stream = TokenStream(tokens, numSpacesForIndentation)
+    stream = TokenStream(tokens, numSpacesForIndentation, parentBeforeTokenContext)
     lines = []
 
     while True:
@@ -471,8 +473,8 @@ def parseDl(stream):
     numSpacesForIndentation = stream.numSpacesForIndentation
 
     def parseItem(stream):
-        # Assumes it's being called with curr being a numbered line.
-        # Remove the numbered part from the line
+        # Assumes it's being called with curr being a definition line.
+        # Remove the definition prefix part from the line (':' or '::')
         firstLine = stream.currtext() + "\n"
         type = stream.currtype()
         lines = [firstLine]
@@ -506,14 +508,20 @@ def parseDl(stream):
     lines = ["<dl data-md>"]
     for type, di_lines in getItems(stream):
         lines.append("<{0} data-md>".format(type))
-        lines.extend(parse(di_lines, numSpacesForIndentation))
+        if type == 'dt':
+            # passing the 'parentBeforeTokenContext' tells the nested parse function *not* to generate
+            # paragraphs when tokens of type 'text' are first encounterd (the default
+            # 'parentBeforeTokenContext' token is 'blank' and 'blank' followed by 'text' creates a <p>)
+            lines.extend(parse(di_lines, numSpacesForIndentation, parentBeforeTokenContext={'type':'dt','raw':'\n','prefixlen':0}))
+        else:
+            lines.extend(parse(di_lines, numSpacesForIndentation))
         lines.append("</{0}>".format(type))
     lines.append("</dl>")
     return lines
 
 
 class TokenStream:
-    def __init__(self, tokens, numSpacesForIndentation, before={'type':'blank','raw':'\n','prefixlen':0}, after={'type':'eof','raw':'','prefixlen':0}):
+    def __init__(self, tokens, numSpacesForIndentation, before, after={'type':'eof','raw':'','prefixlen':0}):
         self.tokens = tokens
         self.i = 0
         self.numSpacesForIndentation = numSpacesForIndentation
