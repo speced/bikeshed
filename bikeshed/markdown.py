@@ -473,8 +473,7 @@ def parseDl(stream):
     numSpacesForIndentation = stream.numSpacesForIndentation
 
     def parseItem(stream):
-        # Assumes it's being called with curr being a numbered line.
-        # Remove the numbered part from the line
+        # Assumes it's being called with curr being a :/:: prefixed line.
         firstLine = stream.currtext() + "\n"
         type = stream.currtype()
         lines = [firstLine]
