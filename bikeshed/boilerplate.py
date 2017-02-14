@@ -485,7 +485,7 @@ def addPropertyIndex(doc):
 
 
 def addIDLSection(doc):
-    idlBlocks = filter(isNormative, findAll("pre.idl", doc))
+    idlBlocks = filter(isNormative, findAll("pre.idl, xmp.idl", doc))
     if len(idlBlocks) == 0:
         return
     html = getFillContainer('idl-index', doc=doc, default=True)
@@ -779,7 +779,7 @@ def addIssuesSection(doc):
     for issue in issues:
         el = copy.deepcopy(issue)
         el.tail = None
-        if el.tag not in ("pre",):
+        if el.tag not in ("pre","xmp"):
             el.tag = "div"
         appendChild(container, el)
         appendChild(el,
