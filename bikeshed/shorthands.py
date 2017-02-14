@@ -185,7 +185,7 @@ def transformAutolinkShortcuts(doc):
             linkText = match.group(4)[1:]
         else:
             linkText = match.group(2)
-        return E.code({"class":"idl"},
+        return E.code({"class":"idl", "nohighlight":""},
                       E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
 
     dfnRe = re.compile(r"\[=(?!\s)(?:([^=]*)/)?([^\"=]+?)(\|[^\"=]+)?=\]")
