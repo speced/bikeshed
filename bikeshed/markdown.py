@@ -261,6 +261,8 @@ def parseTokens(tokens, numSpacesForIndentation):
     rule
     numbered
     bulleted
+    dt
+    dd
     text
     htmlblock
     raw
