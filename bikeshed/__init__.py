@@ -272,7 +272,9 @@ def main():
         else:
             rm = ReferenceManager()
             rm.initializeRefs()
-        refs = rm.queryAllRefs(text=unicode(options.text, encoding="utf-8"), linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact)
+        if options.text:
+            options.text = unicode(options.text, encoding="utf-8")
+        refs = rm.queryAllRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact)
         if config.printMode == "json":
             p(json.dumps(refs, indent=2, default=config.getjson))
         else:
