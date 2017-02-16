@@ -198,9 +198,11 @@ class RefSource(object):
             variants[methodSig] = {"args":args, "for":[], "shortname": shortname}
         variants[methodSig]["for"].extend(forVals)
 
-def filterObsoletes(refs, replacedSpecs, ignoredSpecs, localShortname=None):
+def filterObsoletes(refs, replacedSpecs, ignoredSpecs, localShortname=None, localSpec=None):
     # Remove any ignored or obsoleted specs
     possibleSpecs = set(ref.spec for ref in refs)
+    if localSpec:
+        possibleSpecs.add(localSpec)
     moreIgnores = set()
     for oldSpec, newSpec in replacedSpecs:
         if newSpec in possibleSpecs:
@@ -390,7 +392,11 @@ class ReferenceManager(object):
                     self.localRefs.addMethodVariants(linkText, dfnFor, ref["shortname"])
 
     def filterObsoletes(self, refs):
-        return filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs, localShortname=self.shortname)
+        return filterObsoletes(refs,
+                               replacedSpecs=self.replacedSpecs,
+                               ignoredSpecs=self.ignoredSpecs,
+                               localShortname=self.shortname,
+                               localSpec=self.spec)
 
     def queryAllRefs(self, **kwargs):
         r1,_ = self.localRefs.queryRefs(**kwargs)
