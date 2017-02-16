@@ -139,12 +139,7 @@ class RefSource(object):
         if ignoreObsoletes and not spec:
             # Remove any ignored or obsoleted specs
             # If you specified the spec, don't filter things - you know what you're doing.
-            possibleSpecs = set(ref.spec for ref in refs)
-            moreIgnores = set()
-            for oldSpec, newSpec in self.replacedSpecs:
-                if newSpec in possibleSpecs:
-                    moreIgnores.add(oldSpec)
-            refs = [ref for ref in refs if ref.spec not in self.ignoredSpecs and ref.spec not in moreIgnores]
+            refs = filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs)
         if not refs:
             return refs, "ignored-specs"
 
@@ -202,6 +197,26 @@ class RefSource(object):
             args = [x.strip() for x in args.split(",")]
             variants[methodSig] = {"args":args, "for":[], "shortname": shortname}
         variants[methodSig]["for"].extend(forVals)
+
+def filterObsoletes(refs, replacedSpecs, ignoredSpecs):
+    # Remove any ignored or obsoleted specs
+    possibleSpecs = set(ref.spec for ref in refs)
+    moreIgnores = set()
+    for oldSpec, newSpec in replacedSpecs:
+        if newSpec in possibleSpecs:
+            moreIgnores.add(oldSpec)
+    localSpecs = set(ref.shortname for ref in refs if ref.status == "local")
+    ret = []
+    for ref in refs:
+        if ref.spec in ignoredSpecs:
+            continue
+        if ref.spec in moreIgnores:
+            continue
+        if ref.status != "local" and ref.shortname in localSpecs:
+            continue
+        ret.append(ref)
+    return ret
+
 
 class ReferenceManager(object):
 
@@ -379,7 +394,10 @@ class ReferenceManager(object):
         r1,_ = self.localRefs.queryRefs(**kwargs)
         r2,_ = self.anchorBlockRefs.queryRefs(**kwargs)
         r3,_ = self.foreignRefs.queryRefs(**kwargs)
-        return r1+r2+r3
+        refs = r1+r2+r3
+        if kwargs.get("ignoreObsoletes") is True:
+            refs = filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs)
+        return refs
 
     def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None, exact=False):
         return self.localRefs.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]

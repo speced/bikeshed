@@ -1496,7 +1496,7 @@ def decorateAutolink(doc, el, linkType, linkText):
         if linkText in doc.typeExpansions:
             titleText = doc.typeExpansions[linkText]
         else:
-            refs = doc.refs.queryAllRefs(linkFor=linkText)
+            refs = doc.refs.queryAllRefs(linkFor=linkText, ignoreObsoletes=True)
             if refs:
                 titleText = "Expands to: " + ' | '.join({ref.text for ref in refs})
                 doc.typeExpansions[linkText] = titleText
