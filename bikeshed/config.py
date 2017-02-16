@@ -528,7 +528,7 @@ def printjsonsimplearray(x, indent, level):
     ret = printColor("[", "blue")
     for i,v in enumerate(x):
         if i != 0:
-            ret += ", "
+            ret += printColor(", ", "blue")
         ret += printjsonprimitive(v)
     ret += printColor("]", "blue")
     return ret
