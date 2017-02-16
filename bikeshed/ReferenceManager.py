@@ -352,14 +352,14 @@ class ReferenceManager(object):
                 dfnFor = treeAttr(el, 'data-dfn-for')
                 if dfnFor is None:
                     dfnFor = set()
-                    if self.getLocalRef(linkType, linkText, linkFor="/", exact=True):
+                    if self.localRefs.queryRefs(type=linkType, text=linkText, linkFor="/", exact=True)[0]:
                         die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, linkType, el=el)
                         continue
                 else:
                     dfnFor = set(config.splitForValues(dfnFor))
                     encounteredError = False
                     for singleFor in dfnFor:
-                        if self.getLocalRef(linkType, linkText, linkFor=singleFor, exact=True):
+                        if self.localRefs.queryRefs(type=linkType, text=linkText, linkFor=singleFor, exact=True)[0]:
                             encounteredError = True
                             die("Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, linkType, singleFor, el=el)
                             break
@@ -399,9 +399,6 @@ class ReferenceManager(object):
             refs = filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs)
         return refs
 
-    def getLocalRef(self, linkType, text, linkFor=None, linkForHint=None, el=None, exact=False):
-        return self.localRefs.queryRefs(text=text, linkType=linkType, status="local", linkFor=linkFor, linkForHint=linkForHint, exact=exact)[0]
-
     def getRef(self, linkType, text, spec=None, status=None, statusHint=None, linkFor=None, linkForHint=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a reference or None
         # Otherwise, it pops out debug messages for the user.
@@ -424,7 +421,7 @@ class ReferenceManager(object):
 
         # Local refs always get precedence, unless you manually specified a spec.
         if spec is None:
-            localRefs = self.getLocalRef(linkType, text, linkFor, linkForHint, el)
+            localRefs,_ = self.localRefs.queryRefs(type=linkType, text=text, linkFor=linkFor, linkForHint=linkForHint, el=el)
             # If the autolink was for-less, it found a for-full local link,
             # but there was a for-less version in a foreign spec,
             # emit a warning (unless it was surpressed).
