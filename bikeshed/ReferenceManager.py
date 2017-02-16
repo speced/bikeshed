@@ -424,7 +424,7 @@ class ReferenceManager(object):
             localRefs,_ = self.localRefs.queryRefs(type=linkType, text=text, linkFor=linkFor, linkForHint=linkForHint, el=el)
             # If the autolink was for-less, it found a for-full local link,
             # but there was a for-less version in a foreign spec,
-            # emit a warning (unless it was surpressed).
+            # emit a warning (unless it was supressed).
             if localRefs and linkFor is None and any(x.for_ for x in localRefs):
                 forlessRefs,_ = self.anchorBlockRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
                 if not forlessRefs:
