@@ -351,14 +351,14 @@ class ReferenceManager(object):
                 dfnFor = treeAttr(el, 'data-dfn-for')
                 if dfnFor is None:
                     dfnFor = set()
-                    if self.localRefs.queryRefs(type=linkType, text=linkText, linkFor="/", exact=True)[0]:
+                    if self.localRefs.queryRefs(linkType=linkType, text=linkText, linkFor="/", exact=True)[0]:
                         die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, linkType, el=el)
                         continue
                 else:
                     dfnFor = set(config.splitForValues(dfnFor))
                     encounteredError = False
                     for singleFor in dfnFor:
-                        if self.localRefs.queryRefs(type=linkType, text=linkText, linkFor=singleFor, exact=True)[0]:
+                        if self.localRefs.queryRefs(linkType=linkType, text=linkText, linkFor=singleFor, exact=True)[0]:
                             encounteredError = True
                             die("Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, linkType, singleFor, el=el)
                             break
@@ -420,7 +420,7 @@ class ReferenceManager(object):
 
         # Local refs always get precedence, unless you manually specified a spec.
         if spec is None:
-            localRefs,_ = self.localRefs.queryRefs(type=linkType, text=text, linkFor=linkFor, linkForHint=linkForHint, el=el)
+            localRefs,_ = self.localRefs.queryRefs(linkType=linkType, text=text, linkFor=linkFor, linkForHint=linkForHint, el=el)
             # If the autolink was for-less, it found a for-full local link,
             # but there was a for-less version in a foreign spec,
             # emit a warning (unless it was supressed).
