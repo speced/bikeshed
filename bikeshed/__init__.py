@@ -1461,7 +1461,7 @@ def processAutolinks(doc):
         # rather than checking `status == "local"`, as "local" refs include
         # those defined in `<pre class="anchor">` datablocks, which we do
         # want to capture here.
-        if ref and ref.spec and ref.spec.lower() != doc.refs.specVName.lower():
+        if ref and ref.spec and ref.spec.lower() != doc.refs.spec.lower():
             spec = ref.spec.lower()
             key = ref.for_[0] if ref.for_ else ""
             doc.externalRefsUsed[spec][ref.text][key] = ref

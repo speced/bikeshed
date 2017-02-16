@@ -198,21 +198,20 @@ class RefSource(object):
             variants[methodSig] = {"args":args, "for":[], "shortname": shortname}
         variants[methodSig]["for"].extend(forVals)
 
-def filterObsoletes(refs, replacedSpecs, ignoredSpecs):
+def filterObsoletes(refs, replacedSpecs, ignoredSpecs, localShortname=None):
     # Remove any ignored or obsoleted specs
     possibleSpecs = set(ref.spec for ref in refs)
     moreIgnores = set()
     for oldSpec, newSpec in replacedSpecs:
         if newSpec in possibleSpecs:
             moreIgnores.add(oldSpec)
-    localSpecs = set(ref.shortname for ref in refs if ref.status == "local")
     ret = []
     for ref in refs:
         if ref.spec in ignoredSpecs:
             continue
         if ref.spec in moreIgnores:
             continue
-        if ref.status != "local" and ref.shortname in localSpecs:
+        if ref.status != "local" and ref.shortname == localShortname:
             continue
         ret.append(ref)
     return ret
@@ -311,9 +310,9 @@ class ReferenceManager(object):
 
     def setSpecData(self, md):
         self.status = md.status
-        self.specName = md.shortname
+        self.shortname = md.shortname
         self.specLevel = md.level
-        self.specVName = md.vshortname
+        self.spec = md.vshortname
 
         for term, defaults in md.linkDefaults.items():
             for default in defaults:
@@ -328,7 +327,7 @@ class ReferenceManager(object):
         # so you don't end up accidentally linking to something that's been removed from the local copy.
         for term, refs in self.foreignRefs.refs.items():
             for ref in refs:
-                if ref['status'] != "local" and ref['shortname'].rstrip() == self.specName:
+                if ref['status'] != "local" and ref['shortname'].rstrip() == self.shortname:
                     ref['export'] = False
 
     def addLocalDfns(self, dfns):
@@ -376,8 +375,8 @@ class ReferenceManager(object):
                 ref = {
                     "type":linkType,
                     "status":"local",
-                    "spec":self.specVName,
-                    "shortname":self.specName,
+                    "spec":self.spec,
+                    "shortname":self.shortname,
                     "level":self.specLevel,
                     "url":"#" + el.get('id'),
                     "export":True,
@@ -396,7 +395,7 @@ class ReferenceManager(object):
         r3,_ = self.foreignRefs.queryRefs(**kwargs)
         refs = r1+r2+r3
         if kwargs.get("ignoreObsoletes") is True:
-            refs = filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs)
+            refs = filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs, localShortname=self.shortname)
         return refs
 
     def getRef(self, linkType, text, spec=None, status=None, statusHint=None, linkFor=None, linkForHint=None, error=True, el=None):
@@ -499,7 +498,7 @@ class ReferenceManager(object):
                 # Dedup/collect by url, so I'll get all the signatures for a given dfn.
                 possibleMethods = defaultdict(list)
                 for argfullName, metadata in methodSignatures.items():
-                    if text in metadata["args"] and (interfaceName in metadata["for"] or interfaceName is None) and metadata["shortname"] != self.specName:
+                    if text in metadata["args"] and (interfaceName in metadata["for"] or interfaceName is None) and metadata["shortname"] != self.shortname:
                         possibleMethods[metadata["shortname"]].append(argfullName)
                 possibleMethods = possibleMethods.values()
                 if not possibleMethods:
