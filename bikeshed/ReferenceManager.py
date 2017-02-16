@@ -369,6 +369,8 @@ class ReferenceManager(object):
                     "for": dfnFor
                 }
                 self.localRefs.refs[linkText].append(ref)
+                for for_ in dfnFor:
+                    self.localRefs.fors[for_].append(linkText)
                 methodishStart = re.match(r"([^(]+\()[^)]", linkText)
                 if methodishStart:
                     self.localRefs.addMethodVariants(linkText, dfnFor, ref["shortname"])
