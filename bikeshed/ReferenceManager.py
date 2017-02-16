@@ -389,13 +389,16 @@ class ReferenceManager(object):
                 if methodishStart:
                     self.localRefs.addMethodVariants(linkText, dfnFor, ref["shortname"])
 
+    def filterObsoletes(self, refs):
+        return filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs, localShortname=self.shortname)
+
     def queryAllRefs(self, **kwargs):
         r1,_ = self.localRefs.queryRefs(**kwargs)
         r2,_ = self.anchorBlockRefs.queryRefs(**kwargs)
         r3,_ = self.foreignRefs.queryRefs(**kwargs)
         refs = r1+r2+r3
         if kwargs.get("ignoreObsoletes") is True:
-            refs = filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs, localShortname=self.shortname)
+            refs = self.filterObsoletes(refs)
         return refs
 
     def getRef(self, linkType, text, spec=None, status=None, statusHint=None, linkFor=None, linkForHint=None, error=True, el=None):
