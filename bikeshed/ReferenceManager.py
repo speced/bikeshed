@@ -435,8 +435,10 @@ class ReferenceManager(object):
             # emit a warning (unless it was supressed).
             if localRefs and linkFor is None and any(x.for_ for x in localRefs):
                 forlessRefs,_ = self.anchorBlockRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
+                forlessRefs = self.filterObsoletes(forlessRefs)
                 if not forlessRefs:
                     forlessRefs,_ = self.foreignRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
+                forlessRefs = self.filterObsoletes(forlessRefs)
                 if forlessRefs:
                     reportAmbiguousForlessLink(el, text, forlessRefs, localRefs)
                     return None
@@ -471,6 +473,7 @@ class ReferenceManager(object):
         blockRefs,_ = self.anchorBlockRefs.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el, status="anchor-block")
         if blockRefs and linkFor is None and any(x.for_ for x in blockRefs):
             forlessRefs,_ = self.foreignRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
+            forlessRefs = self.filterObsoletes(forlessRefs)
             if forlessRefs:
                 reportAmbiguousForlessLink(el, text, forlessRefs, blockRefs)
                 return None
