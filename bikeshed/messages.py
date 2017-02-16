@@ -98,9 +98,7 @@ def resetSeenMessages():
 
 
 def printColor(text, color="white", *styles):
-    if config.printMode == "plain":
-        return text
-    elif config.printMode == "console":
+    if config.printMode == "console":
         colorsConverter = {
             "black": 30,
             "red": 31,
@@ -135,6 +133,8 @@ def printColor(text, color="white", *styles):
         colorNum = colorsConverter[color.lower()]
         styleNum = ";".join(str(stylesConverter[style.lower()]) for style in styles)
         return "\033[{0};{1}m{text}\033[0m".format(styleNum, colorNum, text=text)
+    else:
+        return text
 
 
 def formatMessage(type, text, lineNum=None):
