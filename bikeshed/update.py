@@ -422,6 +422,10 @@ def updateTestSuites():
 
     testSuites = dict()
     for rawTestSuite in rawTestSuiteData.values():
+        if "specs" not in rawTestSuite:
+            # Looks like test-suites might not have spec data at first.
+            # Useless, so just drop them.
+            continue
         testSuite = {
             'vshortname': rawTestSuite['name'],
             'title': rawTestSuite.get('title'),
