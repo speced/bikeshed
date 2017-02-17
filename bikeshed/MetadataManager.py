@@ -46,6 +46,8 @@ class MetadataManager:
         self.canIUseURLs = []
         self.complainAbout = config.BoolSet()
         self.customTextMacros = []
+        self.customWarningText = []
+        self.customWarningTitle = None
         self.date = datetime.utcnow().date()
         self.deadline = None
         self.defaultBiblioStatus = "snapshot"
@@ -250,6 +252,10 @@ class MetadataManager:
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-NOTE"
         else:
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(self.rawStatus)
+        if self.customWarningText is not None:
+            macros["customwarningtext"] = "\n".join(markdown.parse(self.customWarningText, self.indent))
+        if self.customWarningTitle is not None:
+            macros["customwarningtitle"] = self.customWarningTitle
         # Custom macros
         for name, text in self.customTextMacros:
             macros[name.lower()] = text
@@ -291,6 +297,8 @@ def parseWarning(key, val, lineNum):
         return "warning-obsolete",
     if val.lower() == "not ready":
         return "warning-not-ready",
+    if val.lower() == "custom":
+        return "warning-custom",
     match = re.match(r"Commit +([^ ]+) +(.+) +replaced by +(.+)", val, re.I)
     if match:
         return "warning-commit", match.group(3), match.group(1), match.group(2)
@@ -309,7 +317,8 @@ def parseWarning(key, val, lineNum):
   replaced by [new url]
   new version [new url]
   commit [snapshot id] [snapshot url] replaced by [master url]
-  branch [branch name] [branch url] replaced by [master url]''', key, val, lineNum=lineNum)
+  branch [branch name] [branch url] replaced by [master url]
+  custom''', key, val, lineNum=lineNum)
     return None
 
 
@@ -836,6 +845,8 @@ knownKeys = {
     "Boilerplate": Metadata("Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate),
     "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joinList, parseLiteralList),
     "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
+    "Custom Warning Text": Metadata("Custom Warning Text", "customWarningText", joinList, parseLiteralList),
+    "Custom Warning Title": Metadata("Custom Warning Title", "customWarningTitle", joinValue, parseLiteral),
     "Date": Metadata("Date", "date", joinValue, parseDate),
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
     "Default Biblio Status": Metadata("Default Biblio Status", "defaultBiblioStatus", joinValue, parseBiblioStatus),
