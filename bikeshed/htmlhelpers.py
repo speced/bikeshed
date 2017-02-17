@@ -537,6 +537,14 @@ def unfixTypography(text):
     return text
 
 
+def emptyText(text):
+    # Because LXML represents a complete lack of text as None,
+    # you can't do something like `el.text.strip() == ""` to test for emptiness.
+    if text is None:
+        return True
+    return text.strip() == ""
+
+
 def hashContents(el):
     # Hash the contents of an element into an 8-character alphanum string.
     # Generally used for generating probably-unique IDs.
