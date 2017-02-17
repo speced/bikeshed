@@ -1979,6 +1979,7 @@ def cleanupHTML(doc):
     strayHeadEls = []
     styleScoped = []
     nestedLists = []
+    flattenEls = []
     for el in doc.document.iter():
         if head is None and el.tag == "head":
             head = el
@@ -2075,6 +2076,13 @@ def cleanupHTML(doc):
             else:
                 addClass(el, "allcaps")
 
+        # If a markdown-generated <dt> contains only a single paragraph,
+        # remove that paragraph so it just contains naked text.
+        if el.tag == "dt" and el.get("data-md") is not None:
+            child = hasOnlyChild(el)
+            if child is not None and child.tag == "p" and emptyText(el.text) and emptyText(child.tail):
+                flattenEls.append(el)
+
         # Remove a bunch of attributes
         if el.get("data-attribute-info") is not None or el.get("data-dict-member-info") is not None:
             removeAttr(el, 'data-attribute-info')
@@ -2116,6 +2124,8 @@ def cleanupHTML(doc):
         parent = parentElement(el)
         clearContents(parent)
         appendChild(parent, *children)
+    for el in flattenEls:
+        moveContents(fromEl=el[0], toEl=el)
 
 
 def finalHackyCleanup(text):
