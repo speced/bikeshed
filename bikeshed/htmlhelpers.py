@@ -244,9 +244,9 @@ def replaceContents(el, newElements):
     return appendContents(el, newElements)
 
 
-def moveContents(targetEl, sourceEl):
-    replaceContents(targetEl, sourceEl)
-    sourceEl.text = ''
+def moveContents(toEl, fromEl):
+    replaceContents(toEl, fromEl)
+    fromEl.text = ''
 
 
 def headingLevelOfElement(el):
