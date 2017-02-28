@@ -124,12 +124,12 @@ class RefSource(object):
                 else:
                     raise
             # Status is a non-refStatus, but is a valid linkStatus, like "local"
-            elif status in config.linkStatus:
+            elif status in config.linkStatuses:
                 return [x for x in refs if x.status == status]
             else:
                 raise
         if status:
-            refs = filterByStatus(refs, config.refStatus(status))
+            refs = filterByStatus(refs, status)
         if not refs:
             return refs, "status"
 
