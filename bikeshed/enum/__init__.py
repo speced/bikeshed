@@ -349,7 +349,11 @@ class EnumMeta(type):
         return cls._create_(value, names, module=module, type=type, start=start)
 
     def __contains__(cls, member):
-        return isinstance(member, cls) and member.name in cls._member_map_
+        if isinstance(member, cls) and member.name in cls._member_map_:
+            return True
+        if isinstance(member, basestring) and member in cls._member_map_:
+            return True
+        return False
 
     def __delattr__(cls, attr):
         # nicer error message when someone tries to delete an attribute
@@ -754,6 +758,8 @@ else:
 def __eq__(self, other):
     if type(other) is self.__class__:
         return self is other
+    if isinstance(other, basestring):
+        return other in self.__class__
     return NotImplemented
 temp_enum_dict['__eq__'] = __eq__
 del __eq__
@@ -761,6 +767,8 @@ del __eq__
 def __ne__(self, other):
     if type(other) is self.__class__:
         return self is not other
+    if isinstance(other, basestring):
+        return other not in self
     return NotImplemented
 temp_enum_dict['__ne__'] = __ne__
 del __ne__
