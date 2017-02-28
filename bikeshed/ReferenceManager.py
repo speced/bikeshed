@@ -30,14 +30,14 @@ class RefSource(object):
         self.ignoredSpecs = set() if ignored is None else ignored
         self.replacedSpecs = set() if replaced is None else replaced
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, excludeStatuses=[], export=None, ignoreObsoletes=False, exact=False, **kwargs):
-        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, excludeStatuses, export, ignoreObsoletes, exact=True)
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, **kwargs):
+        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, exact=True)
         if error and not exact:
-            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, excludeStatuses, export, ignoreObsoletes)
+            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes)
         else:
             return results, error
 
-    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, excludeStatuses=[], export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         def refsIterator(refs):
@@ -80,11 +80,6 @@ class RefSource(object):
             refs = list(refsIterator(self.refs))
         if not refs:
             return refs, "text"
-
-        if excludeStatuses:
-            refs = [x for x in refs if x.status not in excludeStatuses]
-        if not refs:
-            return refs, "exclude-statuses"
 
         if linkType:
             if linkType in config.dfnTypes:
