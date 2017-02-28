@@ -112,15 +112,22 @@ class RefSource(object):
             return refs, "for"
 
         def filterByStatus(refs, status):
-            # If status is "current'", kill snapshot refs unless their spec *only* has a snapshot_url
-            if status == config.refStatus.current:
-                return [ref for ref in refs if ref.status == "current" or (ref.status == "snapshot" and self.specs.get(ref.spec,{}).get('current_url') is None)]
-            # If status is "snapshot", kill current refs if there's a corresponding snapshot ref for the same spec.
-            elif status == config.refStatus.snapshot:
-                snapshotSpecs = [ref.spec for ref in refs if ref.status == 'snapshot']
-                return [ref for ref in refs if ref.status == "snapshot" or (ref.status == "current" and ref.spec not in snapshotSpecs)]
+            if status in config.refStatus:
+                status = config.refStatus(status)
+                # If status is "current'", kill snapshot refs unless their spec *only* has a snapshot_url
+                if status == config.refStatus.current:
+                    return [ref for ref in refs if ref.status == "current" or (ref.status == "snapshot" and self.specs.get(ref.spec,{}).get('current_url') is None)]
+                # If status is "snapshot", kill current refs if there's a corresponding snapshot ref for the same spec.
+                elif status == config.refStatus.snapshot:
+                    snapshotSpecs = [ref.spec for ref in refs if ref.status == 'snapshot']
+                    return [ref for ref in refs if ref.status == "snapshot" or (ref.status == "current" and ref.spec not in snapshotSpecs)]
+                else:
+                    raise
+            # Status is a non-refStatus, but is a valid linkStatus, like "local"
+            elif status in config.linkStatus:
+                return [x for x in refs if x.status == status]
             else:
-                return [x for x in refs if x.status == status.name()]
+                raise
         if status:
             refs = filterByStatus(refs, config.refStatus(status))
         if not refs:
