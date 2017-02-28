@@ -462,7 +462,7 @@ class ReferenceManager(object):
                     break
 
         # Then anchor-block refs get preference
-        blockRefs,_ = self.anchorBlockRefs.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el, status="anchor-block")
+        blockRefs,_ = self.anchorBlockRefs.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el)
         if blockRefs and linkFor is None and any(x.for_ for x in blockRefs):
             forlessRefs,_ = self.foreignRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
             forlessRefs = self.filterObsoletes(forlessRefs)
