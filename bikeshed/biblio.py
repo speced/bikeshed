@@ -10,7 +10,7 @@ class BiblioEntry(object):
 
     def __init__(self, preferredURL=None, **kwargs):
         if preferredURL is None:
-            preferredURL = config.refStatus.current
+            preferredURL = config.refStatus.snapshot
         self.linkText = None
         self.title = None
         self.authors = []
