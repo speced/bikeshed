@@ -1715,22 +1715,34 @@ class DebugMarker(object):
     # Debugging tool for IDL markup
 
     def markupConstruct(self, text, construct):
-        return ('<' + construct.idlType + '>', '</' + construct.idlType + '>')
+        return ('<construct-' + construct.idlType + '>', '</construct-' + construct.idlType + '>')
 
     def markupType(self, text, construct):
-        return ('<TYPE idlType=' + construct.idlType + '>', '</TYPE>')
+        return ('<TYPE for="' + construct.idlType + '" idlType="' + text + '">', '</TYPE>')
+
+    def markupPrimitiveType(self, text, construct):
+        return ('<PRIMITIVE for="' + construct.idlType + '" idlType="' + text + '">', '</PRIMITIVE>')
+
+    def markupBufferType(self, text, construct):
+        return ('<BUFFER for="' + construct.idlType + '" idlType="' + text + '">', '</BUFFER>')
+
+    def markupStringType(self, text, construct):
+        return ('<STRING for="' + construct.idlType + '" idlType="' + text + '">', '</STRING>')
+
+    def markupObjectType(self, text, construct):
+        return ('<OBJECT for="' + construct.idlType + '" idlType="' + text + '">', '</OBJECT>')
 
     def markupTypeName(self, text, construct):
-        return ('<TYPE-NAME idlType=' + construct.idlType + '>', '</TYPE-NAME>')
+        return ('<TYPE-NAME idlType="' + construct.idlType + '">', '</TYPE-NAME>')
 
     def markupName(self, text, construct):
-        return ('<NAME idlType=' + construct.idlType + '>', '</NAME>')
+        return ('<NAME idlType="' + construct.idlType + '">', '</NAME>')
 
     def markupKeyword(self, text, construct):
-        return ('<KEYWORD idlType=' + construct.idlType + '>', '</KEYWORD>')
+        return ('<KEYWORD idlType="' + construct.idlType + '">', '</KEYWORD>')
 
     def markupEnumValue(self, text, construct):
-        return ('<ENUM-VALUE for=' + construct.name + '>', '</ENUM-VALUE>')
+        return ('<ENUM-VALUE for="' + construct.name + '">', '</ENUM-VALUE>')
 
 
 class IDLMarker(object):
@@ -1745,6 +1757,18 @@ class IDLMarker(object):
         # For example, a "type" wrapper surrounds an entire union type,
         # as well as its component types.
         return (None, None)
+
+    def markupPrimitiveType(self, text, construct):
+        return ("<a class=n data-link-type=interface>", "</a>")
+
+    def markupStringType(self, text, construct):
+        return ("<a class=n data-link-type=interface>", "</a>")
+
+    def markupBufferType(self, text, construct):
+        return ("<a class=n data-link-type=interface>", "</a>")
+
+    def markupObjectType(self, text, construct):
+        return ("<a class=n data-link-type=interface>", "</a>")
 
     def markupTypeName(self, text, construct):
         # Fires for non-defining type names, such as arg types.

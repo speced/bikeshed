@@ -255,13 +255,13 @@ class Parser(object):
             if (interface):
                 methods = interface.findMethods(name, argumentNames)
                 if (methods):
-                    return itertools.chain(*[method.methodNames for method in methods])
+                    return list(itertools.chain(*[method.methodNames for method in methods]))
             return [name + '(' + ', '.join(argumentNames or []) + ')']
 
         for construct in self.constructs:
             methods = construct.findMethods(name, argumentNames)
             if (methods):
-                return itertools.chain(*[method.methodNames for method in methods])
+                return list(itertools.chain(*[method.methodNames for method in methods]))
 
         construct = self.find(name)
         if (construct and ('method' == construct.idlType)):

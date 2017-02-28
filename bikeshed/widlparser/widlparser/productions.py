@@ -1080,9 +1080,7 @@ class ArgumentList(Production):    # Argument ["," Argument]...
         if (self.arguments):
             args = [argument for argument in self.arguments]
             names = []
-            name = ', '.join([argument.name for argument in args])
-            if (self.arguments[-1].variadic):
-                names.append(name + '...')
+            name = ', '.join([('...' + argument.name) if (argument.variadic) else argument.name for argument in args])
             names.append(name)
             while (args and (args[-1].optional)):
                 args.pop()

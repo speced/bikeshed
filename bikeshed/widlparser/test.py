@@ -226,7 +226,7 @@ typedef (short or (long or double) or long long) moreNested;
 typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequenceUnion;
 
 [ Constructor , NamedConstructor = MyConstructor, Constructor (Foo one), NamedConstructor = MyOtherConstructor (Foo two , long long longest ) ] partial interface Foo: Bar {
-    unsigned long long method(short x, unsigned long long y, optional double inf = Infinity, optional sequence<Foo> fooArg = 123.4) raises (hell);
+    unsigned long long method(short x, unsigned long long y, optional double inf = Infinity, sequence<Foo>... fooArg) raises (hell);
     unsigned long long method(DOMString string);
     void abort();
     void anotherMethod(short round);
