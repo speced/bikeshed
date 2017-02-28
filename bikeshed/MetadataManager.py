@@ -51,7 +51,7 @@ class MetadataManager:
         self.date = datetime.utcnow().date()
         self.deadline = None
         self.defaultHighlight = None
-        self.defaultRefStatus = config.refStatus.current
+        self.defaultRefStatus = None
         self.editors = []
         self.editorTerm = {"singular": "Editor", "plural": "Editors"}
         self.group = None

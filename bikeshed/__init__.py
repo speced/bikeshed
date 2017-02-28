@@ -1370,7 +1370,7 @@ def processBiblioLinks(doc):
         if linkText[0] == "[" and linkText[-1] == "]":
             linkText = linkText[1:-1]
 
-        refStatus = config.refStatus(treeAttr(el, "data-biblio-status"), default=doc.md.defaultRefStatus)
+        refStatus = treeAttr(el, "data-biblio-status") or doc.md.defaultRefStatus
 
         okayToFail = el.get('data-okay-to-fail') is not None
 

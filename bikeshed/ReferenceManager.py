@@ -602,8 +602,6 @@ class ReferenceManager(object):
 
     def getBiblioRef(self, text, status=None, generateFakeRef=False, el=None, quiet=False):
         key = text.lower()
-        if status is None:
-            status = config.refStatus.current
         if key in self.biblios:
             candidates = self.biblios[key]
         elif key in self.biblioKeys:
