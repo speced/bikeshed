@@ -4,6 +4,7 @@ import os.path
 import io
 import re
 import collections
+import enum
 from collections import defaultdict
 from functools import total_ordering
 from .messages import *
@@ -306,6 +307,8 @@ anchorDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1
 testSuiteDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
 
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
+
+refStatus = enum.Enum("RefStatus", "current snapshot")
 
 
 @total_ordering

@@ -334,7 +334,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
     for spec, refGroups in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0]):
         # ref.spec is always lowercase; if the same string shows up in biblio data,
         # use its casing instead.
-        biblioRef = doc.refs.getBiblioRef(spec, status="normative")
+        biblioRef = doc.refs.getBiblioRef(spec)
         if biblioRef:
             printableSpec = biblioRef.linkText
         else:

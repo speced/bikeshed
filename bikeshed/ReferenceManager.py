@@ -118,16 +118,16 @@ class RefSource(object):
 
         def filterByStatus(refs, status):
             # If status is "current'", kill snapshot refs unless their spec *only* has a snapshot_url
-            if status == "current":
+            if status == config.refStatus.current:
                 return [ref for ref in refs if ref.status == "current" or (ref.status == "snapshot" and self.specs.get(ref.spec,{}).get('current_url') is None)]
             # If status is "snapshot", kill current refs if there's a corresponding snapshot ref for the same spec.
-            elif status == "snapshot":
+            elif status == config.refStatus.snapshot:
                 snapshotSpecs = [ref.spec for ref in refs if ref.status == 'snapshot']
                 return [ref for ref in refs if ref.status == "snapshot" or (ref.status == "current" and ref.spec not in snapshotSpecs)]
             else:
-                return [x for x in refs if x.status == status]
+                return [x for x in refs if x.status == status.name()]
         if status:
-            refs = filterByStatus(refs, status)
+            refs = filterByStatus(refs, config.refStatus(status))
         if not refs:
             return refs, "status"
 
@@ -221,7 +221,7 @@ def filterObsoletes(refs, replacedSpecs, ignoredSpecs, localShortname=None, loca
 
 class ReferenceManager(object):
 
-    def __init__(self, specStatus=None):
+    def __init__(self, defaultStatus=None):
         # Dict of {spec vshortname => spec data}
         self.specs = dict()
 
@@ -248,7 +248,11 @@ class ReferenceManager(object):
         # Each heading is either {#foo => heading-dict}, {/foo#bar => heading-dict} or {#foo => [page-heading-keys]}
         # In the latter, it's a list of the heading keys (of the form /foo#bar) that collide for that id.
         self.headings = dict()
-        self.status = specStatus
+
+        if defaultStatus is None:
+            self.defaultStatus = config.refStatus.current
+        else:
+            self.defaultStatus = config.refStatus(defaultStatus)
 
         self.localRefs = RefSource("local")
         self.anchorBlockRefs = RefSource("anchor-block")
@@ -293,25 +297,13 @@ class ReferenceManager(object):
             self.biblioKeys.add(k)
             self.biblios[k].extend(vs)
 
-    @property
-    def status(self):
-        return self._status
-
-    @status.setter
-    def status(self, val):
-        if val is None:
-            self._status = None
-        elif val in config.snapshotStatuses:
-            self._status = "snapshot"
-        elif val in config.shortToLongStatus:
-            self._status = "current"
-        else:
-            die("Unknown spec status '{0}'.", val)
-            self._status = None
-        return self._status
-
     def setSpecData(self, md):
-        self.status = md.status
+        if md.defaultRefStatus:
+            self.defaultStatus = md.defaultRefStatus
+        elif md.status in config.snapshotStatuses:
+            self.defaultStatus = config.refStatus.snapshot
+        elif md.status in config.shortToLongStatus:
+            self.defaultStatus = config.refStatus.current
         self.shortname = md.shortname
         self.specLevel = md.level
         self.spec = md.vshortname
@@ -421,7 +413,7 @@ class ReferenceManager(object):
         if spec is not None:
             spec = spec.lower()
         if statusHint is None:
-            statusHint = self.status
+            statusHint = self.defaultStatus
         if status not in config.linkStatuses and status is not None:
             if error:
                 die("Unknown spec status '{0}'. Status must be {1}.", status, config.englishFromList(config.linkStatuses), el=el)
@@ -606,8 +598,10 @@ class ReferenceManager(object):
             reportMultiplePossibleRefs([refToText(ref) for ref in simplifyPossibleRefs(refs)], text, linkType, defaultRef, el)
         return defaultRef
 
-    def getBiblioRef(self, text, status="normative", generateFakeRef=False, el=None, quiet=False):
+    def getBiblioRef(self, text, status=None, generateFakeRef=False, el=None, quiet=False):
         key = text.lower()
+        if status is None:
+            status = config.refStatus.current
         if key in self.biblios:
             candidates = self.biblios[key]
         elif key in self.biblioKeys:
@@ -624,7 +618,7 @@ class ReferenceManager(object):
                 if ref:
                     return ref
             if generateFakeRef:
-                return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=self.status)
+                return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=status)
             else:
                 return None
         else:
@@ -640,7 +634,7 @@ class ReferenceManager(object):
             # Follow the chain to the real candidate
             bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True)
         else:
-            bib = biblio.BiblioEntry(preferredURL=self.status, **candidate)
+            bib = biblio.BiblioEntry(preferredURL=status, **candidate)
 
         # If a canonical name has been established, use it.
         if bib.linkText in self.preferredBiblioNames:

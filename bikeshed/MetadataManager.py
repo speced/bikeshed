@@ -50,8 +50,8 @@ class MetadataManager:
         self.customWarningTitle = None
         self.date = datetime.utcnow().date()
         self.deadline = None
-        self.defaultBiblioStatus = "snapshot"
         self.defaultHighlight = None
+        self.defaultRefStatus = config.refStatus.current
         self.editors = []
         self.editorTerm = {"singular": "Editor", "plural": "Editors"}
         self.group = None
@@ -74,6 +74,7 @@ class MetadataManager:
         self.noEditor = False
         self.noteClass = "note"
         self.opaqueElements = ["pre", "xmp", "script", "style"]
+        self.prepTR = False
         self.previousEditors = []
         self.previousVersions = []
         self.repository = config.Nil()
@@ -85,7 +86,6 @@ class MetadataManager:
         self.translateIDs = defaultdict(list)
         self.translations = []
         self.useDfnPanels = True
-        self.prepTR = False
         self.useIAutolinks = False
         self.versionHistory = []
         self.warning = None
@@ -439,16 +439,16 @@ def parseBoilerplate(key, val, lineNum):
     return boilerplate
 
 
-def parseBiblioStatus(key, val, lineNum):
+def parseRefStatus(key, val, lineNum):
     val = val.strip().lower()
     if val == "dated":
         # Legacy term that used to be allowed
         val == "snapshot"
-    if val in ("current", "snapshot"):
-        return val
-    else:
+    try:
+        return config.refStatus(val)
+    except:
         die("'{0}' must be either 'current' or 'snapshot'. Got '{1}'", key, val, lineNum=lineNum)
-        return "snapshot"
+        return config.refStatus.current
 
 
 def parseComplainAbout(key, val, lineNum):
@@ -849,8 +849,9 @@ knownKeys = {
     "Custom Warning Title": Metadata("Custom Warning Title", "customWarningTitle", joinValue, parseLiteral),
     "Date": Metadata("Date", "date", joinValue, parseDate),
     "Deadline": Metadata("Deadline", "deadline", joinValue, parseDate),
-    "Default Biblio Status": Metadata("Default Biblio Status", "defaultBiblioStatus", joinValue, parseBiblioStatus),
+    "Default Biblio Status": Metadata("Default Biblio Status", "defaultRefStatus", joinValue, parseRefStatus), #synonym of "Default Ref Status"
     "Default Highlight": Metadata("Default Highlight", "defaultHighlight", joinValue, parseLiteral),
+    "Default Ref Status": Metadata("Default Ref Status", "defaultRefStatus", joinValue, parseRefStatus),
     "ED": Metadata("ED", "ED", joinValue, parseLiteral),
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),

@@ -1370,13 +1370,11 @@ def processBiblioLinks(doc):
         if linkText[0] == "[" and linkText[-1] == "]":
             linkText = linkText[1:-1]
 
-        biblioStatus = treeAttr(el, "data-biblio-status")
-        if not biblioStatus:
-            biblioStatus = doc.md.defaultBiblioStatus
+        refStatus = config.refStatus(treeAttr(el, "data-biblio-status"), default=doc.md.defaultRefStatus)
 
         okayToFail = el.get('data-okay-to-fail') is not None
 
-        ref = doc.refs.getBiblioRef(linkText, status=biblioStatus, generateFakeRef=okayToFail, el=el)
+        ref = doc.refs.getBiblioRef(linkText, status=refStatus, generateFakeRef=okayToFail, el=el)
         if not ref:
             if not okayToFail:
                 closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)
@@ -1466,12 +1464,10 @@ def processAutolinks(doc):
             key = ref.for_[0] if ref.for_ else ""
             doc.externalRefsUsed[spec][ref.text][key] = ref
             if isNormative(el):
-                biblioStatus = "normative"
                 biblioStorage = doc.normativeRefs
             else:
-                biblioStatus = "informative"
                 biblioStorage = doc.informativeRefs
-            biblioRef = doc.refs.getBiblioRef(ref.spec, status=biblioStatus, generateFakeRef=True)
+            biblioRef = doc.refs.getBiblioRef(ref.spec, generateFakeRef=True)
             if biblioRef:
                 biblioStorage[biblioRef.linkText] = biblioRef
 

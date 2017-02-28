@@ -8,7 +8,9 @@ from .htmlhelpers import *
 
 class BiblioEntry(object):
 
-    def __init__(self, preferredURL="snapshot", **kwargs):
+    def __init__(self, preferredURL=None, **kwargs):
+        if preferredURL is None:
+            preferredURL = config.refStatus.current
         self.linkText = None
         self.title = None
         self.authors = []
@@ -22,12 +24,13 @@ class BiblioEntry(object):
         self.other = None
         for key, val in kwargs.items():
             setattr(self, key, val)
-        if preferredURL == "snapshot":
+        preferredURL = config.refStatus(preferredURL)
+        if preferredURL == config.refStatus.snapshot:
             self.url = self.snapshot_url or self.current_url
-        elif preferredURL == "current":
+        elif preferredURL == config.refStatus.current:
             self.url = self.current_url or self.snapshot_url
         else:
-            die("Programming error: when trying to build the biblio entry for '{0}', got unknown status '{1}'.", self.linkText, preferredURL)
+            raise
 
     def __str__(self):
         str = ""
@@ -122,13 +125,14 @@ class SpecBasedBiblioEntry(BiblioEntry):
         self.spec = spec
         self.linkText = spec['vshortname']
         self._valid = True
-        if preferredURL == "snapshot" and spec["snapshot_url"]:
-            self.url = spec['snapshot_url']
-        elif spec["current_url"]:
-            self.url = spec['current_url']
-        elif spec["snapshot_url"]:
-            self.url = spec['snapshot_url']
+        preferredURL = config.refStatus(preferredURL)
+        if preferredURL == config.refStatus.snapshot:
+            self.url = self.snapshot_url or self.current_url
+        elif preferredURL == config.refStatus.current:
+            self.url = self.current_url or self.snapshot_url
         else:
+            raise
+        if not self.url:
             self._valid = False
         assert self.url
 
