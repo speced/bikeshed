@@ -129,9 +129,9 @@ class SpecBasedBiblioEntry(BiblioEntry):
         self._valid = True
         preferredURL = config.refStatus(preferredURL)
         if preferredURL == config.refStatus.snapshot:
-            self.url = self.snapshot_url or self.current_url
+            self.url = spec['snapshot_url'] or spec['current_url']
         elif preferredURL == config.refStatus.current:
-            self.url = self.current_url or self.snapshot_url
+            self.url = spec['current_url'] or spec['snapshot_url']
         else:
             raise
         if not self.url:
