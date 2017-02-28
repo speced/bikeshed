@@ -121,7 +121,9 @@ class SpecBasedBiblioEntry(BiblioEntry):
     for when we don't have "real" bibliography data for a reference.
     '''
 
-    def __init__(self, spec, preferredURL="snapshot"):
+    def __init__(self, spec, preferredURL=None):
+        if preferredURL is None:
+            preferredURL = config.refStatus.snapshot
         self.spec = spec
         self.linkText = spec['vshortname']
         self._valid = True
