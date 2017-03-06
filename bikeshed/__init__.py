@@ -1186,7 +1186,7 @@ def determineDfnType(dfn, inferCSS=False):
         text = textContent(dfn)
         if text[0:1] == "@":
             return "at-rule"
-        elif len(dfn) == 1 and dfn[0].get('data-link-type') == "maybe":
+        elif len(dfn) == 1 and dfn[0].get('data-link-type') == "maybe" and emptyText(dfn.text) and emptyText(dfn[0].tail):
             return "value"
         elif text[0:1] == "<" and text[-1:] == ">":
             return "type"
