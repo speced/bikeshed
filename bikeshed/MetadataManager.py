@@ -159,6 +159,7 @@ class MetadataManager:
             requiredSingularKeys['deadline'] = 'Deadline'
         if self.status in config.snapshotStatuses:
             recommendedSingularKeys['date'] = 'Date'
+            requiredSingularKeys['TR'] = "TR"
         if self.status not in config.unlevelledStatuses:
             requiredSingularKeys['level'] = 'Level'
         if self.status not in config.shortToLongStatus:
