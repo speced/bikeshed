@@ -308,7 +308,7 @@ testSuiteDataContentTypes = ["application/json", "application/vnd.csswg.shepherd
 
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
 
-refStatus = enum.Enum("RefStatus", "current snapshot")
+refStatus = enum.Enum("RefStatus", {"current":"current", "snapshot":"snapshot"})
 
 
 @total_ordering
