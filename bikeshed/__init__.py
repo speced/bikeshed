@@ -2346,6 +2346,7 @@ def inlineRemoteIssues(doc):
             appendChild(el,
                     E.a({"href":href, "class":"marker", "style":"text-transform:none"}, key),
                     E.a({"href":href}, data['title']))
+            addClass(el, "no-marker")
         else:
             appendChild(el,
                     E.a({"href":href, "class":"marker"},
