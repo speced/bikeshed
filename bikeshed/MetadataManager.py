@@ -43,6 +43,7 @@ class MetadataManager:
         self.audience = []
         self.blockElements = []
         self.boilerplate = config.BoolSet(default=True)
+        self.canonicalURL = None
         self.canIUseURLs = []
         self.complainAbout = config.BoolSet()
         self.customTextMacros = []
@@ -132,6 +133,13 @@ class MetadataManager:
         if self.repository.type == "github" and "feedback-header" in self.boilerplate and "repository-issue-tracking" in self.boilerplate:
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
         self.status = config.canonicalizeStatus(self.rawStatus, self.group)
+
+        # for TR document, defaults to TR
+        # fallbacks to ED
+        if (self.canonicalURL == None or self.canonicalURL == "TR") and self.TR:
+            self.canonicalURL = self.TR
+        elif (self.canonicalURL == None or self.canonicalURL == "ED") and self.ED:
+            self.canonicalURL = self.ED
         self.validate()
 
     def validate(self):
@@ -845,6 +853,7 @@ knownKeys = {
     "Block Elements": Metadata("Block Elements", "blockElements", joinList, parseCommaSeparated),
     "Boilerplate": Metadata("Boilerplate", "boilerplate", joinBoolSet, parseBoilerplate),
     "Can I Use Url": Metadata("Can I Use URL", "canIUseURLs", joinList, parseLiteralList),
+    "Canonical Url": Metadata("Canonical URL", "canonicalURL", joinValue, parseLiteral),
     "Complain About": Metadata("Complain About", "complainAbout", joinBoolSet, parseComplainAbout),
     "Custom Warning Text": Metadata("Custom Warning Text", "customWarningText", joinList, parseLiteralList),
     "Custom Warning Title": Metadata("Custom Warning Title", "customWarningTitle", joinValue, parseLiteral),
