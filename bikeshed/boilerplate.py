@@ -19,6 +19,13 @@ def addBikeshedVersion(doc):
     appendChild(head,
                 E.meta({"name": "generator", "content": "Bikeshed version {0}".format(bikeshedVersion)}))
 
+def addCanonicalURL(doc):
+    # Adds a <link rel=canonical> to the configured canonical url
+    if doc.md.canonicalURL:
+        head = find("head", doc)
+        appendChild(head,
+                    E.link({"rel": "canonical", "href": doc.md.canonicalURL}))
+
 
 def addHeaderFooter(doc):
     header = config.retrieveBoilerplateFile(doc, 'header') if "header" in doc.md.boilerplate else ""
