@@ -462,7 +462,7 @@ def parseRefStatus(key, val, lineNum):
 
 def parseComplainAbout(key, val, lineNum):
     ret = config.BoolSet(default=False)
-    validLabels = frozenset(["missing-example-ids", "broken-links"])
+    validLabels = frozenset(["missing-example-ids", "broken-links", "accidental-2119"])
     parseBoolishList(key, val.lower(), ret, validLabels)
     return ret
 

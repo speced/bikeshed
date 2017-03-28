@@ -623,6 +623,7 @@ class Spec(object):
         fixIntraDocumentReferences(self)
         fixInterDocumentReferences(self)
         lint.lintBrokenLinks(self)
+        lint.lintAccidental2119(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
