@@ -1329,9 +1329,11 @@ def determineLinkText(el):
     contents = textContent(el)
     if el.get('data-lt'):
         linkText = el.get('data-lt')
-    elif linkType in config.functionishTypes.union(["functionish"]) and re.match(r"^[\w-]+\(.*\)$", contents):
+    elif config.linkTypeIn(linkType, "function") and re.match(r"^[\w-]+\(.*\)$", contents):
+        # Remove arguments from CSS function autolinks,
+        # as they should always be defined argument-less
+        # (and this allows filled-in examples to still autolink).
         linkText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1) + "()"
-        # Need to fix this using the idl parser.
     else:
         linkText = contents
     linkText = foldWhitespace(linkText)
