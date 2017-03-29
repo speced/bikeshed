@@ -2318,7 +2318,7 @@ def inlineRemoteIssues(doc):
 
         try:
             res = requests.get(url, headers=headers)
-        except bikeshed.requests.requests.exceptions.ConnectionError:
+        except requests.exceptions.ConnectionError:
             # Offline or something, recover if possible
             if key in responses:
                 data = responses[key]
