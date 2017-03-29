@@ -2316,6 +2316,7 @@ def inlineRemoteIssues(doc):
             # Have a cached response, see if it changed
             headers["If-None-Match"] = responses[key]["ETag"]
 
+        res = None
         try:
             res = requests.get(url, headers=headers)
         except requests.exceptions.ConnectionError:
@@ -2325,7 +2326,10 @@ def inlineRemoteIssues(doc):
             else:
                 warn("Connection error fetching issue #{0}", issue.num)
                 continue
-        if res.status_code == 304:
+        if res is None:
+            # Already handled in the except block
+            pass
+        elif res.status_code == 304:
             # Unchanged, I can use the cache
             data = responses[key]
         elif res.status_code == 200:
