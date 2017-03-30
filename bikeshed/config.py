@@ -259,6 +259,7 @@ linkTypeToDfnType = {
     "element-sub": frozenset(["element-attr", "element-state"]),
     "maybe": maybeTypes,
     "dfn": frozenset(["dfn"]),
+    "biblio": frozenset(["biblio"]),
     "all": linkTypes
 }
 for dfnType in dfnClassToType.values():
