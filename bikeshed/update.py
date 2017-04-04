@@ -270,7 +270,11 @@ def updateBiblio():
         with closing(urllib2.urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
             lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
             biblio.processReferBiblioFile(lines, biblios, order=4)
+    except urllib2.URLError:
+        warn("Ugh, you're on a version of Python that doesn't understand TLS's SNI feature, which is now required to talk to the SpecRef server. Try upgrading to 2.7.10 or higher?")
+        return
     except Exception, e:
+        print type(e)
         die("Couldn't download the biblio data.\n{0}", e)
     if not config.dryRun:
         # Group the biblios by the first two letters of their keys
