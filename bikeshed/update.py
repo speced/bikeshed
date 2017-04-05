@@ -271,8 +271,14 @@ def updateBiblio():
             lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
             biblio.processReferBiblioFile(lines, biblios, order=4)
     except urllib2.URLError:
-        warn("Ugh, you're on a version of Python that doesn't understand TLS's SNI feature, which is now required to talk to the SpecRef server. Try upgrading to 2.7.10 or higher?")
-        return
+        # SpecRef uses SNI, which old Pythons (pre-2.7.10) don't understand.
+        # Try the CSSWG proxy.
+        try:
+            with closing(urllib2.urlopen("https://api.csswg.org/bibrefs")) as fh:
+                biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
+        except:
+            warn("Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?")
+            return
     except Exception, e:
         print type(e)
         die("Couldn't download the biblio data.\n{0}", e)
