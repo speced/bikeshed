@@ -294,10 +294,10 @@ def processSpecrefBiblioFile(text, storage, order):
             for jsonField, biblioField in fields.items():
                 if jsonField in data:
                     biblio[biblioField] = data[jsonField]
-                if "versionOf" in data:
-                    # "versionOf" entries are all snapshot urls,
-                    # so you want the href *all* the time.
-                    biblio["current_url"] = data["href"]
+            if "versionOf" in data:
+                # "versionOf" entries are all snapshot urls,
+                # so you want the href *all* the time.
+                biblio["current_url"] = data["href"]
         storage[biblioKey.lower()].append(biblio)
     return storage
 
