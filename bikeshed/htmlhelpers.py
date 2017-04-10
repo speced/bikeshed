@@ -94,6 +94,16 @@ def outerHTML(el):
         return ''
     return html.tostring(el, with_tail=False, encoding="unicode")
 
+def serializeTag(el):
+    # Serialize *just* the opening tag for the element.
+    # Use when you want to output the HTML,
+    # but it might be a container with a lot of content.
+    tag = "<" + el.tag
+    for n,v in el.attrib.items():
+        tag += ' {n}="{v}"'.format(n=n, v=escapeAttr(v))
+    tag += ">"
+    return tag
+
 
 def foldWhitespace(text):
     return re.sub(r"(\s|\xa0)+", " ", text)
