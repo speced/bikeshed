@@ -155,8 +155,8 @@ def validateCanIUseURLs(doc, elements):
             if feature["url"].startswith(url):
                 sawTheURL = True
                 urlFeatures.add(featureID)
-        if not sawTheURL:
-            die("The Can I Use URL '{0}' isn't associated with any of the Can I Use features. Please check Can I Use for the correct spec url, and either correct your spec or correct Can I Use.", url)
+        if not sawTheURL and url not in doc.md.ignoreCanIUseUrlFailure:
+            warn("The Can I Use URL '{0}' isn't associated with any of the Can I Use features. Please check Can I Use for the correct spec url, and either correct your spec or correct Can I Use. If the URL is correct and you'd like to keep it in pre-emptively, add the URL to a 'Ignore Can I Use URL Failure' metadata.", url)
 
     # Second, ensure that every feature in the data corresponding to one of the listed URLs
     # has a corresponding Can I Use entry in the document;

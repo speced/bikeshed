@@ -57,6 +57,7 @@ class MetadataManager:
         self.editorTerm = {"singular": "Editor", "plural": "Editors"}
         self.group = None
         self.h1 = None
+        self.ignoreCanIUseUrlFailure = []
         self.ignoredTerms = []
         self.ignoredVars = []
         self.includeCanIUsePanels = False
@@ -868,6 +869,7 @@ knownKeys = {
     "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),
     "Group": Metadata("Group", "group", joinValue, parseLiteral),
     "H1": Metadata("H1", "h1", joinValue, parseLiteral),
+    "Ignore Can I Use Url Failure": Metadata("Ignore Can I Use Url Failure", "ignoreCanIUseUrlFailure", joinList, parseLiteralList),
     "Ignored Terms": Metadata("Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated),
     "Ignored Vars": Metadata("Ignored Vars", "ignoredVars", joinList, parseCommaSeparated),
     "Include Can I Use Panels": Metadata("Include Can I Use Panels", "includeCanIUsePanels", joinValue, parseBoolean),
