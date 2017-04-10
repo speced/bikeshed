@@ -18,11 +18,7 @@ def addCanIUsePanels(doc):
     classFromBrowser = doc.canIUse["agents"]
 
     atLeastOnePanel = False
-    caniuseDfnElementsSelector = ",".join(
-        selector + "[caniuse]"
-        for selector in config.dfnElementsSelector.split(",")
-    )
-    elements = findAll(caniuseDfnElementsSelector, doc)
+    elements = findAll("[caniuse]", doc)
     validateCanIUseURLs(doc, elements)
     for dfn in elements:
         featId = dfn.get("caniuse")
@@ -32,12 +28,15 @@ def addCanIUsePanels(doc):
 
         featId = featId.lower()
         if featId not in features:
-            die("Unrecognized Can I Use feature ID: {0}", featId)
+            die("Unrecognized Can I Use feature ID: {0}", featId, el=dfn)
         feature = features[featId]
 
         addClass(dfn, "caniuse-paneled")
         panel = canIUsePanelFor(id=featId, data=feature, update=lastUpdated, classFromBrowser=classFromBrowser)
-        panel.set("dfn-id", dfn.get("id"))
+        dfnId = dfn.get("id")
+        if not dfnId:
+            die("Elements with `caniuse` attribute need to have an ID as well. Got:\n{0}", serializeTag(dfn), el=dfn)
+        panel.set("dfn-id", dfnId)
         appendChild(doc.body, panel)
         atLeastOnePanel = True
 
