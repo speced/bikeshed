@@ -267,21 +267,27 @@ def updateBiblio():
     try:
         with closing(urllib2.urlopen("https://api.specref.org/bibrefs")) as fh:
             biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
-        with closing(urllib2.urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
-            lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
-            biblio.processReferBiblioFile(lines, biblios, order=4)
     except urllib2.URLError:
         # SpecRef uses SNI, which old Pythons (pre-2.7.10) don't understand.
-        # Try the CSSWG proxy.
+        # First try the older herokuapp.com URL.
         try:
-            with closing(urllib2.urlopen("https://api.csswg.org/bibrefs")) as fh:
+            with closing(urllib2.urlopen("https://specref.herokuapp.com/bibrefs")) as fh:
                 biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
         except:
-            warn("Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?")
-            return
+            # Try the CSSWG proxy.
+            try:
+                with closing(urllib2.urlopen("https://api.csswg.org/bibrefs")) as fh:
+                    biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
+            except:
+                warn("Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?")
+                raise
+                return
     except Exception, e:
         print type(e)
         die("Couldn't download the biblio data.\n{0}", e)
+    with closing(urllib2.urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
+        lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
+        biblio.processReferBiblioFile(lines, biblios, order=4)
     if not config.dryRun:
         # Group the biblios by the first two letters of their keys
         groupedBiblios = DefaultOrderedDict(DefaultOrderedDict)
