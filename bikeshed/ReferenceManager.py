@@ -633,6 +633,11 @@ class ReferenceManager(object):
         elif candidate['biblioFormat'] == "alias":
             # Follow the chain to the real candidate
             bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True)
+        elif candidate["obsoletedBy"].strip():
+            # Obsoleted by - throw an error and follow the chain
+            bib = self.getBiblioRef(candidate["obsoletedBy"], status=status, el=el, quiet=True)
+            if not quiet:
+                die("Obsolete biblio ref: [{0}] is replaced by [{1}].", candidate["linkText"], bib.linkText)
         else:
             bib = biblio.BiblioEntry(preferredURL=status, **candidate)
 
