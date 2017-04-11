@@ -21,6 +21,7 @@ class BiblioEntry(object):
         self.current_url = None
         self.preferred_url = preferredURL
         self.url = None
+        self.obsoletedBy = None
         self.other = None
         for key, val in kwargs.items():
             setattr(self, key, val)
@@ -274,6 +275,7 @@ def processSpecrefBiblioFile(text, storage, order):
         "status": "status"
     }
 
+    obsoletedBy = {}
     for biblioKey, data in datas.items():
         biblio = {"linkText": biblioKey, "order": order}
         if isinstance(data, basestring):
@@ -298,7 +300,17 @@ def processSpecrefBiblioFile(text, storage, order):
                 # "versionOf" entries are all snapshot urls,
                 # so you want the href *all* the time.
                 biblio["current_url"] = data["href"]
+            if "obsoletedBy" in data:
+                for v in data["obsoletedBy"]:
+                    obsoletedBy[biblioKey.lower()] = v.lower()
+            if "obsoletes" in data:
+                for v in data["obsoletes"]:
+                    obsoletedBy[v.lower()] = biblioKey.lower()
         storage[biblioKey.lower()].append(biblio)
+    for old,new in obsoletedBy.items():
+        if old in storage:
+            for biblio in storage[old]:
+                biblio["obsoletedBy"] = new
     return storage
 
 
@@ -315,6 +327,7 @@ def loadBiblioDataFile(lines, storage):
                     "title": lines.next(),
                     "snapshot_url": lines.next(),
                     "current_url": lines.next(),
+                    "obsoletedBy": lines.next(),
                     "other": lines.next(),
                     "etAl": lines.next() != "\n",
                     "order": 3,

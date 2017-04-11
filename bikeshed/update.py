@@ -489,8 +489,9 @@ def writeBiblioFile(fh, biblios):
     date
     status
     title
-    snapshot url
-    current url
+    snapshot_url
+    current_url
+    obsoletedBy
     other
     etAl (as a boolish string)
     authors* (each on a separate line, an indeterminate number of lines)
@@ -507,7 +508,7 @@ def writeBiblioFile(fh, biblios):
         format = b['biblioFormat']
         fh.write("{prefix}:{key}\n".format(prefix=typePrefixes[format], key=key.lower()))
         if format == "dict":
-            for field in ["linkText", "date", "status", "title", "snapshot_url", "current_url", "other"]:
+            for field in ["linkText", "date", "status", "title", "snapshot_url", "current_url", "obsoletedBy", "other"]:
                 fh.write(b.get(field, "") + "\n")
             if b.get("etAl", False):
                 fh.write("1\n")
