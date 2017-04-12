@@ -633,7 +633,7 @@ class ReferenceManager(object):
         elif candidate['biblioFormat'] == "alias":
             # Follow the chain to the real candidate
             bib = self.getBiblioRef(candidate["aliasOf"], status=status, el=el, quiet=True)
-        elif candidate["obsoletedBy"].strip():
+        elif candidate.get("obsoletedBy", "").strip():
             # Obsoleted by - throw an error and follow the chain
             bib = self.getBiblioRef(candidate["obsoletedBy"], status=status, el=el, quiet=True)
             if not quiet:
