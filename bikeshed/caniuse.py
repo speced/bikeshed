@@ -36,6 +36,7 @@ def addCanIUsePanels(doc):
         dfnId = dfn.get("id")
         if not dfnId:
             die("Elements with `caniuse` attribute need to have an ID as well. Got:\n{0}", serializeTag(dfn), el=dfn)
+            continue
         panel.set("dfn-id", dfnId)
         appendChild(doc.body, panel)
         atLeastOnePanel = True
