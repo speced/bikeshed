@@ -9,26 +9,25 @@ from .htmlhelpers import *
 class BiblioEntry(object):
 
     def __init__(self, preferredURL=None, **kwargs):
-        if preferredURL is None:
-            preferredURL = config.refStatus.snapshot
-        self.linkText = None
-        self.title = None
-        self.authors = []
-        self.etAl = False
-        self.status = None
-        self.date = None
-        self.snapshot_url = None
-        self.current_url = None
+        self.linkText = kwargs.get("linkText", None)
+        self.title = kwargs.get("title", None)
+        self.authors = kwargs.get("authors", [])
+        self.etAl = kwargs.get("etAl", False)
+        self.status = kwargs.get("status", None)
+        self.date = kwargs.get("date", None)
+        self.snapshot_url = kwargs.get("snapshot_url", None)
+        self.current_url = kwargs.get("current_url", None)
         self.preferred_url = preferredURL
         self.url = None
-        self.obsoletedBy = None
-        self.other = None
-        for key, val in kwargs.items():
-            setattr(self, key, val)
-        preferredURL = config.refStatus(preferredURL)
-        if preferredURL == config.refStatus.snapshot:
+        self.obsoletedBy = kwargs.get("obsoletedBy", "")
+        self.other = kwargs.get("other", None)
+        if preferredURL is None:
+            self.preferred_url = config.refStatus.snapshot
+        else:
+            self.preferred_url = config.refStatus(preferredURL)
+        if self.preferred_url == config.refStatus.snapshot:
             self.url = self.snapshot_url or self.current_url
-        elif preferredURL == config.refStatus.current:
+        elif self.preferred_url == config.refStatus.current:
             self.url = self.current_url or self.snapshot_url
         else:
             raise
