@@ -464,11 +464,11 @@ def parseRefStatus(key, val, lineNum):
 def parseComplainAbout(key, val, lineNum):
     ret = config.BoolSet(default=False)
     validLabels = frozenset(["missing-example-ids", "broken-links", "accidental-2119"])
-    parseBoolishList(key, val.lower(), ret, validLabels)
+    parseBoolishList(key, val.lower(), ret, validLabels, lineNum=lineNum)
     return ret
 
 
-def parseBoolishList(key, val, boolset, validLabels=None, extraValues=None):
+def parseBoolishList(key, val, boolset, validLabels=None, extraValues=None, lineNum=None):
     # Parses anything defined as "label <boolish>, label <boolish>" into a passed BoolSet
     # Supply a list of valid labels if you want to have them checked,
     # and a dict of {value=>bool} pairs you want in addition to the standard boolish values
