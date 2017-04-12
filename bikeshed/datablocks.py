@@ -612,6 +612,7 @@ def parseInfoTree(lines, indent=4, lineNum=0):
     # ===
     # key1: val1; key2: val2
     # key1: val1; key2a: val2a
+    # Starting a line with # will comment it out.
 
     def extendData(datas, infoLevels):
         if not infoLevels:
@@ -635,6 +636,8 @@ def parseInfoTree(lines, indent=4, lineNum=0):
         if line.strip() == "":
             continue
         ws, text = re.match("(\s*)(.*)", line).groups()
+        if text.startswith("#"): # comment
+            continue
         wsLen = len(ws.replace("\t", indentSpace))
         if wsLen % indent != 0:
             die("Line has inconsistent indentation; use tabs or {1} spaces:\n{0}", text, indent, lineNum=thisLine)
