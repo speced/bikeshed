@@ -37,7 +37,7 @@ def addCanIUsePanels(doc):
         if not dfnId:
             die("Elements with `caniuse` attribute need to have an ID as well. Got:\n{0}", serializeTag(dfn), el=dfn)
             continue
-        panel.set("dfn-id", dfnId)
+        panel.set("data-dfn-id", dfnId)
         appendChild(doc.body, panel)
         atLeastOnePanel = True
 
@@ -47,7 +47,7 @@ def addCanIUsePanels(doc):
                 var panels = [].slice.call(document.querySelectorAll(".caniuse-status"));
                 for(var i = 0; i < panels.length; i++) {
                     var panel = panels[i];
-                    var dfn = document.querySelector("#" + panel.getAttribute("dfn-id"));
+                    var dfn = document.querySelector("#" + panel.getAttribute("data-dfn-id"));
                     var rect = dfn.getBoundingClientRect();
                     panel.style.top = (window.scrollY + rect.top) + "px";
                 }
