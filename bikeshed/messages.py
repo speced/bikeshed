@@ -12,16 +12,23 @@ messageCounts = Counter()
 
 
 def p(msg):
+    if isinstance(msg, tuple):
+        msg, ascii = msg
+    else:
+        ascii = None
     if config.quiet == float("infinity"):
         return
     try:
         print msg
     except UnicodeEncodeError:
-        warning = formatMessage("warning", "Your console does not understand Unicode.\n  Messages may be slightly corrupted.")
-        if warning not in messages:
-            print warning
-            messages.add(warning)
-        print msg.encode("ascii", "xmlcharrefreplace")
+        if ascii is not None:
+            print ascii.encode("ascii", "replace")
+        else:
+            warning = formatMessage("warning", "Your console does not understand Unicode.\n  Messages may be slightly corrupted.")
+            if warning not in messages:
+                print warning
+                messages.add(warning)
+            print msg.encode("ascii", "xmlcharrefreplace")
 
 
 def die(msg, *formatArgs, **namedArgs):
@@ -156,9 +163,9 @@ def formatMessage(type, text, lineNum=None):
         if type == "message":
             return text
         if type == "success":
-            return printColor(" ✔ ", "green", "invert") + " " + text
+            return (printColor(" ✔ ", "green", "invert") + " " + text, printColor("YAY", "green", "invert") + " " + text)
         if type == "failure":
-            return printColor(" ✘ ", "red", "invert") + " " + text
+            return (printColor(" ✘ ", "red", "invert") + " " + text, printColor("ERR", "red", "invert") + " " + text)
         if type == "fatal":
             headingText = "FATAL ERROR"
             color = "red"
