@@ -219,7 +219,7 @@ typedef sequence<DOMString[]> sequins;
 typedef sequence<DOMString[]>? sequinses;
 typedef object obj;
 typedef Date? today;
-typedef (short or double) union;
+typedef (short or [Extended] double) union;
 typedef (short or sequence < DOMString [ ] ? [ ] > ? or DOMString[]?[] or unsigned long long or unrestricted double) craziness;
 typedef (short or (long or double)) nestedUnion;
 typedef (short or (long or double) or long long) moreNested;
@@ -236,7 +236,7 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
 }
 [ NoInterfaceObject , MapClass (short, Foo )] interface LinkStyle {
     stringifier attribute DOMString mediaText;
-    readonly attribute short bar;
+    readonly attribute [Extended] short bar;
     getter object (DOMString name);
     getter setter object bob(DOMString name);
     stringifier foo me(int x);
@@ -247,7 +247,7 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
 };
 [foo] partial dictionary FooDict:BarDict {
     [one "]" ( tricky ] test)] short bar;
-    [two] sequence<(double or Foo)> foo = "hello";
+    [two] sequence<(double or [Extended] Foo)> foo = "hello";
     required Foo baz;
 }
 
@@ -271,7 +271,7 @@ interface Int {
 };
 
 namespace Namespace1 {
-    [One] unsigned long long method(short x);
+    [One] unsigned long long method([Extended] short x);
     [Two] unsigned long long method(short x, short y);
     readonly attribute long? value;
     attribute long error;   // error, must be readonly

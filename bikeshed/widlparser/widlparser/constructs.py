@@ -215,13 +215,13 @@ class Enum(Construct):    # [ExtendedAttributes] "enum" identifier "{" EnumValue
                 '[values: ' + repr(self.values) + ']]')
 
 
-class Typedef(Construct):    # [ExtendedAttributes] "typedef" Type identifier ";"
+class Typedef(Construct):    # [ExtendedAttributes] "typedef" TypeWithExtendedAttributes identifier ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
         if (Symbol.peek(tokens, 'typedef')):
-            if (Type.peek(tokens)):
+            if (TypeWithExtendedAttributes.peek(tokens)):
                 token = tokens.peek()
                 return tokens.popPosition(token and token.isIdentifier())
         return tokens.popPosition(False)
@@ -229,7 +229,7 @@ class Typedef(Construct):    # [ExtendedAttributes] "typedef" Type identifier ";
     def __init__(self, tokens, parent = None, parser = None):
         Construct.__init__(self, tokens, parent, parser = parser)
         self._typedef = Symbol(tokens, 'typedef')
-        self.type = Type(tokens)
+        self.type = TypeWithExtendedAttributes(tokens)
         self.name = tokens.next().text
         self._consumeSemicolon(tokens)
         self._didParse(tokens)
@@ -254,7 +254,7 @@ class Typedef(Construct):    # [ExtendedAttributes] "typedef" Type identifier ";
         return output + repr(self.type) + ' [name: ' + self.name + ']]'
 
 
-class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut] Type ArgumentName [Default] |
+class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut] TypeWithExtendedAttributes ArgumentName [Default] |
                               # [ExtendedAttributeList] [IgnoreInOut] Type ["..."] ArgumentName
     @classmethod
     def peek(cls, tokens):
@@ -267,7 +267,7 @@ class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut]
         else:
             if (Symbol.peek(tokens, 'optional')):
                 IgnoreInOut.peek(tokens)
-                if (Type.peek(tokens)):
+                if (TypeWithExtendedAttributes.peek(tokens)):
                     if (ArgumentName.peek(tokens)):
                         Default.peek(tokens)
                         return tokens.popPosition(True)
@@ -278,7 +278,7 @@ class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut]
         if (Symbol.peek(tokens, 'optional')):
             self.optional = Symbol(tokens, 'optional')
             self._ignore = IgnoreInOut(tokens) if (IgnoreInOut.peek(tokens)) else None
-            self.type = Type(tokens)
+            self.type = TypeWithExtendedAttributes(tokens)
             self.variadic = None
             self._name = ArgumentName(tokens)
             self.default = Default(tokens) if (Default.peek(tokens)) else None
@@ -435,6 +435,10 @@ class SyntaxError(Construct):   # ... ";" | ... "}"
     @property
     def name(self):
         return None
+
+    @property
+    def required(self):
+        return False
 
     def _unicode(self):
         return ''.join([unicode(token) for token in self.tokens])
@@ -785,13 +789,13 @@ class Namespace(Construct):    # [ExtendedAttributes] ["partial"] "namespace" id
         return output + ']]'
 
 
-class DictionaryMember(Construct): # [ExtendedAttributes] ["required"] Type identifier [Default] ";"
+class DictionaryMember(Construct): # [ExtendedAttributes] ["required"] TypeWithExtendedAttributes identifier [Default] ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
         Symbol.peek(tokens, 'required')
-        if (Type.peek(tokens)):
+        if (TypeWithExtendedAttributes.peek(tokens)):
             token = tokens.peek()
             if (token and token.isIdentifier()):
                 Default.peek(tokens)
@@ -801,7 +805,7 @@ class DictionaryMember(Construct): # [ExtendedAttributes] ["required"] Type iden
     def __init__(self, tokens, parent = None):
         Construct.__init__(self, tokens, parent)
         self.required = Symbol(tokens, 'required') if (Symbol.peek(tokens, 'required')) else None
-        self.type = Type(tokens)
+        self.type = TypeWithExtendedAttributes(tokens)
         self.name = tokens.next().text
         self.default = Default(tokens) if (Default.peek(tokens)) else None
         self._consumeSemicolon(tokens)

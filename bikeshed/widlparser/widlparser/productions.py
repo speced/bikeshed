@@ -527,10 +527,10 @@ class SingleType(Production):    # NonAnyType | "any" [TypeSuffixStartingWithArr
 
 class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [TypeSuffix] | "DOMString" [TypeSuffix] |
                                 # "USVString" TypeSuffix |
-                                # identifier [TypeSuffix] | "sequence" "<" Type ">" [Null] | "object" [TypeSuffix] |
+                                # identifier [TypeSuffix] | "sequence" "<" TypeWithExtendedAttributes ">" [Null] | "object" [TypeSuffix] |
                                 # "Date" [TypeSuffix] | "RegExp" [TypeSuffix] | "Error" TypeSuffix |
                                 # "DOMException" TypeSuffix | "Promise" "<" ReturnType ">" [Null] | BufferRelatedType [Null] |
-                                # "FrozenArray" "<" Type ">" [Null] | "record" "<" StringType "," Type ">"
+                                # "FrozenArray" "<" TypeWithExtendedAttributes ">" [Null] | "record" "<" StringType "," TypeWithExtendedAttributes ">"
 
     BufferRelatedTypes = frozenset(['ArrayBuffer', 'DataView', 'Int8Array', 'Int16Array', 'Int32Array',
                                     'Uint8Array', 'Uint16Array', 'Uint32Array', 'Uint8ClampedArray',
@@ -549,7 +549,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             return tokens.popPosition(True)
         elif (token and token.isSymbol(('sequence', 'FrozenArray'))):
             if (Symbol.peek(tokens, '<')):
-                if (Type.peek(tokens)):
+                if (TypeWithExtendedAttributes.peek(tokens)):
                     if (Symbol.peek(tokens, '>')):
                         Symbol.peek(tokens, '?')
                         return tokens.popPosition(True)
@@ -566,7 +566,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             if (Symbol.peek(tokens, '<')):
                 if (Symbol.peek(tokens, cls.StringTypes)):
                     if (Symbol.peek(tokens, ',')):
-                        if (Type.peek(tokens)):
+                        if (TypeWithExtendedAttributes.peek(tokens)):
                             if (Symbol.peek(tokens, '>')):
                                 Symbol.peek(tokens, '?')
                                 return tokens.popPosition(True)
@@ -594,7 +594,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
             elif (token.isSymbol(('sequence', 'FrozenArray'))):
                 self.sequence = Symbol(tokens)
                 self._openType = Symbol(tokens, '<')
-                self.type = Type(tokens)
+                self.type = TypeWithExtendedAttributes(tokens)
                 self._closeType = Symbol(tokens, '>', False)
                 self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
             elif (token.isSymbol('Promise')):
@@ -611,7 +611,7 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
                 self._openType = Symbol(tokens, '<')
                 self.keyType = Symbol(tokens)
                 self._comma = Symbol(tokens, ',')
-                self.type = Type(tokens)
+                self.type = TypeWithExtendedAttributes(tokens)
                 self._closeType = Symbol(tokens, '>', False)
                 self.null = Symbol(tokens, '?', False) if (Symbol.peek(tokens, '?')) else None
             else:
@@ -687,9 +687,12 @@ class NonAnyType(Production):   # PrimitiveType [TypeSuffix] | "ByteString" [Typ
         return output + (repr(self.suffix) if (self.suffix) else '') + ']'
 
 
-class UnionMemberType(Production):   # NonAnyType | UnionType [TypeSuffix] | "any" "[" "]" [TypeSuffix]
+class UnionMemberType(Production):   # [ExtendedAttributeList] NonAnyType | UnionType [TypeSuffix] | "any" "[" "]" [TypeSuffix]
     @classmethod
     def peek(cls, tokens):
+        if (ExtendedAttributeList.peek(tokens)):
+            if (NonAnyType.peek(tokens)):
+                return True
         if (NonAnyType.peek(tokens)):
             return True
         if (UnionType.peek(tokens)):
@@ -709,6 +712,7 @@ class UnionMemberType(Production):   # NonAnyType | UnionType [TypeSuffix] | "an
         self._openBracket = None
         self._closeBracket = None
         self.typeName = None
+        self.extendedAttributes = ExtendedAttributeList(tokens, self) if (ExtendedAttributeList.peek(tokens)) else None
         if (NonAnyType.peek(tokens)):
             self.type = NonAnyType(tokens)
             self.suffix = None
@@ -725,7 +729,8 @@ class UnionMemberType(Production):   # NonAnyType | UnionType [TypeSuffix] | "an
         self._didParse(tokens, False)
 
     def _unicode(self):
-        output = (unicode(self.any) + unicode(self._openBracket) + unicode(self._closeBracket)) if (self.any) else unicode(self.type)
+        output = unicode(self.extendedAttributes) if (self.extendedAttributes) else ''
+        output += (unicode(self.any) + unicode(self._openBracket) + unicode(self._closeBracket)) if (self.any) else unicode(self.type)
         return output + (unicode(self.suffix) if (self.suffix) else '')
 
     def _markup(self, generator):
@@ -734,6 +739,8 @@ class UnionMemberType(Production):   # NonAnyType | UnionType [TypeSuffix] | "an
             generator.addText(self._openBracket)
             generator.addText(self._closeBracket)
         else:
+            if (self.extendedAttributes):
+                self.extendedAttributes.markup(generator)
             self.type.markup(generator)
         generator.addText(self.suffix)
         return self
@@ -832,6 +839,46 @@ class Type(Production):  # SingleType | UnionType [TypeSuffix]
 
     def __repr__(self):
         return '[Type: ' + repr(self.type) + (repr(self.suffix) if (self.suffix) else '') + ']'
+
+
+class TypeWithExtendedAttributes(Production):  # [ExtendedAttributeList] SingleType | UnionType [TypeSuffix]
+    @classmethod
+    def peek(cls, tokens):
+        ExtendedAttributeList.peek(tokens)
+        if (SingleType.peek(tokens)):
+            return True
+        if (UnionType.peek(tokens)):
+            TypeSuffix.peek(tokens)
+            return True
+        return False
+
+    def __init__(self, tokens):
+        Production.__init__(self, tokens)
+        self.extendedAttributes = ExtendedAttributeList(tokens, self) if (ExtendedAttributeList.peek(tokens)) else None
+        if (SingleType.peek(tokens)):
+            self.type = SingleType(tokens)
+            self.suffix = None
+        else:
+            self.type = UnionType(tokens)
+            self.suffix = TypeSuffix(tokens) if (TypeSuffix.peek(tokens)) else None
+        self._didParse(tokens)
+
+    @property
+    def typeNames(self):
+        return self.type.typeNames
+
+    def _unicode(self):
+        return (unicode(self.extendedAttributes) if (self.extendedAttributes) else '') + unicode(self.type) + (self.suffix._unicode() if (self.suffix) else '')
+
+    def _markup(self, generator):
+        if (self.extendedAttributes):
+            self.extendedAttributes.markup(generator)
+        self.type.markup(generator)
+        generator.addText(self.suffix)
+        return self
+
+    def __repr__(self):
+        return '[TypeWithExtendedAttributes: ' + (repr(self.extendedAttributes) if (self.extendedAttributes) else '') + repr(self.type) + (repr(self.suffix) if (self.suffix) else '') + ']'
 
 
 class IgnoreInOut(Production):  # "in" | "out"
@@ -1190,14 +1237,14 @@ class Special(Production):   # "getter" | "setter" | "creator" | "deleter" | "le
         return '[' + self.name.encode('ascii', 'replace') + ']'
 
 
-class AttributeRest(Production):   # ["readonly"] "attribute" Type ("required" | identifier) [Ignore] ";"
+class AttributeRest(Production):   # ["readonly"] "attribute" TypeWithExtendedAttributes ("required" | identifier) [Ignore] ";"
     @classmethod
     def peek(cls, tokens):
         token = tokens.pushPosition()
         if (token and token.isSymbol('readonly')):
             token = tokens.peek()
         if (token and token.isSymbol('attribute')):
-            if (Type.peek(tokens)):
+            if (TypeWithExtendedAttributes.peek(tokens)):
                 token = tokens.peek()
                 return tokens.popPosition(token and (token.isIdentifier() or token.isSymbol('required')))
         return tokens.popPosition(False)
@@ -1206,7 +1253,7 @@ class AttributeRest(Production):   # ["readonly"] "attribute" Type ("required" |
         Production.__init__(self, tokens)
         self.readonly = Symbol(tokens, 'readonly') if (Symbol.peek(tokens, 'readonly')) else None
         self._attribute = Symbol(tokens, 'attribute')
-        self.type = Type(tokens)
+        self.type = TypeWithExtendedAttributes(tokens)
         self.name = tokens.next().text
         self._ignore = Ignore(tokens) if (Ignore.peek(tokens)) else None
         self._consumeSemicolon(tokens)
@@ -1357,15 +1404,15 @@ class OperationRest(ChildProduction):   # [identifier] "(" [ArgumentList] ")" [I
         return output + '[argumentlist: ' + (repr(self.arguments) if (self.arguments) else '') + ']]'
 
 
-class Iterable(ChildProduction):     # "iterable" "<" Type ["," Type] ">" ";" | "legacyiterable" "<" Type ">" ";"
+class Iterable(ChildProduction):     # "iterable" "<" TypeWithExtendedAttributes ["," TypeWithExtendedAttributes] ">" ";" | "legacyiterable" "<" Type ">" ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         if (Symbol.peek(tokens, 'iterable')):
             if (Symbol.peek(tokens, '<')):
-                if (Type.peek(tokens)):
+                if (TypeWithExtendedAttributes.peek(tokens)):
                     if (Symbol.peek(tokens, ',')):
-                        if (Type.peek(tokens)):
+                        if (TypeWithExtendedAttributes.peek(tokens)):
                             token = tokens.peek()
                             return tokens.popPosition(token and token.isSymbol('>'))
                     token = tokens.peek()
@@ -1381,12 +1428,12 @@ class Iterable(ChildProduction):     # "iterable" "<" Type ["," Type] ">" ";" | 
         ChildProduction.__init__(self, tokens, parent)
         self._iterable = Symbol(tokens)
         self._openType = Symbol(tokens, '<')
-        self.type = Type(tokens)
+        self.type = TypeWithExtendedAttributes(tokens)
         if (Symbol.peek(tokens, ',')):
             self.keyType = self.type
             self.type = None
             self._comma = Symbol(tokens)
-            self.valueType = Type(tokens)
+            self.valueType = TypeWithExtendedAttributes(tokens)
         else:
             self.keyType = None
             self.valueType = None
@@ -1435,16 +1482,16 @@ class Iterable(ChildProduction):     # "iterable" "<" Type ["," Type] ">" ";" | 
         return output + ']'
 
 
-class Maplike(ChildProduction):      # ["readonly"] "maplike" "<" Type "," Type ">" ";"
+class Maplike(ChildProduction):      # ["readonly"] "maplike" "<" TypeWithExtendedAttributes "," TypeWithExtendedAttributes ">" ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Symbol.peek(tokens, 'readonly')
         if (Symbol.peek(tokens, 'maplike')):
             if (Symbol.peek(tokens, '<')):
-                if (Type.peek(tokens)):
+                if (TypeWithExtendedAttributes.peek(tokens)):
                     if (Symbol.peek(tokens, ',')):
-                        if (Type.peek(tokens)):
+                        if (TypeWithExtendedAttributes.peek(tokens)):
                             return tokens.popPosition(Symbol.peek(tokens, '>'))
         return tokens.popPosition(False)
 
@@ -1453,9 +1500,9 @@ class Maplike(ChildProduction):      # ["readonly"] "maplike" "<" Type "," Type 
         self.readonly = Symbol(tokens, 'readonly') if (Symbol.peek(tokens, 'readonly')) else None
         self._maplike = Symbol(tokens, 'maplike')
         self._openType = Symbol(tokens, '<')
-        self.keyType = Type(tokens)
+        self.keyType = TypeWithExtendedAttributes(tokens)
         self._comma = Symbol(tokens, ',')
-        self.valueType = Type(tokens)
+        self.valueType = TypeWithExtendedAttributes(tokens)
         self._closeType = Symbol(tokens, '>')
         self._consumeSemicolon(tokens)
         self._didParse(tokens)
@@ -1494,14 +1541,14 @@ class Maplike(ChildProduction):      # ["readonly"] "maplike" "<" Type "," Type 
         return output + ']'
 
 
-class Setlike(ChildProduction):      # ["readonly"] "setlike" "<" Type ">" ";"
+class Setlike(ChildProduction):      # ["readonly"] "setlike" "<" TypeWithExtendedAttributes ">" ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Symbol.peek(tokens, 'readonly')
         if (Symbol.peek(tokens, 'setlike')):
             if (Symbol.peek(tokens, '<')):
-                if (Type.peek(tokens)):
+                if (TypeWithExtendedAttributes.peek(tokens)):
                     return tokens.popPosition(Symbol.peek(tokens, '>'))
         return tokens.popPosition(False)
 
@@ -1510,7 +1557,7 @@ class Setlike(ChildProduction):      # ["readonly"] "setlike" "<" Type ">" ";"
         self.readonly = Symbol(tokens, 'readonly') if (Symbol.peek(tokens, 'readonly')) else None
         self._setlike = Symbol(tokens, 'setlike')
         self._openType = Symbol(tokens, '<')
-        self.type = Type(tokens)
+        self.type = TypeWithExtendedAttributes(tokens)
         self._closeType = Symbol(tokens, '>')
         self._consumeSemicolon(tokens)
         self._didParse(tokens)
