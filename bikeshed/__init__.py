@@ -819,7 +819,7 @@ class MarkdownCodeSpans(func.Functor):
                         pass
                     else:
                         mode = "text"
-                        __codeSpanReplacements__.append(text[indexSoFar:m.start()])
+                        self.__codeSpanReplacements__.append(text[indexSoFar:m.start()])
                         newText += "\ue0ff"
                         indexSoFar = m.end()
         if mode == "text":
@@ -827,6 +827,12 @@ class MarkdownCodeSpans(func.Functor):
         elif mode == "code":
             newText += "`"*escapeLen + text[indexSoFar:]
         self.__val__ = newText
+
+    def map(self, fn):
+        x = MarkdownCodeSpans("")
+        x.__val__ = fn(self.__val__)
+        x.__codeSpanReplacements__ = self.__codeSpanReplacements__
+        return x
 
     def extract(self):
         if self.__codeSpanReplacements__:
@@ -841,7 +847,7 @@ class MarkdownCodeSpans(func.Functor):
                 return "<code data-opaque>" + t + "</code>"
             return re.sub("\ue0ff", codeSpanReviver, self.__val__)
         else:
-            return __val__
+            return self.__val__
 
 
 def stripBOM(doc):
