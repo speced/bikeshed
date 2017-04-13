@@ -561,6 +561,47 @@ def hashContents(el):
     return hashlib.md5(innerHTML(el).strip().encode("ascii", "xmlcharrefreplace")).hexdigest()[0:8]
 
 
+def replaceMacros(text, macros):
+    # `macros` is a dict of {lowercaseMacroName => replacementText}
+    # Macro syntax is [FOO], where FOO is /[A-Z0-9-]+/
+    # If written as [FOO?], failure to find a matching macro just replaced it with nothing;
+    # otherwise, it throws a fatal error.
+    def macroReplacer(match):
+        fullText = match.group(0)
+        innerText = match.group(2).lower() or ""
+        optional = match.group(3) == "?"
+        if fullText.startswith("\\"):
+            # Escaped
+            return fullText[1:]
+        if fullText.startswith("[["):
+            # Actually a biblio link
+            return fullText
+        if re.match("[\d-]+$", innerText):
+            # No refs are all-digits (this is probably JS code, or a regex/grammar).
+            return fullText
+        if innerText in macros:
+            # For some reason I store all the macros in lowercase,
+            # despite requiring them to be spelled with uppercase.
+            return macros[innerText]
+        # Nothing has matched, so start failing the macros.
+        if optional:
+            return ""
+        die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
+        return fullText
+    return re.sub(r"(\\|\[)?\[([A-Z0-9-]+)(\??)\]", macroReplacer, text)
+
+
+def replaceAwkwardCSSShorthands(text):
+    # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
+    text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
+
+    # Replace the ''maybe link'' shortcuts.
+    # They'll survive the HTML parser,
+    # but the current shorthand-recognizer code won't find them if they contain an element.
+    # (The other shortcuts are "atomic" and can't contain elements.)
+    return re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
+
+
 def fixupIDs(doc, els):
     translateIDs(doc.md.translateIDs, els)
     addOldIDs(els)

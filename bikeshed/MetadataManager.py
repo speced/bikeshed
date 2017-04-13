@@ -126,7 +126,7 @@ class MetadataManager:
         result = md.join(getattr(self, md.attrName), val)
         setattr(self, md.attrName, result)
 
-    def finish(self):
+    def computeImplicitMetadata(self):
         # Do some "computed metadata", based on the value of other metadata.
         # Only call this when you're sure all metadata sources are parsed.
         if not self.repository:
@@ -141,14 +141,13 @@ class MetadataManager:
             self.canonicalURL = self.TR
         elif (self.canonicalURL == None or self.canonicalURL == "ED") and self.ED:
             self.canonicalURL = self.ED
-        self.validate()
 
     def validate(self):
         if self.group == "byos":
             return True
 
         if not self.hasMetadata:
-            die("The document requires at least one metadata block.")
+            die("The document requires at least one <pre class=metadata> block.")
             return
 
         # { MetadataManager attr : metadata name (for printing) }

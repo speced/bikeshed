@@ -13,6 +13,7 @@ import argparse
 import itertools
 import collections
 from datetime import datetime
+from functools import partial as curry
 
 from . import config
 from . import biblio
@@ -30,6 +31,7 @@ from . import extensions
 from . import lint
 from . import caniuse
 from . import highlight
+from . import func
 from .requests import requests
 from .ReferenceManager import ReferenceManager
 from .htmlhelpers import *
@@ -540,9 +542,10 @@ class Spec(object):
         self.md = metadata.join(defaultMd, self.md)
         if self.md.group == "byos":
             self.md.boilerplate.default = False
-        self.md.finish()
-        extensions.load(self)
+        self.md.computeImplicitMetadata()
         self.md.fillTextMacros(self.macros, doc=self)
+        self.md.validate()
+        extensions.load(self)
 
         # Initialize things
         self.refs.initializeRefs(self)
@@ -748,94 +751,24 @@ class Spec(object):
         except Exception, e:
             die("Something went wrong while watching the file:\n{0}", e)
 
-    def fixText(self, text, moreMacros=None):
+    def fixText(self, text, moreMacros={}):
         # Do several textual replacements that need to happen *before* the document is parsed as HTML.
 
         # If markdown shorthands are on, remove all `foo`s while processing,
         # so their contents don't accidentally trigger other stuff.
         # Also handle markdown escapes.
-        codeSpanReplacements = []
         if "markdown" in self.md.markupShorthands:
-            newText = ""
-            mode = "text"
-            indexSoFar = 0
-            escapeLen = 0
-            for m in re.finditer(r"(\\`)|(`+)", text):
-                if mode == "text":
-                    if m.group(1):
-                        newText += text[indexSoFar:m.start()] + m.group(1)[1]
-                        indexSoFar = m.end()
-                    elif m.group(2):
-                        mode = "code"
-                        newText += text[indexSoFar:m.start()]
-                        indexSoFar = m.end()
-                        escapeLen = len(m.group(2))
-                elif mode == "code":
-                    if m.group(1):
-                        pass
-                    elif m.group(2):
-                        if len(m.group(2)) != escapeLen:
-                            pass
-                        else:
-                            mode = "text"
-                            codeSpanReplacements.append(text[indexSoFar:m.start()])
-                            newText += "\ue0ff"
-                            indexSoFar = m.end()
-            if mode == "text":
-                newText += text[indexSoFar:]
-            elif mode == "code":
-                newText += "`"*escapeLen + text[indexSoFar:]
-            text = newText
+            textFunctor = MarkdownCodeSpans(text)
+        else:
+            textFunctor = func.Functor(text)
 
-        # Replace the [FOO] text macros.
-        # [FOO?] macros are optional; failure just removes them.
-        def macroReplacer(match):
-            fullText = match.group(0)
-            innerText = match.group(2).lower() or ""
-            optional = match.group(3) == "?"
-            if fullText.startswith("\\"):
-                # Escaped
-                return fullText[1:]
-            if fullText.startswith("[["):
-                # Actually a biblio link
-                return fullText
-            if re.match("[\d-]+$", innerText):
-                # No refs are all-digits (this is probably JS code, or a regex/grammar).
-                return fullText
-            if innerText in self.macros:
-                # For some reason I store all the macros in lowercase,
-                # despite requiring them to be spelled with uppercase.
-                return self.macros[innerText]
-            if moreMacros and innerText in moreMacros:
-                return moreMacros[innerText]
-            # Nothing has matched, so start failing the macros.
-            if optional:
-                return ""
-            die("Found unmatched text macro {0}. Correct the macro, or escape it with a leading backslash.", fullText)
-            return fullText
-        text = re.sub(r"(\\|\[)?\[([A-Z0-9-]+)(\??)\]", macroReplacer, text)
-        text = fixTypography(text)
+        macros = dict(self.macros, **moreMacros)
+        textFunctor = textFunctor.map(curry(replaceMacros, macros=macros))
+        textFunctor = textFunctor.map(fixTypography)
         if "css" in self.md.markupShorthands:
-            # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
-            text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
-            # Replace the ''maybe link'' shortcuts.
-            # They'll survive the HTML parser, but they don't match if they contain an element.
-            # (The other shortcuts are "atomic" and can't contain elements.)
-            text = re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
+            textFunctor = textFunctor.map(replaceAwkwardCSSShorthands)
 
-        if codeSpanReplacements:
-            codeSpanReplacements.reverse()
-
-            def codeSpanReviver(_):
-                # Match object is the PUA character, which I can ignore.
-                # Instead, sub back the replacement in order,
-                # massaged per the Commonmark rules.
-                import string
-                t = escapeHTML(codeSpanReplacements.pop()).strip(string.whitespace)
-                t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
-                return "<code data-opaque>" + t + "</code>"
-            text = re.sub("\ue0ff", codeSpanReviver, text)
-        return text
+        return textFunctor.extract()
 
     def printTargets(self):
         p("Exported terms:")
@@ -855,6 +788,60 @@ class Spec(object):
         return False
 
 config.specClass = Spec
+
+
+class MarkdownCodeSpans(func.Functor):
+    # Wraps a string, such that the contained text is "safe"
+    # and contains no markdown code spans.
+    # Thus, functions mapping over the text can freely make substitutions,
+    # knowing they won't accidentally replace stuff in a code span.
+    def __init__(self, text):
+        self.__codeSpanReplacements__ = []
+        newText = ""
+        mode = "text"
+        indexSoFar = 0
+        escapeLen = 0
+        for m in re.finditer(r"(\\`)|(`+)", text):
+            if mode == "text":
+                if m.group(1):
+                    newText += text[indexSoFar:m.start()] + m.group(1)[1]
+                    indexSoFar = m.end()
+                elif m.group(2):
+                    mode = "code"
+                    newText += text[indexSoFar:m.start()]
+                    indexSoFar = m.end()
+                    escapeLen = len(m.group(2))
+            elif mode == "code":
+                if m.group(1):
+                    pass
+                elif m.group(2):
+                    if len(m.group(2)) != escapeLen:
+                        pass
+                    else:
+                        mode = "text"
+                        __codeSpanReplacements__.append(text[indexSoFar:m.start()])
+                        newText += "\ue0ff"
+                        indexSoFar = m.end()
+        if mode == "text":
+            newText += text[indexSoFar:]
+        elif mode == "code":
+            newText += "`"*escapeLen + text[indexSoFar:]
+        self.__val__ = newText
+
+    def extract(self):
+        if self.__codeSpanReplacements__:
+            repls = self.__codeSpanReplacements__[::-1]
+            def codeSpanReviver(_):
+                # Match object is the PUA character, which I can ignore.
+                # Instead, sub back the replacement in order,
+                # massaged per the Commonmark rules.
+                import string
+                t = escapeHTML(repls.pop()).strip(string.whitespace)
+                t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
+                return "<code data-opaque>" + t + "</code>"
+            return re.sub("\ue0ff", codeSpanReviver, self.__val__)
+        else:
+            return __val__
 
 
 def stripBOM(doc):
