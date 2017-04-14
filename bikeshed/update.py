@@ -285,6 +285,11 @@ def updateBiblio():
     except Exception, e:
         die("Couldn't download the SpecRef biblio data.\n{0}", e)
     try:
+        with closing(urllib2.urlopen("https://wg21.link/specref.json")) as fh:
+            biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
+    except Exception, e:
+        die("Couldn't download the WG21 biblio data.\n{0}", e)
+    try:
         with closing(urllib2.urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
             lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
             biblio.processReferBiblioFile(lines, biblios, order=4)
