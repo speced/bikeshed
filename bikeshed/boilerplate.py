@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 from collections import defaultdict
+from . import highlight
 from .messages import *
 from .htmlhelpers import *
 from .DefaultOrderedDict import DefaultOrderedDict
@@ -513,6 +514,7 @@ def addIDLSection(doc):
         dfn.tag = "a"
         dfn.set("href", "#" + dfn.get("id"))
         del dfn.attrib["id"]
+    highlight.highlightEl(container, lang="webidl")
 
 
 def addTOCSection(doc):

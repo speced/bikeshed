@@ -6,6 +6,16 @@ from . import lexers
 from .messages import *
 from .htmlhelpers import *
 from .widlparser.widlparser import parser
+try:
+    import pygments as pyg
+    from pygments.lexers import get_lexer_by_name
+    from pygments import formatters
+except ImportError:
+    die("Bikeshed now uses Pygments for syntax highlighting.\nPlease run `$ sudo pip install pygments` from your command line.")
+
+customLexers = {
+    "css": lexers.CSSLexer()
+}
 
 ColoredText = collections.namedtuple('ColoredText', ['text', 'color'])
 
@@ -30,45 +40,6 @@ class HighlightMarker(object):
         return ('<span class=s>', '</span>')
 
 def addSyntaxHighlighting(doc):
-    try:
-        import pygments as pyg
-        from pygments.lexers import get_lexer_by_name
-        from pygments import formatters
-    except ImportError:
-        die("Bikeshed now uses Pygments for syntax highlighting.\nPlease run `$ sudo pip install pygments` from your command line.")
-        return
-
-    customLexers = {
-        "css": lexers.CSSLexer()
-    }
-
-    def highlight(el, lang):
-        text = textContent(el)
-        if lang in ["idl", "webidl"]:
-            widl = parser.Parser(text, IDLUI())
-            marker = HighlightMarker()
-            nested = parseHTML(unicode(widl.markup(marker)))
-            coloredText = collections.deque()
-            for n in childNodes(flattenHighlighting(nested)):
-                if isElement(n):
-                    coloredText.append(ColoredText(textContent(n), n.get('class')))
-                else:
-                    coloredText.append(ColoredText(n, None))
-        else:
-            if lang in customLexers:
-                lexer = customLexers[lang]
-            else:
-                try:
-                    lexer = get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
-                except pyg.util.ClassNotFound:
-                    die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
-                    return
-            coloredText = parsePygments(pyg.highlight(text, lexer, formatters.RawTokenFormatter()))
-            # empty span at beginning
-            # extra linebreak at the end
-        mergeHighlighting(el, coloredText)
-        addClass(el, "highlight")
-
     highlightingOccurred = False
 
     if find("pre.idl, xmp.idl", doc) is not None:
@@ -184,6 +155,34 @@ def addSyntaxHighlighting(doc):
         .highlight .vi { color: #0077aa } /* Name.Variable.Instance */
         .highlight .il { color: #000000 } /* Literal.Number.Integer.Long */
         '''
+
+
+def highlightEl(el, lang):
+    text = textContent(el)
+    if lang in ["idl", "webidl"]:
+        widl = parser.Parser(text, IDLUI())
+        marker = HighlightMarker()
+        nested = parseHTML(unicode(widl.markup(marker)))
+        coloredText = collections.deque()
+        for n in childNodes(flattenHighlighting(nested)):
+            if isElement(n):
+                coloredText.append(ColoredText(textContent(n), n.get('class')))
+            else:
+                coloredText.append(ColoredText(n, None))
+    else:
+        if lang in customLexers:
+            lexer = customLexers[lang]
+        else:
+            try:
+                lexer = get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
+            except pyg.util.ClassNotFound:
+                die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
+                return
+        coloredText = parsePygments(pyg.highlight(text, lexer, formatters.RawTokenFormatter()))
+        # empty span at beginning
+        # extra linebreak at the end
+    mergeHighlighting(el, coloredText)
+    addClass(el, "highlight")
 
 
 def mergeHighlighting(el, coloredText):
