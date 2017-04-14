@@ -542,6 +542,10 @@ class Spec(object):
         self.md = metadata.join(defaultMd, self.md)
         if self.md.group == "byos":
             self.md.boilerplate.default = False
+        self.md.fillTextMacros(self.macros, doc=self)
+        computedMdText = replaceMacros(config.retrieveBoilerplateFile(self, 'computed-metadata', error=True), macros=self.macros)
+        computedMd = metadata.fromJson(data=computedMdText, doc=self)
+        self.md = metadata.join(self.md, computedMd)
         self.md.computeImplicitMetadata()
         self.md.fillTextMacros(self.macros, doc=self)
         self.md.validate()
