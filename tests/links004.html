@@ -46,6 +46,43 @@
             figcaption:not(.no-marker)::before {
                 content: "Figure " counter(figure) " ";
             }</style>
+<style>/* style-dfn-panel */
+
+        .dfn-panel {
+            position: absolute;
+            z-index: 35;
+            height: auto;
+            width: -webkit-fit-content;
+            width: fit-content;
+            max-width: 300px;
+            max-height: 500px;
+            overflow: auto;
+            padding: 0.5em 0.75em;
+            font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+            background: #DDDDDD;
+            color: black;
+            border: outset 0.2em;
+        }
+        .dfn-panel:not(.on) { display: none; }
+        .dfn-panel * { margin: 0; padding: 0; text-indent: 0; }
+        .dfn-panel > b { display: block; }
+        .dfn-panel a { color: black; }
+        .dfn-panel a:not(:hover) { text-decoration: none !important; border-bottom: none !important; }
+        .dfn-panel > b + b { margin-top: 0.25em; }
+        .dfn-panel ul { padding: 0; }
+        .dfn-panel li { list-style: inside; }
+        .dfn-panel.activated {
+            display: inline-block;
+            position: fixed;
+            left: .5em;
+            bottom: 2em;
+            margin: 0 auto;
+            max-width: calc(100vw - 1.5em - .4em - .5em);
+            max-height: 30vh;
+        }
+
+        .dfn-paneled { cursor: pointer; }
+        </style>
 <style>/* style-selflinks */
 
             .heading, .issue, .note, .example, li, dt {
@@ -171,8 +208,8 @@
    <p class="copyright" data-fill-with="copyright">COPYRIGHT GOES HERE </p>
    <hr title="Separator for header">
   </div>
-  <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
   <div class="p-summary" data-fill-with="abstract">
+   <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
    <p>Testing explicitly empty for links.</p>
   </div>
   <div data-fill-with="at-risk"></div>
@@ -187,8 +224,8 @@
    </ol>
   </nav>
   <main>
-   <p><dfn data-dfn-type="dfn" data-noexport="" id="foo">foo<a class="self-link" href="#foo"></a></dfn> (without for) should be linked by <a data-link-type="dfn" href="#foo">foo</a></p>
-   <p><dfn data-dfn-for="bar" data-dfn-type="dfn" data-noexport="" id="foo-bar">foo<a class="self-link" href="#foo-bar"></a></dfn> (for bar) should be linked by <a data-link-type="dfn" href="#foo-bar">foo</a></p>
+   <p><dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport="" id="foo">foo</dfn> (without for) should be linked by <a data-link-type="dfn" href="#foo" id="ref-for-foo-1">foo</a></p>
+   <p><dfn class="dfn-paneled" data-dfn-for="bar" data-dfn-type="dfn" data-noexport="" id="foo-bar">foo</dfn> (for bar) should be linked by <a data-link-type="dfn" href="#foo-bar" id="ref-for-foo-bar-1">foo</a></p>
   </main>
   <h2 class="no-num no-ref heading settled" id="index"><span class="content">Index</span></h2>
   <h3 class="no-num no-ref heading settled" id="index-defined-here"><span class="content">Terms defined by this specification</span></h3>
@@ -200,3 +237,72 @@
      <li><a href="#foo-bar">dfn for bar</a><span>, in §Unnumbered section</span>
     </ul>
   </ul>
+  <aside class="dfn-panel" data-for="foo">
+   <b><a href="#foo">#foo</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-foo-1">Unnamed section</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="foo-bar">
+   <b><a href="#foo-bar">#foo-bar</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-foo-bar-1">Unnamed section</a>
+   </ul>
+  </aside>
+<script>/* script-dfn-panel */
+
+        document.body.addEventListener("click", function(e) {
+            var queryAll = function(sel) { return [].slice.call(document.querySelectorAll(sel)); }
+            // Find the dfn element or panel, if any, that was clicked on.
+            var el = e.target;
+            var target;
+            var hitALink = false;
+            while(el.parentElement) {
+                if(el.tagName == "A") {
+                    // Clicking on a link in a <dfn> shouldn't summon the panel
+                    hitALink = true;
+                }
+                if(el.classList.contains("dfn-paneled")) {
+                    target = "dfn";
+                    break;
+                }
+                if(el.classList.contains("dfn-panel")) {
+                    target = "dfn-panel";
+                    break;
+                }
+                el = el.parentElement;
+            }
+            if(target != "dfn-panel") {
+                // Turn off any currently "on" or "activated" panels.
+                queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(function(el){
+                    el.classList.remove("on");
+                    el.classList.remove("activated");
+                });
+            }
+            if(target == "dfn" && !hitALink) {
+                // open the panel
+                var dfnPanel = document.querySelector(".dfn-panel[data-for='" + el.id + "']");
+                if(dfnPanel) {
+                    console.log(dfnPanel);
+                    dfnPanel.classList.add("on");
+                    var rect = el.getBoundingClientRect();
+                    dfnPanel.style.left = window.scrollX + rect.right + 5 + "px";
+                    dfnPanel.style.top = window.scrollY + rect.top + "px";
+                    var panelRect = dfnPanel.getBoundingClientRect();
+                    var panelWidth = panelRect.right - panelRect.left;
+                    if(panelRect.right > document.body.scrollWidth && (rect.left - (panelWidth + 5)) > 0) {
+                        // Reposition, because the panel is overflowing
+                        dfnPanel.style.left = window.scrollX + rect.left - (panelWidth + 5) + "px";
+                    }
+                } else {
+                    console.log("Couldn't find .dfn-panel[data-for='" + el.id + "']");
+                }
+            } else if(target == "dfn-panel") {
+                // Switch it to "activated" state, which pins it.
+                el.classList.add("activated");
+                el.style.left = null;
+                el.style.top = null;
+            }
+
+        });
+        </script>

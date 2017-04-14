@@ -1583,10 +1583,13 @@ def addDfnPanels(doc, dfns):
             continue
         refs = DefaultOrderedDict(list)
         for link in allRefs[id]:
-            h = relevantHeadings(link).next()
-            if hasClass(h, "no-ref"):
-                continue
-            sectionText = textContent(h)
+            try:
+                h = relevantHeadings(link).next()
+                if hasClass(h, "no-ref"):
+                    continue
+                sectionText = textContent(h)
+            except StopIteration:
+                sectionText = "Unnamed section"
             refs[sectionText].append(link)
         if not refs:
             # Just insert a self-link instead
