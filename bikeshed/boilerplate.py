@@ -504,6 +504,8 @@ def addIDLSection(doc):
 
     container = appendChild(html, E.pre({"class":"idl"}))
     for block in idlBlocks:
+        if hasClass(block, "extract"):
+            continue
         blockCopy = copy.deepcopy(block)
         appendContents(container, blockCopy)
         appendChild(container, "\n")
