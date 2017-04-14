@@ -74,7 +74,7 @@ def addSyntaxHighlighting(doc):
                 continue
             else:
                 lang = doc.md.defaultHighlight
-        highlight(el, translateLang(lang))
+        highlightEl(el, translateLang(lang))
         highlightingOccurred = True
 
     if highlightingOccurred:
