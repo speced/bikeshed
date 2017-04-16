@@ -1,6 +1,8 @@
 Bikeshed, a spec preprocessor
 =============================
 
+[![Join the chat at https://gitter.im/tabatkins/bikeshed](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tabatkins/bikeshed?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 <img src="https://rawgit.com/tabatkins/bikeshed/master/docs/icon.svg" width=100 height=100 align=left>
 
 Bikeshed is a pre-processor for spec documents,
