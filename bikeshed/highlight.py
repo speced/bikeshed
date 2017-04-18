@@ -237,7 +237,7 @@ def flattenHighlighting(el):
             appendChild(container, node)
         else:
             # el with internal structure
-            overclass = el.get("class", "")
+            overclass = el.get("class", '') if isElement(el) else ""
             flattened = flattenHighlighting(node)
             for subnode in childNodes(flattened):
                 if isElement(subnode):
