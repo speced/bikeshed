@@ -600,7 +600,7 @@ class ReferenceManager(object):
             reportMultiplePossibleRefs([refToText(ref) for ref in simplifyPossibleRefs(refs)], text, linkType, defaultRef, el)
         return defaultRef
 
-    def getBiblioRef(self, text, status=None, generateFakeRef=False, el=None, quiet=False):
+    def getBiblioRef(self, text, status=None, generateFakeRef=False, silentAliases=False, el=None, quiet=False):
         key = text.lower()
         if key in self.biblios:
             candidates = self.biblios[key]
@@ -636,7 +636,7 @@ class ReferenceManager(object):
         elif candidate.get("obsoletedBy", "").strip():
             # Obsoleted by - throw an error and follow the chain
             bib = self.getBiblioRef(candidate["obsoletedBy"], status=status, el=el, quiet=True)
-            if not quiet:
+            if not (quiet or silentAliases):
                 die("Obsolete biblio ref: [{0}] is replaced by [{1}].", candidate["linkText"], bib.linkText)
         else:
             bib = biblio.BiblioEntry(preferredURL=status, **candidate)
