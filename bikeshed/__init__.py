@@ -1467,7 +1467,7 @@ def processAutolinks(doc):
                 biblioStorage = doc.normativeRefs
             else:
                 biblioStorage = doc.informativeRefs
-            biblioRef = doc.refs.getBiblioRef(ref.spec, generateFakeRef=True, silentAliases=True)
+            biblioRef = doc.refs.getBiblioRef(ref.spec, status=doc.md.defaultRefStatus, generateFakeRef=True, silentAliases=True)
             if biblioRef:
                 biblioStorage[biblioRef.linkText] = biblioRef
                 spec = biblioRef.linkText.lower()
