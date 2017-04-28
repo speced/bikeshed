@@ -1463,7 +1463,6 @@ def processAutolinks(doc):
         if ref and ref.spec and ref.spec.lower() != doc.refs.spec.lower():
             spec = ref.spec.lower()
             key = ref.for_[0] if ref.for_ else ""
-            doc.externalRefsUsed[spec][ref.text][key] = ref
             if isNormative(el):
                 biblioStorage = doc.normativeRefs
             else:
@@ -1471,6 +1470,8 @@ def processAutolinks(doc):
             biblioRef = doc.refs.getBiblioRef(ref.spec, generateFakeRef=True, silentAliases=True)
             if biblioRef:
                 biblioStorage[biblioRef.linkText] = biblioRef
+                spec = biblioRef.linkText.lower()
+            doc.externalRefsUsed[spec][ref.text][key] = ref
 
         if ref:
             el.set('href', ref.url)
