@@ -653,7 +653,7 @@ def addSpecMetadataSection(doc):
     if doc.md.ED and doc.md.status in config.snapshotStatuses:
         md["Editor's Draft"].append(E.a({"href": doc.md.ED}, doc.md.ED))
     if len(doc.md.previousVersions):
-        md["Previous Versions"] = [E.a({"href":ver, "rel":"previous"}, ver) for ver in doc.md.previousVersions]
+        md["Previous Versions"] = [E.a({"href":ver, "rel":"prev"}, ver) for ver in doc.md.previousVersions]
     if len(doc.md.versionHistory):
         md["Version History"] = [E.a({"href":vh}, vh) for vh in doc.md.versionHistory]
     if doc.md.mailingList:
