@@ -603,15 +603,18 @@ def replaceAwkwardCSSShorthands(text):
 
 
 def fixupIDs(doc, els):
-    translateIDs(doc.md.translateIDs, els)
     addOldIDs(els)
     dedupIDs(doc)
 
 
-def translateIDs(trans, els):
-    for el in els:
-        if el.get('id') in trans:
-            el.set('id', trans[el.get('id')])
+def safeID(transOrDoc, id):
+    if isinstance(transOrDoc, dict):
+        trans = transOrDoc
+    else:
+        trans = transOrDoc.md.translateIDs
+    if id in trans:
+        return trans[id]
+    return id
 
 
 def addOldIDs(els):
@@ -641,7 +644,7 @@ def dedupIDs(doc):
         for el in els[1:]:
             # If I registered an alternate ID, try to use that.
             if el.get('data-alternate-id'):
-                el.set("id", el.get("data-alternate-id"))
+                el.set("id", safeID(doc, el.get("data-alternate-id")))
                 continue
             # Try to de-dup the id by appending an integer after it.
             if warnAboutDupes:

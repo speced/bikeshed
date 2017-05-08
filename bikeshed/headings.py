@@ -47,12 +47,9 @@ def addHeadingIds(doc, headings):
             if header.get("data-dfn-type") is None:
                 # dfn headings will get their IDs assigned by the dfn code
                 neededIds.add(header)
-                header.set('id', simplifyText(textContent(find(".content", header))))
-        if header.get("oldids"):
-            oldIDs = [h.strip() for h in header.get("oldids").strip().split(",")]
-            for oldID in oldIDs:
-                appendChild(header, E.span({"id":oldID}))
-            removeAttr(header, "oldids")
+                id = simplifyText(textContent(find(".content", header)))
+                header.set('id', safeID(doc, id))
+    addOldIDs(headings)
     if len(neededIds) > 0:
         warn("You should manually provide IDs for your headings:\n{0}",
              "\n".join("  " + outerHTML(el) for el in neededIds))

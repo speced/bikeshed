@@ -1279,7 +1279,7 @@ def classifyDfns(doc, dfns):
                 id = config.simplifyText("dom-{id}".format(id=id))
             else:
                 id = "{type}-{id}".format(type=dfnTypeToPrefix[dfnType], id=id)
-            el.set('id', id)
+            el.set('id', safeID(doc, id))
         # Set lt if it's not set,
         # and doing so won't mess with anything else.
         if el.get('data-lt') is None and "|" not in primaryDfnText:
@@ -1506,7 +1506,7 @@ def processIssuesAndExamples(doc):
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
     # examples, and link to remote issues if possible:
     for el in findAll(".issue:not([id])", doc):
-        el.set('id', "issue-" + hashContents(el))
+        el.set('id', safeID(doc, "issue-" + hashContents(el)))
         remoteIssueID = el.get('data-remote-issue-id')
         if remoteIssueID:
             del el.attrib['data-remote-issue-id']
@@ -1528,7 +1528,7 @@ def processIssuesAndExamples(doc):
             if remoteIssueURL:
                 appendChild(el, " ", E.a({"href": remoteIssueURL}, "<" + remoteIssueURL + ">"))
     for el in findAll(".example:not([id])", doc):
-        el.set('id', "example-" + hashContents(el))
+        el.set('id', safeID(doc, "example-" + hashContents(el)))
     fixupIDs(doc, findAll(".issue, .example", doc))
 
 
@@ -1612,7 +1612,7 @@ def addDfnPanels(doc, dfns):
                 refID = el.get("id")
                 if refID is None:
                     refID = "ref-for-{0}-{1}".format(id, counter)
-                    el.set("id", refID)
+                    el.set("id", safeID(doc, refID))
                 if i == 0:
                     appendChild(li,
                                 E.a({"href": "#" + urllib.quote(refID)}, text))
@@ -2083,7 +2083,7 @@ def cleanupHTML(doc):
         # (And the ID will be guaranteed stable across publications, but guaranteed to change when the text changes.)
         if el.tag == "assert":
             el.tag = "span"
-            el.set("id", "assert-" + hashContents(el))
+            el.set("id", safeID(doc, "assert-" + hashContents(el)))
 
         # Add ARIA role of "note" to class="note" elements
         if el.tag in ["div", "p"] and hasClass(el, doc.md.noteClass):
@@ -2246,9 +2246,10 @@ def formatElementdefTables(doc):
                                  E.a({"data-link-type":"dfn"}, groupName)),
                              E.ul())
             for ref in groupAttrs:
+                id = "element-attrdef-" + config.simplifyText(textContent(elements[0])) + "-" + ref.text
                 appendChild(ul,
                             E.li(
-                                E.dfn({"id":"element-attrdef-" + config.simplifyText(textContent(elements[0])) + "-" + ref.text, "for":elementsFor, "data-dfn-type":"element-attr"},
+                                E.dfn({"id": safeID(doc, id), "for":elementsFor, "data-dfn-type":"element-attr"},
                                       E.a({"data-link-type":"element-attr", "for":groupName},
                                           ref.text.strip()))))
 

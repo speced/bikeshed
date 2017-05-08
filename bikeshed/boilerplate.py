@@ -165,7 +165,7 @@ def addIndexSection(doc):
     if container is None:
         return
     appendChild(container,
-                E.h2({"class":"no-num no-ref", "id":"index"}, "Index"))
+                E.h2({"class":"no-num no-ref", "id":safeID(doc, "index")}, "Index"))
 
     if len(findAll(config.dfnElementsSelector, doc)):
         addIndexOfLocallyDefinedTerms(doc, container)
@@ -176,7 +176,7 @@ def addIndexSection(doc):
 
 def addIndexOfLocallyDefinedTerms(doc, container):
     appendChild(container,
-                E.h3({"class":"no-num no-ref", "id":"index-defined-here"}, "Terms defined by this specification"))
+                E.h3({"class":"no-num no-ref", "id":safeID(doc, "index-defined-here")}, "Terms defined by this specification"))
 
     indexEntries = defaultdict(list)
     for el in findAll(config.dfnElementsSelector, doc):
@@ -369,7 +369,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
                                    ref.text)
                     appendChild(termsUl, E.li(link))
     appendChild(container,
-                E.h3({"class":"no-num no-ref", "id":"index-defined-elsewhere"}, "Terms defined by reference"),
+                E.h3({"class":"no-num no-ref", "id":safeID(doc, "index-defined-elsewhere")}, "Terms defined by reference"),
                 ul)
 
 
@@ -383,7 +383,7 @@ def addPropertyIndex(doc):
         return
 
     appendChild(html,
-                E.h2({"class":"no-num no-ref", "id":"property-index"}, "Property Index"))
+                E.h2({"class":"no-num no-ref", "id":safeID(doc, "property-index")}, "Property Index"))
 
     def extractKeyValFromRow(tr, table):
         # Extract the key, minus the trailing :
@@ -478,8 +478,9 @@ def addPropertyIndex(doc):
             for desc in descs:
                 allKeys |= set(desc.keys())
             columns.extend(sorted(allKeys - set(columns)))
+            id = config.simplifyText(atRuleName) + "-descriptor-table"
             appendChild(html,
-                        E.h3({"class":"no-num no-ref", "id":config.simplifyText(atRuleName) + "-descriptor-table"},
+                        E.h3({"class":"no-num no-ref", "id":safeID(doc, id)},
                              E.a({"data-link-type":"at-rule"}, atRuleName),
                              " Descriptors"))
             appendChild(html,
@@ -501,7 +502,7 @@ def addIDLSection(doc):
         return
 
     appendChild(html,
-                E.h2({"class":"no-num no-ref", "id":"idl-index"}, "IDL Index"))
+                E.h2({"class":"no-num no-ref", "id":safeID(doc, "idl-index")}, "IDL Index"))
 
     container = appendChild(html, E.pre({"class":"idl"}))
     for block in idlBlocks:
@@ -522,7 +523,7 @@ def addTOCSection(doc):
     if toc is None:
         return
     appendChild(toc,
-                E.h2({"class": "no-num no-toc no-ref", "id":"contents"}, "Table of Contents"))
+                E.h2({"class": "no-num no-toc no-ref", "id":safeID(doc, "contents")}, "Table of Contents"))
 
     # containers[n] holds the current <ol> for inserting each heading's <li> into.
     # containers[1] is initialized with something arbitrary
@@ -690,10 +691,10 @@ def addSpecMetadataSection(doc):
     if len(doc.md.audience):
         md["Audience"] = [", ".join(doc.md.audience)]
     if doc.md.toggleDiffs:
-        md["Toggle Diffs"] = [E.label({"for": "hidedel", "id": "hidedel-label"}, "Hide deleted text")]
+        md["Toggle Diffs"] = [E.label({"for": safeID(doc, "hidedel"), "id": safeID(doc, "hidedel-label")}, "Hide deleted text")]
         prependChild(find("body", doc),
                      E.input({"type": "checkbox",
-                              "id": "hidedel",
+                              "id": safeID(doc, "hidedel"),
                               "style": "display:none"}))
         doc.extraStyles['style-hidedel'] = """
             #hidedel:checked ~ del, #hidedel:checked ~ * del { display:none; }
@@ -754,24 +755,26 @@ def addReferencesSection(doc):
         return linkText
 
     appendChild(container,
-                E.h2({"class":"no-num no-ref", "id":"references"}, "References"))
+                E.h2({"class":"no-num no-ref", "id":safeID(doc, "references")}, "References"))
 
     normRefs = sorted(doc.normativeRefs.values(), key=lambda r: r.linkText.lower())
     if len(normRefs):
         dl = appendChild(container,
-                         E.h3({"class":"no-num no-ref", "id":"normative"}, "Normative References"),
+                         E.h3({"class":"no-num no-ref", "id":safeID(doc, "normative")}, "Normative References"),
                          E.dl())
         for ref in normRefs:
-            appendChild(dl, E.dt({"id":"biblio-" + config.simplifyText(ref.linkText), "data-no-self-link":""}, "[" + formatBiblioTerm(ref.linkText) + "]"))
+            id = "biblio-" + config.simplifyText(ref.linkText)
+            appendChild(dl, E.dt({"id":safeID(doc, id), "data-no-self-link":""}, "[" + formatBiblioTerm(ref.linkText) + "]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
     informRefs = [x for x in sorted(doc.informativeRefs.values(), key=lambda r: r.linkText.lower()) if x.linkText not in doc.normativeRefs]
     if len(informRefs):
         dl = appendChild(container,
-                         E.h3({"class":"no-num no-ref", "id":"informative"}, "Informative References"),
+                         E.h3({"class":"no-num no-ref", "id":safeID(doc, "informative")}, "Informative References"),
                          E.dl())
         for ref in informRefs:
-            appendChild(dl, E.dt({"id":"biblio-" + config.simplifyText(ref.linkText), "data-no-self-link":""}, "[" + formatBiblioTerm(ref.linkText) + "]"))
+            id = "biblio-" + config.simplifyText(ref.linkText)
+            appendChild(dl, E.dt({"id":safeID(doc, id), "data-no-self-link":""}, "[" + formatBiblioTerm(ref.linkText) + "]"))
             appendChild(dl, E.dd(*ref.toHTML()))
 
 
@@ -784,7 +787,7 @@ def addIssuesSection(doc):
         return
 
     appendChild(container,
-                E.h2({"class":"no-num no-ref", "id":"issues-index"}, "Issues Index"))
+                E.h2({"class":"no-num no-ref", "id":safeID(doc, "issues-index")}, "Issues Index"))
     container = appendChild(container,
                             E.div({"style":"counter-reset:issue"}))
     for issue in issues:
