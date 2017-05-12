@@ -114,7 +114,7 @@ def canIUsePanelFor(id, data, update, classFromBrowser):
     appendChild(panel,
         E.p({"class": "caniuse"},
             "Source: ",
-            E.a({"href": "http://caniuse.com/#feat=" + id}, "caniuse.com"),
+            E.a({"href": "https://caniuse.com/#feat=" + id}, "caniuse.com"),
             " as of " + update))
     return panel
 
@@ -169,4 +169,4 @@ def validateCanIUseURLs(doc, elements):
     unusedFeatures = urlFeatures - docFeatures
     if unusedFeatures:
         warn("The following Can I Use features are associated with your URLs, but don't show up in your spec:\n{0}",
-             "\n".join(" * {0} - http://caniuse.com/#feat={0}".format(x) for x in sorted(unusedFeatures)))
+             "\n".join(" * {0} - https://caniuse.com/#feat={0}".format(x) for x in sorted(unusedFeatures)))
