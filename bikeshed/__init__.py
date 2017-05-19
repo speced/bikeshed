@@ -2139,6 +2139,7 @@ def cleanupHTML(doc):
         removeAttr(el, 'data-opaque')
         removeAttr(el, 'data-no-self-link')
         removeAttr(el, "line-number")
+        removeAttr(el, "caniuse")
     for el in strayHeadEls:
         head.append(el)
     for el in styleScoped:
