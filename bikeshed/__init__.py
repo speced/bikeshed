@@ -1303,7 +1303,7 @@ def classifyDfns(doc, dfns):
         # wrap the contents in a <code>.
         if config.linkTypeIn(dfnType, "codelike"):
             child = hasOnlyChild(el)
-            if child and child.tag == "code":
+            if child is not None and child.tag == "code":
                 pass
             wrapContents(el, E.code())
 
