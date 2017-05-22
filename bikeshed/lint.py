@@ -21,8 +21,15 @@ def lintBrokenLinks(doc):
     for el in findAll("a", doc):
         href = el.get('href')
         if not href or href[0] == "#":
+            # Local link
             continue
-        res = requests.get(href)
+        if href.startswith("mailto:"):
+            # Can't check mailto links
+            continue
+        try:
+            res = requests.get(href)
+        except:
+            warn("The following link caused an error when I tried to request it:\n{0}", outerHTML(el))
         if res.status_code >= 400:
             warn("Got a {0} status when fetching the link for:\n{1}", res.status_code, outerHTML(el))
     say("Done checking links!")
