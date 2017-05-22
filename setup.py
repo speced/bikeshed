@@ -5,6 +5,6 @@ setup(
     author='Tab Atkins Jr.',
     packages=find_packages(),
     include_package_data=True,
-    install_requires=['lxml', 'html5lib', 'cssselect'],
+    install_requires=['pygments','lxml', 'html5lib', 'cssselect'],
     entry_points={'console_scripts': ['bikeshed = bikeshed:main']},
 )
