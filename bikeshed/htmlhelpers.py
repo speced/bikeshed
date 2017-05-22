@@ -258,6 +258,11 @@ def moveContents(toEl, fromEl):
     replaceContents(toEl, fromEl)
     fromEl.text = ''
 
+def wrapContents(parentEl, wrapperEl):
+    appendContents(wrapperEl, parentEl)
+    appendChild(parentEl, wrapperEl)
+    return parentEl
+
 
 def headingLevelOfElement(el):
     for el in relevantHeadings(el, levels=[2,3,4,5,6]):
