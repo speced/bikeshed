@@ -474,7 +474,7 @@ class ReferenceManager(object):
         if len(blockRefs) == 1:
             return blockRefs[0]
         elif len(blockRefs) > 1:
-            reportMultiplePossibleRefs(simplifyPossibleRefs(blockRefs), text, linkType, blockRefs[0], el)
+            reportMultiplePossibleRefs(simplifyPossibleRefs(blockRefs), linkText=text, linkType=linkType, linkFor=linkFor, defaultRef=blockRefs[0], el=el)
             return blockRefs[0]
 
 
@@ -597,7 +597,7 @@ class ReferenceManager(object):
                     defaultRef = ref
                     break
         if error:
-            reportMultiplePossibleRefs(simplifyPossibleRefs(refs), text, linkType, defaultRef, el)
+            reportMultiplePossibleRefs(simplifyPossibleRefs(refs), linkText=text, linkType=linkType, linkFor=linkFor, defaultRef=defaultRef, el=el)
         return defaultRef
 
     def getBiblioRef(self, text, status=None, generateFakeRef=False, silentAliases=False, el=None, quiet=False):
@@ -798,7 +798,7 @@ def refToText(ref):
     else:
         return 'spec:{spec}; type:{type}; text:{text}'.format(**ref)
 
-def reportMultiplePossibleRefs(possibleRefs, text, linkType, defaultRef, el):
+def reportMultiplePossibleRefs(possibleRefs, linkText, linkType, linkFor, defaultRef, el):
     # Sometimes a badly-written spec has indistinguishable dfns.
     # Detect this by seeing if more than one stringify to the same thing.
     allRefs = defaultdict(list)
@@ -812,7 +812,11 @@ def reportMultiplePossibleRefs(possibleRefs, text, linkType, defaultRef, el):
         else:
             mergedRefs.append(refs)
 
-    error = "Multiple possible '{0}' refs for '{1}'. Arbitrarily chose {2}".format(linkType, text, defaultRef.url)
+    if linkFor:
+        error = "Multiple possible '{0}' {1} refs for '{2}'.".format(linkText, linkType, linkFor)
+    else:
+        error = "Multiple possible '{0}' {1} refs.".format(linkText, linkType)
+    error += "\nArbitrarily chose {0}".format(defaultRef.url)
     if uniqueRefs:
         error += "\nTo auto-select one of the following refs, insert one of these lines into a <pre class=link-defaults> block:\n"
         error += "\n".join(refToText(r) for r in uniqueRefs)
