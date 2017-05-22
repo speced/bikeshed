@@ -507,19 +507,21 @@ def hasChildElements(el):
 # If the element has one child element, returns it.
 # Otherwise, returns None
 def hasOnlyChild(el):
+    if not emptyText(el.text):
+        # Has significant child text
+        return None
     children = childElements(el)
-    try:
-        single = children.next()
-    except StopIteration:
+    single = next(children, None)
+    if single is None:
         # No children
         return None
-    try:
-        children.next()
+    if not emptyText(single.tail):
+        # Has significant child text following the child element
+        return None
+    if next(children, None):
         # At least two children
         return None
-    except StopIteration:
-        # Exactly one child
-        return single
+    return single
 
 
 def fixTypography(text):
