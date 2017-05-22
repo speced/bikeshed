@@ -474,7 +474,7 @@ class ReferenceManager(object):
         if len(blockRefs) == 1:
             return blockRefs[0]
         elif len(blockRefs) > 1:
-            reportMultiplePossibleRefs([refToText(ref) for ref in simplifyPossibleRefs(blockRefs)], text, linkType, blockRefs[0], el)
+            reportMultiplePossibleRefs(simplifyPossibleRefs(blockRefs), text, linkType, blockRefs[0], el)
             return blockRefs[0]
 
 
@@ -597,7 +597,7 @@ class ReferenceManager(object):
                     defaultRef = ref
                     break
         if error:
-            reportMultiplePossibleRefs([refToText(ref) for ref in simplifyPossibleRefs(refs)], text, linkType, defaultRef, el)
+            reportMultiplePossibleRefs(simplifyPossibleRefs(refs), text, linkType, defaultRef, el)
         return defaultRef
 
     def getBiblioRef(self, text, status=None, generateFakeRef=False, silentAliases=False, el=None, quiet=False):
@@ -779,16 +779,17 @@ def simplifyPossibleRefs(refs, alwaysShowFor=False):
     for ref in refs:
         if ref.for_:
             for for_ in ref.for_:  # ref.for_ is a list
-                forVals[(ref.text, ref.type, ref.spec)].append(for_)
+                forVals[(ref.text, ref.type, ref.spec)].append((for_, ref.url))
         else:
-            forVals[(ref.text, ref.type, ref.spec)].append("/")
+            forVals[(ref.text, ref.type, ref.spec)].append(("/", ref.url))
     retRefs = []
     for (text, type, spec), fors in forVals.items():
         if len(fors) >= 2 or alwaysShowFor:
-            for for_ in fors:
-                retRefs.append({'text':text, 'type':type, 'spec':spec, 'for_':for_})
+            # Needs for-based disambiguation
+            for for_,url in fors:
+                retRefs.append({'text':text, 'type':type, 'spec':spec, 'for_':for_, 'url': url})
         else:
-            retRefs.append({'text':text, 'type':type, 'spec':spec, 'for_':None})
+            retRefs.append({'text':text, 'type':type, 'spec':spec, 'for_':None, 'url': fors[0][1]})
     return retRefs
 
 def refToText(ref):
@@ -798,21 +799,30 @@ def refToText(ref):
         return 'spec:{spec}; type:{type}; text:{text}'.format(**ref)
 
 def reportMultiplePossibleRefs(possibleRefs, text, linkType, defaultRef, el):
-    if len(possibleRefs) == 1:
-        # Only happens when the refs can't be disambiguated under Bikeshed's data model.
-        linkerror("Multiple possible '{0}' refs for '{1}' in {2}, but they're not distinguishable with Bikeshed's data model. Either create a manual link, or ask the spec maintainer to add sufficient disambiguating attributes to make them distinguishable. Usually this means adding a for='' value to at least one of them.\nArbitrarily chose the {3} one to link to for now.",
-                  linkType,
-                  text,
-                  defaultRef.spec,
-                  defaultRef.url,
-                  el=el)
-    else:
-        linkerror("Multiple possible '{0}' refs for '{1}'.\nArbitrarily chose the one in {2}.\nIf this is wrong, insert one of the following lines into a <pre class=link-defaults> block:\n{3}",
-                  linkType,
-                  text,
-                  defaultRef.spec,
-                  '\n'.join(possibleRefs),
-                  el=el)
+    # Sometimes a badly-written spec has indistinguishable dfns.
+    # Detect this by seeing if more than one stringify to the same thing.
+    allRefs = defaultdict(list)
+    for ref in possibleRefs:
+        allRefs[refToText(ref)].append(ref)
+    uniqueRefs = []
+    mergedRefs = []
+    for refs in allRefs.values():
+        if len(refs) == 1:
+            uniqueRefs.append(refs[0])
+        else:
+            mergedRefs.append(refs)
+
+    error = "Multiple possible '{0}' refs for '{1}'. Arbitrarily chose {2}".format(linkType, text, defaultRef.url)
+    if uniqueRefs:
+        error += "\nTo auto-select one of the following refs, insert one of these lines into a <pre class=link-defaults> block:\n"
+        error += "\n".join(refToText(r) for r in uniqueRefs)
+    if mergedRefs:
+        error += "\nThe following refs show up multiple times in their spec, in a way that Bikeshed can't distinguish between. Either create a manual link, or ask the spec maintainer to add disambiguating attributes (usually a for='' attribute to all of them)."
+        for refs in mergedRefs:
+            error += "\n" + refToText(refs[0])
+            for ref in refs:
+                error += "\n  " + ref['url']
+    linkerror(error, el=el)
 
 def reportAmbiguousForlessLink(el, text, forlessRefs, localRefs):
     linkerror("Ambiguous for-less link for '{0}', please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\nLocal references:\n{1}\nfor-less references:\n{2}", text, "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)]), "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)]), el=el)
