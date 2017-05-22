@@ -1298,6 +1298,14 @@ def classifyDfns(doc, dfns):
                     el.set('data-noexport', '')
                 else:
                     el.set('data-export', '')
+        # If it's an code-ish type such as IDL,
+        # and doesn't already have a sole <code> child,
+        # wrap the contents in a <code>.
+        if config.linkTypeIn(dfnType, "codelike"):
+            child = hasOnlyChild(el)
+            if child and child.tag == "code":
+                pass
+            wrapContents(el, E.code())
 
 
 def determineLinkType(el):

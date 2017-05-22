@@ -260,6 +260,7 @@ linkTypeToDfnType = {
     "maybe": maybeTypes,
     "dfn": frozenset(["dfn"]),
     "biblio": frozenset(["biblio"]),
+    "codelike": frozenset(["element", "element-attr", "element-state", "attr-value"]) | idlTypes,
     "all": linkTypes
 }
 for dfnType in dfnClassToType.values():
