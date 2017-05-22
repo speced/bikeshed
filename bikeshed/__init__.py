@@ -1797,6 +1797,11 @@ class IDLMarker(object):
                 typeName = typeName[:-1]
             return ('<a class=n data-link-type=attribute data-link-for="{0}">'.format(typeName), '</a>')
 
+        # LegacyWindowAlias defines additional names for the construct,
+        # so all the names should be forced <dfn>s, just like the interface name itself.
+        if construct.idlType == "extended-attribute" and construct.name == "LegacyWindowAlias":
+            return ('<idl class=nv data-idl-type=interface data-lt="{0}">'.format(text), '</idl>')
+
         if construct.idlType == "constructor":
             # This shows up for the method name in a [NamedConstructor] extended attribute.
             # The "NamedConstructor" Name already got markup up, so ignore this one.
