@@ -518,7 +518,7 @@ def hasOnlyChild(el):
     if not emptyText(single.tail):
         # Has significant child text following the child element
         return None
-    if next(children, None):
+    if next(children, None) is not None:
         # At least two children
         return None
     return single
