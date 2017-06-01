@@ -9,6 +9,9 @@ def addCanIUsePanels(doc):
     # Constructs "Can I Use panels" which show a compatibility data summary
     # for a term's feature.
     if not doc.md.includeCanIUsePanels:
+        elements = findAll("[caniuse]", doc)
+        for dfn in elements:
+            del dfn.attrib["caniuse"]
         return
 
     features = doc.canIUse["data"]
