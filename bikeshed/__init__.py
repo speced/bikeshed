@@ -229,12 +229,14 @@ def main():
         # Can't have an error killing the watcher
         config.force = True
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
+        doc.md = metadata.fromCommandLine(extras, doc)
         if options.byos:
             doc.md.addData("Group", "byos")
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "serve":
         config.force = True
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
+        doc.md = metadata.fromCommandLine(extras, doc)
         if options.byos:
             doc.md.addData("Group", "byos")
         doc.watch(outputFilename=options.outfile, port=int(options.port))
@@ -243,18 +245,22 @@ def main():
         config.quiet = 2
         if options.printExports:
             doc = Spec(inputFilename=options.infile)
+            doc.md = metadata.fromCommandLine(extras, doc)
             doc.preprocess()
             doc.printTargets()
         elif options.jsonCode:
             doc = Spec(inputFilename=options.infile)
+            doc.md = metadata.fromCommandLine(extras, doc)
             doc.preprocess()
             exec("print config.printjson({0})".format(options.jsonCode))
         elif options.code:
             doc = Spec(inputFilename=options.infile)
+            doc.md = metadata.fromCommandLine(extras, doc)
             doc.preprocess()
             exec("print {0}".format(options.code))
         elif options.linkText:
             doc = Spec(inputFilename=options.infile)
+            doc.md = metadata.fromCommandLine(extras, doc)
             doc.preprocess()
             refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText + "\n"]
             config.quiet = options.quiet
@@ -269,6 +275,7 @@ def main():
         config.quiet = 10
         doc = Spec(inputFilename=options.infile)
         if doc.valid:
+            doc.md = metadata.fromCommandLine(extras, doc)
             doc.preprocess()
             rm = doc.refs
         else:
