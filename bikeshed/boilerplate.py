@@ -515,7 +515,7 @@ def addIDLSection(doc):
         dfn.tag = "a"
         dfn.set("href", "#" + dfn.get("id"))
         del dfn.attrib["id"]
-    highlight.highlightEl(container, lang="webidl")
+    addClass(container, "highlight")
 
 
 def addTOCSection(doc):
