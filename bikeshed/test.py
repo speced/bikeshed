@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division, unicode_literals
+import difflib
 import glob
 import io
-import difflib
-import subprocess
 import pipes
+import subprocess
 from itertools import *
-from .messages import *
-from .htmlhelpers import parseDocument, outerHTML, nodeIter, isElement, findAll
 from . import config
+from .htmlhelpers import parseDocument, outerHTML, nodeIter, isElement, findAll
+from .messages import *
 
 
 def runAllTests(constructor, testFiles):

@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division, unicode_literals
-import tempfile
-import tarfile
-import os
 import logging
+import os
+import tarfile
+import tempfile
 
-from .messages import *
 from . import extensions
+from .messages import *
 from .requests import requests
 
 

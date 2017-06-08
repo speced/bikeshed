@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
+import collections as col
 import copy
 import re
-import collections as col
-from .messages import *
 from . import config
+from .messages import *
 from .ReferenceManager import linkTextsFromElement
 
 '''

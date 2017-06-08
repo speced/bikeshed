@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
-import re
-import os
 import collections
 import copy
 import json
-from DefaultOrderedDict import DefaultOrderedDict
-from subprocess import check_output
+import os
+import re
 from collections import defaultdict
 from datetime import datetime
+from DefaultOrderedDict import DefaultOrderedDict
+from subprocess import check_output
 from . import config
 from . import markdown
-from .messages import *
 from .htmlhelpers import *
+from .messages import *
 from .repository import *
 
 

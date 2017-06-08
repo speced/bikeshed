@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
-import re
-import json
-import io
 import copy
+import io
+import json
+import re
 from collections import defaultdict
 from operator import itemgetter
-from . import config
 from . import biblio
+from . import config
 from . import datablocks
-from .messages import *
 from .htmlhelpers import *
+from .messages import *
 
 class RefSource(object):
     def __init__(self, source, specs=None, ignored=None, replaced=None):

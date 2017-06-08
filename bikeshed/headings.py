@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
-from .messages import *
-from .htmlhelpers import *
 from .config import simplifyText
+from .htmlhelpers import *
+from .messages import *
 
 
 def processHeadings(doc, scope="doc"):

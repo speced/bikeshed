@@ -3,8 +3,8 @@ from __future__ import division, unicode_literals
 import collections
 from . import config
 from . import lexers
-from .messages import *
 from .htmlhelpers import *
+from .messages import *
 from .widlparser.widlparser import parser
 try:
     import pygments as pyg

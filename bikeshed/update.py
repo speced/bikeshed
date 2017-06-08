@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
+import io
 import json
 import re
-import io
+import urllib2
 from collections import defaultdict, OrderedDict
 from contextlib import closing
-import urllib2
 
-from . import config
 from . import biblio
-from DefaultOrderedDict import DefaultOrderedDict
+from . import config
 from .messages import *
+from DefaultOrderedDict import DefaultOrderedDict
 
 from .apiclient.apiclient import apiclient
 

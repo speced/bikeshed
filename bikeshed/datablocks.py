@@ -3,10 +3,10 @@ from __future__ import division, unicode_literals
 import re
 from collections import OrderedDict, defaultdict
 
-import config
-import biblio
-from .messages import *
+from . import biblio
+from . import config
 from .htmlhelpers import *
+from .messages import *
 
 # This function does a single pass through the doc,
 # finding all the "data blocks" and processing them.

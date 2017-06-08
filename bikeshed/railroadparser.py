@@ -1,5 +1,5 @@
+from . import railroaddiagrams as rr
 from .messages import *
-import railroaddiagrams as rr
 
 
 def parse(string):

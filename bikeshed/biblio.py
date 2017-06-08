@@ -2,8 +2,8 @@
 from __future__ import division, unicode_literals
 import re
 from collections import defaultdict
-from .messages import *
 from .htmlhelpers import *
+from .messages import *
 
 
 class BiblioEntry(object):

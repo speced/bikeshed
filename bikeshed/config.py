@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
-import os.path
-import io
-import re
 import collections
 import enum
+import io
+import os.path
+import re
 from collections import defaultdict
 from functools import total_ordering
+
 from .messages import *
 
 force = True

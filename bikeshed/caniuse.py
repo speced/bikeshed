@@ -2,8 +2,8 @@
 from __future__ import division, unicode_literals
 from datetime import datetime
 from . import config
-from .messages import *
 from .htmlhelpers import *
+from .messages import *
 
 def addCanIUsePanels(doc):
     # Constructs "Can I Use panels" which show a compatibility data summary

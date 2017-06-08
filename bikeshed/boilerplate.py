@@ -6,9 +6,9 @@ import re
 import subprocess
 from collections import defaultdict
 from . import highlight
-from .messages import *
-from .htmlhelpers import *
 from .DefaultOrderedDict import DefaultOrderedDict
+from .htmlhelpers import *
+from .messages import *
 
 
 def addBikeshedVersion(doc):

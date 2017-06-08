@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
+import glob
 import io
 import re
 import sys
-import glob
 from .messages import *
 
 statusStyle = {

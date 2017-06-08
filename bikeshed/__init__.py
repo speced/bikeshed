@@ -1,41 +1,41 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division, unicode_literals
-import re
-from collections import defaultdict, OrderedDict
-import io
-import os
-import sys
-import json
-import urllib
-import logging
 import argparse
-import itertools
 import collections
+import io
+import itertools
+import json
+import logging
+import os
+import re
+import sys
+import urllib
+from collections import defaultdict, OrderedDict
 from datetime import datetime
 from functools import partial as curry
 
-from . import config
 from . import biblio
-from . import update
-from . import markdown
-from . import test
-from . import MetadataManager as metadata
-from . import HTMLSerializer
-from . import headings
-from . import shorthands
 from . import boilerplate
-from . import datablocks
-from . import publish
-from . import extensions
-from . import lint
 from . import caniuse
-from . import highlight
+from . import config
+from . import datablocks
+from . import extensions
 from . import func
-from .requests import requests
-from .ReferenceManager import ReferenceManager
+from . import headings
+from . import highlight
+from . import HTMLSerializer
+from . import lint
+from . import markdown
+from . import MetadataManager as metadata
+from . import publish
+from . import shorthands
+from . import test
+from . import update
 from .htmlhelpers import *
 from .messages import *
+from .ReferenceManager import ReferenceManager
+from .requests import requests
 from .widlparser.widlparser import parser
 
 

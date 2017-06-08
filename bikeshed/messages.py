@@ -3,8 +3,8 @@ from __future__ import division, unicode_literals
 import sys
 from collections import Counter
 from lxml import html
-
 import config
+
 
 
 messages = set()

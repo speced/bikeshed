@@ -2,8 +2,8 @@
 from __future__ import division, unicode_literals
 import logging
 import re
-from .messages import *
 from .htmlhelpers import *
+from .messages import *
 from .requests import requests
 
 def lintExampleIDs(doc):

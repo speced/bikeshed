@@ -2,12 +2,12 @@
 from __future__ import division, unicode_literals
 import hashlib
 import html5lib
-from lxml import html
-from lxml import etree
-from lxml.cssselect import CSSSelector
-from collections import Counter
-import re
 import HTMLParser
+import re
+from collections import Counter
+from lxml import etree
+from lxml import html
+from lxml.cssselect import CSSSelector
 
 from . import config
 from .messages import *
