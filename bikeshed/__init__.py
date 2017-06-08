@@ -2247,14 +2247,14 @@ def formatElementdefTables(doc):
         elementsFor = ' '.join(textContent(x) for x in elements)
         for el in findAll("a[data-element-attr-group]", table):
             groupName = textContent(el).strip()
-            groupAttrs = sorted(doc.refs.queryRefs(linkType="element-attr", linkFor=groupName)[0], key=lambda x:x.text)
+            groupAttrs = sorted(doc.refs.queryAllRefs(linkType="element-attr", linkFor=groupName), key=lambda x:x.text)
             if len(groupAttrs) == 0:
                 die("The element-attr group '{0}' doesn't have any attributes defined for it.", groupName, el=el)
                 continue
             el.tag = "details"
             clearContents(el)
-            del el.attrib["data-element-attr-group"]
-            del el.attrib["dfn"]
+            removeAttr(el, "data-element-attr-group")
+            removeAttr(el, "data-dfn-type")
             ul = appendChild(el,
                              E.summary(
                                  E.a({"data-link-type":"dfn"}, groupName)),
