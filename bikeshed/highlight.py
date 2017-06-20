@@ -19,170 +19,80 @@ customLexers = {
 
 ColoredText = collections.namedtuple('ColoredText', ['text', 'color'])
 
-class IDLUI(object):
-    def warn(self, msg):
-        die("{0}", msg.rstrip())
-
-
-class HighlightMarker(object):
-    # Just applies highlighting classes to IDL stuff.
-
-    def markupTypeName(self, text, construct):
-        return ('<span class=n>', '</span>')
-
-    def markupName(self, text, construct):
-        return ('<span class=nv>', '</span>')
-
-    def markupKeyword(self, text, construct):
-        return ('<span class=kt>', '</span>')
-
-    def markupEnumValue(self, text, construct):
-        return ('<span class=s>', '</span>')
-
 def addSyntaxHighlighting(doc):
-    highlightingOccurred = False
-
-    if find("pre.idl, xmp.idl", doc) is not None:
-        highlightingOccurred = True
-
-    def translateLang(lang):
-        # Translates some names to ones Pygment understands
-        if lang == "aspnet":
-            return "aspx-cs"
-        if lang in ["markup", "svg"]:
-            return "html"
-        return lang
-
-    # Translate Prism-style highlighting into Pygment-style
-    for el in findAll("[class*=language-], [class*=lang-]", doc):
-        match = re.search("(?:lang|language)-(\w+)", el.get("class"))
-        if match:
-            el.set("highlight", match.group(1))
+    normalizeHighlightMarkers(doc)
 
     # Highlight all the appropriate elements
+    highlightingOccurred = False
     for el in findAll("xmp, pre, code", doc):
         attr, lang = closestAttr(el, "nohighlight", "highlight")
         if attr == "nohighlight":
             continue
         if attr is None:
+            #Highlight-by-default, if applicable.
             if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
                 if isNormative(el):
                     # Already processed/highlighted.
+                    highlightingOccurred = True
                     continue
                 lang = "idl"
-            elif doc.md.defaultHighlight is None:
-                continue
             else:
                 lang = doc.md.defaultHighlight
-        highlightEl(el, translateLang(lang))
+        if lang is None:
+            continue
+        lang = normalizeLanguageName(lang)
+        highlightEl(el, lang)
         highlightingOccurred = True
 
     if highlightingOccurred:
-        # To regen the styles, edit and run the below
-        #from pygments import token
-        #from pygments import style
-        #class PrismStyle(style.Style):
-        #    default_style = "#000000"
-        #    styles = {
-        #        token.Name: "#0077aa",
-        #        token.Name.Tag: "#669900",
-        #        token.Name.Builtin: "noinherit",
-        #        token.Name.Variable: "#222222",
-        #        token.Name.Other: "noinherit",
-        #        token.Operator: "#999999",
-        #        token.Punctuation: "#999999",
-        #        token.Keyword: "#990055",
-        #        token.Literal: "#000000",
-        #        token.Literal.Number: "#000000",
-        #        token.Literal.String: "#a67f59",
-        #        token.Comment: "#708090"
-        #    }
-        #print formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
-        doc.extraStyles['style-syntax-highlighting'] += '''
-        .highlight:not(.idl) { background: hsl(24, 20%, 95%); }
-        code.highlight { padding: .1em; border-radius: .3em; }
-        pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
-        .highlight .c { color: #708090 } /* Comment */
-        .highlight .k { color: #990055 } /* Keyword */
-        .highlight .l { color: #000000 } /* Literal */
-        .highlight .n { color: #0077aa } /* Name */
-        .highlight .o { color: #999999 } /* Operator */
-        .highlight .p { color: #999999 } /* Punctuation */
-        .highlight .cm { color: #708090 } /* Comment.Multiline */
-        .highlight .cp { color: #708090 } /* Comment.Preproc */
-        .highlight .c1 { color: #708090 } /* Comment.Single */
-        .highlight .cs { color: #708090 } /* Comment.Special */
-        .highlight .kc { color: #990055 } /* Keyword.Constant */
-        .highlight .kd { color: #990055 } /* Keyword.Declaration */
-        .highlight .kn { color: #990055 } /* Keyword.Namespace */
-        .highlight .kp { color: #990055 } /* Keyword.Pseudo */
-        .highlight .kr { color: #990055 } /* Keyword.Reserved */
-        .highlight .kt { color: #990055 } /* Keyword.Type */
-        .highlight .ld { color: #000000 } /* Literal.Date */
-        .highlight .m { color: #000000 } /* Literal.Number */
-        .highlight .s { color: #a67f59 } /* Literal.String */
-        .highlight .na { color: #0077aa } /* Name.Attribute */
-        .highlight .nc { color: #0077aa } /* Name.Class */
-        .highlight .no { color: #0077aa } /* Name.Constant */
-        .highlight .nd { color: #0077aa } /* Name.Decorator */
-        .highlight .ni { color: #0077aa } /* Name.Entity */
-        .highlight .ne { color: #0077aa } /* Name.Exception */
-        .highlight .nf { color: #0077aa } /* Name.Function */
-        .highlight .nl { color: #0077aa } /* Name.Label */
-        .highlight .nn { color: #0077aa } /* Name.Namespace */
-        .highlight .py { color: #0077aa } /* Name.Property */
-        .highlight .nt { color: #669900 } /* Name.Tag */
-        .highlight .nv { color: #222222 } /* Name.Variable */
-        .highlight .ow { color: #999999 } /* Operator.Word */
-        .highlight .mb { color: #000000 } /* Literal.Number.Bin */
-        .highlight .mf { color: #000000 } /* Literal.Number.Float */
-        .highlight .mh { color: #000000 } /* Literal.Number.Hex */
-        .highlight .mi { color: #000000 } /* Literal.Number.Integer */
-        .highlight .mo { color: #000000 } /* Literal.Number.Oct */
-        .highlight .sb { color: #a67f59 } /* Literal.String.Backtick */
-        .highlight .sc { color: #a67f59 } /* Literal.String.Char */
-        .highlight .sd { color: #a67f59 } /* Literal.String.Doc */
-        .highlight .s2 { color: #a67f59 } /* Literal.String.Double */
-        .highlight .se { color: #a67f59 } /* Literal.String.Escape */
-        .highlight .sh { color: #a67f59 } /* Literal.String.Heredoc */
-        .highlight .si { color: #a67f59 } /* Literal.String.Interpol */
-        .highlight .sx { color: #a67f59 } /* Literal.String.Other */
-        .highlight .sr { color: #a67f59 } /* Literal.String.Regex */
-        .highlight .s1 { color: #a67f59 } /* Literal.String.Single */
-        .highlight .ss { color: #a67f59 } /* Literal.String.Symbol */
-        .highlight .vc { color: #0077aa } /* Name.Variable.Class */
-        .highlight .vg { color: #0077aa } /* Name.Variable.Global */
-        .highlight .vi { color: #0077aa } /* Name.Variable.Instance */
-        .highlight .il { color: #000000 } /* Literal.Number.Integer.Long */
-        '''
+        doc.extraStyles['style-syntax-highlighting'] += getHighlightStyles()
 
 
 def highlightEl(el, lang):
     text = textContent(el)
     if lang in ["idl", "webidl"]:
-        widl = parser.Parser(text, IDLUI())
-        marker = HighlightMarker()
-        nested = parseHTML(unicode(widl.markup(marker)))
-        coloredText = collections.deque()
-        for n in childNodes(flattenHighlighting(nested)):
-            if isElement(n):
-                coloredText.append(ColoredText(textContent(n), n.get('class')))
-            else:
-                coloredText.append(ColoredText(n, None))
+        coloredText = highlightWithWebIDL(text, el=el)
     else:
-        if lang in customLexers:
-            lexer = customLexers[lang]
-        else:
-            try:
-                lexer = get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
-            except pyg.util.ClassNotFound:
-                die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
-                return
-        coloredText = parsePygments(pyg.highlight(text, lexer, formatters.RawTokenFormatter()))
-        # empty span at beginning
-        # extra linebreak at the end
+        coloredText = highlightWithPygments(text, lang, el=el)
     mergeHighlighting(el, coloredText)
+    print outerHTML(el)
     addClass(el, "highlight")
+
+
+def highlightWithWebIDL(text, el):
+    class IDLUI(object):
+        def warn(self, msg):
+            die("{0}", msg.rstrip())
+    class HighlightMarker(object):
+        # Just applies highlighting classes to IDL stuff.
+        def markupTypeName(self, text, construct):
+            return ('<span class=n>', '</span>')
+        def markupName(self, text, construct):
+            return ('<span class=nv>', '</span>')
+        def markupKeyword(self, text, construct):
+            return ('<span class=kt>', '</span>')
+        def markupEnumValue(self, text, construct):
+            return ('<span class=s>', '</span>')
+
+    widl = parser.Parser(text, IDLUI())
+    nested = parseHTML(unicode(widl.markup(HighlightMarker())))
+    coloredText = collections.deque()
+    for n in childNodes(flattenHighlighting(nested)):
+        if isElement(n):
+            coloredText.append(ColoredText(textContent(n), n.get('class')))
+        else:
+            coloredText.append(ColoredText(n, None))
+    return coloredText
+
+
+def highlightWithPygments(text, lang, el):
+    lexer = lexerFromLang(lang)
+    if lexer is None:
+        die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
+        return
+    rawTokens = pyg.highlight(text, lexer, formatters.RawTokenFormatter())
+    coloredText = coloredTextFromRawTokens(rawTokens)
+    return coloredText
 
 
 def mergeHighlighting(el, coloredText):
@@ -247,7 +157,7 @@ def flattenHighlighting(el):
                     appendChild(container, E.span({"class":overclass},subnode))
     return container
 
-def parsePygments(text):
+def coloredTextFromRawTokens(text):
     tokenClassFromName = {
         "Token.Comment": "c",
         "Token.Keyword": "k",
@@ -318,4 +228,107 @@ def parsePygments(text):
     return coloredText
 
 
+def normalizeLanguageName(lang):
+    # Translates some names to ones Pygment understands
+    if lang == "aspnet":
+        return "aspx-cs"
+    if lang in ["markup", "svg"]:
+        return "html"
+    return lang
 
+
+def normalizeHighlightMarkers(doc):
+    # Translate Prism-style highlighting into Pygment-style
+    for el in findAll("[class*=language-], [class*=lang-]", doc):
+        match = re.search("(?:lang|language)-(\w+)", el.get("class"))
+        if match:
+            el.set("highlight", match.group(1))
+
+
+def lexerFromLang(lang):
+    if lang in customLexers:
+        return customLexers[lang]
+    try:
+        return get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
+    except pyg.util.ClassNotFound:
+        return None
+
+
+def getHighlightStyles():
+    # To regen the styles, edit and run the below
+    #from pygments import token
+    #from pygments import style
+    #class PrismStyle(style.Style):
+    #    default_style = "#000000"
+    #    styles = {
+    #        token.Name: "#0077aa",
+    #        token.Name.Tag: "#669900",
+    #        token.Name.Builtin: "noinherit",
+    #        token.Name.Variable: "#222222",
+    #        token.Name.Other: "noinherit",
+    #        token.Operator: "#999999",
+    #        token.Punctuation: "#999999",
+    #        token.Keyword: "#990055",
+    #        token.Literal: "#000000",
+    #        token.Literal.Number: "#000000",
+    #        token.Literal.String: "#a67f59",
+    #        token.Comment: "#708090"
+    #    }
+    #print formatters.HtmlFormatter(style=PrismStyle).get_style_defs('.highlight')
+    return '''
+.highlight:not(.idl) { background: hsl(24, 20%, 95%); }
+code.highlight { padding: .1em; border-radius: .3em; }
+pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
+.highlight .c { color: #708090 } /* Comment */
+.highlight .k { color: #990055 } /* Keyword */
+.highlight .l { color: #000000 } /* Literal */
+.highlight .n { color: #0077aa } /* Name */
+.highlight .o { color: #999999 } /* Operator */
+.highlight .p { color: #999999 } /* Punctuation */
+.highlight .cm { color: #708090 } /* Comment.Multiline */
+.highlight .cp { color: #708090 } /* Comment.Preproc */
+.highlight .c1 { color: #708090 } /* Comment.Single */
+.highlight .cs { color: #708090 } /* Comment.Special */
+.highlight .kc { color: #990055 } /* Keyword.Constant */
+.highlight .kd { color: #990055 } /* Keyword.Declaration */
+.highlight .kn { color: #990055 } /* Keyword.Namespace */
+.highlight .kp { color: #990055 } /* Keyword.Pseudo */
+.highlight .kr { color: #990055 } /* Keyword.Reserved */
+.highlight .kt { color: #990055 } /* Keyword.Type */
+.highlight .ld { color: #000000 } /* Literal.Date */
+.highlight .m { color: #000000 } /* Literal.Number */
+.highlight .s { color: #a67f59 } /* Literal.String */
+.highlight .na { color: #0077aa } /* Name.Attribute */
+.highlight .nc { color: #0077aa } /* Name.Class */
+.highlight .no { color: #0077aa } /* Name.Constant */
+.highlight .nd { color: #0077aa } /* Name.Decorator */
+.highlight .ni { color: #0077aa } /* Name.Entity */
+.highlight .ne { color: #0077aa } /* Name.Exception */
+.highlight .nf { color: #0077aa } /* Name.Function */
+.highlight .nl { color: #0077aa } /* Name.Label */
+.highlight .nn { color: #0077aa } /* Name.Namespace */
+.highlight .py { color: #0077aa } /* Name.Property */
+.highlight .nt { color: #669900 } /* Name.Tag */
+.highlight .nv { color: #222222 } /* Name.Variable */
+.highlight .ow { color: #999999 } /* Operator.Word */
+.highlight .mb { color: #000000 } /* Literal.Number.Bin */
+.highlight .mf { color: #000000 } /* Literal.Number.Float */
+.highlight .mh { color: #000000 } /* Literal.Number.Hex */
+.highlight .mi { color: #000000 } /* Literal.Number.Integer */
+.highlight .mo { color: #000000 } /* Literal.Number.Oct */
+.highlight .sb { color: #a67f59 } /* Literal.String.Backtick */
+.highlight .sc { color: #a67f59 } /* Literal.String.Char */
+.highlight .sd { color: #a67f59 } /* Literal.String.Doc */
+.highlight .s2 { color: #a67f59 } /* Literal.String.Double */
+.highlight .se { color: #a67f59 } /* Literal.String.Escape */
+.highlight .sh { color: #a67f59 } /* Literal.String.Heredoc */
+.highlight .si { color: #a67f59 } /* Literal.String.Interpol */
+.highlight .sx { color: #a67f59 } /* Literal.String.Other */
+.highlight .sr { color: #a67f59 } /* Literal.String.Regex */
+.highlight .s1 { color: #a67f59 } /* Literal.String.Single */
+.highlight .ss { color: #a67f59 } /* Literal.String.Symbol */
+.highlight .vc { color: #0077aa } /* Name.Variable.Class */
+.highlight .vg { color: #0077aa } /* Name.Variable.Global */
+.highlight .vi { color: #0077aa } /* Name.Variable.Instance */
+.highlight .il { color: #000000 } /* Literal.Number.Integer.Long */
+'''
