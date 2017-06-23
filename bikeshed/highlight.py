@@ -35,18 +35,8 @@ def addSyntaxHighlighting(doc):
             highlightEl(el, lang)
             highlightingOccurred = True
         # Find whether to add line numbers
-        lAttr, lineStart = closestAttr(el, "no-line-numbers", "line-numbers")
-        if lAttr == "no-line-numbers" or el.tag == "code":
-            addLineNumbers = False
-        elif lAttr == "line-numbers" or doc.md.lineNumbers:
-            if lineStart == "":
-                lineStart = 1
-            else:
-                try:
-                    lineStart = int(lineStart)
-                except ValueError:
-                    die("line-numbers attribute must either be boolean or have an integer value. Got '{0}'.", lineStart, el=el)
-                    continue
+        addLineNumbers, lineStart = determineLineNumbers(doc, el)
+        if addLineNumbers:
             addLineWrappers(el, start=lineStart)
             lineWrappingOccurred = True
 
@@ -76,6 +66,28 @@ def determineHighlightLang(doc, el):
                 return "idl"
         else:
             return doc.md.defaultHighlight
+
+
+def determineLineNumbers(doc, el):
+    lAttr, _ = closestAttr(el, "no-line-numbers", "line-numbers")
+    if lAttr == "no-line-numbers" or el.tag == "code":
+        addLineNumbers = False
+    elif lAttr == "line-numbers":
+        addLineNumbers = True
+    else:
+        addLineNumbers = doc.md.lineNumbers
+
+    lineStart = el.get("line-start")
+    if lineStart is None:
+        lineStart = 1
+    else:
+        try:
+            lineStart = int(lineStart)
+        except ValueError:
+            die("line-start attribute must have an integer value. Got '{0}'.", lineStart, el=el)
+            lineStart = 1
+
+    return addLineNumbers, lineStart
 
 
 def highlightEl(el, lang):
