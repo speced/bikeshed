@@ -35,11 +35,19 @@ def addSyntaxHighlighting(doc):
             highlightEl(el, lang)
             highlightingOccurred = True
         # Find whether to add line numbers
-        lAttr, _ = closestAttr(el, "no-line-numbers", "line-numbers")
+        lAttr, lineStart = closestAttr(el, "no-line-numbers", "line-numbers")
         if lAttr == "no-line-numbers" or el.tag == "code":
             addLineNumbers = False
         elif lAttr == "line-numbers" or doc.md.lineNumbers:
-            addLineWrappers(el)
+            if lineStart == "":
+                lineStart = 1
+            else:
+                try:
+                    lineStart = int(lineStart)
+                except ValueError:
+                    die("line-numbers attribute must either be boolean or have an integer value. Got '{0}'.", lineStart, el=el)
+                    continue
+            addLineWrappers(el, start=lineStart)
             lineWrappingOccurred = True
 
     if highlightingOccurred:
@@ -285,7 +293,7 @@ def lexerFromLang(lang):
         return None
 
 
-def addLineWrappers(el):
+def addLineWrappers(el, start=1):
     # Wrap everything between each top-level newline with a line tag.
     # Add an attr for the line number, and if needed, the end line.
     lineWrapper = E.div({"class": "line"})
@@ -306,7 +314,7 @@ def addLineWrappers(el):
     if len(lineWrapper):
         appendChild(el, lineWrapper)
     # Number the lines
-    lineNumber = 1
+    lineNumber = start
     for node in childNodes(el):
         if isElement(node):
             node.set("line", unicode(lineNumber))
