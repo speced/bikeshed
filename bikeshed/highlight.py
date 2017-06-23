@@ -36,7 +36,7 @@ def addSyntaxHighlighting(doc):
             highlightingOccurred = True
         # Find whether to add line numbers
         lAttr, _ = closestAttr(el, "no-line-numbers", "line-numbers")
-        if lAttr == "no-line-numbers":
+        if lAttr == "no-line-numbers" or el.tag == "code":
             addLineNumbers = False
         elif lAttr == "line-numbers" or doc.md.lineNumbers:
             addLineWrappers(el)
