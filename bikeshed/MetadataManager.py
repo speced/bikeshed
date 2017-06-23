@@ -67,6 +67,7 @@ class MetadataManager:
         self.issueClass = "issue"
         self.issues = []
         self.issueTrackerTemplate = None
+        self.lineNumbers = False
         self.linkDefaults = defaultdict(list)
         self.logo = ""
         self.mailingList = None
@@ -879,6 +880,7 @@ knownKeys = {
     "Issue Tracker Template": Metadata("Issue Tracker Template", "issueTrackerTemplate", joinValue, parseLiteral),
     "Issue Tracking": Metadata("Issue Tracking", "issues", joinList, parseLinkedText),
     "Level": Metadata("Level", "level", joinValue, parseLevel),
+    "Line Numbers": Metadata("Line Numbers", "lineNumbers", joinValue, parseBoolean),
     "Link Defaults": Metadata("Link Defaults", "linkDefaults", joinDdList, parseLinkDefaults),
     "Logo": Metadata("Logo", "logo", joinValue, parseLiteral),
     "Mailing List Archives": Metadata("Mailing List Archives", "mailingListArchives", joinValue, parseLiteral),

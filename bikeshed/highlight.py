@@ -24,28 +24,50 @@ def addSyntaxHighlighting(doc):
 
     # Highlight all the appropriate elements
     highlightingOccurred = False
+    lineWrappingOccurred = False
     for el in findAll("xmp, pre, code", doc):
-        attr, lang = closestAttr(el, "nohighlight", "highlight")
-        if attr == "nohighlight":
-            continue
-        if attr is None:
-            #Highlight-by-default, if applicable.
-            if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
-                if isNormative(el):
-                    # Already processed/highlighted.
-                    highlightingOccurred = True
-                    continue
-                lang = "idl"
-            else:
-                lang = doc.md.defaultHighlight
-        if lang is None:
-            continue
-        lang = normalizeLanguageName(lang)
-        highlightEl(el, lang)
-        highlightingOccurred = True
+        # Find whether to highlight, and what the lang is
+        lang = determineHighlightLang(doc, el)
+        if lang is False:
+            # Element was already highlighted, but needs styles
+            highlightingOccurred = True
+        elif lang:
+            highlightEl(el, lang)
+            highlightingOccurred = True
+        # Find whether to add line numbers
+        lAttr, _ = closestAttr(el, "no-line-numbers", "line-numbers")
+        if lAttr == "no-line-numbers":
+            addLineNumbers = False
+        elif lAttr == "line-numbers" or doc.md.lineNumbers:
+            addLineWrappers(el)
+            lineWrappingOccurred = True
 
     if highlightingOccurred:
         doc.extraStyles['style-syntax-highlighting'] += getHighlightStyles()
+    if lineWrappingOccurred:
+        doc.extraStyles['style-line-wrapping'] += getLineWrappingStyles()
+
+
+def determineHighlightLang(doc, el):
+    # Either returns a normalized highlight lang,
+    # False indicating the element was already highlighted,
+    # or None indicating the element shouldn't be highlighted.
+    attr, lang = closestAttr(el, "nohighlight", "highlight")
+    lang = normalizeLanguageName(lang)
+    if attr == "nohighlight":
+        return None
+    elif attr == "highlight":
+        return lang
+    else:
+        # Highlight-by-default, if applicable.
+        if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
+            if isNormative(el):
+                # Normative IDL gets 'highlighted' by the IDL parser.
+                return False
+            else:
+                return "idl"
+        else:
+            return doc.md.defaultHighlight
 
 
 def highlightEl(el, lang):
@@ -55,7 +77,6 @@ def highlightEl(el, lang):
     else:
         coloredText = highlightWithPygments(text, lang, el=el)
     mergeHighlighting(el, coloredText)
-    print outerHTML(el)
     addClass(el, "highlight")
 
 
@@ -102,6 +123,9 @@ def mergeHighlighting(el, coloredText):
     # merging them together into runs of text for convenience/efficiency only;
     # the markup structure is a flat list of sibling elements containing raw text
     # (and maybe some un-highlighted raw text between them).
+    def createEl(color, text):
+        return E.span({"class":color}, text)
+
     def colorizeEl(el, coloredText):
         for node in childNodes(el, clear=True):
             if isElement(node):
@@ -118,13 +142,13 @@ def mergeHighlighting(el, coloredText):
                 if nextColor.color is None:
                     nodes.append(nextColor.text)
                 else:
-                    nodes.append(E.span({"class":nextColor.color}, nextColor.text))
+                    nodes.append(createEl(nextColor.color, nextColor.text))
                 text = text[len(nextColor.text):]
             else:  # Need to use only part of the nextColor node
                 if nextColor.color is None:
                     nodes.append(text)
                 else:
-                    nodes.append(E.span({"class":nextColor.color}, text))
+                    nodes.append(createEl(nextColor.color, text))
                 # Truncate the nextColor text to what's unconsumed,
                 # and put it back into the deque
                 nextColor = ColoredText(nextColor.text[len(text):], nextColor.color)
@@ -254,6 +278,48 @@ def lexerFromLang(lang):
         return None
 
 
+def addLineWrappers(el):
+    # Wrap everything between each top-level newline with a line tag.
+    # Add an attr for the line number, and if needed, the end line.
+    lineWrapper = E.div({"class": "line"})
+    for node in childNodes(el, clear=True):
+        if isElement(node):
+            appendChild(lineWrapper, node)
+        else:
+            while True:
+                if "\n" in node:
+                    pre, _, post = node.partition("\n")
+                    appendChild(lineWrapper, pre)
+                    appendChild(el, lineWrapper)
+                    lineWrapper = E.div({"class": "line"})
+                    node = post
+                else:
+                    appendChild(lineWrapper, node)
+                    break
+    if len(lineWrapper):
+        appendChild(el, lineWrapper)
+    # Number the lines
+    lineNumber = 1
+    for node in childNodes(el):
+        if isElement(node):
+            node.set("line", unicode(lineNumber))
+            internalNewlines = countInternalNewlines(node)
+            if internalNewlines:
+                lineNumber += internalNewlines
+                node.set("line-end", unicode(lineNumber))
+            lineNumber += 1
+    return el
+
+def countInternalNewlines(el):
+    count = 0
+    for node in childNodes(el):
+        if isElement(node):
+            count += countInternalNewlines(node)
+        else:
+            count += node.count("\n")
+    return count
+
+
 def getHighlightStyles():
     # To regen the styles, edit and run the below
     #from pygments import token
@@ -331,4 +397,29 @@ pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em
 .highlight .vg { color: #0077aa } /* Name.Variable.Global */
 .highlight .vi { color: #0077aa } /* Name.Variable.Instance */
 .highlight .il { color: #000000 } /* Literal.Number.Integer.Long */
+'''
+
+def getLineWrappingStyles():
+    return '''
+.line {
+    padding-left: 1.4em;
+    position: relative;
+}
+.line:hover {
+    background: rgba(0,0,0,.05);
+}
+.line::before {
+    content: attr(line);
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: gray;
+}
+.line[line-end]::after {
+    content: attr(line-end);
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    color: gray;
+}
 '''
