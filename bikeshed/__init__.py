@@ -1216,6 +1216,9 @@ def classifyDfns(doc, dfns):
         if primaryDfnText is None:
             die("Dfn has no linking text:\n{0}", outerHTML(el), el=el)
             continue
+        if len(primaryDfnText) > 100:
+            # Almost certainly accidentally missed the end tag
+            warn("Dfn has extremely long text - did you forget the </dfn> tag?\n{0}", outerHTML(el), el=el)
         # Check for invalid fors, as it's usually some misnesting.
         if dfnFor and dfnType in config.typesNotUsingFor:
             die("'{0}' definitions don't use a 'for' attribute, but this one claims it's for '{1}' (perhaps inherited from an ancestor). This is probably a markup error.\n{2}", dfnType, dfnFor, outerHTML(el), el=el)
