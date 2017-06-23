@@ -182,7 +182,7 @@ def flattenHighlighting(el):
     return container
 
 def coloredTextFromRawTokens(text):
-    tokenClassFromName = {
+    colorFromName = {
         "Token.Comment": "c",
         "Token.Keyword": "k",
         "Token.Literal": "l",
@@ -236,20 +236,27 @@ def coloredTextFromRawTokens(text):
         "Token.Name.Variable.Instance": "vi",
         "Token.Literal.Number.Integer.Long": "il"
     }
-    coloredText = collections.deque()
+    textList = collections.deque()
+    currentCT = None
     for line in text.split("\n"):
         if not line:
             continue
         tokenName,_,tokenTextRepr = line.partition("\t")
-        tokenText = eval(tokenTextRepr)
-        if not tokenText:
+        color = colorFromName.get(tokenName, None)
+        text = eval(tokenTextRepr)
+        if not text:
             continue
-        if tokenName == "Token.Text":
-            tokenClass = None
+        if not currentCT:
+            currentCT = ColoredText(text, color)
+        elif currentCT.color == color:
+            # Repeated color, merge into current
+            currentCT = currentCT._replace(text=currentCT.text + text)
         else:
-            tokenClass = tokenClassFromName.get(tokenName, None)
-        coloredText.append(ColoredText(tokenText, tokenClass))
-    return coloredText
+            textList.append(currentCT)
+            currentCT = ColoredText(text, color)
+    if currentCT:
+        textList.append(currentCT)
+    return textList
 
 
 def normalizeLanguageName(lang):
