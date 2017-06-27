@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import collections
+import re
 from . import config
 from . import lexers
 from .htmlhelpers import *
@@ -25,6 +26,7 @@ def addSyntaxHighlighting(doc):
     # Highlight all the appropriate elements
     highlightingOccurred = False
     lineWrappingOccurred = False
+    lineHighlightingOccurred = False
     for el in findAll("xmp, pre, code", doc):
         # Find whether to highlight, and what the lang is
         lang = determineHighlightLang(doc, el)
@@ -35,15 +37,20 @@ def addSyntaxHighlighting(doc):
             highlightEl(el, lang)
             highlightingOccurred = True
         # Find whether to add line numbers
-        addLineNumbers, lineStart = determineLineNumbers(doc, el)
-        if addLineNumbers:
-            addLineWrappers(el, start=lineStart)
-            lineWrappingOccurred = True
+        addLineNumbers, lineStart, lineHighlights = determineLineNumbers(doc, el)
+        if addLineNumbers or lineHighlights:
+            addLineWrappers(el, numbers=addLineNumbers, start=lineStart, highlights=lineHighlights)
+            if addLineNumbers:
+                lineWrappingOccurred = True
+            if lineHighlights:
+                lineHighlightingOccurred = True
 
     if highlightingOccurred:
         doc.extraStyles['style-syntax-highlighting'] += getHighlightStyles()
     if lineWrappingOccurred:
-        doc.extraStyles['style-line-wrapping'] += getLineWrappingStyles()
+        doc.extraStyles['style-line-numbers'] += getLineNumberStyles()
+    if lineHighlightingOccurred:
+        doc.extraStyles['style-line-highlighting'] += getLineHighlightingStyles()
 
 
 def determineHighlightLang(doc, el):
@@ -87,7 +94,35 @@ def determineLineNumbers(doc, el):
             die("line-start attribute must have an integer value. Got '{0}'.", lineStart, el=el)
             lineStart = 1
 
-    return addLineNumbers, lineStart
+    lh = el.get("line-highlight")
+    lineHighlights = set()
+    if lh is None:
+        pass
+    else:
+        lh = re.sub(r"\s*", "", lh)
+        for item in lh.split(","):
+            if "-" in item:
+                # Range, format of DDD-DDD
+                low,_,high = item.partition("-")
+                try:
+                    low = int(low)
+                    high = int(high)
+                except ValueError:
+                    die("Error parsing line-highlight range '{0}' - must be `int-int`.", item, el=el)
+                    continue
+                if low >= high:
+                    die("line-highlight ranges must be well-formed lo-hi - got '{0}'.", item, el=el)
+                    continue
+                lineHighlights.update(range(low, high+1))
+            else:
+                try:
+                    item = int(item)
+                except ValueError:
+                    die("Error parsing line-highlight value '{0}' - must be integers.", item, el=el)
+                    continue
+                lineHighlights.add(item)
+
+    return addLineNumbers, lineStart, lineHighlights
 
 
 def highlightEl(el, lang):
@@ -305,9 +340,11 @@ def lexerFromLang(lang):
         return None
 
 
-def addLineWrappers(el, start=1):
+def addLineWrappers(el, numbers=True, start=1, highlights=None):
     # Wrap everything between each top-level newline with a line tag.
     # Add an attr for the line number, and if needed, the end line.
+    if highlights is None:
+        highlights = set()
     lineWrapper = E.div({"class": "line"})
     for node in childNodes(el, clear=True):
         if isElement(node):
@@ -330,8 +367,13 @@ def addLineWrappers(el, start=1):
     for node in childNodes(el):
         if isElement(node):
             node.set("line", unicode(lineNumber))
+            if lineNumber in highlights:
+                addClass(node, "highlight-line")
             internalNewlines = countInternalNewlines(node)
             if internalNewlines:
+                for i in range(1, internalNewlines+1):
+                    if (lineNumber + i) in highlights:
+                        addClass(node, "highlight-line")
                 lineNumber += internalNewlines
                 node.set("line-end", unicode(lineNumber))
             lineNumber += 1
@@ -426,7 +468,7 @@ pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em
 .highlight .il { color: #000000 } /* Literal.Number.Integer.Long */
 '''
 
-def getLineWrappingStyles():
+def getLineNumberStyles():
     return '''
 .line {
     padding-left: 1.4em;
@@ -439,14 +481,39 @@ def getLineWrappingStyles():
     content: attr(line);
     position: absolute;
     top: 0;
-    left: 0;
+    left: 1px;
     color: gray;
 }
 .line[line-end]::after {
     content: attr(line-end);
     position: absolute;
     bottom: 0;
-    left: 0;
+    left: 1px;
+    color: gray;
+}
+'''
+
+def getLineHighlightingStyles():
+    return '''
+.line {
+    padding-left: 1.4em;
+    position: relative;
+}
+.line.highlight-line {
+    background: rgba(0,0,0,.05);
+}
+.line.highlight-line::before {
+    content: attr(line);
+    position: absolute;
+    top: 0;
+    left: 1px;
+    color: gray;
+}
+.line.highlight-line[line-end]::after {
+    content: attr(line-end);
+    position: absolute;
+    bottom: 0;
+    left: 1px;
     color: gray;
 }
 '''
