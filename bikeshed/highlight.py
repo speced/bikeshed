@@ -366,16 +366,20 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
     lineNumber = start
     for node in childNodes(el):
         if isElement(node):
-            node.set("line", unicode(lineNumber))
+            if numbers:
+                node.set("line", unicode(lineNumber))
             if lineNumber in highlights:
+                node.set("line", unicode(lineNumber))
                 addClass(node, "highlight-line")
             internalNewlines = countInternalNewlines(node)
             if internalNewlines:
                 for i in range(1, internalNewlines+1):
                     if (lineNumber + i) in highlights:
                         addClass(node, "highlight-line")
+                        node.set("line", unicode(lineNumber))
                 lineNumber += internalNewlines
-                node.set("line-end", unicode(lineNumber))
+                if numbers:
+                    node.set("line-end", unicode(lineNumber))
             lineNumber += 1
     return el
 
@@ -477,7 +481,7 @@ def getLineNumberStyles():
 .line:hover {
     background: rgba(0,0,0,.05);
 }
-.line::before {
+.line[line]::before {
     content: attr(line);
     position: absolute;
     top: 0;
@@ -502,7 +506,7 @@ def getLineHighlightingStyles():
 .line.highlight-line {
     background: rgba(0,0,0,.05);
 }
-.line.highlight-line::before {
+.line.highlight-line[line]::before {
     content: attr(line);
     position: absolute;
     top: 0;
