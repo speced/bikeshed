@@ -678,14 +678,19 @@ def parse(lines, doc):
     inMetadata = False
     lastKey = None
     blockSize = 0
+    endTag = None
     md = MetadataManager(doc)
     for i,line in enumerate(lines):
-        if not inMetadata and re.match(r"<pre [^>]*class=[^>]*metadata[^>]*>", line):
+        if not inMetadata and re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line):
             blockSize = 1
             inMetadata = True
             md.hasMetadata = True
+            if line.startswith("<pre"):
+                endTag = r"</pre>\s*"
+            else:
+                endTag = r"</xmp>\s*"
             continue
-        elif inMetadata and re.match(r"</pre>\s*", line):
+        elif inMetadata and re.match(endTag, line):
             newlines.append("<!--line count correction {0}-->".format(blockSize + 1))
             blockSize = 0
             inMetadata = False
