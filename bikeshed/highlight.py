@@ -377,6 +377,12 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
     lineNumber = start
     for node in childNodes(el):
         if isElement(node):
+            if isEmpty(node):
+                # Blank line; since I removed the \n from the source
+                # and am relying on <div> for lines now,
+                # this'll collapse to zero-height and mess things up.
+                # Add a single space to keep it one line tall.
+                node.text = " "
             if numbers:
                 node.set("line", unicode(lineNumber))
             if lineNumber in highlights:
