@@ -291,6 +291,17 @@ def coloredTextFromRawTokens(text):
         "Token.Name.Variable.Instance": "vi",
         "Token.Literal.Number.Integer.Long": "il"
     }
+    def addCtToList(list, ct):
+        if "\n" in ct.text:
+            # Break apart the formatting so that the \n is plain text,
+            # so it works better with line numbers.
+            textBits = ct.text.split("\n")
+            list.append(ColoredText(textBits[0], ct.color))
+            for bit in textBits[1:]:
+                list.append(ColoredText("\n", None))
+                list.append(ColoredText(bit, ct.color))
+        else:
+            list.append(ct)
     textList = collections.deque()
     currentCT = None
     for line in text.split("\n"):
@@ -307,10 +318,10 @@ def coloredTextFromRawTokens(text):
             # Repeated color, merge into current
             currentCT = currentCT._replace(text=currentCT.text + text)
         else:
-            textList.append(currentCT)
+            addCtToList(textList, currentCT)
             currentCT = ColoredText(text, color)
     if currentCT:
-        textList.append(currentCT)
+        addCtToList(textList, currentCT)
     return textList
 
 
