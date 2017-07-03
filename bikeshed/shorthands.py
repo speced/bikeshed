@@ -245,6 +245,25 @@ def transformAutolinkShortcuts(doc):
     def strongReplacer(match):
         return E.strong(match.group(2))
 
+    codeRe = re.compile(r"(?<!`)(\\?)(`+)(?!\s)(.*?[^`])(?!\s)(\\?)(\2)(?!`)")
+
+    def codeReplacer(match):
+        # This condition represents an escaped backtick. Substitute the string
+        # without the escaping character.
+        if match.group(1) != "":
+            return match.expand("\\2\\3\\5")
+
+        # From the CommonMark specification (version 0.27):
+        #
+        #  > The contents of the code span are the characters between the two
+        #  > backtick strings, with leading and trailing spaces and line
+        #  > endings removed, and whitespace collapsed to single spaces.
+        import string
+        normalized = escapeHTML(match.group(3)).strip(string.whitespace)
+        normalized = re.sub("[" + string.whitespace + "]{2,}", " ", normalized)
+
+        return E.code(normalized)
+
     emRe = re.compile(r"(?<!\\)(\*)(?!\s)([^*]+)(?!\s)(?<!\\)\*")
 
     def emReplacer(match):
@@ -286,6 +305,7 @@ def transformAutolinkShortcuts(doc):
             config.processTextNodes(nodes, varRe, varReplacer)
         if "markdown" in doc.md.markupShorthands:
             config.processTextNodes(nodes, inlineLinkRe, inlineLinkReplacer)
+            config.processTextNodes(nodes, codeRe, codeReplacer)
             config.processTextNodes(nodes, strongRe, strongReplacer)
             config.processTextNodes(nodes, emRe, emReplacer)
             config.processTextNodes(nodes, escapedRe, escapedReplacer)

@@ -808,12 +808,12 @@ class MarkdownCodeSpans(func.Functor):
         for m in re.finditer(r"(\\`)|(`+)", text):
             if mode == "text":
                 if m.group(1):
-                    newText += text[indexSoFar:m.start()] + m.group(1)[1]
+                    newText += text[indexSoFar:m.end()]
                     indexSoFar = m.end()
                 elif m.group(2):
                     mode = "code"
                     newText += text[indexSoFar:m.start()]
-                    indexSoFar = m.end()
+                    indexSoFar = m.start()
                     escapeLen = len(m.group(2))
             elif mode == "code":
                 if m.group(1):
@@ -823,13 +823,12 @@ class MarkdownCodeSpans(func.Functor):
                         pass
                     else:
                         mode = "text"
-                        self.__codeSpanReplacements__.append(text[indexSoFar:m.start()])
+                        self.__codeSpanReplacements__.append(text[indexSoFar:m.end()])
                         newText += "\ue0ff"
                         indexSoFar = m.end()
-        if mode == "text":
-            newText += text[indexSoFar:]
-        elif mode == "code":
-            newText += "`"*escapeLen + text[indexSoFar:]
+
+        newText += text[indexSoFar:]
+
         self.__val__ = newText
 
     def map(self, fn):
@@ -843,12 +842,8 @@ class MarkdownCodeSpans(func.Functor):
             repls = self.__codeSpanReplacements__[::-1]
             def codeSpanReviver(_):
                 # Match object is the PUA character, which I can ignore.
-                # Instead, sub back the replacement in order,
-                # massaged per the Commonmark rules.
-                import string
-                t = escapeHTML(repls.pop()).strip(string.whitespace)
-                t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
-                return "<code data-opaque>" + t + "</code>"
+                # Instead, sub back the replacement in order.
+                return repls.pop()
             return re.sub("\ue0ff", codeSpanReviver, self.__val__)
         else:
             return self.__val__

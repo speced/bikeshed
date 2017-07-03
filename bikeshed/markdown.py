@@ -76,18 +76,6 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
         # We're either in a nesting raw element or not in a raw element at all,
         # so check if the line starts a new element.
-        match = re.match("\s*(`{3,}|~{3,})([^`]*)$", rawline)
-        if match:
-            rawStack.append({"type":"fenced", "tag":match.group(1), "nest":False})
-            infoString = match.group(2).strip()
-            if infoString:
-                # For now, I only care about lang
-                lang = infoString.split(" ")[0]
-                classAttr = " class='language-{0}'".format(escapeAttr(lang))
-            else:
-                classAttr = ""
-            tokens.append({'type':'raw', 'raw':'<xmp{0}>'.format(classAttr), 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
-            continue
         match = re.match(r"\s*<({0})[ >]".format(rawElements), rawline)
         if match:
             tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
@@ -101,6 +89,20 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
         if rawStack:
             tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
             continue
+
+        match = re.match("\s*(`{3,}|~{3,})([^`]*)$", rawline)
+        if match:
+            rawStack.append({"type":"fenced", "tag":match.group(1), "nest":False})
+            infoString = match.group(2).strip()
+            if infoString:
+                # For now, I only care about lang
+                lang = infoString.split(" ")[0]
+                classAttr = " class='language-{0}'".format(escapeAttr(lang))
+            else:
+                classAttr = ""
+            tokens.append({'type':'raw', 'raw':'<xmp{0}>'.format(classAttr), 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
+            continue
+
 
         line = rawline.strip()
         match = re.match("<!--line count correction (-?\d+)-->", line)
