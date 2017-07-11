@@ -410,6 +410,7 @@ def addPropertyIndex(doc):
             tempProp = prop.copy()
             tempProp['Name'] = name
             props.append(tempProp)
+    props.sort(key=lambda x:x["Name"])
     # Extract descdef info
     atRules = defaultdict(list)
     for table in findAll('table.descdef', doc):
@@ -428,6 +429,8 @@ def addPropertyIndex(doc):
             tempDesc = desc.copy()
             tempDesc['Name'] = name
             atRules[atRule].append(tempDesc)
+    for desc in atRules.values():
+        desc.sort(key=lambda x:x["Name"])
 
     def createRow(prop, linkType):
         return E.tr(
