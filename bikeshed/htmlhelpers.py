@@ -343,7 +343,7 @@ def childNodes(parentEl, clear=False, skipOddNodes=True):
     if isinstance(parentEl, list):
         return parentEl
     ret = []
-    if parentEl.text is not None:
+    if not emptyText(parentEl.text, wsAllowed=False):
         ret.append(parentEl.text)
         if clear:
             parentEl.text = None
@@ -352,7 +352,7 @@ def childNodes(parentEl, clear=False, skipOddNodes=True):
             pass
         else:
             ret.append(c)
-        if c.tail is not None:
+        if not emptyText(c.tail, wsAllowed=False):
             ret.append(c.tail)
             if clear:
                 c.tail = None
@@ -554,11 +554,14 @@ def unfixTypography(text):
     return text
 
 
-def emptyText(text):
+def emptyText(text, wsAllowed=True):
     # Because LXML represents a complete lack of text as None,
     # you can't do something like `el.text.strip() == ""` to test for emptiness.
+    # wsAllowed controls whether whitespace-only strings count as empty or not
     if text is None:
         return True
+    if not wsAllowed:
+        return text == ""
     return text.strip() == ""
 
 

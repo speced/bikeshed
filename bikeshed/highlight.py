@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import collections
+import itertools
 import re
 from . import config
 from . import lexers
@@ -365,6 +366,7 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
                 if "\n" in node:
                     pre, _, post = node.partition("\n")
                     appendChild(lineWrapper, pre)
+                    appendChild(el, E.span({"class": "line-no"}))
                     appendChild(el, lineWrapper)
                     lineWrapper = E.div({"class": "line"})
                     node = post
@@ -372,32 +374,34 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
                     appendChild(lineWrapper, node)
                     break
     if len(lineWrapper):
+        appendChild(el, E.span({"class": "line-no"}))
         appendChild(el, lineWrapper)
     # Number the lines
     lineNumber = start
-    for node in childNodes(el):
-        if isElement(node):
-            if isEmpty(node):
-                # Blank line; since I removed the \n from the source
-                # and am relying on <div> for lines now,
-                # this'll collapse to zero-height and mess things up.
-                # Add a single space to keep it one line tall.
-                node.text = " "
+    for lineNo, node in grouper(childNodes(el), 2):
+        if isEmpty(node):
+            # Blank line; since I removed the \n from the source
+            # and am relying on <div> for lines now,
+            # this'll collapse to zero-height and mess things up.
+            # Add a single space to keep it one line tall.
+            node.text = " "
+        if numbers or lineNumber in highlights:
+            lineNo.set("line", unicode(lineNumber))
+        if lineNumber in highlights:
+            addClass(node, "highlight-line")
+            addClass(lineNo, "highlight-line")
+        internalNewlines = countInternalNewlines(node)
+        if internalNewlines:
+            for i in range(1, internalNewlines+1):
+                if (lineNumber + i) in highlights:
+                    addClass(lineNo, "highlight-line")
+                    addClass(node, "highlight-line")
+                    lineNo.set("line", unicode(lineNumber))
+            lineNumber += internalNewlines
             if numbers:
-                node.set("line", unicode(lineNumber))
-            if lineNumber in highlights:
-                node.set("line", unicode(lineNumber))
-                addClass(node, "highlight-line")
-            internalNewlines = countInternalNewlines(node)
-            if internalNewlines:
-                for i in range(1, internalNewlines+1):
-                    if (lineNumber + i) in highlights:
-                        addClass(node, "highlight-line")
-                        node.set("line", unicode(lineNumber))
-                lineNumber += internalNewlines
-                if numbers:
-                    node.set("line-end", unicode(lineNumber))
-            lineNumber += 1
+                lineNo.set("line-end", unicode(lineNumber))
+        lineNumber += 1
+    addClass(el, "line-numbered")
     return el
 
 def countInternalNewlines(el):
@@ -491,50 +495,61 @@ pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em
 
 def getLineNumberStyles():
     return '''
+.line-numbered {
+    display: grid !important;
+    grid-template-columns: min-content 1fr;
+    grid-auto-flow: row;
+}
+.line-no {
+    grid-column: 1;
+    color: gray;
+}
 .line {
-    padding-left: 1.4em;
-    position: relative;
+    grid-column: 2;
 }
 .line:hover {
     background: rgba(0,0,0,.05);
 }
-.line[line]::before {
+.line-no[line]::before {
+    padding: 0 .5em 0 .1em;
     content: attr(line);
-    position: absolute;
-    top: 0;
-    left: 1px;
-    color: gray;
 }
-.line[line-end]::after {
+.line-no[line-end]::after {
+    padding: 0 .5em 0 .1em;
     content: attr(line-end);
-    position: absolute;
-    bottom: 0;
-    left: 1px;
-    color: gray;
 }
 '''
 
 def getLineHighlightingStyles():
     return '''
+.line-numbered {
+    display: grid;
+    grid-template-columns: min-content 1fr;
+    grid-auto-flow: rows;
+}
+.line-no {
+    grid-column: 1;
+    color: gray;
+}
 .line {
-    padding-left: 1.4em;
-    position: relative;
+    grid-column: 2;
 }
 .line.highlight-line {
     background: rgba(0,0,0,.05);
 }
-.line.highlight-line[line]::before {
+.line-no.highlight-line[line]::before {
+    padding: 0 .5em 0 .1em;
     content: attr(line);
-    position: absolute;
-    top: 0;
-    left: 1px;
-    color: gray;
 }
-.line.highlight-line[line-end]::after {
+.line-no.highlight-line[line-end]::after {
+    padding: 0 .5em 0 .1em;
     content: attr(line-end);
-    position: absolute;
-    bottom: 0;
-    left: 1px;
-    color: gray;
 }
 '''
+
+
+def grouper(iterable, n, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(fillvalue=fillvalue, *args)
