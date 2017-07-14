@@ -745,7 +745,14 @@ def fromJson(data, doc):
             die("Error loading default metadata:\n{0}", str(e))
         return md
     for key,val in defaults.items():
-        md.addData(key, val)
+        if isinstance(val, basestring):
+            md.addData(key, val)
+        elif isinstance(val, list):
+            for indivVal in val:
+                md.addData(key, indivVal)
+        else:
+            die("Default metadata values must be strings or arrays of strings. '{0}' is something else.", key)
+            return md
     return md
 
 
