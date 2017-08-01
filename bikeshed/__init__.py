@@ -2045,7 +2045,7 @@ def cleanupHTML(doc):
 
         # Convert the technically-invalid <nobr> element to an appropriate <span>
         if el.tag == "nobr":
-            el.tag == "span"
+            el.tag = "span"
             el.set("style", el.get('style', '') + ";white-space:nowrap")
 
         # And convert <xmp> to <pre>
