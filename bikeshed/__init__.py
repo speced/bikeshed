@@ -1494,7 +1494,7 @@ def processAutolinks(doc):
         if ref:
             el.set('href', ref.url)
             el.tag = "a"
-            decorateAutolink(doc, el, linkType=linkType, linkText=linkText)
+            decorateAutolink(doc, el, linkType=linkType, linkText=linkText, ref=ref)
         else:
             if linkType == "maybe":
                 el.tag = "css"
@@ -1502,12 +1502,21 @@ def processAutolinks(doc):
                     del el.attrib["data-link-type"]
                 if el.get("data-lt"):
                     del el.attrib["data-lt"]
+    dedupIDs(doc)
 
 
-def decorateAutolink(doc, el, linkType, linkText):
-    # Add additional effects to some autolinks.
+def decorateAutolink(doc, el, linkType, linkText, ref):
+    # Add additional effects to autolinks.
+
+    # Put an ID on every reference, so I can link to references to a term.
+    if el.get('id') is None:
+        _,_,id = ref.url.partition("#")
+        if id:
+            el.set('id', "ref-for-{0}".format(id))
+            el.set('data-silently-dedup', '')
+
+    # Get all the values that the type expands to, add it as a title.
     if linkType == "type":
-        # Get all the values that the type expands to, add it as a title.
         titleText = None
         if linkText in doc.typeExpansions:
             titleText = doc.typeExpansions[linkText]
@@ -2163,6 +2172,7 @@ def cleanupHTML(doc):
         removeAttr(el, 'data-no-self-link')
         removeAttr(el, "line-number")
         removeAttr(el, "caniuse")
+        removeAttr(el, "data-silently-dedup")
     for el in strayHeadEls:
         head.append(el)
     for el in styleScoped:
