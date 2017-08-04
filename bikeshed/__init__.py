@@ -1099,6 +1099,9 @@ def fillAttributeInfoSpans(doc):
             continue
         if dfn.get("data-dfn-for"):
             spanFor = dfn.get("data-dfn-for") + "/" + spanFor
+        # If there's whitespace after the dfn, clear it out
+        if emptyText(dfn.tail, wsAllowed=True):
+            dfn.tail = None
         insertAfter(dfn,
                     ", ",
                     E.span({attrName:"", "for":spanFor}))
