@@ -64,6 +64,44 @@ def escapeCSSIdent(val):
     return ident
 
 
+def escapeUrlFrag(val):
+    result = ""
+    for char in val:
+        if validUrlUnit(char):
+            result += char
+        else:
+            bytes = map(ord, char.encode("utf-8"))
+            for b in bytes:
+                result += "%{:0>2x}".format(b)
+    return result
+
+
+def validUrlUnit(char):
+    c = ord(char)
+    if c < 0xa0:
+        # ASCII range
+        if (
+            c == 0x21 or
+            c == 0x24 or
+            0x26 <= c <= 0x29 or
+            0x2a <= c <= 0x3b or
+            c == 0x3d or
+            0x3f <= c <= 0x5a or
+            c == 0x5f or
+            0x61 <= c <= 0x7a or
+            c == 0x7e):
+            return True
+        return False
+    else:
+        if (0xd800 <= c <= 0xdfff or
+            0xfdd0 <= c <= 0xfdef):
+            return False
+        if (c % 0xffff) in [0xfffe, 0xffff]:
+            # Last two bytes are FFFE or FFFF
+            return False
+        return True
+
+
 def textContent(el, exact=False):
     # If exact is False, then any elements with data-deco attribute
     # get ignored in the textContent.

@@ -1564,7 +1564,7 @@ def processIssuesAndExamples(doc):
 
 def addSelfLinks(doc):
     def makeSelfLink(el):
-        return E.a({"href": "#" + urllib.quote(el.get('id', '')), "class":"self-link"})
+        return E.a({"href": "#" + escapeUrlFrag(el.get('id', '')), "class":"self-link"})
 
     dfnElements = findAll(config.dfnElementsSelector, doc)
 
@@ -1625,31 +1625,28 @@ def addDfnPanels(doc, dfns):
         if not refs:
             # Just insert a self-link instead
             appendChild(dfn,
-                        E.a({"href": "#" + urllib.quote(id), "class":"self-link"}))
+                        E.a({"href": "#" + escapeUrlFrag(id), "class":"self-link"}))
             continue
         addClass(dfn, "dfn-paneled")
         atLeastOnePanel = True
         panel = E.aside({"class": "dfn-panel", "data-for": id},
-                        E.b(
-            E.a({"href":"#" + urllib.quote(id)}, "#" + id)),
-            E.b("Referenced in:"))
-        counter = 0
+                        E.b(E.a({"href":"#" + escapeUrlFrag(id)}, "#" + id)),
+                        E.b("Referenced in:"))
         ul = appendChild(panel, E.ul())
         for text,els in refs.items():
             li = appendChild(ul, E.li())
             for i,el in enumerate(els):
-                counter += 1
                 refID = el.get("id")
                 if refID is None:
-                    refID = "ref-for-{0}-{1}".format(id, counter)
+                    refID = "ref-for-{0}".format(id, counter)
                     el.set("id", safeID(doc, refID))
                 if i == 0:
                     appendChild(li,
-                                E.a({"href": "#" + urllib.quote(refID)}, text))
+                                E.a({"href": "#" + escapeUrlFrag(refID)}, text))
                 else:
                     appendChild(li,
                                 " ",
-                                E.a({"href": "#" + urllib.quote(refID)}, "(" + str(i + 1) + ")"))
+                                E.a({"href": "#" + escapeUrlFrag(refID)}, "(" + str(i + 1) + ")"))
         appendChild(body, panel)
     if atLeastOnePanel:
         doc.extraScripts['script-dfn-panel'] = '''
