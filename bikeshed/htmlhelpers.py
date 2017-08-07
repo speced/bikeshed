@@ -683,26 +683,51 @@ def dedupIDs(doc):
     ids = defaultdict(list)
     for el in findAll("[id]", doc):
         ids[el.get('id')].append(el)
-    for dupe,els in ids.items():
+    for dupeId,els in ids.items():
         if len(els) < 2:
             # Only one instance, so nothing to do.
             continue
         warnAboutDupes = True
-        if re.match(r"issue-[0-9a-fA-F]{8}$", dupe):
+        if re.match(r"issue-[0-9a-fA-F]{8}$", dupeId):
             # Don't warn about issues, it's okay if they have the same ID because they're identical text.
             warnAboutDupes = False
-        ints = iter.imap(str, iter.count(0))
+        ints = iter.count(1)
         for el in els[1:]:
             # If I registered an alternate ID, try to use that.
             if el.get('data-alternate-id'):
-                el.set("id", safeID(doc, el.get("data-alternate-id")))
-                continue
+                altId = el.get('data-alternate-id')
+                if altId not in ids:
+                    el.set("id", safeID(doc, el.get("data-alternate-id")))
+                    ids[altId].append(el)
+                    continue
             if el.get("data-silently-dedup") is not None:
                 warnAboutDupes = False
             # Try to de-dup the id by appending an integer after it.
             if warnAboutDupes:
-                warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupe, el=el)
-            el.set("id", "{0}-{1}".format(dupe, next(ints)))
+                warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupeId, el=el)
+            for x in ints:
+                altId = "{0}{1}".format(dupeId, circledDigits(x))
+                if altId not in ids:
+                    el.set("id", safeID(doc, altId))
+                    ids[altId].append(el)
+                    break
+
+
+def circledDigits(num):
+    '''
+    Converts a base-10 number into a string using unicode circled digits.
+    That is, 123 becomes u"①②③"
+    '''
+    num = int(num)
+    assert(num >= 0)
+    digits = ["⓪","①","②","③","④","⑤","⑥","⑦","⑧","⑨"]
+    result = ""
+    if num <= 0:
+        return digits[0]
+    while(num > 0):
+        result = digits[num%10] + result
+        num = num // 10
+    return result
 
 
 def createElement(tag, attrs={}, *children):
