@@ -702,6 +702,8 @@ def dedupIDs(doc):
                     continue
             if el.get("data-silently-dedup") is not None:
                 warnAboutDupes = False
+            if dupeId.startswith("ref-for-"):
+                warnAboutDupes = False
             # Try to de-dup the id by appending an integer after it.
             if warnAboutDupes:
                 warn("Multiple elements have the same ID '{0}'.\nDeduping, but this ID may not be stable across revisions.", dupeId, el=el)

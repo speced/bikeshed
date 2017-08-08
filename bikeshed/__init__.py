@@ -1638,15 +1638,15 @@ def addDfnPanels(doc, dfns):
             for i,el in enumerate(els):
                 refID = el.get("id")
                 if refID is None:
-                    refID = "ref-for-{0}".format(id, counter)
+                    refID = "ref-for-{0}".format(id)
                     el.set("id", safeID(doc, refID))
                 if i == 0:
                     appendChild(li,
-                                E.a({"href": "#" + escapeUrlFrag(refID)}, text))
+                                E.a({"href": "#" + escapeUrlFrag(refID), "data-silently-dedup": ""}, text))
                 else:
                     appendChild(li,
                                 " ",
-                                E.a({"href": "#" + escapeUrlFrag(refID)}, "(" + str(i + 1) + ")"))
+                                E.a({"href": "#" + escapeUrlFrag(refID), "data-silently-dedup": ""}, "(" + str(i + 1) + ")"))
         appendChild(body, panel)
     if atLeastOnePanel:
         doc.extraScripts['script-dfn-panel'] = '''
