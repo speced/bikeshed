@@ -264,45 +264,12 @@ def updateCrossRefs():
 def updateBiblio():
     say("Downloading biblio data...")
     biblios = defaultdict(list)
-    try:
-        with closing(urllib2.urlopen("https://api.specref.org/bibrefs")) as fh:
-            biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
-    except urllib2.URLError:
-        # SpecRef uses SNI, which old Pythons (pre-2.7.10) don't understand.
-        # First try the older herokuapp.com URL.
-        try:
-            with closing(urllib2.urlopen("https://specref.herokuapp.com/bibrefs")) as fh:
-                biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
-        except:
-            # Try the CSSWG proxy.
-            try:
-                with closing(urllib2.urlopen("https://api.csswg.org/bibrefs")) as fh:
-                    biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
-            except:
-                warn("Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?")
-                raise
-                return
-    except Exception, e:
-        die("Couldn't download the SpecRef biblio data.\n{0}", e)
-    try:
-        with closing(urllib2.urlopen("https://wg21.link/specref.json")) as fh:
-            biblio.processSpecrefBiblioFile(unicode(fh.read(), encoding="utf-8"), biblios, order=3)
-    except Exception, e:
-        die("Couldn't download the WG21 biblio data.\n{0}", e)
-    try:
-        with closing(urllib2.urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
-            lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
-            biblio.processReferBiblioFile(lines, biblios, order=4)
-    except Exception, e:
-        die("Couldn't download the CSSWG biblio data.\n{0}", e)
+    biblio.processSpecrefBiblioFile(getSpecrefData(), biblios, order=3)
+    biblio.processSpecrefBiblioFile(getWG21Data(), biblios, order=3)
+    biblio.processReferBiblioFile(getCSSWGData(), biblios, order=4)
     if not config.dryRun:
-        # Group the biblios by the first two letters of their keys
-        groupedBiblios = DefaultOrderedDict(DefaultOrderedDict)
-        allNames = []
-        for k,v in sorted(biblios.items(), key=lambda x:x[0].lower()):
-            allNames.append(k)
-            group = k[0:2]
-            groupedBiblios[group][k] = v
+        groupedBiblios, allNames = groupBiblios(biblios)
+        # Save each group to a file
         for group, biblios in groupedBiblios.items():
             try:
                 with io.open(config.scriptPath + "/spec-data/biblio/biblio-{0}.data".format(group), 'w', encoding="utf-8") as fh:
@@ -310,6 +277,7 @@ def updateBiblio():
             except Exception, e:
                 die("Couldn't save biblio database to disk.\n{0}", e)
                 return
+        # Save the list of all names to a file
         try:
             with io.open(config.scriptPath + "/spec-data/biblio-keys.json", 'w', encoding="utf-8") as fh:
                 fh.write(unicode(json.dumps(allNames, indent=0, ensure_ascii=False, sort_keys=True)))
@@ -317,6 +285,56 @@ def updateBiblio():
             die("Couldn't save biblio database to disk.\n{0}", e)
             return
     say("Success!")
+
+
+def getSpecrefData():
+    try:
+        with closing(urllib2.urlopen("https://api.specref.org/bibrefs")) as fh:
+            return unicode(fh.read(), encoding="utf-8")
+    except urllib2.URLError:
+        # SpecRef uses SNI, which old Pythons (pre-2.7.10) don't understand.
+        # First try the older herokuapp.com URL.
+        try:
+            with closing(urllib2.urlopen("https://specref.herokuapp.com/bibrefs")) as fh:
+                return unicode(fh.read(), encoding="utf-8")
+        except:
+            # Try the CSSWG proxy.
+            try:
+                with closing(urllib2.urlopen("https://api.csswg.org/bibrefs")) as fh:
+                    return unicode(fh.read(), encoding="utf-8")
+            except:
+                warn("Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?")
+                raise
+                return "{}"
+    except Exception, e:
+        die("Couldn't download the SpecRef biblio data.\n{0}", e)
+        return "{}"
+
+def getWG21Data():
+    try:
+        with closing(urllib2.urlopen("https://wg21.link/specref.json")) as fh:
+            return unicode(fh.read(), encoding="utf-8")
+    except Exception, e:
+        die("Couldn't download the WG21 biblio data.\n{0}", e)
+        return "{}"
+
+def getCSSWGData():
+    try:
+        with closing(urllib2.urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
+            return [unicode(line, encoding="utf-8") for line in fh.readlines()]
+    except Exception, e:
+        die("Couldn't download the CSSWG biblio data.\n{0}", e)
+        return []
+
+def groupBiblios(biblios):
+    # Group the biblios by the first two letters of their keys
+    groupedBiblios = DefaultOrderedDict(DefaultOrderedDict)
+    allNames = []
+    for k,v in sorted(biblios.items(), key=lambda x:x[0].lower()):
+        allNames.append(k)
+        group = k[0:2]
+        groupedBiblios[group][k] = v
+    return groupedBiblios, allNames
 
 
 def updateCanIUse():
