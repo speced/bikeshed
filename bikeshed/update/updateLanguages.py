@@ -12,7 +12,7 @@ def update():
     try:
         say("Downloading languages...")
         with closing(urllib2.urlopen("https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/languages.json")) as fh:
-            lines = [unicode(line, encoding="utf-8") for line in fh.readlines()]
+            data = unicode(fh.read(), encoding="utf-8")
     except Exception, e:
         die("Couldn't download languages data.\n{0}", e)
         return
@@ -20,7 +20,7 @@ def update():
     if not config.dryRun:
         try:
             with io.open(config.scriptPath + "/spec-data/languages.json", 'w', encoding="utf-8") as f:
-                f.write(''.join(lines))
+                f.write(data)
         except Exception, e:
             die("Couldn't save languages database to disk.\n{0}", e)
             return
