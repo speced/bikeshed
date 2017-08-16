@@ -11,8 +11,6 @@ from . import updateTestSuites
 from . import updateLanguages
 from .. import config
 
-__all__ = ["updateCrossRefs", "updateBiblio", "updateCanIUse", "updateLinkDefaults", "updateTestSuites", "updateLanguages"]
-
 
 def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False):
     # If all are False, update everything
