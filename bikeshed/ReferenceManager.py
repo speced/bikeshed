@@ -313,6 +313,24 @@ class ReferenceManager(object):
             self.biblioKeys.add(k)
             self.biblios[k].extend(vs)
 
+        # Hardcode RFC2119, used in most spec's boilerplates,
+        # to avoid having to parse the entire biblio-rf.data file for this single reference.
+        self.biblioKeys.add("rfc2119")
+        self.biblios["rfc2119"].append({
+            "linkText": "rfc2119\n",
+            "date": "March 1997\n",
+            "status": "Best Current Practice\n",
+            "title": "Key words for use in RFCs to Indicate Requirement Levels\n",
+            "snapshot_url": "https://tools.ietf.org/html/rfc2119\n",
+            "current_url": "\n",
+            "obsoletedBy": "\n",
+            "other": "\n",
+            "etAl": False,
+            "order": 3,
+            "biblioFormat": "dict",
+            "authors": ["S. Bradner\n"]
+            })
+
     def setSpecData(self, md):
         if md.defaultRefStatus:
             self.defaultStatus = md.defaultRefStatus
