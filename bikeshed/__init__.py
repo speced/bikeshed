@@ -146,6 +146,8 @@ def main():
                                help="Runs the specified code and prints it.")
     debugCommands.add_argument("--print-json", dest="jsonCode",
                                help="Runs the specified code and prints it as formatted JSON.")
+    debugCommands.add_argument("--refresh-data", dest="refreshData", action="store_true",
+                               help="Clobbers the readonly data files with the mutable ones.")
 
     refParser = subparsers.add_parser('refs', help="Search Bikeshed's ref database.")
     refParser.add_argument("infile", nargs="?",
@@ -270,6 +272,9 @@ def main():
             for ref in refs:
                 ref['level'] = str(ref['level'])
             p(config.printjson(refs))
+        elif options.refreshData:
+            update.updateReadonlyDataFiles()
+            warn("Don't forget to bump the version number!")
     elif options.subparserName == "refs":
         config.force = True
         config.quiet = 10

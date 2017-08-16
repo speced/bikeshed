@@ -30,6 +30,11 @@ def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testS
 
 
 def fixupDataFiles():
+    ''' 
+    Checks the readonly/ version is more recent than your current mutable data files.
+    This happens if I changed the datafile format and shipped updated files as a result;
+    using the legacy files with the new code is quite bad!
+    '''
     import os
     localPath = os.path.join(config.scriptPath, "spec-data")
     remotePath = os.path.join(config.scriptPath, "spec-data", "readonly")
@@ -50,20 +55,42 @@ def fixupDataFiles():
     # If versions don't match, either the remote versions have been updated
     # (and we should switch you to them, because formats may have changed),
     # or you're using a historical version of Bikeshed (ditto).
-    def copyanything(src, dst):
-        import shutil
-        import errno
-        try:
-            shutil.rmtree(dst, ignore_errors=True)
-            shutil.copytree(src, dst)
-        except OSError as exc:
-            if exc.errno in [errno.ENOTDIR, errno.EINVAL]:
-                shutil.copy(src, dst)
-            else:
-                raise
     try:
         for filename in os.listdir(remotePath):
             copyanything(os.path.join(remotePath, filename), os.path.join(localPath, filename))
     except Exception, err:
         warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
         return
+
+
+def updateReadonlyDataFiles():
+    '''
+    Like fixupDataFiles(), but in the opposite direction --
+    copies all my current mutable data files into the readonly directory.
+    This is a debugging tool to help me quickly update the built-in data files,
+    and will not be called as part of normal operation.
+    '''
+    import os
+    localPath = os.path.join(config.scriptPath, "spec-data")
+    remotePath = os.path.join(config.scriptPath, "spec-data", "readonly")
+    try:
+        for filename in os.listdir(localPath):
+            copyanything(os.path.join(localPath, filename), os.path.join(remotePath, filename))
+    except Exception, err:
+        warn("Error copying over the datafiles:\n{0}", err)
+        return
+
+
+
+
+def copyanything(src, dst):
+    import shutil
+    import errno
+    try:
+        shutil.rmtree(dst, ignore_errors=True)
+        shutil.copytree(src, dst)
+    except OSError as exc:
+        if exc.errno in [errno.ENOTDIR, errno.EINVAL]:
+            shutil.copy(src, dst)
+        else:
+            raise
