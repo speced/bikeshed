@@ -38,12 +38,12 @@ def update():
         specs[spec['vshortname']] = spec
         specHeadings = headings[spec['vshortname']]
 
-        def setStatus(status):
-            def temp(obj):
-                obj['status'] = status
-                return obj
-            return temp
-        rawAnchorData = map(setStatus('snapshot'), linearizeAnchorTree(rawSpec.get('anchors', []))) + map(setStatus('current'), linearizeAnchorTree(rawSpec.get('draft_anchors',[])))
+        def setStatus(obj, status):
+            obj['status'] = status
+            return obj
+        rawAnchorData = (
+            [setStatus(x, "snapshot") for x in linearizeAnchorTree(rawSpec.get('anchors', []))] +
+            [setStatus(x, "current") for x in linearizeAnchorTree(rawSpec.get('draft_anchors', []))])
         for rawAnchor in rawAnchorData:
             rawAnchor = fixupAnchor(rawAnchor)
             linkingTexts = rawAnchor['linking_text']
