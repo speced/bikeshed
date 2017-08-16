@@ -261,13 +261,27 @@ class ReferenceManager(object):
         self.foreignRefs = RefSource("foreign", specs=self.specs, ignored=self.ignoredSpecs, replaced=self.replacedSpecs)
 
     def initializeRefs(self, doc=None):
-        # Load up the xref data
-        self.specs.update(json.loads(config.retrieveDataFile("specs.json", quiet=True, str=True)))
-        self.headings.update(json.loads(config.retrieveDataFile("headings.json", quiet=True, str=True)))
-        with config.retrieveDataFile("anchors.data", quiet=True) as lines:
-            self.foreignRefs.refs = decodeAnchors(lines)
-        self.foreignRefs.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
-        self.foreignRefs.fors.update(json.loads(config.retrieveDataFile("fors.json", quiet=True, str=True)))
+        '''
+        Load up the xref data
+        This is oddly split up into sub-functions to make it easier to track performance.
+        '''
+
+        def initSpecs():
+            self.specs.update(json.loads(config.retrieveDataFile("specs.json", quiet=True, str=True)))
+        initSpecs()
+        def initHeadings():
+            self.headings.update(json.loads(config.retrieveDataFile("headings.json", quiet=True, str=True)))
+        initHeadings()
+        def initAnchors():
+            with config.retrieveDataFile("anchors.data", quiet=True) as lines:
+                self.foreignRefs.refs = decodeAnchors(lines)
+        initAnchors()
+        def initMethods():
+            self.foreignRefs.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
+        initMethods()
+        def initFors():
+            self.foreignRefs.fors.update(json.loads(config.retrieveDataFile("fors.json", quiet=True, str=True)))
+        initFors()
         if doc is not None:
             # Get local anchor data
             try:
