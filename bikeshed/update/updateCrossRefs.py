@@ -30,53 +30,11 @@ def update():
         die("Couldn't download anchor data.  Error was:\n{0}", str(e))
         return
 
-    def linearizeAnchorTree(multiTree, list=None):
-        if list is None:
-            list = []
-        # Call with multiTree being a list of trees
-        for item in multiTree:
-            if item['type'] in config.dfnTypes.union(["dfn", "heading"]):
-                list.append(item)
-            if item.get('children'):
-                linearizeAnchorTree(item['children'], list)
-                del item['children']
-        return list
-
     specs = dict()
     anchors = defaultdict(list)
     headings = defaultdict(dict)
     for rawSpec in rawSpecData.values():
-        spec = {
-            'vshortname': rawSpec['name'],
-            'shortname': rawSpec.get('short_name'),
-            'snapshot_url': rawSpec.get('base_uri'),
-            'current_url': rawSpec.get('draft_uri'),
-            'title': rawSpec.get('title'),
-            'description': rawSpec.get('description'),
-            'work_status': rawSpec.get('work_status'),
-            'working_group': rawSpec.get('working_group'),
-            'domain': rawSpec.get('domain'),
-            'status': rawSpec.get('status'),
-            'abstract': rawSpec.get('abstract')
-        }
-        if spec['shortname'] is not None and spec['vshortname'].startswith(spec['shortname']):
-            # S = "foo", V = "foo-3"
-            # Strip the prefix
-            level = spec['vshortname'][len(spec['shortname']):]
-            if level.startswith("-"):
-                level = level[1:]
-            if level.isdigit():
-                spec['level'] = int(level)
-            else:
-                spec['level'] = 1
-        elif spec['shortname'] is None and re.match(r"(.*)-(\d+)", spec['vshortname']):
-            # S = None, V = "foo-3"
-            match = re.match(r"(.*)-(\d+)", spec['vshortname'])
-            spec['shortname'] = match.group(1)
-            spec['level'] = int(match.group(2))
-        else:
-            spec['shortname'] = spec['vshortname']
-            spec['level'] = 1
+        spec = genSpec(rawSpec)
         specs[spec['vshortname']] = spec
         specHeadings = headings[spec['vshortname']]
 
@@ -93,14 +51,6 @@ def update():
                 continue
             if len(linkingTexts) == 1 and linkingTexts[0].strip() == "":
                 continue
-            # If any smart quotes crept in, replace them with ASCII.
-            for i,t in enumerate(linkingTexts):
-                if "’" in t or "‘" in t:
-                    t = re.sub(r"‘|’", "'", t)
-                    linkingTexts[i] = t
-                if "“" in t or "”" in t:
-                    t = re.sub(r"“|”", '"', t)
-                    linkingTexts[i] = t
             if rawAnchor['type'] == "heading":
                 uri = rawAnchor['uri']
                 if uri.startswith("??"):
@@ -174,39 +124,8 @@ def update():
                 specHeadings[k] = specHeadings[v[0]]
                 del specHeadings[v[0]]
 
-    # Compile a db of {argless methods => {argfull method => {args, fors, url, shortname}}
-    methods = defaultdict(dict)
-    for key, anchors_ in anchors.items():
-        # Extract the name and arguments
-        match = re.match(r"([^(]+)\((.*)\)", key)
-        if not match:
-            continue
-        methodName, argstring = match.groups()
-        arglessMethod = methodName + "()"
-        args = [x.strip() for x in argstring.split(",")] if argstring else []
-        for anchor in anchors_:
-            if anchor['type'] not in config.idlMethodTypes:
-                continue
-            if key not in methods[arglessMethod]:
-                methods[arglessMethod][key] = {"args":args, "for": set(), "shortname":anchor['shortname']}
-            methods[arglessMethod][key]["for"].update(anchor["for"])
-    # Translate the "for" set back to a list for JSONing
-    for signatures in methods.values():
-        for signature in signatures.values():
-            signature["for"] = list(signature["for"])
-
-    # Compile a db of {for value => dict terms that use that for value}
-    fors = defaultdict(set)
-    for key, anchors_ in anchors.items():
-        for anchor in anchors_:
-            for for_ in anchor["for"]:
-                if for_ == "":
-                    continue
-                fors[for_].add(key)
-            if not anchor["for"]:
-                fors["/"].add(key)
-    for key, val in fors.items():
-        fors[key] = list(val)
+    methods = extractMethodData(anchors)
+    fors = extractForsData(anchors)
 
     if not config.dryRun:
         try:
@@ -243,10 +162,70 @@ def update():
     say("Success!")
 
 
+def linearizeAnchorTree(multiTree, list=None):
+    if list is None:
+        list = []
+    # Call with multiTree being a list of trees
+    for item in multiTree:
+        if item['type'] in config.dfnTypes.union(["dfn", "heading"]):
+            list.append(item)
+        if item.get('children'):
+            linearizeAnchorTree(item['children'], list)
+            del item['children']
+    return list
+
+
+def genSpec(rawSpec):
+    spec = {
+        'vshortname': rawSpec['name'],
+        'shortname': rawSpec.get('short_name'),
+        'snapshot_url': rawSpec.get('base_uri'),
+        'current_url': rawSpec.get('draft_uri'),
+        'title': rawSpec.get('title'),
+        'description': rawSpec.get('description'),
+        'work_status': rawSpec.get('work_status'),
+        'working_group': rawSpec.get('working_group'),
+        'domain': rawSpec.get('domain'),
+        'status': rawSpec.get('status'),
+        'abstract': rawSpec.get('abstract')
+    }
+    if spec['shortname'] is not None and spec['vshortname'].startswith(spec['shortname']):
+        # S = "foo", V = "foo-3"
+        # Strip the prefix
+        level = spec['vshortname'][len(spec['shortname']):]
+        if level.startswith("-"):
+            level = level[1:]
+        if level.isdigit():
+            spec['level'] = int(level)
+        else:
+            spec['level'] = 1
+    elif spec['shortname'] is None and re.match(r"(.*)-(\d+)", spec['vshortname']):
+        # S = None, V = "foo-3"
+        match = re.match(r"(.*)-(\d+)", spec['vshortname'])
+        spec['shortname'] = match.group(1)
+        spec['level'] = int(match.group(2))
+    else:
+        spec['shortname'] = spec['vshortname']
+        spec['level'] = 1
+    return spec
+
+
 def fixupAnchor(anchor):
     # Miscellaneous fixes
     if anchor.get('title', None) == "'@import'":
         anchor['title'] = "@import"
+    # If any smart quotes crept in, replace them with ASCII.
+    linkingTexts = anchor.get('linking_text', [anchor.get('title')])
+    for i,t in enumerate(linkingTexts):
+        if t is None:
+            continue
+        if "’" in t or "‘" in t:
+            t = re.sub(r"‘|’", "'", t)
+            linkingTexts[i] = t
+        if "“" in t or "”" in t:
+            t = re.sub(r"“|”", '"', t)
+            linkingTexts[i] = t
+    anchor['linking_text'] = linkingTexts
     for k,v in anchor.items():
         # Normalize whitespace
         if isinstance(v, basestring):
@@ -256,6 +235,48 @@ def fixupAnchor(anchor):
                 if isinstance(v1, basestring):
                     anchor[k][k1] = re.sub(r"\s+", " ", v1.strip())
     return anchor
+
+
+def extractMethodData(anchors):
+    '''Compile a db of {argless methods => {argfull method => {args, fors, url, shortname}}'''
+
+    methods = defaultdict(dict)
+    for key, anchors_ in anchors.items():
+        # Extract the name and arguments
+        match = re.match(r"([^(]+)\((.*)\)", key)
+        if not match:
+            continue
+        methodName, argstring = match.groups()
+        arglessMethod = methodName + "()"
+        args = [x.strip() for x in argstring.split(",")] if argstring else []
+        for anchor in anchors_:
+            if anchor['type'] not in config.idlMethodTypes:
+                continue
+            if key not in methods[arglessMethod]:
+                methods[arglessMethod][key] = {"args":args, "for": set(), "shortname":anchor['shortname']}
+            methods[arglessMethod][key]["for"].update(anchor["for"])
+    # Translate the "for" set back to a list for JSONing
+    for signatures in methods.values():
+        for signature in signatures.values():
+            signature["for"] = list(signature["for"])
+    return methods
+
+
+def extractForsData(anchors):
+    '''Compile a db of {for value => dict terms that use that for value}'''
+
+    fors = defaultdict(set)
+    for key, anchors_ in anchors.items():
+        for anchor in anchors_:
+            for for_ in anchor["for"]:
+                if for_ == "":
+                    continue
+                fors[for_].add(key)
+            if not anchor["for"]:
+                fors["/"].add(key)
+    for key, val in fors.items():
+        fors[key] = list(val)
+    return fors
 
 
 def writeAnchorsFile(fh, anchors):
