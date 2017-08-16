@@ -46,83 +46,19 @@ def update():
         rawAnchorData = map(setStatus('snapshot'), linearizeAnchorTree(rawSpec.get('anchors', []))) + map(setStatus('current'), linearizeAnchorTree(rawSpec.get('draft_anchors',[])))
         for rawAnchor in rawAnchorData:
             rawAnchor = fixupAnchor(rawAnchor)
-            linkingTexts = rawAnchor.get('linking_text', [rawAnchor.get('title')])
+            linkingTexts = rawAnchor['linking_text']
             if linkingTexts[0] is None:
+                # Happens if it had no linking text at all originally
                 continue
             if len(linkingTexts) == 1 and linkingTexts[0].strip() == "":
+                # Happens if it was marked with an empty lt and Shepherd still picked it up
                 continue
             if rawAnchor['type'] == "heading":
-                uri = rawAnchor['uri']
-                if uri.startswith("??"):
-                    # css3-tables has this a bunch, for some strange reason
-                    uri = uri[2:]
-                if uri[0] == "#":
-                    # Either single-page spec, or link on the top page of a multi-page spec
-                    heading = {
-                        'url': spec["{0}_url".format(rawAnchor['status'])] + uri,
-                        'number': rawAnchor['name'] if re.match(r"[\d.]+$", rawAnchor['name']) else "",
-                        'text': rawAnchor['title'],
-                        'spec': spec['title']
-                    }
-                    fragment = uri
-                    shorthand = "/" + fragment
-                else:
-                    # Multi-page spec, need to guard against colliding IDs
-                    if "#" in uri:
-                        # url to a heading in the page, like "foo.html#bar"
-                        match = re.match(r"([\w-]+).*?(#.*)", uri)
-                        if not match:
-                            die("Unexpected URI pattern '{0}' for spec '{1}'. Please report this to the Bikeshed maintainer.", uri, spec['vshortname'])
-                            continue
-                        page, fragment = match.groups()
-                        page = "/" + page
-                    else:
-                        # url to a page itself, like "foo.html"
-                        page, _, _ = uri.partition(".")
-                        page = "/" + page
-                        fragment = "#"
-                    shorthand = page + fragment
-                    heading = {
-                        'url': spec["{0}_url".format(rawAnchor['status'])] + uri,
-                        'number': rawAnchor['name'] if re.match(r"[\d.]+$", rawAnchor['name']) else "",
-                        'text': rawAnchor['title'],
-                        'spec': spec['title']
-                    }
-                if shorthand not in specHeadings:
-                    specHeadings[shorthand] = {}
-                specHeadings[shorthand][rawAnchor['status']] = heading
-                if fragment not in specHeadings:
-                    specHeadings[fragment] = []
-                if shorthand not in specHeadings[fragment]:
-                    specHeadings[fragment].append(shorthand)
+                addToHeadings(rawAnchor, specHeadings, spec=spec)
             else:
-                anchor = {
-                    'status': rawAnchor['status'],
-                    'type': rawAnchor['type'],
-                    'spec': spec['vshortname'],
-                    'shortname': spec['shortname'],
-                    'level': int(spec['level']),
-                    'export': rawAnchor.get('export', False),
-                    'normative': rawAnchor.get('normative', False),
-                    'url': spec["{0}_url".format(rawAnchor['status'])] + rawAnchor['uri'],
-                    'for': rawAnchor.get('for', [])
-                }
-                for text in linkingTexts:
-                    if anchor['type'] in config.lowercaseTypes:
-                        text = text.lower()
-                    text = re.sub(r'\s+', ' ', text)
-                    anchors[text].append(anchor)
+                addToAnchors(rawAnchor, anchors, spec=spec)
 
-    # Headings data was purposely verbose, assuming collisions even when there wasn't one.
-    # Want to keep the collision data for multi-page, so I can tell when you request a non-existent page,
-    # but need to collapse away the collision stuff for single-page.
-    for specHeadings in headings.values():
-        for k, v in specHeadings.items():
-            if k[0] == "#" and len(v) == 1 and v[0][0:2] == "/#":
-                # No collision, and this is either a single-page spec or a non-colliding front-page link
-                # Go ahead and collapse them.
-                specHeadings[k] = specHeadings[v[0]]
-                del specHeadings[v[0]]
+    cleanSpecHeadings(headings)
 
     methods = extractMethodData(anchors)
     fors = extractForsData(anchors)
@@ -211,9 +147,16 @@ def genSpec(rawSpec):
 
 
 def fixupAnchor(anchor):
-    # Miscellaneous fixes
+    '''Miscellaneous fixes to the anchors before I start processing'''
+
+    # This one issue was annoying
     if anchor.get('title', None) == "'@import'":
         anchor['title'] = "@import"
+    
+    # css3-tables has this a bunch, for some strange reason
+    if anchor.get('uri', "").startswith("??"):
+        anchor['uri'] = anchor['uri'][2:]
+    
     # If any smart quotes crept in, replace them with ASCII.
     linkingTexts = anchor.get('linking_text', [anchor.get('title')])
     for i,t in enumerate(linkingTexts):
@@ -226,8 +169,9 @@ def fixupAnchor(anchor):
             t = re.sub(r"“|”", '"', t)
             linkingTexts[i] = t
     anchor['linking_text'] = linkingTexts
+    
+    # Normalize whitespace to a single space
     for k,v in anchor.items():
-        # Normalize whitespace
         if isinstance(v, basestring):
             anchor[k] = re.sub(r"\s+", " ", v.strip())
         elif isinstance(v, list):
@@ -235,6 +179,81 @@ def fixupAnchor(anchor):
                 if isinstance(v1, basestring):
                     anchor[k][k1] = re.sub(r"\s+", " ", v1.strip())
     return anchor
+
+
+def addToHeadings(rawAnchor, specHeadings, spec):
+    uri = rawAnchor['uri']
+    if uri[0] == "#":
+        # Either single-page spec, or link on the top page of a multi-page spec
+        heading = {
+            'url': spec["{0}_url".format(rawAnchor['status'])] + uri,
+            'number': rawAnchor['name'] if re.match(r"[\d.]+$", rawAnchor['name']) else "",
+            'text': rawAnchor['title'],
+            'spec': spec['title']
+        }
+        fragment = uri
+        shorthand = "/" + fragment
+    else:
+        # Multi-page spec, need to guard against colliding IDs
+        if "#" in uri:
+            # url to a heading in the page, like "foo.html#bar"
+            match = re.match(r"([\w-]+).*?(#.*)", uri)
+            if not match:
+                die("Unexpected URI pattern '{0}' for spec '{1}'. Please report this to the Bikeshed maintainer.", uri, spec['vshortname'])
+                return
+            page, fragment = match.groups()
+            page = "/" + page
+        else:
+            # url to a page itself, like "foo.html"
+            page, _, _ = uri.partition(".")
+            page = "/" + page
+            fragment = "#"
+        shorthand = page + fragment
+        heading = {
+            'url': spec["{0}_url".format(rawAnchor['status'])] + uri,
+            'number': rawAnchor['name'] if re.match(r"[\d.]+$", rawAnchor['name']) else "",
+            'text': rawAnchor['title'],
+            'spec': spec['title']
+        }
+    if shorthand not in specHeadings:
+        specHeadings[shorthand] = {}
+    specHeadings[shorthand][rawAnchor['status']] = heading
+    if fragment not in specHeadings:
+        specHeadings[fragment] = []
+    if shorthand not in specHeadings[fragment]:
+        specHeadings[fragment].append(shorthand)
+
+
+def cleanSpecHeadings(headings):
+    '''Headings data was purposely verbose, assuming collisions even when there wasn't one.
+       Want to keep the collision data for multi-page, so I can tell when you request a non-existent page,
+       but need to collapse away the collision stuff for single-page.'''
+    for specHeadings in headings.values():
+        for k, v in specHeadings.items():
+            if k[0] == "#" and len(v) == 1 and v[0][0:2] == "/#":
+                # No collision, and this is either a single-page spec or a non-colliding front-page link
+                # Go ahead and collapse them.
+                specHeadings[k] = specHeadings[v[0]]
+                del specHeadings[v[0]]
+
+
+def addToAnchors(rawAnchor, anchors, spec):
+    anchor = {
+        'status': rawAnchor['status'],
+        'type': rawAnchor['type'],
+        'spec': spec['vshortname'],
+        'shortname': spec['shortname'],
+        'level': int(spec['level']),
+        'export': rawAnchor.get('export', False),
+        'normative': rawAnchor.get('normative', False),
+        'url': spec["{0}_url".format(rawAnchor['status'])] + rawAnchor['uri'],
+        'for': rawAnchor.get('for', [])
+    }
+    for text in rawAnchor['linking_text']:
+        if anchor['type'] in config.lowercaseTypes:
+            text = text.lower()
+        text = re.sub(r'\s+', ' ', text)
+        anchors[text].append(anchor)
 
 
 def extractMethodData(anchors):
