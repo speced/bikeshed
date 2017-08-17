@@ -75,6 +75,8 @@ def updateReadonlyDataFiles():
     remotePath = os.path.join(config.scriptPath, "spec-data", "readonly")
     try:
         for filename in os.listdir(localPath):
+            if filename.startswith("readonly"):
+                continue
             copyanything(os.path.join(localPath, filename), os.path.join(remotePath, filename))
     except Exception, err:
         warn("Error copying over the datafiles:\n{0}", err)
