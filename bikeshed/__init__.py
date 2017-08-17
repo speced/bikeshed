@@ -1031,9 +1031,9 @@ def fixInterDocumentReferences(doc):
         if section is None:
             die("Spec-section autolink doesn't have a 'spec-section' attribute:\n{0}", outerHTML(el), el=el)
             continue
-        if spec in doc.refs.headings:
+        if spec in doc.refs.specs:
             # Bikeshed recognizes the spec
-            specData = doc.refs.headings[spec]
+            specData = doc.refs.fetchHeadings(spec)
             if section in specData:
                 heading = specData[section]
             else:

@@ -269,9 +269,6 @@ class ReferenceManager(object):
         def initSpecs():
             self.specs.update(json.loads(config.retrieveDataFile("specs.json", quiet=True, str=True)))
         initSpecs()
-        def initHeadings():
-            self.headings.update(json.loads(config.retrieveDataFile("headings.json", quiet=True, str=True)))
-        initHeadings()
         def initAnchors():
             with config.retrieveDataFile("anchors.data", quiet=True) as lines:
                 self.foreignRefs.refs = decodeAnchors(lines)
@@ -297,6 +294,15 @@ class ReferenceManager(object):
                     datablocks.transformInfo(lines, doc)
             except IOError:
                 pass
+
+    def fetchHeadings(self, spec):
+        if spec in self.headings:
+            return self.headings
+        data = json.loads(config.retrieveDataFile("headings/headings-{0}.json".format(spec), quiet=True, str=True))
+        if data is None:
+            return
+        self.headings[spec] = data
+        return data
 
     def initializeBiblio(self):
         self.biblioKeys.update(json.loads(config.retrieveDataFile("biblio-keys.json", quiet=True, str=True)))

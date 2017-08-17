@@ -71,8 +71,9 @@ def update():
             die("Couldn't save spec database to disk.\n{0}", e)
             return
         try:
-            with io.open(config.scriptPath + "/spec-data/headings.json", 'w', encoding="utf-8") as f:
-                f.write(unicode(json.dumps(headings, ensure_ascii=False, indent=2, sort_keys=True)))
+            for spec, specHeadings in headings.items():
+                with io.open(config.scriptPath + "/spec-data/headings/headings-{0}.json".format(spec), 'w', encoding="utf-8") as f:
+                    f.write(unicode(json.dumps(specHeadings, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save headings database to disk.\n{0}", e)
             return
