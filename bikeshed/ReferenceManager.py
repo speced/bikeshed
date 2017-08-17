@@ -299,7 +299,7 @@ class ReferenceManager(object):
 
     def fetchHeadings(self, spec):
         if spec in self.headings:
-            return self.headings
+            return self.headings[spec]
         data = json.loads(config.retrieveDataFile("headings/headings-{0}.json".format(spec), quiet=True, str=True))
         if data is None:
             return
