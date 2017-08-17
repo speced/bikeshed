@@ -32,9 +32,32 @@ def update():
                 die("Couldn't save biblio database to disk.\n{0}", e)
                 return
         # Save the list of all names to a file
+        reducedNames = []
+        for name in allNames:
+            if re.search(r"-\d{8}$", name):
+                continue
+            if re.match(r"cwg\d+$", name):
+                continue
+            if re.match(r"ewg\d+$", name):
+                continue
+            if re.match(r"fs\d+$", name):
+                continue
+            if re.match(r"lewg\d+$", name):
+                continue
+            if re.match(r"lwg\d+$", name):
+                continue
+            if re.match(r"n\d+$", name):
+                continue
+            if re.match(r"p\d+r\d+$", name):
+                continue
+            if re.match(r"rfc\d+$", name):
+                continue
+            if re.match(r"wg21-", name):
+                continue
+            reducedNames.append(name)
         try:
             with io.open(config.scriptPath + "/spec-data/biblio-keys.json", 'w', encoding="utf-8") as fh:
-                fh.write(unicode(json.dumps(allNames, indent=0, ensure_ascii=False, sort_keys=True)))
+                fh.write(unicode(json.dumps(reducedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception, e:
             die("Couldn't save biblio database to disk.\n{0}", e)
             return

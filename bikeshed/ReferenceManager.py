@@ -42,6 +42,7 @@ class RefSource(object):
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         def refsIterator(refs):
             # Turns a dict of arrays of refs into an iterator of refs
+            warn("Plain refs iterator used")
             for key, group in refs.items():
                 for ref in group:
                     yield RefWrapper(key, ref)
@@ -242,6 +243,7 @@ class ReferenceManager(object):
 
         # All the biblio keys
         self.biblioKeys = set()
+        self.loadedBiblioGroups = set()
 
         # Dict of {base key name => preferred display name}
         self.preferredBiblioNames = dict()
@@ -640,26 +642,35 @@ class ReferenceManager(object):
 
     def getBiblioRef(self, text, status=None, generateFakeRef=False, silentAliases=False, el=None, quiet=False):
         key = text.lower()
-        if key in self.biblios:
-            candidates = self.biblios[key]
-        elif key in self.biblioKeys:
-            # Key exists in biblio db, but its data isn't loaded yet.
+        while True:
+            # Is key already loaded?
+            if key in self.biblios:
+                candidates = self.biblios[key]
+                break
+            # See if the key exists in the biblio data at all.
             group = key[0:2]
+            if group in self.loadedBiblioGroups:
+                # We already loaded the group, but didn't find the key earlier, so it's not there.
+                return None
+            # Otherwise, load the group up
             with config.retrieveDataFile("biblio/biblio-{0}.data".format(group), quiet=True) as lines:
                 biblio.loadBiblioDataFile(lines, self.biblios)
-            candidates = self.biblios[key]
-        elif key in self.specs:
-            # First see if the ref is just unnecessarily levelled
-            match = re.match(r"(.+?)-\d+", key)
-            if match:
-                ref = self.getBiblioRef(match.group(1), status, el=el, quiet=True)
-                if ref:
-                    return ref
-            if generateFakeRef:
-                return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=status)
-            else:
-                return None
-        else:
+            self.loadedBiblioGroups.add(group)
+            if key in self.biblios:
+                candidates = self.biblios[key]
+                break
+            # Otherwise, see if the ref is to a spec I know about thru Shepherd data.
+            if key in self.specs:
+                # First see if the ref is just unnecessarily levelled
+                match = re.match(r"(.+?)-\d+", key)
+                if match:
+                    ref = self.getBiblioRef(match.group(1), status, el=el, quiet=True)
+                    if ref:
+                        return ref
+                if generateFakeRef:
+                    return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=status)
+                else:
+                    return None
             return None
 
         candidate = stripLineBreaks(sorted(candidates, key=itemgetter('order'))[0])
