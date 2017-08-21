@@ -78,8 +78,7 @@ def update():
             die("Couldn't save headings database to disk.\n{0}", e)
             return
         try:
-            with io.open(config.scriptPath + "/spec-data/anchors.data", 'w', encoding="utf-8") as f:
-                writeAnchorsFile(f, anchors)
+            writeAnchorsFile(anchors)
         except Exception, e:
             die("Couldn't save anchor database to disk.\n{0}", e)
             return
@@ -299,7 +298,7 @@ def extractForsData(anchors):
     return fors
 
 
-def writeAnchorsFile(fh, anchors):
+def writeAnchorsFile(anchors):
     '''
     Keys may be duplicated.
 
@@ -315,17 +314,23 @@ def writeAnchorsFile(fh, anchors):
     for* (one per line, unknown #)
     - (by itself, ends the segment)
     '''
-    for key, entries in anchors.items():
-        for e in entries:
-            fh.write(key + "\n")
-            for field in ["type", "spec", "shortname", "level", "status", "url"]:
-                fh.write(unicode(e.get(field, "")) + "\n")
-            for field in ["export", "normative"]:
-                if e.get(field, False):
-                    fh.write("1\n")
-                else:
-                    fh.write("\n")
-            for forValue in e.get("for", []):
-                if forValue:  # skip empty strings
-                    fh.write(forValue + "\n")
-            fh.write("-" + "\n")
+    groupedEntries = defaultdict(dict)
+    for key,entries in anchors.items():
+        group = config.groupFromKey(key)
+        groupedEntries[group][key] = entries
+    for group, anchors in groupedEntries.items():
+        with io.open(config.scriptPath + "/spec-data/anchors/anchors-{0}.data".format(group), 'w', encoding="utf-8") as fh:
+            for key, entries in sorted(anchors.items(), key=lambda x:x[0]):
+                for e in entries:
+                    fh.write(key + "\n")
+                    for field in ["type", "spec", "shortname", "level", "status", "url"]:
+                        fh.write(unicode(e.get(field, "")) + "\n")
+                    for field in ["export", "normative"]:
+                        if e.get(field, False):
+                            fh.write("1\n")
+                        else:
+                            fh.write("\n")
+                    for forValue in e.get("for", []):
+                        if forValue:  # skip empty strings
+                            fh.write(forValue + "\n")
+                    fh.write("-" + "\n")

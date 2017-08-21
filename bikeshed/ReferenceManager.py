@@ -18,7 +18,7 @@ class RefSource(object):
         self.source = source
 
         # Dict of {linking text => [anchor data]}
-        self.refs = defaultdict(list)
+        self._refs = defaultdict(list)
 
         # Dict of {argless method signatures => {"argfull signature": {"args":[args], "for":[fors]}}}
         self.methods = defaultdict(dict)
@@ -29,6 +29,29 @@ class RefSource(object):
         self.specs = {} if specs is None else specs
         self.ignoredSpecs = set() if ignored is None else ignored
         self.replacedSpecs = set() if replaced is None else replaced
+        self._loadedAnchorGroups = set()
+
+    def fetchRefs(self, key):
+        '''Safe, lazy-loading version of self._refs[key]'''
+
+        if key in self._refs:
+            return self._refs[key]
+
+        # Currently, only the "foreign" refs group can load extra files,
+        # so if it wasn't found previously, it's just not here.
+        if self.source != "foreign":
+            return []
+
+        group = config.groupFromKey(key)
+        if group in self._loadedAnchorGroups:
+            # Group was loaded, but previous check didn't find it, so it's just not here.
+            return []
+        # Otherwise, load the group file.
+        with config.retrieveDataFile("anchors/anchors-{0}.data".format(group), quiet=True, okayToFail=True) as fh:
+            self._refs.update(decodeAnchors(fh))
+            self._loadedAnchorGroups.add(group)
+        return self._refs.get(key, [])
+
 
     def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, **kwargs):
         results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, exact=True)
@@ -40,45 +63,46 @@ class RefSource(object):
     def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
-        def refsIterator(refs):
+        def refsIterator():
             # Turns a dict of arrays of refs into an iterator of refs
+            # TODO: This needs to load all possible refs.
             warn("Plain refs iterator used")
-            for key, group in refs.items():
+            for key, group in self._refs.items():
                 for ref in group:
                     yield RefWrapper(key, ref)
 
-        def textRefsIterator(refs, texts):
+        def textRefsIterator(texts):
             # Same as above, but only grabs those keyed to a given text
             for text in texts:
-                for ref in refs.get(text, []):
+                for ref in self.fetchRefs(text):
                     yield RefWrapper(text, ref)
-                for ref in refs.get(text + "\n", []):
+                for ref in self.fetchRefs(text + "\n"):
                     yield RefWrapper(text, ref)
 
-        def forRefsIterator(refs, fors, targetFors):
+        def forRefsIterator(fors, targetFors):
             # Same as above, but only grabs those for certain values
             for for_ in targetFors:
                 for text in fors[for_]:
-                    for ref in refs.get(text, []):
+                    for ref in self.fetchRefs(text):
                         yield RefWrapper(text, ref)
-                    for ref in refs.get(text + "\n", []):
+                    for ref in self.fetchRefs(text + "\n"):
                         yield RefWrapper(text, ref)
 
         # Set up the initial list of refs to query
         if text:
             if exact:
-                refs = list(textRefsIterator(self.refs, [text]))
+                refs = list(textRefsIterator([text]))
             else:
                 textsToSearch = list(linkTextVariations(text, linkType))
                 if text.endswith("()") and text in self.methods:
                     textsToSearch += self.methods[text].keys()
                 if (linkType is None or linkType in config.lowercaseTypes) and text.lower() != text:
                     textsToSearch += [t.lower() for t in textsToSearch]
-                refs = list(textRefsIterator(self.refs, textsToSearch))
+                refs = list(textRefsIterator(textsToSearch))
         elif linkFor:
-            refs = list(forRefsIterator(self.refs, self.fors, [linkFor]))
+            refs = list(forRefsIterator(self.fors, [linkFor]))
         else:
-            refs = list(refsIterator(self.refs))
+            refs = list(refsIterator())
         if not refs:
             return refs, "text"
 
@@ -240,10 +264,12 @@ class ReferenceManager(object):
         # Dict of {biblio term => biblio data}
         # Sparsely populated, with more loaded on demand
         self.biblios = defaultdict(list)
-
-        # All the biblio keys
-        self.biblioKeys = set()
         self.loadedBiblioGroups = set()
+
+        # Most of the biblio keys, for biblio near-miss correction
+        # (Excludes dated versions, and all huge "foo\d+" groups that can't usefully correct typos.)
+        self.biblioKeys = set()
+        
 
         # Dict of {base key name => preferred display name}
         self.preferredBiblioNames = dict()
@@ -271,10 +297,6 @@ class ReferenceManager(object):
         def initSpecs():
             self.specs.update(json.loads(config.retrieveDataFile("specs.json", quiet=True, str=True)))
         initSpecs()
-        def initAnchors():
-            with config.retrieveDataFile("anchors.data", quiet=True) as lines:
-                self.foreignRefs.refs = decodeAnchors(lines)
-        initAnchors()
         def initMethods():
             self.foreignRefs.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
         initMethods()
@@ -300,11 +322,14 @@ class ReferenceManager(object):
     def fetchHeadings(self, spec):
         if spec in self.headings:
             return self.headings[spec]
-        data = json.loads(config.retrieveDataFile("headings/headings-{0}.json".format(spec), quiet=True, str=True))
-        if data is None:
-            return
-        self.headings[spec] = data
-        return data
+        with config.retrieveDataFile("headings/headings-{0}.json".format(spec), quiet=True, okayToFail=True) as fh:
+            try:
+                data = json.load(fh)
+            except ValueError:
+                # JSON couldn't be decoded, *should* only be because of empty file
+                return
+            self.headings[spec] = data
+            return data
 
     def initializeBiblio(self):
         self.biblioKeys.update(json.loads(config.retrieveDataFile("biblio-keys.json", quiet=True, str=True)))
@@ -361,7 +386,8 @@ class ReferenceManager(object):
     def removeSameSpecRefs(self):
         # Kill all the non-local anchors with the same shortname as the current spec,
         # so you don't end up accidentally linking to something that's been removed from the local copy.
-        for term, refs in self.foreignRefs.refs.items():
+        # TODO: This is dumb.
+        for term, refs in self.foreignRefs._refs.items():
             for ref in refs:
                 if ref['status'] != "local" and ref['shortname'].rstrip() == self.shortname:
                     ref['export'] = False
@@ -418,7 +444,7 @@ class ReferenceManager(object):
                     "export":True,
                     "for": dfnFor
                 }
-                self.localRefs.refs[linkText].append(ref)
+                self.localRefs._refs[linkText].append(ref)
                 for for_ in dfnFor:
                     self.localRefs.fors[for_].append(linkText)
                 methodishStart = re.match(r"([^(]+\()[^)]", linkText)
@@ -881,7 +907,7 @@ def reportAmbiguousForlessLink(el, text, forlessRefs, localRefs):
     linkerror("Ambiguous for-less link for '{0}', please see <https://tabatkins.github.io/bikeshed/#ambi-for> for instructions:\nLocal references:\n{1}\nfor-less references:\n{2}", text, "\n".join([refToText(ref) for ref in simplifyPossibleRefs(localRefs, alwaysShowFor=True)]), "\n".join([refToText(ref) for ref in simplifyPossibleRefs(forlessRefs, alwaysShowFor=True)]), el=el)
 
 def decodeAnchors(linesIter):
-    # Decodes the anchor storage format into a list of dicts
+    # Decodes the anchor storage format into {key: [{anchor-data}]}
     anchors = defaultdict(list)
     try:
         while True:

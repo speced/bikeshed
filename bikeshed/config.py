@@ -413,7 +413,8 @@ class Nil(object):
         return iter([])
 
 
-def retrieveDataFile(filename, quiet=False, str=False):
+def retrieveDataFile(filename, quiet=False, str=False, okayToFail=False):
+    import os
     cacheLocation = scriptPath + "/spec-data/" + filename
     fallbackLocation = scriptPath + "/spec-data/readonly/" + filename
     try:
@@ -422,8 +423,12 @@ def retrieveDataFile(filename, quiet=False, str=False):
         try:
             fh = open(fallbackLocation, 'r')
         except IOError:
-            die("Couldn't retrieve the file '{0}' from cache. Something's wrong, please report this.", filename)
-            return
+            if not okayToFail:
+                die("Couldn't retrieve the file '{0}' from cache. Something's wrong, please report this.", filename)
+            if str:
+                return ""
+            else:
+                return open(os.devnull)
         import shutil
         try:
             if not quiet:
@@ -707,3 +712,16 @@ class BoolSet(collections.MutableMapping):
             falseVals = [k for k,v in self._internal.items() if v is False]
             vrepr = "{" + ", ".join(repr(x) + ":False" for x in falseVals) + "}"
         return "BoolSet({0}, default={1})".format(vrepr, self.default)
+
+
+def groupFromKey(key, length=1):
+    '''Generates a filename-safe "group" from a key, of a specified length.'''
+    safeChars = frozenset("abcdefghijklmnopqrstuvwxyz0123456789")
+    group = ""
+    for char in key.lower():
+        if len(group) == length:
+            return group
+        if char in safeChars:
+            group += char
+    else:
+        return group.ljust(length, "_")
