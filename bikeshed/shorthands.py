@@ -100,7 +100,7 @@ def transformMaybePlaceholders(doc):
 def transformAutolinkShortcuts(doc):
     # Do the remaining textual replacements
 
-    biblioRe = re.compile(r"(\\)?\[\[(!)?([\w.+-]+)((?: +current)|(?: +dated))?\]\]")
+    biblioRe = re.compile(r"(\\)?\[\[(!)?([\w.+-]+)((?: +current)|(?: +snapshot))?\]\]")
 
     def biblioReplacer(match):
         # Allow escaping things that aren't actually biblio links, by preceding with a \
