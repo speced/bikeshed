@@ -486,11 +486,10 @@ def addClass(el, cls):
 
 
 def hasClass(el, cls):
-    if el.get('class') is None:
+    elClass = el.get("class")
+    if elClass is None:
         return False
-    paddedAttr = " {0} ".format(el.get('class'))
-    paddedCls = " {0} ".format(cls)
-    return paddedCls in paddedAttr
+    return (" "+cls+" ") in (" "+elClass+" ")
 
 
 def removeClass(el, cls):
