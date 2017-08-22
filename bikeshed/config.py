@@ -714,14 +714,20 @@ class BoolSet(collections.MutableMapping):
         return "BoolSet({0}, default={1})".format(vrepr, self.default)
 
 
-def groupFromKey(key, length=1):
+def groupFromKey(key, length=2):
     '''Generates a filename-safe "group" from a key, of a specified length.'''
+    if key in _groupFromKeyCache:
+        return _groupFromKeyCache[key]
     safeChars = frozenset("abcdefghijklmnopqrstuvwxyz0123456789")
     group = ""
     for char in key.lower():
         if len(group) == length:
+            _groupFromKeyCache[key] = group
             return group
         if char in safeChars:
             group += char
     else:
-        return group.ljust(length, "_")
+        group = group.ljust(length, "_")
+        _groupFromKeyCache[key] = group
+        return group
+_groupFromKeyCache = {}
