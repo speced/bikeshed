@@ -827,14 +827,24 @@ class RefWrapper(object):
     # It also makes all the ref dict keys look like object attributes.
     def __init__(self, text, ref):
         self.text = text
-        self.ref = stripLineBreaks(ref)
+        self._ref = ref
 
     def __getattr__(self, name):
+        '''
+        Indirect all attr accesses into the self._ref dict.
+        Also, strip whitespace from the values (they'll have \n at the end) on access,
+        and store them directly on the RefWrapper for fast access next time.
+        '''
         if name == "for_":
-            name = "for"
-        val = self.ref[name]
+            refKey = "for"
+        else:
+            refKey = name
+        val = self._ref[refKey]
         if isinstance(val, basestring):
             val = val.strip()
+        elif isinstance(val, list):
+            val = [x.strip() for x in val]
+        self.key = val
         return val
 
     def __json__(self):
