@@ -520,17 +520,25 @@ def isOddNode(node):
 def isNormative(el):
     # Returns whether the element is "informative" or "normative" with a crude algo.
     # Currently just tests whether the element is in a class=example or class=note block, or not.
+    if el in _normativeElCache:
+        return _normativeElCache[el]
     if hasClass(el, "note") or hasClass(el, "example") or hasClass(el, "non-normative"):
+        _normativeElCache[el] = False
         return False
     if hasClass(el, "normative"):
+        _normativeElCache[el] = True
         return True
     parent = parentElement(el)
     if not isElement(parent):
         # Went past the root without finding any indicator,
         # so normative by default.
+        _normativeElCache[el] = True
         return True
     # Otherwise, walk the tree
-    return isNormative(parent)
+    norm = isNormative(parent)
+    _normativeElCache[el] = norm
+    return norm
+_normativeElCache = {}
 
 
 def isEmpty(el):
