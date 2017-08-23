@@ -489,11 +489,17 @@ def addClass(el, cls):
         el.set('class', "{0} {1}".format(el.get('class'), cls))
 
 
-def hasClass(el, cls):
+_classMap = {}
+def hasClass(el, cls, classMap=_classMap):
     elClass = el.get("class")
     if elClass is None:
         return False
-    return (" "+cls+" ") in (" "+elClass+" ")
+    key = cls, elClass
+    if key in classMap:
+        return classMap[key]
+    ret = (" "+cls+" ") in (" "+elClass+" ")
+    classMap[key] = ret
+    return ret
 
 
 def removeClass(el, cls):
