@@ -76,16 +76,12 @@ class RefSource(object):
             for text in texts:
                 for ref in self.fetchRefs(text):
                     yield RefWrapper(text, ref)
-                for ref in self.fetchRefs(text + "\n"):
-                    yield RefWrapper(text, ref)
 
         def forRefsIterator(fors, targetFors):
             # Same as above, but only grabs those for certain values
             for for_ in targetFors:
                 for text in fors[for_]:
                     for ref in self.fetchRefs(text):
-                        yield RefWrapper(text, ref)
-                    for ref in self.fetchRefs(text + "\n"):
                         yield RefWrapper(text, ref)
 
         # Set up the initial list of refs to query
@@ -921,7 +917,7 @@ def decodeAnchors(linesIter):
     anchors = defaultdict(list)
     try:
         while True:
-            key = linesIter.next().decode('utf-8')
+            key = linesIter.next().decode('utf-8')[:-1]
             a = {
                 "type": linesIter.next(),
                 "spec": linesIter.next(),
