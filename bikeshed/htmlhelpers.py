@@ -353,7 +353,7 @@ def previousElements(startEl, tag=None, *tags):
 
 def childElements(parentEl, tag="*", *tags, **stuff):
     if len(parentEl) == 0:
-        return []
+        return iter(())
     return parentEl.iterchildren(tag=tag, *tags, **stuff)
 
 
