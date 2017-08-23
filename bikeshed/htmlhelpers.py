@@ -106,6 +106,8 @@ def textContent(el, exact=False):
     # If exact is False, then any elements with data-deco attribute
     # get ignored in the textContent.
     # This allows me to ignore things added by Bikeshed by default.
+    if len(el) == 0:
+        return el.text or ''
     if exact:
         return html.tostring(el, method='text', with_tail=False, encoding="unicode")
     else:
@@ -350,6 +352,8 @@ def previousElements(startEl, tag=None, *tags):
 
 
 def childElements(parentEl, tag="*", *tags, **stuff):
+    if len(parentEl) == 0:
+        return []
     return parentEl.iterchildren(tag=tag, *tags, **stuff)
 
 
