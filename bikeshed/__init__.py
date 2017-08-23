@@ -977,18 +977,28 @@ def checkVarHygiene(doc):
 
     # Look for vars that only show up once. These are probably typos.
     singularVars = []
-    varCounts = Counter((foldWhitespace(textContent(el)), nearestAlgo(el)) for el in findAll("var", doc) if el.get("data-var-ignore") is None)
-    for var,count in varCounts.items():
-        if count == 1 and var[0].lower() not in doc.md.ignoredVars:
-            singularVars.append(var)
-    if singularVars:
-        printVars = ""
-        for var,algo in singularVars:
+    varCounts = defaultdict(lambda: 0)
+    for el in findAll("var:not([data-var-ignore])", doc):
+        key = textContent(el), nearestAlgo(el)
+        varCounts[key] += 1
+    foldedVarCounts = defaultdict(lambda: 0)
+    for (var,algo),count in varCounts.items():
+        if count > 1:
+            continue
+        var = foldWhitespace(var).strip()
+        if var.lower() in doc.md.ignoredVars:
+            continue
+        key = var, algo
+        foldedVarCounts[key] += 1
+    varLines = []
+    for (var, algo),count in foldedVarCounts.items():
+        if count == 1:
             if algo:
-                printVars += "  '{0}', in algorithm '{1}'\n".format(var, algo)
+                varLines.append("  '{0}', in algorithm '{1}'".format(var, algo))
             else:
-                printVars += "  '{0}'\n".format(var)
-        warn("The following <var>s were only used once in the document:\n{0}If these are not typos, please add an ignore='' attribute to the <var>.", printVars)
+                varLines.append("  '{0}'".format(var))
+    if varLines:
+        warn("The following <var>s were only used once in the document:\n{0}\nIf these are not typos, please add an ignore='' attribute to the <var>.", "\n".join(varLines))
 
     # Look for algorithms that show up twice; these are errors.
     for algo, count in Counter(el.get('data-algorithm') for el in findAll("[data-algorithm]", doc)).items():
