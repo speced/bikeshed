@@ -211,7 +211,7 @@ def main():
     update.fixupDataFiles()
     if options.subparserName == "update":
         if options.manifest:
-            update.createManifest()
+            update.createManifest(path=os.path.join(config.scriptPath, "spec-data"))
         else:
             update.update(anchors=options.anchors, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, dryRun=config.dryRun)
     elif options.subparserName == "spec":
