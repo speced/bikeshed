@@ -12,21 +12,23 @@ from . import updateLanguages
 from .. import config
 
 
-def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False):
+def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False, path=None, dryRun=False):
+    if path is None:
+        path = os.path.join(config.scriptPath, "spec-data")
     # If all are False, update everything
     updateAnyway = not (anchors or biblio or caniuse or linkDefaults or testSuites or languages)
     if anchors or updateAnyway:
-        updateCrossRefs.update()
+        updateCrossRefs.update(path=path, dryRun=dryRun)
     if biblio or updateAnyway:
-        updateBiblio.update()
+        updateBiblio.update(path=path, dryRun=dryRun)
     if caniuse or updateAnyway:
-        updateCanIUse.update()
+        updateCanIUse.update(path=path, dryRun=dryRun)
     if linkDefaults or updateAnyway:
-        updateLinkDefaults.update()
+        updateLinkDefaults.update(path=path, dryRun=dryRun)
     if testSuites or updateAnyway:
-        updateTestSuites.update()
+        updateTestSuites.update(path=path, dryRun=dryRun)
     if languages or updateAnyway:
-        updateLanguages.update()
+        updateLanguages.update(path=path, dryRun=dryRun)
 
 
 def fixupDataFiles():
@@ -35,7 +37,6 @@ def fixupDataFiles():
     This happens if I changed the datafile format and shipped updated files as a result;
     using the legacy files with the new code is quite bad!
     '''
-    import os
     localPath = os.path.join(config.scriptPath, "spec-data")
     remotePath = os.path.join(config.scriptPath, "spec-data", "readonly")
     try:
@@ -70,7 +71,6 @@ def updateReadonlyDataFiles():
     This is a debugging tool to help me quickly update the built-in data files,
     and will not be called as part of normal operation.
     '''
-    import os
     localPath = os.path.join(config.scriptPath, "spec-data")
     remotePath = os.path.join(config.scriptPath, "spec-data", "readonly")
     try:
@@ -81,8 +81,6 @@ def updateReadonlyDataFiles():
     except Exception, err:
         warn("Error copying over the datafiles:\n{0}", err)
         return
-
-
 
 
 def copyanything(src, dst):

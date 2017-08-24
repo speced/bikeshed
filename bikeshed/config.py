@@ -306,9 +306,6 @@ typeRe["constructor"] = typeRe["function"]
 typeRe["method"] = typeRe["function"]
 typeRe["interface"] = re.compile("^\w+$")
 
-anchorDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
-testSuiteDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
-
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
 
 refStatus = enum.Enum("RefStatus", {"current":"current", "snapshot":"snapshot"})

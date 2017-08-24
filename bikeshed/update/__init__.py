@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 
-from .main import update, fixupDataFiles, updateReadonlyDataFiles
+from .main import fixupDataFiles, update, updateReadonlyDataFiles
+from .manifest import createManifest
 
 __all__ = ["updateCrossRefs", "updateBiblio", "updateCanIUse", "updateLinkDefaults", "updateTestSuites", "updateLanguages"]

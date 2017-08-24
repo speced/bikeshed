@@ -2,15 +2,15 @@
 from __future__ import division, unicode_literals
 import io
 import json
+import os
 import urllib2
 from collections import OrderedDict
 from contextlib import closing
 
-from .. import config
 from ..messages import *
 
 
-def update():
+def update(path, dryRun=False):
     say("Downloading Can I Use data...")
     try:
         with closing(urllib2.urlopen("https://raw.githubusercontent.com/Fyrd/caniuse/master/fulldata-json/data-2.0.json")) as fh:
@@ -89,9 +89,9 @@ def update():
         featureData[featureName] = {"notes":notes, "url":url, "support":browserData}
     data["data"] = featureData
 
-    if not config.dryRun:
+    if not dryRun:
         try:
-            with closing(io.open(config.scriptPath + "/spec-data/caniuse.json", 'w', encoding="utf-8")) as fh:
+            with io.open(os.path.join(path, "caniuse.json"), 'w', encoding="utf-8") as fh:
                 fh.write(unicode(json.dumps(data, indent=1, ensure_ascii=False, sort_keys=True)))
         except Exception, e:
             die("Couldn't save Can I Use database to disk.\n{0}", e)

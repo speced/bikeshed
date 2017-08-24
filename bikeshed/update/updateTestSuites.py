@@ -2,14 +2,16 @@
 from __future__ import division, unicode_literals
 import io
 import json
+import os
 import urllib2
 from contextlib import closing
 
-from .. import config
 from ..apiclient.apiclient import apiclient
 from ..messages import *
 
-def update():
+testSuiteDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
+
+def update(path, dryRun=False):
     try:
         say("Downloading test suite data...")
         shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
@@ -17,7 +19,7 @@ def update():
         if ((not res) or (406 == res.status)):
             die("This version of the test suite API is no longer supported. Please update Bikeshed.")
             return
-        if res.contentType not in config.testSuiteDataContentTypes:
+        if res.contentType not in testSuiteDataContentTypes:
             die("Unrecognized test suite content-type '{0}'.", res.contentType)
             return
         rawTestSuiteData = res.data
@@ -41,9 +43,9 @@ def update():
         }
         testSuites[testSuite['spec']] = testSuite
 
-    if not config.dryRun:
+    if not dryRun:
         try:
-            with io.open(config.scriptPath + "/spec-data/test-suites.json", 'w', encoding="utf-8") as f:
+            with io.open(os.path.join(path, "test-suites.json"), 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(testSuites, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save test-suite database to disk.\n{0}", e)

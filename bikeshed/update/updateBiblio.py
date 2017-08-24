@@ -3,30 +3,30 @@ from __future__ import division, unicode_literals
 import io
 import json
 import re
+import os
 import urllib2
 from collections import defaultdict
 from contextlib import closing
 
 from .. import biblio
-from .. import config
 from ..apiclient.apiclient import apiclient
 from ..DefaultOrderedDict import DefaultOrderedDict
 from ..messages import *
 
 
 
-def update():
+def update(path, dryRun=False):
     say("Downloading biblio data...")
     biblios = defaultdict(list)
     biblio.processSpecrefBiblioFile(getSpecrefData(), biblios, order=3)
     biblio.processSpecrefBiblioFile(getWG21Data(), biblios, order=3)
     biblio.processReferBiblioFile(getCSSWGData(), biblios, order=4)
-    if not config.dryRun:
+    if not dryRun:
         groupedBiblios, allNames = groupBiblios(biblios)
         # Save each group to a file
         for group, biblios in groupedBiblios.items():
             try:
-                with io.open(config.scriptPath + "/spec-data/biblio/biblio-{0}.data".format(group), 'w', encoding="utf-8") as fh:
+                with io.open(os.path.join(path, "biblio", "biblio-{0}.data".format(group)), 'w', encoding="utf-8") as fh:
                     writeBiblioFile(fh, biblios)
             except Exception, e:
                 die("Couldn't save biblio database to disk.\n{0}", e)
@@ -56,7 +56,7 @@ def update():
                 continue
             reducedNames.append(name)
         try:
-            with io.open(config.scriptPath + "/spec-data/biblio-keys.json", 'w', encoding="utf-8") as fh:
+            with io.open(os.path.join(path, "biblio-keys.json"), 'w', encoding="utf-8") as fh:
                 fh.write(unicode(json.dumps(reducedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception, e:
             die("Couldn't save biblio database to disk.\n{0}", e)

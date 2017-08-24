@@ -3,6 +3,7 @@ from __future__ import division, unicode_literals
 import io
 import json
 import re
+import os
 import urllib2
 from collections import defaultdict
 from contextlib import closing
@@ -12,8 +13,9 @@ from ..apiclient.apiclient import apiclient
 from ..messages import *
 
 
+anchorDataContentTypes = ["application/json", "application/vnd.csswg.shepherd.v1+json"]
 
-def update():
+def update(path, dryRun=False):
     try:
         say("Downloading anchor data...")
         shepherd = apiclient.APIClient("https://api.csswg.org/shepherd/", version="vnd.csswg.shepherd.v1")
@@ -22,7 +24,7 @@ def update():
         if ((not res) or (406 == res.status)):
             die("Either this version of the anchor-data API is no longer supported, or (more likely) there was a transient network error. Try again in a little while, and/or update Bikeshed. If the error persists, please report it on GitHub.")
             return
-        if res.contentType not in config.anchorDataContentTypes:
+        if res.contentType not in anchorDataContentTypes:
             die("Unrecognized anchor-data content-type '{0}'.", res.contentType)
             return
         rawSpecData = res.data
@@ -63,33 +65,33 @@ def update():
     methods = extractMethodData(anchors)
     fors = extractForsData(anchors)
 
-    if not config.dryRun:
+    if not dryRun:
         try:
-            with io.open(config.scriptPath + "/spec-data/specs.json", 'w', encoding="utf-8") as f:
+            with io.open(os.path.join(path, "specs.json"), 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(specs, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save spec database to disk.\n{0}", e)
             return
         try:
             for spec, specHeadings in headings.items():
-                with io.open(config.scriptPath + "/spec-data/headings/headings-{0}.json".format(spec), 'w', encoding="utf-8") as f:
+                with io.open(os.path.join(path, "headings", "headings-{0}.json".format(spec)), 'w', encoding="utf-8") as f:
                     f.write(unicode(json.dumps(specHeadings, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save headings database to disk.\n{0}", e)
             return
         try:
-            writeAnchorsFile(anchors)
+            writeAnchorsFile(anchors, path)
         except Exception, e:
             die("Couldn't save anchor database to disk.\n{0}", e)
             return
         try:
-            with io.open(config.scriptPath + "/spec-data/methods.json", 'w', encoding="utf-8") as f:
+            with io.open(os.path.join(path, "methods.json"), 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save methods database to disk.\n{0}", e)
             return
         try:
-            with io.open(config.scriptPath + "/spec-data/fors.json", 'w', encoding="utf-8") as f:
+            with io.open(os.path.join(path, "fors.json"), 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(fors, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save fors database to disk.\n{0}", e)
@@ -298,7 +300,7 @@ def extractForsData(anchors):
     return fors
 
 
-def writeAnchorsFile(anchors):
+def writeAnchorsFile(anchors, path):
     '''
     Keys may be duplicated.
 
@@ -319,7 +321,7 @@ def writeAnchorsFile(anchors):
         group = config.groupFromKey(key)
         groupedEntries[group][key] = entries
     for group, anchors in groupedEntries.items():
-        with io.open(config.scriptPath + "/spec-data/anchors/anchors-{0}.data".format(group), 'w', encoding="utf-8") as fh:
+        with io.open(os.path.join(path, "anchors", "anchors-{0}.data".format(group)), 'w', encoding="utf-8") as fh:
             for key, entries in sorted(anchors.items(), key=lambda x:x[0]):
                 for e in entries:
                     fh.write(key + "\n")
