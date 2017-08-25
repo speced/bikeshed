@@ -10,7 +10,7 @@ def createManifest(path):
     '''Generates a manifest file for all the data files.'''
     manifests = []
     try:
-        for absPath, relPath in getDatafilePaths(localPath):
+        for absPath, relPath in getDatafilePaths(path):
             if relPath in knownFiles:
                 pass
             elif relPath.partition("/")[0] in knownFolders:
