@@ -9,6 +9,7 @@ from . import updateCanIUse
 from . import updateLinkDefaults
 from . import updateTestSuites
 from . import updateLanguages
+from . import manifest
 from .. import config
 
 
@@ -29,6 +30,7 @@ def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testS
         updateTestSuites.update(path=path, dryRun=dryRun)
     if languages or updateAnyway:
         updateLanguages.update(path=path, dryRun=dryRun)
+    manifest.createManifest(path=path, dryRun=dryRun)
 
 
 def fixupDataFiles():
