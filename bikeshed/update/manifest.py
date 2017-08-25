@@ -6,7 +6,7 @@ import hashlib
 import io
 import os
 
-def createManifest(path):
+def createManifest(path, dryRun=False):
     '''Generates a manifest file for all the data files.'''
     manifests = []
     try:
@@ -21,13 +21,14 @@ def createManifest(path):
                 manifests.append((relPath, hashFile(fh)))
     except Exception, err:
         raise
-    try:
-        with io.open(os.path.join(localPath, "manifest.txt"), 'w', encoding="utf-8") as fh:
-            fh.write(unicode(datetime.datetime.utcnow()) + "\n")
-            for p,h in sorted(manifests, key=keyManifest):
-                fh.write("{0} {1}\n".format(h, p))
-    except Exception, err:
-        raise
+    if not dryRun:
+        try:
+            with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
+                fh.write(unicode(datetime.datetime.utcnow()) + "\n")
+                for p,h in sorted(manifests, key=keyManifest):
+                    fh.write("{0} {1}\n".format(h, p))
+        except Exception, err:
+            raise
 
 
 knownFiles = [
