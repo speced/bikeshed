@@ -5,6 +5,10 @@ import datetime
 import hashlib
 import io
 import os
+import urllib2
+from contextlib import closing
+
+from ..messages import *
 
 def createManifest(path, dryRun=False):
     '''Generates a manifest file for all the data files.'''
@@ -68,3 +72,81 @@ def getDatafilePaths(basePath):
         for filename in files:
             filePath = os.path.join(root, filename)
             yield filePath, os.path.relpath(filePath, basePath)
+
+
+def updateByManifest(path, dryRun=False):
+    '''
+    Attempts to update only the recently updated datafiles by using a manifest file.
+    Returns False if updating failed and a full update should be performed;
+    returns True if updating was a success.
+    '''
+    ghPrefix = "https://raw.githubusercontent.com/tabatkins/bikeshed-data/master/data/"
+    say("Updating via manifest...")
+    try:
+        with io.open(os.path.join(path, "manifest.txt"), 'r', encoding="utf-8") as fh:
+            oldManifest = fh.readlines()
+    except Exception, e:
+        warn("Couldn't find local manifest file.\n{0}", e)
+        return False
+    try:
+        with closing(urllib2.urlopen(ghPrefix + "manifest.txt")) as fh:
+            newManifest = [unicode(line, encoding="utf-8") for line in fh]
+    except Exception, e:
+        warn("Couldn't download remote manifest file.\n{0}", e)
+        return False
+
+    # First manifest line is a datetime string,
+    # which luckily sorts lexicographically.
+    if oldManifest[0] == newManifest[0]:
+        say("Local data is already up-to-date ({0}). Done!", oldManifest[0].strip())
+        return True
+    elif oldManifest[0] > newManifest[0]:
+        # No need to update, local data is more recent.
+        say("Local data is fresher ({0}) than remote ({1}), so nothing to update.", oldManifest[0].strip(), newManifest[0].strip())
+        return True
+
+    oldFiles = dictFromManifest(oldManifest)
+    newFiles = dictFromManifest(newManifest)
+    newPaths = []
+    for filePath,hash in newFiles.items():
+        if hash != oldFiles.get(filePath):
+            newPaths.append(filePath)
+    if not dryRun:
+        for filePath in newPaths:
+            remotePath = ghPrefix + filePath
+            localPath = os.path.join(path, *filePath.split("/"))
+            try:
+                with closing(urllib2.urlopen(remotePath)) as fh:
+                    newFile = unicode(fh.read(), encoding="utf-8")
+            except Exception,e:
+                warn("Couldn't download file '{0}'.\n{1}", remotePath, e)
+                return False
+            try:
+                with io.open(localPath, 'w', encoding="utf-8") as fh:
+                    fh.write(newFile)
+            except Exception,e:
+                warn("Couldn't save file '{0}'.\n{1}", localPath, e)
+                return False
+        try:
+            with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
+                fh.write("".join(newManifest))
+        except Exception,e:
+            warn("Couldn't save new manifest file.\n{0}", e)
+            return False
+    say("Done!")
+    return True
+
+    
+
+def dictFromManifest(lines):
+    '''
+    Converts a manifest file, where each line is
+    <hash>[space]<filepath>
+    into a dict of {path:hash}.
+    First line of file is a datetime string, which we skip.
+    '''
+    ret = {}
+    for line in lines[1:]:
+        hash,_,path = line.strip().partition(" ")
+        ret[path] = hash
+    return ret

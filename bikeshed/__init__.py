@@ -114,13 +114,13 @@ def main():
                              help="Bring-Your-Own-Spec: turns off all the Bikeshed auto-niceties, so you can piecemeal its features into your existing doc instead. Experimental, let me know if things get crashy or weird.")
 
     updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
+    updateParser.add_argument("--force", action="store_true", help="Forces a full update, skipping the manifest.")
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
     updateParser.add_argument("--caniuse", action="store_true", help="Download Can I Use... data.")
     updateParser.add_argument("--link-defaults", dest="linkDefaults", action="store_true", help="Download link default data.")
     updateParser.add_argument("--test-suites", dest="testSuites", action="store_true", help="Download test suite data.")
     updateParser.add_argument("--languages", dest="languages", action="store_true", help="Download language/translation data.")
-    updateParser.add_argument("--manifest", dest="manifest", action="store_true", help="UNDER TESTING - don't use")
 
     issueParser = subparsers.add_parser('issues-list', help="Process a plain-text issues file into HTML. Call with no args to see an example input text.")
     issueParser.add_argument("-t",
@@ -210,10 +210,7 @@ def main():
 
     update.fixupDataFiles()
     if options.subparserName == "update":
-        if options.manifest:
-            update.createManifest(path=os.path.join(config.scriptPath, "spec-data"))
-        else:
-            update.update(anchors=options.anchors, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, dryRun=config.dryRun)
+        update.update(anchors=options.anchors, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, dryRun=config.dryRun, force=options.force)
     elif options.subparserName == "spec":
         doc = Spec(inputFilename=options.infile, debug=options.debug, token=options.ghToken, lineNumbers=options.lineNumbers)
         doc.md = metadata.fromCommandLine(extras, doc)

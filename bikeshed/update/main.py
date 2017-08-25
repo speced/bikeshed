@@ -11,26 +11,35 @@ from . import updateTestSuites
 from . import updateLanguages
 from . import manifest
 from .. import config
+from ..messages import *
 
 
-def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False, path=None, dryRun=False):
+def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False, path=None, dryRun=False, force=False):
     if path is None:
         path = os.path.join(config.scriptPath, "spec-data")
-    # If all are False, update everything
-    updateAnyway = not (anchors or biblio or caniuse or linkDefaults or testSuites or languages)
-    if anchors or updateAnyway:
-        updateCrossRefs.update(path=path, dryRun=dryRun)
-    if biblio or updateAnyway:
-        updateBiblio.update(path=path, dryRun=dryRun)
-    if caniuse or updateAnyway:
-        updateCanIUse.update(path=path, dryRun=dryRun)
-    if linkDefaults or updateAnyway:
-        updateLinkDefaults.update(path=path, dryRun=dryRun)
-    if testSuites or updateAnyway:
-        updateTestSuites.update(path=path, dryRun=dryRun)
-    if languages or updateAnyway:
-        updateLanguages.update(path=path, dryRun=dryRun)
-    manifest.createManifest(path=path, dryRun=dryRun)
+
+    # Update via manifest by default, falling back to a full update only if failed or forced.
+    if not force:
+        success = manifest.updateByManifest(path=path, dryRun=dryRun)
+        if not success:
+            say("Falling back to a manual update...")
+            force = True
+    if force:
+        # If all are False, update everything
+        updateAnyway = not (anchors or biblio or caniuse or linkDefaults or testSuites or languages)
+        if anchors or updateAnyway:
+            updateCrossRefs.update(path=path, dryRun=dryRun)
+        if biblio or updateAnyway:
+            updateBiblio.update(path=path, dryRun=dryRun)
+        if caniuse or updateAnyway:
+            updateCanIUse.update(path=path, dryRun=dryRun)
+        if linkDefaults or updateAnyway:
+            updateLinkDefaults.update(path=path, dryRun=dryRun)
+        if testSuites or updateAnyway:
+            updateTestSuites.update(path=path, dryRun=dryRun)
+        if languages or updateAnyway:
+            updateLanguages.update(path=path, dryRun=dryRun)
+        manifest.createManifest(path=path, dryRun=dryRun)
 
 
 def fixupDataFiles():
