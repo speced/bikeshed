@@ -112,6 +112,8 @@ def updateByManifest(path, dryRun=False):
         if hash != oldFiles.get(filePath):
             newPaths.append(filePath)
     if not dryRun:
+        if newPaths:
+            say("Updating {0} file{1}...", len(newPaths), "s" if len(newPaths) > 1 else "")
         for filePath in newPaths:
             remotePath = ghPrefix + filePath
             localPath = os.path.join(path, *filePath.split("/"))
