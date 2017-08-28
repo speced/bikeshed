@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
-from functools import total_ordering
-import collections
 import io
-import os.path
+import os
 import re
-from collections import defaultdict
 
 from ..enum import Enum
 
