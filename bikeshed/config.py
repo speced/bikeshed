@@ -552,7 +552,7 @@ def printjsonprimitive(x):
         return unicode(x)
     if x is None:
         return "null"
-
+    raise Exception(x)
 
 def processTextNodes(nodes, regex, replacer):
     '''
