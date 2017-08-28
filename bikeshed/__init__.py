@@ -35,7 +35,6 @@ from . import update
 from .htmlhelpers import *
 from .messages import *
 from .refs import ReferenceManager
-from .requests import requests
 from .widlparser.widlparser import parser
 
 
@@ -2349,6 +2348,8 @@ def inlineRemoteIssues(doc):
         removeAttr(el, "data-inline-github")
     if not inlineIssues:
         return
+
+    from .requests import requests
 
     logging.captureWarnings(True)
 

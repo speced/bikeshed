@@ -4,19 +4,15 @@ import collections
 import itertools
 import re
 from . import config
-from . import lexers
 from .htmlhelpers import *
 from .messages import *
-from .widlparser.widlparser import parser
-try:
-    import pygments as pyg
-    from pygments.lexers import get_lexer_by_name
-    from pygments import formatters
-except ImportError:
-    die("Bikeshed now uses Pygments for syntax highlighting.\nPlease run `$ sudo pip install pygments` from your command line.")
 
+
+def loadCSSLexer():
+    from .lexers import CSSLexer
+    return CSSLexer()
 customLexers = {
-    "css": lexers.CSSLexer()
+    "css": loadCSSLexer
 }
 
 ColoredText = collections.namedtuple('ColoredText', ['text', 'color'])
@@ -137,6 +133,7 @@ def highlightEl(el, lang):
 
 
 def highlightWithWebIDL(text, el):
+    from .widlparser.widlparser import parser
     class IDLUI(object):
         def warn(self, msg):
             die("{0}", msg.rstrip())
@@ -163,11 +160,13 @@ def highlightWithWebIDL(text, el):
 
 
 def highlightWithPygments(text, lang, el):
+    import pygments
+    from pygments import formatters
     lexer = lexerFromLang(lang)
     if lexer is None:
         die("'{0}' isn't a known syntax-highlighting language. See http://pygments.org/docs/lexers/. Seen on:\n{1}", lang, outerHTML(el), el=el)
         return
-    rawTokens = pyg.highlight(text, lexer, formatters.RawTokenFormatter())
+    rawTokens = pygments.highlight(text, lexer, formatters.RawTokenFormatter())
     coloredText = coloredTextFromRawTokens(rawTokens)
     return coloredText
 
@@ -345,8 +344,9 @@ def normalizeHighlightMarkers(doc):
 
 def lexerFromLang(lang):
     if lang in customLexers:
-        return customLexers[lang]
+        return customLexers[lang]()
     try:
+        from pygments.lexers import get_lexer_by_name
         return get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
     except pyg.util.ClassNotFound:
         return None

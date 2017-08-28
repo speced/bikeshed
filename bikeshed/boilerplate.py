@@ -5,7 +5,6 @@ import os
 import re
 import subprocess
 from collections import defaultdict
-from . import highlight
 from .DefaultOrderedDict import DefaultOrderedDict
 from .htmlhelpers import *
 from .messages import *

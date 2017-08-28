@@ -4,7 +4,6 @@ import logging
 import re
 from .htmlhelpers import *
 from .messages import *
-from .requests import requests
 
 def lintExampleIDs(doc):
     if not doc.md.complainAbout['missing-example-ids']:
@@ -15,6 +14,7 @@ def lintExampleIDs(doc):
 def lintBrokenLinks(doc):
     if not doc.md.complainAbout['broken-links']:
         return
+    from .requests import requests
 
     say("Checking links, this may take a while...")
     logging.captureWarnings(True) # Silence the requests library :/
