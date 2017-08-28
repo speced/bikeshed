@@ -96,10 +96,10 @@ class RefSource(object):
                 for ref in self.fetchRefs(text):
                     yield RefWrapper(text, ref)
 
-        def forRefsIterator(fors, targetFors):
+        def forRefsIterator(targetFors):
             # Same as above, but only grabs those for certain values
             for for_ in targetFors:
-                for text in fors[for_]:
+                for text in self.fors[for_]:
                     for ref in self.fetchRefs(text):
                         yield RefWrapper(text, ref)
 
@@ -115,7 +115,7 @@ class RefSource(object):
                     textsToSearch += [t.lower() for t in textsToSearch]
                 refs = list(textRefsIterator(textsToSearch))
         elif linkFor:
-            refs = list(forRefsIterator(self.fors, [linkFor]))
+            refs = list(forRefsIterator([linkFor]))
         else:
             refs = list(allRefsIterator())
         if not refs:
