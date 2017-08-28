@@ -4,6 +4,7 @@ import copy
 import io
 import json
 import re
+import os
 from collections import defaultdict
 from operator import itemgetter
 from . import biblio
@@ -13,6 +14,10 @@ from .htmlhelpers import *
 from .messages import *
 
 class RefSource(object):
+
+    # Which sources use lazy-loading; other sources always have all their refs loaded immediately.
+    lazyLoadedSources = ["foreign"]
+    
     def __init__(self, source, specs=None, ignored=None, replaced=None):
         # String identifying which refsource this is.
         self.source = source
@@ -37,9 +42,7 @@ class RefSource(object):
         if key in self._refs:
             return self._refs[key]
 
-        # Currently, only the "foreign" refs group can load extra files,
-        # so if it wasn't found previously, it's just not here.
-        if self.source != "foreign":
+        if self.source not in self.lazyLoadedSources:
             return []
 
         group = config.groupFromKey(key)
@@ -47,11 +50,28 @@ class RefSource(object):
             # Group was loaded, but previous check didn't find it, so it's just not here.
             return []
         # Otherwise, load the group file.
-        with config.retrieveDataFile("anchors/anchors-{0}.data".format(group), quiet=True, okayToFail=True) as fh:
+        with config.retrieveDataFile(os.path.join("anchors", "anchors-{0}.data".format(group)), quiet=True, okayToFail=True) as fh:
             self._refs.update(decodeAnchors(fh))
             self._loadedAnchorGroups.add(group)
         return self._refs.get(key, [])
 
+    def fetchAllRefs(self):
+        '''Nuts to lazy-loading, just load everything at once.'''
+
+        if self.source not in self.lazyLoadedSources:
+            return self._refs.items()
+        
+        path = os.path.join(config.scriptPath, "spec-data", "anchors")
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                group = re.match("anchors-(.{2})", file).group(1)
+                if group in self._loadedAnchorGroups:
+                    # Already loaded
+                    continue
+                with config.retrieveDataFile(os.path.join("anchors", file), quiet=True) as fh:
+                    self._refs.update(decodeAnchors(fh))
+                    self._loadedAnchorGroups.add(group)
+        return self._refs.items()
 
     def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, **kwargs):
         results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, exact=True)
@@ -63,11 +83,10 @@ class RefSource(object):
     def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
-        def refsIterator():
+        def allRefsIterator():
             # Turns a dict of arrays of refs into an iterator of refs
             # TODO: This needs to load all possible refs.
-            warn("Plain refs iterator used")
-            for key, group in self._refs.items():
+            for key, group in self.fetchAllRefs():
                 for ref in group:
                     yield RefWrapper(key, ref)
 
@@ -98,7 +117,7 @@ class RefSource(object):
         elif linkFor:
             refs = list(forRefsIterator(self.fors, [linkFor]))
         else:
-            refs = list(refsIterator())
+            refs = list(allRefsIterator())
         if not refs:
             return refs, "text"
 
