@@ -1,0 +1,162 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
+from functools import total_ordering
+import collections
+import io
+import os.path
+import re
+from collections import defaultdict
+
+from ..enum import Enum
+
+force = True
+quiet = True
+dryRun = False
+printMode = "console"
+scriptPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+doc = None
+textMacros = {}
+
+def englishFromList(items):
+    # Format a list of strings into an English list.
+    items = list(items)
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return "{0} or {1}".format(*items)
+    return "{0}, or {1}".format(", ".join(items[:-1]), items[-1])
+
+testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
+
+refStatus = Enum("RefStatus", {"current":"current", "snapshot":"snapshot"})
+
+
+def intersperse(iterable, delimiter):
+    it = iter(iterable)
+    yield next(it)
+    for x in it:
+        yield delimiter
+        yield x
+
+
+def processTextNodes(nodes, regex, replacer):
+    '''
+    Takes an array of alternating text/objects,
+    and runs reSubObject on the text parts,
+    splicing them into the passed-in array.
+    Mutates!
+    '''
+    for i, node in enumerate(nodes):
+        # Node list always alternates between text and elements
+        if i % 2 == 0:
+            nodes[i:i + 1] = reSubObject(regex, node, replacer)
+    return nodes
+
+
+def reSubObject(pattern, string, repl=None):
+    '''
+    like re.sub, but replacements don't have to be text;
+    returns an array of alternating unmatched text and match objects instead.
+    If repl is specified, it's called with each match object,
+    and the result then shows up in the array instead.
+    '''
+    lastEnd = 0
+    pieces = []
+    for match in pattern.finditer(string):
+        pieces.append(string[lastEnd:match.start()])
+        if repl:
+            pieces.append(repl(match))
+        else:
+            pieces.append(match)
+        lastEnd = match.end()
+    pieces.append(string[lastEnd:])
+    return pieces
+
+
+def simplifyText(text):
+    # Remove anything that's not a name character.
+    text = text.strip().lower()
+    # I convert ( to - so foo(bar) becomes foo-bar,
+    # but then I have to remove () because there's nothing to separate,
+    # otherwise I get a double-dash in some cases.
+    text = re.sub(r"\(\)", "", text)
+    text = re.sub(r"[\s/(,]+", "-", text)
+    text = re.sub(r"[^a-z0-9_-]", "", text)
+    text = text.rstrip("-")
+    return text
+
+
+def linkTextsFromElement(el, preserveCasing=False):
+    from ..htmlhelpers import find, textContent
+    if el.get('data-lt') == '':
+        return []
+    elif el.get('data-lt'):
+        rawText = el.get('data-lt')
+        if rawText in ["|", "||", "|||"]:
+            texts = [rawText]
+        else:
+            texts = [x.strip() for x in rawText.split('|')]
+    else:
+        if el.tag in ("dfn", "a"):
+            texts = [textContent(el).strip()]
+        elif el.tag in ("h2", "h3", "h4", "h5", "h6"):
+            texts = [textContent(find(".content", el)).strip()]
+    if el.get('data-local-lt'):
+        localTexts = [x.strip() for x in el.get('data-local-lt').split('|')]
+        for text in localTexts:
+            if text in texts:
+                # lt and local-lt both specify the same thing
+                raise DuplicatedLinkText(text, texts + localTexts, el)
+        texts += localTexts
+
+    texts = [re.sub(r"\s+", " ", x) for x in texts if x != '']
+    return texts
+
+
+class DuplicatedLinkText(Exception):
+    def __init__(self, offendingText, allTexts, el):
+        self.offendingText = offendingText
+        self.allTexts = allTexts
+        self.el = el
+
+    def __unicode__(self):
+        return "<Text '{0}' shows up in both lt and local-lt>".format(self.offendingText)
+
+
+def firstLinkTextFromElement(el):
+    try:
+        texts = linkTextsFromElement(el)
+    except DuplicatedLinkText as e:
+        texts = e.allTexts
+    return texts[0] if len(texts) else None
+
+
+def splitForValues(forValues):
+    '''
+    Splits a string of 1+ "for" values into an array of individual value.
+    Respects function args, etc.
+    Currently, for values are separated by commas.
+    '''
+    if forValues is None:
+        return None
+    forValues = re.sub("\s+", " ", forValues)
+    return [value.strip() for value in re.split(r',(?![^()]*\))', forValues) if value.strip()]
+
+
+def groupFromKey(key, length=2):
+    '''Generates a filename-safe "group" from a key, of a specified length.'''
+    if key in _groupFromKeyCache:
+        return _groupFromKeyCache[key]
+    safeChars = frozenset("abcdefghijklmnopqrstuvwxyz0123456789")
+    group = ""
+    for char in key.lower():
+        if len(group) == length:
+            _groupFromKeyCache[key] = group
+            return group
+        if char in safeChars:
+            group += char
+    else:
+        group = group.ljust(length, "_")
+        _groupFromKeyCache[key] = group
+        return group
+_groupFromKeyCache = {}
