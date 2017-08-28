@@ -19,7 +19,9 @@ shortToLongStatus = {
     "w3c/PR": "W3C Proposed Recommendation",
     "w3c/REC": "W3C Recommendation",
     "w3c/PER": "W3C Proposed Edited Recommendation",
-    "w3c/NOTE": "W3C Working Group Note",
+    "w3c/WG-NOTE": "W3C Working Group Note",
+    "w3c/IG-NOTE": "W3C Interest Group Note",
+    "w3c/NOTE": "W3C Note",
     "w3c/MO": "W3C Member-only Draft",
     "w3c/UD": "Unofficial Proposal Draft",
     "w3c/CG-DRAFT": "Draft Community Group Report",
@@ -68,7 +70,7 @@ shortToLongStatus = {
     "iso/PRF-AMD": "Proof Amendment",
     "iso/AMD": "Amendment"
 }
-snapshotStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/NOTE", "w3c/MO"]
+snapshotStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/WG-NOTE", "w3c/IG-NOTE", "w3c/NOTE", "w3c/MO"]
 unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING", "DRAFT-FINDING"]
 deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
 noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DRAFT-FINDING", "DREAM"]
