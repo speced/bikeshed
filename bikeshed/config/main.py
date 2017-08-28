@@ -11,6 +11,11 @@ quiet = True
 dryRun = False
 printMode = "console"
 scriptPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
+
+
+refStatus = Enum("RefStatus", {"current":"current", "snapshot":"snapshot"})
+
 
 def englishFromList(items):
     # Format a list of strings into an English list.
@@ -20,10 +25,6 @@ def englishFromList(items):
     if len(items) == 2:
         return "{0} or {1}".format(*items)
     return "{0}, or {1}".format(", ".join(items[:-1]), items[-1])
-
-testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
-
-refStatus = Enum("RefStatus", {"current":"current", "snapshot":"snapshot"})
 
 
 def intersperse(iterable, delimiter):
