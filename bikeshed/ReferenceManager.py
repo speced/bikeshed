@@ -844,12 +844,12 @@ class RefWrapper(object):
         return val
 
     def __json__(self):
-        refCopy = copy.copy(self.ref)
+        refCopy = copy.copy(self._ref)
         refCopy['text'] = self.text
-        return refCopy
+        return stripLineBreaks(refCopy)
 
     def __repr__(self):
-        return "RefWrapper(" + repr(self.text) + ", " + repr(self.ref) + ")"
+        return "RefWrapper(" + repr(self.text) + ", " + repr(self._ref) + ")"
 
 
 def simplifyPossibleRefs(refs, alwaysShowFor=False):
