@@ -14,8 +14,6 @@ quiet = True
 dryRun = False
 printMode = "console"
 scriptPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-doc = None
-textMacros = {}
 
 def englishFromList(items):
     # Format a list of strings into an English list.
