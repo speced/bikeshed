@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 
+from .. import config
+
 
 def filterObsoletes(refs, replacedSpecs, ignoredSpecs, localShortname=None, localSpec=None):
     # Remove any ignored or obsoleted specs

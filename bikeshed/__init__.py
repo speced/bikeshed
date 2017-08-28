@@ -34,7 +34,7 @@ from . import test
 from . import update
 from .htmlhelpers import *
 from .messages import *
-from .ReferenceManager import ReferenceManager
+from .refs import ReferenceManager
 from .requests import requests
 from .widlparser.widlparser import parser
 

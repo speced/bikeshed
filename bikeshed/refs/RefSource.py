@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 
+import copy
 import os
 import re
 from collections import defaultdict
 
 from .. import config
 from .RefWrapper import RefWrapper
+from .utils import *
 
 class RefSource(object):
 

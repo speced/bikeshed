@@ -8,9 +8,12 @@ import re
 from collections import defaultdict
 from operator import itemgetter
 
+from .RefSource import RefSource
+from .utils import *
 from .. import biblio
 from .. import config
 from .. import datablocks
+from ..htmlhelpers import *
 
 class ReferenceManager(object):
 
