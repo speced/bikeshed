@@ -116,8 +116,6 @@ class MetadataManager:
             return
         md = knownKeys[key]
 
-        self.manuallySetKeys.add(key)
-
         val = md.parse(key, val, lineNum)
 
         self.addParsedData(key, val)
@@ -126,6 +124,7 @@ class MetadataManager:
         md = knownKeys[key]
         result = md.join(getattr(self, md.attrName), val)
         setattr(self, md.attrName, result)
+        self.manuallySetKeys.add(key)
 
     def computeImplicitMetadata(self):
         # Do some "computed metadata", based on the value of other metadata.
