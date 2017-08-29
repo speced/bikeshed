@@ -77,16 +77,18 @@ class Spec(object):
         try:
             if self.inputSource == "-":
                 self.lines = [unicode(line, encoding="utf-8") for line in sys.stdin.readlines()]
-                self.md.date = datetime.today()
             else:
                 self.lines = io.open(self.inputSource, 'r', encoding="utf-8").readlines()
-                self.md.date = datetime.fromtimestamp(os.path.getmtime(self.inputSource))
+                # Initialize date to the last-modified date on the file,
+                # so processing repeatedly over time doesn't cause spurious date-only changes.
+                self.md.addParsedData("Date", datetime.fromtimestamp(os.path.getmtime(self.inputSource)).date())
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", self.inputSource)
             return False
         except IOError:
             die("Couldn't open the input file '{0}'.", self.inputSource)
             return False
+
         return True
 
     def preprocess(self):
