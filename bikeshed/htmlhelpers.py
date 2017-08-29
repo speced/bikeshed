@@ -494,10 +494,12 @@ def hasClass(el, cls, classMap=_classMap):
     elClass = el.get("class")
     if elClass is None:
         return False
+    if cls not in elClass:
+        return False
     key = cls, elClass
     if key in classMap:
         return classMap[key]
-    ret = (" "+cls+" ") in (" "+elClass+" ")
+    ret = re.search(r"(^|\s)"+cls+r"($|\s)", elClass)
     classMap[key] = ret
     return ret
 
