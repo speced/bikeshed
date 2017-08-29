@@ -187,9 +187,9 @@ def main():
         update.update(anchors=options.anchors, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, dryRun=config.dryRun, force=options.force)
     elif options.subparserName == "spec":
         doc = Spec(inputFilename=options.infile, debug=options.debug, token=options.ghToken, lineNumbers=options.lineNumbers)
-        doc.md = metadata.fromCommandLine(extras, doc)
+        doc.mdCommandLine = metadata.fromCommandLine(extras, doc)
         if options.byos:
-            doc.md.addData("Group", "byos")
+            doc.mdCommandLine.addData("Group", "byos")
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "echidna":

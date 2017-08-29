@@ -129,6 +129,8 @@ class MetadataManager:
     def computeImplicitMetadata(self):
         # Do some "computed metadata", based on the value of other metadata.
         # Only call this when you're sure all metadata sources are parsed.
+        if self.group == "byos":
+            self.boilerplate.default = False
         if not self.repository:
             self.repository = getSpecRepository(self.doc)
         if self.repository.type == "github" and "feedback-header" in self.boilerplate and "repository-issue-tracking" in self.boilerplate:
@@ -737,8 +739,7 @@ def fromCommandLine(overrides, doc):
     return md
 
 
-def fromJson(data, doc):
-    md = MetadataManager(doc)
+def fromJson(data, md):
     try:
         defaults = json.loads(data)
     except Exception, e:

@@ -59,7 +59,12 @@ class Spec(object):
         self.informativeRefs = {}
         self.refs = ReferenceManager()
         self.externalRefsUsed = defaultdict(lambda:defaultdict(dict))
-        self.md = metadata.MetadataManager(doc=self)
+        self.md = None
+        self.mdBaseline = metadata.MetadataManager(doc=self)
+        self.mdDocument = None
+        self.mdCommandLine = metadata.MetadataManager(doc=self)
+        self.mdDefaults = None
+        self.mdOverridingDefaults = None
         self.biblios = {}
         self.typeExpansions = {}
         self.macros = defaultdict(lambda x: "???")
@@ -81,7 +86,7 @@ class Spec(object):
                 self.lines = io.open(self.inputSource, 'r', encoding="utf-8").readlines()
                 # Initialize date to the last-modified date on the file,
                 # so processing repeatedly over time doesn't cause spurious date-only changes.
-                self.md.addParsedData("Date", datetime.fromtimestamp(os.path.getmtime(self.inputSource)).date())
+                self.mdBaseline.addParsedData("Date", datetime.fromtimestamp(os.path.getmtime(self.inputSource)).date())
         except OSError:
             die("Couldn't find the input file at the specified location '{0}'.", self.inputSource)
             return False
@@ -99,16 +104,14 @@ class Spec(object):
         self.lines = markdown.stripComments(self.lines)
 
         # Extract and process metadata
-        self.lines, documentMd = metadata.parse(lines=self.lines, doc=self)
-        self.md = metadata.join(documentMd, self.md)
-        defaultMd = metadata.fromJson(data=config.retrieveBoilerplateFile(self, 'defaults', error=True), doc=self)
-        self.md = metadata.join(defaultMd, self.md)
-        if self.md.group == "byos":
-            self.md.boilerplate.default = False
+        self.lines, self.mdDocument = metadata.parse(lines=self.lines, doc=self)
+        self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
+        self.mdDefaults = metadata.fromJson(data=config.retrieveBoilerplateFile(self, 'defaults', error=True), md=metadata.MetadataManager(self))
+        self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
         self.md.fillTextMacros(self.macros, doc=self)
         computedMdText = replaceMacros(config.retrieveBoilerplateFile(self, 'computed-metadata', error=True), macros=self.macros)
-        computedMd = metadata.fromJson(data=computedMdText, doc=self)
-        self.md = metadata.join(self.md, computedMd)
+        self.mdOverridingDefaults = metadata.fromJson(data=computedMdText, md=metadata.MetadataManager(self))
+        self.md = metadata.join(self.md, self.mdOverridingDefaults)
         self.md.computeImplicitMetadata()
         self.md.fillTextMacros(self.macros, doc=self)
         self.md.validate()
