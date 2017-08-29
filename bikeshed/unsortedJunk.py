@@ -1,0 +1,1384 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
+
+import io
+import itertools
+import json
+import logging
+import os
+import re
+from collections import defaultdict, namedtuple
+from functools import partial as curry
+
+from . import biblio
+from . import config
+from . import datablocks
+from . import func
+from . import markdown
+from .htmlhelpers import *
+from .messages import *
+
+class MarkdownCodeSpans(func.Functor):
+    # Wraps a string, such that the contained text is "safe"
+    # and contains no markdown code spans.
+    # Thus, functions mapping over the text can freely make substitutions,
+    # knowing they won't accidentally replace stuff in a code span.
+    def __init__(self, text):
+        self.__codeSpanReplacements__ = []
+        newText = ""
+        mode = "text"
+        indexSoFar = 0
+        escapeLen = 0
+        for m in re.finditer(r"(\\`)|(`+)", text):
+            if mode == "text":
+                if m.group(1):
+                    newText += text[indexSoFar:m.start()] + m.group(1)[1]
+                    indexSoFar = m.end()
+                elif m.group(2):
+                    mode = "code"
+                    newText += text[indexSoFar:m.start()]
+                    indexSoFar = m.end()
+                    escapeLen = len(m.group(2))
+            elif mode == "code":
+                if m.group(1):
+                    pass
+                elif m.group(2):
+                    if len(m.group(2)) != escapeLen:
+                        pass
+                    else:
+                        mode = "text"
+                        self.__codeSpanReplacements__.append(text[indexSoFar:m.start()])
+                        newText += "\ue0ff"
+                        indexSoFar = m.end()
+        if mode == "text":
+            newText += text[indexSoFar:]
+        elif mode == "code":
+            newText += "`"*escapeLen + text[indexSoFar:]
+        self.__val__ = newText
+
+    def map(self, fn):
+        x = MarkdownCodeSpans("")
+        x.__val__ = fn(self.__val__)
+        x.__codeSpanReplacements__ = self.__codeSpanReplacements__
+        return x
+
+    def extract(self):
+        if self.__codeSpanReplacements__:
+            repls = self.__codeSpanReplacements__[::-1]
+            def codeSpanReviver(_):
+                # Match object is the PUA character, which I can ignore.
+                # Instead, sub back the replacement in order,
+                # massaged per the Commonmark rules.
+                import string
+                t = escapeHTML(repls.pop()).strip(string.whitespace)
+                t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
+                return "<code data-opaque>" + t + "</code>"
+            return re.sub("\ue0ff", codeSpanReviver, self.__val__)
+        else:
+            return self.__val__
+
+
+def stripBOM(doc):
+    if len(doc.lines) >= 1 and doc.lines[0][0:1] == "\ufeff":
+        doc.lines[0] = doc.lines[0][1:]
+        warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
+
+
+# Definitions and the like
+
+def fixManualDefTables(doc):
+    # Def tables generated via datablocks are guaranteed correct,
+    # but manually-written ones often don't link up the names in the first row.
+    for table in findAll("table.propdef, table.descdef, table.elementdef", doc):
+        if hasClass(table, "partial"):
+            tag = "a"
+            attr = "data-link-type"
+        else:
+            tag = "dfn"
+            attr = "data-dfn-type"
+        tag = "a" if hasClass(table, "partial") else "dfn"
+        if hasClass(table, "propdef"):
+            type = "property"
+        elif hasClass(table, "descdef"):
+            type = "descriptor"
+        elif hasClass(table, "elementdef"):
+            type = "element"
+        cell = findAll("tr:first-child > :nth-child(2)", table)[0]
+        names = [x.strip() for x in textContent(cell).split(',')]
+        newContents = config.intersperse((createElement(tag, {attr:type}, name) for name in names), ", ")
+        replaceContents(cell, newContents)
+
+
+def canonicalizeShortcuts(doc):
+    # Take all the invalid-HTML shortcuts and fix them.
+
+    attrFixup = {
+        "export":"data-export",
+        "noexport":"data-noexport",
+        "spec":"data-link-spec",
+        "status":"data-link-status",
+        "dfn-for":"data-dfn-for",
+        "link-for":"data-link-for",
+        "link-for-hint":"data-link-for-hint",
+        "dfn-type":"data-dfn-type",
+        "link-type":"data-link-type",
+        "force":"data-dfn-force",
+        "section":"data-section",
+        "attribute-info":"data-attribute-info",
+        "dict-member-info":"data-dict-member-info",
+        "lt":"data-lt",
+        "local-lt":"data-local-lt",
+        "algorithm":"data-algorithm",
+        "ignore":"data-var-ignore"
+    }
+    for el in findAll(",".join("[{0}]".format(attr) for attr in attrFixup.keys()), doc):
+        for attr, fixedAttr in attrFixup.items():
+            if el.get(attr) is not None:
+                el.set(fixedAttr, el.get(attr))
+                del el.attrib[attr]
+
+    # The next two aren't in the above dict because some of the words conflict with existing attributes on some elements.
+    # Instead, limit the search/transforms to the relevant elements.
+    for el in findAll("dfn, h2, h3, h4, h5, h6", doc):
+        for dfnType in config.dfnTypes:
+            if el.get(dfnType) == "":
+                del el.attrib[dfnType]
+                el.set("data-dfn-type", dfnType)
+                break
+    for el in findAll("a", doc):
+        for linkType in config.linkTypes:
+            if el.get(linkType) is not None:
+                del el.attrib[linkType]
+                el.set("data-link-type", linkType)
+                break
+    for el in findAll(config.dfnElementsSelector + ", a", doc):
+        if el.get("for") is None:
+            continue
+        if el.tag == "a":
+            el.set("data-link-for", el.get('for'))
+        else:
+            el.set("data-dfn-for", el.get('for'))
+        del el.attrib['for']
+
+
+def addImplicitAlgorithms(doc):
+    # If a container has an empty `algorithm` attribute,
+    # but it contains only a single `<dfn>`,
+    # assume that the dfn is a description of the algorithm.
+    for el in findAll("[algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
+        dfns = findAll("dfn", el)
+        if len(dfns) == 1:
+            el.set("algorithm", config.firstLinkTextFromElement(dfns[0]))
+        elif len(dfns) == 0:
+            die("Algorithm container has no name, and there is no <dfn> to infer one from.", el=el)
+        else:
+            die("Algorithm container has no name, and there are too many <dfn>s to choose which to infer a name from.", el=el)
+
+
+def checkVarHygiene(doc):
+    def nearestAlgo(var):
+        # Find the nearest "algorithm" container,
+        # either an ancestor with [algorithm] or the nearest heading with same.
+        algo = treeAttr(var, "data-algorithm")
+        if algo:
+            return algo or None
+        for h in relevantHeadings(var):
+            algo = h.get("data-algorithm")
+            if algo is not None and algo is not "":
+                return algo
+
+    # Look for vars that only show up once. These are probably typos.
+    singularVars = []
+    varCounts = defaultdict(lambda: 0)
+    for el in findAll("var:not([data-var-ignore])", doc):
+        key = textContent(el), nearestAlgo(el)
+        varCounts[key] += 1
+    foldedVarCounts = defaultdict(lambda: 0)
+    for (var,algo),count in varCounts.items():
+        if count > 1:
+            continue
+        var = foldWhitespace(var).strip()
+        if var.lower() in doc.md.ignoredVars:
+            continue
+        key = var, algo
+        foldedVarCounts[key] += 1
+    varLines = []
+    for (var, algo),count in foldedVarCounts.items():
+        if count == 1:
+            if algo:
+                varLines.append("  '{0}', in algorithm '{1}'".format(var, algo))
+            else:
+                varLines.append("  '{0}'".format(var))
+    if varLines:
+        warn("The following <var>s were only used once in the document:\n{0}\nIf these are not typos, please add an ignore='' attribute to the <var>.", "\n".join(varLines))
+
+    # Look for algorithms that show up twice; these are errors.
+    for algo, count in Counter(el.get('data-algorithm') for el in findAll("[data-algorithm]", doc)).items():
+        if count > 1:
+            die("Multiple declarations of the '{0}' algorithm.", algo)
+            return
+
+
+def fixIntraDocumentReferences(doc):
+    ids = {el.get('id'):el for el in findAll("[id]", doc)}
+    headingIDs = {el.get('id'):el for el in findAll("[id].heading", doc)}
+    for el in findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
+        targetID = el.get("href")[1:]
+        if el.get('data-section') is not None and targetID not in headingIDs:
+            die("Couldn't find target document section {0}:\n{1}", targetID, outerHTML(el), el=el)
+            continue
+        elif targetID not in ids:
+            die("Couldn't find target anchor {0}:\n{1}", targetID, outerHTML(el), el=el)
+            continue
+        if isEmpty(el):
+            # TODO Allow this to respect "safe" markup (<sup>, etc) in the title
+            target = ids[targetID]
+            content = find(".content", target)
+            if content is None:
+                die("Tried to generate text for a section link, but the target isn't a heading:\n{0}", outerHTML(el), el=el)
+                continue
+            text = textContent(content).strip()
+            if target.get('data-level') is not None:
+                text = "§{1} {0}".format(text, target.get('data-level'))
+            appendChild(el, text)
+
+
+def fixInterDocumentReferences(doc):
+    for el in findAll("[spec-section]", doc):
+        spec = el.get('data-link-spec')
+        section = el.get('spec-section', '')
+        if spec is None:
+            die("Spec-section autolink doesn't have a 'spec' attribute:\n{0}", outerHTML(el), el=el)
+            continue
+        if section is None:
+            die("Spec-section autolink doesn't have a 'spec-section' attribute:\n{0}", outerHTML(el), el=el)
+            continue
+        if spec in doc.refs.specs:
+            # Bikeshed recognizes the spec
+            specData = doc.refs.fetchHeadings(spec)
+            if section in specData:
+                heading = specData[section]
+            else:
+                die("Couldn't find section '{0}' in spec '{1}':\n{2}", section, spec, outerHTML(el), el=el)
+                continue
+            if isinstance(heading, list):
+                # Multipage spec
+                if len(heading) == 1:
+                    # only one heading of this name, no worries
+                    heading = specData[heading[0]]
+                else:
+                    # multiple headings of this id, user needs to disambiguate
+                    die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  [[{0}]]".format(spec + x) for x in heading), el=el)
+                    continue
+            if doc.md.status == "current":
+                if "current" in heading:
+                    heading = heading["current"]
+                else:
+                    heading = heading["snapshot"]
+            else:
+                if "snapshot" in heading:
+                    heading = heading["snapshot"]
+                else:
+                    heading = heading["current"]
+            el.tag = "a"
+            el.set("href", heading['url'])
+            if isEmpty(el):
+                el.text = "{spec} §{number} {text}".format(**heading)
+        elif doc.refs.getBiblioRef(spec):
+            # Bikeshed doesn't know the spec, but it's in biblio
+            bib = doc.refs.getBiblioRef(spec)
+            if isinstance(bib, biblio.StringBiblioEntry):
+                die("Can't generate a cross-spec section ref for '{0}', because the biblio entry has no url.", spec, el=el)
+                continue
+            el.tag = "a"
+            el.set("href", bib.url + section)
+            if isEmpty(el):
+                el.text = bib.title + " §" + section[1:]
+        else:
+            # Unknown spec
+            die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el), el=el)
+            continue
+        removeAttr(el, 'data-link-spec')
+        removeAttr(el, 'spec-section')
+
+
+def fillAttributeInfoSpans(doc):
+    # Auto-add <span attribute-info> to <dt><dfn> when it's an attribute or dict-member.
+    for dt in findAll("dt", doc):
+        if find("span[data-attribute-info]", dt) is not None:
+            # Already has one, no need to do any work here
+            continue
+        dfn = find("dfn", dt)
+        if dfn is None:
+            continue
+        dfnType = dfn.get("data-dfn-type")
+        if dfnType == "attribute":
+            attrName = "data-attribute-info"
+        elif dfnType == "dict-member":
+            attrName = "data-dict-member-info"
+        else:
+            continue
+        spanFor = config.firstLinkTextFromElement(dfn)
+        if spanFor is None:
+            continue
+        # Internal slots (denoted by [[foo]] naming scheme) don't have attribute info
+        if spanFor.startswith("[["):
+            continue
+        if dfn.get("data-dfn-for"):
+            spanFor = dfn.get("data-dfn-for") + "/" + spanFor
+        # If there's whitespace after the dfn, clear it out
+        if emptyText(dfn.tail, wsAllowed=True):
+            dfn.tail = None
+        insertAfter(dfn,
+                    ", ",
+                    E.span({attrName:"", "for":spanFor}))
+
+    for el in findAll("span[data-attribute-info], span[data-dict-member-info]", doc):
+        if el.get('data-attribute-info') is not None:
+            refType = "attribute"
+        else:
+            refType = "dict-member"
+        if (el.text is None or el.text.strip() == '') and len(el) == 0:
+            referencedAttribute = el.get("for")
+            if referencedAttribute is None or referencedAttribute == "":
+                die("Missing for reference in attribute info span.", el=el)
+                continue
+            if "/" in referencedAttribute:
+                interface, referencedAttribute = referencedAttribute.split("/")
+                target = findAll('a[data-link-type={2}][data-lt="{0}"][data-link-for="{1}"]'.format(referencedAttribute, interface, refType), doc)
+            else:
+                target = findAll('a[data-link-type={1}][data-lt="{0}"]'.format(referencedAttribute, refType), doc)
+            if len(target) == 0:
+                die("Couldn't find target {1} '{0}':\n{2}", referencedAttribute, refType, outerHTML(el), el=el)
+                continue
+            elif len(target) > 1:
+                die("Multiple potential target {1}s '{0}':\n{2}", referencedAttribute, refType, outerHTML(el), el=el)
+                continue
+            target = target[0]
+            datatype = target.get("data-type").strip()
+            default = target.get("data-default")
+            decorations = []
+            if target.get("data-readonly") is not None:
+                decorations.append(", readonly")
+            if datatype[-1] == "?":
+                decorations.append(", nullable")
+                datatype = datatype[:-1]
+            if default is not None:
+                decorations.append(", defaulting to ")
+                decorations.append(E.code(default))
+            if datatype[0] == "(":
+                # Union type
+                # TODO(Nov 2015): actually handle this properly, don't have time to think through it right now.
+                appendChild(el,
+                            " of type ",
+                            E.code({"class":"idl-code"}, datatype),
+                            *decorations)
+            elif re.match(r"(\w+)<(\w+)>", datatype):
+                # Sequence type
+                match = re.match(r"(\w+)<(\w+)>", datatype)
+                appendChild(el,
+                            " of type ",
+                            match.group(1),
+                            "<",
+                            E.a({"data-link-type":"idl-name"}, match.group(2)),
+                            ">",
+                            *decorations)
+            else:
+                # Everything else
+                appendChild(el,
+                            " of type ",
+                            E.a({"data-link-type":"idl-name"}, datatype),
+                            *decorations)
+
+
+def processDfns(doc):
+    dfns = findAll(config.dfnElementsSelector, doc)
+    classifyDfns(doc, dfns)
+    fixupIDs(doc, dfns)
+    doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
+
+
+def determineDfnType(dfn, inferCSS=False):
+    # 1. Look at data-dfn-type
+    if dfn.get('data-dfn-type'):
+        return dfn.get('data-dfn-type')
+    # 2. Look for a prefix on the id
+    if dfn.get('id'):
+        id = dfn.get('id')
+        for prefix, type in config.dfnClassToType.items():
+            if id.startswith(prefix):
+                return type
+    # 3. Look for a class or data-dfn-type on the ancestors
+    for ancestor in dfn.iterancestors():
+        if ancestor.get('data-dfn-type'):
+            return ancestor.get('data-dfn-type')
+        for cls, type in config.dfnClassToType.items():
+            if hasClass(ancestor, cls):
+                return type
+            if hasClass(ancestor, "idl") and not hasClass(ancestor, "extract"):
+                return "interface"
+    # 4. Introspect on the text
+    if inferCSS:
+        text = textContent(dfn)
+        if text[0:1] == "@":
+            return "at-rule"
+        elif len(dfn) == 1 and dfn[0].get('data-link-type') == "maybe" and emptyText(dfn.text) and emptyText(dfn[0].tail):
+            return "value"
+        elif text[0:1] == "<" and text[-1:] == ">":
+            return "type"
+        elif text[0:1] == ":":
+            return "selector"
+        elif re.match(r"^[\w-]+\(.*\)$", text) and not (dfn.get('id') or '').startswith("dom-"):
+            return "function"
+    # 5. Assume it's a "dfn"
+    return "dfn"
+
+
+def classifyDfns(doc, dfns):
+    dfnTypeToPrefix = {v:k for k,v in config.dfnClassToType.items()}
+    for el in dfns:
+        dfnType = determineDfnType(el, inferCSS=doc.md.inferCSSDfns)
+        if dfnType not in config.dfnTypes:
+            die("Unknown dfn type '{0}' on:\n{1}", dfnType, outerHTML(el), el=el)
+            continue
+        dfnFor = treeAttr(el, "data-dfn-for")
+        primaryDfnText = config.firstLinkTextFromElement(el)
+        if primaryDfnText is None:
+            die("Dfn has no linking text:\n{0}", outerHTML(el), el=el)
+            continue
+        if len(primaryDfnText) > 100:
+            # Almost certainly accidentally missed the end tag
+            warn("Dfn has extremely long text - did you forget the </dfn> tag?\n{0}", outerHTML(el), el=el)
+        # Check for invalid fors, as it's usually some misnesting.
+        if dfnFor and dfnType in config.typesNotUsingFor:
+            die("'{0}' definitions don't use a 'for' attribute, but this one claims it's for '{1}' (perhaps inherited from an ancestor). This is probably a markup error.\n{2}", dfnType, dfnFor, outerHTML(el), el=el)
+        # Push the dfn type down to the <dfn> itself.
+        if el.get('data-dfn-type') is None:
+            el.set('data-dfn-type', dfnType)
+        # Push the for value too.
+        if dfnFor:
+            el.set('data-dfn-for', dfnFor)
+        elif dfnType in config.typesUsingFor:
+            die("'{0}' definitions need to specify what they're for.\nAdd a 'for' attribute to {1}, or add 'dfn-for' to an ancestor.", dfnType, outerHTML(el), el=el)
+            continue
+        # Some error checking
+        if dfnType in config.functionishTypes:
+            if not re.match(r"^[\w\[\]-]+\(.*\)$", primaryDfnText):
+                die("Functions/methods must end with () in their linking text, got '{0}'.", primaryDfnText, el=el)
+                continue
+            elif el.get('data-lt') is None:
+                if dfnType == "function":
+                    # CSS function, define it with no args in the text
+                    primaryDfnText = re.match(r"^([\w\[\]-]+)\(.*\)$", primaryDfnText).group(1) + "()"
+                    el.set('data-lt', primaryDfnText)
+                elif dfnType in config.idlTypes:
+                    # IDL methodish construct, ask the widlparser what it should have.
+                    # If the method isn't in any IDL, this tries its best to normalize it anyway.
+                    names = list(doc.widl.normalizedMethodNames(primaryDfnText, el.get('data-dfn-for')))
+                    primaryDfnText = names[0]
+                    el.set('data-lt', "|".join(names))
+                else:
+                    die("BIKESHED ERROR: Unhandled functionish type '{0}' in classifyDfns. Please report this to Bikeshed's maintainer.", dfnType, el=el)
+        # If type=argument, try to infer what it's for.
+        if dfnType == "argument" and el.get('data-dfn-for') is None:
+            parent = el.getparent()
+            parentFor = parent.get('data-dfn-for')
+            if parent.get('data-dfn-type') in config.functionishTypes and parentFor is not None:
+                dfnFor = ", ".join(parentFor + "/" + name for name in doc.widl.normalizedMethodNames(textContent(parent), parentFor))
+            elif treeAttr(el, "data-dfn-for") is None:
+                die("'argument' dfns need to specify what they're for, or have it be inferrable from their parent. Got:\n{0}", outerHTML(el), el=el)
+                continue
+        # Automatically fill in id if necessary.
+        if el.get('id') is None:
+            if dfnFor:
+                singleFor = config.splitForValues(dfnFor)[0]
+            if dfnType in config.functionishTypes.intersection(config.idlTypes):
+                id = config.simplifyText("{_for}-{id}".format(_for=singleFor, id=re.match(r"[^(]*", primaryDfnText).group(0) + "()"))
+                el.set("data-alternate-id", config.simplifyText("dom-{_for}-{id}".format(_for=singleFor, id=primaryDfnText)))
+                if primaryDfnText.startswith("[["):
+                    # Slots get their identifying [] stripped from their ID,
+                    # so gotta dedup them some other way.
+                    id += "-slot"
+                    el.set("data-alternate-id", "{0}-slot".format(el.get("data-alternate-id")))
+            else:
+                if dfnFor:
+                    id = config.simplifyText("{_for}-{id}".format(_for=singleFor, id=primaryDfnText))
+                else:
+                    id = config.simplifyText(primaryDfnText)
+            if dfnType == "dfn":
+                pass
+            elif dfnType == "interface":
+                pass
+            elif dfnType == "event":
+                # Special case 'event' because it needs a different format from IDL types
+                id = config.simplifyText("{type}-{id}".format(type=dfnTypeToPrefix[dfnType], _for=singleFor, id=id))
+            elif dfnType == "attribute" and primaryDfnText.startswith("[["):
+                # Slots get their identifying [] stripped from their ID, so gotta dedup them some other way.
+                id = config.simplifyText("dom-{id}-slot".format(_for=singleFor, id=id))
+            elif dfnType in config.idlTypes.intersection(config.typesUsingFor):
+                id = config.simplifyText("dom-{id}".format(id=id))
+            else:
+                id = "{type}-{id}".format(type=dfnTypeToPrefix[dfnType], id=id)
+            el.set('id', safeID(doc, id))
+        # Set lt if it's not set,
+        # and doing so won't mess with anything else.
+        if el.get('data-lt') is None and "|" not in primaryDfnText:
+            el.set('data-lt', primaryDfnText)
+        # Push export/noexport down to the definition
+        if el.get('data-export') is None and el.get('data-noexport') is None:
+            for ancestor in el.iterancestors():
+                if ancestor.get('data-export') is not None:
+                    el.set('data-export', '')
+                    break
+                elif ancestor.get('data-noexport') is not None:
+                    el.set('data-noexport', '')
+                    break
+            else:
+                if dfnType == "dfn":
+                    el.set('data-noexport', '')
+                else:
+                    el.set('data-export', '')
+        # If it's an code-ish type such as IDL,
+        # and doesn't already have a sole <code> child,
+        # wrap the contents in a <code>.
+        if config.linkTypeIn(dfnType, "codelike"):
+            child = hasOnlyChild(el)
+            if child is not None and child.tag == "code":
+                pass
+            wrapContents(el, E.code())
+
+
+def determineLinkType(el):
+    # 1. Look at data-link-type
+    linkType = treeAttr(el, 'data-link-type')
+    if linkType:
+        if linkType in config.linkTypes:
+            return linkType
+        die("Unknown link type '{0}' on:\n{1}", linkType, outerHTML(el), el=el)
+        return "unknown-type"
+    # 2. Introspect on the text
+    text = textContent(el)
+    if config.typeRe["at-rule"].match(text):
+        return "at-rule"
+    elif config.typeRe["type"].match(text):
+        return "type"
+    elif config.typeRe["selector"].match(text):
+        return "selector"
+    elif config.typeRe["function"].match(text):
+        return "functionish"
+    else:
+        return "dfn"
+
+
+def determineLinkText(el):
+    linkType = el.get('data-link-type')
+    contents = textContent(el)
+    if el.get('data-lt'):
+        linkText = el.get('data-lt')
+    elif config.linkTypeIn(linkType, "function") and re.match(r"^[\w-]+\(.*\)$", contents):
+        # Remove arguments from CSS function autolinks,
+        # as they should always be defined argument-less
+        # (and this allows filled-in examples to still autolink).
+        linkText = re.match(r"^([\w-]+)\(.*\)$", contents).group(1) + "()"
+    else:
+        linkText = contents
+    linkText = foldWhitespace(linkText)
+    if len(linkText) == 0:
+        die("Autolink {0} has no linktext.", outerHTML(el), el=el)
+    return linkText
+
+
+def classifyLink(el):
+    linkType = determineLinkType(el)
+    el.set('data-link-type', linkType)
+    linkText = determineLinkText(el)
+
+    el.set('data-lt', linkText)
+    for attr in ["data-link-status", "data-link-for", "data-link-spec", "data-link-for-hint"]:
+        val = treeAttr(el, attr)
+        if val is not None:
+            el.set(attr, val)
+    return el
+
+# Additional Processing
+
+
+def processBiblioLinks(doc):
+    biblioLinks = findAll("a[data-link-type='biblio']", doc)
+    for el in biblioLinks:
+        biblioType = el.get('data-biblio-type')
+        if biblioType == "normative":
+            storage = doc.normativeRefs
+        elif biblioType == "informative":
+            storage = doc.informativeRefs
+        else:
+            die("Unknown data-biblio-type value '{0}' on {1}. Only 'normative' and 'informative' allowed.", biblioType, outerHTML(el), el=el)
+            continue
+
+        linkText = determineLinkText(el)
+        if linkText[0] == "[" and linkText[-1] == "]":
+            linkText = linkText[1:-1]
+
+        refStatus = treeAttr(el, "data-biblio-status") or doc.md.defaultRefStatus
+
+        okayToFail = el.get('data-okay-to-fail') is not None
+
+        ref = doc.refs.getBiblioRef(linkText, status=refStatus, generateFakeRef=okayToFail, silentAliases=okayToFail, el=el)
+        if not ref:
+            if not okayToFail:
+                closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)
+                die("Couldn't find '{0}' in bibliography data. Did you mean:\n{1}", linkText, '\n'.join("  " + b for b in closeBiblios), el=el)
+            el.tag = "span"
+            continue
+
+        # Need to register that I have a preferred way to refer to this biblio,
+        # in case aliases show up - they all need to use my preferred key!
+        if hasattr(ref, "originalLinkText"):
+            # Okay, so this particular ref has been reffed before...
+            if linkText == ref.linkText:
+                # Whew, and with the same name I'm using now. Ship it.
+                pass
+            else:
+                # Oh no! I'm using two different names to refer to the same biblio!
+                die("The biblio refs [[{0}]] and [[{1}]] are both aliases of the same base reference [[{2}]]. Please choose one name and use it consistently.", linkText, ref.linkText, ref.originalLinkText, el=el)
+                # I can keep going, tho - no need to skip this ref
+        else:
+            # This is the first time I've reffed this particular biblio.
+            # Register this as the preferred name...
+            doc.refs.preferredBiblioNames[ref.linkText] = linkText
+            # Use it on the current ref. Future ones will use the preferred name automatically.
+            ref.linkText = linkText
+
+        id = config.simplifyText(ref.linkText)
+        el.set('href', '#biblio-' + id)
+        storage[ref.linkText] = ref
+
+
+def processAutolinks(doc):
+    # An <a> without an href is an autolink.
+    # <i> is a legacy syntax for term autolinks. If it links up, we change it into an <a>.
+    # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
+    query = "a:not([href]):not([data-link-type='biblio'])"
+    if doc.md.useIAutolinks:
+        query += ", i"
+    autolinks = findAll(query, doc)
+    for el in autolinks:
+        # Explicitly empty linking text indicates this shouldn't be an autolink.
+        if el.get('data-lt') == '':
+            continue
+
+        classifyLink(el)
+        linkType = el.get('data-link-type')
+        linkText = el.get('data-lt')
+
+        # Properties and descriptors are often written like 'foo-*'. Just ignore these.
+        if linkType in ("property", "descriptor", "propdesc") and "*" in linkText:
+            continue
+
+        # Not super clear why I think links will specify multiple for values,
+        # or why it's okay to just use the first one in that case.
+        linkFor = config.splitForValues(el.get('data-link-for'))
+        if linkFor:
+            linkFor = linkFor[0]
+        if not linkFor and doc.md.assumeExplicitFor:
+            linkFor = "/"
+
+        # Status used to use ED/TR, so convert those if they appear,
+        # and verify
+        status = el.get('data-link-status')
+        if status == "ED":
+            status = "current"
+        elif status == "TR":
+            status = "snapshot"
+        elif status in config.linkStatuses or status is None:
+            pass
+        else:
+            die("Unknown link status '{0}' on {1}", status, outerHTML(el))
+            continue
+
+        ref = doc.refs.getRef(linkType, linkText,
+                              spec=el.get('data-link-spec'),
+                              status=status,
+                              linkFor=linkFor,
+                              linkForHint=el.get('data-link-for-hint'),
+                              el=el,
+                              error=(linkText.lower() not in doc.md.ignoredTerms))
+        # Capture the reference (and ensure we add a biblio entry) if it
+        # points to an external specification. We check the spec name here
+        # rather than checking `status == "local"`, as "local" refs include
+        # those defined in `<pre class="anchor">` datablocks, which we do
+        # want to capture here.
+        if ref and ref.spec and ref.spec.lower() != doc.refs.spec.lower():
+            spec = ref.spec.lower()
+            key = ref.for_[0] if ref.for_ else ""
+            if isNormative(el):
+                biblioStorage = doc.normativeRefs
+            else:
+                biblioStorage = doc.informativeRefs
+            biblioRef = doc.refs.getBiblioRef(ref.spec, status=doc.md.defaultRefStatus, generateFakeRef=True, silentAliases=True)
+            if biblioRef:
+                biblioStorage[biblioRef.linkText] = biblioRef
+                spec = biblioRef.linkText.lower()
+            doc.externalRefsUsed[spec][ref.text][key] = ref
+
+        if ref:
+            el.set('href', ref.url)
+            el.tag = "a"
+            decorateAutolink(doc, el, linkType=linkType, linkText=linkText, ref=ref)
+        else:
+            if linkType == "maybe":
+                el.tag = "css"
+                if el.get("data-link-type"):
+                    del el.attrib["data-link-type"]
+                if el.get("data-lt"):
+                    del el.attrib["data-lt"]
+    dedupIDs(doc)
+
+
+def decorateAutolink(doc, el, linkType, linkText, ref):
+    # Add additional effects to autolinks.
+
+    # Put an ID on every reference, so I can link to references to a term.
+    if el.get('id') is None:
+        _,_,id = ref.url.partition("#")
+        if id:
+            el.set('id', "ref-for-{0}".format(id))
+            el.set('data-silently-dedup', '')
+
+    # Get all the values that the type expands to, add it as a title.
+    if linkType == "type":
+        titleText = None
+        if linkText in doc.typeExpansions:
+            titleText = doc.typeExpansions[linkText]
+        else:
+            refs = doc.refs.queryAllRefs(linkFor=linkText, ignoreObsoletes=True)
+            if refs:
+                titleText = "Expands to: " + ' | '.join({ref.text for ref in refs})
+                doc.typeExpansions[linkText] = titleText
+        if titleText:
+            el.set('title', titleText)
+
+
+def processIssuesAndExamples(doc):
+    # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
+    # examples, and link to remote issues if possible:
+    for el in findAll(".issue:not([id])", doc):
+        el.set('id', safeID(doc, "issue-" + hashContents(el)))
+        remoteIssueID = el.get('data-remote-issue-id')
+        if remoteIssueID:
+            del el.attrib['data-remote-issue-id']
+            # Eventually need to support a way to trigger other repo url structures,
+            # but defaulting to GH is fine for now.
+            githubMatch = re.match(r"\s*([\w-]+)/([\w-]+)#(\d+)\s*$", remoteIssueID)
+            numberMatch = re.match(r"\s*(\d+)\s*$", remoteIssueID)
+            remoteIssueURL = None
+            if githubMatch:
+                remoteIssueURL = "https://github.com/{0}/{1}/issues/{2}".format(*githubMatch.groups())
+                if doc.md.inlineGithubIssues:
+                    el.set("data-inline-github", "{0} {1} {2}".format(*githubMatch.groups()))
+            elif numberMatch and doc.md.repository.type == "github":
+                remoteIssueURL = doc.md.repository.formatIssueUrl(numberMatch.group(1))
+                if doc.md.inlineGithubIssues:
+                    el.set("data-inline-github", "{0} {1} {2}".format(doc.md.repository.user, doc.md.repository.repo, numberMatch.group(1)))
+            elif doc.md.issueTrackerTemplate:
+                remoteIssueURL = doc.md.issueTrackerTemplate.format(remoteIssueID)
+            if remoteIssueURL:
+                appendChild(el, " ", E.a({"href": remoteIssueURL}, "<" + remoteIssueURL + ">"))
+    for el in findAll(".example:not([id])", doc):
+        el.set('id', safeID(doc, "example-" + hashContents(el)))
+    fixupIDs(doc, findAll(".issue, .example", doc))
+
+
+def addSelfLinks(doc):
+    def makeSelfLink(el):
+        return E.a({"href": "#" + escapeUrlFrag(el.get('id', '')), "class":"self-link"})
+
+    dfnElements = findAll(config.dfnElementsSelector, doc)
+
+    foundFirstNumberedSection = False
+    for el in findAll("h2, h3, h4, h5, h6", doc):
+        foundFirstNumberedSection = foundFirstNumberedSection or (el.get('data-level') is not None)
+        if el in dfnElements:
+            # It'll get a self-link or dfn-panel later.
+            continue
+        if foundFirstNumberedSection:
+            appendChild(el, makeSelfLink(el))
+    for el in findAll(".issue[id], .example[id], .note[id], li[id], dt[id]", doc):
+        if list(el.iterancestors("figure")):
+            # Skipping - element is inside a figure and is part of an example.
+            continue
+        if el.get("data-no-self-link") is not None:
+            continue
+        prependChild(el, makeSelfLink(el))
+    if doc.md.useDfnPanels:
+        addDfnPanels(doc, dfnElements)
+    else:
+        for el in dfnElements:
+            if list(el.iterancestors("a")):
+                warn("Found <a> ancestor, skipping self-link. Swap <dfn>/<a> order?\n  {0}", outerHTML(el), el=el)
+                continue
+            appendChild(el, makeSelfLink(el))
+
+
+def addDfnPanels(doc, dfns):
+    from .DefaultOrderedDict import DefaultOrderedDict
+    # Constructs "dfn panels" which show all the local references to a term
+    atLeastOnePanel = False
+    # Gather all the <a href>s together
+    allRefs = DefaultOrderedDict(list)
+    for a in findAll("a", doc):
+        href = a.get("href")
+        if href is None:
+            continue
+        if not href.startswith("#"):
+            continue
+        allRefs[href[1:]].append(a)
+    body = find("body", doc)
+    for dfn in dfns:
+        id = dfn.get("id")
+        if not id:
+            # Something went wrong, bail.
+            continue
+        refs = DefaultOrderedDict(list)
+        for link in allRefs[id]:
+            try:
+                h = relevantHeadings(link).next()
+                if hasClass(h, "no-ref"):
+                    continue
+                sectionText = textContent(h)
+            except StopIteration:
+                sectionText = "Unnamed section"
+            refs[sectionText].append(link)
+        if not refs:
+            # Just insert a self-link instead
+            appendChild(dfn,
+                        E.a({"href": "#" + escapeUrlFrag(id), "class":"self-link"}))
+            continue
+        addClass(dfn, "dfn-paneled")
+        atLeastOnePanel = True
+        panel = E.aside({"class": "dfn-panel", "data-for": id},
+                        E.b(E.a({"href":"#" + escapeUrlFrag(id)}, "#" + id)),
+                        E.b("Referenced in:"))
+        ul = appendChild(panel, E.ul())
+        for text,els in refs.items():
+            li = appendChild(ul, E.li())
+            for i,el in enumerate(els):
+                refID = el.get("id")
+                if refID is None:
+                    refID = "ref-for-{0}".format(id)
+                    el.set("id", safeID(doc, refID))
+                if i == 0:
+                    appendChild(li,
+                                E.a({"href": "#" + escapeUrlFrag(refID), "data-silently-dedup": ""}, text))
+                else:
+                    appendChild(li,
+                                " ",
+                                E.a({"href": "#" + escapeUrlFrag(refID), "data-silently-dedup": ""}, "(" + str(i + 1) + ")"))
+        appendChild(body, panel)
+    if atLeastOnePanel:
+        doc.extraScripts['script-dfn-panel'] = '''
+        document.body.addEventListener("click", function(e) {
+            var queryAll = function(sel) { return [].slice.call(document.querySelectorAll(sel)); }
+            // Find the dfn element or panel, if any, that was clicked on.
+            var el = e.target;
+            var target;
+            var hitALink = false;
+            while(el.parentElement) {
+                if(el.tagName == "A") {
+                    // Clicking on a link in a <dfn> shouldn't summon the panel
+                    hitALink = true;
+                }
+                if(el.classList.contains("dfn-paneled")) {
+                    target = "dfn";
+                    break;
+                }
+                if(el.classList.contains("dfn-panel")) {
+                    target = "dfn-panel";
+                    break;
+                }
+                el = el.parentElement;
+            }
+            if(target != "dfn-panel") {
+                // Turn off any currently "on" or "activated" panels.
+                queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(function(el){
+                    el.classList.remove("on");
+                    el.classList.remove("activated");
+                });
+            }
+            if(target == "dfn" && !hitALink) {
+                // open the panel
+                var dfnPanel = document.querySelector(".dfn-panel[data-for='" + el.id + "']");
+                if(dfnPanel) {
+                    console.log(dfnPanel);
+                    dfnPanel.classList.add("on");
+                    var rect = el.getBoundingClientRect();
+                    dfnPanel.style.left = window.scrollX + rect.right + 5 + "px";
+                    dfnPanel.style.top = window.scrollY + rect.top + "px";
+                    var panelRect = dfnPanel.getBoundingClientRect();
+                    var panelWidth = panelRect.right - panelRect.left;
+                    if(panelRect.right > document.body.scrollWidth && (rect.left - (panelWidth + 5)) > 0) {
+                        // Reposition, because the panel is overflowing
+                        dfnPanel.style.left = window.scrollX + rect.left - (panelWidth + 5) + "px";
+                    }
+                } else {
+                    console.log("Couldn't find .dfn-panel[data-for='" + el.id + "']");
+                }
+            } else if(target == "dfn-panel") {
+                // Switch it to "activated" state, which pins it.
+                el.classList.add("activated");
+                el.style.left = null;
+                el.style.top = null;
+            }
+
+        });
+        '''
+        doc.extraStyles['style-dfn-panel'] = '''
+        .dfn-panel {
+            position: absolute;
+            z-index: 35;
+            height: auto;
+            width: -webkit-fit-content;
+            width: fit-content;
+            max-width: 300px;
+            max-height: 500px;
+            overflow: auto;
+            padding: 0.5em 0.75em;
+            font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+            background: #DDDDDD;
+            color: black;
+            border: outset 0.2em;
+        }
+        .dfn-panel:not(.on) { display: none; }
+        .dfn-panel * { margin: 0; padding: 0; text-indent: 0; }
+        .dfn-panel > b { display: block; }
+        .dfn-panel a { color: black; }
+        .dfn-panel a:not(:hover) { text-decoration: none !important; border-bottom: none !important; }
+        .dfn-panel > b + b { margin-top: 0.25em; }
+        .dfn-panel ul { padding: 0; }
+        .dfn-panel li { list-style: inside; }
+        .dfn-panel.activated {
+            display: inline-block;
+            position: fixed;
+            left: .5em;
+            bottom: 2em;
+            margin: 0 auto;
+            max-width: calc(100vw - 1.5em - .4em - .5em);
+            max-height: 30vh;
+        }
+
+        .dfn-paneled { cursor: pointer; }
+        '''
+
+
+def cleanupHTML(doc):
+    # Cleanup done immediately before serialization.
+
+    head = None
+    inBody = False
+    strayHeadEls = []
+    styleScoped = []
+    nestedLists = []
+    flattenEls = []
+    for el in doc.document.iter():
+        if head is None and el.tag == "head":
+            head = el
+            continue
+        if el.tag == "body":
+            inBody = True
+
+        # Move any stray <link>, <meta>, or <style> into the <head>.
+        if inBody and el.tag in ["link", "meta", "style"]:
+            strayHeadEls.append(el)
+
+        if el.tag == "style" and el.get("scoped") is not None:
+            die("<style scoped> is no longer part of HTML. Ensure your styles can apply document-globally and remove the scoped attribute.", el=el)
+            styleScoped.append(el)
+
+        # Convert the technically-invalid <nobr> element to an appropriate <span>
+        if el.tag == "nobr":
+            el.tag = "span"
+            el.set("style", el.get('style', '') + ";white-space:nowrap")
+
+        # And convert <xmp> to <pre>
+        if el.tag == "xmp":
+            el.tag = "pre"
+
+        # If we accidentally recognized an autolink shortcut in SVG, kill it.
+        if el.tag == "{http://www.w3.org/2000/svg}a" and el.get("data-link-type") is not None:
+            removeAttr(el, "data-link-type")
+            el.tag = "{http://www.w3.org/2000/svg}tspan"
+
+        # Add .algorithm to [algorithm] elements, for styling
+        if el.get("data-algorithm") is not None and not hasClass(el, "algorithm"):
+            addClass(el, "algorithm")
+
+        # Allow MD-generated lists to be surrounded by HTML list containers,
+        # so you can add classes/etc without an extraneous wrapper.
+        if el.tag in ["ol", "ul", "dl"]:
+            onlyChild = hasOnlyChild(el)
+            if onlyChild is not None and el.tag == onlyChild.tag and el.get("data-md") is None and onlyChild.get("data-md") is not None:
+                # The md-generated list container is featureless,
+                # so we can just throw it away and move its children into its parent.
+                nestedLists.append(onlyChild)
+            else:
+                # Remove any lingering data-md attributes on lists that weren't using this container replacement thing.
+                removeAttr(el, "data-md")
+
+        # Mark pre.idl blocks as .def, for styling
+        if el.tag == "pre" and hasClass(el, "idl") and not hasClass(el, "def"):
+            addClass(el, "def")
+
+        # Tag classes on wide types of dfns/links
+        if el.tag in config.dfnElements:
+            if el.get("data-dfn-type") in config.idlTypes:
+                addClass(el, "idl-code")
+            if el.get("data-dfn-type") in config.maybeTypes.union(config.linkTypeToDfnType['propdesc']):
+                if not hasAncestor(el, lambda x:x.tag=="pre"):
+                    addClass(el, "css")
+        if el.tag == "a":
+            if el.get("data-link-type") in config.idlTypes:
+                addClass(el, "idl-code")
+            if el.get("data-link-type") in config.maybeTypes.union(config.linkTypeToDfnType['propdesc']):
+                if not hasAncestor(el, lambda x:x.tag=="pre"):
+                    addClass(el, "css")
+
+        # Remove duplicate linking texts.
+        if el.tag in config.anchorishElements and el.get("data-lt") is not None and el.get("data-lt") == textContent(el, exact=True):
+            removeAttr(el, "data-lt")
+
+        # Transform the <css> fake tag into markup.
+        # (Used when the ''foo'' shorthand doesn't work.)
+        if el.tag == "css":
+            el.tag = "span"
+            addClass(el, "css")
+
+        # Transform the <assert> fake tag into a span with a unique ID based on its contents.
+        # This is just used to tag arbitrary sections with an ID so you can point tests at it.
+        # (And the ID will be guaranteed stable across publications, but guaranteed to change when the text changes.)
+        if el.tag == "assert":
+            el.tag = "span"
+            el.set("id", safeID(doc, "assert-" + hashContents(el)))
+
+        # Add ARIA role of "note" to class="note" elements
+        if el.tag in ["div", "p"] and hasClass(el, doc.md.noteClass):
+            el.set("role", "note")
+
+        # Look for nested <a> elements, and warn about them.
+        if el.tag == "a" and hasAncestor(el, lambda x:x.tag=="a"):
+            warn("The following (probably auto-generated) link is illegally nested in another link:\n{0}", outerHTML(el), el=el)
+
+        # If the <h1> contains only capital letters, add a class=allcaps for styling hook
+        if el.tag == "h1":
+            for letter in textContent(el):
+                if letter.isalpha() and letter.islower():
+                    break
+            else:
+                addClass(el, "allcaps")
+
+        # If a markdown-generated <dt> contains only a single paragraph,
+        # remove that paragraph so it just contains naked text.
+        if el.tag == "dt" and el.get("data-md") is not None:
+            child = hasOnlyChild(el)
+            if child is not None and child.tag == "p" and emptyText(el.text) and emptyText(child.tail):
+                flattenEls.append(el)
+
+        # Remove a bunch of attributes
+        if el.get("data-attribute-info") is not None or el.get("data-dict-member-info") is not None:
+            removeAttr(el, 'data-attribute-info')
+            removeAttr(el, 'data-dict-member-info')
+            removeAttr(el, 'for')
+        if el.tag in ["a", "span"]:
+            removeAttr(el, 'data-link-for')
+            removeAttr(el, 'data-link-for-hint')
+            removeAttr(el, 'data-link-status')
+            removeAttr(el, 'data-link-spec')
+            removeAttr(el, 'data-section')
+            removeAttr(el, 'data-biblio-type')
+            removeAttr(el, 'data-biblio-status')
+            removeAttr(el, 'data-okay-to-fail')
+            removeAttr(el, 'data-lt')
+        if el.tag != "a":
+            removeAttr(el, 'data-link-for')
+            removeAttr(el, 'data-link-type')
+        if el.tag not in config.dfnElements:
+            removeAttr(el, 'data-dfn-for')
+            removeAttr(el, 'data-dfn-type')
+            removeAttr(el, 'data-export')
+            removeAttr(el, 'data-noexport')
+        if el.tag == "var":
+            removeAttr(el, 'data-var-ignore')
+        removeAttr(el, 'data-alternate-id')
+        removeAttr(el, 'highlight')
+        removeAttr(el, 'nohighlight')
+        removeAttr(el, 'data-opaque')
+        removeAttr(el, 'data-no-self-link')
+        removeAttr(el, "line-number")
+        removeAttr(el, "caniuse")
+        removeAttr(el, "data-silently-dedup")
+    for el in strayHeadEls:
+        head.append(el)
+    for el in styleScoped:
+        parent = parentElement(el)
+        prependChild(parent, el)
+    for el in nestedLists:
+        children = childNodes(el, clear=True)
+        parent = parentElement(el)
+        clearContents(parent)
+        appendChild(parent, *children)
+    for el in flattenEls:
+        moveContents(fromEl=el[0], toEl=el)
+
+
+def finalHackyCleanup(text):
+    # For hacky last-minute string-based cleanups of the rendered html.
+
+    return text
+
+
+def hackyLineNumbers(lines):
+    # Hackily adds line-number information to each thing that looks like an open tag.
+    # This is just regex text-munging, so potentially dangerous!
+    for i,line in enumerate(lines):
+        lines[i] = re.sub(r"(^|[^<])(<[\w-]+)([ >])", r"\1\2 line-number={0}\3".format(i + 1), line)
+    return lines
+
+
+def correctH1(doc):
+    # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
+    h1s = [h1 for h1 in findAll("h1", doc) if isNormative(h1)]
+    if len(h1s) == 2:
+        replaceNode(h1s[0], h1s[1])
+
+
+def processInclusions(doc):
+    import hashlib
+    while True:
+        els = findAll("pre.include", doc)
+        if not els:
+            break
+        for el in els:
+            macros = {}
+            for i in itertools.count(0):
+                m = el.get("macro-" + str(i))
+                if m is None:
+                    break
+                k,_,v = m.partition(" ")
+                macros[k.lower()] = v
+            if el.get("path"):
+                path = el.get("path")
+                try:
+                    with io.open(path, 'r', encoding="utf-8") as f:
+                        lines = f.readlines()
+                except Exception, err:
+                    die("Couldn't find include file '{0}'. Error was:\n{1}", path, err, el=el)
+                    removeNode(el)
+                    continue
+                # hash the content + path together for identity
+                # can't use just path, because they're relative; including "foo/bar.txt" might use "foo/bar.txt" further nested
+                # can't use just content, because then you can't do the same thing twice.
+                # combined does a good job unless you purposely pervert it
+                hash = hashlib.md5(path + ''.join(lines).encode("ascii", "xmlcharrefreplace")).hexdigest()
+                if el.get('hash'):
+                    # This came from another included file, check if it's a loop-include
+                    if hash in el.get('hash'):
+                        # WHOOPS
+                        die("Include loop detected - “{0}” is included in itself.", path)
+                        removeNode(el)
+                        continue
+                    hash += " " + el.get('hash')
+                depth = int(el.get('depth')) if el.get('depth') is not None else 0
+                if depth > 100:
+                    # Just in case you slip past the nesting restriction
+                    die("Nesting depth > 100, literally wtf are you doing.")
+                    removeNode(el)
+                    continue
+                lines = datablocks.transformDataBlocks(doc, lines)
+                lines = markdown.parse(lines, doc.md.indent, opaqueElements=doc.md.opaqueElements)
+                text = ''.join(lines)
+                text = doc.fixText(text, moreMacros=macros)
+                subtree = parseHTML(text)
+                for childInclude in findAll("pre.include", E.div({}, *subtree)):
+                    childInclude.set("hash", hash)
+                    childInclude.set("depth", str(depth + 1))
+                replaceNode(el, *subtree)
+
+
+def formatElementdefTables(doc):
+    for table in findAll("table.elementdef", doc):
+        elements = findAll("tr:first-child dfn", table)
+        elementsFor = ' '.join(textContent(x) for x in elements)
+        for el in findAll("a[data-element-attr-group]", table):
+            groupName = textContent(el).strip()
+            groupAttrs = sorted(doc.refs.queryAllRefs(linkType="element-attr", linkFor=groupName), key=lambda x:x.text)
+            if len(groupAttrs) == 0:
+                die("The element-attr group '{0}' doesn't have any attributes defined for it.", groupName, el=el)
+                continue
+            el.tag = "details"
+            clearContents(el)
+            removeAttr(el, "data-element-attr-group")
+            removeAttr(el, "data-dfn-type")
+            ul = appendChild(el,
+                             E.summary(
+                                 E.a({"data-link-type":"dfn"}, groupName)),
+                             E.ul())
+            for ref in groupAttrs:
+                id = "element-attrdef-" + config.simplifyText(textContent(elements[0])) + "-" + ref.text
+                appendChild(ul,
+                            E.li(
+                                E.dfn({"id": safeID(doc, id), "for":elementsFor, "data-dfn-type":"element-attr"},
+                                      E.a({"data-link-type":"element-attr", "for":groupName},
+                                          ref.text.strip()))))
+
+
+def formatArgumentdefTables(doc):
+    for table in findAll("table.argumentdef", doc):
+        forMethod = doc.widl.normalizedMethodNames(table.get("data-dfn-for"))
+        method = doc.widl.find(table.get("data-dfn-for"))
+        if not method:
+            die("Can't find method '{0}'.", forMethod, el=table)
+            continue
+        for tr in findAll("tbody > tr", table):
+            tds = findAll("td", tr)
+            argName = textContent(tds[0]).strip()
+            arg = method.findArgument(argName)
+            if arg:
+                appendChild(tds[1], unicode(arg.type))
+                if unicode(arg.type).strip().endswith("?"):
+                    appendChild(tds[2],
+                                E.span({"class":"yes"}, "✔"))
+                else:
+                    appendChild(tds[2],
+                                E.span({"class":"no"}, "✘"))
+                if arg.optional:
+                    appendChild(tds[3],
+                                E.span({"class":"yes"}, "✔"))
+                else:
+                    appendChild(tds[3],
+                                E.span({"class":"no"}, "✘"))
+            else:
+                die("Can't find the '{0}' argument of method '{1}' in the argumentdef block.", argName, method.fullName, el=table)
+                continue
+
+
+def inlineRemoteIssues(doc):
+    # Finds properly-marked-up "remote issues",
+    # and inlines their contents into the issue.
+
+    # Right now, only github inline issues are supported.
+    # More can be supported when someone cares.
+
+    # Collect all the inline issues in the document
+    inlineIssues = []
+    GitHubIssue = namedtuple('GitHubIssue', ['user', 'repo', 'num', 'el'])
+    for el in findAll("[data-inline-github]", doc):
+        inlineIssues.append(GitHubIssue(*el.get('data-inline-github').split(), el=el))
+        removeAttr(el, "data-inline-github")
+    if not inlineIssues:
+        return
+
+    from .requests import requests
+
+    logging.captureWarnings(True)
+
+    responses = json.load(config.retrieveDataFile("github-issues.json", quiet=True))
+    for i,issue in enumerate(inlineIssues):
+        issueUserRepo = "{0}/{1}".format(*issue)
+        key = "{0}/{1}".format(issueUserRepo, issue.num)
+        href = "https://github.com/{0}/issues/{1}".format(issueUserRepo, issue.num)
+        url = "https://api.github.com/repos/{0}/issues/{1}".format(issueUserRepo, issue.num)
+        say("Fetching issue {:-3d}/{:d}: {:s}".format(i+1, len(inlineIssues), key))
+
+        # Fetch the issues
+        headers = {"Accept": "application/vnd.github.v3.html+json"}
+        if doc.token is not None:
+            headers["Authorization"] = "token " + doc.token
+        if key in responses:
+            # Have a cached response, see if it changed
+            headers["If-None-Match"] = responses[key]["ETag"]
+
+        res = None
+        try:
+            res = requests.get(url, headers=headers)
+        except requests.exceptions.ConnectionError:
+            # Offline or something, recover if possible
+            if key in responses:
+                data = responses[key]
+            else:
+                warn("Connection error fetching issue #{0}", issue.num)
+                continue
+        if res is None:
+            # Already handled in the except block
+            pass
+        elif res.status_code == 304:
+            # Unchanged, I can use the cache
+            data = responses[key]
+        elif res.status_code == 200:
+            # Fresh data, prep it for storage
+            data = res.json()
+            data["ETag"] = res.headers["ETag"]
+        elif res.status_code == 401:
+            error = res.json()
+            if error["message"] == "Bad credentials":
+                die("'{0}' is not a valid GitHub OAuth token. See https://github.com/settings/tokens", doc.token)
+            else:
+                die("401 error when fetching GitHub Issues:\n{0}", config.printjson(error))
+            continue
+        elif res.status_code == 403:
+            error = res.json()
+            if error["message"].startswith("API rate limit exceeded"):
+                die("GitHub Issues API rate limit exceeded. Get an OAuth token from https://github.com/settings/tokens to increase your limit, or just wait an hour for your limit to refresh; Bikeshed has cached all the issues so far and will resume from where it left off.")
+            else:
+                die("403 error when fetching GitHub Issues:\n{0}", config.printjson(error))
+            continue
+        elif res.status_code >= 400:
+            die("{0} error when fetching GitHub Issues:\n{1}", res.status_code, config.printjson(res.json()))
+            continue
+        responses[key] = data
+        # Put the issue data into the DOM
+        el = issue.el
+        data = responses[key]
+        clearContents(el)
+        if doc.md.inlineGithubIssues == 'title':
+            appendChild(el,
+                    E.a({"href":href, "class":"marker", "style":"text-transform:none"}, key),
+                    E.a({"href":href}, data['title']))
+            addClass(el, "no-marker")
+        else:
+            appendChild(el,
+                    E.a({"href":href, "class":"marker"},
+                    "Issue #{0} on GitHub: “{1}”".format(data['number'], data['title'])),
+                    *parseHTML(data['body_html']))
+            addClass(el, "no-marker")
+        if el.tag == "p":
+            el.tag = "div"
+    # Save the cache for later
+    try:
+        with io.open(config.scriptPath + "/spec-data/github-issues.json", 'w', encoding="utf-8") as f:
+            f.write(unicode(json.dumps(responses, ensure_ascii=False, indent=2, sort_keys=True)))
+    except Exception, e:
+        warn("Couldn't save GitHub Issues cache to disk.\n{0}", e)
+    return
+
+
+def addNoteHeaders(doc):
+    # Finds <foo heading="bar"> and turns it into a marker-heading
+    for el in findAll("[heading]", doc):
+        addClass(el, "no-marker")
+        if hasClass(el, "note"):
+            preText = "NOTE: "
+        elif hasClass(el, "issue"):
+            preText = "ISSUE: "
+        elif hasClass(el, "example"):
+            preText = "EXAMPLE: "
+        else:
+            preText = ""
+        prependChild(el,
+                     E.div({"class":"marker"}, preText, *parseHTML(el.get('heading'))))
+        removeAttr(el, "heading")
+
+
+def locateFillContainers(doc):
+    fillContainers = defaultdict(list)
+    for el in findAll("[data-fill-with]", doc):
+        fillContainers[el.get("data-fill-with")].append(el)
+    return fillContainers
