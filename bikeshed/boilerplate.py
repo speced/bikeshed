@@ -649,15 +649,15 @@ def addSpecMetadataSection(doc):
 
     md = DefaultOrderedDict(list)
     mac = doc.macros
-    if mac.get('version'):
+    if 'version' in mac:
         md["This version"].append(E.a({"href":mac['version'], "class":"u-url"}, mac['version']))
     if doc.md.TR:
         md["Latest published version"].append(E.a({"href": doc.md.TR}, doc.md.TR))
     if doc.md.ED and doc.md.status in config.snapshotStatuses:
         md["Editor's Draft"].append(E.a({"href": doc.md.ED}, doc.md.ED))
-    if len(doc.md.previousVersions):
+    if doc.md.previousVersions:
         md["Previous Versions"] = [E.a({"href":ver, "rel":"prev"}, ver) for ver in doc.md.previousVersions]
-    if len(doc.md.versionHistory):
+    if doc.md.versionHistory:
         md["Version History"] = [E.a({"href":vh}, vh) for vh in doc.md.versionHistory]
     if doc.md.mailingList:
         span = E.span(
@@ -680,17 +680,17 @@ def addSpecMetadataSection(doc):
     elif (doc.md.vshortname in doc.testSuites) and (doc.testSuites[doc.md.vshortname]['url'] is not None):
         url = doc.testSuites[doc.md.vshortname]['url']
         md["Test Suite"].append(E.a({"href":url}, url))
-    if len(doc.md.issues):
+    if doc.md.issues:
         md["Issue Tracking"] = [E.a({"href":href}, text) for text,href in doc.md.issues]
-    if len(doc.md.editors):
+    if doc.md.editors:
         editorTerm = doc.md.editorTerm['singular']
         md[editorTerm] = map(printEditor, doc.md.editors)
-    if len(doc.md.previousEditors):
+    if doc.md.previousEditors:
         editorTerm = doc.md.editorTerm['singular']
         md["Former " + editorTerm] = map(printEditor, doc.md.previousEditors)
-    if len(doc.md.translations):
+    if doc.md.translations:
         md["Translations"] = map(printTranslation, doc.md.translations)
-    if len(doc.md.audience):
+    if doc.md.audience:
         md["Audience"] = [", ".join(doc.md.audience)]
     if doc.md.toggleDiffs:
         md["Toggle Diffs"] = [E.label({"for": safeID(doc, "hidedel"), "id": safeID(doc, "hidedel-label")}, "Hide deleted text")]
