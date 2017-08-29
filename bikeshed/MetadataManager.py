@@ -219,6 +219,8 @@ class MetadataManager:
             macros["longstatus"] = ""
         if self.status in ("w3c/LCWD", "w3c/FPWD"):
             macros["status"] = "WD"
+        elif self.status in ("w3c/WG-NOTE", "w3c/IG-NOTE"):
+            macros["status"] = "NOTE"
         else:
             macros["status"] = self.rawStatus
         if self.workStatus:
