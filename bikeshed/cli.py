@@ -6,10 +6,11 @@ import os
 import sys
 
 from . import config
-from . import publish
-from . import update
 from . import metadata
+from . import publish
 from . import test
+from . import update
+from .messages import *
 from .Spec import Spec
 
 def main():
@@ -247,6 +248,7 @@ def main():
                 ref['level'] = str(ref['level'])
             p(config.printjson(refs))
         elif options.refreshData:
+            config.quiet = 0
             update.updateReadonlyDataFiles()
             warn("Don't forget to bump the version number!")
     elif options.subparserName == "refs":
