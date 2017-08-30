@@ -10,6 +10,8 @@ from collections import defaultdict
 from datetime import datetime
 from DefaultOrderedDict import DefaultOrderedDict
 from subprocess import check_output
+
+from . import attr
 from . import config
 from . import markdown
 from .htmlhelpers import *
@@ -821,7 +823,12 @@ def join(*sources):
             md.otherMetadata[k] = v
     return md
 
-Metadata = collections.namedtuple('Metadata', ['humanName', 'attrName', 'join', 'parse'])
+@attr.s(slots=True, frozen=True)
+class Metadata(object):
+    humanName = attr.ib()
+    attrName = attr.ib()
+    join = attr.ib()
+    parse = attr.ib()
 
 
 def joinValue(a, b):
