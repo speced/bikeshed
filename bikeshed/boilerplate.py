@@ -138,7 +138,7 @@ def addAnnotations(doc):
 
 def addBikeshedBoilerplate(doc):
     for k,v in doc.extraStyles.items():
-        if k not in doc.md.doc.md.boilerplate:
+        if k not in doc.md.boilerplate:
             continue
         container = getFillContainer(k, doc)
         if container is None:
@@ -147,7 +147,7 @@ def addBikeshedBoilerplate(doc):
             appendChild(container,
                         E.style("/* {0} */\n".format(k) + v))
     for k,v in doc.extraScripts.items():
-        if k not in doc.md.doc.md.boilerplate:
+        if k not in doc.md.boilerplate:
             continue
         container = getFillContainer(k, doc)
         if container is None:

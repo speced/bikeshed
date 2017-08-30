@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
+
 import collections
 import copy
 import json
@@ -23,8 +24,7 @@ class MetadataManager:
             return "{0}-{1}".format(self.shortname, self.level)
         return self.shortname
 
-    def __init__(self, doc):
-        self.doc = doc
+    def __init__(self):
         self.hasMetadata = False
 
         # required metadata
@@ -126,13 +126,13 @@ class MetadataManager:
         setattr(self, md.attrName, result)
         self.manuallySetKeys.add(key)
 
-    def computeImplicitMetadata(self):
+    def computeImplicitMetadata(self, doc):
         # Do some "computed metadata", based on the value of other metadata.
         # Only call this when you're sure all metadata sources are parsed.
         if self.group == "byos":
             self.boilerplate.default = False
-        if not self.repository:
-            self.repository = getSpecRepository(self.doc)
+        if not self.repository and doc:
+            self.repository = getSpecRepository(doc)
         if self.repository.type == "github" and "feedback-header" in self.boilerplate and "repository-issue-tracking" in self.boilerplate:
             self.issues.append(("GitHub", self.repository.formatIssueUrl()))
         self.status = config.canonicalizeStatus(self.rawStatus, self.group)
@@ -198,7 +198,7 @@ class MetadataManager:
             die("Not all required metadata was provided:\n{0}", "\n".join(errors))
             return
 
-    def fillTextMacros(self, macros, doc=None):
+    def fillTextMacros(self, macros, doc):
         # Fills up a set of text macros based on metadata.
         if self.title:
             macros["title"] = self.title
@@ -671,7 +671,7 @@ def parseMaxToCDepth(key, val, lineNum):
     return v
 
 
-def parse(lines, doc):
+def parse(lines):
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
     # Returns the text lines, with the metadata-related lines removed,
@@ -682,7 +682,7 @@ def parse(lines, doc):
     lastKey = None
     blockSize = 0
     endTag = None
-    md = MetadataManager(doc)
+    md = MetadataManager()
     for i,line in enumerate(lines):
         if not inMetadata and re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line):
             blockSize = 1
@@ -720,11 +720,11 @@ def parse(lines, doc):
     return newlines, md
 
 
-def fromCommandLine(overrides, doc):
+def fromCommandLine(overrides):
     # Given a list of strings representing command-line arguments,
     # finds the args that correspond to metadata keys
     # and fills a MetadataManager accordingly.
-    md = MetadataManager(doc)
+    md = MetadataManager()
     for o in overrides:
         match = re.match("--md-([^ =]+)=(.+)", o)
         if not match:
@@ -739,7 +739,8 @@ def fromCommandLine(overrides, doc):
     return md
 
 
-def fromJson(data, md):
+def fromJson(data):
+    md = MetadataManager()
     try:
         defaults = json.loads(data)
     except Exception, e:
@@ -810,11 +811,9 @@ def join(*sources):
     '''
     MetadataManager is a monoid
     '''
-    md = MetadataManager(sources[0].doc)
-    if any(x.hasMetadata for x in sources):
-        md.hasMetadata = True
+    md = MetadataManager()
+    md.hasMetadata = any(x.hasMetadata for x in sources)
     for mdsource in sources:
-        md.manuallySetKeys |= mdsource.manuallySetKeys
         for k in mdsource.manuallySetKeys:
             mdentry = knownKeys[k]
             md.addParsedData(k, getattr(mdsource, mdentry.attrName))

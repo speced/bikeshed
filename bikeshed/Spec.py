@@ -60,9 +60,9 @@ class Spec(object):
         self.refs = ReferenceManager()
         self.externalRefsUsed = defaultdict(lambda:defaultdict(dict))
         self.md = None
-        self.mdBaseline = metadata.MetadataManager(doc=self)
+        self.mdBaseline = metadata.MetadataManager()
         self.mdDocument = None
-        self.mdCommandLine = metadata.MetadataManager(doc=self)
+        self.mdCommandLine = metadata.MetadataManager()
         self.mdDefaults = None
         self.mdOverridingDefaults = None
         self.biblios = {}
@@ -104,15 +104,15 @@ class Spec(object):
         self.lines = markdown.stripComments(self.lines)
 
         # Extract and process metadata
-        self.lines, self.mdDocument = metadata.parse(lines=self.lines, doc=self)
+        self.lines, self.mdDocument = metadata.parse(lines=self.lines)
         self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
-        self.mdDefaults = metadata.fromJson(data=config.retrieveBoilerplateFile(self, 'defaults', error=True), md=metadata.MetadataManager(self))
+        self.mdDefaults = metadata.fromJson(data=config.retrieveBoilerplateFile(self, 'defaults', error=True))
         self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
         self.md.fillTextMacros(self.macros, doc=self)
         computedMdText = replaceMacros(config.retrieveBoilerplateFile(self, 'computed-metadata', error=True), macros=self.macros)
-        self.mdOverridingDefaults = metadata.fromJson(data=computedMdText, md=metadata.MetadataManager(self))
+        self.mdOverridingDefaults = metadata.fromJson(data=computedMdText)
         self.md = metadata.join(self.md, self.mdOverridingDefaults)
-        self.md.computeImplicitMetadata()
+        self.md.computeImplicitMetadata(doc=self)
         self.md.fillTextMacros(self.macros, doc=self)
         self.md.validate()
         extensions.load(self)

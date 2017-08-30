@@ -187,14 +187,14 @@ def main():
         update.update(anchors=options.anchors, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, dryRun=config.dryRun, force=options.force)
     elif options.subparserName == "spec":
         doc = Spec(inputFilename=options.infile, debug=options.debug, token=options.ghToken, lineNumbers=options.lineNumbers)
-        doc.mdCommandLine = metadata.fromCommandLine(extras, doc)
+        doc.mdCommandLine = metadata.fromCommandLine(extras)
         if options.byos:
             doc.mdCommandLine.addData("Group", "byos")
         doc.preprocess()
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "echidna":
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
-        doc.mdCommandLine = metadata.fromCommandLine(extras, doc)
+        doc.mdCommandLine = metadata.fromCommandLine(extras)
         doc.mdCommandLine.addData("Prepare For TR", "yes")
         doc.preprocess()
         addDirs = [] if options.selfContained else options.additionalDirectories
@@ -206,38 +206,38 @@ def main():
         # Can't have an error killing the watcher
         config.force = True
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
-        doc.md = metadata.fromCommandLine(extras, doc)
+        doc.mdCommandLine = metadata.fromCommandLine(extras)
         if options.byos:
-            doc.md.addData("Group", "byos")
+            doc.mdCommandLine.addData("Group", "byos")
         doc.watch(outputFilename=options.outfile)
     elif options.subparserName == "serve":
         config.force = True
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
-        doc.md = metadata.fromCommandLine(extras, doc)
+        doc.mdCommandLine = metadata.fromCommandLine(extras)
         if options.byos:
-            doc.md.addData("Group", "byos")
+            doc.mdCommandLine.addData("Group", "byos")
         doc.watch(outputFilename=options.outfile, port=int(options.port))
     elif options.subparserName == "debug":
         config.force = True
         config.quiet = 2
         if options.printExports:
             doc = Spec(inputFilename=options.infile)
-            doc.md = metadata.fromCommandLine(extras, doc)
+            doc.mdCommandLine = metadata.fromCommandLine(extras)
             doc.preprocess()
             doc.printTargets()
         elif options.jsonCode:
             doc = Spec(inputFilename=options.infile)
-            doc.md = metadata.fromCommandLine(extras, doc)
+            doc.mdCommandLine = metadata.fromCommandLine(extras)
             doc.preprocess()
             exec("print config.printjson({0})".format(options.jsonCode))
         elif options.code:
             doc = Spec(inputFilename=options.infile)
-            doc.md = metadata.fromCommandLine(extras, doc)
+            doc.mdCommandLine = metadata.fromCommandLine(extras)
             doc.preprocess()
             exec("print {0}".format(options.code))
         elif options.linkText:
             doc = Spec(inputFilename=options.infile)
-            doc.md = metadata.fromCommandLine(extras, doc)
+            doc.mdCommandLine = metadata.fromCommandLine(extras)
             doc.preprocess()
             refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText + "\n"]
             config.quiet = options.quiet
@@ -256,7 +256,7 @@ def main():
         config.quiet = 10
         doc = Spec(inputFilename=options.infile)
         if doc.valid:
-            doc.md = metadata.fromCommandLine(extras, doc)
+            doc.mdCommandLine = metadata.fromCommandLine(extras)
             doc.preprocess()
             rm = doc.refs
         else:
