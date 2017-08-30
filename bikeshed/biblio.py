@@ -1,33 +1,38 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
+
 import re
 from collections import defaultdict
+
+from . import attr
 from .htmlhelpers import *
 from .messages import *
 
-
+@attr.s(slots=True)
 class BiblioEntry(object):
+    linkText = attr.ib(default=None)
+    title = attr.ib(default=None)
+    authors = attr.ib(default=attr.Factory(list))
+    etAl = attr.ib(default=False)
+    status = attr.ib(default=None)
+    date = attr.ib(default=None)
+    snapshot_url = attr.ib(default=None)
+    current_url = attr.ib(default=None)
+    preferredURL = attr.ib(default=None)
+    url = attr.ib(default=None)
+    obsoletedBy = attr.ib(default="")
+    other = attr.ib(default=None)
+    biblioFormat = attr.ib(default=None)
+    order = attr.ib(default=None)
 
-    def __init__(self, preferredURL=None, **kwargs):
-        self.linkText = kwargs.get("linkText", None)
-        self.title = kwargs.get("title", None)
-        self.authors = kwargs.get("authors", [])
-        self.etAl = kwargs.get("etAl", False)
-        self.status = kwargs.get("status", None)
-        self.date = kwargs.get("date", None)
-        self.snapshot_url = kwargs.get("snapshot_url", None)
-        self.current_url = kwargs.get("current_url", None)
-        self.preferred_url = preferredURL
-        self.url = None
-        self.obsoletedBy = kwargs.get("obsoletedBy", "")
-        self.other = kwargs.get("other", None)
-        if preferredURL is None:
-            self.preferred_url = config.refStatus.snapshot
+    def __attrs_post_init__(self):
+        if self.preferredURL is None:
+            self.preferredURL = config.refStatus.snapshot
         else:
-            self.preferred_url = config.refStatus(preferredURL)
-        if self.preferred_url == config.refStatus.snapshot:
+            self.preferredURL = config.refStatus(self.preferredURL)
+        if self.preferredURL == config.refStatus.snapshot:
             self.url = self.snapshot_url or self.current_url
-        elif self.preferred_url == config.refStatus.current:
+        elif self.preferredURL == config.refStatus.current:
             self.url = self.current_url or self.snapshot_url
         else:
             raise
@@ -52,7 +57,7 @@ class BiblioEntry(object):
         else:
             str += "{0}. ".format(self.title)
 
-        if self.preferred_url == "current" and self.current_url:
+        if self.preferredURL == "current" and self.current_url:
             pass
         else:
             if self.date:
@@ -92,7 +97,7 @@ class BiblioEntry(object):
             ret.append(self.title + ". ")
 
         str = ""
-        if self.preferred_url == "current" and self.current_url:
+        if self.preferredURL == "current" and self.current_url:
             pass
         else:
             if self.date:
@@ -149,6 +154,7 @@ class SpecBasedBiblioEntry(BiblioEntry):
         ]
 
 
+@attr.s(slots=True, frozen=True)
 class StringBiblioEntry(BiblioEntry):
     '''
     Generates a barebones biblio entry from a preformatted biblio string.
@@ -156,9 +162,8 @@ class StringBiblioEntry(BiblioEntry):
     don't use it on purpose for real things in the future.
     '''
 
-    def __init__(self, data, linkText, **kwargs):
-        self.data = data
-        self.linkText = linkText
+    data = attr.ib(default="")
+    linkText = attr.ib(default="")
 
     def valid(self):
         return True
