@@ -194,8 +194,8 @@ def main():
         doc.finish(outputFilename=options.outfile)
     elif options.subparserName == "echidna":
         doc = Spec(inputFilename=options.infile, token=options.ghToken)
-        doc.md = metadata.fromCommandLine(extras, doc)
-        doc.md.addData("Prepare For TR", "yes")
+        doc.mdCommandLine = metadata.fromCommandLine(extras, doc)
+        doc.mdCommandLine.addData("Prepare For TR", "yes")
         doc.preprocess()
         addDirs = [] if options.selfContained else options.additionalDirectories
         if options.justTar:
