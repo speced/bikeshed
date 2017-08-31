@@ -2,7 +2,7 @@
 
 from __future__ import division, unicode_literals
 import StringIO
-from .htmlhelpers import childNodes, isElement, outerHTML, escapeHTML, escapeAttr
+from .htmlhelpers import childNodes, isElement, outerHTML, escapeHTML, escapeAttr, hasAttrs
 from .messages import *
 
 
@@ -56,11 +56,18 @@ class HTMLSerializer(object):
         return t2
 
     def startTag(self, tag, el, write):
-        if tag != "[]":
-            write("<" + tag)
-            for attrName, attrVal in sorted(el.items()):
-                write(" " + self.unfuckName(attrName) + '="' + escapeAttr(attrVal) + '"')
-            write(">")
+        if tag == "[]":
+            return
+        if not hasAttrs(el):
+            write("<"+tag+">")
+            return
+
+        strs = []
+        strs.append("<" + tag)
+        for attrName, attrVal in sorted(el.items()):
+            strs.append(" " + self.unfuckName(attrName) + '="' + escapeAttr(attrVal) + '"')
+        strs.append(">")
+        write("".join(strs))
 
     def endTag(self, tag, write):
         if tag != "[]":

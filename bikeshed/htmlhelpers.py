@@ -480,6 +480,10 @@ def removeAttr(el, attrName):
     return el
 
 
+def hasAttrs(el):
+    return bool(el.attrib)
+
+
 def addClass(el, cls):
     if el.get('class') is None:
         el.set('class', cls)
