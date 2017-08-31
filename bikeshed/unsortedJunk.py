@@ -633,7 +633,7 @@ def processBiblioLinks(doc):
 
         # Need to register that I have a preferred way to refer to this biblio,
         # in case aliases show up - they all need to use my preferred key!
-        if hasattr(ref, "originalLinkText"):
+        if ref.originalLinkText:
             # Okay, so this particular ref has been reffed before...
             if linkText == ref.linkText:
                 # Whew, and with the same name I'm using now. Ship it.

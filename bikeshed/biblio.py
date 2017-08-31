@@ -11,6 +11,7 @@ from .messages import *
 @attr.s(slots=True)
 class BiblioEntry(object):
     linkText = attr.ib(default=None)
+    originalLinkText = attr.ib(default=None)
     title = attr.ib(default=None)
     authors = attr.ib(default=attr.Factory(list))
     etAl = attr.ib(default=False)
