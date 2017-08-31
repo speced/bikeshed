@@ -3,22 +3,21 @@ from __future__ import division, unicode_literals
 
 import copy
 
+from .. import attr
+
+@attr.s(slots=True)
 class RefWrapper(object):
     # Refs don't contain their own name, so I don't have to copy as much when there are multiple linkTexts
     # This wraps that, producing an object that looks like it has a text property.
     # It also makes all the ref dict keys look like object attributes.
 
-    __slots__ = ["text", "_ref", "type", "spec", "shortname", "level", "status", "url", "export", "normative", "for"]
-
-    def __init__(self, text, ref):
-        self.text = text
-        self._ref = ref
+    text = attr.ib()
+    _ref = attr.ib()
 
     def __getattr__(self, name):
         '''
         Indirect all attr accesses into the self._ref dict.
-        Also, strip whitespace from the values (they'll have \n at the end) on access,
-        and store them directly on the RefWrapper for fast access next time.
+        Also, strip whitespace from the values (they'll have \n at the end) on access.
         '''
         if name == "for_":
             refKey = "for"
@@ -29,13 +28,9 @@ class RefWrapper(object):
             val = val.strip()
         elif isinstance(val, list):
             val = [x.strip() for x in val]
-        setattr(self, refKey, val)
         return val
 
     def __json__(self):
         refCopy = copy.copy(self._ref)
         refCopy['text'] = self.text
         return stripLineBreaks(refCopy)
-
-    def __repr__(self):
-        return "RefWrapper(" + repr(self.text) + ", " + repr(self._ref) + ")"
