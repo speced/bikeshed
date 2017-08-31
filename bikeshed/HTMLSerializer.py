@@ -90,11 +90,10 @@ class HTMLSerializer(object):
         return len(block) == 1 and not self.isElement(block[0]) and block[0].strip() == ""
 
     def _serializeEl(self, el, write, indent=0, pre=False, inline=False):
-        if self.isElement(el):
-            tag = self.unfuckName(el.tag)
-        else:
-            # el is an array
+        if isinstance(el, list):
             tag = "[]"
+        else:
+            tag = self.unfuckName(el.tag)
 
         if self.isVoidElement(tag):
             write(" " * indent)
