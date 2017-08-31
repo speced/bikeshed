@@ -29,7 +29,7 @@ class RefWrapper(object):
             val = val.strip()
         elif isinstance(val, list):
             val = [x.strip() for x in val]
-        #self.key = val
+        setattr(self, refKey, val)
         return val
 
     def __json__(self):
