@@ -12,6 +12,8 @@ from .utils import *
 
 class RefSource(object):
 
+    __slots__ = ["source", "_refs", "methods", "fors", "specs", "ignoredSpecs", "replacedSpecs", "_loadedAnchorGroups"]
+
     # Which sources use lazy-loading; other sources always have all their refs loaded immediately.
     lazyLoadedSources = ["foreign"]
 

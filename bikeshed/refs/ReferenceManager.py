@@ -17,6 +17,10 @@ from ..htmlhelpers import *
 
 class ReferenceManager(object):
 
+    __slots__ = ["specs", "defaultSpecs", "ignoredSpecs", "replacedSpecs", "biblios", "loadedBiblioGroups",
+        "biblioKeys", "preferredBiblioNames", "headings", "defaultStatus", "localRefs", "anchorBlockRefs", "foreignRefs",
+        "shortname", "specLevel", "spec"]
+
     def __init__(self, defaultStatus=None):
         # Dict of {spec vshortname => spec data}
         self.specs = dict()

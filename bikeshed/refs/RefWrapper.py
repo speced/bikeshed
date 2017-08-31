@@ -7,6 +7,9 @@ class RefWrapper(object):
     # Refs don't contain their own name, so I don't have to copy as much when there are multiple linkTexts
     # This wraps that, producing an object that looks like it has a text property.
     # It also makes all the ref dict keys look like object attributes.
+
+    __slots__ = ["text", "_ref", "type", "spec", "shortname", "level", "status", "url", "export", "normative", "for"]
+
     def __init__(self, text, ref):
         self.text = text
         self._ref = ref
@@ -26,7 +29,7 @@ class RefWrapper(object):
             val = val.strip()
         elif isinstance(val, list):
             val = [x.strip() for x in val]
-        self.key = val
+        #self.key = val
         return val
 
     def __json__(self):
