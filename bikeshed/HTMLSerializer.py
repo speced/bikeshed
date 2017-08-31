@@ -36,7 +36,7 @@ class HTMLSerializer(object):
     def groupIntoBlocks(self, nodes):
         collect = []
         for node in nodes:
-            if self.isElement(node) and not self.isInlineElement(node.tag):
+            if self.isElement(node) and self.isBlockElement(node.tag):
                 yield collect
                 collect = []
                 yield node
@@ -90,6 +90,9 @@ class HTMLSerializer(object):
 
     def isInlineElement(self, tag):
         return (tag in self.inlineEls) or ("-" in tag and tag not in self.blockEls)
+
+    def isBlockElement(self, tag):
+        return not self.isInlineElement(tag)
 
     def justWS(self, block):
         if self.isElement(block):
@@ -161,14 +164,14 @@ class HTMLSerializer(object):
             write(" " * indent)
             self.startTag(tag, el, write)
             for block in blocks:
-                if self.isElement(block):
-                    write("\n")
-                    self._serializeEl(block, write, indent=indent + 1)
-                else:
+                if isinstance(block, list):
                     # is an array of inlines
                     if len(block) > 0:
                         write("\n" + (" " * (indent + 1)))
                         self._serializeEl(block, write, inline=True)
+                else:
+                    write("\n")
+                    self._serializeEl(block, write, indent=indent + 1)
             if tag not in self.omitEndTagEls:
                 write("\n" + (" " * indent))
                 self.endTag(tag, write)
