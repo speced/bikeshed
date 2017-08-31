@@ -96,54 +96,53 @@ class HTMLSerializer(object):
             return False
         return len(block) == 1 and not self.isElement(block[0]) and block[0].strip() == ""
 
-    def _serializeEl(self, el, write, indent=0, pre=False, inline=False):
-        if isinstance(el, list):
-            tag = "[]"
-        else:
-            tag = self.unfuckName(el.tag)
+    def _writeVoidElement(self, tag, el, write, indent):
+        write(" " * indent)
+        self.startTag(tag, el, write)
 
-        if self.isVoidElement(tag):
-            write(" " * indent)
-            self.startTag(tag, el, write)
-            return
-        elif self.isRawElement(tag):
-            self.startTag(tag, el, write)
-            for node in childNodes(el):
-                if self.isElement(node):
-                    die("Somehow a CDATA element got an element child:\n{0}", outerHTML(el))
-                    return
-                else:
-                    write(node)
-            self.endTag(tag, write)
-            return
-        elif pre or self.isOpaqueElement(tag):
-            self.startTag(tag, el, write)
-            for node in childNodes(el):
-                if self.isElement(node):
-                    self._serializeEl(node, write, indent=indent, pre=True)
-                else:
-                    write(escapeHTML(node))
-            self.endTag(tag, write)
-            return
-        elif inline or self.isInlineElement(el):
-            self.startTag(tag, el, write)
-            for node in childNodes(el):
-                if self.isElement(node):
-                    self._serializeEl(node, write, inline=inline)
-                else:
-                    write(escapeHTML(self.fixWS(node)))
-            self.endTag(tag, write)
-            return
+    def _writeRawElement(self, tag, el, write):
+        self.startTag(tag, el, write)
+        #write(el.text or '')
+        #'''
+        for node in childNodes(el):
+            if self.isElement(node):
+                die("Somehow a CDATA element got an element child:\n{0}", outerHTML(el))
+                return
+            else:
+                write(node)
+        #'''
+        self.endTag(tag, write)
 
-        # Otherwise I'm a block element.
+    def _writeOpaqueElement(self, tag, el, write, indent):
+        self.startTag(tag, el, write)
+        for node in childNodes(el):
+            if self.isElement(node):
+                self._serializeEl(node, write, indent=indent, pre=True)
+            else:
+                write(escapeHTML(node))
+        self.endTag(tag, write)
 
+    def _writeInlineElement(self, tag, el, write, inline):
+        self.startTag(tag, el, write)
+        for node in childNodes(el):
+            if self.isElement(node):
+                self._serializeEl(node, write, inline=inline)
+            else:
+                write(escapeHTML(self.fixWS(node)))
+        self.endTag(tag, write)
+
+    def _blocksFromChildren(self, el):
+        return [block for block in self.groupIntoBlocks(childNodes(el)) if not self.justWS(block)]
+
+    def _writeBlockElement(self, tag, el, write, indent):
         # Dropping pure-WS anonymous blocks.
         # This maintains whitespace between *inline* elements, which is required.
         # It just avoids serializing a line of "inline content" that's just WS.
-        blocks = [block for block in self.groupIntoBlocks(childNodes(el)) if not self.justWS(block)]
+        blocks = self._blocksFromChildren(el)
 
         # Handle all the possibilities
         if len(blocks) == 0:
+            # Empty of text and children
             write(" " * indent)
             self.startTag(tag, el, write)
             if el.tag not in self.omitEndTagEls:
@@ -173,4 +172,20 @@ class HTMLSerializer(object):
             if tag not in self.omitEndTagEls:
                 write("\n" + (" " * indent))
                 self.endTag(tag, write)
-        return
+
+    def _serializeEl(self, el, write, indent=0, pre=False, inline=False):
+        if isinstance(el, list):
+            tag = "[]"
+        else:
+            tag = self.unfuckName(el.tag)
+
+        if self.isVoidElement(tag):
+            self._writeVoidElement(tag, el, write, indent)
+        elif self.isRawElement(tag):
+            self._writeRawElement(tag, el, write)
+        elif pre or self.isOpaqueElement(tag):
+            self._writeOpaqueElement(tag, el, write, indent)
+        elif inline or self.isInlineElement(el):
+            self._writeInlineElement(tag, el, write, inline)
+        else:
+            self._writeBlockElement(tag, el, write, indent)
