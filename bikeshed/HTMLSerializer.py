@@ -27,131 +27,136 @@ class HTMLSerializer(object):
         output.close()
         return str
 
+    def unfuckName(self, n):
+        # LXML does namespaces stupidly
+        if n.startswith("{"):
+            return n.partition("}")[2]
+        return n
+
+    def groupIntoBlocks(self, nodes):
+        collect = []
+        for node in nodes:
+            if self.isElement(node) and not self.isInlineElement(node.tag):
+                yield collect
+                collect = []
+                yield node
+                continue
+            else:
+                collect.append(node)
+        yield collect
+
+    def fixWS(self, text):
+        import string
+        t1 = text.lstrip(string.whitespace)
+        if text != t1:
+            t1 = " " + t1
+        t2 = t1.rstrip(string.whitespace)
+        if t1 != t2:
+            t2 = t2 + " "
+        return t2
+
+    def startTag(self, tag, el, write):
+        if tag != "[]":
+            write("<" + tag)
+            for attrName, attrVal in sorted(el.items()):
+                write(" " + self.unfuckName(attrName) + '="' + escapeAttr(attrVal) + '"')
+            write(">")
+
+    def endTag(self, tag, write):
+        if tag != "[]":
+            write("</" + tag + ">")
+
+    def isElement(self, node):
+        return isElement(node)
+
+    def isAnonBlock(self, block):
+        return not isElement(block)
+
+    def isVoidElement(self, tag):
+        return tag in self.voidEls
+
+    def isRawElement(self, tag):
+        return tag in self.rawEls
+
+    def isOpaqueElement(self, tag):
+        return tag in self.opaqueEls
+
+    def isInlineElement(self, tag):
+        return (tag in self.inlineEls) or ("-" in tag and tag not in self.blockEls)
+
+    def justWS(self, block):
+        if self.isElement(block):
+            return False
+        return len(block) == 1 and not self.isElement(block[0]) and block[0].strip() == ""
+
     def _serializeEl(self, el, write, indent=0, pre=False, inline=False):
-        def unfuckName(n):
-            # LXML does namespaces stupidly
-            if n.startswith("{"):
-                return n.partition("}")[2]
-            return n
-
-        def groupIntoBlocks(nodes):
-            collect = []
-            for node in nodes:
-                if isElement(node) and not isInlineElement(node.tag):
-                    yield collect
-                    collect = []
-                    yield node
-                    continue
-                else:
-                    collect.append(node)
-            yield collect
-
-        def fixWS(text):
-            import string
-            t1 = text.lstrip(string.whitespace)
-            if text != t1:
-                t1 = " " + t1
-            t2 = t1.rstrip(string.whitespace)
-            if t1 != t2:
-                t2 = t2 + " "
-            return t2
-
-        def startTag(tag):
-            if tag != "[]":
-                write("<" + tag)
-                for attrName, attrVal in sorted(el.items()):
-                    write(" " + unfuckName(attrName) + '="' + escapeAttr(attrVal) + '"')
-                write(">")
-
-        def endTag(tag):
-            if tag != "[]":
-                write("</" + tag + ">")
-
-        def isAnonBlock(block):
-            return not isElement(block)
-
-        def isVoidElement(tag):
-            return tag in self.voidEls
-
-        def isRawElement(tag):
-            return tag in self.rawEls
-
-        def isOpaqueElement(tag):
-            return tag in self.opaqueEls
-
-        def isInlineElement(tag):
-            return (tag in self.inlineEls) or ("-" in tag and tag not in self.blockEls)
-
-        if isElement(el):
-            tag = unfuckName(el.tag)
+        if self.isElement(el):
+            tag = self.unfuckName(el.tag)
         else:
             # el is an array
             tag = "[]"
 
-        if isVoidElement(tag):
+        if self.isVoidElement(tag):
             write(" " * indent)
-            startTag(tag)
+            self.startTag(tag, el, write)
             return
-        if isRawElement(tag):
-            startTag(tag)
+        elif self.isRawElement(tag):
+            self.startTag(tag, el, write)
             for node in childNodes(el):
-                if isElement(node):
+                if self.isElement(node):
                     die("Somehow a CDATA element got an element child:\n{0}", outerHTML(el))
                     return
                 else:
                     write(node)
-            endTag(tag)
+            self.endTag(tag, write)
             return
-        if pre or isOpaqueElement(tag):
-            startTag(tag)
+        elif pre or self.isOpaqueElement(tag):
+            self.startTag(tag, el, write)
             for node in childNodes(el):
-                if isElement(node):
+                if self.isElement(node):
                     self._serializeEl(node, write, indent=indent, pre=True)
                 else:
                     write(escapeHTML(node))
-            endTag(tag)
+            self.endTag(tag, write)
             return
-        if inline or isInlineElement(el):
-            startTag(tag)
+        elif inline or self.isInlineElement(el):
+            self.startTag(tag, el, write)
             for node in childNodes(el):
-                if isElement(node):
+                if self.isElement(node):
                     self._serializeEl(node, write, inline=inline)
                 else:
-                    write(escapeHTML(fixWS(node)))
-            endTag(tag)
+                    write(escapeHTML(self.fixWS(node)))
+            self.endTag(tag, write)
             return
 
-        # Otherwise I'm a block element
-        def justWS(block):
-            if isElement(block):
-                return False
-            return len(block) == 1 and not isElement(block[0]) and block[0].strip() == ""
+        # Otherwise I'm a block element.
+
         # Dropping pure-WS anonymous blocks.
         # This maintains whitespace between *inline* elements, which is required.
         # It just avoids serializing a line of "inline content" that's just WS.
-        blocks = [block for block in groupIntoBlocks(childNodes(el)) if not justWS(block)]
+        blocks = [block for block in self.groupIntoBlocks(childNodes(el)) if not self.justWS(block)]
 
         # Handle all the possibilities
         if len(blocks) == 0:
             write(" " * indent)
-            startTag(tag)
+            self.startTag(tag, el, write)
             if el.tag not in self.omitEndTagEls:
-                endTag(tag)
+                self.endTag(tag, write)
             return
-        elif len(blocks) == 1 and isAnonBlock(blocks[0]):
+        elif len(blocks) == 1 and self.isAnonBlock(blocks[0]):
             # Contains only inlines, print accordingly
             write(" " * indent)
-            startTag(tag)
+            self.startTag(tag, el, write)
             self._serializeEl(blocks[0], write, inline=True)
             if el.tag not in self.omitEndTagEls:
-                endTag(tag)
+                self.endTag(tag, write)
             return
         else:
             # Otherwise I'm a block that contains at least one block
             write(" " * indent)
-            startTag(tag)
+            self.startTag(tag, el, write)
             for block in blocks:
-                if isElement(block):
+                if self.isElement(block):
                     write("\n")
                     self._serializeEl(block, write, indent=indent + 1)
                 else:
@@ -161,5 +166,5 @@ class HTMLSerializer(object):
                         self._serializeEl(block, write, inline=True)
             if tag not in self.omitEndTagEls:
                 write("\n" + (" " * indent))
-                endTag(tag)
+                self.endTag(tag, write)
         return
