@@ -105,15 +105,12 @@ class HTMLSerializer(object):
 
     def _writeRawElement(self, tag, el, write):
         self.startTag(tag, el, write)
-        #write(el.text or '')
-        #'''
         for node in childNodes(el):
             if self.isElement(node):
                 die("Somehow a CDATA element got an element child:\n{0}", outerHTML(el))
                 return
             else:
                 write(node)
-        #'''
         self.endTag(tag, write)
 
     def _writeOpaqueElement(self, tag, el, write, indent):
@@ -134,28 +131,39 @@ class HTMLSerializer(object):
                 write(escapeHTML(self.fixWS(node)))
         self.endTag(tag, write)
 
-    def _blocksFromChildren(self, el):
-        return [block for block in self.groupIntoBlocks(childNodes(el)) if not self.justWS(block)]
+    def _blocksFromChildren(self, children):
+        return [block for block in self.groupIntoBlocks(children) if not self.justWS(block)]
+
+    def _categorizeBlockChildren(self, el):
+        '''
+        Figure out what sort of contents the block has,
+        so we know what serialization strategy to use.
+        '''
+        if len(el) == 0 and (el.text is None or el.text.strip() == ""):
+            return "empty", None
+        children = childNodes(el)
+        for child in children:
+            if self.isElement(child) and self.isBlockElement(child.tag):
+                return "blocks", self._blocksFromChildren(children)
+        return "inlines", children
 
     def _writeBlockElement(self, tag, el, write, indent):
         # Dropping pure-WS anonymous blocks.
         # This maintains whitespace between *inline* elements, which is required.
         # It just avoids serializing a line of "inline content" that's just WS.
-        blocks = self._blocksFromChildren(el)
+        contentsType, contents = self._categorizeBlockChildren(el)
 
-        # Handle all the possibilities
-        if len(blocks) == 0:
+        if contentsType == "empty":
             # Empty of text and children
             write(" " * indent)
             self.startTag(tag, el, write)
             if el.tag not in self.omitEndTagEls:
                 self.endTag(tag, write)
-            return
-        elif len(blocks) == 1 and self.isAnonBlock(blocks[0]):
+        elif contentsType == "inlines":
             # Contains only inlines, print accordingly
             write(" " * indent)
             self.startTag(tag, el, write)
-            self._serializeEl(blocks[0], write, inline=True)
+            self._serializeEl(contents, write, inline=True)
             if el.tag not in self.omitEndTagEls:
                 self.endTag(tag, write)
             return
@@ -163,7 +171,7 @@ class HTMLSerializer(object):
             # Otherwise I'm a block that contains at least one block
             write(" " * indent)
             self.startTag(tag, el, write)
-            for block in blocks:
+            for block in contents:
                 if isinstance(block, list):
                     # is an array of inlines
                     if len(block) > 0:
