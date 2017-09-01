@@ -155,7 +155,7 @@ class SpecBasedBiblioEntry(BiblioEntry):
         ]
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True)
 class StringBiblioEntry(BiblioEntry):
     '''
     Generates a barebones biblio entry from a preformatted biblio string.
