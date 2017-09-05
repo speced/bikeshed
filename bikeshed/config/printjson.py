@@ -26,7 +26,7 @@ def printjson(x, indent=2, level=0):
 def getjson(x):
     try:
         return x.__json__()
-    except:
+    except AttributeError:
         return x
 
 
