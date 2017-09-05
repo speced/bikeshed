@@ -12,6 +12,7 @@ from . import test
 from . import update
 from .messages import *
 from .Spec import Spec
+from .refs import ReferenceManager
 
 def main():
     # Hack around argparse's lack of optional subparsers

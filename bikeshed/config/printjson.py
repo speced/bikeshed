@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 
+from ..messages import printColor
+
 def printjson(x, indent=2, level=0):
     if isinstance(indent, int):
         # Convert into a number of spaces.

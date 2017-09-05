@@ -3,6 +3,7 @@ from __future__ import division, unicode_literals
 
 import copy
 
+from .utils import stripLineBreaks
 from .. import attr
 
 @attr.s(slots=True)
