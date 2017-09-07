@@ -174,6 +174,12 @@ def main():
 
     templateParser = subparsers.add_parser('template', help="Outputs a skeleton .bs file for you to start with.")
 
+    wptParser = subparsers.add_parser('wpt', help="Tools for writing Web Platform Tests.")
+    wptParser.add_argument("--template",
+                           default=False,
+                           action="store_true",
+                           help="Outputs a skeleton WPT file for you to start with.")
+
     options, extras = argparser.parse_known_args()
 
     config.quiet = options.quiet
@@ -314,4 +320,52 @@ Introduction {#intro}
 =====================
 
 Introduction here.
+''')
+
+    elif options.subparserName == "wpt":
+        if options.template:
+            p('''
+<!DOCTYPE html>
+<meta charset=utf-8>
+<title>window.offscreenBuffering</title>
+<link rel=author title="AUTHOR NAME HERE" href="mailto:AUTHOR EMAIL HERE">
+<link rel=help href="LINK TO ROUGHLY WHAT'S BEING TESTED HERE">
+<script src="/resources/testharness.js"></script>
+<script src="/resources/testharnessreport.js"></script>
+<script>
+/* Choose the test type you want: */
+
+
+/* Standard, synchronous test */
+test(function() {
+    /* test code here */
+}, "TEST NAME HERE / SHORT DESCRIPTION PHRASE");
+
+
+/* Async test */
+let t = async_test("TEST NAME HERE / SHORT DESCRIPTION PHRASE");
+somethingWithACallback( function(){ t.step(()=>{ /* test code here */}) );
+something.addEventListener('foo', t.step_func(()=>{ /* test code here */}));
+t.done(); // when all tests are finished running
+// or call the following if there's only one test, automatically does .done() for you
+something.addEventListener('foo', t.step_func_done(()=>{ /* test code here */}));
+
+
+/* Promise test */
+promise_test(function(){
+    return somePromiseFunc().then(()=>{ /* test code here */ });
+}, "TEST NAME HERE / SHORT DESCRIPTION PHRASE");
+// auto-finishes when the returned promise fulfills
+// or if promise should reject:
+promise_test(function(t){
+    return promise_rejects(t, new ExpectedError(), somePromiseCode());
+}, "TEST NAME HERE / SHORT DESCRIPTION PHRASE");
+
+
+/* "test code here" Asserts */
+// Only use inside of /* test code here */ regions
+assert_true(VALUE HERE, "TEST DESCRIPTION");
+assert_equals(ACTUAL VALUE HERE, EXPECTED VALUE HERE, "TEST DESCRIPTION");
+// lots more at http://web-platform-tests.org/writing-tests/testharness-api.html#list-of-assertions
+</script>
 ''')
