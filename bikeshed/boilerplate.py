@@ -28,7 +28,7 @@ def addCanonicalURL(doc):
 
 def addSpecVersion(doc):
     # Adds a <meta> with the current spec revision, if one was detected
-    if "spec-version" not in doc.md.boilerplate:
+    if "document-revision" not in doc.md.boilerplate:
         return
 
     revision = None
