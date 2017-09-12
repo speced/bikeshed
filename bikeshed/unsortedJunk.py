@@ -545,6 +545,9 @@ def classifyDfns(doc, dfns):
             child = hasOnlyChild(el)
             if child is not None and child.tag == "code":
                 pass
+            if el.tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
+                # Don't wrap headings, it looks bad.
+                pass
             wrapContents(el, E.code())
 
 
