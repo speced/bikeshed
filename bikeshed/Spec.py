@@ -145,6 +145,7 @@ class Spec(object):
         lint.lintExampleIDs(self)
         boilerplate.addBikeshedVersion(self)
         boilerplate.addCanonicalURL(self)
+        boilerplate.addSpecVersion(self)
         boilerplate.addStatusSection(self)
         boilerplate.addLogo(self)
         boilerplate.addCopyright(self)

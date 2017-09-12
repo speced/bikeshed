@@ -6,10 +6,10 @@ import copy
 import json
 import os
 import re
+import subprocess
 from collections import defaultdict
 from datetime import datetime
 from DefaultOrderedDict import DefaultOrderedDict
-from subprocess import check_output
 
 from . import attr
 from . import config
@@ -773,7 +773,7 @@ def getSpecRepository(doc):
         try:
             os.chdir(source_dir)
             with open(os.devnull, "wb") as fnull:
-                remotes = check_output(["git", "remote", "-v"], stderr=fnull)
+                remotes = subprocess.check_output(["git", "remote", "-v"], stderr=fnull)
             os.chdir(old_dir)
             search = re.search(r"origin\tgit@github\.com:([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
             if search:
@@ -782,7 +782,7 @@ def getSpecRepository(doc):
             if search:
                 return GithubRepository(*search.groups())
             return config.Nil()
-        except:
+        except subprocess.CalledProcessError:
             # check_output will throw CalledProcessError when not in a git repo
             os.chdir(old_dir)
             return config.Nil()

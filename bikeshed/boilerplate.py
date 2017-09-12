@@ -14,17 +14,42 @@ def addBikeshedVersion(doc):
     # Adds a <meta> containing the current Bikeshed semver.
     if "generator" not in doc.md.boilerplate:
         return
-    head = find("head", doc)
     bikeshedVersion = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=os.path.dirname(__file__)).rstrip()
-    appendChild(head,
+    appendChild(doc.head,
                 E.meta({"name": "generator", "content": "Bikeshed version {0}".format(bikeshedVersion)}))
+
 
 def addCanonicalURL(doc):
     # Adds a <link rel=canonical> to the configured canonical url
     if doc.md.canonicalURL:
-        head = find("head", doc)
-        appendChild(head,
+        appendChild(doc.head,
                     E.link({"rel": "canonical", "href": doc.md.canonicalURL}))
+
+
+def addSpecVersion(doc):
+    # Adds a <meta> with the current spec revision, if one was detected
+    if "spec-version" not in doc.md.boilerplate:
+        return
+
+    revision = None
+    source_dir = os.path.dirname(os.path.abspath(doc.inputSource))
+    old_dir = os.getcwd()
+    os.chdir(source_dir)
+    try:
+        # Check for a Git repo
+        with open(os.devnull, "wb") as fnull:
+            revision = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=fnull).strip()
+    except subprocess.CalledProcessError:
+        try:
+            # Check for an Hg repo
+            with open(os.devnull, "wb") as fnull:
+                revision = subprocess.check_output(["hg", "parent", "--temp='{node}'"], stderr=fnull).strip()
+        except:
+            pass
+    os.chdir(old_dir)
+    if revision:
+        appendChild(doc.head,
+                    E.meta({"name":"document-revision", "content":revision}))
 
 
 def addHeaderFooter(doc):
