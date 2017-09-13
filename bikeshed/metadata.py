@@ -471,7 +471,7 @@ def parseRefStatus(key, val, lineNum):
 
 def parseComplainAbout(key, val, lineNum):
     validLabels = frozenset(["missing-example-ids", "broken-links", "accidental-2119"])
-    parseBoolishList(key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum)
+    ret = parseBoolishList(key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum)
     return ret
 
 
@@ -489,7 +489,7 @@ def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None,
         extraValues = {}
     vals = [v.strip() for v in val.split(",")]
     for v in vals:
-        name,_, boolstring = v.split().rpartition(" ")
+        name,_, boolstring = v.strip().rpartition(" ")
         if not name or not boolstring:
             die("{0} metadata pieces are a label and a boolean. Got:\n{1}", key, v, lineNum=lineNum)
             continue
