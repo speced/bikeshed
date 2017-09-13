@@ -9,11 +9,12 @@ import re
 import subprocess
 from collections import defaultdict
 from datetime import datetime
-from DefaultOrderedDict import DefaultOrderedDict
+from functools import partial
 
 from . import attr
 from . import config
 from . import markdown
+from .DefaultOrderedDict import DefaultOrderedDict
 from .htmlhelpers import *
 from .messages import *
 from .repository import *
@@ -76,6 +77,8 @@ class MetadataManager:
         self.mailingListArchives = None
         self.markupShorthands = config.BoolSet(["css", "dfn", "biblio", "markup", "idl", "algorithm"])
         self.maxToCDepth = float('inf')
+        self.metadataInclude = config.BoolSet(default=True)
+        self.metadataOrder = ["*", "!*"]
         self.noEditor = False
         self.noteClass = "note"
         self.opaqueElements = ["pre", "xmp", "script", "style"]
@@ -118,7 +121,7 @@ class MetadataManager:
             return
         md = knownKeys[key]
 
-        val = md.parse(key, val, lineNum)
+        val = md.parse(key=key, val=val, lineNum=lineNum)
 
         self.addParsedData(key, val)
 
@@ -467,25 +470,29 @@ def parseRefStatus(key, val, lineNum):
 
 
 def parseComplainAbout(key, val, lineNum):
-    ret = config.BoolSet(default=False)
     validLabels = frozenset(["missing-example-ids", "broken-links", "accidental-2119"])
-    parseBoolishList(key, val.lower(), ret, validLabels, lineNum=lineNum)
+    parseBoolishList(key, val.lower(), default=False, validLabels=validLabels, lineNum=lineNum)
     return ret
 
 
-def parseBoolishList(key, val, boolset, validLabels=None, extraValues=None, lineNum=None):
+def parseBoolishList(key, val, default=None, validLabels=None, extraValues=None, lineNum=None):
     # Parses anything defined as "label <boolish>, label <boolish>" into a passed BoolSet
     # Supply a list of valid labels if you want to have them checked,
     # and a dict of {value=>bool} pairs you want in addition to the standard boolish values
+    if default is None:
+        boolset = {}
+    elif default in (True, False):
+        boolset = config.BoolSet(default=default)
+    else:
+        die("Programming error - parseBoolishList() got a non-bool default value: '{0}'", default)
     if extraValues is None:
         extraValues = {}
     vals = [v.strip() for v in val.split(",")]
     for v in vals:
-        pieces = v.split()
-        if len(pieces) != 2:
+        name,_, boolstring = v.split().rpartition(" ")
+        if not name or not boolstring:
             die("{0} metadata pieces are a label and a boolean. Got:\n{1}", key, v, lineNum=lineNum)
             continue
-        name, boolstring = pieces
         if validLabels and name not in validLabels:
             die("Unknown {0} label '{1}'.", key, name, lineNum=lineNum)
             continue
@@ -673,6 +680,11 @@ def parseMaxToCDepth(key, val, lineNum):
     return v
 
 
+def parseMetadataOrder(key, val, lineNum):
+    pieces = [x.strip() for x in val.split(",")]
+    return pieces
+
+
 def parse(lines):
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
@@ -852,16 +864,16 @@ def joinDdList(a,b):
     return x
 
 
-def parseLiteral(k, v, l):
-    return v
+def parseLiteral(key, val, lineNum):
+    return val
 
 
-def parseLiteralCaseless(k, v, l):
-    return v.lower()
+def parseLiteralCaseless(key, val, lineNum):
+    return val.lower()
 
 
-def parseLiteralList(k, v, l):
-    return [v]
+def parseLiteralList(key, val, lineNum):
+    return [val]
 
 
 knownKeys = {
@@ -907,6 +919,8 @@ knownKeys = {
     "Mailing List": Metadata("Mailing List", "mailingList", joinValue, parseLiteral),
     "Markup Shorthands": Metadata("Markup Shorthands", "markupShorthands", joinBoolSet, parseMarkupShorthands),
     "Max Toc Depth": Metadata("Max ToC Depth", "maxToCDepth", joinValue, parseMaxToCDepth),
+    "Metadata Include": Metadata("Metadata Include", "metadataInclude", joinBoolSet, partial(parseBoolishList, default=True)),
+    "Metadata Order": Metadata("Metadata Order", "metadataOrder", joinValue, parseMetadataOrder),
     "No Editor": Metadata("No Editor", "noEditor", joinValue, parseBoolean),
     "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),
     "Opaque Elements": Metadata("Opaque Elements", "opaqueElements", joinList, parseCommaSeparated),

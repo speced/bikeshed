@@ -728,39 +728,64 @@ def addSpecMetadataSection(doc):
             #hidedel ~ #hidedel-label::before, #hidedel ~ * #hidedel-label::before { content: "☐ "; }
             #hidedel:checked ~ #hidedel-label::before, #hidedel:checked ~ * #hidedel-label::before { content: "☑ "; }
         """
-    for key, vals in doc.md.otherMetadata.items():
-        md[key].extend(parseHTML("<span>" + doc.fixText(val) + "</span>")[0] for val in vals)
 
-    pluralization = {
-        "Previous Version": "Previous Versions",
-        "Test Suite": "Test Suites",
-        doc.md.editorTerm['singular']: doc.md.editorTerm['plural'],
-        "Former " + doc.md.editorTerm['singular']: "Former " + doc.md.editorTerm['plural']
-    }
-
-    dl = E.dl()
-    for key, vals in md.items():
+    def createMdEntry(key, vals):
         # Pluralize appropriate words
+        pluralization = {
+            "Previous Version": "Previous Versions",
+            "Test Suite": "Test Suites",
+            doc.md.editorTerm['singular']: doc.md.editorTerm['plural'],
+            "Former " + doc.md.editorTerm['singular']: "Former " + doc.md.editorTerm['plural']
+        }
         if len(vals) > 1 and key in pluralization:
             displayKey = pluralization[key]
         else:
             displayKey = key
         if key in ("Editor", "Former Editor"):
-            # A bunch of Microformats stuff is preloading on the <dd>s,
+            # A bunch of Microformats stuff is preloaded on the <dd>s,
             # so this prevents code from genning an extra wrapper <dd>.
-            appendChild(dl,
-                        E.dt({"class": "editor"}, displayKey, ":"),
-                        *vals)
+            return [E.dt({"class": "editor"}, displayKey, ":")] + vals
         elif key == "Translations":
-            appendChild(dl,
-                        E.dt(displayKey, " ",
-                             E.small("(non-normative and likely out-of-date)"),
-                             ":"),
-                        *[E.dd(val) for val in vals])
+            ret = [E.dt(displayKey, " ", E.small("(non-normative and likely out-of-date)"), ":")]
+            ret += [E.dd({}, val) for val in vals]
+            return ret
         else:
-            appendChild(dl,
-                        E.dt(displayKey, ":"),
-                        *[E.dd(val) for val in vals])
+            return [E.dt(displayKey, ":")] + [E.dd({}, val) for val in vals]
+
+    # Merge "custom" metadata into non-custom, when they match up
+    otherMd = copy.deepcopy(doc.md.otherMetadata)
+    for k, vs in doc.md.otherMetadata.items():
+        if k in md:
+            md[k].extend(vs)
+            del otherMd[k]
+
+    dl = E.dl()
+    for key in doc.md.metadataOrder:
+        if key == "*":
+            # Do all the non-explicit non-custom keys
+            for k,vs in md.items():
+                if k in doc.md.metadataOrder:
+                    # Handled explicitly, don't put in the * spot
+                    continue
+                if k not in doc.md.metadataInclude:
+                    # Explicitly excluded
+                    continue
+                appendChild(dl, *createMdEntry(k, vs))
+        elif key == "!*":
+            # Do all the non-explicit custom keys
+            for k,vs in otherMd.items():
+                if k in doc.md.metadataOrder:
+                    continue
+                if k not in doc.md.metadataInclude:
+                    continue
+                appendChild(dl, *createMdEntry(k, [parseHTML(doc.fixText(v))[0] for v in vs]))
+        elif key not in doc.md.metadataInclude:
+            # Key explicitly excluded
+            continue
+        elif key in md:
+            appendChild(dl, *createMdEntry(key, md[key]))
+        elif key in otherMd:
+            appendChild(dl, *createMdEntry(key, [parseHTML(doc.fixText(v)) for v in otherMd[key]]))
     fillWith('spec-metadata', E.div(dl), doc=doc)
 
 
