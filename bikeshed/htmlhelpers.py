@@ -194,6 +194,7 @@ def parentElement(el):
 
 def appendChild(parent, *children):
     # Appends either text or an element.
+    children = list(config.flatten(children))
     for child in children:
         if isinstance(child, basestring):
             if len(parent) > 0:

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
+import collections
 import io
+import lxml
 import os
 import re
 
@@ -156,3 +158,12 @@ def groupFromKey(key, length=2):
         _groupFromKeyCache[key] = group
         return group
 _groupFromKeyCache = {}
+
+
+def flatten(l):
+    for el in l:
+        if isinstance(el, collections.Iterable) and not isinstance(el, basestring) and not lxml.etree.iselement(el):
+            for sub in flatten(el):
+                yield sub
+        else:
+            yield el
