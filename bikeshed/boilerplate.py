@@ -778,7 +778,7 @@ def addSpecMetadataSection(doc):
                     continue
                 if k not in doc.md.metadataInclude:
                     continue
-                appendChild(dl, *createMdEntry(k, [parseHTML(doc.fixText(v))[0] for v in vs]))
+                appendChild(dl, *createMdEntry(k, [parseHTML(doc.fixText(v)) for v in vs]))
         elif key not in doc.md.metadataInclude:
             # Key explicitly excluded
             continue
