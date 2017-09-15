@@ -2,6 +2,7 @@
 from __future__ import division, unicode_literals
 
 from .main import englishFromList
+from ..messages import *
 
 shortToLongStatus = {
     "DREAM": "A Collection of Interesting Ideas",
