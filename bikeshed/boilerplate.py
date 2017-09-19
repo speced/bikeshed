@@ -753,11 +753,12 @@ def addSpecMetadataSection(doc):
             return [E.dt(displayKey, ":")] + [E.dd({}, val) for val in vals]
 
     # Merge "custom" metadata into non-custom, when they match up
-    otherMd = copy.deepcopy(doc.md.otherMetadata)
+    otherMd = {}
     for k, vs in doc.md.otherMetadata.items():
         if k in md:
-            md[k].extend(vs)
-            del otherMd[k]
+            md[k].extend(parseHTML(doc.fixText(v)) for v in vs)
+        else:
+            otherMd[k] = [parseHTML(doc.fixText(v)) for v in vs]
 
     dl = E.dl()
     for key in doc.md.metadataOrder:
@@ -778,14 +779,14 @@ def addSpecMetadataSection(doc):
                     continue
                 if k not in doc.md.metadataInclude:
                     continue
-                appendChild(dl, *createMdEntry(k, [parseHTML(doc.fixText(v)) for v in vs]))
+                appendChild(dl, *createMdEntry(k, vs))
         elif key not in doc.md.metadataInclude:
             # Key explicitly excluded
             continue
         elif key in md:
             appendChild(dl, *createMdEntry(key, md[key]))
         elif key in otherMd:
-            appendChild(dl, *createMdEntry(key, [parseHTML(doc.fixText(v)) for v in otherMd[key]]))
+            appendChild(dl, *createMdEntry(key, otherMd[key]))
     fillWith('spec-metadata', E.div(dl), doc=doc)
 
 
