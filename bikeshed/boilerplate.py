@@ -4,7 +4,7 @@ import copy
 import os
 import re
 import subprocess
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from .DefaultOrderedDict import DefaultOrderedDict
 from .htmlhelpers import *
 from .messages import *
@@ -336,7 +336,6 @@ def htmlFromIndexTerms(entries):
     # entries: dict (preferably OrderedDict, if you want stability) of linkText=>{url, label, disambiguator}
     # label is used for the actual link (normally heading level), disambiguator is phrase to use when there are collisions
 
-    from collections import OrderedDict
     entries = OrderedDict(sorted(entries.items(), key=lambda x:re.sub(r'[^a-z0-9]', '', x[0].lower())))
 
     topList = E.ul({"class":"index"})
@@ -753,7 +752,7 @@ def addSpecMetadataSection(doc):
             return [E.dt(displayKey, ":")] + [E.dd({}, val) for val in vals]
 
     # Merge "custom" metadata into non-custom, when they match up
-    otherMd = {}
+    otherMd = OrderedDict()
     for k, vs in doc.md.otherMetadata.items():
         if k in md:
             md[k].extend(parseHTML(doc.fixText(v)) for v in vs)
