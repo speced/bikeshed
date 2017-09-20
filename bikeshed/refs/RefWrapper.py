@@ -26,9 +26,9 @@ class RefWrapper(object):
             refKey = name
         val = self._ref[refKey]
         if isinstance(val, basestring):
-            val = val.strip()
+            val = unicode(val.strip(), encoding="utf-8")
         elif isinstance(val, list):
-            val = [x.strip() for x in val]
+            val = [unicode(x.strip(), encoding="utf-8") for x in val]
         return val
 
     def __json__(self):
