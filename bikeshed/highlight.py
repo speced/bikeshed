@@ -124,7 +124,7 @@ def determineLineNumbers(doc, el):
 
 def highlightEl(el, lang):
     text = textContent(el)
-    if lang in ["idl", "webidl"]:
+    if lang == "webidl":
         coloredText = highlightWithWebIDL(text, el=el)
     else:
         coloredText = highlightWithPygments(text, lang, el=el)
@@ -331,6 +331,8 @@ def normalizeLanguageName(lang):
         return "aspx-cs"
     if lang in ["markup", "svg"]:
         return "html"
+    if lang == "idl":
+        return "webidl"
     return lang
 
 
