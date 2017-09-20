@@ -26,12 +26,17 @@ class RefWrapper(object):
             refKey = name
         val = self._ref[refKey]
         if isinstance(val, basestring):
-            val = unicode(val.strip(), encoding="utf-8")
+            val = decode(val.strip())
         elif isinstance(val, list):
-            val = [unicode(x.strip(), encoding="utf-8") for x in val]
+            val = [decode(x.strip()) for x in val]
         return val
 
     def __json__(self):
         refCopy = copy.copy(self._ref)
         refCopy['text'] = self.text
         return stripLineBreaks(refCopy)
+
+def decode(s):
+    if isinstance(s, str):
+        return unicode(s, encoding="utf-8")
+    return s
