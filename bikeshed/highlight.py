@@ -56,6 +56,10 @@ def determineHighlightLang(doc, el):
     # or None indicating the element shouldn't be highlighted.
     attr, lang = closestAttr(el, "nohighlight", "highlight")
     lang = normalizeLanguageName(lang)
+    if lang == "webidl" and el.tag == "code" and parentElement(el).tag == "dfn":
+        # No such thing as a dfn that needs to be WebIDL-highlighted.
+        # This is probably happening from a <dfn idl-type> inside a <pre highlight=idl>.
+        return None
     if attr == "nohighlight":
         return None
     elif attr == "highlight":
