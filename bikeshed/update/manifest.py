@@ -38,10 +38,10 @@ def createManifest(path, dryRun=False):
 knownFiles = [
     "fors.json",
     "specs.json",
-    "caniuse.json", 
+    "caniuse.json",
     "methods.json",
     "languages.json",
-    "biblio-keys.json", 
+    "biblio-keys.json",
     "test-suites.json",
     "link-defaults.infotree"
 ]
@@ -112,9 +112,12 @@ def updateByManifest(path, dryRun=False):
         if hash != oldFiles.get(filePath):
             newPaths.append(filePath)
     if not dryRun:
+        import time
+        messageDelta = 3
+        lastMsgTime = time.clock()
         if newPaths:
             say("Updating {0} file{1}...", len(newPaths), "s" if len(newPaths) > 1 else "")
-        for filePath in newPaths:
+        for i,filePath in enumerate(newPaths):
             remotePath = ghPrefix + filePath
             localPath = os.path.join(path, *filePath.split("/"))
             try:
@@ -129,6 +132,11 @@ def updateByManifest(path, dryRun=False):
             except Exception,e:
                 warn("Couldn't save file '{0}'.\n{1}", localPath, e)
                 return False
+
+            currFileTime = time.clock()
+            if (currFileTime - lastMsgTime) >= messageDelta:
+                say("Updated {0}/{1}...", i+1, len(newPaths))
+                lastMsgTime = currFileTime
         try:
             with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
                 fh.write("".join(newManifest))
@@ -138,7 +146,7 @@ def updateByManifest(path, dryRun=False):
     say("Done!")
     return True
 
-    
+
 
 def dictFromManifest(lines):
     '''
