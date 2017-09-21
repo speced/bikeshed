@@ -16,7 +16,7 @@ scriptPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
 
 
-refStatus = Enum("RefStatus", {"current":"current", "snapshot":"snapshot"})
+refStatus = Enum("current", "snapshot")
 
 
 def englishFromList(items):

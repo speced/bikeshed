@@ -462,9 +462,9 @@ def parseRefStatus(key, val, lineNum):
     if val == "dated":
         # Legacy term that used to be allowed
         val == "snapshot"
-    try:
-        return config.refStatus(val)
-    except:
+    if val in config.refStatus:
+        return val
+    else:
         die("'{0}' must be either 'current' or 'snapshot'. Got '{1}'", key, val, lineNum=lineNum)
         return config.refStatus.current
 

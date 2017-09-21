@@ -1,0 +1,31 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
+
+
+class Enum(object):
+	'''
+	Simple Enum class.
+
+	Takes strings, returns an object that acts set-like (you can say `"foo" in someEnum`),
+	but also hangs the strings off of the object as attributes (you can say `someEnum.foo`)
+	or as a dictionary (`someEnum["foo"]`).
+	'''
+
+	def __init__(self, *vals):
+		self._vals = set(vals)
+		for val in vals:
+			setattr(self, val, val)
+
+	def __iter__(self):
+		return iter(self._vals)
+
+	def __len__(self):
+		return len(self._vals)
+
+	def __contains__(self, val):
+		return val in self._vals
+
+	def __getitem__(self, val):
+		if val in self._vals:
+			return val
+		raise AttributeError()

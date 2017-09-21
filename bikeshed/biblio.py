@@ -30,7 +30,7 @@ class BiblioEntry(object):
         if self.preferredURL is None:
             self.preferredURL = config.refStatus.snapshot
         else:
-            self.preferredURL = config.refStatus(self.preferredURL)
+            self.preferredURL = config.refStatus[self.preferredURL]
         if self.preferredURL == config.refStatus.snapshot:
             self.url = self.snapshot_url or self.current_url
         elif self.preferredURL == config.refStatus.current:
@@ -133,7 +133,7 @@ class SpecBasedBiblioEntry(BiblioEntry):
         self.spec = spec
         self.linkText = spec['vshortname']
         self._valid = True
-        preferredURL = config.refStatus(preferredURL)
+        preferredURL = config.refStatus[preferredURL]
         if preferredURL == config.refStatus.snapshot:
             self.url = spec['snapshot_url'] or spec['current_url']
         elif preferredURL == config.refStatus.current:

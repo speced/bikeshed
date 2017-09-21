@@ -152,7 +152,6 @@ class RefSource(object):
 
         def filterByStatus(refs, status):
             if status in config.refStatus:
-                status = config.refStatus(status)
                 # If status is "current'", kill snapshot refs unless their spec *only* has a snapshot_url
                 if status == config.refStatus.current:
                     return [ref for ref in refs if ref.status == "current" or (ref.status == "snapshot" and self.specs.get(ref.spec,{}).get('current_url') is None)]
