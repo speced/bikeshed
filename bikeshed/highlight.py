@@ -71,7 +71,7 @@ def determineHighlightLang(doc, el):
                 # Normative IDL gets 'highlighted' by the IDL parser.
                 return False
             else:
-                return "idl"
+                return "webidl"
         else:
             return doc.md.defaultHighlight
 
