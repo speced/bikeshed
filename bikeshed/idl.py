@@ -211,6 +211,12 @@ class IDLMarker(object):
 def markupIDL(doc):
     highlightingOccurred = False
     idlEls = findAll("pre.idl:not([data-no-idl]), xmp.idl:not([data-no-idl])", doc)
+    for el in findAll("script[type=idl]", doc):
+        # To help with syntax-highlighting, <script type=idl> is also allowed here.
+        idlEls.append(el)
+        el.tag = "pre"
+        removeAttr(el, "type")
+        addClass(el, "idl")
     # One pass with a silent parser to collect the symbol table.
     symbolTable = None
     for el in idlEls:
