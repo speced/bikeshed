@@ -84,7 +84,6 @@ class RefSource(object):
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         def allRefsIterator():
             # Turns a dict of arrays of refs into an iterator of refs
-            # TODO: This needs to load all possible refs.
             for key, group in self.fetchAllRefs():
                 for ref in group:
                     yield RefWrapper(key, ref)
