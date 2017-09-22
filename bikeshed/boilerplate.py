@@ -238,10 +238,12 @@ def addExplicitIndexes(doc):
 
     for el in findAll("index", doc):
         indexEntries = defaultdict(list)
+
         status = el.get('status')
         if status and status not in config.specStatuses:
             die("<index> has unknown value '{0}' for status. Must be {1}.", status, config.englishFromList(config.specStatuses), el=el)
             continue
+
         if el.get('type'):
             types = set(x.strip() for x in el.get('type').split(','))
             for t in types:
@@ -250,6 +252,7 @@ def addExplicitIndexes(doc):
                     types.remove(t)
         else:
             types = None
+
         if el.get('data-link-spec'):
             # Yes, this is dumb. Accidental over-firing of a shortcut attribute. >_<
             specs = set(x.strip() for x in el.get('data-link-spec').split(','))
@@ -259,10 +262,12 @@ def addExplicitIndexes(doc):
                     specs.remove(s)
         else:
             specs = None
+
         if el.get('for'):
             fors = set(x.strip() for x in el.get('for').split(','))
         else:
             fors = None
+
         if el.get('export'):
             exportVal = el.get('export').lower().strip()
             if exportVal in ["yes", "y", "true", "on"]:
@@ -274,6 +279,7 @@ def addExplicitIndexes(doc):
                 export = None
         else:
             export = None
+
         for ref in doc.refs.queryAllRefs():
             text = ref.text.strip()
             if export is not None and ref.export != export:
