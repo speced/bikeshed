@@ -134,7 +134,8 @@ def main():
     refParser.add_argument("--for", dest="linkFor", default=None)
     refParser.add_argument("--spec", dest="spec", default=None)
     refParser.add_argument("--status", dest="status", default=None)
-    refParser.add_argument("--exact", dest="exact", action="store_true")
+    refParser.add_argument("--exact", dest="exact", action="store_true", help="Only search for the exact text provided; don't apply Bikeshed's automatic conjugation help for plurals/etc.")
+    refParser.add_argument("--latest-only", dest="latestOnly", action="store_true", help="Apply Bikeshed's logic for only returning the latest version of a given ref when it exists in multiple levels of a spec.")
 
     sourceParser = subparsers.add_parser('source', help="Tools for formatting the *source* document.")
     sourceParser.add_argument("--big-text",
@@ -271,7 +272,7 @@ def main():
             rm.initializeRefs()
         if options.text:
             options.text = unicode(options.text, encoding="utf-8")
-        refs = rm.queryAllRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, exact=options.exact)
+        refs = rm.queryAllRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, latestOnly=options.latestOnly, exact=options.exact)
         if config.printMode == "json":
             p(json.dumps(refs, indent=2, default=config.getjson))
         else:

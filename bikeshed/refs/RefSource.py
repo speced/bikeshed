@@ -72,14 +72,14 @@ class RefSource(object):
                     self._loadedAnchorGroups.add(group)
         return self._refs.items()
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, **kwargs):
-        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, exact=True)
+    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, latestOnly=True, exact=False, **kwargs):
+        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, latestOnly, exact=True)
         if error and not exact:
-            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes)
+            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, latestOnly)
         else:
             return results, error
 
-    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, exact=False, error=False, **kwargs):
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, latestOnly=True, exact=False, error=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         def allRefsIterator():
@@ -200,26 +200,27 @@ class RefSource(object):
                 seenUrls.add(ref.url)
         refs = tempRefs
 
-        # If multiple levels of the same shortname exist,
-        # only use the latest level.
-        # If generating for a snapshot, prefer the latest snapshot level,
-        # unless that doesn't exist, in which case just prefer the latest level.
-        shortnameLevels = defaultdict(lambda:defaultdict(list))
-        snapshotShortnameLevels = defaultdict(lambda:defaultdict(list))
-        for ref in refs:
-            shortnameLevels[ref.shortname][ref.level].append(ref)
-            if status == ref.status == "snapshot":
-                snapshotShortnameLevels[ref.shortname][ref.level].append(ref)
-        refs = []
-        for shortname, levelSet in shortnameLevels.items():
-            if status == "snapshot" and snapshotShortnameLevels[shortname]:
-                # Get the latest snapshot refs if they exist and you're generating a snapshot...
-                maxLevel = max(snapshotShortnameLevels[shortname].keys())
-                refs.extend(snapshotShortnameLevels[shortname][maxLevel])
-            else:
-                # Otherwise just grab the latest refs regardless.
-                maxLevel = max(levelSet.keys())
-                refs.extend(levelSet[maxLevel])
+        if latestOnly:
+            # If multiple levels of the same shortname exist,
+            # only use the latest level.
+            # If generating for a snapshot, prefer the latest snapshot level,
+            # unless that doesn't exist, in which case just prefer the latest level.
+            shortnameLevels = defaultdict(lambda:defaultdict(list))
+            snapshotShortnameLevels = defaultdict(lambda:defaultdict(list))
+            for ref in refs:
+                shortnameLevels[ref.shortname][ref.level].append(ref)
+                if status == ref.status == "snapshot":
+                    snapshotShortnameLevels[ref.shortname][ref.level].append(ref)
+            refs = []
+            for shortname, levelSet in shortnameLevels.items():
+                if status == "snapshot" and snapshotShortnameLevels[shortname]:
+                    # Get the latest snapshot refs if they exist and you're generating a snapshot...
+                    maxLevel = max(snapshotShortnameLevels[shortname].keys())
+                    refs.extend(snapshotShortnameLevels[shortname][maxLevel])
+                else:
+                    # Otherwise just grab the latest refs regardless.
+                    maxLevel = max(levelSet.keys())
+                    refs.extend(levelSet[maxLevel])
 
         return refs, None
 
