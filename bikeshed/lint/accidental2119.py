@@ -1,40 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
-import logging
 import re
-from .htmlhelpers import *
-from .messages import *
+from ..htmlhelpers import *
+from ..messages import *
 
-def lintExampleIDs(doc):
-    if not doc.md.complainAbout['missing-example-ids']:
-        return
-    for el in findAll(".example:not([id])", doc):
-        warn("Example needs ID:\n{0}", outerHTML(el)[0:100], el=el)
-
-def lintBrokenLinks(doc):
-    if not doc.md.complainAbout['broken-links']:
-        return
-    from .requests import requests
-
-    say("Checking links, this may take a while...")
-    logging.captureWarnings(True) # Silence the requests library :/
-    for el in findAll("a", doc):
-        href = el.get('href')
-        if not href or href[0] == "#":
-            # Local link
-            continue
-        if href.startswith("mailto:"):
-            # Can't check mailto links
-            continue
-        try:
-            res = requests.get(href)
-        except:
-            warn("The following link caused an error when I tried to request it:\n{0}", outerHTML(el))
-        if res.status_code >= 400:
-            warn("Got a {0} status when fetching the link for:\n{1}", res.status_code, outerHTML(el))
-    say("Done checking links!")
-
-def lintAccidental2119(doc):
+def accidental2119(doc):
+    '''
+    Looks for usage of 2119 keywords in non-normative sections.
+    You can override this, allowing the keyword,
+    by putting an "allow-2119" class on the text's containing element specifically
+    (not an ancestor, to avoid accidentally over-silencing).
+    '''
     if not doc.md.complainAbout['accidental-2119']:
         return
     keywords = r"\b(may|must|should|shall|optional|recommended|required)\b"

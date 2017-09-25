@@ -142,7 +142,7 @@ class Spec(object):
 
         # Fill in and clean up a bunch of data
         self.fillContainers = locateFillContainers(self)
-        lint.lintExampleIDs(self)
+        lint.exampleIDs(self)
         boilerplate.addBikeshedVersion(self)
         boilerplate.addCanonicalURL(self)
         boilerplate.addSpecVersion(self)
@@ -196,8 +196,8 @@ class Spec(object):
         boilerplate.addBikeshedBoilerplate(self)
         fixIntraDocumentReferences(self)
         fixInterDocumentReferences(self)
-        lint.lintBrokenLinks(self)
-        lint.lintAccidental2119(self)
+        lint.brokenLinks(self)
+        lint.accidental2119(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
