@@ -198,6 +198,7 @@ class Spec(object):
         fixInterDocumentReferences(self)
         lint.brokenLinks(self)
         lint.accidental2119(self)
+        lint.missingExposed(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
