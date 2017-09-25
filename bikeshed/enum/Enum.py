@@ -12,8 +12,9 @@ class Enum(object):
 	'''
 
 	def __init__(self, *vals):
-		self._vals = set(vals)
+		self._vals = {}
 		for val in vals:
+			self._vals[val] = val
 			setattr(self, val, val)
 
 	def __iter__(self):
@@ -26,6 +27,4 @@ class Enum(object):
 		return val in self._vals
 
 	def __getitem__(self, val):
-		if val in self._vals:
-			return val
-		raise AttributeError()
+		return self._vals[val]
