@@ -25,7 +25,6 @@ def missingExposed(doc):
         if construct.idlType == "namespace":
             good = False
             for attr in extendedAttrs:
-                print attr.name
                 if attr.name == "Exposed":
                     good = True
                     break
