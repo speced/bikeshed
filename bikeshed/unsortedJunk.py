@@ -762,6 +762,23 @@ def decorateAutolink(doc, el, linkType, linkText, ref):
             el.set('title', titleText)
 
 
+def removeMultipleLinks(doc):
+    # If there are multiple autolinks to the same thing in a paragraph,
+    # only keep the first.
+    if not doc.md.removeMultipleLinks:
+        return
+    paras = defaultdict(lambda:defaultdict(list))
+    for el in findAll("a[data-link-type]", doc):
+        paras[parentElement(el)][el.get("href")].append(el)
+    for linkGroups in paras.values():
+        for href,links in linkGroups.items():
+            if len(links) > 1:
+                for el in links[1:]:
+                    el.tag = "span"
+                    removeAttr(el, "href")
+                    removeAttr(el, "data-link-type")
+                    removeAttr(el, "id")
+
 def processIssuesAndExamples(doc):
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
     # examples, and link to remote issues if possible:

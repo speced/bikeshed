@@ -189,6 +189,7 @@ class Spec(object):
         boilerplate.addBikeshedBoilerplate(self)
         fixIntraDocumentReferences(self)
         fixInterDocumentReferences(self)
+        removeMultipleLinks(self)
         lint.brokenLinks(self)
         lint.accidental2119(self)
         lint.missingExposed(self)
