@@ -37,17 +37,10 @@ class Spec(object):
             # line-numbers are too hacky, so force this to be a dry run
             config.dryRun = True
         if inputFilename is None:
-            # Default to looking for a *.bs file.
-            # Otherwise, look for a *.src.html file.
-            # Otherwise, use standard input.
-            import glob
-            if glob.glob("*.bs"):
-                inputFilename = glob.glob("*.bs")[0]
-            elif glob.glob("*.src.html"):
-                inputFilename = glob.glob("*.src.html")[0]
-            else:
-                die("No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.")
-                return
+            inputFilename = findImplicitInputFile()
+        if inputFilename is None: # still
+            die("No input file specified, and no *.bs or *.src.html files found in current directory.\nPlease specify an input file, or use - to pipe from STDIN.")
+            return
         self.inputSource = inputFilename
         self.debug = debug
         self.token = token
@@ -358,6 +351,33 @@ class Spec(object):
         if el.get("data-opaque") is not None:
             return True
         return False
+
+def findImplicitInputFile():
+    '''
+    Find what input file the user *probably* wants to use,
+    by scanning the current folder.
+    In preference order:
+    1. index.bs
+    2. Overview.bs
+    3. the first file with a .bs extension
+    4. the first file with a .src.html extension
+    '''
+    import glob
+    import os
+    if os.path.isfile("index.bs"):
+        return "index.bs"
+    if os.path.isfile("Overview.bs"):
+        return "Overview.bs"
+
+    allBs = glob.glob("*.bs")
+    if allBs:
+        return allBs[0]
+
+    allHtml = glob.glob("*.src.html")
+    if allHtml:
+        return allHtml[0]
+
+    return None
 
 config.specClass = Spec
 
