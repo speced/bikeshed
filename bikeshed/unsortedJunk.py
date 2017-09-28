@@ -1187,7 +1187,7 @@ def processInclusions(doc):
             if el.get("path"):
                 path = el.get("path")
                 try:
-                    with io.open(path, 'r', encoding="utf-8") as f:
+                    with io.open(os.path.join(config.localFolderPath(doc), path), 'r', encoding="utf-8") as f:
                         lines = f.readlines()
                 except Exception, err:
                     die("Couldn't find include file '{0}'. Error was:\n{1}", path, err, el=el)
