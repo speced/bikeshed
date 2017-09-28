@@ -24,9 +24,9 @@ def brokenLinks(doc):
             # Can't check mailto links
             continue
         try:
-            res = requests.get(href)
-        except:
-            warn("The following link caused an error when I tried to request it:\n{0}", outerHTML(el))
+            res = requests.get(href, verify=False)
+        except Exception, e:
+            warn("The following link caused an error when I tried to request it:\n{0}\n{1}", outerHTML(el), e)
             continue
         if res.status_code >= 400:
             warn("Got a {0} status when fetching the link for:\n{1}", res.status_code, outerHTML(el))
