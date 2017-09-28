@@ -240,7 +240,7 @@ class ReferenceManager(object):
             refs = self.filterObsoletes(refs)
         return refs
 
-    def getRef(self, linkType, text, spec=None, status=None, statusHint=None, linkFor=None, linkForHint=None, error=True, el=None):
+    def getRef(self, linkType, text, spec=None, status=None, statusHint=None, linkFor=None, explicitFor=False, linkForHint=None, error=True, el=None):
         # If error is False, this function just shuts up and returns a reference or None
         # Otherwise, it pops out debug messages for the user.
 
@@ -262,7 +262,7 @@ class ReferenceManager(object):
 
         # Local refs always get precedence, unless you manually specified a spec.
         if spec is None:
-            localRefs,_ = self.localRefs.queryRefs(linkType=linkType, text=text, linkFor=linkFor, linkForHint=linkForHint, el=el)
+            localRefs,_ = self.localRefs.queryRefs(linkType=linkType, text=text, linkFor=linkFor, linkForHint=linkForHint, explicitFor=explicitFor, el=el)
             # If the autolink was for-less, it found a for-full local link,
             # but there was a for-less version in a foreign spec,
             # emit a warning (unless it was supressed).
@@ -303,7 +303,7 @@ class ReferenceManager(object):
                     break
 
         # Then anchor-block refs get preference
-        blockRefs,_ = self.anchorBlockRefs.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, el=el)
+        blockRefs,_ = self.anchorBlockRefs.queryRefs(linkType=linkType, text=text, spec=spec, linkFor=linkFor, linkForHint=linkForHint, explicitFor=explicitFor, el=el)
         if blockRefs and linkFor is None and any(x.for_ for x in blockRefs):
             forlessRefs,_ = self.foreignRefs.queryRefs(linkType=linkType, text=text, linkFor="/", export=True, el=el)
             forlessRefs = self.filterObsoletes(forlessRefs)
@@ -322,7 +322,7 @@ class ReferenceManager(object):
             export = True
         else:
             export = None
-        refs, failure = self.foreignRefs.queryRefs(text=text, linkType=linkType, spec=spec, status=status, statusHint=statusHint, linkFor=linkFor, linkForHint=linkForHint, export=export, ignoreObsoletes=True)
+        refs, failure = self.foreignRefs.queryRefs(text=text, linkType=linkType, spec=spec, status=status, statusHint=statusHint, linkFor=linkFor, linkForHint=linkForHint, explicitFor=explicitFor, export=export, ignoreObsoletes=True)
 
         if failure and linkType in ("argument", "idl") and linkFor is not None and linkFor.endswith("()"):
             # foo()/bar failed, because foo() is technically the wrong signature

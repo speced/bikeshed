@@ -83,7 +83,7 @@ class RefSource(object):
             else:
                 return results,error
 
-    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, latestOnly=True, exact=False, error=False, **kwargs):
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, explicitFor=False, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, latestOnly=True, exact=False, error=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         def allRefsIterator():
@@ -146,10 +146,36 @@ class RefSource(object):
         if not refs:
             return refs, "spec"
 
-        if linkFor == "/":
-            refs = [x for x in refs if not x.for_]
-        elif linkFor:
-            refs = [x for x in refs if linkFor in x.for_]
+        '''
+        for=A | forHint=B | explicitFor
+        ✘ | ✘ | ✘ = anything
+        ✘ | ✘ | ✔ = /
+        ✘ | ✔ | ✘ = B/, fallback to anything
+        ✘ | ✔ | ✔ = B/, fallback to /
+        ✔ | ✘ | ✘ = A/
+        ✔ | ✘ | ✔ = A/
+        ✔ | ✔ | ✘ = A/
+        ✔ | ✔ | ✔ = A/
+        '''
+        def filterByFor(refs, linkFor):
+            if linkFor == "/":
+                return [x for x in refs if not x.for_]
+            elif linkFor:
+                return [x for x in refs if linkFor in x.for_]
+
+        if linkFor:
+            refs = filterByFor(refs, linkFor)
+        elif linkForHint:
+            if explicitFor:
+                tempRefs = filterByFor(refs, linkForHint)
+                if not tempRefs:
+                    tempRefs = filterByFor(refs, "/")
+                refs = tempRefs
+            else:
+                # Handled later, in the "just a hint" section.
+                pass
+        elif explicitFor:
+            refs = filterByFor(refs, "/")
         if not refs:
             return refs, "for"
 
@@ -179,19 +205,17 @@ class RefSource(object):
             if tempRefs:
                 refs = tempRefs
 
+        if linkForHint and not linkFor and not explicitFor:
+            tempRefs = filterByFor(refs, linkForHint)
+            if tempRefs:
+                refs = tempRefs
+
         if ignoreObsoletes and not spec:
             # Remove any ignored or obsoleted specs
             # If you specified the spec, don't filter things - you know what you're doing.
             refs = filterObsoletes(refs, replacedSpecs=self.replacedSpecs, ignoredSpecs=self.ignoredSpecs)
         if not refs:
             return refs, "ignored-specs"
-
-        if linkForHint:
-            # If anything matches the linkForHint, filter to just those,
-            # but don't worry if nothing matches it.
-            tempRefs = [x for x in refs if linkForHint in x.for_]
-            if tempRefs:
-                refs = tempRefs
 
         # With non-exact texts, you might have multiple "anchors"
         # that point to the same url. Dedup them.
