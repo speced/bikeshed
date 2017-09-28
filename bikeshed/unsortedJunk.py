@@ -663,6 +663,7 @@ def processAutolinks(doc):
     # We exclude bibliographical links, as those are processed in `processBiblioLinks`.
     query = "a:not([href]):not([data-link-type='biblio'])"
     if doc.md.useIAutolinks:
+        warn("Use <i> Autolinks is deprecated and will be removed. Please switch to using <a> elements.")
         query += ", i"
     autolinks = findAll(query, doc)
     for el in autolinks:
