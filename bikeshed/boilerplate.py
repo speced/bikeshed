@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 from collections import defaultdict, OrderedDict
+from . import config
 from .DefaultOrderedDict import DefaultOrderedDict
 from .htmlhelpers import *
 from .messages import *
@@ -14,7 +15,7 @@ def addBikeshedVersion(doc):
     # Adds a <meta> containing the current Bikeshed semver.
     if "generator" not in doc.md.boilerplate:
         return
-    bikeshedVersion = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=os.path.dirname(__file__)).rstrip()
+    bikeshedVersion = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=config.scriptPath()).rstrip()
     appendChild(doc.head,
                 E.meta({"name": "generator", "content": "Bikeshed version {0}".format(bikeshedVersion)}))
 
@@ -32,7 +33,7 @@ def addSpecVersion(doc):
         return
 
     revision = None
-    source_dir = os.path.dirname(os.path.abspath(doc.inputSource))
+    source_dir = config.docPath(doc)
     old_dir = os.getcwd()
     os.chdir(source_dir)
     try:

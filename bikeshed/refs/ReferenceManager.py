@@ -76,18 +76,17 @@ class ReferenceManager(object):
         def initFors():
             self.foreignRefs.fors.update(json.loads(config.retrieveDataFile("fors.json", quiet=True, str=True)))
         initFors()
-        if doc is not None:
+        datablocks.transformInfo(config.retrieveDataFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
+        if doc and config.docPath(doc):
             # Get local anchor data
             try:
-                with io.open("anchors.bsdata", 'r', encoding="utf-8") as lines:
+                with io.open(config.docPath(doc, "anchors.bsdata"), 'r', encoding="utf-8") as lines:
                     datablocks.transformAnchors(lines, doc)
             except IOError:
                 pass
 
-            datablocks.transformInfo(config.retrieveDataFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
-            # local info
             try:
-                with io.open("link-defaults.infotree", 'r', encoding="utf-8") as lines:
+                with io.open(config.docPath(doc, "link-defaults.infotree"), 'r', encoding="utf-8") as lines:
                     datablocks.transformInfo(lines, doc)
             except IOError:
                 pass
@@ -95,7 +94,7 @@ class ReferenceManager(object):
     def fetchHeadings(self, spec):
         if spec in self.headings:
             return self.headings[spec]
-        with config.retrieveDataFile(os.path.join("headings", "headings-{0}.json".format(spec)), quiet=True, okayToFail=True) as fh:
+        with config.retrieveDataFile("headings", "headings-{0}.json".format(spec), quiet=True, okayToFail=True) as fh:
             try:
                 data = json.load(fh)
             except ValueError:

@@ -12,7 +12,6 @@ force = True
 quiet = True
 dryRun = False
 printMode = "console"
-scriptPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
 
 
@@ -167,3 +166,15 @@ def flatten(l):
                 yield sub
         else:
             yield el
+
+
+def scriptPath(*pathSegs):
+    startPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    return os.path.join(startPath, *pathSegs)
+
+
+def docPath(doc, *pathSegs):
+    if doc.inputSource == "-":
+        return None
+    startPath = os.path.dirname(os.path.abspath(doc.inputSource))
+    return os.path.join(startPath, *pathSegs)

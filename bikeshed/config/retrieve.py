@@ -5,12 +5,15 @@ import io
 import os
 
 from ..messages import *
-from .main import scriptPath
+from .main import scriptPath, docPath
 
-def retrieveDataFile(filename, quiet=False, str=False, okayToFail=False):
+def retrieveDataFile(*segs, **kwargs):
+    quiet = kwargs.get("quiet", False)
+    str = kwargs.get("str", False)
+    okayToFail = kwargs.get("okayToFail", False)
     import os
-    cacheLocation = scriptPath + "/spec-data/" + filename
-    fallbackLocation = scriptPath + "/spec-data/readonly/" + filename
+    cacheLocation = scriptPath("spec-data", *segs)
+    fallbackLocation = scriptPath("spec-data", "readonly", *segs)
     try:
         fh = open(cacheLocation, 'r')
     except IOError:
@@ -50,19 +53,19 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
     if status is None:
         status = doc.md.rawStatus
 
-    localFolder = localFolderPath(doc)
-    includeFolder = os.path.join(scriptPath, "boilerplate")
+    def boilerplatePath(*segs):
+        return scriptPath("boilerplate", *segs)
     statusFile = "{0}-{1}.include".format(name, status)
     genericFile = "{0}.include".format(name)
     filenames = []
-    if localFolder:
-        filenames.append(os.path.join(localFolder, statusFile))
-        filenames.append(os.path.join(localFolder, genericFile))
+    if docPath(doc):
+        filenames.append(docPath(doc, statusFile))
+        filenames.append(docPath(doc, genericFile))
     if group:
-        filenames.append(os.path.join(includeFolder, group, statusFile))
-        filenames.append(os.path.join(includeFolder, group, genericFile))
-    filenames.append(os.path.join(includeFolder, statusFile))
-    filenames.append(os.path.join(includeFolder, genericFile))
+        filenames.append(boilerplatePath(group, statusFile))
+        filenames.append(boilerplatePath(group, genericFile))
+    filenames.append(boilerplatePath(statusFile))
+    filenames.append(boilerplatePath(genericFile))
 
     for filename in filenames:
         if os.path.isfile(filename):
@@ -78,9 +81,3 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
         if error:
             die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
         return ""
-
-
-def localFolderPath(doc):
-    if doc.inputSource == "-":
-        return None
-    return os.path.dirname(os.path.abspath(doc.inputSource))

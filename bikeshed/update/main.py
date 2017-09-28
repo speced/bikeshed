@@ -16,7 +16,7 @@ from ..messages import *
 
 def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False, path=None, dryRun=False, force=False):
     if path is None:
-        path = os.path.join(config.scriptPath, "spec-data")
+        path = config.scriptPath("spec-data")
 
     # Update via manifest by default, falling back to a full update only if failed or forced.
     if not force:
@@ -43,19 +43,17 @@ def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testS
 
 
 def fixupDataFiles():
-    ''' 
+    '''
     Checks the readonly/ version is more recent than your current mutable data files.
     This happens if I changed the datafile format and shipped updated files as a result;
     using the legacy files with the new code is quite bad!
     '''
-    localPath = os.path.join(config.scriptPath, "spec-data")
-    remotePath = os.path.join(config.scriptPath, "spec-data", "readonly")
     try:
-        localVersion = int(open(os.path.join(localPath, "version.txt"), 'r').read())
+        localVersion = int(open(localPath("version.txt"), 'r').read())
     except IOError:
         localVersion = None
     try:
-        remoteVersion = int(open(os.path.join(remotePath, "version.txt"), 'r').read())
+        remoteVersion = int(open(remotePath("version.txt"), 'r').read())
     except IOError, err:
         warn("Couldn't check the datafile version. Bikeshed may be unstable.\n{0}", err)
         return
@@ -68,8 +66,8 @@ def fixupDataFiles():
     # (and we should switch you to them, because formats may have changed),
     # or you're using a historical version of Bikeshed (ditto).
     try:
-        for filename in os.listdir(remotePath):
-            copyanything(os.path.join(remotePath, filename), os.path.join(localPath, filename))
+        for filename in os.listdir(remotePath()):
+            copyanything(remotePath(filename), localPath(filename))
     except Exception, err:
         warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
         return
@@ -82,13 +80,11 @@ def updateReadonlyDataFiles():
     This is a debugging tool to help me quickly update the built-in data files,
     and will not be called as part of normal operation.
     '''
-    localPath = os.path.join(config.scriptPath, "spec-data")
-    remotePath = os.path.join(config.scriptPath, "spec-data", "readonly")
     try:
-        for filename in os.listdir(localPath):
+        for filename in os.listdir(localPath()):
             if filename.startswith("readonly"):
                 continue
-            copyanything(os.path.join(localPath, filename), os.path.join(remotePath, filename))
+            copyanything(localPath(filename), remotePath(filename))
     except Exception, err:
         warn("Error copying over the datafiles:\n{0}", err)
         return
@@ -105,3 +101,9 @@ def copyanything(src, dst):
             shutil.copy(src, dst)
         else:
             raise
+
+def localPath(*segs):
+    return config.scriptPath("spec-data", *segs)
+
+def remotePath(*segs):
+    return config.scriptPath("spec-data", "readonly", *segs)

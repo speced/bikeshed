@@ -781,7 +781,7 @@ def getSpecRepository(doc):
     Returns a "shortname" of the repo, and the full url.
     '''
     if doc and doc.inputSource and doc.inputSource != "-":
-        source_dir = os.path.dirname(os.path.abspath(doc.inputSource))
+        source_dir = config.docPath(doc)
         old_dir = os.getcwd()
         try:
             os.chdir(source_dir)

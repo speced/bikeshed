@@ -49,7 +49,7 @@ class RefSource(object):
             # Group was loaded, but previous check didn't find it, so it's just not here.
             return []
         # Otherwise, load the group file.
-        with config.retrieveDataFile(os.path.join("anchors", "anchors-{0}.data".format(group)), quiet=True, okayToFail=True) as fh:
+        with config.retrieveDataFile("anchors", "anchors-{0}.data".format(group), quiet=True, okayToFail=True) as fh:
             self._refs.update(decodeAnchors(fh))
             self._loadedAnchorGroups.add(group)
         return self._refs.get(key, [])
@@ -60,14 +60,14 @@ class RefSource(object):
         if self.source not in self.lazyLoadedSources:
             return self._refs.items()
 
-        path = os.path.join(config.scriptPath, "spec-data", "anchors")
+        path = config.scriptPath("spec-data", "anchors")
         for root, dirs, files in os.walk(path):
             for file in files:
                 group = re.match("anchors-(.{2})", file).group(1)
                 if group in self._loadedAnchorGroups:
                     # Already loaded
                     continue
-                with config.retrieveDataFile(os.path.join("anchors", file), quiet=True) as fh:
+                with config.retrieveDataFile("anchors", file, quiet=True) as fh:
                     self._refs.update(decodeAnchors(fh))
                     self._loadedAnchorGroups.add(group)
         return self._refs.items()

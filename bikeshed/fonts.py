@@ -56,7 +56,7 @@ This defines a font capable of rendering text composed of "A", "B", "a", "b", an
 
 
 class Font(object):
-    def __init__(self, fontfilename=config.scriptPath + "/bigblocks.bsfont"):
+    def __init__(self, fontfilename=config.scriptPath("bigblocks.bsfont")):
         try:
             lines = io.open(fontfilename, 'r', encoding="utf-8").readlines()
         except Exception, e:

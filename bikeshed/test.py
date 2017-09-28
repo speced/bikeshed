@@ -15,7 +15,7 @@ from .messages import *
 def runAllTests(constructor, testFiles):
     numPassed = 0
     if len(testFiles) == 0:
-        testFolder = config.scriptPath + "/../tests/"
+        testFolder = config.scriptPath() + "/../tests/"
         testFiles = glob.glob(testFolder + "*.bs")
         if len(testFiles) == 0:
             p("No tests were found in '{0}'.".format(testFolder))
@@ -95,7 +95,7 @@ def equalOrEmpty(a, b):
 
 def rebase(files=None):
     if not files:
-        files = glob.glob(config.scriptPath + "/../tests/*.bs")
+        files = glob.glob(config.scriptPath() + "/../tests/*.bs")
     for path in files:
         _,_,name = path.rpartition("/")
         p("Rebasing {0}".format(name))
