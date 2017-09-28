@@ -7,5 +7,5 @@ from .HierarchicalNumber import HierarchicalNumber
 from .main import *
 from .Nil import Nil
 from .printjson import printjson
-from .retrieve import retrieveBoilerplateFile, retrieveDataFile
+from .retrieve import retrieveBoilerplateFile, retrieveDataFile, localFolderPath
 from .status import *

@@ -50,13 +50,14 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
     if status is None:
         status = doc.md.rawStatus
 
-    localFolder = os.path.dirname(os.path.abspath(doc.inputSource))
+    localFolder = localFolderPath(doc)
     includeFolder = os.path.join(scriptPath, "boilerplate")
     statusFile = "{0}-{1}.include".format(name, status)
     genericFile = "{0}.include".format(name)
     filenames = []
-    filenames.append(os.path.join(localFolder, statusFile))
-    filenames.append(os.path.join(localFolder, genericFile))
+    if localFolder:
+        filenames.append(os.path.join(localFolder, statusFile))
+        filenames.append(os.path.join(localFolder, genericFile))
     if group:
         filenames.append(os.path.join(includeFolder, group, statusFile))
         filenames.append(os.path.join(includeFolder, group, genericFile))
@@ -77,3 +78,9 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
         if error:
             die("Couldn't find an appropriate include file for the {0} inclusion, given group='{1}' and status='{2}'.", name, group, status)
         return ""
+
+
+def localFolderPath(doc):
+    if doc.inputSource == "-":
+        return None
+    return os.path.dirname(os.path.abspath(doc.inputSource))
