@@ -72,12 +72,16 @@ class RefSource(object):
                     self._loadedAnchorGroups.add(group)
         return self._refs.items()
 
-    def queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, latestOnly=True, exact=False, **kwargs):
-        results, error = self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, latestOnly, exact=True)
-        if error and not exact:
-            return self._queryRefs(text, spec, linkType, linkFor, linkForHint, status, statusHint, export, ignoreObsoletes, latestOnly)
+    def queryRefs(self, **kwargs):
+        if "exact" in kwargs:
+            return self._queryRefs(**kwargs)
         else:
-            return results, error
+            # First search for the exact term, and only if it fails fall back to conjugating.
+            results,error = self._queryRefs(exact=True, **kwargs)
+            if error:
+                return self._queryRefs(exact=False, **kwargs)
+            else:
+                return results,error
 
     def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, latestOnly=True, exact=False, error=False, **kwargs):
         # Query the ref database.
