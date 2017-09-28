@@ -149,6 +149,9 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
             match = re.match(r"(:{1,2})", line)
             type = 'dt' if len(match.group(1)) == 1 else 'dd'
             token = {'type':type, 'text': "", 'raw':rawline}
+        elif re.match(r">", line):
+            match = re.match(r">\s?(.*)", line)
+            token = {'type':'blockquote', 'text':match.group(1), 'raw':rawline}
         elif re.match(r"<", line):
             if re.match(r"<<|<\{", line) or inlineElementStart(line):
                 token = {'type':'text', 'text': line, 'raw': rawline}
@@ -265,6 +268,7 @@ def parseTokens(tokens, numSpacesForIndentation):
     dd
     text
     htmlblock
+    blockquote
     raw
     '''
     stream = TokenStream(tokens, numSpacesForIndentation)
@@ -290,12 +294,14 @@ def parseTokens(tokens, numSpacesForIndentation):
             lines += parseNumbered(stream, start=stream.currnum())
         elif stream.currtype() in ("dt", "dd"):
             lines += parseDl(stream)
+        elif stream.currtype() == "blockquote":
+            lines += parseBlockquote(stream)
         else:
             lines.append(stream.currraw())
             stream.advance()
 
     #for line in lines:
-    #    print line,
+    #    print "«{0}»".format(line),
 
     return lines
 
@@ -511,6 +517,20 @@ def parseDl(stream):
         lines.append("</{0}>".format(type))
     lines.append("</dl>")
     return lines
+
+
+def parseBlockquote(stream):
+    prefixLen = stream.currprefixlen()
+    lines = [stream.currtext()+"\n"]
+    while True:
+        stream.advance()
+        if stream.currprefixlen() < prefixLen:
+            break
+        if stream.currtype() in ["blockquote", "text"]:
+            lines.append(stream.currtext()+"\n")
+        else:
+            break
+    return ["<blockquote>\n"] + parse(lines, stream.numSpacesForIndentation) + ["</blockquote>\n"]
 
 
 class TokenStream:
