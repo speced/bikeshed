@@ -441,32 +441,28 @@ class ReferenceManager(object):
     def getBiblioRef(self, text, status=None, generateFakeRef=False, silentAliases=False, el=None, quiet=False):
         key = text.lower()
         while True:
-            # Is key already loaded?
-            if key in self.biblios:
-                candidates = self.biblios[key]
-                break
-            # See if the key exists in the biblio data at all.
+            # Load the group up if necessary
             group = key[0:2]
-            if group in self.loadedBiblioGroups:
-                # We already loaded the group, but didn't find the key earlier, so it's not there.
-                return None
-            # Otherwise, load the group up
-            with config.retrieveDataFile("biblio/biblio-{0}.data".format(group), quiet=True) as lines:
-                biblio.loadBiblioDataFile(lines, self.biblios)
+            if group not in self.loadedBiblioGroups:
+                with config.retrieveDataFile("biblio/biblio-{0}.data".format(group), quiet=True) as lines:
+                    biblio.loadBiblioDataFile(lines, self.biblios)
             self.loadedBiblioGroups.add(group)
+            # Check if it's there
             if key in self.biblios:
                 candidates = self.biblios[key]
                 break
             # Otherwise, see if the ref is to a spec I know about thru Shepherd data.
             if key in self.specs:
-                # First see if the ref is just unnecessarily levelled
-                match = re.match(r"(.+?)-\d+", key)
-                if match:
-                    ref = self.getBiblioRef(match.group(1), status, el=el, quiet=True)
+                spec = self.specs[key]
+                # It matched, so it's a real spec.
+                # Did it fail just because SpecRef only has the *un*versioned shortname?
+                if key != spec['shortname']:
+                    ref = self.getBiblioRef(spec['shortname'], status, el=el, quiet=True)
                     if ref:
                         return ref
+                # No, so just generate the ref from the specref data if allowed.
                 if generateFakeRef:
-                    return biblio.SpecBasedBiblioEntry(self.specs[key], preferredURL=status)
+                    return biblio.SpecBasedBiblioEntry(spec, preferredURL=status)
                 else:
                     return None
             return None
