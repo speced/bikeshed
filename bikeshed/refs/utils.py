@@ -110,6 +110,11 @@ def linkTextVariations(str, linkType):
         if str[:1] != "_":
             yield "_" + str
 
+        # Let people refer to methods without the parens.
+        # Since attrs and methods live in the same namespace, this is safe.
+        if "(" not in str:
+            yield str + "()"
+
 
 def stripLineBreaks(obj):
     it = obj.items() if isinstance(obj, dict) else enumerate(obj)
