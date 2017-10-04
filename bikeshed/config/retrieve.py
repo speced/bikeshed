@@ -11,6 +11,8 @@ def retrieveDataFile(*segs, **kwargs):
     quiet = kwargs.get("quiet", False)
     str = kwargs.get("str", False)
     okayToFail = kwargs.get("okayToFail", False)
+    filename = "/".join(segs)
+    filetype = segs[0]
     import os
     cacheLocation = scriptPath("spec-data", *segs)
     fallbackLocation = scriptPath("spec-data", "readonly", *segs)
@@ -29,14 +31,14 @@ def retrieveDataFile(*segs, **kwargs):
         import shutil
         try:
             if not quiet:
-                say("Attempting to save the {0} file to cache...", type)
+                say("Attempting to save the {0} file to cache...", filetype)
             if not dryRun:
                 shutil.copy(fallbackLocation, cacheLocation)
             if not quiet:
-                say("Successfully saved the {0} file to cache.", type)
+                say("Successfully saved the {0} file to cache.", filetype)
         except:
             if not quiet:
-                warn("Couldn't save the {0} file to cache. Proceeding...", type)
+                warn("Couldn't save the {0} file to cache. Proceeding...", filetype)
     if str:
         return unicode(fh.read(), encoding="utf-8")
     else:
