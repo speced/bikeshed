@@ -149,6 +149,7 @@ class Spec(object):
         addNoteHeaders(self)
         addImplicitAlgorithms(self)
         boilerplate.removeUnwantedBoilerplate(self)
+        shorthands.transformShorthandElements(self)
         shorthands.transformProductionPlaceholders(self)
         shorthands.transformMaybePlaceholders(self)
         shorthands.transformAutolinkShortcuts(self)

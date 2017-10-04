@@ -100,161 +100,6 @@ def transformMaybePlaceholders(doc):
 def transformAutolinkShortcuts(doc):
     # Do the remaining textual replacements
 
-    biblioRe = re.compile(r"(\\)?\[\[(!)?([\w.+-]+)((?: +current)|(?: +snapshot))?\]\]")
-
-    def biblioReplacer(match):
-        # Allow escaping things that aren't actually biblio links, by preceding with a \
-        if match.group(1) is not None:
-            return match.group(0)[1:]
-        if match.group(2) == "!":
-            type = "normative"
-        else:
-            type = "informative"
-        term = match.group(3)
-        attrs = {"data-lt":term, "data-link-type":"biblio", "data-biblio-type":type}
-        if match.group(4) is not None:
-            attrs['data-biblio-status'] = match.group(4).strip()
-        return E.a(attrs,
-                   "[",
-                   term,
-                   "]")
-
-    sectionRe = re.compile(r"""
-                            \[\[
-                            ([\w-]+)?
-                            (?:
-                                ((?:\/[\w-]*)?(?:\#[\w-]+)) |
-                                (\/[\w-]+)
-                            )
-                            (\|[^\]]+)?
-                            \]\]""", re.X)
-
-    def sectionReplacer(match):
-        spec, section, justPage, linkText = match.groups()
-        if linkText is None:
-            linkText = ""
-        else:
-            linkText = linkText[1:]
-        if spec is None:
-            # local section link
-            return E.a({"section":"", "href":section}, linkText)
-        elif justPage is not None:
-            # foreign link, to an actual page from a multipage spec
-            return E.span({"spec-section":justPage + "#", "spec":spec}, linkText)
-        else:
-            # foreign link
-            return E.span({"spec-section":section, "spec":spec}, linkText)
-
-    propdescRe = re.compile(r"'(?:([^\s']*)/)?([\w*-]+)(?:!!([\w-]+))?(\|[^']+)?'")
-
-    def propdescReplacer(match):
-        if match.group(1) == "":
-            linkFor = "/"
-        else:
-            linkFor = match.group(1)
-        if match.group(2) == "-":
-            return "'-'"
-        if match.group(3) is None:
-            linkType = "propdesc"
-        elif match.group(3) in ("property", "descriptor"):
-            linkType = match.group(3)
-        else:
-            die("Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3))
-            return E.span(match.group(0))
-        if match.group(4) is not None:
-            linkText = match.group(4)[1:]
-        else:
-            linkText = match.group(2)
-        return E.a({"data-link-type":linkType, "class":"property", "for": linkFor, "lt": match.group(2)}, linkText)
-
-    idlRe = re.compile(r"{{(?:([^}]*)/)?((?:[^}]|,\s)+?)(?:!!([\w-]+))?(\|[^}]+)?}}")
-
-    def idlReplacer(match):
-        if match.group(1) == "":
-            linkFor = "/"
-        else:
-            linkFor = match.group(1)
-        if match.group(3) is None:
-            linkType = "idl"
-        elif match.group(3) in config.idlTypes:
-            linkType = match.group(3)
-        else:
-            die("Shorthand {0} gives type as '{1}', but only IDL types are allowed.", match.group(0), match.group(3))
-            return E.span(match.group(0))
-        if match.group(4) is not None:
-            linkText = match.group(4)[1:]
-        else:
-            linkText = match.group(2)
-        return E.code({"class":"idl", "nohighlight":""},
-                      E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
-
-    dfnRe = re.compile(r"\[=(?!\s)(?:([^=]*)/)?([^\"=]+?)(\|[^\"=]+)?=\]")
-
-    def dfnReplacer(match):
-        if match.group(1) == "":
-            linkFor = "/"
-        else:
-            linkFor = match.group(1)
-        if match.group(3) is not None:
-            linkText = match.group(3)[1:]
-        else:
-            linkText = match.group(2)
-        return E.a({"data-link-type":"dfn", "for": linkFor, "lt":match.group(2)}, linkText)
-
-    elementRe = re.compile(r"<{(?P<element>[\w*-]+)(?:/(?P<attr>[\w*-]+)(?:/(?P<value>[^}!|]+))?)?(?:!!(?P<linkType>[\w-]+))?(?:\|(?P<linkText>[^}]+))?}>")
-
-    def elementReplacer(match):
-        groupdict = match.groupdict()
-        if groupdict["attr"] is None and groupdict["value"] is None:
-            linkType = "element"
-            linkFor = None
-            lt = groupdict["element"]
-        elif groupdict["value"] is None:
-            linkType = "element-sub"
-            linkFor = groupdict["element"]
-            lt = groupdict["attr"]
-        else:
-            linkType = "attr-value"
-            linkFor = groupdict["element"] + "/" + groupdict["attr"]
-            lt = groupdict["value"]
-        if groupdict["linkType"] is not None:
-            linkType = groupdict["linkType"]
-        if groupdict["linkText"] is not None:
-            linkText = groupdict["linkText"]
-        else:
-            linkText = lt
-        return E.code({},
-                      E.a({"data-link-type":linkType, "for": linkFor, "lt": lt}, linkText))
-
-    varRe = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
-
-    def varReplacer(match):
-        return E.var(match.group(1))
-
-    inlineLinkRe = re.compile(r'\[([^\]]*)\]\(\s*([^\s)]*)\s*(?:"([^"]*)")?\s*\)')
-
-    def inlineLinkReplacer(match):
-        return (E.a({"href":match.group(2)}, match.group(1))
-                if len(match.groups()) < 3
-                else
-                E.a({"href":match.group(2), "title":match.group(3)}, match.group(1))
-                )
-
-    strongRe = re.compile(r"(?<!\\)(\*\*)(?!\s)([^*]+)(?!\s)(?<!\\)\*\*")
-
-    def strongReplacer(match):
-        return E.strong(match.group(2))
-
-    emRe = re.compile(r"(?<!\\)(\*)(?!\s)([^*]+)(?!\s)(?<!\\)\*")
-
-    def emReplacer(match):
-        return E.em(match.group(2))
-
-    escapedRe = re.compile(r"\\\*")
-
-    def escapedReplacer(match):
-        return "*"
-
     def transformElement(parentEl):
         processContents = isElement(parentEl) and not doc.isOpaqueElement(parentEl)
         if not processContents:
@@ -295,6 +140,47 @@ def transformAutolinkShortcuts(doc):
 
     for el in findAll("var", doc):
         fixSurroundingTypography(el)
+
+
+def transformShorthandElements(doc):
+    '''
+    The <l> element can contain any shorthand,
+    and works inside of "opaque" elements too,
+    unlike ordinary autolinking shorthands.
+    '''
+    def replacer(reg, rep, el, text):
+        match = reg.match(text)
+        if match:
+            result = rep(match)
+            replaceNode(el, result)
+            if result.tag == "a":
+                attrTarget = result
+            else:
+                attrTarget = find("a", result)
+            for k,v in el.attrib.items():
+                attrTarget.set(k,v)
+            return True
+        return False
+    for el in findAll("l", doc):
+        text = textContent(el)
+        if replacer(propdescRe, propdescReplacer, el, text):
+            continue
+        if replacer(dfnRe, dfnReplacer, el, text):
+            continue
+        if replacer(idlRe, idlReplacer, el, text):
+            continue
+        if replacer(elementRe, elementReplacer, el, text):
+            continue
+        if replacer(biblioRe, biblioReplacer, el, text):
+            continue
+        if replacer(sectionRe, sectionReplacer, el, text):
+            continue
+        if replacer(varRe, varReplacer, el, text):
+            continue
+        # TODO: handle "maybe" autolinks
+        die("<l> element doesn't contain a recognized autolinking syntax:\n{0}", outerHTML(el), el=el)
+        el.tag = "span"
+
 
 
 def transformProductionGrammars(doc):
@@ -344,3 +230,149 @@ def transformProductionGrammars(doc):
 
     for el in findAll(".prod", doc):
         transformElement(el)
+
+
+
+biblioRe = re.compile(r"(\\)?\[\[(!)?([\w.+-]+)((?: +current)|(?: +snapshot))?\]\]")
+def biblioReplacer(match):
+    # Allow escaping things that aren't actually biblio links, by preceding with a \
+    if match.group(1) is not None:
+        return match.group(0)[1:]
+    if match.group(2) == "!":
+        type = "normative"
+    else:
+        type = "informative"
+    term = match.group(3)
+    attrs = {"data-lt":term, "data-link-type":"biblio", "data-biblio-type":type}
+    if match.group(4) is not None:
+        attrs['data-biblio-status'] = match.group(4).strip()
+    return E.a(attrs,
+               "[",
+               term,
+               "]")
+
+sectionRe = re.compile(r"""
+                        \[\[
+                        ([\w-]+)?
+                        (?:
+                            ((?:\/[\w-]*)?(?:\#[\w-]+)) |
+                            (\/[\w-]+)
+                        )
+                        (\|[^\]]+)?
+                        \]\]""", re.X)
+def sectionReplacer(match):
+    spec, section, justPage, linkText = match.groups()
+    if linkText is None:
+        linkText = ""
+    else:
+        linkText = linkText[1:]
+    if spec is None:
+        # local section link
+        return E.a({"section":"", "href":section}, linkText)
+    elif justPage is not None:
+        # foreign link, to an actual page from a multipage spec
+        return E.span({"spec-section":justPage + "#", "spec":spec}, linkText)
+    else:
+        # foreign link
+        return E.span({"spec-section":section, "spec":spec}, linkText)
+
+propdescRe = re.compile(r"'(?:([^\s']*)/)?([\w*-]+)(?:!!([\w-]+))?(\|[^']+)?'")
+def propdescReplacer(match):
+    if match.group(1) == "":
+        linkFor = "/"
+    else:
+        linkFor = match.group(1)
+    if match.group(2) == "-":
+        return "'-'"
+    if match.group(3) is None:
+        linkType = "propdesc"
+    elif match.group(3) in ("property", "descriptor"):
+        linkType = match.group(3)
+    else:
+        die("Shorthand {0} gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3))
+        return E.span(match.group(0))
+    if match.group(4) is not None:
+        linkText = match.group(4)[1:]
+    else:
+        linkText = match.group(2)
+    return E.a({"data-link-type":linkType, "class":"property", "for": linkFor, "lt": match.group(2)}, linkText)
+
+idlRe = re.compile(r"{{(?:([^}]*)/)?((?:[^}]|,\s)+?)(?:!!([\w-]+))?(\|[^}]+)?}}")
+def idlReplacer(match):
+    if match.group(1) == "":
+        linkFor = "/"
+    else:
+        linkFor = match.group(1)
+    if match.group(3) is None:
+        linkType = "idl"
+    elif match.group(3) in config.idlTypes:
+        linkType = match.group(3)
+    else:
+        die("Shorthand {0} gives type as '{1}', but only IDL types are allowed.", match.group(0), match.group(3))
+        return E.span(match.group(0))
+    if match.group(4) is not None:
+        linkText = match.group(4)[1:]
+    else:
+        linkText = match.group(2)
+    return E.code({"class":"idl", "nohighlight":""},
+                  E.a({"data-link-type":linkType, "for": linkFor, "lt":match.group(2)}, linkText))
+
+dfnRe = re.compile(r"\[=(?!\s)(?:([^=]*)/)?([^\"=]+?)(\|[^\"=]+)?=\]")
+def dfnReplacer(match):
+    if match.group(1) == "":
+        linkFor = "/"
+    else:
+        linkFor = match.group(1)
+    if match.group(3) is not None:
+        linkText = match.group(3)[1:]
+    else:
+        linkText = match.group(2)
+    return E.a({"data-link-type":"dfn", "for": linkFor, "lt":match.group(2)}, linkText)
+
+elementRe = re.compile(r"<{(?P<element>[\w*-]+)(?:/(?P<attr>[\w*-]+)(?:/(?P<value>[^}!|]+))?)?(?:!!(?P<linkType>[\w-]+))?(?:\|(?P<linkText>[^}]+))?}>")
+def elementReplacer(match):
+    groupdict = match.groupdict()
+    if groupdict["attr"] is None and groupdict["value"] is None:
+        linkType = "element"
+        linkFor = None
+        lt = groupdict["element"]
+    elif groupdict["value"] is None:
+        linkType = "element-sub"
+        linkFor = groupdict["element"]
+        lt = groupdict["attr"]
+    else:
+        linkType = "attr-value"
+        linkFor = groupdict["element"] + "/" + groupdict["attr"]
+        lt = groupdict["value"]
+    if groupdict["linkType"] is not None:
+        linkType = groupdict["linkType"]
+    if groupdict["linkText"] is not None:
+        linkText = groupdict["linkText"]
+    else:
+        linkText = lt
+    return E.code({},
+                  E.a({"data-link-type":linkType, "for": linkFor, "lt": lt}, linkText))
+
+varRe = re.compile(r"\|(\w(?:[\w\s-]*\w)?)\|")
+def varReplacer(match):
+    return E.var(match.group(1))
+
+inlineLinkRe = re.compile(r'\[([^\]]*)\]\(\s*([^\s)]*)\s*(?:"([^"]*)")?\s*\)')
+def inlineLinkReplacer(match):
+    return (E.a({"href":match.group(2)}, match.group(1))
+            if len(match.groups()) < 3
+            else
+            E.a({"href":match.group(2), "title":match.group(3)}, match.group(1))
+            )
+
+strongRe = re.compile(r"(?<!\\)(\*\*)(?!\s)([^*]+)(?!\s)(?<!\\)\*\*")
+def strongReplacer(match):
+    return E.strong(match.group(2))
+
+emRe = re.compile(r"(?<!\\)(\*)(?!\s)([^*]+)(?!\s)(?<!\\)\*")
+def emReplacer(match):
+    return E.em(match.group(2))
+
+escapedRe = re.compile(r"\\\*")
+def escapedReplacer(match):
+    return "*"
