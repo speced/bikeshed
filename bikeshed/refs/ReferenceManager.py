@@ -441,10 +441,10 @@ class ReferenceManager(object):
     def getBiblioRef(self, text, status=None, generateFakeRef=False, silentAliases=False, el=None, quiet=False):
         key = text.lower()
         while True:
-            # Load the group up if necessary
+            # Try to load the group up, if necessary
             group = key[0:2]
             if group not in self.loadedBiblioGroups:
-                with config.retrieveDataFile("biblio/biblio-{0}.data".format(group), quiet=True) as lines:
+                with config.retrieveDataFile("biblio/biblio-{0}.data".format(group), quiet=True, okayToFail=True) as lines:
                     biblio.loadBiblioDataFile(lines, self.biblios)
             self.loadedBiblioGroups.add(group)
             # Check if it's there
