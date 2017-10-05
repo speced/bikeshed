@@ -191,13 +191,13 @@ def checkVarHygiene(doc):
     singularVars = []
     varCounts = defaultdict(lambda: 0)
     for el in findAll("var:not([data-var-ignore])", doc):
-        key = textContent(el), nearestAlgo(el)
+        key = foldWhitespace(textContent(el)).strip(), nearestAlgo(el)
+        print key
         varCounts[key] += 1
     foldedVarCounts = defaultdict(lambda: 0)
     for (var,algo),count in varCounts.items():
         if count > 1:
             continue
-        var = foldWhitespace(var).strip()
         if var.lower() in doc.md.ignoredVars:
             continue
         key = var, algo
