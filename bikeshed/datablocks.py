@@ -201,23 +201,46 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
     # drop the default 'Animation type' entry.
     if "Animatable" in parsedAttrs:
         attrs.pop("Animation type")
+
+    attrsToPrint = []
     for key, val in attrs.items():
-        if key in parsedAttrs or val is not None:
-            if key in parsedAttrs:
-                val = parsedAttrs[key]
-            if key in ("Value", "New values"):
-                ret.append("<tr class='value'><th>{0}:<td class='prod'>{1}".format(key, val))
-            elif key == "Applies to" and val.lower() == "all elements":
-                ret.append("<tr><th>Applies to:<td><a href='https://drafts.csswg.org/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>")
-            else:
-                ret.append("<tr><th>{0}:<td>{1}".format(key, val))
-        else:
+        if key in parsedAttrs:
+            # Key was provided
+            val = parsedAttrs[key]
+        elif val is None:
+            # Required key, not provided
             die("The propdef for '{0}' is missing a '{1}' line.", parsedAttrs.get("Name", "???"), key, lineNum=lineNum)
             continue
-    for key, val in parsedAttrs.items():
-        if key in attrs:
-            continue
-        ret.append("<tr><th>{0}:<td>{1}".format(key, val))
+        else:
+            # Optional key, just use default
+            pass
+        attrsToPrint.append((key,val))
+    for key,val in parsedAttrs.items():
+        # Find any "custom" provided keys
+        if key not in attrs:
+            attrsToPrint.append((key,val))
+
+    for key,val in attrsToPrint:
+        tr = "<tr>"
+        th = "<th>{0}:".format(key)
+        td = "<td>{0}".format(val)
+        if key in ("Value", "New values"):
+            tr = "<tr class=value>"
+            th = "<th><a href='https://drafts.csswg.org/css-values/#value-defs'>{0}:</a>".format(key)
+            td = "<td class=prod>{0}".format(val)
+        elif key == "Initial":
+            th = "<th><a href='https://drafts.csswg.org/css-cascade/#initial-values'>{0}:</a>".format(key)
+        elif key == "Inherited":
+            th = "<th><a href='https://drafts.csswg.org/css-cascade/#inherited-property'>{0}:</a>".format(key)
+        elif key == "Percentages":
+            th = "<th><a href='https://drafts.csswg.org/css-values/#percentages'>{0}:</a>".format(key)
+        elif key == "Computed value":
+            th = "<th><a href='https://drafts.csswg.org/css-cascade/#computed'>{0}:</a>".format(key)
+        elif key in ("Animatable", "Animation type"):
+            th = "<th><a href='https://drafts.csswg.org/css-transitions/#animatable-properties'>{0}:</a>".format(key)
+        elif key == "Applies to" and val.lower() == "all elements":
+            td = "<td><a href='https://drafts.csswg.org/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>"
+        ret.append(tr+th+td)
     ret.append("</table>")
     return ret
 
