@@ -40,10 +40,11 @@ knownFiles = [
     "specs.json",
     "caniuse.json",
     "methods.json",
+    "wpt-tests.txt",
     "languages.json",
     "biblio-keys.json",
     "test-suites.json",
-    "link-defaults.infotree"
+    "link-defaults.infotree",
 ]
 knownFolders = [
     "anchors",
