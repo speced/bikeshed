@@ -9,12 +9,13 @@ from . import updateCanIUse
 from . import updateLinkDefaults
 from . import updateTestSuites
 from . import updateLanguages
+from . import updateWpt
 from . import manifest
 from .. import config
 from ..messages import *
 
 
-def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False, path=None, dryRun=False, force=False):
+def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False, wpt=False, path=None, dryRun=False, force=False):
     if path is None:
         path = config.scriptPath("spec-data")
 
@@ -39,6 +40,8 @@ def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testS
             updateTestSuites.update(path=path, dryRun=dryRun)
         if languages or updateAnyway:
             updateLanguages.update(path=path, dryRun=dryRun)
+        if wpt or updateAnyway:
+            updateWpt.update(path=path, dryRun=dryRun)
         manifest.createManifest(path=path, dryRun=dryRun)
 
 

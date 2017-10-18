@@ -96,6 +96,7 @@ def main():
     updateParser.add_argument("--link-defaults", dest="linkDefaults", action="store_true", help="Download link default data.")
     updateParser.add_argument("--test-suites", dest="testSuites", action="store_true", help="Download test suite data.")
     updateParser.add_argument("--languages", dest="languages", action="store_true", help="Download language/translation data.")
+    updateParser.add_argument("--wpt", dest="wpt", action="store_true", help="Download web-platform-tests data.")
 
     issueParser = subparsers.add_parser('issues-list', help="Process a plain-text issues file into HTML. Call with no args to see an example input text.")
     issueParser.add_argument("-t",
@@ -192,7 +193,7 @@ def main():
 
     update.fixupDataFiles()
     if options.subparserName == "update":
-        update.update(anchors=options.anchors, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, dryRun=config.dryRun, force=options.force)
+        update.update(anchors=options.anchors, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, wpt=options.wpt, dryRun=config.dryRun, force=options.force)
     elif options.subparserName == "spec":
         doc = Spec(inputFilename=options.infile, debug=options.debug, token=options.ghToken, lineNumbers=options.lineNumbers)
         doc.mdCommandLine = metadata.fromCommandLine(extras)
