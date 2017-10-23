@@ -120,6 +120,7 @@ def transformAutolinkShortcuts(doc):
             config.processTextNodes(nodes, propdescRe, propdescReplacer)
         if "dfn" in doc.md.markupShorthands:
             config.processTextNodes(nodes, dfnRe, dfnReplacer)
+            config.processTextNodes(nodes, abstractRe, abstractReplacer)
         if "idl" in doc.md.markupShorthands:
             config.processTextNodes(nodes, idlRe, idlReplacer)
         if "markup" in doc.md.markupShorthands:
@@ -328,6 +329,18 @@ def dfnReplacer(match):
     else:
         linkText = match.group(2)
     return E.a({"data-link-type":"dfn", "for": linkFor, "lt":match.group(2)}, linkText)
+
+abstractRe = re.compile(r"\[\$(?!\s)(?:([^$]*)/)?([^\"$]+?)(\|[^\"$]+)?\$\]")
+def abstractReplacer(match):
+    if match.group(1) == "":
+        linkFor = "/"
+    else:
+        linkFor = match.group(1)
+    if match.group(3) is not None:
+        linkText = match.group(3)[1:]
+    else:
+        linkText = match.group(2)
+    return E.a({"data-link-type":"abstract-op", "for": linkFor, "lt":match.group(2)}, linkText)
 
 elementRe = re.compile(r"<{(?P<element>[\w*-]+)(?:/(?P<attr>[\w*-]+)(?:/(?P<value>[^}!|]+))?)?(?:!!(?P<linkType>[\w-]+))?(?:\|(?P<linkText>[^}]+))?}>")
 def elementReplacer(match):
