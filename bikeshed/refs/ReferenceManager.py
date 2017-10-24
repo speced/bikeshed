@@ -76,8 +76,8 @@ class ReferenceManager(object):
         def initFors():
             self.foreignRefs.fors.update(json.loads(config.retrieveDataFile("fors.json", quiet=True, str=True)))
         initFors()
-        datablocks.transformInfo(config.retrieveDataFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
         if doc and config.docPath(doc):
+            datablocks.transformInfo(config.retrieveDataFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
             # Get local anchor data
             try:
                 with io.open(config.docPath(doc, "anchors.bsdata"), 'r', encoding="utf-8") as lines:
