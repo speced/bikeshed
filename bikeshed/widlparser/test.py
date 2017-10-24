@@ -24,43 +24,45 @@ def debugHook(type, value, tb):
         # device, so we call the default hook
         sys.__excepthook__(type, value, tb)
     else:
-        import traceback, pdb
+        import traceback
+        import pdb
         # we are NOT in interactive mode, print the exception...
         traceback.print_exception(type, value, tb)
         print
         # ...then start the debugger in post-mortem mode.
         pdb.pm()
 
+
 class Marker(object):
     def markupConstruct(self, text, construct):
-        return ('<' + construct.idlType + '>', '</' + construct.idlType + '>')
+        return ('<c ' + construct.idlType + '>', '</c>')
 
     def markupType(self, text, construct):
-        return ('<TYPE for=' + construct.idlType + ' type=' + text + '>', '</TYPE>')
+        return ('<t>', '</t>')
 
     def markupPrimitiveType(self, text, construct):
-        return ('<PRIMITIVE for=' + construct.idlType + ' type=' + text + '>', '</PRIMITIVE>')
+        return ('<p>', '</p>')
 
     def markupBufferType(self, text, construct):
-        return ('<BUFFER for=' + construct.idlType + ' type=' + text + '>', '</BUFFER>')
+        return ('<b>', '</b>')
 
     def markupStringType(self, text, construct):
-        return ('<STRING for=' + construct.idlType + ' type=' + text + '>', '</STRING>')
+        return ('<s>', '</s>')
 
     def markupObjectType(self, text, construct):
-        return ('<OBJECT for=' + construct.idlType + ' type=' + text + '>', '</OBJECT>')
+        return ('<o>', '</o>')
 
     def markupTypeName(self, text, construct):
-        return ('<TYPE-NAME for=' + construct.idlType + '>', '</TYPE-NAME>')
+        return ('<tn>', '</tn>')
 
     def markupName(self, text, construct):
-        return ('<NAME for=' + construct.idlType + '>', '</NAME>')
+        return ('<n>', '</n>')
 
     def markupKeyword(self, text, construct):
-        return ('<KEYWORD for=' + construct.idlType + '>', '</KEYWORD>')
+        return ('<k>', '</k>')
 
     def markupEnumValue(self, text, construct):
-        return ('<ENUM-VALUE for=' + construct.idlType + '>', '</ENUM-VALUE>')
+        return ('<ev>', '</ev>')
 
     def encode(self, text):
         return cgi.escape(text)
@@ -107,25 +109,24 @@ class NullMarker(object):
 
 class ui(object):
     def warn(self, str):
-        print str
+        print(str)
 
     def note(self, str):
 #        return
-        print str
+        print(str)
 
-def testDifference(input, output):
-    if (output == input):
-        print "NULLIPOTENT"
-    else:
-        print "DIFFERENT"
-        inputLines = input.split('\n')
-        outputLines = output.split('\n')
 
-        for inputLine, outputLine in itertools.izip_longest(inputLines, outputLines, fillvalue = ''):
-            if (inputLine != outputLine):
-                print "<" + inputLine
-                print ">" + outputLine
-                print
+def test_difference(input, output):
+    if (output != input):
+        print("NOT NULLIPOTENT")
+        input_lines = input.split('\n')
+        output_lines = output.split('\n')
+
+        for input_line, output_line in itertools.izip_longest(input_lines, output_lines, fillvalue=''):
+            if (input_line != output_line):
+                print("<" + input_line)
+                print(">" + output_line)
+                print()
 
 
 if __name__ == "__main__":      # called from the command line
@@ -134,7 +135,7 @@ if __name__ == "__main__":      # called from the command line
 
     if (1 < len(sys.argv)):
         for fileName in sys.argv[1:]:
-            print "Parsing: " + fileName
+            print("Parsing: " + fileName)
             file = open(fileName)
             parser.reset()
             text = file.read()
@@ -147,16 +148,6 @@ if __name__ == "__main__":      # called from the command line
 interface Simple{
     serializer;
     serializer = { foo };
-    serializer = { foo, bar };
-    serializer = { inherit };
-    serializer = { inherit, foo };
-    serializer = { attribute };
-    serializer = { inherit, attribute };
-    serializer = { getter };
-    serializer = [ foo ];
-    serializer = [ foo, bar ];
-    serializer = [ getter ];
-    serializer = foo;
     serializer cereal(short one);
     iterable<Foo>;
     iterable<Foo, Bar>;
@@ -263,7 +254,7 @@ callback interface callMe {
     any [] value = null;
 };
 
-interface Int {
+[] interface Int {
     readonly attribute long? service;
     readonly attribute ArrayBuffer? value;
     readonly attribute ArrayBuffer value2;
@@ -296,52 +287,51 @@ interface OptionalTest {
 };
 """
 #    idl = idl.replace(' ', '  ')
-    print "IDL >>>\n" + idl + "\n<<<"
+    print("IDL >>>\n" + idl + "\n<<<")
     parser.parse(idl)
-    print repr(parser)
+    print(repr(parser))
 
-    testDifference(idl, unicode(parser))
+    test_difference(idl, unicode(parser))
     assert(unicode(parser) == idl)
 
-    print "MARKED UP:"
+    print("MARKED UP:")
     marker = NullMarker()
-    testDifference(idl, parser.markup(marker))
+    test_difference(idl, parser.markup(marker))
     assert(marker.text == idl)
-    print parser.markup(Marker())
+    print(parser.markup(Marker()))
 
-    print "Complexity: " + unicode(parser.complexityFactor)
+    print("Complexity: " + unicode(parser.complexityFactor))
 
 
     for construct in parser.constructs:
-        print unicode(construct.idlType) + u': ' + unicode(construct.normalName)
+        print(unicode(construct.idlType) + u': ' + unicode(construct.normalName))
         for member in construct:
-            print '    ' + member.idlType + ': ' + unicode(member.normalName) + ' (' + unicode(member.name) + ')'
+            print('    ' + member.idlType + ': ' + unicode(member.normalName) + ' (' + unicode(member.name) + ')')
 
-    print "FIND:"
-    print parser.find('round').fullName
-    print parser.find('Foo/method/y').fullName
-    print parser.find('Foo.method').fullName
-    print parser.find('Foo(constructor)').fullName
-    print parser.find('longest').fullName
-    print parser.find('fooArg').fullName
-    print parser.find('Window').fullName
-    print parser.find('mediaText').fullName
-    print parser.find('Foo.method').markup(Marker())
+    print("FIND:")
+    print(parser.find('round').fullName)
+    print(parser.find('Foo/method/y').fullName)
+    print(parser.find('Foo.method').fullName)
+    print(parser.find('Foo(constructor)').fullName)
+    print(parser.find('longest').fullName)
+    print(parser.find('fooArg').fullName)
+    print(parser.find('Window').fullName)
+    print(parser.find('mediaText').fullName)
+    print(parser.find('Foo.method').markup(Marker()))
     for method in parser.findAll('Foo.method'):
-        print method.fullName
+        print(method.fullName)
 
-    print "NORMALIZE:"
-    print parser.normalizedMethodName('foo')
-    print parser.normalizedMethodName('unknown')
-    print parser.normalizedMethodName('testMethod(short one, double two)')
-    print parser.normalizedMethodName('testMethod2(one, two, and a half)')
-    print parser.normalizedMethodName('bob(xxx)', 'LinkStyle')
-    print parser.normalizedMethodName('bob')
-    print parser.normalizedMethodName('bob()')
-    print ', '.join(parser.normalizedMethodNames('method', 'Foo'))
-    print ', '.join(parser.normalizedMethodNames('method()', 'Foo'))
-    print ', '.join(parser.normalizedMethodNames('method(x)', 'Foo'))
-    print ', '.join(parser.normalizedMethodNames('method(x, y)', 'Foo'))
-    print ', '.join(parser.normalizedMethodNames('method(x, y, bar)', 'Foo'))
-    print ', '.join(parser.normalizedMethodNames('abort()', 'Foo'))
-
+    print("NORMALIZE:")
+    print(parser.normalizedMethodName('foo'))
+    print(parser.normalizedMethodName('unknown'))
+    print(parser.normalizedMethodName('testMethod(short one, double two)'))
+    print(parser.normalizedMethodName('testMethod2(one, two, and a half)'))
+    print(parser.normalizedMethodName('bob(xxx)', 'LinkStyle'))
+    print(parser.normalizedMethodName('bob'))
+    print(parser.normalizedMethodName('bob()'))
+    print(', '.join(parser.normalizedMethodNames('method', 'Foo')))
+    print(', '.join(parser.normalizedMethodNames('method()', 'Foo')))
+    print(', '.join(parser.normalizedMethodNames('method(x)', 'Foo')))
+    print(', '.join(parser.normalizedMethodNames('method(x, y)', 'Foo')))
+    print(', '.join(parser.normalizedMethodNames('method(x, y, bar)', 'Foo')))
+    print(', '.join(parser.normalizedMethodNames('abort()', 'Foo')))

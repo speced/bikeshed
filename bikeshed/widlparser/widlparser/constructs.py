@@ -21,7 +21,7 @@ class Construct(ChildProduction):
     def __init__(self, tokens, parent, parseExtendedAttributes = True, parser = None):
         ChildProduction.__init__(self, tokens, parent)
         self._parser = parser
-        self.extendedAttributes = self._parseExtendedAttributes(tokens, self) if (parseExtendedAttributes) else None
+        self._extendedAttributes = self._parseExtendedAttributes(tokens, self) if (parseExtendedAttributes) else None
 
     def _parseExtendedAttributes(self, tokens, parent):
         return ExtendedAttributeList(tokens, parent) if (ExtendedAttributeList.peek(tokens)) else None
@@ -33,11 +33,15 @@ class Construct(ChildProduction):
 
     @property
     def constructors(self):
-        return [attribute for attribute in self.extendedAttributes if ('constructor' == attribute.idlType)] if (self.extendedAttributes) else []
+        return [attribute for attribute in self._extendedAttributes if ('constructor' == attribute.idlType)] if (self._extendedAttributes) else []
 
     @property
     def parser(self):
         return self._parser if (self._parser) else self.parent.parser
+
+    @property
+    def extendedAttributes(self):
+        return self._extendedAttributes if (self._extendedAttributes) else {}
 
     def __nonzero__(self):
         return True
@@ -80,10 +84,10 @@ class Construct(ChildProduction):
         return 1
 
     def _unicode(self):
-        return unicode(self.extendedAttributes) if (self.extendedAttributes) else ''
+        return unicode(self._extendedAttributes) if (self._extendedAttributes) else ''
 
     def __repr__(self):
-        return repr(self.extendedAttributes) if (self.extendedAttributes) else ''
+        return repr(self._extendedAttributes) if (self._extendedAttributes) else ''
 
     def markup(self, generator):
         if (not generator):
@@ -97,8 +101,8 @@ class Construct(ChildProduction):
             generator = None
 
         myGenerator = MarkupGenerator(self)
-        if (self.extendedAttributes):
-            self.extendedAttributes.markup(myGenerator)
+        if (self._extendedAttributes):
+            self._extendedAttributes.markup(myGenerator)
         target = self._markup(myGenerator)
         if (target._tail):
             myGenerator.addText(''.join([unicode(token) for token in target._tail]))
@@ -332,12 +336,12 @@ class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut]
         return output + ((' [default: ' + repr(self.default) + ']]') if (self.default) else ']')
 
 
-class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | SpecialOperation | Serializer | Stringifier | StaticMember | Iterable | Attribute | Maplike | Setlike
+class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | SpecialOperation | Stringifier | StaticMember | Iterable | Attribute | Maplike | Setlike
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
-        return tokens.popPosition(Const.peek(tokens) or Serializer.peek(tokens) or
+        return tokens.popPosition(Const.peek(tokens) or 
                                   Stringifier.peek(tokens) or StaticMember.peek(tokens) or
                                   Iterable.peek(tokens) or Maplike.peek(tokens) or
                                   Setlike.peek(tokens) or Attribute.peek(tokens) or
@@ -347,8 +351,6 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | Spe
         Construct.__init__(self, tokens, parent)
         if (Const.peek(tokens)):
             self.member = Const(tokens, parent)
-        elif (Serializer.peek(tokens)):
-            self.member = Serializer(tokens, parent)
         elif (Stringifier.peek(tokens)):
             self.member = Stringifier(tokens, parent)
         elif (StaticMember.peek(tokens)):
