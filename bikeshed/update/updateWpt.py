@@ -10,9 +10,9 @@ from ..messages import *
 
 def update(path, dryRun=False):
     try:
-        say("Downloading link defaults...")
+        say("Downloading web-platform-tests data...")
         with closing(urllib2.urlopen("https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/wpt-tests.txt")) as fh:
-            data = fh.read()
+            data = unicode(fh.read(), encoding="utf-8")
     except Exception, e:
         die("Couldn't download web-platform-tests data.\n{0}", e)
         return
