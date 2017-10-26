@@ -342,6 +342,7 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = " line-number={0}".format(lineNum)
+    wsPrefix,_,_ = firstLine.partition("<")
     attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False)
     el = parseHTML(firstLine + "</pre>")[0]
     if "for" in el.attrib:
@@ -358,32 +359,29 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
         return
     addClass(el, "data")
     rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
-    lines = [
-        '''
-            <table {attrs}{lineNumAttr}>
-                <caption>Arguments for the <a method lt='{method}' for='{interface}'{lineNumAttr}>{interface}.{method}</a> method.</caption>
-                <thead>
-                    <tr>
-                        <th>Parameter
-                        <th>Type
-                        <th>Nullable
-                        <th>Optional
-                        <th>Description
-                <tbody>'''.format(attrs=rootAttrs, interface=interface, method=method, lineNumAttr=lineNumAttr)
-    ] + [
-        '''
-                <tr>
-                    <td><dfn argument{lineNumAttr}>{0}</dfn>
-                    <td>
-                    <td>
-                    <td>
-                    <td>{1}'''.format(param, desc, lineNumAttr=lineNumAttr)
-        for param,desc in attrs.items()
-    ] + [
-        '''
-            </table>
-            '''
-    ]
+    text = ('''
+<table {attrs}{lineNumAttr}>
+    <caption>Arguments for the <a method lt='{method}' for='{interface}'{lineNumAttr}>{interface}.{method}</a> method.</caption>
+    <thead>
+        <tr>
+            <th>Parameter
+            <th>Type
+            <th>Nullable
+            <th>Optional
+            <th>Description
+    <tbody>'''.format(attrs=rootAttrs, interface=interface, method=method, lineNumAttr=lineNumAttr)
++ '\n'.join(['''
+        <tr>
+            <td><dfn argument{lineNumAttr}>{0}</dfn>
+            <td>
+            <td>
+            <td>
+            <td>{1}'''.format(param, desc, lineNumAttr=lineNumAttr)
+    for param,desc in attrs.items()])
++ '''
+</table>''')
+    lines = [wsPrefix+line for line in text.split("\n")]
+
     return lines
 
 
