@@ -72,6 +72,9 @@ def transformDataBlocks(doc, lines):
             if startLine == i:
                 # Single-line <pre>.
                 match = re.match(r"\s*(<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line, re.I)
+                if not match:
+                    die("Can't figure out how to parse this datablock line:\n{0}".format(line))
+                    continue
                 repl = blockTypes[blockType](
                     lines=[match.group(2)],
                     tagName=tagName,
@@ -352,11 +355,11 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
             interface, method = forValue.split("/")
         else:
             die("Argumentdef for='' values need to specify interface/method(). Got '{0}'.", forValue, lineNum=lineNum)
-            return
+            return []
         removeAttr(el, "for")
     else:
         die("Argumentdef blocks need a for='' attribute specifying their method.", lineNum=lineNum)
-        return
+        return []
     addClass(el, "data")
     rootAttrs = " ".join("{0}='{1}'".format(k,escapeAttr(v)) for k,v in el.attrib.items())
     text = ('''
