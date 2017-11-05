@@ -2,8 +2,8 @@
 
 from __future__ import division, unicode_literals
 import difflib
-import glob
 import io
+import os
 import pipes
 import subprocess
 from itertools import *
@@ -12,13 +12,19 @@ from .htmlhelpers import parseDocument, outerHTML, nodeIter, isElement, findAll
 from .messages import *
 
 
+def findTestFiles():
+    for root, dirnames, filenames in os.walk(config.scriptPath() + "/../tests"):
+        for filename in filenames:
+            if filename.endswith(".bs"):
+                yield root + "/" + filename
+
+
 def runAllTests(constructor, testFiles):
     numPassed = 0
     if len(testFiles) == 0:
-        testFolder = config.scriptPath() + "/../tests/"
-        testFiles = glob.glob(testFolder + "*.bs")
+        testFiles = list(findTestFiles())
         if len(testFiles) == 0:
-            p("No tests were found in '{0}'.".format(testFolder))
+            p("No tests were found")
             return True
     total = 0
     fails = []
@@ -95,7 +101,7 @@ def equalOrEmpty(a, b):
 
 def rebase(files=None):
     if not files:
-        files = glob.glob(config.scriptPath() + "/../tests/*.bs")
+        files = findTestFiles()
     for path in files:
         _,_,name = path.rpartition("/")
         p("Rebasing {0}".format(name))
