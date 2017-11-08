@@ -69,7 +69,13 @@ shortToLongStatus = {
     "iso/D-AMD": "Draft Amendment",
     "iso/FD-AMD": "Final Draft Amendment",
     "iso/PRF-AMD": "Proof Amendment",
-    "iso/AMD": "Amendment"
+    "iso/AMD": "Amendment",
+    "fido/ED": "Editor's Draft",
+    "fido/WD": "Working Draft",
+    "fido/RD": "Review Draft",
+    "fido/ID": "Implementation Draft",
+    "fido/PS": "Proposed Standard",
+    "fido/FD": "Final Document"
 }
 snapshotStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/WG-NOTE", "w3c/IG-NOTE", "w3c/NOTE", "w3c/MO"]
 unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING", "DRAFT-FINDING"]
@@ -80,6 +86,7 @@ megaGroups = {
     "w3c": frozenset(["act-framework", "audiowg", "csswg", "dap", "fxtf", "geolocation", "houdini", "html", "i18n", "mediacapture", "ricg", "serviceworkers", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webauthn", "web-payments", "webperf", "webplatform", "webspecs", "webvr", "wicg"]),
     "tc39": frozenset(["tc39"]),
     "iso": frozenset(["wg21"]),
+    "fido": frozenset(["fido"]),
     "priv-sec": frozenset(["audiowg", "csswg", "dap", "fxtf", "geolocation", "houdini", "html", "mediacapture", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"])
 }
 
