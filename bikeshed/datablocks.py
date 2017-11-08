@@ -88,7 +88,7 @@ def transformDataBlocks(doc, lines):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
                 repl = blockTypes[blockType](
-                    lines=lines[startLine + 1:i],
+                    lines=cleanPrefix(lines[startLine + 1:i], doc.md.indent),
                     tagName=tagName,
                     firstLine=lines[startLine],
                     lineNum=blockStartLine,
@@ -100,7 +100,7 @@ def transformDataBlocks(doc, lines):
                 # End tag was at the end of line of useful content.
                 # Process the stuff before it, preserve the stuff after it.
                 repl = blockTypes[blockType](
-                    lines=lines[startLine + 1:i] + [match.group(1)],
+                    lines=cleanPrefix(lines[startLine + 1:i] + [match.group(1)], doc.md.indent),
                     tagName=tagName,
                     firstLine=lines[startLine],
                     lineNum=blockStartLine,
@@ -117,6 +117,19 @@ def transformDataBlocks(doc, lines):
 
     return newLines
 
+def cleanPrefix(lines, tabSize):
+    # Remove the longest common whitespace prefix from the lines.
+    # Returns a fresh array, does not mutate the passed lines.
+    prefixSize = float("inf")
+    newLines = []
+    for line in lines:
+        prefix, rest = re.match(r"(\s*)(.*)", line).groups()
+        prefix = re.sub(prefix, "\t", " "*tabSize)
+        prefixSize = min(prefixSize, len(prefix))
+        newLines.append(prefix+rest)
+    for i,line in enumerate(newLines):
+        newLines[i] = line[prefixSize:]
+    return newLines
 
 def transformPre(lines, tagName, firstLine, **kwargs):
     # If the last line in the source is a </code></pre>,
