@@ -346,7 +346,7 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     if lineNum is not None:
         lineNumAttr = " line-number={0}".format(lineNum)
     wsPrefix,_,_ = firstLine.partition("<")
-    attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False)
+    attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False, lineNum=lineNum)
     el = parseHTML(firstLine + "</pre>")[0]
     if "for" in el.attrib:
         forValue = el.get('for')
@@ -388,7 +388,7 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     return lines
 
 
-def parseDefBlock(lines, type, capitalizeKeys=True):
+def parseDefBlock(lines, type, capitalizeKeys=True, lineNum=None):
     vals = OrderedDict()
     lastKey = None
     for line in lines:
@@ -398,7 +398,7 @@ def parseDefBlock(lines, type, capitalizeKeys=True):
                 key = lastKey
                 val = line.strip()
             else:
-                die("Incorrectly formatted {2} line for '{0}':\n{1}", vals.get("Name", "???"), line, type)
+                die("Incorrectly formatted {2} line for '{0}':\n{1}", vals.get("Name", "???"), line, type, lineNum=lineNum)
                 continue
         else:
             key = match.group(1).strip()
