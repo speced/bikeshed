@@ -174,6 +174,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 def stripComments(lines):
     output = []
     inComment = False
+    wholeCommentLines = 0
     for line in lines:
         # Eagerly strip comments, because the serializer can't output them right now anyway,
         # and they trigger some funky errors
@@ -181,11 +182,15 @@ def stripComments(lines):
         if (line != strippedLine and strippedLine.strip() == "") or (line.strip() == "" and inComment):
             # We want to entirely skip lines who are completely composed of comments (and maybe whitespace).
             # That way we don't, say, break paragraphs when we comment out their middle.
+            wholeCommentLines += 1
             continue
         else:
             # Otherwise, just process whatever's left as normal.
             if line.endswith("\n") and not strippedLine.endswith("\n"):
                 strippedLine += "\n"
+            if wholeCommentLines:
+                output.append("<!--line count correction {0}-->".format(wholeCommentLines-1))
+                wholeCommentLines = 0
             output.append(strippedLine)
     return output
 
