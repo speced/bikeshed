@@ -246,7 +246,7 @@ class Spec(object):
                 else:
                     with io.open(outputFilename, "w", encoding="utf-8") as f:
                         f.write(rendered)
-            except Exception, e:
+            except Exception as e:
                 die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)
 
     def printResultMessage(self):
@@ -284,7 +284,7 @@ class Spec(object):
             SocketServer.TCPServer.allow_reuse_address = True
             server = SocketServer.TCPServer(("", port), SilentServer)
 
-            print "Serving at port {0}".format(port)
+            print("Serving at port {0}".format(port))
             thread = threading.Thread(target = server.serve_forever)
             thread.daemon = True
             thread.start()
@@ -315,7 +315,7 @@ class Spec(object):
                     server.shutdown()
                     thread.join()
                 sys.exit(0)
-        except Exception, e:
+        except Exception as e:
             die("Something went wrong while watching the file:\n{0}", e)
 
     def fixText(self, text, moreMacros={}):

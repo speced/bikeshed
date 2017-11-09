@@ -13,8 +13,8 @@
 import re
 import itertools
 
-import tokenizer
-from constructs import *
+from . import tokenizer
+from .constructs import *
 
 
 class Parser(object):

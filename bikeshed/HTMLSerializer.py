@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division, unicode_literals
-import StringIO
+try:
+    from io import StringIO
+except ImportError:
+    import StringIO
 from .htmlhelpers import childNodes, isElement, outerHTML, escapeHTML, escapeAttr, hasAttrs
 from .messages import *
 

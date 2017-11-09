@@ -13,19 +13,25 @@
 # Process URI templates per http://tools.ietf.org/html/rfc6570
 
 
-import urllib2
-import urlparse
+try:
+    from urllib.request import Request, urlopen
+    from urllib.parse import urljoin
+    from collections import UserString
+except ImportError:
+    from urllib2 import Request, urlopen
+    from urlparse import urljoin
+    import UserString
 import json
 import base64
 import contextlib
 import collections
-import UserString
+
 
 import uritemplate
 
-class MimeType(UserString.MutableString):
+class MimeType(UserString):
     def __init__(self, mimeType):
-        UserString.MutableString.__init__(self, mimeType)
+        UserString.__init__(self, mimeType)
         self._type = None
         self._subtype = None
         self._structure = None
@@ -144,9 +150,9 @@ class APIHints(object):
 class APIResource(object):
     def __init__(self, baseURI, uri, variables = None, hints = None):
         try:
-            self.template = uritemplate.URITemplate(urlparse.urljoin(baseURI, uri))
+            self.template = uritemplate.URITemplate(urljoin(baseURI, uri))
             if (variables):
-                self.variables = {variable: urlparse.urljoin(baseURI, variables[variable]) for variable in variables}
+                self.variables = {variable: urljoin(baseURI, variables[variable]) for variable in variables}
             else:
                 self.variables = {variable: '' for variable in self.template.variables}
             self.hints = hints
@@ -179,14 +185,14 @@ class APIClient(object):
         if (home):
             if ('application/json' == home.contentType):
                 for name in home.data:
-                    apiKey = urlparse.urljoin(self.baseURI, name)
+                    apiKey = urljoin(self.baseURI, name)
                     self._resources[apiKey] = APIResource(self.baseURI, home.data[name])
             elif (('application/home+json' == home.contentType) or
                   ('application/json-home' == home.contentType)):
                 resources =  home.data.get('resources')
                 if (resources):
                     for name in resources:
-                        apiKey = urlparse.urljoin(self.baseURI, name)
+                        apiKey = urljoin(self.baseURI, name)
                         data = resources[name]
                         uri = data['href'] if ('href' in data) else data.get('href-template')
                         variables = data.get('href-vars')
@@ -207,7 +213,7 @@ class APIClient(object):
         return [self.relativeURI(apiKey) for apiKey in self._resources]
 
     def resource(self, name):
-        return self._resources.get(urlparse.urljoin(self.baseURI, name))
+        return self._resources.get(urljoin(self.baseURI, name))
 
     def _accept(self, resource):
         version = None
@@ -219,21 +225,21 @@ class APIClient(object):
 
     def _callURI(self, method, uri, accept, payload = None, payloadType = None):
         try:
-            request = urllib2.Request(uri, data = payload, headers = { 'Accept' : accept })
+            request = Request(uri, data = payload, headers = { 'Accept' : accept })
             if (self.username and self.password):
                 request.add_header('Authorization', b'Basic ' + base64.b64encode(self.username + b':' + self.password))
             if (payload and payloadType):
                 request.add_header('Content-Type', payloadType)
             request.get_method = lambda: method
             
-            with contextlib.closing(urllib2.urlopen(request)) as response:
+            with contextlib.closing(urlopen(request)) as response:
                 return APIResponse(response)
         except Exception as e:
             pass
         return None
     
     def _call(self, method, name, arguments, payload = None, payloadType = None):
-        apiKey = urlparse.urljoin(self.baseURI, name)
+        apiKey = urljoin(self.baseURI, name)
 
         resource = self._resources.get(apiKey)
         if (resource):
@@ -247,11 +253,11 @@ class APIClient(object):
         return None
     
     def setVersion(self, name, version):
-        apiKey = urlparse.urljoin(self.baseURI, name)
+        apiKey = urljoin(self.baseURI, name)
         self._versions[apiKey] = version
 
     def setAccept(self, name, mimeType):
-        apiKey = urlparse.urljoin(self.baseURI, name)
+        apiKey = urljoin(self.baseURI, name)
         self._accepts[apiKey] = mimeType
 
     def get(self, name, **kwargs):

@@ -4,7 +4,10 @@ import io
 import json
 import re
 import os
-import urllib2
+# try:
+#     from urllib.request import urlopen
+# except ImportError:
+#     from urllib2 import urlopen
 from collections import defaultdict
 from contextlib import closing
 
@@ -28,7 +31,7 @@ def update(path, dryRun=False):
             die("Unrecognized anchor-data content-type '{0}'.", res.contentType)
             return
         rawSpecData = res.data
-    except Exception, e:
+    except Exception as e:
         die("Couldn't download anchor data.  Error was:\n{0}", str(e))
         return
 
@@ -69,31 +72,31 @@ def update(path, dryRun=False):
         try:
             with io.open(os.path.join(path, "specs.json"), 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(specs, ensure_ascii=False, indent=2, sort_keys=True)))
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save spec database to disk.\n{0}", e)
             return
         try:
             for spec, specHeadings in headings.items():
                 with io.open(os.path.join(path, "headings", "headings-{0}.json".format(spec)), 'w', encoding="utf-8") as f:
                     f.write(unicode(json.dumps(specHeadings, ensure_ascii=False, indent=2, sort_keys=True)))
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save headings database to disk.\n{0}", e)
             return
         try:
             writeAnchorsFile(anchors, path)
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save anchor database to disk.\n{0}", e)
             return
         try:
             with io.open(os.path.join(path, "methods.json"), 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True)))
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save methods database to disk.\n{0}", e)
             return
         try:
             with io.open(os.path.join(path, "fors.json"), 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(fors, ensure_ascii=False, indent=2, sort_keys=True)))
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save fors database to disk.\n{0}", e)
             return
 

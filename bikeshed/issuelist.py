@@ -41,7 +41,7 @@ def printIssueList(infilename=None, outfilename=None):
                 infile = io.open(infilename + suffix, 'r', encoding="utf-8")
                 infilename += suffix
                 break
-            except Exception, e:
+            except Exception as e:
                 pass
         else:
             die("Couldn't read from the infile:\n  {0}", str(e))
@@ -62,7 +62,7 @@ def printIssueList(infilename=None, outfilename=None):
     else:
         try:
             outfile = io.open(outfilename, 'w', encoding="utf-8")
-        except Exception, e:
+        except Exception as e:
             die("Couldn't write to outfile:\n{0}", str(e))
             return
 

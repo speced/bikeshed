@@ -1188,7 +1188,7 @@ def processInclusions(doc):
                 try:
                     with io.open(config.docPath(doc, path), 'r', encoding="utf-8") as f:
                         lines = f.readlines()
-                except Exception, err:
+                except Exception as err:
                     die("Couldn't find include file '{0}'. Error was:\n{1}", path, err, el=el)
                     removeNode(el)
                     continue
@@ -1374,7 +1374,7 @@ def inlineRemoteIssues(doc):
     try:
         with io.open(config.scriptPath("spec-data", "github-issues.json"), 'w', encoding="utf-8") as f:
             f.write(unicode(json.dumps(responses, ensure_ascii=False, indent=2, sort_keys=True)))
-    except Exception, e:
+    except Exception as e:
         warn("Couldn't save GitHub Issues cache to disk.\n{0}", e)
     return
 

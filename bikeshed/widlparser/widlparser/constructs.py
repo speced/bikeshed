@@ -10,8 +10,8 @@
 #  [1] http://www.w3.org/Consortium/Legal/2002/copyright-software-20021231
 #
 
-from productions import *
-from markup import MarkupGenerator
+from .productions import *
+from .markup import MarkupGenerator
 
 class Construct(ChildProduction):
     @classmethod

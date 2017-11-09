@@ -12,4 +12,4 @@
 
 __all__ = ['parser', 'tokenizer', 'constructs', 'productions']
 
-import parser
+from . import parser

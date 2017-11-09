@@ -106,8 +106,12 @@ class MetadataManager:
 
     def addData(self, key, val, lineNum=None):
         key = key.strip()
-        if isinstance(val, basestring):
-            val = val.strip()
+        try:
+            if isinstance(val, basestring):
+                val = val.strip()
+        except NameError:
+            if isinstance(val, str):
+                val = val.strip()
 
         if key.startswith("!"):
             key = key[1:]
@@ -237,6 +241,11 @@ class MetadataManager:
         if self.abstract:
             macros["abstract"] = "\n".join(markdown.parse(self.abstract, self.indent))
             macros["abstractattr"] = escapeAttr("  ".join(self.abstract).replace("<<","<").replace(">>",">"))
+        try:
+            # FIXME: I am probably going to hell for this.
+            x = unicode("")
+        except NameError:
+            unicode = lambda x, encoding="": str(x)
         macros["year"] = unicode(self.date.year)
         macros["date"] = unicode(self.date.strftime("{0} %B %Y".format(self.date.day)), encoding="utf-8")
         macros["cdate"] = unicode(self.date.strftime("%Y%m%d"), encoding="utf-8")
@@ -672,7 +681,7 @@ def parseMaxToCDepth(key, val, lineNum):
         return float('inf')
     try:
         v = int(val)
-    except ValueError, e:
+    except ValueError as e:
         die("Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.", val, lineNum=lineNum)
         return float('inf')
     if not (1 <= v <= 5):
@@ -758,19 +767,32 @@ def fromJson(data):
     md = MetadataManager()
     try:
         defaults = json.loads(data)
-    except Exception, e:
+    except Exception as e:
         if data != "":
             die("Error loading default metadata:\n{0}", str(e))
         return md
     for key,val in defaults.items():
-        if isinstance(val, basestring):
-            md.addData(key, val)
-        elif isinstance(val, list):
+        # FIXME: This smells.
+        handled = False
+        try:
+            if isinstance(val, basestring):
+                md.addData(key, val)
+                handled = True
+        except NameError:
+            if isinstance(val, str):
+                md.addData(key, val)
+                handled = True
+            
+        if isinstance(val, list):
             for indivVal in val:
                 md.addData(key, indivVal)
-        else:
+                
+            handled = True
+                
+        if not handled:
             die("Default metadata values must be strings or arrays of strings. '{0}' is something else.", key)
             return md
+            
     return md
 
 

@@ -4,7 +4,10 @@ import io
 import json
 import re
 import os
-import urllib2
+try:
+    from urllib.request import URLError, urlopen
+except ImportError:
+    from urllib2 import URLError, urlopen
 from collections import defaultdict
 from contextlib import closing
 
@@ -28,7 +31,7 @@ def update(path, dryRun=False):
             try:
                 with io.open(os.path.join(path, "biblio", "biblio-{0}.data".format(group)), 'w', encoding="utf-8") as fh:
                     writeBiblioFile(fh, biblios)
-            except Exception, e:
+            except Exception as e:
                 die("Couldn't save biblio database to disk.\n{0}", e)
                 return
         # Save the list of all names to a file
@@ -58,7 +61,7 @@ def update(path, dryRun=False):
         try:
             with io.open(os.path.join(path, "biblio-keys.json"), 'w', encoding="utf-8") as fh:
                 fh.write(unicode(json.dumps(reducedNames, indent=0, ensure_ascii=False, sort_keys=True)))
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save biblio database to disk.\n{0}", e)
             return
     say("Success!")
@@ -66,42 +69,42 @@ def update(path, dryRun=False):
 
 def getSpecrefData():
     try:
-        with closing(urllib2.urlopen("https://api.specref.org/bibrefs")) as fh:
+        with closing(urlopen("https://api.specref.org/bibrefs")) as fh:
             return unicode(fh.read(), encoding="utf-8")
-    except urllib2.URLError:
+    except URLError:
         # SpecRef uses SNI, which old Pythons (pre-2.7.10) don't understand.
         # First try the older herokuapp.com URL.
         try:
-            with closing(urllib2.urlopen("https://specref.herokuapp.com/bibrefs")) as fh:
+            with closing(urlopen("https://specref.herokuapp.com/bibrefs")) as fh:
                 return unicode(fh.read(), encoding="utf-8")
         except:
             # Try the CSSWG proxy.
             try:
-                with closing(urllib2.urlopen("https://api.csswg.org/bibrefs")) as fh:
+                with closing(urlopen("https://api.csswg.org/bibrefs")) as fh:
                     return unicode(fh.read(), encoding="utf-8")
             except:
                 warn("Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?")
                 raise
                 return "{}"
-    except Exception, e:
+    except Exception as e:
         die("Couldn't download the SpecRef biblio data.\n{0}", e)
         return "{}"
 
 
 def getWG21Data():
     try:
-        with closing(urllib2.urlopen("https://wg21.link/specref.json")) as fh:
+        with closing(urlopen("https://wg21.link/specref.json")) as fh:
             return unicode(fh.read(), encoding="utf-8")
-    except Exception, e:
+    except Exception as e:
         die("Couldn't download the WG21 biblio data.\n{0}", e)
         return "{}"
 
 
 def getCSSWGData():
     try:
-        with closing(urllib2.urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
+        with closing(urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
             return [unicode(line, encoding="utf-8") for line in fh.readlines()]
-    except Exception, e:
+    except Exception as e:
         die("Couldn't download the CSSWG biblio data.\n{0}", e)
         return []
 

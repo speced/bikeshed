@@ -3,7 +3,10 @@ from __future__ import division, unicode_literals
 import io
 import json
 import os
-import urllib2
+try:
+    from urllib.request import urlopen
+except ImportError:
+    from urllib2 import urlopen
 from contextlib import closing
 
 from ..messages import *
@@ -11,9 +14,9 @@ from ..messages import *
 def update(path, dryRun=False):
     try:
         say("Downloading languages...")
-        with closing(urllib2.urlopen("https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/languages.json")) as fh:
+        with closing(urlopen("https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/languages.json")) as fh:
             data = unicode(fh.read(), encoding="utf-8")
-    except Exception, e:
+    except Exception as e:
         die("Couldn't download languages data.\n{0}", e)
         return
 
@@ -21,7 +24,7 @@ def update(path, dryRun=False):
         try:
             with io.open(os.path.join(path, "languages.json"), 'w', encoding="utf-8") as f:
                 f.write(data)
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save languages database to disk.\n{0}", e)
             return
     say("Success!")

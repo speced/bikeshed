@@ -2,7 +2,11 @@
 from __future__ import division, unicode_literals
 import hashlib
 import html5lib
-import HTMLParser
+try:
+    import HTMLParser
+except ImportError as e:
+    import html.parser as HTMLParser
+    print(e)
 import re
 from collections import Counter, defaultdict
 from lxml import etree
@@ -24,7 +28,7 @@ def findAll(sel, context):
         context = context.document
     try:
         return CSSSelector(sel, namespaces={"svg":"http://www.w3.org/2000/svg"})(context)
-    except Exception, e:
+    except Exception as e:
         die("The selector '{0}' returned an error:\n{1}", sel, e)
         return []
 

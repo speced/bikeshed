@@ -40,7 +40,7 @@ def retrieveDataFile(*segs, **kwargs):
             if not quiet:
                 warn("Couldn't save the {0} file to cache. Proceeding...", filetype)
     if str:
-        return unicode(fh.read(), encoding="utf-8")
+        return fh.read() # unicode(fh.read(), encoding="utf-8")
     else:
         return fh
 

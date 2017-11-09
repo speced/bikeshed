@@ -12,4 +12,4 @@
 
 __all__ = ['apiclient', 'uritemplate']
 
-import apiclient
+from . import apiclient
