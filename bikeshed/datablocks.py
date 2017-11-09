@@ -405,7 +405,7 @@ def parseDefBlock(lines, type, capitalizeKeys=True, lineNum=None):
     vals = OrderedDict()
     lastKey = None
     for line in lines:
-        match = re.match(r"\s*([^:]+):\s*(\S.*)", line)
+        match = re.match(r"\s*([^:]+):\s*(\S.*)?", line)
         if match is None:
             if lastKey is not None and (line.strip() == "" or re.match(r"\s+", line)):
                 key = lastKey
@@ -418,7 +418,7 @@ def parseDefBlock(lines, type, capitalizeKeys=True, lineNum=None):
             if capitalizeKeys:
                 key = key.capitalize()
             lastKey = key
-            val = match.group(2).strip()
+            val = (match.group(2) or "").strip()
         if key in vals:
             vals[key] += "\n" + val
         else:
