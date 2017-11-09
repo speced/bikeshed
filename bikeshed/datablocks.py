@@ -122,9 +122,10 @@ def cleanPrefix(lines, tabSize):
     # Returns a fresh array, does not mutate the passed lines.
     prefixSize = float("inf")
     newLines = []
+    spaceIndent = " " * tabSize
     for line in lines:
         prefix, rest = re.match(r"(\s*)(.*)", line).groups()
-        prefix = re.sub(prefix, "\t", " "*tabSize)
+        prefix = prefix.replace("\t", spaceIndent)
         prefixSize = min(prefixSize, len(prefix))
         newLines.append(prefix+rest)
     for i,line in enumerate(newLines):
@@ -677,7 +678,8 @@ def parseInfoTree(lines, indent=4, lineNum=0):
             continue
         wsLen = len(ws.replace("\t", indentSpace))
         if wsLen % indent != 0:
-            die("Line has inconsistent indentation; use tabs or {1} spaces:\n{0}", text, indent, lineNum=thisLine)
+            visibleWs = ws.replace("\t", "\\t").replace(" ", "\\s")
+            die("Line has inconsistent indentation; use tabs or {1} spaces:\n{0}", visibleWs+text, indent, lineNum=thisLine)
             return []
         wsLen = wsLen // indent
         if wsLen >= lastIndent + 2:
