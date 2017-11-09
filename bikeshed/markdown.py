@@ -189,7 +189,7 @@ def stripComments(lines):
             if line.endswith("\n") and not strippedLine.endswith("\n"):
                 strippedLine += "\n"
             if wholeCommentLines:
-                output.append("<!--line count correction {0}-->".format(wholeCommentLines-1))
+                output.append("<!--line count correction {0}-->\n".format(wholeCommentLines-1))
                 wholeCommentLines = 0
             output.append(strippedLine)
     return output
