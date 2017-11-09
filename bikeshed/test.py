@@ -12,11 +12,22 @@ from .htmlhelpers import parseDocument, outerHTML, nodeIter, isElement, findAll
 from .messages import *
 
 
+TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
+
+
 def findTestFiles():
-    for root, dirnames, filenames in os.walk(config.scriptPath() + "/../tests"):
+    for root, dirnames, filenames in os.walk(TEST_DIR):
         for filename in filenames:
             if filename.endswith(".bs"):
-                yield root + "/" + filename
+                yield os.path.join(root, filename)
+
+
+# The test name will be the path relative to the tests directory, or the path as
+# given if the test is outside of that directory.
+def testNameForPath(path):
+    if path.startswith(TEST_DIR):
+        return path[len(TEST_DIR)+1:]
+    return path
 
 
 def runAllTests(constructor, testFiles):
@@ -29,7 +40,7 @@ def runAllTests(constructor, testFiles):
     total = 0
     fails = []
     for testPath in testFiles:
-        _,_,testName = testPath.rpartition("/")
+        testName = testNameForPath(testPath)
         p(testName)
         total += 1
         doc = constructor(inputFilename=testPath)
@@ -103,6 +114,6 @@ def rebase(files=None):
     if not files:
         files = findTestFiles()
     for path in files:
-        _,_,name = path.rpartition("/")
+        name = testNameForPath(path)
         p("Rebasing {0}".format(name))
         subprocess.call("bikeshed -qf spec {0}".format(pipes.quote(path)), shell=True)
