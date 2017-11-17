@@ -120,17 +120,25 @@ def transformDataBlocks(doc, lines):
 def cleanPrefix(lines, tabSize):
     # Remove the longest common whitespace prefix from the lines.
     # Returns a fresh array, does not mutate the passed lines.
-    prefixSize = float("inf")
-    newLines = []
-    spaceIndent = " " * tabSize
-    for line in lines:
-        prefix, rest = re.match(r"(\s*)(.*)", line).groups()
-        prefix = prefix.replace("\t", spaceIndent)
-        prefixSize = min(prefixSize, len(prefix))
-        newLines.append(prefix+rest)
-    for i,line in enumerate(newLines):
-        newLines[i] = line[prefixSize:]
-    return newLines
+    if not lines:
+        return []
+    prefix = reduce(commonPrefix, map(getWsPrefix, lines))
+    prefixLen = len(prefix)
+    return [line[prefixLen:] for line in lines]
+
+def commonPrefix(line1, line2):
+    prefixSoFar = ""
+    for i,char in enumerate(line1):
+        if i == len(line2):
+            break
+        if char == line2[i]:
+            prefixSoFar += char
+        else:
+            break
+    return prefixSoFar
+
+def getWsPrefix(line):
+    return re.match(r"(\s*)", line).group(1)
 
 def transformPre(lines, tagName, firstLine, **kwargs):
     # If the last line in the source is a </code></pre>,
