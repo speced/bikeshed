@@ -52,6 +52,7 @@ def transformDataBlocks(doc, lines):
             # Previous edits changed the number of lines
             # Kill this line, and adjust the line number for adding to tokens
             lineCountCorrection += int(match.group(1))
+            newLines.append(line)
             continue
         # Look for the start of a block.
         match = re.match(r"\s*<(pre|xmp)(.*)", line, re.I)
