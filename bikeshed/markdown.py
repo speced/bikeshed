@@ -90,7 +90,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
             continue
         match = re.match(r"\s*<({0})[ >]".format(rawElements), rawline)
         if match:
-            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
+            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':prefixLen(rawline, numSpacesForIndentation), 'line':i + lineCountCorrection})
             if re.search(r"</({0})>".format(match.group(1)), rawline):
                 # Element started and ended on same line, cool, don't need to do anything.
                 pass
