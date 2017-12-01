@@ -72,7 +72,7 @@ def transformDataBlocks(doc, lines):
             inBlock = False
             if startLine == i:
                 # Single-line <pre>.
-                match = re.match(r"\s*(<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line, re.I)
+                match = re.match(r"(\s*<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line, re.I)
                 if not match:
                     die("Can't figure out how to parse this datablock line:\n{0}".format(line))
                     continue
