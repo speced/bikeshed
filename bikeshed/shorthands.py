@@ -244,7 +244,7 @@ def biblioReplacer(match):
         type = "normative"
     else:
         type = "informative"
-    attrs = {"data-lt":term, "data-link-type":"biblio", "data-biblio-type":type}
+    attrs = {"data-lt":term, "data-link-type":"biblio", "data-biblio-type":type, "bs-autolink-syntax":match.group(0)}
     if status is not None:
         attrs['data-biblio-status'] = status.strip()
     return E.a(attrs,
@@ -272,13 +272,13 @@ def sectionReplacer(match):
         linkText = linkText[1:]
     if spec is None:
         # local section link
-        return E.a({"section":"", "href":section}, linkText)
+        return E.a({"section":"", "href":section, "bs-autolink-syntax":match.group(0)}, linkText)
     elif justPage is not None:
         # foreign link, to an actual page from a multipage spec
-        return E.span({"spec-section":justPage + "#", "spec":spec}, linkText)
+        return E.span({"spec-section":justPage + "#", "spec":spec, "bs-autolink-syntax":match.group(0)}, linkText)
     else:
         # foreign link
-        return E.span({"spec-section":section, "spec":spec}, linkText)
+        return E.span({"spec-section":section, "spec":spec, "bs-autolink-syntax":match.group(0)}, linkText)
 
 propdescRe = re.compile(r"""
                         (\\)?
@@ -306,7 +306,7 @@ def propdescReplacer(match):
         return E.span(match.group(0))
     if linkText is None:
         linkText = lt
-    return E.a({"data-link-type":linkType, "class":"property", "for": linkFor, "lt": lt}, linkText)
+    return E.a({"data-link-type":linkType, "class":"property", "for": linkFor, "lt": lt, "bs-autolink-syntax":match.group(0)}, linkText)
 
 idlRe = re.compile(r"""
                     (\\)?
@@ -332,7 +332,7 @@ def idlReplacer(match):
     if linkText is None:
         linkText = lt
     return E.code({"class":"idl", "nohighlight":""},
-                  E.a({"data-link-type":linkType, "for": linkFor, "lt":lt}, linkText))
+                  E.a({"data-link-type":linkType, "for": linkFor, "lt":lt, "bs-autolink-syntax":match.group(0)}, linkText))
 
 dfnRe = re.compile(r"""
                     (\\)?
@@ -349,7 +349,7 @@ def dfnReplacer(match):
         linkFor = "/"
     if linkText is None:
         linkText = lt
-    return E.a({"data-link-type":"dfn", "for": linkFor, "lt":lt}, linkText)
+    return E.a({"data-link-type":"dfn", "for": linkFor, "lt":lt, "bs-autolink-syntax":match.group(0)}, linkText)
 
 abstractRe = re.compile(r"""
                         (\\)?
@@ -366,7 +366,7 @@ def abstractReplacer(match):
         linkFor = "/"
     if linkText is None:
         linkText = lt
-    return E.a({"data-link-type":"abstract-op", "for": linkFor, "lt":lt}, linkText)
+    return E.a({"data-link-type":"abstract-op", "for": linkFor, "lt":lt, "bs-autolink-syntax":match.group(0)}, linkText)
 
 elementRe = re.compile(r"""
                         (?P<escape>\\)?
@@ -401,7 +401,7 @@ def elementReplacer(match):
     else:
         linkText = lt
     return E.code({},
-                  E.a({"data-link-type":linkType, "for": linkFor, "lt": lt}, linkText))
+                  E.a({"data-link-type":linkType, "for": linkFor, "lt": lt, "bs-autolink-syntax":match.group(0)}, linkText))
 
 varRe = re.compile(r"""
                     (\\)?
@@ -412,7 +412,7 @@ def varReplacer(match):
     escape, varText = match.groups()
     if escape:
         return match.group(0)[1:]
-    return E.var({}, varText)
+    return E.var({"bs-autolink-syntax":match.group(0)}, varText)
 
 inlineLinkRe = re.compile(r"""
                             (\\)?
@@ -427,6 +427,7 @@ def inlineLinkReplacer(match):
         attrs = {"href": href, "title":title}
     else:
         attrs = {"href": href}
+    attrs["bs-autolink-syntax"] = match.group(0)
     return E.a(attrs, text)
 
 strongRe = re.compile(r"""
@@ -435,7 +436,7 @@ strongRe = re.compile(r"""
                         (?!\s)([^*]+)(?!\s)
                         (?<!\\)\*\*""", re.X)
 def strongReplacer(match):
-    return E.strong(match.group(1))
+    return E.strong({"bs-autolink-syntax":match.group(0)}, match.group(1))
 
 emRe = re.compile(r"""
                     (?<!\\)
@@ -443,7 +444,7 @@ emRe = re.compile(r"""
                     (?!\s)([^*]+)(?!\s)
                     (?<!\\)\*""", re.X)
 def emReplacer(match):
-    return E.em(match.group(1))
+    return E.em({"bs-autolink-syntax":match.group(0)}, match.group(1))
 
 escapedRe = re.compile(r"\\\*")
 def escapedReplacer(match):

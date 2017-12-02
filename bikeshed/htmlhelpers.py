@@ -132,6 +132,8 @@ def innerHTML(el):
 def outerHTML(el):
     if el is None:
         return ''
+    if el.get("bs-autolink-syntax") is not None:
+        return el.get("bs-autolink-syntax")
     return html.tostring(el, with_tail=False, encoding="unicode")
 
 def serializeTag(el):
@@ -665,13 +667,22 @@ def replaceMacros(text, macros):
 
 def replaceAwkwardCSSShorthands(text):
     # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
-    text = re.sub("<<([^>\s]+)>>", r"<fake-production-placeholder class=production>\1</fake-production-placeholder>", text)
+    def replaceProduction(match):
+        syntaxAttr = escapeAttr(match.group(0))
+        text = match.group(1)
+        return "<fake-production-placeholder class=production bs-autolink-syntax='{0}'>{1}</fake-production-placeholder>".format(syntaxAttr, text)
+    text = re.sub(r"<<([^>\s]+)>>", replaceProduction, text)
 
     # Replace the ''maybe link'' shortcuts.
     # They'll survive the HTML parser,
     # but the current shorthand-recognizer code won't find them if they contain an element.
     # (The other shortcuts are "atomic" and can't contain elements.)
-    return re.sub(r"''([^=\n]+?)''", r'<fake-maybe-placeholder>\1</fake-maybe-placeholder>', text)
+    def replaceMaybe(match):
+        syntaxAttr = escapeAttr(match.group(0))
+        text = match.group(1)
+        return "<fake-maybe-placeholder bs-autolink-syntax='{0}'>{1}</fake-maybe-placeholder>".format(syntaxAttr, text)
+    text = re.sub(r"''([^=\n]+?)''", replaceMaybe, text)
+    return text
 
 
 def fixupIDs(doc, els):

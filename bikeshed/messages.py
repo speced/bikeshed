@@ -52,10 +52,14 @@ def linkerror(msg, *formatArgs, **namedArgs):
     lineNum = None
     suffix = ""
     if 'el' in namedArgs:
-        if namedArgs['el'].get("line-number"):
-            lineNum = namedArgs['el'].get("line-number")
+        el = namedArgs['el']
+        if el.get("line-number"):
+            lineNum = el.get("line-number")
         else:
-            suffix = "\n{0}".format(html.tostring(namedArgs['el'], with_tail=False, encoding="unicode"))
+            if el.get("bs-autolink-syntax"):
+                suffix = "\n{0}".format(el.get("bs-autolink-syntax"))
+            else:
+                suffix = "\n{0}".format(html.tostring(namedArgs['el'], with_tail=False, encoding="unicode"))
     elif namedArgs.get("lineNum", None):
         lineNum = namedArgs['lineNum']
     msg = formatMessage("link", msg.format(*formatArgs, **namedArgs)+suffix, lineNum=lineNum)

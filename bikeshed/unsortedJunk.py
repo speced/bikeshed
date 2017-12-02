@@ -1126,6 +1126,7 @@ def cleanupHTML(doc):
             removeAttr(el, 'data-noexport')
         if el.tag == "var":
             removeAttr(el, 'data-var-ignore')
+        removeAttr(el, 'bs-autolink-syntax')
         removeAttr(el, 'data-alternate-id')
         removeAttr(el, 'highlight')
         removeAttr(el, 'nohighlight')
