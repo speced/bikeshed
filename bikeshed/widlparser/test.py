@@ -247,6 +247,9 @@ callback callFoo2 = unsigned long long(unrestricted double one, DOMString two, F
 callback interface callMe {
     inherit attribute short round setraises (for the heck of it);
 };
+callback interface mixin callMeMixin {
+    long method();
+};
 
 [Exposed=(Window, Worker)] dictionary MyDictionary {
     any value = null;
@@ -285,6 +288,46 @@ interface OptionalTest {
   long methodWithRequiredDict(long one, FooDict requiredDict);
   long methodWithRequiredDict(long one, FooDict requiredDict, long three);
 };
+
+interface Interface {
+  attribute long hello;
+};
+
+interface mixin Mixin {
+  const double constantMember = 10.0;
+  readonly attribute long readOnlyAttributeMember;
+  DOMString? operationMember(long argument);
+  stringifier;
+};
+
+Interface includes Mixin;
+
+[NoInterfaceObject] Interface includes Mixin;
+
+interface mixin MixinCanNotIncludeAttribute {
+  attribute long attributeMember;
+};
+
+interface mixin MixinCanNotIncludeSpecialOperation {
+  getter long (unsigned long argument);
+};
+
+interface mixin MixinCanNotIncludeStaticMember {
+  static readonly attribute long staticReadOnlyAttributeMember;
+};
+
+interface mixin MixinCanNotIncludeIterable {
+  iterable<long>;
+};
+
+interface mixin MixinCanNotIncludeMaplike {
+  readonly maplike<DOMString, DOMString>;
+};
+
+interface mixin MixinCanNotIncludeSetlike {
+  readonly setlike<DOMString>;
+};
+
 """
 #    idl = idl.replace(' ', '  ')
     print("IDL >>>\n" + idl + "\n<<<")

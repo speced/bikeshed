@@ -1317,6 +1317,46 @@ class ChildProduction(Production):
         return self.parent.parser
 
 
+class ReadOnlyAttribute(ChildProduction):   # "readonly" AttributeRest
+    @classmethod
+    def peek(cls, tokens):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, 'readonly')):
+            return tokens.popPosition(AttributeRest.peek(tokens))
+        return tokens.popPosition(False)
+
+    def __init__(self, tokens, parent):
+        ChildProduction.__init__(self, tokens, parent)
+        self.attribute = AttributeRest(tokens)
+        self._didParse(tokens)
+
+    @property
+    def idlType(self):
+        return 'attribute'
+
+    @property
+    def stringifier(self):
+        return False
+
+    @property
+    def name(self):
+        return self.attribute.name
+
+    @property
+    def arguments(self):
+        return None
+
+    def _unicode(self):
+        return unicode(self.attribute)
+
+    def _markup(self, generator):
+        return self.attribute._markup(generator)
+
+    def __repr__(self):
+        output = '[attribute: '
+        return output + repr(self.attribute) + ']'
+
+
 class Attribute(ChildProduction):   # ["inherit"] AttributeRest
     @classmethod
     def peek(cls, tokens):

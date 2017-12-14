@@ -43,6 +43,8 @@ class Parser(object):
                 self.constructs.append(Callback(tokens, parser = self))
             elif (Interface.peek(tokens)):
                 self.constructs.append(Interface(tokens, parser = self))
+            elif (Mixin.peek(tokens)):
+                self.constructs.append(Mixin(tokens, parser = self))
             elif (Namespace.peek(tokens)):
                 self.constructs.append(Namespace(tokens, parser = self))
             elif (Dictionary.peek(tokens)):
@@ -55,6 +57,8 @@ class Parser(object):
                 self.constructs.append(Const(tokens, parser = self))
             elif (ImplementsStatement.peek(tokens)):
                 self.constructs.append(ImplementsStatement(tokens, parser = self))
+            elif (IncludesStatement.peek(tokens)):
+                self.constructs.append(IncludesStatement(tokens, parser = self))
             else:
                 self.constructs.append(SyntaxError(tokens, None, parser = self))
 
