@@ -752,7 +752,7 @@ def addSpecMetadataSection(doc):
             # so this prevents code from genning an extra wrapper <dd>.
             return [E.dt({"class": "editor"}, displayKey, ":")] + vals
         elif key == "Translations":
-            ret = [E.dt(displayKey, " ", E.small("(non-normative and likely out-of-date)"), ":")]
+            ret = [E.dt(displayKey, " ", E.small("(non-normative)"), ":")]
             ret += [E.dd({}, val) for val in vals]
             return ret
         else:
