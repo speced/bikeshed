@@ -99,11 +99,11 @@ class Spec(object):
         # Extract and process metadata
         self.lines, self.mdDocument = metadata.parse(lines=self.lines)
         self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
-        self.mdDefaults = metadata.fromJson(data=config.retrieveBoilerplateFile(self, 'defaults', error=True))
+        self.mdDefaults = metadata.fromJson(data=config.retrieveBoilerplateFile(self, 'defaults', error=True), source="defaults")
         self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
         self.md.fillTextMacros(self.macros, doc=self)
         computedMdText = replaceMacros(config.retrieveBoilerplateFile(self, 'computed-metadata', error=True), macros=self.macros)
-        self.mdOverridingDefaults = metadata.fromJson(data=computedMdText)
+        self.mdOverridingDefaults = metadata.fromJson(data=computedMdText, source="computed-metadata")
         self.md = metadata.join(self.md, self.mdOverridingDefaults)
         self.md.computeImplicitMetadata(doc=self)
         self.md.fillTextMacros(self.macros, doc=self)

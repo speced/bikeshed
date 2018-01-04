@@ -754,13 +754,16 @@ def fromCommandLine(overrides):
     return md
 
 
-def fromJson(data):
+def fromJson(data, source=""):
     md = MetadataManager()
     try:
         defaults = json.loads(data)
     except Exception, e:
         if data != "":
-            die("Error loading default metadata:\n{0}", str(e))
+            if source == "computed-metadata":
+                die("Error loading computed-metadata JSON.\nCheck if you need to JSON-escape some characters in a text macro?\n{0}", str(e))
+            else:
+                die("Error loading {1} JSON:\n{0}", str(e), source)
         return md
     for key,val in defaults.items():
         if isinstance(val, basestring):
@@ -769,7 +772,7 @@ def fromJson(data):
             for indivVal in val:
                 md.addData(key, indivVal)
         else:
-            die("Default metadata values must be strings or arrays of strings. '{0}' is something else.", key)
+            die("JSON metadata values must be strings or arrays of strings. '{0}' is something else.", key)
             return md
     return md
 
