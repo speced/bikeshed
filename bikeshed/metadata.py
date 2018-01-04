@@ -833,7 +833,7 @@ def join(*sources):
             mdentry = knownKeys[k]
             md.addParsedData(k, getattr(mdsource, mdentry.attrName))
         for k,v in mdsource.otherMetadata.items():
-            md.otherMetadata[k] = v
+            md.otherMetadata[k].extend(v)
     return md
 
 @attr.s(slots=True, frozen=True)
