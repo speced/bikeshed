@@ -24,9 +24,10 @@ from . import shorthands
 from . import markdown
 
 from .htmlhelpers import *
-from .unsortedJunk import *
+from .Line import Line
 from .messages import *
 from .refs import ReferenceManager
+from .unsortedJunk import *
 
 class Spec(object):
 
@@ -74,9 +75,9 @@ class Spec(object):
 
         try:
             if self.inputSource == "-":
-                self.lines = [unicode(line, encoding="utf-8") for line in sys.stdin.readlines()]
+                self.lines = [Line(i,unicode(line, encoding="utf-8")) for i,line in enumerate(sys.stdin.readlines(), 1)]
             else:
-                self.lines = io.open(self.inputSource, 'r', encoding="utf-8").readlines()
+                self.lines = [Line(i,l) for i,l in enumerate(io.open(self.inputSource, 'r', encoding="utf-8").readlines(), 1)]
                 # Initialize date to the last-modified date on the file,
                 # so processing repeatedly over time doesn't cause spurious date-only changes.
                 self.mdBaseline.addParsedData("Date", datetime.fromtimestamp(os.path.getmtime(self.inputSource)).date())
@@ -123,6 +124,7 @@ class Spec(object):
         # Deal with further <pre> blocks, and markdown
         self.lines = datablocks.transformDataBlocks(self, self.lines)
         self.lines = markdown.parse(self.lines, self.md.indent, opaqueElements=self.md.opaqueElements, blockElements=self.md.blockElements)
+        # Note that, currently, markdown.parse returns an array of strings, not of Line objects.
 
         self.refs.setSpecData(self.md)
 

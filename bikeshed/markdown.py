@@ -2,11 +2,14 @@
 from __future__ import division, unicode_literals
 import re
 from itertools import *
+
+from . import Line
 from .htmlhelpers import escapeAttr
 from .messages import *
 
 
 def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
+    lines = Line.rectify(lines)
     tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements, blockElements=blockElements)
     return parseTokens(tokens, numSpacesForIndentation)
 
@@ -45,8 +48,9 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
     opaqueElements += ["pre", "xmp", "script", "style"]
     rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
-    lineCountCorrection = 0
-    for i, rawline in enumerate(lines):
+    for l in lines:
+        i = l.i
+        rawline = l.text
 
         # Three kinds of "raw" elements, which prevent markdown processing inside of them.
         # 1. <pre> and manual opaque elements, which can contain markup and so can nest.
@@ -62,16 +66,16 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
             endTag = rawStack[-1]
             if endTag['type'] == "element" and re.search(endTag['tag'], rawline):
                 rawStack.pop()
-                tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
+                tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i})
                 continue
             elif endTag['type'] == "fenced" and re.match(r"\s*{0}{1}*\s*$".format(endTag['tag'], endTag['tag'][0]), rawline):
                 rawStack.pop()
-                tokens.append({'type':'raw', 'raw':"</xmp>", 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
+                tokens.append({'type':'raw', 'raw':"</xmp>", 'prefixlen':float('inf'), 'line':i})
                 continue
             elif not endTag['nest']:
                 # Just an internal line, but for the no-nesting elements,
                 # so guaranteed no more work needs to be done.
-                tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
+                tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i})
                 continue
 
         # We're either in a nesting raw element or not in a raw element at all,
@@ -86,11 +90,11 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
                 classAttr = " class='language-{0}'".format(escapeAttr(lang))
             else:
                 classAttr = ""
-            tokens.append({'type':'raw', 'raw':'<xmp{0}>'.format(classAttr), 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
+            tokens.append({'type':'raw', 'raw':'<xmp{0}>'.format(classAttr), 'prefixlen':float('inf'), 'line':i})
             continue
         match = re.match(r"\s*<({0})[ >]".format(rawElements), rawline)
         if match:
-            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':prefixLen(rawline, numSpacesForIndentation), 'line':i + lineCountCorrection})
+            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':prefixLen(rawline, numSpacesForIndentation), 'line':i})
             if re.search(r"</({0})>".format(match.group(1)), rawline):
                 # Element started and ended on same line, cool, don't need to do anything.
                 pass
@@ -99,16 +103,10 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
                 rawStack.append({'type':'element', 'tag':"</{0}>".format(match.group(1)), 'nest':nest})
             continue
         if rawStack:
-            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i + lineCountCorrection})
+            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i})
             continue
 
         line = rawline.strip()
-        match = re.match("<!--line count correction (-?\d+)-->", line)
-        if match:
-            # Previous edits changed the number of lines
-            # Kill this line, and adjust the line number for adding to tokens
-            lineCountCorrection += int(match.group(1))
-            continue
 
         if line == "":
             token = {'type':'blank', 'raw': '\n'}
@@ -164,7 +162,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
             token['prefixlen'] = float('inf')
         else:
             token['prefixlen'] = prefixLen(rawline, numSpacesForIndentation)
-        token['line'] = i + lineCountCorrection
+        token['line'] = i
         tokens.append(token)
         #print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
 
@@ -172,26 +170,29 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
 
 def stripComments(lines):
+    '''
+    Eagerly strip comments, because the serializer can't output them right now anyway,
+    and they trigger some funky errors.
+    '''
     output = []
     inComment = False
     wholeCommentLines = 0
     for line in lines:
-        # Eagerly strip comments, because the serializer can't output them right now anyway,
-        # and they trigger some funky errors
-        strippedLine, inComment = stripCommentsFromLine(line, inComment)
-        if (line != strippedLine and strippedLine.strip() == "") or (line.strip() == "" and inComment):
-            # We want to entirely skip lines who are completely composed of comments (and maybe whitespace).
-            # That way we don't, say, break paragraphs when we comment out their middle.
-            wholeCommentLines += 1
+        text, inComment = stripCommentsFromLine(line.text, inComment)
+        if (line.text != text and text.strip() == "") or (line.text.strip() == "" and inComment):
+            # First covers the entire line being stripped away by comment-removal.
+            # Second covers an empty line that was fully inside a comment.
+            # (If a comment started or ended on that line, it wouldn't start out empty.)
+            # By removing these entirely, we avoid breaking Markdown constructs with their middles commented out or something.
+            # (Rather than leaving them in as blank lines.)
             continue
         else:
             # Otherwise, just process whatever's left as normal.
-            if line.endswith("\n") and not strippedLine.endswith("\n"):
-                strippedLine += "\n"
-            if wholeCommentLines:
-                output.append("<!--line count correction {0}-->\n".format(wholeCommentLines-1))
-                wholeCommentLines = 0
-            output.append(strippedLine)
+            if line.text.endswith("\n") and not text.endswith("\n"):
+                # Put back the newline, in case it got swallowed by an unclosed comment.
+                text += "\n"
+            line.text = text
+            output.append(line)
     return output
 
 

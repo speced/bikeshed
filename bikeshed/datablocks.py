@@ -5,6 +5,7 @@ from collections import OrderedDict, defaultdict
 
 from . import biblio
 from . import config
+from . import Line
 from .htmlhelpers import *
 from .messages import *
 
@@ -25,6 +26,7 @@ from .messages import *
 
 
 def transformDataBlocks(doc, lines):
+    lines = Line.rectify(lines)
     inBlock = False
     blockTypes = {
         'propdef': transformPropdef,
@@ -42,82 +44,71 @@ def transformDataBlocks(doc, lines):
     }
     blockType = ""
     tagName = ""
-    startLine = 0
-    blockStartLine = None
-    lineCountCorrection = 0
+    blockLines = []
     newLines = []
-    for i, line in enumerate(lines):
-        match = re.match("<!--line count correction (-?\d+)-->", line)
-        if match:
-            # Previous edits changed the number of lines
-            # Kill this line, and adjust the line number for adding to tokens
-            lineCountCorrection += int(match.group(1))
-            newLines.append(line)
-            continue
+    for line in lines:
         # Look for the start of a block.
-        match = re.match(r"\s*<(pre|xmp)(.*)", line, re.I)
+        match = re.match(r"\s*<(pre|xmp)(.*)", line.text, re.I)
         if match and not inBlock:
             inBlock = True
-            startLine = i
             tagName = match.group(1)
             typeMatch = re.search("|".join(blockTypes.keys()), match.group(2))
             if typeMatch:
                 blockType = typeMatch.group(0)
             else:
                 blockType = "pre"
-            blockStartLine = i + lineCountCorrection
         # Look for the end of a block.
-        match = re.match(r"(.*)</" + tagName + ">(.*)", line, re.I)
+        match = re.match(r"(.*)</" + tagName + ">(.*)", line.text, re.I)
         if match and inBlock:
             inBlock = False
-            if startLine == i:
+            if len(blockLines) == 1:
                 # Single-line <pre>.
-                match = re.match(r"(\s*<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line, re.I)
+                match = re.match(r"(\s*<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line.text, re.I)
                 if not match:
-                    die("Can't figure out how to parse this datablock line:\n{0}".format(line))
+                    die("Can't figure out how to parse this datablock line:\n{0}", line.text, lineNum=line.i)
+                    blockLines = []
                     continue
                 repl = blockTypes[blockType](
                     lines=[match.group(2)],
                     tagName=tagName,
                     firstLine=match.group(1),
-                    lineNum=blockStartLine,
+                    lineNum=line.i,
                     doc=doc)
-                newLines.extend(repl)
-                if len(repl) != 1:
-                    newLines.append("<!--line count correction {0}-->".format(-len(repl) - 1))
-                newLines.append(match.group(3))
+                newLines.extend(Line.Line(line.i,l) for l in repl)
+                line.text = match.group(3)
+                newLines.append(line)
             elif re.match(r"^\s*$", match.group(1)):
                 # End tag was the first tag on the line.
                 # Remove the tag from the line.
                 repl = blockTypes[blockType](
-                    lines=cleanPrefix(lines[startLine + 1:i], doc.md.indent),
+                    lines=cleanPrefix([l.text for l in blockLines[1:]], doc.md.indent),
                     tagName=tagName,
-                    firstLine=lines[startLine],
-                    lineNum=blockStartLine,
+                    firstLine=blockLines[0].text,
+                    lineNum=blockLines[0].i,
                     doc=doc)
-                newLines.extend(repl)
-                if len(repl) != (i - startLine):
-                    newLines.append("<!--line count correction {0}-->".format((i - startLine) - len(repl) - 1))
-                newLines.append(match.group(2))
+                newLines.extend(Line.Line(blockLines[0].i, l) for l in repl)
+                line.text = match.group(2)
+                newLines.append(line)
             else:
                 # End tag was at the end of line of useful content.
                 # Process the stuff before it, preserve the stuff after it.
                 repl = blockTypes[blockType](
-                    lines=cleanPrefix(lines[startLine + 1:i] + [match.group(1)], doc.md.indent),
+                    lines=cleanPrefix([l.text for l in blockLines[1:]] + [match.group(1)], doc.md.indent),
                     tagName=tagName,
-                    firstLine=lines[startLine],
-                    lineNum=blockStartLine,
+                    firstLine=blockLines[0].text,
+                    lineNum=blockLines[0].i,
                     doc=doc)
-                newLines.extend(repl)
-                if len(repl) != (i - startLine):
-                    newLines.append("<!--line count correction {0}-->".format((i - startLine) - len(repl) - 1))
-                newLines.append(match.group(2))
+                newLines.extend(Line.Line(blockLines[0].i, l) for l in repl)
+                line.text = match.group(2)
+                newLines.append(line)
             tagName = ""
             blockType = ""
+            blockLines = []
             continue
         if inBlock:
-            continue
-        newLines.append(line)
+            blockLines.append(line)
+        else:
+            newLines.append(line)
 
     return newLines
 

@@ -79,8 +79,8 @@ class MarkdownCodeSpans(func.Functor):
 
 
 def stripBOM(doc):
-    if len(doc.lines) >= 1 and doc.lines[0][0:1] == "\ufeff":
-        doc.lines[0] = doc.lines[0][1:]
+    if len(doc.lines) >= 1 and doc.lines[0].text[0:1] == "\ufeff":
+        doc.lines[0].text = doc.lines[0].text[1:]
         warn("Your document has a BOM. There's no need for that, please re-save it without a BOM.")
 
 
@@ -1158,8 +1158,8 @@ def finalHackyCleanup(text):
 def hackyLineNumbers(lines):
     # Hackily adds line-number information to each thing that looks like an open tag.
     # This is just regex text-munging, so potentially dangerous!
-    for i,line in enumerate(lines):
-        lines[i] = re.sub(r"(^|[^<])(<[\w-]+)([ >])", r"\1\2 line-number={0}\3".format(i + 1), line)
+    for line in lines:
+        line.text = re.sub(r"(^|[^<])(<[\w-]+)([ >])", r"\1\2 line-number={0}\3".format(line.i), line.text)
     return lines
 
 

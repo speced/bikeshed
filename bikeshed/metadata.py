@@ -695,40 +695,35 @@ def parse(lines):
     newlines = []
     inMetadata = False
     lastKey = None
-    blockSize = 0
     endTag = None
     md = MetadataManager()
-    for i,line in enumerate(lines):
-        if not inMetadata and re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line):
-            blockSize = 1
+    for line in lines:
+        if not inMetadata and re.match(r"<(pre|xmp) [^>]*class=[^>]*metadata[^>]*>", line.text):
             inMetadata = True
             md.hasMetadata = True
-            if line.startswith("<pre"):
+            if line.text.startswith("<pre"):
                 endTag = r"</pre>\s*"
             else:
                 endTag = r"</xmp>\s*"
             continue
-        elif inMetadata and re.match(endTag, line):
-            newlines.append("<!--line count correction {0}-->".format(blockSize + 1))
-            blockSize = 0
+        elif inMetadata and re.match(endTag, line.text):
             inMetadata = False
             continue
         elif inMetadata:
-            blockSize += 1
-            if lastKey and (line.strip() == "" or re.match(r"\s+", line)):
+            if lastKey and (line.text.strip() == "" or re.match(r"\s+", line.text)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
-                md.addData(lastKey, line.lstrip(), lineNum=i + 1)
-            elif re.match(r"([^:]+):\s*(.*)", line):
-                match = re.match(r"([^:]+):\s*(.*)", line)
-                md.addData(match.group(1), match.group(2), lineNum=i + 1)
+                md.addData(lastKey, line.text.lstrip(), lineNum=line.i)
+            elif re.match(r"([^:]+):\s*(.*)", line.text):
+                match = re.match(r"([^:]+):\s*(.*)", line.text)
+                md.addData(match.group(1), match.group(2), lineNum=line.i)
                 lastKey = match.group(1)
             else:
-                die("Incorrectly formatted metadata line:\n{0}", line, lineNum=i + 1)
+                die("Incorrectly formatted metadata line:\n{0}", line.text, lineNum=line.i)
                 continue
-        elif re.match(r"\s*<h1[^>]*>.*?</h1>", line):
+        elif re.match(r"\s*<h1[^>]*>.*?</h1>", line.text):
             if md.title is None:
-                title = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line).group(1)
-                md.addData("Title", title, lineNum=i + 1)
+                title = re.match(r"\s*<h1[^>]*>(.*?)</h1>", line.text).group(1)
+                md.addData("Title", title, lineNum=line.i)
             newlines.append(line)
         else:
             newlines.append(line)
