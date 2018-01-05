@@ -5,8 +5,8 @@ from . import attr
 
 @attr.s(slots=True)
 class Line(object):
-	i = attr.ib()
-	text = attr.ib()
+	i = attr.ib(validator=[attr.validators.instance_of(int)])
+	text = attr.ib(validator=[attr.validators.instance_of(unicode)])
 
 def rectify(lines):
 	if any(isinstance(l, unicode) for l in lines):
