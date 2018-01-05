@@ -98,14 +98,19 @@ class Spec(object):
 
         # Extract and process metadata
         self.lines, self.mdDocument = metadata.parse(lines=self.lines)
+        # First load the metadata sources from 'local' data
         self.md = metadata.join(self.mdBaseline, self.mdDocument, self.mdCommandLine)
+        # Using that to determine the Group and Status, load the correct defaults.include boilerplate
         self.mdDefaults = metadata.fromJson(data=config.retrieveBoilerplateFile(self, 'defaults', error=True), source="defaults")
         self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdDocument, self.mdCommandLine)
+        # Using all of that, load up the text macros so I can sub them into the computed-metadata file.
         self.md.fillTextMacros(self.macros, doc=self)
         computedMdText = replaceMacros(config.retrieveBoilerplateFile(self, 'computed-metadata', error=True), macros=self.macros)
         self.mdOverridingDefaults = metadata.fromJson(data=computedMdText, source="computed-metadata")
-        self.md = metadata.join(self.md, self.mdOverridingDefaults)
+        self.md = metadata.join(self.mdBaseline, self.mdDefaults, self.mdOverridingDefaults, self.mdDocument, self.mdCommandLine)
+        # Finally, compute the "implicit" things.
         self.md.computeImplicitMetadata(doc=self)
+        # And compute macros again, in case the preceding steps changed them.
         self.md.fillTextMacros(self.macros, doc=self)
         self.md.validate()
         extensions.load(self)
