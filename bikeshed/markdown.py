@@ -248,7 +248,7 @@ def prefixLen(text, numSpacesForIndentation):
 def stripPrefix(token, numSpacesForIndentation, len):
     '''Removes len number of prefix groups'''
 
-    text = token['raw']
+    text = token['line'].text
 
     # Don't mess with "infinite" prefix lines
     if token['prefixlen'] == float('inf'):
