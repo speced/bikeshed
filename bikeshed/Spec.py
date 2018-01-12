@@ -96,7 +96,6 @@ class Spec(object):
         if self.lineNumbers:
             self.lines = hackyLineNumbers(self.lines)
         self.lines = markdown.stripComments(self.lines)
-
         # Extract and process metadata
         self.lines, self.mdDocument = metadata.parse(lines=self.lines)
         # First load the metadata sources from 'local' data
@@ -129,7 +128,7 @@ class Spec(object):
         self.refs.setSpecData(self.md)
 
         # Convert to a single string of html now, for convenience.
-        self.html = ''.join(self.lines)
+        self.html = ''.join(l.text for l in self.lines)
         boilerplate.addHeaderFooter(self)
         self.html = self.fixText(self.html)
 

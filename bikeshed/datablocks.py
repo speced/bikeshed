@@ -26,7 +26,10 @@ from .messages import *
 
 
 def transformDataBlocks(doc, lines):
-    lines = Line.rectify(lines)
+    fromStrings = False
+    if any(isinstance(l, unicode) for l in lines):
+        fromStrings = True
+        lines = [Line.Line(-1, l) for l in lines]
     inBlock = False
     blockTypes = {
         'propdef': transformPropdef,
@@ -110,7 +113,10 @@ def transformDataBlocks(doc, lines):
         else:
             newLines.append(line)
 
-    return newLines
+    if fromStrings:
+        return [l.text for l in newLines]
+    else:
+        return newLines
 
 def cleanPrefix(lines, tabSize):
     # Remove the longest common whitespace prefix from the lines.

@@ -9,9 +9,17 @@ from .messages import *
 
 
 def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
+    fromStrings = False
+    if any(isinstance(l, unicode) for l in lines):
+        fromStrings = True
+        lines = [Line.Line(-1, l) for l in lines]
     lines = Line.rectify(lines)
     tokens = tokenizeLines(lines, numSpacesForIndentation, features, opaqueElements=opaqueElements, blockElements=blockElements)
-    return parseTokens(tokens, numSpacesForIndentation)
+    html = parseTokens(tokens, numSpacesForIndentation)
+    if fromStrings:
+        return [l.text for l in html]
+    else:
+        return html
 
 
 def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
@@ -49,8 +57,6 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
     rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
     for l in lines:
-        i = l.i
-        rawline = l.text
 
         # Three kinds of "raw" elements, which prevent markdown processing inside of them.
         # 1. <pre> and manual opaque elements, which can contain markup and so can nest.
@@ -64,23 +70,24 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
             # Inside at least one raw element that turns off markdown.
             # First see if this line will *end* the raw element.
             endTag = rawStack[-1]
-            if endTag['type'] == "element" and re.search(endTag['tag'], rawline):
+            if endTag['type'] == "element" and re.search(endTag['tag'], l.text):
                 rawStack.pop()
-                tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i})
+                tokens.append({'type':'raw', 'prefixlen':float('inf'), 'line':l})
                 continue
-            elif endTag['type'] == "fenced" and re.match(r"\s*{0}{1}*\s*$".format(endTag['tag'], endTag['tag'][0]), rawline):
+            elif endTag['type'] == "fenced" and re.match(r"\s*{0}{1}*\s*$".format(endTag['tag'], endTag['tag'][0]), l.text):
                 rawStack.pop()
-                tokens.append({'type':'raw', 'raw':"</xmp>", 'prefixlen':float('inf'), 'line':i})
+                l.text = "</xmp>"
+                tokens.append({'type':'raw', 'prefixlen':float('inf'), 'line':l})
                 continue
             elif not endTag['nest']:
                 # Just an internal line, but for the no-nesting elements,
                 # so guaranteed no more work needs to be done.
-                tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i})
+                tokens.append({'type':'raw', 'prefixlen':float('inf'), 'line':l})
                 continue
 
         # We're either in a nesting raw element or not in a raw element at all,
         # so check if the line starts a new element.
-        match = re.match("\s*(`{3,}|~{3,})([^`]*)$", rawline)
+        match = re.match(r"\s*(`{3,}|~{3,})([^`]*)$", l.text)
         if match:
             rawStack.append({"type":"fenced", "tag":match.group(1), "nest":False})
             infoString = match.group(2).strip()
@@ -90,12 +97,13 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
                 classAttr = " class='language-{0}'".format(escapeAttr(lang))
             else:
                 classAttr = ""
-            tokens.append({'type':'raw', 'raw':'<xmp{0}>'.format(classAttr), 'prefixlen':float('inf'), 'line':i})
+            l.text = '<xmp{0}>'.format(classAttr)
+            tokens.append({'type':'raw', 'prefixlen':float('inf'), 'line':l})
             continue
-        match = re.match(r"\s*<({0})[ >]".format(rawElements), rawline)
+        match = re.match(r"\s*<({0})[ >]".format(rawElements), l.text)
         if match:
-            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':prefixLen(rawline, numSpacesForIndentation), 'line':i})
-            if re.search(r"</({0})>".format(match.group(1)), rawline):
+            tokens.append({'type':'raw', 'prefixlen':prefixLen(l.text, numSpacesForIndentation), 'line':l})
+            if re.search(r"</({0})>".format(match.group(1)), l.text):
                 # Element started and ended on same line, cool, don't need to do anything.
                 pass
             else:
@@ -103,68 +111,70 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
                 rawStack.append({'type':'element', 'tag':"</{0}>".format(match.group(1)), 'nest':nest})
             continue
         if rawStack:
-            tokens.append({'type':'raw', 'raw':rawline, 'prefixlen':float('inf'), 'line':i})
+            tokens.append({'type':'raw', 'prefixlen':float('inf'), 'line':l})
             continue
 
-        line = rawline.strip()
+        line = l.text.strip()
 
         if line == "":
-            token = {'type':'blank', 'raw': '\n'}
+            token = {'type':'blank',}
         # FIXME: Detect the heading ID from heading lines
         elif "headings" in features and re.match(r"={3,}\s*$", line):
             # h1 underline
             match = re.match(r"={3,}\s$", line)
-            token = {'type':'equals-line', 'raw': rawline}
+            token = {'type':'equals-line'}
         elif "headings" in features and re.match(r"-{3,}\s*$", line):
             # h2 underline
             match = re.match(r"-{3,}\s*$", line)
-            token = {'type':'dash-line', 'raw': rawline}
+            token = {'type':'dash-line'}
         elif "headings" in features and re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", line):
             # single-line heading
             match = re.match(r"(#{1,5})\s+(.+?)(\1\s*\{#[^ }]+\})?\s*$", line)
             level = len(match.group(1)) + 1
-            token = {'type':'heading', 'text': match.group(2).strip(), 'raw':rawline, 'level': level}
+            token = {'type':'heading', 'text': match.group(2).strip(), 'level': level}
             match = re.search(r"\{#([^ }]+)\}\s*$", line)
             if match:
                 token['id'] = match.group(1)
         elif re.match(r"((\*\s*){3,})$|((-\s*){3,})$|((_\s*){3,})$", line):
-            token = {'type':'rule', 'raw': rawline}
+            token = {'type':'rule'}
         elif re.match(r"-?\d+\.\s", line):
             match = re.match(r"(-?\d+)\.\s+(.*)", line)
-            token = {'type':'numbered', 'text': match.group(2), 'raw':rawline, 'num': int(match.group(1))}
+            token = {'type':'numbered', 'text': match.group(2), 'num': int(match.group(1))}
         elif re.match(r"-?\d+\.$", line):
-            token = {'type':'numbered', 'text': "", 'raw':rawline, 'num': int(line[:-1])}
+            token = {'type':'numbered', 'text': "", 'num': int(line[:-1])}
         elif re.match(r"[*+-]\s", line):
             match = re.match(r"[*+-]\s+(.*)", line)
-            token = {'type':'bulleted', 'text': match.group(1), 'raw':rawline}
+            token = {'type':'bulleted', 'text': match.group(1)}
         elif re.match(r"[*+-]$", line):
-            token = {'type':'bulleted', 'text': "", 'raw':rawline}
+            token = {'type':'bulleted', 'text': ""}
         elif re.match(r":{1,2}\s+", line):
             match = re.match(r"(:{1,2})\s+(.*)", line)
             type = 'dt' if len(match.group(1)) == 1 else 'dd'
-            token = {'type':type, 'text': match.group(2), 'raw':rawline}
+            token = {'type':type, 'text': match.group(2)}
         elif re.match(r":{1,2}$", line):
             match = re.match(r"(:{1,2})", line)
             type = 'dt' if len(match.group(1)) == 1 else 'dd'
-            token = {'type':type, 'text': "", 'raw':rawline}
+            token = {'type':type, 'text': ""}
         elif re.match(r">", line):
             match = re.match(r">\s?(.*)", line)
-            token = {'type':'blockquote', 'text':match.group(1), 'raw':rawline}
+            token = {'type':'blockquote', 'text':match.group(1)}
         elif re.match(r"<", line):
             if re.match(r"<<|<\{", line) or inlineElementStart(line):
-                token = {'type':'text', 'text': line, 'raw': rawline}
+                token = {'type':'text', 'text': line}
             else:
-                token = {'type':'htmlblock', 'raw': rawline}
+                token = {'type':'htmlblock'}
         else:
-            token = {'type':'text', 'text': line, 'raw': rawline}
+            token = {'type':'text', 'text': line}
 
         if token['type'] == "blank":
             token['prefixlen'] = float('inf')
         else:
-            token['prefixlen'] = prefixLen(rawline, numSpacesForIndentation)
-        token['line'] = i
+            token['prefixlen'] = prefixLen(l.text, numSpacesForIndentation)
+        token['line'] = l
         tokens.append(token)
-        #print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['raw'],
+
+    #for token in tokens:
+    #    print (" " * (11 - len(token['type']))) + token['type'] + ": " + token['line'].text.rstrip()
 
     return tokens
 
@@ -255,7 +265,7 @@ def stripPrefix(token, numSpacesForIndentation, len):
         elif text[offset:offset + numSpacesForIndentation] == " " * numSpacesForIndentation:
             offset += numSpacesForIndentation
         else:
-            die("Line {i} isn't indented enough (needs {0} indent{plural}) to be valid Markdown:\n\"{1}\"", len, text[:-1], plural="" if len == 1 else "s", i=token['line'])
+            die("Line {i} isn't indented enough (needs {0} indent{plural}) to be valid Markdown:\n\"{1}\"", len, text[:-1], plural="" if len == 1 else "s", i=token['line'].i)
     return text[offset:]
 
 
@@ -284,7 +294,7 @@ def parseTokens(tokens, numSpacesForIndentation):
         if stream.ended():
             break
         elif stream.currtype() in ('raw', 'htmlblock'):
-            lines.append(stream.currraw())
+            lines.append(stream.currline())
             stream.advance()
         elif stream.currtype() == 'heading':
             lines += parseSingleLineHeading(stream)
@@ -303,13 +313,18 @@ def parseTokens(tokens, numSpacesForIndentation):
         elif stream.currtype() == "blockquote":
             lines += parseBlockquote(stream)
         else:
-            lines.append(stream.currraw())
+            lines.append(stream.currline())
             stream.advance()
 
     #for line in lines:
-    #    print "«{0}»".format(line),
+    #    print "«{0}»".format(line.text.rstrip())
 
     return lines
+
+def lineFromStream(stream, text):
+    # Shortcut for when you're producing a new line from the currline in the stream,
+    # with some modified text.
+    return Line.Line(stream.currline().i,  text)
 
 # Each parser gets passed the stream
 # and must return the lines it returns.
@@ -322,7 +337,7 @@ def parseSingleLineHeading(stream):
         idattr = " id='{0}'".format(stream.currid())
     else:
         idattr = ""
-    lines = ["<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, **stream.curr())]
+    lines = [lineFromStream(stream, "<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, **stream.curr()))]
     stream.advance()
     return lines
 
@@ -341,13 +356,13 @@ def parseMultiLineHeading(stream):
     else:
         text = stream.currtext()
         idattr = ""
-    lines = ["<h{level} {idattr} >{htext}</h{level}>\n".format(idattr=idattr, level=level, htext=text, **stream.curr())]
+    lines = [lineFromStream(stream,  "<h{level} {idattr} >{htext}</h{level}>\n".format(idattr=idattr, level=level, htext=text, **stream.curr()))]
     stream.advance(2)
     return lines
 
 
 def parseHorizontalRule(stream):
-    lines = ["<hr>\n"]
+    lines = [lineFromStream(stream,  "<hr>\n")]
     stream.advance()
     return lines
 
@@ -378,13 +393,13 @@ def parseParagraph(stream):
             p = "<p data-remote-issue-id='%s' class='replace-with-issue-class'>" % match.group(1)
         else:
             p = "<p>"
-    lines = ["{0}{1}\n".format(p, line)]
+    lines = [lineFromStream(stream, "{0}{1}\n".format(p, line))]
     while True:
         stream.advance()
         if stream.currtype() not in ["text"] or stream.currprefixlen() < initialPrefixLen:
-            lines[-1] = lines[-1].rstrip() + endTag + "\n"
+            lines[-1].text = lines[-1].text.rstrip() + endTag + "\n"
             return lines
-        lines.append(stream.currraw())
+        lines.append(stream.currline())
 
 
 def parseBulleted(stream):
@@ -395,7 +410,7 @@ def parseBulleted(stream):
         # Assumes it's being called with curr being a bulleted line.
         # Remove the bulleted part from the line
         firstLine = stream.currtext() + "\n"
-        lines = [firstLine]
+        lines = [lineFromStream(stream,  firstLine)]
         while True:
             stream.advance()
             # All the conditions that indicate we're *past* the end of the item.
@@ -408,7 +423,7 @@ def parseBulleted(stream):
             if stream.currtype() == 'eof':
                 return lines
             # Remove the prefix from each line before adding it.
-            lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1))
+            lines.append(lineFromStream(stream,  stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1)))
 
     def getItems(stream):
         while True:
@@ -423,12 +438,12 @@ def parseBulleted(stream):
                 stream.advance()
             yield parseItem(stream)
 
-    lines = ["<ul data-md>"]
+    lines = [Line.Line(-1,  "<ul data-md>")]
     for li_lines in getItems(stream):
-        lines.append("<li data-md>")
+        lines.append(Line.Line(-1, "<li data-md>"))
         lines.extend(parse(li_lines, numSpacesForIndentation))
-        lines.append("</li>")
-    lines.append("</ul>")
+        lines.append(Line.Line(-1, "</li>"))
+    lines.append(Line.Line(-1, "</ul>"))
     return lines
 
 
@@ -440,7 +455,7 @@ def parseNumbered(stream, start=1):
         # Assumes it's being called with curr being a numbered line.
         # Remove the numbered part from the line
         firstLine = stream.currtext() + "\n"
-        lines = [firstLine]
+        lines = [lineFromStream(stream, firstLine)]
         while True:
             stream.advance()
             # All the conditions that indicate we're *past* the end of the item.
@@ -453,7 +468,7 @@ def parseNumbered(stream, start=1):
             if stream.currtype() == 'eof':
                 return lines
             # Remove the prefix from each line before adding it.
-            lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1))
+            lines.append(lineFromStream(stream, stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1)))
 
     def getItems(stream):
         while True:
@@ -469,14 +484,14 @@ def parseNumbered(stream, start=1):
             yield parseItem(stream)
 
     if start == 1:
-        lines = ["<ol data-md>"]
+        lines = [Line.Line(-1, "<ol data-md>")]
     else:
-        lines = ["<ol data-md start='{0}'>".format(start)]
+        lines = [Line.Line(-1, "<ol data-md start='{0}'>".format(start))]
     for li_lines in getItems(stream):
-        lines.append("<li data-md>")
+        lines.append(Line.Line(-1, "<li data-md>"))
         lines.extend(parse(li_lines, numSpacesForIndentation))
-        lines.append("</li>")
-    lines.append("</ol>")
+        lines.append(Line.Line(-1, "</li>"))
+    lines.append(Line.Line(-1, "</ol>"))
     return lines
 
 
@@ -488,7 +503,7 @@ def parseDl(stream):
         # Assumes it's being called with curr being a :/:: prefixed line.
         firstLine = stream.currtext() + "\n"
         type = stream.currtype()
-        lines = [firstLine]
+        lines = [lineFromStream(stream, firstLine)]
         while True:
             stream.advance()
             # All the conditions that indicate we're *past* the end of the item.
@@ -501,7 +516,7 @@ def parseDl(stream):
             if stream.currtype() == 'eof':
                 return type, lines
             # Remove the prefix from each line before adding it.
-            lines.append(stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1))
+            lines.append(lineFromStream(stream, stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1)))
 
     def getItems(stream):
         while True:
@@ -516,31 +531,31 @@ def parseDl(stream):
                 stream.advance()
             yield parseItem(stream)
 
-    lines = ["<dl data-md>"]
+    lines = [Line.Line(-1, "<dl data-md>")]
     for type, di_lines in getItems(stream):
-        lines.append("<{0} data-md>".format(type))
+        lines.append(Line.Line(-1, "<{0} data-md>".format(type)))
         lines.extend(parse(di_lines, numSpacesForIndentation))
-        lines.append("</{0}>".format(type))
-    lines.append("</dl>")
+        lines.append(Line.Line(-1, "</{0}>".format(type)))
+    lines.append(Line.Line(-1, "</dl>"))
     return lines
 
 
 def parseBlockquote(stream):
     prefixLen = stream.currprefixlen()
-    lines = [stream.currtext()+"\n"]
+    lines = [lineFromStream(stream, stream.currtext()+"\n")]
     while True:
         stream.advance()
         if stream.currprefixlen() < prefixLen:
             break
         if stream.currtype() in ["blockquote", "text"]:
-            lines.append(stream.currtext()+"\n")
+            lines.append(lineFromStream(stream, stream.currtext()+"\n"))
         else:
             break
-    return ["<blockquote>\n"] + parse(lines, stream.numSpacesForIndentation) + ["</blockquote>\n"]
+    return [Line.Line(-1, "<blockquote>\n")] + parse(lines, stream.numSpacesForIndentation) + [Line.Line(-1, "</blockquote>\n")]
 
 
 class TokenStream:
-    def __init__(self, tokens, numSpacesForIndentation, before={'type':'blank','raw':'\n','prefixlen':0}, after={'type':'eof','raw':'','prefixlen':0}):
+    def __init__(self, tokens, numSpacesForIndentation, before={'type':'blank','prefixlen':0}, after={'type':'eof','prefixlen':0}):
         self.tokens = tokens
         self.i = 0
         self.numSpacesForIndentation = numSpacesForIndentation
@@ -589,6 +604,6 @@ class TokenStream:
                 if attrName in tok:
                     return tok[attrName]
                 else:
-                    return tok['raw']
                     raise AttributeError(attrName)
+                    return tok['raw']
             return _missing
