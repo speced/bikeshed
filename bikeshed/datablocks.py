@@ -64,7 +64,7 @@ def transformDataBlocks(doc, lines):
         match = re.match(r"(.*)</" + tagName + ">(.*)", line.text, re.I)
         if match and inBlock:
             inBlock = False
-            if len(blockLines) == 1:
+            if len(blockLines) == 0:
                 # Single-line <pre>.
                 match = re.match(r"(\s*<{0}[^>]*>)(.*)</{0}>(.*)".format(tagName), line.text, re.I)
                 if not match:
@@ -95,6 +95,8 @@ def transformDataBlocks(doc, lines):
             else:
                 # End tag was at the end of line of useful content.
                 # Process the stuff before it, preserve the stuff after it.
+                print blockLines
+                print line
                 repl = blockTypes[blockType](
                     lines=cleanPrefix([l.text for l in blockLines[1:]] + [match.group(1)], doc.md.indent),
                     tagName=tagName,
