@@ -52,6 +52,8 @@ def transformDataBlocks(doc, lines):
     for line in lines:
         # Look for the start of a block.
         match = re.match(r"\s*<(pre|xmp)(.*)", line.text, re.I)
+        # Note that, by design, I don't pay attention to anything on the same line as the start tag,
+        # unless it's single-line.
         if match and not inBlock:
             inBlock = True
             tagName = match.group(1)
@@ -95,8 +97,6 @@ def transformDataBlocks(doc, lines):
             else:
                 # End tag was at the end of line of useful content.
                 # Process the stuff before it, preserve the stuff after it.
-                print blockLines
-                print line
                 repl = blockTypes[blockType](
                     lines=cleanPrefix([l.text for l in blockLines[1:]] + [match.group(1)], doc.md.indent),
                     tagName=tagName,
@@ -110,10 +110,13 @@ def transformDataBlocks(doc, lines):
             blockType = ""
             blockLines = []
             continue
-        if inBlock:
+        elif inBlock:
             blockLines.append(line)
         else:
             newLines.append(line)
+
+    #for line in newLines:
+    #    print line
 
     if fromStrings:
         return [l.text for l in newLines]
