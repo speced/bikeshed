@@ -165,10 +165,10 @@ def addImplicitAlgorithms(doc):
     # If a container has an empty `algorithm` attribute,
     # but it contains only a single `<dfn>`,
     # assume that the dfn is a description of the algorithm.
-    for el in findAll("[algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
+    for el in findAll("[data-algorithm='']:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6)", doc):
         dfns = findAll("dfn", el)
         if len(dfns) == 1:
-            el.set("algorithm", config.firstLinkTextFromElement(dfns[0]))
+            el.set("data-algorithm", config.firstLinkTextFromElement(dfns[0]))
         elif len(dfns) == 0:
             die("Algorithm container has no name, and there is no <dfn> to infer one from.", el=el)
         else:
