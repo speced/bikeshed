@@ -19,9 +19,10 @@ from . import HTMLSerializer
 from . import idl
 from . import lint
 from . import markdown
+from . import markdown
 from . import metadata
 from . import shorthands
-from . import markdown
+from . import wpt
 
 from .htmlhelpers import *
 from .Line import Line
@@ -168,6 +169,7 @@ class Spec(object):
         processIssuesAndExamples(self)
         idl.markupIDL(self)
         inlineRemoteIssues(self)
+        wpt.processWptElements(self)
 
         # Handle all the links
         processBiblioLinks(self)

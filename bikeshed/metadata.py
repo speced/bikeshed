@@ -99,6 +99,7 @@ class MetadataManager:
         self.versionHistory = []
         self.warning = None
         self.workStatus = None
+        self.wptDisplay = "none"
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -686,6 +687,14 @@ def parseMetadataOrder(key, val, lineNum):
     return pieces
 
 
+def parseWptDisplay(key, val, lineNum):
+    val = val.lower()
+    if val in ("none", "inline"):
+        return val
+    die("WPT Display metadata only accepts the values 'none' or 'inline'. Got '{0}'.", val, lineNum=lineNum)
+    return "none"
+
+
 def parse(lines):
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
@@ -943,5 +952,6 @@ knownKeys = {
     "Use Dfn Panels": Metadata("Use Dfn Panels", "useDfnPanels", joinValue, parseBoolean),
     "Version History": Metadata("Version History", "versionHistory", joinList, parseLiteralList),
     "Warning": Metadata("Warning", "warning", joinValue, parseWarning),
-    "Work Status": Metadata("Work Status", "workStatus", joinValue, parseWorkStatus)
+    "Work Status": Metadata("Work Status", "workStatus", joinValue, parseWorkStatus),
+    "Wpt Display": Metadata("Wpt Display", "wptDisplay", joinValue, parseWptDisplay)
 }
