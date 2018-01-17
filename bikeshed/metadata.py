@@ -100,6 +100,7 @@ class MetadataManager:
         self.warning = None
         self.workStatus = None
         self.wptDisplay = "none"
+        self.wptPathPrefix = None
 
         self.otherMetadata = DefaultOrderedDict(list)
 
@@ -953,5 +954,6 @@ knownKeys = {
     "Version History": Metadata("Version History", "versionHistory", joinList, parseLiteralList),
     "Warning": Metadata("Warning", "warning", joinValue, parseWarning),
     "Work Status": Metadata("Work Status", "workStatus", joinValue, parseWorkStatus),
-    "Wpt Display": Metadata("Wpt Display", "wptDisplay", joinValue, parseWptDisplay)
+    "Wpt Display": Metadata("Wpt Display", "wptDisplay", joinValue, parseWptDisplay),
+    "Wpt Path Prefix": Metadata("Wpt Path Prefix", "wptPathPrefix", joinValue, parseLiteral)
 }
