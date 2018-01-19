@@ -1,0 +1,292 @@
+<pre class=metadata>
+Title: Long Tasks API
+Group: webperf
+Status: ED
+Shortname: longtasks
+Level: 1
+URL: https://w3c.github.io/longtasks/
+Editor: Shubhie Panicker, Google https://google.com, panicker@chromium.org
+Editor: Ilya Grigorik, Google https://google.com, igrigorik@chromium.org
+Editor: Domenic Denicola, Google https://google.com, domenic@chromium.org
+Repository: w3c/longtasks
+Test Suite: http://w3c-test.org/longtask-timing/
+Abstract: This document defines an API that web page authors can use to detect presence of “long tasks” that monopolize the UI thread for extended periods of time and block other critical tasks from being executed - e.g. reacting to user input.
+Status Text: If you wish to make comments regarding this document, please send them to  <a href="mailto:public-web-perf@w3.org?subject=%5BLongTasks%5D">public-web-perf@w3.org</a> (<a href="mailto:public-web-perf-request@w3.org?subject=subscribe">subscribe</a>, <a href="https://lists.w3.org/Archives/Public/public-web-perf/">archives</a>) with <code nohighlight>[LongTasks]</code> at the start of your email's subject.
+Default Highlight: js
+</pre>
+
+<pre class=anchors>
+urlPrefix: https://w3c.github.io/performance-timeline/; spec: PERFORMANCE-TIMELINE-2;
+    type: interface; url: #the-performanceentry-interface; text: PerformanceEntry;
+    type: attribute; for: PerformanceEntry;
+        text: name; url: #dom-performanceentry-name
+        text: entryType; url: #dom-performanceentry-entrytype
+        text: startTime; url: #dom-performanceentry-starttime
+        text: duration; url: #dom-performanceentry-duration
+urlPrefix: https://w3c.github.io/hr-time/#idl-def-domhighrestimestamp; spec: HR-TIME-2; type: typedef; text: DOMHighResTimeStamp
+</pre>
+
+Introduction {#intro}
+=====================
+
+As the page is loading and while the user is interacting with the page afterwards, both the application and browser, queue various events that are then executed by the browser -- e.g. user agent schedules input events based on user’s activity, the application schedules callbacks for requestAnimationFrame and other callbacks etc. Once in the queue, these events are then dequeued one-by-one by the browser and executed.
+
+However, some task can take a long time (multiple frames), and if and when that happens, the UI thread is locked and all other tasks are blocked as well. To the user this is commonly visible as a “locked up” page where the browser is unable to respond to user input; this is a major source of bad user experience on the web today:
+
+: Delayed “time to Interactive”:
+:: while the page is loading long tasks often tie up the main thread and prevent the user from interactive with the page even though the page is visually rendered. Poorly designed third-party content is a frequent culprit.
+
+: High/variable input latency:
+:: critical user interaction events (tap, click, scroll, wheel, etc) are queued behind long tasks, which yields janky and unpredictable user experience.
+
+: High/variable event handling latency:
+:: similar to input, but for processing event callbacks (e.g. onload events, and so on), which delay application updates.
+
+: Janky animations and scrolling:
+:: some animation and scrolling interactions require coordination between compositor and main threads; if the main thread is blocked due to a long task, it can affect responsiveness of animations and scrolling.
+
+Some applications (and RUM vendors) are already attempting to identify and track cases where “long tasks” happen. For example, one known pattern is to install a ~short periodic timer and inspect the elapsed time between the successive calls: if the elapsed time is greater than the timer period, then there is high likelihood that one or more long tasks have delayed execution of the timer. This mostly works, but it has several bad performance implications: the application is polling to detect long tasks, which prevents quiescence and long idle blocks (see requestIdleCallback); it’s bad for battery life; there is no way to know who caused the delay (e.g. first party vs third party code)
+
+RAIL performance model suggests that applications should respond in under 100ms to user input; for touch move and scrolling in under 16ms. Our goal with this API is to surface notifications about tasks that may prevent the application from hitting these targets.
+
+Usage Example {#example}
+------------------------
+
+<pre class="example highlight">
+    var observer = new PerformanceObserver(function(list) {
+        var perfEntries = list.getEntries();
+        for (var i = 0; i < perfEntries.length; i++) {
+            // Process long task notifications:
+            // report back for analytics and monitoring
+            // ...
+        }
+    });
+    // register observer for long task notifications
+    observer.observe({entryTypes: ["longtask"]});
+    // Long script execution after this will result in queueing
+    // and receiving “longtask” entries in the observer.
+</pre>
+
+Terminology {#sec-terminology}
+==============================
+
+<dfn export>Long task</dfn> refers to an event loop task that exceeds 50ms.
+
+<dfn>Frame</dfn> or <dfn>frame context</dfn> refers to the browsing context, such as iframe (not animation frame), embed or object in which some work (such as script or layout) occurs.
+
+<dfn>Culprit frame</dfn> refers to the browsing context (iframe, embed or object etc) that is being implicated, on the whole, for a long task.
+
+<dfn>Attribution</dfn> refers to identifying the type of work (such as script, layout etc.) that contributed significantly to the long task AND which browsing context is responsible for that work.
+
+Long Task Timing {#sec-longtask-timing}
+=======================================
+
+Long Task timing involves the following new interfaces
+
+{{PerformanceLongTaskTiming}} interface {#sec-PerformanceLongTaskTiming}
+------------------------------------------------------------------------
+
+<pre class="idl">
+    interface PerformanceLongTaskTiming : PerformanceEntry {
+        readonly attribute FrozenArray&lt;TaskAttributionTiming> attribution;
+    };
+</pre>
+
+{{PerformanceLongTaskTiming}} extends the following attributes of {{PerformanceEntry}} interface:
+
+* The {{PerformanceEntry/name}} attribute must return {{DOMString}} for minimal frame attribution. Possible values of name are:
+
+    * <code>self</code>: long task is from within my own frame
+    * <code>same-origin-ancestor</code>: long task is from a same-origin ancestor frame
+    * <code>same-origin-descendant</code>: long task is from a same-origin descendant frame
+    * <code>same-origin</code>: long task is from an unreachable same-origin frame
+    * <code>cross-origin-ancestor</code>: long task is from a cross-origin ancestor frame
+    * <code>cross-origin-descendant</code>: long task is from a cross-origin descendant frame
+    * <code>cross-origin-unreachable</code>: long task is from a cross-origin unreachable frame
+    * <code>multiple-contexts</code>: multiple frame contexts were involved in the long task
+    * <code>unknown</code>: none of the above
+* The {{PerformanceEntry/entryType}} attribute must return <code>"longtask"</code>.
+* The {{PerformanceEntry/startTime}} attribute MUST return a {{DOMHighResTimeStamp}} of when the task started.
+* The {{PerformanceEntry/duration}} attribute MUST return a {{DOMHighResTimeStamp}} equal to the elapsed time between the start and end of task
+
+{{PerformanceLongTaskTiming}} adds the following attributes:
+
+* The <dfn attribute for=PerformanceEntry>attribution</dfn> field returns a sequence of {{TaskAttributionTiming}} entries.
+
+{{TaskAttributionTiming}} interface {#sec-TaskAttributionTiming}
+----------------------------------------------------------------
+
+<pre class="def idl">
+    interface TaskAttributionTiming : PerformanceEntry {
+        readonly attribute DOMString containerType;
+        readonly attribute DOMString containerSrc;
+        readonly attribute DOMString containerId;
+        readonly attribute DOMString containerName;
+    };
+</pre>
+
+{{TaskAttributionTiming}} extends the following attributes of {{PerformanceEntry}} interface:
+
+* The {{PerformanceEntry/name}} attribute must return {{DOMString}} indicating type of attribution. Currently this can <code>"script"</code>.
+* The {{PerformanceEntry/entryType}} attribute must return {{DOMString}} <code>"taskattribution"</code>
+* The {{PerformanceEntry/startTime}} attribute MUST return 0.
+* The {{PerformanceEntry/duration}} attribute MUST return 0.
+
+{{TaskAttributionTiming}} adds the following attributes:
+
+<ul dfn-type=attribute dfn-for=TaskAttributionTiming>
+    * The <dfn>containerType</dfn> attribute must return {{DOMString}} with type of frame container, such as <code>"iframe"</code>, <code>"embed"</code>, <code>"object"</code>.
+    * The <dfn>containerName</dfn> attribute must return {{DOMString}} with container's <code>name</code> attribute.
+    * The <dfn>containerId</dfn> attribute must return {{DOMString}} with container's <code>id</code> attribute.
+    * The <dfn>containerSrc</dfn> attribute must return {{DOMString}} with container's <code>src</code> attribute.
+</ul>
+
+Pointing to the culprit {#sec-PointingToCulprit}
+------------------------------------------------
+
+Long task represents the top level event loop task. Within this task, different types of work (such as script, layout, style etc) may be done, and they could be executed within different frame contexts. The type of work could also be global in nature such as a long GC that is process or frame-tree wide.
+
+Thus pointing to the culprit has couple of facets:
+
+* Pointing to the overall frame to blame for the long task on the whole: this is refered to as "minimal frame attribution" and is captured in the {{PerformanceEntry/name}} field
+* Pointing to the type of work involved in the task, and its associated frame context: this is captured in {{TaskAttributionTiming}} objects in the {{PerformanceLongTaskTiming/attribution}} field of {{PerformanceLongTaskTiming}}
+
+Therefore, {{PerformanceEntry/name}} and {{PerformanceLongTaskTiming/attribution}} fields on {{PerformanceLongTaskTiming}} together paint the picture for where the blame rests for a long task.
+When delivering this information the web origin-policy must be adhered to.
+
+As an illustration, the {{TaskAttributionTiming}} entry in {{PerformanceLongTaskTiming/attribution}} is populated with "script" work, and the container or frame implicated in attribution should match up with the {{PerformanceEntry/name}} as follows:
+
+<table>
+    <thead>
+        <tr>
+            <th>value of {{PerformanceEntry/name}}</th>
+            <th>culprit frame implicated in {{PerformanceLongTaskTiming/attribution}}</th>
+    <tbody>
+        <tr>
+            <td><code>self</code>
+            <td>empty
+        <tr>
+            <td><code>same-origin-ancestor</code>
+            <td>same-origin culprit frame
+        <tr>
+            <td><code>same-origin-descendant</code>
+            <td>same-origin culprit frame
+        <tr>
+            <td><code>same-origin</code>
+            <td>same-origin culprit frame
+        <tr>
+            <td><code>cross-origin-ancestor</code>
+            <td>empty
+        <tr>
+            <td><code>cross-origin-descendant</code>
+            <td>empty
+        <tr>
+            <td><code>cross-origin-unreachable</code>
+            <td>empty
+        <tr>
+            <td><code>multiple-contexts</code>
+            <td>empty
+        <tr>
+            <td><code>unknown</code>
+            <td>empty
+</table>
+
+Processing Model {#sec-processing-model}
+========================================
+
+Modifications to other specifications {#mod}
+--------------------------------------------
+
+### HTML: <a href="https://html.spec.whatwg.org/#definitions-3">event loop definitions</a> ### {#html-event-loop-dfn}
+
+Each task gets an associated <dfn for="task">start time</dfn>, <dfn for="task">end time</dfn>, and <dfn for="task">script evaluation environment settings</dfn> object set.
+
+### HTML: <a href>event loop processing model</a> ### {#html-event-loop-processing}
+
+Before Step #3:
+
+* Set the selected task's [=task/start time=] to be the value that would be returned by the {{Performance}} object's {{Performance/now()}} method.
+
+After Step #3:
+
+* Set the selected task's [=task/end time=] to the value be the value that would be returned by the {{Performance}} object's {{Performance/now()}} method.
+* Execute the [[#report-long-tasks]] algorithm (below), passing in the selected task.
+
+### HTML: <a href="https://html.spec.whatwg.org/#calling-scripts">calling scripts</a> ### {#html-calling-scripts}
+
+In <a href="https://html.spec.whatwg.org/#prepare-to-run-script">prepare to run script</a>, add a step at the end to add settings to the currently running task's [=task/script evaluation environment settings=] object set.
+
+Additions to the Long Task Spec {#sec-additions-to-spec}
+--------------------------------------------------------
+
+<h4 dfn>Report Long Tasks</h4>
+
+Given a task |task|, perform the following algorithm:
+
+1. If |end time| minus |start time| is less than the long tasks threshold of 50 ms, abort these steps.
+
+2. Let |destinationRealms| be an empty set.
+
+3. Determine the set of JavaScript Realms to which reports will be delivered:
+
+    For each environment settings object |settings| in task's script evaluation environment settings object set:
+
+    1. Let |topmostBC| be |settings|'s responsible browsing context's top-level browsing context.
+    2. Add |topmostBC|'s Window's relevant Realm to |destinationRealms|.
+    3. Let |descendantBCs| be |topmostBC|'s active document's list of descendant browsing contexts.
+    4. For each |descendantBC| in |descendantBCs|, add |descendantBC|'s Window's relevant Realm to |destinationRealms|.
+
+4. For each |destinationRealm| in |destinationRealms|:
+
+    1. Let |name| be the empty string. This will be used to report minimal frame attribution, below.
+    2. Let |culpritSettings| be null.
+    3. Process task's script evaluation environment settings object set to determine |name| and |culpritSettings| as follows:
+
+        1. If task's script evaluation environment settings object set is empty: set |name| to <code>“unknown”</code> and |culpritSettings| to <code>null</code>.
+        2. If task's script evaluation environment settings object set's length is greater than one: set |name| to <code>"multiple-contexts”</code> and |culpritSettings| to <code>null</code>.
+        3. If task's script evaluation environment settings object set's length is one:
+            1. Set |culpritSettings| to the single item in task's script evaluation environment settings object set.
+            2. Let |destinationOrigin| be |destinationRealm|'s relevant settings object's origin.
+            3. Let |destinationBC| be |destinationRealm|'s relevant settings object's responsible browsing context.
+            4. If |culpritSettings|'s origin and |destinationOrigin| are [same origin]:
+                1. If |culpritSettings|'s responsible browsing context is an ancestor of |destinationBC|, set name to <code>“same-origin-ancestor”</code>.
+                2. If |culpritSettings|'s responsible browsing context is a descendant of |destinationBC|, set name to <code>“same-origin-descendant”</code>.
+            5. Otherwise:
+                1. If |culpritSettings|'s responsible browsing context is an ancestor of |destinationBC|, set name to <code>“cross-origin-ancestor”</code> and set |culpritSettings| to <code>null</code>.
+
+                    NOTE: this is not reported because of security. Developers should look this up themselves.
+
+                2. If |culpritSettings|'s responsible browsing context is a descendant of |destinationBC|, set name to <code>“cross-origin-descendant”</code>.
+
+5. Create a new {{TaskAttributionTiming}} object |attribution| and set its attributes as follows:
+    1. Set |attribution|'s name attribute to <code>"script"</code>.
+    2. Set |attribution|'s entryType attribute to <code>“taskattribution”</code>
+    3. Set |attribution|'s startTime and duration to 0.
+    4. If |culpritSettings| is not null, and |culpritSettings|'s responsible browsing context has a browsing context container that is an iframe element, then let iframe be that element, and perform the following steps:
+        1. Set |attribution|'s frameName attribute to the value of iframe's name content attribute, or null if the attribute is absent.
+        2. Set |attribution|'s frameSrc attribute to the value of iframe's src content attribute, or null if the attribute is absent.
+
+            NOTE: it is intentional that we record the frame's src attribute here, and not its current URL, as this is meant primarily to help identify frames, and allowing discovery of the current URL of a cross-origin iframe is a security problem.
+        3. Set |attribution|'s frameId attribute to the value of iframe's id content attribute, or <code>null</code> if the attribute is absent.
+
+6. Create a new {{PerformanceLongTaskTiming}} object |newEntry| and set its attributes as follows:
+
+    1. Set |newEntry|'s {{PerformanceEntry/name}} attribute to |name|.
+    2. Set |newEntry|'s {{PerformanceEntry/entryType}} attribute to <code>“longtask”</code>
+    3. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |start time|
+    4. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |end time| minus |start time|
+    5. Set |newEntry|'s attribution attribute to a new frozen array containing the single value |attribution|.
+
+        NOTE: future iterations of this API will add more values to the attribution attribute, but for now it only contains a single value.
+
+7. <a href="https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry">Queue the PerformanceEntry</a> |newEntry| on |destinationRealm|.
+
+    NOTE: the "queue a PerformanceEntry" algorithm will end up doing nothing if no observers are registered. Implementations likely will want to bail out from this algorithm earlier in that case, instead of assembling all the above information only to find out nobody is listening for it.
+
+Security & Privacy Considerations {#priv-sec}
+===============================================
+
+Long Tasks API adheres to cross-origin policy by including origin-safe attribution information about the source of the long task.
+There is a 50ms threshold for long tasks. Together this provides adequate protection against security attacks against browser.
+
+However, privacy related attacks are possible, while the API doesn’t introduce any new privacy attacks, it could make existing privacy attacks faster. Mitigations for this are possible and discussed in the security review <a href="https://docs.google.com/document/d/1tIMI1gau_q6X5EBnjDNiFS5NWV9cpYJ5KKA7xPd3VB8/edit">in this document.</a>

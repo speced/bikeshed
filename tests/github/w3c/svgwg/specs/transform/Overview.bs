@@ -1,0 +1,325 @@
+<h1>svg:transform for mapping</h1>
+<pre class='metadata'>
+Level: 1
+Status: ED
+ED: http://dev.w3.org/fxtf/motion-1/
+Shortname: transform-mapping
+Group: svg
+Editor: Satoru Takagi, KDDI Corporation, sa-takagi@kddi.com
+Abstract: This specification gives guidance how the SVG transform attribute in the SVG namespace can be used in other context than SVG. 
+</pre>
+<pre class=link-defaults>
+spec:svg2; type:element; text:svg
+spec:css-transforms-1; type:property; text:transform
+spec:css-transforms-1; type:type; text:<transform-list>
+</pre>
+
+<h2 id="GeographicCoordinates">Geographic coordinate systems</h2>
+
+In order to allow interoperability between SVG content generators
+and user agents dealing with maps encoded in SVG, the use of a common
+metadata definition for describing the coordinate system used to
+generate SVG documents is encouraged.
+
+Such metadata must be added under the <a element>metadata</a> element of
+the topmost <a element>svg</a> element describing the map, consisting of an
+RDF description of the Coordinate Reference System definition used to
+generate the SVG map [[RDF-PRIMER]]. Note that
+the presence of this metadata does not affect the rendering of the SVG
+in any way; it merely provides added semantic value for applications
+that make use of combined maps.
+
+The definition must be conformant to the XML grammar described in
+<a href="http://portal.opengeospatial.org/files/?artifact_id=20509"><cite>GML 3.2.1</cite></a>,
+an OpenGIS Standard for encoding common CRS data types in XML
+[[GML]]. In order to correctly map
+the 2-dimensional data used by SVG, the CRS must be of subtype
+<strong>ProjectedCRS</strong> or <strong>Geographic2dCRS</strong>. The
+first axis of the described CRS maps the SVG <var>x</var>-axis and the
+second axis maps the SVG <var>y</var>-axis.
+
+The main purpose of such metadata is to indicate to the user agent
+that two or more SVG documents can be overlayed or merged into a single
+document. Obviously, if two maps reference the same Coordinate Reference
+System definition and have the same SVG 'transform' property
+value then they can be overlayed without reprojecting the data. If
+the maps reference different Coordinate Reference Systems and/or have
+different SVG 'transform' property values, then a specialized
+cartographic user agent may choose to transform the coordinate data to
+overlay the data. However, typical SVG user agents are not required
+to perform these types of transformations, or even recognize the
+metadata. It is described in this specification so that the connection
+between geographic coordinate systems and the SVG coordinate system is
+clear.
+
+<h2 id="SVGGlobalTransformAttribute">The <span class="attr-name">'svg:transform'</span> attribute</h2>
+
+<div class="adef-list">
+  <p><em>Attribute definition:</em></p>
+  <dl>
+    <dt id="SVGGlobalTransformAttributeDefinition"><dfn>svg:transform</dfn> = <<transform-list>> | ''transform/none''</dt>
+    <dd>
+      <dl>
+        <dt><<transform-list>></dt>
+        <dd>
+          <p>Specifies the affine transformation that has been
+          applied to the map data. The syntax is identical to
+          that described for the 'transform' property.</p>
+        </dd>
+
+        <dt><span class="attr-value">none</span></dt>
+        <dd>
+          <p>Specifies that no supplemental affine transformation has been
+          applied to the map data.  Using this value has the same meaning as
+          specifying the identity matrix, which in turn is just the same as
+          not specifying the <a>svg:transform</a> the attribute at all.</p>
+        </dd>
+      </dl>
+      <p class="anim-target">Animatable: no.</p>
+    </dd>
+  </dl>
+</div> 
+
+This attribute describes an optional additional affine
+transformation that may have been applied during this
+mapping. This attribute may be added to the OpenGIS
+<em>CoordinateReferenceSystem</em> element. Note
+that, unlike the 'transform' property, it does not indicate that
+a transformation is to <em>be applied</em> to the data within the file.
+Instead, it simply describes the transformation that <em>was already
+applied</em> to the data when being encoded in SVG.
+
+There are three typical uses for the <a>svg:transform</a>
+global attribute. These are described below and used in the examples.
+
+<ul>
+  <li>Most ProjectedCRS have the north direction represented by
+  positive values of the second axis and conversely SVG has a
+  <var>y</var>-down coordinate system. That's why, in order to follow the
+  usual way to represent a map with the north at its top, it is
+  recommended for that kind of ProjectedCRS to use the
+  <a>svg:transform</a>
+  global attribute with a ''scale(1, -1)'' value as in the
+  third example below.</li>
+
+  <li>Most Geographic2dCRS have the latitude as their first
+  axis rather than the longitude, which means that the
+  south-north axis would be represented by the <var>x</var>-axis in SVG
+  instead of the usual <var>y</var>-axis. That's why, in order to follow
+  the usual way to represent a map with the north at its top,
+  it is recommended for that kind of Geographic2dCRS to use the
+  <a>svg:transform'</a>
+  global attribute with a ''rotate(-90)'' value as in the
+  first example (while also adding the ''scale(1, -1)'' as for
+  ProjectedCRS).</li>
+
+  <li>In addition, when converting for profiles which place
+  restrictions on precision of real number values, it may be
+  useful to add an additional scaling factor to retain good
+  precision for a specific area. When generating an SVG
+  document from WGS84 geographic coordinates (EPGS 4326), we
+  recommend the use of an additional 100 times scaling factor
+  corresponding to an <a>svg:transform</a>
+  global attribute with a ''rotate(-90) scale(100)''
+  value (shown in the second example).
+  Different scaling values may be required depending on the
+  particular CRS.</li>
+</ul>
+
+Below is a simple example of the coordinate metadata, which
+describes the coordinate system used by the document via a
+URI.
+
+<div class="example">
+ <pre><code class=html>
+&lt;?xml version="1.0"?>
+&lt;svg xmlns="http://www.w3.org/2000/svg"
+     width="100" height="100" viewBox="0 0 1000 1000">
+
+  &lt;desc>An example that references coordinate data.&lt;/desc>
+
+  &lt;metadata>
+    &lt;rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+             xmlns:crs="http://www.ogc.org/crs"
+             xmlns:svg="http://www.w3.org/2000/svg">
+      &lt;rdf:Description rdf:about="">
+        &lt;!-- The Coordinate Reference System is described
+             through a URI. -->
+        &lt;crs:CoordinateReferenceSystem
+            svg:transform="rotate(-90)"
+            rdf:resource="http://www.example.org/srs/epsg.xml#4326"/>
+      &lt;/rdf:Description>
+    &lt;/rdf:RDF>
+  &lt;/metadata>
+
+  &lt;!-- The actual map content -->
+&lt;/svg>
+</code></pre>
+</div>
+
+The second example uses a well-known identifier to describe
+the coordinate system. Note that the coordinates used in the
+document have had the supplied transform applied.
+
+<div class="example">
+  <pre><code class=html>
+&lt;?xml version="1.0"?>
+&lt;svg xmlns="http://www.w3.org/2000/svg"
+     width="100" height="100" viewBox="0 0 1000 1000">
+
+  &lt;desc>Example using a well known coordinate system.&lt;/desc>
+
+  &lt;metadata>
+    &lt;rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+             xmlns:crs="http://www.ogc.org/crs"
+             xmlns:svg="http://www.w3.org/2000/svg">
+      &lt;rdf:Description rdf:about="">
+        &lt;!-- In case of a well-known Coordinate Reference System
+             an 'Identifier' is enough to describe the CRS -->
+        &lt;crs:CoordinateReferenceSystem svg:transform="rotate(-90) scale(100, 100)">
+          &lt;crs:Identifier>
+            &lt;crs:code>4326&lt;/crs:code>
+            &lt;crs:codeSpace>EPSG&lt;/crs:codeSpace>
+            &lt;crs:edition>5.2&lt;/crs:edition>
+          &lt;/crs:Identifier>
+        &lt;/crs:CoordinateReferenceSystem>
+      &lt;/rdf:Description>
+    &lt;/rdf:RDF>
+  &lt;/metadata>
+
+  &lt;!-- The actual map content -->
+&lt;/svg>
+  </code></pre>
+</div>
+
+The third example defines the coordinate system completely
+within the SVG document.
+
+<div class="example">
+  <pre><code class=html>
+&lt;?xml version="1.0"?>
+&lt;svg xmlns="http://www.w3.org/2000/svg"
+     width="100" height="100" viewBox="0 0 1000 1000">
+
+  &lt;desc>Coordinate metadata defined within the SVG document&lt;/desc>
+
+  &lt;metadata>
+    &lt;rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+             xmlns:crs="http://www.ogc.org/crs"
+             xmlns:svg="http://www.w3.org/2000/svg">
+      &lt;rdf:Description rdf:about="">
+        &lt;!-- For other CRS it should be entirely defined -->
+        &lt;crs:CoordinateReferenceSystem svg:transform="scale(1,-1)">
+          &lt;crs:NameSet>
+            &lt;crs:name>Mercator projection of WGS84&lt;/crs:name>
+          &lt;/crs:NameSet>
+          &lt;crs:ProjectedCRS>
+            &lt;!-- The actual definition of the CRS -->
+            &lt;crs:CartesianCoordinateSystem>
+              &lt;crs:dimension>2&lt;/crs:dimension>
+              &lt;crs:CoordinateAxis>
+                &lt;crs:axisDirection>north&lt;/crs:axisDirection>
+                &lt;crs:AngularUnit>
+                  &lt;crs:Identifier>
+                    &lt;crs:code>9108&lt;/crs:code>
+                    &lt;crs:codeSpace>EPSG&lt;/crs:codeSpace>
+                    &lt;crs:edition>5.2&lt;/crs:edition>
+                  &lt;/crs:Identifier>
+                &lt;/crs:AngularUnit>
+              &lt;/crs:CoordinateAxis>
+              &lt;crs:CoordinateAxis>
+                &lt;crs:axisDirection>east&lt;/crs:axisDirection>
+                &lt;crs:AngularUnit>
+                  &lt;crs:Identifier>
+                    &lt;crs:code>9108&lt;/crs:code>
+                    &lt;crs:codeSpace>EPSG&lt;/crs:codeSpace>
+                    &lt;crs:edition>5.2&lt;/crs:edition>
+                  &lt;/crs:Identifier>
+                &lt;/crs:AngularUnit>
+              &lt;/crs:CoordinateAxis>
+            &lt;/crs:CartesianCoordinateSystem>
+            &lt;crs:CoordinateReferenceSystem>
+              &lt;!-- the reference system of that projected system is
+                         WGS84 which is EPSG 4326 in EPSG codeSpace -->
+              &lt;crs:NameSet>
+                &lt;crs:name>WGS 84&lt;/crs:name>
+              &lt;/crs:NameSet>
+              &lt;crs:Identifier>
+                &lt;crs:code>4326&lt;/crs:code>
+                &lt;crs:codeSpace>EPSG&lt;/crs:codeSpace>
+                &lt;crs:edition>5.2&lt;/crs:edition>
+              &lt;/crs:Identifier>
+            &lt;/crs:CoordinateReferenceSystem>
+            &lt;crs:CoordinateTransformationDefinition>
+              &lt;crs:sourceDimensions>2&lt;/crs:sourceDimensions>
+              &lt;crs:targetDimensions>2&lt;/crs:targetDimensions>
+              &lt;crs:ParameterizedTransformation>
+                &lt;crs:TransformationMethod>
+                  &lt;!-- the projection is a Mercator projection which is
+                        EPSG 9805 in EPSG codeSpace -->
+                  &lt;crs:NameSet>
+                    &lt;crs:name>Mercator&lt;/crs:name>
+                  &lt;/crs:NameSet>
+                  &lt;crs:Identifier>
+                    &lt;crs:code>9805&lt;/crs:code>
+                    &lt;crs:codeSpace>EPSG&lt;/crs:codeSpace>
+                    &lt;crs:edition>5.2&lt;/crs:edition>
+                  &lt;/crs:Identifier>
+                  &lt;crs:description>Mercator (2SP)&lt;/crs:description>
+                &lt;/crs:TransformationMethod>
+                &lt;crs:Parameter>
+                  &lt;crs:NameSet>
+                    &lt;crs:name>Latitude of 1st standart parallel&lt;/crs:name>
+                  &lt;/crs:NameSet>
+                  &lt;crs:Identifier>
+                    &lt;crs:code>8823&lt;/crs:code>
+                    &lt;crs:codeSpace>EPSG&lt;/crs:codeSpace>
+                    &lt;crs:edition>5.2&lt;/crs:edition>
+                  &lt;/crs:Identifier>
+                  &lt;crs:value>0&lt;/crs:value>
+                &lt;/crs:Parameter>
+                &lt;crs:Parameter>
+                  &lt;crs:NameSet>
+                    &lt;crs:name>Longitude of natural origin&lt;/crs:name>
+                  &lt;/crs:NameSet>
+                  &lt;crs:Identifier>
+                    &lt;crs:code>8802&lt;/crs:code>
+                    &lt;crs:codeSpace>EPSG&lt;/crs:codeSpace>
+                    &lt;crs:edition>5.2&lt;/crs:edition>
+                  &lt;/crs:Identifier>
+                  &lt;crs:value>0&lt;/crs:value>
+                &lt;/crs:Parameter>
+                &lt;crs:Parameter>
+                  &lt;crs:NameSet>
+                    &lt;crs:name>False Easting&lt;/crs:name>
+                  &lt;/crs:NameSet>
+                  &lt;crs:Identifier>
+                    &lt;crs:code>8806&lt;/crs:code>         
+                    &lt;crs:codeSpace>EPSG&lt;/crs:codeSpace>
+                    &lt;crs:edition>5.2&lt;/crs:edition>
+                  &lt;/crs:Identifier>
+                  &lt;crs:value>0&lt;/crs:value>
+                &lt;/crs:Parameter>
+                &lt;crs:Parameter>
+                  &lt;crs:NameSet>
+                    &lt;crs:name>False Northing&lt;/crs:name>
+                  &lt;/crs:NameSet>
+                  &lt;crs:Identifier>
+                    &lt;crs:code>8807&lt;/crs:code>
+                    &lt;crs:codeSpace>EPSG&lt;/crs:codeSpace>
+                    &lt;crs:edition>5.2&lt;/crs:edition>
+                  &lt;/crs:Identifier>
+                  &lt;crs:value>0&lt;/crs:value>
+                &lt;/crs:Parameter>
+              &lt;/crs:ParameterizedTransformation>
+            &lt;/crs:CoordinateTransformationDefinition>
+          &lt;/crs:ProjectedCRS>
+        &lt;/crs:CoordinateReferenceSystem>
+      &lt;/rdf:Description>
+    &lt;/rdf:RDF>
+  &lt;/metadata>
+
+  &lt;!-- the actual map content -->
+&lt;/svg>
+  </code></pre>
+</div>

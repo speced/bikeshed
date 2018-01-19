@@ -1,0 +1,467 @@
+<pre class="metadata">
+Title: Payment Method Manifest
+Group: web-payments
+Shortname: payment-method-manifest
+Repository: w3c/payment-method-manifest
+Status: ED
+Date: 2017-12-12
+ED: https://w3c.github.io/payment-method-manifest/
+TR: https://www.w3.org/TR/payment-method-manifest/
+Level: none
+Editor: Dapeng Liu, Alibaba
+Editor: Domenic Denicola, w3cid 52873, Google https://www.google.com/, d@domenic.me, https://domenic.me/
+Editor: Zach Koch, w3cid 76588, Google https://www.google.com/
+Abstract: This specification defines the machine-readable manifest file, known as a
+Abstract: <dfn export>payment method manifest</dfn>, describing how a [=payment method=]
+Abstract: participates in the Web Payments ecosystem, and how such files are to be used.
+Default Ref Status: current
+Complain About: accidental-2119 true, missing-example-ids true
+Assume Explicit For: true
+Inline GitHub Issues: title
+Boilerplate: omit issues-index
+Indent: 2
+Prepare For TR: True
+</pre>
+
+<pre class="anchors">
+urlPrefix: https://w3c.github.io/payment-request/; spec: PAYMENT-REQUEST
+  type: dfn
+    text: payment method; url: #dfn-payment-method
+    text: payment app; url: #dfn-payment-apps
+    text: [[serializedMethodData]]; url: #dfn-serializedmethoddata
+  text: PaymentRequest(methodData, details, options); type: constructor; for: PaymentRequest; url: #dfn-paymentrequest-paymentrequest
+  text: PaymentRequest; type: interface; url: #dom-paymentrequest
+urlPrefix: https://www.w3.org/TR/appmanifest/; spec: APPMANIFEST; type: dfn
+  text: web app manifest; url: #dfn-manifest
+  text: URL; for: web app manifest; url: #dfn-manifest-url
+  text: steps for obtaining a web app manifest; url: #dfn-obtaining-the-manifest
+  text: steps for processing a web app manifest; url: #dfn-processing-a-manifest
+  text: processed web app manifest; url: #dfn-processed-manifest
+urlPrefix: https://w3c.github.io/payment-method-id/; spec: PAYMENT-METHOD-ID; type: dfn
+  text: payment method identifier; url: #dfn-payment-method-identifiers
+  text: standardized payment method identifier; url: #dfn-standardized-payment-method-identifiers
+  text: URL-based payment method identifier; url: #dfn-url-based-payment-method-identifiers
+  text: validate a URL-based payment method identifier; url: #dfn-validate-a-url-based-payment-method-identifier
+urlPrefix: https://tc39.github.io/ecma262/; spec: ECMASCRIPT
+  text: JavaScript realm; type: dfn; url: #realm
+  type: abstract-op;
+    text: CreateListFromArrayLike; url: #sec-createlistfromarraylike
+    text: Get; url: #sec-get-o-p
+    text: IsArray; url: #sec-isarray
+    text: Type; url: #sec-ecmascript-data-types-and-values
+</pre>
+
+<div class="non-normative">
+
+<h2 id="introduction">Introduction</h2>
+
+<em>This section and its sub-sections are non-normative.</em>
+
+<h3 id="use-cases">Use cases</h3>
+
+This specification intends to address the following use cases:
+
+* The owner of a [=payment method=] wishes to authorize only certain parties to distribute
+  [=payment apps=] that are capable of implementing the payment method. In this use case, the
+  browser helps to ensure that for that payment method, the user can only invoke payment apps from
+  parties authorized by the owner of the payment method.
+
+* In addition, the owner of a [=payment method=] wishes to confirm the authenticity of a
+  particular payment app (e.g., via a digital signature for that app).
+
+* When the user has not yet installed a [=payment app=] for a [=payment method=], the user agent
+  can provide an improved user experience for procuring one.
+
+This is accomplished via the requirement that every [=payment method=] whose
+[=payment method identifier|identifier=] is [=URL-based payment method identifier|URL-based=] will
+provide a [=payment method manifest=] file in JSON format containing two key pieces of information:
+
+* any default [=payment apps=] that are associated with this [=payment method=], referenced as
+  [=absolute-URL strings=] giving the [=web app manifest/URL=] of their [=web app manifests=]; and
+
+* any other [=origins=] that are permitted to return payment credentials for this
+  [=payment method=].
+
+<h3 id="accessing">Accessing the manifest</h3>
+
+The resource identified by the [=payment method identifier=] URL does not directly contain the
+machine-readable [=payment method manifest=]. It is often a generic URL (such as
+"<code>https://alicepay.com/</code>") which is more suitable for human-readable content. Instead, a
+HTTP Link header is used to direct user agents seeking out the [=payment method manifest=] toward
+another location. [[RFC8288]]
+
+For an example [=payment method=] AlicePay, with [=payment method identifier=]
+"<code>https://alicepay.com/</code>", a user agent might issue a request to that
+[=payment method identifier=] URL as follows:
+
+<pre>
+  HEAD / HTTP/2
+  Host: alicepay.com
+  User-Agent: Mellblomenator/9000
+</pre>
+
+The server would then respond:
+
+<pre>
+  HTTP/2 204
+  Link: &lt;/pay/payment-manifest.json>; rel="payment-method-manifest"
+</pre>
+
+<h3 id="manifest-example">Example manifest file</h3>
+
+Continuing our example from [[#accessing]], the AlicePay [=payment method=] could provide the
+following [=payment method manifest=] file at
+<code>https://alicepay.com/pay/payment-manifest.json</code>:
+
+<pre highlight="json">
+{
+  "default_applications": ["app/webappmanifest.json"],
+  "supported_origins": [
+    "https://bobpay.xyz",
+    "https://alicepay.friendsofalice.example"
+  ]
+}
+</pre>
+
+This indicates that, if the user agent does not have a [=payment app=] for AlicePay installed, it
+can locate one by consulting the [=web app manifest=] at
+"<code>https://alicepay.com/pay/app/webappmanifest.json</code>".
+
+It also indicates that, apart from this default payment app, AlicePay also allows [=payment apps=]
+hosted at the two indicated [=origins=] to be used for AlicePay. This means that if the user agent
+ever encounters payment apps hosted at those origins claiming support for AlicePay, it can allow
+them to act as payment apps for the AlicePay [=payment method=].
+
+The manifest file could also omit the "<code>supported_origins</code>" key, if no third-party
+[=payment apps=] are supported for the [=payment method=] in question, or it could use the value
+"<code>*</code>" instead of an array of [=origins=], to indicate that any third party is allowed to
+support the payment method.
+
+</div>
+
+<h2 id="format">Manifest format</h2>
+
+A <dfn export local-lt="valid|validity">valid payment method manifest</dfn> file is a [=UTF-8=]
+encoded file containing contents parseable as a JSON object. The resulting JSON object must contain
+at most two items, with the possible keys "<code>default_applications</code>" and
+"<code>supported_origins</code>".
+
+The value of the <code>default_applications</code> key, if present, must be a non-empty JSON array.
+Each item in the array must be a [=valid URL string=] such that the resulting [=URL=]'s
+[=url/scheme=], when parsed against the URL of the payment method manifest, is "<code>https</code>".
+
+The value of the <code>supported_origins</code> key, if present, must be either the string
+"<code>*</code>", or a non-empty JSON array. In the latter case, each item in the array must be an
+[=absolute-URL string=] that represents an HTTPS [=origin=]. Formally, the string must be equal to
+the [=serialization of an origin|serialization=] of the resulting parsed [=URL=]'s [=url/origin=].
+
+Web developers must ensure that all of their [=payment method manifests=] are [=valid=].
+
+<p class="note">As with all conformance requirements on the contents of files, these are
+web-developer facing, and not implementer-facing. The exact processing model (given in
+[[#processing-model]]) governs how implementers process all [=payment method manifest=] files,
+including invalid ones.</p>
+
+<div class="example" id="example-invalid-manifest">
+  The following [=payment method manifest=] is not [=valid=], but the currently-specified processing
+  model algorithms will still accept it:
+
+  <pre highlight="json">
+    {
+      "default_applications": ["app/webappmanifest.json"],
+      "created_by": "Alice",
+      "created_in": "Wonderland"
+    }
+  </pre>
+
+  This could change in the future, for example if the processing model later expands to define a
+  meaning for a new standard "<code>created_by</code>" key that requires it to be an object instead
+  of a string. To avoid situations like this, web developers are best served by ensuring
+  [=validity=] of their [=payment method manifests=], and thus avoiding any unpleasant surprises.
+</div>
+
+<h2 id="processing-model">Processing model</h2>
+
+<h3 id="monkeypatch">Modifications to <cite>Payment Request API</cite></h3>
+
+This specification integrates with the rest of the Payment Request ecosystem by modifying the
+{{PaymentRequest/PaymentRequest(methodData, details, options)}} constructor. It adds the following
+steps, before the algorithm completes and returns the newly-constructed {{PaymentRequest}} object.
+In what follows, let |request| be the {{PaymentRequest}} instance being constructed.
+[[!PAYMENT-REQUEST]]
+
+1. Let |identifiers| be a list consisting of the first [=tuple/item=] of each pair in
+   |request|.[=[[serializedMethodData]]=].
+1. Let |client| be the [=current settings object=].
+1. [=Ingest payment method manifests=] given |identifiers| and |client|.
+
+These steps are what kicks off the whole process. The rest of [[#processing-model]] is concerned
+with defining how this process eventually leads to new [=payment apps=] being available for the
+user.
+
+Issue: As this specification gains multi-implementer interest, we anticipate moving this section
+into the <cite>Payment Request API</cite> specification itself, instead of maintaining a monkeypatch
+here.
+
+<h3 id="ingest">Ingesting payment method manifests</h3>
+
+Given a list of [=payment method identifiers=] |identifiers|, as well as an
+[=environment settings object=] |client|, the user agent may run the following steps, to
+<dfn export>ingest payment method manifests</dfn>:
+
+1. [=Fetch payment method manifests=], given |identifiers| and |client|, and wait for this to
+   asynchronously complete with |manifestsMap|. If the result is failure, return.
+1. [=list/For each=] |identifierURL| → |manifest| of |manifestsMap|:
+  1. Let |parsed| be the result of
+     [=validate and parse the payment method manifest|validating and parsing=] |manifest| given
+     |identifierURL|. If this returns failure, [=iteration/continue=].
+  1. [=set/For each=] |webAppManifestURL| in |parsed|'s [=parsed payment method manifest/default
+     applications=]:
+    1. [=fetch the web app manifest for a default payment app|Fetch the web app manifest=] at
+       |webAppManifestURL| given |identifierURL| and |client|, and wait for it to asynchronously
+       complete with |webAppManifestString|. If the result is failure, [=iteration/continue=].
+    1. Let |webAppManifest| be the result of running the [=steps for processing a web app manifest=]
+       given |webAppManifestString|.
+
+       <p class="note">The [=steps for processing a web app manifest=] are very forgiving and will
+       return empty objects or objects missing crucial fields instead of failing. User agents will
+       need to separately validate the [=processed web app manifest=] to ensure it contains enough
+       data for their purposes in the next step.</p>
+
+    1. In a user-agent-specific way, use the resulting [=processed web app manifest=]
+       |webAppManifest| to install any applicable [=payment apps=] for the [=payment method=]
+       identified by |identifier|.
+
+       <p class="note">In the future, the plan is for there to be a user-agent-independent way to
+       use the resulting [=processed web app manifest=], by consulting its
+       <code>serviceworker</code> field and using that to install a web-based [=payment app=]
+       conforming to the <cite>Payment Handler API</cite> specification. [[PAYMENT-HANDLER]]</p>
+  1. Associate the [=parsed payment method manifest/supported origins=] to |identifier| so that the
+     user agent can use it in the future to determine what third-party [=payment apps=] can be
+     displayed for the [=payment method=] identified by |identifier|.
+
+<h3 id="fetch-pmm">Fetching payment method manifests</h3>
+
+To <dfn export>fetch payment method manifests</dfn>, given a [=list=] of [=JavaScript strings=]
+|supportedMethods| and an [=environment settings object=] |client|, perform the following steps.
+This algorithm will asynchronously complete with a [=map=] (possibly empty) from [=URLs=] to
+[=byte sequences=], mapping [=payment method identifiers=] to the contents of the corresponding
+manifest.
+
+1. Let |identifierURLs| be an empty [=list=].
+1. [=list/For each=] |string| of |supportedMethods|:
+  1. Let |identifierURL| be the result of [=basic URL parser|basic URL parsing=] |string|. If the
+     result is failure, [=iteration/continue=].
+     <p class="note">The result will be failure for any [=payment method identifier=] that is not a
+     [=URL-based payment method identifier=], i.e. for a
+     [=standardized payment method identifier=].</p>
+  1. If [=validate a URL-based payment method identifier|validating=] |identifierURL| returns false,
+     [=iteration/continue=].
+  1. Optionally, [=iteration/continue=].
+     <p class="note">This step allows implementations to skip any of the provided [=payment method
+     identifiers=] for user-agent-specific reasons. [[#security]] discusses some reasons why user
+     agents might prefer to only ingest certain identifiers.</p>
+  1. [=list/Append=] |identifierURL| to |identifierURLs|.
+1. Let |manifestsMap| be an empty [=map=].
+1. [=list/For each=] |identifierURL| of |identifierURLs|:
+  1. Let |identifierRequest| be a new [=request=] whose [=request/method=] is `<code>HEAD</code>`,
+     [=request/url=] is |identifierURL|, [=request/client=] is |client|, [=request/mode=] is
+     "<code>cors</code>", [=request/credentials mode=] is "<code>omit</code>",
+     [=request/redirect mode=] is "<code>error</code>", and [=request/referrer policy=] is
+     "<code>strict-origin-when-cross-origin</code>".
+  1. [=Fetch=] |identifierRequest|. To [=process response=] with the [=response=]
+     |identifierResponse|:
+    1. If |identifierResponse| is a [=network error=] or |identifierResponse|'s [=response/status=]
+       is not an [=ok status=], [=iteration/continue=].
+    1. Let |linkHeaders| be the result of
+       [=extract header list values|extracting header list values=] given `<code>Link</code>` and
+       |identifierResponse|'s [=response/header list=].
+    1. Let |manifestURLString| be null.
+    1. [=list/For each=] |linkHeader| of |linkHeaders|:
+      1. Parse |linkHeader| according to the <code>link-value</code> production. If it cannot be
+         parsed, [=iteration/continue=]. [[!RFC8288]]
+      1. If the parsed header contains a parameter whose name is an [=ASCII case-insensitive=] match
+         for the string "<code>rel</code>" and whose value is an [=ASCII case-insensitive=] match
+         for the string "<code>payment-method-manifest</code>", then set |manifestURLString| to the
+         string given by the <code>URI-Reference</code> production in the parsed header, and
+         [=iteration/break=].
+    1. If |manifestURLString| is not null, then:
+      1. Let |manifestURL| be the result of [=basic URL parser|basic URL parsing=]
+         |manifestURLString| with base URL given by |identifierResponse|'s [=response/url=]. If the
+         result is failure, [=iteration/continue=].
+      1. If |manifestURL|'s [=url/scheme=] is not "<code>https</code>", [=iteration/continue=].
+      1. Let |manifestRequest| be a new [=request=] whose [=request/url=] is |manifestURL|,
+         [=request/client=] is |client|, [=request/referrer=] is |identifierResponse|'s
+         [=response/url=], [=request/mode=] is "<code>cors</code>", [=request/credentials mode=] is
+         "<code>omit</code>", and [=request/redirect mode=] is "<code>error</code>".
+      1. [=Fetch=] |manifestRequest|. To [=process response end-of-body=] with the [=response=]
+         |manifestResponse|:
+         1. If |manifestResponse| is a [=network error=] or |manifestResponse|'s [=response/status=]
+            is not an [=ok status=], [=iteration/continue=].
+         1. Let |body| be |manifestResponse|'s [=response/body=].
+         1. If |body| is null, [=iteration/continue=].
+         1. Let |reader| be the result of [=ReadableStream/get a reader|getting a reader=] from
+            |body|.
+         1. Let |promise| be the result of [=ReadableStream/read all bytes|reading all bytes=] from
+            |body| with |reader|.
+         1. [=Upon fulfillment=] of |promise| with a [=byte sequence=] |bytes|, [=map/set=]
+            |manifestsMap|[|identifierURL|] to |bytes|.
+1. Once all ongoing [=fetch=] algorithms initiated by the above steps are complete, including the
+   specified [=process response=] and [=process response end-of-body=] steps, asynchronously
+   complete this algorithm with |manifestsMap|.
+
+<h3 id="validate-and-parse">Validating and parsing payment method manifests</h3>
+
+A <dfn export>parsed payment method manifest</dfn> is a [=struct=] containing two fields:
+
+: <dfn export for="parsed payment method manifest">default applications</dfn>
+:: An [=ordered set=] of [=URLs=], possibly empty
+: <dfn export for="parsed payment method manifest">supported origins</dfn>
+:: Either the string "<code>*</code>", or an [=ordered set=] of [=origins=]
+
+To <dfn export lt="validate and parse the payment method manifest">validate and parse</dfn> a
+[=byte sequence=] |bytes| purporting to contain a payment method manifest, given a [=URL=] |url|,
+perform the following steps. The result will either be a [=parsed payment method manifest=], or
+failure.
+
+1. Let |parsed| be the result of [=parse JSON from bytes|parsing JSON from bytes=] given |bytes|, in
+   a user-agent defined [=JavaScript realm=]. If this throws an exception, return failure.
+1. If <a abstract-op>Type</a>(|parsed|) is not Object, return failure.
+1. Let |defaultApps| be an empty [=ordered set=].
+1. Let |defaultAppsValue| be <a abstract-op>Get</a>(|parsed|, "default_applications").
+1. If |defaultAppsValue| is not undefined:
+  1. If <a abstract-op>IsArray</a>(|defaultAppsValue|) is false, return failure.
+  1. Let |defaultAppsList| be <a abstract-op>CreateListFromArrayLike</a>(|defaultAppsValue|,
+     « String »). If this throws an exception, return failure.
+  1. If the [=list/size=] of |defaultAppsList| is 0, return failure.
+  1. [=list/For each=] |defaultAppString| in |defaultAppsList|:
+    1. Let |defaultAppURL| be the result of [=basic URL parser|basic URL parsing=]
+       |defaultAppString|, given the base URL |url|. If the result is failure, return failure.
+    1. If |defaultAppURL|'s [=url/scheme=] is not "<code>https</code>", return failure.
+    1. [=set/Append=] |defaultAppURL| to |defaultApps|.
+1. Let |supportedOrigins| be an empty [=ordered set=].
+1. Let |supportedOriginsValue| be <a abstract-op>Get</a>(|parsed|, "supported_origins").
+1. If |supportedOriginsValue| is "<code>*</code>", set |supportedOrigins| to "<code>*</code>".
+1. Otherwise, if |supportedOriginsValue| is not undefined:
+  1. If <a abstract-op>IsArray</a>(|supportedOriginsValue|) is false, return failure.
+  1. Let |supportedOriginsList| be
+     <a abstract-op>CreateListFromArrayLike</a>(|supportedOriginsValue|, « String »). If this throws
+     an exception, return failure.
+  1. If the [=list/size=] of |supportedOriginsList| is 0, return failure.
+  1. [=list/For each=] |supportedOriginString| in |supportedOriginsList|:
+    1. Let |supportedOriginURL| be the result of [=basic URL parser|basic URL parsing=]
+       |supportedOriginString|. If the result is failure, return failure.
+    1. If |supportedOriginURL|'s [=url/scheme=] is not "<code>https</code>", return failure.
+    1. If |supportedOriginURL|'s [=url/username=] or [=url/password=] are not the empty string,
+       return failure.
+    1. If |supportedOriginURL|'s [=url/path=]'s [=list/size=] is not 0, return failure.
+    1. If |supportedOriginURL|'s [=url/query=] or [=url/fragment=] are not null, return failure.
+    1. [=set/Append=] |supportedOriginURL|'s [=url/origin=] to |supportedOrigins|.
+1. Return a new [=parsed payment method manifest=] with
+   [=parsed payment method manifest/default applications=] given by |defaultApps| and
+   [=parsed payment method manifest/supported origins=] given by |supportedOrigins|.
+
+<div class="note">
+  Empty arrays for "<code>default_applications</code>" or "<code>supported_origins</code>"
+  will cause parsing to fail. That is, this is not a [=valid payment method manifest=], and will
+  be rejected by the above algorithm:
+
+  <pre highlight="json">
+  {
+    "default_applications": ["https://alicepay.com/pay/app/webappmanifest.json"],
+    "supported_origins": []
+  }
+  </pre>
+</div>
+
+<h3 id="fetch-wam">Fetching web app manifests</h3>
+
+Because the determination of [=payment apps=] happens independent of any embedding HTML document,
+the procedure for obtaining a [=web app manifest=] that gives information about a default payment
+app is different from the usual [=steps for obtaining a web app manifest=].
+
+To <dfn export>fetch the web app manifest for a default payment app</dfn>, given a [=URL=] |url|, a
+URL |referrer|, and an [=environment settings object=] |client|, perform the following steps. This
+algorithm will asynchronously complete with either a [=scalar value string=] or failure.
+
+1. Let |request| be a new [=request=] whose [=request/url=] is |url|, [=request/client=] is
+   |client|, [=request/referrer=] is |referrer|, [=request/mode=] is "<code>cors</code>",
+   [=request/credentials mode=] is "<code>omit</code>", and [=request/redirect mode=] is
+   "<code>error</code>".
+1. [=Fetch=] |request|. To [=process response end-of-body=] with the [=response=] |response|:
+   1. If |response| is a [=network error=] or |response|'s [=response/status=] is not an
+      [=ok status=], asynchronously complete this algorithm with failure.
+   1. Let |body| be |response|'s [=response/body=].
+   1. If |body| is null, asynchronously complete this algorithm with failure.
+   1. Let |reader| be the result of [=ReadableStream/get a reader|getting a reader=] from
+      |body|.
+   1. Let |promise| be the result of [=ReadableStream/read all bytes|reading all bytes=] from
+      |body| with |reader|.
+   1. [=Upon fulfillment=] of |promise| with a [=byte sequence=] |bytes|, asynchronously complete
+      this algorithm with the result of [=UTF-8 decode|UTF-8 decoding=] |bytes|.
+   1. [=Upon rejection=] of |promise|, asynchronously complete this algorithm with failure.
+
+<h2 id="security">Security and privacy considerations</h2>
+
+<h3 id="revealing-to-providers">Revealing user activity to payment providers</h3>
+
+[=ingest payment method manifests|Ingesting payment method manifests=] might reveal information
+to a payment service about the activity of an end user. For example, a [=payment method=] that is
+only supported on one website might allow that payment provider to discover the IP addresses of
+users who visit that website.
+
+One way to mitigate this is to [=fetch payment method manifests|fetch the manifests=] only for the
+[=payment apps=] that the user has installed or has explicitly expressed interest in. This confines
+the risk to only sharing the user's IP address with those parties.
+
+Another important mitigation is already built in to the spec, by setting the appropriate
+[=request/referrer policy=] and [=request/referrer=] on the various fetches performed here. These
+requirements ensure that only the server that controls the [=URL-based payment method
+identifier|identifier URL=] will see the user's activity, and even then will only see the [=origin=]
+of the web page that is creating the {{PaymentRequest}} object (instead of seeing the full URL).
+
+<h3 id="development-environments">Considerations for development environments</h3>
+
+In development situations, a user agent might lower the security requirements of this specification
+to ease testing. For example, the requirements in the [=fetch payment method manifests=] and
+[=validate and parse the payment method manifest=] algorithms requiring a "<code>https</code>"
+[=url/scheme=] might be dropped in a development environment. In such situations, the user agent is
+intentionally not complying with this specification, and should notify the user of the reduced
+security.
+
+<h3 id="matching-payment-apps">Matching payment apps</h3>
+
+Issue(11):
+
+<h2 id="iana">IANA considerations</h2>
+
+<h3 id="payment-method-manifest-link">The <code>payment-method-manifest</code> link relation</h3>
+
+This registration is for community review and will be submitted to the IESG for review, approval,
+and registration with IANA.
+
+: Relation name
+:: payment-method-manifest
+
+: Description
+:: Links to a payment method manifest, which describes a specific [=payment method=] within the Web
+   Payments ecosystem.
+
+: Reference
+:: <a href="https://w3c.github.io/payment-method-manifest/">https://w3c.github.io/payment-method-manifest/</a>
+
+: Notes
+:: See [[#fetch-pmm]] for the specific manner in which such links are expected to be fetched, and
+   [[#ingest]] for the larger context in which they are used.
+
+<h2 id="acknowledgments" class="no-num">Acknowledgments</h2>
+
+[[#processing-model]] is based heavily on algorithms originally outlined by Rouslan Solomakhin.
+
+Thanks to
+Andrew Betts,
+Anne van Kesteren,
+Ian Jacobs,
+L. David Baron,
+Marcos Cáceres, and
+Rouslan Solomakhin for their contributions to making this specification awesome!

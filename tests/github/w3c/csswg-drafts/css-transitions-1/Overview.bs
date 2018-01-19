@@ -1,0 +1,1837 @@
+  <style type="text/css">
+    table.animatable-properties {
+      border-collapse: collapse;
+    }
+    table.animatable-properties td {
+      padding: 0.2em 1em;
+      border: 1px solid black;
+    }
+
+    div.prod { margin: 1em 2em; }
+
+    table.event-handlers {
+      border-collapse: collapse;
+    }
+    table.event-handlers th,
+    table.event-handlers td {
+      padding: 0.2em 1em;
+    }
+    table.event-handlers td {
+      border: 1px solid black;
+    }
+  </style>
+
+
+<pre class="metadata">
+Title: CSS Transitions
+Status: ED
+Work Status: Refining
+Shortname: css-transitions
+Group: csswg
+Level: 1
+TR: https://www.w3.org/TR/css-transitions-1/
+Previous version: https://www.w3.org/TR/2017/WD-css-transitions-1-20171130/
+Previous version: https://www.w3.org/TR/2013/WD-css3-transitions-20131119/
+ED: https://drafts.csswg.org/css-transitions/
+Editor: L. David Baron, Mozilla https://www.mozilla.org/, https://dbaron.org/, w3cid 15393
+Editor: Dean Jackson, Apple Inc https://www.apple.com/, dino@apple.com, w3cid 42080
+Editor: Brian Birtles, Mozilla https://www.mozilla.org/, bbirtles@mozilla.com, w3cid 43194
+Former Editor: David Hyatt, Apple Inc https://www.apple.com/, hyatt@apple.com, w3cid 34140
+Former Editor: Chris Marrin, Apple Inc https://www.apple.com/, cmarrin@apple.com
+Issue Tracking: Bugzilla bugs for this level https://www.w3.org/Bugs/Public/buglist.cgi?query_format=advanced&amp;product=CSS&amp;component=Transitions&amp;resolution=---&amp;status_whiteboard=defer%20to%20level%202&amp;status_whiteboard_type=notregexp
+Issue Tracking: Bugzilla bugs for all levels https://www.w3.org/Bugs/Public/buglist.cgi?query_format=advanced&amp;product=CSS&amp;component=Transitions&amp;resolution=---
+Abstract: CSS Transitions allows property changes in CSS values to occur smoothly over a specified duration.
+Status Text: <strong>This document</strong> is expected to be relatively close to last call.  While some issues raised have yet to be addressed, new features are extremely unlikely to be considered for this level. <p>The following behaviors are at risk: <ul><li><a href="#discrete-interpolation-at-risk">Interpolation in steps of property types that cannot be interpolated</a></li></ul>
+Ignored Terms: float
+Ignored Vars: x1, x2, y1, y2
+Link Defaults: css-transforms (property) transform
+</pre>
+<pre class="link-defaults">
+spec:css2; type:property;
+    text:top
+    text:right
+    text:bottom
+    text:left
+    text:margin-top
+    text:margin-right
+    text:margin-bottom
+    text:margin-left
+    text:padding-top
+    text:padding-right
+    text:padding-bottom
+    text:padding-left
+    text:border-top-color
+    text:border-right-color
+    text:border-bottom-color
+    text:border-left-color
+    text:border-top-width
+    text:border-right-width
+    text:border-bottom-width
+    text:border-left-width
+    text:background-color
+    text:background-position
+    text:border-spacing
+    text:width
+    text:height
+    text:min-width
+    text:min-height
+    text:max-width
+    text:max-height
+    text:clip
+    text:letter-spacing
+    text:line-height
+    text:outline-color
+    text:outline-width
+    text:text-indent
+    text:font-size
+    text:font-weight
+    text:vertical-align
+    text:visibility
+    text:word-spacing
+    text:z-index
+spec:css-backgrounds-3; type:property;
+    text:background-image
+    text:background-origin
+spec:css-color-3;
+    type:property;
+        text:color
+        text:opacity
+    type:value
+        text:green
+        text:blue
+        text:transparent
+spec:css-values-3; type:type; text:<time>
+</pre>
+<!-- FIXME: These overrides aren't great for dev/TR switching -->
+<pre class="anchors">
+url: https://www.w3.org/TR/css3-background/#shadow-inset; type: value; for: shadow; text: inset;
+url: https://www.w3.org/TR/css3-background/#box-shadow-none; type: value; for: shadow; text: none;
+url: https://www.w3.org/TR/CSS21/visufx.html#propdef-visibility; type: value; for: visibility; text: visible;
+urlPrefix: https://www.w3.org/TR/css3-color/; type: value;
+    text: transparent
+    text: blue
+    text: green
+url: http://w3c.github.io/dom/#constructing-events; type: dfn; text: event constructor;
+urlPrefix: https://html.spec.whatwg.org/multipage/webappapis.html; type: dfn; spec: html
+    text: event handlers
+    text: event handler event type
+    text: event handler content attributes
+    text: event handler IDL attributes
+urlPrefix: https://html.spec.whatwg.org/multipage/infrastructure.html; type: dfn; spec: html
+    text: HTML elements
+    text: dispatch; url: concept-event-dispatch
+url: https://html.spec.whatwg.org/#document; type: interface; text: Document; spec: html
+</pre>
+
+<!-- FIXME: This is only here until css-timing gets added to the biblio data -->
+<pre class=biblio>
+{
+  "CSS-TIMING": {
+    "title": "CSS Timing Functions Level 1",
+    "authors": [
+      "Brian Birtles",
+      "Dean Jackson",
+      "Matt Rakow",
+      "Shane Stephens"
+    ],
+    "date": "2017",
+    "publisher": "W3C",
+    "status": "ED",
+    "href": "https://drafts.csswg.org/css-timing/",
+    "deliveredBy": [
+      {
+        "shortname": "csswg",
+        "url": "https://www.w3.org/Style/CSS/"
+      }
+    ]
+  }
+}
+</pre>
+
+Introduction {#introduction}
+============================
+
+      <p><em>This section is not normative.</em>
+      <p>
+        This document introduces new CSS features to enable <em>implicit transitions</em>, which describe how CSS properties can be made to change smoothly from one value to another over a given duration.
+      </p>
+
+<span id="transitions-">Transitions</span> {#transitions}
+=========================================================
+
+      <p>
+        Normally when the value of a CSS property changes, the rendered result is instantly updated, with the affected elements immediately changing from the old property value to the new property value. This section describes a way to specify transitions using new CSS properties. These properties are used to animate smoothly from the old state to the new state over time.
+      </p>
+      <p>
+        For example, suppose that transitions of one second have been defined on the 'left' and
+        'background-color' properties. The following diagram illustrates the effect of updating those properties on an element, in this case moving it to the right and changing the background from red to blue. This assumes other transition parameters still have their default values.
+      </p>
+      <div class="figure">
+        <img src="transition1.png" alt="">
+      </div>
+      <p class="caption">
+        Transitions of 'left' and 'background-color'
+      </p>
+      <p>
+        Transitions are a presentational effect. The <a>computed value</a> of a property transitions over time from the old value to the new value. Therefore if a script queries the <a>computed value</a> of a property (or other data depending on it) as it is transitioning, it will see an intermediate value that represents the current animated value of the property.
+      </p>
+      <p>
+        Only animatable CSS properties can be transitioned. See the table at the end of this document for a list
+        of properties that are animatable.
+      </p>
+      <p>
+        The transition for a property is defined using a number of new properties. For example:
+      </p>
+      <div class="example">
+        <p style="display:none">
+          Example(s):
+        </p>
+        <pre>
+  div {
+    transition-property: opacity;
+    transition-duration: 2s;
+  }
+  </pre>The above example defines a transition on the 'opacity' property that, when a new value is assigned to it, will cause a smooth change between the old value and the new value over a period of two seconds.
+      </div>
+      <p>
+        Each of the transition properties accepts a comma-separated list, allowing multiple transitions to be defined, each acting on a different property. In this case, the individual transitions take their parameters from the same index in all the lists. For example:
+      </p>
+      <div class="example">
+        <p style="display:none">
+          Example(s):
+        </p>
+        <pre>
+  div {
+    transition-property: opacity, left;
+    transition-duration: 2s, 4s;
+  }
+
+  </pre>This will cause the 'opacity' property to transition over a period of two seconds and the left property to transition over a period of four seconds.
+      </div>
+
+      <p id="list-matching">
+        In the case where the lists of values in transition properties
+        do not have the same length, the length of the
+        'transition-property' list determines the number of items in
+        each list examined when starting transitions.  The lists are
+        matched up from the first value: excess values at the end are
+        not used.  If one of the other properties doesn't have enough
+        comma-separated values to match the number of values of
+        'transition-property', the UA must calculate its used value by
+        repeating the list of values until there are enough.  This
+        truncation or repetition does not affect the computed value.
+        <span class="note">
+          Note: This is analogous to the behavior of the 'background-*'
+          properties, with 'background-image' analogous to
+          'transition-property'.
+        </span>
+      </p>
+
+      <div class="example">
+        <p style="display:none">
+          Example(s):
+        </p>
+      <pre>
+      div {
+        transition-property: opacity, left, top, width;
+        transition-duration: 2s, 1s;
+      }
+      </pre>The above example defines a transition on the 'opacity' property of 2 seconds duration, a
+      transition on the 'left' property of 1
+      second duration, a transition on the 'top' property of 2 seconds duration and a
+      transition on the 'width' property of 1
+      second duration.
+
+      </div>
+
+      <p>
+        While authors can use transitions to create dynamically changing content,
+        dynamically changing content can lead to seizures in some users.
+        For information on how to avoid content that can lead to seizures, see
+        <a href="https://www.w3.org/TR/WCAG20/#seizure">Guideline 2.3:
+        Seizures:
+        Do not design content in a way that is known to cause seizures</a>
+        ([[WCAG20]]).
+      </p>
+
+<span id="the-transition-property-property-">The 'transition-property' Property</span> {#transition-property-property}
+----------------------------------------------------------------------------------------------------------------------
+
+      <p>
+        The 'transition-property' property specifies the name of the CSS property to which the transition is applied.
+      </p>
+      <pre class="propdef">
+        Name: transition-property
+        Value: ''transition-property/none'' | <<single-transition-property>> #
+        Initial: ''transition-property/all''
+        Applies to: all elements, ::before and ::after pseudo elements
+        Inherited: no
+        Animatable: no
+        Percentages: N/A
+        Media: visual
+        Computed value: Same as specified value.
+        Canonical order: <abbr title="follows order of property value definition">per grammar</abbr>
+      </pre>
+
+      <div class="prod">
+        <dfn type id="single-transition-property">&lt;single-transition-property&gt;</dfn> = ''transition-property/all'' | <<custom-ident>>;
+      </div>
+
+      <p>
+        A value of
+        <dfn value for="transition-property">none</dfn>
+        means that no property will transition.
+        Otherwise, a list of properties to be transitioned, or the
+        keyword <dfn value for="transition-property">all</dfn>
+        which indicates that all properties are to be
+        transitioned, is given.
+      </p>
+
+      <p>
+        If one of the identifiers listed is not a recognized property
+        name or is not an animatable property, the implementation must
+        still start transitions on the animatable properties in the
+        list using the duration, delay, and timing function at their
+        respective indices in the lists for 'transition-duration',
+        'transition-delay', and 'transition-timing-function'.  In other
+        words, unrecognized or non-animatable properties must be kept in
+        the list to preserve the matching of indices.
+      </p>
+
+      <p>
+        The <<custom-ident>> production in <<single-transition-property>>
+        also excludes the keyword ''transition-property/none'',
+        in addition to the keywords always excluded from <<custom-ident>>.
+        This means that
+        ''transition-property/none'', ''inherit'', and ''initial'' are not
+        permitted as items within a list of more that one identifier;
+        any list that uses them is syntactically invalid.
+      </p>
+
+      <p>
+        For the keyword ''transition-property/all'',
+        or if one of the identifiers listed is a
+        shorthand property, implementations must start transitions for
+        any of its longhand sub-properties that are animatable (or, for
+        ''transition-property/all'', all animatable properties), using the duration, delay,
+        and timing function at the index corresponding to the shorthand.
+      </p>
+      <p>
+        If a property is specified multiple times in the value of
+        'transition-property' (either on its own, via a shorthand that
+        contains it, or via the ''transition-property/all'' value), then the transition that
+        starts uses the duration, delay, and timing function at the
+        index corresponding to the <em>last</em> item in the value of
+        'transition-property' that calls for animating that property.
+      </p>
+      <p class="note">
+        Note:  The ''transition-property/all'' value and 'all' shorthand
+        property work in similar ways, so the
+        ''transition-property/all'' value is just like a shorthand that
+        covers all properties.
+      </p>
+
+<span id="the-transition-duration-property-">The 'transition-duration' Property</span> {#transition-duration-property}
+----------------------------------------------------------------------------------------------------------------------
+
+      <p>
+        The 'transition-duration' property defines the length of time that a transition takes.
+      </p>
+      <pre class="propdef">
+        Name: transition-duration
+        Value: <<time>> #
+        Initial: ''0s''
+        Applies to: all elements, ::before and ::after pseudo elements
+        Inherited: no
+        Animatable: no
+        Percentages: N/A
+        Media: interactive
+        Computed value: Same as specified value.
+        Canonical order: <abbr title="follows order of property value definition">per grammar</abbr>
+      </pre>
+      <p>
+        This property specifies how long the transition from the old value to the new value should take. By default the value is ''0s'', meaning that the transition is immediate (i.e. there will be no animation). A negative value for 'transition-duration' renders the declaration invalid.
+      </p>
+
+<span id="transition-timing-function_tag">The 'transition-timing-function' Property</span> {#transition-timing-function-property}
+---------------------------------------------------------------------------------------------------------------------------------
+
+      <p>
+        The 'transition-timing-function' property
+        describes how the intermediate values used during a transition will be
+        calculated. It allows for a transition to change speed over its
+        duration. These effects are commonly called <em>easing</em> functions.
+      </p>
+      <p>
+        Timing functions are defined in the separate CSS Timing Functions module
+        [[!css-timing]].
+        The <a spec=css-timing>input progress value</a> used is the percentage
+        of the transition duration, and the <a spec=css-timing>output progress
+        value</a> is used as the <var>p</var> value when applying the <a
+        href="#animatable-types">interpolation rules</a> for the value type.
+      </p>
+      <pre class="propdef">
+        Name: transition-timing-function
+        Value: <<timing-function>> #
+        Initial: ''transition-timing-function/ease''
+        Applies to: all elements, ::before and ::after pseudo elements
+        Inherited: no
+        Animatable: no
+        Percentages: N/A
+        Media: interactive
+        Computed value: Same as specified value.
+        Canonical order: <abbr title="follows order of property value definition">per grammar</abbr>
+      </pre>
+
+
+<span id="the-transition-delay-property-">The 'transition-delay' Property</span> {#transition-delay-property}
+-------------------------------------------------------------------------------------------------------------
+
+      <p>
+        The 'transition-delay' property defines when the transition will start. It allows a transition to begin execution some some period of time from when it is applied. A 'transition-delay' value of ''0s'' means the transition will execute as soon as the property is changed. Otherwise, the value specifies an offset from the moment the property is changed, and the transition will delay execution by that offset.
+      </p>
+      <p>
+        If the value for 'transition-delay' is a negative time offset then the transition will execute the moment the property is changed, but will appear to have begun execution at the specified offset. That is, the transition will appear to begin part-way through its play cycle. In the case where a transition has implied starting values and a negative 'transition-delay', the starting values are taken from the moment the property is changed.
+      </p>
+      <pre class="propdef">
+        Name: transition-delay
+        Value: <<time>> #
+        Initial: ''0s''
+        Applies to: all elements, ::before and ::after pseudo elements
+        Inherited: no
+        Animatable: no
+        Percentages: N/A
+        Media: interactive
+        Computed value: Same as specified value.
+        Canonical order: <abbr title="follows order of property value definition">per grammar</abbr>
+      </pre>
+
+<span id="the-transition-shorthand-property-">The 'transition' Shorthand Property</span> {#transition-shorthand-property}
+-------------------------------------------------------------------------------------------------------------------------
+
+      <p>
+        The 'transition' shorthand property combines the four properties described above into a single property.
+      </p>
+      <pre class="propdef">
+        Name: transition
+        Value: <<single-transition>> #
+        Initial: see individual properties
+        Applies to: all elements, ::before and ::after pseudo elements
+        Inherited: no
+        Animatable: no
+        Percentages: N/A
+        Media: interactive
+        Computed value: see individual properties
+        Canonical order: <abbr title="follows order of property value definition">per grammar</abbr>
+      </pre>
+
+      <div class="prod">
+        <dfn type id="single-transition">&lt;single-transition&gt;</dfn> = [ ''transition-property/none'' | <<single-transition-property>> ] || <<time>> || <<timing-function>> || <<time>>
+      </div>
+
+      <p>
+        Note that order is important within the items in this property:
+        the first value that can be parsed as a time is assigned to the
+        transition-duration,
+        and the second value that can be parsed as a time is assigned to
+        transition-delay.
+      </p>
+
+      <p>
+        If there is more than one <<single-transition>> in the shorthand,
+        and any of the transitions has
+        ''transition-property/none'' as the <<single-transition-property>>,
+        then the declaration is invalid.
+      </p>
+
+Starting of transitions {#starting}
+===================================
+
+      <p>
+        Implementations must maintain a set of
+        <dfn export lt="running transition">running transitions</dfn>,
+        each of which applies to a specific element and non-shorthand
+        property.  Each of these transitions also has a
+        <dfn export for="transition">start time</dfn>, <dfn export for="transition">end time</dfn>,
+        <dfn export for="transition">start value</dfn>, <dfn export for="transition">end value</dfn>,
+        <dfn export for="transition">reversing-adjusted start value</dfn>, and <dfn export for="transition">reversing shortening factor</dfn>.
+        Transitions are added to this set as described in this section,
+        and are removed from this set
+        when they <a>complete</a>
+        or when implementations are required to <dfn export for="transition">cancel</dfn> them.
+        <span class="note">
+          For the rationale behind the <a>reversing-adjusted start value</a>
+          and <a>reversing shortening factor</a>, see [[#reversing]].
+        </span>
+      </p>
+
+      <p>
+        Implementations must also maintain a set of
+        <dfn export lt="completed transition">completed transitions</dfn>,
+        each of which
+        (like <a>running transitions</a>)
+        applies to a specific element and non-shorthand property.
+        <span class="note">
+          This specification maintains the invariant that
+          there is never both a <a>running transition</a> and
+          a <a>completed transition</a> for the same property and element.
+        </span>
+      </p>
+
+      <p>
+        If an element is no longer in the document,
+        implementations must <a>cancel</a> any <a>running transitions</a>
+        on it and remove transitions on it from the
+        <a>completed transitions</a>.
+      </p>
+
+      <div class="note">
+
+        <p>
+          This set of completed transitions
+          needs to be maintained
+          in order to prevent
+          transitions from repeating themselves in certain cases,
+          i.e., to maintain the invariant
+          that this specification tries to maintain
+          that unrelated style changes do not trigger transitions.
+        </p>
+
+        <p class="example">
+          An example where maintaining the set of completed transitions
+          is necessary would be a transition on
+          an inherited property,
+          where the parent specifies a transition of that property for
+          a longer duration (say, ''transition: 4s text-indent'')
+          and a child element that inherits the parent's value specifies
+          a transition of the same property for a shorter duration
+          (say, ''transition: 1s text-indent'').
+          Without the maintenance of this set of completed transitions,
+          implementations could start additional transitions on the child
+          after the initial 1 second transition on the child completes.
+        </p>
+
+      </div>
+
+      <p>
+        Various things can cause the <a>computed values</a> of properties
+        on an element to change.
+        These include
+        insertion and removal of elements from the document tree
+        (which both changes whether those elements have <a>computed values</a> and
+        can change the styles of other elements through selector matching),
+        changes to the document tree that cause
+        changes to which selectors match elements,
+        changes to style sheets or style attributes,
+        and other things.
+        This specification does not define when <a>computed values</a> are updated,
+        beyond saying that implementations must not
+        use, present, or display something resulting from the CSS
+        cascading, value computation, and inheritance process [[!CSS3CASCADE]]
+        without updating the <a>computed value</a>
+        (which means merely that implementations cannot avoid
+        meeting requirements of this specification
+        by claiming not to have updated the <a>computed value</a>
+        as part of handling a style change).
+        However,
+        when an implementation updates the <a>computed value</a> of a
+        property on an element
+        to reflect one of these changes,
+        or computes the <a>computed value</a> of a property on an element
+        newly added to the document,
+        it must update the <a>computed value</a>
+        for all properties and elements to reflect all
+        of these changes at the same time
+        (or at least it must be undetectable that it was done at a
+        different time).
+        This processing of a set of simultaneous style changes is called a
+        <dfn export>style change event</dfn>.
+        (Implementations typically have a <a>style change event</a> to
+        correspond with their desired screen refresh rate,
+        and when up-to-date computed style or layout information is needed
+        for a script API that depends on it.)
+      </p>
+
+      <p>
+        Since this specification does not define
+        when a <a>style change event</a> occurs,
+        and thus what changes to computed values are considered simultaneous,
+        authors should be aware that changing any of the transition
+        properties a small amount of time after making a change that
+        might transition can result in behavior that varies between
+        implementations, since the changes might be considered
+        simultaneous in some implementations but not others.
+      </p>
+
+      <p>
+        When a <a>style change event</a> occurs,
+        implementations must start transitions based on
+        the <a>computed values</a> that changed in that event.
+        If an element is not in the document during that
+        style change event or was not in the document during
+        the previous style change event,
+        then transitions are not started for that element
+        in that style change event.
+        Otherwise,
+        define the <dfn export>before-change style</dfn> as
+        the <a>computed values</a> of all properties on the element as of
+        the previous <a>style change event</a>,
+        except with any styles derived from declarative
+        animations such as CSS Transitions, CSS Animations
+        ([[CSS3-ANIMATIONS]]),
+        and SMIL Animations ([[SMIL-ANIMATION]], [[SVG11]])
+        updated to the current time.
+        Likewise, define the <dfn export>after-change style</dfn> as
+        the <a>computed values</a> of all properties
+        on the element based on the information
+        known at the start of that <a>style change event</a>,
+        but using the computed values of the 'animation-*' properties from the
+        <a>before-change style</a>,
+        excluding any styles from CSS Transitions in the computation,
+        and inheriting from
+        the <a>after-change style</a> of the parent.
+        Note that this means the <a>after-change style</a> does not differ from
+        the <a>before-change style</a> due to newly created or canceled CSS
+        Animations.
+      </p>
+
+      <div class="note">
+        <p>
+          Note that this definition of the <a>after-change style</a>
+          means that a single change
+          can start a transition on the same property
+          on both an ancestor element and its descendant element.
+          This can happen when a property change is inherited
+          from one element with 'transition-*' properties
+          that say to animate the changing property
+          to another element with 'transition-*' properties
+          that also say to animate the changing property.
+        </p>
+
+        <p>
+          When this happens, both transitions will run,
+          and the transition on the descendant will override
+          the transition on the ancestor
+          because of the normal
+          CSS cascading and inheritance rules ([[CSS3CASCADE]]).
+        </p>
+
+        <p>
+          If the transition on the descendant completes before
+          the transition on the ancestor,
+          the descendant will then resume inheriting
+          the (still transitioning) value from its parent.
+          This effect is likely not a desirable effect,
+          but it is essentially doing what the author asked for.
+        </p>
+      </div>
+
+      <p>
+        For each element with a <a>before-change style</a> and
+        an <a>after-change style</a>,
+        and each property (other than shorthands),
+        define the <dfn export>matching transition-property value</dfn> as
+        the last value in the
+        'transition-property' in the element's <a>after-change style</a>
+        that matches the property,
+        as described in
+        [[#transition-property-property]].
+        If there is such a value, then corresponding to it, there is
+        a <dfn export>matching transition duration</dfn>,
+        a <dfn export>matching transition delay</dfn>, and
+        a <dfn export>matching transition timing function</dfn>
+        in the values in the <a>after-change style</a> of
+        'transition-duration', 'transition-delay', and 'transition-timing-function'
+        (see <a href="#list-matching">the rules on matching lists</a>).
+        Define the <dfn export for="transition">combined duration</dfn> of the transition
+        as the sum of max(<a>matching transition duration</a>, ''0s'') and
+        the <a>matching transition delay</a>.
+        For each element and property, the implementation must act
+        as follows:
+      </p>
+
+      <ol>
+      <li>
+        If all of the following are true:
+        <ul>
+          <li>
+            the element does not have
+            a <a>running transition</a> for the property,
+          </li>
+          <li>
+            the <a>before-change style</a> is different from
+            and can be interpolated with
+            the <a>after-change style</a> for that property,
+          </li>
+          <li>
+            the element does not have a <a>completed transition</a>
+            for the property
+            or the <a>end value</a> of the <a>completed transition</a>
+            is different from the <a>after-change style</a> for the property,
+          </li>
+          <li>
+            there is a <a>matching transition-property value</a>, and
+          </li>
+          <li>
+            the <a>combined duration</a> is greater than ''0s'',
+          </li>
+        </ul>
+        then implementations must
+        remove the <a>completed transition</a> (if present) from the set
+        of completed transitions and
+        start a transition whose:
+        <ul>
+          <li>
+            <a>start time</a> is
+            the time of the <a>style change event</a> plus
+            the <a>matching transition delay</a>,
+          </li>
+          <li>
+            <a>end time</a> is
+            the <a>start time</a> plus
+            the <a>matching transition duration</a>,
+          </li>
+          <li>
+            <a>start value</a> is
+            the value of the transitioning property
+            in the <a>before-change style</a>,
+          </li>
+          <li>
+            <a>end value</a> is
+            the value of the transitioning property
+            in the <a>after-change style</a>,
+          </li>
+          <li>
+            <a>reversing-adjusted start value</a> is the same as
+            the <a>start value</a>, and
+          <li>
+            <a>reversing shortening factor</a> is 1.
+          </li>
+        </ul>
+      </li>
+      <li>
+        Otherwise,
+        if the element has a <a>completed transition</a> for the property
+        and the <a>end value</a> of the <a>completed transition</a>
+        is different from the <a>after-change style</a> for the property,
+        then implementations must
+        remove the <a>completed transition</a> from the set of
+        <a>completed transitions</a>.
+      </li>
+      <li>
+        If the element has a <a>running transition</a> or
+        <a>completed transition</a> for the property,
+        and there is <strong>not</strong>
+        a <a>matching transition-property value</a>,
+        then implementations must
+        <a>cancel</a> the <a>running transition</a>
+        or remove the <a>completed transition</a> from the set of
+        <a>completed transitions</a>.
+      </li>
+      <li>
+        If the element has a <a>running transition</a> for the property,
+        there is a <a>matching transition-property value</a>,
+        and the <a>end value</a> of the <a>running transition</a> is
+        <strong>not</strong> equal to the value of the property in the
+        <a>after-change style</a>, then:
+        <ol>
+          <li>
+            If the <a>current value</a> of the property
+            in the <a>running transition</a>
+            is equal to
+            the value of the property in the <a>after-change style</a>,
+            or if these two values cannot be interpolated,
+            then implementations must
+            <a>cancel</a> the <a>running transition</a>.
+          </li>
+          <li>
+            Otherwise, if the <a>combined duration</a> is
+            less than or equal to ''0s'',
+            or if the
+            <a>current value</a> of the property in the <a>running transition</a>
+            cannot be interpolated with
+            the value of the property in the <a>after-change style</a>,
+            then implementations must
+            <a>cancel</a> the <a>running transition</a>.
+          </li>
+          <li>
+            Otherwise, if the <a>reversing-adjusted start value</a>
+            of the <a>running transition</a> is the same as the value of
+            the property in the <a>after-change style</a>
+            <span class="note">(see the
+            <a href="#reversing">section on reversing of
+            transitions</a> for why these case exists)</span>,
+            implementations must
+            <a>cancel</a> the <a>running transition</a> and
+            start a new transition whose:
+            <ul>
+              <li>
+                <a>reversing-adjusted start value</a> is
+                the <a>end value</a> of the
+                <a>running transition</a>
+                <span class="note">(Note: This represents the logical start state of
+                the transition, and allows some calculations to ignore that
+                the transition started before that state was reached, which
+                in turn allows repeated reversals of the same transition to
+                work correctly),</span>
+              <li>
+                <a>reversing shortening factor</a>
+                is the absolute value, clamped to the range [0, 1],
+                of the sum of:
+                <ol>
+                  <li>the output of the timing function of the old transition
+                  at the time of the <a>style change event</a>,
+                  times the <a>reversing shortening factor</a> of the
+                  old transition</li>
+                  <li>1 minus the <a>reversing shortening factor</a> of
+                  the old transition.</li>
+                </ol>
+                <span class="note">Note: This represents the portion of the
+                space between the <a>reversing-adjusted start value</a>
+                and the <a>end value</a> that the old transition has
+                traversed (in amounts of the value, not time), except with the
+                absolute value and clamping to handle timing functions that
+                have y1 or y2 outside the range [0, 1].</span>
+              </li>
+              <li>
+                <a>start time</a> is
+                the time of the <a>style change event</a> plus:
+                <ol>
+                  <li>if the <a>matching transition delay</a>
+                      is nonnegative,
+                      the <a>matching transition delay</a>, or
+                  <li>if the <a>matching transition delay</a>
+                      is negative,
+                      the product of
+                      the new transition's
+                      <a>reversing shortening factor</a> and
+                      the <a>matching transition delay</a>,
+                </ol>
+              </li>
+              <li>
+                <a>end time</a> is
+                the <a>start time</a> plus the product of
+                the <a>matching transition duration</a> and
+                the new transition's <a>reversing shortening factor</a>,
+              </li>
+              <li>
+                <a>start value</a> is
+                the <a>current value</a> of the property
+                in the <a>running transition</a>,
+              </li>
+              <li>
+                <a>end value</a> is
+                the value of the property
+                in the <a>after-change style</a>,
+              </li>
+            </ul>
+          </li>
+          <li>
+            Otherwise, implementations must
+            <a>cancel</a> the <a>running transition</a>
+            and start a new transition whose:
+            <ul>
+              <li>
+                <a>start time</a> is
+                the time of the <a>style change event</a> plus
+                the <a>matching transition delay</a>,
+              </li>
+              <li>
+                <a>end time</a> is
+                the <a>start time</a> plus
+                the <a>matching transition duration</a>,
+              </li>
+              <li>
+                <a>start value</a> is
+                the <a>current value</a> of the property
+                in the <a>running transition</a>,
+              </li>
+              <li>
+                <a>end value</a> is
+                the value of the property
+                in the <a>after-change style</a>,
+              </li>
+              <li>
+                <a>reversing-adjusted start value</a> is the same as
+                the <a>start value</a>, and
+              <li>
+                <a>reversing shortening factor</a> is 1.
+              </li>
+            </ul>
+          </li>
+        </ol>
+      </li>
+
+      </ol>
+
+      <div class="note">
+        <p>
+          Note that the above rules mean that
+          when the computed value of an animatable property changes,
+          the transitions that start are based on the
+          values of the 'transition-property', 'transition-duration',
+          'transition-timing-function', and 'transition-delay' properties
+          at the time the animatable property would first have its new
+          computed value.
+          This means that when one of these 'transition-*' properties
+          changes at the same time as
+          a property whose change might transition,
+          it is the <em>new</em> values of the 'transition-*' properties
+          that control the transition.
+        </p>
+        <div class="example" id="manual-reversing-example">
+          <p style="display:none">
+            Example(s):
+          </p>
+          <p>This provides a way for authors to specify different values
+          of the 'transition-*' properties for the &ldquo;forward&rdquo;
+          and &ldquo;reverse&rdquo; transitions,
+          when the transitions are between two states
+          (but see <a
+          href="#reversing">below</a> for special reversing behavior when
+          an <em>incomplete</em> transition is interrupted).  Authors can
+          specify the value of 'transition-duration',
+          'transition-timing-function', or 'transition-delay' in the same
+          rule where they specify the value that triggers the transition,
+          or can change these properties at the same time as they change
+          the property that triggers the transition.  Since it's the new
+          values of these 'transition-*' properties that affect the
+          transition, these values will be used for the transitions
+          <em>to</em> the associated transitioning values.  For example:
+           </p>
+          <pre>
+  li {
+    transition: background-color linear 1s;
+    background: blue;
+  }
+  li:hover {
+    background-color: green;
+    transition-duration: 2s; /* applies to the transition *to* the :hover state */
+  }</pre>
+          <p>
+            When a list item with these style rules enters the :hover
+            state, the computed 'transition-duration' at the time that
+            'background-color' would have its new value (''green'') is ''2s'',
+            so the transition from ''blue'' to ''green'' takes 2 seconds.
+            However, when the list item leaves the :hover state, the
+            transition from ''green'' to ''blue'' takes 1 second.
+          </p>
+        </div>
+      </div>
+
+      <p class="note">
+        Note that once the transition of a property has started
+        (including being in its delay phase),
+        it continues running based on
+        the original timing function, duration, and
+        delay, even if the 'transition-timing-function',
+        'transition-duration', or 'transition-delay' property changes
+        before the transition is complete.  However, if the
+        'transition-property' property changes such that the transition
+        would not have started, the transition stops (and the
+        property immediately changes to its final value).
+      </p>
+
+      <p class="note">
+        Note that above rules mean that
+        transitions do not start when the computed
+        value of a property changes as a result of declarative animation
+        (as opposed to scripted animation).
+        This happens because the before-change style includes up-to-date
+        style for declarative animations.
+      </p>
+
+Faster reversing of interrupted transitions {#reversing}
+--------------------------------------------------------
+
+      <div class="note">
+
+      <p>
+        Many common transitions effects involve transitions between two states,
+        such as the transition that occurs when the mouse pointer moves
+        over a user interface element, and then later moves out of that element.
+        With these effects, it is common for a running transition
+        to be interrupted before it completes,
+        and the property reset to the starting value of that transition.
+        An example is a hover effect on an element,
+        where a transition starts when the pointer enters the element,
+        and then the pointer exits the element before the effect has completed.
+        If the outgoing and incoming transitions
+        are executed using their specified durations and timing functions,
+        the resulting effect can be distractingly asymmetric
+        because the second transition
+        takes the full specified time to move a shortened distance.
+        Instead, this specification makes second transition shorter.
+      </p>
+
+      <p>
+        The mechanism the above rules use to cause this involves the
+        <a>reversing shortening factor</a> and the
+        <a>reversing-adjusted start value</a>.
+        In particular, the reversing behavior is present whenever
+        the <a>reversing shortening factor</a> is less than 1.
+      </p>
+
+      <p class="note">
+        Note that these rules do not fully address the problem for
+        transition patterns that involve more than two states.
+      </p>
+
+      <p class="note">
+        Note that these rules lead to the entire timing function of the
+        new transition being used, rather than jumping into the middle
+        of a timing function, which can create a jarring effect.
+      </p>
+
+      <p class="note">
+        This was one of several possibilities that was considered by the
+        working group.  See the
+        <a href="transition-reversing-demo">reversing demo</a>
+        demonstrating a number of them, leading to a working group
+        resolution made on 2013-06-07 and edits made on 2013-11-11.
+      </p>
+
+      </div>
+
+Application of transitions {#application}
+=========================================
+
+      <p>
+        When a property on an element is undergoing a transition
+        (that is, when or after the transition has started and before the
+        <a>end time</a> of the transition)
+        the transition adds a style called the <dfn export>current value</dfn>
+        to the CSS cascade
+        at the level defined for CSS Transitions in [[!CSS3CASCADE]].
+      </p>
+
+      <p class="note">
+        Note that this means that computed values
+        resulting from CSS transitions
+        can inherit to descendants just like
+        any other computed values.
+        In the normal case, this means that
+        a transition of an inherited property
+        applies to descendant elements
+        just as an author would expect.
+      </p>
+
+      <p>
+        Implementations must add this value to the cascade
+        if and only if
+        that property is not currently
+        undergoing a CSS Animation ([[!CSS3-ANIMATIONS]]) on the same element.
+      </p>
+
+      <p class="note">
+        Note that this behavior of transitions not applying to the cascade
+        when an animation on the same element and property is running
+        does not affect whether the transition has started or ended.
+        APIs that detect whether transitions are running
+        (such as <a href="#transition-events">transition events</a>)
+        still report that a transition is running.
+      </p>
+
+      <p>
+        If the current time is at or before the
+        <a>start time</a> of the transition
+        (that is, during the delay phase of the transition),
+        the <a>current value</a> is a specified style that will compute
+        to the <a>start value</a> of the transition.
+      </p>
+
+      <p>
+        If the current time is after the
+        <a>start time</a> of the transition
+        (that is, during the duration phase of the transition),
+        the <a>current value</a> is a specified style that will compute
+        to the <a href="#animatable-types">result of interpolating the property</a>
+        using the <a>start value</a> of the transition as
+        <var>V</var><sub>start</sub>,
+        using the <a>end value</a> of the transition as
+        <var>V</var><sub>end</sub>,
+        and using (current time - start time) / (end time - start time)
+        as the input to the timing function.
+      </p>
+
+Completion of transitions {#complete}
+=====================================
+
+      <p>
+        <a>Running transitions</a>
+        <dfn export for="transition" id="dfn-complete">complete</dfn>
+        at a time that equal to or after their end time,
+        but prior to to the first <a>style change event</a>
+        whose time is equal to or after their <a>end time</a>.
+        When a transition completes,
+        implementations must move
+        all transitions that complete at that time
+        from the set of <a>running transitions</a>
+        to the set of <a>completed transitions</a>
+        and then fire the <a href="#transition-events">events</a>
+        for those completions.
+        <span class="note">(Note that doing otherwise, that is,
+        firing some of the events before doing all of the moving
+        from <a>running transitions</a> to <a>completed transitions</a>,
+        could allow
+        a style change event to happen
+        without the necessary transitions completing,
+        since firing the event could cause a style change event,
+        if an event handler requests up-to-date computed style or
+        layout data.)</span>
+      </p>
+
+<span id="transition-events-">Transition Events</span> {#transition-events}
+===========================================================================
+
+The creation, beginning, completion, and cancellation of CSS transitions
+generate corresponding DOM Events.
+An event is <a>dispatched</a> to the element for each property that undergoes
+a transition on that element.
+This allows a content developer to perform actions that synchronize
+with changes to transitions.
+
+Each event provides the name of the property the transition is
+associated with as well as the duration of the transition.
+
+## Interface {{TransitionEvent}} ## {#interface-transitionevent}
+
+The {{TransitionEvent}} interface provides specific contextual information
+associated with transitions.
+
+### IDL Definition ### {#interface-transitionevent-idl}
+
+<pre class="idl">
+  [Constructor(CSSOMString type, optional TransitionEventInit transitionEventInitDict)]
+  interface TransitionEvent : Event {
+    readonly attribute CSSOMString propertyName;
+    readonly attribute float elapsedTime;
+    readonly attribute CSSOMString pseudoElement;
+  };
+
+  dictionary TransitionEventInit : EventInit {
+    CSSOMString propertyName = "";
+    float elapsedTime = 0.0;
+    CSSOMString pseudoElement = "";
+  };
+</pre>
+
+### Attributes ### {#interface-transitionevent-attributes}
+
+:   <code class='attribute-name'><dfn attribute for="TransitionEvent" id="Events-TransitionEvent-propertyName">propertyName</dfn></code> of type <code>CSSOMString</code>, readonly
+::  The name of the CSS property associated with the transition.
+    <p class="note">Note:  This is always the name of a longhand property.  See 'transition-property' for how specifying shorthand properties causes transitions on longhands.</p>
+:   <code class='attribute-name'><dfn attribute for="TransitionEvent" id="Events-TransitionEvent-elapsedTime">elapsedTime</dfn></code> of type <code>float</code>, readonly
+::  The amount of time the transition has been running, in seconds, when this
+    event fired not including any time spent in the delay phase.  The precise
+    calculation for of this member is defined along with each event type.
+:   <code class='attribute-name'><dfn attribute for="TransitionEvent" id="Events-TransitionEvent-pseudoElement">pseudoElement</dfn></code> of type <code>CSSOMString</code>, readonly
+::  The name (beginning with two colons) of the CSS
+    pseudo-element on which the transition occurred (in
+    which case the target of the event is that
+    pseudo-element's corresponding element), or the empty
+    string if the transition occurred on an element (which
+    means the target of the event is that element).
+
+
+<code id="TransitionEvent-constructor"><dfn constructor
+for="TransitionEvent">TransitionEvent(type, transitionEventInitDict)</dfn></code>
+is an <a>event constructor</a>.
+
+
+Types of <code>TransitionEvent</code> {#event-transitionevent}
+--------------------------------------------------------------
+
+The different types of transition events that can occur are:
+
+  <dl dfn-type=event dfn-for=transitionevent>
+    <dt><dfn id=transitionrun>transitionrun</dfn></dt>
+    <dd>
+      The {{transitionrun}} event occurs when a transition is created (i.e.,
+      when it is added to the set of <a>running transitions</a>).
+
+      A negative 'transition-delay' will cause the event to fire with
+      an {{TransitionEvent/elapsedTime}} equal to the absolute value of the
+      delay capped to the 'transition-duration' of the animation. That is,
+      the elapsed time is equal to
+      <code>min(max(-'transition-delay', 0), 'transition-duration'</a>)</code>.
+      <ul>
+        <li>Bubbles: Yes</li>
+        <li>Cancelable: No</li>
+        <li>Context Info: propertyName, elapsedTime, pseudoElement</li>
+      </ul>
+    </dd>
+
+    <dt><dfn id=transitionstart>transitionstart</dfn></dt>
+    <dd>
+      The {{transitionstart}} event occurs when a transition's delay phase ends.
+
+      The value of {{TransitionEvent/elapsedTime}} for {{transitionstart}}
+      events is the same as the value used for {{transitionrun}} events.
+      <ul>
+        <li>Bubbles: Yes</li>
+        <li>Cancelable: No</li>
+        <li>Context Info: propertyName, elapsedTime, pseudoElement</li>
+      </ul>
+    </dd>
+
+    <dt><dfn id=transitionend>transitionend</dfn></dt>
+    <dd>
+      The {{transitionend}} event occurs at the completion of the transition. In
+      the case where a transition is removed before completion, such as if the
+      'transition-property' is removed, then the event will not fire.
+
+      The value of {{TransitionEvent/elapsedTime}} for this event is equal to
+      the value of 'transition-duration'.
+      <ul>
+        <li>Bubbles: Yes</li>
+        <li>Cancelable: No</li>
+        <li>Context Info: propertyName, elapsedTime, pseudoElement</li>
+      </ul>
+    </dd>
+
+    <dt><dfn id=transitioncancel>transitioncancel</dfn></dt>
+    <dd>
+      The {{transitioncancel}} event occurs when a transition is <a
+      lt="cancel">canceled</a>.
+
+      The {{TransitionEvent/elapsedTime}} for {{transitioncancel}} events is
+      the number of seconds from the end of the transition's delay to the
+      moment when the transition was canceled.
+      If the transition had a negative 'transition-delay', the beginning of the
+      transition is the moment equal to the absolute value of 'transition-delay'
+      seconds <em>prior</em> to when the transition was actually triggered.
+      Alternatively, if the transition had a positive 'transition-delay' and the
+      event is fired before the transition's delay has expired, the
+      {{AnimationEvent/elapsedTime}} will be zero.
+      <ul>
+        <li>Bubbles: Yes</li>
+        <li>Cancelable: No</li>
+        <li>Context Info: propertyName, elapsedTime, pseudoElement</li>
+      </ul>
+    </dd>
+  </dl>
+
+Event handlers on elements, <code>Document</code> objects, and <code>Window</code> objects {#event-handlers-on-elements-document-objects-and-window-objects}
+---------------------------------------------------------------------------
+
+The following are the <a>event handlers</a> (and their corresponding <a>event
+handler event types</a>) that must be supported by all <a>HTML elements</a>, as
+both <a>event handler content attributes</a> and <a>event handler IDL
+attributes</a>; and that must be supported by all {{Document}} and {{Window}}
+objects, as <a>event handler IDL attributes</a>:
+
+<table class="event-handlers">
+  <tr>
+    <th><a>Event handler</a></th>
+    <th><a>Event handler event type</a></th>
+  </tr>
+  <tr>
+    <td><dfn>ontransitionrun</dfn></td>
+    <td><a idl>transitionrun</a></td>
+  </tr>
+  <tr>
+    <td><dfn>ontransitionstart</dfn></td>
+    <td><a idl>transitionstart</a></td>
+  </tr>
+  <tr>
+    <td><dfn>ontransitionend</dfn></td>
+    <td><a idl>transitionend</a></td>
+  </tr>
+  <tr>
+    <td><dfn>ontransitioncancel</dfn></td>
+    <td><a idl>transitioncancel</a></td>
+  </tr>
+</table>
+
+
+DOM Interfaces {#interface-dom}
+===============================
+
+This specification extends the {{GlobalEventHandlers}} interface from HTML to
+add <a>event handler IDL attributes</a> for <a
+href="#transition-events">transition events</a> as defined in [[#event-handlers-on-elements-document-objects-and-window-objects]].
+
+IDL Definition {#interface-globaleventhandlers-idl}
+--------------
+
+<pre class="idl">
+partial interface GlobalEventHandlers {
+  attribute EventHandler ontransitionrun;
+  attribute EventHandler ontransitionstart;
+  attribute EventHandler ontransitionend;
+  attribute EventHandler ontransitioncancel;
+};
+</pre>
+
+
+<span id="animation-of-property-types-">Animation of property types</span> {#animatable-types}
+==============================================================================================
+
+      <p>
+        Some property types can be interpolated,
+        which means they can animate smoothly from one value to another.
+        Other property types cannot, and thus animate only in a single
+        step from one value to the other.
+      </p>
+
+Animation of interpolated property types {#interpolated-types}
+--------------------------------------------------------------
+
+      <p>
+        When interpolating between two values,
+        <var>V</var><sub>start</sub> and <var>V</var><sub>end</sub>,
+        interpolation is done using the output <var>p</var> of the timing function,
+        which gives the portion of the value space
+        that the interpolation has crossed.
+        Thus the result of the interpolation is
+        <var>V</var><sub>res</sub> =
+          (1 - <var>p</var>) &sdot; <var>V</var><sub>start</sub> +
+          <var>p</var> &sdot; <var>V</var><sub>end</sub>.
+      </p>
+
+      <p>
+        However, if this value (<var>V</var><sub>res</sub>)
+        is outside the allowed range of values for the property,
+        then it is clamped to that range.
+        This can occur if <var>p</var> is outside of the range 0 to 1,
+        which can occur if a timing function is specified
+        with a <var>y1</var> or <var>y2</var> that is outside the range 0 to 1.
+      </p>
+
+      <p>
+        The following describes how each property type undergoes transition or
+        animation.
+      </p>
+
+      <ul>
+        <li id="animtype-color">
+          <strong>color</strong>: interpolated via red, green, blue and alpha
+          components (treating each as a number, see below).
+          The interpolation is done between premultiplied colors
+          (that is, colors for which the red, green, and blue components
+          specified have been multiplied by the alpha).
+        </li>
+        <li id="animtype-length">
+          <strong>length</strong>: interpolated as real numbers.
+        </li>
+        <li id="animtype-percentage">
+          <strong>percentage</strong>: interpolated as real numbers.
+        </li>
+        <li id="animtype-lpcalc">
+          <strong>length, percentage, or calc</strong>: when both values
+          are lengths, interpolated as lengths; when both values are
+          percentages, interpolated as percentages; otherwise, both
+          values are converted into a ''calc()'' function that is the
+          sum of a length and a percentage (each possibly zero), and
+          these ''calc()'' functions have each half interpolated as real
+          numbers.
+        </li>
+        <li id="animtype-integer">
+          <strong>integer</strong>: interpolated via discrete steps (whole
+          numbers). The interpolation happens in real number space and is
+          converted to an integer by rounding to the nearest integer, with
+          values halfway between a pair of integers rounded towards
+          positive infinity.
+        </li>
+        <li id="animtype-font-weight">
+          <strong>font weight</strong>: interpolated via discrete steps
+          (multiples of 100). The interpolation happens in real number
+          space and is converted to an integer by rounding to the
+          nearest multiple of 100, with values halfway between multiples
+          of 100 rounded towards positive infinity.
+        </li>
+        <li id="animtype-number">
+          <strong>number</strong>: interpolated as real (floating point)
+          numbers.
+        </li>
+        <li id="animtype-rect">
+          <strong>rectangle</strong>: interpolated via the x, y,
+          width and height components (treating each as a number).
+        </li>
+        <li id="animtype-visibility">
+          <strong>visibility</strong>: if one of the values is
+          ''visibility/visible'', interpolated as a discrete step where values of the
+          timing function between 0 and 1 map to ''visibility/visible'' and other
+          values of the timing function (which occur only at the
+          start/end of the transition or as a result of ''cubic-bezier()''
+          functions with Y values outside of [0, 1]) map to the closer
+          endpoint; if neither value is ''visibility/visible'' then not interpolable.
+        </li>
+        <li id="animtype-shadow-list">
+          <strong>shadow list</strong>: Each shadow in the list
+          (treating ''shadow/none'' as a 0-length list)
+          is interpolated via the
+          color (as <a href="#animtype-color">color</a>) component,
+          and x, y, blur, and (when appropriate) spread
+          (as <a href="#animtype-length">length</a>) components.
+          For each shadow, if both input shadows are ''shadow/inset''
+          or both input shadows are not ''shadow/inset'',
+          then the interpolated shadow must match the input shadows in that regard.
+          If any pair of input shadows has one ''shadow/inset'' and the other not ''shadow/inset'',
+          the entire <a href="#animtype-shadow-list">shadow-list</a> is uninterpolable.
+          If the lists of shadows have different lengths,
+          then the shorter list is padded at the end
+          with shadows whose color is ''transparent'',
+          all lengths are ''0'',
+          and whose ''shadow/inset'' (or not) matches the longer list.
+        </li>
+        <li id="animtype-gradient">
+          <strong>gradient</strong>: interpolated via the
+          positions and colors of each stop. They must have the same type
+          (radial or linear) and same number of stops in order to be animated.
+          <span class="note">Note: [[CSS3-IMAGES]] may extend this
+          definition.</span>
+        </li>
+        <li id="animtype-paintserver">
+          <strong>paint server</strong> (SVG): interpolation is only supported
+          between: gradient to gradient and color to color. They then
+          work as above.
+        </li>
+        <li id="animtype-simple-list">
+          <strong>simple list</strong> of other types:
+          If the lists have the same number of items,
+          and each pair of values can be interpolated,
+          each item in the list is interpolated using
+          the rules given for those types.
+          Otherwise the values are not interpolable.
+        </li>
+        <li id="animtype-repeatable-list">
+          <strong>repeatable list</strong> of other types:
+          The result list has a length that is the least common multiple
+          of the lengths of the input lists.
+          Each item in the result is the interpolation of the value
+          from each input list repeated to the length of the result list.
+          If a pair of values cannot be interpolated, then the lists
+          are not interpolable.
+          <span class="note">
+            The repeatable list concept ensures that a list that is
+            conceptually repeated to a certain length (as
+            'background-origin' is repeated to the length of the
+            'background-image' list) or repeated infinitely will
+            smoothly transition between any values, and so that the
+            computed value will properly represent the result (and
+            potentially be inherited correctly).
+          </span>
+        </li>
+      </ul>
+
+      <p>Future specifications may define additional types that can
+      be animated.</p>
+
+      <p>See the definition of 'transition-property' for how animation
+      of shorthand properties and the ''all'' value is applied to any
+      properties (in the shorthand) that can be animated.</p>
+
+Animation in steps of other property types {#step-types}
+--------------------------------------------------------
+
+      <p>
+        When interpolating between two values that cannot be interpolated,
+        <var>V</var><sub>start</sub> and <var>V</var><sub>end</sub>,
+        interpolation is done using the output <var>p</var> of the timing function.
+        If <var>p</var> is less than 0.5, then the
+        result of the interpolation is
+        <var>V</var><sub>start</sub>;
+        if <var>p</var> is greater than or equal to 0.5, then the
+        result of the interpolation is
+        <var>V</var><sub>end</sub>.
+      </p>
+
+      <p class="note" id="discrete-interpolation-at-risk">
+        This is a recent change to which implementations have
+        not yet updated.  (Prior to the change CSS Transitions
+        and CSS Animations did not run on such changes.)  It's
+        possible that it won't be compatible with existing Web content.
+        If that is the case, the problem may be mitigated by restricting
+        this behavior only to CSS Animations (and not to CSS Transitions),
+        and/or restricting it to step timing functions.
+      </p>
+
+<span id="animatable-properties-">Animatable properties</span> {#animatable-properties}
+=======================================================================================
+
+      <!--
+      As resolved in
+      http://lists.w3.org/Archives/Public/www-style/2011Sep/0497.html
+      -->
+
+      <p>The definition of each CSS property defines
+      when the values of that property can be interpolated
+      by referring to the definitions of property types
+      in the <a href="#animatable-types">previous section</a>.
+      The animated value is interpolated from the from and to values when
+      both the from and the to values of the property have the type described.
+      (When a composite type such as "length, percentage, or calc" is listed,
+      this means that both values must fit into that composite type.)
+      When multiple types are listed in the form "either A or B",
+      both values must be of the same type to be interpolable.</p>
+
+      <p>Otherwise, since the from and to values cannot be interpolated,
+      the animation is done <a href="#step-types">in a single step</a>.</p>
+
+      <p>The 'transition-*' properties defined in this specification do
+      not undergo transitions.</p>
+
+      <p>For properties that exist at the time this specification was
+      developed, this specification defines how they are
+      animated.  However, future CSS specifications may define
+      additional properties, additional values for existing properties,
+      or additional animation behavior of existing values.  In order to
+      describe new animation behaviors and to have the definition of
+      animation behavior in a more appropriate location, future CSS
+      specifications should include an "Animatable:" line in the summary
+      of the property's definition (in addition to the other lines
+      described in [[CSS21]], <a
+      href="https://www.w3.org/TR/CSS21/about.html#property-defs">section
+      1.4.2</a>).  This line should say "no" to indicate that a property
+      cannot be animated or should reference an animation behavior
+      (which may be one of the behaviors in the <a
+      href="#animation-of-property-types-">Animation of property
+      types</a> section above, or may be a new behavior) to define how
+      the property animates.  Such definitions override those given in
+      this specification.</p>
+
+      <p class="issue" id="issue-animatable-name">
+        It no longer makes sense for this line to be called
+        "Animatable".  It should probably be renamed to "Interpolation",
+        and the "no" value renamed to "discrete" or "in steps".
+        See mailing list thread:
+        <a href="https://lists.w3.org/Archives/Public/www-style/2015May/0256.html">message 1</a>,
+        <a href="https://lists.w3.org/Archives/Public/www-style/2015May/0257.html">message 2</a>
+      </p>
+
+<span id="properties-from-css-">Properties from CSS</span> {#animatable-css}
+----------------------------------------------------------------------------
+
+      <p>
+      The following definitions define the animation behavior for
+      properties in CSS Level 2 Revision 1 ([[CSS21]]) and in Level 3 of
+      the CSS Color Module ([[CSS3COLOR]]).
+      </p>
+
+     <table class="animatable-properties">
+       <tr>
+         <th>Property Name</th>
+         <th>Type</th>
+       </tr>
+       <tr>
+         <td>'background-color'</td><td>as <a href="#animtype-color">color</a></tr>
+       <tr>
+         <td>'background-position'</td><td>as <a href="#animtype-repeatable-list">repeatable list</a> of <a href="#animtype-simple-list">simple list</a> of <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'border-bottom-color'</td><td>as <a href="#animtype-color">color</a></td>
+       </tr>
+       <tr>
+         <td>'border-bottom-width'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'border-left-color'</td><td>as <a href="#animtype-color">color</a></td>
+       </tr>
+       <tr>
+         <td>'border-left-width'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'border-right-color'</td><td>as <a href="#animtype-color">color</a></td>
+       </tr>
+       <tr>
+         <td>'border-right-width'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'border-spacing'</td><td>as <a href="#animtype-simple-list">simple list</a> of <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'border-top-color'</td><td>as <a href="#animtype-color">color</a></td>
+       </tr>
+       <tr>
+         <td>'border-top-width'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'bottom'</td><td>as <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'clip'</td><td>as <a href="#animtype-rect">rectangle</a></td>
+       </tr>
+       <tr>
+         <td>'color'</td><td>as <a href="#animtype-color">color</a></td>
+       </tr>
+       <tr>
+         <td>'font-size'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'font-weight!!property'</td><td>as <a href="#animtype-font-weight">font weight</a></td>
+       </tr>
+       <tr>
+         <td>'height'</td><td>as <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'left'</td><td>as <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'letter-spacing'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'line-height'</td><td>as either <a href="#animtype-number">number</a> or <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'margin-bottom'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'margin-left'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'margin-right'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'margin-top'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'max-height'</td><td>as <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'max-width'</td><td>as <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'min-height'</td><td>as <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'min-width'</td><td>as <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'opacity'</td><td>as <a href="#animtype-number">number</a></td>
+       </tr>
+       <tr>
+         <td>'outline-color'</td><td>as <a href="#animtype-color">color</a></td>
+       </tr>
+       <tr>
+         <td>'outline-width'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'padding-bottom'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'padding-left'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'padding-right'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'padding-top'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'right'</td><td>as <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'text-indent'</td><td>as <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'text-shadow'</td><td>as <a href="#animtype-shadow-list">shadow list</a></td>
+       </tr>
+       <tr>
+         <td>'top'</td><td>as <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'vertical-align'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'visibility'</td><td>as <a href="#animtype-visibility">visibility</a></td>
+       </tr>
+       <tr>
+         <td>'width'</td><td>as <a href="#animtype-lpcalc">length, percentage, or calc</a></td>
+       </tr>
+       <tr>
+         <td>'word-spacing'</td><td>as <a href="#animtype-length">length</a></td>
+       </tr>
+       <tr>
+         <td>'z-index'</td><td>as <a href="#animtype-integer">integer</a></td>
+       </tr>
+     </table>
+
+<span id="properties-from-svg-">Properties from SVG</span> {#animatable-svg}
+----------------------------------------------------------------------------
+
+     <p>
+       All properties defined as animatable in the SVG specification, provided
+       they are one of the property types listed above.
+      </p>
+
+     <!-- <table>
+       <tr>
+         <th>Property Name</th><th>Type</th>
+       </tr>
+       <tr>
+         <td>stop-color</td><td>as <a href="#animtype-color">color</a></td>
+       </tr>
+       <tr>
+         <td>stop-opacity</td><td>as <a href="#animtype-number">number</a></td>
+       </tr>
+       <tr>
+         <td>fill</td><td>as <a href="#animtype-paintserver">paint server</a></td>
+       </tr>
+       <tr>
+         <td>fill-opacity</td><td>as <a href="#animtype-number">number</a></td>
+       </tr>
+       <tr>
+         <td>stroke</td><td>as <a href="#animtype-paintserver">paint server</a></td>
+       </tr>
+       <tr>
+         <td>stroke-dasharray</td><td>as <a href="#animtype-repeatable-list">repeatable list</a> of <a href="#animtype-number">number</a></td>
+       </tr>
+       <tr>
+         <td>stroke-dashoffset</td><td>as <a href="#animtype-number">number</a></td>
+       </tr>
+       <tr>
+         <td>stroke-miterlimit</td><td>as <a href="#animtype-number">number</a></td>
+       </tr>
+       <tr>
+         <td>stroke-opacity</td><td>as <a href="#animtype-number">number</a></td>
+       </tr>
+       <tr>
+         <td>stroke-width</td><td>as <a href="#animtype-number">number</a></td>
+       </tr>
+       <tr>
+         <td>viewport-fill</td><td>as <a href="#animtype-color">color</a></td>
+       </tr>
+       <tr>
+         <td>viewport-fill-opacity</td><td>as <a href="#animtype-color">color</a></td>
+       </tr>
+      </table> -->
+
+Security Considerations {#security}
+===================================
+
+<em>This section is not normative.</em>
+
+The security implications of this specification are limited
+because it doesn't allow Web content to do things
+that it could not do before.
+Rather, it allows things that could previously be done with script
+to be done declaratively,
+and it ways that implementations can optimize (for frame rate and
+CPU usage).
+
+One of the major categories of optimizations
+that implementations can make is implementing animation
+of certain high-value properties (such as 'transform' and 'opacity')
+run on a browser's compositor thread or process
+without updating style or layout on the main Web content thread
+unless up-to-date style data are needed.
+This optimization often requires allocations of graphics memory
+to display the contents of the element being animated.
+Implementations should take care to ensure that Web content
+cannot trigger unsafe out-of-memory handling
+by using large numbers of animations
+or animations on elements covering large areas
+(where large may be defined in terms of pre-transform or post-transform size).
+
+Privacy Considerations {#privacy}
+=================================
+
+<em>This section is not normative.</em>
+
+As for security, the privacy considerations of this specification are limited
+because it does not allow Web content to do things that it could not do before.
+
+This specification may provide additional mechanisms that help to determine
+characteristics of the user's hardware or software.
+However, ability to determine performance characteristics of the user's
+hardware or software is common to many Web technologies,
+and this specification does not introduce new capabilities.
+
+As described in [[#accessibility]],
+implementations may provide mitigations to help users with disabilities.
+These mitigations are likely to be detectable by Web content,
+which means that users who would benefit from these mitigations
+may face a tradeoff between keeping their disability private from
+the Web content or benefiting from the mitigation.
+
+Accessibility Considerations {#accessibility}
+=============================================
+
+<em>This section is not normative.</em>
+
+Motion {#accessibility-motion}
+------------------------------
+
+This specification provides declarative mechanisms for animations
+that previously needed to be done using script.
+Providing a declarative mechanism has multiple effects:
+it makes such animations easier to make and thus likely to be more common,
+but it also makes it easier for user agents to modify those animations
+if such modifications are needed to meet a user's accessibility needs.
+
+Thus, users who are sensitive to movement,
+or who require additional time to read or understand content,
+may benefit from user agent features that allow
+animations to be disabled or slowed down.
+(But see [[#privacy]] for information on the privacy implications
+of such mitigations.)
+
+User agent implementors should be aware that Web content
+may depend on the firing of <a href="#transition-events">transition events</a>,
+so implementations of such mitigations may wish to fire transition events
+even if the transitions were not run as continuous animations.
+However, it is probably poor practice for Web content to depend on
+such events to function correctly.
+
+Cascade {#accessibility-cascade}
+--------------------------------
+
+The CSS <a>cascade</a> is a general mechanism in CSS
+that allows user needs to interact with author styles.
+This specification interacts with the cascade,
+but since it only allows animation between values
+that result from the existing cascade rules,
+it does not interfere with the user's ability to force
+CSS properties to have particular values.
+
+The cascade also allows users to disable transitions entirely
+by overriding the transition properties.
+
+
+Changes since Working Draft of 19 November 2013 {#changes}
+==========================================================
+
+<p>The following are the substantive changes made since the
+<a href="https://www.w3.org/TR/2013/WD-css3-transitions-20131119/">Working Draft
+dated 19 November 2013</a>:</p>
+
+<ul>
+  <li>Values that cannot be interpolated are transitioned when the timing function crosses its midpoint, instead of not running transitions and changing immediately.</li>
+  <li>Canceling and interrupting of running transitions is defined much more precisely.  This includes the after-change style no longer including styles from CSS Transitions.</li>
+  <li>Completion of transitions is defined somewhat more precisely.</li>
+  <li>The transitionend event is no longer cancelable.  This is since it has no default action, so canceling it would have no meaning.  It also matches the animation events.</li>
+  <li>The {{transitionrun}}, {{transitionstart}}, and {{transitioncancel}}
+  events have been added.</li>
+  <li>The interpolation of ''shadow/inset'' values on shadow lists is no longer backwards.</li>
+  <li>A [[#conformance]] section, [[#security]] section, [[#privacy]] section, [[#accessibility]] section, and [[#idl-index]] have been added</li>
+  <li>The identifiers accepted by 'transition-property' are defined in terms of <<custom-ident>>.</li>
+  <li>Define a little bit more about when changes to computed values happen, by saying at least that implementations must not update the effects of computed values without actually updating computed values.</li>
+</ul>
+
+<p>For more details on these changes, see the version control <a href="https://hg.csswg.org/drafts/log/tip/css-transitions/Overview.bs">change log since 2015 January 26</a> and the <a href="https://hg.csswg.org/drafts/log/tip/css-transitions/Overview.src.html">change log from 2013 March 28 to 2015 January 26</a>.</p>
+
+<p>For changes in earlier working drafts:</p>
+
+<ol>
+  <li>see the <a href="https://www.w3.org/TR/2013/WD-css3-transitions-20131119/#changes">changes section in the 19 November 2013 Working Draft</a>
+  <li>see the <a href="https://www.w3.org/TR/2013/WD-css3-transitions-20130212/ChangeLog">the ChangeLog</a> for changes in previous working drafts
+  <li>For more details on these changes, see the version control change logs, which are split in three parts because of file renaming: <a href="https://hg.csswg.org/drafts/log/tip/css-transitions/Overview.bs">change log since 2015 January 26</a>, <a href="https://hg.csswg.org/drafts/log/tip/css-transitions/Overview.src.html">change log from 2013 March 28 to 2015 January 26</a>, <a href="https://hg.csswg.org/drafts/log/tip/css3-transitions/Overview.src.html">change log before 2013 March 28</a>.
+</ol>
+
+Acknowledgments {#acknowledgments}
+==================================
+
+<p>Thanks especially to the feedback from
+Tab Atkins,
+Carine Bournez,
+Aryeh Gregor,
+Vincent Hardy,
+Anne van Kesteren,
+Cameron McCormack,
+Alex Mogilevsky,
+Jasper St. Pierre,
+Estelle Weyl,
+and all the rest of the
+<a href="http://lists.w3.org/Archives/Public/www-style/">www-style</a> community.</p>

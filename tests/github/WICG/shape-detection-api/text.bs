@@ -1,0 +1,200 @@
+<pre class="metadata">
+Title: Accelerated Text Detection in Images
+Repository: wicg/shape-detection-api
+Status: ED
+ED: https://wicg.github.io/shape-detection-api
+Shortname: text-detection-api
+Level: 1
+Editor: Miguel Casas-Sanchez, w3cid 82825, Google Inc., mcasas@google.com
+Abstract: This document describes an API providing access to accelerated text detectors for still images and/or live image feeds.
+Group: wicg
+!Participate: <a href="https://www.w3.org/community/wicg/">Join the W3C Community Group</a>
+!Participate: <a href="https://github.com/WICG/shape-detection-api">Fix the text through GitHub</a>
+</pre>
+
+<style>
+table {
+  border-collapse: collapse;
+  border-left-style: hidden;
+  border-right-style: hidden;
+  text-align: left;
+}
+table caption {
+  font-weight: bold;
+  padding: 3px;
+  text-align: left;
+}
+table td, table th {
+  border: 1px solid black;
+  padding: 3px;
+}
+</style>
+
+# Introduction # {#introduction}
+
+Photos and images constitute the largest chunk of the Web, and many include recognisable features, such as human faces, QR codes or text. Detecting these features is computationally expensive, but would lead to interesting use cases e.g. face tagging, or web URL redirection. This document deals with text detection whereas the sister document [[shape_detection]] specifies the Face and Barcode detection cases and APIs.
+
+## Text detection use cases
+
+Please see the <a href="https://github.com/WICG/shape-detection-api/blob/gh-pages/README.md">Readme/Explainer</a> in the repository.
+
+# Text Detection API # {#api}
+
+Individual browsers MAY provide Detectors indicating the availability of hardware providing accelerated operation.
+
+## Image sources for detection
+
+Please refer to [[shape_detection#image-sources-for-detection]]
+
+## Text Detection API
+
+{{TextDetector}} represents an underlying accelerated platform's component for detection in images of Latin-1 text as defined in [[iso8859-1]].  It provides a single {{TextDetector/detect()}} operation on an {{ImageBitmapSource}} of which the result is a Promise.  This method must reject this Promise in the cases detailed in [[#image-sources-for-detection]]; otherwise it may queue a task using the OS/Platform resources to resolve the Promise with a sequence of {{DetectedText}}s, each one essentially consisting on a {{DetectedText/rawValue}} and delimited by a {{DetectedText/boundingBox}} and a series of {{Point2D}}s.
+
+<div class="example">
+Example implementations of Text code detection are e.g. <a href="https://developers.google.com/android/reference/com/google/android/gms/vision/text/package-summary">Google Play Services</a>, <a href="https://developer.apple.com/reference/coreimage/cidetectortypetext">Apple's CIDetector</a> (bounding box only, no OCR) or <a href="https://msdn.microsoft.com/en-us/library/windows/apps/windows.media.ocr.aspx">Windows 10 <abbr title="Optical Character Recognition">OCR</abbr> API</a>.
+</div>
+
+<pre class="idl">
+[
+    Constructor,
+    Exposed=(Window,Worker),
+] interface TextDetector {
+    Promise&lt;sequence&lt;DetectedText&gt;&gt; detect(ImageBitmapSource image);
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn constructor for="TextDetector"><code>TextDetector()</code></dfn></dt>
+  <dd>
+    <div class="note">
+    Detectors may potentially allocate and hold significant resources. Where possible, reuse the same {{TextDetector}} for several detections.
+    </div>
+  </dd>
+  <dt><dfn method for="TextDetector"><code>detect(ImageBitmapSource image)</code></dfn></dt>
+  <dd>Tries to detect text blocks in the {{ImageBitmapSource}} |image|.</dd>
+</dl>
+
+### {{DetectedText}} ### {#detectedtext-section}
+
+<pre class="idl">
+[
+    Constructor,
+] interface DetectedText {
+  [SameObject] readonly attribute DOMRect boundingBox;
+  [SameObject] readonly attribute DOMString rawValue;
+  [SameObject] readonly attribute FrozenArray&lt;Point2D> cornerPoints;
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn attribute for="DetectedText"><code>boundingBox</code></dfn></dt>
+  <dd>A rectangle indicating the position and extent of a detected feature aligned to the image</dd>
+
+  <dt><dfn attribute for="DetectedText"><code>rawValue</code></dfn></dt>
+  <dd>Raw string detected from the image, where characters are drawn from [[iso8859-1]].</dd>
+
+  <dt><dfn attribute for="DetectedText"><code>cornerPoints</code></dfn></dt>
+  <dd>A <a>sequence</a> of corner points of the detected feature, in clockwise direction and  starting with top-left. This is not necessarily a square due to possible perspective distortions.</dd>
+</dl>
+
+# Examples # {#examples}
+
+<i>This section is non-normative.</i>
+
+<p class="note">
+Slightly modified/extended versions of these examples (and more) can be found in
+ e.g. <a href="https://codepen.io/collection/DwWVJj/">this codepen collection</a>.
+</p>
+
+## Platform support for a text detector
+
+<div class="note">
+The following example can also be found in e.g. <a
+href="https://codepen.io/miguelao/pen/PbYpMv?editors=0010">this codepen</a>
+with minimal modifications.
+</div>
+
+<div class="example" highlight="javascript">
+
+<pre>
+if (window.TextDetector == undefined) {
+  console.error('Text Detection not supported on this platform');
+}
+</pre>
+</div>
+
+## Text Detection
+
+<div class="note">
+The following example can also be found in e.g.
+<a href="https://codepen.io/miguelao/pen/ygxVqg">this codepen</a>.
+</div>
+
+<div class="example" highlight="javascript">
+<pre>
+let textDetector = new TextDetector();
+// Assuming |theImage| is e.g. a &lt;img> content, or a Blob.
+
+textDetector.detect(theImage)
+.then(detectedTextBlocks => {
+  for (const textBlock of detectedTextBlocks) {
+    console.log(
+        'text @ (${textBlock.boundingBox.x}, ${textBlock.boundingBox.y}), ' +
+        'size ${textBlock.boundingBox.width}x${textBlock.boundingBox.height}');
+  }
+}).catch(() => {
+  console.error("Text Detection failed, boo.");
+})
+</pre>
+</div>
+
+
+<pre class="anchors">
+spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/#
+    type: interface
+        text: Array; url: sec-array-objects
+        text: Promise; url:sec-promise-objects
+        text: TypeError; url: sec-native-error-types-used-in-this-standard-typeerror
+</pre>
+
+<pre class="anchors">
+type: interface; text: Point2D; url: https://w3c.github.io/mediacapture-image/#Point2D;
+</pre>
+
+<pre class="anchors">
+type: interface; text: DOMString; url: https://heycam.github.io/webidl/#idl-DOMString; spec: webidl
+</pre>
+
+<pre class="link-defaults">
+spec: html
+    type: dfn
+        text: allowed to show a popup
+        text: in parallel
+        text: incumbent settings object
+</pre>
+
+<pre class="biblio">
+{
+  "iso8859-1": {
+      "href": "https://www.iso.org/standard/28245.html",
+      "title": "Information technology -- 8-bit single-byte coded graphic character sets -- Part 1: Latin alphabet No. 1",
+      "publisher": "ISO/IEC",
+      "date": "April 1998"
+  },
+  "canvas2dcontext": {
+      "authors": [ "Rik Cabanier", "Jatinder Mann", "Jay Munro", "Tom Wiltzius",
+                   "Ian Hickson"],
+      "href": "https://www.w3.org/TR/2dcontext/",
+      "title": "HTML Canvas 2D Context",
+      "status": "REC"
+  },
+  "shape_detection": {
+      "authors": [ "Miguel Casas-Sanchez" ],
+      "href": "https://wicg.github.io/shape-detection-api",
+      "title": "Accelerated Shape Detection in Images",
+      "publisher": "W3C Platform Incubator Community Group",
+      "date": "21 October 2017",
+      "status": "ED"
+  }
+}
+</pre>

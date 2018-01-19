@@ -1,0 +1,775 @@
+<pre class=metadata>
+Title: Geofencing API
+Status: ED
+ED: https://w3c.github.io/geofencing-api/
+TR: http://www.w3.org/TR/geofencing/
+Shortname: geofencing-api
+Level: 1
+Editor: Marijn Kruisselbrink, Google, mek@chromium.org
+Repository: w3c/geofencing-api
+Abstract: This specification defines an API that lets <a title="webapp">webapps</a> setup geographic boundaries around specific locations and then receive notifications when the hosting device enters or leaves those areas.
+Group: geolocation
+Link Defaults: html (dfn) global object/in parallel/queue a task/event handler/event handler event type
+Markup Shorthands: css off
+Warning: Obsolete
+</pre>
+
+<pre class=biblio>
+{
+  "promises-guide": {
+    "href": "https://www.w3.org/2001/tag/doc/promises-guide",
+    "title": "Writing Promise-Using Specifications",
+    "date": "24 July 2015",
+    "status": "Finding of the W3C TAG",
+    "publisher": "W3C TAG"
+  },
+  "WGS84": {
+    "href": "http://earth-info.nga.mil/GandG/publications/tr8350.2/wgs84fin.pdf",
+    "title": "National Imagery and Mapping Agency Technical Report 8350.2, Third Edition",
+    "publisher": "National Imagery and Mapping Agency",
+    "date": "3 January 2000"
+  }
+}
+</pre>
+
+<pre class=anchors>
+spec: ecma-262; urlPrefix: http://www.ecma-international.org/ecma-262/6.0/
+    type: interface
+        text: RangeError; url: sec-native-error-types-used-in-this-standard-rangeerror
+        text: TypeError; url: sec-native-error-types-used-in-this-standard-typeerror
+
+spec: geolocation-api; urlPrefix: http://www.w3.org/TR/geolocation-API/
+    type: interface
+        text: Position; url: position_interface
+
+spec: html; urlPrefix: https://html.spec.whatwg.org/
+    type: dfn
+        text: trusted; url: concept-events-trusted
+
+spec: powerful-features; urlPrefix: https://w3c.github.io/webappsec/specs/powerfulfeatures/#
+    type: dfn
+        text: secure context; url: secure-context
+
+spec: promises-guide; urlPrefix: https://www.w3.org/2001/tag/doc/promises-guide#
+    type: dfn
+        text: A new promise; url: a-new-promise
+        text: Reject; url: reject-promise
+        text: Resolve; url: resolve-promise
+
+spec: service-workers; urlPrefix: https://slightlyoff.github.io/ServiceWorker/spec/service_worker/index.html
+    type: dfn
+        text: handle functional event; url: handle-functional-event-algorithm
+        text: service worker; url: service-worker-concept
+        text: service worker registration; url: service-worker-registration-concept
+    type: interface
+        text: ExtendableEvent; url: extendable-event-interface
+        text: ExtendableEventInit; url: extendable-event-init-dictionary
+        text: ServiceWorkerGlobalScope; url: service-worker-global-scope-interface
+        text: ServiceWorkerRegistration; url: service-worker-registration-interface
+
+spec: WebIDL; urlPrefix: https://heycam.github.io/webidl/#
+    type: exception
+        text: QuotaExceededError; url: quotaexceedederror
+    type: interface
+        text: DOMException; url: idl-DOMException-error-names
+        text: Promise; url: idl-Promise
+        text: sequence; url: idl-sequence
+</pre>
+
+<section>
+  <h2 id="introduction">Introduction</h2>
+
+  <em>This section is non-normative.</em>
+
+  The Geofencing API lets <a title="webapp">webapps</a> set up geographic boundaries around
+  specific locations and then receive notifications when the hosting device enters or leaves
+  those areas. While it would be possible to implement something similar using the
+  Geolocation API [[!GEOLOCATION-API]], there are a few differences that could make this API
+  a better choice:
+
+  * Because of the limited API surface of the Geofencing API, <a data-lt="user agent">user
+    agents</a> can implement the API in a more (power) efficient way than could be achieved by
+    regularly checking the current geographic position with the Geolocation API.
+  * The Geofencing API is built around Service Workers. This makes it possible for a
+    <a>webapp</a> to receive notifications from the Geofencing API even after the user has
+    closed the <a>webapp</a>.
+
+  <section>
+    <h3 id="examples">Examples</h3>
+
+    The following code extracts illustrate how to use this API to be notified of geographic
+    regions being entered or left.
+
+    <div class=example>
+      Monitor a region:
+
+      <pre highlight=js>
+        // https://example.com/webapp.js
+        navigator.serviceWorker
+          .register('serviceworker.js')
+          .then((swRegistration) =&gt; {
+            let region = new CircularGeofenceRegion({
+              name: 'myfence',
+              latitude: 37.421999,
+              longitude: -122.084015,
+              radius: 1000
+            });
+            let options = {
+              includePosition: true
+            };
+            swRegistration.geofencing.add(region, options)
+              .then(
+                // If more than just a name needs to be stored with a geofence, now
+                // would be the time to store this in some storage.
+                (geofence) =&gt; console.log(geofence.id),
+                (error) =&gt; console.log(error)
+              );
+        });
+      </pre>
+    </div>
+
+    <div class=example>
+      Respond to a region being entered:
+
+      <pre highlight=js>
+        // https://example.com/serviceworker.js
+        self.ongeofenceenter = (event) =&gt; {
+          console.log(event.geofence.id);
+          console.log(event.geofence.region.name);
+
+          // If this is not a geofence of interest anymore, remove it.
+          if (event.geofence.region.name !== "myfence") {
+            event.waitUntil(event.geofence.remove());
+          }
+        };
+      </pre>
+    </div>
+
+    <div class=example>
+      Respond to an error condition:
+
+      <pre highlight=js>
+        // https://example.com/serviceworker.js
+        self.ongeofenceerror = (event) =&gt; {
+          console.log(event.geofence.id);
+          console.log(event.geofence.region.name);
+          console.log(event.error);
+
+          // Some error condition occurred. The region is no longer monitored, and won't
+          // trigger any more events.
+
+          // Try to re-monitor, although depending on the error this might fail.
+          event
+            .waitUntil(self.registration.geofencing.add(event.geofence.region))
+            .then((geofence) =&gt; {
+              // re-monitoring succeeded, new geofence will have a different ID.
+            }, (error) =&gt; {
+              // re-monitoring failed.
+            });
+        };
+      </pre>
+    </div>
+
+    <div class=example>
+      Stop monitoring a region in response to some other event:
+
+      <pre highlight=js>
+        // https://example.com/serviceworker.js
+
+        // Either look geofence up by name:
+        self.onsomeevent = (event) =&gt; {
+          event
+            .waitUntil(
+              self.registration.geofencing.getAll({
+                name: 'myfence'
+              })
+            )
+            .then(
+              geofences =&gt; geofences.forEach(fence =&gt; fence.remove())
+            );
+        };
+
+        // Or look geofence up by ID:
+        self.onsomeotherevent = (event) =&gt; {
+          let geofence_id = ''; /* somehow get the ID of a geofence */
+          event
+            .waitUntil(self.registration.geofencing.getById(geofence_id))
+            .then(geofence =&gt; geofence.remove());
+        };
+      </pre>
+    </div>
+  </section>
+</section>
+
+<section>
+  <h2 id="model">Model</h2>
+
+  The term <dfn>webapp</dfn> refers to a Web application, i.e. an application implemented
+  using Web technologies, and executing within the context of a Web <a>user agent</a>, e.g. a
+  Web browser or other Web runtime environment.
+
+  A <a>service worker registration</a> has an associated <dfn>list of geofences</dfn> whose element
+  type is a <a>geofence</a>.
+
+  A <dfn id="geofence-term">geofence</dfn> is one specific registration of a geograhpic region as a geofence.
+
+  A <a>geofence</a> has a <dfn data-lt="geofence name">name</dfn> (a string).
+
+  A <a>geofence</a> has an associated <a>geographic region</a>.
+
+  A <a>geofence</a> has a <dfn>geofence ID</dfn>, a string uniquely identifying it. This ID is
+  generated by the user agent and MUST be unique among all <a data-lt="list of geofences">geofences</a>
+  associated with all <a data-lt="service worker registration">service worker registrations</a> at the
+  same origin. A user agent SHOULD NOT reuse the ID from an old <a>geofence</a> for a new
+  one.
+
+  A <a>geofence</a> has an <dfn>include position</dfn> flag, a boolean indicating if events
+  associated with this <a>geofence</a> should include the exact geographic position.
+
+  A <a>geofence</a> has an associated <dfn>state</dfn>, which is one of <dfn>active</dfn> or
+  <dfn>inactive</dfn>.
+
+  The <a>user agent</a> SHOULD be monitoring all <a>active</a> <a data-lt=geofence>geofences</a>
+  for <a data-lt="breached">breach</a> events.
+
+  A <dfn>geographic region</dfn> is a circular region defined by a <a>geographic
+  coordinate</a> representing the center of the region and a <dfn>radius</dfn> representing
+  the size of the region.
+
+  The <dfn>geographic coordinate</dfn> reference system used by the attributes in this API is
+  the World Geodetic System (2d) [[!WGS84]]. No other reference system is supported.
+
+  A <a>geofence</a> is said to be <dfn>breached</dfn> if the current geographical location
+  changed from being inside the <a>geographic region</a> to outside (a <dfn>leave
+  event</dfn>), or vice versa (an <dfn>enter event</dfn>).
+
+  <section>
+    <h3 id="implementation considerations">Implementation considerations</h3>
+
+    A <a>user agent</a> MAY impose <dfn data-lt="name limit">limits</dfn> on the maximum size of a
+    <a>geofence name</a>. If a limit is imposed, this limit SHOULD allow for at least 100 characters.
+
+    A <a>user agent</a> MAY impose <dfn data-lt="geofence limit">limits</dfn> on the total number of
+    <a data-lt="list of geofences">geofences</a> that can be registered by a single origin. If a
+    limit is imposed, this limit SHOULD allow at least 20 <a data-lt="list of geofences">geofences</a>
+    to be registered on a single origin.
+  </section>
+</section>
+
+<section>
+  <h2 id="security-and-privacy-considerations">Security and privacy considerations</h2>
+
+  The same <a href="http://www.w3.org/TR/geolocation-API/#security">security and privacy
+  considerations</a> that apply to the Geolocation API [[!GEOLOCATION-API]] also apply to
+  this API. Furthermore since this API effectively gives access to geographic location
+  information after a user has stopped interacting with a webapp, a few other considerations
+  should be taken into account.
+
+  <section>
+    <h3 id="privacy-considerations-for-implementers-of-the-geofencing-api">
+      Privacy considerations for implementers of the Geofencing API
+    </h3>
+
+
+    <a data-lt="user agent">User agents</a> MUST NOT provide Geofencing API access to
+    <a data-lt=webapp>webapps</a> without the express permission of the user.
+    <a data-lt="user agent">User agents</a> MUST acquire consent for permission through a user
+    interface for each call to the {{GeofenceManager/add(initialRegion, options)}} method, unless a
+    previous permission grant has been persisted, or a prearranged trust relationship applies.
+    Permissions that are preserved beyond the current browsing session MUST be revocable.
+
+    The <a>user agent</a> MAY consider the {{GeofenceRegion}} and/or the {{GeofenceOptions}} when
+    acquiring permission or determining the permission status.
+
+    When a permission is revoked, all <a data-lt=geofence>geofences</a> added with that permission
+    MUST be <a>deactivated</a>.
+
+    When permission is granted for unlimited use of the Geofencing API by a <a>service worker
+    registration</a>, the <a>state</a> of all associated <a data-lt=geofence>geofences</a> SHOULD
+    be set to <a>active</a>, and the <a>user agent</a> SHOULD start monitoring these
+    <a data-lt=geofence>geofences</a> for <a data-lt=breached>breach</a> events.
+
+    When a <a>service worker registration</a> is unregistered, any associated
+    <a data-lt=geofence>geofences</a> MUST be <a>deactivated</a>.
+
+    <a data-lt="user agent">User agents</a> MUST allow access to the Geofencing API from
+    <a data-lt="secure context">secure contexts</a> only.
+
+    ISSUE: This should somehow mention how the [permissions] API is related to this.
+  </section>
+
+  <section>
+    <h3 id="privacy-considerations-for-recipients-of-location-information">
+      Privacy considerations for recipients of location information
+    </h3>
+
+    TODO
+  </section>
+
+  <section>
+    <h3 id="additional-implementation-considerations">
+      Additional implementation considerations
+    </h3>
+
+    <em>This section is non-normative.</em>
+
+    TODO
+  </section>
+</section>
+
+<section>
+  <h2 id="api-description">API Description</h2>
+
+  <section>
+    <h3 id="extensions-to-the-serviceworkerregistration-interface">
+      Extensions to the {{ServiceWorkerRegistration}} interface
+    </h3>
+
+    The Service Worker specification defines a {{ServiceWorkerRegistration}} interface, which
+    this specification extends.
+
+    <pre class=idl>
+      partial interface ServiceWorkerRegistration {
+        readonly attribute GeofenceManager geofencing;
+      };
+    </pre>
+  </section>
+
+  <section>
+    <h3 id="geofencemanager-interface">{{GeofenceManager}} interface</h3>
+
+    The {{GeofenceManager}} interface defines operations that enable
+    <a title="webapp">webapps</a> to establish access to geofencing services.
+
+    <pre class=idl>
+      [NoInterfaceObject]
+      interface GeofenceManager {
+        Promise&lt;Geofence&gt; add(GeofenceRegion initialRegion, optional GeofenceOptions options);
+        Promise&lt;sequence&lt;Geofence&gt;&gt; getAll(optional GeofenceQueryOptions options);
+        Promise&lt;Geofence&gt; getById(DOMString id);
+      };
+
+      dictionary GeofenceOptions {
+        boolean includePosition = false;
+      };
+
+      dictionary GeofenceQueryOptions {
+        DOMString? name;
+      };
+    </pre>
+
+    A {{GeofenceManager}} has an associated <a>service worker registration</a>, represented by the
+    {{ServiceWorkerRegistration}} instance on which the {{GeofenceManager}} was exposed.
+
+    The <code><dfn method for=GeofenceManager title="add(initialRegion, options)">
+    add(<var>initialRegion</var>, <var>options</var>)</dfn></code> method when invoked MUST return
+    <a>a new promise</a> <var>promise</var> and run the following steps <a>in parallel</a>:
+    <ol>
+      <li>
+        Let <var>serviceWorkerRegistration</var> be the {{GeofenceManager}}'s associated <a>service worker registration</a>.
+      </li>
+      <li>
+        If <var>initialRegion</var> is not a {{CircularGeofenceRegion}} instance, <a>reject</a> <var>promise</var> with a {{TypeError}}.
+      </li>
+      <li>
+        If the length of the {{GeofenceRegion/name}} property of <var>initialRegion</var> exceeds a
+        <a>user agent</a> defined <a data-lt="name limit">limit</a>, <a>reject</a> <var>promise</var>
+        with a {{RangeError}}.
+      </li>
+      <li>
+        If the {{CircularGeofenceRegion/latitude}} property of <var>initialRegion</var> is less than
+        <code>-90</code> or greater than <code>90</code>, <a>reject</a> <var>promise</var> with a
+        {{RangeError}}.
+      </li>
+      <li>
+        If the {{CircularGeofenceRegion/longitude}} property of <var>initialRegion</var> is less
+        than <code>-180</code> or greater than <code>180</code>, <a>reject</a> <var>promise</var>
+        with a {{RangeError}}.
+      </li>
+      <li>
+        If the total number of <a data-lt="list of geofences">geofences</a> for all <a data-lt=
+        "service worker registration">service worker registrations</a> in the current origin
+        is more than the <a>user agent</a> defined <a data-lt="geofence limit">limit</a>, <a>reject</a>
+        <var>promise</var> with a {{QuotaExceededError}} and terminate these substeps.
+      </li>
+      <li>
+        Let <var>geofence</var> be a new <a>geofence</a>.
+      </li>
+      <li>
+        Set the <a>geofence ID</a> of <var>geofence</var> to a newly generated value.
+      </li>
+      <li>
+        Set the <a>geographic region</a> of <var>geofence</var> to a
+        the region represented by <var>initialRegion</var>.
+      </li>
+      <li>
+        Set the <a>include position</a> flag of <var>geofence</var> to
+        <var>options.includePosition</var>, or <code>false</code> if no options were
+        specified.
+      </li>
+      <li>
+        Set the <a>state</a> of <var>geofence</var> to <a>inactive</a>.
+      </li>
+      <li>
+        Add <var>geofence</var> to the <a>list of geofences</a> associated with
+        <var>serviceWorkerRegistration</var>.
+      </li>
+      <li>
+        <a>Resolve</a> <var>promise</var> with a new {{Geofence}} instance representing
+        <var>geofence</var>.
+      </li>
+      <li>
+        Ask the user whether they allow the <a>webapp</a> to monitor geofences, unless a
+        prearranged trust relationship applies or the user has already granted or denied
+        permission explicitly for this <a>webapp</a> to use this API.
+      </li>
+      <li>
+        If permission is not granted, invoke the <a>Handle Functional Event</a>
+        algorithm with <var>serviceWorkerRegistration</var> and the algorithm represented by
+        the following substeps as arguments.
+        <ol>
+          <li>
+            Let <var>globalObject</var> be the <a>global object</a> these steps are invoked with.
+          </li>
+          <li>
+            Create a <a>trusted</a> event <var>event</var> that uses the {{GeofenceErrorEvent}}
+            interface, with event type <code><a>geofenceerror</a></code>.
+          </li>
+          <li>
+            Let the {{GeofenceErrorEvent/geofence}} atrribute of <var>event</var> be initialized to
+            a new {{Geofence}} instance representing <var>geofence</var>.
+          </li>
+          <li>
+            Let the {{GeofenceErrorEvent/error}} attribute of <var>event</var> be initialized to
+            {{PermissionDeniedError}}.
+          </li>
+          <li>
+            Dispatch <var>event</var> at <var>globalObject</var>.
+          </li>
+        </ol>
+      </li>
+      <li>
+        Else if permission is granted, run the following substeps:
+        <ol>
+          <li>
+            Set the <a>state</a> of <var>geofence</var> to <a>active</a> and start monitoring the
+            geofence for <a data-lt=breached>breach</a> events.
+          </li>
+          <li>
+            If the current geographic position is inside the newly added region, <a data-lt=
+            "fire a geofence event">fire a geofenceenter event</a>.
+          </li>
+        </ol>
+    </ol>
+
+    ISSUE: Somehow mention that the region that is saved as part of the registration can be slightly
+    different from the region passed to register. An implementation may adjust parameters to
+    be in range of what is possible, or otherwise modify the region.
+
+    If the <code><dfn dict-member for=GeofenceOptions title=includePosition>includePosition</dfn></code>
+    attribute is set to true, {{GeofenceEvent}}s for this registration will have a
+    {{GeofenceEvent/position}} attribute. When set to false, the {{GeofenceEvent/position}}
+    attribute will always be undefined.
+
+    The <code><dfn method for=GeofenceManager titlt="getAll(options)">getAll(<var>options</var>)</dfn></code>
+    method when invoked MUST return <a>a new promise</a> <var>promise</var> and run the following steps
+    <a>in parallel</a>:
+    <ol>
+      <li>
+        Let <var>geofences</var> be a new {{sequence}}.
+      </li>
+      <li>
+        For each <var>geofence</var> <a>geofence</a> in the <a>list of geofences</a> associated
+        with this <a>service worker registration</a>, run the following substeps:
+        <ol>
+          <li>
+            If <var>options</var> is passed, has a non-null <var>name</var> attribute,
+            and that <var>name</var> is not equal to the <a data-lt="geofence name">name</a> of the
+            <var>geofence</var>, skip the rest of these substeps and continue with the next registration.
+          </li>
+          <li>
+            Append a new {{Geofence}} instance representing <var>geofence</var> to <var>geofences</var>.
+          </li>
+        </ol>
+      </li>
+      <li>
+        <a>Resolve</a> <var>promise</var> with <var>geofences</var>.
+      </li>
+    </ol>
+
+    The <code><dfn method for=GeofenceManager title="getById(id)">getById(<var>id</var>)</dfn></code>
+    method when invoked MUST return <a>a new promise</a> <var>promise</var> and run the following
+    steps <a>in parallel</a>:
+    <ol>
+      <li>
+        For each <var>geofence</var> <a>geofence</a> in the <a>list of geofences</a> associated
+        with this <a>service worker registration</a>, run the following substeps:
+        <ol>
+          <li>
+            If the <a>geofence ID</a> of <var>geofence</var> is not equal to
+            the passed in <var>id</var>, skip the rest of these substeps and continue with
+            the next geofence.
+          </li>
+          <li>
+            <a>Resolve</a> <var>promise</var> with a new {{Geofence}} instance representing
+            <var>geofence</var>.
+          </li>
+        </ol>
+      </li>
+      <li>
+        If <var>promise</var> was not resolved, <a>resolve</a> <var>promise</var> with
+        <code>null</code>.
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h3 id="geofence-interface">{{Geofence}} interface</h3>
+
+    An instance of the {{Geofence}} interface represents a <a>geofence</a>.
+
+    <pre class=idl>
+      [Exposed=(Window,Worker)]
+      interface Geofence {
+        readonly attribute DOMString id;
+        readonly attribute GeofenceRegion region;
+        Promise&lt;boolean&gt; remove();
+      };
+    </pre>
+
+    When getting the <code><dfn attribute for=Geofence title=id>id</dfn></code> attribute, the <a>user
+    agent</a> MUST return the <a>geofence ID</a> of the <a>geofence</a>.
+
+    When getting the <code><dfn attribute for=Geofence title=region>region</dfn></code> attribute, the
+    <a>user agent</a> MUST return the <a>geographic region</a> of this <a>geofence</a>.
+
+    The <code><dfn method for=Geofence title="remove()">remove()</dfn></code> method when invoked
+    MUST return <a>a new promise</a> <var>promise</var> and run the following steps
+    <a>in parallel</a>:
+    <ol>
+      <li>
+        Let <var>geofence</var> be the <a>geofence</a> represented by this {{Geofence}} instance.
+      </li>
+      <li>
+        If <var>geofence</var> is not currently in the <a>list of geofences</a>
+        associated with a <a>service worker registration</a>, <a>resolve</a> <var>promise</var> with
+        <code>false</code> and abort the remainder of these steps.
+      </li>
+      <li>
+        Remove <var>geofence</var> from the <a>list of geofences</a> associated
+        with the current <a>service worker registration</a>. No more events related to this
+        geofence will be fired after this.
+      </li>
+      <li>
+        Set the <a>state</a> of <var>geofence</var> to <a>inactive</a>, but do not trigger the steps
+        that are normally triggered when a <a>geofence</a> is <a>deactivated</a>.
+      </li>
+      <li>
+        <a>Resolve</a> <var>promise</var> with <code>true</code>.
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h3 id="geofenceregion-interface">{{GeofenceRegion}} interface</h3>
+
+    <pre class=idl>
+      [Exposed=(Window,Worker)]
+      interface GeofenceRegion {
+        readonly attribute DOMString name;
+      };
+
+      dictionary GeofenceRegionInit {
+        DOMString? name;
+      };
+    </pre>
+
+    The <code><dfn attribute for=GeofenceRegion title=name>name</dfn></code> attribute MUST return
+    the value it was initialized to. When the object is created, this attribute MUST be set to the
+    value of the {{GeofenceRegionInit/name}} property in the {{GeofenceRegionInit}} dictionary, or
+    an empty string if that property wasn't set.
+  </section>
+
+  <section>
+    <h3 id="circulargeofenceregion-interface">{{CircularGeofenceRegion}} interface</h3>
+
+    <pre class=idl>
+      [Constructor(CircularGeofenceRegionInit init), Exposed=(Window,Worker)]
+      interface CircularGeofenceRegion : GeofenceRegion {
+        readonly attribute double latitude;
+        readonly attribute double longitude;
+        readonly attribute double radius;
+      };
+
+      dictionary CircularGeofenceRegionInit : GeofenceRegionInit {
+        double latitude;
+        double longitude;
+        double radius;
+      };
+    </pre>
+
+    The {{CircularGeofenceRegion}} constructor when invoked MUST initialize the properties of the
+    newly created object to the corresponding attributes in the initializer.
+
+    The <code><dfn attribute for=CircularGeofenceRegion title=latitude>latitude</dfn></code> attribute
+    MUST return the value it was intialized to. This value represents the latitude in
+    circular degrees of the center of the circular region.
+
+    The <code><dfn attribute for=CircularGeofenceRegion title=longitude>longitude</dfn></code>
+    attribute MUST return the value it was intialized to. This value represents the longitude
+    in circular degrees of the center of the circular region.
+
+    The <code><dfn attribute for=CircularGeofenceRegion title=radius>radius</dfn></code> attribute MUST
+    return thev value it was initialized to. This value represents the radius in meters of the
+    circular region.
+  </section>
+
+  <section>
+    <h3 id="events">Events</h3>
+
+    The Service Worker specification defines a {{ServiceWorkerGlobalScope}} interface, which this
+    specification extends.
+
+    <pre class=idl>
+      partial interface ServiceWorkerGlobalScope {
+        attribute EventHandler ongeofenceenter;
+        attribute EventHandler ongeofenceleave;
+        attribute EventHandler ongeofenceerror;
+      };
+    </pre>
+
+    The <code><dfn attribute for=ServiceWorkerGlobalScope title=ongeofenceenter>ongeofenceenter</dfn></code> attribute is
+    an <a>event handler</a> whose corresponding <a>event handler event type</a> is
+    <code><dfn>geofenceenter</dfn></code>.
+
+    The <code><dfn attribute for=ServiceWorkerGlobalScope title=ongeofenceleave>ongeofenceleave</dfn></code> attribute is
+    an <a>event handler</a> whose corresponding <a>event handler event type</a> is
+    <code><dfn>geofenceleave</dfn></code>.
+
+    The <code><dfn attribute for=ServiceWorkerGlobalScope title=ongeofenceerror>ongeofenceerror</dfn></code> attribute is
+    an <a>event handler</a> whose corresponding <a>event handler event type</a> is
+    <code><dfn>geofenceerror</dfn></code>.
+
+    <section>
+      <h4 id="the-geofenceenter-and-geofenceleave-events">
+        The <code>geofenceenter</code> and <code>geofenceleave</code> events
+      </h4>
+
+      The {{GeofenceEvent}} interface represents a geofence being <a>breached</a>.
+
+      <pre class=idl>
+        [Exposed=ServiceWorker]
+        interface GeofenceEvent : ExtendableEvent {
+          readonly attribute Geofence geofence;
+          readonly attribute Position? position;
+        };
+      </pre>
+
+      Upon detecting a <a title="breached">breach</a> of a <a>geofence</a> <var>geofence</var>,
+      the <a>user agent</a> MUST run the following steps to <dfn>fire a geofence event</dfn>:
+      <ol>
+        <li>
+          Let <var>serviceWorkerRegistration</var> be the <a>service worker registration</a>
+          <var>geofence</var> is associated with.
+        </li>
+        <li>
+          Invoke the <a>Handle Functional Event</a> algorithm with <var>serviceWorkerRegistration</var>
+          and the algorithm represented by the following substeps as arguments.
+          <ol>
+            <li>
+              Let <var>globalObject</var> be the <a>global object</a> these steps are invoked with.
+            </li>
+            <li>
+              Let <var>eventType</var> be <code><a>geofenceenter</a></code> or
+              <code><a>geofenceleave</a></code>, corresponding to the type of <a title="breached">breach</a>
+              event being processed.
+            </li>
+            <li>
+              Create a <a>trusted</a> event <var>event</var> that uses the {{GeofenceEvent}}
+              interface, with event type equal to <var>eventType</var>.
+            </li>
+            <li>
+              Let the {{GeofenceEvent/geofence}} atrribute of <var>event</var> be initialized to
+              a new {{Geofence}} instance representing <var>geofence</var>.
+            </li>
+            <li>
+              If the <a>include position</a> flag of <var>geofence</var> is true, set the
+              {{GeofenceEvent/position}} attribute of <var>event</var> to the current geographical
+              position.
+            </li>
+            <li>
+              Dispatch <var>event</var> at <var>globalObject</var>.
+            </li>
+          </ol>
+        </li>
+      </ol>
+
+      The <a>user agent</a> MAY delay <a data-lt="fire a geofence event">firing a geofence
+      event</a> until some time and/or distance has passed after the <a title=
+      "breached">breach</a> was detected to make sure that the geofence really was <a>breached</a>.
+    </section>
+
+    <section>
+      <h4 id="geofenceerrorevent-section">{{GeofenceErrorEvent}}</h4>
+
+      <pre class=idl>
+        [Exposed=ServiceWorker]
+        interface GeofenceErrorEvent : ExtendableEvent {
+          readonly attribute Geofence geofence;
+          readonly attribute DOMString error;
+          readonly attribute DOMString message;
+        };
+      </pre>
+
+      When a <a>geofence</a> <var>geofence</var> is <dfn>deactivated</dfn>, the <a>user agent</a>
+      SHOULD run the following steps:
+      <ol>
+        <li>
+          Let <var>serviceWorkerRegistration</var> be the <a>service worker registration</a>
+          <var>geofence</var> is associated with.
+        </li>
+        <li>
+          Let <var>oldState</var> be the <a>state</a> of <var>geofence</var>.
+        </li>
+        <li>
+          Set the <a>state</a> of <var>geofence</var> to <a>inactive</a>.
+        </li>
+        <li>
+          If <var>oldState</var> is <a>active</a>, invoke the <a>Handle Functional Event</a>
+          algorithm with <var>serviceWorkerRegistration</var> and the algorithm represented by
+          the following substeps as arguments.
+          <ol>
+            <li>
+              Let <var>globalObject</var> be the <a>global object</a> these steps are invoked with.
+            </li>
+            <li>
+              Create a <a>trusted</a> event <var>event</var> that uses the {{GeofenceErrorEvent}}
+              interface, with event type <code><a>geofenceerror</a></code>.
+            </li>
+            <li>
+              Let the {{GeofenceErrorEvent/geofence}} atrribute of <var>event</var> be initialized to
+              a new {{Geofence}} instance representing <var>geofence</var>.
+            </li>
+            <li>
+              Let the {{GeofenceErrorEvent/error}} attribute of <var>event</var> be initialized to
+              an error name.
+            </li>
+            <li>
+              Let the {{GeofenceErrorEvent/message}} attribute of <var>event</var> be initialized to
+              a descriptive message for the error that occurred.
+            </li>
+            <li>
+              Dispatch <var>event</var> at <var>globalObject</var>.
+            </li>
+          </ol>
+        </li>
+      </ol>
+    </section>
+  </section>
+</section>
+
+<section>
+  <h2 id="exceptions">Exceptions</h2>
+
+  The Geofencing API uses the new <code><dfn exception>PermissionDeniedError</dfn></code> {{DOMException}} name.
+</section>

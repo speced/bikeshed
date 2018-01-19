@@ -1,0 +1,1141 @@
+<pre class='metadata'>
+Title: CSS Shapes Module Level 1
+Status: ED
+Work Status: Testing
+Shortname: css-shapes
+Level: 1
+Group: csswg
+TR: https://www.w3.org/TR/css-shapes/
+ED: https://drafts.csswg.org/css-shapes/
+Previous Version: http://www.w3.org/TR/2014/CR-css-shapes-1-20140320/
+Editor: Vincent Hardy, Adobe Systems&#44; Inc., vhardy@adobe.com
+Editor: Rossen Atanassov, Microsoft Corporation, ratan@microsoft.com, w3cid 49885
+Editor: Alan Stearns, Adobe Systems&#44; Inc., stearns@adobe.com, w3cid 46659
+!Issues list: <a href="https://www.w3.org/Bugs/Public/buglist.cgi?query_format=advanced&amp;product=CSS&amp;component=Shapes&amp;resolution=---&amp;cmdtype=doit">In Bugzilla</a>
+Abstract: CSS Shapes describe geometric shapes for use in CSS. For Level 1, CSS Shapes can be applied to floats. A circle shape on a float will cause inline content to <a>wrap</a> around the circle shape instead of the float's bounding box.
+Link Defaults: css21 (property) margin
+</pre>
+
+<pre class='link-defaults'>
+spec:css-masking-1; type: value
+	text: nonzero
+	text: evenodd
+</pre>
+
+<style type="text/css">
+	.singleImgExample {
+		display: block;
+		margin: auto;
+	}
+</style>
+
+<h2 id="intro">
+Introduction</h2>
+
+<em>This section is not normative.</em>
+
+	Shapes define arbitrary geometries
+	that can be used as CSS values.
+	This specification defines properties
+	to control the geometry
+	of an element's <a>float area</a>.
+	The 'shape-outside' property uses shape values
+	to define the <a>float area</a> for a float.
+
+	Note: Future levels of CSS Shapes will allow use of shapes
+	on elements other than floats.
+	Other CSS modules can make use of shapes as well,
+	such as CSS Masking [[CSS-MASKING]]
+	and CSS Exclusions [[CSS3-EXCLUSIONS]].
+
+	Note: If a user agent implements both CSS Shapes
+	and CSS Exclusions,
+	the 'shape-outside' property defines
+	the exclusion area for an exclusion.
+
+	Note: A future level of CSS Shapes will define a shape-inside property,
+	which will define a shape to <a>wrap</a> content within the element.
+
+<h3 id="module-interactions">
+Module Interactions</h3>
+
+	This module extends the float features defined in [[!CSS2]] chapter 9.
+
+<h3 id="values">Values</h3>
+
+	This specification follows the <a href="https://www.w3.org/TR/CSS21/about.html#property-defs">CSS property definition conventions</a> from [[!CSS2]].
+	Value types not defined in this specification are defined in CSS Values & Units [[!CSS-VALUES-3]].
+	Other CSS modules may expand the definitions of these value types.
+
+	In addition to the property-specific values listed in their definitions,
+	all properties defined in this specification
+	also accept the <a>CSS-wide keywords</a> keywords as their property value.
+	For readability they have not been repeated explicitly.
+
+<h3 id=animations>Animated Values</h3>
+
+	It is expected that CSS will include ways
+	to animate transitions between styles.
+	(The section
+	<a href="https://www.w3.org/TR/css3-transitions/#animatable-types">"Animation of property types"</a>
+	of the <cite>CSS Transitions module</cite> [[CSS3-TRANSITIONS]]
+	is expected to define how different kinds
+	of values are interpolated during a transition.)
+	In anticipation of that,
+	this module includes a line "Animatable" for each property,
+	which specifies whether and how values
+	of the property can be animated.
+
+<h3 id="terminology">
+Terminology</h3>
+
+	<dfn data-lt="wrap|wrapping">Wrap</dfn>
+
+	This specification uses the term <a>wrap</a>
+	to refer to flowing content
+	around the sides of a <a>float area</a>,
+	defined in [[!CSS2]] chapter 9.
+	Content <a>wraps</a> around the right side
+	of a left-floated box,
+	and content <a>wraps</a> around the left side
+	of a right-floated box.
+	One result of this <a>wrapping</a>
+	is that line boxes next to a float
+	are shortened as necessary
+	to avoid intersections with the <a>float area</a>.
+
+	<dfn>Float area</dfn>
+
+	The area used
+	for <a>wrapping</a> content
+	around a float element.
+	The rules for float behavior
+	use the sides of the <a>float area</a>
+	to determine where content flows.
+	By default,
+	the <a>float area</a> is the float element's
+	<a href="https://www.w3.org/TR/CSS2/box.html#box-dimensions">margin box</a>
+	(note this can be different than
+	the <a>float area</a> produced
+	by the ''margin-box'' value,
+	which includes border-radius curvature).
+	This specification's 'shape-outside' property
+	can be used to define an arbitrary,
+	non-rectangular <a>float area</a>.
+
+<h2 id="relation-to-box-model-and-float-behavior">
+Relation to the box model and float behavior</h2>
+
+	While the boundaries used
+	for <a>wrapping</a> inline flow content
+	outside a float
+	can be defined using shapes,
+	the actual box model does not change.
+	If the element has specified
+	margins, borders or padding
+	they will be computed and rendered
+	according to the [[!CSS3BOX]] module.
+	Also, float positioning and stacking are not affected
+	by defining a <a>float area</a> with a shape.
+
+	When a shape is used to define
+	a <a>float area</a>,
+	the shape is clipped
+	to the float's margin box.
+	In other words,
+	a shape can only ever reduce
+	a <a>float area</a>,
+	not increase it.
+	A reduced <a>float area</a> may have no effect
+	on some line boxes
+	that would normally be affected by the float.
+	An <dfn>empty float area</dfn>
+	(where the shape encloses no area)
+	has no effect on line boxes.
+
+	A <a>float area</a> defined by a shape
+	may reduce the normal <a>float area</a> on all sides,
+	but this does not allow content to <a>wrap</a>
+	on both sides of a float.
+	Left floats with a 'shape-outside' still
+	only allow content <a>wrapping</a> on the right side,
+	and right floats only allow <a>wrapping</a> on the left.
+
+	<div class="example">
+
+		In the following example
+		the left and right floating
+		<code class="html">img</code> elements
+		specify a triangular shape
+		using the 'shape-outside' property.
+
+		<pre><code>
+			&lt;img class="left" src="hand.svg"/&gt;
+			&lt;img class="right" src="hand.svg"/&gt;
+			&lt;p&gt;
+				Sometimes a web page's text content appears to be
+				funneling your attention towards a spot on the page
+				to drive you to follow a particular link. Sometimes
+				you don't notice.
+			&lt;/p&gt;
+
+			&lt;style type="text/css"&gt;
+				.left {
+					shape-outside: polygon(0 0, 100% 100%, 0 100%);
+					float: left;
+					width: 40%;
+					height: 12ex;
+					transform: scaleX(-1);
+				}
+
+				.right {
+					shape-outside: polygon(100% 0, 100% 100%, 0 100%);
+					float: right;
+					width: 40%;
+					height: 12ex;
+				}
+
+				p {
+					text-align: center;
+				}
+			&lt;/style&gt;
+		</code>
+		</pre>
+
+		<img class="singleImgExample" src="images/hand-funnel.png" alt="Using the shape-outside property with floats"/>
+	</div>
+
+	<div class="example">
+
+		Since shapes are clipped to the float's margin box,
+		adding this shape to the left float above
+		would result in the same rendering.
+
+		<pre><code>
+			shape-outside: polygon(0 0, 500% 500%, 0 500%);
+		</code>
+		</pre>
+	</div>
+
+	<div class="example">
+
+		A shape with no extent will create
+		a <a>float area</a> with no extent.
+		Because <a>wrapping</a> only considers the <a>float area</a>,
+		either shape below applied to a float
+		will allow inline content
+		to flow through all of the float's box.
+
+		<pre><code>
+			shape-outside: inset(50% 50% 50% 50%);
+			shape-outside: inset(150% 150% 0% 0%);
+		</code>
+		</pre>
+	</div>
+
+	<div class="example">
+
+		A 'shape-outside' can create open areas
+		on both the left and right
+		of a <a>float area</a>.
+		Content still <a>wraps</a> only on one side
+		of a float in this case.
+		In the picture,
+		the shape is rendered in blue,
+		and the content area outside the shape in mauve.
+
+		<pre><code>
+			shape-outside: polygon(50px 0px, 100px 100px, 0px 100px);
+		</code>
+		</pre>
+		<img class="singleImgExample" src="images/float-side-example.png" alt="wrapping around right side of a left-float float area"/>
+	</div>
+
+	<div class="example">
+
+		The following styling creates
+		a shape much smaller than
+		the float's content area,
+		and adds a margin-top to the float.
+		In the picture,
+		the shape is rendered in blue,
+		the content area outside the shape in mauve,
+		and the margin area of the float box in yellow.
+		The inline content only <a>wraps</a> around the shape,
+		and otherwise overlays the rest
+		of the float margin box.
+
+		<pre><code>
+			.float-left {
+				shape-outside: polygon(0% 50%, 50% 100%, 0 100%);
+				float: left;
+				width: 100px;
+				height: 100px;
+				margin-top: 20px;
+			}
+		</code></pre>
+
+		<img class="singleImgExample" src="images/float-margin-example.png" alt="Adding margin-top to a float with a small shape-outside"/>
+
+		The next picture shows a possible result
+		if two of these floats
+		were stacked next to each other.
+		Note that the floats are positioned
+		using their margin boxes,
+		not the <a>float area</a>.
+
+		<img class="singleImgExample" src="images/stacked-float-example.png" alt="Stacking two floats with a small shape-outside"/>
+	</div>
+
+<h2 id="basic-shape-functions">
+Basic Shapes</h2>
+
+	The <dfn>&lt;basic-shape&gt;</dfn> type
+	can be specified using basic shape functions.
+	When using this syntax
+	to define shapes,
+	the <dfn>reference box</dfn> is defined
+	by each property that uses
+	<<basic-shape>> values.
+	The coordinate system for the shape
+	has its origin on the top-left corner of the
+	<a>reference box</a> with the x-axis
+	running to the right
+	and the y-axis running downwards.
+	All the lengths expressed in percentages
+	are resolved from the used dimensions
+	of the <a>reference box</a>.
+
+<h3 id="supported-basic-shapes">
+Supported Shapes</h3>
+
+	The following shapes are supported.
+	All <<basic-shape>> values use
+	<a href="https://www.w3.org/TR/css3-values/#functional-notation">functional notation</a>
+	and are defined here using the
+	<a href="https://www.w3.org/TR/css3-values/#value-defs">Value Definition Syntax</a>.
+
+	<dl>
+		<dt><dfn>inset()</dfn> =
+			inset( <<length-percentage>>{1,4} [ round <<'border-radius'>> ]? )
+		</dt>
+		<dd>
+			Defines an inset rectangle.
+			<ul>
+				<li>
+					When all of the first four arguments
+					are supplied they represent the
+					<strong>top, right, bottom</strong> and
+					<strong>left</strong> offsets
+					from the <a>reference box</a> inward
+					that define the positions
+					of the edges
+					of the inset rectangle.
+					These arguments follow the syntax
+					of the 'margin' shorthand,
+					that let you set all four insets
+					with one, two or four values.
+				</li>
+				<li>
+					The optional <<'border-radius'>> argument(s)
+					define rounded corners for the inset rectangle
+					using the 'border-radius' shorthand syntax.
+				</li>
+			</ul>
+
+			A pair of insets in either dimension
+			that add up to more than the used dimension
+			(such as left and right insets of 75% apiece)
+			define a shape enclosing no area.
+			For this specification,
+			this results in an <a>empty float area</a>.
+
+		</dd>
+		<dt><dfn>circle()</dfn> =
+			circle( <<shape-radius>>? [ at <<position>> ]? )
+		</dt>
+		<dd>
+			<ul>
+				<li>
+					The shape-radius argument represents
+					<strong>r</strong>, the radius
+					of the circle.
+					Negative values are invalid.
+					A radius of zero defines a shape
+					enclosing no area,
+					which results in an <a>empty float area</a>.
+					A percentage value here
+					is resolved from the used width and height
+					of the <a>reference box</a> as <br>
+					<code>sqrt(<em>width</em><sup>2</sup>+<em>height</em><sup>2</sup>)/sqrt(2)</code>.
+				</li>
+				<li>
+					The position argument defines
+					the center of the circle.
+					This defaults to center if omitted.
+				</li>
+			</ul>
+		</dd>
+		<dt><dfn>ellipse()</dfn> =
+			ellipse( <<shape-radius>>{2}? [ at <<position>> ]? )
+		</dt>
+		<dd>
+			<ul>
+				<li>
+					The shape-radius arguments represent
+					<strong>rx</strong> and
+					<strong>ry</strong>,
+					the x-axis and y-axis radii
+					of the ellipse,
+					in that order.
+					Negative values for either radius are invalid.
+					If either radius is zero this defines a shape
+					enclosing no area,
+					which results in an <a>empty float area</a>.
+					Percentage values here are resolved
+					against the used width (for the rx value)
+					and the used height (for the ry value)
+					of the reference box.
+				</li>
+				<li>
+					The position argument defines
+					the center of the ellipse.
+					This defaults to center if omitted.
+				</li>
+			</ul>
+		</dd>
+		<dt><dfn>polygon()</dfn> =
+			polygon( <<fill-rule>>? , [<<length-percentage>> <<length-percentage>>]# )
+		</dt>
+		<dd>
+			<ul>
+				<li>
+					<dfn><<fill-rule>></dfn> -
+					The filling rule used
+					to determine the interior
+					of the polygon.
+					See <a href="https://www.w3.org/TR/SVG/painting.html#FillRuleProperty">fill-rule</a> property
+					in SVG for details.
+					Possible values are ''nonzero''
+					or ''evenodd''.
+					Default value when omitted is ''nonzero''.</li>
+				<li>
+					Each pair argument in the list represents <strong>x<sub>i</sub></strong> and <strong>y<sub>i</sub></strong> -
+					the <strong>x</strong> and <strong>y</strong> axis coordinates of the i-th vertex of the polygon.
+				</li>
+			</ul>
+
+			The UA must close a polygon
+			by connecting the last vertex
+			with the first vertex of the list.
+
+			At least three vertices are required
+			to define a polygon with an area.
+			This means that (for this specification)
+			polygons with less than three vertices
+			(or with three or more vertices
+			arranged to enclose no area)
+			result in an <a>empty float area</a>.
+		</dd>
+	</dl>
+
+	The arguments not defined above are defined as follows:
+
+	<dl>
+		<dt><dfn><<shape-radius>></dfn> = <<length-percentage>> | closest-side | farthest-side
+		<dd>
+			Defines a radius for a circle or ellipse. If omitted it defaults to closest-side.
+			<ul>
+				<li>
+					<dfn>closest-side</dfn>
+					uses the length from the center
+					of the shape to the closest side
+					of the <a>reference box</a>.
+					For circles,
+					this is the closest side
+					in any dimension.
+					For ellipses,
+					this is the closest side
+					in the radius dimension.
+				<li>
+					<dfn>farthest-side</dfn>
+					uses the length from the center
+					of the shape to the farthest side
+					of the <a>reference box</a>.
+					For circles,
+					this is the farthest side
+					in any dimension.
+					For ellipses,
+					this is the farthest side
+					in the radius dimension.
+			</ul>
+	</dl>
+
+<h3 id='basic-shape-computed-values'>
+Computed Values of Basic Shapes</h3>
+
+	The values in a <<basic-shape>> function are computed as specified, with these exceptions:
+
+	<ul>
+		<li>
+			Omitted values are included and compute to their defaults.
+		</li>
+		<li>
+			A <<position>> value in ''circle()'' or ''ellipse()'' is computed as a pair of offsets (horizontal then vertical) from the top left origin, each given as a combination of an absolute length and a percentage.
+		</li>
+		<li>
+			A <'border-radius'> value in ''inset()'' is computed as an expanded list of all eight <<length>> or percentage values.
+		</li>
+	</ul>
+
+<h3 id='basic-shape-serialization'>
+Serialization of Basic Shapes</h3>
+
+	To serialize the <<basic-shape>> functions,
+	serialize as per their individual grammars,
+	in the order the grammars are written in,
+	avoiding calc() expressions where possible,
+	avoiding calc() transformations,
+	omitting components when possible without changing the meaning,
+	joining space-separated tokens with a single space,
+	and following each serialized comma with a single space.
+
+	The <<position>> values
+	(including the defaults)
+	in ''ellipse()'' and ''circle()''
+	serialize to their 2- and 4-value forms only,
+	preferring the 2-value form
+	when it can be expressed without calc(),
+	preferring left and top origins,
+	and preferring 0% over a zero length.
+
+<div class="example">
+
+
+	Since <<position>> keywords stand in for percentages, keywords without an offset turn into percentages.
+
+	<pre><code>
+		circle(at left bottom)
+
+		serializes as "circle(at 0% 100%)"
+	</code></pre>
+
+	Omitting components means that some default values do not show up in the serialization. But since <<position>> always uses the 2- or 4-value form, a default <<position>> is not omitted.
+
+	<pre><code>
+		circle(closest-side at center)
+
+		serializes as "circle(at 50% 50%)"
+	</code></pre>
+
+	Using grammar order means that <<position>> values always give horizontal components first, then vertical.
+
+	<pre><code>
+		circle(at bottom left)
+
+		serializes as "circle(at 0% 100%)"
+	</code></pre>
+
+	Avoiding calc() expressions means that some <<position>> values that could be simplified to the 2-value form must be serialized in 4-value form instead.
+
+	<pre><code>
+		circle(at right 5px bottom 10px)
+
+		serializes as "circle(at right 5px bottom 10px)"
+
+		not as "circle(at calc(100% - 5px) calc(100% - 10px))"
+	</code></pre>
+
+	Avoiding calc() transformations means that if a specified (or computed) calc() must stay in calc() form, it will be used as-is, not reformulated with a different origin or reduced.
+
+	<pre><code>
+		bottom calc(10% + 5px)
+
+		serializes as "bottom calc(10% + 5px)"
+
+		not as "top calc(90% - 5px)" or "calc(90% - 5px)"
+	</code></pre>
+
+	Preferring 0% over a zero length comes up when you must supply an omitted offset.
+
+	<pre><code>
+		circle(at right 5px top)
+
+		serializes as "circle(at right 5px top 0%)"
+	</code></pre>
+
+	Preferring left and top origins means that some percentage offsets will normalize to those origins (when calc can be avoided).
+
+	<pre><code>
+		circle(at right 5% top 0px)
+
+		serializes as "circle(at 95% 0%)"
+	</code></pre>
+
+</div>
+
+<h3 id='basic-shape-interpolation'>
+Interpolation of Basic Shapes</h3>
+
+	For interpolating between
+	one basic shape and a second,
+	the rules below are applied.
+	The values in the shape functions interpolate
+	as a <a href="https://www.w3.org/TR/css3-transitions/#animtype-simple-list">simple list</a>.
+	The list values interpolate as
+	<a href="https://www.w3.org/TR/css3-transitions/#animtype-lpcalc">length,
+	percentage, or calc</a> where possible.
+	If list values are not one of those types
+	but are identical
+	(such as finding ''nonzero''
+	in the same list position
+	in both lists)
+	those values do interpolate.
+
+	<ul>
+		<li>
+			Both shapes must use the same <a>reference box</a>.
+		</li>
+		<li>
+			If both shapes are the same type,
+			that type is ''ellipse()'' or ''circle()'',
+			and none of the radii use
+			the ''closest-side'' or ''farthest-side'' keywords,
+			interpolate between each value
+			in the shape functions.
+		</li>
+		<li>
+			If both shapes are of type ''inset()'',
+			interpolate between each value
+			in the shape functions.
+		</li>
+		<li>
+			If both shapes are of type ''polygon()'',
+			both polygons have the same number of vertices,
+			and use the same <<fill-rule>>,
+			interpolate between each value
+			in the shape functions.
+		</li>
+		<li>
+			In all other cases no interpolation is specified.
+		</li>
+	</ul>
+
+<h2 id="shapes-from-image">
+Shapes from Image</h2>
+
+	Another way of defining shapes
+	is by specifying a source <<image>>
+	whose alpha channel is used
+	to compute the shape.
+	The shape is computed to be the path or paths
+	that enclose the area(s)
+	where the opacity of the specified image
+	is greater than the 'shape-image-threshold' value.
+	The absence of any pixels with an alpha value
+	greater than the specified threshold
+	results in an <a>empty float area</a>.
+	If the 'shape-image-threshold' is not specified,
+	the initial value to be considered is 0.0.
+
+	The image is sized and positioned
+	as if it were a replaced element
+	whose specified width and height
+	are the same as the element's
+	used content box size.
+
+	For animated raster image formats (such as
+	<a href="http://www.w3.org/Graphics/GIF/spec-gif89a.txt">GIF</a>),
+	the first frame of the animation sequence is used.
+
+	<div class="example">
+
+	An image is floating to the left of a paragraph.
+	The image shows the 3D version of the
+	CSS logo over a transparent background.
+	The logo has a shadow using an alpha-channel.
+
+	The image defines its <a>float area</a>
+	through the 'shape-outside' property.
+
+	<pre>
+		<code>
+			&lt;p&gt;
+				&lt;img id="CSSlogo" src="CSS-logo1s.png"/&gt;
+				blah blah blah blah...
+			&lt;/p&gt;
+
+			&lt;style&gt;
+				#CSSlogo {
+					float: left;
+					shape-outside: attr(src url);
+					shape-image-threshold: 0.1;
+				}
+			&lt;/style&gt;
+		</code>
+	</pre>
+
+	The 'shape-outside' property re-uses the url
+	from the src attribute of the img element.
+
+	It is perfectly possible to display an image
+	and use a different image for its <a>float area</a>.
+
+	In the figure below, the alpha-channel threshold
+	is represented by the dotted line around the CSS logo.
+
+	It's then possible to affect where the lines
+	of the paragraph start in three ways:
+
+	<ol>
+		<li>Modifying the alpha channel in the image</li>
+		<li>Changing the value of the 'shape-image-threshold' property</li>
+		<li>Changing the value of the 'shape-margin' property (see example 8)</li>
+	</ol>
+
+		<figure>
+			<img alt="A float shape around an image using its alpha-channel" src="images/shape-outside-image.png" style="width:70%"/>
+			<figcaption>
+				A float shape around an image using its alpha-channel.
+			</figcaption>
+		</figure>
+	</div>
+
+<h2 id="shapes-from-box-values">
+Shapes from Box Values</h2>
+
+	Shapes can be defined
+	by reference to edges in the
+	<a href="https://www.w3.org/TR/CSS21/box.html#box-dimensions">CSS Box Model</a>.
+	These edges include
+	<a href="https://www.w3.org/TR/css3-background/#corner-shaping">border-radius curvature</a> [[!CSS3BG]]
+	from the used border-radius values.
+	The <<shape-box>> value extends the <<box>> value
+	to include ''margin-box''.
+	Its syntax is:
+
+	<pre>
+		<dfn><<shape-box>></dfn> = <<box>> | ''margin-box''
+	</pre>
+
+	The definitions of the values are:
+
+	The <dfn value for="<shape-box>, shape-outside">margin-box</dfn> value defines the shape
+	enclosed by the outside margin edge.
+	The corner radii of this shape are determined
+	by the corresponding border-radius and margin values.
+	If the ratio of <code>border-radius/margin</code> is 1 or more,
+	then the margin box corner radius is
+	<code>border-radius + margin</code>.
+	If the ratio of <code>border-radius/margin</code> is less than 1,
+	then the margin box corner radius is
+	<code>border-radius + (margin * (1 + (ratio-1)^3))</code>.
+
+	The <dfn value for="<shape-box>, shape-outside">border-box</dfn> value defines the shape
+	enclosed by the outside border edge.
+	This shape follows all
+	of the normal border radius shaping rules
+	for the outside of the border.
+
+	The <dfn value for="<shape-box>, shape-outside">padding-box</dfn> value defines the shape
+	enclosed by the outside padding edge.
+	This shape follows all
+	of the normal border radius shaping rules
+	for the inside of the border.
+
+	The <dfn value for="<shape-box>, shape-outside">content-box</dfn> value defines the shape
+	enclosed by the outside content edge.
+	Each corner radius of this box
+	is the larger of 0
+	or <code>border-radius - border-width - padding</code>.
+
+	<div class="example">
+
+		Given the 100px square below with
+		10px padding, border and margins,
+		the box values define these shapes:
+
+		<ul>
+			<li>''margin-box'': the shape containing all of the yellow pixels</li>
+			<li>''border-box'': the shape containing all of the black pixels</li>
+			<li>''padding-box'': the shape containing all of the mauve pixels</li>
+			<li>''content-box'': the shape containing all of the blue pixels</li>
+		</ul>
+
+		<figure>
+			<img alt="Colored boxes representing simple box edges" src="images/box-edges-simple.png"/>
+			<figcaption>
+				Simple CSS Box Model Edges
+			</figcaption>
+		</figure>
+
+		And the same definitions apply to a more complex example with the same 100px square, but with these border, padding and margin properties:
+
+		<pre>
+			<code>
+				border-radius: 20px 20px 20px 40px;
+				border-width: 30px 10px 20px 10px;
+				padding: 10px 20px 10px 10px;
+				margin: 20px 10px 10px 10px;
+			</code>
+		</pre>
+
+		<figure>
+			<img alt="Colored boxes representing complex box edges" src="images/box-edges-complex.png"/>
+			<figcaption>
+				Complex CSS Box Model Edges
+			</figcaption>
+		</figure>
+	</div>
+
+	<div class="example">
+
+		The difference between normal float wrapping
+		and wrapping around the shape defined
+		by the margin-box value is that
+		the margin-box shape includes corner shaping.
+		Take the 100px square with 10px padding,
+		border and margins,
+		but with a border-radius of 60px.
+		If you make a left float out of it,
+		content normally wraps in this manner:
+
+		<figure>
+			<img alt="Text wrapping around float with no shape" src="images/normal-wrap.png"/>
+			<figcaption>
+				Normal float wrapping
+			</figcaption>
+		</figure>
+
+		If you add a margin-box shape to the float,
+		then content wraps around the rounded margin-box corners.
+
+		<pre>
+			<code>
+				shape-outside: margin-box;
+			</code>
+		</pre>
+
+		<figure>
+			<img alt="Text wrapping around float with margin-box shape" src="images/margin-box-wrap.png"/>
+			<figcaption>
+				Float wrapping with margin-box
+			</figcaption>
+		</figure>
+	</div>
+
+<h2 id="declaring-shapes">
+Declaring Shapes</h2>
+
+	Shapes are declared with
+	the 'shape-outside' property,
+	with possible modifications
+	from the 'shape-margin' property.
+	The shape defined by
+	the 'shape-outside'
+	and 'shape-margin' properties
+	changes the geometry
+	of a float element's
+	<a>float area</a>.
+
+<h3 id="shape-outside-property">
+Float Area Shape: the 'shape-outside' property</h3>
+
+	<pre class='propdef'>
+		Name: shape-outside
+		Value: none | [ <<basic-shape>> || <<shape-box>> ] | <<image>>
+		Initial: none
+		Applies to: floats
+		Inherited: no
+		Computed value: as <a href="#basic-shape-computed-values">defined</a> for <<basic-shape>> (with <<shape-box>> following, if supplied), the <<image>> with its URI made absolute, otherwise as specified.
+		Media: visual
+		Animatable: as <a href="#basic-shape-interpolation">specified</a> for <<basic-shape>>, otherwise no
+	</pre>
+
+		The values of this property have the following meanings:
+
+	<dl dfn-type="value" dfn-for="shape-outside">
+		<dt><dfn>none</dfn></dt>
+		<dd>
+			The <a>float area</a> is unaffected.
+		</dd>
+
+		<dt><<shape-box>></dt>
+		<dd>
+			If one of these values is specified by itself
+			the shape is computed based on one of
+			''margin-box'',
+			''border-box'',
+			''padding-box'' or
+			''content-box''
+			which use their respective boxes
+			including curvature from border-radius,
+			similar to 'background-clip' [[!CSS3BG]].
+		</dd>
+
+		<dt><dfn><<basic-shape>></dfn></dt>
+		<dd>
+			The shape is computed based on the values of one
+			of ''inset()'', ''circle()'', ''ellipse()''
+			or ''polygon()''. If a <<shape-box>> is also supplied, this defines the <a>reference box</a> for the <<basic-shape>> function. If <<shape-box>> is not supplied, then the <a>reference box</a> defaults to ''margin-box''.
+		</dd>
+
+		<dt><dfn><<image>></dfn></dt>
+		<dd>
+			The shape is extracted
+			and computed based
+			on the alpha channel
+			of the specified <<image>>
+			as defined by 'shape-image-threshold'.
+
+			User agents must use the
+			<a href="https://www.w3.org/TR/html5/infrastructure.html#cors-enabled-fetch">potentially CORS-enabled fetch</a>
+			method defined by the [[!HTML5]] specification
+			for all URLs in a 'shape-outside' value.
+			When fetching,
+			user agents must use "Anonymous" mode,
+			set the referrer source
+			to the stylesheet's URL
+			and set the origin to the URL
+			of the containing document.
+			If this results in network errors
+			such that there is no valid fallback image,
+			the effect is as if
+			the value <a value for="shape-outside">none</a>
+			had been specified.
+		</dd>
+	</dl>
+
+<h3 id="shape-image-threshold-property">
+Choosing Image Pixels: the 'shape-image-threshold' property</h3>
+
+	The 'shape-image-threshold'
+	defines the alpha channel threshold
+	used to extract the shape
+	using an image.
+	A value of 0.5 means that
+	the shape will enclose
+	all the pixels
+	that are more than 50% opaque.
+
+	<pre class='propdef'>
+		Name: shape-image-threshold
+		Value: <<number>>
+		Initial: 0.0
+		Applies to: floats
+		Inherited: no
+		Computed value: The same as the specified value after clipping the <<number>> to the range [0.0,1.0]
+		Media: visual
+		Animatable: as <a href="https://www.w3.org/TR/css3-transitions/#animtype-number">number</a>
+	</pre>
+
+	The values of this property have the following meanings:
+
+	<dl dfn-type="value" dfn-for="shape-image-threshold">
+		<dt><dfn><<number>></dfn></dt>
+		<dd>
+			Sets the threshold used
+			for extracting a shape
+			from an image.
+			The shape is defined
+			by the pixels whose alpha value
+			is greater than the threshold.
+			A threshold value outside the range
+			0.0 (fully transparent)
+			to 1.0 (fully opaque)
+			will be clamped to this range.
+		</dd>
+	</dl>
+
+	Note: A future level of CSS Shapes may define
+	a switch to use the luminance data
+	from an image instead of the alpha data.
+	When this happens,
+	shape-image-threshold will be extended
+	to apply its threshold
+	to either alpha or luminance,
+	depending on the switch state.
+
+<h3 id="shape-margin-property">
+Expanding a Shape: the 'shape-margin' property</h3>
+
+	The 'shape-margin' property adds
+	a margin to a 'shape-outside'.
+	This defines a new shape
+	that is the smallest contour
+	(in the shrink-wrap sense)
+	that includes all the points
+	that are the 'shape-margin' distance outward
+	in the perpendicular direction
+	from a point on the underlying shape.
+	Note that at points where
+	a perpendicular is not defined
+	(e.g. sharp points)
+	take all points
+	on the circle centered at the point
+	and with a radius of 'shape-margin'.
+	This property takes only non-negative values.
+
+
+	<pre class='propdef'>
+		Name: shape-margin
+		Value: <<length>> | <<percentage>>
+		Initial: 0
+		Applies to: floats
+		Inherited: no
+		Computed value: as specified, but with lengths made absolute
+		Media: visual
+		Animatable: as <a href="https://www.w3.org/TR/css3-transitions/#animtype-lpcalc">length, percentage, or calc</a>.
+	</pre>
+
+	<dl dfn-type="value" dfn-for="shape-margin">
+		<dt><dfn><<length>></dfn></dt>
+		<dd>
+			Sets the margin of the shape to the <<length>>.
+		</dd>
+		<dt><dfn><<percentage>></dfn></dt>
+		<dd>
+			Sets the margin of the shape to a percentage
+			of the width of the element's containing block.
+		</dd>
+	</dl>
+
+	<div class="example">
+
+		A 'shape-margin' creating an offset from a polygonal 'shape-outside'. The lighter blue area shows the shape in a 100x100px float, and the darker blue area shows the 10px offset.
+
+		<pre>
+			<code>
+				.float {
+					shape-outside: polygon(10px 10px, 90px 50px, 40px 50px, 90px 90px, 10px 90px);
+					shape-margin: 10px;
+				}
+			</code>
+		</pre>
+		<img src="images/nepal-flag-shape.png"
+			alt="Example of a shape-margin offset"/>
+	</div>
+
+	<div class="example">
+
+		If shape-margin is added
+		to the CSS logo from example 6,
+		the line boxes <a>wrapping</a>
+		around the shape are shortened further.
+		<pre>
+			<code>
+				#CSSlogo {
+					shape-margin: 35px;
+				}
+			</code>
+		</pre>
+		<figure>
+			<img alt="A float shape around an image using its alpha-channel with a 35 pixels shape-margin"	src="images/shape-outside-image-with-margin.png" style="width:70%"/>
+			<figcaption>
+				A float shape around an image using its alpha-channel with a 35-pixel 'shape-margin'
+			</figcaption>
+		</figure>
+	</div>
+
+<h2 class="no-num" id="acknowledgments">
+Acknowledgments</h2>
+
+	This specification is made possible by input from
+	Andrei Bucur,
+	Alexandru Chiculita,
+	Elika Etemad,
+	Arron Eicholz,
+	Sylvain Galineau,
+	Daniel Glazman,
+	Arno Gourdol,
+	Zoltan Horvath,
+	Chris Jones,
+	Bem Jones-Bey,
+	Marcus Mielke,
+	Alex Mogilevsky,
+	Hans Muller,
+	Mihnea Ovidenie,
+	Virgil Palanciuc,
+	Robert Sanderson,
+	Dirk Schulze,
+	Peter Sorotokin,
+	Bear Travis,
+	Eugene Veselov,
+	Stephen Zilles
+	and the CSS Working Group members.
+
+<h2 class="no-num" id="change-log">
+Change Log</h2>
+
+<h3 class="no-num" id="20140320">
+Since <a href="https://www.w3.org/TR/2014/CR-css-shapes-1-20140320/">March 20th 2014</a></h3>
+	<ul>
+		<li>Clarified shape-margin computed value</li>
+		<li>Clarified empty circles and ellipses for <a href="https://github.com/w3c/csswg-drafts/issues/850">issue #850</a></li>
+	</ul>
+
+<h3 class="no-num" id="20140211">
+Since <a href="https://www.w3.org/TR/2014/WD-css-shapes-1-20140211/">February 11th 2014</a></h3>
+	<ul>
+		<li>Replaced divs with images in the first example</li>
+		<li>Add 0px to last serialization example</li>
+	</ul>
+
+<h3 class="no-num" id="20131203">
+Since <a href="https://www.w3.org/TR/2013/WD-css-shapes-1-20131203/">December 3rd 2013</a></h3>
+	<ul>
+		<li>Updated computed value and serialization of basic shapes</li>
+		<li>Added a margin-box example</li>
+		<li>Change auto to none for shape-outside</li>
+		<li>Defined shape-box instead of redefining box</li>
+		<li>Clarified that shape from image may produce more than one path</li>
+	</ul>
+
+<h3 class="no-num" id="20130620">
+Since <a href="https://www.w3.org/TR/2013/WD-css-shapes-1-20130620/">June 20th 2013</a></h3>
+	<ul>
+		<li>Added shape from box value section</li>
+		<li>Updated basic-shape interpolation</li>
+		<li>Allow negative insets, disallow negative radii</li>
+		<li>Changed relevant to reference</li>
+		<li>Remove box-sizing dependency, add relevant box keywords</li>
+		<li>Changed circle() and ellipse() to use radial gradient syntax</li>
+		<li>Postponed rectangle() to level 2</li>
+		<li>Clarified shape-from-image sizing and positioning</li>
+		<li>Change inset-rectangle() to inset()</li>
+		<li>Future-proof shape-image-threshold to possibly apply to luminance</li>
+		<li>Added CORS fetching to shape-outside URLs</li>
+		<li>Changed shape-outside value from &lt;uri&gt; to &lt;image&gt;</li>
+		<li>Remove 'percentages based on auto-sizing resolve to 0'</li>
+		<li>Change initial value of shape-image-threshold to 0.0</li>
+		<li>Change float positioning to be unaffected by shape-outside</li>
+		<li>Shapes on floats clipped to float's margin box</li>
+	</ul>
+
+<h3 class="no-num" id="20120503">
+Since <a href="https://www.w3.org/TR/2012/WD-css3-exclusions-20120503/">May 3rd 2012</a></h3>
+	<ul>
+		<li>Postpone shapes from SVG elements to a future Shapes level</li>
+		<li>Postpone shape-inside to a future Shapes level</li>
+		<li>split exclusions from shapes into separate modules</li>
+		<li>added inset-rectangle() to basic shapes</li>
+		<li>Changed shape-inside overflow diagrams to show exclusion behavior</li>
+		<li>Changed shape-inside to contribute to the wrapping context</li>
+		<li>Defined exclusion edges relative to wrapping content's writing mode</li>
+		<li>Made use of start, end, before and after consistent</li>
+		<li>Added interpolation for basic shapes</li>
+		<li>Changed basic shapes to depend on box specified with box-sizing</li>
+		<li>Added overflow behavior for shape-inside.</li>
+		<li>Added wrap-flow:minimum.</li>
+		<li>Clarified processing model.</li>
+		<li>Changed wrap-margin and wrap-padding to shape-margin and shape-padding.</li>
+		<li>Removed wrap shorthand.</li>
+	</ul>
+
+<h3 class="no-num" id="20111213">
+Since <a href="https://www.w3.org/TR/2011/WD-css3-exclusions-20111213/">December 13th 2011</a></h3>
+	<ul>
+		<li>Clarified processing model.</li>
+		<li>Clarified interaction with floats.</li>
+		<li>Clarified that an exclusion element establishes a new block formatting context.</li>
+	</ul>

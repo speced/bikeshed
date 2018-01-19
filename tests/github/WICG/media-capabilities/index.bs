@@ -1,0 +1,806 @@
+<pre class='metadata'>
+Title: Media Capabilities
+Repository: wicg/media-capabilities
+Status: CG-DRAFT
+ED: https://wicg.github.io/media-capabilities/
+Shortname: media-capabilities
+Level: 1
+Group: wicg
+Editor: Mounir Lamouri, w3cid 45389, Google Inc. https://google.com/
+
+Abstract: This specification intends to provide APIs to allow websites to make
+Abstract: an optimal decision when picking media content for the user. The APIs
+Abstract: will expose information about the decoding and encoding capabilities
+Abstract: for a given format but also output capabilities to find the best match
+Abstract: based on the device's display.
+
+!Participate: <a href='https://github.com/wicg/media-capabilities'>Git Repository.</a>
+!Participate: <a href='https://github.com/wicg/media-capabilities/issues/new'>File an issue.</a>
+!Version History: <a href='https://github.com/wicg/media-capabilities/commits'>https://github.com/wicg/media-capabilities/commits</a>
+</pre>
+
+<pre class='anchors'>
+spec: media-source; urlPrefix: https://w3c.github.io/media-source/
+    type: interface
+        for: MediaSource; text: MediaSource; url: #media-source
+    type: method
+        for: MediaSource; text: isTypeSupported(); url: #dom-mediasource-istypesupported
+
+spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/;
+    type: method
+        urlPrefx: embedded-content.html/
+            for: HTMLMediaElement; text: canPlayType(); url: #dom-navigator-canplaytype
+    type: dfn
+        text: rules for parsing floating-point number values
+
+spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/#
+    type: interface
+        text: TypeError; url: sec-native-error-types-used-in-this-standard-typeerror
+
+spec: cssom-view; urlPrefix: https://drafts.csswg.org/cssom-view/#
+    type: interface
+        text: Screen; url: screen
+
+spec: mediaqueries-4; urlPrefix: https://drafts.csswg.org/mediaqueries-4/#
+    type: interface
+        text: color-gamut
+
+spec: mediacapture-record; urlPrefix: https://www.w3.org/TR/mediastream-recording/#
+    type:interface
+        text: MediaRecorder; url: mediarecorder
+
+spec: webrtc-pc; urlPrefix: https://www.w3.org/TR/webrtc/#
+    type: interface
+        text: RTCPeerConnection; url: interface-definition
+
+spec: mimesniff; urlPrefix: https://mimesniff.spec.whatwg.org/#
+    type: dfn; text: valid mime type; url: valid-mime-type
+
+spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
+    type: dfn; text: present
+</pre>
+<pre class='biblio'>
+{
+    "media-playback-quality": {
+        "href": "https://wicg.github.io/media-playback-quality/",
+        "title": "Media Playback Quality Specification",
+        "status": "CG-DRAFT",
+        "publisher": "WICG"
+    }
+}
+</pre>
+
+<section class='non-normative'>
+  <h2 id='introduction'>Introduction</h2>
+  <em>This section is non-normative</em>
+
+  <p>
+    This specification relies on exposing the following sets of properties:
+    <ul>
+      <li>
+        <p>
+          An API to query the user agent with regards to the decoding and
+          encoding abilities of the device based on information such as the
+          codecs, profile, resolution, bitrates, etc. The API exposes
+          information such as whether the playback should be smooth and power
+          efficient.
+        </p>
+        <p>
+          The intent of purposes of the decoding capabilities API is to provide
+          a powerful replacement to API such as
+          {{MediaSource/isTypeSupported()}} or
+          {{HTMLMediaElement/canPlayType()}} which are vague and mostly help the
+          callers to know if something can not be decoded but not how well it
+          should perform.
+        </p>
+      </li>
+      <li>
+        <p>
+          Better information about the display properties such as supported
+          color gamut or dynamic range abilities in order to pick the right
+          content for the display and avoid providing HDR content to an SDR
+          display.
+        </p>
+      </li>
+      <li>
+        <p>
+          Real time feedback about the playback so an adaptative streaming can
+          alter the quality of the content based on actual user perceived
+          quality. Such information will allow websites to react to a pick of
+          CPU/GPU usage in real time. It is expected that this will be tacklked
+          as part of the [[media-playback-quality]] specification.
+        </p>
+      </li>
+    </ul>
+  </p>
+</section>
+
+<section>
+  <h2 id='decoding-encoding-capabilities'>Decoding and Encoding Capabilities</h2>
+
+  <section>
+    <h3 id='media-configurations'>Media Configurations</h3>
+
+    <section>
+      <h4 id='mediaconfiguration'>MediaConfiguration</h4>
+
+      <pre class='idl'>
+        dictionary MediaConfiguration {
+          VideoConfiguration video;
+          AudioConfiguration audio;
+        };
+      </pre>
+
+      <pre class='idl'>
+        dictionary MediaDecodingConfiguration : MediaConfiguration {
+          required MediaDecodingType type;
+        };
+      </pre>
+
+      <pre class='idl'>
+        dictionary MediaEncodingConfiguration : MediaConfiguration {
+          required MediaEncodingType type;
+        };
+      </pre>
+
+      <p>
+        The input to the decoding capabilities is represented by a
+        {{MediaDecodingConfiguration}} dictionary and the input of the encoding
+        capabilities by a {{MediaEncodingConfiguration}} dictionary.
+      </p>
+      <p>
+        For a {{MediaConfiguration}} to be a <dfn>valid
+        MediaConfiguration</dfn>, <code>audio</code> or <code>video</code> MUST
+        be <a>present</a>.
+      </p>
+    </section>
+
+    <section>
+      <h4 id='mediadecodingtype'>MediaDecodingType</h4>
+
+      <pre class='idl'>
+        enum MediaDecodingType {
+          "file",
+          "media-source",
+        };
+      </pre>
+
+      <p>
+        A {{MediaDecodingConfiguration}} has two types:
+        <ul>
+          <li><dfn for='MediaDecodingType' enum-value>file</dfn> is used to
+          represent a configuration that is meant to be used for a plain file
+          playback.</li>
+          <li><dfn for='MediaDecodingType' enum-value>media-source</dfn> is used
+          to represent a configuration that is meant to be used for playback of
+          a {{MediaSource/MediaSource}} as defined in the [[media-source]]
+          specification.</li>
+        </ul>
+      </p>
+    </section>
+
+    <section>
+      <h4 id='mediaencodingtype'>MediaEncodingType</h4>
+
+      <pre class='idl'>
+        enum MediaEncodingType {
+          "record",
+          "transmission"
+        };
+      </pre>
+
+      <p>
+        A {{MediaEncodingConfiguration}} can have one of two types:
+        <ul>
+          <li><dfn for='MediaEncodingType' enum-value>record</dfn> is used to
+          represent a configuration for recording of media, e.g. using
+          {{MediaRecorder}} as defined in [[mediastream-recording]].</li>
+          <li><dfn for='MediaEncodingType' enum-value>transmission</dfn> is used
+          to represent a configuration meant to be transmitted over electronic
+          means (e.g. using {{RTCPeerConnection}}).</li>
+        </ul>
+      </p>
+    </section>
+
+    <section>
+      <h4 id='mime-type'>MIME types</h4>
+
+      <p>
+        In the context of this specification, a MIME type is also called content
+        type. A <dfn>valid media MIME type</dfn> is a string that is a <a>valid
+        MIME type</a> per [[mimesniff]]. If the MIME type does not imply a
+        codec, the string MUST also have one and only one parameter that is
+        named <code>codecs</code> with a value describing a single media codec.
+        Otherwise, it MUST contain no parameters.
+      </p>
+
+      <p>
+        A <dfn>valid audio MIME type</dfn> is a string that is <a>valid media
+        MIME type</a> and for which the <code>type</code> per [[RFC7231]] is
+        either <code>audio</code> or <code>application</code>.
+      </p>
+
+      <p>
+        A <dfn>valid video MIME type</dfn> is a string that is a <a>valid media
+        MIME type</a> and for which the <code>type</code> per [[RFC7231]] is
+        either <code>video</code> or <code>application</code>.
+      </p>
+    </section>
+
+    <section>
+      <h4 id='videoconfiguration'>VideoConfiguration</h4>
+
+      <pre class='idl'>
+        dictionary VideoConfiguration {
+          required DOMString contentType;
+          required unsigned long width;
+          required unsigned long height;
+          required unsigned long long bitrate;
+          required DOMString framerate;
+        };
+      </pre>
+
+      <p>
+        The <dfn for='VideoConfiguration' dict-member>contentType</dfn> member
+        represents the MIME type of the video track.
+      </p>
+
+      <p>
+        To check if a {{VideoConfiguration}} <var>configuration</var> is a
+        <dfn>valid video configuration</dfn>, the following steps MUST be run:
+        <ol>
+          <li>
+            If <var>configuration</var>'s {{VideoConfiguration/contentType}} is
+            not a <a>valid video MIME type</a>, return <code>false</code> and
+            abort these steps.
+          </li>
+          <li>
+            If none of the following is true, return <code>false</code> and
+            abort these steps:
+            <ul>
+              <li>
+                Applying the <a>rules for parsing floating-point number
+                values</a> to <var>configuration</var>'s
+                {{VideoConfiguration/framerate}} results in a number that is
+                finite and greater than 0.
+              </li>
+              <li>
+                <var>Configuration</var>'{{VideoConfiguration/framerate}}
+                contains one occurence of U+002F SLASH character (/) and the
+                substrings before and after this character, when applying the
+                <a>rules for parsing floating-point number values</a> results in
+                a number that is finite and greater than 0.
+              </li>
+            </ul>
+          </li>
+          <li>
+            Return <code>true</code>.
+          </li>
+        </ol>
+      </p>
+
+      <p>
+        The <dfn for='VideoConfiguration' dict-member>width</dfn> and
+        <dfn for='VideoConfiguration' dict-member>height</dfn> members represent
+        respectively the visible horizontal and vertical encoded pixels in the
+        encoded video frames.
+      </p>
+
+      <p>
+        The <dfn for='VideoConfiguration' dict-member>bitrate</dfn> member
+        represents the average bitrate of the video track given in units of bits
+        per second. In the case of a video stream encoded at a constant bit rate
+        (CBR) this value should be accurate over a short term window. For the
+        case of variable bit rate (VBR) encoding, this value should be usable to
+        allocate any necessary buffering and throughput capability to
+        provide for the un-interrupted decoding of the video stream over the
+        long-term based on the indicated {{VideoConfiguration/contentType}}.
+      </p>
+
+      <p>
+        The <dfn for='VideoConfiguration' dict-member>framerate</dfn> member
+        represents the framerate of the video track. The framerate is the number
+        of frames used in one second (frames per second). It is represented
+        either as a double or as a fraction.
+      </p>
+    </section>
+
+    <section>
+      <h4 id='audioconfiguration'>AudioConfiguration</h4>
+
+      <pre class='idl'>
+        dictionary AudioConfiguration {
+          required DOMString contentType;
+          DOMString channels;
+          unsigned long long bitrate;
+          unsigned long samplerate;
+        };
+      </pre>
+
+      <p>
+        The <dfn for='AudioConfiguration' dict-member>contentType</dfn> member
+        represents the MIME type of the audio track.
+      </p>
+
+      <p>
+        To check if a {{AudioConfiguration}} <var>configuration</var> is a
+        <dfn>valid audio configuration</dfn>, the following steps MUST be run:
+        <ol>
+          <li>
+            If <var>configuration</var>'s {{AudioConfiguration/contentType}} is
+            not a <a>valid audio MIME type</a>, return <code>false</code> and
+            abort these steps.
+          </li>
+          <li>
+            Return <code>true</code>.
+          </li>
+        </ol>
+      </p>
+
+      <p>
+        The <dfn for='AudioConfiguration' dict-member>channels</dfn> member
+        represents the audio channels used by the audio track.
+      </p>
+
+      <p class='issue'>
+        The {{AudioConfiguration/channels}} needs to be defined as a
+        <code>double</code> (2.1, 4.1, 5.1, ...), an <code>unsigned short</code>
+        (number of channels) or as an <code>enum</code> value. The current
+        definition is a placeholder.
+      </p>
+
+      <p>
+        The <dfn for='AudioConfiguration' dict-member>bitrate</dfn> member
+        represents the number of average bitrate of the audio track. The bitrate
+        is the number of bits used to encode a second of the audio track.
+      </p>
+
+      <p>
+        The <dfn for='AudioConfiguration' dict-member>samplerate</dfn>
+        represents the samplerate of the audio track in. The samplerate is the
+        number of samples of audio carried per second.
+      </p>
+
+      <p class='note'>
+        The {{AudioConfiguration/samplerate}} is expressed in <code>Hz</code>
+        (ie. number of samples of audio per second). Sometimes the samplerates
+        value are expressed in <code>kHz</code> which represents the number of
+        thousands of samples of audio per second.<br>
+        44100 <code>Hz</code> is equivalent to 44.1 <code>kHz</code>.
+      </p>
+    </section>
+  </section>
+
+  <section>
+    <h3 id='media-capabilities-info'>Media Capabilities Information</h3>
+
+    <pre class='idl'>
+      interface MediaCapabilitiesInfo {
+        readonly attribute boolean supported;
+        readonly attribute boolean smooth;
+        readonly attribute boolean powerEfficient;
+      };
+    </pre>
+
+    <p>
+      The {{MediaCapabilitiesInfo}} has an associated <dfn
+      for='MediaCapabilitiesInfo'>configuration</dfn> which is a
+      {{MediaDecodingConfiguration}} or {{MediaEncodingConfiguration}}.
+    </p>
+
+    <p>
+      A {{MediaCapabilitiesInfo}} has associated <dfn
+      for='MediaCapabilitiesInfo'>supported</dfn>, <dfn
+      for='MediaCapabilitiesInfo'>smooth</dfn>, <dfn
+      for='MediaCapabilitiesInfo'>powerEfficient</dfn> fields which are
+      booleans.
+    </p>
+
+    <p>
+      When the <dfn>create a MediaCapabilitiesInfo algorithm</dfn> with a
+      <var>configuration</var> is invoked, the user agent MUST run the following
+      steps:
+      <ol>
+        <li>
+          Let <var>info</var> be a new {{MediaCapabilitiesInfo}} instance.
+          Unless stated otherwise, reading and writing apply to <var>info</var>
+          for the next steps.
+        </li>
+        <li>
+          Set <a for=MediaCapabilitiesInfo>configuration</a> to
+          <var>configuration</var>.
+        </li>
+        <li>
+          If <a for=MediaCapabilitiesInfo>configuration</a> is of type
+          {{MediaDecodingConfiguration}}, run the following substeps:
+          <ol>
+            <li>
+              If the user agent is able to decode the media represented by
+              <a for=MediaCapabilitiesInfo>configuration</a>, set
+              <a for=MediaCapabilitiesInfo>supported</a> to <code>true</code>.
+              Otherwise set it to <code>false</code>.
+            </li>
+            <li>
+              If the user agent is able to decode the media represented by
+              <a for=MediaCapabilitiesInfo>configuration</a> at a pace that
+              allows a smooth playback, set <a
+              for=MediaCapabilitiesInfo>smooth</a> to <code>true</code>.
+              Otherwise set it to <code>false</code>.
+            </li>
+            <li>
+              If the user agent is able to decode the media represented by
+              <a for=MediaCapabilitiesInfo>configuration</a> in a power efficient
+              manner, set <a for=MediaCapabilitiesInfo>powerEfficient</a> to
+              <code>true</code>. Otherwise set it to <code>false</code>. The
+              user agent SHOULD NOT take into consideration the current power
+              source in order to determine the decoding power efficiency unless
+              the device's power source has side effects such as enabling
+              different decoding modules.
+            </li>
+          </ol>
+        </li>
+        <li>
+          If <a for=MediaCapabilitiesInfo>configuration</a> is of type
+          {{MediaEncodingConfiguration}}, run the following substeps:
+          <ol>
+            <li>
+              If the user agent is able to encode the media represented by
+              <a for=MediaCapabilitiesInfo>configuration</a>, set
+              <a for=MediaCapabilitiesInfo>supported</a> to <code>true</code>.
+              Otherwise set it to <code>false</code>.
+            </li>
+            <li>
+              If the user agent is able to encode the media represented by
+              <a for=MediaCapabilitiesInfo>configuration</a> at a pace that
+              allows encoding frames at the same pace as they are sent to the
+              encoder, set <a for=MediaCapabilitiesInfo>smooth</a> to
+              <code>true</code>. Otherwise set it to <code>false</code>.
+            </li>
+            <li>
+              If the user agent is able to encode the media represented by
+              <a for=MediaCapabilitiesInfo>configuration</a> in a power
+              efficient manner, set <a
+              for=MediaCapabilitiesInfo>powerEfficient</a> to <code>true</code>.
+              Otherwise set it to <code>false</code>. The user agent SHOULD NOT
+              take into consideration the current power source in order to
+              determine the encoding power efficiency unless the device's power
+              source has side effects such as enabling different encoding
+              modules.
+            </li>
+          </ol>
+          <li>
+            Return <var>info</var>.
+          </li>
+        </li>
+      </ol>
+    </p>
+
+    <p>
+      The <dfn for='MediaCapabilitiesInfo' attribute>supported</dfn> attribute
+      MUST return <a for=MediaCapabilitiesInfo>supported</a>.
+    </p>
+
+    <p>
+      The <dfn for='MediaCapabilitiesInfo' attribute>smooth</dfn> attribute MUST
+      return <a for=MediaCapabilitiesInfo>smooth</a>.
+    </p>
+
+    <p>
+      The <dfn for='MediaCapabilitiesInfo' attribute>powerEfficient</dfn>
+      attribute MUST return <a for=MediaCapabilitiesInfo>powerEfficient</a>.
+    </p>
+
+    <p class='note'>
+      Authors can use {{MediaCapabilitiesInfo/powerEfficient}} in concordance
+      with the Battery Status API [[battery-status]] in order to determine
+      whether the media they would like to play is appropriate for the user
+      configuration. It is worth noting that even when a device is not power
+      constrained, high power usage has side effects such as increasing the
+      temperature or the fans noise.
+    </p>
+  </section>
+
+  <section>
+    <h3 id='navigators-extensions'>Navigator and WorkerNavigator extension</h3>
+
+    <pre class='idl'>
+      [Exposed=(Window)]
+      partial interface Navigator {
+        [SameObject] readonly attribute MediaCapabilities mediaCapabilities;
+      };
+    </pre>
+    <pre class='idl'>
+      [Exposed=(Worker)]
+      partial interface WorkerNavigator {
+        [SameObject] readonly attribute MediaCapabilities mediaCapabilities;
+      };
+    </pre>
+  </section>
+
+  <section>
+    <h3 id='media-capabilities-interface'>Media Capabilities Interface</h3>
+
+    <pre class='idl'>
+      [Exposed=(Window, Worker)]
+      interface MediaCapabilities {
+        Promise&lt;MediaCapabilitiesInfo&gt; decodingInfo(MediaDecodingConfiguration configuration);
+        Promise&lt;MediaCapabilitiesInfo&gt; encodingInfo(MediaEncodingConfiguration configuration);
+      };
+    </pre>
+
+    <p>
+      The <dfn for='MediaCapabilities' method>decodingInfo()</dfn> method and
+      the <dfn for='MediaCapabilities' method>encodingInfo()</dfn> method MUST
+      run the following steps:
+      <ol>
+        <li>
+          If <var>configuration</var> is not a <a>valid MediaConfiguration</a>,
+          return a Promise rejected with a <code>TypeError</code>.
+        </li>
+        <li>
+          If <code>configuration.video</code> is <a>present</a> and is not a
+          <a>valid video configuration</a>, return a Promise rejected with a
+          <code>TypeError</code>.
+        </li>
+        <li>
+          If <code>configuration.audio</code> is <a>present</a> and is not a
+          <a>valid audio configuration</a>, return a Promise rejected with a
+          <code>TypeError</code>.
+        </li>
+        <li>
+          Let <var>p</var> be a new promise.
+        </li>
+        <li>
+          <a>In parallel</a>, run the <a>create a MediaCapabilitiesInfo
+          algorithm</a> with <var>configuration</var> and resolve <var>p</var>
+          with its result.
+        </li>
+        <li>
+          Return <var>p</var>.
+        </li>
+      </ol>
+    </p>
+  </section>
+</section>
+
+<section>
+  <h2 id='display-capabilities'>Display Capabilities</h2>
+
+  <section>
+    <h3 id='screen-luminance'>Screen Luminance</h3>
+
+    <pre class='idl'>
+      interface ScreenLuminance {
+        readonly attribute double min;
+        readonly attribute double max;
+        readonly attribute double maxAverage;
+      };
+    </pre>
+
+    <p>
+      The {{ScreenLuminance}} object represents the known luminance
+      characteristics of the screen.
+    </p>
+
+    <p>
+      The <dfn for='ScreenLuminance' attribute>min</dfn> attribute MUST return
+      the minimal screen luminance that a pixel of the screen can emit in
+      candela per square metre. The minimal screen luminance is the luminance
+      used when showing the darkest color a pixel on the screen can display.
+    </p>
+
+    <p>
+      The <dfn for='ScreenLuminance' attribute>max</dfn> attribute MUST return
+      the maximal screen luminance that a pixel of the screen can emit in
+      candela per square metre. The maximal screen luminance is the luminance
+      used when showing the whitest color a pixel on the screen can display.
+    </p>
+
+    <p>
+      The <dfn for='ScreenLuminance' attribute>maxAverage</dfn> attribute MUST
+      return the maximal average screen luminance that the screen can emit in
+      candela per square metre. The maximal average screen luminance is the
+      maximal luminance value such as all the pixels of the screen emit the same
+      luminance. The value returned by {{ScreenLuminance/maxAverage}} is
+      expected to be different from {{ScreenLuminance/max}} as screens usually
+      can't apply the maximal screen luminance to the entire panel.
+    </p>
+  </section>
+
+  <section>
+    <h3 id='color-gamut'>Screen Color Gamut</h3>
+
+    <pre class='idl'>
+      enum ScreenColorGamut {
+        "srgb",
+        "p3",
+        "rec2020",
+      };
+    </pre>
+
+    <p>
+      The {{ScreenColorGamut}} represents the color gamut supported by a
+      {{Screen}}, that means the range of color that the screen can display.
+    </p>
+
+    <p>
+      The {{ScreenColorGamut}} values are:
+      <ul>
+        <li>
+          <dfn for='ScreenColorGamut' enum-value>srgb</dfn>, it represents the
+          [[sRGB]] color gamut.
+        </li>
+        <li>
+          <dfn for='ScreenColorGamut' enum-value>p3</dfn>, it represents the DCI
+          P3 Color Space color gamut. This color gamut includes the
+          {{ScreenColorGamut/srgb}} gamut.
+        </li>
+        <li>
+          <dfn for='ScreenColorGamut' enum-value>rec2020</dfn>, it represents
+          the ITU-R Recommendation BT.2020 color gamut. This color gamut
+          includes the {{ScreenColorGamut/p3}} gamut.
+        </li>
+    </p>
+  </section>
+
+  <section>
+    <h3 id='screen-color-depth-section'>Screen Color Depth</h3>
+
+    <p>
+      The <dfn>screen color depth</dfn> of a given <var>screen</var> is the
+      the number of bits used to represent a color on the <var>screen</var>.
+      Most screens will return 24. Screen able to represent wider color range
+      will encode bits in more than 24 bits.
+    </p>
+  </section>
+
+  <section>
+    <h3 id='screen-extension'>Screen extension</h3>
+
+    <p class='issue'>
+      Part of this section is 🐵 patching of the CSSOM View Module. <a
+      href='https://github.com/WICG/media-capabilities/issues/4'>Issue #4</a>
+      is tracking merging the changes. This partial interface requires the
+      {{Screen}} interface to become an {{EventTarget}}.
+    </p>
+
+    <pre class='idl'>
+      partial interface Screen {
+        readonly attribute ScreenColorGamut colorGamut;
+        readonly attribute ScreenLuminance? luminance;
+
+        attribute EventHandler onchange;
+      };
+    </pre>
+
+    <p>
+      The <dfn for='Screen' attribute>colorGamut</dfn> attribute SHOULD return
+      the {{ScreenColorGamut}} approximately supported by the screen. In other
+      words, the screen does not need to fully support the given color gamut but
+      needs to be close enough. If the user agent does not know the color gamut
+      supported by the screen, if the supported color gamut is lower than
+      {{ScreenColorGamut/srgb}}, or if the user agent does not want to expose
+      this information for privacy consideration, it SHOULD return
+      {{ScreenColorGamut/srgb}} as a default value. The value returned by
+      {{Screen/colorGamut}} MUST match the value returned by the {{color-gamut}}
+      CSS media query.
+    </p>
+
+    <p>
+      The <dfn for='Screen' attribute>luminance</dfn> attribute SHOULD return
+      a {{ScreenLuminance}} object that will expose the luminance
+      characteristics of the screen. If the user agent has no access to the
+      luminance characteristics of the screen, it MUST return <code>null</code>.
+      The user agent MAY also return <code>null</code> if it does not want to
+      expose the luminance information for privacy reasons.
+    </p>
+
+    <p>
+      The <dfn for='Screen' attribute>onchange</dfn> attribute is an <a>event
+      handler</a> whose corresponding <a>event handler event type</a> is
+      <code>change</code>.
+    </p>
+
+    <p>
+      Whenever the user agent is aware that the state of the {{Screen}}
+      object has changed, that is if one the value exposed on the {{Screen}}
+      object or in an object exposed on the {{Screen}} object, it MUST
+      queue a task to <a>fire an event</a> named <code>change</code> on
+      {{Screen}}.
+    </p>
+  </section>
+</section>
+
+<section class='non-normative'>
+  <h2 id='security-privacy-considerations'>
+    Security and Privacy Considerations
+  </h2>
+
+  <section>
+    <p>
+      This specification does not introduce any security-sensitive information
+      or APIs but is provides an easier access to some information that can be
+      used to fingerprint users.
+    </p>
+
+    <section>
+      <h3 id='decoding-encoding-fingerprinting'>
+        Decoding/Encoding and Fingerprinting
+      </h3>
+
+      <p>
+        The information exposed by the decoding/encoding capabilities can
+        already be discovered via experimentation with the exception that the
+        API will likely provide more accurate and consistent information. This
+        information is expected to have a high correlation with other
+        information already available to the web pages as a given class of
+        device is expected to have very similar decoding/encoding capabilities.
+        In other words, high end devices from a certain year are expected to
+        decode some type of videos while older devices may not. Therefore, it is
+        expected that the entropy added with this API isn't going to be
+        significant.
+      </p>
+
+      <p>
+        If an implementation wishes to implement a fingerprint-proof version of
+        this specification, it would be recommended to fake a given set of
+        capabilities (ie. decode up to 1080p VP9, etc.) instead of returning
+        always yes or always no as the latter approach could considerably degrade
+        the user's experience.
+      </p>
+    </section>
+
+    <section>
+      <h3 id='display-fingerprinting'>Display and Fingerprinting</h3>
+
+      <p>
+        The information exposed by the display capabilities can already be
+        accessed via CSS for the most part. The specification also provides
+        default values when the user agent does not which to expose the feature
+        for privacy reasons.
+      </p>
+    </section>
+  </section>
+</section>
+
+<section>
+  <h2 id='examples'>Examples</h2>
+
+  <section>
+    <h3 id='example1'>Query recording capabilities with {{encodingInfo()}}</h3>
+
+      <div class="note">
+        The following example can also be found in e.g.
+        <a href="https://codepen.io/miguelao/pen/bWNwej/left?editors=0010#0">
+        this codepen</a> with minimal modifications.
+      </div>
+
+      <div class="example" highlight="javascript">
+        <pre>
+          &lt;script>
+            const configuration = {
+                type : 'record',
+                video : {
+                  contentType : 'video/webm;codecs=vp8',
+                  width : 640,
+                  height : 480,
+                  bitrate : 10000,
+                  framerate : '30'
+              }
+            };
+            navigator.mediaCapabilities.encodingInfo(configuration)
+                .then((result) => {
+                  console.log(contentType + ' is:'
+                      + (result.supported ? '' : ' NOT') + ' supported,'
+                      + (result.smooth ? '' : ' NOT') + ' smooth and'
+                      + (result.powerEfficient ? '' : ' NOT') + ' power efficient');
+                })
+                .catch(() => {
+                  console.error(contentType + ' caused encodingInfo to throw');
+                });
+            });
+          &lt;/script>
+        </pre>
+      </div>
+  </section>
+</section>

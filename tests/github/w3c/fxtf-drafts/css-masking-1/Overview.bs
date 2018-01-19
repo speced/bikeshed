@@ -1,0 +1,1459 @@
+<pre class=metadata>
+Title: CSS Masking Module Level 1
+Status: ED
+Deadline: 2015-01-17
+ED: https://drafts.fxtf.org/css-masking-1/
+TR: https://www.w3.org/TR/css-masking-1/
+Previous Version: https://www.w3.org/TR/2014/CR-css-masking-1-20140826/
+Shortname: css-masking
+Level: 1
+Group: fxtf
+Editor: Dirk Schulze, Adobe Systems Inc., dschulze@adobe.com, w3cid 51803
+Editor: Brian Birtles, Mozilla Japan, bbirtles@mozilla.com, w3cid 43194
+Editor: Tab Atkins Jr., Google, http://www.xanthir.com/contact/, w3cid 42199
+Abstract: CSS Masking provides two means for partially or fully hiding portions of visual elements: masking and clipping.
+Abstract:
+Abstract: Masking describes how to use another graphical element or image as a luminance or alpha mask. Typically, rendering an element via CSS or SVG can conceptually described as if the element, including its children, are drawn into a buffer and then that buffer is composited into the element's parent. Luminance and alpha masks influence the transparency of this buffer before the compositing stage.
+Abstract:
+Abstract: Clipping describes the visible region of visual elements. The region can be described by using certain SVG graphics elements or basic shapes. Anything outside of this region is not rendered.
+Test Suite: http://test.csswg.org/suites/css-masking/nightly-unstable/
+Ignored Vars: trapeze.svg
+</pre>
+<pre class=link-defaults>
+spec:fill-stroke-3; type:value; text:square
+spec:svg2; type:property
+    text:fill
+    text:fill-rule
+    text:fill-opacity
+    text:stroke
+    text:stroke-dashoffset
+    text:stroke-dasharray
+    text:stroke-opacity
+    text:stroke-linecap
+    text:stroke-miterlimit
+    text:stroke-linejoin
+    text:stroke-width
+spec:svg2; type:element
+    text:a
+    text:title
+    text:script
+    text:style
+spec:css-color-4; type:property; text:color
+spec:css-fonts-4; type:property; text:font-stretch
+spec:filter-effects-1; type:property;
+    text:flood-color
+    text:flood-opacity
+    text:lighting-color
+    text:color-interpolation-filters
+    text:filter
+spec:filter-effects-1; type:element;
+    text:fecolormatrix
+    text:filter
+</pre>
+<pre class=anchors>
+spec:svg2; url:https://svgwg.org/svg2-draft/coords.html#ViewBoxAttribute; type:element-attr; for:svg; text:viewBox
+spec:svg2; url:https://svgwg.org/svg2-draft/text.html#TermTextContentElement; type:dfn; text:text content element
+spec:svg2; url:https://svgwg.org/svg2-draft/render.html#TermNeverRenderedElement; type:dfn; text:never-rendered element
+</pre>
+
+<style type="text/css">
+a[data-link-type=element]::before,span[data-link-type=element]::before {
+  content: '<';
+}
+a[data-link-type=element]::after,span[data-link-type=element]::after {
+  content: '>';
+}
+</style>
+
+
+# Introduction # {#intro}
+
+<em>This section is not normative.</em>
+
+This specification defines two different graphical operations which both fully or partly hide portions of an object: clipping and masking.
+
+
+## Clipping ## {#clipping}
+
+A closed vector path, shape or polygon defines a so called <dfn export>clipping path</dfn>. This clipping path is a region (in the absence of anti-aliasing) where everything on the “inside” of this region is allowed to show through but everything on the outside is “clipped out” and does not appear on the canvas.
+
+<div class="example">
+  <div class=figure>
+    <img src="images/clipping-path.svg" width="655" height="260" alt="Example Mask">
+    <p class=caption>A clipping path (middle) is applied on a polygon shaded with different colors (left). This results in a “clipped out” shape (right).</p>
+  </div>
+</div>
+
+The 'clip-path' property can use specified basic shapes as clipping path or reference an <a element>clipPath</a> element with <a>graphics elements</a> to be used as clipping path.
+
+
+## Masking ## {#masking}
+
+The effect of applying a mask to a graphical object is as if the graphical object will be painted onto the background through a mask, thus completely or partially masking out parts of the graphical object.
+
+<div class="example">
+  <div class=figure>
+    <img src="images/luminance-mask.svg" width="655" height="260" alt="Example Mask">
+    <p class=caption>A luminance mask (middle) is applied on a shape filled with a gradient (left). This results in a masked shape (right).</p>
+  </div>
+</div>
+
+Masks are applied using the 'mask-image' or 'mask-border-source' properties.
+
+The 'mask-image' property may reference a <a element>mask</a> element. The content of the <a element>mask</a> element serves as the mask.
+
+Alternatively, for many simple uses, the 'mask-image' property may refer directly to images to be used as mask, forgoing the need for an explicit <a element>mask</a> element. This mask can then be sized and positioned just like CSS background images using the 'mask-position', 'mask-size' and other characterizing properties.
+
+The 'mask-border-source' property splits a mask into 9 pieces. The pieces may be sliced, scaled and stretched in various ways to fit the size of the <a>mask border image area</a>. The 'mask-border' property serves as a shorthand property for 'mask-border-source' and other characterizing properties.
+
+The 'mask' property serves as a shorthand property for all 'mask-border' and 'mask-image' affiliated properties.
+
+Note: While masking gives many possibilities for enhanced graphical effects and in general provides more control over the “visible portions” of the content, clipping paths can perform better and basic shapes are easier to interpolate.
+
+
+# Module interactions # {#placement}
+
+This specification defines a set of CSS properties that affect the visual rendering of elements to which those properties are applied. These effects are applied after elements have been sized and positioned according to the <a href="https://www.w3.org/TR/CSS2/visuren.html" title="Visual formatting model">Visual formatting model</a> from [[!CSS21]]. Some values of these properties result in the creation of a <a spec="css21">stacking context</a>. Furthermore, this specification replaces the section <a href="https://www.w3.org/TR/CSS2/visufx.html#clipping">Clipping: the clip property</a> from [[!CSS21]].
+
+The compositing model follows the SVG compositing model [[!SVG11]]: First the element is styled under absence of filter effects, masking, clipping and opacity. Then the element and its descendants are drawn on a temporary canvas. In a last step the following effects are applied to the element in order: filter effects [[FILTER-EFFECTS]], clipping, masking and opacity.
+
+This specification allows compositing multiple mask layers with the Porter Duff compositing operators defined in CSS Compositing and Blending [[!COMPOSITING-1]].
+
+The term <a>object bounding box</a> follows the definition in SVG 1.1 [[!SVG11]].
+
+
+# Values # {#values}
+
+This specification follows the <a href="https://www.w3.org/TR/CSS21/about.html#property-defs">CSS property definition conventions</a> from [[!CSS21]]. Basic shapes are defined in CSS Shapes Module Level 1 [[!CSS-SHAPES]]. Value types not defined in these specifications are defined in CSS Values and Units Module Level 3 [[!CSS3VAL]].
+
+In addition to the property-specific values listed in their definitions, all properties defined in this specification also accept CSS-wide keywords such as <a href="https://www.w3.org/TR/CSS21/cascade.html#value-def-inherit">inherit</a> as their property value [[!CSS3VAL]]. For readability it has not been repeated explicitly.
+
+
+# Terminology # {#terminology}
+
+Definitions of CSS properties and values in this specification are analogous to definitions in CSS Backgrounds and Borders [[!CSS3BG]]. To avoid redundancy, this specification relies on descriptions and definitions of CSS Backgrounds and Borders. The following terms in CSS Backgrounds and Borders have the following meaning in this specification:
+
+<table class="data" id="term-matching">
+  <thead>
+    <tr>
+      <th>Term in CSS Masking
+      <th>Term in [[!CSS3BG]]
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th><a>mask layer image</a>
+      <td>background images
+    </tr>
+    <tr>
+      <th><a>mask painting area</a>
+      <td><a spec="css-backgrounds-3">background painting area</a>
+    </tr>
+    <tr>
+      <th><dfn>mask-size</dfn>
+      <td>background-size
+    </tr>
+    <tr>
+      <th><dfn>mask-position</dfn>
+      <td>background-position
+    </tr>
+    <tr>
+      <th><a>mask positioning area</a>
+      <td><a spec="css-backgrounds-3">background positioning area</a>
+    </tr>
+    <tr>
+      <th><a>mask border image</a>
+      <td>border-image</a>
+    </tr>
+    <tr>
+      <th><a>mask border image area</a>
+      <td><a spec="css-backgrounds-3">border image area</a>
+    </tr>
+  </tbody>
+</table>
+
+# Clipping Paths # {#clipping-paths}
+
+The clipping path restricts the region to which paint can be applied, the so-called <dfn export>clipping region</dfn>. Conceptually, any parts of the drawing that lie outside of this region are not drawn. This includes any content, background, borders, text decoration, outline and visible scrolling mechanism of the element to which the clipping path is applied, and those of its descendants.
+
+An element's ancestors may also clip portions of their content (e.g., via their own 'clip' or 'clip-path' properties and/or if their 'overflow' property is not ''visible''). What is rendered is the cumulative intersection.
+
+If the clipping region exceeds the bounds of the UA's document window, content may be clipped to that window by the native operating environment.
+
+A clipping path affects the rendering of an element. It does not affect the element's inherent geometry. The geometry of a clipped element (i.e. an element which references a <a element>clipPath</a> element via a 'clip-path' property, or a child of the referencing element) must remain the same as if it were not clipped.
+
+<div class=example>
+    Consider a shape that is clipped by a clipping path applied to an ancestor:
+
+    <pre><code highlight=svg>
+        &lt;g clip-path="circle()">
+          &lt;path id="shape" d="M0,0 L10,10, L 20,0 z"/>
+        &lt;/g>
+    </code></pre>
+
+    The shape is referenced by a <a element>use</a> element:
+
+    <pre><code highlight=svg>
+        &lt;use xlink:href="#shape"/>
+    </code></pre>
+
+    The geometry of the shape is not influenced by the circular clipping path.
+</div>
+
+By default, 'pointer-events' must not be dispatched on the clipped-out (non-visible) regions of a shape. For example, an element with a dimension of 10px to 10px which is clipped to a circle with a radius of 5px will not receive ''click'' events outside the <a>clipping region</a>.
+
+## Clipping Shape: the 'clip-path' property ## {#the-clip-path}
+
+<pre class=propdef>
+Name: clip-path
+Value: <<clip-source>> | [ <<basic-shape>> || <<geometry-box>> ] | none
+Initial: none
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: as specified, but with <<url>> values made absolute
+Media: visual
+Animatable: as specified for <<basic-shape>> [[!CSS-SHAPES]], otherwise no
+</pre>
+
+Specifies a basic shape or references a <a element>clipPath</a> element to create a <a>clipping path</a>.
+
+<pre class=prod><dfn>&lt;clip-source></dfn> = <<url>></pre>
+<pre class=prod><dfn>&lt;geometry-box></dfn> = <<shape-box>> | fill-box | stroke-box | view-box</pre>
+
+<div dfn-type="value" dfn-for="clip-path">
+    : <<basic-shape>>
+    :: A basic shape function as defined in the CSS Shapes module [[!CSS-SHAPES]]. A basic shape makes use of the specified reference box to size and position the basic shape. If no reference box is specified, the ''mask-clip/border-box'' will be used as reference box.
+    : <<geometry-box>>
+    ::
+        If specified in combination with a <<basic-shape>> it provides the reference box for the <<basic-shape>>.
+
+        If specified by itself, uses the edges of the specified box, including any corner shaping (e.g. defined by 'border-radius' [[!CSS3BG]]), as clipping path. See also <a href="https://www.w3.org/TR/css-shapes/#shapes-from-box-values">“Shapes from box values”</a> [[!CSS-SHAPES]].</p>
+    : <dfn>fill-box</dfn>
+    :: Uses the <a>object bounding box</a> as reference box.
+    : <dfn>stroke-box</dfn>
+    :: Uses the <a>stroke bounding box</a> as reference box.
+    : <dfn>view-box</dfn>
+    ::
+        Uses the nearest <a href="https://www.w3.org/TR/SVG11/intro.html#TermSVGViewport">SVG viewport</a> as reference box.
+
+        If a <a element-attr>viewBox</a> attribute is specified for the <a href="https://www.w3.org/TR/SVG11/intro.html#TermSVGViewport">SVG viewport</a> creating element:
+        * The reference box is positioned at the origin of the coordinate system established by the <a element-attr>viewBox</a> attribute.
+        * The dimension of the reference box is set to the <em>width</em> and <em>height</em> values of the <a element-attr>viewBox</a> attribute.
+    : none
+    :: No <a>clipping path</a> gets created.
+</div>
+
+For SVG elements without associated CSS layout box, the <a>used value</a> for ''mask-clip/content-box'', ''mask-clip/padding-box'', ''mask-clip/border-box'' and ''mask-clip/margin-box'' is ''clip-path/fill-box''.
+
+For elements with associated CSS layout box, the <a>used value</a> for ''clip-path/fill-box'', ''clip-path/stroke-box'' and ''clip-path/view-box'' is ''mask-clip/border-box''.
+
+A computed value of other than ''clip-path/none'' results in the creation of a <a spec="css21">stacking context</a> [[!CSS21]] the same way that CSS 'opacity' [[CSS3COLOR]] does for values other than ''1''.
+
+If the URI reference is not valid (e.g it points to an object that doesn't exist or the object is not a <a element>clipPath</a> element), no clipping is applied.
+
+<div class=example>
+    This example demonstrates the use of the basic shape <<polygon()>> as clipping path. Each space separated length pair represents one point of the polygon. The visualized clipping path can be seen in the <a href="#clipping">introduction</a>.
+
+    <pre><code highlight=css>
+        clip-path: polygon(15px 99px, 30px 87px, 65px 99px, 85px 55px,
+                122px 57px, 184px 73px, 198px 105px, 199px 150px,
+                145px 159px, 155px 139px, 126px 120px, 112px 138px,
+                80px 128px, 39px 126px, 24px 104px);
+    </code></pre>
+</div>
+
+<div class=example>
+    In this example, the 'clip-path' property references an SVG <a element>clipPath</a> element. Each comma separated length pair represents one point of the polygon. As for the previous example, the visualized clipping path can be seen in the <a href="#clipping">introduction</a>.</p>
+  
+    <pre><code highlight=css>
+        clip-path: url("#clip1");
+    </code></pre>
+
+    <pre><code highlight=xml>
+        &lt;clipPath id="clip1">
+            &lt;polygon points="15,99 30,87 65,99 85,55 122,57 184,73 198,105
+                199,150 145,159 155,139 126,120 112,138 80,128 39,126 24,104"/>
+        &lt;/clipPath>
+    </code></pre>
+</div>
+
+
+# SVG Clipping Path Sources # {#svg-clipping-paths}
+
+## The <a element>clipPath</a> element ## {#ClipPathElement}
+
+<table class="definition-table">
+  <tr>
+    <th>Name:</th>
+    <td><dfn element>clipPath</dfn>
+  </tr>
+  <tr>
+    <th>Categories:</th>
+    <td><a>container elements</a>, <a>never-rendered element</a></td>
+  </tr>
+  <tr>
+    <th>Content model:</th>
+    <td>Any number of the following elements, in any order: <ul class=no-bullets><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermDescriptiveElement'>descriptive</a> <span class=expanding> — <a element>desc</a>, <a element>title</a>, <a element>metadata</a></span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermAnimationElement'>animation</a> <span class=expanding> — <a element>animate</a>, <a element>animateColor</a>, <a element>animateMotion</a>, <a element>animateTransform</a>, <a element>set</a></span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermShapeElement'>shape</a> <span class=expanding> — <a element>circle</a>, <a element>ellipse</a>, <a element>line</a>, <a element>path</a>, <a element>polygon</a>, <a element>polyline</a>, <a element>rect</a></span></li><li><a element>text</a></li><li><a element>use</a></li><li><a element>script</a></li></ul></td>
+  </tr>
+  <tr>
+    <th>Attributes:</th>
+    <td><ul class=no-bullets><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermConditionalProcessingAttribute'>conditional processing attributes</a><span class=expanding> — <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#RequiredFeaturesAttribute'><span class=attr-name>‘requiredFeatures’</span></a>, <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#RequiredExtensionsAttribute'><span class=attr-name>‘requiredExtensions’</span></a>, <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#SystemLanguageAttribute'><span class=attr-name>‘systemLanguage’</span></a></span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermCoreAttributes'>core attributes</a><span class=expanding> — <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#IDAttribute'><span class=attr-name>‘id’</span></a>, <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#XMLBaseAttribute'><span class=attr-name>‘xml:base’</span></a>, <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#XMLLangAttribute'><span class=attr-name>‘xml:lang’</span></a>, <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#XMLSpaceAttribute'><span class=attr-name>‘xml:space’</span></a></span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermPresentationAttribute'>presentation attributes</a><span class=expanding> — 'alignment-baseline', 'baseline-shift', 'clip', 'clip-path', 'clip-rule', 'color', 'color-interpolation', 'color-interpolation-filters', 'color-profile', 'color-rendering', 'cursor', 'direction', 'display', 'dominant-baseline', 'enable-background', 'fill', 'fill-opacity', 'fill-rule', 'filter', 'flood-color', 'flood-opacity', 'font', 'font-family', 'font-size', 'font-size-adjust', 'font-stretch', 'font-style', 'font-variant', 'font-weight', 'glyph-orientation-horizontal', 'glyph-orientation-vertical', 'image-rendering', 'kerning', 'letter-spacing', 'lighting-color', 'marker', 'marker-end', 'marker-mid', 'marker-start', 'mask', 'opacity', 'overflow', 'pointer-events', 'shape-rendering', 'stop-color', 'stop-opacity', 'stroke', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-opacity', 'stroke-width', 'text-anchor', 'text-decoration', 'text-rendering', 'unicode-bidi', 'visibility', 'word-spacing', 'writing-mode'</span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/styling.html#ClassAttribute'><span class=attr-name>‘class’</span></a></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/styling.html#StyleAttribute'><span class=attr-name>‘style’</span></a></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#ExternalResourcesRequiredAttribute'><span class=attr-name>‘externalResourcesRequired’</span></a></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/coords.html#TransformAttribute'><span class=attr-name>‘transform’</span></a></li><li>‘<a element-attr for=clipPath>clipPathUnits</a>’</li></ul></td>
+  </tr>
+  <tr>
+    <th>DOM Interfaces:</th>
+    <td><a class=idlinterface href='#InterfaceSVGClipPathElement'>SVGClipPathElement</a></td>
+  </tr>
+</table>
+
+<em>Attribute definitions:</em>
+<dl dfn-type=element-attr dfn-for=clipPath>
+    : <dfn element-attr>clipPathUnits</dfn> = "''clipPathUnits/userSpaceOnUse'' | ''clipPathUnits/objectBoundingBox''"
+    ::
+        Defines the coordinate system for the contents of the <a element>clipPath</a>.</p>
+        : <dfn dfn-type=value dfn-for=clipPathUnits>userSpaceOnUse</dfn></dt>
+        :: The contents of the <a element>clipPath</a> represent values in the current <a>user coordinate system</a> in place at the time when the <a element>clipPath</a> element is referenced (i.e., the <a>user coordinate system</a> for the element referencing the <a element>clipPath</a> element via the 'clip-path' property).</p>
+        : <dfn dfn-type=value dfn-for=clipPathUnits>objectBoundingBox</dfn></dt>
+        :: The coordinate system has its origin at the top left corner of the <a>bounding box</a> of the element to which the clipping path applies to and the same width and height of this <a>bounding box</a>. <a href="https://www.w3.org/TR/SVG/coords.html#Units">User coordinates</a> are sized equivalently to the CSS ''px'' unit.</p>
+
+        If attribute <a element-attr>clipPathUnits</a> is not specified, then the effect is as if a value of ''clipPathUnits/userSpaceOnUse'' were specified.</p>
+
+        Animatable: yes.
+</dl>
+
+CSS properties inherit into the <a element>clipPath</a> element from its ancestors; properties do <em>not</em> inherit from the element referencing the <a element>clipPath</a> element.
+
+<a element>clipPath</a> elements are never rendered directly; their only usage is as something that can be referenced using the 'clip-path' property. The 'display' property does not apply to the <a element>clipPath</a> element; thus, <a element>clipPath</a> elements are not directly rendered even if the 'display' property is set to a value other than ''display/none'', and <a element>clipPath</a> elements are available for referencing even when the 'display' property on the <a element>clipPath</a> element or any of its ancestors is set to ''display/none''.
+
+A <a element>clipPath</a> element can contain <a element>path</a> elements, <a element>text</a> elements, <a>basic shapes</a> (such as <a element>circle</a>) or a <a element>use</a> element. If a <a element>use</a> element is a child of a <a element>clipPath</a> element, it must directly reference <a element>path</a>, <a element>text</a> or <a>basic shapes</a> elements. Indirect references are an error and the <a element>clipPath</a> element must be ignored.
+
+Issue(17): Firefox disables rendering of elements referencing clipPaths with violated content model. No browser ignores clipPath on use with indirect reference.
+
+The raw geometry of each child element exclusive of rendering properties such as 'fill', 'stroke', 'stroke-width' within a <a element>clipPath</a> conceptually defines a 1-bit mask (with the possible exception of anti-aliasing along the edge of the geometry) which represents the silhouette of the graphics associated with that element. Anything outside the outline of the object is masked out. If a child element is made invisible by 'display' or 'visibility' it does not contribute to the clipping path. When the <a element>clipPath</a> element contains multiple child elements, the silhouettes of the child elements are logically OR'd together to create a single silhouette which is then used to restrict the region onto which paint can be applied. Thus, a point is inside the clipping path if it is inside any of the children of the <a element>clipPath</a>.
+
+Issue(170): Define raw geometry with regards to CSS properties that affect it. Especially on text.
+
+For a given <a>graphics element</a>, the actual clipping path used will be the intersection of the clipping path specified by its 'clip-path' property (if any) with any clipping paths on its ancestors, as specified by the 'clip-path' property on the elements which establish a new viewport. (See [[!SVG11]])
+
+A couple of additions:
+
+* The <a element>clipPath</a> element itself and its child elements do <em>not</em> inherit clipping paths from the ancestors of the <a element>clipPath</a> element.</li>
+* The <a element>clipPath</a> element or any of its children can specify property 'clip-path'.<br> If a valid 'clip-path' reference is placed on a <a element>clipPath</a> element, the resulting clipping path is the intersection of the contents of the <a element>clipPath</a> element with the referenced clipping path.<br> If a valid 'clip-path' reference is placed on one of the children of a <a element>clipPath</a> element, then the given child element is clipped by the referenced clipping path before OR'ing the silhouette of the child element with the silhouettes of the other child elements.</li>
+* An empty clipping path will completely clip away the element that had the 'clip-path' property applied.</li>
+
+
+## Winding Rules: the 'clip-rule' property ## {#the-clip-rule}
+
+<pre class=propdef>
+Name: clip-rule
+Value: nonzero | evenodd
+Initial: nonzero
+Applies to: Applies to SVG <a>graphics elements</a>
+Inherited: yes
+Percentages: n/a
+Computed value: as specified
+Media: visual
+Animatable: no
+</pre>
+
+The 'clip-rule' property indicates the algorithm which is to be used to determine whether a given point is inside a shape for a <a>clipping region</a> created with a <a>graphics element</a>. The definition of the algorithms and the 'clip-rule' values follows the definition of the 'fill-rule' property. See section <a href="https://www.w3.org/TR/2011/REC-SVG11-20110816/painting.html#FillProperties">“Fill Properties”</a> in SVG 1.1 [[!SVG11]].
+
+<dl dfn-type=value dfn-for=clip-rule>
+    : <dfn>nonzero</dfn>
+    :: See description of 'fill-rule' property [[!SVG11]].
+    : <dfn>evenodd</dfn>
+    :: See description of 'fill-rule' property [[!SVG11]].
+</dl>
+
+The 'clip-rule' property only applies to <a>graphics elements</a> that are contained within a <a element>clipPath</a> element.
+
+Note: The 'clip-rule' property does not apply to <<basic-shape>>s.
+
+<div class=example>
+  <p>The following drawing illustrates the <a value>nonzero</a> rule:</p>
+  <div class=figure>
+    <p><img src="images/cliprule-nonzero.svg" alt="Shape with nonzero rule." style="border: solid black 1px;">
+  </div>
+  <p>The following drawing illustrates the <a value>evenodd</a> rule:</p>
+  <div class=figure>
+    <p><img src="images/cliprule-evenodd.svg" alt="Shape with even-odd rule." style="border: solid black 1px;">
+  </div>
+
+  Issue: Add figure description.
+
+</div>
+
+<div class=example>
+    The following fragment of code will cause an even-odd clipping rule to be applied to the clipping path because 'clip-rule' is specified on the <a element>path</a> element that defines the clipping shape:
+
+    <pre><code highlight=svg>
+        &lt;g clip-rule="nonzero"&gt;
+          &lt;clipPath id="MyClip"&gt;
+            &lt;path d="..." clip-rule="evenodd" /&gt;
+          &lt;/clipPath&gt;
+          &lt;rect clip-path="url(#MyClip)" ... /&gt;
+        &lt;/g&gt;
+    </code></pre>
+
+    whereas the following fragment of code will <em>not</em> cause an evenodd clipping rule to be applied because the 'clip-rule' is specified on the referencing element, not on the object defining the clipping shape:
+
+    <pre><code highlight=svg>
+        &lt;g clip-rule="nonzero"&gt;
+          &lt;clipPath id="MyClip"&gt;
+            &lt;path d="..." /&gt;
+          &lt;/clipPath&gt;
+          &lt;rect clip-path="url(#MyClip)" clip-rule="evenodd" ... /&gt;
+        &lt;/g&gt;
+    </code></pre>
+</div>
+
+# Positioned Masks # {#positioned-masks}
+
+## Mask Image Source: the 'mask-image' property ## {#the-mask-image}
+
+<pre class=propdef>
+Name: mask-image
+Value: <<mask-reference>>#
+Initial: none
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: as specified, but with URIs made absolute
+Media: visual
+Animatable: no
+</pre>
+
+This property sets the <dfn export>mask layer image</dfn> of an element. Where:
+
+<pre class=prod><dfn>&lt;mask-reference></dfn> = none | <<image>> | <<mask-source>></pre>
+
+<pre class=prod><dfn>&lt;mask-source></dfn> = <<url>></pre>
+
+<dl dfn-type=value dfn-for="mask-image">
+    : <dfn>&lt;url></dfn>
+    :: A URL reference to a <a element>mask</a> element (for example ''url(commonmasks.svg#mask)'') or to a CSS image.
+    : none
+    :: A value of ''mask-image/none'' counts as a transparent black image layer.
+</dl>
+
+A computed value of other than ''mask-image/none'' results in the creation of a <a spec="css21">stacking context</a> [[!CSS21]] the same way that CSS 'opacity' [[CSS3COLOR]] does for values other than ''1''.
+
+A mask reference that is an empty image (zero width or zero height), that fails to download, is not a reference to an <a element>mask</a> element, is non-existent, or that cannot be displayed (e.g. because it is not in a supported image format) still counts as an image layer of transparent black.
+
+See the section <a href="#MaskValues">“Mask processing”</a> for how to process a <a>mask layer image</a>.
+
+Note: A value of ''mask-image/none'' in a list of <<mask-reference>>s may influence the masking operation depending on the used compositing operator specified by 'mask-composite'.
+
+Note: A <<mask-source>> counts as mask layer and can be combined in a repeatable <<mask-reference>> list with <<image>> or further <<mask-source>> list items.
+
+Note: An element can also be masked with 'mask-border-source'. See 'mask-border-source' for the interaction of that property with 'mask-image'.
+
+<div class="example">
+    Examples for mask references:
+
+    <pre><code highlight=css>
+        body { mask-image: linear-gradient(black 0%, transparent 100%) }
+        p { mask-image: none }
+        div { mask-image: url(resources.svg#mask2) }
+    </code></pre>
+</div>
+
+See the section <a href="#layering">“Layering multiple mask layer images”</a> for how 'mask-image' interacts with other comma-separated mask properties to form each mask layer.
+
+
+## Mask Image Interpretation: the 'mask-mode' property ## {#the-mask-mode}
+
+<pre class=propdef>
+Name: mask-mode
+Value: <<masking-mode>>#
+Initial: match-source
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: as specified
+Media: visual
+Animatable: no
+</pre>
+
+The 'mask-mode' property indicates whether the <<mask-reference>> is treated as luminance mask or alpha mask. (See <a href="#MaskValues">Mask processing</a>.)
+
+<pre class=prod><dfn>&lt;masking-mode></dfn> = alpha | luminance | match-source</pre>
+
+Values have the following meanings:
+
+<dl dfn-type=value dfn-for="mask-mode">
+    : <dfn>alpha</dfn>
+    :: A value of ''mask-mode/alpha'' indicates that the alpha values of the <a>mask layer image</a> should be used as the mask values. See <a href="#MaskValues">Calculating mask values</a>.
+    : <dfn>luminance</dfn>
+    :: A value of ''mask-mode/luminance'' indicates that the luminance values of the <a>mask layer image</a> should be used as the mask values. See <a href="#MaskValues">Calculating mask values</a>.
+    : <dfn>match-source</dfn>
+    ::
+        If the <<mask-reference>> of the 'mask-image' property is of type <<mask-source>> the luminance values of the <a>mask layer image</a> should be used as the mask values.
+
+        If the <<mask-reference>> of the 'mask-image' property is of type <<image>> the alpha values of the <a>mask layer image</a> should be used as the mask values.
+
+</dl>
+
+<div class="example">
+    In the following example, the 'mask-type' property sets the mask type value for the <a element>mask</a> element to ''mask-type/alpha''. The 'mask-image' property has a reference to this <a element>mask</a> element and the 'mask-mode' property has a value of ''mask-mode/luminance''. The 'mask-mode' property will override the definition of 'mask-type' to ''mask-type/luminance''.
+
+    The 'mask-mode' property must not affect the masking mode of 'mask-border-source'.
+
+    <pre><code highlight=svg>
+        &lt;mask id="SVGMask" mask-type="alpha" maskContentUnits="objectBoundingBox"&gt;
+          &lt;radialGradient id="radialFill"&gt;
+            &lt;stop stop-color="white" offset="0"/&gt;
+            &lt;stop stop-color="black" offset="1"/&gt;
+          &lt;/radialGradient&gt;
+          &lt;circle fill="url(#radialFill)" cx="0.5" cy="0.5" r="0.5"/&gt;
+        &lt;/mask&gt;
+
+        &lt;style&gt;
+          rect {
+            mask-image: url(#SVGMask);
+            mask-mode: luminance;
+          }
+        &lt;/style&gt;
+
+        &lt;rect width="200" height="200" fill="green"/&gt;
+    </code></pre>
+</div>
+
+See the section <a href="#layering">“Layering multiple mask layer images”</a> for how 'mask-mode' interacts with other comma-separated mask properties to form each mask layer.
+
+
+## Tiling Mask Images: the 'mask-repeat' property ## {#the-mask-repeat}
+
+<pre class=propdef>
+Name: mask-repeat
+Value: <<repeat-style>>#
+Initial: no-repeat
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: Consists of: two keywords, one per dimension
+Media: visual
+Animatable: no
+</pre>
+
+Specifies how <a>mask layer images</a> are tiled after they have been <a href="#the-mask-size">sized</a> and <a href="#the-mask-position">positioned</a>.
+
+See 'background-repeat' property [[!CSS3BG]] for the definitions of the property values.
+
+Note:  The initial value of 'mask-repeat' is different from the initial value of 'background-repeat'.
+
+<div class=example>
+    <pre><code highlight=css>
+        body {
+            background-color: blue;
+            mask-image: url(dot-mask.png) luminance;
+            mask-repeat: space;
+        }
+    </code></pre>
+
+  <div class=figure>
+      <p><img src="images/mask-repeat.svg" alt="Image of an element with a dotted mask." width="240" style="border: solid black 1px;">
+
+      <p class=caption>The effect of ''mask-repeat/space'': the <a>mask layer image</a> of a dot is tiled to cover the whole <a>mask painting area</a> and th <a>mask layer image</a>s are equally spaced.</p>
+  </div>
+</div>
+
+See the section <a href="#layering">“Layering multiple mask layer images”</a> for how 'mask-repeat' interacts with other comma-separated mask properties to form each mask layer.
+
+
+## Positioning Mask Images: the 'mask-position' property ## {#the-mask-position}
+
+<pre class=propdef>
+Name: mask-position
+Value: <<position>>#
+Initial: center
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: refer to size of <a>mask painting area</a> <em>minus</em> size of <a>mask layer image</a>; see text 'background-position' [[!CSS3BG]]
+Computed value: Consisting of: two keywords representing the origin and two offsets from that origin, each given as an absolute length (if given a <<length>>), otherwise as a percentage.
+Media: visual
+Animatable: as <a href="https://www.w3.org/TR/css3-transitions/#animtype-repeatable-list">repeatable list</a> of <a href="https://www.w3.org/TR/css3-transitions/#animtype-simple-list">simple list</a> of <a href="https://www.w3.org/TR/css3-transitions/#animtype-lpcalc">length, percentage, or calc
+</pre>
+
+See the 'background-position' property [[!CSS3BG]] for the definitions of the property values.
+
+Note:  The initial value of 'mask-position' is different from the initial value of 'background-position'.
+
+<div class="example">
+    In the example below, the (single) image is placed in the lower-right corner of the viewport.
+
+    <pre><code highlight=css>
+        body {
+            mask-image: url("logo.png");
+            mask-position: 100% 100%;
+            mask-repeat: no-repeat;
+        }
+    </code></pre>
+</div>
+
+<div class=example>
+    Mask positions can also be relative to other corners than the top left. E.g., the following puts the background image 10px from the bottom and 3em from the right:</p>
+
+    <pre><code highlight=css>mask-position: right 3em bottom 10px</code></pre>
+</div>
+
+See the section <a href="#layering">“Layering multiple mask layer images”</a> for how 'mask-position' interacts with other comma-separated mask properties to form each mask layer.
+
+
+## Masking Area: the 'mask-clip' property ## {#the-mask-clip}
+
+<pre class=propdef>
+Name: mask-clip
+Value: [ <<geometry-box>> | no-clip ]#
+Initial: border-box
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: as specified
+Media: visual
+Animatable: no
+</pre>
+
+Determines the <dfn export>mask painting area</dfn>, which determines the area that is affected by the mask. The painted content of an element must be restricted to this area.
+
+Values have the following meanings:
+
+<dl dfn-for=mask-clip dfn-type=value>
+    : <dfn>content-box</dfn>
+    :: The painted content is restricted to (clipped to) the <em>content box</em>.
+    : <dfn>padding-box</dfn>
+    :: The painted content is restricted to (clipped to) the <em>padding box</em>.
+    : <dfn>border-box</dfn>
+    :: The painted content is restricted to (clipped to) the <em>border box</em>.
+    : <dfn>margin-box</dfn>
+    :: The painted content is restricted to (clipped to) the <em>margin box</em>.
+    : <dfn>fill-box</dfn>
+    :: The painted content is restricted to (clipped to) the <a>object bounding box</a>.
+    : <dfn>stroke-box</dfn>
+    :: The painted content is restricted to (clipped to) the <a>stroke bounding box</a>.
+    : <dfn>view-box</dfn></dt>
+    ::
+        Uses the nearest <a href="https://www.w3.org/TR/SVG11/intro.html#TermSVGViewport">SVG viewport</a> as reference box.
+
+        If a <a element-attr>viewBox</a> attribute is specified for the <a href="https://www.w3.org/TR/SVG11/intro.html#TermSVGViewport">SVG viewport</a> creating element:
+        * The reference box is positioned at the origin of the coordinate system established by the <a element-attr>viewBox</a> attribute.
+        * The dimension of the reference box is set to the <em>width</em> and <em>height</em> values of the <a element-attr>viewBox</a> attribute.
+
+    : <dfn>no-clip</dfn>
+    :: The painted content is not restricted (not clipped).
+</dl>
+
+For SVG elements without associated CSS layout box, the values ''mask-clip/content-box'', ''mask-clip/padding-box'', ''mask-clip/border-box'' and ''mask-clip/margin-box'' compute to ''mask-clip/fill-box''.
+
+For elements with associated CSS layout box, the values ''mask-clip/fill-box'', ''mask-clip/stroke-box'' and ''mask-clip/view-box'' compute to the initial value of 'mask-clip'.
+
+See the section <a href="#layering">“Layering multiple mask layer images”</a> for how 'mask-clip' interacts with other comma-separated mask properties to form each mask layer.
+
+
+## Positioning Area: the 'mask-origin' property ## {#the-mask-origin}
+
+<pre class=propdef>
+Name: mask-origin
+Value: <<geometry-box>>#
+Initial: border-box
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: as specified
+Media: visual
+Animatable: no
+</pre>
+
+For elements rendered as a single box, specifies the <dfn export>mask positioning area</dfn>. For elements rendered as multiple boxes (e.g., inline boxes on several lines, boxes on several pages) specifies which boxes 'box-decoration-break' operates on to determine the mask positioning area.
+
+<div dfn-for=mask-origin dfn-type=value>
+    : <dfn>content-box</dfn>
+    :: The position is relative to the <em>content box</em>.
+    : <dfn>padding-box</dfn>
+    :: The position is relative to the <em>padding box</em>. (For single boxes ''0 0'' is the upper left corner of the padding edge, ''100% 100%'' is the lower right corner.)
+    : <dfn>border-box</dfn>
+    :: The position is relative to the <em>border box</em>.
+    : <dfn>margin-box</dfn>
+    :: The position is relative to the <em>margin box</em>.
+    : <dfn>fill-box</dfn>
+    :: The position is relative to the <a>object bounding box</a>.
+    : <dfn>stroke-box</dfn>
+    :: The position is relative to the <a>stroke bounding box</a>.
+    : <dfn>view-box</dfn>
+    ::
+        Uses the nearest <a href="https://www.w3.org/TR/SVG11/intro.html#TermSVGViewport">SVG viewport</a> as reference box.
+
+        If a <a element-attr>viewBox</a> attribute is specified for the <a href="https://www.w3.org/TR/SVG11/intro.html#TermSVGViewport">SVG viewport</a> creating element:
+        * The reference box is positioned at the origin of the coordinate system established by the <a element-attr>viewBox</a> attribute.
+        * The dimension of the reference box is set to the <em>width</em> and <em>height</em> values of the <a element-attr>viewBox</a> attribute.
+</div>
+
+For SVG elements without associated CSS layout box, the values ''mask-origin/content-box'', ''mask-origin/padding-box'', ''mask-origin/border-box'' and ''mask-origin/margin-box'' compute to ''mask-origin/fill-box''.
+
+For elements with associated CSS layout box, the values ''mask-origin/fill-box'', ''mask-origin/stroke-box'' and ''mask-origin/view-box'' compute to the initial value of 'mask-origin'.
+
+Note:  The 'mask-origin' property is similar to the 'background-origin' property [[!CSS3BG]], but it has a different set of values, and a different initial value.
+
+Note: If 'mask-clip' is ''mask-origin/padding-box'', 'mask-origin' is ''mask-origin/border-box'', 'mask-position' is ''top left'' (the initial value), and the element has a non-zero border, then the top and left of the <a>mask layer image</a> will be clipped.
+
+See the section <a href="#layering">“Layering multiple mask layer images”</a> for how 'mask-origin' interacts with other comma-separated mask properties to form each mask layer.
+
+
+## Sizing Mask Images: the 'mask-size' property ## {#the-mask-size}
+
+<pre class=propdef>
+Name: mask-size
+Value: <<bg-size>>#
+Initial: auto
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: as specified, but with lengths made absolute
+Media: visual
+Animatable: as <a href="https://www.w3.org/TR/css3-transitions/#animtype-repeatable-list">repeatable list</a> of <a href="https://www.w3.org/TR/css3-transitions/#animtype-simple-list">simple list</a> of <a href="https://www.w3.org/TR/css3-transitions/#animtype-lpcalc">length, percentage, or calc</a> (<span class="note">This means keyword values are not animatable.</span>)
+</pre>
+
+Specifies the size of the <a>mask layer images</a>.
+
+See 'background-size' property [[!CSS3BG]] for the definitions of the property values.
+
+See the section <a href="#layering">“Layering multiple mask layer images”</a> for how 'mask-size' interacts with other comma-separated mask properties to form each mask layer.
+
+
+## Compositing mask layers: the 'mask-composite' property ## {#the-mask-composite}
+
+<pre class=propdef>
+Name: mask-composite
+Value: <<compositing-operator>>#
+Initial: add
+Applies to: All elements. In SVG, it applies to <a>container elements</a> without the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: as specified
+Media: visual
+Animatable: no
+</pre>
+
+<pre class=prod><dfn>&lt;compositing-operator></dfn> = add | subtract | intersect | exclude</pre>
+
+Each keyword represents a Porter-Duff compositing operator [[!COMPOSITING-1]] which defines the compositing operation used on the current mask layer with the mask layers below it.
+
+In the following, the current mask layer is referred to <dfn>source</dfn>, all mask layers below it (with the corresponding compositing operators applied) are referred to <dfn>destination</dfn>.
+
+<div dfn-for=mask-composite dfn-type=value>
+    : <dfn>add</dfn>
+    :: The <a>source</a> is placed over the <a>destination</a>. (See Porter-Duff compositing operator <a href='https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators_srcover'>source over</a> for more details.)
+    : <dfn>subtract</dfn>
+    :: The <a>source</a> is placed, where it falls outside of the <a>destination</a>. (See Porter-Duff compositing operator <a href='https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators_srcout'>source out</a> for more details.)
+    : <dfn>intersect</dfn>
+    :: The parts of <a>source</a> that overlap the <a>destination</a>, replace the <a>destination</a>. (See Porter-Duff compositing operator <a href='https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators_srcin'>source in</a> .)
+    : <dfn>exclude</dfn>
+    :: The non-overlapping regions of <a>source</a> and <a>destination</a> are combined. (See Porter-Duff compositing operator <a href='https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators_xor'>XOR</a>.)
+</div>
+
+If there is no further mask layer, the compositing operator must be ignored. Mask layers must not composite with the element's content or the content behind the element, instead they must act as if they are rendered into an isolated group.
+
+All mask layers below the current mask layer must be composited before applying the compositing operation for the current mask layer.
+
+<div class=example>
+    This example uses two <a>mask layer images</a>: <var>circle.svg</var> and <var>rect.svg</var>.
+
+    <div class=figure>
+        <img src="images/mask-source-destination.svg" width="440" height="240" alt="Example of source-over compositing of mask layers">
+    </div>
+
+    Both <a>mask layer images</a> are references with the 'mask-image' property:
+
+    <pre><code highlight=css>
+        mask-image: circle.svg, rect.svg;
+    </code></pre>
+
+    The mask layer with <var>rect.svg</var> is below the mask layer with <var>circle.svg</var>. That means <var>circle.svg</var> is closer to the user than <var>rect.svg</var>.
+
+    With the property 'mask-composite' the author may choose different ways to combine multiple mask layers.
+
+    * ''mask-composite/add'' paints the <var>circle.svg</var> on top of <var>rect.svg</var>. The behavior is described by the compositing operator <a href='https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators_srcover'>source over</a>.</p>
+        <pre><code highlight=css>
+            mask-composite: add;
+        </code></pre>
+
+        <div class=figure>
+            <img src="images/mask-composite-add.svg" width="220" height="220" alt="Example of source-over compositing of mask layers">
+        </div>
+    * ''mask-composite/subtract'' paints portions of <var>circle.svg</var> that do not overlap <var>rect.svg</var>. The behavior is described by the compositing operator <a href='https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators_srcout'>source out</a>.</p>
+        <pre><code highlight=css>
+            mask-composite: subtract;
+        </code></pre>
+
+        <div class=figure>
+            <img src="images/mask-composite-subtract.svg" width="220" height="220" alt="Example of source-over compositing of mask layers">
+        </div>
+    * ''mask-composite/intersect'' paints portions of <var>circle.svg</var> that overlap <var>rect.svg</var>. The behavior is described by the compositing operator <a href='https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators_srcin'>source in</a>.</p>
+        <pre><code highlight=css>
+            mask-composite: intersect;
+        </code></pre>
+
+        <div class=figure>
+            <img src="images/mask-composite-intersect.svg" width="220" height="220" alt="Example of source-over compositing of mask layers">
+        </div>
+    * ''mask-composite/exclude'' paints portions of <var>circle.svg</var> and <var>rect.svg</var> that do not overlap. The behavior is described by the compositing operator <a href='https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators_xor'>XOR</a>.</p>
+        <pre><code highlight=css>
+            mask-composite: exclude;
+        </code></pre>
+
+        <div class=figure>
+            <img src="images/mask-composite-exclude.svg" width="220" height="220" alt="Example of source-over compositing of mask layers">
+        </div>
+</div>
+
+<div class=example>
+    The following example specifies two mask layers and two compositing operators.
+
+    <pre><code highlight=css>
+        mask-image: rect.svg, circle.svg;
+        mask-composite: add, exclude;
+    </code></pre>
+
+    <var>rect.svg</var> and <var>circle.svg</var> make use of the ''mask-composite/add'' compositing operator. There is no further mask layer to use ''mask-composite/exclude'' and therefore, ''mask-composite/exclude'' is ignored.
+</div>
+
+<div class=example>
+    This is an example of 3 mask layers with different compositing operators.
+
+    <pre><code highlight=css>
+        mask-image: trapeze.svg, circle.svg, rect.svg;
+        mask-composite: subtract, add;
+    </code></pre>
+
+    First, <var>circle.svg</var> is “added” to <var>rect.svg</var>. In a second step, <var>trapeze.svg</var> is “subtracted” from the previous two layers.
+
+    <div class=figure>
+        <img src="images/mask-composite-subtract-add.svg" width="440" height="240" alt="Example of source-over compositing of mask layers">
+    </div>
+
+    Issue(84): The figure shows an intersection and not a subtraction.
+</div>
+
+See the section <a href="#layering">“Layering multiple mask layer images”</a> for how 'mask-composite' interacts with other comma-separated mask properties to form each mask layer.
+
+
+## Mask Shorthand: the 'mask' property ## {#the-mask}
+
+<pre class=propdef>
+Name: mask
+Value: <<mask-layer>>#
+Initial: see individual properties
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: see individual properties
+Computed value: see individual properties
+Media: visual
+Animatable: see individual properties
+</pre>
+
+<pre class=prod><dfn>&lt;mask-layer></dfn> = <<mask-reference>> || <<position>> [ / <<bg-size>> ]? ||
+    <<repeat-style>> || <<geometry-box>> || [ <<geometry-box>> | no-clip ] || <<compositing-operator>> || <<masking-mode>></pre>
+
+If one <<geometry-box>> value is present then it sets both 'mask-origin' and 'mask-clip' to that value. If two <<geometry-box>> values are present, then the first sets 'mask-origin' and the second 'mask-clip'.
+
+The <a>used value</a> of the properties 'mask-repeat', 'mask-position', 'mask-clip', 'mask-origin' and 'mask-size' must have no effect if <<mask-reference>> references a <a element>mask</a> element. In this case the element defines position, sizing and clipping of the <a>mask layer image</a>.
+
+The 'mask' shorthand also resets 'mask-border' to its initial value. It is therefore recommended that authors use the 'mask' shorthand, rather than other shorthands or the individual properties, to override any mask settings earlier in the cascade. This will ensure that 'mask-border' has also been reset to allow the new styles to take effect.
+
+
+## The Mask Image Rendering Model ## {#the-mask-image-rendering-model}
+
+The application of the 'mask-image' property with a value other than ''mask-image/none'' to an element formatted with the CSS box model establishes a <a spec="css21">stacking context</a> in the same way that CSS 'opacity' [[CSS3COLOR]] does, and all the element's descendants are rendered together as a group with the masking applied to the group as a whole.
+
+The 'mask-image' property has no effect on the geometry or hit-testing of any element's CSS boxes.
+
+
+### Mask processing ### {#MaskValues}
+
+In the following section, <dfn>mask image</dfn> refers either to a <a>mask layer image</a> or to a <a>mask border image</a>.
+
+A mask image may be interpreted using one of two different methods with regards to calculating the mask values that will be multiplied with the target alpha values.
+
+The first and simplest method of calculating the mask values is to use the alpha channel of the  <a>mask image</a>. In this case the mask value at a given point is simply the value of the alpha channel at that point. The color channels do not contribute to the mask value.
+
+The second method of calculating the mask values is to use the luminance of the mask image. In this case the mask value at a given point is computed from the color channel values and alpha channel value using the following procedure.
+
+1. Compute a luminance value from the color channel values.
+    * If the computed value of 'color-interpolation' on the <a element>mask</a> element is ''linearRGB'', convert the original image color values (potentially in the sRGB color space) to the linearRGB color space.
+    * Then, using non-premultiplied RGB color values, apply the luminance-to-alpha coefficients (as defined in the <a element>feColorMatrix</a> filter primitive [[!SVG11]]) to convert the RGB color values to luminance values.
+2. Multiply the computed luminance value by the corresponding alpha value to produce the mask value.
+
+Regardless of the method used, the procedure for calculating mask values assumes the content of the mask is a four-channel RGBA graphics object. For other types of graphics objects, special handling is required as follows.
+
+For a three-channel RGB graphics object that is used in a mask (e.g., when referencing a three-channel image file), the effect is as if the object were converted into a four-channel RGBA image with the alpha channel uniformly set to 1.
+
+For a single-channel image that is used in a mask (e.g., when referencing a single-channel grayscale image file), the effect is as if the object were converted into a four-channel RGBA image, where the single channel from the referenced object is used to compute the three color channels and the alpha channel is uniformly set to 1.
+
+Note: When referencing a grayscale image file, the transfer curve relating the encoded grayscale values to linear light values must be taken into account when computing the color channels.
+
+Note: SVG <a>graphics elements</a> (e.g., <a element>circle</a> or <a element>text</a>) are all treated as four-channel RGBA images for the purposes of masking operations.
+
+The effect of a mask is identical to what would have happened if there were no mask but instead the alpha channel of the given object were multiplied with the mask's resulting mask values.
+
+Regions not covered by a  <a>mask image</a> are treated as transparent black. The mask value is 0.
+
+Note: Masks with repeating  <a>mask image</a> tiles may have an offset to each other. The space between the <a>mask images</a> is treated as a transparent black mask.
+
+
+### Layering Multiple Mask Images ### {#layering}
+
+The mask of a box can have multiple layers. The number of layers is determined by the number of comma-separated values for the 'mask-image' property. A value of ''mask-image/none'' in a list of values with other <<mask-reference>>s still creates a layer.
+
+See <a href="https://www.w3.org/TR/css3-background/#layering">Layering Multiple Background Images</a> [[!CSS3BG]].
+
+All <a>mask layer images</a> are transformed to alpha masks (if necessary see <a href="#MaskValues">Mask processing</a>) and combined by compositing taking the compositing operators specified by 'mask-composite' into account.
+
+
+# Border-Box Mask # {#mask-borders}
+
+With 'mask-border' an image can be split into nine pieces: four corners, four edges and the middle piece as demonstrated in the figure below.
+
+<div class=figure>
+  <img src="images/mask-box-image-mask.svg" alt="pieces of a mask border image" width="240">
+  <p class=caption>Pieces of a <a>mask border image</a>.</p>
+</div>
+
+These pieces may be sliced, scaled and stretched in various ways to fit the size of the <a>mask border image area</a>. This distorted image is then used as a mask. The syntax of 'mask-border' corresponds to the 'border-image' property of CSS Background and Borders [[!CSS3BG]].
+
+<div class=example>
+    The <a>mask border image</a> in the following example is split into four corners with dimensions of 75 pixels, four edges and the middle piece that is stretched and scaled.
+
+    <div class=figure>
+        <img src="images/mask-box-image.svg" alt="Example for 'mask-border'" width="720" height="240">
+        <p class=caption>Example for 'mask-border'. The object on the left is the object to mask. The second image is the alpha mask and the last image the masked object.</p>
+    </div>
+
+    <pre><code highlight=css>
+        div {
+            background: linear-gradient(bottom, #F27BAA 0%, #FCC8AD 100%);
+            mask-border-slice: 25 fill;
+            mask-border-repeat: stretch;
+            mask-border-source: url(mask.png);
+        }
+    </code></pre>
+</div>
+
+
+## Mask Border Image Source: the 'mask-border-source' property ## {#the-mask-border-source}
+
+<pre class=propdef>
+Name: mask-border-source
+Value: none | <<image>>
+Initial: none
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: ''mask-border-source/none'' or the image with its URI made absolute
+Media: visual
+Animatable: no
+</pre>
+
+Specifies an image to be used as <dfn export>mask border image</dfn>.
+
+An image that is an empty image (zero width or zero height), that fails to download, is non-existent, or that cannot be displayed (e.g. because it is not in a supported image format) is ignored. It still counts as an <a>mask border image</a> but does not mask the element.
+
+See “<a href="#MaskValues">Mask processing</a>” on how to process the <a>mask border image</a>.
+
+A computed value of other than ''mask-border-source/none'' results in the creation of a <a spec="css21">stacking context</a> [[!CSS21]] the same way that CSS 'opacity' [[CSS3COLOR]] does for values other than ''1''.
+
+'mask-border-source' and 'mask-image' can be specified independent of each other. If both properties have a value other than ''mask-border-source/none'', the element is masked by both masking operations one after the other.
+
+Note: It does not matter if 'mask-image' is applied to the element before or after 'mask-border-source'. Both operation orders result in the same rendering.
+
+
+## Mask Border Image Interpretation: the 'mask-border-mode' property ## {#the-mask-border-mode}
+
+<pre class=propdef>
+Name: mask-border-mode
+Value: luminance | alpha
+Initial: alpha
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: as specified
+Media: visual
+Animatable: no
+</pre>
+
+The 'mask-border-mode' property indicates whether the <<image>> value for 'mask-border-source' is treated as luminance mask or alpha mask. (See <a href="#MaskValues">Mask processing</a>.)
+
+Values have the following meanings:
+
+<div dfn-type=value dfn-for="mask-border-mode">
+    : <dfn>alpha</dfn>
+    :: A value of ''mask-border-mode/alpha'' indicates that the alpha values of the <a>mask border image</a> should be used as the mask values. See <a href="#MaskValues">Calculating mask values</a>.
+    : <dfn>luminance</dfn>
+    :: A value of ''mask-border-mode/luminance'' indicates that the luminance values of the <a>mask border image</a> should be used as the mask values. See <a href="#MaskValues">Calculating mask values</a>.
+</div>
+
+The 'mask-mode' and 'mask-type' properties must have no affect on the <a>mask border image</a> type.
+
+
+## Mask Border Image Slicing: the 'mask-border-slice' property ## {#the-mask-border-slice}
+
+<pre class=propdef>
+Name: mask-border-slice
+Value: <<number-percentage>>{1,4} fill?
+Initial: 0
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: refer to size of the <a>mask border image</a>
+Computed value: as specified
+Media: visual
+Animatable: no
+</pre>
+
+This property specifies inward offsets from the top, right, bottom, and left edges of the <a>mask border image</a>, dividing it into nine regions: four corners, four edges and a middle. The middle image part is discarded and treated as fully opaque white (the content covered by the middle part is not masked and shines through) unless the <dfn dfn-for=mask-border-slice dfn-type=value>fill</dfn> keyword is present.
+
+See the 'border-image-slice' property [[!CSS3BG]] for the definitions of the property values.
+
+
+## Masking Areas: the 'mask-border-width' property ## {#the-mask-border-width}
+
+<pre class=propdef>
+Name: mask-border-width
+Value: [ <<length-percentage>> | <<number>> | auto ]{1,4}
+Initial: auto
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: relative to width/height of the <a>mask border image area</a>
+Computed value: all <<length>>s made absolute, otherwise as specified
+Media: visual
+Animatable: no
+</pre>
+
+The <a>mask border image</a> is drawn inside an area called the <dfn export>mask border image area</dfn>. This is an area whose boundaries by default correspond to the border box, see 'mask-border-outset'.
+
+See the 'border-image-width' property [[!CSS3BG]] for the definitions of the property values.
+
+Note: For SVG elements without an associated layout box the 'border-width' is considered to be ''0''.
+
+
+## Edge Overhang: the 'mask-border-outset' property ## {#the-mask-border-outset}
+
+<pre class=propdef>
+Name: mask-border-outset
+Value: [ <<length>> | <<number>> ]{1,4}
+Initial: 0
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: all <<length>>s made absolute, otherwise as specified
+Media: visual
+Animatable: no
+</pre>
+
+The values specify the amount by which the <a>mask border image area</a> extends beyond the border box. If it has four values, they set the outsets on the top, right, bottom and left sides in that order. If the left is missing, it is the same as the right; if the bottom is missing, it is the same as the top; if the right is missing, it is the same as the top.
+
+As with 'mask-border-width', a <<number>> represents a multiple of the corresponding 'border-width'. Negative values are not allowed for any of the 'mask-border-outset' values.
+
+Note: For SVG elements without associated layout box the 'border-width' is considered to be ''0''.
+
+
+## Mask Border Image Tiling: the 'mask-border-repeat' property ## {#the-mask-border-repeat}
+
+<pre class=propdef>
+Name: mask-border-repeat
+Value: [ stretch | repeat | round | space ]{1,2}
+Initial: stretch
+Applies to: All elements. In SVG, it applies to <a>container elements</a> excluding the <a element>defs</a> element and all <a>graphics elements</a>
+Inherited: no
+Percentages: n/a
+Computed value: as specified
+Media: visual
+Animatable: no
+</pre>
+
+This property specifies how the images for the sides and the middle part of the <a>mask border image</a> are scaled and tiled. The first keyword applies to the horizontal sides, the second to the vertical ones. If the second keyword is absent, it is assumed to be the same as the first.
+
+See the 'border-image-repeat' property [[!CSS3BG]] for the definitions of the property values.
+
+The exact process for scaling and tiling the <a>mask border image</a> parts is given in the section <a href="#masking-with-the-mask-border-image">Masking with the mask border image</a>
+
+
+## Mask Border Image Shorthand: the 'mask-border' property ## {#the-mask-border}
+
+<pre class=propdef>
+Name: mask-border
+Value: <<'mask-border-source'>> || <<'mask-border-slice'>> [ / <<'mask-border-width'>>? [ / <<'mask-border-outset'>> ]? ]? || <<'mask-border-repeat'>> || <<'mask-border-mode'>>
+Initial: See individual properties
+Applies to: See individual properties
+Inherited: no
+Percentages: n/a
+Computed value: See individual properties
+Media: visual
+Animatable: See individual properties
+</pre>
+
+This is a shorthand property for setting 'mask-border-source', 'mask-border-slice', 'mask-border-width', 'mask-border-outset' and 'mask-border-repeat'. Omitted values are set to their initial values.
+
+Note: The 'mask' shorthand resets the properties 'mask-border', 'mask-border-source', 'mask-border-mode', 'mask-border-slice', 'mask-border-width', 'mask-border-outset' and 'mask-border-repeat'.
+
+
+## Masking with the mask border image ## {#masking-with-the-mask-border-image}
+
+After the <a>mask border image</a> given by 'mask-border-source' is sliced by the 'mask-border-slice' values, the resulting nine images are scaled, positioned, and tiled into their corresponding <a>mask border image</a> regions in four steps as described in the section <a href="https://www.w3.org/TR/css3-background/#border-image-process">Drawing the Border Image</a> [[!CSS3BG]].
+
+The application of the 'mask-border-source' property to an element formatted with the CSS box model establishes a <a spec="css21">stacking context</a> in the same way that CSS 'opacity' [[CSS3COLOR]] does, and all the element's descendants are rendered together as a group with the masking applied to the group as a whole.
+
+The 'mask-border-source' property has no effect on the geometry or hit-testing of any element's CSS boxes.
+
+
+# SVG Mask Sources # {#svg-masks}
+
+## The <a element>mask</a> element ## {#MaskElement}
+
+<table class="definition-table">
+  <tr>
+    <th>Name:</th>
+    <td><dfn element>mask</dfn>
+  </tr>
+  <tr>
+    <th>Categories:</th>
+    <td><a>container elements</a>, <a>never-rendered element</a></td>
+  </tr>
+  <tr>
+    <th>Content model:</th>
+    <td>Any number of the following elements, in any order: <ul class=no-bullets><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermAnimationElement'>animation</a> <span class=expanding> — <a element>animate</a>, <a element>animateColor</a>, <a element>animateMotion</a>, <a element>animateTransform</a>, <a element>set</a></span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermDescriptiveElement'>descriptive</a> <span class=expanding> — <a element>desc</a>, <a element>title</a>, <a element>metadata</a></span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermShapeElement'>shape</a> <span class=expanding> — <a element>circle</a>, <a element>ellipse</a>, <a element>line</a>, <a element>path</a>, <a element>polygon</a>, <a element>polyline</a>, <a element>rect</a></span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermStructuralElement'>structural</a> <span class=expanding> — <a element>defs</a>, <a element>g</a>, <a element>svg</a>, <a element>symbol</a>, <a element>use</a></span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermGradientElement'>gradient</a> <span class=expanding> — <a element>linearGradient</a>, <a element>radialGradient</a></span></li><li><a element>a</a></li><li><a element>clipPath</a></li><li><a element>color-profile</a></li><li><a element>cursor</a></li><li><a element>filter</a></li><li><a element>font</a></li><li><a element>font-face</a></li><li><a element>foreignObject</a></li><li><a element>image</a></li><li><a element>marker</a></li><li><a element>mask</a></li><li><a element>pattern</a></li><li><a element>script</a></li><li><a element>style</a></li><li><a element>switch</a></li><li><a element>view</a></li><li><a element>text</a></li><li><a element>altGlyphDef</a></li></ul></td>
+  </tr>
+  <tr>
+    <th>Attributes:</th>
+    <td><ul class=no-bullets><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermConditionalProcessingAttribute'>conditional processing attributes</a><span class=expanding> — <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#RequiredFeaturesAttribute'><span class=attr-name>‘requiredFeatures’</span></a>, <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#RequiredExtensionsAttribute'><span class=attr-name>‘requiredExtensions’</span></a>, <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#SystemLanguageAttribute'><span class=attr-name>‘systemLanguage’</span></a></span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermCoreAttributes'>core attributes</a><span class=expanding> — <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#IDAttribute'><span class=attr-name>‘id’</span></a>, <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#XMLBaseAttribute'><span class=attr-name>‘xml:base’</span></a>, <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#XMLLangAttribute'><span class=attr-name>‘xml:lang’</span></a>, <a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/struct.html#XMLSpaceAttribute'><span class=attr-name>‘xml:space’</span></a></span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/intro.html#TermPresentationAttribute'>presentation attributes</a><span class=expanding> — 'alignment-baseline', 'baseline-shift', 'clip', 'clip-path', 'clip-rule', 'color', 'color-interpolation', 'color-interpolation-filters', 'color-profile', 'color-rendering', 'cursor', 'direction', 'display', 'dominant-baseline', 'enable-background', 'fill', 'fill-opacity', 'fill-rule', 'filter', 'flood-color', 'flood-opacity', 'font', 'font-family', 'font-size', 'font-size-adjust', 'font-stretch', 'font-style', 'font-variant', 'font-weight', 'glyph-orientation-horizontal', 'glyph-orientation-vertical', 'image-rendering', 'kerning', 'letter-spacing', 'lighting-color', 'marker', 'marker-end', 'marker-mid', 'marker-start', 'mask', 'opacity', 'overflow', 'pointer-events', 'shape-rendering', 'stop-color', 'stop-opacity', 'stroke', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-opacity', 'stroke-width', 'text-anchor', 'text-decoration', 'text-rendering', 'unicode-bidi', 'visibility', 'word-spacing', 'writing-mode'</span></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/styling.html#ClassAttribute'><span class=attr-name>‘class’</span></a></li><li><a href='https://www.w3.org/TR/2011/REC-SVG11-20110816/styling.html#StyleAttribute'><span class=attr-name>‘style’</span></a></li><li>‘<a element-attr for=mask>x</a>’</li><li>‘<a element-attr for=mask>y</a>’</li><li>‘<a element-attr for=mask>width</a>’</li><li>‘<a element-attr for=mask>height</a>’</li><li>‘<a element-attr for=mask>maskUnits</a>’</li><li>‘<a element-attr for=mask>maskContentUnits</a>’</li></ul></td>
+  </tr>
+  <tr>
+    <th>DOM Interfaces:</th>
+    <td><a class=idlinterface href='#InterfaceSVGMaskElement'>SVGMaskElement</a></td>
+  </tr>
+</table>
+
+
+<em>Attribute definitions:</em>
+<dl dfn-type="element-attr" dfn-for="mask">
+    : <dfn>maskUnits</dfn> = "''maskUnits/userSpaceOnUse'' | ''maskUnits/objectBoundingBox''"
+    ::
+        Defines the coordinate system for attributes <a element-attr>x</a>, <a element-attr>y</a>, <a element-attr for=mask>width</a> and <a element-attr for=mask>height</a>.
+        : <dfn value for=maskUnits>userSpaceOnUse</dfn>
+        :: <a element-attr>x</a>, <a element-attr>y</a>, <a element-attr for=mask>width</a> and <a element-attr for=mask>height</a> represent values in the current <a>user coordinate system</a> [[!CSS3-TRANSFORMS]] in place at the time when the <a element>mask</a> element is referenced (i.e., the <a>user coordinate system</a> for the element referencing the <a element>mask</a> element via the 'mask' property).
+        : <dfn dfn-type=value dfn-for=maskUnits>objectBoundingBox</dfn>
+        :: <a element-attr>x</a>, <a element-attr>y</a>, <a element-attr for=mask>width</a> and <a element-attr for=mask>height</a> represent fractions or percentages of the <a>object bounding box</a> of the element to which the mask is applied. <a href="https://www.w3.org/TR/SVG/coords.html#Units">User coordinates</a> are sized equivalently to the CSS ''px'' unit.
+      
+        If attribute <a element-attr>maskUnits</a> is not specified, then the effect is as if a value of ''maskUnits/objectBoundingBox'' were specified.
+      
+        Animatable: yes.
+    : <dfn>maskContentUnits</dfn> = "''maskContentUnits/userSpaceOnUse'' | ''maskContentUnits/objectBoundingBox''"
+    ::
+        Defines the coordinate system for the contents of the <a element>mask</a>.
+        : <dfn dfn-type=value dfn-for=maskContentUnits>userSpaceOnUse</dfn>
+        :: The <a>user coordinate system</a> for the contents of the <a element>mask</a> element is the current <a>user coordinate system</a> in place at the time when the <a element>mask</a> element is referenced (i.e., the <a>user coordinate system</a> for the element referencing the <a element>mask</a> element via the 'mask' property).
+        : <dfn dfn-type=value dfn-for=maskContentUnits>objectBoundingBox</dfn>
+        :: The coordinate system has its origin at the top left corner of the <a>bounding box</a> of the element to which the clipping path applies to  and the same width and height of this <a>bounding box</a>. <a href="https://www.w3.org/TR/SVG/coords.html#Units">User coordinates</a> are sized equivalently to the CSS ''px'' unit.
+
+        If attribute <a element-attr>maskContentUnits</a> is not specified, then the effect is as if a value of ''maskContentUnits/userSpaceOnUse'' were specified.
+
+        Animatable: yes.
+    : <dfn>x</dfn> = "<<length-percentage>>"
+    ::
+        The x-axis coordinate of one corner of the rectangle for the largest possible offscreen buffer.
+        If the attribute is not specified but at least one of the attributes <a element-attr>y</a>, <a element-attr for=mask>width</a> or <a element-attr for=mask>height</a> are specified, the effect is as if a value of ''-10%'' were specified.
+
+        Animatable: yes.
+    : <dfn>y</dfn> = "<<length-percentage>>"
+    ::
+        The y-axis coordinate of one corner of the rectangle for the largest possible offscreen buffer.
+        If the attribute is not specified but at least one of the attributes <a element-attr>x</a>, <a element-attr for=mask>width</a> or <a element-attr for=mask>height</a> are specified, the effect is as if a value of ''-10%'' were specified.
+
+        Animatable: yes.
+    : <dfn>width</dfn> = "<<length-percentage>>"
+    ::
+        The width of the largest possible offscreen buffer. A negative value or a value of zero disables rendering of the element.
+        If the attribute is not specified but at least one of the attributes <a element-attr>x</a>, <a element-attr>y</a> or <a element-attr for=mask>height</a> are specified, the effect is as if a value of ''120%'' were specified.
+
+        Animatable: yes.
+    : <dfn>height</dfn> = "<<length-percentage>>"
+    ::
+        The height of the largest possible offscreen buffer.
+        A negative value or a value of zero disables rendering of the element.
+        If the attribute is not specified but at least one of the attributes <a element-attr>x</a>, <a element-attr>y</a> or <a element-attr for=mask>width</a> are specified, the effect is as if a value of ''120%'' were specified.
+
+        Animatable: yes.
+</dl>
+
+If at least one of the attributes <a element-attr>x</a>, <a element-attr>y</a>, <a element-attr for=mask>width</a> or <a element-attr for=mask>height</a> are specified, the given object and the rectangle defined by <a element-attr>x</a>, <a element-attr>y</a>, <a element-attr for=mask>width</a> and <a element-attr for=mask>height</a> establish a current clipping path. The rendered content of the mask must be clipped by this current clipping path.
+
+CSS properties inherit into the <a element>mask</a> element from its ancestors; properties do <em>not</em> inherit from the element referencing the <a element>mask</a> element.
+
+<a element>mask</a> elements are never rendered directly; their only usage is as something that can be referenced using the 'mask' property. The 'opacity', 'filter' and 'display' properties do not apply to the <a element>mask</a> element; thus, <a element>mask</a> elements are not directly rendered even if the 'display' property is set to a value other than ''display/none'', and <a element>mask</a> elements are available for referencing even when the 'display' property on the <a element>mask</a> element or any of its ancestors is set to ''display/none''.
+
+
+## Mask Source Interpretation: the 'mask-type' property ## {#the-mask-type}
+
+<pre class=propdef>
+Name: mask-type
+Value: luminance | alpha
+Initial: luminance
+Applies to: <a element>mask</a> elements
+Inherited: no
+Percentages: n/a
+Computed value: as specified
+Media: visual
+Animatable: no
+</pre>
+
+The 'mask-type' property defines whether the content of the <a element>mask</a> element is treated as as luminance mask or alpha mask, as described in <a href="#MaskValues">Calculating mask values</a>.
+
+Values have the following meanings:
+
+<dl dfn-for="mask-type" dfn-type=value>
+    : <dfn>luminance</dfn>
+    :: Indicates that the luminance values of the mask should be used.
+    : <dfn>alpha</dfn>
+    :: Indicates that the alpha values of the mask should be used.
+
+</dl>
+
+The 'mask-type' property allows the author of the <a element>mask</a> element to specify the preferred masking mode. However, the author can override this preference by setting the 'mask-mode' value to something different than ''mask-mode/match-source'' on the masked content.
+
+<div class=example>
+    In the following example the computed value of 'mask-type' is ''mask-type/luminance'' and the computed value of 'mask-mode' is ''mask-mode/match-source''. The UA must follow the preferred masking mode defined on the <a element>mask</a> element.
+
+    <pre><code highlight=svg>
+        &lt;svg>
+          &lt;mask style="mask-type: luminance;" id="mask">
+            ...
+          &lt;/mask>
+        &lt;/svg>
+
+        &lt;p style="mask-image: url(#mask); mask-mode: auto;">
+          This is the masked content.
+        &lt;/p>
+    </code></pre>
+
+    In the next example the computed value of 'mask-mode' is ''mask-mode/alpha'' and overrides the preference on the <a element>mask</a> element that is computed to ''mask-type/luminance''. The <a>mask layer image</a> is used as an alpha mask.</p>
+
+    <pre><code highlight=html>
+        lt;svg>
+         &lt;mask style="mask-type: luminance;" id="mask2">
+           ...
+         &lt;/mask>
+        lt;/svg>
+
+        lt;p style="mask-image: url(#mask2); mask-mode: alpha;">
+         This is the masked content.
+        lt;/p>
+    </code></pre>
+</div>
+
+The 'mask-type' property is a presentation attribute for SVG elements.
+
+
+# Privacy and Security Considerations # {#priv-sec}
+
+It is important that the timing to the masking operations is independent of the source and destination pixel. Masking operations must be implemented in such a way that they always take the same amount of time regardless of the pixel values. If this rule is not followed, an attacker could infer information and mount a timing attack.
+
+A timing attack is a method of obtaining information about content that is otherwise protected, based on studying the amount of time it takes for an operation to occur. If, for example, red pixels took longer to draw than green pixels, one might be able to reconstruct a rough image of the element being rendered, without ever having access to the content of the element.
+
+<<mask-source>>s and <<clip-source>>s have special requirements on fetching resources.
+
+User agents must use the <a href="https://www.w3.org/TR/html5/infrastructure.html#cors-enabled-fetch">potentially CORS-enabled fetch</a> method defined by the [[!HTML5]] specification for all <<mask-source>>, <<clip-source>> and <<image>> values on the 'mask-image', 'mask-border-source' and 'clip-path' properties. When fetching, user agents must use “Anonymous” mode, set the referrer source to the stylesheet's URL and set the origin to the URL of the containing document. If this results in network errors, the effect is as if the value ''mask-image/none'' had been specified.
+
+<h2 id="clip-property" class="no-num">Appendix A: The deprecated 'clip' property</h3>
+
+<pre class=propdef>
+Name: clip
+Value: ''clip/rect()'' | ''clip/auto''
+Initial: auto
+Applies to: Absolutely positioned elements. In SVG, it applies to <a href="https://www.w3.org/TR/SVG/coords.html#EstablishingANewViewport">elements which establish a new viewport</a>, <a element>pattern</a> elements and <a element>mask</a> elements.
+Inherited: no
+Percentages: n/a
+Computed value: as specified
+Media: visual
+Animatable: as <a href="http://dev.w3.org/csswg/css3-transitions/#animtype-rect">rectangle</a>
+</pre>
+
+With this specification the 'clip' property is deprecated. Authors are encouraged to use the 'clip-path' property instead. UAs must support the 'clip' property.
+
+The 'clip' property applies only to absolutely positioned elements. In SVG, it applies to <a href="https://www.w3.org/TR/SVG/coords.html#EstablishingANewViewport">elements which establish a new viewport</a>, <a element>pattern</a> elements and <a element>mask</a> elements. Values have the following meanings:
+
+<dl dfn-type=value dfn-for="clip">
+  : auto
+  :: The element does not clip.</dd>
+  : <dfn function>rect()</dfn> = rect( <<clip/top>>, <<clip/right>>, <<clip/bottom>>, <<clip/left>> )
+  ::
+      <<clip/top>> and <<clip/bottom>> specify offsets from the top border edge of the box, and <<clip/right>>, and <<clip/left>> specify offsets from the left border edge of the box. Authors should separate offset values with commas. User agents must support separation with commas, but may also support separation without commas (but not a combination), because a previous revision of this specification was ambiguous in this respect.
+
+      <dfn dfn-type="type">&lt;top></dfn>, <dfn dfn-type="type">&lt;right></dfn>, <dfn dfn-type="type">&lt;bottom></dfn>, and <dfn dfn-type="type">&lt;left></dfn> may either have a <<length>> value or ''clip/auto''. Negative lengths are permitted. The value ''clip/auto'' means that a given edge of the clipping region will be the same as the edge of the element's generated border box (i.e., ''clip/auto'' means the same as ''0'' for <<clip/top>> and <<clip/left>>, the same as the <a>used value</a> of the height plus the sum of vertical padding and border widths for <<clip/bottom>>, and the same as the used value of the width plus the sum of the horizontal padding and border widths for <<clip/right>>, such that four ''clip/auto'' values result in the clipping region being the same as the element's border box).
+
+      When coordinates are rounded to pixel coordinates, care should be taken that no pixels remain visible when <<clip/left>> and <<clip/right>> have the same value (or <<clip/top>> and <<clip/bottom>> have the same value), and conversely that no pixels within the element's border box remain hidden when these values are ''clip/auto''.
+
+</dl>
+
+<div class="example">
+    Example: The following two rules:
+
+    <pre><code highlight=css>
+        p#one { clip: rect(5px, 40px, 45px, 5px); }
+        p#two { clip: rect(5px, 55px, 45px, 5px); }
+    </code></pre>
+
+    and assuming both Ps are 50 by 55 pixel, will create, respectively, the rectangular clipping regions delimited by the dashed lines in the following illustrations:
+
+    <div class=figure>
+        <img src="images/clip.svg" width="580" height="300" alt="Values for rect shape">
+        <p class=caption>This diagram illustrates two block boxes, one next to the other, with rectangular clipping regions of different dimensions. (See <a href="https://www.w3.org/TR/CSS2/images/longdesc/clip-desc.html">long description</a>.)</p>
+    </div>
+</div>
+
+<h2 id="compute-stroke-bounding-box" class="no-num">Appendix B: Compute stroke bounding box</h2>
+
+The algorithm to compute the <dfn>stroke bounding box</dfn> is as follows, depending on the type of <var>element</var>:
+
+<dl class="switch">
+    : a <a>graphics element</a> without <a element>use</a> or <a element>image</a>
+    : an <a element>a</a> element with a <a>text content element</a>
+    ::
+        <ol class="algorithm">
+            1. Let <var>box</var> be a rectangle initialized to the <a>object bounding box</a> of <var>element</var>.
+            2. If the <a>used value</a> of 'stroke-width' &lt;= 0 or the used value of 'stroke' is ''stroke/none'' return <var>box</var>.
+            3. Let <var>delta</var> be the inflation value initialized to the half of the 'stroke-width'.
+            4. If <var>element</var> is not <a element>rect</a>, <a element>ellipse</a>, <a element>circle</a> or <a element>image</a> just follow one of the following conditions in the order they apply:
+                <dl class="switch">
+                    : the used value for 'stroke-linejoin' is ''miter''
+                    ::
+                        1. Let <var>miter</var> be the used value of 'stroke-miterlimit'.
+                        2. If <var>miter</var> is smaller than the square root of 2 and if the used value for 'stroke-linecap' is ''square'', multiply <var>delta</var> with the square root of 2. Otherwise, multiply <var>delta</var> with <var>miter</var>.
+                    : the used value for 'stroke-linecap' is ''square''
+                    ::
+                        1. Multiply <var>delta</var> with the square root of 2.
+                </dl>
+            5. Inflate <var>box</var> with the value of <var>delta</var>.
+            6. Return <var>box</var>.
+        </ol>
+
+        Note: The values of the 'stroke-opacity', 'stroke-dasharray' and 'stroke-dashoffset' do not affect the calculation of the stroke bounding box.
+    : a <a>container element</a>
+    : <a element>use</a>
+    ::
+        <ol class="algorithm">
+            1. Let <var>parent</var> be the <a>container element</a> if it is one, or the root of the <a element>use</a> element's shadow tree otherwise.
+            2. For each child <var>child</var> of <var>parent</var>
+                1. Invoke the stroke bounding box algorithm with <var>child</var>.
+                2. Let <var>childBox</var> be the returned box value of the invoked algorithm.
+                3. Map <var>childBox</var> from the coordinate space of <var>child</var> to the coordinate space of <var>parent</var>.
+            3. Let <var>box</var> be the union of all <var>childBox</var>es.
+            4. Return <var>box</var>.
+    : <a element>image</a>
+    ::
+        <ol class="algorithm">
+            1. Return the <a>object bounding box</a> of <var>element</var>.
+        </ol>
+</dl>
+
+Note: A future version of the SVG specification may override this section.
+
+<h2 id="DOMInterfaces" class="no-num">Appendix C: DOM interfaces</h2>
+
+## Interface SVGClipPathElement ## {#InterfaceSVGClipPathElement}
+
+The <dfn interface>SVGClipPathElement</dfn> interface corresponds to the <a element>clipPath</a> element.
+
+<pre class=idl>
+interface SVGClipPathElement : SVGElement {
+  readonly attribute SVGAnimatedEnumeration clipPathUnits;
+  readonly attribute SVGAnimatedTransformList transform;
+};
+</pre>
+
+<div dfn-type=attribute dfn-for=SVGClipPathElement>
+    : Attributes:
+    ::
+        : <dfn>clipPathUnits</dfn>
+        :: Corresponds to attribute <a element-attr>clipPathUnits</a> on the given <a element>clipPath</a> element. Takes one of the constants defined in <a interface>SVGUnitTypes</a>.
+        : <dfn>transform</dfn>
+        :: Corresponds to presentation attribute 'transform' on the given element.
+</div>
+
+## Interface SVGMaskElement ## {#InterfaceSVGMaskElement}
+
+The <dfn interface>SVGMaskElement</dfn> interface corresponds to the <a element>mask</a> element.
+
+<pre class=idl>
+interface SVGMaskElement : SVGElement {
+  readonly attribute SVGAnimatedEnumeration maskUnits;
+  readonly attribute SVGAnimatedEnumeration maskContentUnits;
+  readonly attribute SVGAnimatedLength x;
+  readonly attribute SVGAnimatedLength y;
+  readonly attribute SVGAnimatedLength width;
+  readonly attribute SVGAnimatedLength height;
+};
+</pre>
+
+<div dfn-type=attribute dfn-for=SVGMaskElement>
+    : Attributes:
+    ::
+        : <dfn>maskUnits</dfn>
+        :: Corresponds to attribute <a element-attr>maskUnits</a> on the given <a element>mask</a> element. Takes one of the constants defined in <a interface>SVGUnitTypes</a>.
+        : <dfn>maskContentUnits</dfn>
+        :: Corresponds to attribute <a element-attr>maskContentUnits</a> on the given <a element>mask</a> element. Takes one of the constants defined in <a interface>SVGUnitTypes</a>.
+        : <dfn>x</dfn>
+        :: Corresponds to attribute <a element-attr>x</a> on the given <a element>mask</a> element.
+        : <dfn>y</dfn>
+        :: Corresponds to attribute <a element-attr>y</a> on the given <a element>mask</a> element.
+        : <dfn>width</dfn>
+        :: Corresponds to attribute <a element-attr for=mask>width</a> on the given <a element>mask</a> element.
+        : <dfn>height</dfn>
+        :: Corresponds to attribute <a element-attr for=mask>height</a> on the given <a element>mask</a> element.
+</div>
+
+<h2 class="no-num" id="changes">Changes since last publication</h2>
+
+The following changes were made since the <a href="http://www.w3.org/TR/2014/CR-css-masking-1-20140826/">26 August 2014 Candidate Recommendation</a>.
+* Allowed the <<'mask-mode'>> value in the 'mask' shorthand to appear anywhere other than between <<'mask-position'>> and <<'mask-size'>>.
+* Removed Implements SVGUnitTypes on clipPath and mask elements.
+* Editorial changes.
+
+The following changes were made since the <a href="https://www.w3.org/TR/2014/WD-css-masking-1-20140522/">22 May 2014 Working Draft</a>.
+* Change the inital value of 'mask-size' from border-box to auto.
+
+The following changes were made since the <a href="https://www.w3.org/TR/2014/WD-css-masking-1-20140213/">13 February 2014 Working Draft</a>.
+* Renamed mask-box* properties and terms to mask-border*.
+* Added support for multiple mask layers. (Similar to multiple background layers for 'background'.)
+* Added the 'mask-composite' property to control compositing of multiple <a>mask layer images</a> with the keywords ''add'', ''subtract'', ''intersect'' and ''exclude''.
+* 'mask-border-slice' without keyword ''mask-border-slice/fill'' does not clip middle piece of content anymore. Changed initial value from ''0 fill'' to ''0''.
+* Better description for 'clip-rule', 'mask-mode' and 'mask-type'.
+* Rename ''mask-border-slice/fill'' and ''stroke'' keywords to ''clip-path/fill-box'' and ''clip-path/stroke-box''.
+* Added definition for <a>stroke bounding box</a>.
+* Better differentiation between mask images: <a>mask layer image</a> and <a>mask border image</a>.
+
+The following changes were made since the <a href="https://www.w3.org/TR/2013/WD-css-masking-1-20131029/">29 October 2013 Last Call Working Draft</a>.
+* Remove note that a future version of the spec will allow controlling hit testing on clipping.
+* Changed order of sections within the document.
+* Make clear that the <a>used value</a> of the properties 'mask-image', 'mask-repeat', 'mask-position', 'mask-clip', 'mask-origin' and 'mask-size' must be ignored for <<mask-source>>, not the properties.
+* "Animatable" section of 'mask-size', 'mask-position' described as repeatable list of lists. Changed to a single list.
+* Computed value of 'mask-repeat' and 'mask-position' was described as list of items. Changed to have just one value.
+* Change link to ED from <a href='https://drafts.fxtf.org/masking/'>https://drafts.fxtf.org/masking/</a> to <a href='https://drafts.fxtf.org/css-masking-1/'>https://drafts.fxtf.org/css-masking-1/</a>
+
+The following significant changes were made since the <a href="https://www.w3.org/TR/2013/WD-css-masking-20130620/">20 June 2013 Working Draft</a>.
+* 'mask' resets ''mask-box'' properties.
+* Initial values for 'mask-repeat', 'mask-position' and 'mask-origin' changed to ''mask-repeat/no-repeat'', ''mask-position/center'' and ''mask-origin/border-box''.
+* Multiple layers of mask images were deferred to a future level of this specification.
+* Added security model for pixel operations and fetching of masking and clipping resources.
+* Deferred ''child'' and select() function to next level.
+
+The following significant changes were made since the <a href="https://www.w3.org/TR/2012/WD-css-masking-20121115/">15 November 2012 Working Draft</a>.
+* Better integration with terms and definitions of CSS Backgrounds and Borders module.
+* Syntax changes on 'mask' shorthand property to be conform with 'background' shorthand property.
+* Define how the implementation can differ between an SVG resource (<a element>mask</a>, <a element>clipPath</a>) and an image resource.
+* Added 'mask-mode' property to alter between luminance and alpha mask on 'mask-image'.
+* Adapt IDL definition of SVGMaskElement and SVGClipPathElement to WebIDL.
+* Further editorial changes.
+
+See detailed list of changes in the <a href="ChangeLog">ChangeLog</a>.
+
+<h2 class=no-num id="acknowledgments">Acknowledgments</h2>
+
+Thanks to Elika J. Etemad, Cameron McCormack, Liam R. E. Quin, Björn Höhrmann, Alan Stearns and Sara Soueidan for their careful reviews, comments, and corrections. Special thanks to CJ Gammon for graphical assets.

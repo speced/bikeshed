@@ -1,0 +1,499 @@
+<pre class="metadata">
+Title: Accelerated Shape Detection in Images
+Repository: wicg/shape-detection-api
+Status: ED
+ED: https://wicg.github.io/shape-detection-api
+Shortname: shape-detection-api
+Level: 1
+Editor: Miguel Casas-Sanchez, w3cid 82825, Google Inc., mcasas@google.com
+Abstract: This document describes an API providing access to accelerated shape detectors (e.g. human faces) for still images and/or live image feeds.
+Translation: zh-CN https://wicg.github.io/shape-detection-api/index-zh-cn.html
+Group: wicg
+!Participate: <a href="https://www.w3.org/community/wicg/">Join the W3C Community Group</a>
+!Participate: <a href="https://github.com/WICG/shape-detection-api">Fix the text through GitHub</a>
+</pre>
+
+<style>
+table {
+  border-collapse: collapse;
+  border-left-style: hidden;
+  border-right-style: hidden;
+  text-align: left;
+}
+table caption {
+  font-weight: bold;
+  padding: 3px;
+  text-align: left;
+}
+table td, table th {
+  border: 1px solid black;
+  padding: 3px;
+}
+</style>
+
+# Introduction # {#introduction}
+
+Photos and images constitute the largest chunk of the Web, and many include recognisable features, such as human faces or barcordes/QR codes. Detecting these features is computationally expensive, but would lead to interesting use cases e.g. face tagging, or web URL redirection. While hardware manufacturers have been supporting these features for a long time, Web Apps do not yet have access to these hardware capabilities, which makes the use of computationally demanding libraries necessary.
+
+<p class="note">
+Text Detection, despite being an interesting field, is not considered stable enough across neither computing platforms nor character sets to be standarized in the context of this document. For reference a sister informative specification is kept in [[text_detection]].
+</p>
+
+## Shape detection use cases
+
+Please see the <a href="https://github.com/WICG/shape-detection-api/blob/gh-pages/README.md">Readme/Explainer</a> in the repository.
+
+# Shape Detection API # {#api}
+
+Individual browsers MAY provide Detectors indicating the availability of hardware providing accelerated operation.
+
+## Image sources for detection ## {#image-sources-for-detection}
+
+<p class="note">
+This section is inspired by [[canvas2dcontext#image-sources-for-2d-rendering-contexts]].
+</p>
+
+{{ImageBitmapSource}} allows objects implementing any of a number of interfaces to be used as image sources for the detection process.
+
+* When an {{ImageBitmapSource}} object represents an {{HTMLImageElement}}, the element's image must be used as the source image. Specifically, when an {{ImageBitmapSource}} object represents an animated image in an {{HTMLImageElement}}, the user agent must use the default image of the animation (the one that the format defines is to be used when animation is not supported or is disabled), or, if there is no such image, the first frame of the animation.
+
+* When an {{ImageBitmapSource}} object represents an {{HTMLVideoElement}}, then the frame at the current playback position when the method with the argument is invoked must be used as the source image when processing the image, and the source image's dimensions must be the <a href="https://drafts.csswg.org/css2/conform.html#intrinsic">intrinsic dimensions</a> of the media resource (i.e. after any aspect-ratio correction has been applied).
+
+* When an {{ImageBitmapSource}} object represents an {{HTMLCanvasElement}}, the element's bitmap must be used as the source image.
+
+When the UA is required to use a given type of {{ImageBitmapSource}} as input argument for the<code>detect()</code> method of whichever detector, it MUST run these steps:
+
+* If any {{ImageBitmapSource}} have an effective script origin ([[HTML#concept-origin]]) which is not the same as the Document's effective script origin, then reject the Promise with a new {{DOMException}} whose name is {{SecurityError}}.
+
+* If the {{ImageBitmapSource}} is an {{HTMLImageElement}} object that is in the |broken| state, then reject the Promise with a new {{DOMException}} whose name is {{InvalidStateError}}, and abort any further steps.
+
+* If the {{ImageBitmapSource}} is an {{HTMLImageElement}} object that is not fully decodable then reject the Promise with a new {{DOMException}} whose name is {{InvalidStateError}}, and abort any further steps
+
+* If the {{ImageBitmapSource}} is an {{HTMLVideoElement}} object whose <a href="https://html.spec.whatwg.org/multipage/embedded-content.html#ready-states:dom-media-readystate">|readyState|</a> attribute is either |HAVE_NOTHING| or |HAVE_METADATA|, then reject the Promise with a new {{DOMException}} whose name is {{InvalidStateError}}, and abort any further steps.
+
+* If the {{ImageBitmapSource}} argument is an {{HTMLCanvasElement}} whose bitmap's |origin-clean| ([[HTML#concept-canvas-origin-clean]]) flag is false, then reject the Promise with a new {{DOMException}} whose name is {{SecurityError}}, and abort any further steps.
+
+Note that if the {{ImageBitmapSource}} is an object with either a horizontal dimension or a vertical dimension equal to zero, then the Promise will be simply resolved with an empty sequence of detected objects.
+
+## Face Detection API
+
+{{FaceDetector}} represents an underlying accelerated platform's component for detection of human faces in images. It can be created with an optional Dictionary of {{FaceDetectorOptions}}. It provides a single {{FaceDetector/detect()}} operation on an {{ImageBitmapSource}} which result is a Promise. This method MUST reject this promise in the cases detailed in [[#image-sources-for-detection]]; otherwise it MAY queue a task that utilizes the OS/Platform resources to resolve the Promise with a Sequence of {{DetectedFace}}s, each one essentially consisting on and delimited by a {{DetectedFace/boundingBox}}.
+
+<div class="example">
+Example implementations of face detection are e.g. <a href="https://developer.android.com/reference/android/media/FaceDetector.html">Android FaceDetector</a> (or the <a href="https://developers.google.com/android/reference/com/google/android/gms/vision/face/Face">Google Play Services vision library</a>), <a href="https://developer.apple.com/reference/coreimage/cifacefeature?language=objc">Apple's CIFaceFeature</a> or <a href="https://msdn.microsoft.com/library/windows/apps/windows.media.faceanalysis.facedetector.aspx">Windows 10 FaceDetector</a>.
+</div>
+
+<pre class="idl">
+[Exposed=(Window,Worker),
+ Constructor(optional FaceDetectorOptions faceDetectorOptions)]
+interface FaceDetector {
+  Promise&lt;sequence&lt;DetectedFace>> detect(ImageBitmapSource image);
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn constructor for="FaceDetector"><code>FaceDetector(optional FaceDetectorOptions faceDetectorOptions)</code></dfn></dt>
+  <dd>Constructs a new {{FaceDetector}} with the optional |faceDetectorOptions|.
+    <div class="note">
+    Detectors may potentially allocate and hold significant resources. Where possible, reuse the same {{FaceDetector}} for several detections.
+    </div>
+  </dd>
+  <dt><dfn method for="FaceDetector"><code>detect()</code></dfn></dt>
+  <dd>Tries to detect human faces in the {{ImageBitmapSource}} |image|.  The detected faces, if any, are returned as a sequence of {{DetectedFace}}s.</dd>
+</dl>
+
+### {{FaceDetectorOptions}} ### {#facedetectoroptions-section}
+
+<pre class="idl">
+dictionary FaceDetectorOptions {
+  unsigned short maxDetectedFaces;
+  boolean fastMode;
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn dict-member for="FaceDetectorOptions"><code>maxDetectedFaces</code></dfn></dt>
+  <dd>Maximum number of detected faces to be identified in the scene.</dd>
+  <dt><dfn dict-member for="FaceDetectorOptions"><code>fastMode</code></dfn></dt>
+  <dd>Hint to the UA to try and prioritise speed over accuracy by e.g. operating on a reduced scale or looking for large features.</dd>
+</dl>
+
+### {{DetectedFace}} ### {#detectedface-section}
+
+<pre class="idl">
+interface DetectedFace {
+  [SameObject] readonly attribute DOMRectReadOnly boundingBox;
+  [SameObject] readonly attribute FrozenArray&lt;Landmark>? landmarks;
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn attribute for="DetectedFace"><code>boundingBox</code></dfn></dt>
+  <dd>A rectangle indicating the position and extent of a detected feature aligned to the image axes.</dd>
+  <dt><dfn attribute for="DetectedFace"><code>landmarks</code></dfn></dt>
+  <dd>A series of features of interest related to the detected feature.</dd>
+</dl>
+
+<pre class="idl">
+dictionary Landmark {
+  required FrozenArray&lt;Point2D> location;
+  LandmarkType type;
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn dict-member for="Landmark"><code>location</code></dfn></dt>
+  <dd>A point or a <a>sequence</a> of points indicating the position of a detected landmark aligned to the image axes.</dd>
+  <dt><dfn dict-member for="Landmark"><code>type</code></dfn></dt>
+  <dd>Type of the landmark, if known.</dd>
+</dl>
+
+<pre class="idl">
+enum LandmarkType {
+  "mouth",
+  "eye",
+  "nose"
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn enum-value for="LandmarkType"><code>mouth</code></dfn></dt>
+  <dd>The landmark is identified as a human mouth.</dd>
+  <dt><dfn enum-value for="LandmarkType"><code>eye</code></dfn></dt>
+  <dd>The landmark is identified as a human eye.</dd>
+  <dt><dfn enum-value for="LandmarkType"><code>nose</code></dfn></dt>
+  <dd>The landmark is identified as a human nose.</dd>
+</dl>
+
+<div class="note">
+  Consider adding attributes such as, e.g.:
+  <pre>
+    [SameObject] readonly attribute unsigned long id;
+  </pre>
+  to {{DetectedFace}}.
+</div>
+
+## Barcode Detection API
+
+{{BarcodeDetector}} represents an underlying accelerated platform's component for detection of linear or two-dimensional barcodes in images.  It provides a single {{BarcodeDetector/detect()}} operation on an {{ImageBitmapSource}} which result is a Promise.  This method MUST reject this Promise in the cases detailed in [[#image-sources-for-detection]]; otherwise it MAY queue a task using the OS/Platform resources to resolve the Promise with a sequence of {{DetectedBarcode}}s, each one essentially consisting on and delimited by a {{DetectedBarcode/boundingBox}} and a series of {{Point2D}}s, and possibly a {{DetectedBarcode/rawValue}} decoded {{DOMString}}.
+
+<div class="example">
+Example implementations of Barcode/QR code detection are e.g. <a href="https://developers.google.com/android/reference/com/google/android/gms/vision/barcode/package-summary">Google Play Services</a> or <a href="https://developer.apple.com/reference/coreimage/ciqrcodefeature?language=objc">Apple's CIQRCodeFeature</a>.
+</div>
+
+<pre class="idl">
+[Exposed=(Window,Worker),
+ Constructor(optional BarcodeDetectorOptions barcodeDetectorOptions)]
+interface BarcodeDetector {
+  readonly attribute FrozenArray&lt;BarcodeFormat> supportedFormats;
+
+  Promise&lt;sequence&lt;DetectedBarcode>> detect(ImageBitmapSource image);
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn constructor for="BarcodeDetector"><code>BarcodeDetector(optional BarcodeDetectorOptions barcodeDetectorOptions)</code></dfn></dt>
+  <dd>Constructs a new {{BarcodeDetector}} with the optional |barcodeDetectorOptions|, if present.
+    <div class="note">
+    Detectors may potentially allocate and hold significant resources. Where possible, reuse the same {{BarcodeDetector}} for several detections.
+    </div>
+  </dd>
+
+  <dt><dfn attribute for="BarcodeDetector"><code>supportedFormats</code></dfn></dt>
+  <dd> List of {{BarcodeFormat}}s supported by the platform.
+
+  <div class="note">
+    The list of supported {{BarcodeFormat}}s is platform dependent, some examples are the ones supported by <a href="https://developers.google.com/android/reference/com/google/android/gms/vision/barcode/BarcodeDetector.Builder.html#setBarcodeFormats(int)">Google Play Services</a> and <a href="https://developer.apple.com/documentation/coreimage/ciqrcodefeature?preferredLanguage=occ#overview">Apple's QICRCodeFeature</a>.
+  </div>
+  </dd>
+
+  <dt><dfn method for="BarcodeDetector"><code>detect(ImageBitmapSource image)</code></dfn></dt>
+  <dd>Tries to detect barcodes in the {{ImageBitmapSource}} |image|.</dd>
+</dl>
+
+### {{BarcodeDetectorOptions}} ### {#barcodedetectoroptions-section}
+
+<pre class="idl">
+dictionary BarcodeDetectorOptions {
+  sequence&lt;BarcodeFormat> formats;
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn dict-member for="BarcodeDetectorOptions"><code>formats</code></dfn></dt>
+  <dd>A series of {{BarcodeFormat}}s to search for in the subsequent {{detect()}} calls.</dd>
+</dl>
+
+### {{DetectedBarcode}} ### {#detectedbarcode-section}
+
+<pre class="idl">
+interface DetectedBarcode {
+  [SameObject] readonly attribute DOMRectReadOnly boundingBox;
+  [SameObject] readonly attribute DOMString rawValue;
+  [SameObject] readonly attribute BarcodeFormat format;
+  [SameObject] readonly attribute FrozenArray&lt;Point2D> cornerPoints;
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn attribute for="DetectedBarcode"><code>boundingBox</code></dfn></dt>
+  <dd>A rectangle indicating the position and extent of a detected feature aligned to the image</dd>
+
+  <dt><dfn attribute for="DetectedBarcode"><code>rawValue</code></dfn></dt>
+  <dd>String decoded from the barcode. This value might be multiline.</dd>
+
+  <dt><dfn attribute for="DetectedBarcode"><code>format</code></dfn></dt>
+  <dd>Detect {{BarcodeFormat}}.</dd>
+
+  <dt><dfn attribute for="DetectedBarcode"><code>cornerPoints</code></dfn></dt>
+  <dd>A <a>sequence</a> of corner points of the detected barcode, in clockwise direction and  starting with top-left. This is not necessarily a square due to possible perspective distortions.</dd>
+</dl>
+
+### {{BarcodeFormat}} ### {#barcodeformat-section}
+
+<pre class="idl">
+  enum BarcodeFormat {
+    "aztec",
+    "code_128",
+    "code_39",
+    "code_93",
+    "codabar",
+    "data_matrix",
+    "ean_13",
+    "ean_8",
+    "itf",
+    "pdf417",
+    "qr_code",
+    "unknown",
+    "upc_a",
+    "upc_e"
+  };
+</pre>
+
+<dl class="domintro">
+  <dt><dfn enum-value for="BarcodeFormat"><code>aztec</code></dfn></dt>
+  <dd>This entry represents a square two-dimensional matrix following [[iso24778]] and with a square bullseye pattern at their centre, thus resembling an Aztec pyramid. Does not require a surrounding blank zone.
+  </dd>
+  <dt><dfn enum-value for="BarcodeFormat"><code>code_128</code></dfn></dt>
+  <dd><dfn>Code 128</dfn> is a linear (one-dimensional), bidirectionally-decodable, self-checking barcode following [[iso15417]] and able to encode all 128 characters of ASCII (hence the naming).
+  </dd>
+  <dt><dfn enum-value for="BarcodeFormat"><code>code_39</code></dfn></dt>
+  <dd>This part talks about the <dfn>Code 39</dfn> barcode. It is a discrete and variable-length barcode type.
+  [[iso16388]]
+  </dd>
+  <dt><dfn enum-value for="BarcodeFormat"><code>code_93</code></dfn></dt>
+  <dd> Code 93 is a linear, continuous symbology with a variable length following [[bc5]]. It offers a larger information density than <a>Code 128</a> and the visually similar <a>Code 39</a>. Code 93 is used primarily by Canada Post to encode supplementary delivery information.</dd>
+  <dt><dfn enum-value for="BarcodeFormat"><code>codabar</code></dfn></dt>
+  <dd>Codabar is a linear barcode symbology developed in 1972 by Pitney Bowes Corp. (
+  </dd>
+
+  <dt><dfn enum-value for="BarcodeFormat"><code>data_matrix</code></dfn></dt>
+  <dd> Data Matrix is an orientation-independent two-dimensional barcode composed of black and white modules arranged in either a square or rectangular pattern following [[iso16022]].</dd>
+
+  <dt><dfn enum-value for="BarcodeFormat"><code>ean_13</code></dfn></dt>
+  <dd><dfn>EAN-13</dfn> is a linear barcode based on the <a>UPC-A</a> standard and defined in [[iso15420]]. It was originally developed by the International Article Numbering Association (EAN) in Europe as a superset of the original 12-digit Universal Product Code (UPC) system developed in the United States (<a>UPC-A</a> codes are represented in EAN-13 with the first character set to <var>0</var>).</dd>
+  <dt><dfn enum-value for="BarcodeFormat"><code>ean_8</code></dfn></dt>
+  <dd>EAN-8 is a linear barcode defined in [[iso15420]] and derived from <a>EAN-13</a>.</dd>
+
+  <dt><dfn enum-value for="BarcodeFormat"><code>itf</code></dfn></dt>
+  <dd>ITF14 barcode is the GS1 implementation of an Interleaved 2 of 5 bar code to encode a Global Trade Item  Number. It is continuous, self-checking, bidirectionally decodable and it will always encode 14 digits.
+  was once used in the package delivery industry but replaced by <a>Code 128</a>.
+  [[bc2]]
+  </dd>
+
+  <dt><dfn enum-value for="BarcodeFormat"><code>pdf417</code></dfn></dt>
+  <dd>PDF417 refers to a continuous two-dimensional barcode symbology format with multiple rows and columns, bi-directionally decodable and according to the Standard [[iso15438]].</dd>
+
+  <dt><dfn enum-value for="BarcodeFormat"><code>qr_code</code></dfn></dt>
+  <dd>QR Code is a two-dimensional barcode respecting the Standard [[iso18004]]. The information encoded can be text, URL or other data.</dd>
+
+  <dt><dfn enum-value for="BarcodeFormat"><code>unknown</code></dfn></dt>
+  <dd>This value is used by the platform to signify that it does not know or specify which barcode format is being detected or supported.</dd>
+
+  <dt><dfn enum-value for="BarcodeFormat"><code>upc_a</code></dfn></dt>
+  <dd><dfn>UPC-A</dfn> is one of the most common linear barcode types and is widely applied to retail in the United States.  Define in [[iso15420]], it represents digits by strips of bars and spaces, each digit being associated to a unique pattern of 2 bars and 2 spaces, both of variable width.  UPC-A can encode 12 digits that are uniquely assigned to each trade item, and it'ss technically a subset of <a>EAN-13</a> (UPC-A codes are represented in <a>EAN-13</a> with the first character set to <var>0</var>). </dd>
+
+  <dt><dfn enum-value for="BarcodeFormat"><code>upc_e</code></dfn></dt>
+  <dd>UPC-E Barcode is a variation of <a>UPC-A</a> defined in [[iso15420]], compressing out unnecessary zeros for a more compact barcode.</dd>
+</dl>
+
+# Examples # {#examples}
+
+<i>This section is non-normative.</i>
+
+<p class="note">
+Slightly modified/extended versions of these examples (and more) can be found in
+ e.g. <a href="https://codepen.io/collection/DwWVJj/">this codepen collection</a>.
+</p>
+
+## Platform support for a given detector
+
+<div class="note">
+The following example can also be found in e.g. <a
+href="https://codepen.io/miguelao/pen/PbYpMv?editors=0010">this codepen</a>
+with minimal modifications.
+</div>
+
+<div class="example" highlight="javascript">
+
+<pre>
+if (window.FaceDetector == undefined) {
+	console.error('Face Detection not supported on this platform');
+}
+if (window.BarcodeDetector == undefined) {
+  console.error('Barcode Detection not supported on this platform');
+}
+</pre>
+</div>
+
+## Face Detection
+
+<div class="note">
+The following example can also be found in e.g.
+<a href="https://codepen.io/miguelao/pen/ORYbbm?editors=0010">this codepen</a> (or <a href="https://codepen.io/miguelao/pen/PmJWro">this one</a>, with landmarks overlay).
+</div>
+
+<div class="example" highlight="javascript">
+<pre>
+let faceDetector = new FaceDetector({fastMode: true, maxDetectedFaces: 1});
+// Assuming |theImage| is e.g. a &lt;img> content, or a Blob.
+
+faceDetector.detect(theImage)
+.then(detectedFaces => {
+  for (const face of detectedFaces) {
+    console.log(
+        ' Face @ (${face.boundingBox.x}, ${face.boundingBox.y}),' +
+        ' size ${face.boundingBox.width}x${face.boundingBox.height}');
+  }
+}).catch(() => {
+  console.error("Face Detection failed, boo.");
+})
+</pre>
+</div>
+
+## Barcode Detection
+
+<div class="note">
+The following example can also be found in e.g.
+<a href="https://codepen.io/miguelao/pen/wgrYjZ?editors=0010">this codepen</a>.
+</div>
+
+<div class="example" highlight="javascript">
+<pre>
+let barcodeDetector = new BarcodeDetector();
+// Assuming |theImage| is e.g. a &lt;img> content, or a Blob.
+
+barcodeDetector.detect(theImage)
+.then(detectedCodes => {
+  for (const barcode of detectedCodes) {
+    console.log(' Barcode ${barcode.rawValue}' +
+        ' @ (${barcode.boundingBox.x}, ${barcode.boundingBox.y}) with size' +
+        ' ${barcode.boundingBox.width}x${barcode.boundingBox.height}');
+  }
+}).catch(() => {
+  console.error("Barcode Detection failed, boo.");
+})
+</pre>
+</div>
+
+<pre class="anchors">
+spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/#
+    type: interface
+        text: Array; url: sec-array-objects
+        text: Promise; url:sec-promise-objects
+        text: TypeError; url: sec-native-error-types-used-in-this-standard-typeerror
+</pre>
+
+<pre class="anchors">
+type: interface; text: Point2D; url: https://w3c.github.io/mediacapture-image/#Point2D;
+</pre>
+
+<pre class="anchors">
+type: interface; text: DOMString; url: https://heycam.github.io/webidl/#idl-DOMString; spec: webidl
+</pre>
+
+<pre class="link-defaults">
+spec: html
+    type: dfn
+        text: allowed to show a popup
+        text: in parallel
+        text: incumbent settings object
+</pre>
+
+<pre class="biblio">
+{
+  "iso15417": {
+      "href": "https://www.iso.org/standard/43896.html",
+      "title": "Information technology -- Automatic identification and data capture techniques -- Code 128 bar code symbology specification",
+      "publisher": "ISO/IEC",
+      "date": "June 2007"
+  },
+  "iso15420": {
+      "href": "https://www.iso.org/standard/46143.html",
+      "title": "Information technology -- Automatic identification and data capture techniques -- EAN/UPC bar code symbology specification",
+      "publisher": "ISO/IEC",
+      "date": "Decemver 2009"
+  },
+  "iso15438": {
+      "href": "https://www.iso.org/standard/65502.html",
+      "title": "Information technology -- Automatic identification and data capture techniques -- PDF417 bar code symbology specification",
+      "publisher": "ISO/IEC",
+      "date": "September 2015"
+  },
+  "iso16022": {
+      "href": "https://www.iso.org/standard/44230.html",
+      "title": "Information technology -- Automatic identification and data capture techniques -- Data Matrix bar code symbology specification",
+      "publisher": "ISO/IEC",
+      "date": "September 2009"
+  },
+  "iso16388": {
+      "href": "https://www.iso.org/standard/43897.html",
+      "title": "nformation technology -- Automatic identification and data capture techniques -- Code 39 bar code symbology specification",
+      "publisher": "ISO/IEC",
+      "date": "May 2007"
+  },
+  "iso18004": {
+      "href": "https://www.iso.org/standard/62021.html",
+      "title": "Information technology -- Automatic identification and data capture techniques -- QR Code bar code symbology specification",
+      "publisher": "ISO/IEC",
+      "date": "February 2015"
+  },
+  "iso24778": {
+      "href": "https://www.iso.org/standard/62021.html",
+      "title": "Information technology -- Automatic identification and data capture techniques -- Aztec Code bar code symbology specification",
+      "publisher": "ISO/IEC",
+      "date": "February 2008"
+  },
+  "bc2" :{
+      "title": "ANSI/AIM-BC2, Uniform Symbol Specification - Interleaved 2 of 5",
+      "publisher": "ANSI",
+      "date": "1995"
+  },
+  "bc5" :{
+      "title": "ANSI/AIM-BC5, Uniform Symbol Specification - Code 93",
+      "publisher": "ANSI",
+      "date": "1995"
+  },
+  "wikipedia": {
+      "href": "https://en.wikipedia.org/wiki/Object-class_detection",
+      "title": "Object-class Detection Wikipedia Entry",
+      "publisher": "Wikipedia",
+      "date": "14 September 2016"
+  },
+  "canvas2dcontext": {
+      "authors": [ "Rik Cabanier", "Jatinder Mann", "Jay Munro", "Tom Wiltzius",
+                   "Ian Hickson"],
+      "href": "https://www.w3.org/TR/2dcontext/",
+      "title": "HTML Canvas 2D Context",
+      "status": "REC"
+  },
+  "text_detection": {
+      "authors": [ "Miguel Casas-Sanchez" ],
+      "href": "https://wicg.github.io/shape-detection-api/text.html",
+      "title": "Accelerated Text Detection in Images",
+      "publisher": "W3C Platform Incubator Community Group",
+      "date": "21 October 2017",
+      "status": "ED"
+  }
+}
+</pre>

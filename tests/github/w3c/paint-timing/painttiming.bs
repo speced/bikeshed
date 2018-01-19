@@ -1,0 +1,132 @@
+<pre class='metadata'>
+Title: Paint Timing
+Group: webperf
+Shortname: paint-timing
+Level: 1
+ED: https://w3c.github.io/paint-timing/
+TR: https://www.w3.org/TR/paint-timing/
+Status: ED
+Editor: Shubhie Panicker, Google https://google.com, panicker@google.com
+Repository: w3c/paint-timing
+Abstract: This document defines an API that can be used to capture a series of key moments (First Paint, First Contentful Paint) during pageload which developers care about.
+Default Highlight: js
+</pre>
+
+<pre class=anchors>
+urlPrefix: https://www.w3.org/TR/performance-timeline-2/; spec: PERFORMANCE-TIMELINE-2;
+    type: interface; url: #the-performanceentry-interface; text: PerformanceEntry;
+    type: attribute; for: PerformanceEntry;
+        text: name; url: #dom-performanceentry-name
+        text: entryType; url: #dom-performanceentry-entrytype
+        text: startTime; url: #dom-performanceentry-starttime
+        text: duration; url: #dom-performanceentry-duration
+urlPrefix: https://www.w3.org/TR/hr-time-2/#idl-def-domhighrestimestamp; spec: HR-TIME-2; type: typedef; text: DOMHighResTimeStamp
+</pre>
+ 
+Introduction {#intro}
+=====================
+Load is not a single moment in time — it's an experience that no one metric can fully capture. There are multiple moments during the load experience that can affect whether a user perceives it as "fast" or "slow".
+
+First Paint (FP) is the first of these key moments, followed by First Contentful Paint (FCP). These metrics mark the points, immediately after navigation, when the browser renders pixels to the screen. This is important to the user because it answers the question: is it happening?
+
+The primary difference between the two metrics is FP marks the point when the browser renders anything that is visually different from what was on the screen prior to navigation. By contrast, FCP is the point when the browser renders the first bit of content from the DOM, which may be text, an image, SVG, or even a canvas element.
+
+Usage example {#example}
+------------------------
+
+<pre class="example highlight">
+    var observer = new PerformanceObserver(function(list) {
+        var perfEntries = list.getEntries();
+        for (var i = 0; i < perfEntries.length; i++) {
+            // Process entries
+            // report back for analytics and monitoring
+            // ...
+        }
+    });
+
+    // register observer for long task notifications
+    observer.observe({entryTypes: ["paint"]});
+</pre>
+
+Terminology {#sec-terminology}
+==============================
+
+<dfn export>Paint</dfn>: the browser has performed a "paint" (or "render") when it has converted the render tree to pixels on the screen.
+This is formally defined as the when <a href="https://html.spec.whatwg.org/multipage/webappapis.html#event-loop-processing-model">"update the rendering"</a> happens in event loop processing.
+
+    NOTE: The rendering pipeline is very complex, and the timestamp should be the latest timestamp the browser is able to note in this pipeline (best effort). Typically the time at which the frame is submitted to the OS for display is recommended for this API.
+
+<dfn export>First Paint</dfn> entry contains a {{DOMHighResTimeStamp}} reporting the time when the browser first rendered after navigation. This excludes the default background paint, but includes non-default background paint and the enclosing box of an iframe. This is the first key moment developers care about in page load – when the browser has started to render the page.
+
+<dfn export>First Contentful Paint</dfn> entry contains a {{DOMHighResTimeStamp}} reporting the time when the browser first rendered any text, image (including background images), non-white canvas or SVG. This excludes any content of iframes, but includes text with pending webfonts. This is the first time users could start consuming page content.
+
+Paint Timing {#sec-paint-timing}
+=======================================
+
+Paint timing involves the following new interface
+
+{{PerformancePaintTiming}} interface {#sec-PerformancePaintTiming}
+------------------------------------------------------------------------
+
+<pre class="idl">
+    interface PerformancePaintTiming : PerformanceEntry {};
+</pre>
+
+{{PerformancePaintTiming}} extends the following attributes of {{PerformanceEntry}} interface:
+
+* The {{PerformanceEntry/name}} attribute must return {{DOMString}} for minimal frame attribution. Possible values of name are:
+    * <code>first-paint</code>: for First Paint
+    * <code>first-contentful-paint</code>: for First Contentful Paint
+* The {{PerformanceEntry/entryType}} attribute must return <code>"paint"</code>.
+* The {{PerformanceEntry/startTime}} attribute MUST return a {{DOMHighResTimeStamp}} of when the paint occured.
+* The {{PerformanceEntry/duration}} attribute MUST return 0.
+
+Processing model {#sec-processing-model}
+========================================
+
+Modifications to other specifications {#mod}
+--------------------------------------------
+
+### HTML: <a href="https://html.spec.whatwg.org/multipage/webappapis.html#event-loop-processing-model">event loop processing model</a> ### {#html-event-loop-processing-model}
+
+During step 7.12 in "update the rendering":
+
+* For each fully active Document in docs, update the rendering or user interface of that Document and its browsing context to reflect the current state, and invoke [[#mark-paint-timing]] while doing so.
+
+
+Reporting Paint Timing {#sec-reporting-paint-timing}
+--------------------------------------------------------
+
+<h4 dfn>Mark Paint Timing</h4>
+
+Perform the following steps:
+* If this instance of update the rendering is the first paint, then record the timestamp as |paint-timestamp| and invoke [[#report-paint-timing]] algorithm with two arguments: string "first-paint" and |paint-timestamp|.
+
+    NOTE: First paint excludes the default background paint, but includes non-default background paint.
+
+* If this instance of update the rendering is the first contentful paint, then record the timestamp as |paint-timestamp| and invoke [[#report-paint-timing]] algorithm with two arguments: string "first-contentful-paint" and |paint-timestamp|.
+
+    NOTE: This paint must include text, image (including background images), non-white canvas or SVG.
+
+* Otherwise, do nothing and return.
+
+    NOTE: A parent frame should not be aware of the paint events from its child iframes, and vice versa. This means that a frame that contains just iframes will have first paint (due to the enclosing boxes of the iframes) but no first contentful paint.
+
+<h4 dfn>Report Paint Timing</h4>
+
+Given two arguments |paint-type| and |paint-timestamp|, perform the following steps:
+* Create a new {{PerformancePaintTiming}} object |newEntry| and set its attributes as follows:
+    1. Set |newEntry|'s name attribute to |paint-type|
+    2. Set |newEntry|'s entryType attribute to <code>paint</code>
+    3. Set |newEntry|'s startTime attribute to |paint-timestamp|
+    4. Set |newEntry|'s duration attribute to 0.
+* <a href="https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry">Add the PerformanceEntry</a> |newEntry| object.
+
+
+
+<!-- ============================================================ -->
+<h2 id=acknowledgements>Acknowledgements</h2>
+<!-- ============================================================ -->
+
+Special thanks to <a href="https://github.com/w3c/paint-timing/graphs/contributors">all the contributors</a> for their technical input and suggestions that led to improvements to this
+specification.

@@ -1,0 +1,791 @@
+<pre class="metadata">
+Title: Subresource Integrity
+Status: ED
+Deadline: 2015-12-15
+ED: https://w3c.github.io/webappsec-subresource-integrity/
+TR: http://www.w3.org/TR/SRI/
+Previous Version: http://www.w3.org/TR/2015/WD-SRI-20151006/
+Shortname: SRI
+Level: 1
+Editor: Devdatta Akhawe, Dropbox Inc., http://devd.me, dev.akhawe@gmail.com
+Editor: Frederik Braun 68466, Mozilla, https://frederik-braun.com, fbraun@mozilla.com
+Editor: François Marier, Mozilla, https://fmarier.org, francois@mozilla.com
+Editor: Joel Weinberger, Google Inc., https://joelweinberger.us, jww@google.com
+Abstract:
+  This specification defines a mechanism by which user agents may verify that a
+  fetched resource has been delivered without unexpected manipulation.
+Group: webappsec
+Repository: w3c/webappsec-subresource-integrity
+Indent: 2
+Version History: https://github.com/w3c/webappsec-subresource-integrity/commits/gh-pages
+!Implementation status: <a href="https://code.google.com/p/chromium/issues/detail?id=355467">Blink/Chromium</a><br /><a href="https://bugzilla.mozilla.org/show_bug.cgi?id=992096">Gecko</a>
+!Implementation report: <a href="https://github.com/w3c/webappsec-subresource-integrity/wiki/Links">https://github.com/w3c/webappsec-subresource-integrity/wiki/Links</a>
+
+Markup Shorthands: css off, markdown on
+Ignored Vars: src, resource, val
+</pre>
+
+<pre class="anchors">
+spec: ABNF; urlPrefix: https://tools.ietf.org/html/rfc5234
+  type: dfn
+    text: VCHAR; url: appendix-B.1
+    text: WSP; url: appendix-B.1
+  type: grammar
+    text: ALPHA; url: appendix-B.1
+    text: DIGIT; url: appendix-B.1
+    text: VCHAR; url: appendix-B.1
+    text: WSP; url: appendix-B.1
+
+spec: CSP; urlPrefix: https://w3c.github.io/webappsec-csp/
+  type: dfn
+    text: Content Security Policy; urlPrefix: #
+    text: policy; url: policy
+    text: directive; url: directives
+    text: value; for: directive; url: directive-value
+    text: pre-request check; url: directive-pre-request-check
+    text: create a violation object for global; url: create-violation-for-global
+    text: report violation; url: report-violation
+    text: disposition; for: policy
+
+spec: Fetch; urlPrefix: https://fetch.spec.whatwg.org
+  type: dfn
+    text: fetch; url: concept-fetch
+    text: request; url: concept-request
+    text: response type; url: concept-response-type
+    text: destination; url: concept-request-destination
+
+spec: HTML5; urlPrefix: http://www.w3.org/TR/html5/
+  type: dfn
+    text: global object; url: global-object
+    urlPrefix: document-metadata.html
+      text: obtain a resource; url: concept-link-obtain
+    urlPrefix: infrastructure.html
+      text: CORS settings attribute; url: #cors-settings-attributes
+      text: reflect; url: #reflect
+      text: split a string on spaces; url: #split-a-string-on-spaces
+    urlPrefix: scripting-1.html
+      text: prepare a script; url: #prepare-a-script
+      text: splitting tokens on spaces; url: split-a-string-on-spaces
+      text: ASCII case-insensitive match; url: ascii-case-insensitive
+  type: interface
+    urlPrefix: dom.html
+      text: Document
+
+spec: RFC7230; urlPrefix: https://tools.ietf.org/html/rfc7230
+  type: grammar
+    text: RWS; url: section-3.2.3
+    text: token; url: section-3.2.6
+
+spec: RFC7234; urlPrefix: https://tools.ietf.org/html/rfc7234
+  type: dfn
+    text: Cache-Control; url: section-5.2
+    text: no-transform; url: section-5.2.1.6
+
+spec: SECURE-CONTEXTS; urlPrefix: "http://www.w3.org/TR/powerful-features/"
+  type: dfn
+    text: Secure Context; urlPrefix: #
+
+spec: SHA2; urlPrefix: http://csrc.nist.gov/publications/fips/fips180-4/fips-180-4.pdf
+  type: dfn
+    text: SHA-1; url: #
+    text: SHA-2; url: #
+    text: SHA-256; url: #
+    text: SHA-384; url: #
+    text: SHA-512; url: #
+</pre>
+
+<pre class="biblio">
+{
+  "SECURE-CONTEXTS": {
+    "authors": [ "Mike West", "Yan Zhu" ],
+    "href": "https://w3c.github.io/webappsec-secure-contexts/",
+    "title": "Secure Contexts",
+    "status": "WD",
+    "publisher": "W3C"
+  },
+  "SHA2": {
+    "href": "http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf",
+    "title": "FIPS PUB 180-4, Secure Hash Standard"
+  }
+}
+</pre>
+
+  <!-- ####################################################################### -->
+
+  # Introduction # {#intro}
+
+  Sites and applications on the web are rarely composed of resources from
+  only a single origin. For example, authors pull scripts and styles from a
+  wide variety of services and content delivery networks, and must trust
+  that the delivered representation is, in fact, what they expected to
+  load. If an attacker can trick a user into downloading content from
+  a hostile server (via DNS [[RFC1035]] poisoning, or other such means), the author has
+  no recourse. Likewise, an attacker who can replace the file on the Content
+  Delivery Network (CDN) server has the ability to inject arbitrary content.
+
+  Delivering resources over a secure channel mitigates some of this risk: with
+  TLS [[TLS]], HSTS [[RFC6797]], and pinned public keys
+  [[RFC7469]], a user agent can be fairly certain
+  that it is indeed speaking with the server it believes it's talking to. These
+  mechanisms, however, authenticate <em>only</em> the server, <em>not</em> the content. An
+  attacker (or administrator) with access to the server can manipulate content with
+  impunity. Ideally, authors would not only be able to pin the keys of a
+  server, but also pin the <em>content</em>, ensuring that an exact representation of
+  a resource, and <em>only</em> that representation, loads and executes.
+
+  This document specifies such a validation scheme, extending two HTML elements
+  with an `integrity` attribute that contains a cryptographic hash
+  of the representation of the resource the author expects to load. For instance,
+  an author may wish to load some framework from a shared server rather than hosting it
+  on their own origin. Specifying that the <em>expected</em> SHA-384 hash of
+  `https://example.com/example-framework.js`
+  is `Li9vy3DqF8tnTXuiaAJuML3ky+er10rcgNR/VqsVpcw+ThHmYcwiB1pbOxEbzJr7` means
+  that the user agent can verify that the data it loads from that URL matches
+  that expected hash before executing the JavaScript it contains. This
+  integrity verification significantly reduces the risk that an attacker can
+  substitute malicious content.
+
+  This example can be communicated to a user agent by adding the hash to a
+  `script` element, like so:
+
+  <div class="example">
+  <pre>
+    &lt;script src="https://example.com/example-framework.js"
+            integrity="sha384-Li9vy3DqF8tnTXuiaAJuML3ky+er10rcgNR/VqsVpcw+ThHmYcwiB1pbOxEbzJr7"
+            crossorigin="anonymous"&gt;&lt;/script&gt;
+  </pre>
+  </div>
+
+  Scripts, of course, are not the only response type which would benefit
+  from integrity validation. The scheme specified here also applies to `link`
+  and future versions of this specification are likely to expand this coverage.
+
+  ## Goals ## {#goals}
+
+  1.  Compromise of a third-party service should not automatically mean
+      compromise of every site which includes its scripts. Content authors
+      will have a mechanism by which they can specify expectations for
+      content they load, meaning for example that they could load a
+      <em>specific</em> script, and not <em>any</em> script that happens to have a
+      particular URL.
+
+  2.  The verification mechanism should have error-reporting functionality which
+      would inform the author that an invalid response was received.
+
+  ## Use Cases/Examples ## {#examples}
+
+  ### Resource Integrity ### {#resource-integrity}
+
+  *   An author wishes to use a content delivery network to improve performance
+      for globally-distributed users. It is important, however, to ensure that
+      the CDN's servers deliver <em>only</em> the code the author expects them to
+      deliver. To mitigate the risk that a CDN compromise (or unexpectedly malicious
+      behavior) would change that site in unfortunate ways, the following
+      <a>integrity metadata</a> is added to the `link` element included on the page:
+
+      <div class="example">
+      <pre>
+          &lt;link rel="stylesheet" href="https://site53.example.net/style.css"
+                integrity="sha384-+/M6kredJcxdsqkczBUjMLvqyHb1K/JThDXWsBVxMEeZHEaMKEOEct339VItX1zB"
+                crossorigin="anonymous"&gt;
+      </pre>
+      </div>
+
+  *   An author wants to include JavaScript provided by a third-party
+      analytics service. To ensure that only the code that has been carefully
+      reviewed is executed, the author generates <a>integrity metadata</a> for
+      the script, and adds it to the `script` element:
+
+      <div class="example">
+      <pre>
+          &lt;script src="https://analytics-r-us.example.com/v1.0/include.js"
+                  integrity="sha384-MBO5IDfYaE6c6Aao94oZrIOiC6CGiSN2n4QUbHNPhzk5Xhm0djZLQqTpL0HzTUxk"
+                  crossorigin="anonymous"&gt;&lt;/script&gt;
+      </pre>
+      </div>
+
+  *   A user agent wishes to ensure that JavaScript code running in high-privilege HTML 
+      contexts (for example, a browser's New Tab page) aren't manipulated before display.
+      <a>Integrity metadata</a> mitigates the risk that altered JavaScript will run
+      in these pages' high-privilege contexts.
+
+  <!-- ####################################################################### -->
+
+  # Key Concepts and Terminology # {#terms}
+
+  This section defines several terms used throughout the document.
+
+  The term <dfn>digest</dfn> refers to the base64 encoded result of
+  executing a cryptographic hash function on an arbitrary block of data.
+
+  The terms <dfn>origin</dfn>, <dfn>cross-origin</dfn>, and <dfn>same-origin</dfn>
+  are defined by the Origin specification. [[!ORIGIN]]
+
+  The <dfn>representation data</dfn> and <dfn>content encoding</dfn> of a resource
+  are defined by <a href="https://tools.ietf.org/html/rfc7231#section-3">Section 3
+  of RFC 7231</a>. [[!RFC7231]]
+
+  A <dfn>base64 encoding</dfn> is defined in <a
+  href="https://tools.ietf.org/html/rfc4648#section-4">Section 4 of RFC 4648</a>.
+  [[!RFC4648]]
+
+  The <a>SHA-256</a>, <a>SHA-384</a>, and <a>SHA-512</a> are part
+  of the <a>SHA-2</a> set of cryptographic hash functions defined by the
+  NIST. [[!SHA2]]
+
+  ## Grammatical Concepts ## {#grammar-concepts}
+
+  The Augmented Backus-Naur Form (ABNF) notation used in this document is
+  specified in RFC5234. [[!ABNF]]
+
+  <a href="https://tools.ietf.org/html/rfc5234#appendix-B.1">Appendix B.1</a> of
+  [[!ABNF]] defines <a>VCHAR</a> (printing characters).
+
+  <a>WSP</a> (white space) characters are defined in <a href="http://www.w3.org/TR/html5/infrastructure.html#space-character">Section 2.4.1 Common parser idioms</a> of the HTML 5 specification as
+  <code>White_Space characters</code>. [[!HTML5]]
+
+  </section>
+
+  <!-- ####################################################################### -->
+
+  # Framework # {#framework}
+
+  The integrity verification mechanism specified here boils down to the
+  process of generating a sufficiently strong cryptographic digest for a
+  resource, and transmitting that digest to a user agent so that it may be
+  used to verify the response.
+
+  ## Integrity metadata ## {#integrity-metadata-description}
+
+  To verify the integrity of a response, a user agent requires <dfn>integrity
+  metadata</dfn> as part of the <a>request</a>. This metadata consists of the
+  following pieces of information:
+
+  * cryptographic hash function ("alg")
+  * <a>digest</a> ("val")
+  * options ("opt")
+
+  The hash function and digest MUST be provided in order to validate a
+  response's integrity.
+
+  Note: At the moment, no options are defined. However, future versions of
+  the spec may define options, such as MIME types [[!MIME-TYPES]].
+
+  This metadata MUST be encoded in the same format as the `hash-source` (without
+  the single quotes) in <a
+  href="http://www.w3.org/TR/CSP2/#source-list-syntax">section 4.2 of the Content
+  Security Policy Level 2 specification</a>.
+
+  For example, given a script resource containing only the string `alert(\'Hello,
+  world.\');`, an author might choose <a>SHA-384</a> as a hash function.
+  `H8BRh8j48O9oYatfu5AZzq6A9RINhZO5H16dQZngK7T62em8MUt1FLm52t+eX6xO` is the <a
+  lt="base64 encoding">base64 encoded</a> digest that results. This can be encoded
+  as follows:
+
+  <div class="example">
+  <pre>
+      sha384-H8BRh8j48O9oYatfu5AZzq6A9RINhZO5H16dQZngK7T62em8MUt1FLm52t+eX6xO
+  </pre>
+  </div>
+
+  <div class="note">
+  Digests may be generated using any number of utilities. <a
+  href="https://www.openssl.org/">OpenSSL</a>, for example, is quite commonly
+  available. The example in this section is the result of the following command
+  line:
+
+  <pre>
+      echo -n "alert('Hello, world.');" | openssl dgst -sha384 -binary | openssl base64 -A
+  </pre>
+  </div>
+
+  ## Cryptographic hash functions ## {#hash-functions}
+
+  Conformant user agents MUST support the <a>SHA-256</a>, <a>SHA-384</a>,
+  and <a>SHA-512</a> cryptographic hash functions for use as part of a
+  request's <a>integrity metadata</a> and MAY support additional hash functions.
+
+  User agents SHOULD refuse to support known-weak hashing functions like MD5 or
+  SHA-1 and SHOULD restrict supported hashing functions to those known to be
+  collision-resistant. Additionally, user agents SHOULD re-evaluate their
+  supported hash functions on a regular basis and deprecate support for those
+  functions that have become insecure. See [[#hash-collision-attacks]].
+
+  ### Agility ### {#agility}
+
+  Multiple sets of <a>integrity metadata</a> may be associated with a single
+  resource in order to provide agility in the face of future cryptographic discoveries.
+  For example, the resource described in the previous section may be described
+  by either of the following hash expressions:
+
+  <div class="example">
+  <pre>
+      sha384-H8BRh8j48O9oYatfu5AZzq6A9RINhZO5H16dQZngK7T62em8MUt1FLm52t+eX6xO
+      sha512-Q2bFTOhEALkN8hOms2FKTDLy7eugP2zFZ1T8LCvX42Fp3WoNr3bjZSAHeOsHrbV1Fu9/A0EzCinRE7Af1ofPrw==
+  </pre>
+  </div>
+
+  Authors may choose to specify both, for example:
+
+  <div class="example">
+  <pre>
+      &lt;script src="hello_world.js"
+         integrity="sha384-H8BRh8j48O9oYatfu5AZzq6A9RINhZO5H16dQZngK7T62em8MUt1FLm52t+eX6xO
+                    sha512-Q2bFTOhEALkN8hOms2FKTDLy7eugP2zFZ1T8LCvX42Fp3WoNr3bjZSAHeOsHrbV1Fu9/A0EzCinRE7Af1ofPrw=="
+         crossorigin="anonymous"&gt;&lt;/script&gt;
+  </pre>
+  </div>
+
+  In this case, the user agent will choose the strongest hash function in the
+  list, and use that metadata to validate the response (as described below in
+  the [[#parse-metadata]] and [[#get-the-strongest-metadata]] algorithms).
+
+  When a hash function is determined to be insecure, user agents SHOULD deprecate
+  and eventually remove support for integrity validation using the insecure hash
+  function. User agents MAY check the validity of responses using a digest based on
+  a deprecated function.
+
+  To allow authors to switch to stronger hash functions without being held back by older
+  user agents, validation using unsupported hash functions acts like no integrity value
+  was provided (see the [[#does-response-match-metadatalist]] algorithm below).
+  Authors  are encouraged to use strong hash functions, and to begin migrating to
+  stronger hash functions as they become available.
+
+  ### Priority ### {#priority}
+
+  User agents must provide a mechanism for determining the relative priority of two
+  hash functions and return the empty string if the priority is equal. That is, if
+  a user agent implemented a function like <dfn>getPrioritizedHashFunction</dfn>(a,
+  b) it would return the hash function the user agent considers the most
+  collision-resistant.  For example, `getPrioritizedHashFunction('sha256',
+  'sha512')` would return `'sha512'` and `getPrioritizedHashFunction('sha256',
+  'sha256')` would return the empty string.
+
+  Note: The <a>getPrioritizedHashFunction</a> is an internal
+  implementation detail. It is not an API that implementors
+  provide to web applications. It is used in this document
+  only to simplify the algorithm description.
+
+  ## Request verification algorithms ## {#request-verification-algorithms}
+
+  ### Opting-in  ### {#opt-in-require-sri-for}
+
+  Authors may opt a {{Document}} to require SRI metadata be present for 
+  some resource types via a <dfn export>require-sri-for</dfn> <a>Content
+  Security Policy</a> directive defined by the following ABNF grammar:
+
+  <pre dfn-type="grammar" link-type="grammar">
+      directive-name  = "require-sri-for"
+      directive-value = <a grammar>token</a> *( <a>RWS</a> <a>token</a> )
+  </pre>
+
+  The following list contains the set of <dfn noexport>known tokens</dfn>:
+
+    * `script` requires SRI for scripts
+    * `style` requires SRI for style sheets
+
+
+  ### Parsing `require-sri-for` ### {#parse-require-sri-for}
+
+  Given a string (|token list|), this algorithm returns a list of resource
+  types which will require integrity checks:
+
+  1.  Let the set of |protected resource types| that require SRI be the empty set.
+
+  2.  For each |token| in the result of <a lt="split a string on spaces">
+      splitting |token list| on spaces</a>, if token matches the grammar
+      for <a>require-sri-for</a> and is a <a>ASCII case-insensitive match</a>
+      for any of the <a>known token</a>s, add |token| to |protected resource types|.
+      Otherwise, ignore the token.
+
+  3.  Return the set of |protected resource types|.
+
+  ### Apply |algorithm| to |request| ### {#apply-algorithm-to-request}
+
+  This directive’s <a>pre-request check</a> is as follows:
+
+  Given a <a>request</a> (|request|) and a <a>policy</a> (|policy|):
+
+  1.  Let |protected resource types| be the result of executing
+      [[#parse-require-sri-for]] on this <a>directive</a>'s <a for="directive">value</a>.
+
+  2.  If |request|'s <a>destination</a> is a <a>ASCII case-insensitive match</a> for at least
+      one token in |protected resource types|, and |request|'s integrity metadata
+      is the empty string, return "Blocked".
+
+      Note: This logic means that request with matched <a>destination</a> and missing <a>integrity metadata</a>
+      will be blocked even if it is not currently possible to set it's <a>integrity metadata</a>.
+      Such requests are originated by, for example, <code>importScripts()</code>, CSS' <code>@import</code>,
+      or `script`/`style` elements without crossorigin content attribute.
+
+
+  3.  Return "Allowed".
+
+  <div class="example">
+    A page with the following Content Security Policy:
+
+    <pre>
+      Content-Security-Policy: <a>require-sri-for</a> script style
+    </pre>
+
+    is equivalent to Content Security Policy delivered through `<meta>`
+    element:
+
+    <pre>
+      &lt;meta http-equiv="Content-Security-Policy"
+            content="<a>require-sri-for</a> script style"&gt;
+    </pre>
+
+
+    and requires <a>integrity metadata</a> be present in `script`
+    and `link` HTML elements that contain `src` attribute.
+  </div>
+
+
+  ## Response verification algorithms ## {#response-verification-algorithms}
+
+  ### Apply |algorithm| to |response| ### {#apply-algorithm-to-response}
+
+  1.  Let |result| be the result of [[#apply-algorithm-to-response]]
+      to the <a>representation data</a> without any content-codings
+      applied, except when the user agent intends to consume the content with
+      content-encodings applied. In the latter case, let |result| be
+      the result of applying |algorithm| to the <a>representation data</a>.
+  2.  Let |encodedResult| be result of <a>base64 encoding</a> |result|.
+  3.  Return |encodedResult|.
+
+  ### Is |response| eligible for integrity validation? ### {#is-response-eligible}
+
+  In order to mitigate an attacker's ability to read data cross-origin by
+  brute-forcing values via integrity checks, responses are only eligible for such
+  checks if they are same-origin or are the result of explicit access granted to
+  the loading origin via Cross Origin Resource Sharing [[!CORS]].
+
+  Note: As noted in 
+  <a href="https://tools.ietf.org/html/rfc6454#section-4">RFC6454, section 4</a>,
+  some user agents use
+  globally unique identifiers for each file URI. This means that
+  resources accessed over a `file` scheme URL are unlikely to be
+  eligible for integrity checks.
+
+  Note: Being in a <a>Secure Context</a> (e.g., a document delivered over HTTPS) is not
+  necessary for the use of integrity validation. Because resource integrity is
+  only an application level security tool, and it does not change the security
+  state of the user agent, a Secure Context is unnecessary. However, if integrity
+  is used in something other than a Secure Context (e.g., a document delivered
+  over HTTP), authors are reminded that the integrity provides <em>no security
+  guarantees at all</em>. For this reason, authors are encouraged to only deliver
+  integrity metadata in a Secure Context.  See [[#non-secure-contexts]] for
+  more discussion.
+
+  The following algorithm details these restrictions:
+
+  1.  Let |response| be the response that results from
+      <a lt="fetch">fetching</a> the |resource|.
+  2.  If the <a>|response| type</a> is `basic`,
+      `cors` or `default`, return `true`.
+  3.  Return `false`.
+
+  <div class="note">
+  The <a lt="response type">response types</a> are defined by the Fetch
+  specification [[!FETCH]] and refer to the following:
+
+  * `basic` is a <a>same-origin</a> response, and thus the requestor has full access
+    to read the body.
+  * `cors` is a valid response to a <a>cross-origin</a>, CORS-enabled request, and thus
+    again the requestor has full access to read the body.
+  * `default` is a valid response that is generated by a Service Worker as a
+    response to the request, so its body, too, is fully readable by the requestor.
+
+  </div>
+
+  ### Parse |metadata| ### {#parse-metadata}
+
+  This algorithm accepts a string, and returns either `no metadata`, or a set of
+  valid hash expressions whose hash functions are understood by
+  the user agent.
+
+  1.  Let |result| be the empty set.
+  2.  Let |empty| be equal to `true`.
+  3.  For each |token| returned by <a lt="split a string on space">splitting |metadata| on
+      spaces</a>:
+      1.  Set |empty| to `false`.
+      2.  Parse |token| as a <a grammar>hash-with-options</a>.
+      3.  If |token| does not parse, [=continue=] to the next token.
+      4.  Let |algorithm| be the <a grammar>hash-algo</a> component of
+          |token|.
+      5.  If |algorithm| is a hash function recognized by the user
+          agent, add the parsed |token| to |result|.
+  4.  Return `no metadata` if |empty| is `true`, otherwise return
+      |result|.
+
+  ### Get the strongest metadata from |set| ### {#get-the-strongest-metadata}
+
+  1.  Let |result| be the empty set and |strongest| be the empty
+      string.
+  2.  For each |item| in |set|:
+      1.  If |result| is the empty set, add |item| to
+          |result| and set |strongest| to |item|, skip
+          to the next |item|.
+      2.  Let |currentAlgorithm| be the |alg| component of
+          |strongest|.
+      3.  Let |newAlgorithm| be the |alg| component of
+          |item|.
+      4.  If the result of <a lt="getPrioritizedHashFunction">
+          getPrioritizedHashFunction(|currentAlgorithm|, |newAlgorithm|)</a>
+          is the empty string, add |item| to |result|. If the result is
+          |newAlgorithm|, set |strongest| to |item|, set |result| to the empty
+          set, and add |item| to |result|.
+  3.  Return |result|.
+
+  ### Does |response| match |metadataList|? ### {#does-response-match-metadatalist}
+
+  1.  Let |parsedMetadata| be the result of
+      <a href="#parse-metadata">parsing |metadataList|</a>.
+  2.  If |parsedMetadata| is `no metadata`, return `true`.
+  3.  If <a href="#is-response-eligible">|response| is not eligible for integrity
+      validation</a>, return `false`.
+  4.  If |parsedMetadata| is the empty set, return `true`.
+  5.  Let |metadata| be the result of <a href="#get-the-strongest-metadata">
+      getting the strongest metadata from |parsedMetadata|</a>.
+  6.  For each |item| in |metadata|:
+      1.  Let |algorithm| be the |alg| component of
+          |item|.
+      2.  Let |expectedValue| be the |val| component of
+          |item|.
+      3.  Let |actualValue| be the result of <a
+          href="#apply-algorithm-to-response">applying |algorithm| to |response|
+          </a>.
+      4.  If |actualValue| is a case-sensitive match for
+          |expectedValue|, return `true`.
+  7.  Return `false`.
+
+  This algorithm allows the user agent to accept multiple, valid strong hash
+  functions. For example, a developer might write a `script` element such as:
+
+  <div class="example">
+  <pre>
+      &lt;script src="https://example.com/example-framework.js"
+              integrity="sha384-Li9vy3DqF8tnTXuiaAJuML3ky+er10rcgNR/VqsVpcw+ThHmYcwiB1pbOxEbzJr7
+                         sha384-+/M6kredJcxdsqkczBUjMLvqyHb1K/JThDXWsBVxMEeZHEaMKEOEct339VItX1zB"
+              crossorigin="anonymous"&gt;&lt;/script&gt;
+  </pre>
+  </div>
+
+  which would allow the user agent to accept two different content payloads, one
+  of which matches the first SHA384 hash value and the other matches the second
+  SHA384 hash value.
+
+  Note: User agents may allow users to modify the result of this algorithm via
+  user preferences, bookmarklets, third-party additions to the user agent, and
+  other such mechanisms. For example, redirects generated by an extension like <a
+  href="https://www.eff.org/https-everywhere">HTTPS Everywhere</a> could load and
+  execute correctly, even if the HTTPS version of a resource differs from the HTTP
+  version.
+
+  Note: This algorithm returns `false` if the response is not <a
+  href="#is-response-eligible">eligible</a> for integrity
+  validation since Subresource Integrity requires CORS, and it is a logical error
+  to attempt to use it without CORS. Additionally, user agents SHOULD report a
+  warning message to the developer console to explain this failure.
+
+  ## Verification of HTML document subresources ## {#verification-of-html-document-subresources}
+
+  A variety of HTML elements result in requests for resources that are to be
+  embedded into the document, or executed in its context. To support integrity
+  metadata for some of these elements, a new `integrity` attribute is added to
+  the list of content attributes for the `link` and `script` elements.
+
+  A corresponding `integrity` IDL attribute which <a>reflects</a> the
+  value of each element's `integrity` content attribute is added to the
+  `HTMLLinkElement` and `HTMLScriptElement` interfaces.
+
+  Note: A future revision of this specification is likely to include integrity support
+  for all possible subresources, i.e., `a`, `audio`, `embed`, `iframe`, `img`,
+  `link`, `object`, `script`, `source`, `track`, and `video` elements.
+
+  ## The `integrity` attribute ## {#the-integrity-attribute}
+
+  The `integrity` attribute represents <a>integrity metadata</a> for an element.
+  The value of the attribute MUST be either the empty string, or at least one
+  valid metadata as described by the following ABNF grammar:
+
+  <pre dfn-type="grammar" link-type="grammar">
+      <dfn>integrity-metadata</dfn> = *<a>WSP</a> <a>hash-with-options</a> *(1*<a>WSP</a> <a>hash-with-options</a> ) *<a>WSP</a> / *<a>WSP</a>
+      <dfn>hash-with-options</dfn>  = <a>hash-expression</a> *("?" <a>option-expression</a>)
+      <dfn>option-expression</dfn>  = *<a>VCHAR</a>
+      <dfn>hash-algo</dfn>          = &lt;hash-algo production from [Content Security Policy Level 2, section 4.2]&gt;
+      <dfn>base64-value</dfn>       = &lt;base64-value production from [Content Security Policy Level 2, section 4.2]&gt;
+      <dfn>hash-expression</dfn>    = <a>hash-algo</a> "-" <a>base64-value</a>
+  </pre>
+
+  The `integrity` IDL attribute must <a>reflect</a> the `integrity` content attribute.
+
+  `option-expression`s are associated on a per `hash-expression` basis and are
+  applied only to the `hash-expression` that immediately precedes it.
+
+  In order for user agents to remain fully forwards compatible with future
+  options, the user agent MUST ignore all unrecognized  `option-expression`s.
+
+  Note: Note that while the `option-expression` has been reserved in the syntax,
+  no options have been defined. It is likely that a future version of the spec
+  will define a more specific syntax for options, so it is defined here as broadly
+  as possible.
+
+  ## Element interface extensions ## {#interface-extensions}
+
+  ### HTMLLinkElement ### {#HTMLLinkElement}
+
+  <pre class="idl">
+    partial interface HTMLLinkElement {
+      attribute DOMString integrity;
+    };
+  </pre>
+
+  #### Attributes #### {#HTMLLinkElement-Attributes}
+  <b>integrity</b> of type `DOMString`: The value of this element's integrity
+  attribute.
+
+  ### HTMLScriptElement ### {#HTMLScriptElement}
+  <pre class="idl">
+    partial interface HTMLScriptElement {
+      attribute DOMString integrity;
+    };
+  </pre>
+
+  #### Attributes #### {#HTMLScriptElement-Attributes}
+  <b>integrity</b> of type `DOMString`: The value of this element's integrity
+  attribute.
+
+  ## Handling integrity violations ## {#handling-integrity-violations}
+
+  The user agent will refuse to render or execute responses that fail an integrity
+  check, instead returning a network error as defined in Fetch [[!FETCH]].
+
+  Note: On a failed integrity check, an `error` event is fired. Developers
+  wishing to provide a canonical fallback resource (e.g., a resource not served
+  from a CDN, perhaps from a secondary, trusted, but slower source) can catch this
+  `error` event and provide an appropriate handler to replace the
+  failed resource with a different one.
+
+  ## Elements ## {#elements}
+
+  ### The `link` element for stylesheets ### {#link-element-for-stylesheets}
+
+  Whenever a user agent attempts to <a>obtain a resource</a> pointed to by a
+  `link` element that has a `rel` attribute with the keyword of `stylesheet`,
+  modify step 4 to read:
+
+  Do a potentially CORS-enabled fetch of the resulting absolute URL, with the
+  mode being the current state of the element's crossorigin content attribute,
+  the origin being the origin of the link element's Document, the default origin
+  behavior set to taint, and the <a>integrity metadata</a> of the request set to
+  the value of the element's `integrity` attribute.
+
+  ### The `script` element ### {#script-element}
+
+  Replace step 14.1 of HTML5's <a>prepare a script</a> algorithm with:
+
+  1.  Let |src| be the value of the element's `src` attribute and
+      the request's associated <a>integrity metadata</a> be the value of the
+      element's `integrity` attribute.
+
+  <!-- ####################################################################### -->
+
+  # Proxies # {#proxies}
+
+  Optimizing proxies and other intermediate servers which modify the
+  responses MUST ensure that the digest associated
+  with those responses stays in sync with the new content. One option
+  is to ensure that the <a>integrity metadata</a> associated with
+  resources is updated. Another
+  would be simply to deliver only the canonical version of resources
+  for which a page author has requested integrity verification.
+
+  To help inform intermediate servers, those serving the resources SHOULD
+  send along with the resource a <a>`Cache-Control`</a> header
+  with a value of <a>`no-transform`</a>.
+
+  <!-- ####################################################################### -->
+
+  # Security Considerations # {#security-considerations}
+
+  <em> This section is not normative.</em>
+
+  ## Non-secure contexts remain non-secure ## {#non-secure-contexts}
+
+  <a>Integrity metadata</a> delivered by a context that is not a <a>Secure
+  Context</a> such as an HTTP page, only protects an origin against a compromise
+  of the server where an external resources is hosted. Network attackers can alter
+  the digest in-flight (or remove it entirely, or do absolutely anything else to
+  the document), just as they could alter the response the hash is meant to
+  validate.  Thus, it is recommended that authors deliver integrity metadata only
+  to a <a>Secure Context</a>. See also  <a
+  href="http://www.w3.org/2001/tag/doc/web-https ">Securing the Web</a>.
+
+  ## Hash collision attacks ## {#hash-collision-attacks}
+
+  Digests are only as strong as the hash function used to generate them. It is
+  recommended that user agents refuse to support known-weak hashing functions and
+  limit supported algorithms to those known to be collision resistant. Examples of
+  hashing functions that are not recommended include MD5 and SHA-1. At the time of
+  writing, SHA-384 is a good baseline.
+
+  Moreover, it is recommended that user agents re-evaluate their supported hash
+  functions on a regular basis and deprecate support for those functions shown to
+  be insecure. Over time, hash functions may be shown to be much weaker than
+  expected and, in some cases, broken, so it is important that user agents stay
+  aware of these developments.
+
+  ## Cross-origin data leakage ## {#cross-origin-data-leakage}
+
+  This specification requires the <a>CORS settings attribute</a> to be present on
+  integrity-protected cross-origin requests. If that requirement were omitted,
+  attackers could violate the <a
+  href="http://www.w3.org/Security/wiki/Same_Origin_Policy">same-origin policy</a>
+  and determine whether a cross-origin resource has certain content.
+
+  Attackers would attempt to load the resource with a known digest, and
+  watch for load failures. If the load fails, the attacker could surmise
+  that the response didn't match the hash and thereby gain some insight into
+  its contents. This might reveal, for example, whether or not a user is
+  logged into a particular service.
+
+  Moreover, attackers could brute-force specific values in an otherwise
+  static resource. Consider a JSON response that looks like this:
+
+  <div class="example">
+  <pre>
+      {'status': 'authenticated', 'username': 'admin'}
+  </pre>
+  </div>
+
+  An attacker could precompute hashes for the response with a variety of
+  common usernames, and specify those hashes while repeatedly attempting
+  to load the document. A successful load would confirm that the attacker
+  has correctly guessed the username.
+
+
+  <section>
+    <h2 id="iana-considerations">IANA Considerations</h2>
+
+    The Content Security Policy Directive registry should be updated with the
+    following directives and references [[!RFC7762]]:
+
+    :   <a>`require-sri-for`</a>
+    ::  This document (see [[#opt-in-require-sri-for]])
+  </section>
+
+  <!-- ####################################################################### -->
+
+  # Acknowledgements # {#acknowledgements}
+
+  Much of the content here is inspired heavily by Gervase Markham's <a
+  href="http://www.gerv.net/security/link-fingerprints/">Link Fingerprints</a>
+  concept as well as WHATWG's <a
+  href="https://wiki.whatwg.org/wiki/Link_Hashes">Link Hashes</a>.
+
+  A special thanks to Mike West of Google, Inc. for his invaluable contributions
+  to the initial version of this spec. Additionally, Brad Hill, Anne van Kesteren,
+  Jonathan Kingston, Mark Nottingham, Dan Veditz, Eduardo Vela, Tanvi Vyas, and
+  Michal Zalewski provided invaluable feedback.
