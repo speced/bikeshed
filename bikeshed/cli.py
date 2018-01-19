@@ -293,11 +293,11 @@ def main():
             fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
     elif options.subparserName == "test":
         md = metadata.fromCommandLine(extras)
+        config.force = True
+        config.quiet = 2
         if options.rebase:
-            test.rebase(options.testFiles, md=md)
+            test.rebase(Spec, options.testFiles, md=md)
         else:
-            config.force = True
-            config.quiet = 2
             result = test.runAllTests(Spec, options.testFiles, md=md)
             sys.exit(0 if result else 1)
     elif options.subparserName == "profile":

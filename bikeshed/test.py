@@ -30,13 +30,13 @@ def testNameForPath(path):
     return path
 
 
-def runAllTests(Spec, testFiles, md=None):
-    numPassed = 0
-    if len(testFiles) == 0:
+def runAllTests(Spec, testFiles=None, md=None):
+    if not testFiles:
         testFiles = sorted(findTestFiles())
         if len(testFiles) == 0:
             p("No tests were found")
             return True
+    numPassed = 0
     total = 0
     fails = []
     for testPath in testFiles:
@@ -114,10 +114,20 @@ def equalOrEmpty(a, b):
     return False
 
 
-def rebase(files=None, md=None):
+def rebase(Spec, files=None, md=None):
     if not files:
         files = sorted(findTestFiles())
+        if len(files) == 0:
+            p("No tests were found")
+            return True
     for path in files:
+        resetSeenMessages()
         name = testNameForPath(path)
         p("Rebasing {0}".format(name))
-        subprocess.call("bikeshed -qf spec {0}".format(pipes.quote(path)), shell=True)
+        doc = Spec(path)
+        doc.mdBaseline.addData("Date", "1970-01-01")
+        doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
+        if md:
+            doc.mdCommandLine = md
+        doc.preprocess()
+        doc.finish()

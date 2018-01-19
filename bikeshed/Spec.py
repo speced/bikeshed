@@ -244,7 +244,7 @@ class Spec(object):
                 outputFilename = "-"
         return outputFilename
 
-    def finish(self, outputFilename):
+    def finish(self, outputFilename=None):
         self.printResultMessage()
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         rendered = self.serialize()
