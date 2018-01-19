@@ -8,18 +8,36 @@ from ..htmlhelpers import findAll, textContent, removeNode, E, addClass, appendC
 from ..messages import *
 
 def processWptElements(doc):
+	# <wpt> elements
 	wptElements = findAll("wpt", doc)
 	if not wptElements:
 		return
 	testData = loadTestData(doc)
 	pathPrefix = doc.md.wptPathPrefix
+	if pathPrefix is not None and not pathPrefix.endswith("/"):
+		pathPrefix += "/"
+	seenTestNames = set()
 	for el in wptElements:
-		testNames = testNamesFromEl(el, pathPrefix = pathPrefix)
+		testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
 		for testName in testNames:
 			if testName not in testData:
 				die("Couldn't find WPT test '{0}' - did you misspell something?", testName, el=el)
 				continue
+			seenTestNames.add(testName)
 		createHTML(doc, el, testNames)
+
+	# <wpt-rest> elements
+	wptRestElements = findAll("wpt-rest", doc)
+	if len(wptRestElements) > 1:
+		die("Only one <wpt-rest> element allowed per document, you have {0}.", len(wptRestElements))
+		wptRestElements = wptRestElements[0:1]
+	if len(wptRestElements) == 1:
+		if pathPrefix is None:
+			die("Can't use <wpt-rest> without a WPT Path Prefix metadata.")
+			return
+		prefixedNames = [p for p in testData if p.startswith(pathPrefix) and p not in seenTestNames]
+		createHTML(doc, wptRestElements[0], prefixedNames)
+
 
 
 def createHTML(doc, blockEl, testNames):
@@ -48,14 +66,21 @@ def testNamesFromEl(el, pathPrefix=None):
 		if pathPrefix is None:
 			testNames.append(name)
 		else:
-			if pathPrefix.endswith("/") and name.startswith("/"):
-				testPath = pathPrefix[:-1] + name
-			elif not pathPrefix.endswith("/") and not name.startswith("/"):
-				testPath = pathPrefix + "/" + name
+			if name.startswith("/"):
+				testPath = pathPrefix + name[1:]
 			else:
 				testPath = pathPrefix + name
 			testNames.append(testPath)
 	return testNames
+
+
+def prefixPlusPath(prefix, path):
+	if prefix.endswith("/") and path.startswith("/"):
+		return prefix[:-1] + path
+	elif not prefix.endswith("/") and not path.startswith("/"):
+		return prefix + "/" + path
+	else:
+		return prefix + path
 
 
 def loadTestData(doc):
