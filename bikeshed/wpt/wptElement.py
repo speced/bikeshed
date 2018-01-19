@@ -8,14 +8,15 @@ from ..htmlhelpers import findAll, textContent, removeNode, E, addClass, appendC
 from ..messages import *
 
 def processWptElements(doc):
-	# <wpt> elements
-	wptElements = findAll("wpt", doc)
-	if not wptElements:
-		return
 	testData = loadTestData(doc)
 	pathPrefix = doc.md.wptPathPrefix
 	if pathPrefix is not None and not pathPrefix.endswith("/"):
 		pathPrefix += "/"
+
+	# <wpt> elements
+	wptElements = findAll("wpt", doc)
+	if not wptElements:
+		return
 	seenTestNames = set()
 	for el in wptElements:
 		testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
@@ -36,6 +37,9 @@ def processWptElements(doc):
 			die("Can't use <wpt-rest> without a WPT Path Prefix metadata.")
 			return
 		prefixedNames = [p for p in testData if p.startswith(pathPrefix) and p not in seenTestNames]
+		if len(prefixedNames) == 0:
+			die("Couldn't find any tests with the path prefix '{0}'.", pathPrefix)
+			return
 		createHTML(doc, wptRestElements[0], prefixedNames)
 
 
