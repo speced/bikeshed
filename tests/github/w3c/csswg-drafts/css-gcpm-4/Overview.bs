@@ -1,0 +1,355 @@
+<pre class='metadata'>
+Title: CSS Generated Content for Paged Media Module Level 4
+Status: ED
+Work Status: Exploring
+Shortname: css-gcpm-4
+Level: 4
+Group: csswg
+ED: https://drafts.csswg.org/css-gcpm-4/
+Editor: Dave Cramer, Hachette Livre, dauwhe@gmail.com, w3cid 65283
+Editor: Daniel Glazman, Disruptive Innovations, daniel.glazman@disruptive-innovations.com, w3cid 13329
+Abstract: Level 4 of GCPM proposes a region-based approach to footnotes and running heads.
+Issue Tracking: W3C Bugzilla https://www.w3.org/Bugs/Public/enter_bug.cgi?product=CSS&component=Generated%20Content%20for%20Paged%20Media
+Ignored Terms:
+Warning: Not Ready
+</pre>
+
+<h2 class="no-num" id="introduction">
+Introduction
+</h2>
+
+There have been many proposals for using CSS to move document content, often motivated by the desire for magazine- or book-style layout of footnotes, running heads, pull quotes, sidebars, and so on. [[CSS3GCPM]] used float: footnote and position: running(). The now-abandoned [[CSS3GENCON]] Working Draft used content: footnote. PrinceXML (and older GCPM drafts) has content: flow() and flow: static(). WHATWG CSS Books has flow: area().
+
+This module proposes a unified approach to paginated layout based on [[CSS3-REGIONS]] and [[CSS3-PAGE-TEMPLATE]]. Additional properties will be introduced as necessary.
+
+
+<h2 id="running-headers-and-footers">
+	Running headers and footers
+</h2>
+[[CSS3PAGE]] describes the sixteen page margin boxes which can be used for running headers and footers, but does not describe a mechanism for inserting content in those boxes.
+
+[[CSS3GCPM]] provides for copying the string values of elements into the existing page margin boxes.
+
+The existing mechanisms do not cover many use cases.
+
+
+<h3 id="copy-into-heading">Copying a flow: the 'copy-into' property</h3>
+
+Headers often contain document content, and it is desirable to both display that content normally (for example, as an <code>h1</code>) and to use the content in a running head. [[CSS3-REGIONS]] allows for an element to be moved to a ''named flow'', but doesn't allow for using the same content in two ways. The 'copy-into' property allows an element to be copied into a content fragment which can then be placed with the 'content' property.
+
+<p class="note">Use cases for running heads can be found in [[LATINREQ]] http://w3c.github.io/dpub-pagination/#content</p>
+
+
+
+<pre class="propdef">
+Name: <dfn id="copy-into-property">copy-into</dfn>
+Value: none |  [ [ &lt;custom-ident>  &lt;content-level>] [,  &lt;custom-ident>  &lt;content-level>]*  ]?
+Initial: none
+Applies To: all elements and pseudo-elements, but not ::first-line or ::first-letter.
+Inherited: no
+Media: visual
+Computed value: as specified
+</pre>
+
+The 'copy-into' property contains one or more pairs, each consisting of a custom identifier followed by a content-level keyword describing how to construct the value of the named content fragment.
+
+''content-level'' expands to the following values:
+
+<pre class="prod">
+	<dfn id="content-list">content-list</dfn> = element | content | text | attr(&lt;identifier>) | counter() | counters()
+</pre>
+
+
+<dl>
+<dt>element</dt>
+<dd>the entire element is copied into the named content fragment</dd>
+
+<dt>contents</dt>
+<dd>only the element’s contents are copied into the named content fragment. This is the default if ''content-level'' is not specified.</dd>
+
+<dt>text</dt>
+<dd>only the element’s text (including normally collapsed white space) is copied into the named content fragment.</dd>
+</dl>
+
+<div class="example">
+<pre>
+h1 {
+  copy-into: chapter-title element;
+  font-size: 1.5em;
+}
+
+@page {
+  @top-center {
+    content: chapter-title '.';
+    font-size: .9em;
+    font-variant: small-caps;
+    }
+}
+</pre>
+</div>
+
+
+<h3 id="flow-persist-heading">Choosing among multiple values on a page</h3>
+
+<h4 id="page-selector-pseudo-classes">Page selector pseudo-classes</h4>
+
+By default, the content fragment name would be global, as the named flow is with 'flow-into'. But if one of the following pseudo-classes are used on the subject of the selector, then the name is locally scoped to just the page the element is on.
+
+<dl>
+
+<dt><dfn>:nth-of-page(n)</dfn></dt>
+<dd>The element is the nth matched element on the page.</dd>
+
+<dt><dfn>:first-of-page</dfn></dt>
+<dd>Same as :nth-of-page(n), but where n = 1 (it is the first matched element on the page).</dd>
+
+<dt><dfn>:last-of-page</dfn></dt>
+<dd>The element is the last matched element on the page.</dd>
+
+<dt><dfn>:start-of-page</dfn></dt>
+<dd>The element is the first matched element on the page, and neither it nor its ancestors have any previous siblings that appear on the page.</dd>
+
+</dl>
+
+
+<div class="example">
+
+HTML:
+
+<pre>
+&lt;h1>The Voyage of the <i>Beagle</i>&lt;/h1>
+</pre>
+
+CSS:
+
+<pre>
+h1::before {
+  content: 'Chapter 'counter(chapterNumber);
+}
+h1:first-of-page {
+  copy-into: headerP1 counter(chapter), headerP2;
+}
+h1::after {
+  content: '.' copy-into: headerP3;
+}
+
+@top-center {
+  content: headerP1 ": " headerP2 headerP3;
+}
+</pre>
+
+
+The value of the named string “headerP1” will be “Chapter 1”, and the value of the named string “headerP2” will be “Voyage of the <i>Beagle</i>”. headerP2 will include the italic tags around "Beagle", because the <code>content-type</code> defaults to ''copy-into/contents'', not ''copy-into/text''. The value of the named string “headerP3” will be “.”. The top-center content will be “Chapter 1: The Voyage of the <i>Horizon</i>.”
+
+</div>
+
+<div class="example">
+HTML:
+
+<pre>
+&lt;section title="Loomings">
+</pre>
+
+CSS:
+
+<pre>
+section:first-of-page { copy-into: header attr(title) }
+</pre>
+
+The value of the “header” string will be “Loomings”, assuming that section intersected with the page.
+</div>
+
+
+
+<div class="example">
+CSS:
+
+<pre>
+@page {
+   size: 15cm 10cm;
+   margin: 1.5cm;
+
+   @top-left {
+   content: "first: " heading1;
+   }
+   @top-center {
+   content: "start: " heading2;
+   }
+    @top-right {
+    content: "last: " heading3;
+   }
+  }
+
+h2:first-of-page { copy-into: heading1 }
+h2:start-of-page { copy-into: heading2 }
+h2:last-of-page { copy-into: heading3 }
+</pre>
+
+The following figures show the first, start, and last assignments of the “heading” string on various pages.
+
+<figure>
+<img src="images/using-strings-1.jpg" width="480" alt=""/>
+<figcaption>The <code>start</code> value is empty, as the string had not yet been set at the start of the page.</figcaption>
+</figure>
+
+<figure>
+<img src="images/using-strings-2.jpg" width="480" alt=""/>
+<figcaption>Since the page starts with an h2, the <code>start</code> value is the value of that head.</figcaption>
+</figure>
+
+<figure>
+<img src="images/using-strings-3.jpg" width="480" alt=""/>
+<figcaption>Since there’s not an h2 at the top of this page, the <code>start</code> value is the exit value of the previous page.</figcaption>
+</figure>
+
+</div>
+
+
+
+<h2 id="page-area-head">Creating Page Areas</h2>
+
+
+[[CSS3-PAGE-TEMPLATE]] introduces @template and @slot rules. We propose to allow the use of @slot in the @page context, to allow greater flexibility than the page margin boxes in [[CSS3PAGE]]. These slots can also be used for sidenotes, pull quotes, footnotes, and many other document features.
+
+
+<div class="example">
+
+<pre>
+
+@page body {
+  @slot center-header {
+    top: 0px;
+    left: 1em;
+    right: 1em;
+    height: 2em;
+    flow-from: header;
+    flow-persist: persist;
+    wrap-flow: clear;
+  }
+}
+
+</pre>
+
+
+</div>
+
+
+<p class="issue">Is there a need for both @page and @template?</p>
+
+
+
+
+
+<h2 id="footnotes">
+	Footnotes
+</h2>
+Ancillary content may be moved to the bottom or side of a page. A footnote is created when such content moves to the bottom of the page, leaving a reference indicator.
+
+
+<h3 id="footnote-terms">Terminology</h3>
+
+Footnotes are complex objects, so it will be helpful to define some terms before proceeding.
+
+<figure>
+
+
+<img src="images/footnote-diagram.001.jpg" width="480" alt="page with footnotes"/>
+<figcaption>Footnote terminology</figcaption>
+</figure>
+
+<dl>
+
+
+
+<dt>footnote element</dt>
+<dd>The element containing the content of the footnote, which will be removed from the flow and displayed as a footnote.</dd>
+
+<dt>footnote marker (also known as footnote number)</dt>
+<dd>A number or symbol adjacent to the footnote body, identifying the particular footnote. The footnote marker should use the same number or symbol as the corresponding footnote call, although the marker may contain additional punctuation.</dd>
+
+<dt>footnote body</dt>
+<dd>The footnote marker is placed before the footnote element, and together they represent the footnote body, which will be placed in the footnote area.</dd>
+
+<dt>footnote call (also known as footnote reference)</dt>
+<dd>A number or symbol, found in the main text, which points to the footnote body.</dd>
+
+
+<dt>footnote area</dt>
+<dd>The page area used to display footnotes.</dd>
+
+<dt>footnote rule (also known as footnote separator)</dt>
+<dd>A horizontal rule is often used to separate the footnote area from the rest of the page. The separator (and the entire footnote area) cannot be rendered on a page with no footnotes.</dd>
+
+</dl>
+
+<h3 id="footnotes-as-regions">Footnotes as Regions</h3>
+
+
+<div class="example">
+HTML:
+<pre style="word-wrap: break-word; white-space: pre-wrap;">
+&lt;p>Though the body was erect, the head was thrown back so that the closed eyes were pointed towards the needle of the tell-tale that swung from a beam in the ceiling..&lt;span class="reference">&lt;span class="footnote">The cabin-compass is called the tell-tale, because without going to the compass at the helm, the Captain, while below, can inform himself of the course of the ship.&lt;/span>&lt;/span>&lt;/p>
+</pre>
+CSS:
+<pre>
+span.footnote {
+  flow-into: footnote;
+  flow-policy: copy;
+  display: block;
+}
+
+span.footnote::before {
+  content: counter(footnote) '. ';
+}
+
+span.reference::before {
+  content: counter(footnote);
+  font-variant-position: super;
+}
+
+@page {
+  @slot footnote {
+    flow-from: footnote;
+    required-flow: footnote;
+    position: absolute;
+    left: 54pt;
+    bottom: 0pt;
+    width: 352pt;
+    height: auto;
+    border-top: .25pt solid black;
+    vertical-align: bottom;
+    wrap-flow: clear;
+  }
+}
+</pre>
+</div>
+
+<p class="issue">The above HTML contains two nested spans for the footnote, as CSS has no mechanism to leave a reference object where something was removed from the flow.</p>
+
+<p class="issue">Would it be possible to specify <code>flow-into: none</code> on <code>span.footnote::after</code>? [[CSS3-REGIONS]] forbids the flow-into property on pseudo-elements, but should that be changed?</p>
+
+
+
+<div class="example">
+Inline footnote
+<pre>
+span.footnote {
+  flow-into: footnote;
+  display: inline;
+}
+</pre>
+</div>
+
+
+
+
+
+
+
+
+<h2 class="no-num" id="acknowledgments">
+Acknowledgments
+</h2>
+
+Tab Atkins, Jr., Brak Kemper, Håkon Wium Lie, Liam Quin, Peter Sorotokin, Alan Stearns
+

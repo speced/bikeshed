@@ -1,0 +1,125 @@
+<pre class='metadata'>
+Title: Requesting Permissions
+Shortname: permissions-request
+Level: 1
+Status: CG-DRAFT
+Group: WICG
+Repository: jyasskin/permissions-request
+URL: https://jyasskin.github.io/permissions-request
+Editor: Jeffrey Yasskin, w3cid 72192, Google Inc. https://google.com/
+!Tests: <a href=https://github.com/w3c/web-platform-tests/tree/master/permissions-request>web-platform-tests permissions-request/</a> (<a href=https://github.com/w3c/web-platform-tests/labels/permissions-request>ongoing work</a>)
+
+Abstract: This specification extends the Permissions API to provide a uniform function for requesting permission to use powerful features.
+</pre>
+<pre class="link-defaults">
+spec: permissions
+    type: dfn
+        text: create a permissionstatus
+</pre>
+
+# Introduction # {#intro}
+
+This document specifies a function to request permission to use [=powerful
+features=] on the Web platform.
+
+Different Web APIs have disparate ways to signal a developer's intent to use them:
+
+* The [[notifications]] API allows developers to request a permission and check
+    the permission status explicitly.
+* The [[geolocation-API]] conflates the permission request with a location request.
+
+It's easier for developers to design their permission-related code if they have
+a single pattern to follow for all powerful features.
+
+# Request API # {#api}
+
+<xmp class=idl>
+partial interface Permissions {
+  Promise<PermissionStatus> request(object permissionDesc);
+};
+</xmp>
+
+When the <dfn for='Permissions' method>request(permissionDesc)</dfn> method is
+invoked, the user agent MUST run the following algorithm, passing the parameter
+|permissionDesc|:
+
+<ol class="algorithm">
+1. Let |rootDesc| be the object |permissionDesc| refers to, [=converted to an
+    IDL value=] of type {{PermissionDescriptor}}. If this throws an exception,
+    return [=a promise rejected with=] that exception and abort these steps.
+1. Let |typedDescriptor| be the object |permissionDesc| refers to, [=converted
+    to an IDL value=] of <code>|rootDesc|.{{PermissionDescriptor/name}}</code>'s
+    [=permission descriptor type=]. If this throws an exception, return [=a
+    promise rejected with=] that exception and abort these steps.
+1. Let |promise| be a newly-created {{Promise}}.
+1. Return |promise| and continue the following steps asynchronously.
+1. Run the steps to [=create a PermissionStatus=] for |typedDescriptor|, and let
+    |status| be the result.
+1. Run the [=permission request algorithm=] of the feature named
+    <code>|typedDescriptor|.name</code> with |typedDescriptor| and |status| as
+    arguments.
+1. If the previous step threw an exception, [=reject=] |promise| with that
+    exception.
+1. Otherwise resolve |promise| with |status|.
+
+</ol>
+
+# Additional fields in the Permission Registry # {#registry-additions}
+
+Powerful features in the <a
+href="https://w3c.github.io/permissions/#permission-registry">Permission
+Registry</a> additionally define a <dfn export>permission request
+algorithm</dfn>:
+
+: Input
+::  * An instance of the [=permission descriptor type=]
+    * A newly-created instance of the <a>permission result type</a>. 
+: Behavior
+:: Uses the algorithms in <a
+    href="https://w3c.github.io/permissions/#requesting-more-permission">Requesting
+    more permission</a> to show the user any necessary prompt to try to increase
+    permissions, and updates the instance of the [=permission result type=] to
+    match.
+: Returns
+:: Nothing, but may throw an exception if the request can fail exceptionally.
+    (Merely being denied permission is not exceptional.)
+
+: Example callers
+::  * <code>{{Permissions}}.{{Permissions/request(permissionDesc)}}</code>
+: Default
+:: If unspecified, this defaults to the [=boolean permission request
+    algorithm=].
+
+## Default request algorithm ## {#boolean-request-algorithm}
+
+The <dfn export>boolean permission request algorithm</dfn>, given a
+{{PermissionDescriptor}} <var>permissionDesc</var> and a {{PermissionStatus}}
+|status|, runs the following steps:
+
+<ol class="algorithm">
+1. Run the <a>boolean permission query algorithm</a> on |permissionDesc| and
+    |status|.
+1. If <code>|status|.state</code> is not {{"prompt"}}, abort these steps.
+1. [=Request permission to use=] |permissionDesc|.
+1. Run the <a>boolean permission query algorithm</a> again on |permissionDesc|
+    and |status|.
+
+    <p class="issue" id="issue-non-persistent-grants">
+      On browsers that don't store permissions persistently within an
+      <a>environment settings object</a>, this will always return {{"prompt"}},
+      but still show the user an unnecessary prompt. That may mean that no
+      permissions should use the <a>boolean permission request algorithm</a>,
+      since it can never return an appropriate object-capability.
+    </p>
+
+</ol>
+
+
+
+# Security Considerations # {#security}
+
+No security considerations have been identified.
+
+# Privacy Considerations # {#privacy}
+
+No privacy considerations have been identified.

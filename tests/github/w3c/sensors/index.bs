@@ -1,0 +1,1962 @@
+<pre class="metadata">
+Title: Generic Sensor API
+Shortname: generic-sensor
+Level: none
+Status: ED
+Group: dap
+ED: https://w3c.github.io/sensors/
+TR: https://www.w3.org/TR/generic-sensor/
+Previous Version: https://www.w3.org/TR/2017/WD-generic-sensor-20171018/
+Editor: Rick Waldron 50572, JS Foundation
+Editor: Mikhail Pozdnyakov 78325, Intel Corporation, https://intel.com/
+Editor: Alexander Shalamov 78335, Intel Corporation, https://intel.com/
+Former Editor: Tobie Langel 60809, Codespeaks&#44; formerly on behalf of Intel Corporation, http://tobie.me, tobie@codespeaks.com
+Abstract:
+  This specification defines a framework for exposing sensor data
+  to the Open Web Platform in a consistent way.
+  It does so by defining a blueprint for writing
+  specifications of concrete sensors along with an abstract Sensor interface
+  that can be extended to accommodate different sensor types.
+!Feedback: <a href="https://github.com/w3c/sensors">GitHub</a> (<a href="https://github.com/w3c/sensors/issues/new">new issue</a>, <a href="https://github.com/w3c/sensors/milestone/2">level 1 issues</a>, <a href="https://github.com/w3c/sensors/issues">all issues</a>)
+!Other: <a href="https://github.com/w3c/web-platform-tests/tree/master/generic-sensor">Test suite</a>, <a href="https://github.com/w3c/sensors/commits/master/index.bs">latest version history</a>, <a href="https://github.com/w3c/sensors/commits/gh-pages/index.bs">previous version history</a>
+Indent: 2
+Repository: w3c/sensors
+Markup Shorthands: markdown on
+Boilerplate: omit issues-index, omit conformance, omit feedback-header
+Ignored Vars: activated_sensors
+Inline GitHub Issues: yes
+Default Biblio Status: current
+</pre>
+<pre class="anchors">
+urlPrefix: https://dom.spec.whatwg.org; spec: DOM
+  type: dfn
+    text: dispatch; url: concept-event-dispatch
+    text: event; url: concept-event
+    text: event listener; url: concept-event-listener
+urlPrefix: https://html.spec.whatwg.org/multipage/; spec: HTML
+  type: dfn
+    urlPrefix: webappapis.html
+      text: task queue
+      text: task; url: concept-task
+      text: fire a simple event
+      text: trusted; url: concept-events-trusted
+      text: spin the event loop; url: spin-the-event-loop
+    urlPrefix: browsers.html
+      text: origin; url: origin-2
+      text: navigating; url: navigate
+      text: browsing context
+      text: nested browsing context
+    urlPrefix: iframe-embed-object.html
+      text: allowed-to-use
+    urlPrefix: interaction.html
+      text: focused
+      text: gains focus; url: gains-focus
+      text: DOM anchor; url: dom-anchor
+      text: focusable area; url: focusable-area
+      text: currently focused area; url: currently-focused-area-of-a-top-level-browsing-context
+      text: has focus steps; url: has-focus-steps
+urlPrefix: http://w3c.github.io/hr-time/; spec: HR-TIME-2
+  type: interface
+    text: DOMHighResTimeStamp; url: dom-domhighrestimestamp
+  type: dfn
+    text: time origin
+urlPrefix: https://w3c.github.io/page-visibility; spec: PAGE-VISIBILITY
+  type: dfn
+    text: document visibility state; url: dom-document-visibilitystate
+    text: visibility states; url: dfn-visibility-states
+    text: steps to determine the visibility state; url: dfn-steps-to-determine-the-visibility-state
+urlPrefix: https://w3ctag.github.io/security-questionnaire/; spec: SECURITY-PRIVACY-QUESTIONNAIRE
+  type: dfn
+    text: same-origin policy violations; url: sop-violations
+urlPrefix: https://wicg.github.io/feature-policy/; spec: FEATURE-POLICY
+  type: dfn
+    text: allow attribute
+    text: default allowlist
+    text: feature name
+    text: policy-controlled feature
+</pre>
+<pre class=link-defaults>
+spec: webidl; type:dfn; text:attribute
+spec: webidl; type:dfn; text:identifier
+</pre>
+
+<pre class=biblio>
+{
+    "MOBILESENSORS": {
+        "authors": [
+            "Manish J. Gajjar"
+        ],
+        "id": "MOBILESENSORS",
+        "title": "Mobile Sensors and Context-Aware Computing",
+        "date": "2017",
+        "status": "Informational",
+        "publisher": "Morgan Kaufmann"
+     },
+     "GYROSPEECHRECOGNITION": {
+         "authors": [
+             "Michalevsky, Y., Boneh, D. and Nakibly, G."
+         ],
+         "id": "GYROSPEECHRECOGNITION",
+         "href": "https://www.usenix.org/system/files/conference/usenixsecurity14/sec14-paper-michalevsky.pdf",
+         "title": "Gyrophone: Recognizing Speech from Gyroscope Signals",
+         "date": "2014",
+         "status": "Informational",
+         "publisher": "USENIX"
+     },
+     "STEALINGPINSVIASENSORS": {
+         "authors": [
+             "Maryam Mehrnezhad, Ehsan Toreini, Siamak F. Shahandashti, Feng Hao"
+         ],
+         "id": "STEALINGPINSVIASENSORS",
+         "href": "https://rd.springer.com/article/10.1007/s10207-017-0369-x?wt_mc=Internal.Event.1.SEM.ArticleAuthorOnlineFirst",
+         "title": "Stealing PINs via mobile sensors: actual risk versus user perception",
+         "date": "2017",
+         "status": "Informational",
+         "publisher": "International Journal of Information Security"
+     },
+     "GENERIC-SENSOR-USECASES": {
+         "authors": [
+             "Rick Waldron, Mikhail Pozdnyakov, Alexander Shalamov"
+         ],
+         "id": "GENERIC-SENSOR-USECASES",
+         "href": "https://w3c.github.io/sensors/usecases",
+         "title": "Sensor Use Cases",
+         "date": "2017",
+         "status": "Note"
+     }
+}
+</pre>
+
+<h2 id="intro">Introduction</h2>
+
+Increasingly, sensor data is used in application development to
+enable new use cases such as geolocation,
+counting steps or head-tracking.
+This is especially true on mobile devices where new sensors are added regularly.
+
+Exposing sensor data to the Web
+has so far been both slow-paced and ad-hoc.
+Few sensors are already exposed to the Web.
+When they are, it is often in ways that limit their possible use cases
+(for example by exposing abstractions that are too [=high-level=]
+and which don't perform well enough).
+APIs also vary greatly from one sensor to the next
+which increases the cognitive burden of Web application developers
+and slows development.
+
+The goal of the Generic Sensor API is to
+promote consistency across sensor APIs,
+enable advanced use cases thanks to performant [=low-level=] APIs,
+and increase the pace at which new sensors can be exposed to the Web
+by simplifying the specification and implementation processes.
+
+A comprehensive list of concrete sensors that are based on Generic Sensor API, applicable use
+cases, and code examples can be found in [[GENERIC-SENSOR-USECASES]] and [[MOTION-SENSORS]]
+explainer documents.
+
+<h2 id="scope">Scope</h2>
+
+<em>This section is non-normative</em>.
+
+The scope of this specification is currently limited
+to specifying primitives which enable exposing data from [=device sensors=].
+
+Exposing remote sensors
+or sensors found on personal area networks (e.g. Bluetooth)
+is out of scope.
+As work in these areas mature,
+it is possible that common, lower-level primitives be found,
+in which case this specification will be updated accordingly.
+This should have little to no effects on implementations, however.
+
+This specification also does not currently expose a
+sensor discovery API.
+This is because the limited number of sensors currently available to user agents
+does not warrant such an API.
+Using feature detection, such as described in [[#feature-detection]],
+is good enough for now.
+A subsequent version of this specification might specify such an API,
+and the current API has been designed with this in mind.
+
+
+<h2 id="feature-detection">A note on Feature Detection of Hardware Features</h2>
+
+<em>This section is non-normative.</em>
+
+Feature detection is an established Web development best practice.
+Resources on the topic are plentiful on and offline and
+the purpose of this section is not to discuss it further,
+but rather to put it in the context of detecting hardware-dependent features.
+
+Consider the below feature detection examples:
+
+<div class="example">
+    <pre highlight="js">
+        if (typeof Gyroscope === "function") {
+            // run in circles...
+        }
+
+        if ("ProximitySensor" in window) {
+            // watch out!
+        }
+
+        if (window.AmbientLightSensor) {
+            // go dark...
+        }
+
+        // etc.
+    </pre>
+</div>
+
+All of these tell you something about the presence
+and possible characteristics of an API.
+They do not tell you anything, however, about whether
+that API is actually connected to a real hardware sensor,
+whether that sensor works,
+if its still connected,
+or even whether the user is going to allow you to access it.
+Note you can check the latter using the Permissions API [[PERMISSIONS]].
+
+In an ideal world, information about the underlying status
+would be available upfront.
+The problem with this is twofold.
+First, getting this information out of the hardware is costly,
+in both performance and battery time,
+and would sit in the critical path.
+Secondly, the status of the underlying hardware can evolve over time.
+The user can revoke permission, the connection to the sensor be severed,
+the operating system may decide to limit sensor usage below a certain battery threshold,
+etc.
+
+Therefore, an effective strategy is to combine feature detection,
+which checks whether an API for the sought-after sensor actually exists,
+and defensive programming which includes:
+
+1.  checking for error thrown when instantiating a {{Sensor}} object,
+2.  listening to errors emitted by it,
+3.  handling all of the above graciously so that the user's experience is
+    enhanced by the possible usage of a sensor, not degraded by its
+    absence.
+
+<div class="example">
+    <pre highlight="js">
+        try { // No need to feature detect thanks to try..catch block.
+            var sensor = new GeolocationSensor();
+            sensor.start();
+            sensor.onerror = error => gracefullyDegrade(error);
+            sensor.onreading = _ => updatePosition(sensor.latitude, sensor.longitude);
+        } catch(error) {
+            gracefullyDegrade(error);
+        }
+    </pre>
+</div>
+
+
+<h2 id="security-and-privacy">Security and privacy considerations</h2>
+
+[=sensor readings|Sensor readings=] are sensitive data and could become a subject of
+various attacks from malicious Web pages. Before discussing the mitigation strategies we
+briefly enumerate the main types of the [=device sensor|sensor=]'s privacy and security threats.
+The [[MOBILESENSORS]] categorizes main threats into [[#location-tracking|location tracking]],
+[[#eavesdropping|eavesdropping]], [[#keystroke-monitoring|keystroke monitoring]],
+[[#device-fingerprinting|device fingerprinting]], and [[#user-identifying|user identification]].
+This categorization is a good fit for this specification.
+
+The risk of successful attack can increase when [=device sensor|sensors=] are used with each other,
+in combination with other functionality, or when used over time,
+specifically with the risk of correlation of data
+and user identification through fingerprinting.
+Web application developers using these JavaScript APIs should
+consider how this information might be correlated with other information
+and the privacy risks that might be created.
+The potential risks of collection of such data over a longer period of time
+should also be considered.
+
+Variations in [=sensor readings=]
+as well as event firing rates
+offer the possibility of fingerprinting to identify users.
+User agents may reduce the risk by
+limiting event rates available to web application developers.
+
+Minimizing the accuracy of a sensor's readout
+generally decreases the risk of fingerprinting.
+User agents should not provide unnecessarily verbose readouts of sensors data.
+Each [=sensor type=] should be assessed individually.
+
+If the same JavaScript code using the API can be
+used simultaneously in different window contexts on the same device
+it may be possible for that code to correlate the user across those two contexts,
+creating unanticipated tracking mechanisms.
+
+User agents should consider providing the user
+an indication of when the [=device sensor|sensor=] is used
+and allowing the user to disable it.
+Additionally, user agents may consider
+allowing the user to verify past and current sensor use patterns.
+
+Web application developers that use [=device sensor|sensors=] should
+perform a privacy impact assessment of their application
+taking all aspects of their application into consideration.
+
+Ability to detect a full working set of sensors on a device can form an
+identifier and could be used for fingerprinting.
+
+A combination of selected sensors can potentially be used to form an out of
+band communication channel between devices.
+
+Sensors can potentially be used in cross-device linking and tracking of a user.
+
+<h3 id="main-privacy-security-threats">Types of privacy and security threats</h3>
+
+<em>This section is non-normative.</em>
+
+<h4 id="location-tracking">Location Tracking</h4>
+
+Under this type of threat, the attacks use [=sensor readings=] to locate the device without
+using GPS or any other location sensors. For example, accelerometer data can be used to infer
+the location of smartphones by using statistical models to obtain estimated trajectory,
+then map matching algorithms can be used to obtain predicted location points (within a
+200-m radius)[[MOBILESENSORS]].
+
+<h4 id="eavesdropping">Eavesdropping</h4>
+
+Recovering speech from gyroscope [=sensor readings|readings=] is an example of eavesdropping attack.
+See [[GYROSPEECHRECOGNITION]].
+
+<h4 id="keystroke-monitoring">Keystroke Monitoring</h4>
+
+Many user inputs can be inferred from [=sensor readings=], this includes a wide range of attacks
+on user PINs, passwords, and lock patterns (and even touch actions such as click, scroll, and
+zoom) using motion sensors. These attacks normally train a machine learning algorithm to
+discover such information about the users. See [[STEALINGPINSVIASENSORS]].
+
+<h4 id="device-fingerprinting">Device Fingerprinting</h4>
+
+Sensors can provide information that can uniquely identify the device using those sensors.
+Every concrete sensor model has minor manufacturing imperfections and differences that will be
+unique for this model. These manufacturing variations and imperfections can be used to fingerprint
+the device [[MOBILESENSORS]].
+
+<h4 id="user-identifying">User Identifying</h4>
+
+[=Sensor readings=] can be used to identify the user, for example via inferring
+individual walking patterns from smartphone or wearable device motion sensors' data.
+
+
+<h3 id="mitigation-strategies">Mitigation Strategies</h3>
+
+<em>This section is non-normative.</em>
+
+This section gives a high-level presentation of some of the mitigation strategies
+specified in the normative sections of this specification.
+
+<h4 id="secure-context">Secure Context</h4>
+
+[=Sensor readings=] are explicitly flagged by the
+Secure Contexts specification [[POWERFUL-FEATURES]]
+as a high-value target for network attackers.
+Thus all interfaces defined by this specification
+or [=extension specifications=]
+are only available within a [=secure context=].
+
+
+<h4 id="feature-policy" oldids="browsing-context">Feature Policy</h4>
+
+To avoid the privacy risk of sharing [=sensor readings=] with contexts unfamiliar
+to the user, [=sensor readings=] are only available for the
+[=documents=] which are [=allowed to use=] the [=policy-controlled features=] for
+the given [=sensor type=]. See [[FEATURE-POLICY]] for more details.
+
+<h4 id="losing-focus">Losing Focus</h4>
+
+When the [=top-level browsing context=] loses focus,
+or when an element from the [=nested browsing context=] of a different [=origin=]
+[=gains focus=] (for example when the user carries out an in-game purchase
+using a third party payment service from within an iframe)
+the [=top-level browsing contexts=] suddenly becomes in a position
+to carry out a skimming attack against the [=browsing context=] whose element
+has [=gains focus|gained focus=].
+
+To mitigate this risk [=sensor readings=] are only available to the [=browsing contexts=]
+of the same [=origin=] with the [=browsing context|context=] containing
+the [=focused=] element.
+
+<h4 id="visibility-state">Visibility State</h4>
+
+[=Sensor readings=] are only available for the [=active documents=] whose
+[=steps to determine the visibility state|visibility state=]
+is "visible".
+
+<h4 id="permissions" oldids="permissioning">Permissions API</h4>
+
+Access to [=sensor readings=] are controlled by the Permissions API [[!PERMISSIONS]].
+User agents use a [=new information about the user's intent|number of criteria=]
+to grant access to the [=sensor readings|readings=].
+Note that access can be granted without prompting the user.
+
+<h3 id="mitigation-strategies-case-by-case">Mitigation strategies applied on a case by case basis</h3>
+
+Each [=sensor type=] will need to be assessed individually,
+taking into account the use cases it enables
+and its particular threat profile.
+While some of the below mitigation strategies
+are effective for certain sensors,
+they might also hinder or altogether prevent certain use cases.
+
+Note: These mitigation strategies can be applied constantly or temporarily,
+for example when the user is carrying out specific actions,
+when other APIs which are known to amplify the level of the threat are in use,
+etc.
+
+
+<h4 id="limit-max-frequency" dfn>Limit maximum sampling frequency</h4>
+
+User agents may mitigate certain threats by
+limiting the maximum [=sampling frequency=].
+What upper limit to choose depends on the [=sensor type=],
+the kind of threats the user agent is trying to protect against,
+the expected resources of the attacker, etc.
+
+Limiting the maximum [=sampling frequency=] prevents use cases
+which rely on low latency or high data density.
+
+
+<h4 id="stop-sensor" dfn>Stop the sensor altogether</h4>
+
+This is obviously a last-resort solution,
+but it can be extremely effective if it's temporal,
+for example to prevent password skimming attempts
+when the user is entering credentials on a different origin ([[rfc6454]])
+or in a different application.
+
+
+<h4 id="limit-number-of-delivered-readings" dfn>Limit number of delivered readings</h4>
+
+An alternative to [=limit maximum sampling frequency|limiting the maximum sampling frequency=] is to
+limit the number of [=sensor readings=] delivered to Web application developer,
+regardless of what frequency the sensor is polled at.
+This allows use cases which have low latency requirement
+to increase [=sampling frequency=]
+without increasing the amount of data provided.
+
+Discarding intermediary readings prevents certain use cases,
+such as those relying on certain kinds of filters.
+
+
+<h4 id="reduce-accuracy" dfn>Reduce accuracy</h4>
+
+Reducing the accuracy of [=sensor readings=]
+or sensor [=reading timestamps=]
+might also help mitigate certain threats,
+thus user agents should not provide
+unnecessarily verbose readouts of sensors data.
+
+Note: Inaccuracies will further increase for operations carried out on the
+[=sensor readings=], or time deltas calculated from the [=reading timestamp|timestamps=].
+So, this mitigation strategy can affect certain use cases.
+
+Note: while adding random bias to [=sensor readings=] has similar effects,
+it shouldn't be used in practice
+as it is easy to filter out the added noise.
+
+
+<h4 id="inform-user">Keep the user informed about API use</h4>
+
+User agents may choose to keep the user informed
+about current and past use of the API.
+
+Note: this does not imply keeping a log of the actual [=sensor readings=]
+which would have issues of its own.
+
+
+<h2 id="concepts">Concepts</h2>
+
+
+<h3 id="concepts-sensors">Sensors</h3>
+
+The term <dfn id="concept-device-sensor">device sensor</dfn> refers to a device's underlying
+physical sensor instance.
+
+The [=device sensors=] measure different physical quantities
+and provide corresponding <dfn>raw sensor readings</dfn>
+which are a source of information about the user and their environment.
+
+Each [=raw sensor reading|reading=] is composed of the <dfn lt="reading value">values</dfn>
+of the different physical quantities measured by the [=device sensor|sensor=]
+at time <var ignore>t<sub>n</sub></var> which is called the <dfn>reading timestamp</dfn>.
+
+Known, <em>predictable</em> discrepancies between [=raw sensor readings=]
+and the corresponding physical quantities being measured
+are corrected through <dfn>calibration</dfn>.
+
+Known but <em>unpredictable</em> discrepancies need to be addressed dynamically
+through a process called [=sensor fusion=].
+
+[=calibration|Calibrated=] [=raw sensor readings=] are referred to as <dfn>sensor readings</dfn>,
+whether or not they have undergone [=sensor fusion=].
+
+The term <dfn id="concept-platform-sensor">platform sensor</dfn> refers to platform interfaces,
+with which the user agent ineracts to obtain [=sensor readings=] for a single [=sensor type=]
+originated from one or several [=device sensors=].
+
+[=Platform sensor=] can be defined by the underlying platform (e.g. in a native sensors framework)
+or by the user agent, if it has a direct access to [=device sensor=].
+
+From the implementation perspective [=platform sensor=] can be treated as a software proxy for the
+corresponding [=device sensor=]. It is possible to have multiple [=platform sensors=] simultaneously
+interacting with the same [=device sensor=] if the underlying platform suppports it.
+
+In simple case a [=platform sensor=] corresponds to a single [=device sensor=],
+but if the provided [=sensor readings=] are product of [=sensor fusion=] performed
+in software, the [=platform sensor=] corresponds to a set of [=device sensors=]
+involved in the [=sensor fusion=] process.
+
+Note: [=platform sensors=] created through [=sensor fusion=] are sometimes
+called virtual or synthetic sensors. However, the specification doesn't
+make any practical distinction between them.
+
+<h3 id="concepts-sensor-types">Sensor Types</h3>
+
+Different [=sensor types=] measure different physical quantities
+such as temperature, air pressure, heart-rate, or luminosity.
+
+For the purpose of this specification we distinguish between
+[=high-level=] and [=low-level=] [=sensor types=].
+
+[=Sensor types=] which are characterized by their implementation
+are referred to as <dfn>low-level</dfn> sensors.
+For example a Gyroscope is a [=low-level=] [=sensor type=].
+
+Sensors named after their [=sensor readings|readings=],
+regardless of the implementation,
+are said to be <dfn>high-level</dfn> sensors.
+For instance, geolocation sensors provide information about the user's location,
+but the precise means by which this data is obtained
+is purposefully left opaque
+(it could come from a GPS chip, network cell triangulation,
+wifi networks, etc. or any combination of the above)
+and depends on various, implementation-specific heuristics.
+[=High-level=] sensors are generally the fruits of
+applying algorithms to [=low-level=] sensors--
+for example, a pedometer can be built using only the output of a gyroscope--
+or of [=sensor fusion=].
+
+That said, the distinction between
+[=high-level=] and [=low-level=] [=sensor types=]
+is somewhat arbitrary and the line between the two is often blurred.
+For instance, a barometer, which measures air pressure,
+would be considered [=low-level=] for most common purposes,
+even though it is the product of the [=sensor fusion=] of
+resistive piezo-electric pressure and temperature sensors.
+Exposing the sensors that compose it would serve no practical purpose;
+who cares about the temperature of a piezo-electric sensor?
+A pressure-altimeter would probably fall in the same category,
+while a nondescript altimeter--
+which could get its data from either a barometer or a GPS signal--
+would clearly be categorized as a [=high-level=] [=sensor type=].
+
+Because the distinction is somewhat blurry,
+extensions to this specification (see [[#extensibility]])
+are encouraged to provide domain-specific definitions of
+[=high-level=] and [=low-level=] sensors
+for the given [=sensor types=] they are targeting.
+
+[=Sensor readings=] from different [=sensor types=] can be combined together
+through a process called <dfn>sensor fusion</dfn>.
+This process provides [=high-level|higher-level=] or
+more accurate data (often at the cost of increased latency).
+For example, the [=sensor readings|readings=] of a three-axis magnetometer
+needs to be combined with the [=sensor readings|readings=] of an accelerometer
+to provide a correct bearing.
+
+<dfn>Smart sensors</dfn> and <dfn>sensor hubs</dfn>
+have built-in compute resources which allow them
+to carry out [=calibration=] and [=sensor fusion=] at the hardware level,
+freeing up CPU resources and lowering battery consumption in the process.
+
+[=Sensor fusion=] can also be carried out in software if it cannot be
+performed at the hardware level or if an application-specific
+[=sensor fusion|fusion=] algorithm is required.
+
+## Default sensor ## {#concepts-default-sensor}
+
+The Generic Sensor API is designed to make the most common use cases straightforward
+while still enabling more complex use cases.
+
+Most of devices deployed today do not carry more than one
+[=device sensor=] providing [=sensor readings=] of the same [=sensor type|type=].
+The use cases which require a set of similar [=device sensors=] are rare
+and generally limited to specific [=sensor types=],
+such as multiple accelerometers in 2-in-1 laptops.
+
+The API therefore makes it easy to interact with
+the device's default (and often unique) [=device sensor|sensor=]
+for each [=sensor types|type=]
+simply by instantiating the corresponding {{Sensor}} subclass.
+
+Indeed, without specific information identifying a particular [=device sensor|sensor=]
+of a given [=sensor type|type=], the <dfn export>default sensor</dfn> is chosen by the
+user agent.
+
+If the underlying platform provides an interface to find the [=default sensor=],
+the user agent must choose the sensor offered by the platform, otherwise the user agent
+itself defines which of the [=device sensor|sensors=] present on the device is
+the [=default sensor=].
+
+<div class="example">
+    Listening to the default accelerometer changes:
+
+    <pre highlight="js">
+    let sensor = new Accelerometer({ frequency: 30 });
+
+    sensor.onreading = () => { ... }
+    sensor.start();
+    </pre>
+</div>
+
+Note: extension to this specification may choose not to define a [=default sensor=]
+when doing so wouldn't make sense.
+For example, it does not make sense to explicitly define a default
+[=device sensor|sensor=] for geolocation [=sensor type=] as the
+implementation of its interface can use multiple backends.
+
+In cases where
+multiple [=device sensors=] corresponding to the same [=sensor type|type=]
+may coexist on the same device,
+specification extension will have to
+define ways to uniquely identify each one.
+
+<div class="example">
+    For example checking the pressure of the left rear tire:
+
+    <pre highlight="js">
+    var sensor = new DirectTirePressureSensor({ position: "rear", side: "left" });
+    sensor.onreading = _ => console.log(sensor.pressure);
+    sensor.start();
+    </pre>
+</div>
+
+## Reading change threshold ## {#concepts-reading-change-threshold}
+
+A [=platform sensor=] reports [=sensor readings|readings=] to the user agent considering
+the [=reading change threshold=].
+
+The <dfn>reading change threshold</dfn> refers to a value which indicates whether or
+not the changes in the [=device sensor=]'s measurements were significant enough to
+update the corresponding [=sensor readings=].
+
+The [=reading change threshold|threshold=] value depends on the surrounding software and hardware
+environment constraints, e.g., software power consumption optimizations or the underlying
+[=device sensor=]'s accuracy.
+
+## Sampling Frequency and Reporting Frequency ## {#concepts-sampling-and-reporting-frequencies}
+
+For the purpose of this specification, <dfn>sampling frequency</dfn> for a [=platform sensor=] is
+defined as a frequency at which the user agent obtains [=sensor readings=] from the underlying
+platform.
+
+The user agent can request the underlying platform to deliver [=sensor readings|readings=] at a certain
+rate which is called <dfn>requested sampling frequency</dfn>.
+
+The [=sampling frequency=] is equal to the [=requested sampling frequency=] if the underlying platform
+can support it.
+
+The [=sampling frequency=] differs from the [=requested sampling frequency=] in the following cases:
+ - the [=requested sampling frequency=] exceeds upper or lower [=sampling frequency=] bounds
+   supported by the underlying platform.
+ - the [=reading change threshold|threshold=] value is significant so that some of the
+   [=device sensor=]'s measurements are skipped and the [=sensor readings=] are not updated.
+
+The <dfn>reporting frequency</dfn> for a concrete {{Sensor}} object is defined as a frequency at which
+the "reading" event is [=fire an event|fired=] at this object.
+
+A {{Sensor}} object cannot access new [=sensor readings|readings=] at a higher rate than the
+user agent obtains them from the underlying platform, therefore the [=reporting frequency=] can
+never exceed the [=sampling frequency=] for the given [=sensor type=].
+
+## Conditions to expose sensor readings ## {#concepts-can-expose-sensor-readings}
+
+The user agent must verify that all [=mandatory conditions=] are satisfied to ensure it
+<dfn>can expose sensor readings</dfn> to a given [=active document=].
+
+The <dfn>mandatory conditions</dfn> are the following:
+ - [=document visibility state|Visibility state=] of the document is "visible".
+ - The document is [=allowed to use=] all the [=policy-controlled features=] associated
+   with the given [=sensor type=].
+ - [=Currently focused area=] belongs to a document whose origin is [=same origin-domain=]
+   with the origin of the given [=active document=].
+ - <dfn>Specific conditions</dfn>: The [=extension specifications=] that add new
+   [=mandatory conditions|conditions=] hook into this specification at this point.
+
+Note: In order to release hardware resources, the user agent can request underlying
+[=platform sensor=] to suspend notifications about newly available readings until it
+[=can expose sensor readings=].
+
+<h2 id="model">Model</h2>
+
+<h3 id="model-sensor-type">Sensor Type</h3>
+
+A <dfn>sensor type</dfn> has an associated [=interface=]
+whose [=inherited interfaces=] contains {{Sensor}}.
+
+A [=sensor type=] has a [=ordered set|set=] of <dfn export>associated sensors</dfn>.
+
+A [=sensor type=] may have a [=default sensor=].
+
+A [=sensor type=] has a [=set/is empty|nonempty=] [=ordered set|set=] of associated
+{{PermissionName|PermissionNames}} referred as <dfn export>sensor permission names</dfn>.
+
+Note: multiple [=sensor types=] may share the same {{PermissionName}}.
+
+A [=sensor type=] has a [=permission revocation algorithm=].
+
+<div algorithm>
+
+    To invoke the <dfn lt="generic sensor permission revocation algorithm">permission revocation algorithm</dfn>
+    with {{PermissionName}} |permission_name|, run the following steps:
+
+    1.  For each |sensor_type| whose [=sensor permission names|permission names=] [=set/contains=] |permission_name|:
+        1.  [=set/For each=] |sensor| in |sensor_type|'s [=ordered set|set=] of [=associated sensors=],
+            1.  Invoke [=revoke sensor permission=] with |sensor| as argument.
+</div>
+
+A [=sensor type=] has a [=set/is empty|nonempty=] [=ordered set|set=] of associated
+[=feature names=] referred as <dfn export>sensor feature names</dfn>.
+
+<h3 id="model-sensor">Sensor</h3>
+
+A [=platform sensor=] has an associated [=ordered set|set=]
+of <dfn>activated sensor objects</dfn>.
+This set is initially [=set/is empty|empty=].
+
+The current [=browsing context=]'s [=platform sensor=] has an associated <dfn>latest reading</dfn>
+[=ordered map|map=] which holds the latest available [=sensor readings=].
+
+Note: User agents can share [=latest reading=] [=ordered map|map=] between different
+[=browsing context|contexts=] only if the [=origins=] of these contexts' [=active documents=]
+are [=same origin-domain=].
+
+Any time a new [=sensor reading=] for a [=platform sensor=] is obtained and if the user agent
+[=can expose sensor readings=] to the current [=browsing context=]'s [=active document=],
+[=update latest reading=] is invoked with the [=platform sensor=]
+and the [=sensor reading=] as arguments.
+
+The [=latest reading=] [=ordered map|map=] contains an [=map/entry=] whose [=map/key=] is
+"timestamp" and whose [=map/value=] is a high resolution timestamp that estimates the
+[=reading timestamp=] expressed in milliseconds since the [=time origin=].
+
+Note: The accuracy of the [=reading timestamp=] estimate depends on the underlying
+platform interfaces that expose it.
+
+The [=latest reading=]["timestamp"] is initially set to null,
+unless the [=latest reading=] [=ordered map|map=] caches a previous [=sensor readings|reading=].
+
+The other [=map/entries=] of the [=latest reading=] [=ordered map|map=]
+hold the values of the different quantities measured by the [=platform sensor=].
+The [=map/keys=] of these [=map/entries=] must match
+the [=attribute=] [=identifier=] defined by
+the [=sensor type=]'s associated interface.
+The return value of the [=attribute=] getter is
+easily obtained by invoking [=get value from latest reading=]
+with the object implementing the [=sensor type=]'s associated interface
+and the [=attribute=] [=identifier=] as arguments.
+
+The [=map/value=] of all [=latest reading=] [=map/entries=]
+is initially set to null.
+<!-- ,
+unless the [=latest reading=] [=ordered map|map=]
+caches a previous [=sensor readings|reading=].
+
+Note: there are additional privacy concerns when using cached [=sensor readings|readings=]
+which predate either [=navigating=] to resources in the current [=origin=],
+or being granted permission to access the [=platform sensor=]. -->
+
+A [=platform sensor=] has an associated [=requested sampling frequency=] which is initially null.
+
+For a non[=set/is empty|empty=] [=ordered set|set=] of [=activated sensor objects=] the
+[=requested sampling frequency=] is equal to <dfn>optimal sampling frequency</dfn>, which is estimated
+by the user agent taking into account {{[[frequency]]|provided frequencies}}
+of [=activated sensor objects|activated=] {{Sensor|Sensors}} and [=sampling frequency=] bounds
+defined by the underlying platform.
+
+Note: For example, the user agent may estimate [=optimal sampling frequency=] as a Least Common
+Denominator (LCD) for a set of {{[[frequency]]|provided frequencies}} capped
+by [=sampling frequency=] bounds defined by the underlying platform.
+
+<div class=example>
+
+This example illustrates a possible implementation of the described [[#model|Model]].
+
+In the diagram below several [=activated sensor objects|activated=] {{Sensor}} objects from two
+different [=browsing contexts=] interact with a single [=device sensor=].
+
+<img srcset="images/generic_sensor_model.svg" src="images/generic_sensor_model.png" alt="Generic Sensor Model">
+
+The {{Sensor}} object in "idle" [[#sensor-lifecycle|state]] is not among the [=platform sensor=]'s
+[=activated sensor objects=] and thus it does not interact with the [=device sensor=].
+
+In this example there is a [=platform sensor=] instance per [=browsing context=].
+
+The [=latest reading=] [=ordered map|map=] is shared between {{Sensor}} objects from the
+same [=browsing context|context=] and is updated at rate equal to [=requested sampling frequency=]
+of the corresponding [=platform sensor=].
+
+</div>
+
+<h2 id="api">API</h2>
+
+
+<h3 id="the-sensor-interface">The Sensor Interface</h3>
+
+<pre class="idl">
+[SecureContext, Exposed=Window]
+interface Sensor : EventTarget {
+  readonly attribute boolean activated;
+  readonly attribute boolean hasReading;
+  readonly attribute DOMHighResTimeStamp? timestamp;
+  void start();
+  void stop();
+  attribute EventHandler onreading;
+  attribute EventHandler onactivate;
+  attribute EventHandler onerror;
+};
+
+dictionary SensorOptions {
+  double frequency;
+};
+</pre>
+
+A {{Sensor}} object has an associated [=platform sensor=].
+
+The [=task source=] for the [=tasks=] mentioned in this specification is the <dfn>sensor task source</dfn>.
+
+<div class="example">
+    In the following example, firstly, we check whether the user agent has permission to access
+    [=sensor readings=], then we construct accelerometer sensor and add
+    [=event listener|event listeners=] to get [=event|events=] for [=platform sensor=] activation,
+    error conditions and notifications about newly available [=sensor readings=]. The example
+    measures and logs maximum total acceleration of a device hosting the [=platform sensor=].
+
+    The [=event handler event types=] for the corresponding
+    [[#the-sensor-interface| Sensor Interface]]'s [=event handler=] attributes are defined in
+    [[#event-handlers|Event handlers]] section.
+
+    <pre highlight="js">
+    navigator.permissions.query({ name: 'accelerometer' }).then(result => {
+        if (result.state === 'denied') {
+            console.log('Permission to use accelerometer sensor is denied.');
+            return;
+        }
+
+        let acl = new Accelerometer({frequency: 30});
+        let max_magnitude = 0;
+        acl.addEventListener('activate', () => console.log('Ready to measure.'));
+        acl.addEventListener('error', error => console.log(\`Error: ${error.name}\`));
+        acl.addEventListener('reading', () => {
+            let magnitude = Math.hypot(acl.x, acl.y, acl.z);
+            if (magnitude > max_magnitude) {
+                max_magnitude = magnitude;
+                console.log(\`Max magnitude: ${max_magnitude} m/s2\`);
+            }
+        });
+        acl.start();
+    });
+    </pre>
+</div>
+
+
+### Sensor lifecycle ### {#sensor-lifecycle}
+
+<style>
+    svg g.edge text {
+        font-size: 8px;
+    }
+
+    svg g.node text {
+        font-size: 10px;
+    }
+</style>
+<svg xmlns="http://www.w3.org/2000/svg" height="79pt" viewBox="0.00 0.00 351.00 78.51" width="351pt">
+    <g class="graph" transform="scale(1 1) rotate(0) translate(4 74.5122)">
+        <title>Sensor lifecycle</title>
+        <a xlink:href="#dom-sensor-state-slot">
+            <g class="node">
+                <title>idle</title>
+                <path d="M96.997,-64C96.997,-64 66.997,-64 66.997,-64 60.997,-64 54.997,-58 54.997,-52 54.997,-52 54.997,-36 54.997,-36 54.997,-30 60.997,-24 66.997,-24 66.997,-24 96.997,-24 96.997,-24 102.997,-24 108.997,-30 108.997,-36 108.997,-36 108.997,-52 108.997,-52 108.997,-58 102.997,-64 96.997,-64" fill="white" stroke="black"/>
+                <text text-anchor="middle" transform="translate(0,-2)" x="81.997" y="-41.2">idle</text>
+            </g>
+        </a>
+        <a xlink:href="#dom-sensor-state-slot">
+            <g class="node">
+                <title>activating</title>
+                <path d="M214.997,-64C214.997,-64 156.997,-64 156.997,-64 150.997,-64 144.997,-58 144.997,-52 144.997,-52 144.997,-36 144.997,-36 144.997,-30 150.997,-24 156.997,-24 156.997,-24 214.997,-24 214.997,-24 220.997,-24 226.997,-30 226.997,-36 226.997,-36 226.997,-52 226.997,-52 226.997,-58 220.997,-64 214.997,-64" fill="white" stroke="black"/>
+                <text text-anchor="middle" transform="translate(0,-2)" x="185.997" y="-41.2">activating</text>
+            </g>
+        </a>
+        <g class="edge">
+            <title>idle-&gt;activating</title>
+            <path d="M109,-38.0296C116.891,-37.4946 125.842,-37.2349 134.762,-37.2507" fill="none" stroke="black"/>
+            <polygon fill="black" points="144.762,-37.3855 134.702,-41.7502 139.762,-37.318 134.763,-37.2506 134.763,-37.2506 134.763,-37.2506 139.762,-37.318 134.823,-32.751 144.762,-37.3855 144.762,-37.3855" stroke="black"/>
+            <text text-anchor="middle" transform="translate(0,-4)" x="133.576" y="-20.9121">start()</text>
+            <a xlink:href="#sensor-start">
+                <text text-anchor="middle" transform="translate(0,-4)" x="133.576" y="-20.9121">start()</text>
+            </a>
+        </g>
+        <g class="edge">
+            <title>activating-&gt;idle</title>
+            <path d="M144.762,-50.6145C136.302,-50.8304 127.428,-50.7883 119.129,-50.4883" fill="none" stroke="black"/>
+            <polygon fill="black" points="109,-49.9704 119.217,-45.987 113.993,-50.2258 118.987,-50.4811 118.987,-50.4811 118.987,-50.4811 113.993,-50.2258 118.757,-54.9753 109,-49.9704 109,-49.9704" stroke="black"/>
+            <text text-anchor="middle" transform="translate(0,-4)" x="119.656" y="-59.3122">
+                <a xlink:href="#sensor-onerror">onerror</a>
+            </text>
+        </g>
+        <a xlink:href="#dom-sensor-state-slot">
+            <g class="node">
+                <title>activated</title>
+                <path d="M330.997,-40C330.997,-40 274.997,-40 274.997,-40 268.997,-40 262.997,-34 262.997,-28 262.997,-28 262.997,-12 262.997,-12 262.997,-6 268.997,-0 274.997,-0 274.997,-0 330.997,-0 330.997,-0 336.997,-0 342.997,-6 342.997,-12 342.997,-12 342.997,-28 342.997,-28 342.997,-34 336.997,-40 330.997,-40" fill="white" stroke="black"/>
+                <text text-anchor="middle" transform="translate(0,-2)" x="302.997" y="-17.2">activated</text>
+            </g>
+        </a>
+        <g class="edge">
+            <title>activating-&gt;activated</title>
+            <path d="M227.218,-35.606C235.505,-33.8766 244.319,-32.037 252.881,-30.2504" fill="none" stroke="black"/>
+            <polygon fill="black" points="262.767,-28.1871 253.898,-34.6352 257.873,-29.2086 252.978,-30.2301 252.978,-30.2301 252.978,-30.2301 257.873,-29.2086 252.059,-25.825 262.767,-28.1871 262.767,-28.1871" stroke="black"/>
+        </g>
+        <g class="edge">
+            <title>activated-&gt;idle</title>
+            <path d="M262.74,-17.3829C244.593,-16.1731 226.997,-15 226.997,-15 226.997,-15 144.997,-15 144.997,-15 144.997,-15 132.341,-20.9199 118.465,-27.4103" fill="none" stroke="black"/>
+            <polygon fill="black" points="109.291,-31.7014 116.442,-23.3883 113.82,-29.5829 118.349,-27.4645 118.349,-27.4645 118.349,-27.4645 113.82,-29.5829 120.255,-31.5406 109.291,-31.7014 109.291,-31.7014" stroke="black"/>
+            <text text-anchor="middle" transform="translate(0,-4)" x="200" y="5"><a xlink:href="#sensor-stop">stop()</a> / <a xlink:href="#sensor-onerror">onerror</a></text>
+        </g>
+        <g class="node">
+            <title>start</title>
+            <ellipse cx="11.997" cy="-44" fill="black" rx="7" ry="7" stroke="black"/>
+        </g>
+        <g class="edge">
+            <title>start-&gt;idle</title>
+            <path d="M19.2724,-44C25.2754,-44 34.8461,-44 44.6767,-44" fill="none" stroke="black"/>
+            <polygon fill="black" points="54.8766,-44 44.8767,-48.5001 49.8766,-44 44.8766,-44.0001 44.8766,-44.0001 44.8766,-44.0001 49.8766,-44 44.8766,-39.5001 54.8766,-44 54.8766,-44" stroke="black"/>
+            <a xlink:href="#construct-sensor-object">
+                <text text-anchor="middle" transform="translate(0,-4)" x="29.5" y="-52.1333">construct</text>
+            </a>
+        </g>
+    </g>
+</svg>
+
+Note: the nodes in the diagram above represent the states of a {{Sensor}} object and they should not be
+confused with the possible states of the underlying [=platform sensor=] or [=device sensor=].
+
+### Sensor garbage collection ### {#sensor-garbage-collection}
+
+A {{Sensor}} object whose {{[[state]]}} is "activating" must not be garbage collected
+if there are any event listeners registered for "activated" events, "reading" events,
+or "error" events.
+
+A {{Sensor}} object whose {{[[state]]}} is "activated" must not be garbage collected
+if there are any event listeners registered for "reading" events, or "error" events.
+
+When a {{Sensor}} object whose {{[[state]]}} is "activated" or "activating" is
+eligible for garbage collection, the user agent must invoke [=deactivate a sensor
+object=] with this object as argument.
+
+### Sensor internal slots ### {#sensor-internal-slots}
+
+Instances of {{Sensor}} are created
+with the internal slots described in the following table:
+
+<table id="sensor-slots" class="vert data">
+    <thead>
+        <tr><th>Internal Slot</th><th>Description (non-normative)</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><dfn attribute for=Sensor>\[[state]]</dfn></td>
+            <td>The current state of the {{Sensor}} object which is one of
+                "idle",
+                "activating", or
+                "activated".
+                It is initially "idle".
+            </td>
+        </tr>
+        <tr>
+            <td><dfn attribute for=Sensor>\[[frequency]]</dfn></td>
+            <td>A double representing frequency in Hz that is used to calculate
+                the [=requested sampling frequency=] for the associated [=platform sensor=]
+                and to define the upper bound of the [=reporting frequency=] for this
+                {{Sensor}} object.
+
+                This slot holds the provided {{SensorOptions}}.{{frequency!!dict-member}} value.
+                It is initially unset.</td>
+        </tr>
+        <tr>
+            <td><dfn attribute for=Sensor>\[[lastEventFiredAt]]</dfn></td>
+            <td>The high resolution timestamp of the latest [=sensor reading=]
+                that was sent to observers of the {{Sensor}} object,
+                expressed in milliseconds that passed since the [=time origin=].
+                It is initially null.
+            </td>
+        </tr>
+        <tr>
+            <td><dfn attribute for=Sensor>\[[pendingReadingNotification]]</dfn></td>
+            <td>A boolean which indicates whether the observers need to be
+                notified after a new [=sensor reading=] was reported.
+                It is initially false.</td>
+        </tr>
+    </tbody>
+</table>
+
+
+### Sensor.activated ### {#sensor-activated}
+
+<div algorithm="is sensor activated">
+
+    The getter of the {{Sensor/activated!!attribute}} attribute must run these steps:
+
+    1.  If <strong>this</strong>.{{[[state]]}} is "activated",
+        return true.
+    1.  Otherwise, return false.
+</div>
+
+### Sensor.hasReading ### {#sensor-has-reading}
+
+<div algorithm="sensor has reading">
+
+    The getter of the {{Sensor/hasReading!!attribute}} attribute must run these steps:
+
+    1. Let |timestamp| be the result of invoking [=get value from latest reading=] with <strong>this</strong> and "timestamp" as arguments.
+    1.  If |timestamp| is not null, return true.
+    1.  Otherwise, return false.
+</div>
+
+### Sensor.timestamp ### {#sensor-timestamp}
+
+The getter of the {{Sensor/timestamp!!attribute}} attribute returns
+the result of invoking [=get value from latest reading=] with <strong>this</strong>
+and "timestamp" as arguments.
+
+
+### Sensor.start() ### {#sensor-start}
+
+<div algorithm="to start a sensor">
+
+    The {{Sensor/start()}} method must run these steps:
+
+    1.  Let |sensor_state| be the value of |sensor_instance|.{{[[state]]}}.
+    1.  If |sensor_state| is either "activating"
+        or "activated", then return.
+    1.  Set |sensor_instance|.{{[[state]]}} to "activating".
+    1.  Run these sub-steps [=in parallel=]:
+        1.  let |connected| be the result of invoking [=connect to sensor=] with |sensor_instance|
+            as argument.
+        1.  If |connected| is false, then
+            1.  Let |e| be the result of [=created|creating=] a
+                "{{NotReadableError!!exception}}" {{DOMException}}.
+                <!-- Note: user agents may decide to use a
+                "{{NotAllowedError!!exception}}" {{DOMException}},
+                here instead, possibly after a random but bounded delay,
+                to simulate the user denying the permission request,
+                rather than giving away physical characteristics of the device
+                which might be used for fingerprinting or profiling.
+                This would of course prevent the developer from
+                correctly diagnosing the reason for the rejection
+                and might lead to confusing instructions to the user,
+                but it is a tradeoff some User Agent might choose to make. -->
+            1.  Queue a task to run [=notify error=] with |e| and |sensor_instance| as arguments.
+            1.  Return.
+        1.  Let |permission_state| be the result of invoking
+            [=request sensor access=] with |sensor_instance| as argument.
+        1.  If |permission_state| is "granted",
+            1.  Invoke [=activate a sensor object=] with |sensor_instance| as argument.
+        1.  Otherwise, if |permission_state| is "denied",
+            1.  let |e| be the result of [=created|creating=]
+                a "{{NotAllowedError!!exception}}" {{DOMException}}.
+            1.  Queue a task to run [=notify error=] with |e| and |sensor_instance| as arguments.
+</div>
+
+
+### Sensor.stop() ### {#sensor-stop}
+
+<div algorithm="to stop a sensor">
+
+    The {{Sensor/stop()}} method must run these steps:
+
+    1.  If |sensor_instance|.{{[[state]]}} is "idle", then return.
+    1.  Set |sensor_instance|.{{[[state]]}} to "idle".
+    1.  Run these sub-steps [=in parallel=]:
+        1.  Invoke [=deactivate a sensor object=] with |sensor_instance| as argument.
+</div>
+
+
+### Sensor.onreading ### {#sensor-onreading}
+
+{{Sensor/onreading}} is an {{EventHandler}} which is called
+to notify that new [=sensor reading|reading=] is available.
+
+
+### Sensor.onactivate ### {#sensor-onactivate}
+
+{{Sensor/onactivate}} is an {{EventHandler}} which is called when
+<strong>this</strong>.{{[[state]]}} transitions from "activating" to "activated".
+
+
+### Sensor.onerror ### {#sensor-onerror}
+
+{{Sensor/onerror}} is an {{EventHandler}} which is called whenever
+an [=exception type|exception=] cannot be handled synchronously.
+
+
+### Event handlers ### {#event-handlers}
+
+The following are the [=event handlers=]
+(and their corresponding [=event handler event types=])
+that must be supported as attributes by the objects implementing the {{Sensor}} interface:
+
+<table class="def">
+  <thead>
+      <th>event handler</th>
+      <th>event handler event type</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong><code>onreading</code></strong></td>
+      <td><code>reading</code></td>
+    </tr>
+    <tr>
+      <td><strong><code>onactivate</code></strong></td>
+      <td><code>activate</code></td>
+    </tr>
+    <tr>
+      <td><strong><code>onerror</code></strong></td>
+      <td><code>error</code></td>
+    </tr>
+  </tbody>
+</table>
+
+
+<h3 id="the-sensor-error-event-interface">The SensorErrorEvent Interface</h3>
+
+<pre class="idl">
+[Constructor(DOMString type, SensorErrorEventInit errorEventInitDict),
+ SecureContext, Exposed=Window]
+interface SensorErrorEvent : Event {
+  readonly attribute DOMException error;
+};
+
+dictionary SensorErrorEventInit : EventInit {
+  required DOMException error;
+};
+</pre>
+
+
+### SensorErrorEvent.error ### {#sensor-error-event-error}
+
+Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
+
+<h2 id="abstract-operations">Abstract Operations</h2>
+
+<h3 dfn export>Construct sensor object</h3>
+
+<div algorithm="construct sensor object">
+
+    : input
+    :: |options|, a {{SensorOptions}} object.
+    : output
+    :: A {{Sensor}} object.
+
+    1.  [=set/For each=] |feature_name| of the associated [=sensor feature names=],
+        1. If [=active document=] is not [=allowed to use=] the
+           [=policy-controlled feature=] named |feature_name|, then:
+           1.  [=Throw=] a {{SecurityError}} {{DOMException}}.
+    1.  Let |sensor_instance| be a new {{Sensor}} object,
+    1.  If |options|.{{frequency!!dict-member}} is [=present=], then
+        1.  Set |sensor_instance|.{{[[frequency]]}} to |options|.{{frequency!!dict-member}}.
+
+        Note: there is not guarantee that the requested |options|.{{frequency!!dict-member}}
+        can be respected. The actual [=sampling frequency=] can be calculated using
+        {{Sensor}} {{Sensor/timestamp!!attribute}} attributes.
+    1.  Set |sensor_instance|.{{[[state]]}} to "idle".
+    1.  Return |sensor_instance|.
+</div>
+
+
+<h3 dfn export>Connect to sensor</h3>
+
+<div algorithm="connect to sensor">
+
+    : input
+    :: |sensor_instance|, a {{Sensor}} object.
+    : output
+    :: True if sensor instance was associated with a [=platform sensor=],
+       false otherwise.
+
+    1.  Let |type| be the [=sensor type=] of |sensor_instance|.
+    1.  If the device has a single [=device sensor=] which can provide [=sensor readings|readings=]
+        for |type|, then
+        1.  Associate |sensor_instance| with a [=platform sensor=] corresponding
+            to this [=device sensor=].
+        1.  Return true.
+    1.  If the device has multiple [=device sensors=] which can provide [=sensor readings|readings=]
+        for |type|, then
+        1.  If |type| has an associated [=default sensor=], then
+            1.  Associate |sensor_instance| with a [=platform sensor=] corresponding
+                to [=default sensor=].
+            1.  Return true.
+    1.  Return false.
+</div>
+
+
+<h3 dfn>Activate a sensor object</h3>
+
+<div algorithm="activate a sensor object">
+
+    : input
+    :: |sensor_instance|, a {{Sensor}} object.
+    : output
+    :: None
+
+    1.  Let |sensor| be the [=platform sensor=] associated with |sensor_instance|.
+    1.  [=set/Append=] |sensor_instance| to |sensor|'s set of [=activated sensor objects=].
+    1.  Invoke [=set sensor settings=] with |sensor| as argument.
+    1.  Queue a task to run [=notify activated state=] with |sensor_instance|
+        as an argument.
+</div>
+
+
+<h3 dfn>Deactivate a sensor object</h3>
+
+<div algorithm="deactivate a sensor object">
+
+    : input
+    :: |sensor_instance|, a {{Sensor}} object.
+    : output
+    :: None
+
+    1.  Remove all [=tasks=] associated with |sensor_instance| from the [=task queue=] associated
+        with [=sensor task source=].
+    1.  Let |sensor| be the [=platform sensor=] associated with |sensor_instance|.
+    1.  If |sensor|'s set of [=activated sensor objects=] [=set/contains=] |sensor_instance|,
+        1.  [=set/Remove=] |sensor_instance| from |sensor|'s set of [=activated sensor objects=].
+        1.  Invoke [=set sensor settings=] with |sensor| as argument.
+        1.  Set |sensor_instance|.{{[[pendingReadingNotification]]}} to false.
+        1.  Set |sensor_instance|.{{[[lastEventFiredAt]]}} to null.
+</div>
+
+<h3 dfn>Revoke sensor permission</h3>
+
+<div algorithm="revoke sensor permission">
+
+    : input
+    :: |sensor|, a [=platform sensor=].
+    : output
+    :: None
+
+    1.  Let |activated_sensors| be |sensor|'s associated [=ordered set|set=] of [=activated sensor objects=].
+    1.  [=set/For each=] |s| of |activated_sensors|,
+        1.  Invoke [=deactivate a sensor object=] with |s| as argument.
+        1.  Let |e| be the result of [=created|creating=]
+            a "{{NotAllowedError!!exception}}" {{DOMException}}.
+        1.  Queue a task to run [=notify error=] with |e| and |s| as arguments.
+</div>
+
+
+<h3 dfn>Set sensor settings</h3>
+
+<div algorithm="set sensor settings">
+
+    : input
+    :: |sensor|, a [=platform sensor=].
+    : output
+    :: None
+
+    1.  If |sensor|'s set of [=activated sensor objects=] [=set/is empty=],
+        1.  Set [=requested sampling frequency=] to null.
+        1.  [=map/For each=] |key| → <var ignore>value</var> of [=latest reading=].
+            1.  [=map/Set=] [=latest reading=][|key|] to null.
+        1.  Update the user-agent-specific way in which [=sensor readings=] are obtained from |sensor|
+            to no longer provide [=sensor readings|readings=].
+        1.  Return.
+    1.  Set [=requested sampling frequency=] to [=optimal sampling frequency=].
+</div>
+
+<h3 dfn>Update latest reading</h3>
+
+<div algorithm="update latest reading">
+
+    : input
+    :: |sensor|, a [=platform sensor=].
+    :: |reading|, a [=sensor reading=].
+    : output
+    :: None
+
+    1.  [=map/For each=] |key| → <var ignore>value</var> of [=latest reading=].
+        1.  [=map/Set=] [=latest reading=][|key|] to the corresponding
+            value of |reading|.
+    1.  Let |activated_sensors| be |sensor|'s associated [=ordered set|set=] of [=activated sensor objects=].
+
+    1.  Run these sub-steps [=in parallel=]:
+        1.  [=set/For each=] |s| in |activated_sensors|,
+            1.  Invoke [=report latest reading updated=] with |s| as an argument.
+</div>
+
+<h3 dfn>Find the reporting frequency of a sensor object</h3>
+
+<div algorithm="find the reporting frequency of a sensor object">
+
+    : input
+    :: |sensor_instance|, a {{Sensor}} object.
+    : output
+    :: [=reporting frequency=] in Hz.
+
+    1.  Let |frequency| be null.
+    1.  Let |f| be |sensor_instance|.{{[[frequency]]}}.
+        1. if |f| is set,
+            1. set |frequency| to |f| capped by the upper and lower [=sampling frequency=]
+               bounds for the associated [=platform sensor=].
+        1.  Otherwise,
+            1. user agent can assign |frequency| to an appropriate value.
+    1. return |frequency|.
+</div>
+
+
+<h3 dfn>Report latest reading updated</h3>
+
+<div algorithm="report latest reading updated">
+
+    : input
+    :: |sensor_instance|, a {{Sensor}} object.
+    : output
+    :: None
+
+    1.  If |sensor_instance|.{{[[pendingReadingNotification]]}} is true,
+        1. Return.
+    1.  Set |sensor_instance|.{{[[pendingReadingNotification]]}} to true.
+    1.  Let |lastReportedTimestamp| be the value of |sensor_instance|.{{[[lastEventFiredAt]]}}.
+    1.  If |lastReportedTimestamp| is not set
+        1.  Queue a task to run [=notify new reading=] with |sensor_instance| as an argument.
+        1.  Return.
+    1.  Let |reportingFrequency| be result of invoking [=Find the reporting frequency of a sensor object=].
+    1.  If |reportingFrequency| is null
+        1.  Queue a task to run [=notify new reading=] with |sensor_instance| as an argument.
+        1.  Return.
+    1.  Let |reportingInterval| be the result of 1 / |reportingFrequency|.
+    1.  Let |timestampDelta| be the result of [=latest reading=]["timestamp"] - |lastReportedTimestamp|.
+    1.  If  |timestampDelta| is greater than or equal to |reportingInterval|
+        1.  Queue a task to run [=notify new reading=] with |sensor_instance| as an argument.
+        1.  Return.
+    1.  Let |deferUpdateTime| be the result of |reportingInterval| - |timestampDelta|.
+    1.  [=Spin the event loop=] for a period of time equal to |deferUpdateTime|.
+    1.  If |sensor_instance|.{{[[pendingReadingNotification]]}} is true,
+        1.  Queue a task to run [=notify new reading=] with |sensor_instance| as an argument.
+</div>
+
+<h3 dfn>Notify new reading</h3>
+
+<div algorithm="notify new reading">
+
+    : input
+    :: |sensor_instance|, a {{Sensor}} object.
+    : output
+    :: None
+
+    1.  Set |sensor_instance|.{{[[pendingReadingNotification]]}} to false.
+    1.  Set |sensor_instance|.{{[[lastEventFiredAt]]}} to [=latest reading=]["timestamp"].
+    1.  [=Fire an event=] named "reading" at |sensor_instance|.
+</div>
+
+<h3 dfn>Notify activated state</h3>
+
+<div algorithm="notify activated state">
+
+    : input
+    :: |sensor_instance|, a {{Sensor}} object.
+    : output
+    :: None
+
+    1.  Set |sensor_instance|.{{[[state]]}} to "activated".
+    1.  [=Fire an event=] named "activate" at |sensor_instance|.
+    1.  Let |sensor| be the [=platform sensor=] associated with |sensor_instance|.
+    1.  If |sensor|’s [=latest reading=]["timestamp"] is not null,
+        1.  Queue a task to run [=notify new reading=] with |sensor_instance|
+            as an argument.
+</div>
+
+
+<h3 dfn>Notify error</h3>
+
+<div algorithm="notify error">
+
+    : input
+    :: |sensor_instance|, a {{Sensor}} object.
+    :: |error|, a {{DOMException}}.
+    : output
+    :: None
+
+    1.  Set |sensor_instance|.{{[[state]]}} to "idle".
+    1.  [=Fire an event=] named "error" at |sensor_instance| using {{SensorErrorEvent}}
+        with its {{SensorErrorEvent/error!!attribute}} attribute initialized to |error|.
+</div>
+
+
+<h3 dfn>Get value from latest reading</h3>
+
+<div algorithm="get value from latest reading">
+
+    : input
+    :: |sensor_instance|, a {{Sensor}} object.
+    :: |key|, a string representing the name of the value.
+    : output
+    :: A [=sensor reading=] value or null.
+
+    1.  If |sensor_instance|.{{[[state]]}} is "activated",
+        1.  Let |readings| be the [=latest reading=] of |sensor_instance|'s related [=platform sensor=].
+        1.  Return |readings|[|key|].
+    1.  Otherwise, return null.
+</div>
+
+
+<h3 dfn>Request sensor access</h3>
+
+<div algorithm="request sensor access">
+
+    : input
+    :: |sensor_instance|, a {{Sensor}} object.
+    : output
+    :: A [=permission state=].
+
+    1.  Let |sensor| be the [=platform sensor=] associated with |sensor_instance|.
+    1.  Let |sensor_permissions| be |sensor|'s associated [=ordered set|set=] of
+        [=sensor permission names|permission names=].
+    1.  Run these sub-steps [=in parallel=]:
+        1.  [=set/For each=] |permission_name| in |sensor_permissions|,
+            1.  Let |state| be the result of [=request permission to use|requesting permission to use=] |permission_name|.
+            1.  If |state| is "denied"
+                1.  Return "denied".
+        1.  Otherwise, return "granted".
+</div>
+
+<h2 id="extensibility">Extensibility</h2>
+
+<em>This section is non-normative.</em>
+
+This section describes how this specification can be extended to specify APIs for different
+[=sensor types=].
+
+Such <dfn lt="extension specification">extension specifications</dfn> are encouraged to focus on a
+single [=sensor type=], exposing both [=high-level|high=] and [=low-level|low=] level
+as appropriate.
+
+For an up-to-date list of [=extension specifications=], please refer to [[GENERIC-SENSOR-USECASES]]
+and [[MOTION-SENSORS]] documents.
+
+<h3 id="extension-security-and-privacy">Security and Privacy</h3>
+
+[=Extension specifications=] are expected to:
+
+- conform with the generic [[#mitigation-strategies|mitigation strategies]],
+- consider [[#mitigation-strategies-case-by-case|mitigation strategies applied
+  on a case by case basis]],
+- be evaluated against the Self-Review Questionnaire on Security and Privacy
+  [[SECURITY-PRIVACY-QUESTIONNAIRE]],
+- and in particular, be evaluated against the <a>same-origin policy violations</a>
+  that can arise if sensors expose a new communication channel not governed
+  by the same-origin policy.
+
+<h3 id="naming">Naming</h3>
+
+{{Sensor}} interfaces for [=low-level=] sensors should be
+named after their associated [=platform sensor=].
+So for example, the interface associated with a gyroscope
+should be simply named `Gyroscope`.
+{{Sensor}} interfaces for [=high-level=] sensors should be
+named by combining the physical quantity the [=platform sensor=] measures
+with the "Sensor" suffix.
+For example, a [=platform sensor=] measuring
+the distance at which an object is from it
+may see its associated interface called `ProximitySensor`.
+
+Attributes of the {{Sensor}} subclass that
+hold [=sensor readings=] values
+should be named after the full name of these values.
+For example, the `Thermometer` interface should hold
+the [=sensor reading=]'s value in
+a `temperature` attribute (and not a `value` or `temp` attribute).
+A good starting point for naming are the
+Quantities, Units, Dimensions and Data Types Ontologies [[QUDT]].
+
+
+<h3 id="unit">Unit</h3>
+
+[=Extension specifications=] must specify the unit of [=sensor readings=].
+
+As per the Technical Architecture Group's (TAG) API Design Principles [[API-DESIGN-PRINCIPLES]],
+all time measurement should be in milliseconds.
+All other units should be specified using,
+in order of preference,
+and with the exception of temperature (for which Celsius should be favored over Kelvin),
+the International System of Units (SI),
+SI derived units, and
+Non-SI units accepted for use with the SI,
+as described in the SI Brochure [[SI]].
+
+
+<h3 id="high-vs-low-level">Exposing High-Level vs. Low-Level Sensors</h3>
+
+So far, specifications exposing sensors to the Web platform
+have focused on [=high-level=] sensors APIs. [[GEOLOCATION-API]] [[ORIENTATION-EVENT]]
+
+This was a reasonable approach for a number of reasons.
+Indeed, [=high-level=] sensors:
+
+-   convey developer intent clearly,
+-   do not require intimate knowledge of how the underlying hardware sensors functions,
+-   are easy to use,
+-   may enable the User Agent to make significant
+    performance and battery life improvements,
+-   help avoid certain privacy and security issues by
+    decreasing the amount and type of information exposed.
+
+However, an increasing number of use cases
+such as virtual and augmented reality
+require [=low-level=] access to sensors,
+most notably for performance reasons.
+
+Providing [=low-level=] access
+enables Web application developers to leverage domain-specific constraints
+and design more performant systems.
+
+Following the precepts of the Extensible Web Manifesto [[EXTENNNNSIBLE]],
+[=extension specifications=] should focus primarily on
+exposing [=low-level=] sensor APIs, but should also expose
+[=high-level=] APIs when they are clear benefits in doing so.
+
+
+<h3 id="multiple-sensors">When is Enabling Multiple Sensors of the Same Type Not the Right Choice?</h3>
+
+It is not advisable to construct multiple {{Sensor}} instances of the same [=sensor type=] with
+equal construction parameters, as it can lead to unnecessary hardware resources consumption.
+
+In cases when multiple observers are interested in notifications of a newly available
+[=sensor reading=], an [=event listener=] can be added on a single {{Sensor}} instance instead of
+creating multiple instances of the same [=sensor type=] and using simple {{Sensor/onreading}} event
+handler.
+
+Conversely, multiple {{Sensor|Sensors}} of the same [=sensor type=] can be created when they
+are intended to be used with different settings, such as: [=requested sampling frequency=],
+accuracy or other settings defined in [=extension specifications=].
+
+<h3 id="definition-reqs">Definition Requirements</h3>
+
+The following definitions must be specified for
+each [=sensor type=] in [=extension specifications=]:
+
+-   An [=interface=] whose [=inherited interfaces=] contains {{Sensor}}.
+    This interface must be constructible.
+    Its [{{Constructor!!extended-attribute}}] must take, as an argument,
+    an optional [=dictionary=] whose [=inherited dictionaries=] contains {{SensorOptions}}.
+    Its [=attributes=] which expose [=sensor readings=] are [=read only=] and
+    their getters must return the result of invoking [=get value from latest reading=]
+    with <strong>this</strong> and [=attribute=] [=identifier=] as arguments.
+-   A {{PermissionName}}, if the [=sensor type=] is not representing
+    [=sensor fusion=] (otherwise, {{PermissionName|PermissionNames}}
+    associated with the fusion source [=sensor types=] must be used).
+
+An [=extension specification=] may specify the following definitions
+for each [=sensor types=]:
+
+-   A [=dictionary=] whose [=inherited dictionaries=] contains {{SensorOptions}}.
+-   A [=default sensor=]. Generally, devices are equipped with a single [=platform sensor=]
+    of each [=sensor types|type=],
+    so defining a [=default sensor=] should be straightforward.
+    For [=sensor types=] where multiple [=device sensor|sensors=] are common,
+    [=extension specifications=] may choose not to define a [=default sensor=],
+    especially when doing so would not make sense.
+
+<h3 id="permission-api">Extending the Permission API</h3>
+
+An implementation of the {{Sensor}} interface for each [=sensor type=] must protect its
+[=sensor reading|reading=] by associated {{PermissionName}} or {{PermissionDescriptor}}.
+A [=Low-level=] {{Sensor|sensor}} may use its interface name as a {{PermissionName}},
+for instance, "gyroscope" or "accelerometer". [=sensor fusion|Fusion sensors=] must
+[=request permission to use|request permission to access=] each of the sensors that are
+used as a source of fusion.
+
+Even though, it might be difficult to reconstruct [=low-level=] [=sensor readings=] from
+fused data, some of the original information might be inferred. For example, it is easy to
+deduce user's orientation in space if absolute or geomagnetic orientation sensors are used,
+therefore, these sensors must [=request permission to use|request permission to use=]
+magnetometer as it provides information about orientation of device in relation to Earth's
+magnetic field. In contrast, relative orientation sensor does not expose such information, thus,
+it does not need to [=request permission to use|request permission to use=] magnetometer.
+
+{{PermissionDescriptor|Permission descriptors}} can also be used to set maximum allowed limits
+for accuracy or [=sampling frequency=]. An example for a possible extension of the Permission API
+for accelerometer sensor is given below.
+
+<pre class=example>
+    dictionary AccelerometerPermissionDescriptor : PermissionDescriptor {
+        boolean highAccuracy = false;
+        boolean highFrequency = false;
+    };
+</pre>
+
+<h3 id="feature-policy-api">Extending the Feature Policy API</h3>
+
+An implementation of the {{Sensor}} interface for each [=sensor type=] has one
+(if [=sensor fusion=] is not performed) or several [=policy-controlled features=]
+that control whether or not this implementation can be used in a document.
+
+The [=policy-controlled feature|features=]' [=default allowlist=] is
+<code>["self"]</code>.
+
+Note: The [=default allowlist=] of <code>["self"]</code> allows {{Sensor}} interface
+implementation usage in same-origin nested frames but prevents third-party content
+from [=sensor readings=] access.
+
+The [=sensor feature names=] [=ordered set|set=] must contain [=feature names=] of
+every associated [=policy-controlled feature|feature=].
+
+A [=Low-level=] {{Sensor|sensor}} may use its interface name as a [=feature name=],
+for instance, "gyroscope" or "accelerometer". Unless the [=extension specification=] tells
+otherwise, the [=sensor feature names=] matches the same [=sensor type|type=]-associated
+[=sensor permission names=].
+
+<div class="example html">
+The accelerometer feature is selectively enabled for third-party origin by adding
+[=allow attribute=] to the frame container element:
+<pre highlight="html">
+  &lt;iframe src="https://third-party.com" allow="accelerometer"/&gt;&lt;/iframe&gt;
+</pre>
+</div>
+
+<div class="example html">
+A sensor usage is disabled completely by specifying the feature policy in a HTTP
+response header:
+<pre highlight="js">
+ Feature-Policy: {"accelerometer": []}
+</pre>
+</div>
+
+[=sensor fusion|Fusion sensors=] must use [=sensor feature names=] of the sensors
+that are used as a source of fusion.
+
+<div class="example html">
+Allow third-party origin to use accelerometer, magnetometer and gyroscope features
+that are required by the absolute orientation sensor.
+<pre highlight="html">
+  &lt;iframe src="https://third-party.com" allow="accelerometer; magnetometer; gyroscope"/&gt;
+</pre>
+</div>
+
+
+<h3 id="example-webidl">Example WebIDL</h3>
+
+Here's example WebIDL for a possible extension of this specification
+for proximity [=device sensor|sensors=].
+
+<pre class=example>
+    [Constructor(optional ProximitySensorOptions proximitySensorOptions),
+     SecureContext, Exposed=Window]
+    interface ProximitySensor : Sensor {
+        readonly attribute double? distance;
+    };
+
+    dictionary ProximitySensorOptions : SensorOptions {
+        double min;
+        double max;
+        ProximitySensorPosition position;
+        ProximitySensorDirection direction;
+    };
+
+    enum ProximitySensorPosition {
+        "top-left",
+        "top",
+        "top-right",
+        "middle-left",
+        "middle",
+        "middle-right",
+        "bottom-left",
+        "bottom",
+        "bottom-right"
+    };
+
+    enum ProximitySensorDirection {
+        "front",
+        "rear",
+        "left",
+        "right",
+        "top",
+        "bottom"
+    };
+</pre>
+
+
+<h2 id="acknowledgements">Acknowledgements</h2>
+
+First and foremost, I would like to thank Anssi Kostiainen
+for his continuous and dedicated support and input throughout
+the development of this specification, as well as Mikhail Pozdnyakov,
+Alexander Shalamov, Rijubrata Bhaumik, and Kenneth Rohde Christiansen
+for their invaluable implementation feedback, suggestions, and research
+that have helped inform the specification work.
+
+Special thanks to Rick Waldron for
+driving the discussion around a generic sensor API design for the Web,
+sketching the original API on which this is based,
+providing implementation feedback from his work on Johnny-Five,
+and continuous input during the development of this specification.
+
+Special thanks to Boris Smus, Tim Volodine, and Rich Tibbett
+for their initial work on exposing sensors to the web with consistency.
+
+Thanks to Anne van Kesteren
+for his tireless help both in person and through IRC.
+
+Thanks to Domenic Denicola and Jake Archibald for their help.
+
+Thanks also to Frederick Hirsch and Dominique Hazaël-Massieux (via the HTML5Apps project)
+for both their administrative help and technical input.
+
+Thanks to Tab Atkins for making Bikeshed and taking the time to explain its subtleties.
+
+Thanks to Lukasz Olejnik and Maryam Mehrnezhad for their contributions around privacy and security.
+
+The following people have greatly contributed to this specification through extensive discussions on GitHub:
+Anssi Kostiainen,
+Boris Smus,
+chaals,
+Claes Nilsson,
+Dave Raggett,
+David Mark Clements,
+Domenic Denicola,
+Dominique Hazaël-Massieux (via the HTML5Apps project),
+Francesco Iovine,
+Frederick Hirsch,
+gmandyam,
+Jafar Husain,
+Johannes Hund,
+Kris Kowal,
+Lukasz Olejnik,
+Marcos Caceres,
+Marijn Kruisselbrink,
+Mark Foltz,
+Mats Wichmann,
+Matthew Podwysocki,
+Olli Pettay,
+pablochacin,
+Remy Sharp,
+Rich Tibbett,
+Rick Waldron,
+Rijubrata Bhaumik,
+robman,
+Sean T. McBeth,
+Tab Atkins Jr.,
+Virginie Galindo,
+zenparsing,
+and Zoltan Kis.
+
+We'd also like to thank
+Anssi Kostiainen,
+Dominique Hazaël-Massieux,
+Erik Wilde,
+and
+Michael[tm] Smith
+for their editorial input.
+
+<h2 id="conformance" class="no-ref no-num">Conformance</h2>
+
+<h3 id="conventions" class="no-ref no-num">Document conventions</h3>
+
+    <p>Conformance requirements are expressed with a combination of
+    descriptive assertions and RFC 2119 terminology. The key words "MUST",
+    "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT",
+    "RECOMMENDED", "MAY", and "OPTIONAL" in the normative parts of this
+    document are to be interpreted as described in RFC 2119.
+    However, for readability, these words do not appear in all uppercase
+    letters in this specification.
+
+    <p>All of the text of this specification is normative except sections
+    explicitly marked as non-normative, examples, and notes. [[!RFC2119]]</p>
+
+    <p>Examples in this specification are introduced with the words "for example"
+    or are set apart from the normative text with <code>class="example"</code>,
+    like this:
+
+    <div class="example">
+        <p>This is an example of an informative example.</p>
+    </div>
+
+    <p>Because this document doesn't itself define APIs for specific [=sensor types=]--
+    that is the role of extensions to this specification--
+    all examples are inevitably (wishful) fabrications.
+    Although all of the [=device sensor|sensors=] used a examples
+    would be great candidates for building atop the Generic Sensor API,
+    their inclusion in this document does not imply that the relevant Working Groups
+    are planning to do so.
+
+    <p>Informative notes begin with the word "Note" and are set apart from the
+    normative text with <code>class="note"</code>, like this:
+
+    <p class="note">Note, this is an informative note.</p>
+
+<h3 id="conformant-algorithms" class="no-ref no-num">Conformant Algorithms</h3>
+
+    <p>Requirements phrased in the imperative as part of algorithms (such as
+    "strip any leading space characters" or "return false")
+    are to be interpreted with the meaning of the key word ("must",
+    "should", "may", etc) used in introducing the algorithm.</p>
+
+    <p>Conformance requirements phrased as algorithms or specific steps can be
+    implemented in any manner, so long as the end result is <dfn>equivalent</dfn>. In
+    particular, the algorithms defined in this specification are intended to
+    be easy to understand and are not intended to be performant. Implementers
+    are encouraged to optimize.</p>
+
+<h3 id="conformance-classes" class="no-ref no-num">Conformance Classes</h3>
+
+    <p>A <dfn>conformant user agent</dfn> must implement all the requirements
+    listed in this specification that are applicable to user agents.</p>
+
+<style>
+    #toc .current,
+    #toc .current-parent {
+      border-right-width: 3px;
+      border-right-style: solid;
+      border-right-color: #3980B5;
+    }
+
+    #toc .current {
+      background: rgba(75%, 75%, 75%, .25);
+      border-right-color: #054572;
+    }
+</style>
+<script>
+    // Scrollspy
+    var createScrollSpy = (function() {
+
+        function targetId(element) {
+            return (element.href || "").split("#")[1] || null;
+        }
+
+        function getScrollTop() {
+            return (window.pageYOffset !== undefined)
+                ? window.pageYOffset
+                : (document.documentElement || document.body.parentNode || document.body).scrollTop;
+        }
+
+        function addClassToParents(element, className, parentClassName) {
+            do {
+                element = element.parentNode;
+            } while (element && element.tagName != "LI")
+            if (element) {
+                var a = element.querySelector("a");
+                if (a) a.className = className;
+                addClassToParents(element, parentClassName ? parentClassName : className);
+            }
+        }
+
+        function getPosition(element, container) {
+            var eR = element.getBoundingClientRect();
+            var cR = container.getBoundingClientRect();
+            if (eR.bottom < cR.top) return "above";
+            if (eR.top > cR.bottom) return "below";
+            return "visible";
+        }
+
+        function createScrollSpy(options) {
+            options = options || {};
+
+            var OFFSET = 80,
+                needsUpdate = false,
+                previous = null,
+                current = null,
+                currentNav = null,
+                tocContainer,
+                toc,
+                sections;
+
+            tocContainer = document.querySelector(options.id);
+            toc = [].slice.call(tocContainer.querySelectorAll("a"), 0);
+            sections = toc.reduce(function(sections, a) {
+                var id = targetId(a);
+                var section = id ? document.getElementById(id) : null;
+                if (section) { sections.push(section); }
+                return sections;
+            }, []);
+
+            function onscroll() {
+                if (!needsUpdate) {
+                    needsUpdate = true;
+                    requestAnimationFrame(updatePosition);
+                }
+            }
+
+            function updatePosition() {
+                needsUpdate = false;
+                var scrollTop = (options.offset || 0) + getScrollTop();
+                current = sections.filter(function(section){
+                    return section.offsetTop < scrollTop;
+                }).pop();
+                current = current ? current.id : null;
+
+                if (previous !== current) {
+                    previous = current;
+                    toc.forEach(function(a) {
+                        if (targetId(a) == current) {
+                            currentNav = a;
+                        } else {
+                            a.className = "";
+                        }
+                    });
+                    if (options.markParents) {
+                        addClassToParents(currentNav, options.className, options.parentClassName)
+                    } else {
+                        currentNav.className = options.className;
+                    }
+                    if (options.scrollIntoView && typeof currentNav.scrollIntoView == "function") {
+                        var p = getPosition(currentNav, tocContainer);
+                        if (p == "above") {
+                            currentNav.scrollIntoView(true);
+                        } else if (p == "below") {
+                            currentNav.scrollIntoView(false);
+                        }
+                    }
+                }
+            }
+
+            return {
+                start: function() {
+                    window.addEventListener("scroll", onscroll, false);
+                },
+
+                stop: function() {
+                    window.removeEventListener("scroll", onscroll, false);
+                    toc.forEach(function(a) {
+                        a.className = "";
+                    });
+                }
+            }
+        }
+
+        return createScrollSpy;
+    })();
+
+    (function() {
+        var spy = createScrollSpy({
+            offset: 80,
+            id: "#toc",
+            className: "current",
+            parentClassName: "current-parent",
+            markParents: true,
+            scrollIntoView: true
+        });
+
+        var mm = window.matchMedia('screen and (min-width: 78em)');
+        if (mm.matches) {
+            spy.start();
+        }
+        mm.addListener(function(m) {
+            if (m.matches) spy.start();
+            else spy.stop();
+        });
+    })();
+</script>

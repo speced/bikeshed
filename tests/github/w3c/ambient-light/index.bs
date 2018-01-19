@@ -1,0 +1,285 @@
+<pre class="metadata">
+Title: Ambient Light Sensor
+Level: none
+Status: ED
+ED: https://w3c.github.io/ambient-light/
+Shortname: ambient-light
+TR: http://www.w3.org/TR/ambient-light/
+Previous Version: https://www.w3.org/TR/2017/WD-ambient-light-20170814/
+Editor: Anssi Kostiainen 41974, Intel Corporation, http://intel.com/
+Former Editor: Tobie Langel 60809, Codespeaks&#44; formerly on behalf of Intel Corporation, http://tobie.me, tobie@codespeaks.com
+Former Editor: Doug Turner, Mozilla Corporation, http://mozilla.com/
+Group: dap
+Abstract:
+  This specification defines a concrete sensor interface to monitor
+  the ambient light level or illuminance of the device's environment.
+Version History: https://github.com/w3c/ambient-light/commits/gh-pages/index.bs
+!Bug Reports: <a href="https://www.github.com/w3c/ambient-light/issues/new">via the w3c/ambient-light repository on GitHub</a>
+Indent: 2
+Repository: w3c/ambient-light
+Markup Shorthands: markdown on
+Inline Github Issues: off
+!Issue Tracking: <a href="https://github.com/w3c/ambient-light/milestones/Level%202">Level 2 Issues</a>
+!Test Suite: <a href="https://github.com/w3c/web-platform-tests/tree/master/ambient-light">web-platform-tests on GitHub</a>
+Boilerplate: omit issues-index, omit conformance
+Default Biblio Status: current
+</pre>
+<pre class="anchors">
+urlPrefix: https://w3c.github.io/sensors; spec: GENERIC-SENSOR
+  type: dfn
+    text: high-level
+    text: default sensor
+    text: implementation specific; url: implementation-specific
+    text: reporting mode; url: reporting-modes
+    text: auto 
+    text: construct a sensor object; url: construct-sensor-object
+    text: limit maximum sampling frequency; url: limit-max-frequency
+    text: reduce accuracy; url: reduce-accuracy
+    text: mitigation strategies; url: mitigation-strategies
+    text: sampling frequency
+    text: sensor type
+    text: sensor readings
+</pre>
+<pre class=biblio>
+{
+	"MEDIAQUERIES-5": {
+		"authors": [
+            "Dean Jackson",
+			"Florian Rivoal",
+			"Tab Atkins"
+		],
+		"href": "https://drafts.csswg.org/mediaqueries-5/",
+		"title": "Media Queries Level 5",
+		"status": "ED",
+		"publisher": "W3C",
+		"deliveredBy": [
+			"https://www.w3.org/Style/CSS/members"
+		]
+	}
+}
+</pre>
+
+Introduction {#intro}
+============
+
+The Ambient Light Sensor extends the Generic Sensor API [[GENERIC-SENSOR]]
+to provide information about ambient light levels,
+as detected by the device's main light detector, in terms of lux units.
+
+Scope {#scope}
+-----
+
+This document specifies an API designed for [[#usecases-requirements|use cases]]
+which require fine grained illuminance data, with low latency, and possibly
+sampled at high frequencies.
+
+Common use cases relying on a small set of illuminance values, such as styling
+webpages according to ambient light levels are best served by the the
+`light-level` CSS media feature [[MEDIAQUERIES-5]] and its accompanying
+`matchMedia` API [[CSSOM]] and are out of scope of this API.
+
+Note: it might be worthwhile to provide a <a>high-level</a> Light Level Sensor
+which would mirror the `light-level` media feature, but in JavaScript.
+This sensor would *not require additional user permission to be activated*
+in user agents that exposed the `light-level` media feature.
+
+Examples {#examples}
+========
+
+<div class="example">
+    In this simple example, ambient light sensor is created with
+    default configuration. Whenever new [=sensor readings|reading=] is available,
+    it is printed to the console.
+
+    <pre highlight="js">
+    const sensor = new AmbientLightSensor();
+    sensor.onreading = () => console.log(sensor.illuminance);
+    sensor.onerror = event => console.log(event.error.name, event.error.message);
+    sensor.start();
+    </pre>
+</div>
+
+<div class="example">
+    In this example, exposure value (EV) at ISO 100 is calculated from
+    the ambient light [=sensor readings=]. Initially, we check that the user
+    agent has permissions to access ambient light [=sensor readings=]. Then,
+    {{AmbientLightSensor/illuminance!!attribute}} value is converted to the
+    closest exposure value.
+
+    <pre highlight="js">
+    navigator.permissions.query({ name: 'ambient-light-sensor' }).then(result => {
+        if (result.state === 'denied') {
+            console.log('Permission to use ambient light sensor is denied.');
+            return;
+        }
+
+        const als = new AmbientLightSensor({frequency: 20});
+        als.addEventListener('activate', () => console.log('Ready to measure EV.'));
+        als.addEventListener('error', event => console.log(\`Error: ${event.error.name}\`));
+        als.addEventListener('reading', () => {
+            // Defaut ISO value.
+            const ISO = 100;
+            // Incident-light calibration constant.
+            const C = 250;
+
+            let EV = Math.round(Math.log2((als.illuminance * ISO) / C));
+            console.log(\`Exposure Value (EV) is: ${EV}\`);
+        });
+
+        als.start();
+    });
+    </pre>
+</div>
+
+<div class="example">
+    This example demonstrates how ambient light [=sensor readings=] can be mapped
+    to recommended workplace light levels.
+
+    <pre highlight="js">
+    const als = new AmbientLightSensor();
+
+    als.onreading = () => {
+        let str = luxToWorkplaceLevel(als.illuminance);
+        if (str) {
+            console.log(\`Light level is suitable for: ${str}.\`);
+        }
+    };
+
+    als.start();
+
+    function luxToWorkplaceLevel(lux) {
+        if (lux > 20 && lux < 100) {
+            return 'public areas, short visits';
+        } else if (lux > 100 && lux < 150) {
+            return 'occasionally performed visual tasks';
+        } else if (lux > 150 && lux < 250) {
+            return 'easy office work, classes, homes, theaters';
+        } else if (lux > 250 && lux < 500) {
+            return 'normal office work, groceries, laboratories';
+        } else if (lux > 500 && lux < 1000) {
+            return 'mechanical workshops, drawing, supermarkets';
+        } else if (lux > 1000 && lux < 5000) {
+            return 'detailed drawing work, visual tasks of low contrast';
+        }
+
+        return;
+    }
+    </pre>
+</div>
+
+Security and Privacy Considerations {#security-and-privacy}
+===================================
+
+Ambient Light Sensor provides information about lighting conditions near
+the device environment. Potential privacy risks include:
+
+  - Profiling. Ambient Light Sensor can leak information about user's use
+    patterns and surrounding. This information can be used to enhance user
+    profiling and behavioral analysis.
+  - Cross-device linking. Two devices can access web sites that include the
+    same third-party script that correlates lighting levels over time.
+  - Cross-device communication. A simple broadcast communication method can
+    use device screen or camera LED flashes to broadcast messages read
+    out with an Ambient Light Sensor in a close by device.
+  - Cross-origin leaks. Light emitted from the screen can be reflected back to
+    the sensor from nearby reflective surfaces. Malicious sites can embed
+    resources from different origins and scale the content to display
+    particular pixels to allow distinguish the contents, pixel by pixel.
+  - Hijacking browsing history. Styling visited links to allow distinguish the
+    light levels associated with visited and unvisited links i.e. visited
+    links styled as a block of black screen; white for unvisited.
+
+To mitigate these Ambient Light Sensor specific threats, user agents should
+use one or both of the following mitigation strategies:
+  - <a>limit maximum sampling frequency</a>
+  - <a>reduce accuracy</a> of sensor readings
+
+The generic <a>mitigation strategies</a> are described in the Generic Sensor
+API [[!GENERIC-SENSOR]].
+
+Model {#model}
+=====
+
+The <dfn>Ambient Light Sensor</dfn> <a>sensor type</a>'s associated {{Sensor}}
+subclass is the {{AmbientLightSensor}} class.
+
+The <a>Ambient Light Sensor</a> has a <a>default sensor</a>,
+which is the device's main light detector.
+
+The <a>Ambient Light Sensor</a> has an associated {{PermissionName}}
+which is <a for="PermissionName" enum-value>"ambient-light-sensor"</a>.
+
+The <dfn>current light level</dfn> or <dfn>illuminance</dfn>
+is a value that represents the ambient light level
+around the hosting device. Its unit is the lux (lx) [[SI]].
+
+Note: The precise lux value reported by
+different devices in the same light can be different,
+due to differences in detection method, sensor construction, etc.
+
+API {#api}
+===
+
+The AmbientLightSensor Interface {#ambient-light-sensor-interface}
+--------------------------------
+
+<pre class="idl">
+  [Constructor(optional SensorOptions sensorOptions), SecureContext, Exposed=Window]
+  interface AmbientLightSensor : Sensor {
+    readonly attribute double? illuminance;
+  };
+</pre>
+
+To <dfn>Construct an AmbientLightSensor Object</dfn> the user agent must invoke the 
+<a>construct a Sensor object</a> abstract operation.
+
+### The illuminance attribute ### {#ambient-light-sensor-reading-attribute}
+
+The <a attribute for="AmbientLightSensor">illuminance</a> attribute of the {{AmbientLightSensor}}
+interface represents the [=current light level=] and returns the result of invoking
+[=get value from latest reading=] with `this` and "illuminance" as arguments.
+
+Use Cases and Requirements {#usecases-requirements}
+=========
+
+- A Web application provides input for a smart home system to control lighting.
+- A Web aplication checks whether light level at work space is sufficient.
+- A Web application calculates settings for a camera with manual controls (apperture, shutter speed, ISO).
+- A Web application monitors light level changes produced by hovering hand user gesture and
+  interprets them to control a game character.
+
+While some of the use cases may benefit from obtaining precise ambient light measurements, the use
+cases that convert ambient light level fluctuations to user input events, would benefit from
+higher [=sampling frequency|sampling frequencies=].
+
+Acknowledgements {#acknowledgements}
+================
+
+Doug Turner for the initial prototype and
+Marcos Caceres for the test suite.
+
+Paul Bakaus for the LightLevelSensor idea.
+
+Mikhail Pozdnyakov and Alexander Shalamov for the use cases and requirements.
+
+Lukasz Olejnik for the privacy risk assessment.
+
+Conformance {#conformance}
+===========
+
+Conformance requirements are expressed with a combination of
+descriptive assertions and RFC 2119 terminology. The key words "MUST",
+"MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT",
+"RECOMMENDED", "MAY", and "OPTIONAL" in the normative parts of this
+document are to be interpreted as described in RFC 2119.
+However, for readability, these words do not appear in all uppercase
+letters in this specification.
+
+All of the text of this specification is normative except sections
+explicitly marked as non-normative, examples, and notes. [[!RFC2119]]
+
+A <dfn>conformant user agent</dfn> must implement all the requirements
+listed in this specification that are applicable to user agents.
+
+The IDL fragments in this specification must be interpreted as required for
+conforming IDL fragments, as described in the Web IDL specification. [[!WEBIDL]]

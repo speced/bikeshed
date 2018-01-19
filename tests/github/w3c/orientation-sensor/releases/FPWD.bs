@@ -1,0 +1,367 @@
+<pre class="metadata">
+Title: Orientation Sensor
+Status: FPWD
+Date: 2017-05-11
+#Level: 1
+ED: https://w3c.github.io/orientation-sensor/
+Shortname: orientation-sensor
+TR: https://www.w3.org/TR/orientation-sensor/
+Editor: Mikhail Pozdnyakov 78325, Intel Corporation, http://intel.com/
+Editor: Alexander Shalamov 78335, Intel Corporation, http://intel.com/
+Editor: Kenneth Rohde Christiansen 57705, Intel Corporation, http://intel.com/
+Editor: Anssi Kostiainen 41974, Intel Corporation, http://intel.com/
+Group: dap
+Abstract:
+  This specification defines a base orientation sensor interface and concrete sensor subclasses to monitor the device's
+  physical orientation in relation to a stationary three dimensional Cartesian coordinate system.
+Version History: https://github.com/w3c/orientation-sensor/commits/gh-pages/index.bs
+!Bug Reports: <a href="https://www.github.com/w3c/orientation-sensor/issues/new">via the w3c/orientation-sensor repository on GitHub</a>
+Indent: 2
+Repository: w3c/orientation-sensor
+Markup Shorthands: markdown on
+Inline Github Issues: true
+!Test Suite: <a href="https://github.com/w3c/web-platform-tests/tree/master/orientation-sensor">web-platform-tests on GitHub</a>
+Boilerplate: omit issues-index, omit conformance
+Ignored Vars: sensor_instance, targetMatrix, x, y, z, w
+</pre>
+<pre class="anchors">
+urlPrefix: https://w3c.github.io/sensors; spec: GENERIC-SENSOR
+  type: dfn
+    text: activated
+    text: construct a sensor object; url: construct-sensor-object
+    text: default sensor
+    text: equivalent
+    text: high-level
+    text: low-level
+    text: latest reading
+    text: sensor
+    text: sensor-fusion
+urlPrefix: https://w3c.github.io/accelerometer; spec: ACCELEROMETER
+  type: dfn
+    text: acceleration
+    text: local coordinate system
+  type: interface
+    text: Accelerometer; url: accelerometer
+</pre>
+
+<pre class="anchors">
+urlPrefix: https://w3c.github.io/gyroscope; spec: GYROSCOPE
+  type: dfn
+    text: angular velocity
+  type: interface
+    text: Gyroscope; url: gyroscope
+</pre>
+
+<pre class="anchors">
+urlPrefix: https://w3c.github.io/magnetometer; spec: MAGNETOMETER
+  type: dfn
+    text: magnetic field
+  type: interface
+    text: Magnetometer; url: magnetometer
+</pre>
+
+<pre class="anchors">
+urlPrefix: https://www.w3.org/TR/orientation-event; spec: DEVICEORIENTATION
+  type: interface
+    text: DeviceOrientationEvent; url: deviceorientation_event
+</pre>
+
+<pre class="anchors">
+urlPrefix: https://w3c.github.io/motion-sensors; spec: MOTIONSENSORS
+  type: dfn
+    text: Absolute Orientation Sensor; url: absolute-orientation
+</pre>
+
+<pre class="link-defaults">
+spec:infra;
+  type:dfn;
+    text:list
+spec:generic-sensor-1;
+  type:enum-value;
+    text:"activated"
+</pre>
+
+<pre class=biblio>
+{
+    "QUATERNIONS": {
+        "authors": [
+            "Kuipers, Jack B"
+        ],
+        "id": "QUATERNIONS",
+        "href": "http://www.emis.ams.org/proceedings/Varna/vol1/GEOM09.pdf",
+        "title": "Quaternions and rotation sequences. Vol. 66.",
+        "date": "1999",
+        "status": "Informational",
+        "publisher": "Princeton university press"
+    },
+    "QUATCONV": {
+        "authors": [
+            "Watt, Alan H., and Mark Watt."
+        ],
+        "id": "QUATCONV",
+        "href": "http://www.cs.cmu.edu/afs/cs/academic/class/15462-s14/www/lec_slides/3DRotationNotes.pdf",
+        "title": "Advanced animation and rendering techniques., page 362",
+        "date": "1992",
+        "status": "Informational",
+        "publisher": "New York, NY, USA:: ACM press"
+    }
+}
+</pre>
+
+Introduction {#intro}
+============
+
+The Orientation Sensor API extends the Generic Sensor API [[GENERIC-SENSOR]]
+to provide generic information describing the device's physical orientation
+in relation to a three dimensional Cartesian coordinate system.
+
+The {{AbsoluteOrientationSensor}} class inherits from the {{OrientationSensor}} interface and
+describes the device's physical orientation in relation to the <a>Earth's reference coordinate system</a>.
+
+Other subclasses describe the orientation in relation to other stationary
+directions, such as true north, or non stationary directions, like in
+relation to a devices own z-position, drifting towards its latest most stable
+z-position.
+
+The data provided by the {{OrientationSensor}} subclasses are similar to data from
+{{DeviceOrientationEvent}}, but the Orientation Sensor API has the following significant differences:
+1. The Orientation Sensor API represents orientation data in WebGL-compatible formats (quaternion, rotation matrix).
+1. The Orientation Sensor API satisfies stricter latency requirements.
+1. Unlike {{DeviceOrientationEvent}}, the {{OrientationSensor}} subclasses explicitly define which [=low-level=]
+   motion sensors are used to obtain the orientation data, thus obviating possible interoperability issues.
+1. Instances of {{OrientationSensor}} subclasses are configurable via {{SensorOptions}} constructor parameter.
+
+Use Cases and Requirements {#usecases-requirements}
+==============================
+
+The use cases and requirements are discussed in the <cite><a href="https://w3c.github.io/motion-sensors/#usecases-and-requirements">
+Motion Sensors Explainer</a></cite> document.
+
+Examples {#examples}
+========
+
+<div class="example">
+    <pre highlight="js">
+    const sensor = new AbsoluteOrientationSensor();
+    const mat4 = new Float32Array(16);
+    sensor.start();
+    sensor.onerror = event => console.log(event.error.name, event.error.message);
+
+    sensor.onchange = () => {
+      sensor.populateMatrix(mat4);
+    };
+    </pre>
+</div>
+
+<div class="example">
+    <pre highlight="js">
+    const sensor = new AbsoluteOrientationSensor({ frequency: 60 });
+    const mat4 = new Float32Array(16);
+    sensor.start();
+    sensor.onerror = event => console.log(event.error.name, event.error.message);
+
+    function draw(timestamp) {
+      window.requestAnimationFrame(draw);
+      try {
+        sensor.populateMatrix(mat4);
+      } catch(e) {
+        // mat4 has not been updated.
+      }
+      // Drawing...
+    }
+
+    window.requestAnimationFrame(draw);
+    </pre>
+</div>
+
+Security and Privacy Considerations {#security-and-privacy}
+===================================
+
+There are no specific security and privacy considerations
+beyond those described in the Generic Sensor API [[!GENERIC-SENSOR]].
+
+Model {#model}
+=====
+
+The {{OrientationSensor}} class extends the {{Sensor}} class and provides generic interface
+representing device orientation data.
+
+To access the orientation sensor's [=latest reading=], the user agent must invoke [=request sensor access=] abstract operation for each of the [=low-level=] sensors used by the concrete orientation sensor. The table below
+describes mapping between concrete orientation sensors and permission tokens defined by [=low-level=] sensors.
+
+<table class="def">
+  <thead>
+    <th>OrientationSensor sublass</th>
+    <th>Permission tokens</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td>{{AbsoluteOrientationSensor}}</td>
+      <td>"<code>accelerometer</code>", "<code>gyroscope</code>", "<code>magnetometer</code>"</td>
+    </tr>
+  </tbody>
+</table>
+
+A [=latest reading=] per [=sensor=] of orientation type includes an [=map/entry=]
+whose [=map/key=] is "quaternion" and whose [=map/value=] contains a four element [=list=].
+The elements of the [=list=] are equal to components of a unit quaternion [[QUATERNIONS]]
+[V<sub>x</sub> * sin(θ/2), V<sub>y</sub> * sin(θ/2), V<sub>z</sub> * sin(θ/2), cos(θ/2)] where V is
+the unit vector (whole elements are V<sub>x</sub>, V<sub>y</sub>, and V<sub>z</sub>) representing the axis of rotation, and θ is the rotation angle about the axis defined by the unit vector V.
+
+Note: The quaternion components are arranged in the [=list=] as [q<sub>1</sub>, q<sub>2</sub>, q<sub>3</sub>, q<sub>0</sub>]
+[[QUATERNIONS]], i.e. the components representing the vector part of the quaternion go first and the scalar part component which
+is equal to cos(θ/2) goes after. This order is used for better compatibility with the most of the existing WebGL frameworks,
+however other libraries could use a different order when exposing quaternion as an array, e.g. [q<sub>0</sub>, q<sub>1</sub>,
+q<sub>2</sub>, q<sub>3</sub>].
+
+The {{AbsoluteOrientationSensor}} class is a subclass of {{OrientationSensor}} which represents the [=Absolute
+Orientation Sensor=].
+
+The absolute orientation sensor is a [=high-level=] sensor which is created through [=sensor-fusion=]
+of the [=low-level=] motion sensors:
+
+ - accelerometer that measures [=acceleration=],
+ - gyroscope that measures [=angular velocity=], and
+ - magnetometer that measures [=magnetic field=].
+
+Note: Corresponding [=low-level=] sensors are defined in [[ACCELEROMETER]], [[GYROSCOPE]], and
+[[MAGNETOMETER]]. Regardless, the fusion is platform specific and can happen in software or
+hardware, i.e. on a sensor hub.
+
+For the absolute orientation sensor the value of [=latest reading=]["quaternion"] represents the rotation of a
+device hosting motion sensors in relation to the <dfn>Earth's reference coordinate system</dfn> defined as a
+three dimensional Cartesian coordinate system (x, y, z), where:
+
+ - x-axis is a vector product of y.z that is tangential to the ground and points east,
+ - y-axis is tangential to the ground and points towards magnetic north, and
+ - z-axis points towards the sky and is perpendicular to the plane made up of x and y axes.
+
+The device's <a>local coordinate system</a> is the same as defined by [=low-level=] motion sensors.
+
+Note: Figure below represents the case where device's <a>local coordinate system</a> and the <a>Earth's reference coordinate system</a> are aligned, therefore,
+orientation sensor's [=latest reading=] would represent 0 (rad) [[SI]] rotation about each axis.
+
+<img src="images/absolute_orientation_sensor_coordinate_system.png" srcset="images/absolute_orientation_sensor_coordinate_system.svg" style="display: block;margin: auto;" alt="AbsoluteOrientationSensor coordinate system.">
+
+API {#api}
+===
+
+The OrientationSensor Interface {#orientationsensor-interface}
+-------------------------------------
+
+<pre class="idl">
+  typedef (Float32Array or Float64Array or DOMMatrix) RotationMatrixType;
+  interface OrientationSensor : Sensor {
+    readonly attribute FrozenArray&lt;double>? quaternion;
+    void populateMatrix(RotationMatrixType targetMatrix);
+  };
+</pre>
+
+### OrientationSensor.quaternion ### {#orientationsensor-quaternion}
+
+Returns a four-element {{FrozenArray}} whose elements contain the components of the unit quaternion representing the device orientation.
+In other words, this attribute returns [=latest reading=]["quaternion"].
+
+### OrientationSensor.populateMatrix() ### {#orientationsensor-populatematrix}
+
+The {{OrientationSensor/populateMatrix()}} method  populates the given object with rotation matrix
+which is converted from the value of [=latest reading=]["quaternion"] [[QUATCONV]], as shown below:
+
+<img src="images/quaternion_to_rotation_matrix.png" style="display: block;margin: auto;" alt="Converting quaternion to rotation matrix." width="50%" height="50%">
+
+where:
+
+ - W = cos(θ/2)
+ - X = V<sub>x</sub> * sin(θ/2)
+ - Y = V<sub>y</sub> * sin(θ/2)
+ - Z = V<sub>z</sub> * sin(θ/2)
+
+The rotation matrix is flattened in |targetMatrix| object according to the column-major order, as described in
+[=populate rotation matrix=] algorighm.
+
+<div algorithm="populate rotation matrix">
+To <dfn>populate rotation matrix</dfn>, the {{OrientationSensor/populateMatrix()}} method must
+run these steps or their [=equivalent=]:
+    1.  If |targetMatrix| is not of type defined by {{RotationMatrixType}} union, [=throw=] a
+        "{{TypeError!!exception}}" {{DOMException}} and abort these steps.
+    1.  If |targetMatrix| is of type {{Float32Array}} or {{Float64Array}} with a size less than sixteen, [=throw=] a
+        "{{TypeError!!exception}}" {{DOMException}} and abort these steps.
+    1.  Let |quaternion| be the value of [=latest reading=]["quaternion"]
+    1.  If |quaternion| is `null`, [=throw=] a "{{NotReadableError!!exception}}" {{DOMException}} and abort these steps.
+    1.  Let |x| be the value of |quaternion|[0]
+    1.  Let |y| be the value of |quaternion|[1]
+    1.  Let |z| be the value of |quaternion|[2]
+    1.  Let |w| be the value of |quaternion|[3]
+    1.  If |targetMatrix| is of  {{Float32Array}} or {{Float64Array}} type, run these sub-steps:
+        1.  Set |targetMatrix|[0] = 1 - 2 * y * y - 2 * z * z
+        1.  Set |targetMatrix|[1] = 2 * x * y - 2 * z * w
+        1.  Set |targetMatrix|[2] = 2 * x * z + 2 * y * w
+        1.  Set |targetMatrix|[3] = 0
+        1.  Set |targetMatrix|[4] = 2 * x * y + 2 * z * w
+        1.  Set |targetMatrix|[5] = 1 - 2 * x * x - 2 * z * z
+        1.  Set |targetMatrix|[6] = 2 * y * z - 2 * x * w
+        1.  Set |targetMatrix|[7] = 0
+        1.  Set |targetMatrix|[8] = 2 * x * z - 2 * y * w
+        1.  Set |targetMatrix|[9] = 2 * y * z + 2 * x * w
+        1.  Set |targetMatrix|[10] = 1 - 2 * x * x - 2 * y * y
+        1.  Set |targetMatrix|[11] = 0
+        1.  Set |targetMatrix|[12] = 0
+        1.  Set |targetMatrix|[13] = 0
+        1.  Set |targetMatrix|[14] = 0
+        1.  Set |targetMatrix|[15] = 1
+    1.  If |targetMatrix| is of  {{DOMMatrix}} type, run these sub-steps:
+        1.  Set |targetMatrix|.m11 = 1 - 2 * y * y - 2 * z * z
+        1.  Set |targetMatrix|.m12 = 2 * x * y - 2 * z * w
+        1.  Set |targetMatrix|.m13 = 2 * x * z + 2 * y * w
+        1.  Set |targetMatrix|.m14 = 0
+        1.  Set |targetMatrix|.m21 = 2 * x * y + 2 * z * w
+        1.  Set |targetMatrix|.m22 = 1 - 2 * x * x - 2 * z * z
+        1.  Set |targetMatrix|.m23 = 2 * y * z - 2 * x * w
+        1.  Set |targetMatrix|.m24 = 0
+        1.  Set |targetMatrix|.m31 = 2 * x * z - 2 * y * w
+        1.  Set |targetMatrix|.m32 = 2 * y * z + 2 * x * w
+        1.  Set |targetMatrix|.m33 = 1 - 2 * x * x - 2 * y * y
+        1.  Set |targetMatrix|.m34 = 0
+        1.  Set |targetMatrix|.m41 = 0
+        1.  Set |targetMatrix|.m42 = 0
+        1.  Set |targetMatrix|.m43 = 0
+        1.  Set |targetMatrix|.m44 = 1
+</div>
+
+
+The AbsoluteOrientationSensor Interface {#absoluteorientationsensor-interface}
+-------------------------------------
+
+<pre class="idl">
+  [Constructor(optional SensorOptions sensorOptions)]
+  interface AbsoluteOrientationSensor : OrientationSensor {
+  };
+</pre>
+
+To <dfn>Construct an AbsoluteOrientationSensor Object</dfn> the user agent must invoke the
+<a>construct a Sensor object</a> abstract operation.
+
+Acknowledgements {#acknowledgements}
+================
+
+Tobie Langel for the work on Generic Sensor API.
+
+Conformance {#conformance}
+===========
+
+Conformance requirements are expressed with a combination of
+descriptive assertions and RFC 2119 terminology. The key words "MUST",
+"MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT",
+"RECOMMENDED", "MAY", and "OPTIONAL" in the normative parts of this
+document are to be interpreted as described in RFC 2119.
+However, for readability, these words do not appear in all uppercase
+letters in this specification.
+
+All of the text of this specification is normative except sections
+explicitly marked as non-normative, examples, and notes. [[!RFC2119]]
+
+A <dfn>conformant user agent</dfn> must implement all the requirements
+listed in this specification that are applicable to user agents.
+
+The IDL fragments in this specification must be interpreted as required for
+conforming IDL fragments, as described in the Web IDL specification. [[!WEBIDL]]

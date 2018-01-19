@@ -1,0 +1,482 @@
+<pre class="metadata">
+Title: CSS Overflow Module Level 3
+Status: ED
+Work Status: Revising
+ED: https://drafts.csswg.org/css-overflow-3/
+Shortname: css-overflow
+Group: csswg
+Level: 3
+TR: https://www.w3.org/TR/css-overflow-3/
+Previous version: https://www.w3.org/TR/2016/WD-css-overflow-3-20160531/
+Previous version: https://www.w3.org/TR/2013/WD-css-overflow-3-20130418/
+Editor: L. David Baron, Mozilla https://www.mozilla.org/, https://dbaron.org/, w3cid 15393
+Editor: Florian Rivoal, On behalf of Bloomberg, http://florian.rivoal.net/, w3cid 43241
+Abstract: This module contains the features of CSS relating to scrollable overflow handling in visual media.
+!Change Log: <a href="https://hg.csswg.org/drafts/log/tip/css-overflow/Overview.bs">from 27 January 2015 to the present</a>
+!Change Log: <a href="https://hg.csswg.org/drafts/log/tip/css-overflow/Overview.src.html">from 28 March 2013 to 27 January 2015</a>
+!Change Log: <a href="https://hg.csswg.org/drafts/log/tip/css3-overflow/Overview.src.html">from 31 July 2012 to 27 March 2013</a>
+Ignored Vars: B, P
+Ignored Terms: padding edge
+Status Text: <strong>This update trims away most of the experimental new ideas
+   for handling overflow that were described in the <a href="https://www.w3.org/TR/2013/WD-css-overflow-3-20130418/">previous Working Draft</a>.
+   These ideas are not abandoned; they are merely <a href="https://drafts.csswg.org/css-overflow/">deferred until Level 4</a>.</strong>
+   Level 3 is focused solely on completing a spec for the existing, shipped 'overflow' features;
+   work will resume on fragmented overflow and other fun things once this is completed.
+</pre>
+<!-- FIXME: Regressions from bikeshed conversion: -->
+<!-- - Value lines in propdef tables no longer link to #values. -->
+<!-- - no longer says "Test suite: none yet" -->
+<!-- - Abstract has the most introductory sentence last -->
+<!-- FIXME: other bikeshed issues -->
+<pre class="link-defaults">
+spec:css-transforms-1; type:property; text:transform-style
+type: dfn; spec:css-multicol-1; text:overflow column
+type: dfn; spec:css-transforms-1; text:3d rendering context
+</pre>
+<!-- FIXME: the break-* link doesn't actually work! -->
+<pre class="anchors">
+url: https://www.w3.org/TR/2008/CR-css3-marquee-20081205/#the-overflow-style; type: property; text: overflow-style;
+</pre>
+
+<h2 id="intro">
+Introduction</h2>
+
+	In CSS Level 1 [[CSS1]], placing more content than would fit
+	inside an element with a specified size
+	was generally an authoring error.
+	Doing so caused the content to extend
+	outside the bounds of the element,
+	which would likely cause
+	that content to overlap with other elements.
+
+	CSS Level 2 [[CSS21]] introduced the 'overflow' property,
+	which allows authors to have overflow be handled by scrolling,
+	which means it is no longer an authoring error.
+	It also allows authors to specify
+	that overflow is handled by clipping,
+	which makes sense when the author's intent
+	is that the content not be shown.
+
+	This specification introduces the long-standing de-facto 'overflow-x' and 'overflow-y' properties,
+	and defines overflow handling more fully.
+
+	[Something something 'max-lines'.]
+
+<!--
+████████ ██    ██ ████████  ████████  ██████
+   ██     ██  ██  ██     ██ ██       ██    ██
+   ██      ████   ██     ██ ██       ██
+   ██       ██    ████████  ██████    ██████
+   ██       ██    ██        ██             ██
+   ██       ██    ██        ██       ██    ██
+   ██       ██    ██        ████████  ██████
+-->
+
+<h2 id="overflow-concepts">
+Types of overflow</h2>
+
+	CSS uses the term <dfn export>overflow</dfn> to describe
+	the contents of a box
+	that extend outside one of that box's edges
+	(i.e., its <i>content edge</i>, <i>padding edge</i>,
+	<i>border edge</i>, or <i>margin edge</i>).
+	The term might be interpreted as
+	elements or features that cause this overflow,
+	the non-rectangular region occupied by these features,
+	or, more commonly,
+	the minimal rectangle that bounds that region.
+	A box's overflow is computed based on the layout and styling of the box itself
+	and of all descendants whose <a>containing block chain</a>
+	includes the box.
+
+	In most cases, <a>overflow</a>
+	can be computed for any box
+	from the bounds and properties of that box itself,
+	plus the <a>overflow</a>
+	of each of its children.
+	However, this is not always the case; for example,
+	when ''transform-style: preserve-3d'' [[CSS3-TRANSFORMS]] is used on
+	some of the children, any of their descendants with
+	''transform-style: preserve-3d'' must also be examined.
+
+	There are two different types of overflow,
+	which are used for different purposes by the UA:
+
+	<ul>
+		<li><a>ink overflow</a>
+		<li><a>scrollable overflow</a>
+	</ul>
+
+<h3 id="ink">Ink overflow</h3>
+
+	The <dfn export>ink overflow</dfn> of a box
+	is the part of that box and its contents that
+	creates a visual effect outside of
+	the box's border box.
+	Ink overflow is the overflow of painting effects defined to not affect layout
+	or otherwise extend the <a>scrollable overflow region</a>,
+	such as <a href="https://www.w3.org/TR/css-backgrounds/#box-shadow">box shadows</a>,
+	<a href="">border images</a>,
+	<a href="https://www.w3.org/TR/css-text-decor-3/">text decoration</a>,
+	overhanging glyphs (with negative side bearings,
+	or with ascenders/descenders extending outside the em box),
+	<a href="https://www.w3.org/TR/CSS2/ui.html#dynamic-outlines">outlines</a>,
+	etc.
+
+	Since some effects in CSS (for example, the blurs in
+	'text-shadow' [[CSS3TEXT]] and 'box-shadow' [[CSS3BG]])
+	do not define what visual extent they cover, the extent
+	of the <a>ink overflow</a> is undefined.
+
+	The <dfn export>ink overflow region</dfn> is the non-rectangular area
+	occupied by the <a>ink overflow</a>, and the
+	<dfn export>ink overflow rectangle</dfn> is
+	the minimal rectangle whose axis is aligned to the box's axes
+	and contains the <a>ink overflow region</a>.
+	Note that the <a>ink overflow rectangle</a> is a rectangle
+	in the box's coordinate system, but might be non-rectangular
+	in other coordinate systems due to transforms [[CSS3-TRANSFORMS]].
+
+
+<h3 id="scrollable">
+Scrollable overflow</h3>
+
+	The <dfn export>scrollable overflow</dfn> of a box is the
+	set of things extending outside of that box's padding edge
+	for which a scrolling mechanism needs to be provided.
+
+	The <dfn export>scrollable overflow region</dfn> is the non-rectangular region
+	occupied by the <a>scrollable overflow</a>, and the
+	<dfn export>scrollable overflow rectangle</dfn> is
+	the minimal rectangle whose axis is aligned to the box's axes
+	and contains the <a>scrollable overflow region</a>.
+
+	The <a>scrollable overflow region</a> is the union of:
+	<ul>
+		<li>
+			the box’s own content and padding areas
+
+			<div class=issue>
+				There's disagreement on the scrolling model.
+				2.1 apparently defined that you scrolled the *content* area;
+				the content would overflow the content-box,
+				and you would union that overflow with the content box to find the scrollable area.
+				In particular, this means that the content would be offset by the start-sides padding,
+				but if it overflowed,
+				it would go right to the edge on the end sides.
+				This is what Firefox and IE do.
+
+				At least some authors (and spec authors)
+				instead have the mental model that the padding box is what's scrollable,
+				so when you scroll to the end of the overflow,
+				there's the right/bottom padding.
+				Chrome/WebKit do this for the block axis, at least.
+				They're somewhat inconsistent for the inline axis;
+				there's something weird about how they handle lineboxes.
+
+				It seems that the block-axis padding is probably web-compatible to honor.
+				It's unclear that the inline-axis padding will be.
+				Further experimentation is needed.
+			</div>
+
+
+		<li>
+			all line boxes directly contained by the box
+
+		<li>
+			the border boxes
+			of all boxes for which it is the containing block,
+			accounting for transforms by projecting each box onto
+			the plane of the element that establishes its <a>3D rendering context</a>.
+			[[!CSS3-TRANSFORMS]]
+
+			Issue: Is this description of handling transforms
+			sufficiently accurate?
+
+		<li>
+			the <a>scrollable overflow regions</a> of all of the above boxes
+			(accounting for transforms as described above),
+			provided they themselves have ''overflow: visible''
+			(i.e. do not themselves trap the overflow)
+			and that <a>scrollable overflow</a> is not already clipped
+			(e.g. by the 'clip' property or the 'contain' property).
+
+			Note: The 'mask-*' properties [[!CSS-MASKING-1]]
+			do not affect the <a>scrollable overflow region</a>.
+
+			Issue: Need to evaluate compat of honoring or ignoring 'clip' and 'clip-path'.
+
+		<li>
+			Optionally,
+			additional padding on the end-edge sides,
+			corresponding to the end-side padding of the <a>scroll container</a>, such that the end edges of its in-flow content
+			coincide with the end edges of its content area
+			when scrolled to the end.
+
+			Issue: It's not yet clear if including the end-side padding in the scrollable layer is Web-compatible, so this clause is under investigation.
+			It appears that Chrome and Safari include such padding <a href="https://bug748518.bmoattachments.org/attachment.cgi?id=618078">in the block axis</a>;
+			and the behavior in the inline axis is <a href="http://jsbin.com/digadoyohi/1/edit?html,css,output">not</a> <a href="http://jsbin.com/vexahocayi/1/edit?html,css,output">clear</a>.
+
+			<!-- Make sure http://jsbin.com/qececaqilo/edit?html,css,output is clearly defined. -->
+	</ul>
+
+	The UA may <em>additionally</em> include
+	the margin areas of boxes for which it is the containing block.
+	The conditions under which such margin areas are included is undefined in this level.
+	<span class="issue">This needs further testing and investigation; is therefore deferred in this draft.</span>
+	<!--
+	Considerations:
+	  * floats
+	  * relpos
+	  * margins that collapsed through to the edge of the scrollable area
+	  * inline-side margins on both blocks and inlines
+	Notes:
+	  The reasoning for only including border boxes is to minimize the cases
+	  in which overflow scrolling is triggered; however once overflow is triggered,
+	  excluding margins creates tight, uncomfortable edges
+	  because the margin has been effectively truncated.
+	Testcase:
+		http://software.hixie.ch/utilities/js/live-dom-viewer/?%3C!DOCTYPE%20html%3E%0A%3Cstyle%3E%0A%20%20div%20%7B%20height%3A%2050px%3B%20overflow%3A%20scroll%3B%20border%3A%20solid%3B%20position%3A%20relative%3B%7D%0A%20%20p%20%7B%20margin%3A%2025px%3B%20background%3A%20red%3B%20%7D%0A%20%20q%20%7B%20position%3A%20absolute%3B%20background%3A%20blue%3B%20top%3A%2025px%3B%20margin%3A%2025px%3B%20%7D%0A%3C%2Fstyle%3E%0A%3Cdiv%3E%0A%20%20%3Cp%3ETest%20%3Cq%3ETest2%0A%3C%2Fdiv%3E
+	-->
+
+	Note: The <a>scrollable overflow rectangle</a> is always a rectangle
+	in the box's own coordinate system, but might be non-rectangular
+	in other coordinate systems due to transforms [[CSS3-TRANSFORMS]].
+	This means scrollbars can sometimes appear when not actually necessary.
+
+<!--
+ ███████  ██     ██ ████████ ████████  ████████ ██        ███████  ██      ██
+██     ██ ██     ██ ██       ██     ██ ██       ██       ██     ██ ██  ██  ██          ██   ██
+██     ██ ██     ██ ██       ██     ██ ██       ██       ██     ██ ██  ██  ██           ██ ██
+██     ██ ██     ██ ██████   ████████  ██████   ██       ██     ██ ██  ██  ██ ███████ █████████
+██     ██  ██   ██  ██       ██   ██   ██       ██       ██     ██ ██  ██  ██           ██ ██
+██     ██   ██ ██   ██       ██    ██  ██       ██       ██     ██ ██  ██  ██          ██   ██
+ ███████     ███    ████████ ██     ██ ██       ████████  ███████   ███  ███
+-->
+
+<h2 id="overflow-properties">
+Scrollable Overflow: the 'overflow-x', 'overflow-y', and 'overflow' properties</h2>
+
+	These properties specify whether a box’s content
+	(including any <a>ink overflow</a>)
+	is clipped to its padding edge,
+	and if so,
+	whether it is a <dfn export>scroll container</dfn>
+	that allows the user to scroll clipped parts of its <a>scrollable overflow region</a>
+	into view.
+	The visual viewport of the <a>scroll container</a>
+	(through which the <a>scrollable overflow region</a> can be viewed)
+	coincides with its padding box,
+	and is called the <dfn export>scrollport</dfn>.
+
+	<pre class=propdef>
+		Name: overflow-x, overflow-y
+		Value: ''visible'' | ''hidden'' | ''clip'' | ''scroll'' | ''auto''
+		Initial: ''visible''
+		Applies to: block containers [[!CSS21]], flex containers [[!CSS3-FLEXBOX]], and grid containers [[!CSS3-GRID-LAYOUT]]
+		Inherited: no
+		Percentages: N/A
+		Media: visual
+		Computed value: as specified, except with ''visible'' computing to ''auto'' if one of 'overflow-x' or 'overflow-y' is not ''visible''
+		Animatable: no
+	</pre>
+
+	The 'overflow-x' property specifies
+	the handling of <a>overflow</a> in the horizontal direction
+	(i.e., overflow from the left and right sides of the box),
+	and the 'overflow-y' property specifies the handling
+	of <a>overflow</a> in the vertical direction
+	(i.e., overflow from the top and bottom sides of the box).
+
+	<pre class=propdef>
+		Name: overflow
+		Value: ''visible'' | ''hidden'' | ''clip'' | ''scroll'' | ''auto''
+		Initial: see individual properties
+		Applies to: block containers [[!CSS21]], flex containers [[!CSS3-FLEXBOX]], and grid containers [[!CSS3-GRID-LAYOUT]]
+		Inherited: no
+		Percentages: N/A
+		Media: visual
+		Computed value: see individual properties
+		Animatable: no
+		Canonical order: <abbr title="follows order of property value definition">per grammar</abbr>
+	</pre>
+
+	The 'overflow' property is a shorthand property
+	that sets the specified values of both 'overflow-x' and 'overflow-y'
+	to the value specified for 'overflow'.
+
+	Values have the following meanings:
+
+	<dl dfn-for="overflow, overflow-x, overflow-y" dfn-type="value">
+		<dt><dfn>visible</dfn>
+		<dd>
+			There is no special handling of overflow, that is, it
+			may be rendered outside the box.
+			The box is not a <a>scroll container</a>.
+
+		<dt><dfn>hidden</dfn>
+		<dd>
+			This value indicates that
+			the box’s content is clipped to its padding box
+			and that the UA must not provide any scrolling user interface
+			to view the content outside the clipping region,
+			nor allow scrolling by direct intervention of the user,
+			such as dragging on a touch screen
+			or using the scrolling wheel on a mouse.
+			However, the content must still be scrollable programatically,
+			for example using the mechanisms defined in [[CSSOM-VIEW]],
+			and the box is therefore still a <a>scroll container</a>.
+
+		<dt><dfn>clip</dfn>
+		<dd>
+			Like ''hidden'',
+			this value indicates that
+			the box’s content is clipped to its padding box
+			and that no scrolling user interface should be provided by the UA
+			to view the content outside the clipping region.
+			In addition, unlike ''overflow: hidden''
+			which still allows programmatic scrolling,
+			''overflow: clip'' forbids scrolling entirely,
+			through any mechanism,
+			and therefore the box is not a <a>scroll container</a>.
+
+		<dt><dfn>scroll</dfn>
+		<dd>
+			This value indicates that
+			the content is clipped to the padding box,
+			but can be scrolled into view
+			(and therefore the box is a <a>scroll container</a>).
+			Furthermore, if the user agent uses a scrolling mechanism
+			that is visible on the screen (such as a scroll bar or a panner),
+			that mechanism should be displayed
+			whether or not any of its content is clipped.
+			This avoids any problem with scrollbars appearing
+			and disappearing in a dynamic environment.
+			When this value is specified and the target medium is ''print'',
+			overflowing content may be printed.
+
+		<dt><dfn>auto</dfn>
+		<dd>
+			This value indicates that
+			the box’s content is clipped to the padding box,
+			but can be scrolled into view
+			(and therefore the box is a <a>scroll container</a>).
+			However, if the user agent uses a scrolling mechanism
+			that is visible on the screen (such as a scroll bar or a panner),
+			that mechanism should only be displayed
+			if there is overflow.
+		</dl>
+
+	If the computed value of 'overflow' on a <a>block box</a> is not ''overflow/visible'',
+	it creates a new <a>block formatting context</a> for its content.
+
+<h3 id="overflow-propagation">
+Overflow Value Propagation</h3>
+
+	UAs must apply the 'overflow' property
+	set on the root element to the viewport.
+	When the root element is an [[!HTML]] <{html}> element
+	(including <a href="https://html.spec.whatwg.org/multipage/introduction.html#html-vs-xhtml">XML syntax for HTML</a>),
+	and that element has a <{body}> element as a child,
+	user agents must instead apply the 'overflow' property
+	from the first such child element to the viewport,
+	if the value on the root element is ''overflow/visible''.
+	The ''overflow/visible'' value when used for the viewport must be interpreted as ''overflow/auto''.
+	The element from which the value is propagated must have a used value for 'overflow' of ''overflow/visible''.
+
+	If this application would result in the viewport having ''visible'' overflow,
+	the UA must instead treat the viewport as having ''overflow/auto'' overflow.
+
+<h3 id="scrollbar-layout">
+Scrollbars and Layout</h3>
+
+	In the case of a scrollbar being placed on an edge of the element's box,
+	it should be inserted between the inner border edge
+	and the outer padding edge.
+	Any space taken up by the scrollbars should be
+	taken out of (subtracted from the dimensions of)
+	the containing block formed by the element with the scrollbars.
+
+	Issue: import examples from [[CSS3-BOX]].
+
+<h3 id="scrolling-direction">
+Scrolling Origin, Direction, and Restriction</h3>
+
+	The <dfn export>initial scroll position</dfn>,
+	that is, the initial position of
+	the box’s <a>scrollable overflow region</a>
+	with respect to its border box,
+	prior to any user or programmatic scrolling that changes it,
+	is dependent on the box’s <a>writing mode</a>,
+	and is by default the <a>block-start</a>/</a>inline-start</a> edge
+	of the box’s <a>padding edge</a>.
+	However, the 'align-content' and 'justify-content' properties [[!CSS-ALIGN-3]]
+	can be used to change this.
+
+	Due to Web-compatibility constraints
+	(caused by authors exploiting legacy bugs to surreptitiously hide content from visual readers but not search engines and/or speech output),
+	UAs must clip the <a>scrollable overflow region</a>
+	of <a>scroll containers</a>
+	on the <a>block-start</a> and </a>inline-start</a> sides of the box
+	(thereby behaving as if they had no <a>scrollable overflow</a> on that side).
+
+	The viewport uses the <a>principal writing mode</a> for these calculations.
+
+<h2 id="max-lines">
+Limiting Number of Visible Text Lines: the 'max-lines' property</h2>
+
+
+	<pre class=propdef>
+		Name: max-lines
+		Value: none | <<integer>>
+		Initial: none
+		Applies to: all non-inline elements
+		Inherited: no
+		Animatable: as integer
+		Percentages: N/A
+		Media: visual
+		Computed value: specified value
+	</pre>
+
+	Issue: Add back 'max-lines', so we can kill the unspecified WebKit feature that does this poorly.
+
+
+<h2 id="static-media">
+Overflow in static media</h2>
+
+	<p class="issue">
+		This specification should define useful behavior
+		for all values of 'overflow'
+		in static media (such as print).
+		Current implementation behavior is quite poor and
+		produces unexpected results when authors have not considered
+		what will happen when
+		the content they produce for interactive media
+		is printed.
+
+
+Privacy and Security Considerations {#priv-sec}
+===============================================
+
+This specification introduces no new privacy or security concerns.
+
+<h2 class=no-num id="acknowledgments">
+Acknowledgments</h2>
+
+	<p>
+		Thanks especially to the feedback from
+		Rossen Atanassov,
+		Bert Bos,
+		Tantek Çelik,
+		John Daggett,
+		fantasai,
+		Daniel Glazman,
+		Vincent Hardy,
+		H&aring;kon Wium Lie,
+		Peter Linss,
+		Robert O'Callahan,
+		Florian Rivoal,
+		Alan Stearns,
+		Steve Zilles,
+		and all the rest of the
+		<a href="http://lists.w3.org/Archives/Public/www-style/">www-style</a> community.

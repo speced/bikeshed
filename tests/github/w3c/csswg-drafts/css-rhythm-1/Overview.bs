@@ -1,0 +1,519 @@
+<style>
+.example .figure img {
+  background-color: white;
+  padding: 20px;
+  margin: 20px;
+}
+</style>
+<pre class=metadata>
+Title: CSS Rhythmic Sizing
+Shortname: css-rhythm
+Level: 1
+Group: CSSWG
+Status: ED
+Work Status: exploring
+Editor: Koji Ishii, Google, kojiishi@gmail.com, w3cid 45369
+Editor: Elika J. Etemad / fantasai, Invited Expert, http://fantasai.inkedblade.net/contact, w3cid 35400
+ED: https://drafts.csswg.org/css-rhythm/
+TR: https://www.w3.org/TR/css-rhythm-1/
+Abstract: This module contains CSS features for aligning content size
+  to multiple of unit size.
+</pre>
+<pre class=link-defaults>
+spec:css21; type:property; text:max-height
+spec:css21; type:property; text:max-width
+spec:css21; type:property; text:min-width
+spec:css-writing-modes-4; type:dfn; text:end
+spec:css-writing-modes-4; type:dfn; text:start
+spec:css-break-3; type:dfn; text:fragment
+</pre>
+
+Introduction {#intro}
+=====================
+
+	This specification provides features to control sizes of CSS objects
+	according to the rules desired by use cases.
+
+	Controlling sizes of CSS objects to be multiple of a unit
+	is desired in many cases.
+	This level of the specification focuses on following cases.
+
+	* Adjust heights of block-level boxes to multiples of the specified length.
+	* Adjust heights of line boxes to multiples of the specified length.
+
+	By stacking blocks at multiples,
+	authors can align content across columns, pages, scroll-snapped bocks
+	or multiple blocks placed absolutely
+	to maintain vertical rhythm.
+
+	Also by controlling heights of line boxes,
+	lines of text in different fonts can create consistent visuals
+	to help readability.
+
+	<div class="figure">
+		<a href="examples/snap-height.html">
+			<img src="images/snap-height-sample.png"></a>
+		<p class="caption">Vertical rhythm kept through pictures and different size of text in a multi-column document.
+	</div>
+
+East Asian Casual Vertical Rhythms {#eastasia}
+----------------------------------------------
+
+In East Asia, a casual variant of vertical rhythm is widely used.
+
+Vertical rhythm is typically used in professional typography.
+While it improves readability,
+its spacing constraints require careful and well-thought design of spaces.
+
+The East Asian casual variant was
+originally a product of technical constraints of traditional word processors in '80s.
+But when the technical constraints were lifted in more modern technologies,
+with the help of square-like visual of ideographic characters,
+East Asian authors preferred to keep parts of the characteristics.
+
+In this variant of vertical rhythm,
+the requirement is loosened for the ease of use for non-professional authors.
+Text is still on the rhythm,
+so that the majority of ideographic characters are mostly on grid,
+but when author specifies borders, margins, or some other objects that may break the rhythm,
+the rhythm is shifted rather than forced.
+The strict vertical rhythm often surprises non-professional authors by forced jumps in such cases,
+while this variant combines rhythm on text and the ease of use for non-professional authors.
+
+This variant was very widely accepted in East Asia since the middle of '90s,
+such that most major word processors used in East Asia provided similar features
+by default.
+
+In East Asian publishing typography,
+the vertical rhythm is one of important properties,
+but its priority compared to other properties
+varies by types of documents.
+In single column documents,
+the priority is weaker than that of multi-column documents.
+Text should be on the vertical rhythm,
+but it is often preferred for borders, margins,
+or other properties to win over the rhythm.
+In such cases, the rhythm is shifted, similar to the casual variant.
+
+In this specification,
+when the 'line-height-step' property is used without combination of the 'block-step' property
+or the 'line-grid' property,
+it produces the similar effect as the East Asian casual vertical rhythm.
+
+It may also serve good for East Asian publishing typography,
+depends on the desired strength of the vertical rhythm.
+
+For other cases of vertical rhythm,
+it is expected that
+the 'block-step' property or the 'line-grid' property are used,
+or that the 'line-height-step' property is used together with them.
+
+Adjusting Block-level Box Heights {#block-height}
+=================================
+
+	The most common typographic rhythm problems are block-level intrusions:
+	when continuous paragraph-level text is interrupted
+	by differently-sized content such as illustrations and headings,
+	then the line-to-line rhythm can be thrown off.
+	The block step properties allow such elements
+	to be fitted to the rhythmic interval
+	by constraining their height to a multiple of a specified step size.
+	This allows content before and after the interruption
+	to maintain a continuous rhythm.
+
+		<div class="figure">
+			<img src="images/block-step-size-before.png"
+			style="width: 500px">
+			<figcaption>Heads and blockquotes have varying font sizes and line heights,
+			resulting in uneven text across columns.</figcaption>
+		</div>
+
+
+
+		<div class="figure">
+			<img src="images/block-step-size-after.png"
+			style="width: 500px">
+			<figcaption>Space inserted before and after blocks (shown with colored borders)
+			restores vertical rhythm.</figcaption>
+		</div>
+
+	While consistent use of the block step properties
+	can produce the strictly gridded layout needed
+	for parallel content flows,
+	per-element specification of the step size
+	also allows some interruptions to take their natural size in the flow,
+	restarting the vertical rhythm afterwards.
+	This can be useful in single-column layouts
+	where the vertical rhythm is important to maintain visual continuity,
+	but there is nothing alongside to align to.
+	In these casese,
+	large interruptions which visually disconnect the flow before and after
+	can prioritize optimal spacing around the item
+	over strict adherence to a continouous grid
+	(by specifying ''block-step: none'', the initial value).
+
+	ISSUE: This proposal can be simplified down to just the 'block-step-size' property, represented solely through its shortened form as 'block-step'.
+	This level will likely at most contain 'block-step-size' and 'block-step-insert', leaving 'block-step-align' and 'block-step-round' to be added if the future demands.
+	The full design is described herein for current discussion and future reference.
+
+	ISSUE: This proposal is currently defined to apply only to block-level boxes. This limitation is solely to simplify the first iteration; it should eventually be extended to all layout modes that honor specified heights.
+
+Specifying the Step Size: the 'block-step-size' property {#block-step-size}
+--------------------------------------------------------
+
+	<pre class="propdef">
+	Name: block-step-size
+	Value: none | <<length>>
+	Initial: none
+	Applies to: block-level boxes
+	Inherited: no
+	Animatable: ???
+	Percentages: N/A
+	Media: visual
+	Computed Value: keyword or absolute length
+	</pre>
+
+	This property defines the <a>step unit</a> for a block-level box’s <a>block size</a>.
+	When the <a>step unit</a> is set to a positive <<length>>,
+	the box’s outer height is rounded
+	(see 'block-step-round')
+	to the closest multiple of the unit.
+	Negative <<length>> values are invalid.
+
+	Values other than ''block-step-size/none''
+	cause the box to establish a new formatting context.
+
+	In situations where margins <a href="https://www.w3.org/TR/CSS2/box.html#collapsing-margins">collapse</a>,
+	only the box’s own margin is considered
+	in calculating its outer size.
+
+	When a box <a>fragments</a>,
+	step sizing is applied per fragment.
+
+Specifying the Spacing Type: the 'block-step-insert' property {#block-step-insert}
+--------------------------------------------------------
+
+	<pre class="propdef">
+	Name: block-step-insert
+	Value: margin | padding
+	Initial: margin
+	Applies to: block-level boxes
+	Inherited: no
+	Animatable: no
+	Percentages: N/A
+	Media: visual
+	Computed Value: as specified
+	</pre>
+
+	This property specifies whether extra spacing
+	derived from applying 'block-step-size'
+	is inserted inside (like 'padding') or outside (like 'margin')
+	the box’s border.
+
+	Values have the following meanings:
+
+	<dl dfn-for="block-step-insert" dfn-type="value">
+		<dt><dfn>margin</dfn>
+		<dd>
+			Any extra space resulting from a 'block-step-size'-induced adjustment
+			is inserted outside the box’s border, as extra margin.
+
+		<dt><dfn>padding</dfn>
+		<dd>
+			Any extra space resulting from a 'block-step-size'-induced adjustment
+			is inserted inside the box’s border, as extra padding.
+	</dl>
+
+Specifying Alignment: the 'block-step-align' property {#block-step-align}
+-----------------------------------------------------
+
+	<pre class="propdef">
+	Name: block-step-align
+	Value: auto | center | start | end
+	Initial: auto
+	Applies to: block-level boxes
+	Inherited: no
+	Animatable: no
+	Percentages: N/A
+	Media: visual
+	Computed Value: as specified
+	</pre>
+
+	This property specifies whether extra spacing
+	derived from applying 'block-step-size'
+	is inserted before, inserted after, or split between both sides of the box.
+
+	Values have the following meanings:
+
+	<dl dfn-for="block-step-align" dfn-type="value">
+		<dt><dfn>auto</dfn>
+		<dd>
+			If 'block-step-insert' is ''margin'':
+			if 'align-self' is ''start'', ''end'', or ''center'', treat as that value,
+			otherwise treat as ''center''.
+
+		<dt><dfn>center</dfn>
+		<dd>
+			Any extra space resulting from a 'block-step-size'-induced adjustment
+			is split, and applied half on either side of the box.
+		<dt><dfn>start</dfn>
+		<dd>
+			Any extra space resulting from a 'block-step-size'-induced adjustment
+			is inserted on the <a>end</a> side of the box.
+		<dt><dfn>end</dfn>
+		<dd>
+			Any extra space resulting from a 'block-step-size'-induced adjustment
+			is inserted on the <a>start</a> side of the box.
+	</dl>
+
+	In all cases,
+	additional spacing cannot be added to margins
+	that are truncated or omitted due to unforced fragmentation breaks
+	(see [[CSS3-PAGE]] and [[CSS-BREAK-3]]);
+	therefore if 'block-step-insert' is ''margin'',
+	all extra space derived from applying 'block-step-size'
+	must be inserted on the opposite side of the fragment
+	(regardless of 'block-step-align').
+
+Rounding Method: the 'block-step-round' property {#block-step-round}
+------------------------------------------------
+
+	<pre class="propdef">
+	Name: block-step-round
+	Value: up | down | nearest
+	Initial: up
+	Applies to: block-level boxes
+	Inherited: no
+	Animatable: no
+	Percentages: N/A
+	Media: visual
+	Computed Value: as specified
+	</pre>
+
+	This property specifies whether adjustments due to 'block-step-size'
+	insert positive or negative space.
+
+	Values have the following meanings:
+
+	<dl dfn-for="block-step-align" dfn-type="value">
+		<dt><dfn>up</dfn>
+		<dd>
+			The outer size of the box is <em>increased</em>
+			(positive space is inserted)
+			to fulfill the 'block-step-size' constraint.
+
+		<dt><dfn>down</dfn>
+		<dd>
+			The outer size of the box is <em>decreased</em>
+			(negative space is inserted)
+			to fulfill the 'block-step-size' constraint.
+
+		<dt><dfn>nearest</dfn>
+		<dd>
+			The outer size of the box is either
+			<em>increased</em> (as for ''up'') or <em>decreased</em> (as for ''down''--
+			whichever results in the smallest absolute change--
+			to fulfill the 'block-step-size' constraint.
+			If both options would result in the same amount of change,
+			the size is increased.
+	</dl>
+
+Block Step Adjustment Shorthand: the 'block-step' shorthand {#block-step}
+-----------------------------------------------------------
+
+	<pre class="propdef">
+	Name: block-step
+	Value: <'block-step-size'> || <'block-step-insert'> || <'block-step-align'> || <'block-step-round'>
+	Initial: See individual properties
+	Applies to: block-level boxes
+	Inherited: no
+	Animatable: See individual properties
+	Percentages: N/A
+	Media: visual
+	Computed Value: See individual properties
+	</pre>
+
+	This <a>shorthand property</a> allows for setting
+	'block-step-size',
+	'block-step-insert',
+	'block-step-align',
+	and
+	'block-step-round'
+	in one declaration.
+	Omitted values are set to the property’s initial value.
+
+	Advisement: Authors are advised to use this shorthand rather than the longhands
+	unless there is a specific need for its individual longhands to cascade independently.
+
+Adjusting Line Box Heights: the 'line-height-step' property {#line-height-step}
+===============================================================================
+
+	<pre class='propdef'>
+	Name: line-height-step
+	Value: <<length>>
+	Initial: 0
+	Applies to: block containers
+	Inherited: yes
+	Animatable: no
+	Percentages: N/A
+	Media: visual
+	Computed Value: the absolute length
+	</pre>
+
+This property defines the <dfn>step unit</dfn> for line box heights.
+A <a>step unit</a> is the length of the vertical rhythm,
+usually the distance from one baseline to the next baseline of the body text.
+Body text should fit into one <a>step unit</a>,
+and taller lines such as headings
+should have heights of two or more <a>step unit</a>s.
+Vertical rhythm is created
+by making heights of all lines an integer multiple of the <a>step unit</a>.
+
+	When the <a>step unit</a> is set to a positive <<length>>,
+	the line box heights are rounded <i>up</i> to
+	the closest multiple of the unit.
+	Negative <<length>> values are invalid.
+
+	[[!CSS21]] <a href="https://drafts.csswg.org/css2/visudet.html#line-height">&#xA7;10.8 Line height calculations</a>
+	defines how to compute the height of a line box from its inline-level content.
+	The rounding is applied to the resulting height of the line box,
+	and the additional space is distributed to
+	<a>over</a>-side and <a>under</a>-side of the line box equally,
+	so that the original line box appears at the center of the
+	multiple of <a>step unit</a>.
+	This adjustment is done
+	by assuming that there is an inline-level box that has adjusted A' and D'
+	in the line box.
+	This inline-level box does not affect alignment points of the 'vertical-align' property,
+	except values that align relative to the line box.
+
+	<div class="figure">
+	<img src="images/adjust-line-height.svg">
+	<p class="caption">Rounding up the computed line box height.
+	</div>
+
+	<div class="issue">Should this be animatable?
+	There doesn't seem to be use cases but needed for consistency?</div>
+
+	<div class="example">
+		<div class="figure" style="float:right">
+			<img src="images/line-grid-center.svg"
+			style="height: 300px"
+			>
+		</div>
+
+		In the following example,
+		the height of line box in each paragraph is rounded up to the <a>step unit</a>.
+
+		<pre class="lang-css">
+			:root {
+			  font-size: 12pt;
+			  --my-grid: 18pt;
+			  line-height-step: var(--my-grid);
+			}
+			h1 {
+			  font-size: 20pt;
+			  margin-top: calc(2 * var(--my-grid));
+			}
+			p {
+			  margin: 0;
+			}
+		</pre>
+
+		The line box in <code>&lt;h1&gt;</code> does not fit into one <a>step unit</a>
+		and thus occupies two,
+		but it is still centered within the two <a>step unit</a>.
+	</div>
+
+	<div class="example">
+	Authors can keep margins or other properties to be multiple of <a>step unit</a>
+	using ''var()'' and ''calc()'' as in the example above.
+
+	If author prefers,
+	tools like Sass can make such declarations shorter.
+
+		<pre class="lang-css">
+		  $gu: 18px;
+
+		  @function gu($n) {
+		    @return $n * $gu;
+		  }
+
+		  h1 {
+		    font-size: 20pt;
+		    margin: gu(1.2) auto gu(1.8);
+		  }
+		</pre>
+	</div>
+
+	<div class="note">
+	It is usually recommended to set the 'line-height' lower than
+	the <a>step unit</a>.
+	The used line height can increase due to several factors such as
+	the use of 'vertical-align' or font fallback.
+	</div>
+
+<!--
+Notes on Block-level Boxes {#inline-block}
+------------------------------------------
+
+	<i>This section is not normative.</i>
+
+	This level of the specification does not provide features
+	to adjust heights of block-level boxes.
+
+	<div class="example">
+	The following CSS turns <code>&lt;h2&gt;</code> to inline-blocks,
+	so that the 'line-height-step' property can control its height.
+
+	<pre class="lang-css">
+	:root {
+	  line-height-step: 18pt;
+	}
+	h2 {
+	  display: inline-block;
+	  width: 100%;
+	  line-height-step: 0;
+	  line-height: 1.2;
+	}
+	</pre>
+
+	When an <code>&lt;h2&gt;</code> is long enough to wrap,
+	text inside the <code>&lt;h2&gt;</code> uses ''line-height: 1.2'', while
+	the height of the <code>&lt;h2&gt;</code> block is rounded up
+	to the multiple of ''18pt''.
+	See <a href="examples/snap-height.html">a sample in action</a>.
+	</div>
+-->
+
+Privacy and Security Considerations {#priv-sec}
+===============================================
+
+	This specification introduces no new privacy leaks,
+	or security considerations beyond "implement it correctly".
+
+Acknowledgments {#acks}
+=======================
+
+	This specification would not have been possible without the help from:
+	Masaharu Akutsu,
+	Yoko Aoki,
+	Takao Baba,
+	Chris Eppstein,
+	Ichiro Inaba,
+	Jxck,
+	Noriko Kase,
+	Motoya Kinoshita,
+	Shinyu Murakami,
+	Tsutomu Nanjo,
+	Kiyoshi Narishima,
+	Charlie Neely,
+	Takuya Nishimura,
+	Katsuhiro Osumi,
+	Florian Rivoal,
+	Hiroshi Sakakibara,
+	Alan Stearns,
+	Masataka Yakura,
+	KADOKAWA Corporation,
+	PixelGrid Inc.,
+	and the CSS Working Group members.

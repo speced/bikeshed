@@ -1,0 +1,356 @@
+<pre class="metadata">
+Title: 加速的图形识别
+Repository: wicg/shape-detection-api
+Status: ED
+ED: https://wicg.github.io/shape-detection-api
+Shortname: shape-detection-api
+Level: 1
+Editor: Miguel Casas-Sanchez, w3cid 82825, Google Inc., mcasas@google.com
+Abstract: 本文档描述了一套Chrome中针对静态和/或动态图像的图形识别（如：人脸识别）API。
+Group: wicg
+!Participate: <a href="https://www.w3.org/community/wicg/">Join the W3C Community Group</a>
+!Participate: <a href="https://github.com/WICG/shape-detection-api">Fix the text through GitHub</a>
+</pre>
+
+<style>
+table {
+  border-collapse: collapse;
+  border-left-style: hidden;
+  border-right-style: hidden;
+  text-align: left;
+}
+table caption {
+  font-weight: bold;
+  padding: 3px;
+  text-align: left;
+}
+table td, table th {
+  border: 1px solid black;
+  padding: 3px;
+}
+</style>
+
+# 简介 # {#introduction}
+
+照片和图像是互联网构成中最大的部分，其中相当一部分包含了可识别的特征，比如人脸，二维码或者文本。可想而之，识别这些特征的计算开销非常大，但有些很有趣场景，比如在照片中自动标记人脸，或者根据图像中的URL进行重定向。硬件厂商从很久以前就已经开始支持这些特性，但Web应用迟迟未能很好地利用上这些硬件特性，必须借助一些难用的程序库才能达到目的。
+
+## 图形识别的场景 ## {#image-sources-for-detection}
+
+请参考代码库中<a href="https://github.com/WICG/shape-detection-api/blob/gh-pages/README.md">自述/解释</a> 的文档。
+
+# 图形识别API # {#api}
+
+某些特定的浏览器可能会提供识别器来标示当前硬件是否提供加速功能。
+
+## 用于识别的图像源 ## {#image-sources-for-detection}
+
+<p class="note">
+本节的灵感来自 [[canvas2dcontext#image-sources-for-2d-rendering-contexts]]。
+</p>
+
+{{ImageBitmapSource}} 允许多种图形接口的实现对象作为图像源，进行识别处理。
+
+
+* 当{{ImageBitmapSource}}对象代表{{HTMLImageElement}}的时候，该元素的图像必须用作源图像。而在特定情况下，当{{ImageBitmapSource}}对象代表{{HTMLImageElement}}中的动画图像的时候，用户代理程序(User Agent)必须显示这个动画图像的默认图像（该默认图像指的是，在动画图像被禁用或不支持动画的环境下，需要展现的图像），或者没有默认图像的话，就显示该动画图像的第一帧。
+
+* 当{{ImageBitmapSource}}对象代表{{HTMLVideoElement}}的时候，该视频播放的当前帧必须用作源图像，同时，该源图像的尺寸必须是视频源的<a href="https://drafts.csswg.org/css2/conform.html#intrinsic">固有维数(intrinsic dimensions)</a>，换句话说，就是视频源经过任意比例的调整后的大小。
+
+
+* 当{{ImageBitmapSource}}对象代表{{HTMLCanvasElement}}的时候，该元素的位图必须用作源图像。
+
+当用户代理程序(User Agent)被要求用某种既有的{{ImageBitmapSource}}作为识别器的<code>detect()</code>方法的输入参数的时候，必须执行以下步骤：
+
+* 如果{{ImageBitmapSource}}所含的有效脚本源([[HTML#concept-origin]])和当前文档的有效脚本源不同，就拒绝对应的Promise对象，并附上一个名为{{SecurityError}}的新建{{DOMException}}对象。
+
+* 如果一个{{ImageBitmapSource}}是一个处于|broken|状态的{{HTMLImageElement}}对象的话，就拒绝对应的Promise对象，并附上一个名为{{InvalidStateError}}的新建{{DOMException}}对象，同时停止之后的所有步骤。
+
+
+* 如果{{ImageBitmapSource}}是一个不能完整解码的{{HTMLImageElement}}对象的话，就拒绝对应的Promise对象，并附上一个名为{{InvalidStateError}}的新建{{DOMException}}对象，同时停止之后的所有步骤。
+
+* 如果一个{{ImageBitmapSource}}是一个{{HTMLVideoElement}}对象，且其<a href="https://html.spec.whatwg.org/multipage/embedded-content.html#ready-states:dom-media-readystate">|readyState|</a>属性为|HAVE_NOTHING| 或 |HAVE_METADATA|的话，就拒绝对应的Promise对象，并附上一个名为{{InvalidStateError}}的新建{{DOMException}}对象，同时停止之后的所有步骤。
+
+
+* 如果一个{{ImageBitmapSource}}是一个{{HTMLCanvasElement}}对象，且其位图的|origin-clean| ([[HTML#concept-canvas-origin-clean]])标识为false的话，就拒绝对应的Promise对象，并附上一个名为{{SecurityError}}的新建{{DOMException}}对象，同时停止之后的所有步骤。
+
+
+请注意，如果一个{{ImageBitmapSource}}的水平尺寸或垂直尺寸等于0，那么对应的Promise对象就会被简单地当作一个空的已检测对象序列来处理。
+
+
+## 人脸识别API ## {#face-detection-api}
+
+{{FaceDetector}}代表一个针对图像中的人脸进行识别的底层加速平台组件。创建时可以选择一个{{FaceDetectorOptions}}的Dictionary对象作为入参。它提供了一个单独的 {{FaceDetector/detect()}}方法操作{{ImageBitmapSource}}对象，并返回Promise对象。如果检测到[[#image-sources-for-detection]]中提及的用例，则该方法必须拒绝该Promise对象；否则，它可能会向{{DetectedFace}}序列推入一个新任务，这样会消耗操作系统或平台资源去依序处理该Promise，每个任务由一个{{DetectedFace/boundingBox}}所包含并界定。
+
+<pre class="idl">
+dictionary FaceDetectorOptions {
+  unsigned short maxDetectedFaces;
+  boolean fastMode;
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn dict-member for="FaceDetectorOptions"><code>maxDetectedFaces</code></dfn></dt>
+  <dd>当前场景中已识别的人脸数的最大值。</dd>
+  <dt><dfn dict-member for="FaceDetectorOptions"><code>fastMode</code></dfn></dt>
+  <dd>提示User Agent（UA）尝试以速度优先（于精确度）的模式，通过更小的比例尺（更靠近目标图形）或寻找更大的目标图形的办法进行识别。</dd>
+</dl>
+
+<pre class="idl">
+[Exposed=(Window,Worker), Constructor(optional FaceDetectorOptions faceDetectorOptions)]
+interface FaceDetector {
+  Promise&lt;sequence&lt;DetectedFace>> detect(ImageBitmapSource image);
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn constructor for="FaceDetector"><code>FaceDetector(optional FaceDetectorOptions faceDetectorOptions)</code></dfn></dt>
+  <dd>构建一个新的{{FaceDetector}}对象，附带可选项|faceDetectorOptions|。</dd>
+  <dt><dfn method for="FaceDetector"><code>detect()</code></dfn></dt>
+  <dd>尝试在{{ImageBitmapSource}} |图像|中识别人脸，如果识别到人脸，则返回一个{{DetectedFace}}序列。</dd>
+</dl>
+
+<pre class="idl">
+interface DetectedFace {
+  [SameObject] readonly attribute DOMRectReadOnly boundingBox;
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn attribute for="DetectedFace"><code>boundingBox</code></dfn></dt>
+  <dd>与图像坐标轴对齐的一个矩形，该矩形标示了一个已识别特征的位置和范围。</dd>
+</dl>
+
+<div class="example">
+人脸识别的实现案例有：<a href="https://developer.android.com/reference/android/media/FaceDetector.html">Android FaceDetector</a>, <a href="https://developer.apple.com/reference/coreimage/cifacefeature?language=objc">Apple's CIFaceFeature</a> 或者 <a href="https://msdn.microsoft.com/library/windows/apps/windows.media.faceanalysis.facedetector.aspx">Windows 10 FaceDetector</a>。
+</div>
+
+<div class="note">
+  Consider adding attributes such as, e.g.:
+  <pre>
+    [SameObject] readonly attribute unsigned long id;
+    [SameObject] readonly attribute FrozenArray&lt;Landmark>? landmarks;
+  </pre>
+  to {{DetectedFace}}.
+</div>
+
+## 条形码识别API ## {#barcode-detection-api}
+
+{{BarcodeDetector}}代表一个针对图像中的二维码或条形码进行识别的底层加速平台组件。它提供了一个单独的{{BarcodeDetector/detect()}}方法操作{{ImageBitmapSource}}对象，并返回Promise对象。如果检测到[[#image-sources-for-detection]]中提及的情况，则该方法必须拒绝该Promise对象；否则，它可能会向{{DetectedBarcode}}序列推入一个新任务，这样会消耗操作系统或平台资源去依序处理该Promise。基本上每个任务包含{{DetectedBarcode/boundingBox}}和一系列{{Point2D}}，甚至可能还有个解码后的{{DOMString}}对象{{DetectedBarcode/rawValue}}，由它们来确定边界。
+
+
+<pre class="idl">
+[Exposed=(Window,Worker), Constructor()]
+interface BarcodeDetector {
+  Promise&lt;sequence&lt;DetectedBarcode>> detect(ImageBitmapSource image);
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn method for="BarcodeDetector"><code>detect(ImageBitmapSource image)</code></dfn></dt>
+  <dd>尝试在{{ImageBitmapSource}}图像中识别条形码。</dd>
+</dl>
+
+<pre class="idl">
+interface DetectedBarcode {
+  [SameObject] readonly attribute DOMRectReadOnly boundingBox;
+  [SameObject] readonly attribute DOMString rawValue;
+  [SameObject] readonly attribute FrozenArray&lt;Point2D> cornerPoints;
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn attribute for="DetectedBarcode"><code>boundingBox</code></dfn></dt>
+  <dd>与图像坐标轴对齐的一个矩形，该矩形标示了一个已识别特征的位置和范围。</dd>
+
+  <dt><dfn attribute for="DetectedBarcode"><code>rawValue</code></dfn></dt>
+  <dd>从条形码解码得到的DOMString对象，该值可能为多行。</dd>
+
+  <dt><dfn attribute for="DetectedBarcode"><code>cornerPoints</code></dfn></dt>
+  <dd>一串已识别条形码的顶点序列（<a>sequence</a>），顺序从左上角开始，以顺时针方向排列。因为现实中透视形变的原因，该序列不一定表示的是正方形。</dd>
+</dl>
+
+<div class="example">
+实现了条形码/二维码识别的示例有：<a href="https://developers.google.com/android/reference/com/google/android/gms/vision/barcode/package-summary">Google Play Services</a> 或者 <a href="https://developer.apple.com/reference/coreimage/ciqrcodefeature?language=objc">Apple's CICRCodeFeature</a>.
+</div>
+
+## 文本识别API ## {#text-detection-api}
+
+TextDetector代表一个针对图像中的文本进行识别的底层加速平台组件。它提供了一个单独的{{TextDetector/detect()}}方法操作{{ImageBitmapSource}}对象，并返回Promise对象。如果检测到[[#image-sources-for-detection]]中提及的情况，则该方法必须拒绝该Promise对象；否则，它可能会向{{DetectedText}}序列推入一个新任务，这样会消耗操作系统或平台资源去依序处理该Promise，基本上每个task包含一个{{DetectedText/rawValue}}，并由一个{{DetectedText/boundingBox}}来确定边界。
+
+
+
+<pre class="idl">
+[
+    Constructor,
+    Exposed=(Window,Worker),
+] interface TextDetector {
+    Promise&lt;sequence&lt;DetectedText&gt;&gt; detect(ImageBitmapSource image);
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn method for="TextDetector"><code>detect(ImageBitmapSource image)</code></dfn></dt>
+  <dd>尝试在{{ImageBitmapSource}} |图像|中识别文本块。.</dd>
+</dl>
+
+<pre class="idl">
+[
+    Constructor,
+] interface DetectedText {
+    [SameObject] readonly attribute DOMRect boundingBox;
+    [SameObject] readonly attribute DOMString rawValue;
+};
+</pre>
+
+<dl class="domintro">
+  <dt><dfn attribute for="DetectedText"><code>boundingBox</code></dfn></dt>
+  <dd>与图像坐标轴对齐的一个矩形，该矩形标示了一个已识别特征的位置和范围。</dd>
+
+  <dt><dfn attribute for="DetectedText"><code>rawValue</code></dfn></dt>
+  <dd>从图像中识别到的原始字符串。</dd>
+</dl>
+
+<div class="example">
+实现了文本识别的示例有：<a href="https://developers.google.com/android/reference/com/google/android/gms/vision/text/package-summary">Google Play Services</a>, <a href="https://developer.apple.com/reference/coreimage/cidetectortypetext">Apple's CIDetector</a> 或者 <a href="https://msdn.microsoft.com/en-us/library/windows/apps/windows.media.ocr.aspx">Windows 10 <abbr title="Optical Character Recognition">OCR</abbr> API</a>.
+</div>
+
+# 示例 # {#examples}
+
+<p class="note">
+以下示例的微调或扩展版本，以及更多示例请参考<a href="https://codepen.io/collection/DwWVJj/">这个codepen集合</a>。
+</p>
+
+## 图形识别器的平台支持 ## {#platform-support-for-a-given-detector}
+
+<div class="note">
+以下的示例同样可以在<a href="https://codepen.io/miguelao/pen/PbYpMv?editors=0010">这个codepen</a>中找到微调的版本。
+</div>
+
+<div class="example" highlight="javascript">
+
+<pre>
+if (window.FaceDetector == undefined) {
+  console.error('Face Detection not supported on this platform');
+}
+if (window.BarcodeDetector == undefined) {
+  console.error('Barcode Detection not supported on this platform');
+}
+if (window.TextDetector == undefined) {
+  console.error('Text Detection not supported on this platform');
+}
+</pre>
+</div>
+
+## 人脸识别 ## {#face-detection}
+
+<div class="note">
+以下的示例同样可以在<a href="https://codepen.io/miguelao/pen/YGrYAm?editors=0010">这个codepen</a>(或者<a href="https://codepen.io/miguelao/pen/ORYbbm?editors=0010">这个有边界框覆盖的图像示例中</a>)找到。
+</div>
+
+<div class="example" highlight="javascript">
+<pre>
+let faceDetector = new FaceDetector({fastMode: true, maxDetectedFaces: 1});
+// Assuming |theImage| is e.g. a &lt;img> content, or a Blob.
+
+faceDetector.detect(theImage)
+.then(detectedFaces => {
+  for (const face of detectedFaces) {
+    console.log(' Face @ (${face.boundingBox.x}, ${face.boundingBox.y}),' +
+        ' size ${face.boundingBox.width}x${face.boundingBox.height}');
+  }
+}).catch(() => {
+  console.error("Face Detection failed, boo.");
+})
+</pre>
+</div>
+
+## 条形码识别 ## {#barcode-detection}
+
+<div class="note">
+ 以下的示例同样可以在这个<a href="https://codepen.io/miguelao/pen/ZBBxOM?editors=0010">这个codepen</a>(或者<a href="https://codepen.io/miguelao/pen/bBWOzM?editors=0010">这个覆盖了边界框的图像示例中</a>)找到。
+</div>
+
+<div class="example" highlight="javascript">
+<pre>
+let barcodeDetector = new BarcodeDetector();
+// Assuming |theImage| is e.g. a &lt;img> content, or a Blob.
+
+barcodeDetector.detect(theImage)
+.then(detectedCodes => {
+  for (const barcode of detectedCodes) {
+    console.log(' Barcode ${barcode.rawValue}' +
+        ' @ (${barcode.boundingBox.x}, ${barcode.boundingBox.y}) with size' +
+        ' ${barcode.boundingBox.width}x${barcode.boundingBox.height}');
+  }
+}).catch(() => {
+  console.error("Barcode Detection failed, boo.");
+})
+</pre>
+</div>
+
+## 文本识别 ## {#text-detection}
+
+<div class="note">
+以下的示例同样可以在<a href="http://s.codepen.io/xianglu_google/debug/pNGBKv">这个codepen</a> (或者<a href="https://codepen.io/miguelao/pen/VPMxrj">这个集成了视频捕捉功能的示例</a>)找到。
+</div>
+
+<div class="example" highlight="javascript">
+<pre>
+let textDetector = new TextDetector();
+// Assuming |theImage| is e.g. a &lt;img> content, or a Blob.
+
+textDetector.detect(theImage)
+.then(detectedTextBlocks => {
+  for (const textBlock of detectedTextBlocks) {
+    console.log(
+        'text @ (${textBlock.boundingBox.x}, ${textBlock.boundingBox.y}), ' +
+        'size ${textBlock.boundingBox.width}x${textBlock.boundingBox.height}');
+  }
+}).catch(() => {
+  console.error("Text Detection failed, boo.");
+})
+</pre>
+</div>
+
+
+<pre class="anchors">
+spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/#
+    type: interface
+        text: Array; url: sec-array-objects
+        text: Promise; url:sec-promise-objects
+        text: TypeError; url: sec-native-error-types-used-in-this-standard-typeerror
+</pre>
+
+<pre class="anchors">
+type: interface; text: Point2D; url: https://w3c.github.io/mediacapture-image/#Point2D;
+</pre>
+
+<pre class="anchors">
+type: interface; text: DOMString; url: https://heycam.github.io/webidl/#idl-DOMString; spec: webidl
+</pre>
+
+<pre class="link-defaults">
+spec: html
+    type: dfn
+        text: allowed to show a popup
+        text: in parallel
+        text: incumbent settings object
+</pre>
+
+<pre class="biblio">
+{
+  "wikipedia": {
+      "href": "https://en.wikipedia.org/wiki/Object-class_detection",
+      "title": "Object-class Detection Wikipedia Entry",
+      "publisher": "Wikipedia",
+      "date": "14 September 2016"
+  },
+  "canvas2dcontext": {
+      "authors": [ "Rik Cabanier", "Jatinder Mann", "Jay Munro", "Tom Wiltzius",
+                   "Ian Hickson"],
+      "href": "https://www.w3.org/TR/2dcontext/",
+      "title": "HTML Canvas 2D Context",
+      "status": "REC"
+  }
+}
+</pre>
+

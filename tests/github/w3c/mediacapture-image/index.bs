@@ -1,0 +1,1070 @@
+<pre class="metadata">
+Title: MediaStream Image Capture
+Repository: image-capture
+Group: mediacapture
+Status: ED
+ED: https://w3c.github.io/mediacapture-image/
+TR: https://www.w3.org/TR/image-capture/
+Shortname: image-capture
+Level: none
+Editor: Giridhar Mandyam, w3cid 54271, Qualcomm Innovation Center Inc.
+Editor: Miguel Casas-Sanchez, w3cid 82825, Google Inc., mcasas@google.com
+Abstract: This document specifies methods and camera settings to produce photographic image capture. The source of images is, or can be referenced via a {{MediaStreamTrack}}.
+Previous Version: https://www.w3.org/TR/2017/WD-image-capture-20170104/
+
+!Participate: <a href="https://lists.w3.org/Archives/Public/public-media-capture/">Mailing list</a>
+!Participate: <a href="https://github.com/w3c/mediacapture-image">GitHub repo</a> (<a href="https://github.com/w3c/mediacapture-image/issues/new">new issue</a>, <a href="https://github.com/w3c/mediacapture-image/issues">open issues</a>)
+
+!Implementation: <a href="https://github.com/w3c/mediacapture-image/blob/master/implementation-status.md">Implementation Status</a>
+!Implementation: <a href="http://caniuse.com/#feat=imagecapture">Can I use Image Capture?</a>
+
+</pre>
+
+<style>
+table {
+  border-collapse: collapse;
+  border-left-style: hidden;
+  border-right-style: hidden;
+  text-align: left;
+}
+table caption {
+  font-weight: bold;
+  padding: 3px;
+  text-align: left;
+}
+table td, table th {
+  border: 1px solid black;
+  padding: 3px;
+}
+</style>
+
+# Introduction # {#introduction}
+
+The API defined in this document captures images from a photographic device referenced through a valid {{MediaStreamTrack}} [[!GETUSERMEDIA]]. The produced image can be in the form of a {{Blob}} (see {{takePhoto()}} method) or as a {{ImageBitmap}} (see {{grabFrame()}}).
+
+Reading capabilities and settings and applying constraints is done in one of two ways depending on whether it impacts the video {{MediaStreamTrack}} or not.  Photo-specific capabilities and current settings can be retrieved via {{getPhotoCapabilities()}}/{{getPhotoSettings()}} and configured via {{takePhoto()}}'s {{PhotoSettings}} argument.  Manipulating video-related capabilities, current settings and constraints is done via the MediaStreamTrack <a href="#extensions">extension mechanism</a>.
+
+# Security and Privacy Considerations # {#securityandprivacy}
+
+The <a href="https://w3c.github.io/mediacapture-main/#privacy-and-security-considerations"> privacy and security considerations</a> discussed in
+[[GETUSERMEDIA]] apply to this extension specification.
+
+Moreover, implementors should take care to prevent additional leakage of privacy-sensitive data from captured images.
+For instance, embedding the user’s location in the metadata of the digitzed image (e.g. EXIF) might transmit more private data than the user is expecting.
+
+# Image Capture API # {#imagecaptureapi}
+
+The User Agent must support Promises in order to implement the Image Capture API.  Any {{Promise}} object is assumed to have a resolver object, with <code>resolve()</code> and <code>reject()</code> methods associated with it.
+
+<pre class="idl">
+[Exposed=Window, Constructor(MediaStreamTrack videoTrack)]
+interface ImageCapture {
+   Promise&lt;Blob&gt;              takePhoto(optional PhotoSettings photoSettings);
+   Promise&lt;PhotoCapabilities&gt; getPhotoCapabilities();
+   Promise&lt;PhotoSettings&gt;     getPhotoSettings();
+
+   Promise&lt;ImageBitmap&gt;       grabFrame();
+
+   readonly attribute MediaStreamTrack track;
+};
+</pre>
+
+<div class="note">
+{{takePhoto()}} returns a captured image encoded in the form of a {{Blob}}, whereas {{grabFrame()}} returns a snapshot of the {{track}} video feed in the form of a non-encoded {{ImageBitmap}}.
+</div>
+
+## Attributes ## {#imagecapture-attributes}
+
+<dl class="domintro">
+  <dt><dfn attribute for="ImageCapture"><code>track</code></dfn></dt>
+  <dd>The {{MediaStreamTrack}} passed into the constructor.</dd>
+</dl>
+
+## Methods ## {#imagecapture-methods}
+
+<dl class="domintro">
+  <dt><dfn constructor for="ImageCapture"><code>ImageCapture(MediaStreamTrack videoTrack)</code></dfn></dt>
+  <dd>
+  <table class="parameters">
+    <tbody>
+      <tr>
+        <th>Parameter</th>
+        <th>Type</th>
+        <th>Nullable</th>
+        <th>Optional</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td class="prmName">videoTrack</td>
+        <td class="prmType">{{MediaStreamTrack}}</td>
+        <td class="prmNullFalse"><span role="img" aria-label="False">&#10008;</span></td>
+        <td class="prmOptFalse"><span role="img" aria-label="False">&#10008;</span></td>
+        <td class="prmDesc">The {{MediaStreamTrack}} to be used as source of data. This will be the value of the {{track}} attribute. The {{MediaStreamTrack}} passed to the constructor MUST have its {{kind}} attribute set to <code>"video"</code> otherwise a {{DOMException}} of type {{NotSupportedError}} will be thrown.</td>
+      </tr>
+    </tbody>
+  </table>
+  </dd>
+
+  <dt><dfn method for="ImageCapture"><code>takePhoto(optional PhotoSettings photoSettings)</code></dfn></dt>
+  <dd>
+  {{takePhoto()}} produces the result of a single photographic exposure using the video capture device sourcing the {{track}} and including any {{PhotoSettings}} configured, returning an encoded image in the form of a {{Blob}} if successful. When this method is invoked:
+  <ol>
+    <li>If the {{readyState}} of {{track}} provided in the constructor is not {{live}}, return <a>a promise rejected with</a> a new {{DOMException}} whose name is {{InvalidStateError}}. </li>
+
+    <li>Otherwise it MUST queue a task, using the DOM manipulation task source, that runs the following steps in parallel:
+    <ol>
+      <li>Gather data from the {{track}} underlying source with the defined {{photoSettings}} and into a {{Blob}} containing a single still image. The method of doing this will depend on the underlying device.
+      <div class="note">
+        Devices MAY temporarily stop streaming data, reconfigure themselves with the appropriate photo settings, take the photo, and then resume streaming.  In this case, the stopping and restarting of streaming SHOULD cause {{onmute}} and {{onunmute}} events to fire on the track in question.
+      </div>
+      </li>
+
+      <li>If the UA is unable to execute the {{takePhoto()}} method for any reason (for example, upon invocation of multiple {{takePhoto()}} method calls in rapid succession), then the UA MUST return <a>a promise rejected with</a> a new {{DOMException}} whose name is {{UnknownError}}.</li>
+
+      <li>Return a promise resolved with the Blob object.</li>
+    </ol>
+    </li>
+  </ol>
+
+
+  <table class="parameters">
+    <tbody>
+      <tr>
+        <th>Parameter</th>
+        <th>Type</th>
+        <th>Nullable</th>
+        <th>Optional</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td class="prmName">settings</td>
+        <td class="prmType">{{PhotoSettings}}</td>
+        <td class="prmNullTrue"><span role="img" aria-label="True">&#10004;</span></td>
+        <td class="prmOptFalse"><span role="img" aria-label="False">&#10008;</span></td>
+        <td class="prmDesc">The {{PhotoSettings}} dictionary to be applied.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  </dd>
+
+  <dt><dfn method for="ImageCapture"><code>getPhotoCapabilities()</code></dfn></dt>
+  <dd>
+  {{getPhotoCapabilities()}} is used to retrieve the ranges of available configuration options, if any. When this method is invoked:
+  <ol>
+    <li>If the {{readyState}} of {{track}} provided in the constructor is not {{live}}, return <a>a promise rejected with</a> a new {{DOMException}} whose name is {{InvalidStateError}}. </li>
+
+    <li>Otherwise it MUST queue a task, using the DOM manipulation task source, that runs the following steps in parallel:
+    <ol>
+      <li>Gather data from {{track}} into a {{PhotoCapabilities}} object containing the available capabilities of the device, including ranges where appropriate. The method of doing this will depend on the underlying device. </li>
+
+      <li>If the UA is unable to to gather the data for any reason (for example, the {{MediaStreamTrack}} being ended asynchronously), then the UA MUST return <a>a promise rejected with</a> a new {{DOMException}} whose name is {{OperationError}}.</li>
+
+      <li>Return a promise resolved with the {{PhotoCapabilities}} object.</li>
+    </ol>
+    </li>
+  </ol>
+  </dd>
+
+  <dt><dfn method for="ImageCapture"><code>getPhotoSettings()</code></dfn></dt>
+  <dd>
+  {{getPhotoSettings()}} is used to retrieve the current configuration settings values, if any. When this method is invoked:
+  <ol>
+    <li>If the {{readyState}} of {{track}} provided in the constructor is not {{live}}, return <a>a promise rejected with</a> a new {{DOMException}} whose name is {{InvalidStateError}}. </li>
+
+    <li>Otherwise it MUST queue a task, using the DOM manipulation task source, that runs the following steps in parallel:
+    <ol>
+      <li>Gather data from {{track}} into a {{PhotoSettings}} containing the current conditions in which the device is found. The method of doing this will depend on the underlying device. </li>
+
+      <li>If the UA is unable to gather the data for any reason (for example, the {{MediaStreamTrack}} being ended asynchronously), then the UA MUST return <a>a promise rejected with</a> a new {{DOMException}} whose name is {{OperationError}}.</li>
+
+      <li>Return a promise resolved with the {{PhotoSettings}} object.</li>
+    </ol>
+    </li>
+  </ol>
+  </dd>
+
+  <dt><dfn method for="ImageCapture"><code>grabFrame()</code></dfn></dt>
+  <dd>{{grabFrame()}} takes a snapshot of the live video being held in {{track}}, returning an {{ImageBitmap}} if successful. {{grabFrame()}} returns data only once upon being invoked. When this method is invoked:
+  <ol>
+    <li>If the {{readyState}} of {{track}} provided in the constructor is not {{live}}, return <a>a promise rejected with</a> a new {{DOMException}} whose name is {{InvalidStateError}}.</li>
+
+    <li>Otherwise it MUST queue a task, using the DOM manipulation task source, that runs the following steps in parallel:
+    <ol>
+      <li>Gather data from {{track}} into an {{ImageBitmap}} object. The |width| and |height| of the {{ImageBitmap}} object are derived from the constraints of {{track}}.
+      </li>
+
+      <li>Returns a promise resolved with a newly created {{ImageBitmap}} object.</li>
+
+      <li>If the UA is unable to execute the {{grabFrame()}} method for any reason (for example, upon invocation of multiple {{grabFrame()}}/{{takePhoto()}} method calls in rapid succession), then the UA MUST return <a>a promise rejected with</a> a new {{DOMException}} whose name is {{UnknownError}}.</li>
+    </ol>
+    </li>
+  </ol>
+  </dd>
+
+</dl>
+
+# PhotoCapabilities # {#photocapabilities-section}
+
+<pre class="idl">
+  [Exposed=Window] interface PhotoCapabilities {
+    readonly attribute RedEyeReduction            redEyeReduction;
+    readonly attribute MediaSettingsRange         imageHeight;
+    readonly attribute MediaSettingsRange         imageWidth;
+    readonly attribute FrozenArray&lt;FillLightMode> fillLightMode;
+  };
+</pre>
+
+## Attributes ## {#photocapabilities-attributes}
+
+<dl class="domintro">
+  <dt><dfn attribute for="PhotoCapabilities"><code>redEyeReduction</code></dfn></dt>
+  <dd>The <a>red eye reduction</a> capacity of the source.</dd>
+
+  <dt><dfn attribute for="PhotoCapabilities"><code>imageHeight</code></dfn></dt>
+  <dd>This reflects the <a>image height</a> range supported by the UA.</dd>
+
+  <dt><dfn attribute for="PhotoCapabilities"><code>imageWidth</code></dfn></dt>
+  <dd>This reflects the <a>image width</a> range supported by the UA.</dd>
+
+  <dt><dfn attribute for="PhotoCapabilities"><code>fillLightMode</code></dfn></dt>
+  <dd>This reflects the supported <a>fill light mode</a> (flash) settings, if any.</dd>
+</dl>
+
+<div class="note">
+  The supported resolutions are presented as segregated {{PhotoCapabilities/imageWidth}} and {{PhotoCapabilities/imageHeight}} ranges to prevent increasing the fingerprinting surface and to allow the UA to make a best-effort decision with regards to actual hardware configuration.
+</div>
+
+# PhotoSettings # {#photosettings-section}
+
+<pre class="idl">
+  dictionary PhotoSettings {
+    FillLightMode   fillLightMode;
+    double          imageHeight;
+    double          imageWidth;
+    boolean         redEyeReduction;
+  };
+</pre>
+
+## Members ## {#photosettings-members}
+
+<dl class="domintro">
+  <dt><dfn dict-member for="PhotoSettings"><code>redEyeReduction</code></dfn></dt>
+  <dd>This reflects whether camera <a>red eye reduction</a> is desired</dd>
+
+  <dt><dfn dict-member for="PhotoSettings"><code>imageWidth</code></dfn></dt>
+  <dd>This reflects the desired <a>image height</a>.  The UA MUST select the closest height value this setting if it supports a discrete set of height options.</dd>
+
+  <dt><dfn dict-member for="PhotoSettings"><code>imageHeight</code></dfn></dt>
+  <dd>This reflects the desired <a>image width</a>. The UA MUST select the closest width value this setting if it supports a discrete set of width options.</dd>
+
+  <dt><dfn dict-member for="PhotoSettings"><code>fillLightMode</code></dfn></dt>
+  <dd>This reflects the desired <a>fill light mode</a> (flash) setting.</dd>
+</dl>
+
+
+# {{MediaSettingsRange}} # {#mediasettingsrange-section}
+
+<pre class="idl">
+  [Exposed=Window] interface MediaSettingsRange {
+      readonly attribute double max;
+      readonly attribute double min;
+      readonly attribute double step;
+  };
+</pre>
+
+## Attributes ## {#mediasettingsrange-attributes}
+
+<dl class="domintro">
+  <dt><dfn attribute for="MediaSettingsRange"><code>max</code></dfn></dt>
+  <dd>The maximum value of this setting</dd>
+
+  <dt><dfn attribute for="MediaSettingsRange"><code>min</code></dfn></dt>
+  <dd>The minimum value of this setting</dd>
+
+  <dt><dfn attribute for="MediaSettingsRange"><code>step</code></dfn></dt>
+  <dd>The minimum difference between consecutive values of this setting.</dd>
+</dl>
+
+# {{RedEyeReduction}} # {#redeyereduction-section}
+
+<pre class="idl">
+  enum RedEyeReduction {
+    "never",
+    "always",
+    "controllable"
+  };
+</pre>
+
+## Values ## {#redeyereduction-values}
+
+<dl class="domintro">
+  <dt><dfn enum-value for="RedEyeReduction"><code>never</code></dfn></dt>
+  <dd><a>Red eye reduction</a> is not available in the device.</dd>
+
+  <dt><dfn enum-value for="RedEyeReduction"><code>always</code></dfn></dt>
+  <dd><a>Red eye reduction</a> is available in the device and it is always configured to true.</dd>
+
+  <dt><dfn enum-value for="RedEyeReduction"><code>controllable</code></dfn></dt>
+  <dd><a>Red eye reduction</a> is available in the device and it is controllable by the user via {{PhotoSettings/redEyeReduction}}.</dd>
+</dl>
+
+
+
+# {{FillLightMode}} # {#filllightmode-section}
+
+<pre class="idl">
+  enum FillLightMode {
+    "auto",
+    "off",
+    "flash"
+  };
+</pre>
+
+## Values ## {#filllightmode-values}
+
+<dl class="domintro">
+  <dt><dfn enum-value for="FillLightMode"><code>auto</code></dfn></dt>
+  <dd>The video device's fill light will be enabled when required (typically low light conditions). Otherwise it will be off. Note that auto does not guarantee that a flash will fire when {{takePhoto()}} is called. Use {{flash}} to guarantee firing of the flash for  {{takePhoto()}} method.</dd>
+
+  <dt><dfn enum-value for="FillLightMode"><code>off</code></dfn></dt>
+  <dd>The source's fill light and/or flash will not be used.</dd>
+
+  <dt><dfn enum-value for="FillLightMode"><code>flash</code></dfn></dt>
+  <dd>This value will always cause the flash to fire for {{takePhoto()}} method.</dd>
+</dl>
+
+
+# Extensions # {#extensions}
+
+This Section defines a number of new set of <a>Constrainable Properties</a> for {{MediaStreamTrack}} that can be applied in order to make its behavior more suitable for taking pictures.  Use of these constraints via {{MediaStreamTrack}}'s methods {{getCapabilities()}}, {{getSettings()}}, {{getConstraints()}} and {{applyConstraints()}} will modify the behavior of  the {{ImageCapture}} object's {{track}}.
+
+## {{MediaTrackSupportedConstraints}} dictionary ## {#mediatracksupportedconstraints-section}
+
+{{MediaTrackSupportedConstraints}} is extended here with the list of constraints that a User Agent recognizes for controlling the photo capabilities.  This dictionary can be retrieved using {{MediaDevices}} {{getSupportedConstraints()}} method.
+
+<pre class="idl">
+  partial dictionary MediaTrackSupportedConstraints {
+    boolean whiteBalanceMode = true;
+    boolean exposureMode = true;
+    boolean focusMode = true;
+    boolean pointsOfInterest = true;
+
+    boolean exposureCompensation = true;
+    boolean colorTemperature = true;
+    boolean iso = true;
+
+    boolean brightness = true;
+    boolean contrast = true;
+    boolean saturation = true;
+    boolean sharpness = true;
+    boolean focusDistance = true;
+    boolean zoom = true;
+    boolean torch = true;
+  };
+</pre>
+
+### Members ### {#mediatracksupportedconstraints-members}
+
+<dl class="domintro">
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>whiteBalanceMode</code></dfn></dt>
+  <dd>Whether <a>white balance mode</a> constraining is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>colorTemperature</code></dfn></dt>
+  <dd>Whether <a>color temperature</a> constraining is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>exposureMode</code></dfn></dt>
+  <dd>Whether <a>exposure</a> constraining is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>exposureCompensation</code></dfn></dt>
+  <dd>Whether <a>exposure compensation</a> constraining is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>iso</code></dfn></dt>
+  <dd>Whether <a>ISO</a> constraining is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>focusMode</code></dfn></dt>
+  <dd>Whether <a>focus mode</a> constraining is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>pointsOfInterest</code></dfn></dt>
+  <dd>Whether <a>points of interest</a> are supported.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>brightness</code></dfn></dt>
+  <dd>Whether <a>brightness</a> constraining is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>contrast</code></dfn></dt>
+  <dd>Whether <a>contrast</a> constraining is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>saturation</code></dfn></dt>
+  <dd>Whether <a>saturation</a> constraining is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>sharpness</code></dfn></dt>
+  <dd>Whether <a>sharpness</a> constraining is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>focusDistance</code></dfn></dt>
+  <dd>Whether <a>focus distance</a> constraining is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>zoom</code></dfn></dt>
+  <dd>Whether configuration of the <a>zoom</a> level is recognized.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSupportedConstraints"><code>torch</code></dfn></dt>
+  <dd>Whether configuration of <a>torch</a> is recognized.</dd>
+</dl>
+
+## {{MediaTrackCapabilities}} dictionary ## {#mediatrackcapabilities-section}
+
+{{MediaTrackCapabilities}} is extended here with the capabilities specific to image capture. This dictionary is produced by the UA via {{getCapabilities()}} and represents the supported ranges and enumerations of the supported constraints.
+
+<pre class="idl">
+  partial dictionary MediaTrackCapabilities {
+    sequence&lt;DOMString>  whiteBalanceMode;
+    sequence&lt;DOMString>  exposureMode;
+    sequence&lt;DOMString>  focusMode;
+
+    MediaSettingsRange   exposureCompensation;
+    MediaSettingsRange   colorTemperature;
+    MediaSettingsRange   iso;
+
+    MediaSettingsRange   brightness;
+    MediaSettingsRange   contrast;
+    MediaSettingsRange   saturation;
+    MediaSettingsRange   sharpness;
+
+    MediaSettingsRange   focusDistance;
+    MediaSettingsRange   zoom;
+
+    boolean              torch;
+  };
+</pre>
+
+### Members ### {#mediatrackcapabilities-members}
+
+<dl class="domintro">
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>whiteBalanceMode</code></dfn></dt>
+  <dd>A sequence of supported <a>white balance modes</a>. Each string MUST be one of the members of {{MeteringMode}}.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>colorTemperature</code></dfn></dt>
+  <dd>This range reflects the supported correlated <a>color temperatures</a> to be used for the scene white balance calculation.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>exposureMode</code></dfn></dt>
+  <dd>A sequence of supported <a>exposure</a> modes. Each string MUST be the members of {{MeteringMode}}.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>exposureCompensation</code></dfn></dt>
+  <dd>This reflects the supported range of <a>exposure compensation</a>. The supported range can be, and usually is, centered around 0 EV.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>iso</code></dfn></dt>
+  <dd>This reflects the permitted range of <a>ISO</a> values.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>focusMode</code></dfn></dt>
+  <dd>A sequence of supported <a>focus modes</a>. Each string MUST be one of the members of {{MeteringMode}}.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>brightness</code></dfn></dt>
+  <dd>This reflects the supported range of <a>brightness</a> setting of the camera. Values are numeric. Increasing values indicate increasing brightness.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>contrast</code></dfn></dt>
+  <dd>This reflects the supported range of <a>contrast</a>. Values are numeric.  Increasing values indicate increasing contrast.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>saturation</code></dfn></dt>
+  <dd>This reflects the permitted range of <a>saturation</a> setting. Values are numeric. Increasing values indicate increasing saturation.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>sharpness</code></dfn></dt>
+  <dd>This reflects the permitted <a>sharpness</a> range of the camera. Values are numeric. Increasing values indicate increasing sharpness, and the minimum value always implies no sharpness enhancement or processing.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>focusDistance</code></dfn></dt>
+  <dd>This reflects the <a>focus distance</a> value range supported by the UA.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>zoom</code></dfn></dt>
+  <dd>This reflects the <a>zoom</a> value range supported by the UA.</dd>
+
+  <dt><dfn dict-member for="MediaTrackCapabilities"><code>torch</code></dfn></dt>
+  <dd>A boolean indicating whether camera supports <a>torch</a>  mode- on meaning supported.</dd>
+</dl>
+
+## {{MediaTrackConstraintSet}} dictionary ## {#mediatrackconstraintset-section}
+
+{{MediaTrackConstraintSet}} [[!GETUSERMEDIA]] dictionary is used for both reading the current status with {{getConstraints()}} and for applying a set of constraints with {{applyConstraints()}}.
+
+<div class="note">
+{{MediaTrackSettings}} can be retrieved to verify the effect of the application by the user agent of the requested {{MediaTrackConstraints}}. Some constraints such as, e.g. <a>zoom</a>, might not be immediately applicable.
+</div>
+
+<pre class="idl">
+  partial dictionary MediaTrackConstraintSet {
+    ConstrainDOMString whiteBalanceMode;
+    ConstrainDOMString exposureMode;
+    ConstrainDOMString focusMode;
+    ConstrainPoint2D   pointsOfInterest;
+
+    ConstrainDouble    exposureCompensation;
+    ConstrainDouble    colorTemperature;
+    ConstrainDouble    iso;
+
+    ConstrainDouble    brightness;
+    ConstrainDouble    contrast;
+    ConstrainDouble    saturation;
+    ConstrainDouble    sharpness;
+
+    ConstrainDouble    focusDistance;
+    ConstrainDouble    zoom;
+
+    ConstrainBoolean   torch;
+  };
+</pre>
+
+### Members ### {#mediatrackconstraintset-members}
+
+<dl class="domintro">
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>whiteBalanceMode</code></dfn></dt>
+  <dd>This string MUST be one of the members of {{MeteringMode}}. See <a>white balance mode</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>exposureMode</code></dfn></dt>
+  <dd>This string MUST be one of the members of {{MeteringMode}}. See <a>exposure</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>focusMode</code></dfn></dt>
+  <dd>This string MUST be one of the members of {{MeteringMode}}. See <a>focus mode</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>colorTemperature</code></dfn></dt>
+  <dd>See <a>color temperature</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>exposureCompensation</code></dfn></dt>
+  <dd>See <a>exposure compensation</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>iso</code></dfn></dt>
+  <dd>See <a>iso</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>pointsOfInterest</code></dfn></dt>
+  <dd>See <a>points of interest</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>brightness</code></dfn></dt>
+  <dd>See <a>brightness</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>contrast</code></dfn></dt>
+  <dd>See <a>contrast</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>saturation</code></dfn></dt>
+  <dd>See <a>saturation</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>sharpness</code></dfn></dt>
+  <dd>See <a>sharpness</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>focusDistance</code></dfn></dt>
+  <dd>See <a>focus distance</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>zoom</code></dfn></dt>
+  <dd>See <a>zoom</a> constrainable property.</dd>
+
+  <dt><dfn dict-member for="MediaTrackConstraintSet"><code>torch</code></dfn></dt>
+  <dd>See <a>torch</a> constrainable property.</dd>
+</dl>
+
+## {{MediaTrackSettings}} dictionary ## {#mediatracksettings-section}
+
+When the {{getSettings()}} method is invoked on a video stream track, the user agent must return the extended {{MediaTrackSettings}} dictionary, representing the current status of the underlying user agent.
+
+<pre class="idl">
+  partial dictionary MediaTrackSettings {
+    DOMString         whiteBalanceMode;
+    DOMString         exposureMode;
+    DOMString         focusMode;
+    sequence&lt;Point2D> pointsOfInterest;
+
+    double            exposureCompensation;
+    double            colorTemperature;
+    double            iso;
+
+    double            brightness;
+    double            contrast;
+    double            saturation;
+    double            sharpness;
+
+    double            focusDistance;
+    double            zoom;
+
+    boolean           torch;
+  };
+</pre>
+
+### Members ### {#mediatracksettings-members}
+
+<dl class="domintro">
+  <dt><dfn dict-member for="MediaTrackSettings"><code>whiteBalanceMode</code></dfn></dt>
+  <dd>Current <a>white balance mode</a> setting. The string MUST be one of the members of {{MeteringMode}}.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>exposureMode</code></dfn></dt>
+  <dd>Current <a>exposure</a> mode setting. The string MUST be one of the members of {{MeteringMode}}.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>colorTemperature</code></dfn></dt>
+  <dd><a>Color temperature</a> in use for the white balance calculation of the scene. This field is only significant if {{MediaTrackSettings/whiteBalanceMode}} is {{manual}}.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>exposureCompensation</code></dfn></dt>
+  <dd>Current <a>exposure compensation</a> setting.  A value of 0 EV is interpreted as no exposure compensation.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>iso</code></dfn></dt>
+  <dd>Current camera <a>ISO</a> setting.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>focusMode</code></dfn></dt>
+  <dd>Current <a>focus mode</a> setting. The string MUST be one of the members of {{MeteringMode}}.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>pointsOfInterest</code></dfn></dt>
+  <dd>A sequence of {{Point2D}}s in use as <a>points of interest</a> for other settings, e.g. Focus, Exposure and Auto White Balance.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>brightness</code></dfn></dt>
+  <dd>This reflects the current <a>brightness</a> setting of the camera.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>contrast</code></dfn></dt>
+  <dd>This reflects the current <a>contrast</a> setting of the camera.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>saturation</code></dfn></dt>
+  <dd>This reflects the current <a>saturation</a> setting of the camera.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>sharpness</code></dfn></dt>
+  <dd>This reflects the current <a>sharpness</a> setting of the camera.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>focusDistance</code></dfn></dt>
+  <dd>This reflects the current <a>focus distance</a> setting of the camera.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>zoom</code></dfn></dt>
+  <dd>This reflects the current <a>zoom</a> setting of the camera.</dd>
+
+  <dt><dfn dict-member for="MediaTrackSettings"><code>torch</code></dfn></dt>
+  <dd>Current camera <a>torch</a> configuration setting.</dd>
+
+</dl>
+
+## Additional Constrainable Properties ## {#additional-constrainable-props}
+
+<pre class="idl">
+  dictionary ConstrainPoint2DParameters {
+    sequence&lt;Point2D> exact;
+    sequence&lt;Point2D> ideal;
+  };
+
+  typedef (sequence&lt;Point2D> or ConstrainPoint2DParameters) ConstrainPoint2D;
+</pre>
+
+### Members ### {#constraintpoint2d-members}
+
+<dl class="domintro">
+  <dt><dfn dict-member for="ConstrainPoint2DParameters"><code>exact</code></dfn></dt>
+  <dd>The exact required value of <a>points of interest</a>.</dd>
+
+  <dt><dfn dict-member for="ConstrainPoint2DParameters"><code>ideal</code></dfn></dt>
+  <dd>The ideal (target) value of <a>points of interest</a>.</dd>
+</dl>
+
+
+# Photo Capabilities and Constrainable Properties # {#constrainable-properties}
+
+   <div class="note">
+    Many of the mentioned photo and video capabilities mirror hardware features that are hard to define since can be implemented in a number of ways.  Moreover, manufacturers tend to publish vague definitions to protect their intellectual property.
+  </div>
+
+  <ol>
+    <li><i><dfn>White balance mode</dfn></i> is a setting that cameras use to adjust for different color temperatures.  <dfn>Color temperature</dfn> is the temperature of background light (usually measured in Kelvin).  This setting can usually be automatically and continuously determined by the implementation, but it's also common to offer a <code>manual</code> mode in which the estimated temperature of the scene illumination is hinted to the implementation.  Typical temperature ranges for popular modes are provided below:
+    <table class="simple">
+      <tr> <th>Mode</th> <th>Kelvin range</th> </tr>
+      <tr> <td>incandescent</td> <td>2500-3500</td> </tr>
+      <tr> <td>fluorescent</td> <td>4000-5000</td> </tr>
+      <tr> <td>warm-fluorescent</td> <td>5000-5500</td> </tr>
+      <tr> <td>daylight</td> <td>5500-6500</td> </tr>
+      <tr> <td>cloudy-daylight</td> <td>6500-8000</td> </tr>
+      <tr> <td>twilight</td> <td>8000-9000</td> </tr>
+      <tr> <td>shade</td> <td>9000-10000</td> </tr>
+    </table>
+    </li>
+
+    <li><i><dfn>Exposure</dfn></i> is the amount of time during which light is allowed to fall on the photosensitive device.  Auto-exposure mode is a camera setting where the exposure levels are automatically adjusted by the implementation based on the subject of the photo.</li>
+
+    <li><dfn>Focus mode</dfn> describes the focus setting of the capture device (e.g. |auto| or |manual|). </li>
+
+    <li><dfn>Points of interest</dfn> describe the metering area centers used in other settings, e.g. <a>exposure</a>, <a>white balance mode</a> and <a>focus mode</a> each one being a {{Point2D}} (usually these three controls are modified simultaneously by the so-called <code>3A</code> algorithm: auto-focus, auto-exposure, auto-white-balance).
+
+    A {{Point2D}} Point of Interest is interpreted to represent a pixel position in a normalized square space (|{x,y} &isin; [0.0, 1.0]|). The origin of coordinates |{x,y} = {0.0, 0.0}| represents the upper leftmost corner whereas the |{x,y} = {1.0, 1.0}| represents the lower rightmost corner: the <a href="#dom-point2d-x"><code>x</code></a> coordinate (columns) increases rightwards and the <a href="#dom-point2d-y"><code>y</code></a> coordinate (rows) increases downwards. Values beyond the mentioned limits will be clamped to the closest allowed value.</li>
+
+    <li><i><dfn>Exposure Compensation</dfn></i> is a numeric camera setting that adjusts the exposure level from the current value used by the implementation.  This value can be used to bias the exposure level enabled by auto-exposure, and usually is a symmetric range around 0 EV (the no-compensation value).</li>
+
+    <li>The <i><dfn>ISO</dfn></i> setting of a camera describes the sensitivity of the camera to light. It is a numeric value, where the lower the value the greater the sensitivity.  This value should follow the [[iso12232]] standard.</li>
+
+    <li><dfn>Red Eye Reduction</dfn> is a feature in cameras that is designed to limit or prevent the appearance of red pupils ("Red Eye") in photography subjects due prolonged exposure to a camera's flash.</li>
+
+
+    <li>[[LIGHTING-VOCABULARY]] defines <i><dfn>brightness</dfn></i> as "the attribute of a visual sensation according to which an area appears to emit more or less light" and in the context of the present API, it refers to the numeric camera setting that adjusts the perceived amount of light emitting from the photo object.  A higher brightness setting increases the intensity of darker areas in a scene while compressing the intensity of brighter parts of the scene.  The range and effect of this setting is implementation dependent but in general it translates into a numerical value that is added to each pixel with saturation.</li>
+
+    <li><i><dfn>Contrast</dfn></i> is the numeric camera setting that controls the difference in brightness between light and dark areas in a scene.  A higher contrast setting reflects an expansion in the difference in brightness. The range and effect of this setting is implementation dependent but it can be understood as a transformation of the pixel values so that the luma range in the histogram becomes larger; the transformation is sometimes as simple as a gain factor.</li>
+
+    <li>[[LIGHTING-VOCABULARY]] defines <i><dfn>saturation</dfn></i> as "the colourfulness of an area judged in proportion to its brightness" and in the current context it refers to a numeric camera setting that controls the intensity of color in a scene (i.e. the amount of gray in the scene). Very low saturation levels will result in photos closer to black-and-white. Saturation is similar to <a>contrast</a> but referring to colors, so its implementation, albeit being platform dependent, can be understood as a gain factor applied to the chroma components of a given image.</li>
+
+    <li><i><dfn>Sharpness</dfn></i> is a numeric camera setting that controls the intensity of edges in a scene.  Higher sharpness settings result in higher contrast along the edges, while lower settings result in less contrast and blurrier edges (i.e. soft focus). The implementation is platform dependent, but it can be understood as the linear combination of an edge detection operation applied on the original image and the original image itself; the relative weights being cotrolled by this |sharpness|.
+
+    <div class="note">
+      <a>Brightness</a>, <a>contrast</a>, <a>saturation</a> and <a>sharpness</a> are specified in [[UVC]].
+    </div></li>
+
+    <li><dfn>Image width</dfn> and <dfn>image height</dfn> represent the supported/desired resolution of the resulting photographic image after any potential sensor corrections and other algorithms are run.
+
+    <div class="note">
+      The supported resolutions are managed segregated e.g. {{PhotoCapabilities/imageWidth}} and {{PhotoCapabilities/imageHeight}} values/ranges to prevent increasing the fingerprinting surface and to allow the UA to make a best-effort decision with regards to actual hardware configuration vis-a-vis requested constraints.
+    </div>
+    </li>
+
+    <li><dfn>Focus distance</dfn> is a numeric camera setting that controls the focus distance of the lens.  The setting usually represents distance in meters to the optimal focus distance.</li>
+
+    <li><dfn>Zoom</dfn> is a numeric camera setting that controls the focal length of the lens.  The setting usually represents a ratio, e.g. 4 is a zoom ratio of 4:1.  The minimum value is usually 1, to represent a 1:1 ratio (i.e. no zoom).</li>
+
+    <li><dfn>Fill light mode</dfn> describes the flash setting of the capture device (e.g. |auto|, |off|, |on|). <dfn>Torch</dfn> describes the setting of the source's fill light as  continuously connected, staying on as long as {{track}} is active.</li>
+  </ol>
+
+# {{MeteringMode}} # {#meteringmode-section}
+
+<pre class="idl">
+  enum MeteringMode {
+    "none",
+    "manual",
+    "single-shot",
+    "continuous"
+  };
+</pre>
+
+## Values ## {#meteringmode-values}
+
+<dl class="domintro">
+  <dt><dfn enum-value for="MeteringMode"><code>none</code></dfn></dt>
+  <dd>This source does not offer focus/exposure/white balance mode.  For setting, this is interpreted as a command to turn off the feature.</dd>
+
+  <dt><dfn enum-value for="MeteringMode"><code>manual</code></dfn></dt>
+  <dd>The capture device is set to manually control the lens position/exposure time/white balance, or such a mode is requested to be configured.</dd>
+
+  <dt><dfn enum-value for="MeteringMode"><code>single-shot</code></dfn></dt>
+  <dd>The capture device is configured for single-sweep autofocus/one-shot exposure/white balance calculation, or such a mode is requested.</dd>
+
+  <dt><dfn enum-value for="MeteringMode"><code>continuous</code></dfn></dt>
+  <dd>The capture device is configured for continuous focusing for near-zero shutter-lag/continuous auto exposure/white balance calculation, or such continuous focus hunting/exposure/white balance calculation mode is requested.</dd>
+</dl>
+
+# {{Point2D}} # {#point2d-section}
+
+A {{Point2D}} represents a location in a two dimensional space. The origin of coordinates is situated in the upper leftmost corner of the space.
+
+<pre class="idl">
+  dictionary Point2D {
+    double x = 0.0;
+    double y = 0.0;
+  };
+</pre>
+
+## Members ## {#point2d-members}
+
+<dl class="domintro">
+  <dt><dfn dict-member for="Point2D"><code>x</code></dfn></dt>
+  <dd>Value of the horizontal (abscissa) coordinate.</dd>
+
+  <dt><dfn dict-member for="Point2D"><code>y</code></dfn></dt>
+  <dd>Value of the vertical (ordinate) coordinate.</dd>
+</dl>
+
+# Examples # {#examples}
+
+<div class="note">
+  Slightly modified versions of these examples can be found in e.g. <a href="https://codepen.io/collection/nLeobQ/">this codepen collection</a>.
+</div>
+
+## Update camera zoom and {{takePhoto()}} ## {#example1}
+
+<div class="note">
+  The following example can also be found in e.g. <a href="https://codepen.io/miguelao/pen/BLPzKx/left?editors=1010">this codepen</a> with minimal modifications.
+</div>
+
+<div class="example" highlight="javascript">
+  <pre>
+    &lt;html>
+    &lt;body>
+    &lt;video autoplay>&lt;/video>
+    &lt;img>
+    &lt;input type="range" hidden>
+    &lt;script>
+      var imageCapture;
+
+      navigator.mediaDevices.getUserMedia({video: true})
+        .then(gotMedia)
+        .catch(err => console.error('getUserMedia() failed: ', err));
+
+      function gotMedia(mediastream) {
+        const video = document.querySelector('video');
+        video.srcObject = mediastream;
+
+        const track = mediastream.getVideoTracks()[0];
+        imageCapture = new ImageCapture(track);
+
+        const capabilities = track.getCapabilities()
+        // Check whether zoom is supported or not.
+        if (!capabilities.zoom) {
+          return;
+        }
+
+        // Map zoom to a slider element.
+        const input = document.querySelector('input[type="range"]');
+        input.min = capabilities.zoom.min;
+        input.max = capabilities.zoom.max;
+        input.step = capabilities.zoom.step;
+        input.value = track.getSettings().zoom;
+
+        input.oninput = function(event) {
+          track.applyConstraints({advanced : [{zoom: event.target.value}] });
+        }
+        input.hidden = false;
+      }
+
+      function takePhoto() {
+        imageCapture.takePhoto()
+          .then(blob => {
+            console.log('Photo taken: ' + blob.type + ', ' + blob.size + 'B');
+
+            const image = document.querySelector('img');
+            image.src = URL.createObjectURL(blob);
+          })
+          .catch(err => console.error('takePhoto() failed: ', err));
+      }
+    &lt;/script>
+    &lt;/body>
+    &lt;/html>
+  </pre>
+</div>
+
+## Repeated grabbing of a frame with {{grabFrame()}} ## {#example2}
+
+<div class="note">
+  The following example can also be found in e.g. <a href="https://codepen.io/miguelao/pen/wzxxwp/left?editors=1010">this codepen</a> with minimal modifications.
+</div>
+
+<div class="example" highlight="javascript">
+  <pre>
+    &lt;html>
+    &lt;body>
+    &lt;canvas>&lt;/canvas>
+    &lt;button onclick="stopGrabFrame()">Stop frame grab&lt;/button>
+    &lt;script>
+      const canvas = document.querySelector('canvas');
+
+      var interval;
+      var track;
+
+      navigator.mediaDevices.getUserMedia({video: true})
+        .then(gotMedia)
+        .catch(err => console.error('getUserMedia() failed: ', err));
+
+      function gotMedia(mediastream) {
+        track = mediastream.getVideoTracks()[0];
+        var imageCapture = new ImageCapture(track);
+        interval = setInterval(function () {
+          imageCapture.grabFrame()
+            .then(processFrame)
+            .catch(err => console.error('grabFrame() failed: ', err));
+        }, 1000);
+      }
+
+      function processFrame(imgData) {
+        canvas.width = imgData.width;
+        canvas.height = imgData.height;
+        canvas.getContext('2d').drawImage(imgData, 0, 0);
+      }
+
+      function stopGrabFrame(e) {
+        clearInterval(interval);
+        track.stop();
+      }
+    &lt;/script>
+    &lt;/body>
+    &lt;/html>
+  </pre>
+ </div>
+
+## Grabbing a Frame and Post-Processing ## {#example3}
+<div class="note">
+  The following example can also be found in e.g. <a href="https://codepen.io/miguelao/pen/mAzXpN/left?editors=1010">this codepen</a> with minimal modifications.
+</div>
+
+<div class="example" highlight="javascript">
+  <pre>
+    &lt;html>
+    &lt;body>
+    &lt;canvas>&lt;/canvas>
+    &lt;script>
+      const canvas = document.querySelector('canvas');
+
+      var track;
+
+      navigator.mediaDevices.getUserMedia({video: true})
+        .then(gotMedia)
+        .catch(err => console.error('getUserMedia() failed: ', err));
+
+      function gotMedia(mediastream) {
+        track = mediastream.getVideoTracks()[0];
+        var imageCapture = new ImageCapture(track);
+        imageCapture.grabFrame()
+          .then(processFrame)
+          .catch(err => console.error('grabFrame() failed: ', err));
+      }
+
+      function processFrame(imageBitmap) {
+        track.stop();
+
+        // |imageBitmap| pixels are not directly accessible: we need to paint
+        // the grabbed frame onto a &lt;canvas>, then getImageData() from it.
+        const ctx = canvas.getContext('2d');
+        canvas.width = imageBitmap.width;
+        canvas.height = imageBitmap.height;
+        ctx.drawImage(imageBitmap, 0, 0);
+
+        // Read back the pixels from the &lt;canvas>, and invert the colors.
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        var data = imageData.data;
+        for (var i = 0; i &lt; data.length; i += 4) {
+          data[i]     = 255 - data[i];     // red
+          data[i + 1] = 255 - data[i + 1]; // green
+          data[i + 2] = 255 - data[i + 2]; // blue
+        }
+        // Finally, draw the inverted image to the &lt;canvas>
+        ctx.putImageData(imageData, 0, 0);
+      }
+    &lt;/script>
+    &lt;/body>
+    &lt;/html>
+  </pre>
+</div>
+
+## Update camera focus distance and {{takePhoto()}} ## {#example4}
+
+<div class="example" highlight="javascript">
+  <pre>
+    &lt;html>
+    &lt;body>
+    &lt;video autoplay>&lt;/video>
+    &lt;img>
+    &lt;input type="range" hidden>
+    &lt;script>
+      var imageCapture;
+
+      navigator.mediaDevices.getUserMedia({video: true})
+        .then(gotMedia)
+        .catch(err => console.error('getUserMedia() failed: ', err));
+
+      function gotMedia(mediastream) {
+        const video = document.querySelector('video');
+        video.srcObject = mediastream;
+
+        const track = mediastream.getVideoTracks()[0];
+        imageCapture = new ImageCapture(track);
+
+        const capabilities = track.getCapabilities()
+        // Check whether focus distance is supported or not.
+        if (!capabilities.focusDistance) {
+          return;
+        }
+
+        // Map focus distance to a slider element.
+        const input = document.querySelector('input[type="range"]');
+        input.min = capabilities.focusDistance.min;
+        input.max = capabilities.focusDistance.max;
+        input.step = capabilities.focusDistance.step;
+        input.value = track.getSettings().focusDistance;
+
+        input.oninput = function(event) {
+          track.applyConstraints({
+            advanced : [{focusMode: "manual", focusDistance: event.target.value}]
+          });
+        }
+        input.hidden = false;
+      }
+
+      function takePhoto() {
+        imageCapture.takePhoto()
+          .then(blob => {
+            console.log('Photo taken: ' + blob.type + ', ' + blob.size + 'B');
+
+            const image = document.querySelector('img');
+            image.src = URL.createObjectURL(blob);
+          })
+          .catch(err => console.error('takePhoto() failed: ', err));
+      }
+    &lt;/script>
+    &lt;/body>
+    &lt;/html>
+  </pre>
+</div>
+
+
+
+
+
+<pre class="anchors">
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: interface; text: MediaStreamTrack; url: mediastreamtrack
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: method; text: onmute; url: widl-MediaStreamTrack-onmute
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: method; text: onunmute; url: widl-MediaStreamTrack-onunmute
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: attribute; text: readyState; url: widl-MediaStreamTrack-readyState
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: attribute; text: kind; url: widl-MediaStreamTrack-kind
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: enum-value; text: live; url: idl-def-MediaStreamTrackState.live
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: method; text: getUserMedia(); url: dom-mediadevices-getusermedia
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: method; text: getSettings(); url: widl-ConstrainablePattern-getSettings-Settings
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: method; text: getCapabilities(); url: widl-MediaStreamTrack-getCapabilities-MediaTrackCapabilities
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: method; text: getConstraints(); url: widl-MediaStreamTrack-getConstraints-MediaTrackConstraints
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: method; text: applyConstraints(); url: widl-MediaStreamTrack-applyConstraints-Promise-void--MediaTrackConstraints-constraints
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: interface; text: MediaDevices; url: mediadevices-interface-extensions
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: method; text: getSupportedConstraints(); url: widl-MediaDevices-getSupportedConstraints-MediaTrackSupportedConstraints
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: interface; text: ConstrainDouble ; url: idl-def-ConstrainDouble
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: interface; text: ConstrainDOMString ; url: idl-def-constraindomstring
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: interface; text: ConstrainBoolean ; url: idl-def-ConstrainBoolean
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: dictionary; text: MediaTrackSupportedConstraints; url: idl-def-MediaTrackSupportedConstraints
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: dictionary; text: MediaTrackCapabilities; url: idl-def-MediaTrackCapabilities
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: dictionary; text: MediaTrackConstraintSet; url: idl-def-MediaTrackConstraintSet
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: dictionary; text: MediaTrackConstraints; url: idl-def-MediaTrackConstraints
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: dictionary; text: MediaTrackSettings; url: idl-def-MediaTrackSettings
+
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: dfn; text: constrainable property; url: defining-a-new-constrainable-property
+</pre>
+
+<pre class="link-defaults">
+spec: html
+    type: dfn
+        text: allowed to show a popup
+        text: in parallel
+        text: incumbent settings object
+spec:webidl; type:interface; text:Promise
+</pre>
+
+<pre class="biblio">
+{
+  "iso12232": {
+      "href": "http://www.iso.org/iso/catalogue_detail.htm?csnumber=37777",
+      "title": "Photography - Digital still cameras - Determination of exposure index, ISO speed ratings, standard output sensitivity, and recommended exposure index",
+      "publisher": "ISO/IEC",
+      "date": "15 April 2006"
+  },
+  "UVC": {
+      "href": "http://www.usb.org/developers/docs/devclass_docs/",
+      "title": "USB Device Class Definition for Video Devices",
+      "publisher": "USB Implementers Forum Inc.",
+      "date": "9 August 2012"
+  }
+}
+</pre>
