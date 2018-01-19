@@ -30,10 +30,10 @@ def testNameForPath(path):
     return path
 
 
-def runAllTests(constructor, testFiles):
+def runAllTests(Spec, testFiles, md=None):
     numPassed = 0
     if len(testFiles) == 0:
-        testFiles = list(findTestFiles())
+        testFiles = sorted(findTestFiles())
         if len(testFiles) == 0:
             p("No tests were found")
             return True
@@ -43,7 +43,11 @@ def runAllTests(constructor, testFiles):
         testName = testNameForPath(testPath)
         p(testName)
         total += 1
-        doc = constructor(inputFilename=testPath)
+        doc = Spec(inputFilename=testPath)
+        doc.mdBaseline.addData("Date", "1970-01-01")
+        doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
+        if md is not None:
+            doc.mdCommandLine = md
         doc.preprocess()
         outputText = doc.serialize()
         with io.open(testPath[:-2] + "html", encoding="utf-8") as golden:
@@ -110,9 +114,9 @@ def equalOrEmpty(a, b):
     return False
 
 
-def rebase(files=None):
+def rebase(files=None, md=None):
     if not files:
-        files = findTestFiles()
+        files = sorted(findTestFiles())
     for path in files:
         name = testNameForPath(path)
         p("Rebasing {0}".format(name))
