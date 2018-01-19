@@ -294,7 +294,7 @@ def main():
     elif options.subparserName == "test":
         md = metadata.fromCommandLine(extras)
         config.force = True
-        config.quiet = 2
+        config.quiet = 100
         if options.rebase:
             test.rebase(Spec, options.testFiles, md=md)
         else:

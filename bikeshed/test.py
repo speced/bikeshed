@@ -67,34 +67,17 @@ def runAllTests(Spec, testFiles=None, md=None):
 
 
 def compare(suspect, golden):
-    suspectDoc = parseDocument(suspect)
-    goldenDoc = parseDocument(golden)
-    for s, g in izip(nodeIter(suspectDoc), nodeIter(goldenDoc)):
-        if isElement(s) and isElement(g):
-            if s.tag == g.tag and compareDicts(s.attrib, g.attrib):
-                continue
-        elif isinstance(g, basestring) and isinstance(s, basestring):
-            if equalOrEmpty(s, g):
-                continue
-        if isinstance(g, basestring):
-            fromText = g
+    if suspect == golden:
+        return True
+    for line in difflib.unified_diff(golden.split(), suspect.split(), fromfile="golden", tofile="suspect", lineterm=""):
+        if line[0] == "-":
+            p(printColor(line, color="red"))
+        elif line[0] == "+":
+            p(printColor(line, color="green"))
         else:
-            fromText = outerHTML(g)
-        if isinstance(s, basestring):
-            toText = s
-        else:
-            toText = outerHTML(s)
-        differ = difflib.SequenceMatcher(None, fromText, toText)
-        for tag, i1, i2, j1, j2 in differ.get_opcodes():
-            if tag == "equal":
-                p(fromText[i1:i2])
-            if tag in ("delete", "replace"):
-                p("\033[41m\033[30m" + fromText[i1:i2] + "\033[0m")
-            if tag in ("insert", "replace"):
-                p("\033[42m\033[30m" + toText[j1:j2] + "\033[0m")
-        p("")
-        return False
-    return True
+            p(line)
+    p("")
+    return False
 
 def compareDicts(a, b):
     aKeys = set(a.keys())
