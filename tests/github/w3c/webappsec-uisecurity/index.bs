@@ -1,0 +1,825 @@
+<pre class='metadata'>
+Title: User Interface Security and the Visibility API
+Status: WD
+Group: WebAppSec
+ED: https://w3c.github.io/webappsec-uisecurity/
+Shortname: UI Security
+Level: 1
+Editor: Brad Hill, Facebook, hillbrad@fb.com
+!Author: Dan Kaminsky, White Ops
+!Author: David Lin-Shung Huang, Carnegie Mellon University
+!Author: Giorgio Maone, Invited Expert
+Abstract:
+	UI Security and the Visibility API defines both a
+	declarative and imperative means for resources
+	displayed in an embedded context to protect 
+	themselves against having their content obscured,
+	moved, or otherwise displayed in a misleading
+	manner.
+Indent: 4
+Ignored Terms: long, boolean
+</pre>
+
+<pre class='anchors'>
+urlPrefix: http://www.w3.org/TR/hr-time/; type: typedef; text: DOMHighResTimeStamp
+urlPrefix: https://html.spec.whatwg.org/multipage/browsers.html; type: dfn; text: unit of related similar-origin browsing contexts
+urlPrefix: https://html.spec.whatwg.org/multipage/browsers.html; type: dfn; text: parent browsing context
+urlPrefix: https://html.spec.whatwg.org/multipage/webappapis.html; type: dfn; text: event loop
+urlPrefix: https://html.spec.whatwg.org/multipage/webappapis.html; type: dfn; text: report the exception
+urlPrefix: https://dom.spec.whatwg.org/; type: dfn; text: cancelled flag
+urlPrefix: https://dom.spec.whatwg.org/; type: dfn; text: dispatching events
+url: http://w3c.github.io/requestidlecallback/#dfn-list-of-idle-request-callbacks; type: dfn; text: list of idle request callbacks
+url: https://html.spec.whatwg.org/multipage/infrastructure.html#dfn-callback-this-value; type: dfn; text: callback this value
+url: https://drafts.csswg.org/css2/box.html#content-edge; type:dfn; text: content-box
+spec: HTML; urlPrefix: https://html.spec.whatwg.org/multipage/
+	urlPrefix: wwebappapis.html
+		type: interface
+			text: Navigator; url: the-navigator-object
+</pre>
+
+<pre class='link-defaults'>
+spec:dom; type:interface; text:Event
+spec:dom; type:interface; text:Document
+</pre>
+
+<!--
+████ ██    ██ ████████ ████████   ███████
+ ██  ███   ██    ██    ██     ██ ██     ██
+ ██  ████  ██    ██    ██     ██ ██     ██
+ ██  ██ ██ ██    ██    ████████  ██     ██
+ ██  ██  ████    ██    ██   ██   ██     ██
+ ██  ██   ███    ██    ██    ██  ██     ██
+████ ██    ██    ██    ██     ██  ███████
+-->
+
+<section>
+
+    <h2 id='intro'>Introduction</h2>
+
+    <em>This section is not normative.</em>
+
+		Composite or "mash-up" web applications built using iframes
+		are ubiquitous because they allow users to interact seamlessly and
+		simultaneously with content from multiple origins while
+		maintaining isolation boundaries that are essential to
+		security and privacy for both users and applications.
+
+		However, those boundaries are not absolute.  In particular,
+		the visual and temporal integrity of embedded content is
+		not protected from manipulation by the embedding resource.
+		An embedding resource might constrain the viewport,
+		draw over, transform, reposition, or resize the user's
+		view of a third-party resource.
+
+		Collectively known as User Interface Redressing, the goal
+		of such manipulations might be to entice the user to interact
+		with embedded content without knowing its context, (e.g. to 
+		send a payment or share content) commonly known as "clickjacking",
+		or to convince paid content that it is being shown to the user
+		when it is actually obscured, commonly known in the advertising
+		business as "display fraud".
+
+    Existing anti-clickjacking measures such as frame-busting 
+    scripts and headers granting origin-based embedding permissions have 
+		shortcomings which prevent their application to important use-cases.
+    Frame-busting scripts, for example, rely on browser behavior that has not been 
+		engineered to provide a security guarantee and as a consequence,
+		such scripts may be unreliable if loaded inside a sandbox
+    or otherwise disabled. The X-Frame-Options header and the frame-ancestors
+		Content Security Policy directive offer an all-or-none approach to
+		display of embedded content that is not appropriate for content
+		which may be embedded in arbitrary locations, or known locations
+		which might still be adversarial.
+
+		This document defines mechanisms to allow resources to
+		request to be displayed free of interference by their embedding context and
+		learn if the user agent was able to satisfy such a request, with 
+		sufficient granularity to make decisions that can protect both users
+		and content purveyors from various types of fraud.
+
+		First, this document defines an imperative API, VisibilityObserver,
+		by which a resource can request that a conforming user agent guarantee
+		unmodified display of its viewport, and report events on the success or
+		failure of meeting such guarantees.  This API should be suitable
+		for e.g. paid content such as advertising to receive trustworthy
+		signals about its viewability from a conforming user agent.
+		
+		Secondly, this specification defines a declarative mechanism
+		(via a Content Security Poicy directive) to request visibility
+		protection and receive notification, via event properties or
+		out-of-band reporting, if certain events are delivered to
+		a resource while it does not meet its requested visibility 
+		contract.
+
+		The declarative CSP interface does not offer the same fine-granularity control as 
+		the JavaScript API.  Its goal is to allow protection to be
+		retrofitted to legacy applications, with no or minimal code changes, as a replacement for
+		X-Frame-Options, or potentially for use with content that is sandboxed and cannot
+		execute JavaScript.
+
+		ISSUE: Do we need to deal with form submission / navigations that aren't JS-event-based?
+
+    ISSUE: how to interact with frame-ancestors and XFO?
+
+		A notable non-goal is pixel-accurate information about what was
+		actually displayed beyond its bounding rectangle, as this information
+		can be quite difficult to obtain in an efficient manner, and is extremely
+		difficult to accomplish without exposing timing side channels which leak
+		information across the Same Origin Policy security boundary.
+
+		<div class='note'>
+		NOTE:
+		Similar to, and modeled on the 
+		<a href=http://rawgit.com/slightlyoff/IntersectionObserver/master/index.html>
+		Intersection Observer</a> draft, this specification shares a goal of allowing reliable and low-cost
+		calculation of element visibility for, e.g purposes of
+		<a href="http://www.iab.net/iablog/2014/03/viewability-has-arrived-what-you-need-to-know-to-see-through-this-sea-change.html">
+		reporting ad visibility for monetizing impressions</a>.  The current specification
+		adds the goals of preventing clickjacking and other UI redressing attacks both by enforcing that
+		an iframe which has requested visibility be free of any transforms, movement or re-clipping
+		within a defined time threshold, and by allowing event delivery to be intercepted or
+		annotated when policies are not met.
+
+		Distinct from the <em>Intersection Observer</em> proposal, this specification operates internally on entire
+		documents, on a per-iframe basis (although it provides some syntatic sugar for the declarative,
+		event-driven API) rather than observing individual elements, and it affirmatively modifies the final 
+		composited result in the global viewport by promoting the graphics layer of an iframe that has requested visibility.
+		</div>
+    
+
+</section>
+
+<!--
+ ██████   ███████  ██    ██ ████████  ███████  ████████  ██     ██    ███    ██    ██  ██████  ████████
+██    ██ ██     ██ ███   ██ ██       ██     ██ ██     ██ ███   ███   ██ ██   ███   ██ ██    ██ ██      
+██       ██     ██ ████  ██ ██       ██     ██ ██     ██ ████ ████  ██   ██  ████  ██ ██       ██      
+██       ██     ██ ██ ██ ██ ██████   ██     ██ ████████  ██ ███ ██ ██     ██ ██ ██ ██ ██       ██████  
+██       ██     ██ ██  ████ ██       ██     ██ ██   ██   ██     ██ █████████ ██  ████ ██       ██      
+██    ██ ██     ██ ██   ███ ██       ██     ██ ██    ██  ██     ██ ██     ██ ██   ███ ██    ██ ██      
+ ██████   ███████  ██    ██ ██        ███████  ██     ██ ██     ██ ██     ██ ██    ██  ██████  ████████
+-->
+
+<section>
+    <h2 id='special-conformance'>Special Conformance Notes</h2>
+
+    <em>This section is not normative.</em>
+
+    UI Redressing attacks rely on fooling the subjective perceptions of
+    human actors to induce them to interact with a web application out of
+    its intended context.  Because of this, the specific mechanisms which
+    may be used in attack and defense may vary greatly with the details of
+    a user agent implementation.  For example, attacks which rely on
+    redressing the cursor may not apply in a touch environment, or entire
+    classes of attack may be impossible on a text-only browser or screen
+    reader.
+
+    Similarly, the implementation of the policies specified herein is highly
+    dependent on internal architecture and implementation strategies of
+    the user agent; such strategies may vary greatly between user agents
+    or even across versions or platforms for a single user agent.
+
+    This specification provides a normative means by which a resource
+    owner can communicate to a user agent its desire for additional
+    protective measures, actions to take if violations are detected,
+    and tuning hints which may be useful for certain means of
+    implementation.  A user agent is conformant if it understands
+		these directives and makes a best effort to provide the desired 
+		security properties, which might require no additional implementation
+		steps, e.g. in the case of a screen reader that does not support
+		embedded resources in a manner that is subject to any of the
+		attack classes of concern.
+
+    While the indeterminacy of the user agent implementation protects
+    applications from needing to constantly update their policies as
+    user agents make internal changes, application authors should
+    understand that even a conformant user agent cannot make
+    perfect security guarantees against UI Redressing.
+    
+    These directives should be used as part of a comprehensive risk
+    mitigation strategy with an appropriate understanding of their
+    limitations.
+</section>
+
+<!--
+      ██  ██████           ███    ████████  ████
+      ██ ██    ██         ██ ██   ██     ██  ██ 
+      ██ ██              ██   ██  ██     ██  ██ 
+      ██  ██████        ██     ██ ████████   ██ 
+██    ██       ██       █████████ ██         ██ 
+██    ██ ██    ██       ██     ██ ██         ██ 
+ ██████   ██████        ██     ██ ██        ████
+-->
+
+<section>
+
+<h2 id='visibility-observer-api'>VisibilityObserver API</h2>
+
+	The VisibilityObserver API provides an imperative API for developers to
+	receive notification of visibility state changes for their document relative to
+	the global viewport.
+
+	<h3 id='visibility-observer-callback'>The VisibilityObserverCallback</h3>
+		<pre class='idl'>
+			callback VisibilityObserverCallback = void(sequence&lt;VisibilityObserverEntry&gt; entries, VisibilityObserver observer);
+		</pre>
+		This callback will be invoked when there are changes to the document's <em>visibility state</em>.
+
+	<h3 id='visibility-observer-entry'>The VisibilityObserverEntry interface</h3>
+		<pre class="idl">
+			[Constructor(VisibilityObserverCallback callback, optional VisibilityObserverEntryInit visibilityObserverEntryInit), Exposed=Window]
+			interface VisibilityObserverEntry {
+				readonly attribute DOMRectReadOnly globalVisibleBounds;
+				readonly attribute DOMRectReadOnly visibleBounds;
+				readonly attribute DOMHighResTimeStamp time;
+ 	    };
+
+			dictionary VisibilityObserverEntryInit {
+				required DOMRectInit globalVisibleBounds;
+				required DOMRectInit visibleBounds;
+				required DOMHighResTimeStamp time;
+			};
+		</pre>
+
+		<div dfn-for='VisibilityObserverEntry'>
+			<dfn attribute lt='globalVisibleBounds'>globalVisibleBounds</dfn>
+				The {{DOMRect}} coresponding to the visible dimensions of the 
+				top-level document in the global viewport's coordinate space.
+
+			<dfn attribute lt='visibleBounds'>visibleBounds</dfn>
+				The {{DOMRect}} corresponding to the document's <i>boundingClientRect</i>,
+				intersected by each of the document's ancestor's clipping rects,
+				intersected with {{VisibilityObserverEntry/globalVisibleBounds}}.
+				This value represents the portion of the document actually visible within
+				{{VisibilityObserverEntry/globalVisibleBounds}}.
+
+			<dfn attribute lt='time'>time</dfn>
+				A {{DOMHighResTimeStamp}} that corresponds to the time the visibility
+				state was recorded.
+		</div>
+	
+	<h3 id='visibility-observer-interface'>The VisibilityObserver Interface</h3>
+		The VisibilityObserver interface can be used to observe changes in the
+		document's visibility state relative to the global viewport.
+
+		<pre class='idl'>
+			[Constructor(VisibilityObserverCallback callback), Exposed=Window]
+			interface VisibilityObserver {
+				void observe ();
+				void unobserve ();
+				sequence&lt;VisibilityObserverEntry&gt; takeRecords ();
+			};
+		</pre>
+	
+	<div dfn-type='method' dfn-for='VisibilityObserver'>
+    : <dfn constructor lt='VisibilityObserver(callback, options)'>new VisibilityObserver(callback, options)</dfn>
+		:: 
+   	 	<ol>
+				<li>Let |this| be a new {{VisibilityObserver}} object</li>
+				<li>Set |this|'s internal {{[[callback]]}} slot to |callback|.</li>
+    	</ol>
+		: <dfn>observe()</dfn>
+		::
+			<ol>
+				<li>Add |this| to the document's {{[[RegisteredVisibilityObservers]]}} list</li> 
+			</ol>
+		: <dfn>unobserve()</dfn>
+		::
+			<ol>
+				<li>Remove |this| from the document's {{[[RegisteredVisibilityObservers]]}} set.</li>
+			</ol>
+		: <dfn>takeRecords()</dfn>
+		::
+			<ol>
+				<li>Let |queue| be a copy of |this|'s internal {{[[QueuedEntries]]}} slot.</li>
+				<li>Clear |this|'s internal {{[[QueuedEntries]]}} slot.</li>
+				<li>Return |queue|.</li>
+			</ol>
+
+		</div>
+
+	<h3 id="visibility-observer-init">The VisibilityObserverInit dictionary</h3>
+		<pre class="idl">
+ 	     dictionary VisibilityObserverInit {
+ 	       (double or sequence&lt;double&gt;) areaThreshold = 0;
+				 (boolean) displacementAware = false;
+				 (DOMString) visibleMargin = "0px";
+				 (Element)? observedElement;
+ 	     };
+		</pre>
+
+		<div dfn-type="dict-member" dfn-for="VisibilityObserverInit">
+		: <dfn>areaThreshold</dfn>
+		::
+			List of threshold(s) at which to trigger callback.
+			callback will be invoked when visibleBounds area changes from
+			greater than or equal to any threshold to less than that threshold,
+			and vice versa.
+
+			Threshold values must be in the range of [0, 1.0] and represent a
+			percentage of the area as specified by
+			<em>target</em>.{{Element/getBoundingClientRect()}}.
+
+			Note: 0.0 is effectively "any non-zero number of pixels".
+
+		: <dfn>displacementAware</dfn>
+		::
+			If <em>true</em>, this observer should trigger the callback
+			when the position of the {{[[observedElement]]}} changes relative to the
+			global viewport.
+
+
+		: <dfn>visibleMargin</dfn>
+		::
+				Same as 'margin', extends the required visibility rectangle
+				behind the <a>protected-element</a>.{{Element/getBoundingClientRect()}}.
+				Can be 1, 2, 3 or 4 components, possibly negative lengths.
+
+				If there is only one component value, it applies to all sides.
+				If there are two values, the top and bottom margins are set to
+				the first value and the right and left margins are set to the
+				second. If there are three values, the top is set to the first
+				value, the left and right are set to the second, and the bottom
+				is set to the third. If there are four values, they apply to the
+				top, right, bottom, and left, respectively.e.g.
+				<pre class="example">
+					<code class="js">
+						"5px"                // all margins set to 5px
+						"5px 10px"           // top &amp; bottom = 5px, right &amp; left = 10px
+						"-10px 5px 8px"      // top = -10px, right &amp; left = 5px, bottom = 8px
+						"-10px -5px 5px 8px" // top = -10px, right = -5px, bottom = 5px, left = 8px
+					</code>
+				</pre>
+
+		: <dfn>observedElement</dfn>
+		::
+			The {{Element}} being observed.  If unset, the internal slot will be
+			initialized to the {{Document}} element.
+
+    </div>
+
+<section>
+
+<!--
+ ██████   ██████  ████████        ████████  ████ ████████  ████████  ██████  ████████ ████ ██     ██ ████████
+██    ██ ██    ██ ██     ██       ██     ██  ██  ██     ██ ██       ██    ██    ██     ██  ██     ██ ██      
+██       ██       ██     ██       ██     ██  ██  ██     ██ ██       ██          ██     ██  ██     ██ ██      
+██        ██████  ████████        ██     ██  ██  ████████  ██████   ██          ██     ██  ██     ██ ██████  
+██             ██ ██              ██     ██  ██  ██   ██   ██       ██          ██     ██   ██   ██  ██      
+██    ██ ██    ██ ██              ██     ██  ██  ██    ██  ██       ██    ██    ██     ██    ██ ██   ██      
+ ██████   ██████  ██              ████████  ████ ██     ██ ████████  ██████     ██    ████    ███    ████████
+-->
+<section>
+
+ <h2 id='csp-interface'>Content Security Policy Interface</h2>
+
+    This section describes the Content Security Policy
+    directive introduced in this specification to provide declarative
+		configuration of protection against input when an element does not meet it's
+		visibility requirements.  
+
+		The optional directive-value allows configuration of conditions for which violations
+		will be triggered.
+
+		<h3 id='input-protection-interface'>The <dfn>input-protection Directive</dfn></h3>
+
+		<pre>
+			directive-name    = 'input-protection'
+			directive-value   = ['area-threshold=' num-val]
+													['protected-element=' id-selector]
+													['time-threshold=' num-val]
+													['visible-margin=' num-val 'px' *3(',' num-val 'px')]
+		</pre>
+
+		<h4 id='directive-value'>Directive Value</h4>
+
+			<dfn>area-threshold</dfn>
+				A violation will be triggered if an event is delivered to the
+				protected-element or one of its ancestors if the visibility of the
+				protected area is below this threshold.
+
+				Threshold values must be in the range [0, 1.0] and represent a
+				percentage of the area as specified by 
+				<a>protected-element</a>.{{Element/getBoundingClientRect()}},
+				adjusted by <a>visible-margin</a>.  Unlike the imperative API,
+				only a single value may be specified.
+
+			<dfn>protected-element</dfn>
+				A {{DOMString}} used as the argument to {{NonElementParentNode/getElementById()}}
+				to resolve the {{Element}} to which the policy applies.  
+
+				If unspecified the policy is applied to the resource's {{Document}} node.
+
+			<dfn>time-threshold</dfn>
+				A numeric value in the range [0, 10000] that specifies how long,
+				in milliseconds, the screen area containing the protected-element
+				must have unmodified viewiability properties when an event is 
+				delivered to it or one of its ancestors.
+
+				If not specified, it defaults to 800.  If a value outside of the
+				range stated above is given, it defaults ot the nearest value
+				between the lower and higher bounds.
+
+			<dfn>visible-margin</dfn>
+				Same as {{VisibilityObserverInit/visibleMargin}}.
+				
+				If unspecified, it defaults to "0px".
+
+</section>
+
+<!--
+████████  ████████   ███████   ██████  ████████  ██████   ██████  ████ ██    ██  ██████         ██     ██  ███████  ████████  ████████ ██      
+██     ██ ██     ██ ██     ██ ██    ██ ██       ██    ██ ██    ██  ██  ███   ██ ██    ██        ███   ███ ██     ██ ██     ██ ██       ██      
+██     ██ ██     ██ ██     ██ ██       ██       ██       ██        ██  ████  ██ ██              ████ ████ ██     ██ ██     ██ ██       ██      
+████████  ████████  ██     ██ ██       ██████    ██████   ██████   ██  ██ ██ ██ ██   ████       ██ ███ ██ ██     ██ ██     ██ ██████   ██      
+██        ██   ██   ██     ██ ██       ██             ██       ██  ██  ██  ████ ██    ██        ██     ██ ██     ██ ██     ██ ██       ██      
+██        ██    ██  ██     ██ ██    ██ ██       ██    ██ ██    ██  ██  ██   ███ ██    ██        ██     ██ ██     ██ ██     ██ ██       ██      
+██        ██     ██  ███████   ██████  ████████  ██████   ██████  ████ ██    ██  ██████         ██     ██  ███████  ████████  ████████ ████████
+-->
+
+<section>
+
+<h2 id='processing-model'>Processing Model</h2>
+	This section outlines the steps the user agent must take when implementing the
+	VisibilityObserver API.
+
+	<h3 id='defines'>Internal Slot Definitions</h3>
+
+		<h4 id='browsing-context-slots'>Browsing Contexts</h4>
+			Each <a>unit of related similar-origin browsing contexts</a> has an
+			<dfn for="browsing context">VisibilityObserverTaskQueued</dfn> flag which
+			is initialized to false.
+			
+		<h4 id='element-private-slots'>Element</h4>
+			{{Element}} objects have an internal
+			<dfn attribute for=Element>\[[InputProtectionObservers]]</dfn> list,
+			which is initially empty.
+
+		<h4 id='document-private-slots'>Document</h4>
+			{{Document}} objects have an internal
+			<dfn attribute for=Document>\[[RegisteredVisibilityObservers]]</dfn> list,
+			which is initially empty, and an
+			<dfn attribute for=Document>\[[InputProtectionRequested]]</dfn> flag which is intitially <i>false</i>.
+
+		<h4 id='visibility-observer-private-slots'>VisibilityObserver</h4>
+			{{VisibilityObserver}} objects have the following internal slots:
+			<ul>
+				<li><dfn attribute for=VisibilityObserver>\[[QueuedEntries]]</dfn>
+						which is initialized to an empty list</li>
+				<li><dfn attribute for=VisibilityObserver>\[[previousVisibleRatio]]</dfn> 
+						which is initialized to 0</li>
+				<li><dfn attribute for=VisibilityObserver>\[[previousGlobalViewportPosition]]</dfn>
+			</ul>
+			As well as internal slots initialized by <a>VisibilityObserver(callback,options)</a>:
+			<ul>
+				<li><dfn attribute for=VisibilityObserver>\[[callback]]</dfn></li>
+				<li><dfn attribute for=VisibilityObserver>\[[areaThreshold]]</dfn></li>
+				<li><dfn attribute for=VisibilityObserver>\[[displacementAware]]</dfn></li>
+				<li><dfn attribute for=VisibilityObserver>\[[visibleMargin]]</dfn></li>
+				<li><dfn attribute for=VisibilityObserver>\[[observedElement]]</dfn> which is
+				initialized to the {{Document}} Element if not set in the {{VisibilityObserverInit}}</a> dictionary</li>
+		 </ul>
+		 The following internal slots will be initialzed to <i>null</i> unless the 
+		 object was constructed to represent an <a>input-protection directive</a>. 
+		 <ul>
+		 	<li><dfn attribute for=VisibilityObserver>\[[timeThreshold]]</dfn></li>
+		 	<li><dfn attribute for=VisibilityObserver>\[[associatedContentSecurityPolicy]]</dfn></li>
+		 </ul>
+
+	<h3 id='algorithms'>Algorithms</h3>
+
+		<h4 id='queue-visibility-observer-task-algo'>Queue a VisibilityObserver Task</h4>
+			To <dfn>queue a visibility observer task</dfn> for a
+			<a>unit of related similar-origin browsing contexts</a> |unit|,
+			run these steps:
+			<ol>
+				<li>If |unit|'s <a>VisibilityObserverTaskQueued</a> flag is set to
+						true, return.</li>
+				<li>Set |unit|'s <a>VisibilityObserverTaskQueued</a> flag to true.</li>
+				<li>Post a task to <a>notify visibility observers</a>, or enqueue a
+						task to <a>notify visibility observers</a> in the
+						<a>list of idle request callbacks</a> with an appropriate |timeout|.
+
+				Issue: Should we define an appropriate |timeout|?
+				</li>
+			</ol>
+
+
+		<h4 id='notify-visibility-observers-algo'>Notify VisibilityObservers</h4>
+			To <dfn>notify visibility observers</dfn> for a 
+			<a>unit of related similar-origin browsing contexts</a> |unit|,
+			run these steps:
+			<ol>
+				<li>Set |unit|'s <a>VisibilityObserverTaskQueued</a> flag to false.</li>
+				<li>For each {{Document}} |document| in |unit|</li>
+				<ol>
+					<li>Let |notify list| be a copy of |document|'s {{[[RegisteredVisibilityObservers]]}}</a>
+							list.</li>
+					<li>For each {{VisibilityObserver}} object |observer| in
+							|notify list|, run these steps:</li>
+							<ol>
+								<li>If |observer|'s internal {{[[QueuedEntries]]}} slot is
+										empty, continue.</li>
+								<li>Let |queue| be a copy of |observer|'s internal
+										{{[[QueuedEntries]]}} slot.</li>
+								<li>Clear |observer|'s internal {{[[QueuedEntries]]}} slot.</li>
+								<li>Invoke |callback| with |queue| as the first argument and
+										|observer| as the second argument and
+										<a>callback this value</a>. If this throws an exception,
+										<a>report the exception</a>.</li>
+							</ol>
+					</ol>
+				</ol>
+
+
+		<h4 id='queue-visibility-observer-entry-algo'>Queue a VisibilityObserverEntry</h4>
+			To <dfn>queue a VisibilityObserverEntry</dfn> for |observer|, given a
+			<a>unit of related similar-origin browsing contexts</a> |unit|, VisibilityObserver
+			|observer|, and VisibilityObserverEntry |entry| run these steps:
+			<ol>
+				<li>Append |entry| to |observer|'s internal {{[[QueuedEntries]]}} slot.</li>
+				<li><a>Queue a visibility observer task</a> for |unit|.</li>
+			</ol>
+
+		<h4 id='promote-observed-graphicslayers-algo'>Promote Observed GraphicsLayers</h4>
+
+			<em>This section is non-normative.</em>
+
+			<div class="note">
+				NOTE: The full internal details of rendering a document to the pixels 
+				actually displayed to the user is not standardized. UA implementations 
+				may vary widely.
+
+				The implementation strategy detailed in this section is not normative. Any 
+				strategy which produces correct outcomes for the normative algorithms is 
+				conformant and implementers are encouraged to optimize whenever possible.
+
+				The possibility of variance among user agent implementations notwithstanding,
+				the normative algorithms of this specification are designed such that a highly performant 
+				implementation should be possible on the most common internal software and hardware
+				architectures that are state-of-the-art for user agents and consumer computing
+				platforms as of the time of writing.
+
+				In particular, the approach here deliberately avoids auditing the correctness
+				of the representations displayed to users.  In typical architectures, the pixel-level
+				rendering of the global viewport is delgated to a a Graphics Processing Unit (GPU)
+				using higher-level abstractions like surfaces, polygons, and vectors. As a consequence,
+				the main execution context of the user agent does not "know" what pixels actually result
+				without reading them back.  System architectures are optimized for sending data 
+				to a GPU, not returning data from it, therefore, approaches which rely on pixel comparisons
+				are likely to have an unacceptable performance cost.  Instead, the approach detailed 
+				here relies on correctness by design, by manipulating the order in which instructions 
+				are sent to the GPU such that malicious interference is not possible.
+			</div>
+
+				Generally, at some point in the rendering of a set of documents in nested browsing
+				contexts into the fully composed graphical representation in the global viewport,
+				a user agent will arrive at a set of intermediate representations we will designate 
+				as <dfn>GraphicsLayer</dfn>s, each of which represents a graphical surface to be
+				painted / clipped / scrolled.
+
+				A <a>GraphicsLayer</a> representing the contents of a document in an iframe will
+				be arranged in the layer stack such that at a later phase in the rendering 
+				it is automatically clipped and positioned relative to the series of viewports 
+				above it, and also subject to being drawn over or transformed by the layers above it.
+
+				To prevent potentially malicious composition, the user agent can
+				<dfn>promote observed graphicsLayers</dfn> by manipulating them such that
+				a document with {{[[RegisteredVisibilityObservers]]}}
+				<ul>
+					<li>Is clipped and positioned as-if-unmodified within the set of viewports of its ancestor 
+							browsing contexts. A promoted document should not be able to occupy more
+							screen real estate than it is given by its embedding contexts.</li>
+					<li>Responds to hit testing and events as-if-unmodified.  Implementation-specific modifications
+							to internal representations of the document should not change the behavior of the DOM.</li> 
+					<li>Is not subject to being drawn over or transformed by any other <a>GraphicsLayers</a>,
+							except other promoted layers, which should be treated as fully opaque occlusions 
+							when reporting the visibility state of the document.</li>
+				</ul>
+			
+				To <a>promote observed graphicsLayers</a>, given a time |now|, and an initially empty list
+				|promotedLayers|, run these steps during the rendering
+				loop at the stage where the intermediate representation of a set of {{Document}}s is a set of
+				<a>GraphicsLayer</a>s |graphicsLayers|.
+					<ol>
+						<li>For each |graphicsLayer| in |graphicsLayers|</li>	
+						<li>For each {{Document}} |document| with an intermediate representation in |graphicsLayer|</li>
+						<ol>
+						  <li>If |document| has an empty list of {{[[RegisteredVisibilityObservers]]}}, continue.</li>
+							<li>If |document| has a non-empty list of {{[[RegisteredVisibilityObservers]]}}</li>
+								<ol>
+									<li>If |document| is not the only {{Document}} represented  in |graphicsLayer|, apply
+											whatever implementation-specific steps are necessary to place it in its own layer.
+											(e.g. apply translatez(0) to the documentElement) Let |graphicsLayer| be that
+											new layer.</li>
+								</ol>
+							<li>Let |rectToRaise| be the value of |document|.{{Element/getBoundingClientRect()}}.</li>
+							<li>Intersect |rectToRaise| with |document|'s viewport clip rect.</li>
+							<li>For every <a>parent browsing context</a> |parent| between |document| and the top-level document,
+									intersect |rectToRaise| with |parent|'s viewport clip rect,
+									and finally with the global viewport clip rect.</li>
+							<li>Clip |graphicsLayer| to |rectToRaise|.  (|graphicsLayer| may have zero width and height
+									if it is scrolled off screen by an ancestor browsing context)</li> 
+							<li>Intersect |rectToRaise| with any items in the |promotedLayers| list.</li> 
+							<li>Add |rectToRaise| to the |promotedLayers| list.</li>
+							<li>Without reordering prior intermediate representations in a manner which would 
+									change event dispatching, hit testing, or the DOM as exposed to JavaScript, reorder
+									the <a>GraphicsLayer</a>s such that |rectToRaise| is on top of the root <a>GraphicsLayer</a>. 
+									(e.g. by making it a direct child of the root layer) but beneath any layers in |promotedLayers|
+									that clipped it.</li>
+							<li>Let |protectedRect| be the value of |observer|'s {{[[observedElement]]}}.{{Element/getBoundingClientRect()}},
+									adjusted by {{[[visibleMargin]]}}.</li>
+							<li>Let |visibleRatio| be the intersection of |protectedRect| with |rectToRaise|, divided by |protectedRect|
+									if |protectedRect| is non-zero, and <i>0</i> otherwise.</li>
+							<li>For each of |document|'s {{[[RegisteredVisibilityObservers]]}} |observer|</li>
+								<ol>
+								 		<li>Let |threshold| be the index of the first entry in
+                        |observer|'s internal {{[[areaThreshold]]}} slot whose value
+                        is greater than or equal to |visibleRatio|. If
+                        |visibleRatio| is equal to <i>0</i>, let |threshold| be
+                        <i>-1</i>.</li>
+                    <li>Let |oldVisibleRatio| be set to |observer|'s internal
+                        {{[[previousVisibleRatio]]}} slot.</li>
+                    <li>Let |oldThreshold| be the index of the first entry in
+                        |observer|'s internal {{[[areaThreshold]]}} slot whose value
+                        is greater than or equal to |oldVisibleRatio|. If
+                        |oldVisibleRatio| is equal to <i>0</i>, let
+                        |oldThreshold| be <i>-1</i>.</li>
+										<li>Let |oldPosition| be the value of the |observer|'s internal
+												{{[[previousGlobalViewportPosition]]}}.</li>
+										<li>If |threshold| does not equal |oldThreshold|, or if |observer|'s 
+												internal {{[[displacementAware]]}} slot is <i>true</i> and
+												|oldPosition| is not equal to |protectedRect|,</li>
+												<ul>
+                        	<li><a>queue a VisibilityObserverEntry</a></li>
+													<li>Assign |visibleRatio| to |observer|'s internal
+			                        {{[[previousVisibleRatio]]}} slot.</li>
+													<li>Assign |protectedRect| to the value of the |observer|'s internal
+															{{[[previousGlobalViewportPosition]]}} slot.</li>
+												</ul>
+
+								</ol>
+						</ol>
+					</ol>
+				
+		ISSUE: find exact terms to make sure that we have viewport definitions minus scrollbars	
+
+		ISSUE: need to also clip to any other layers that were promoted ahead of us!
+
+		ISSUE: if a parent and child layer both request to be promoted, the parent's clipping window will have a complex geometry with holes in it that is not accounted for by this algorithm.  Likely need to specify that graphics layers be processed by order of depth.
+
+	<h4 id='enforce-an-input-protection-directive-algo'>Enforce An input-protection Directive</h4>
+		To <dfn>enforce an input-protection directive</dfn> for a {{Document}} |document|,
+		run the following steps:	
+		<ol>
+			<li>Parse the policy according to [[!CSP2]].</li>
+			<li>If a value is set for <a>protected-element</a>, let |protectedElement| be the
+					{{Element}} returned by invoking |document|.{{NonElementParentNode/getElementById()}} with
+					the value as the input, or |document| if <i>null</i> or unset.</li>
+			<li>If |document|'s {{[[InputProtectionRequested]]}} flag is <i>false</i>, set it
+					to <i>true</i>.</li>
+			<li>Construct a new {{VisibilityObserver}} |observer|, with {{[[areaThreshold]]}} set to the value of
+					<a>area-threshold</a>, {{[[visibleMargin]]}} set to the value of <a>visible-margin</a>,
+					{{[[observedElement]]}} set to |protectedElement|, {{[[displacementAware]]}} set to <i>true</i>,
+					and {{[[callback]]}} set to a new function with an empty function body.</li>
+			<li>Set the internal {{[[timeThreshold]]}} slot of |observer| to the value of <a>time-threshold</a></li> 
+			<li>Set the internal {{[[associatedContentSecurityPolicy]]}} slot of |observer| to a reference to the
+					Content Security Policy which the <a>input-protection directive</a> is associated with.</li>
+			<li>When <a>dispatching events</a>, when an {{Element}} |element| will handle an {{Event}} |event|,
+					if |event| is of type Mouse Event, Pointer Event, Drag-and-Drop, or Clipboard Event, (TODO:linkify)
+					and if |element| has {{[[InputProtectionObservers]]}} |observers|:</li>
+					<ol>
+						<li>If applicable, check the computed style for the cursor.  If a cursor is typically displayed but
+								has been hidden or changed to a non-standard bitmap, <a>handle a violation</a> for |event| and each
+								|observer| in |observers|.</li>
+						<li>Otherwise, for each |observer| in |observers|:</li>
+							<ol>
+								<li>If |observer|'s {{[[previousVisibleRatio]]}} is less than {{[[areaThreshold]]}},
+										<a>handle a violation</a> for |observer|.</li>
+								<li>If |observer|'s {{[[previousVisibleRatio]]}} is greater than {{[[areaThreshold]]}},
+										get the most recent {{VisibilityObserverEntry}} |entry| from |observer|'s 
+										{{[[QueuedEntries]]}}.  If the difference between |entry|.{{VisibilityObserverEntry/time}}
+										and |now| is less than {{[[timeThreshold]]}}, <a>handle a violation</a> for |observer|.
+							</ol>
+				 	</ol>
+		</ol>
+	
+	<h4 id='handle-a-violation-algo'>Handle a Violation</h4>
+		To <dfn>handle a violation</dfn> of an <a>input-protection directive</a> for |observer| and |event|, run the following steps:
+		<ul>
+			<li>Follow the steps in [[!CSP2]] to report a violation for |observer|'s {{[[associatedContentSecurityPolicy]]}} |policy|.</li>
+			<li>Determine if |policy| is being <i>enforced</i> or <i>monitored</i>. [[!CSP2]]</li>
+			<li>If |policy| is being <i>enforced</i>, set |event|'s <a>cancelled flag</a> and <a>stop propagation flag</a>.</li>
+			<li>If |policy| is being <i>monitored</i>, set |event|.{{isUnsafe}} to <i>true</i>.</li>
+	
+		</ul>
+
+<h3 id='external-spec-integrations'>External Spec Integrations</h3>
+
+	<h4 id='event-loop'>HTML Processing Model: Event Loop</h4>
+    As part of substep 10 of the 
+		<a href="https://html.spec.whatwg.org/multipage/webappapis.html#processing-model-8">
+    update the rendering</a> event loop in the HTML Processing Model, 
+		<a>Promote Observed GraphicsLayers</a>, passing in <i>now</i> as the timestamp.
+
+	<h4 id='dispatching-events-algo'>DOM: Dispatching Events</h4>
+		As part of <a href="https://dom.spec.whatwg.org/#dispatching-events">dispatching events</a>
+		in the DOM Standard, add a substep to step 5, ("For each <i>object</i> in <i>event path</i>..."),
+		invoking step 7 of <a>enforce an input-protection directive</a> before proceeding to
+		"invoke <i>object</i> with <i>event</i>".
+
+	<h4 id='usafe-attribute'>isUnsafe Attribute</h4>
+
+		<pre class='idl'>
+			partial interface Event {
+				readonly attribute boolean isUnsafe;
+			};
+		</pre>
+
+		<dl dfn-for='Event'>
+			<dt><dfn attribute lt='isUnsafe'>isUnsafe</dfn></dt>
+			<dd>
+				Will be set to true if the event fired when the event did not
+				meet the document's <em>input-protection</em> requirements.
+			</dd>
+  	</dl>
+
+
+</section>
+
+
+<!--
+████████  ████████  ████ ██     ██    ███     ██████  ██    ██
+██     ██ ██     ██  ██  ██     ██   ██ ██   ██    ██  ██  ██ 
+██     ██ ██     ██  ██  ██     ██  ██   ██  ██         ████  
+████████  ████████   ██  ██     ██ ██     ██ ██          ██   
+██        ██   ██    ██   ██   ██  █████████ ██          ██   
+██        ██    ██   ██    ██ ██   ██     ██ ██    ██    ██   
+██        ██     ██ ████    ███    ██     ██  ██████     ██   
+-->
+<section>
+<h2 id='privacy-considerations'>Privacy Considerations</h2>
+
+<em>This section is non-normative.</em>
+
+	The timing of visibilityEvents may leak some information across Origin boundaries.  An embedded
+	document might have previously been unable to learn that it was obscured, or the timing and
+	nature of repositioning of ancestor frame's viewports.  In some circumstances, this information
+	leak might have privacy implications, but the granularity and nature of the information is such
+	that it should not be of much value to attackers.  Compared to anti-clickjacking strategies
+	which rely on pixel comparisions, the side channels exposed by comparing rectulangar masks are
+	very low bandwidth. The privacy gains from preventing clickjacking, considered in a holistic
+	system context, may be quite large.
+
+</section>
+
+<!--
+ ██████  ████████  ██████  ██     ██ ████████  ████ ████████ ██    ██
+██    ██ ██       ██    ██ ██     ██ ██     ██  ██     ██     ██  ██ 
+██       ██       ██       ██     ██ ██     ██  ██     ██      ████  
+ ██████  ██████   ██       ██     ██ ████████   ██     ██       ██   
+      ██ ██       ██       ██     ██ ██   ██    ██     ██       ██   
+██    ██ ██       ██    ██ ██     ██ ██    ██   ██     ██       ██   
+ ██████  ████████  ██████   ███████  ██     ██ ████    ██       ██   
+-->
+<section>
+<h2 id='security-considerations'>Security Considerations</h2>
+
+<em>This section is non-normative.</em>
+
+	UI Redressing and Clickjacking attacks rely on violating the contextual and temporal 
+	integrity of embedded content. Because these attacks target the subjective perception 
+	of the user and not well-defined security boundaries, the heuristic protections 
+	afforded by the input-protection directive can never be 100% effective for every 
+	interface. It provides no protection against certain classes of attacks, such as 
+	displaying content around an embedded resource that appears to extend a trusted 
+	dialog but provides misleading information.
+
+	When used as a mechanism to report visibility for purposes of monetizing content,
+	operators should be aware that a malicious or modified user agent can always report
+	perfect visibility for content it colludes with.  Determining, through remote measurement,
+	whether an ostensible viewer of monetizable content is using an agent which faithfully
+	implements and reports in conformance with this specification is out of scope for this
+	document.
+
+</section>
+
+<!--
+   ███       ██      ██   ██    ██
+  ██ ██    ████    ████    ██  ██ 
+ ██   ██     ██      ██     ████  
+██     ██    ██      ██      ██   
+█████████    ██      ██      ██   
+██     ██    ██      ██      ██   
+██     ██  ██████  ██████    ██   
+-->
+<section>
+<h2 id='accessibility-considerations'>Accessibility Considerations</h2>
+
+	Users of accessibility tools MUST NOT be prevented from accessing content
+	because of input-protection or VisibilityEvents. If a user agent's interaction
+	modality is not subject to UI redressing attacks or definitions of "visibility"
+	do not apply, the user agent SHOULD report a VisibilityEvent indicating 100%
+	visibility, and SHOULD never fire a violation for any input-protection policy.
+  
+
+</section>

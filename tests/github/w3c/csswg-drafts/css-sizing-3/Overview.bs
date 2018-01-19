@@ -1,0 +1,1022 @@
+<pre class='metadata'>
+Title: CSS Intrinsic &amp; Extrinsic Sizing Module Level 3
+Shortname: css-sizing
+Level: 3
+Status: ED
+Work Status: Refining
+Group: csswg
+ED: https://drafts.csswg.org/css-sizing-3/
+TR: https://www.w3.org/TR/css-sizing-3/
+Editor: Tab Atkins, Google, http://xanthir.com/contact/, w3cid 42199
+Editor: Elika J. Etemad / fantasai, Invited Expert, http://fantasai.inkedblade.net/contact, w3cid 35400
+Previous version: https://www.w3.org/TR/2016/WD-css-sizing-3-20160512/
+Abstract: This module extends the CSS sizing properties with keywords that represent content-based "intrinsic" sizes and context-based "extrinsic" sizes, allowing CSS to more easily describe boxes that fit their content or fit into a particular layout context.
+Ignored Terms: content box, border box, non-replaced
+</pre>
+
+<pre class='link-defaults'>
+spec:css-display-3; type:property; text:display
+spec:css-display-3; type:dfn; text:box
+spec:css21; type: property
+	text: min-width
+	text: min-height
+	text: max-width
+	text: max-height
+spec:css-align-3; type:value; text:stretch; for:align-self
+</pre>
+
+<!-- Notes on stuff to do... [copy/pasted from etherpad, probably out-of-date, evaluate later]
+  Swap definition of preferred size in for max-content.
+  Define current max-content as super-max-content.
+  Mark an isssue about whether it's a necessary concept;
+  I'm unsure, but I think it will show up in orthogonal flow sizing.
+-->
+
+<h2 id="intro">
+Introduction</h2>
+
+	<p><em>This section is not normative.</em>
+
+	<p>
+		CSS layout has several different concepts of automatic sizing that are used in various layout calculations.
+		This section defines some more precise terminology
+		to help connect the layout behaviors of this spec to the calculations used in other modules,
+		and some new keywords for the 'width' and 'height' properties
+		to allow authors to assign elements the dimensions resulting from these size calculations.
+
+
+		Issue: This spec needs illustrations! See <a href="https://github.com/w3c/csswg-drafts/issues/1938">issue</a>.
+
+<h3 id="placement">
+Module interactions</h3>
+
+	<p>This module extends the 'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height', and 'column-width'
+	features defined in [[!CSS2]] chapter 10 and in [[!CSS3COL]]
+
+<h3 id="values">
+Values</h3>
+
+	This specification follows the <a href="https://www.w3.org/TR/CSS2/about.html#property-defs">CSS property definition conventions</a> from [[!CSS2]].
+	Value types not defined in this specification are defined in CSS Values & Units [[!CSS-VALUES-3]].
+	Other CSS modules may expand the definitions of these value types.
+
+	In addition to the property-specific values listed in their definitions,
+	all properties defined in this specification
+	also accept the <a>CSS-wide keywords</a> keywords as their property value.
+	For readability they have not been repeated explicitly.
+
+
+<!--
+████████ ████████ ████████  ██     ██  ██████
+   ██    ██       ██     ██ ███   ███ ██    ██
+   ██    ██       ██     ██ ████ ████ ██
+   ██    ██████   ████████  ██ ███ ██  ██████
+   ██    ██       ██   ██   ██     ██       ██
+   ██    ██       ██    ██  ██     ██ ██    ██
+   ██    ████████ ██     ██ ██     ██  ██████
+-->
+
+<h2 id="terms">
+Terminology</h2>
+
+	<dl export>
+		<dt><dfn>size</dfn>
+		<dd>
+			A one- or two-dimensional measurement:
+			a <a>block size</a> and/or <a>inline size</a>;
+			alternatively a width and/or height.
+
+		<dt><dfn>inner size</dfn>
+		<dd>
+			The <a href="https://www.w3.org/TR/css2/box.html#box-dimensions">content-box</a> size of a <a>box</a>.
+
+		<dt><dfn>outer size</dfn>
+		<dd>
+			The <a href="https://www.w3.org/TR/css2/box.html#box-dimensions">margin-box</a> size of a <a>box</a>.
+
+		<dt><dfn id="definite" lt="definite|definite size">definite size</dfn>
+		<dd>
+			A size that can be determined without performing layout;
+			that is, a <<length>>,
+			a measure of text (without consideration of line-wrapping),
+			a size of the <a>initial containing block</a>,
+			or a <<percentage>> or other formula
+			(such the <a href="https://www.w3.org/TR/CSS2/visudet.html#blockwidth">“stretch-fit” sizing of non-replaced blocks</a> [[CSS2]])
+			that is resolved solely against <a>definite</a> sizes.
+
+			Additionally, the size of the <a>containing block</a> of an absolutely positioned element is always <a>definite</a>
+			with respect to that element.
+
+		<dt><dfn id="indefinite" lt="indefinite|indefinite size">indefinite size</dfn>
+		<dd>
+			A size that is not <a>definite</a>.
+			<a>Indefinite</a> <a>available space</a> is essentially infinite.
+
+		<dt><dfn id="available" local-lt="available" lt="available space|available inline space|available block space">available space</dfn>
+		<dd>
+			A size representing the space into which a box is laid out,
+			as determined by
+			the rules of the formatting context in which it participates.
+			The space available to a box is usually
+			either a measurement of its <a>containing block</a> (if that is <a>definite</a>)
+			or an infinite size (when it is <a>indefinite</a>).
+			<a>Available space</a> can alternatively be either a
+			<a>min-content constraint</a> or
+			a <a>max-content constraint</a>.
+
+<!--
+			<p>
+				The space <a>available</a> to a box is determined by the formatting context in which it participates.
+				In block, table, and inline formatting contexts [[!CSS2]],
+				the <a>available space</a> is infinite in the block-axis dimension.
+				<span class="issue">What, exactly, is the available space in the inline axis??? What about other formatting models?</span>
+-->
+
+		<dt><dfn>stretch fit</dfn>
+		<dd>
+			The <a>stretch fit</a> into a given size
+			is that size,
+			minus the element's computed margins (not collapsed, treating ''margin/auto'' as zero),
+			border, and padding in the given dimension
+			(such that the outer size is a perfect fit),
+			and flooring at zero
+			(so that the inner size is not negative).
+
+			<p class='note'>
+				Note: This is the formula used to calculate the ''width/auto'' widths
+				of non-replaced blocks in normal flow in <a href="https://www.w3.org/TR/CSS2/visudet.html#blockwidth">CSS2.1§10.3.3</a>.
+
+		<dt><dfn lt="fallback|fallback size">fallback size</dfn>
+		<dd>
+			Some sizing algorithms do not work well with an infinite size.
+			In these cases, the <a>fallback size</a> is used instead.
+			Unless otherwise specified,
+			this is the size of the <a>initial containing block</a>.
+	</dl>
+
+<h3 id='auto-box-sizes'>
+Auto Box Sizes</h3>
+
+	There are four types of automatically-determined sizes in CSS
+	(sizes resulting fromy ''width/auto'' sizing rules, depending on context):
+
+	<dl export>
+		: <dfn>stretch-fit size</dfn>
+		: <dfn>stretch-fit inline size</dfn>
+		: <dfn>stretch-fit block size</dfn>
+		:: The <a>size</a> a box would take
+			if its <a>outer size</a> filled the <a>available space</a>
+			in the given axis;
+			in other words, the <a>stretch fit</a> into the <a>available space</a>,
+			if that is <a>definite</a>.
+			Undefined if the <a>available space</a> is <a>indefinite</a>.
+
+			Note: For the <a>inline axis</a>, this is called the “available width” in <a href="https://www.w3.org/TR/CSS2/visudet.html#float-width">CSS2.1§10.3.5</a>
+			and computed by the rules in <a href="https://www.w3.org/TR/CSS2/visudet.html#blockwidth">CSS2.1§10.3.3</a>.
+
+			Note: Calculations involving this size need to specify a fallback behavior
+			for when the <a>available space</a> is <a>indefinite</a>
+			if that happens to be possible.
+
+		: <dfn lt="max-content | max-content size">max-content size</dfn>
+		:: A box’s “ideal” <a>size</a> in a given axis when given infinite available space.
+			Usually this is the smallest <a>size</a> the box could take in that axis
+			while still fitting around its contents,
+			i.e. minimizing unfilled space while avoiding overflow.
+
+			: <dfn>max-content inline size</dfn>
+			:: The box's “ideal” <a>size</a> in the <a>inline axis</a>.
+				Usually the narrowest <a>inline size</a> it could take while fitting around its contents
+				if <em>none</em> of the soft wrap opportunities within the box were taken.
+				(See [[#intrinsic]].)
+
+				Note: This is called the “preferred width” in <a href="https://www.w3.org/TR/CSS2/visudet.html#float-width">CSS2.1§10.3.5</a>
+				and the “maximum cell width” in <a href="https://www.w3.org/TR/CSS2/tables.html#auto-table-layout">CSS2.1§17.5.2.2</a>.
+
+			: <dfn>max-content block size</dfn>
+			:: The box's “ideal” <a>size</a> in the <a>block axis</a>.
+				Usually the <a>block size</a> of the content after layout.
+
+		: <dfn lt="min-content | min-content size">min-content size</dfn>
+		:: The smallest <a>size</a> a box could take
+			that doesn't lead to overflow
+			that could be avoided by choosing a larger <a>size</a>.
+			(See [[#intrinsic]].)
+
+			: <dfn>min-content inline size</dfn>
+			:: The narrowest <a>inline size</a> a box could take
+				that doesn't lead to inline-dimension overflow
+				that could be avoided by choosing a larger <a>inline size</a>.
+				Roughly, the <a>inline size</a> that would fit around its contents
+				if <em>all</em> soft wrap opportunities within the box were taken.
+
+				Note: This is called the “preferred minimum width” in <a href="https://www.w3.org/TR/CSS2/visudet.html#float-width">CSS2.1§10.3.5</a>
+				and the “minimum content width” in <a href="https://www.w3.org/TR/CSS2/tables.html#auto-table-layout">CSS2.1§17.5.2.2</a>.
+
+			: <dfn>min-content block size</dfn>
+			:: Equivalent to the <a>max-content block size</a>.
+
+				Issue: Or should this be the minimum between allowed break points?
+				It might make sense in multi-col contexts
+				to have min-content and max-content block-sizes be different,
+				even if they are the same elsewhere.
+
+		: <dfn>fit-content size</dfn>
+		: <dfn>fit-content inline size</dfn>
+		: <dfn>fit-content block size</dfn>
+		:: If the <a>available space</a> in a given axis is finite,
+			equal to <code>min(<a>max-content size</a>, max(<a>min-content size</a>, <a>stretch-fit size</a>))</code>.
+			Otherwise, equal to the <a>max-content size</a> in that axis.
+
+			Note: This is called the “shrink-to-fit” width in <a href="https://www.w3.org/TR/CSS2/visudet.html#float-width">CSS2.1§10.3.5</a>
+			and <a href="https://www.w3.org/TR/css3-multicol/#pseudo-algorithm">CSS Multi-column Layout § 3.4</a>.
+	</dl>
+
+<h3 id='contributions' dfn export lt="intrinsic size contribution">
+Intrinsic Size Contributions</h3>
+
+	<dl export>
+		<dt><dfn lt="max-content contribution|max-content inline-size contribution|max-content block-size contribution">max-content contribution</dfn>
+		<dd>
+			The size that a box contributes to its <a>containing block</a>'s <a>max-content size</a>.
+
+		<dt><dfn lt="min-content contribution|min-content inline-size contribution|min-content block-size contribution">min-content contribution</dfn>
+		<dd>
+			The size that a box contributes to its <a>containing block</a>'s <a>min-content size</a>.
+	</dl>
+
+	Intrinsic size contributions are based on the <a>outer size</a> of the box;
+	for this purpose ''margin/auto'' margins are treated as zero.
+
+<h3 id='constraints' dfn export lt="intrinsic size constraint">
+Intrinsic Size Constraints</h3>
+
+	<dl export>
+		<dt><dfn>max-content constraint</dfn>
+		<dd>
+			A sizing constraint imposed by the box's <a>containing block</a>
+			that causes it to produce its <a>max-content contribution</a>.
+
+		<dt><dfn>min-content constraint</dfn>
+		<dd>
+			A sizing constraint imposed by the box's <a>containing block</a>
+			that causes it to produce its <a>min-content contribution</a>.
+	</dl>
+
+<!--
+████████  ████████   ███████  ████████  ████████  ████████ ████████  ██████
+██     ██ ██     ██ ██     ██ ██     ██ ██     ██ ██       ██       ██    ██
+██     ██ ██     ██ ██     ██ ██     ██ ██     ██ ██       ██       ██
+████████  ████████  ██     ██ ████████  ██     ██ ██████   ██████    ██████
+██        ██   ██   ██     ██ ██        ██     ██ ██       ██             ██
+██        ██    ██  ██     ██ ██        ██     ██ ██       ██       ██    ██
+██        ██     ██  ███████  ██        ████████  ████████ ██        ██████
+-->
+
+<h2 id="specifying-sizes" oldid='size-keywords'>
+Specifying Box Sizes</h2>
+
+<h3 id="sizing-properties">
+Sizing Properties: the 'width', 'height', 'min-width', 'min-height', 'max-width', and 'max-height' properties</h3>
+
+	This section defines the <dfn lt="sizing property">sizing properties</dfn>
+	'width', 'height', 'min-width', 'min-height', 'max-width', and 'max-height'.
+
+	Note: Additional <a>flow-relative</a> aliases to these properties are defined in [[CSS-LOGICAL-1]].
+
+	<pre class=propdef>
+	Name: width, height
+	Value: auto | <<length-percentage>> | min-content | max-content | <nobr>fit-content(<<length-percentage>>)</nobr>
+	Initial: auto
+	Applies to: all elements except <a>non-replaced</a> <a>inlines</a>
+	Inherited: no
+	Percentages: relative to width/height of <a>containing block</a>
+	Computed Value: as specified, with lengths made absolute
+	Animatable: As <<length-percentage>>, or keyword, or as ''fit-content()'' with the <<length-percentage>> argument interpolable
+	</pre>
+
+	The 'width' and 'height' properties specify
+	the preferred (<a>physical</a>) <dfn>width</dfn> and <dfn>height</dfn> of the box, respectively.
+
+	<pre class=propdef>
+	Name: min-width, min-height
+	Value: auto | <<length-percentage>> | min-content | max-content | <nobr>fit-content(<<length-percentage>>)</nobr>
+	Initial: auto
+	Applies to: all elements that accept 'width' or 'height'
+	Inherited: no
+	Percentages: relative to width/height of <a>containing block</a>
+	Computed Value: as specified, with lengths made absolute
+	Animatable: As <<length-percentage>>, or keyword, or as ''fit-content()'' with the <<length-percentage>> argument interpolable
+	</pre>
+
+	The 'min-width' and 'min-height' properties specify
+	the <dfn lt="min width | minimum width | min size | minimum size">minimum width</dfn> (or “min width”)
+	and <dfn lt="min height | minimum height">minimum height</dfn> (or “min height”)
+	of the box, respectively.
+
+	Note: The initial value of ''min-width/auto'' is new;
+	in [[CSS2]] the initial value was zero.
+
+	<pre class=propdef>
+	Name: max-width, max-height
+	Value: none | <<length-percentage>> | min-content | max-content | <nobr>fit-content(<<length-percentage>>)</nobr>
+	Initial: none
+	Applies to: all elements that accept 'width' or 'height'
+	Inherited: no
+	Percentages: relative to width/height of <a>containing block</a>
+	Computed Value: as specified, with lengths made absolute
+	Animatable: As <<length-percentage>>, or keyword, or as ''fit-content()'' with the <<length-percentage>> argument interpolable
+	</pre>
+
+	The 'max-width' and 'max-height' properties specify
+	the <dfn lt="max width | maximum width | max size | maximum size">maximum width</dfn> (or “max width”)
+	and <dfn lt="max height | maximum height">maximum height</dfn> (or “max height”)
+	of the box, respectively.
+
+
+<h3 id="sizing-values" oldids='width-height-keywords'>
+Sizing Values: the <<length-percentage>>, ''width/auto'' | ''max-width/none'', ''width/min-content'', ''width/max-content'', and ''width/fit-content()'' values</h3>
+
+	<dl dfn-type=value dfn-for="width, min-width, max-width, height, min-height, max-height">
+		<dt><dfn><<length-percentage>></dfn>
+		<dd>
+			Specifies the size of the box using <<length>> and/or <<percentage>>.
+			The 'box-sizing' property indicates whether the <a>content box</a> or <a>border box</a> is measured.
+
+			Percentages are resolved against the width/height, as appropriate,
+			of the box's <a>containing block</a>.
+			If, in a particular axis,
+			the <a>containing block’s</a> size depends on the box’s size,
+			see the relevant layout module
+			for special rules on how to resolve percentages.
+
+			Negative values are invalid.
+
+		<dt><dfn for="width, height, min-width, min-height">auto</dfn>
+		<dd>
+			For 'width'/'height', specifies an <dfn dfn for>automatic size</dfn>.
+			See the relevant layout module for how to calculate this.
+
+			For 'min-width'/'min-height',
+			specifies an <dfn dfn for>automatic minimum size</dfn>.
+			Unless otherwise defined by the relevant layout module,
+			this computes to zero.
+
+		<dt><dfn for="max-width, max-height">none</dfn>
+		<dd>
+			No limit on the size of the box.
+
+<!--
+		<dt><dfn>stretch</dfn>
+		<dd>
+			If 'align-self' or 'justify-self' (as appropriate to the relevant axis)
+			is defined to apply,
+			size the box as if ''align-self/stretch'' were specified for that property.
+			(If the box does not exactly fill its <a>alignment container</a>,
+			the <a>box alignment properties</a> will dictate how the size differential is handled.)
+			Otherwise,
+			this value behaves as the initial value.
+
+			NOTE: For the <a>inline size</a> of a <a>block-level box</a>,
+			this is exactly the formula used to calculate ''width/auto'' widths
+			for non-replaced blocks in normal flow, see <a href="https://www.w3.org/TR/CSS2/visudet.html#blockwidth">CSS2.1§10.3.3</a>.
+			It allows re-using this formula for boxes that are otherwise shrink-wrapped,
+			like tables.
+-->
+
+		<dt><dfn>min-content</dfn>
+		<dd>
+			If specified for the inline axis,
+			use the <a>min-content inline size</a>;
+			otherwise compute to the property’s <a>initial value</a>.
+
+		<dt><dfn>max-content</dfn>
+		<dd>
+			If specified for the inline axis,
+			use the <a>max-content inline size</a>;
+			otherwise compute to the property’s <a>initial value</a>.
+<!--
+		<dt><dfn>fit-content</dfn>
+		<dd>
+			If specified for the inline axis,
+			use the <a>fit-content inline size</a>
+			i.e.
+			<code>min(''width/max-content'', max(''width/min-content'', ''width/stretch''))</code>;
+			otherwise compute to the property’s <a>initial value</a>.
+-->
+		<dt><dfn>fit-content(<<length-percentage>>)</dfn>
+		<dd>
+			If specified for the inline axis,
+			use the fit-content formula
+			with the <a>available space</a> replaced by the specified argument,
+			i.e.
+			<code>min(''width/max-content'', max(''width/min-content'', <<length-percentage>>))</code>;
+			otherwise compute to the property’s <a>initial value</a>.
+
+			Negative values are invalid.
+	</dl>
+
+	In all cases,
+	the used value is floored to preserve a non-negative <a>inner size</a>.
+
+	Note: The ''width/min-content'', ''width/max-content'', and ''width/fit-content()'' values
+	are new in Level 3.
+
+	Note: The 'flex-basis' property hereby also gains these new keywords,
+	as its values are defined by reference to <'width'>.
+
+	Note: This section previously defined ''width/stretch'' and ''width/fit-content''
+	as keywords representing the <a>stretch-fit size</a> and <a>fit-content size</a>,
+	respectively.
+	These keywords have been deferred to Level 4
+	(along with an additional ''width/contain'' keyword that
+	behaves similarly to ''width/stretch''
+	but preserves the intrinsic aspect ratio, if any)
+	to better work out the implications in situations with
+	<a>indefinite</a> <a>available space</a>.
+
+<h4 id="behave-auto">
+“Behaving as ''width/auto''”</h4>
+
+<!-- THIS NEED SOME THINKING THROUGH, WE DID WEIRD THINGS WITH FLEXBOX/GRID
+	Note: Percentages resolved against the intrinsic sizes
+	(''width/max-content'', ''width/min-content'', ''width/fit-content'')
+	will behave as ''width/auto''.
+-->
+	<!-- <a href="https://www.w3.org/TR/CSS2/visudet.html#the-height-property">as defined by CSS 2</a>. [[!CSS2]] -->
+	<!-- Restore the above when 2.1 is updated and published with the new "behaves as" text we resolved on. -->
+
+	To have a common term for both when
+	'width'/'height' computes to ''width/auto''
+	and when it is defined to behave as if ''width/auto'' were specified
+	(as in the case of <a href="https://www.w3.org/TR/CSS2/visudet.html#the-height-property">block percentage heights</a>
+	resolving against an <a>indefinite</a> size,
+	see <a href="https://www.w3.org/TR/CSS2/visudet.html#the-height-property">CSS2&sect;10.5</a>),
+	the property is said to <dfn export lt="behave as auto|behaves as auto|behaving as auto">behave as auto</dfn>
+	in both of these cases.
+
+	Note: Legacy spec prose defining layout behavior
+	might explicitly refer to 'width'/'height' having a computed value of ''width/auto'' as a condition;
+	these should be interpreted as meaning <a>behaves as auto</a>,
+	and reported to the CSSWG for updating.
+
+	ISSUE: Replace this section with references to the new term <a>automatic size</a>.
+
+<h4 id='the-contain-floats-value'>
+Containing or Excluding Floats</h4>
+
+	<em>This section is non-normative.</em>
+
+	Although <a>block box</a> boundaries are typically pervious to floats,
+	sometimes an author needs them to contain their own (descendant) floats
+	or to exclude floats from outside.
+	For Block layout,
+	specifying ''display: flow-root''
+	will make the box a <a>formatting context</a> root,
+	which has this behavior.
+
+	Note: Boxes participating in Flex, Grid, or Table layout will automatically have this behavior.
+
+<!--
+████████   ███████  ██     ██          ██████  ████ ████████ ████ ██    ██  ██████
+██     ██ ██     ██  ██   ██          ██    ██  ██       ██   ██  ███   ██ ██    ██
+██     ██ ██     ██   ██ ██           ██        ██      ██    ██  ████  ██ ██
+████████  ██     ██    ███    ███████  ██████   ██     ██     ██  ██ ██ ██ ██   ████
+██     ██ ██     ██   ██ ██                 ██  ██    ██      ██  ██  ████ ██    ██
+██     ██ ██     ██  ██   ██          ██    ██  ██   ██       ██  ██   ███ ██    ██
+████████   ███████  ██     ██          ██████  ████ ████████ ████ ██    ██  ██████
+-->
+
+<h3 id="box-sizing">
+Inner vs Outer Sizes: the 'box-sizing' property</h3>
+
+
+	<pre class="propdef">
+	Name: box-sizing
+	Value: content-box | border-box
+	Initial: content-box
+	Applies to: all elements that accept 'width' or 'height'
+	Inherited: no
+	Percentages: N/A
+	Animation type: discrete
+	</pre>
+
+	The 'box-sizing' property switches the box model
+	between asssigning finite sizes such as <<length>>s and <<percentage>>s
+	to either the <a>content box</a> or <a>border box</a>.
+	It affects the interpretation of all <a>sizing properties</a>,
+	including 'flex-basis'.
+
+	Values have the following meanings:
+
+	<dl dfn-type=value dfn-for=box-sizing>
+		<dt><dfn>content-box</dfn>
+		<dd>
+			Sizes specified on <a>sizing properties</a>
+			as <<length-percentage>>
+			represent <a>inner sizes</a>:
+			they are applied to the <a>content box</a>.
+			The padding and border of the box
+			are laid out and drawn <em>outside</em> the specified 'width' and 'height'.
+
+			Note: This is the behavior of width and height as specified by CSS2.1,
+			and is thus the default.
+
+		<dt><dfn>border-box</dfn>
+		<dd>
+			Sizes specified on <a>sizing properties</a>
+			as <<length-percentage>>
+			represent <a>outer sizes</a>:
+			they are applied to the <a>border box</a>.
+			The padding and border of the box
+			are laid out and drawn <em>inside</em> the specified 'width' and 'height',
+			with the <a>content box</a> sized to fill the remaining space,
+			floored at zero.
+
+			The content width and height are calculated
+			by subtracting the border and padding widths of the respective sides
+			from the specified <<length-percentage>>.
+			As the content width and height
+			[[#sizing-values|cannot be negative]],
+			this computation is floored at zero.
+
+			Used values, as exposed for instance through {{getComputedStyle()}},
+			also refer to the border box.
+	</dl>
+
+	Values affected by 'box-sizing' include
+	both raw <<length-percentage>> values
+	and those used in functional notations such as ''width/fit-content()''.
+	In contrast,
+	non-quantitative values such as ''width/auto'' and ''width/min-content''
+	are not influenced by the 'box-sizing' property
+	(unless otherwise specified).
+
+	<div class=example>
+		For example, the following properties set the <a>inner size</a> of the box to ''100px'',
+		and the <a>outer size</a> to ''120px'':
+
+		<pre class=lang-css>
+		.box {
+			box-sizing:   content-box; /* default */
+			width:        100px;
+			padding-left: 10px;
+			border-left:  10px solid;
+		}
+		</pre>
+
+		On the other hand, by changing to ''border-box'',
+		the <a>inner size</a> is now ''80px'',
+		while the <a>outer size</a> is ''100px'':
+
+		<pre class=lang-css>
+		.box {
+			box-sizing:   border-box;
+			width:        100px;
+			padding-left: 10px;
+			border-left:  10px solid;
+		}
+		</pre>
+
+		The <a>inner size</a> can't be less than zero,
+		so if the 'padding' + 'border' is greater than the specified <a>outer size</a>,
+		the box will end up larger than specified.
+		In this case, the <a>inner size</a> will be ''0px''
+		while the <a>outer size</a> is ''120px'',
+		even though ''width: 100px'' is specified:
+
+		<pre class=lang-css>
+		.box {
+			box-sizing:   border-box;
+			width:        100px;
+			padding-left: 60px;
+			border-left:  60px solid;
+			/* padding + border = 120px */
+		}
+		</pre>
+	</div>
+
+	Note: Certain HTML elements,
+	such as <{button}>,
+	default to ''border-box'' behavior.
+	See HTML for details on which elements have this behavior.
+
+	In the CSS specifications,
+	the terms <a>width</a>, <a>height</a>,
+	<a lt="min width">minimum (min) width</a>,
+	<a lt="min height">minimum (min) height</a>,
+	<a lt="max width">maximum (max) width</a>, and
+	<a lt="max height">maximum (max) height</a>
+	refer to the <a lt="inner size">inner</a> size
+	(<a lt="content box">content-box</a> size)
+	of a <a>box</a>
+	unless otherwise indicated.
+
+
+<!--
+ ██████   ███████  ██       ██     ██ ██     ██ ██    ██
+██    ██ ██     ██ ██       ██     ██ ███   ███ ███   ██
+██       ██     ██ ██       ██     ██ ████ ████ ████  ██
+██       ██     ██ ██       ██     ██ ██ ███ ██ ██ ██ ██
+██       ██     ██ ██       ██     ██ ██     ██ ██  ████
+██    ██ ██     ██ ██       ██     ██ ██     ██ ██   ███
+ ██████   ███████  ████████  ███████  ██     ██ ██    ██
+-->
+
+<h3 id='column-sizing'>
+New Column Sizing Values: the ''column-width/min-content'', ''column-width/max-content'', and ''column-width/fit-content()'' values</h3>
+
+	<pre class="propdef partial">
+	Name: column-width
+	New values: min-content | max-content | fit-content(<<length-percentage>>)
+	</pre>
+
+	<p>When  used as values for 'column-width',
+		the new keywords specify the optimal column width:
+
+	<dl dfn-type=value dfn-for="column-width">
+<!--
+		<dt><dfn>stretch</dfn>
+		<dd>Specifies the optimal column width as the <a>stretch-fit inline size</a>
+			of the multi-column element.
+-->
+
+		<dt><dfn>min-content</dfn>
+		<dd>Specifies the optimal column width as the <a>min-content inline size</a>
+			of the multi-column element's contents.
+
+		<dt><dfn>max-content</dfn>
+		<dd>Specifies the optimal column width as the <a>max-content inline size</a>
+			of the multi-column element's contents.
+<!--
+		<dt><dfn>fit-content</dfn>
+		<dd>Specifies the optimal column width as
+			<code>min(<a>max-content inline size</a>, max(<a>min-content inline size</a>, <a>stretch-fit inline size</a>))</code>.
+-->
+		<dt><dfn>fit-content(<<length-percentage>>)</dfn>
+		<dd>
+			Specifies the optimal column width as
+			<code>min(<a>max-content size</a>, max(<a>min-content size</a>, <<length-percentage>>))</code>
+	</dl>
+
+	Note: The column width never varies by column.
+	When the column width is informed by the multi-column element's contents
+	(as in the keywords above),
+	all of its contents are taken under consideration
+	and the calculated width is shared by all the columns.
+
+
+<!--
+████ ██    ██ ████████ ████████  ████ ██    ██  ██████  ████  ██████
+ ██  ███   ██    ██    ██     ██  ██  ███   ██ ██    ██  ██  ██    ██
+ ██  ████  ██    ██    ██     ██  ██  ████  ██ ██        ██  ██
+ ██  ██ ██ ██    ██    ████████   ██  ██ ██ ██  ██████   ██  ██
+ ██  ██  ████    ██    ██   ██    ██  ██  ████       ██  ██  ██
+ ██  ██   ███    ██    ██    ██   ██  ██   ███ ██    ██  ██  ██    ██
+████ ██    ██    ██    ██     ██ ████ ██    ██  ██████  ████  ██████
+-->
+
+<h2 id='intrinsic'>
+Intrinsic Size Determination</h2>
+
+	<p>
+		<dfn export>Intrinsic sizing</dfn> determines sizes based on the contents of an element,
+		without regard for its context.
+
+<h3 id='intrinsic-sizes'>
+Intrinsic Sizes</h3>
+
+	The <a>min-content size</a> of a box in each axis
+	is the size it would have as an
+	''width/auto''-sized (in that axis) float in a zero-sized containing block.
+	(In other words, the minimum size it has when sized as “shrink-to-fit”.)
+
+	The <a>max-content size</a> of a box in each axis
+	is the size it would have as an
+	''width/auto''-sized (in that axis) float in an infinitely-sized containing block.
+	(In other words, the maximum size it has when sized as “shrink-to-fit”.)
+	For replaced elements,
+	if this size would depend on the size of the containing block
+	(as it does for images with an intrinsic aspect ratio but no intrinsic size,
+	see <a href="https://www.w3.org/TR/CSS2/visudet.html#inline-replaced-width">CSS2&sect;10.3.2</a>)
+	and therefore can't be calculated against an infinitely-sized containing block
+	then:
+
+	<dl>
+		<dt>For boxes with an intrinsic aspect ratio, but no intrinsic size:
+		<dd>
+			* If the <a>available space</a> is <a>definite</a>
+				in the <a>inline axis</a>,
+				use the <a>stretch fit</a> into that size for the inline size
+				and calculate the block size using the aspect ratio.
+			* Otherwise
+				if the box has a <a>definite</a> non-zero 'min-width' or 'min-height',
+				use that size and calculate the other dimension using the aspect ratio;
+				if both dimensions have a definite minimum,
+				choose the one that results in the larger overall size.
+
+				Note: This case was previous calculated from a 300x150 default size,
+				rather than the box's min size.
+				This is believed to be a better behavior,
+				and likely to be web compatible,
+				but please send feedback to the CSSWG if there are any problems.
+			* Otherwise
+				use a width of ''300px''
+				(height of ''150px'' in <a>vertical writing modes</a>)
+				and calculate the other dimension using the aspect ratio.
+		<dt>For boxes without an intrinsic aspect ratio:
+		<dd>
+			* If the <a>available space</a> is <a>definite</a>
+				in the appropriate dimension,
+				use the <a>stretch fit</a> into that size in that dimension.
+			* Otherwise,
+				if the box has a <a>definite</a> non-zero minimum size ('min-width'/'min-height') in that dimension,
+				use that size.
+			* Otherwise,
+				use ''300px'' for the width
+				and/or ''150px'' for the height
+				as needed.
+	</dl>
+
+	Since a block-level or inline-level replaced element
+	whose 'height' or 'width' <a>behaves as auto</a>
+	is effectively defined to use its <a>max-content size</a>
+	(<a href="https://www.w3.org/TR/CSS2/visudet.html#inline-replaced-width">CSS2&sect;10.3.2</a>),
+	this specification applies the rules above
+	to the undefined case of a replaced element
+	whose 'height' and 'width' both <a>behave as auto</a>.
+
+	Note: This specification does not define how to determine
+	the size of a float.
+	Please refer to [[CSS2]],
+	the relevant CSS specification for that display type,
+	and/or existing implementations
+	for further details.
+	A future specification will define this in detail,
+	replacing the CSS2 “definition”,
+	such as it is.
+
+	Note: The intrinsic sizing keywords might be re-used
+	in a future level of this module
+	to specify content-based sizes for replaced elements
+	such as <{textarea}> and <{iframe}>
+	whose ''height/auto'' size and intrinsic size contributions
+	are currently arbitrarily fixed.
+	See <a href="https://github.com/w3c/csswg-drafts/issues/1771">discussion</a>.
+
+<h3 id="intrinsic-contribution">
+Intrinsic Contributions</h3>
+
+	A box’s <a>min-content contribution</a>/<a>max-content contribution</a> in each axis
+	is the size of the content box
+	of a hypothetical ''width/auto''-sized float
+	that contains only that box,
+	if that hypothetical float's containing block is zero-sized/infinitely-sized.
+
+	However, in the case of a [=replaced element|replaced=] box with a percentage-based 'width'/'max-width'/'height'/'max-height',
+	the percentage is resolved to zero
+	when calculating the <a>min-content contribution</a> in the corresponding axis.
+	(See [[#min-content-zero]] for a list of which elements in HTML this applies to.)
+	The UA may additionally floor this size based on UI considerations,
+	such as ensuring certain UI elements remain visible
+	(for example, the dropdown arrow on a <{select}>).
+
+	<div class=example>
+		For example,
+		an <{input}> assigned ''width: calc(50% + 50px)''
+		has a <a>min-content contribution</a> of ''50px'',
+		plus any horizontal margin/border/padding.
+	</div>
+
+	Note: We are not 100% sure if zeroing out a percentage 'max-width' on form controls is web-compatible.
+	See <a href="https://github.com/w3c/csswg-drafts/issues/765">Issue 765</a>.
+
+	Note: This specification does not define how to determine these sizes.
+	Please refer to [[CSS2]],
+	the relevant CSS specification for that display type,
+	and/or existing implementations
+	for further details.
+
+
+<!--
+████████ ██     ██ ████████ ████████  ████ ██    ██  ██████  ████  ██████
+██        ██   ██     ██    ██     ██  ██  ███   ██ ██    ██  ██  ██    ██
+██         ██ ██      ██    ██     ██  ██  ████  ██ ██        ██  ██
+██████      ███       ██    ████████   ██  ██ ██ ██  ██████   ██  ██
+██         ██ ██      ██    ██   ██    ██  ██  ████       ██  ██  ██
+██        ██   ██     ██    ██    ██   ██  ██   ███ ██    ██  ██  ██    ██
+████████ ██     ██    ██    ██     ██ ████ ██    ██  ██████  ████  ██████
+-->
+
+<h2 id='extrinsic'>
+Extrinsic Size Determination</h2>
+
+	<p>
+		<dfn export>Extrinsic sizing</dfn> determines sizes based on the context of an element,
+		without regard for its contents.
+
+
+<h3 id="percentage-sizing">
+	Percentage Sizing</h3>
+
+	Percentages specify sizing of a box with respect to the box’s <a>containing block</a>.
+
+	<div class="example">
+		For example, in the following markup:
+
+		<xmp class='lang-html'>
+			<article style="height: 60em">
+				<aside style="height: 50%;">
+				</aside>
+			</article>
+		</xmp>
+
+		the <code>&lt;aside></code> would be 30em tall.
+	</div>
+
+	Sometimes the size of a percentage-sized box's containing block
+	depends on the intrinsic size contribution of the box itself,
+	creating a cyclic dependency.
+	When calculating the containing block's size,
+	the percentage <a>behaves as auto</a>.
+	Then, unless otherwise specified,
+	when calculating the used sizes and positions of the containing block’s <em>contents</em>:
+
+	* If the cyclic dependency was introduced due to
+		a 'block-size' or 'max-block-size' on the containing block
+		that causes it to depend on the size of its contents,
+		the box’s percentage is not resolved and instead <a>behaves as auto</a>.
+
+		Note: <a href="https://www.w3.org/TR/css-grid/">Grid containers</a> (<a href="https://github.com/w3c/csswg-drafts/issues/1679">and flex items?</a>) do allow percentages to resolve in this case.
+
+	* Otherwise, the percentage is resolved against the containing block’s size.
+		(The containing block’s size is not re-resolved based on the resulting size of the box;
+		the contents might thus overflow or underflow the containing block).
+
+	Note: These rules specify the previously-undefined behavior of this cyclic case in <a href="https://www.w3.org/TR/CSS2/visudet.html#the-width-property">CSS2&sect;10.2</a>.
+	Note also, the behavior in <a href="https://www.w3.org/TR/CSS2/visudet.html#the-height-property">CSS2&sect;10.5</a>
+	is superseded in their respective specifications for layout modes
+	(such as <a href="http://www.w3.org/TR/css-flexbox/">flex layout</a>)
+	not described in CSS2.
+
+	Similarly, percentage margins and padding behave as zero in such cyclic cases
+	when calculating the containing block's size,
+	and then resolve when calculating the used sizes and positions of its content.
+	(This defines the previously-undefined behavior of this cyclic case in
+	<a href="https://www.w3.org/TR/CSS2/box.html#margin-properties">CSS2&sect;8.3</a>
+	and
+	<a href="https://www.w3.org/TR/CSS2/box.padding-properties">CSS2&sect;8.4</a>.
+
+	<div class="example">
+		For example, in the following markup:
+
+		<xmp class='lang-html'>
+			<article style="width: min-content">
+				<aside style="width: 50%;">
+				LOOOOOOOOOOOOOOOOOOOONG
+				</aside>
+			</article>
+		</xmp>
+
+		When calculating the width of the outer <code>&lt;article></code>,
+		the inner <code>&lt;aside></code> behaves as ''width: auto'',
+		so the <code>&lt;article></code> sets itself to the width of the long word.
+		Since the <code>&lt;article></code>’s width didn't depend on "real" layout,
+		though, it's treated as <a>definite</a>
+		for resolving the <code>&lt;aside></code>,
+		whose width resolves to half that of the <code>&lt;article></code>.
+	</div>
+
+	<div class="example">
+		In this example,
+
+		<xmp class=lang-html>
+			<article style="height:auto">
+				<aside style="height: 50%;">
+					<div class=block style="height: 150px;"></div>
+				</aside>
+				<section style="height: 30px;"></section>
+			</article>
+		</xmp>
+
+		because the percentage <a>block size</a> ('height', in this case) on block-level elements
+		is defined to not resolve inside content-sized containing blocks,
+		the percentage height on the <code>&lt;aside></code> is ignored,
+		that is, it behaves exactly as if ''height/auto'' were specified.
+	</div>
+
+	<div class=example>
+		Issue: Letting %s still resolve against a definite 'height'
+		when the min-height is intrinsic is an open issue.
+		(CSS2 has a general statement about "height depending on contents",
+		which this technically is,
+		even though CSS2 didn't have content-dependent keywords for 'min-height'.
+		Since this is new, we think we could have this different behavior.)
+
+		The following examples illustrate how block-axis percentages resolve against a containing block whose size depends on its contents.
+
+		<xmp class=lang-html>
+			<article style="height:100px; min-height: min-content;">
+				<aside style="height: 50%;">
+					<div style="height: 150px;"></div>
+				</aside>
+				<section style="height: 30px;"></section>
+			</article>
+		</xmp>
+
+		The initial height of the <code>&lt;article></code> is 100px, as specified,
+		which would make the <code>&lt;aside></code> 50px tall
+		when it resolved its percentage.
+		However, we must calculate the min-height,
+		by substituting it in for 'height'.
+		This causes the percentage on the <code>&lt;aside></code> to <a>behave as auto</a>,
+		so the <code>&lt;aside></code> ends up 150px tall.
+		The total height of the contents is thus 180px.
+		This is larger than the specified 100px height,
+		so the <code>&lt;article></code> gets adjusted to 180px tall.
+
+		Then, since the percentage could <em>originally</em> resolve against the (100px) height,
+		it now resolves against the 180px height,
+		so the <code>&lt;aside></code> ends up being 90px tall.
+
+		<xmp class=lang-html>
+			<article style="height:auto; min-height: min-content;">
+				<aside style="height: 50%;">
+					<div class=block style="height: 150px;"></div>
+				</aside>
+				<section style="height: 30px;"></section>
+			</article>
+		</xmp>
+
+		In this case, the percentage on the <code>&lt;aside></code> won't normally resolve,
+		because the containing block's height is ''height/auto''
+		(and thus depends on the size of its contents).
+		Instead it <a>behaves as auto</a>,
+		resulting in a height of 150px for the <code>&lt;aside></code>,
+		and an initial height of 180px for the <code>&lt;article></code>
+		The 'min-height' doesn't change this;
+		''height: min-content;'' acts similarly to ''height: auto;''
+		and results in the same sizes.
+
+		<xmp class=lang-html>
+			<article style="height:100px; min-height: min-content;">
+				<aside style="height: 200%;">
+					<div style="height: 150px;"></div>
+				</aside>
+				<section style="height: 30px;"></section>
+			</article>
+		</xmp>
+
+		This is a variation on the first code block,
+		and follows a similar path;
+		the <code>&lt;aside></code> initially wants to compute to 200px tall
+		(200% of the 100px containing block height).
+		When we calculate the effects of 'min-height',
+		the percentage <a>behaves as auto</a>,
+		causing it to become 150px tall,
+		and the total ''height/min-content'' height of the containing block
+		to be 180px tall.
+		Since this is larger than 100px,
+		the <code>&lt;article></code> gets clamped to 180px,
+		the percentage resolves against this new height,
+		and the <code>&lt;aside></code> ends up being 360px tall,
+		overflowing the <code>&lt;article></code>
+	</div>
+
+<h2 class=no-num id="min-content-zero">
+Compressible Replaced Elements</h2>
+
+	The following elements can have their <a>min-content size</a> compressed
+	when their 'width'/'height' or 'max-width'/'max-height' is expressed with a percentage size.
+	See [[#intrinsic-contribution]].
+
+	* All <a>replaced elements</a> that aren't form controls.
+		See <a href="https://html.spec.whatwg.org/multipage/rendering.html#replaced-elements">HTML&sect;14.4</a>. [[!HTML]]
+	* <{input}> with any <{input/type}> other than <code>"button"</code>, <code>"submit"</code>, or <code>"reset"</code>.
+	* <{select}>, <{textarea}>, <{progress}>, <{meter}>.
+
+<h2 class=no-num id="changes">
+Changes</h2>
+
+	<p>
+		Significant changes since the <a href="https://www.w3.org/TR/2017/WD-css-sizing-3-20170207/">7 February 2017 Working Draft</a> include:
+
+	<ul>
+		<li>More accurate definition of min-content and max-content sizes for replaced elements.
+		<li>Compute new keywords to the initial value, not to a potentially non-existent ''width/auto'', when applied to the block axis.
+		<li>Specify that percent sizes on replaced elements zero out their min-content contribution.
+		<li>Fix confusing/wrong definition of percentage sizes resolved against a dependent containing block.
+		<li>Deferred the ''width/stretch'' and ''width/fit-content'' keywords to Level 4
+			to allow for further consideration of their behavior in <a>indefinite</a> containing blocks.
+	</ul>
+
+<h2 class=no-num id="acknowledgments">
+Acknowledgments</h2>
+
+	<p>Special thanks go to Aaron Gustafson, L. David Baron
+	for their contributions to this module.
+
+<h2 class=no-num id=priv-sec>
+Privacy and Security Considerations</h2>
+
+This specification introduces no new privacy or security considerations.

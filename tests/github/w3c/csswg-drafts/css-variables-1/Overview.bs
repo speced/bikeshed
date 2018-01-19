@@ -1,0 +1,707 @@
+<pre class='metadata'>
+Title: CSS Custom Properties for Cascading Variables Module Level 1
+Status: ED
+Work Status: Testing
+Shortname: css-variables
+Level: 1
+Group: csswg
+TR: https://www.w3.org/TR/css-variables-1/
+ED: https://drafts.csswg.org/css-variables/
+Previous Version: https://www.w3.org/TR/2015/CR-css-variables-1-20151203/
+Previous Version: https://www.w3.org/TR/2014/WD-css-variables-1-20140506/
+Previous Version: https://www.w3.org/TR/2013/WD-css-variables-1-20130620/
+Previous Version: https://www.w3.org/TR/2013/WD-css-variables-20130312/
+Previous Version: https://www.w3.org/TR/2012/WD-css-variables-20120410/
+Editor: Tab Atkins Jr., Google, http://xanthir.com/contact, w3cid 42199
+Abstract: This module introduces cascading variables as a new primitive value type that is accepted by all CSS properties, and custom properties for defining them.
+Default Highlight: css
+</pre>
+
+<pre class=link-defaults>
+spec:css-syntax-3; type:dfn; text:identifier
+</pre>
+
+<h2 id="intro">
+Introduction</h2>
+
+	<em>This section is not normative.</em>
+
+	Large documents or applications
+	(and even small ones)
+	can contain quite a bit of CSS.
+	Many of the values in the CSS file will be duplicate data;
+	for example,
+	a site may establish a color scheme
+	and reuse three or four colors throughout the site.
+	Altering this data can be difficult and error-prone,
+	since it's scattered throughout the CSS file
+	(and possibly across multiple files),
+	and may not be amenable to Find-and-Replace.
+
+	This module introduces a family of custom author-defined properties known collectively as <a>custom properties</a>,
+	which allow an author to assign arbitrary values to a property with an author-chosen name,
+	and the ''var()'' function,
+	which allow an author to then use those values in other properties elsewhere in the document.
+	This makes it easier to read large files,
+	as seemingly-arbitrary values now have informative names,
+	and makes editing such files much easier and less error-prone,
+	as one only has to change the value once,
+	in the <a>custom property</a>,
+	and the change will propagate to all uses of that variable automatically.
+
+
+<h2 id='defining-variables'>
+Defining Custom Properties: the '--*' family of properties</h2>
+
+	This specification defines an open-ended set of properties called <a>custom properties</a>,
+	which, among other things, are used to define the <a lt="substitute a var()">substitution value</a> of ''var()'' functions.
+
+	<pre class='propdef'>
+	Name: --*
+	Value: <<declaration-value>>
+	Initial: (nothing, see prose)
+	Applies to: all elements
+	Inherited: yes
+	Computed value: specified value with variables substituted (but see prose for "invalid variables")
+	Media: all
+	Animatable: no
+	</pre>
+
+	A <dfn export>custom property</dfn> is any property
+	whose name starts with two dashes (U+002D HYPHEN-MINUS),
+	like '--foo'.
+	The <dfn>&lt;custom-property-name></dfn> production corresponds to this:
+	it's defined as any valid <a>identifier</a> that starts with two dashes.
+	<a>Custom properties</a> are solely for use by authors and users;
+	CSS will never give them a meaning beyond what is presented here.
+
+	<div class='example'>
+		Custom properties define variables,
+		referenced with the ''var()'' notation,
+		which can be used for many purposes.
+		For example, a page that consistently uses a small set of colors in its design
+		can store the colors in custom properties
+		and use them with variables:
+
+		<pre>
+		:root {
+			--main-color: #06c;
+			--accent-color: #006;
+		}
+		/* The rest of the CSS file */
+		#foo h1 {
+			color: var(--main-color);
+		}
+		</pre>
+
+		The naming provides a mnemonic for the colors,
+		prevents difficult-to-spot typos in the color codes,
+		and if the theme colors are ever changed,
+		focuses the change on one simple spot
+		(the custom property value)
+		rather than requiring many edits across all stylesheets in the webpage.
+	</div>
+
+	Unlike other CSS properties,
+	custom property names are <a>case-sensitive</a>.
+
+	<div class='example'>
+		While both '--foo' and --FOO are valid,
+		they are distinct properties -
+		using ''var(--foo)'' will refer to the first one,
+		while using ''var(--FOO)'' will refer to the second.
+	</div>
+
+	Custom properties are <strong>not</strong> reset by the 'all' property.
+	<span class='note'>We may define a property in the future that resets all variables.</span>
+
+	The <a spec=css-values>CSS-wide keywords</a> can be used in custom properties,
+	with the same meaning as in any another property.
+
+	Note: That is, they're interpreted at cascaded-value time as normal,
+	and are not preserved as the custom property's value,
+	and thus are not substituted in by the corresponding variable.
+
+	Note: While this module focuses on the use of <a>custom properties</a> with the ''var()'' function to create “variables”,
+	they can also be used as actual custom properties,
+	parsed by and acted on by script.
+	It's expected that the CSS Extensions spec [[CSS-EXTENSIONS]]
+	will expand on these use-cases and make them easier to do.
+
+<h3 id='syntax'>
+Custom Property Value Syntax</h3>
+
+	The allowed syntax for <a>custom properties</a> is extremely permissive.
+	The <<declaration-value>> production matches <em>any</em> sequence of one or more tokens,
+	so long as the sequence does not contain
+	<<bad-string-token>>,
+	<<bad-url-token>>,
+	unmatched <<)-token>>, <<]-token>>, or <<}-token>>,
+	or top-level <<semicolon-token>> tokens or <<delim-token>> tokens with a value of "!".
+
+	In addition, if the value of a <a>custom property</a> contains a ''var()'' reference,
+	the ''var()'' reference must be valid according to the specified ''var()'' grammar.
+	If not, the <a>custom property</a> is invalid and must be ignored.
+
+	Note: This definition,
+	along with the general CSS syntax rules,
+	implies that a custom property value never includes an unmatched quote or bracket,
+	and so cannot have any effect on larger syntax constructs,
+	like the enclosing style rule,
+	when reserialized.
+
+	Note: Custom properties can contain a trailing ''!important'',
+	but this is automatically removed from the property's value by the CSS parser,
+	and makes the custom property "important" in the CSS cascade.
+	In other words, the prohibition on top-level "!" characters
+	does not prevent ''!important'' from being used,
+	as the ''!important'' is removed before syntax checking happens.
+
+	Note: While <<declaration-value>> must represent at least one token,
+	that one token may be whitespace.
+	This implies that ''--foo: ;'' is valid,
+	and the corresponding ''var(--foo)'' call would have a single space as its substitution value,
+	but ''--foo:;'' is invalid.
+
+	<div class='example'>
+		For example, the following is a valid custom property:
+
+		<pre>
+		--foo: if(x > 5) this.width = 10;
+		</pre>
+
+		While this value is obviously useless as a <em>variable</em>,
+		as it would be invalid in any normal property,
+		it might be read and acted on by JavaScript.
+	</div>
+
+	The values of custom properties,
+	and the values of ''var()'' functions substituted into custom properties,
+	are <em>case-sensitive</em>,
+	and must be preserved in their original author-given casing.
+	(Many CSS values are <a>ASCII case-insensitive</a>,
+	which user agents can take advantage of by "canonicalizing" them into a single casing,
+	but that isn't allowed for custom properties.)
+
+	The initial value of a <a>custom property</a> is an empty value;
+	that is, nothing at all.
+	This initial value has a special interaction with the ''var()'' notation,
+	which is explained in the section defining ''var()''.
+
+	Custom properties are ordinary properties,
+	so they can be declared on any element,
+	are resolved with the normal inheritance and cascade rules,
+	can be made conditional with ''@media'' and other conditional rules,
+	can be used in HTML's <code>style</code> attribute,
+	can be read or set using the CSSOM, etc.
+
+	Notably, they can even be transitioned or animated,
+	but since the UA has no way to interpret their contents,
+	they always use the "flips at 50%" behavior
+	that is used for any other pair of values that can't be intelligently interpolated.
+	However, any <a>custom property</a> used in a ''@keyframes'' rule
+	becomes <dfn>animation-tainted</dfn>,
+	which affects how it is treated when referred to via the ''var()'' function in an animation property.
+
+	<div class='example'>
+		This style rule:
+
+		<pre>
+		:root {
+			--header-color: #06c;
+		}
+		</pre>
+
+		declares a <a>custom property</a> named '--header-color' on the root element,
+		and assigns to it the value "#06c".
+		This property is then inherited to the elements in the rest of the document.
+		Its value can be referenced with the ''var()'' function:
+
+		<pre>
+		h1 { background-color: var(--header-color); }
+		</pre>
+
+		The preceding rule is equivalent to writing ''background-color: #06c;'',
+		except that the variable name makes the origin of the color clearer,
+		and if ''var(--header-color)'' is used on other elements in the document,
+		all of the uses can be updated at once
+		by changing the '--header-color' property on the root element.
+	</div>
+
+	<div class='example'>
+		If a <a>custom property</a> is declared multiple times,
+		the standard cascade rules help resolve it.
+		Variables always draw from the computed value of the associated custom property on the same element:
+
+		<pre>
+		:root { --color: blue; }
+		div { --color: green; }
+		#alert { --color: red; }
+		* { color: var(--color); }
+
+		&lt;p><span style="color: blue">I inherited blue from the root element!</span>&lt;/p>
+		&lt;div><span style="color: green">I got green set directly on me!</span>&lt;/div>
+		&lt;div id='alert'>
+			<span style="color: red">While I got red set directly on me!</span>
+			&lt;p><span style="color: red">I'm red too, because of inheritance!</span>&lt;/p>
+		&lt;/div>
+		</pre>
+	</div>
+
+	<div class='example'>
+		A real-world example of <a>custom property</a> usage
+		is easily separating out strings from where they're used,
+		to aid in maintenance of internationalization:
+
+		<pre class='lang-css'>
+		:root,
+		:root:lang(en) {--external-link: "external link";}
+		:root:lang(de) {--external-link: "externer Link";}
+
+		a[href^="http"]::after {content: " (" var(--external-link) ")"}
+		</pre>
+
+		The variable declarations can even be kept in a separate file,
+		to make maintaining the translations simpler.
+	</div>
+
+
+
+<h3 id='cycles'>
+Resolving Dependency Cycles</h3>
+
+	<a>Custom properties</a> are left almost entirely unevaluated,
+	except that they allow and evaluate the ''var()'' function in their value.
+	This can create cyclic dependencies
+	where a custom property uses a ''var()'' referring to itself,
+	or two or more <a>custom properties</a> each attempt to refer to each other.
+
+	For each element,
+	create a directed dependency graph,
+	containing nodes for each <a>custom property</a>.
+	If the value of a <a>custom property</a> <var>prop</var>
+	contains a ''var()'' function referring to the property <var>var</var>
+	(including in the fallback argument of ''var()''),
+	add an edge between <var>prop</var> and the <var>var</var>.
+	<span class='note'>Edges are possible from a custom property to itself.</span>
+	If there is a cycle in the dependency graph,
+	all the <a>custom properties</a> in the cycle
+	must compute to their initial value
+	(which is a guaranteed-invalid value).
+
+	<div class='example'>
+		This example shows a custom property safely using a variable:
+
+		<pre>
+		:root {
+			--main-color: #c06;
+			--accent-background: linear-gradient(to top, var(--main-color), white);
+		}
+		</pre>
+
+		The '--accent-background' property
+		(along with any other properties that use ''var(--main-color)'')
+		will automatically update when the '--main-color' property is changed.
+	</div>
+
+	<div class='example invalid-example'>
+		On the other hand,
+		this example shows an invalid instance of variables depending on each other:
+
+		<pre>
+		:root {
+			--one: calc(var(--two) + 20px);
+			--two: calc(var(--one) - 20px);
+		}
+		</pre>
+
+		Both '--one' and '--two' now compute to their initial value,
+		rather than lengths.
+	</div>
+
+	It is important to note that
+	<a>custom properties</a> resolve any ''var()'' functions in their values at computed-value time,
+	which occurs <em>before</em> the value is inherited.
+	In general,
+	cyclic dependencies occur only when multiple custom properties on the same element refer to each other;
+	custom properties defined on elements higher in the element tree can never cause a cyclic reference with properties defined on elements lower in the element tree.
+
+	<div class='example'>
+		For example,
+		given the following structure,
+		these custom properties are <strong>not</strong> cyclic,
+		and all define valid variables:
+
+		<pre>
+		&lt;one>&lt;two>&lt;three />&lt;/two>&lt;/one>
+		one   { --foo: 10px; }
+		two   { --bar: calc(var(--foo) + 10px); }
+		three { --foo: calc(var(--bar) + 10px); }
+		</pre>
+
+		The &lt;one> element defines a value for '--foo'.
+		The &lt;two> element inherits this value,
+		and additionally assigns a value to '--bar' using the ''foo'' variable.
+		Finally,
+		the &lt;three> element inherits the '--bar' value
+		<em>after</em> variable substitution
+		(in other words, it sees the value ''calc(10px + 10px)''),
+		and then redefines '--foo' in terms of that value.
+		Since the value it inherited for '--bar' no longer contains a reference to the '--foo' property defined on &lt;one>,
+		defining '--foo' using the ''var(--bar)'' variable is not cyclic,
+		and actually defines a value that will eventually
+		(when referenced as a variable in a normal property)
+		resolve to ''30px''.
+	</div>
+
+
+<!--
+UUUUUUUU     UUUUUUUU                  iiii
+U::::::U     U::::::U                 i::::i
+U::::::U     U::::::U                  iiii
+UU:::::U     U:::::UU
+ U:::::U     U:::::U    ssssssssss   iiiiiiinnnn  nnnnnnnn       ggggggggg   ggggg
+ U:::::D     D:::::U  ss::::::::::s  i:::::in:::nn::::::::nn    g:::::::::ggg::::g
+ U:::::D     D:::::Uss:::::::::::::s  i::::in::::::::::::::nn  g:::::::::::::::::g
+ U:::::D     D:::::Us::::::ssss:::::s i::::inn:::::::::::::::ng::::::ggggg::::::gg
+ U:::::D     D:::::U s:::::s  ssssss  i::::i  n:::::nnnn:::::ng:::::g     g:::::g
+ U:::::D     D:::::U   s::::::s       i::::i  n::::n    n::::ng:::::g     g:::::g
+ U:::::D     D:::::U      s::::::s    i::::i  n::::n    n::::ng:::::g     g:::::g
+ U::::::U   U::::::Ussssss   s:::::s  i::::i  n::::n    n::::ng::::::g    g:::::g
+ U:::::::UUU:::::::Us:::::ssss::::::si::::::i n::::n    n::::ng:::::::ggggg:::::g
+  UU:::::::::::::UU s::::::::::::::s i::::::i n::::n    n::::n g::::::::::::::::g
+    UU:::::::::UU    s:::::::::::ss  i::::::i n::::n    n::::n  gg::::::::::::::g
+      UUUUUUUUU       sssssssssss    iiiiiiii nnnnnn    nnnnnn    gggggggg::::::g
+                                                                          g:::::g
+                                                              gggggg      g:::::g
+                                                              g:::::gg   gg:::::g
+                                                               g::::::ggg:::::::g
+                                                                gg:::::::::::::g
+                                                                  ggg::::::ggg
+                                                                     gggggg
+-->
+
+
+<h2 id='using-variables'>
+Using Cascading Variables: the ''var()'' notation</h2>
+
+	The value of a <a>custom property</a> can be substituted into the value of another property
+	with the ''var()'' function.
+	The syntax of ''var()'' is:
+
+	<pre class='prod'>
+	<dfn>var()</dfn> = var( <<custom-property-name>> [, <<declaration-value>> ]? )
+	</pre>
+
+	The ''var()'' function can be used in place of any part of a value in any property on an element.
+	The ''var()'' function can not be used as
+	property names,
+	selectors,
+	or anything else besides property values.
+	(Doing so usually produces invalid syntax,
+	or else a value whose meaning has no connection to the variable.)
+
+	<div class='example'>
+		For example, the following code incorrectly attempts to use a variable as a property name:
+
+		<pre>
+		.foo {
+			--side: margin-top;
+			var(--side): 20px;
+		}
+		</pre>
+
+		This is <em>not</em> equivalent to setting ''margin-top: 20px;''.
+		Instead, the second declaration is simply thrown away as a syntax error
+		for having an invalid property name.
+	</div>
+
+	The first argument to the function is the name of the <a>custom property</a> to be substituted.
+	The second argument to the function, if provided,
+	is a fallback value,
+	which is used as the substitution value when the referenced <a>custom property</a> is invalid.
+
+	Note: The syntax of the fallback, like that of <a>custom properties</a>, allows commas.
+	For example, ''var(--foo, red, blue)'' defines a fallback of ''red, blue'';
+	that is, anything between the first comma and the end of the function is considered a fallback value.
+
+	<div class='example'>
+		The fallback value allows for some types of defensive coding.
+		For example,
+		an author may create a component
+		intended to be included in a larger application,
+		and use variables to style it
+		so that it's easy for the author of the larger application
+		to theme the component to match the rest of the app.
+
+		Without fallback,
+		the app author must supply a value for every variable that your component uses.
+		With fallback, the component author can supply defaults,
+		so the app author only needs to supply values for the variables they wish to override.
+
+		<pre>
+		/* In the component's style: */
+		.component .header {
+			color: var(--header-color, blue);
+		}
+		.component .text {
+			color: var(--text-color, black);
+		}
+
+		/* In the larger application's style: */
+		.component {
+			--text-color: #080;
+			/* header-color isn't set,
+			   and so remains blue,
+			   the fallback value */
+		}
+		</pre>
+	</div>
+
+	If a property contains one or more ''var()'' functions,
+	and those functions are syntactically valid,
+	the entire property's grammar must be assumed to be valid at parse time.
+	It is only syntax-checked at computed-value time,
+	after ''var()'' functions have been <a lt="substitute a var()">substituted</a>.
+
+	To <dfn export lt="substitute a var()|var() substitution">substitute a var()</dfn> in a property's value:
+
+	<ol>
+		<li>
+			If the <a>custom property</a> named by the first argument to the ''var()'' function is <a>animation-tainted</a>,
+			and the ''var()'' function is being used in:
+
+			* the 'animation' property or one of its longhands,
+			* the 'display' property, such that after substitution the property would have a value that suppresses the element's box (such as ''display/none'' or ''display/contents'')
+
+			treat the <a>custom property</a> as having its initial value for the rest of this algorithm.
+
+		<li>
+			If the value of the <a>custom property</a> named by the first argument to the ''var()'' function
+			is anything but the initial value,
+			replace the ''var()'' function by the value of the corresponding <a>custom property</a>.
+
+		<li>
+			Otherwise, if the ''var()'' function has a fallback value as its second argument,
+			replace the ''var()'' function by the fallback value.
+			If there are any ''var()'' references in the fallback,
+			<a lt="substitute a var()">substitute</a> them as well.
+
+		<li>
+			Otherwise,
+			the property containing the ''var()'' function is <a>invalid at computed-value time</a>.
+
+			Note: Other things can also make a property <a>invalid at computed-value time</a>.
+	</ol>
+
+	<div class=note>
+		Note that <a>var() substitution</a> takes place at the level of CSS tokens [[css-syntax-3]],
+		not at a textual level;
+		you can't build up a single token where part of it is provided by a variable:
+
+		<pre>
+		.foo {
+			--gap: 20;
+			margin-top: var(--gap)px;
+		}
+		</pre>
+
+		This is <em>not</em> equivalent to setting ''margin-top: 20px;'' (a length).
+		Instead, it's equivalent to ''margin-top: 20 px;'' (a number followed by an ident),
+		which is simply an invalid value for the 'margin-top' property.
+		Note, though, that ''calc()'' can be used to validly achieve the same thing, like so:
+
+		<pre>
+		.foo {
+		  --gap: 20;
+		  margin-top: calc(var(--gap) * 1px);
+		}
+		</pre>
+	</div>
+
+	''var()'' functions are <a lt="substitute a var()">substituted</a> at computed-value time.
+	If a declaration,
+	once all ''var()'' functions are substituted in,
+	is invalid,
+	the declaration is <a>invalid at computed-value time</a>.
+
+	<div class='example'>
+		For example,
+		the following usage is fine from a syntax standpoint,
+		but results in nonsense when the variable is substituted in:
+
+		<pre>
+		:root { --looks-valid: 20px; }
+		p { background-color: var(--looks-valid); }
+		</pre>
+
+		Since ''20px'' is an invalid value for 'background-color',
+		this instance of the property computes to ''transparent''
+		(the initial value for 'background-color')
+		instead.
+
+		If the property was one that's inherited by default,
+		such as 'color!!property',
+		it would compute to the inherited value
+		rather than the initial value.
+	</div>
+
+
+<h3 id='invalid-variables'>
+Invalid Variables</h3>
+
+	When a <a>custom property</a> has its initial value,
+	''var()'' functions cannot use it for substitution.
+	Attempting to do so
+	makes the declaration <a>invalid at computed-value time</a>,
+	unless a valid fallback is specified.
+
+	A declaration can be <dfn>invalid at computed-value time</dfn>
+	if it contains a ''var()'' that references a <a>custom property</a> with its initial value,
+	as explained above,
+	or if it uses a valid <a>custom property</a>,
+	but the property value,
+	after substituting its ''var()'' functions,
+	is invalid.
+	When this happens,
+	the computed value of the property is either
+	the property's inherited value
+	or its initial value
+	depending on whether the property is inherited or not, respectively,
+	as if the property's value had been specified as the ''unset'' keyword.
+
+	<div class='example'>
+		For example, in the following code:
+
+		<pre>
+		:root { --not-a-color: 20px; }
+		p { background-color: red; }
+		p { background-color: var(--not-a-color); }
+		</pre>
+
+		the &lt;p> elements will have transparent backgrounds
+		(the initial value for 'background-color'),
+		rather than red backgrounds.
+		The same would happen if the <a>custom property</a> itself was unset,
+		or contained an invalid ''var()'' function.
+
+		Note the difference between this
+		and what happens if the author had just written ''background-color: 20px'' directly in their stylesheet -
+		that would be a normal syntax error,
+		which would cause the rule to be discarded,
+		so the ''background-color: red'' rule would be used instead.
+	</div>
+
+	Note: The <a>invalid at computed-value time</a> concept exists
+	because variables can't "fail early" like other syntax errors can,
+	so by the time the user agent realizes a property value is invalid,
+	it's already thrown away the other cascaded values.
+
+<h3 id=variables-in-shorthands>
+Variables in Shorthand Properties</h3>
+
+	The use of ''var()'' functions in <a>shorthand properties</a> presents some unique difficulties.
+
+	For non-custom properties,
+	the value of a shorthand property is separated out into its component <a>longhand properties</a> at parse time,
+	and then the longhands themselves participate in the <a>cascade</a>,
+	with the shorthand more-or-less discarded.
+	If a ''var()'' functions is used in a shorthand, however,
+	one can't tell what values are meant to go where;
+	it may in fact be impossible to separate it out at parse time,
+	as a single ''var()'' function may substitute in the value of several longhands at once.
+
+	To get around this,
+	implementations must fill in longhands with a special, unobservable-to-authors <dfn export>pending-substitution value</dfn>
+	that indicates the shorthand contains a variable,
+	and thus the longhand's value is pending variable substitution.
+	This value must then be cascaded as normal,
+	and at computed-value time,
+	after ''var()'' functions are finally substituted in,
+	the shorthand must be parsed and the longhands must be given their appropriate values at that point.
+
+	<a>Pending-substitution values</a> must be serialized as the empty string,
+	if an API allows them to be observed.
+
+	Similarly,
+	while [[CSSOM]] defines that shorthand properties are serialized
+	by appropriately concatenating the values of their corresponding longhands,
+	shorthands that are specified with explicit ''var()'' functions
+	must serialize to the original, ''var()''-containing value.
+	For other shorthands,
+	if any of the longhand subproperties for that shorthand have <a>pending-substitution values</a>
+	then the serialized value of the shorthand must be the empty string.
+
+
+
+<!--
+               AAA               PPPPPPPPPPPPPPPPP   IIIIIIIIII
+              A:::A              P::::::::::::::::P  I::::::::I
+             A:::::A             P::::::PPPPPP:::::P I::::::::I
+            A:::::::A            PP:::::P     P:::::PII::::::II
+           A:::::::::A             P::::P     P:::::P  I::::I
+          A:::::A:::::A            P::::P     P:::::P  I::::I
+         A:::::A A:::::A           P::::PPPPPP:::::P   I::::I
+        A:::::A   A:::::A          P:::::::::::::PP    I::::I
+       A:::::A     A:::::A         P::::PPPPPPPPP      I::::I
+      A:::::AAAAAAAAA:::::A        P::::P              I::::I
+     A:::::::::::::::::::::A       P::::P              I::::I
+    A:::::AAAAAAAAAAAAA:::::A      P::::P              I::::I
+   A:::::A             A:::::A   PP::::::PP          II::::::II
+  A:::::A               A:::::A  P::::::::P          I::::::::I
+ A:::::A                 A:::::A P::::::::P          I::::::::I
+AAAAAAA                   AAAAAAAPPPPPPPPPP          IIIIIIIIII
+-->
+
+
+<h2 id='apis'>
+APIs</h2>
+
+	All <a>custom property</a> <a>declarations</a> have the <a for="CSS declaration" spec=cssom>case-sensitive flag</a> set.
+
+	Note: Custom properties do not appear on a CSSStyleDeclaration object in camel-cased form,
+	because their names may have both upper and lower case letters
+	which indicate distinct custom properties.
+	The sort of text transformation that automatic camel-casing performs is incompatible with this.
+	They can still be accessed by their proper name via <a method>getPropertyValue()</a>/etc.
+
+<h3 id='serializing-custom-props'>
+Serializing Custom Properties</h3>
+
+	Custom property names must be serialized with the casing as provided by the author.
+
+	Note: For non-custom properties,
+	property names are restricted to the ASCII range and are <a>ASCII case-insensitive</a>,
+	so implementations typically serialize the name lowercased.
+
+
+
+<h2 id='changes'>
+Changes since the May 6 2014 Last Call Working Draft</h2>
+
+	* Serialization of longhands when shorthand uses a variable was defined.
+	* Link to DOM's definition of "case-sensitive".
+	* Added example of using variables with '':lang()'' to do simple i18n.
+	* Clarified that usage of ''var()'' in a custom property must be valid per the ''var()'' grammar.
+
+
+<h2 id="acks">
+Acknowledgments</h2>
+
+	<p>
+		Many thanks to several people in the CSS Working Group for keeping the dream of variables alive over the years,
+		particularly Daniel Glazman and David Hyatt.
+		Thanks to multiple people on the mailing list for helping contribute to the development of this incarnation of variables,
+		particularly
+		Brian Kardell,
+		David Baron,
+		François Remy,
+		Roland Steiner,
+		and Shane Stephens.
+
+Privacy and Security Considerations {#priv-sec}
+===============================================
+
+This specification defines a purely author-level mechanism for passing styling information around within a page they control.
+
+As such, there are no new privacy or security considerations.

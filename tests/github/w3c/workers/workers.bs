@@ -1,0 +1,2086 @@
+<pre class="metadata">
+Title: Web Workers
+Shortname: workers
+Level: 1
+Status: ED
+Group: webplatform
+URL: https://w3c.github.io/workers/
+Editor: Sangwhan Moon, Invited Expert, http://sangwhan.com
+Former Editor: Ian Hickson, Google https://google.com, ian@hixie.ch
+Abstract: This specification defines an API that allows Web application authors
+          to spawn background workers running scripts in parallel to their main
+          page. This allows for thread-like operation with message-passing as
+          the coordination mechanism.
+!Participate: <a href="https://github.com/w3c/workers/issues/new">File an Issue</a>
+              (<a href="https://github.com/w3c/workers/issues">Open Issues</a>)
+</pre>
+
+<pre class="link-defaults">
+spec:dom; type:interface; text:Document
+spec:html; type:attribute; for:MessageEvent; text:data
+spec:html; type:method; text:importScripts(urls)
+spec:html; type:method; for:MessagePort; text:start()
+spec:webidl; type:interface; text:ArrayBuffer
+</pre>
+
+# Introduction # {#intro}
+
+## Scope ## {#scope}
+
+<em>This section is non-normative.</em>
+
+This specification defines an API for running scripts in the background
+independently of any user interface scripts.
+
+This allows for long-running scripts that are not interrupted by scripts that
+respond to clicks or other user interactions, and allows long tasks to be
+executed without yielding to keep the page responsive.
+
+{{Worker}}s (as these background scripts are called herein) are relatively
+heavy-weight, and are not intended to be used in large numbers. For example,
+it would be inappropriate to launch one worker for each pixel of a four
+megapixel image. The examples below show some appropriate uses of workers.
+
+Generally, workers are expected to be long-lived, have a high start-up
+performance cost, and a high per-instance memory cost.
+
+## Examples ## {#examples}
+
+<em>This section is non-normative.</em>
+
+There are a variety of uses that workers can be put to. The following
+subsections show various examples of this use.
+
+### A background number-crunching worker ### {#examples-1}
+
+<em>This section is non-normative.</em>
+
+The simplest use of workers is for performing a computationally expensive task
+without interrupting the user interface.
+
+In this example, the main document spawns a worker to (naïvely) compute prime
+numbers, and progressively displays the most recently found prime number.
+
+The main page is as follows:
+
+<pre class="example lang-html">
+&lt;!DOCTYPE HTML&gt;
+&lt;html&gt;
+ &lt;head&gt;
+  &lt;title&gt;Worker example: One-core computation&lt;/title&gt;
+ &lt;/head&gt;
+ &lt;body&gt;
+  &lt;p&gt;The highest prime number discovered so far is: &lt;output id="result"&gt;&lt;/output&gt;&lt;/p&gt;
+  &lt;script&gt;
+   var worker = new Worker('worker.js');
+   worker.onmessage = function (event) {
+     document.getElementById('result').textContent = event.data;
+   };
+  &lt;/script&gt;
+ &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+The {{Worker}}() constructor call creates a worker and returns a {{Worker}}
+object representing that worker, which is used to communicate with the worker.
+That object's {{onmessage}} event handler allows the code to receive messages from
+the worker.
+
+The worker itself is as follows:
+
+<pre class="example lang-js">
+var n = 1;
+search: while (true) {
+  n += 1;
+  for (var i = 2; i &lt;= Math.sqrt(n); i += 1)
+    if (n % i == 0)
+     continue search;
+  // Found a prime!
+  postMessage(n);
+}
+</pre>
+
+The bulk of this code is simply an unoptimised search for a prime number.
+The {{postMessage()}} method is used to send a message back to the page when a
+prime is found.
+
+<a href="https://whatwg.org/demos/workers/primes/page.html">
+  View this example online.
+</a>
+
+### {{Worker}} used for background I/O ### {#examples-2}
+
+<em>This section is non-normative.</em>
+
+In this example, the main document uses two workers, one for fetching stock
+updates at regular intervals, and one for performing search queries that the
+user requests.
+
+The main page is as follows:
+
+<pre class="lang-html">
+&lt;!DOCTYPE HTML&gt;
+&lt;html&gt;
+ &lt;head&gt;
+  &lt;title&gt;Worker example: Stock ticker&lt;/title&gt;
+  &lt;script&gt;
+   // Ticker
+   var symbol = 'GOOG'; // default symbol to watch
+   var ticker = new Worker('ticker.js');
+
+   // Searcher
+   var searcher = new Worker('searcher.js');
+   function search(query) {
+     searcher.postMessage(query);
+   }
+
+   // Symbol selection UI
+   function select(newSymbol) {
+     symbol = newSymbol;
+     ticker.postMessage(symbol);
+   }
+  &lt;/script&gt;
+ &lt;/head&gt;
+ &lt;body onload="search('')"&gt;
+  &lt;p&gt;&lt;output id="symbol"&gt;&lt;/output&gt; &lt;output id="value"&gt;&lt;/output&gt;&lt;/p&gt;
+  &lt;script&gt;
+   ticker.onmessage = function (event) {
+     var data = event.data.split(' ');
+     document.getElementById('symbol').textContent = data[0];
+     document.getElementById('value').textContent = data[1];
+   };
+   ticker.postMessage(symbol);
+  &lt;/script&gt;
+  &lt;p&gt;&lt;label&gt;Search: &lt;input type="text" autofocus oninput="search(this.value)"&gt;&lt;/label&gt;&lt;/p&gt;
+  &lt;ul id="results"&gt;&lt;/ul&gt;
+  &lt;script&gt;
+   searcher.onmessage = function (event) {
+     var data = event.data.split(' ');
+     var results = document.getElementById('results');
+     while (results.hasChildNodes()) // Clear previous results
+       results.removeChild(results.firstChild);
+     for (var i = 0; i &lt; data.length; i += 1) {
+       // Add a list item with a button for each result
+       var li = document.createElement('li');
+       var button = document.createElement('button');
+       button.value = data[i];
+       button.type = 'button';
+       button.onclick = function () { select(this.value); };
+       button.textContent = data[i];
+       li.appendChild(button);
+       results.appendChild(li);
+     }
+   };
+  &lt;/script&gt;
+  &lt;p&gt;(The data in this example is not real. Try searching for "Google" or "Apple".)&lt;/p&gt;
+ &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+The two workers use a common library for performing the actual network calls.
+This library is as follows:
+
+<pre class="example lang-js">
+function get(url) {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, false);
+    xhr.send();
+    return xhr.responseText;
+  } catch (e) {
+    return ''; // Turn all errors into empty results
+  }
+}
+</pre>
+
+The stock updater worker is as follows:
+
+<pre class="example lang-js">
+importScripts('io.js');
+var timer;
+var symbol;
+function update() {
+  postMessage(symbol + ' ' + get('stock.cgi?' + symbol));
+  timer = setTimeout(update, 10000);
+}
+onmessage = function (event) {
+  if (timer)
+    clearTimeout(timer);
+  symbol = event.data;
+  update();
+};
+</pre>
+
+The search query worker is as follows:
+
+<pre class="example lang-js">
+importScripts('io.js');
+onmessage = function (event) {
+  postMessage(get('search.cgi?' + event.data));
+};
+</pre>
+
+<a href="https://www.whatwg.org/demos/workers/stocks/page.html">
+View this example online.
+</a>
+
+### Shared workers introduction ### {#examples-3}
+
+<em>This section is non-normative.</em>
+
+This section introduces shared workers using a Hello World example. Shared
+workers use slightly different APIs, since each worker can have multiple
+connections.
+
+This first example shows how you connect to a worker and how a worker can send
+a message back to the page when it connects to it. Received messages are
+displayed in a log.
+
+Here is the HTML page:
+
+<pre class="example lang-html">
+&lt;!DOCTYPE HTML&gt;
+&lt;title&gt;Shared workers: demo 1&lt;/title&gt;
+&lt;pre id="log"&gt;Log:&lt;/pre&gt;
+&lt;script&gt;
+  var worker = new SharedWorker('test.js');
+  var log = document.getElementById('log');
+  worker.port.onmessage = function(e) { // Note: Not worker.onmessage!
+    log.textContent += '\n' + e.data;
+  }
+&lt;/script&gt;
+</pre>
+
+Here is the JavaScript worker:
+
+<pre class="example lang-js">
+onconnect = function(e) {
+  var port = e.ports[0];
+  port.postMessage('Hello World!');
+}
+</pre>
+
+<a href="https://www.whatwg.org/demos/workers/shared/001/test.html">
+  View this example online.
+</a>
+
+This second example extends the first one by changing two things: first,
+messages are received using {{addEventListener()}} instead of an event handler
+IDL attribute, and second, a message is sent to the worker, causing the
+worker to send another message in return. Received messages are again
+displayed in a log.
+
+Here is the HTML page:
+
+<pre class="example lang-html">
+&lt;!DOCTYPE HTML&gt;
+&lt;title&gt;Shared workers: demo 2&lt;/title&gt;
+&lt;pre id=&quot;log&quot;&gt;Log:&lt;/pre&gt;
+&lt;script&gt;
+  var worker = new SharedWorker(&#x27;test.js&#x27;);
+  var log = document.getElementById(&#x27;log&#x27;);
+  worker.port.addEventListener(&#x27;message&#x27;, function(e) {
+    log.textContent += &#x27;\n&#x27; + e.data;
+  }, false);
+  worker.port.start(); // Note: Needed when using addEventListener
+  worker.port.postMessage(&#x27;ping&#x27;);
+&lt;/script&gt;
+</pre>
+
+Here is the JavaScript worker:
+
+<pre class="example lang-js">
+onconnect = function(e) {
+  var port = e.ports[0];
+  port.postMessage('Hello World!');
+  port.onmessage = function(e) {
+    port.postMessage('pong'); // Not e.ports[0].postMessage!
+    // e.target.postMessage('pong'); // Also works
+  }
+}
+</pre>
+
+<a href="https://www.whatwg.org/demos/workers/shared/002/test.html">
+  View this example online.
+</a>
+
+Finally, the example is extended to show how two pages can connect to the same
+worker; in this case, the second page is merely in an iframe on the first page,
+but the same principle would apply to an entirely separate page in a separate
+top-level browsing context.
+
+Here is the outer HTML page:
+
+<pre class="example lang-html">
+&lt;!DOCTYPE HTML&gt;
+&lt;title&gt;Shared workers: demo 3&lt;/title&gt;
+&lt;pre id=&quot;log&quot;&gt;Log:&lt;/pre&gt;
+&lt;script&gt;
+  var worker = new SharedWorker(&#x27;test.js&#x27;);
+  var log = document.getElementById(&#x27;log&#x27;);
+  worker.port.addEventListener(&#x27;message&#x27;, function(e) {
+    log.textContent += &#x27;\n&#x27; + e.data;
+  }, false);
+  worker.port.start();
+  worker.port.postMessage(&#x27;ping&#x27;);
+&lt;/script&gt;
+&lt;iframe src=&quot;inner.html&quot;&gt;&lt;/iframe&gt;
+</pre>
+
+Here is the inner HTML page:
+
+<pre class="example lang-html">
+&lt;!DOCTYPE HTML&gt;
+&lt;title&gt;Shared workers: demo 3 inner frame&lt;/title&gt;
+&lt;pre id=log&gt;Inner log:&lt;/pre&gt;
+&lt;script&gt;
+  var worker = new SharedWorker(&#x27;test.js&#x27;);
+  var log = document.getElementById(&#x27;log&#x27;);
+  worker.port.onmessage = function(e) {
+   log.textContent += &#x27;\n&#x27; + e.data;
+  }
+&lt;/script&gt;
+</pre>
+
+Here is the JavaScript worker:
+
+<pre class="example lang-js">
+var count = 0;
+onconnect = function(e) {
+  count += 1;
+  var port = e.ports[0];
+  port.postMessage('Hello World! You are connection #' + count);
+  port.onmessage = function(e) {
+    port.postMessage('pong');
+  }
+}
+</pre>
+
+<a href="https://www.whatwg.org/demos/workers/shared/003/test.html">
+  View this example online.
+</a>
+
+### Shared state using a shared worker ### {#examples-4}
+
+<em>This section is non-normative.</em>
+
+In this example, multiple windows (viewers) can be opened that are all
+viewing the same map. All the windows share the same map information, with a
+single worker coordinating all the viewers. Each viewer can move around
+independently, but if they set any data on the map, all the viewers are
+updated.
+
+The main page isn't interesting, it merely provides a way to open the viewers:
+
+<pre class="example lang-html">
+&lt;!DOCTYPE HTML&gt;
+&lt;html&gt;
+ &lt;head&gt;
+  &lt;title&gt;Workers example: Multiviewer&lt;/title&gt;
+  &lt;script&gt;
+   function openViewer() {
+     window.open(&#x27;viewer.html&#x27;);
+   }
+  &lt;/script&gt;
+ &lt;/head&gt;
+ &lt;body&gt;
+  &lt;p&gt;&lt;button type=button onclick=&quot;openViewer()&quot;&gt;Open a new
+  viewer&lt;/button&gt;&lt;/p&gt;
+  &lt;p&gt;Each viewer opens in a new window. You can have as many viewers
+  as you like, they all view the same data.&lt;/p&gt;
+ &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+The viewer is more involved:
+
+<pre class="example lang-html">
+&lt;!DOCTYPE HTML&gt;
+&lt;html&gt;
+ &lt;head&gt;
+  &lt;title&gt;Workers example: Multiviewer viewer&lt;/title&gt;
+  &lt;script&gt;
+   var worker = new SharedWorker(&#x27;worker.js&#x27;, &#x27;core&#x27;);
+
+   // Configuration
+   function configure(event) {
+     if (event.data.substr(0, 4) != &#x27;cfg &#x27;) return;
+     var name = event.data.substr(4).split(&#x27; &#x27;, 1)[0];
+     // update display to mention our name is name
+     document.getElementsByTagName(&#x27;h1&#x27;)[0].textContent += &#x27; &#x27; + name;
+     // no longer need this listener
+     worker.port.removeEventListener(&#x27;message&#x27;, configure, false);
+   }
+   worker.port.addEventListener(&#x27;message&#x27;, configure, false);
+
+   // Map
+   function paintMap(event) {
+     if (event.data.substr(0, 4) != &#x27;map &#x27;) return;
+     var data = event.data.substr(4).split(&#x27;,&#x27;);
+     // Display tiles data[0] .. data[8]
+     var canvas = document.getElementById(&#x27;map&#x27;);
+     var context = canvas.getContext(&#x27;2d&#x27;);
+     for (var y = 0; y &lt; 3; y += 1) {
+       for (var x = 0; x &lt; 3; x += 1) {
+         var tile = data[y * 3 + x];
+         if (tile == &#x27;0&#x27;)
+           context.fillStyle = &#x27;green&#x27;;
+         else
+           context.fillStyle = &#x27;maroon&#x27;;
+         context.fillRect(x * 50, y * 50, 50, 50);
+       }
+     }
+   }
+   worker.port.addEventListener(&#x27;message&#x27;, paintMap, false);
+
+   // Public chat
+   function updatePublicChat(event) {
+     if (event.data.substr(0, 4) != &#x27;txt &#x27;) return;
+     var name = event.data.substr(4).split(&#x27; &#x27;, 1)[0];
+     var message = event.data.substr(4 + name.length + 1);
+     // display &quot;&lt;name&gt; message&quot; in public chat
+     var public = document.getElementById(&#x27;public&#x27;);
+     var p = document.createElement(&#x27;p&#x27;);
+     var n = document.createElement(&#x27;button&#x27;);
+     n.textContent = &#x27;&lt;&#x27; + name + &#x27;&gt; &#x27;;
+     n.onclick = function () { worker.port.postMessage(&#x27;msg &#x27; + name); };
+     p.appendChild(n);
+     var m = document.createElement(&#x27;span&#x27;);
+     m.textContent = message;
+     p.appendChild(m);
+     public.appendChild(p);
+   }
+   worker.port.addEventListener(&#x27;message&#x27;, updatePublicChat, false);
+
+   // Private chat
+   function startPrivateChat(event) {
+     if (event.data.substr(0, 4) != &#x27;msg &#x27;) return;
+     var name = event.data.substr(4).split(&#x27; &#x27;, 1)[0];
+     var port = event.ports[0];
+     // Display a private chat UI
+     var ul = document.getElementById(&#x27;private&#x27;);
+     var li = document.createElement(&#x27;li&#x27;);
+     var h3 = document.createElement(&#x27;h3&#x27;);
+     h3.textContent = &#x27;Private chat with &#x27; + name;
+     li.appendChild(h3);
+     var div = document.createElement(&#x27;div&#x27;);
+     var addMessage = function(name, message) {
+       var p = document.createElement(&#x27;p&#x27;);
+       var n = document.createElement(&#x27;strong&#x27;);
+       n.textContent = &#x27;&lt;&#x27; + name + &#x27;&gt; &#x27;;
+       p.appendChild(n);
+       var t = document.createElement(&#x27;span&#x27;);
+       t.textContent = message;
+       p.appendChild(t);
+       div.appendChild(p);
+     };
+     port.onmessage = function (event) {
+       addMessage(name, event.data);
+     };
+     li.appendChild(div);
+     var form = document.createElement(&#x27;form&#x27;);
+     var p = document.createElement(&#x27;p&#x27;);
+     var input = document.createElement(&#x27;input&#x27;);
+     input.size = 50;
+     p.appendChild(input);
+     p.appendChild(document.createTextNode(&#x27; &#x27;));
+     var button = document.createElement(&#x27;button&#x27;);
+     button.textContent = &#x27;Post&#x27;;
+     p.appendChild(button);
+     form.onsubmit = function () {
+       port.postMessage(input.value);
+       addMessage(&#x27;me&#x27;, input.value);
+       input.value = &#x27;&#x27;;
+       return false;
+     };
+     form.appendChild(p);
+     li.appendChild(form);
+     ul.appendChild(li);
+   }
+   worker.port.addEventListener(&#x27;message&#x27;, startPrivateChat, false);
+
+   worker.port.start();
+  &lt;/script&gt;
+ &lt;/head&gt;
+ &lt;body&gt;
+  &lt;h1&gt;Viewer&lt;/h1&gt;
+  &lt;h2&gt;Map&lt;/h2&gt;
+  &lt;p&gt;&lt;canvas id=&quot;map&quot; height=150 width=150&gt;&lt;/canvas&gt;&lt;/p&gt;
+  &lt;p&gt;
+   &lt;button type=button onclick=&quot;worker.port.postMessage(&#x27;mov left&#x27;)&quot;&gt;Left&lt;/button&gt;
+   &lt;button type=button onclick=&quot;worker.port.postMessage(&#x27;mov up&#x27;)&quot;&gt;Up&lt;/button&gt;
+   &lt;button type=button onclick=&quot;worker.port.postMessage(&#x27;mov down&#x27;)&quot;&gt;Down&lt;/button&gt;
+   &lt;button type=button onclick=&quot;worker.port.postMessage(&#x27;mov right&#x27;)&quot;&gt;Right&lt;/button&gt;
+   &lt;button type=button onclick=&quot;worker.port.postMessage(&#x27;set 0&#x27;)&quot;&gt;Set 0&lt;/button&gt;
+   &lt;button type=button onclick=&quot;worker.port.postMessage(&#x27;set 1&#x27;)&quot;&gt;Set 1&lt;/button&gt;
+  &lt;/p&gt;
+  &lt;h2&gt;Public Chat&lt;/h2&gt;
+  &lt;div id=&quot;public&quot;&gt;&lt;/div&gt;
+  &lt;form onsubmit=&quot;worker.port.postMessage(&#x27;txt &#x27; + message.value); message.value = &#x27;&#x27;; return false;&quot;&gt;
+   &lt;p&gt;
+    &lt;input type=&quot;text&quot; name=&quot;message&quot; size=&quot;50&quot;&gt;
+    &lt;button&gt;Post&lt;/button&gt;
+   &lt;/p&gt;
+  &lt;/form&gt;
+  &lt;h2&gt;Private Chat&lt;/h2&gt;
+  &lt;ul id=&quot;private&quot;&gt;&lt;/ul&gt;
+ &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+There are several key things worth noting about the way the viewer is written.
+
+Multiple listeners. Instead of a single message processing function, the code
+here attaches multiple event listeners, each one performing a quick check to
+see if it is relevant for the message. In this example it doesn't make much
+difference, but if multiple authors wanted to collaborate using a single port
+to communicate with a worker, it would allow for independent code instead of
+changes having to all be made to a single event handling function.
+
+Registering event listeners in this way also allows you to unregister
+specific listeners when you are done with them, as is done with the
+configure() method in this example. (FIXME: configure() method doesn't exist...)
+
+Finally, the worker:
+
+<pre class="example lang-js">
+var nextName = 0;
+function getNextName() {
+  // This could use more friendly names
+  // But for now just return a number
+  return nextName++;
+}
+
+var map = [
+ [0, 0, 0, 0, 0, 0, 0],
+ [1, 1, 0, 1, 0, 1, 1],
+ [0, 1, 0, 1, 0, 0, 0],
+ [0, 1, 0, 1, 0, 1, 1],
+ [0, 0, 0, 1, 0, 0, 0],
+ [1, 0, 0, 1, 1, 1, 1],
+ [1, 1, 0, 1, 1, 0, 1],
+];
+
+function wrapX(x) {
+  if (x &lt; 0) return wrapX(x + map[0].length);
+  if (x &gt;= map[0].length) return wrapX(x - map[0].length);
+  return x;
+}
+
+function wrapY(y) {
+  if (y &lt; 0) return wrapY(y + map.length);
+  if (y &gt;= map[0].length) return wrapY(y - map.length);
+  return y;
+}
+
+function wrap(val, min, max) {
+  if (val &lt; min)
+    return val + (max-min)+1;
+  if (val &gt; max)
+    return val - (max-min)-1;
+  return val;
+}
+
+function sendMapData(viewer) {
+  var data = '';
+  for (var y = viewer.y-1; y &lt;= viewer.y+1; y += 1) {
+    for (var x = viewer.x-1; x &lt;= viewer.x+1; x += 1) {
+      if (data != '')
+        data += ',';
+      data += map[wrap(y, 0, map[0].length-1)][wrap(x, 0, map.length-1)];
+    }
+  }
+  viewer.port.postMessage('map ' + data);
+}
+
+var viewers = {};
+onconnect = function (event) {
+  var name = getNextName();
+  event.ports[0]._data = { port: event.ports[0], name: name, x: 0, y: 0, };
+  viewers[name] = event.ports[0]._data;
+  event.ports[0].postMessage('cfg ' + name);
+  event.ports[0].onmessage = getMessage;
+  sendMapData(event.ports[0]._data);
+};
+
+function getMessage(event) {
+  switch (event.data.substr(0, 4)) {
+    case 'mov ':
+      var direction = event.data.substr(4);
+      var dx = 0;
+      var dy = 0;
+      switch (direction) {
+        case 'up': dy = -1; break;
+        case 'down': dy = 1; break;
+        case 'left': dx = -1; break;
+        case 'right': dx = 1; break;
+      }
+      event.target._data.x = wrapX(event.target._data.x + dx);
+      event.target._data.y = wrapY(event.target._data.y + dy);
+      sendMapData(event.target._data);
+      break;
+    case 'set ':
+      var value = event.data.substr(4);
+      map[event.target._data.y][event.target._data.x] = value;
+      for (var viewer in viewers)
+        sendMapData(viewers[viewer]);
+      break;
+    case 'txt ':
+      var name = event.target._data.name;
+      var message = event.data.substr(4);
+      for (var viewer in viewers)
+        viewers[viewer].port.postMessage('txt ' + name + ' ' + message);
+      break;
+    case 'msg ':
+      var party1 = event.target._data;
+      var party2 = viewers[event.data.substr(4).split(' ', 1)[0]];
+      if (party2) {
+        var channel = new MessageChannel();
+        party1.port.postMessage('msg ' + party2.name, [channel.port1]);
+        party2.port.postMessage('msg ' + party1.name, [channel.port2]);
+      }
+      break;
+  }
+}
+</pre>
+
+Connecting to multiple pages. The script uses the {{onconnect}} event listener
+to listen for multiple connections.
+
+Direct channels. When the worker receives a "msg" message from one viewer
+naming another viewer, it sets up a direct connection between the two, so
+that the two viewers can communicate directly without the worker having to
+proxy all the messages.
+
+<a href="https://www.whatwg.org/demos/workers/multiviewer/page.html">
+  View this example online.
+</a>
+
+### Delegation ### {#examples-5}
+
+<em>This section is non-normative.</em>
+
+With multicore CPUs becoming prevalent, one way to obtain better performance
+is to split computationally expensive tasks amongst multiple workers. In this
+example, a computationally expensive task that is to be performed for every
+number from 1 to 10,000,000 is farmed out to ten subworkers.
+
+The main page is as follows, it just reports the result:
+
+<pre class="example lang-html">
+&lt;!DOCTYPE HTML&gt;
+&lt;html&gt;
+ &lt;head&gt;
+  &lt;title&gt;Worker example: Multicore computation&lt;/title&gt;
+ &lt;/head&gt;
+ &lt;body&gt;
+  &lt;p&gt;Result: &lt;output id=&quot;result&quot;&gt;&lt;/output&gt;&lt;/p&gt;
+  &lt;script&gt;
+   var worker = new Worker(&#x27;worker.js&#x27;);
+   worker.onmessage = function (event) {
+     document.getElementById(&#x27;result&#x27;).textContent = event.data;
+   };
+  &lt;/script&gt;
+ &lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+The worker itself is as follows:
+
+<pre class="example lang-js">
+// Settings
+var num_workers = 10;
+var items_per_worker = 1000000;
+
+// Start the workers
+var result = 0;
+var pending_workers = num_workers;
+for (var i = 0; i &lt; num_workers; i += 1) {
+  var worker = new Worker('core.js');
+  worker.postMessage(i * items_per_worker);
+  worker.postMessage((i+1) * items_per_worker);
+  worker.onmessage = storeResult;
+}
+
+// handle the results
+function storeResult(event) {
+  result += 1*event.data;
+  pending_workers -= 1;
+  if (pending_workers &lt;= 0)
+    postMessage(result); // Finished!
+}
+</pre>
+
+It consists of a loop to start the subworkers, and then a handler that waits
+for all the subworkers to respond.
+
+The subworkers are implemented as follows:
+
+<pre class="example lang-js">
+var start;
+onmessage = getStart;
+function getStart(event) {
+  start = 1*event.data;
+  {{onmessage}} = getEnd;
+}
+
+var end;
+function getEnd(event) {
+  end = 1*event.data;
+  {{onmessage}} = null;
+  work();
+}
+
+function work() {
+  var result = 0;
+  for (var i = start; i &lt; end; i += 1) {
+    // Perform some complex calculation here
+    result += 1;
+  }
+  postMessage(result);
+  close();
+}
+</pre>
+
+They receive two numbers in two events, perform the computation for the range
+of numbers thus specified, and then report the result back to the parent.
+
+<a href="https://www.whatwg.org/demos/workers/multicore/page.html">
+  View this example online.
+</a>
+
+<!--
+  NOTE: Missing 10.1.2.7 example section from WHATWG spec.
+        Will not be ported as example code is not substantial.
+ -->
+
+## Tutorials ## {#tutorials}
+
+### Creating a dedicated worker ### {#tutorial-1}
+
+<em>This section is non-normative.</em>
+
+Creating a worker requires a URL to a JavaScript file. The {{Worker()}}
+constructor is invoked with the URL to that file as its only argument; a
+worker is then created and returned:
+
+<pre class="example lang-js">
+var worker = new Worker('helper.js');
+</pre>
+
+<!-- FIXME: Module scripts are not yet in w3c/html. -->
+
+If you want your worker script to be interpreted as a {{module script}}
+instead of the default {{classic script}}, you need to use a slightly
+different signature:
+
+<pre class="example lang-js">
+var worker = new Worker('helper.js', { type: "module" });
+</pre>
+
+### Communicating with a dedicated worker ### {#tutorial-2}
+
+<em>This section is non-normative.</em>
+
+Dedicated workers use {{MessagePort}} objects behind the scenes, and thus
+support all the same features, such as sending structured data, transferring
+binary data, and transferring other ports.
+
+To receive messages from a dedicated worker, use the {{onmessage}} {{event
+handler IDL attribute}} on the {{Worker}} object:
+
+<pre class="example lang-js">
+worker.onmessage = function (event) { ... };
+</pre>
+
+You can also use the {{addEventListener()}} method.
+
+<p class="note">
+The implicit {{MessagePort}} used by dedicated workers has its port message
+queue implicitly enabled when it is created, so there is no equivalent to the
+MessagePort interface's {{start()}} method on the {{Worker}} interface.
+</p>
+
+To send data to a worker, use the {{postMessage()}} method. Structured data
+can be sent over this communication channel. To send {{ArrayBuffer}} objects
+efficiently (by transferring them rather than cloning them), list them in an
+array in the second argument.
+
+<pre class="example lang-js">
+worker.postMessage({
+  operation: 'find-edges',
+  input: buffer, // An {{ArrayBuffer}} object
+  threshold: 0.6,
+}, [buffer]);
+</pre>
+
+To receive a message inside the worker, the {{onmessage}} event handler IDL
+attribute is used.
+
+<pre class="example lang-js">
+onmessage = function (event) { ... };
+</pre>
+
+You can again also use the {{addEventListener()}} method.
+
+In either case, the data is provided in the event object's data attribute.
+
+To send messages back, you again use postMessage(). It supports the
+structured data in the same manner.
+
+<pre class="example lang-js">
+postMessage(event.data.input, [event.data.input]); // Transfer the buffer back
+</pre>
+
+###  Shared workers ### {#tutorial-3}
+
+<em>This section is non-normative.</em>
+
+Shared workers are identified by the URL of the script used to create it,
+optionally with an explicit name. The name allows multiple instances of a
+particular shared worker to be started.
+
+Shared workers are scoped by {{origin}}. Two different sites using the same
+names will not collide. However, if a page tries to use the same shared
+worker name as another page on the same site, but with a different script
+URL, it will fail.
+
+Creating shared workers is done using the {{SharedWorker()}} constructor.
+This constructor takes the URL to the script to use for its first argument,
+and the name of the worker, if any, as the second argument.
+
+<pre class="example lang-js">
+var worker = new SharedWorker('service.js');
+</pre>
+
+Communicating with shared workers is done with explicit {{MessagePort}}
+objects. The object returned by the {{SharedWorker()}} constructor holds a
+reference to the {{port}} on its port attribute.
+
+<pre class="example lang-js">
+worker.port.onmessage = function (event) { ... };
+worker.port.postMessage('some message');
+worker.port.postMessage({ foo: 'structured', bar: ['data', 'also', 'possible']});
+</pre>
+
+Inside the shared worker, new clients of the worker are announced using the
+connect event. The port for the new client is given by the event object's
+source attribute.
+
+<pre class="example lang-js">
+onconnect = function (event) {
+  var newPort = event.source;
+  // Setup a listener
+  newPort.onmessage = function (event) { ... };
+  // Send a message back to the port
+  newPort.postMessage('ready!'); // Can also send structured data
+};
+</pre>
+
+# Terminology # {#terminology}
+
+The construction "a Foo object", where Foo is actually an interface, is
+sometimes used instead of the more accurate "an object implementing the
+interface Foo".
+
+The term DOM is used to refer to the API set made available to scripts in Web
+applications, and does not necessarily imply the existence of an actual
+Document object or of any other Node objects as defined in the DOM
+specifications. [[DOM]]
+
+An IDL attribute is said to be getting when its value is being retrieved
+(e.g. by author script), and is said to be setting when a new value is
+assigned to it.
+
+The term "JavaScript" is used to refer to ECMA262, rather than the official
+term ECMAScript, since the term JavaScript is more widely known. [[ECMA-262]]
+
+# Infrastructure # {#infrastructure}
+
+There are two kinds of workers; dedicated workers, and shared workers.
+Dedicated workers, once created, are linked to their creator; but message
+ports can be used to communicate from a dedicated worker to multiple other
+browsing contexts or workers. Shared workers, on the other hand, are named,
+and once created any script running in the same origin can obtain a reference
+to that worker and communicate with it.
+
+## The global scope ## {#global-scope}
+
+The global scope is the &quot;inside&quot; of a worker.
+
+### The {{WorkerGlobalScope}} common interface ### {#workerglobalscope}
+
+<pre class='idl'>
+[Exposed=Worker]
+interface WorkerGlobalScope : EventTarget {
+  readonly attribute WorkerGlobalScope self;
+  readonly attribute WorkerLocation location;
+  readonly attribute WorkerNavigator navigator;
+  void importScripts(USVString... urls);
+  void close();
+
+  attribute OnErrorEventHandler onerror;
+  attribute EventHandler onlanguagechange;
+  attribute EventHandler onoffline;
+  attribute EventHandler ononline;
+  attribute EventHandler onrejectionhandled;
+  attribute EventHandler onunhandledrejection;
+};
+</pre>
+
+The {{self}} attribute must return the {{WorkerGlobalScope}} object itself.
+
+The {{location}} attribute must return the {{WorkerLocation}} object created for
+the {{WorkerGlobalScope}} object when the worker was creatored. It represents
+the absolute URL of the script that was used to initialise the worker, after
+any redirects.
+
+When a script invokes the {{close()}} method on a {{WorkerGlobalScope}} object,
+the user agent must run the following steps (atomically):
+
+ 1. Discard any tasks that have been added to the {{WorkerGlobalScope}}
+    object's event loop's task queues.
+ 2. Set the worker's {{WorkerGlobalScope}} object's {{closing}} flag to true.
+    (This prevents any further tasks from being queued.)
+
+The following are the event handlers (and their corresponding event handler
+event types) that must be supported, as event handler IDL attributes, by
+objects implementing the {{WorkerGlobalScope}} interface:
+
+<table>
+  <thead>
+    <tr>
+      <th>
+        <span title="event handlers">Event handler</span>
+      </th>
+      <th>
+        <span>Event handler event type</span>
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <dfn id="handler-workerglobalscope-onerror"
+             title="handler-WorkerGlobalScope-onerror"
+             attribute for="WorkerGlobalScope">
+          <code>onerror</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-error">error</code>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <dfn id="handler-workerglobalscope-onlanguagechange"
+             title="handler-WorkerGlobalScope-onlanguagechange"
+             attribute for="WorkerGlobalScope">
+          <code>onlanguagechange</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-languagechange">languagechange</code>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <dfn id="handler-workerglobalscope-onoffline"
+             title="handler-WorkerGlobalScope-onoffline"
+             attribute for="WorkerGlobalScope">
+          <code>onoffline</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-offline">offline</code>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <dfn id="handler-workerglobalscope-ononline"
+             title="handler-WorkerGlobalScope-ononline"
+             attribute for="WorkerGlobalScope">
+          <code>ononline</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-online">online</code>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <dfn id="handler-workerglobalscope-onrejectionhandled"
+             title="handler-WorkerGlobalScope-onrejectionhandled"
+             attribute for="WorkerGlobalScope">
+          <code>onrejectionhandled</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-rejectionhandled">rejectionhandled</code>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <dfn id="handler-workerglobalscope-onunhandledrejection"
+             title="handler-WorkerGlobalScope-onunhandledrejection"
+             attribute for="WorkerGlobalScope">
+          <code>onunhandledrejection</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-rejectionhandled">unhandledrejection</code>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<p class="note">
+  For <code>data:</code> URLs, this is the origin specified by the entry
+  settings object when the constructor was called. For other URLs, this is the
+  origin of the value of the absolute URL given in the worker's location
+  attribute.
+</p>
+
+### Dedicated workers and the {{DedicatedWorkerGlobalScope}} interface ### {#dedicated-workers}
+
+<pre class="idl">
+[Global=Worker,DedicatedWorker,Exposed=DedicatedWorker]
+/*sealed*/ interface DedicatedWorkerGlobalScope : WorkerGlobalScope {
+  readonly attribute DOMString name;
+
+  void postMessage(any message, optional sequence&lt;Transferable&gt; transfer);
+
+  attribute EventHandler onmessage;
+  attribute EventHandler onmessageerror;
+};
+</pre>
+
+{{DedicatedWorkerGlobalScope}} objects act as if they had an implicit
+{{MessagePort}} associated with them. This port is part of a channel that is
+set up when the worker is created, but it is not exposed. This object must
+never be garbage collected before the {{DedicatedWorkerGlobalScope}} object.
+
+All messages received by that port must immediately be retargeted at the
+DedicatedWorkerGlobalScope object.
+
+<dl class="note">
+  <dt><var>dedicatedWorkerGlobal</var> . <code>name</code></dt>
+  <dd>
+    Returns dedicatedWorkerGlobal's {{name}}, i.e. the value given to the
+    {{Worker}} constructor. Primarily useful for debugging.
+  </dd>
+
+  <dt><var>dedicatedWorkerGlobal</var> . <code>postMessage(message [, transfer])</code></dt>
+  <dd>
+    Clones message and transmits it to the {{Worker}} object associated with
+    dedicatedWorkerGlobal.transfer can be passed as a list of objects that
+    are to be transferred rather than cloned.
+  </dd>
+</dl>
+
+The {{name}} attribute must return the {{DedicatedWorkerGlobalScope}} object's
+{{name}}. Its value the name given to the worker using the {{Worker}}
+constructor, used primarily for debugging purposes.
+
+The {{postMessage()}} method on {{DedicatedWorkerGlobalScope}} objects must
+act as if, when invoked, it immediately invoked the method of the same name on
+the port, with the same arguments, and returned the same return value.
+
+The following are the {{event handlers}} (and their corresponding event handler
+event types) that must be supported, as {{event handler IDL attributes}}, by
+objects implementing the {{DedicatedWorkerGlobalScope}} interface:
+
+<table>
+  <thead>
+    <tr>
+      <th>
+        <span title="event handlers">Event handler</span>
+      </th>
+      <th>
+        <span>Event handler event type</span>
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <dfn id="handler-dedicatedworkerglobalscope-onmessage"
+             title="handler-DedicatedWorkerGlobalScope-onmessage"
+             attribute for="DedicatedWorkerGlobalScope">
+          <code>onmessage</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-message">message</code>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <dfn id="handler-dedicatedworkerglobalscope-onmessageerror"
+             title="handler-DedicatedWorkerGlobalScope-onmessageerror"
+             attribute for="DedicatedWorkerGlobalScope">
+          <code>onmessageerror</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-messageerror">messageerror</code>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+For the purposes of the {{application cache}} networking model, a dedicated
+worker is an extension of the {{cache host}} from which it was created.
+
+### Shared workers and the {{SharedWorkerGlobalScope}} interface ### {#shared-workers}
+
+<pre class="idl">
+[Global=Worker,SharedWorker,Exposed=SharedWorker]
+/*sealed*/ interface SharedWorkerGlobalScope : WorkerGlobalScope {
+  readonly attribute DOMString name;
+
+  readonly attribute ApplicationCache applicationCache;
+  attribute EventHandler onconnect;
+};
+</pre>
+
+A {{SharedWorkerGlobalScope}} object has an associated constructor origin,
+and constructor url. They are initialized when the {{SharedWorkerGlobalScope}}
+object is created, in the run a worker algorithm.
+
+Shared workers receive message ports through {{connect}} events on their
+{{SharedWorkerGlobalScope}} object for each connection.
+
+<dl class="note">
+  <dt><var ignore="">sharedWorkerGlobal</var> . <code>name</code></dt>
+  <dd>
+    Returns sharedWorkerGlobal's {{name}}, i.e. the value given to the
+    {{SharedWorker}} constructor. Multiple {{SharedWorker}} objects can
+    correspond to the same shared worker (and {{SharedWorkerGlobalScope}}),
+    by reusing the same name.
+  </dd>
+</dl>
+
+The {{name}} attribute must return the object's name.
+Its value represents the name that can be used to obtain a reference to the
+worker using the {{SharedWorker}} constructor.
+
+The following are the event handlers (and their corresponding event handler
+event types) that must be supported, as event handler IDL attributes, by
+objects implementing the {{SharedWorkerGlobalScope}} interface:
+
+<table>
+  <thead>
+    <tr>
+      <th>
+        <span title="event handlers">Event handler</span>
+      </th>
+      <th>
+        <span>Event handler event type</span>
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <dfn id="handler-sharedworkerglobalscope-onconnect"
+             title="handler-SharedWorkerGlobalScope-onconnect"
+             attribute for="SharedWorkerGlobalScope">
+          <code>onconnect</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-connect">connect</code>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+For the purposes of the application cache networking model, a shared worker
+is its own cache host. The run a worker algorithm takes care of associating
+the worker with an application cache.
+
+<p class="note">
+The applicationCache attribute returns the {{ApplicationCache}} object for the
+worker.
+</p>
+
+## The event loop ## {#event-loop}
+
+Each {{WorkerGlobalScope}} object has a distinct event loop, separate from
+those used by units of related similar-origin browsing contexts. This event
+loop has no associated browsing context, and its task queues only have events,
+callbacks, and networking activity as tasks. These event loops are created by
+the run a worker algorithm.
+
+Each {{WorkerGlobalScope}} object also has a <dfn>closing</dfn> flag, which
+must initially be false, but which can get set to true by the algorithms in the
+processing model section below.
+
+Once the WorkerGlobalScope's {{closing}} flag is set to true, the event loop's
+task queues must discard any further tasks that would be added to them (tasks
+already on the queue are unaffected except where otherwise specified).
+Effectively, once the {{closing}} flag is true, timers stop firing,
+notifications for all pending asynchronous operations are dropped, etc.
+
+## The worker's lifetime ## {#worker-lifetime}
+
+Workers communicate with other workers and with browsing contexts through
+message channels and their {{MessagePort}} objects.
+
+Each {{WorkerGlobalScope}} <em>worker global scope</em> has a list of
+the worker's ports, which consists of all the {{MessagePort}} objects that
+are entangled with another port and that have one (but only one) port owned
+by worker global scope. This list includes the implicit {{MessagePort}} in
+the case of dedicated workers.
+
+<!-- ??? -->
+
+Each {{WorkerGlobalScope}} also has a list of the worker's workers. Initially
+this list is empty; it is populated when the worker creates or obtains
+further workers.
+
+Finally, each {{WorkerGlobalScope}} also has a list of the worker's Documents.
+Initially this list is empty; it is populated when the worker is created.
+
+Whenever a {{Document}} d is added to the worker's {{Document}}s, the user
+agent must, for each worker q in the list of the worker's workers whose list
+of the worker's  {{Document}}s  does not contain d, add d to q's
+{{WorkerGlobalScope}} owner's list of the worker's {{Document}}s.
+
+<!-- END??? -->
+
+Whenever a {{Document}} object is discarded, it must be removed from the list
+of the worker's {{Document}}s of each worker whose list contains that
+{{Document}}.
+
+Given a {{environment settings object}} o when creating or obtaining a worker,
+the list of relevant {{Document}} objects to add depends on the type of
+global object specified by o's. If o specifies a {{global object}} that is a
+WorkerGlobalScope object (i.e. if we are creating a nested worker), then
+the relevant {{Document}}s are the the worker's  {{Document}}s  of the
+{{global object}} specified by o. Otherwise, o specifies a {{global object}}
+that is a Window object, and the relevant {{Document}} is just the
+{{responsible document}} specified by o.
+
+A worker is said to be a permissible worker if its list of the worker's
+ {{Document}}s is not empty or:
+
+ * its {{owner set}} has been {{empty}} for no more than a short user-agent-defined timeout value,
+ * its {{WorkerGlobalScope}} object is a {{SharedWorkerGlobalScope}} object (i.e., the worker is a shared worker), <b>and</b>
+ * the user agent has a {{browsing context}} whose {{Document}} is not {{completely loaded}}.
+
+<p class="note">
+  The second part of this definition allows a shared worker to survive for
+  a short time while a page is loading, in case that page is going to contact
+  the shared worker again. This can be used by user agents as a way to
+  avoid the cost of restarting a shared worker used by a site when the
+  user is navigating from page to page within that site.
+</p>
+
+A worker is said to be an active needed worker if any of the {{Document}}
+objects in the worker's {{Document}}s are fully active.
+
+A worker is said to be a protected worker if it is an active needed worker
+and either it has outstanding timers, database transactions, or network
+connections, or its list of the worker's ports is not empty, or its
+{{WorkerGlobalScope}} is actually a {{SharedWorkerGlobalScope}} object (i.e.
+the worker is a shared worker).
+
+A worker is said to be a suspendable worker if it is not an active needed
+worker but it is a permissible worker.
+
+## Processing model ## {#processing-model}
+
+When a user agent is to <dfn>run a worker</dfn> for a script with URL url
+and a script settings object settings object, it must run the following steps:
+
+<!-- TODO: Sync procedure -->
+
+ 1. Create a separate parallel execution environment (i.e. a separate thread
+    or process or equivalent construct), and run the rest of these steps
+    asynchronously in that context.
+
+    For the purposes of timing APIs, this is
+    <dfn>the official moment of creation</dfn> of the worker.
+ 2. Let <em>worker global scope</em> be the global object specified by settings object.
+ 3. If <em>worker global scope</em> is actually a {{SharedWorkerGlobalScope}} object
+    (i.e. the worker is a shared worker), and there are any relevant
+    application caches that are identified by a manifest URL with the same
+    origin as url and that have url as one of their entries, not excluding
+    entries marked as foreign, then associate the <em>worker global scope</em> with the
+    most appropriate application cache of those that match.
+ 4. Attempt to fetch the resource identified by url, from the origin specified
+    by settings object, using the responsible document specified by settings
+    object as the referrer source (not the specified API referrer source!),
+    and with the synchronous flag set and the force same-origin flag set.
+
+    If the attempt fails, then for each {{Worker}} or {{SharedWorker}} object
+    associated with <em>worker global scope</em>, queue a task to fire a simple event
+    named error at that object. Abort these steps.
+
+    If the attempt succeeds, then let source be the result of running the
+    UTF-8 decode algorithm on the script resource.
+
+    Let language be JavaScript.
+
+    <p class="note">
+    As with script elements, the MIME type of the script is ignored. Unlike
+    with script elements, there is no way to override the type. It's always
+    assumed to be JavaScript.
+    </p>
+ 5. In the newly created execution environment, create a JavaScript global
+    environment whose global object is <em>worker global scope</em>. If worker global
+    scope is a {{DedicatedWorkerGlobalScope}} object, then this is a dedicated
+    worker environment. Otherwise, <em>worker global scope</em> is a
+    {{SharedWorkerGlobalScope}} object, and this is a shared worker
+    environment. (In either case, by definition, it is a worker environment.)
+ 6. Let script be a new script.
+
+    Obtain the appropriate script execution environment for the scripting
+    language language from settings object.
+
+    Parse/compile/initialise source using that script execution environment,
+    as appropriate for language, and thus obtain a code entry-point. If the
+    script was not compiled successfully, let the code entry-point be a no-op
+    script, and act as if a corresponding uncaught script error had occurred.
+
+    Let script's settings object be settings object.
+ 7. Closing orphan workers: Start monitoring the worker such that no sooner
+    than it stops being a protected worker, and no later than it stops being a
+    permissible worker, <em>worker global scope</em>'s {{closing}} flag is set to true.
+ 8. Suspending workers: Start monitoring the worker, such that whenever worker
+    global scope's {{closing}} flag is false and the worker is a suspendable
+    worker, the user agent suspends execution of script in that worker until
+    such time as either the {{closing}} flag switches to true or the worker stops
+    being a suspendable worker.
+ 9. Jump to the script's code entry-point, and let that run until it either
+    returns, fails to catch an exception, or gets prematurely aborted by the
+    "kill a worker" or "terminate a worker" algorithms defined below.
+ 10. If <em>worker global scope</em> is actually a {{DedicatedWorkerGlobalScope}} object
+     (i.e. the worker is a dedicated worker), then enable the port message
+     queue of the worker's implicit port.
+ 11. Event loop: Run the responsible event loop specified by settings object
+     until it is destroyed.
+     <p class="note">
+     The handling of events or the execution of callbacks by tasks run by the
+     event loop might get prematurely aborted by the "kill a worker" or
+     "terminate a worker" algorithms defined below.
+
+     The worker processing model remains on this step until the event loop
+     is destroyed, which happens after the {{closing}} flag is set to true, as
+     described in the event loop processing model.
+     </p>
+ 12. Empty the <em>worker global scope</em>'s list of active timers.
+ 13. Disentangle all the ports in the list of the worker's ports.
+ 14. Empty the worker's list of the worker's Documents.
+
+When a user agent is to <dfn>terminate a worker</dfn> it must run the
+following steps in parallel with the worker's main loop (the "run a worker"
+processing model defined above):
+
+ 1. Set the worker's {{WorkerGlobalScope}} object's {{closing}} flag to true.
+ 2. If there are any tasks queued in the {{WorkerGlobalScope}} object's event
+    loop's task queues, discard them without processing them.
+ 3. Wait a user-agent-defined amount of time.
+    <!-- TODO: Is this actually needed?-->
+ 4. Abort the script currently running in the worker.
+ 5. If the worker's {{WorkerGlobalScope}} object is actually a
+    {{DedicatedWorkerGlobalScope}} object (i.e. the worker is a dedicated
+    worker), then empty the {{port message queue}} of the port that the
+    worker's implicit port is entangled with.
+
+User agents may invoke the "terminate a worker" processing model on a worker at
+any time, e.g. in response to user requests, in response to CPU quota
+management, or when a worker stops being an active needed worker and the
+worker continues executing even after its {{closing}} flag was set to true.
+
+When a user agent is to terminate a worker it must run the following steps in
+parallel with the worker's main loop (the "run a worker" processing model
+defined above):
+
+ 1. Set the worker's {{WorkerGlobalScope}} object's {{closing}} flag to true.
+ 2. If there are any tasks queued in the {{WorkerGlobalScope}} object's event
+    loop's task queues, discard them without processing them.
+ 3. Abort the script currently running in the worker.
+ 4. If the worker's {{WorkerGlobalScope}} object is actually a
+    {{DedicatedWorkerGlobalScope}} object (i.e. the worker is a dedicated
+    worker), then empty the port message queue of the port that the worker's
+    implicit port is entangled with.
+
+The task source for the tasks mentioned above is the DOM manipulation task
+source.
+
+## Runtime script errors ## {#runtime-script-errors}
+
+Whenever an uncaught runtime script error occurs in one of the worker's
+scripts, if the error did not occur while handling a previous script error,
+the user agent must report the error for that script, with the position (line
+number and column number) where the error occurred, using the
+{{WorkerGlobalScope}} object as the target. [[HTML]]
+
+For shared workers, if the error is still not handled afterwards, the error
+may be reported to the user. [[HTML]]
+
+For dedicated workers, if the error is still not handled afterwards, the user
+agent must queue a task to fire a trusted event that uses the {{ErrorEvent}}
+interface, with the name error, that doesn't bubble and is cancelable, with
+its message, filename, lineno, colno, attributes initialized appropriately,
+and with the error attribute initialized to null, at the {{Worker}} object
+associated with the worker. If the event is not canceled, the user agent must
+act as if the uncaught runtime script error had occurred in the global scope
+that the {{Worker}} object is in, thus repeating the entire runtime script
+error reporting process one level up.
+
+If the implicit port connecting the worker to its {{Worker}} object has been
+disentangled (i.e. if the parent worker has been terminated), then the user
+agent must act as if the {{Worker}} object had no <code>error</code> event
+handler and as if that worker's onerror attribute was null, but must otherwise
+act as described above.
+
+<p class="note">
+Thus, error reports propagate up to the chain of dedicated workers up to the
+original {{Document}}, even if some of the workers along this chain have been
+terminated and garbage collected.
+</p>
+
+The task source for the task mentioned above is the DOM manipulation task
+source.
+
+## Creating workers ## {#creating-workers}
+
+### The {{AbstractWorker}}  abstract interface ### {#abstract-worker-interface}
+
+<pre class="idl">
+[NoInterfaceObject, Exposed=Window,Worker]
+interface AbstractWorker {
+  attribute EventHandler onerror;
+};
+</pre>
+
+The following are the event handlers (and their corresponding event handler
+event types) that must be supported, as event handler IDL attributes, by
+objects implementing the {{AbstractWorker}}  interface:
+
+<table>
+  <thead>
+    <tr>
+      <th>
+        <span title="event handlers">Event handler</span>
+      </th>
+      <th>
+        <span>Event handler event type</span>
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <dfn id="handler-abstractworker-onerror"
+             title="handler-AbstractWorker-onerror"
+             attribute for="AbstractWorker">
+          <code>onerror</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-error">error</code>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+### Script settings for workers ### {#script-settings}
+
+When the user agent is required to set up a worker script settings object,
+given a <em>worker global scope</em> and a URL script address, it must run the
+following steps:
+
+<!-- TODO: Sync procedure -->
+
+ 1. Let <em>inherited responsible browsing context</em>be the responsible browsing
+    context specified by the incumbent settings object.
+ 2. Let <em>inherited responsible document</em> be the responsible document specified
+    by the incumbent settings object.
+ 3. Let inherited origin be the origin specified by the incumbent settings
+    object.
+ 4. Let <em>worker event loop</em> be a newly created event loop.
+ 5. Let settings object be a new script settings object whose algorithms are
+    defined as follows:
+    : The script execution environments
+    :: When the script settings object is created, for each language supported by the user agent, create an appropriate execution environment as defined by the relevant specification.
+    :: When a script execution environment is needed, return the appropriate one from those created when the script settings object was created.
+    :: <p class="note">Currently, workers only support JavaScript, so only a JavaScript execution environment is actually needed here.</p>
+    : The global object
+    :: Return <em>worker global scope</em>.
+    : The responsible browsing context
+    :: Return <em>inherited responsible browsing context</em>.
+    : The responsible document
+    :: Return <em>inherited responsible document</em>.
+    : The responsible event loop
+    :: Return <em>worker event loop</em>.
+    : The API referrer source
+    :: Return <em>script address</em>.
+    : The API URL character encoding
+    :: Return UTF-8.
+    : The API base URL
+    :: Return <em>worker URL</em>.
+    : The origin and effective script origin
+    :: Return <em>inherited origin</em>.
+ 6. Return <em>settings</em> object.
+
+### Dedicated workers and the {{Worker}} interface ### {#dedicated-workers-and-worker-interface}
+
+<pre class="idl">
+[Constructor(DOMString scriptURL), Exposed=Window,Worker]
+interface Worker : EventTarget {
+  void terminate();
+
+  void postMessage(any message, optional sequence&lt;Transferable&gt; transfer);
+  attribute EventHandler onmessage;
+  attribute EventHandler onmessageerror;
+};
+
+dictionary WorkerOptions {
+  WorkerType type = "classic";
+  RequestCredentials credentials = "omit"; // Only used if type is "module"
+  DOMString name = "";
+};
+
+enum WorkerType { "classic", "module" };
+
+Worker implements AbstractWorker ;
+</pre>
+
+<dl class="note">
+  <dt><var>worker</var>" = new "<code>Worker</code>"("<var>scriptURL</var>" [, "<var>options</var>" ])"</dt>
+  <dd>
+    Returns a new {{Worker}} object. scriptURL will be fetched and executed in
+    the background, creating a new global environment for which worker
+    represents the communication channel. options can be used to define the
+    {{name}} of that global environment via the {{name}} option, primarily for
+    debugging purposes. It can also ensure this new global environment
+    supports JavaScript modules (specify type: "module"), and if that is
+    specified, can also be used to specify how scriptURL is fetched
+    through the credentials option.
+  </dd>
+
+  <dt><var>worker</var> . <code>terminate()</code></dt>
+  <dd>
+    Aborts worker's associated global environment.
+  </dd>
+
+  <dt><var>worker</var> . <code>postMessage(message [, transfer])</code></dt>
+  <dd>
+    Clones message and transmits it to worker's global environment. transfer can
+    be passed as a list of objects that are to be transferred rather than cloned.
+  </dd>
+</dl>
+
+The {{terminate()}} method, when invoked, must cause the "terminate a worker"
+algorithm to be run on the worker with which the object is associated.
+
+{{Worker}} objects act as if they had an implicit {{MessagePort}}
+associated with them. This port is part of a channel that is set up when the
+worker is created, but it is not exposed. This object must never be garbage
+collected before the {{Worker}} object.
+
+All messages received by that port must immediately be retargeted at the
+{{Worker}} object.
+
+The {{postMessage()}} method on {{Worker}} objects must act as if, when
+invoked, it {{immediately invoked the method of the same name}} on the port,
+with the same arguments, and returned the same return value.
+
+The {{postMessage()}} method's first argument can be structured data:
+
+<pre class="lang-js example">
+worker.postMessage({opcode: 'activate', device: 1938, parameters: [23, 102]});
+</pre>
+
+The following are the event handlers (and their corresponding event handler
+event types) that must be supported, as event handler IDL attributes, by
+objects implementing the {{Worker}} interface:
+
+<table>
+  <thead>
+    <tr>
+      <th>
+        <span title="event handlers">Event handler</span>
+      </th>
+      <th>
+        <span>Event handler event type</span>
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <dfn id="handler-worker-onmessage"
+             title="handler-Worker-onmessage"
+             attribute for="Worker">
+          <code>onmessage</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-message">message</code>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <dfn id="handler-worker-onmessageerror"
+             title="handler-Worker-onmessageerror"
+             attribute for="Worker">
+          <code>onmessageerror</code>
+        </dfn>
+      </td>
+      <td>
+        <code title="event-messageerror">messageerror</code>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+When the {{Worker(scriptURL)}} constructor is invoked, the user agent must run
+the following steps:
+
+<!-- TODO: Sync procedure -->
+
+ 1. The user agent may throw a SecurityError exception and abort these steps
+    if the request violates a policy decision (e.g. if the user agent is
+    configured to not allow the page to start dedicated workers).
+ 2. Resolve the scriptURL argument relative to the API base URL specified by
+    the entry settings object when the method was invoked.
+ 3. If this fails, throw a {{SyntaxError}} exception and abort these steps.
+ 4. Let worker URL be the resulting absolute URL.
+ 5. If the scheme component of worker URL is not "data", and the origin of
+    worker URL is not the same as the origin specified by the incumbent
+    settings object, then throw a {{SecurityError}} exception and abort these
+    steps.
+    <p class="note">
+    For example, scripts can be external files with the same scheme, host,
+    and port as the original page, or data: URLs, or same-origin blob: URLs.
+    Thus, an https: page couldn't start workers using scripts with http: URLs.
+    [[FILEAPI]].
+    </p>
+ 6. Create a new {{DedicatedWorkerGlobalScope}} object. Let <em>worker global scope</em>
+    be this new object.
+ 7. Set up a worker script settings object with <em>worker global scope</em> and worker
+    URL, and let settings object be the result.
+ 8. Create a new {{Worker}} object, associated with <em>worker global scope</em>. Let
+    worker be this new object.
+ 9. Create a new {{MessagePort}} object whose owner is the incumbent settings
+    object. Let this be the outside port.
+ 10. Associate the outside port with worker.
+ 11. Create a new {{MessagePort}} object whose owner is script settings. Let
+     inside port be this new object.
+ 12. Associate inside port with <em>worker global scope</em>.
+ 13. Entangle outside port and inside port.
+ 14. Return worker, and run the following steps asynchronously.
+ 15. Enable outside port's port message queue.
+ 16. Let docs be the list of relevant {{Document}} objects to add given the
+     incumbent settings object.
+ 17. Add to <em>worker global scope</em>'s list of the worker's  {{Document}}s the
+     {{Document}} objects in docs.
+ 18. If the global object specified by the incumbent settings object is a
+     {{WorkerGlobalScope}} object (i.e. we are creating a nested worker), add
+     <em>worker global scope</em> to the list of the worker's workers of the
+     {{WorkerGlobalScope}} object that is the global object specified by the
+     incumbent settings object.
+ 19. Run a worker for the script with URL worker URL and the script settings
+     object settings object.
+
+### Shared workers and the {{SharedWorker}} interface ### {#shared-workers-and-sharedworker-interface}
+
+<pre class="idl">
+[Constructor(USVString scriptURL, optional (DOMString or WorkerOptions) options), Exposed=Window,Worker]
+interface SharedWorker : EventTarget {
+  readonly attribute MessagePort port;
+};
+SharedWorker implements AbstractWorker ;
+</pre>
+
+<dl class="note">
+  <!-- TODO!!! -->
+  <dt><var>sharedWorker</var>" = new "<code>SharedWorker</code>"("<var>scriptURL</var>" [, "<var ignore="">name</var>" ])"</dt>
+  <dd>
+    Returns a new {{SharedWorker}} object. scriptURL will be fetched and
+    executed in the background, creating a new global environment for which
+    sharedWorker represents the communication channel. {{name}} can be used to
+    define the name of that global environment.
+  </dd>
+
+  <dt><var>sharedWorker</var>" = new "<code>SharedWorker</code>"("<var>scriptURL</var>" [, "<var>options</var>" ])"</dt>
+  <dd>
+    Returns a new {{SharedWorker}} object. scriptURL will be fetched and
+    executed in the background, creating a new global environment for which
+    sharedWorker represents the communication channel. options can be used
+    to define the {{name}} of that global environment via the name option. It
+    can also ensure this new global environment supports JavaScript modules
+    (specify type: "module"), and if that is specified, can also be used to
+    specify how scriptURL is fetched through the credentials option.
+  </dd>
+
+  <dt><var>sharedWorker</var> . <code>port</code></dt>
+  <dd>
+    Returns sharedWorker's {{MessagePort}} object which can be used to
+    communicate with the global environment.
+  </dd>
+</dl>
+
+The {{port}} attribute must return the value it was assigned by the object's
+constructor. It represents the {{MessagePort}} for communicating with the
+shared worker.
+
+When the {{SharedWorker(scriptURL, name)}} constructor is invoked, the user
+agent must run the following steps:
+
+<!-- TODO: Sync procedure -->
+
+ 1. The user agent may throw a SecurityError exception and abort these steps
+    if the request violates a policy decision (e.g. if the user agent is
+    configured to not allow the page to start shared workers).
+ 2. Resolve the {{scriptURL}} argument.
+ 3. If this fails, throw a {{SyntaxError}} exception and abort these steps.
+ 4. Let scriptURL be the resulting absolute URL and parsed {{scriptURL}} be the
+    resulting parsed URL.
+ 5. Let name be the value of the second argument, or the empty string if the
+    second argument was omitted.
+ 6. If the scheme component of parsed {{scriptURL}} is not "data", and the
+    origin of scriptURL is not the same as the origin specified by the
+    incumbent settings object, then throw a {{SecurityError}} exception and
+    abort these steps.
+    <p class="note">
+    Thus, scripts must either be external files with the same scheme, host,
+    and port as the original page, or data: URLs. For example, an https: page
+    couldn't start workers using scripts with http: URLs.
+    </p>
+ 7. Let docs be the list of relevant {{Document}} objects to add given the
+    incumbent settings object.
+ 8. Execute the following substeps atomically:
+    <!-- There is a method to my madness. Trust me. -->
+    <ol>
+    <li>
+    Create a new {{SharedWorker}} object, which will shortly be associated with
+    a {{SharedWorkerGlobalScope}} object. Let this {{SharedWorker}} object be
+    worker.
+    </li>
+    <li>
+    Create a new {{MessagePort}} object whose owner is the incumbent settings
+    object. Let this be the outside port.
+    </li>
+    <li>
+    Assign outside port to the port attribute of worker.
+    </li>
+    <li>
+    Let <em>worker global scope</em> be null.
+    </li>
+    <li>
+    If name is not the empty string and there exists a
+    {{SharedWorkerGlobalScope}} object whose {{closing}} flag is false, whose
+    name attribute is exactly equal to name, and that is the global object
+    specified by a script settings object that specifies as its origin the same
+    origin as the origin of {{scriptURL}}, then let <em>worker global scope</em> be that
+    {{SharedWorkerGlobalScope}} object.
+
+    Otherwise, if name is the empty string and there exists a
+    {{SharedWorkerGlobalScope}} object whose {{closing}} flag is false, whose
+    name attribute is the empty string, and whose location attribute represents
+    an absolute URL that is exactly equal to {{scriptURL}}, then let worker
+    global scope be that {{SharedWorkerGlobalScope}} object.
+    </li>
+    <li>
+    If <em>worker global scope</em> is not null, but the user agent has been configured
+    to disallow communication between the worker represented by the worker
+    global scope and the scripts whose settings objects are the incumbent
+    settings object, then set <em>worker global scope</em> to null.
+
+    <p class="note">
+    For example, a user agent could have a development mode that isolates a
+    particular top-level browsing context from all other pages, and scripts in
+    that development mode could be blocked from connecting to shared workers
+    running in the normal browser mode.
+    </p>
+    </li>
+    <li>
+    If <em>worker global scope</em> is not null, then run these steps:
+    <ol>
+    <li>
+    If <em>worker global scope</em>'s location attribute represents an absolute
+    URL that is not exactly equal to {{scriptURL}}, then throw a
+    {{URLMismatchError}} exception and abort all these steps.
+    </li>
+    <li>
+    Associate worker with <em>worker global scope</em>.
+    </li>
+    <li>
+    Let settings object be the script settings object whose global object
+    is <em>worker global scope</em>.
+    </li>
+    <li>
+    Create a new {{MessagePort}} object whose owner is settings object. Let
+    this be the inside port.
+    </li>
+    <li>
+    Entangle outside port and inside port.
+    </li>
+    <li>
+    Create a trusted event that uses the {{MessageEvent}} interface, with the
+    name connect, which does not bubble, is not cancelable, has no default
+    action, has a {{data}} attribute whose value is initialized to the empty
+    string, has a ports attribute whose value is initialized to a read only
+    array containing only the newly created port, and has a source attribute
+    whose value is initialized to the newly created port, and queue a task to
+    dispatch the event at <em>worker global scope</em>.
+    </li>
+    <li>
+    Add to <em>worker global scope</em>'s list of the worker's  {{Document}}s  the
+    {{Document}} objects in docs.
+    </li>
+    <li>
+    If the global object specified by the incumbent settings object is a
+    {{WorkerGlobalScope}} object, add <em>worker global scope</em> to the list of the
+    worker's workers of the {{WorkerGlobalScope}} object that is the global
+    object specified by the incumbent settings object.
+    </li>
+    <li>
+    Return worker and abort all these steps.
+    </li>
+    </ol>
+    <li>
+    Create a new {{SharedWorkerGlobalScope}} object. Let <em>worker global scope</em> be
+    this new object.
+    </li>
+    <li>
+    Set up a worker script settings object with <em>worker global scope</em> and
+    {{scriptURL}}, and let settings object be the result.
+    </li>
+    <li>
+    Associate worker with <em>worker global scope</em>.
+    </li>
+    <li>
+    Set the name attribute of <em>worker global scope</em> to name.
+    </li>
+    <li>
+    Create a new {{MessagePort}} object whose owner is settings object. Let
+    inside port be this new object.
+    </li>
+    <li>
+    Entangle outside port and inside port.
+    </li>
+ 9. Return worker and perform the remaining steps asynchronously.
+ 10. Create a trusted event that uses the {{MessageEvent}} interface, with the
+     name connect, which does not bubble, is not cancelable, has no default
+     action, has a {{data}} attribute whose value is initialized to the empty
+     string, has a ports attribute whose value is initialized to a read only
+     array containing only the newly created port, and has a source attribute
+     whose value is initialized to the newly created port, and queue a task to
+     dispatch the event at <em>worker global scope</em>.
+ 11. Add to <em>worker global scope</em>'s list of the worker's {{Document}}s the
+     {{Document}} objects in docs.
+ 12. If the global object specified by the incumbent settings object is a
+     {{WorkerGlobalScope}} object, add <em>worker global scope</em> to the list of the
+     worker's workers of the {{WorkerGlobalScope}} object that is the global
+     object specified by the incumbent settings object.
+ 13. Run a worker for the script with URL {{scriptURL}} and the script settings
+     object settings object.
+
+The task source for the tasks mentioned above is the DOM manipulation task
+source.
+
+## Concurrent hardware capabilities ## {#concurrency}
+
+<!-- ???: 18,446,744,073,709,551,614 CPUs cores should be enough for everyone.
+     Curious - does the planet earth even have this many CPU cores? -->
+
+<pre class="idl">
+[NoInterfaceObject, Exposed=(Window,Worker)]
+interface NavigatorConcurrentHardware {
+  readonly attribute unsigned long long hardwareConcurrency;
+};
+</pre>
+
+<dl class="note">
+  <dt><var ignore="">self</var> . <code>navigator</code> . <code>hardwareConcurrency</code></dt>
+  <dd>
+    Returns the number of logical processors potentially available to the user agent.
+  </dd>
+</dl>
+
+The {{navigator.hardwareConcurrency}} attribute's getter must return a number
+between 1 and the number of logical processors potentially available to the
+user agent. If this cannot be determined, the getter must return 1.
+
+User agents should err toward exposing the number of logical processors
+available, using lower values only in cases where there are user-agent
+specific limits in place (such as a limitation on the number of workers
+that can be created) or when the user agent desires to limit fingerprinting
+possibilities.
+
+## Importing scripts and libraries ## {#importing}
+
+When a script invokes the {{importScripts(urls)}} method on a
+{{WorkerGlobalScope}} object, the user agent must run the following steps:
+
+<!-- TODO: Sync procedure -->
+
+ 1. If there are no arguments, return without doing anything. Abort these steps.
+ 2. Let settings object be the incumbent settings object.
+ 3. Resolve each argument.
+ 4. If any fail, throw a {{SyntaxError}} exception and abort these steps.
+ 5. Attempt to fetch each resource identified by the resulting absolute URLs,
+    from the origin specified by settings object, using the API referrer source
+    specified by settings object, and with the synchronous flag set.
+ 6. For each argument in turn, in the order given, starting with the first one,
+    run these substeps:
+    <ol>
+    <li>
+    Wait for the fetching attempt for the corresponding resource to complete.
+
+    If the fetching attempt failed, throw a {{NetworkError}} exception and
+    abort all these steps.
+
+    If the attempt succeeds, then let source be the result of running the
+    UTF-8 decode algorithm on the script resource.
+
+    Let language be JavaScript.
+
+    <p class="note">
+    As with the worker's script, the script here is always assumed to be
+    JavaScript, regardless of the MIME type.
+    </p>
+    </li>
+    <li>
+    Create a script using source as the script source, the URL from which
+    source was obtained, language as the scripting language, and settings
+    object as the script settings object.
+
+    If the script came from a resource whose URL does not have the same origin
+    as the origin specified by the incumbent settings object, then pass the
+    muted errors flag to the create a script algorithm as well.
+
+    Let the newly created script run until it either returns, fails to parse,
+    fails to catch an exception, or gets prematurely aborted by the "kill a
+    worker" or "terminate a worker" algorithms defined above.
+
+    If it failed to parse, then throw an ECMAScript SyntaxError exception and
+    abort all these steps. [[ECMA-262]]
+
+    If an exception was thrown or if the script was prematurely aborted, then
+    abort all these steps, letting the exception or aborting continue to be
+    processed by the calling script.
+    </li>
+    </ol>
+
+If the "kill a worker" or "terminate a worker" algorithms abort the script
+then abort all these steps.
+
+## The WorkerNavigator object ## {#workernavigator-object}
+
+The {{navigator}} attribute of the {{WorkerGlobalScope}} interface must
+return an instance of the {{WorkerNavigator}} interface, which represents the
+identity and state of the user agent (the client):
+
+<pre class="idl">
+[Exposed=Worker]
+interface WorkerNavigator {};
+WorkerNavigator implements NavigatorID;
+WorkerNavigator implements NavigatorLanguage;
+WorkerNavigator implements NavigatorOnLine;
+WorkerNavigator implements NavigatorConcurrentHardware;
+</pre>
+
+## {{WorkerLocation}} interface ## {#worker-locations}
+
+<pre class="idl">
+[Exposed=Worker]
+interface WorkerLocation {
+  stringifier readonly attribute USVString href;
+  readonly attribute USVString origin;
+  readonly attribute USVString protocol;
+  readonly attribute USVString host;
+  readonly attribute USVString hostname;
+  readonly attribute USVString port;
+  readonly attribute USVString pathname;
+  readonly attribute USVString search;
+  readonly attribute USVString hash;
+};
+</pre>
+
+A {{WorkerLocation}} object has an associated {{WorkerGlobalScope}} object
+(a {{WorkerGlobalScope}} object).
+
+The {{href}} attribute's getter must return the associated {{WorkerGlobalScope}}
+object's {{url}}, {{serialized}}.
+
+The {{origin}} attribute's getter must return the serialization of the
+associated {{WorkerGlobalScope}} object's {{url}}'s {{origin}}.
+
+The {{protocol}} attribute's getter must run return the associated
+{{WorkerGlobalScope}} object's {{url}}'s {{scheme}}, followed by ":".
+
+The {{host}} attribute's getter must run these steps:
+
+ 1. Let url be the associated {{WorkerGlobalScope}} object's url.
+ 2. If url's {{host}} is null, return the empty string.
+ 3. If url's {{port}} is null, return url's {{host}}, {{serialized}}.
+ 4. Return url's {{host}}, {{serialized}}, followed by ":" and url's {{port}},
+    {{serialized}}.
+
+The {{hostname}} attribute's getter must run these steps:
+
+ 1. Let host be the associated {{WorkerGlobalScope}} object's {{url}}'s {{host}}.
+ 2. If host is null, return the empty string.
+ 3. Return host, {{serialized}}.
+
+The {{port}} attribute's getter must run these steps:
+
+ 1. Let port be the associated {{WorkerGlobalScope}} object's {{url}}'s {{port}}.
+ 2. If port is null, return the empty string.
+ 3. Return port, {{serialized}}.
+
+The {{pathname}} attribute's getter must run these steps:
+
+ 1. Let url be the associated {{WorkerGlobalScope}} object's {{url}}.
+ 2. If url's {{cannot-be-a-base-URL}} flag is set, return the first string in url's {{path}}.
+ 3. Return "/", followed by the strings in url's {{path}} (including empty strings), separated from each other by "/".
+
+The {{search}} attribute's getter must run these steps:
+
+ 1. Let query be the associated {{WorkerGlobalScope}} object's {{url}}'s {{query}}.
+ 2. If query is either null or the empty string, return the empty string.
+ 3. Return "?", followed by query.
+
+The hash attribute's getter must run these steps:
+
+ 1. Let fragment be the associated {{WorkerGlobalScope}} object's {{url}}'s {{fragment}}.
+ 2. If fragment is either null or the empty string, return the empty string.
+ 3. Return "#", followed by fragment.
+
+## Security Considerations ## {#security-considerations}
+
+There are no known security implications directly related to this standard as
+of today.
+
+## Privacy Considerations ## {#privacy-considerations}
+
+The {{NavigatorConcurrentHardware}} mechanism can be used to fingerprint
+users. User agents may choose to provide a mechanism to not disclose this
+information by having the getter return 1.
+
+Additionally, user agents may choose to disclose this information in private
+browsing mode by having the getter return 1.
+
+<section>
+  <h2 class="no-num" id="acknowledgements">Acknowledgements</h2>
+  For inestimable work, and the drive to keep HTML up to date, particular
+  thanks are due to Ian Hickson, and the other editors of the WHATWG:
+  Anne van Kesteren, Domenic Denicola, Philip Jägenstedt, Simon Pieters.
+
+  Thanks to Aaron Boodman, Алексей Проскуряков (Alexey Proskuryakov),
+  Ben Turner, Dmitry Titov, Drew Wilson, Jeremy Orlow, Jonas Sicking,
+  Justin James, Kevin Hakanson, Maciej Stachowiak, Michael Nordman,
+  Mike Smith, and Philip Taylor for their useful and substantial comments.
+
+  Huge thanks to the whole Gears team, who pioneered this technology and whose
+  experience has been a huge influence on this specification.
+</section>

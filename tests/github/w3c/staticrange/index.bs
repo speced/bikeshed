@@ -1,0 +1,217 @@
+<h1>Static Range</h1>
+
+<pre class="metadata">
+Shortname: staticrange
+Level:
+Group: webplatform
+Status: ED
+TR: http://www.w3.org/TR/staticrange/
+ED: https://w3c.github.io/staticrange/
+Repository: w3c/staticrange
+Previous Version:
+	<none>
+Editor: Gary Kacmarcik, Google, garykac@google.com
+!Tests: <a href=https://github.com/w3c/web-platform-tests/tree/master/staticrange>web-platform-tests staticrange/</a>
+
+Abstract:
+	This specification defines a lightweight StaticRange that can be used in
+	place of a {{Range}} when the complexity of a full {{Range}} is not
+	necessary.
+	
+Status Text:
+	This document is an editor's draft proposed as a First Public Working Draft. It has been developed
+	in the editing task force of the Web platform working group.
+	
+</pre>
+
+<pre class="anchors">
+urlPrefix: https://dom.spec.whatwg.org/#concept-; type: dfn;
+	text: node length
+	text: tree preceding
+	text: tree ancestor
+</pre>
+
+<h2 id="introduction">Introduction</h2>
+
+	DOM4 defines a {{Range}} object (originally from DOM2 Traversal/Range) which
+	can be used to represent a sequence of content in the DOM tree. A {{Range}}
+	consists of a start boundary (a node and an offset) and an end boundary
+	(also a node and an offset). A key benefit of using a {{Range}} is that once
+	it is created, it will maintain the integrity of the range as best it can
+	even in the face of DOM mutations.
+
+	A problem with {{Range}} is that whenever a DOM mutation occurs, all of the
+	active {{Range}} objects affected by the mutation need to be updated. This
+	can be an expensive operation, especially if there are a large number of
+	active {{Range}} objects. This cost may be acceptable if all of these
+	{{Range}} objects are actually needed by the application, but {{Range}} is
+	used whenever we need to record start- and end-positions. Because of this,
+	many of the {{Range}} objects that are created are not actually used by the
+	application, and many of the {{Range}} objects that are being used don’t
+	actually need their range start and end to be resilient to DOM mutations.
+
+	This problem is exacerbated when an application caches an object that
+	happens to contain a {{Range}} along with other data that the application
+	needs. As long as this object is active, the {{Range}} will be active and it
+	will need to be updated for every DOM mutation. In this manner, an
+	application can end up with many active {{Range}} objects even if none of
+	them are being used.
+
+	A StaticRange is a simple, lightweight range that contains only a start and
+	an end boundary (node + offset) and does not update when the DOM is mutated.
+
+<h3 id="interface-staticrange">Interface StaticRange</h3>
+
+	The {{StaticRange}} interface provides readonly attributes that track the start
+	and end position of the range, and a readonly boolean attribute that
+	indicates whether or not the current range is collapsed to a single
+	position (where the start equals the end position).
+
+	<pre class="idl" data-highlight="webidl">
+	dictionary StaticRangeInit {
+		required Node startContainer;
+		required unsigned long startOffset;
+		required Node endContainer;
+		required unsigned long endOffset;
+	};
+
+	[Constructor(StaticRangeInit initDict),
+		Exposed=Window]
+	interface StaticRange {
+		attribute Node startContainer;
+		attribute unsigned long startOffset;
+		
+		attribute Node endContainer;
+		attribute unsigned long endOffset;
+		
+		readonly attribute boolean collapsed;
+
+		[NewObject] Range toRange();
+	};
+	</pre>
+
+	: <dfn for="StaticRange">startContainer</dfn>
+	:: The start {{Node}} for the range.
+
+	: <dfn for="StaticRange">startOffset</dfn>
+	:: The offset into the start node identifying the [=start position=] for the range.
+
+	: <dfn for="StaticRange">endContainer</dfn>
+	:: The end {{Node}} for the range.
+
+	: <dfn for="StaticRange">endOffset</dfn>
+	:: The offset into the start node identifying the [=end position=] for the range.
+
+	: <dfn for="StaticRange">collapsed</dfn>
+	:: True if the range's [=start position=] and [=end position=] are the same, as
+		determined by executing [=is collapsed=].
+
+
+<h2 id="algorithms">Algorithms</h3>
+
+	A {{StaticRange}} <dfn for="StaticRange">position</dfn> is the combination of a
+	{{Node}} <dfn for="StaticRange">position node</dfn> and an unsigned long
+	<dfn for="StaticRange">position offset</dfn> into that node. The [=position offset=]
+	is the offset from the start of the [=position node=] to the desired position.
+	
+	The <dfn for="StaticRange">start position</dfn> of a {{StaticRange}} |r| is the
+	[=position=] defined by |r|'s [=startContainer=] and [=startOffset=].
+	
+	The <dfn for="StaticRange">end position</dfn> of a {{StaticRange}} |r| is the
+	[=position=] defined by |r|'s [=endContainer=] and [=endOffset=].
+
+	<div class="algorithm" data-algorithm="position-is-less-than">
+	<h3 id="to-position-is-less-than">a [=position=] |p1| <dfn for="StaticRange/position">is less than</dfn> another [=position=] |p2|</h3>
+
+		: Input
+		:: |p1|, a {{StaticRange}} [=position=]
+		:: |p2|, a {{StaticRange}} [=position=]
+	
+		: Output
+		:: Boolean
+		
+		1. If |p1|'s [=position node=] [=tree preceding|precedes=] |p2|'s [=position node=] in the DOM tree, return True.
+
+		1. If |p1|'s [=position node=] is the same as |p2|'s [=position node=], 
+			1. If |p1|'s [=position offset=] is less than |p2|'s [=position offset=], return True.
+			1. Else, return False.
+		
+		1. Return False.
+	</div>
+
+	<div class="algorithm" data-algorithm="position-is-equal-to">
+	<h3 id="to-position-is-equal-to">a [=position=] |p1| <dfn for="StaticRange/position">is equal to</dfn> another [=position=] |p2|</h3>
+
+		: Input
+		:: |p1|, a {{StaticRange}} [=position=]
+		:: |p2|, a {{StaticRange}} [=position=]
+	
+		: Output
+		:: Boolean
+		
+		1. If |p1|'s [=position node=] is the same as |p2|'s [=position node=], 
+			1. If |p1|'s [=position offset=] is equal to |p2|'s [=position offset=],
+				1. Return True.
+
+		1. Return False.
+	</div>
+
+	<div class="algorithm" data-algorithm="is-collapsed">
+	<h3 id="to-is-collapsed">a {{StaticRange}} <dfn for="StaticRange">is collapsed</dfn></h3>
+
+		: Input
+		:: |sr|, a {{StaticRange}}
+
+		: Output
+		:: Boolean
+
+		1. If |sr|'s [=start position=] [=StaticRange/position/is equal to=] |sr|'s [=end position=],
+			1. Return True
+
+		1. Return False
+	</div>
+
+	<div class="algorithm" data-algorithm="is-valid">
+	<h3 id="to-is-valid">a {{StaticRange}} <dfn for="StaticRange">is valid</dfn></h3>
+
+		: Input
+		:: |sr|, a {{StaticRange}} to be validated
+		
+		: Output
+		:: Boolean
+
+		1. If |sr|'s [=startContainer=] and [=endContainer=] do not share the same [=tree ancestor|ancestor=],
+			1. Return False
+		
+		1. If |sr|'s [=end position=] [=StaticRange/position/is less than=] |sr|'s [=start position=],
+			1. Return False
+
+		1. If |sr|'s [=startOffset=] is greater than the [=node length=] of the [=startContainer=],
+			1. Return False
+
+		1. If |sr|'s [=endOffset=] is greater than the [=node length=] of the [=endContainer=],
+			1. Return False
+			
+		1. Return True
+	</div>
+
+
+<h2 id="acknowledgements-contributors">Acknowledgements</h2>
+
+	Thanks to the following people for the discussions that lead to the creation
+	of this proposal:
+
+	Enrica Casucci (Apple),
+	Bo Cupp (Microsoft),
+	Emil Eklund (Google),
+	Wenson Hsieh (Apple),
+	Gary Kacmarcik (Google),
+	Ian Kilpatrick (Google),
+	Grisha Lyukshin (Microsoft),
+	Miles Maxfield (Apple),
+	Ryosuke Niwa (Apple),
+	Olli Pettay (Mozilla),
+	Dave Tapuska (Google),
+	Ojan Vafai (Google),
+	Johannes Wilm (Fidus),
+	Chong Zhang (Gooogle)

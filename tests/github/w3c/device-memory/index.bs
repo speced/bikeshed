@@ -1,0 +1,105 @@
+<pre class='metadata'>
+Title: Device Memory
+Shortname: device-memory
+Level: 1
+URL: https://w3c.github.io/device-memory/
+Group: webperf
+Status: ED
+TR: https://www.w3.org/TR/device-memory/
+Editor: Shubhie Panicker, Google https://google.com, panicker@google.com
+Repository: w3c/device-memory
+Abstract: This document defines a HTTP Client Hint header to surface device capability for memory i.e. device RAM, in order to enable web apps to customize content depending on device memory constraints.
+Default Highlight: js
+</pre>
+ 
+Introduction {#intro}
+=====================
+Developers need device-class signal for:
+1. Serving light version of the site or specific components, for low-end devices. Egs:
+    * Serve Google "search lite" - a 10KB search results page used in EM.
+    * Serve a light version of video player in Facebook.
+    * Serve lightweight tile images in Google Maps.
+
+2. Normalizing Metrics: analytics need to be able to normalize their metrics against the device-class. For instance, a 100ms long task on a high end device is a more severe issue compared to a low-end device.
+
+Device memory is an especially useful signal for determining “device-class”. Low memory devices devices (under 512MB, 512MB - 1GB) are widely used in emerging markets.
+
+Usage Example {#example}
+------------------------
+A server advertises support for `Device-Memory` client hint using the `Accept-CH` header field, or an equivalent HTML meta element with http-equiv attribute. Optionally, the server can also express a preference for the user agent to persist the opt-in, by using the `Accept-CH-Lifetime` header to communicate the amount of time to remember the opt-in:
+<pre class="highlight">
+    Accept-CH: Device-Memory
+    Accept-CH-Lifetime: 86400
+</pre>
+
+In turn, on receiving the above preferences from the server, a compatible user agent would then advertise the device capability for memory, via the `Device-Memory` request header field:
+<pre class="highlight">
+    GET /example HTTP/1.1
+    Device-Memory: 0.5
+    ...
+</pre>
+
+Device Memory (Client Hint) Header Field {#sec-device-memory-client-hint-header}
+=======================================
+
+The Device Memory header field is a number that indicates the client’s device memory i.e. approximate amount of ram in GiB. The ABNF (Augmented Backus-Naur Form) syntax for the `Device-Memory` header field is as follows:
+
+<pre class="highlight">
+  Device-Memory         = "Device-Memory" ":" #memory-value
+  memory-value   = 1*DIGIT [ "." 1*DIGIT ]
+</pre>
+
+<h3 dfn>Computing Device Memory Value</h3>
+The value is calculated by using the actual device memory in MiB then rounding it to the nearest number where only the most signicant bit can be set and the rest are zeros (nearest power of two). Then dividng that number by 1024.0 to get the value in GiB.
+
+An upper bound and a lower bound should be set on the list of values.
+
+    NOTE: While implementations may choose different values, the recommended upper bound is 8GiB and the recommended lower bound is 0.25GiB (or 256MiB).
+
+If Device-Memory header field occurs in a message more than once, the last value overrides all previous occurrences.
+
+
+<h3 dfn>Examples</h3>
+
+512 MiB will be reported as:
+<pre class="highlight">
+    Device-Memory: 0.5
+</pre>
+
+1000 MiB will be reported as:
+<pre class="highlight">
+    Device-Memory: 1
+</pre>
+
+A full list of possible values is as follows: 0.25, 0.5, 1, 2, 4, 8
+
+
+
+Device Memory JS API {#sec-device-memory-js-api}
+=======================================
+<pre class="idl">
+[
+    NoInterfaceObject,
+    SecureContext,
+    Exposed=(Window,Worker)
+] interface NavigatorDeviceClass {
+    readonly attribute double deviceMemory;
+};
+</pre>
+
+    NOTE: self.navigator.deviceMemory Returns the amount of ram in GiB as described in [[#computing-device-memory-value]]
+
+Security Considerations {#sec-security-considerations}
+=======================================
+Device-Memory Client Hint header and JS API will only be available to HTTPS secure contexts.  
+
+Device identification and classification (e.g. device type and class) based on advertised User-Agent, and other characteristics of the client, are commonly used to select and provide optimized content. Such solutions frequently rely on commercial device databases, which are costly, hard to integrate, and hard to maintain. This specification defines a mechanism to obtain device memory capability that addresses these technical challenges.
+
+To reduce fingerprinting risk, reported value is rounded to single most significant bit, as opposed to reporting the exact value. In addition, an upper and lower bound is placed on the reported values.
+
+<!-- ============================================================ -->
+<h2 id=acknowledgements>Acknowledgements</h2>
+<!-- ============================================================ -->
+
+Special thanks to <a href="https://github.com/w3c/device-memory/graphs/contributors">all the contributors</a> for their technical input and suggestions that led to improvements to this
+specification.
