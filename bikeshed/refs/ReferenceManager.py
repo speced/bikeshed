@@ -205,7 +205,7 @@ class ReferenceManager(object):
                     if match:
                         dfnFor.add(match.group(1).strip())
                 # convert back into a list now, for easier JSONing
-                dfnFor = list(dfnFor)
+                dfnFor = sorted(dfnFor)
                 ref = {
                     "type":linkType,
                     "status":"local",
