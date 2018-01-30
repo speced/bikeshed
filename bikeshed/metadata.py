@@ -58,6 +58,7 @@ class MetadataManager:
         self.defaultRefStatus = None
         self.editors = []
         self.editorTerm = {"singular": "Editor", "plural": "Editors"}
+        self.favicon = None
         self.group = None
         self.h1 = None
         self.ignoreCanIUseUrlFailure = []
@@ -907,6 +908,7 @@ knownKeys = {
     "ED": Metadata("ED", "ED", joinValue, parseLiteral),
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),
+    "Favicon": Metadata("Favicon", "favicon", joinValue, parseLiteral),
     "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),
     "Group": Metadata("Group", "group", joinValue, parseLiteral),
     "H1": Metadata("H1", "h1", joinValue, parseLiteral),

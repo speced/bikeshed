@@ -26,6 +26,12 @@ def addCanonicalURL(doc):
         appendChild(doc.head,
                     E.link({"rel": "canonical", "href": doc.md.canonicalURL}))
 
+def addFavicon(doc):
+    # Adds a <link rel=icon> to the configured favicon url
+    if doc.md.favicon:
+        appendChild(doc.head,
+                    E.link({"rel": "icon", "href": doc.md.favicon}))
+
 
 def addSpecVersion(doc):
     # Adds a <meta> with the current spec revision, if one was detected
