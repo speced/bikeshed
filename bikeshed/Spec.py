@@ -301,6 +301,8 @@ class Spec(object):
         else:
             server = None
 
+        mdCommandLine = self.mdCommandLine
+
         try:
             lastInputModified = os.stat(self.inputSource).st_mtime
             self.preprocess()
@@ -315,6 +317,7 @@ class Spec(object):
                         formattedTime = datetime.fromtimestamp(inputModified).strftime("%H:%M:%S")
                         p("Source file modified at {0}. Rebuilding...".format(formattedTime))
                         self.initializeState()
+                        self.mdCommandLine = mdCommandLine
                         self.preprocess()
                         self.finish(outputFilename)
                         p("==============DONE==============")
