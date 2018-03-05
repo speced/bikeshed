@@ -234,22 +234,31 @@ def transformProductionGrammars(doc):
 
 
 
-biblioRe = re.compile(r"(\\)?\[\[(!)?([\w.+-]+)((?: +current)|(?: +snapshot))?\]\]")
+biblioRe = re.compile(r"""
+                        (\\)?
+                        \[\[
+                        (!)?
+                        ([\w.+-]+)
+                        (?:\s+(current|snapshot))?
+                        (?:\|([^\]]+))?
+                        \]\]""", re.X)
 def biblioReplacer(match):
     # Allow escaping things that aren't actually biblio links, by preceding with a \
-    escape, bang, term, status = match.groups()
+    escape, bang, term, status, linkText = match.groups()
     if escape:
         return match.group(0)[1:]
     if bang == "!":
         type = "normative"
     else:
         type = "informative"
+    if linkText is None:
+        linkText = term
     attrs = {"data-lt":term, "data-link-type":"biblio", "data-biblio-type":type, "bs-autolink-syntax":match.group(0)}
     if status is not None:
         attrs['data-biblio-status'] = status.strip()
     return E.a(attrs,
                "[",
-               term,
+               linkText,
                "]")
 
 sectionRe = re.compile(r"""
@@ -260,7 +269,7 @@ sectionRe = re.compile(r"""
                             ((?:\/[\w-]*)?(?:\#[\w-]+)) |
                             (\/[\w-]+)
                         )
-                        (\|[^\]]+)?
+                        (?:\|([^\]]+))?
                         \]\]""", re.X)
 def sectionReplacer(match):
     escape, spec, section, justPage, linkText = match.groups()
@@ -269,7 +278,7 @@ def sectionReplacer(match):
     if linkText is None:
         linkText = ""
     else:
-        linkText = linkText[1:]
+        linkText = linkText
     if spec is None:
         # local section link
         return E.a({"section":"", "href":section, "bs-autolink-syntax":match.group(0)}, linkText)
