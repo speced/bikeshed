@@ -31,6 +31,7 @@ def update(path, dryRun=False):
             except Exception, e:
                 die("Couldn't save biblio database to disk.\n{0}", e)
                 return
+
         # Save the list of all names to a file
         reducedNames = []
         for name in allNames:
@@ -61,6 +62,14 @@ def update(path, dryRun=False):
         except Exception, e:
             die("Couldn't save biblio database to disk.\n{0}", e)
             return
+
+        # Collect all the number-suffix names which also exist un-numbered
+        numberedNames = collectNumberedNames(reducedNames)
+        try:
+            with io.open(os.path.join(path, "biblio-numeric-suffixes.json"), 'w', encoding="utf-8") as fh:
+                fh.write(unicode(json.dumps(numberedNames, indent=0, ensure_ascii=False, sort_keys=True)))
+        except Exception, e:
+            die("Couldn't save biblio numeric-suffix information to disk.\n{0}", e)
     say("Success!")
 
 
@@ -163,3 +172,23 @@ def writeBiblioFile(fh, biblios):
             die("The biblio key '{0}' has an unknown biblio type '{1}'.", key, format)
             continue
         fh.write("-" + "\n")
+
+def collectNumberedNames(names):
+    '''
+    Collects the set of names that have numeric suffixes
+    (excluding ones that look like dates)
+    for better error-correction.
+    '''
+
+    names = set(names)
+    prefixes = defaultdict(list)
+    for name in names:
+        # Ignoring 4+ digits, as they're probably years or isodates.
+        match = re.match(r"(.+\D)\d{1,3}$", name)
+        if match:
+            prefix = match.group(1)
+            if prefix.endswith("-"):
+                prefix = prefix[:-1]
+            if prefix in names:
+                prefixes[prefix].append(name)
+    return prefixes

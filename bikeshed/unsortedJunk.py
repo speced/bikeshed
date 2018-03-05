@@ -625,7 +625,7 @@ def processBiblioLinks(doc):
 
         okayToFail = el.get('data-okay-to-fail') is not None
 
-        ref = doc.refs.getBiblioRef(linkText, status=refStatus, generateFakeRef=okayToFail, silentAliases=okayToFail, el=el)
+        ref = doc.refs.getBiblioRef(linkText, status=refStatus, generateFakeRef=okayToFail, quiet=okayToFail, el=el)
         if not ref:
             if not okayToFail:
                 closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)
@@ -717,7 +717,7 @@ def processAutolinks(doc):
                 biblioStorage = doc.normativeRefs
             else:
                 biblioStorage = doc.informativeRefs
-            biblioRef = doc.refs.getBiblioRef(ref.spec, status=doc.md.defaultRefStatus, generateFakeRef=True, silentAliases=True)
+            biblioRef = doc.refs.getBiblioRef(ref.spec, status=doc.md.defaultRefStatus, generateFakeRef=True, quiet=True)
             if biblioRef:
                 biblioStorage[biblioRef.linkText] = biblioRef
                 spec = biblioRef.linkText.lower()

@@ -18,7 +18,7 @@ from ..htmlhelpers import *
 class ReferenceManager(object):
 
     __slots__ = ["specs", "defaultSpecs", "ignoredSpecs", "replacedSpecs", "biblios", "loadedBiblioGroups",
-        "biblioKeys", "preferredBiblioNames", "headings", "defaultStatus", "localRefs", "anchorBlockRefs", "foreignRefs",
+        "biblioKeys", "biblioNumericSuffixes", "preferredBiblioNames", "headings", "defaultStatus", "localRefs", "anchorBlockRefs", "foreignRefs",
         "shortname", "specLevel", "spec"]
 
     def __init__(self, defaultStatus=None):
@@ -43,6 +43,9 @@ class ReferenceManager(object):
         # (Excludes dated versions, and all huge "foo\d+" groups that can't usefully correct typos.)
         self.biblioKeys = set()
 
+        # Dict of {suffixless key => [keys with numeric suffixes]}
+        # (So you can tell when it's appropriate to default a numeric-suffix ref to a suffixless one.)
+        self.biblioNumericSuffixes = dict()
 
         # Dict of {base key name => preferred display name}
         self.preferredBiblioNames = dict()
@@ -105,6 +108,7 @@ class ReferenceManager(object):
 
     def initializeBiblio(self):
         self.biblioKeys.update(json.loads(config.retrieveDataFile("biblio-keys.json", quiet=True, str=True)))
+        self.biblioNumericSuffixes.update(json.loads(config.retrieveDataFile("biblio-numeric-suffixes.json", quiet=True, str=True)))
 
         # Get local bibliography data
         try:
@@ -438,7 +442,7 @@ class ReferenceManager(object):
             reportMultiplePossibleRefs(simplifyPossibleRefs(refs), linkText=text, linkType=linkType, linkFor=linkFor, defaultRef=defaultRef, el=el)
         return defaultRef
 
-    def getBiblioRef(self, text, status=None, generateFakeRef=False, silentAliases=False, el=None, quiet=False):
+    def getBiblioRef(self, text, status=None, generateFakeRef=False, el=None, quiet=False):
         key = text.lower()
         while True:
             # Try to load the group up, if necessary
@@ -457,9 +461,17 @@ class ReferenceManager(object):
                 # It matched, so it's a real spec.
                 # Did it fail just because SpecRef only has the *un*versioned shortname?
                 if key != spec['shortname']:
-                    ref = self.getBiblioRef(spec['shortname'], status, el=el, quiet=True)
-                    if ref:
-                        return ref
+                    if spec['shortname'] in self.biblioNumericSuffixes:
+                        # This shortname has some numeric-suffixed versions,
+                        # but they're not what you asked for!
+                        # That means we shouldn't try to self-correct.
+                        if not quiet:
+                            numericSuffixes = self.biblioNumericSuffixes[spec['shortname']]
+                            die("A biblio link references {0}, but only {1} exists.", text, config.englishFromList(numericSuffixes))
+                    else:
+                        ref = self.getBiblioRef(spec['shortname'], status, el=el, quiet=True)
+                        if ref:
+                            return ref
                 # No, so just generate the ref from the specref data if allowed.
                 if generateFakeRef:
                     return biblio.SpecBasedBiblioEntry(spec, preferredURL=status)
@@ -479,7 +491,7 @@ class ReferenceManager(object):
         elif candidate.get("obsoletedBy", "").strip():
             # Obsoleted by - throw an error and follow the chain
             bib = self.getBiblioRef(candidate["obsoletedBy"], status=status, el=el, quiet=True)
-            if not (quiet or silentAliases):
+            if not quiet:
                 die("Obsolete biblio ref: [{0}] is replaced by [{1}].", candidate["linkText"], bib.linkText)
         else:
             bib = biblio.BiblioEntry(preferredURL=status, **candidate)
