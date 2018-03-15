@@ -44,10 +44,9 @@ def runAllTests(Spec, testFiles=None, md=None):
         p(testName)
         total += 1
         doc = Spec(inputFilename=testPath)
-        doc.mdBaseline.addData("Date", "1970-01-01")
-        doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
         if md is not None:
             doc.mdCommandLine = md
+        addTestMetadata(doc)
         doc.preprocess()
         outputText = doc.serialize()
         with io.open(testPath[:-2] + "html", encoding="utf-8") as golden:
@@ -108,9 +107,13 @@ def rebase(Spec, files=None, md=None):
         name = testNameForPath(path)
         p("Rebasing {0}".format(name))
         doc = Spec(path)
-        doc.mdBaseline.addData("Date", "1970-01-01")
-        doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
         if md:
             doc.mdCommandLine = md
+        addTestMetadata(doc)
         doc.preprocess()
         doc.finish()
+
+def addTestMetadata(doc):
+    doc.mdBaseline.addData("Date", "1970-01-01")
+    doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
+    doc.mdCommandLine.addData("Inline Github Issues", "no")
