@@ -5,7 +5,7 @@ import io
 import os
 
 from ..messages import *
-from .main import scriptPath, docPath
+from .main import scriptPath, docPath, useReadonlyData
 
 def retrieveDataFile(*segs, **kwargs):
     quiet = kwargs.get("quiet", False)
@@ -16,6 +16,11 @@ def retrieveDataFile(*segs, **kwargs):
     import os
     cacheLocation = scriptPath("spec-data", *segs)
     fallbackLocation = scriptPath("spec-data", "readonly", *segs)
+
+    if useReadonlyData:
+        # Only read from the readonly data.
+        cacheLocation = fallbackLocation
+
     try:
         fh = open(cacheLocation, 'r')
     except IOError:

@@ -31,6 +31,8 @@ def testNameForPath(path):
 
 
 def runAllTests(Spec, testFiles=None, md=None):
+    oldDataChoice = config.useReadonlyData
+    config.useReadonlyData = True
     if not testFiles:
         testFiles = sorted(findTestFiles())
         if len(testFiles) == 0:
@@ -63,6 +65,7 @@ def runAllTests(Spec, testFiles=None, md=None):
         p(printColor("Failed Tests:", color="red"))
         for fail in fails:
             p("* " + fail)
+    config.useReadonlyData = oldDataChoice
 
 
 def compare(suspect, golden):
@@ -97,6 +100,8 @@ def equalOrEmpty(a, b):
 
 
 def rebase(Spec, files=None, md=None):
+    oldDataChoice = config.useReadonlyData
+    config.useReadonlyData = True
     if not files:
         files = sorted(findTestFiles())
         if len(files) == 0:
@@ -112,6 +117,7 @@ def rebase(Spec, files=None, md=None):
         addTestMetadata(doc)
         doc.preprocess()
         doc.finish()
+    config.useReadonlyData = oldDataChoice
 
 def addTestMetadata(doc):
     doc.mdBaseline.addData("Date", "1970-01-01")

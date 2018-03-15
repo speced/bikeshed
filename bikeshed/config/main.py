@@ -10,6 +10,7 @@ from ..enum import Enum
 
 force = True
 quiet = True
+useReadonlyData = False
 dryRun = False
 printMode = "console"
 testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
