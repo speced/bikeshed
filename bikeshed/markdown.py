@@ -337,7 +337,7 @@ def parseSingleLineHeading(stream):
         idattr = " id='{0}'".format(stream.currid())
     else:
         idattr = ""
-    lines = [lineFromStream(stream, "<h{level}{idattr}>{text}</h{level}>\n".format(idattr=idattr, **stream.curr()))]
+    lines = [lineFromStream(stream, "<h{level}{idattr} line-number={i}>{text}</h{level}>\n".format(idattr=idattr, i=stream.currline().i, **stream.curr()))]
     stream.advance()
     return lines
 
@@ -356,7 +356,7 @@ def parseMultiLineHeading(stream):
     else:
         text = stream.currtext()
         idattr = ""
-    lines = [lineFromStream(stream,  "<h{level} {idattr} >{htext}</h{level}>\n".format(idattr=idattr, level=level, htext=text, **stream.curr()))]
+    lines = [lineFromStream(stream,  "<h{level} {idattr} line-number={i}>{htext}</h{level}>\n".format(idattr=idattr, level=level, htext=text, i=stream.currline().i, **stream.curr()))]
     stream.advance(2)
     return lines
 
@@ -369,6 +369,7 @@ def parseHorizontalRule(stream):
 
 def parseParagraph(stream):
     line = stream.currtext()
+    i = stream.currline().i
     initialPrefixLen = stream.currprefixlen()
     endTag = "</p>"
     if re.match(r"note[:,]\s*", line, re.I):
@@ -379,20 +380,20 @@ def parseParagraph(stream):
             p += "<span>{note}</span>{ws}".format(note=matchNote.group(1), ws=matchNote.group(2))
     elif line.lower().startswith("issue:"):
         line = line[6:]
-        p = "<p class='replace-with-issue-class'>"
+        p = "<p line-number={0} class='replace-with-issue-class'>".format(i)
     elif line.lower().startswith("assert:"):
-        p = "<p class='replace-with-assertion-class'>"
+        p = "<p line-number={0} class='replace-with-assertion-class'>".format(i)
     elif line.lower().startswith("advisement:"):
         line = line[11:]
-        p = "<p><strong class='replace-with-advisement-class'>"
+        p = "<p line-number={0}><strong class='replace-with-advisement-class'>".format(i)
         endTag = "</strong></p>"
     else:
         match = re.match(r"issue\(([^)]+)\):(.*)", line, re.I)
         if match:
             line = match.group(2)
-            p = "<p data-remote-issue-id='%s' class='replace-with-issue-class'>" % match.group(1)
+            p = "<p line-number={0} data-remote-issue-id='{1}' class='replace-with-issue-class'>".format(i, match.group(1))
         else:
-            p = "<p>"
+            p = "<p line-number={0}>".format(i)
     lines = [lineFromStream(stream, "{0}{1}\n".format(p, line))]
     while True:
         stream.advance()
@@ -405,23 +406,25 @@ def parseParagraph(stream):
 def parseBulleted(stream):
     prefixLen = stream.currprefixlen()
     numSpacesForIndentation = stream.numSpacesForIndentation
+    ul_i = stream.currline().i
 
     def parseItem(stream):
         # Assumes it's being called with curr being a bulleted line.
         # Remove the bulleted part from the line
         firstLine = stream.currtext() + "\n"
+        i = stream.currline().i
         lines = [lineFromStream(stream,  firstLine)]
         while True:
             stream.advance()
             # All the conditions that indicate we're *past* the end of the item.
             if stream.currtype() == 'bulleted' and stream.currprefixlen() == prefixLen:
-                return lines
+                return lines, i
             if stream.currprefixlen() < prefixLen:
-                return lines
+                return lines, i
             if stream.currtype() == 'blank' and stream.nexttype() != 'bulleted' and stream.nextprefixlen() <= prefixLen:
-                return lines
+                return lines, i
             if stream.currtype() == 'eof':
-                return lines
+                return lines, i
             # Remove the prefix from each line before adding it.
             lines.append(lineFromStream(stream,  stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1)))
 
@@ -438,9 +441,9 @@ def parseBulleted(stream):
                 stream.advance()
             yield parseItem(stream)
 
-    lines = [Line.Line(-1,  "<ul data-md>")]
-    for li_lines in getItems(stream):
-        lines.append(Line.Line(-1, "<li data-md>"))
+    lines = [Line.Line(-1,  "<ul data-md line-number={0}>".format(ul_i))]
+    for li_lines, i in getItems(stream):
+        lines.append(Line.Line(-1, "<li data-md line-number={0}>".format(i)))
         lines.extend(parse(li_lines, numSpacesForIndentation))
         lines.append(Line.Line(-1, "</li>"))
     lines.append(Line.Line(-1, "</ul>"))
@@ -449,24 +452,26 @@ def parseBulleted(stream):
 
 def parseNumbered(stream, start=1):
     prefixLen = stream.currprefixlen()
+    ol_i = stream.currline().i
     numSpacesForIndentation = stream.numSpacesForIndentation
 
     def parseItem(stream):
         # Assumes it's being called with curr being a numbered line.
         # Remove the numbered part from the line
         firstLine = stream.currtext() + "\n"
+        i = stream.currline().i
         lines = [lineFromStream(stream, firstLine)]
         while True:
             stream.advance()
             # All the conditions that indicate we're *past* the end of the item.
             if stream.currtype() == 'numbered' and stream.currprefixlen() == prefixLen:
-                return lines
+                return lines,i
             if stream.currprefixlen() < prefixLen:
-                return lines
+                return lines,i
             if stream.currtype() == 'blank' and stream.nexttype() != 'numbered' and stream.nextprefixlen() <= prefixLen:
-                return lines
+                return lines,i
             if stream.currtype() == 'eof':
-                return lines
+                return lines,i
             # Remove the prefix from each line before adding it.
             lines.append(lineFromStream(stream, stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1)))
 
@@ -484,11 +489,11 @@ def parseNumbered(stream, start=1):
             yield parseItem(stream)
 
     if start == 1:
-        lines = [Line.Line(-1, "<ol data-md>")]
+        lines = [Line.Line(-1, "<ol data-md line-number={0}>".format(ol_i))]
     else:
-        lines = [Line.Line(-1, "<ol data-md start='{0}'>".format(start))]
-    for li_lines in getItems(stream):
-        lines.append(Line.Line(-1, "<li data-md>"))
+        lines = [Line.Line(-1, "<ol data-md start='{0}' line-number={1}>".format(start, ol_i))]
+    for li_lines,i in getItems(stream):
+        lines.append(Line.Line(-1, "<li data-md line-number={0}>".format(i)))
         lines.extend(parse(li_lines, numSpacesForIndentation))
         lines.append(Line.Line(-1, "</li>"))
     lines.append(Line.Line(-1, "</ol>"))
@@ -497,24 +502,26 @@ def parseNumbered(stream, start=1):
 
 def parseDl(stream):
     prefixLen = stream.currprefixlen()
+    dl_i = stream.currline().i
     numSpacesForIndentation = stream.numSpacesForIndentation
 
     def parseItem(stream):
         # Assumes it's being called with curr being a :/:: prefixed line.
         firstLine = stream.currtext() + "\n"
+        i = stream.currline().i
         type = stream.currtype()
         lines = [lineFromStream(stream, firstLine)]
         while True:
             stream.advance()
             # All the conditions that indicate we're *past* the end of the item.
             if stream.currtype() in ('dt', 'dd') and stream.currprefixlen() == prefixLen:
-                return type, lines
+                return type, lines, i
             if stream.currprefixlen() < prefixLen:
-                return type, lines
+                return type, lines, i
             if stream.currtype() == 'blank' and stream.nexttype() not in ('dt', 'dd') and stream.nextprefixlen() <= prefixLen:
-                return type, lines
+                return type, lines, i
             if stream.currtype() == 'eof':
-                return type, lines
+                return type, lines, i
             # Remove the prefix from each line before adding it.
             lines.append(lineFromStream(stream, stripPrefix(stream.curr(), numSpacesForIndentation, prefixLen + 1)))
 
@@ -531,9 +538,9 @@ def parseDl(stream):
                 stream.advance()
             yield parseItem(stream)
 
-    lines = [Line.Line(-1, "<dl data-md>")]
-    for type, di_lines in getItems(stream):
-        lines.append(Line.Line(-1, "<{0} data-md>".format(type)))
+    lines = [Line.Line(-1, "<dl data-md line-number={0}>".format(dl_i))]
+    for type, di_lines, i in getItems(stream):
+        lines.append(Line.Line(-1, "<{0} data-md line-number={1}>".format(type, i)))
         lines.extend(parse(di_lines, numSpacesForIndentation))
         lines.append(Line.Line(-1, "</{0}>".format(type)))
     lines.append(Line.Line(-1, "</dl>"))
@@ -542,6 +549,7 @@ def parseDl(stream):
 
 def parseBlockquote(stream):
     prefixLen = stream.currprefixlen()
+    i = stream.currline().i
     lines = [lineFromStream(stream, stream.currtext()+"\n")]
     while True:
         stream.advance()
@@ -551,7 +559,7 @@ def parseBlockquote(stream):
             lines.append(lineFromStream(stream, stream.currtext()+"\n"))
         else:
             break
-    return [Line.Line(-1, "<blockquote>\n")] + parse(lines, stream.numSpacesForIndentation) + [Line.Line(-1, "</blockquote>\n")]
+    return [Line.Line(-1, "<blockquote line-number={0}>\n".format(i))] + parse(lines, stream.numSpacesForIndentation) + [Line.Line(-1, "</blockquote>\n")]
 
 
 class TokenStream:
