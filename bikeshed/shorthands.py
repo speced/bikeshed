@@ -483,4 +483,3 @@ def addLineNumber(el):
     line = approximateLineNumber(el)
     if line is not None:
         el.set('line-number', line)
-    print line
