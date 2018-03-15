@@ -632,7 +632,9 @@ def emptyText(text, wsAllowed=True):
 def hashContents(el):
     # Hash the contents of an element into an 8-character alphanum string.
     # Generally used for generating probably-unique IDs.
-    return hashlib.md5(innerHTML(el).strip().encode("ascii", "xmlcharrefreplace")).hexdigest()[0:8]
+    # Normalize whitespace away to avoid git-related newline normalization issues.
+    text = re.sub(r"\s+", " ", innerHTML(el).strip().encode("ascii", "xmlcharrefreplace"))
+    return hashlib.md5(text).hexdigest()[0:8]
 
 
 def replaceMacros(text, macros):
