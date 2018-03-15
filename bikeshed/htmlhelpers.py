@@ -129,10 +129,10 @@ def innerHTML(el):
     return (el.text or '') + ''.join(html.tostring(x, encoding="unicode") for x in el)
 
 
-def outerHTML(el):
+def outerHTML(el, literal=False):
     if el is None:
         return ''
-    if el.get("bs-autolink-syntax") is not None:
+    if el.get("bs-autolink-syntax") is not None and not literal:
         return el.get("bs-autolink-syntax")
     return html.tostring(el, with_tail=False, encoding="unicode")
 
@@ -748,6 +748,24 @@ def dedupIDs(doc):
                     el.set("id", safeID(doc, altId))
                     ids[altId].append(el)
                     break
+
+
+def approximateLineNumber(el, setIntermediate=True):
+    if el.get('line-number'):
+        return el.get('line-number')
+    parent = parentElement(el)
+    if not isElement(parent):
+        if el.tag == "html":
+            return None
+        return None
+    approx = approximateLineNumber(parent, setIntermediate=setIntermediate)
+    if approx is None:
+        return None
+    if approx[0].isdigit():
+        approx = "~" + approx
+    if setIntermediate:
+        el.set('line-number', approx)
+    return approx
 
 
 def circledDigits(num):

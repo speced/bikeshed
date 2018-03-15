@@ -4,13 +4,13 @@ import re
 from .htmlhelpers import *
 from .messages import *
 
-
 def transformProductionPlaceholders(doc):
     propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
     funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
     atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
     typeRe = re.compile(r"^(?:(\S*)/)?(\S+)$")
     for el in findAll("fake-production-placeholder", doc):
+        addLineNumber(el)
         text = textContent(el)
         clearContents(el)
         match = propdescRe.match(text)
@@ -65,6 +65,7 @@ def transformMaybePlaceholders(doc):
     propRe = re.compile(r"^([\w-]+): .+")
     valRe = re.compile(r"^(?:(\S*)/)?(\S[^!]*)(?:!!([\w-]+))?$")
     for el in findAll("fake-maybe-placeholder", doc):
+        addLineNumber(el)
         text = textContent(el)
         clearContents(el)
         match = propRe.match(text)
@@ -99,6 +100,8 @@ def transformMaybePlaceholders(doc):
 
 def transformAutolinkShortcuts(doc):
     # Do the remaining textual replacements
+
+    addedNodes = []
 
     def transformElement(parentEl):
         processContents = isElement(parentEl) and not doc.isOpaqueElement(parentEl)
@@ -135,9 +138,15 @@ def transformAutolinkShortcuts(doc):
             config.processTextNodes(nodes, strongRe, strongReplacer)
             config.processTextNodes(nodes, emRe, emReplacer)
             config.processTextNodes(nodes, escapedRe, escapedReplacer)
+        for node in nodes:
+            if isElement(node):
+                addedNodes.append(node)
         return nodes
 
     transformElement(doc.document.getroot())
+    for node in addedNodes:
+        if isElement(node):
+            addLineNumber(node)
 
     for el in findAll("var", doc):
         fixSurroundingTypography(el)
@@ -210,6 +219,8 @@ def transformProductionGrammars(doc):
     def simpleReplacer(match):
         return E.a({"data-link-type":"grammar", "data-lt": match.group(0), "for":""}, match.group(0))
 
+    addedNodes = []
+
     def transformElement(parentEl):
         children = childNodes(parentEl, clear=True)
         newChildren = []
@@ -227,10 +238,17 @@ def transformProductionGrammars(doc):
         config.processTextNodes(nodes, multRe, multReplacer)
         config.processTextNodes(nodes, multRangeRe, multRangeReplacer)
         config.processTextNodes(nodes, simpleRe, simpleReplacer)
+        for node in nodes:
+            if isElement(node):
+                addedNodes.append(node)
         return nodes
 
     for el in findAll(".prod", doc):
         transformElement(el)
+
+    for node in addedNodes:
+        if isElement(node):
+            addLineNumber(node)
 
 
 
@@ -458,3 +476,11 @@ def emReplacer(match):
 escapedRe = re.compile(r"\\\*")
 def escapedReplacer(match):
     return "*"
+
+def addLineNumber(el):
+    if el.get('line-number'):
+        return
+    line = approximateLineNumber(el)
+    if line is not None:
+        el.set('line-number', line)
+    print line
