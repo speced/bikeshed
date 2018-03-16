@@ -362,7 +362,7 @@ def htmlFromIndexTerms(entries):
         else:
             li = appendChild(topList, E.li(text))
             ul = appendChild(li, E.ul())
-            for item in items:
+            for item in sorted(items, key=lambda x:x['disambiguator']):
                 appendChild(ul,
                             E.li(
                                 E.a({"href":item['url']}, item['disambiguator']),
