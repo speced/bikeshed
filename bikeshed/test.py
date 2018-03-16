@@ -41,9 +41,9 @@ def runAllTests(Spec, testFiles=None, md=None):
     numPassed = 0
     total = 0
     fails = []
-    for testPath in testFiles:
+    for i,testPath in enumerate(testFiles, 1):
         testName = testNameForPath(testPath)
-        p(testName)
+        p("{0}/{1}: {2}".format(i, len(testFiles), testName))
         total += 1
         doc = Spec(inputFilename=testPath)
         if md is not None:
@@ -107,10 +107,10 @@ def rebase(Spec, files=None, md=None):
         if len(files) == 0:
             p("No tests were found")
             return True
-    for path in files:
+    for i,path in enumerate(files, 1):
         resetSeenMessages()
         name = testNameForPath(path)
-        p("Rebasing {0}".format(name))
+        p("{0}/{1}: Rebasing {2}".format(i, len(files), name))
         doc = Spec(path)
         if md:
             doc.mdCommandLine = md
