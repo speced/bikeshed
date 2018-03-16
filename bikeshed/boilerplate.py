@@ -287,7 +287,7 @@ def addExplicitIndexes(doc):
         else:
             export = None
 
-        for ref in doc.refs.queryAllRefs():
+        for ref in doc.refs.queryAllRefs(dedupURLs=False):
             text = ref.text.strip()
             if export is not None and ref.export != export:
                 continue

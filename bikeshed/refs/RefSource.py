@@ -83,7 +83,7 @@ class RefSource(object):
             else:
                 return results,error
 
-    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, explicitFor=False, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, latestOnly=True, exact=False, error=False, **kwargs):
+    def _queryRefs(self, text=None, spec=None, linkType=None, linkFor=None, explicitFor=False, linkForHint=None, status=None, statusHint=None, export=None, ignoreObsoletes=False, latestOnly=True, dedupURLs=True, exact=False, error=False, **kwargs):
         # Query the ref database.
         # If it fails to find a ref, also returns the stage at which it finally ran out of possibilities.
         def allRefsIterator():
@@ -217,15 +217,17 @@ class RefSource(object):
         if not refs:
             return refs, "ignored-specs"
 
-        # With non-exact texts, you might have multiple "anchors"
-        # that point to the same url. Dedup them.
-        seenUrls = set()
-        tempRefs = []
-        for ref in copy.copy(refs):
-            if ref.url not in seenUrls:
-                tempRefs.append(ref)
-                seenUrls.add(ref.url)
-        refs = tempRefs
+        if dedupURLs:
+            # With non-exact texts, you might have multiple "anchors"
+            # that point to the same url. Dedup them.
+            seenUrls = set()
+            tempRefs = []
+            # Sort the refs so the kept one doesn't depend on ordering in the RefSource dict.
+            for ref in sorted(copy.copy(refs), key=lambda x:x.text):
+                if ref.url not in seenUrls:
+                    tempRefs.append(ref)
+                    seenUrls.add(ref.url)
+            refs = tempRefs
 
         if latestOnly:
             # If multiple levels of the same shortname exist,
