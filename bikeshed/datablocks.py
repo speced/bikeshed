@@ -641,11 +641,14 @@ def transformInclude(lines, doc, lineNum=None, **kwargs):
                     macros[k] = v[0]
                 else:
                     die("Include block defines the '{0}' local macro more than once.", k, lineNum=lineNum)
-    el = "<pre class=include path='{0}'".format(escapeAttr(path))
-    for i,(k,v) in enumerate(macros.items()):
-        el += " macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
-    el += "{lineNumAttr}></pre>".format(lineNumAttr=lineNumAttr)
-    return [el]
+    if path:
+        el = "<pre class=include path='{0}'".format(escapeAttr(path))
+        for i,(k,v) in enumerate(macros.items()):
+            el += " macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
+        el += "{lineNumAttr}></pre>".format(lineNumAttr=lineNumAttr)
+        return [el]
+    else:
+        return []
 
 
 def parseInfoTree(lines, indent=4, lineNum=0):
