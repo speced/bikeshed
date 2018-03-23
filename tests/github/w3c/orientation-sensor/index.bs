@@ -25,10 +25,11 @@ Boilerplate: omit issues-index, omit conformance
 Ignored Vars: sensor_instance, targetMatrix, x, y, z, w
 </pre>
 <pre class="anchors">
-urlPrefix: https://w3c.github.io/sensors; spec: GENERIC-SENSOR
+urlPrefix: https://w3c.github.io/sensors/; spec: GENERIC-SENSOR
   type: dfn
     text: activated
     text: construct a sensor object; url: construct-sensor-object
+    text: initialize a sensor object; url: initialize-a-sensor-object
     text: default sensor
     text: equivalent
     text: high-level
@@ -36,16 +37,20 @@ urlPrefix: https://w3c.github.io/sensors; spec: GENERIC-SENSOR
     text: latest reading
     text: sensor-fusion
     text: sensor type
-urlPrefix: https://w3c.github.io/accelerometer; spec: ACCELEROMETER
+    text: local coordinate system
+    text: check sensor policy-controlled features; url: check-sensor-policy-controlled-features
+    text: supported sensor options
+urlPrefix: https://w3c.github.io/accelerometer/; spec: ACCELEROMETER
   type: dfn
     text: acceleration
-    text: local coordinate system
+    text: device coordinate system
+    text: screen coordinate system
   type: interface
     text: Accelerometer; url: accelerometer
 </pre>
 
 <pre class="anchors">
-urlPrefix: https://w3c.github.io/gyroscope; spec: GYROSCOPE
+urlPrefix: https://w3c.github.io/gyroscope/; spec: GYROSCOPE
   type: dfn
     text: angular velocity
   type: interface
@@ -53,7 +58,7 @@ urlPrefix: https://w3c.github.io/gyroscope; spec: GYROSCOPE
 </pre>
 
 <pre class="anchors">
-urlPrefix: https://w3c.github.io/magnetometer; spec: MAGNETOMETER
+urlPrefix: https://w3c.github.io/magnetometer/; spec: MAGNETOMETER
   type: dfn
     text: magnetic field
   type: interface
@@ -61,13 +66,13 @@ urlPrefix: https://w3c.github.io/magnetometer; spec: MAGNETOMETER
 </pre>
 
 <pre class="anchors">
-urlPrefix: https://www.w3.org/TR/orientation-event; spec: DEVICEORIENTATION
+urlPrefix: https://www.w3.org/TR/2016/CR-orientation-event-20160818/; spec: DEVICEORIENTATION
   type: interface
     text: DeviceOrientationEvent; url: deviceorientation_event
 </pre>
 
 <pre class="anchors">
-urlPrefix: https://w3c.github.io/motion-sensors; spec: MOTIONSENSORS
+urlPrefix: https://w3c.github.io/motion-sensors/; spec: MOTIONSENSORS
   type: dfn
     text: Absolute Orientation Sensor; url: absolute-orientation
     text: Relative Orientation Sensor; url: relative-orientation
@@ -80,6 +85,9 @@ spec:infra;
 spec:generic-sensor-1;
   type:enum-value;
     text:"activated"
+spec: webidl;
+  type:dfn;
+    text:identifier
 </pre>
 
 <pre class=biblio>
@@ -285,17 +293,19 @@ The AbsoluteOrientationSensor Model {#absoluteorientationsensor-model}
 The {{AbsoluteOrientationSensor}} class is a subclass of {{OrientationSensor}} which represents
 the [=Absolute Orientation Sensor=].
 
-For the absolute orientation sensor the value of [=latest reading=]["quaternion"] represents the rotation of a
-device hosting motion sensors in relation to the <dfn>Earth's reference coordinate system</dfn> defined as a
-three dimensional Cartesian coordinate system (x, y, z), where:
+For the absolute orientation sensor the value of [=latest reading=]["quaternion"] represents
+the rotation of a device's [=local coordinate system=] in relation to the <dfn>Earth's reference
+coordinate system</dfn> defined as a three dimensional Cartesian coordinate system (x, y, z), where:
 
  - x-axis is a vector product of y.z that is tangential to the ground and points east,
  - y-axis is tangential to the ground and points towards magnetic north, and
  - z-axis points towards the sky and is perpendicular to the plane made up of x and y axes.
 
-The device's <a>local coordinate system</a> is the same as defined by [=low-level=] motion sensors.
+The device's [=local coordinate system=] is the same as defined for the [=low-level=]
+motion sensors. It can be either the [=device coordinate system=] or the
+[=screen coordinate system=].
 
-Note: Figure below represents the case where device's <a>local coordinate system</a> and the <a>Earth's reference coordinate system</a> are aligned, therefore,
+Note: Figure below represents the case where device's [=local coordinate system=] and the <a>Earth's reference coordinate system</a> are aligned, therefore,
 orientation sensor's [=latest reading=] would represent 0 (rad) [[SI]] rotation about each axis.
 
 <img src="images/absolute_orientation_sensor_coordinate_system.png" srcset="images/absolute_orientation_sensor_coordinate_system.svg" style="display: block;margin: auto;" alt="AbsoluteOrientationSensor coordinate system.">
@@ -307,13 +317,17 @@ The {{RelativeOrientationSensor}} class is a subclass of {{OrientationSensor}} w
 [=Relative Orientation Sensor=].
 
 For the relative orientation sensor the value of [=latest reading=]["quaternion"] represents the
-rotation of a device hosting motion sensors in relation to a [=stationary reference coordinate
+rotation of a device's [=local coordinate system=] in relation to a [=stationary reference coordinate
 system=]. The [=stationary reference coordinate system=] may drift due to the bias introduced by
 the gyroscope sensor, thus, the rotation value provided by the sensor, may drift over time.
 
 The <dfn>stationary reference coordinate system</dfn> is defined as an inertial three dimensional
 Cartesian coordinate system that remains stationary as the device hosting the sensor moves through
 the environment.
+
+The device's [=local coordinate system=] is the same as defined for the [=low-level=]
+motion sensors. It can be either the [=device coordinate system=] or the
+[=screen coordinate system=].
 
 Note: The relative orientation sensor data could be more accurate than the one provided by absolute
 orientation sensor, as the sensor is not affected by magnetic fields.
@@ -331,6 +345,12 @@ The OrientationSensor Interface {#orientationsensor-interface}
   interface OrientationSensor : Sensor {
     readonly attribute FrozenArray&lt;double>? quaternion;
     void populateMatrix(RotationMatrixType targetMatrix);
+  };
+
+  enum OrientationSensorLocalCoordinateSystem { "device", "screen" };
+
+  dictionary OrientationSensorOptions : SensorOptions {
+    OrientationSensorLocalCoordinateSystem referenceFrame = "device";
   };
 </pre>
 
@@ -414,25 +434,60 @@ The AbsoluteOrientationSensor Interface {#absoluteorientationsensor-interface}
 -------------------------------------
 
 <pre class="idl">
-  [Constructor(optional SensorOptions sensorOptions), SecureContext, Exposed=Window]
+  [Constructor(optional OrientationSensorOptions sensorOptions), SecureContext, Exposed=Window]
   interface AbsoluteOrientationSensor : OrientationSensor {
   };
 </pre>
 
-To <dfn>Construct an AbsoluteOrientationSensor Object</dfn> the user agent must invoke the
-<a>construct a Sensor object</a> abstract operation.
+To construct an {{AbsoluteOrientationSensor}} object the user agent must invoke the
+[=construct an orientation sensor object=] abstract operation for the {{AbsoluteOrientationSensor}}
+interface.
+
+[=Supported sensor options=] for {{AbsoluteOrientationSensor}} are
+"frequency" and "referenceFrame".
 
 The RelativeOrientationSensor Interface {#relativeorientationsensor-interface}
 -------------------------------------
 
 <pre class="idl">
-  [Constructor(optional SensorOptions sensorOptions), SecureContext, Exposed=Window]
+  [Constructor(optional OrientationSensorOptions sensorOptions), SecureContext, Exposed=Window]
   interface RelativeOrientationSensor : OrientationSensor {
   };
 </pre>
 
-To <dfn>Construct an RelativeOrientationSensor Object</dfn> the user agent must invoke the
-<a>construct a Sensor object</a> abstract operation.
+To construct a {{RelativeOrientationSensor}} object the user agent must invoke the
+[=construct an orientation sensor object=] abstract operation for the {{RelativeOrientationSensor}}
+interface.
+
+[=Supported sensor options=] for {{RelativeOrientationSensor}} are
+"frequency" and "referenceFrame".
+
+Abstract Operations {#abstract-operations}
+===================
+
+<h3 dfn export>Construct an Orientation Sensor object</h3>
+
+<div algorithm="construct an orientation sensor object">
+
+    : input
+    :: |orientation_interface|, an [=interface=] [=identifier=] whose [=inherited interfaces=] contains {{OrientationSensor}}.
+    :: |options|, a {{OrientationSensorOptions}} object.
+    : output
+    :: An {{OrientationSensor}} object.
+
+    1.  Let |allowed| be the result of invoking [=check sensor policy-controlled features=]
+        with the [=interface=] identified by |orientation_interface|.
+    1.  If |allowed| is false, then:
+        1.  [=Throw=] a {{SecurityError}} {{DOMException}}.
+    1.  Let |orientation| be a new instance of the [=interface=] identified by |orientation_interface|.
+    1.  Invoke [=initialize a sensor object=] with |orientation| and |options|.
+    1.  If |options|.{{referenceFrame!!dict-member}} is "screen", then:
+        1.  Define [=local coordinate system=] for |orientation|
+            as the [=screen coordinate system=].
+    1.  Otherwise, define [=local coordinate system=] for |orientation|
+        as the [=device coordinate system=].
+    1.  Return |orientation|.
+</div>
 
 Acknowledgements {#acknowledgements}
 ================

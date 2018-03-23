@@ -11,14 +11,14 @@ Repository: https://github.com/wicg/feature-policy/
 Markup Shorthands: css no, markdown yes
 </pre>
 <pre class="link-defaults">
-spec:html; type:interface; for:/; text:Document
+spec:dom; type:interface; for:/; text:Document
 spec:html; type:dfn; for:/; text:origin
 spec:fetch; type:dfn; for:Response; text:response
 spec:html; type:dfn; for:/; text:browsing context
 spec:html; type:element; text:script
 spec:html; type:element; text:link
-spec:html; type:dfn; for:/; text:global object
-spec:html; type:dfn; for:/; text:header list
+spec:html; type:method; text:getUserMedia()
+spec:html; type:dfn; text:paymentrequest
 spec:fetch; type:dfn; text:name
 spec:fetch; type:dfn; text:value
 </pre>
@@ -90,7 +90,7 @@ spec:fetch; type:dfn; text:value
     <pre><a href="#feature-policy-header">Feature-Policy</a>: geolocation 'self'</pre>
     <p>and including an "<code>allow</code>" attribute on the iframe
     element:</p>
-    <pre>&lt;iframe src="https://other.com/map" <a href="#iframe-allow-attribute">allow</a>="<a>geolocation</a>"&gt;&lt;/iframe&gt;</pre>
+    <pre>&lt;iframe src="https://other.com/map" <a href="#iframe-allow-attribute">allow</a>="geolocation"&gt;&lt;/iframe&gt;</pre>
     <p>Iframe attributes can selectively enable features in certain frames, and
     not in others, even if those contain documents from the same origin.</p>
   </div>
@@ -126,19 +126,20 @@ spec:fetch; type:dfn; text:value
   <h2 id="framwork">Framework</h2>
   <section>
     <h3 id="features">Policy-controlled Features</h3>
-    <p>A <dfn export data-lt="policy-controlled feature">policy-controlled feature</dfn>
-    is an API or behaviour which can be enabled or disabled in a document by
-    referring to it in a <a>feature policy</a>.
+    <p>A <dfn export
+    data-lt="policy-controlled feature">policy-controlled feature</dfn> is an
+    API or behaviour which can be enabled or disabled in a document by referring
+    to it in a <a>feature policy</a>.
     <div class="note">For brevity, policy-controlled features will often be
     referred to in this document simply as "Features". Unless otherwise
     indicated, the term "feature" refers to <a>policy-controlled features</a>.
-    Other specification, defining such features, should use the longer term to
+    Other specifications, defining such features, should use the longer term to
     avoid any ambiguity.</div>
-    <p><a>Policy-controlled features</a> have a <dfn>feature name</dfn> keyword,
-    which is a token used in <a>policy directives</a>, and a <a>default
-    allowlist</a>, which defines whether the <a>policy-controlled feature</a>
-    is available to top-level documents, and how access to that feature is
-    inherited by cross-origin frames.</p>
+    <p><a>Policy-controlled features</a> are identified by tokens, which are
+    character strings used in <a>policy directives</a>.
+    <p>Each <a>policy-controlled feature</a> has a <a>default allowlist</a>,
+    which defines whether that feature is available to top-level documents, and
+    how access to that feature is inherited by cross-origin frames.</p>
     <p>A user agent has a set of <dfn>supported features</dfn>, which is the set
     of <a data-lt="policy-controlled feature">features</a> which it allows to be
     controlled through policies. User agents are not required to support every
@@ -225,17 +226,10 @@ spec:fetch; type:dfn; text:value
   <section>
     <h3 id="policy-directives">Policy directives</h3>
     <p>A <dfn data-lt="policy directive|policy directives">policy
-    directive</dfn> is an ordered map, mapping <a>feature names</a> to
-    corresponding <a>allowlists</a> of origins.</p>
+    directive</dfn> is an ordered map, mapping <a>policy-controlled features</a>
+    to corresponding <a>allowlists</a> of origins.</p>
     <p>A <a>policy directive</a> is represented in HTTP headers and HTML
     attributes as its ASCII serialization.</p>
-    <div class="note">
-      The allowed <a>feature names</a> are not defined by this specification.
-      A non-normative list of currently-defined features and their corresponding
-      names is maintained as a
-      <a href="https://github.com/WICG/feature-policy/blob/gh-pages/features.md">companion
-      document</a> alongside this specification.
-    </div>
   </section>
   <section>
     <h3 id="allowlists">Allowlists</h3>
@@ -270,7 +264,7 @@ spec:fetch; type:dfn; text:value
   </section>
   <section>
     <h3 id="default-allowlists">Default Allowlists</h3>
-    <p>Every <a>policy-controlled feature</a> has a <dfn lt=
+    <p>Every <a>policy-controlled feature</a> has a <dfn export lt=
     "default allowlist|default allowlists">default allowlist</dfn>. The
     <a>default allowlist</a> controls the origins which are allowed to access
     the feature when used in a top-level document with no declared policy, and
@@ -298,18 +292,19 @@ spec:fetch; type:dfn; text:value
   <section>
     <h3 id="ascii-serialization">ASCII serialization</h3>
     <p><a>Policy Directives</a> are represented in HTTP headers and in HTML
-    attributes as ASCII text [[!RFC7159]].</p>
+    attributes as ASCII text.</p>
     <pre class="abnf">
       <dfn>serialized-feature-policy</dfn> = <a>serialized-policy-directive</a> *(";" <a>serialized-policy-directive</a>)
-      <dfn>serialized-policy-directive</dfn> = <a>feature-name</a> RWS <a>allow-list</a>
-      <dfn>feature-name</dfn> = 1*( ALPHA / DIGIT / "-")
+      <dfn>serialized-policy-directive</dfn> = <a>feature-identifier</a> RWS <a>allow-list</a>
+      <dfn>feature-identifier</dfn> = 1*( ALPHA / DIGIT / "-")
       <dfn>allow-list</dfn> = <a>allow-list-value</a> *(RWS <a>allow-list-value</a>)
       <dfn>allow-list-value</dfn> = <a>serialized-origin</a> / "*" / "'self'" / "'src'" / "'none'"
     </pre>
-    <p><code>serialized-origin</code> is the <a>serialization of an origin</a>.
-    However, the code points U+0027 ('), U+0021 (*), U+002C (,) and U+003B (;)
-    MUST NOT appear in the serialization. If they are required, they must be
-    percent-encoded as "`%27`", "`%2A`", "`%2C`" or "`%3B`", respectively.</p>
+    <p><dfn><code>serialized-origin</code></dfn> is the
+    <a>serialization of an origin</a>. However, the code points U+0027 ('),
+    U+0021 (*), U+002C (,) and U+003B (;) MUST NOT appear in the serialization.
+    If they are required, they must be percent-encoded as "`%27`", "`%2A`",
+    "`%2C`" or "`%3B`", respectively.</p>
     <div class="note">
       The string "<code>'self'</code>" may be used as an origin in an allowlist.
       When it is used in this way, it will refer to the origin of the document
@@ -352,7 +347,7 @@ partial interface HTMLIFrameElement {
     <p>When not empty, the "<code>allow</code>" attribute will result in adding
     an <a>allowlist</a> for each recognized
     <a data-lt="policy-controlled feature">feature</a> to the frame's
-    <a>container policy</a>, when it is contructed.</p>
+    <a>container policy</a>, when it is constructed.</p>
   </section>
   <section>
     <h3 id="legacy-attributes">Additional attributes to support legacy
@@ -367,11 +362,11 @@ partial interface HTMLIFrameElement {
       {{requestFullscreen()}}.</p>
       <p>If the iframe element has an "<code>allow</code>" attribute whose
       value contains the token "<code>fullscreen</code>", then the
-      "<code>allowfullscreen</code> attribute must have no effect.</p>
-      <p>Otherwise, the presence of an "allowfullscreen" attribute on an iframe
-      will result in adding an <a>allowlist</a> of <code>*</code> for the
-      "fullscreen" feature to the frame's <a>container policy</a>, when it is
-      constructed.</p>
+      "<code>allowfullscreen</code>" attribute must have no effect.</p>
+      <p>Otherwise, the presence of an "<code>allowfullscreen</code>" attribute
+      on an iframe will result in adding an <a>allowlist</a> of <code>*</code>
+      for the "<code>fullscreen</code>" feature to the frame's <a>container
+      policy</a>, when it is constructed.</p>
       <div class="note">
         This is different from the behaviour of <code>&lt;iframe
         allow="fullscreen"&gt;</code>, and is for compatibility with existing
@@ -384,14 +379,14 @@ partial interface HTMLIFrameElement {
     <section>
       <h4 id="iframe-allowpaymentrequest-attribute">allowpaymentrequest</h4>
       <p>The "<code>allowpaymentrequest</code>" iframe attribute controls
-      access to [=Payment interface=].</p>
+      access to <a>paymentrequest</a>.</p>
       <p>If the iframe element has an "<code>allow</code>" attribute whose
       value contains the token "<code>payment</code>", then the
-      "<code>allowpaymentrequest</code> attribute must have no effect.</p>
-      <p>Otherwise, the presence of an "allowpaymentrequest" attribute on an
-      iframe will result in adding an <a>allowlist</a> of <code>*</code> for
-      the "payment" feature to the frame's <a>container policy</a>, when it is
-      constructed.</p>
+      "<code>allowpaymentrequest</code>" attribute must have no effect.</p>
+      <p>Otherwise, the presence of an "<code>allowpaymentrequest</code>"
+      attribute on an iframe will result in adding an <a>allowlist</a> of
+      <code>*</code> for the "<code>payment</code>" feature to the frame's
+      <a>container policy</a>, when it is constructed.</p>
       <div class="note">
         This is different from the behaviour of <code>&lt;iframe
         allow="payment"&gt;</code>, and is for compatibility with existing uses
@@ -404,14 +399,15 @@ partial interface HTMLIFrameElement {
     <section>
       <h4 id="iframe-allowusermedia-attribute">allowusermedia</h4>
       <p>The "<code>allowusermedia</code>" iframe attribute controls
-      access to [=Payment interface=].</p>
+      access to <a method>getUserMedia()</a>.</p>
       <p>If the iframe element has an "<code>allow</code>" attribute whose
       value contains the token "<code>payment</code>", then the
-      "<code>allowusermedia</code> attribute must have no effect.</p>
-      <p>Otherwise, the presence of an "allowusermedia" attribute on an
-      iframe will result in adding an <a>allowlist</a> of <code>*</code> for
-      each of the "camera" and "microphone" features to the frame's <a>container
-      policy</a>, when it is constructed.</p>
+      "<code>allowusermedia</code>" attribute must have no effect.</p>
+      <p>Otherwise, the presence of an "<code>allowusermedia</code>" attribute
+      on an iframe will result in adding an <a>allowlist</a> of <code>*</code>
+      for each of the "<code>camera</code>" and "<code>microphone</code>"
+      features to the frame's <a>container policy</a>, when it is
+      constructed.</p>
       <div class="note">
         This is different from the behaviour of <code>&lt;iframe
         allow="camera; microphone"&gt;</code>, and is for compatibility with
@@ -464,17 +460,16 @@ partial interface HTMLIFrameElement {
 	</p>
 
         <p>To determine whether a {{Document}} object <var>document</var>
-        is <dfn>allowed to use</dfn> the policy-controlled-feature named
-        <var>feature name</var>, run these steps:</p>
+        is <dfn>allowed to use</dfn> the policy-controlled-feature
+        <var>feature</var>, run these steps:</p>
         <ol>
          <li><p>If <var>document</var> has no [=browsing context=], then return
 	 false.</p></li>
          <li><p>If <var>document</var>'s [=browsing context=]'s [=active
 	 document=] is not <var>document</var>, then return false.</p></li>
          <li><p>If <var>document</var>'s <a>feature policy</a> <a
-	 href="#is-feature-enabled">enables the feature indicated by
-	 <var>feature name</var> for the origin of <var>document</var></a>, then
-	 return true.<p></li>
+	 href="#is-feature-enabled">enables <var>feature</var> for the origin of
+         <var>document</var></a>, then return true.<p></li>
          <li><p>Return false.</p></li>
         </ol>
       </li>
@@ -500,8 +495,8 @@ partial interface HTMLIFrameElement {
       <p>The <{iframe/allowpaymentrequest}> attribute is a boolean attribute.
       When specified, it indicates that {{Document}} objects in the <{iframe}>
       element's [=browsing context=] should be initialized with a <a>feature
-      policy</a> which allows the <code>PaymentRequest</code> feature to be used
-      to make payment rquests from any origin. This is enforced by the <a
+      policy</a> which allows the <code>payment</code> feature to be used
+      to make payment requests from any origin. This is enforced by the <a
       href="#process-feature-policy-attributes">Process feature policy
       attributes</a> algorithm. Note that this will only allow use of the
       <code>PaymentRequest</code> interface if the <{iframe}> element's [=node
@@ -509,8 +504,8 @@ partial interface HTMLIFrameElement {
       <p>The <{iframe/allowusermedia}> attribute is a boolean attribute. When
       specified, it indicates that {{Document}} objects in the <{iframe}>
       element's [=browsing context=] should be initialized with a <a>feature
-      policy</a> which allows the <code>Camera</code> and
-      <code>Microphone</code> features to be used to call
+      policy</a> which allows the <code>camera</code> and
+      <code>microphone</code> features to be used to call
       <code>getUserMedia()</code> from any origin. This is enforced by the <a
       href="#process-feature-policy-attributes">Process feature policy
       attributes</a> algorithm. Note that this will only allow use of the
@@ -532,19 +527,21 @@ partial interface HTMLIFrameElement {
   <h2 id="algorithms">Algorithms</h2>
   <section>
     <h3 id="process-response-policy">Process response policy</h3>
-    <p>Given a [=response=] (<var>response</var>) and [=global object=]
-    (<var>global</var>), this algorithm returns a <a>declared feature
+    <p>Given a [=response=] (<var>response</var>) and an [=origin=]
+    (<var>origin</var>), this algorithm returns a <a>declared feature
     policy</a>.</p>
     <ol>
-      <li>Abort these steps if the <var>response</var>’s [=header list=] does
-      not contain a [=header=] whose [=name=] is "<code>Feature-Policy</code>".
+      <li>Abort these steps if the <var>response</var>’s <a
+      for="response">header list</a> does not contain a [=header=] whose
+      [=name=] is "<code>Feature-Policy</code>".
       </li>
       <li>Let <var>header</var> be the concatenation of the [=value=]s of all
-      [=header=] fields in <var>response</var>’s [=header list=] whose name is
+      [=header=] fields in <var>response</var>’s <a
+      for="response">header list</a> whose name is
       "<code>Feature-Policy</code>", separated by U+002C (,) (according to
       [RFC7230, 3.2.2]).</li>
       <li>Let <var>feature policy</var> be the result of executing <a href=
-      "#parse-header"></a> on <var>header</var> and <var>global</var>'s origin.
+      "#parse-header"></a> on <var>header</var> and <var>origin</var>.
       </li>
       <li>Return <var>feature policy</var>.</li>
     </ol>
@@ -588,10 +585,10 @@ partial interface HTMLIFrameElement {
 	  <li>If <var>tokens</var> is an empty list, then continue.</li>
           <li>Let <var>feature-name</var> be the first element of
 	  <var>tokens</var>.</li>
-          <li>If <var>feature-name</var> is not equal to the name of any
-	  recognized <a>policy-controlled feature</a>, then continue.</li>
+          <li>If <var>feature-name</var> does not identify any recognized
+          <a>policy-controlled feature</a>, then continue.</li>
           <li>Let <var>feature</var> be the <a>policy-controlled feature</a>
-	  named by <var>feature-name</var>.</li>
+	  identified by <var>feature-name</var>.</li>
           <li>Let <var>targetlist</var> be the remaining elements, if any, of
 	  <var>tokens</var>.
           <li>Let <var>allowlist</var> be a new <a>allowlist</a>.
@@ -727,10 +724,10 @@ partial interface HTMLIFrameElement {
 	  <li>If <var>tokens</var> is an empty list, then continue.</li>
           <li>Let <var>feature-name</var> be the first element of
 	  <var>tokens</var>.</li>
-          <li>If <var>feature-name</var> is not equal to the name of any
-	  recognized <a>policy-controlled feature</a>, then continue.</li>
+          <li>If <var>feature-name</var> does not identify any recognized
+          <a>policy-controlled feature</a>, then continue.</li>
           <li>Let <var>feature</var> be the <a>policy-controlled feature</a>
-	  named by <var>feature-name</var>.</li>
+	  identified by <var>feature-name</var>.</li>
           <li>Let <var>targetlist</var> be the remaining elements, if any, of
 	  <var>tokens</var>.
           <li>Let <var>allowlist</var> be a new <a>allowlist</a>.
@@ -784,7 +781,7 @@ partial interface HTMLIFrameElement {
         <ol>
           <li>Let <var>isInherited</var> be the result of running <a href=
           "#define-inherited-policy"></a> on <var>feature</var> and
-          <var>document's</var> browsing context.
+          <var>document</var>'s browsing context.
           </li>
           <li>Set <var>inherited policies</var>[<var>feature</var>] to
             <var>isInherited</var>.</li>
@@ -807,9 +804,12 @@ partial interface HTMLIFrameElement {
     <a>Feature Policy</a></p>
     <ol>
       <li>Initialize <var>document</var>'s Feature Policy</li>
-      <li>Let <var>inherited policies</var> be <var>global</var>'s Feature
+      <li>Let <var>inherited policies</var> be <var>document</var>'s Feature
       Policy's inherited policy set.</li>
       <li>Let <var>declared policies</var> be a new ordered map.</li>
+      <li>Let <var>d</var> be the result of running <a
+      href="#process-response-policy">Process response policy</a> on
+      <var>response</var> and <var>document</var>'s origin.</li>
       <li>For each <var>feature</var> → <var>allowlist</var> of <var>d</var>:
         <ol>
           <li>If <var>inherited policies</var>[<var>feature</var>] is true, then
@@ -864,7 +864,7 @@ partial interface HTMLIFrameElement {
   <section>
     <h3 id="is-feature-enabled">Is <var>feature</var> enabled in
     <var>document</var> for <var>origin</var>?</h3>
-    <p>Given a string (<var>feature</var>) and a Document object
+    <p>Given a feature (<var>feature</var>), a Document object
     (<var>document</var>), and an [=origin=] (<var>origin</var>), this algorithm
     returns "<code>Disabled</code>" if <var>feature</var> should be considered
     disabled, and "<code>Enabled</code>" otherwise.</p>

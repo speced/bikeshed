@@ -367,7 +367,7 @@ directory is selected with an <{input}> element:
 
 <pre class=lang-javascript>
   document.querySelector('#b').addEventListener('change', e => {
-    for (let entry of e.target.files)
+    for (file entry of e.target.files)
       console.log(file.name, file.webkitRelativePath);
   });
 </pre>
@@ -389,7 +389,7 @@ Enumerating entries using {{HTMLInputElement/webkitEntries}}:
 
 <pre class=lang-javascript>
   document.querySelector('#a').addEventListener('change', e => {
-    for (let entry of e.target.webkitEntries)
+    for (const entry of e.target.webkitEntries)
       handleEntry(entry);
   });
 </pre>
@@ -474,10 +474,10 @@ elem.addEventListener('drop', e => {
   e.preventDefault();
 
   // Process all of the items.
-  for (let item of e.dataTransfer.items) {
+  for (const item of e.dataTransfer.items) {
     // kind will be 'file' for file/directory entries.
     if (item.kind === 'file') {
-      let entry = item.webkitGetAsEntry();
+      const entry = item.webkitGetAsEntry();
       handleEntry(entry);
     }
   }
@@ -865,9 +865,9 @@ Helper function to adapt {{FileSystemDirectoryReader}} for use with
 <pre class=lang-javascript>
 function getEntriesAsPromise(dirEntry) {
   return new Promise((resolve, reject) => {
-    let result = [];
-    let reader = dirEntry.createReader();
-    let doBatch = () => {
+    const result = [];
+    const reader = dirEntry.createReader();
+    const doBatch = () => {
       reader.readEntries(entries => {
         if (entries.length > 0) {
           entries.forEach(e => result.push(e));
@@ -885,23 +885,32 @@ function getEntriesAsPromise(dirEntry) {
 
 <aside class=example>
 Helper function to adapt {{FileSystemDirectoryReader}} for use with
-<a href="https://github.com/zenparsing/es-observable">Observables</a>:
+<a href="https://github.com/tc39/proposal-async-iteration">Async Iterators</a>:
 <pre class=lang-javascript>
-function getEntriesAsObservable(entry) {
-  return new Observable(observer => {
-    let reader = dirEntry.createReader();
-    let doBatch = () => {
-      reader.readEntries(entries => {
-        if (entries.length > 0) {
-          entries.forEach(e => observer.next(e));
-          doBatch();
-        } else {
-          observer.complete();
-        }
-      }, reject);
-    };
-    doBatch();
+async function* getEntriesAsAsyncIterator(dirEntry) {
+  const reader = dirEntry.createReader();
+  const getNextBatch = () => new Promise((resolve, reject) => {
+    reader.readEntries(resolve, reject);
   });
+
+  do {
+    const entries = await getNextBatch();
+    for (const entry of entries) {
+      yield entry;
+    }
+  } while (entries.length > 0);
+}
+</pre>
+
+This allows for ordered asynchronous traversal of a directory tree:
+
+<pre class=lang-javascript>
+async function show(entry) {
+  console.log(entry.fullPath);
+  if (entry.isDirectory) {
+    for await (const e of getEntriesAsAsyncIterator(entry))
+      await show(e);
+  }
 }
 </pre>
 </aside>
@@ -950,7 +959,7 @@ Read the contents of a dropped file using {{FileReader}}:
 <pre class=lang-javascript>
 function readFileEntry(entry) {
   entry.file(file => {
-    let reader = new FileReader();
+    const reader = new FileReader();
     reader.readAsText(file);
     reader.onerror = error => console.warn(error);
     reader.onload = () => {

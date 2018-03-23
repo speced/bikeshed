@@ -7,10 +7,10 @@ Group: dap
 ED: https://w3c.github.io/sensors/
 TR: https://www.w3.org/TR/generic-sensor/
 Previous Version: https://www.w3.org/TR/2017/WD-generic-sensor-20171018/
-Editor: Rick Waldron 50572, JS Foundation
+Editor: Rick Waldron 50572, Bocoup&#44; formerly on behalf of JS Foundation
 Editor: Mikhail Pozdnyakov 78325, Intel Corporation, https://intel.com/
 Editor: Alexander Shalamov 78335, Intel Corporation, https://intel.com/
-Former Editor: Tobie Langel 60809, Codespeaks&#44; formerly on behalf of Intel Corporation, http://tobie.me, tobie@codespeaks.com
+Former Editor: Tobie Langel 60809, Codespeaks&#44; formerly on behalf of Intel Corporation, https://www.codespeaks.com/, tobie@codespeaks.com
 Abstract:
   This specification defines a framework for exposing sensor data
   to the Open Web Platform in a consistent way.
@@ -42,7 +42,6 @@ urlPrefix: https://html.spec.whatwg.org/multipage/; spec: HTML
       text: trusted; url: concept-events-trusted
       text: spin the event loop; url: spin-the-event-loop
     urlPrefix: browsers.html
-      text: origin; url: origin-2
       text: navigating; url: navigate
       text: browsing context
       text: nested browsing context
@@ -55,14 +54,16 @@ urlPrefix: https://html.spec.whatwg.org/multipage/; spec: HTML
       text: focusable area; url: focusable-area
       text: currently focused area; url: currently-focused-area-of-a-top-level-browsing-context
       text: has focus steps; url: has-focus-steps
-urlPrefix: http://w3c.github.io/hr-time/; spec: HR-TIME-2
+    urlPrefix: origin.html
+      text: origin; url: origin-2
+urlPrefix: https://www.w3.org/TR/hr-time-2/; spec: HR-TIME-2
   type: interface
     text: DOMHighResTimeStamp; url: dom-domhighrestimestamp
   type: dfn
-    text: time origin
-urlPrefix: https://w3c.github.io/page-visibility; spec: PAGE-VISIBILITY
+    text: time origin; url: dfn-time-origin
+urlPrefix: https://www.w3.org/TR/page-visibility-2/; spec: PAGE-VISIBILITY
   type: dfn
-    text: document visibility state; url: dom-document-visibilitystate
+    text: document visibility state; url: dom-visibilitystate
     text: visibility states; url: dfn-visibility-states
     text: steps to determine the visibility state; url: dfn-steps-to-determine-the-visibility-state
 urlPrefix: https://w3ctag.github.io/security-questionnaire/; spec: SECURITY-PRIVACY-QUESTIONNAIRE
@@ -70,10 +71,14 @@ urlPrefix: https://w3ctag.github.io/security-questionnaire/; spec: SECURITY-PRIV
     text: same-origin policy violations; url: sop-violations
 urlPrefix: https://wicg.github.io/feature-policy/; spec: FEATURE-POLICY
   type: dfn
-    text: allow attribute
+    text: allow attribute; url: iframe-allow-attribute
     text: default allowlist
-    text: feature name
     text: policy-controlled feature
+    text: allowed to use
+urlPrefix: https://www.w3.org/TR/permissions/; spec: PERMISSIONS
+  type: dfn
+    text: permission name; url: enumdef-permissionname
+    text: permission state
 </pre>
 <pre class=link-defaults>
 spec: webidl; type:dfn; text:attribute
@@ -82,6 +87,17 @@ spec: webidl; type:dfn; text:identifier
 
 <pre class=biblio>
 {
+    "ACCELPRINT": {
+        "authors": [
+            "Dey, Sanorita, et al."
+        ],
+        "id": "ACCELPRINT",
+        "href": "http://synrg.csl.illinois.edu/papers/AccelPrint_NDSS14.pdf",
+        "title": "AccelPrint: Imperfections of Accelerometers Make Smartphones Trackable",
+        "date": "2014",
+        "status": "Informational",
+        "publisher": "Network and Distributed System Security Symposium (NDSS)"
+     },
     "MOBILESENSORS": {
         "authors": [
             "Manish J. Gajjar"
@@ -123,6 +139,17 @@ spec: webidl; type:dfn; text:identifier
          "title": "Sensor Use Cases",
          "date": "2017",
          "status": "Note"
+     },
+     "COORDINATES-TRANSFORMATION": {
+         "authors": [
+             "George W. Collins, II"
+         ],
+         "id": "COORDINATES-TRANSFORMATION",
+         "href": "http://ads.harvard.edu/books/1989fcm..book/Chapter2.pdf",
+         "title": "The Foundations of Celestial Mechanics",
+         "date": "2004",
+         "status": "Informational",
+         "publisher": "Pachart Foundation dba Pachart Publishing House"
      }
 }
 </pre>
@@ -191,6 +218,9 @@ but rather to put it in the context of detecting hardware-dependent features.
 Consider the below feature detection examples:
 
 <div class="example">
+    This simple example illustrates how to check whether the User Agent
+    exposes an interface for a particular sensor type. To handle errors in a robust
+    manner, please refer to [this example](#robust-example).
     <pre highlight="js">
         if (typeof Gyroscope === "function") {
             // run in circles...
@@ -238,21 +268,56 @@ and defensive programming which includes:
     enhanced by the possible usage of a sensor, not degraded by its
     absence.
 
-<div class="example">
+<div class="example" id="robust-example">
+    The following snippet illustrates how an Accelerometer sensor can be created
+    in a robust manner. Web application may choose different options for error
+    handling, for example, show notification, choose different sensor type or
+    fallback to other API.
     <pre highlight="js">
-        try { // No need to feature detect thanks to try..catch block.
-            var sensor = new GeolocationSensor();
-            sensor.start();
-            sensor.onerror = error => gracefullyDegrade(error);
-            sensor.onreading = _ => updatePosition(sensor.latitude, sensor.longitude);
-        } catch(error) {
-            gracefullyDegrade(error);
+        let accelerometer = null;
+        try {
+            accelerometer = new Accelerometer({ frequency: 10 });
+            accelerometer.addEventListener('error', event => {
+                // Handle runtime errors.
+                if (event.error.name === 'NotAllowedError') {
+                    console.log('Permission to access sensor was denied.');
+                } else if (event.error.name === 'NotReadableError' ) {
+                    console.log('Cannot connect to the sensor.');
+                }
+            });
+            accelerometer.addEventListener('reading', () => reloadOnShake(accelerometer));
+            accelerometer.start();
+        } catch (error) {
+            // Handle construction errors.
+            if (error.name === 'SecurityError') {
+                console.log('Sensor construction was blocked by the Feature Policy.');
+            } else if (error.name === 'ReferenceError') {
+                console.log('Sensor is not supported by the User Agent.');
+            } else {
+                throw error;
+            }
         }
     </pre>
 </div>
 
-
 <h2 id="security-and-privacy">Security and privacy considerations</h2>
+
+<div class="note">
+The judgement on how to communicate to the user the known [[#main-privacy-security-threats|threats]]
+is up to the implementer. The implementation of the [[#mitigation-strategies|mitigations]] is
+mandatory, however.
+
+The Generic Sensor API and its [=extension specifications=] are agnostic with respect to any user
+interface aspects. This specification defines an [[#request-sensor-access|integration point]] to the
+Permissions API [[PERMISSIONS]] that implementers can use for [=new information about the user's intent|
+explicit or implicit user consenting=]. In addition, implementers are encouraged to use additional
+privacy enchancing mechanisms inline with their product requirements to provide a consistent and
+cohesive experience. Such mechanisms can include, for example, global and per-origin access controls,
+page info dialogs, location bar indicators, or other disclosure user interface elements.
+
+The Generic Sensor API provides flexibility to implementers to make user consenting and
+disclosure user interface design decisions on a concrete sensor basis as needed.
+</div>
 
 [=sensor readings|Sensor readings=] are sensitive data and could become a subject of
 various attacks from malicious Web pages. Before discussing the mitigation strategies we
@@ -335,7 +400,7 @@ discover such information about the users. See [[STEALINGPINSVIASENSORS]].
 Sensors can provide information that can uniquely identify the device using those sensors.
 Every concrete sensor model has minor manufacturing imperfections and differences that will be
 unique for this model. These manufacturing variations and imperfections can be used to fingerprint
-the device [[MOBILESENSORS]].
+the device [[ACCELPRINT]] [[MOBILESENSORS]].
 
 <h4 id="user-identifying">User Identifying</h4>
 
@@ -367,19 +432,16 @@ to the user, [=sensor readings=] are only available for the
 [=documents=] which are [=allowed to use=] the [=policy-controlled features=] for
 the given [=sensor type=]. See [[FEATURE-POLICY]] for more details.
 
-<h4 id="losing-focus">Losing Focus</h4>
+<h4 id="focused-area" oldids="losing-focus">Focused Area</h4>
 
-When the [=top-level browsing context=] loses focus,
-or when an element from the [=nested browsing context=] of a different [=origin=]
-[=gains focus=] (for example when the user carries out an in-game purchase
-using a third party payment service from within an iframe)
-the [=top-level browsing contexts=] suddenly becomes in a position
-to carry out a skimming attack against the [=browsing context=] whose element
-has [=gains focus|gained focus=].
+[=Sensor readings=] are only available for [=active documents=] whose
+origin is [=same origin-domain=] with the [=currently focused area=]
+document.
 
-To mitigate this risk [=sensor readings=] are only available to the [=browsing contexts=]
-of the same [=origin=] with the [=browsing context|context=] containing
-the [=focused=] element.
+This is done in order to mitigate the risk of a skimming attack against the
+[=browsing context=] containing an element which has [=gains focus|gained focus=],
+for example when the user carries out an in-game purchase using a third party
+payment service from within an iframe.
 
 <h4 id="visibility-state">Visibility State</h4>
 
@@ -477,27 +539,36 @@ which would have issues of its own.
 The term <dfn id="concept-device-sensor">device sensor</dfn> refers to a device's underlying
 physical sensor instance.
 
-The [=device sensors=] measure different physical quantities
-and provide corresponding <dfn>raw sensor readings</dfn>
-which are a source of information about the user and their environment.
+A [=device sensor=] measures a physical quantities
+and provides a corresponding <dfn>sensor reading</dfn>
+which is a source of information about the environment.
 
-Each [=raw sensor reading|reading=] is composed of the <dfn lt="reading value">values</dfn>
-of the different physical quantities measured by the [=device sensor|sensor=]
+Each [=sensor reading=] is composed of the <dfn lt="reading value">values</dfn>
+of the physical quantity measured by the [=device sensor=]
 at time <var ignore>t<sub>n</sub></var> which is called the <dfn>reading timestamp</dfn>.
 
-Known, <em>predictable</em> discrepancies between [=raw sensor readings=]
-and the corresponding physical quantities being measured
-are corrected through <dfn>calibration</dfn>.
+If the [=device sensor=] performs a spatial measurement (e.g.
+acceleration, angular velocity), it must be resolved in
+a <dfn export>local coordinate system</dfn> that represents
+a reference frame for the [=device sensor=]'s [=sensor readings=].
+A [=device sensor=] that provides such [=sensor readings=]
+is referred to as <dfn export>spatial sensor</dfn>.
 
-Known but <em>unpredictable</em> discrepancies need to be addressed dynamically
-through a process called [=sensor fusion=].
+A [=spatial sensor=] can be <dfn>uniaxial</dfn>, <dfn>biaxial</dfn>,
+or <dfn>triaxial</dfn>, depending on the number of orthogonal axes in
+which it can perform simultaneous measurements.
 
-[=calibration|Calibrated=] [=raw sensor readings=] are referred to as <dfn>sensor readings</dfn>,
-whether or not they have undergone [=sensor fusion=].
+Scalar physical quantities (i.e. temperature) do not require
+a [=local coordinate system=] for resolution.
+
+The [=local coordinate system=] normally used in a mobile device is
+a Cartesian coordinate system, which is defined relative to the
+device’s screen, so that X and Y axes are parallel to the screen
+dimentions and Z axis is perpendicular to the screen surface.
 
 The term <dfn id="concept-platform-sensor">platform sensor</dfn> refers to platform interfaces,
 with which the user agent ineracts to obtain [=sensor readings=] for a single [=sensor type=]
-originated from one or several [=device sensors=].
+originated from one or more [=device sensors=].
 
 [=Platform sensor=] can be defined by the underlying platform (e.g. in a native sensors framework)
 or by the user agent, if it has a direct access to [=device sensor=].
@@ -510,6 +581,11 @@ In simple case a [=platform sensor=] corresponds to a single [=device sensor=],
 but if the provided [=sensor readings=] are product of [=sensor fusion=] performed
 in software, the [=platform sensor=] corresponds to a set of [=device sensors=]
 involved in the [=sensor fusion=] process.
+
+Discrepancies between a [=sensor reading=]
+and the corresponding physical quantity being measured
+are corrected through <dfn>calibration</dfn> that can happen at manufacturing time.
+Some sensors can require dynamic calibration to compensate unknown discrepancies.
 
 Note: [=platform sensors=] created through [=sensor fusion=] are sometimes
 called virtual or synthetic sensors. However, the specification doesn't
@@ -565,7 +641,7 @@ for the given [=sensor types=] they are targeting.
 through a process called <dfn>sensor fusion</dfn>.
 This process provides [=high-level|higher-level=] or
 more accurate data (often at the cost of increased latency).
-For example, the [=sensor readings|readings=] of a three-axis magnetometer
+For example, the [=sensor readings|readings=] of a [=triaxial=] magnetometer
 needs to be combined with the [=sensor readings|readings=] of an accelerometer
 to provide a correct bearing.
 
@@ -677,9 +753,14 @@ never exceed the [=sampling frequency=] for the given [=sensor type=].
 ## Conditions to expose sensor readings ## {#concepts-can-expose-sensor-readings}
 
 The user agent must verify that all [=mandatory conditions=] are satisfied to ensure it
-<dfn>can expose sensor readings</dfn> to a given [=active document=].
+<dfn>can expose sensor readings</dfn> to the {{Sensor}} objects of a certain
+[=sensor type|type=] that belong to a certain [=active document=].
 
 The <dfn>mandatory conditions</dfn> are the following:
+ - The given document is a [=responsible document=] of a [=secure context=].
+ - For each [=permission name=] from the [=sensor type=]'s associated
+   [=sensor permission names=] [=ordered set|set=], the corresponding permission's
+   [=permission state|state=] is "granted".
  - [=document visibility state|Visibility state=] of the document is "visible".
  - The document is [=allowed to use=] all the [=policy-controlled features=] associated
    with the given [=sensor type=].
@@ -696,17 +777,17 @@ Note: In order to release hardware resources, the user agent can request underly
 
 <h3 id="model-sensor-type">Sensor Type</h3>
 
-A <dfn>sensor type</dfn> has an associated [=interface=]
-whose [=inherited interfaces=] contains {{Sensor}}.
+A <dfn>sensor type</dfn> has one or more associated
+[=extension sensor interface|extension sensor interfaces=].
 
 A [=sensor type=] has a [=ordered set|set=] of <dfn export>associated sensors</dfn>.
 
 A [=sensor type=] may have a [=default sensor=].
 
 A [=sensor type=] has a [=set/is empty|nonempty=] [=ordered set|set=] of associated
-{{PermissionName|PermissionNames}} referred as <dfn export>sensor permission names</dfn>.
+[=permission names=] referred to as <dfn export>sensor permission names</dfn>.
 
-Note: multiple [=sensor types=] may share the same {{PermissionName}}.
+Note: multiple [=sensor types=] may share the same [=permission name=].
 
 A [=sensor type=] has a [=permission revocation algorithm=].
 
@@ -721,25 +802,23 @@ A [=sensor type=] has a [=permission revocation algorithm=].
 </div>
 
 A [=sensor type=] has a [=set/is empty|nonempty=] [=ordered set|set=] of associated
-[=feature names=] referred as <dfn export>sensor feature names</dfn>.
+[=policy-controlled feature=] tokens referred to as <dfn export>sensor feature names</dfn>.
 
 <h3 id="model-sensor">Sensor</h3>
 
-A [=platform sensor=] has an associated [=ordered set|set=]
-of <dfn>activated sensor objects</dfn>.
-This set is initially [=set/is empty|empty=].
+The current [=browsing context=]'s [=platform sensor=] has an associated [=ordered set|set=]
+of <dfn>activated sensor objects</dfn>, which is initially [=set/is empty|empty=] and an
+associated <dfn>latest reading</dfn> [=ordered map|map=], which holds the latest available [=sensor readings=].
 
-The current [=browsing context=]'s [=platform sensor=] has an associated <dfn>latest reading</dfn>
-[=ordered map|map=] which holds the latest available [=sensor readings=].
-
-Note: User agents can share [=latest reading=] [=ordered map|map=] between different
+Note: User agents can share the [=latest reading=] [=ordered map|map=] and
+the [=activated sensor objects=] [=ordered set|set=] between different
 [=browsing context|contexts=] only if the [=origins=] of these contexts' [=active documents=]
 are [=same origin-domain=].
 
 Any time a new [=sensor reading=] for a [=platform sensor=] is obtained and if the user agent
 [=can expose sensor readings=] to the current [=browsing context=]'s [=active document=],
-[=update latest reading=] is invoked with the [=platform sensor=]
-and the [=sensor reading=] as arguments.
+the user agent invokes [=update latest reading=] with the [=platform sensor=] and
+the [=sensor reading=] as arguments.
 
 The [=latest reading=] [=ordered map|map=] contains an [=map/entry=] whose [=map/key=] is
 "timestamp" and whose [=map/value=] is a high resolution timestamp that estimates the
@@ -754,11 +833,11 @@ unless the [=latest reading=] [=ordered map|map=] caches a previous [=sensor rea
 The other [=map/entries=] of the [=latest reading=] [=ordered map|map=]
 hold the values of the different quantities measured by the [=platform sensor=].
 The [=map/keys=] of these [=map/entries=] must match
-the [=attribute=] [=identifier=] defined by
-the [=sensor type=]'s associated interface.
+the [=attribute=] [=identifier=] defined by the [=sensor type=]'s
+associated [=extension sensor interface=].
 The return value of the [=attribute=] getter is
 easily obtained by invoking [=get value from latest reading=]
-with the object implementing the [=sensor type=]'s associated interface
+with the object implementing the [=extension sensor interface=]
 and the [=attribute=] [=identifier=] as arguments.
 
 The [=map/value=] of all [=latest reading=] [=map/entries=]
@@ -936,7 +1015,7 @@ The [=task source=] for the [=tasks=] mentioned in this specification is the <df
             <title>start-&gt;idle</title>
             <path d="M19.2724,-44C25.2754,-44 34.8461,-44 44.6767,-44" fill="none" stroke="black"/>
             <polygon fill="black" points="54.8766,-44 44.8767,-48.5001 49.8766,-44 44.8766,-44.0001 44.8766,-44.0001 44.8766,-44.0001 49.8766,-44 44.8766,-39.5001 54.8766,-44 54.8766,-44" stroke="black"/>
-            <a xlink:href="#construct-sensor-object">
+            <a xlink:href="#extension-sensor-interface">
                 <text text-anchor="middle" transform="translate(0,-4)" x="29.5" y="-52.1333">construct</text>
             </a>
         </g>
@@ -964,7 +1043,7 @@ object=] with this object as argument.
 Instances of {{Sensor}} are created
 with the internal slots described in the following table:
 
-<table id="sensor-slots" class="vert data">
+<table id="sensor-slots" class="def">
     <thead>
         <tr><th>Internal Slot</th><th>Description (non-normative)</th></tr>
     </thead>
@@ -1032,7 +1111,7 @@ with the internal slots described in the following table:
 
 The getter of the {{Sensor/timestamp!!attribute}} attribute returns
 the result of invoking [=get value from latest reading=] with <strong>this</strong>
-and "timestamp" as arguments.
+and "timestamp" as arguments. It represents a [=reading timestamp=].
 
 
 ### Sensor.start() ### {#sensor-start}
@@ -1154,30 +1233,44 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
 
 <h2 id="abstract-operations">Abstract Operations</h2>
 
-<h3 dfn export>Construct sensor object</h3>
+<h3 dfn export>Initialize a sensor object</h3>
 
-<div algorithm="construct sensor object">
+<div algorithm="initialize a sensor object">
 
     : input
-    :: |options|, a {{SensorOptions}} object.
+    :: |sensor_instance|, a {{Sensor}} object.
+    :: |options|, a [=dictionary=] object.
     : output
-    :: A {{Sensor}} object.
+    :: None
 
-    1.  [=set/For each=] |feature_name| of the associated [=sensor feature names=],
-        1. If [=active document=] is not [=allowed to use=] the
-           [=policy-controlled feature=] named |feature_name|, then:
-           1.  [=Throw=] a {{SecurityError}} {{DOMException}}.
-    1.  Let |sensor_instance| be a new {{Sensor}} object,
+    1.  [=map/For each=] |key| → <var ignore>value</var> of |options|
+        1.  If the associated [=supported sensor options=] [=set/contains|does not contain=] |key|
+            1. [=Throw=] "{{NotSupportedError!!exception}}" {{DOMException}}.
     1.  If |options|.{{frequency!!dict-member}} is [=present=], then
         1.  Set |sensor_instance|.{{[[frequency]]}} to |options|.{{frequency!!dict-member}}.
 
         Note: there is not guarantee that the requested |options|.{{frequency!!dict-member}}
         can be respected. The actual [=sampling frequency=] can be calculated using
         {{Sensor}} {{Sensor/timestamp!!attribute}} attributes.
-    1.  Set |sensor_instance|.{{[[state]]}} to "idle".
-    1.  Return |sensor_instance|.
 </div>
 
+<h3 dfn export>Check sensor policy-controlled features</h3>
+
+<div algorithm="check sensor policy-controlled features">
+
+    : input
+    :: |sensor_type|, a [=sensor type=].
+    : output
+    :: True if all of the associated [=sensor feature names=] are [=allowed to use=],
+       false otherwise.
+
+    1.  Let |feature_names| be the |sensor_type|'s associated [=sensor feature names=].
+    1.  [=set/For each=] |feature_name| of |feature_names|,
+        1. If [=active document=] is not [=allowed to use=] the
+           [=policy-controlled feature=] named |feature_name|, then:
+           1.  Return false.
+    1.  Return true.
+</div>
 
 <h3 dfn export>Connect to sensor</h3>
 
@@ -1409,6 +1502,9 @@ Gets the {{DOMException}} object passed to {{SensorErrorEventInit}}.
 
     1.  If |sensor_instance|.{{[[state]]}} is "activated",
         1.  Let |readings| be the [=latest reading=] of |sensor_instance|'s related [=platform sensor=].
+        1.  If the [=extension specification=] defines a [=local coordinate system=] for |sensor_instance|,
+            1. Remap (see [[COORDINATES-TRANSFORMATION]]) |readings| values to the
+               [=local coordinate system=].
         1.  Return |readings|[|key|].
     1.  Otherwise, return null.
 </div>
@@ -1445,6 +1541,13 @@ Such <dfn lt="extension specification">extension specifications</dfn> are encour
 single [=sensor type=], exposing both [=high-level|high=] and [=low-level|low=] level
 as appropriate.
 
+[=Extension specifications=] are encouraged to define whether a [=calibration=]
+process applies to [=sensor readings=].
+
+[=Extension specifications=]
+may explicitly define the [=local coordinate system=] for the associated
+[=sensor type=] or make it configurable per {{Sensor}} object.
+
 For an up-to-date list of [=extension specifications=], please refer to [[GENERIC-SENSOR-USECASES]]
 and [[MOTION-SENSORS]] documents.
 
@@ -1457,7 +1560,8 @@ and [[MOTION-SENSORS]] documents.
   on a case by case basis]],
 - be evaluated against the Self-Review Questionnaire on Security and Privacy
   [[SECURITY-PRIVACY-QUESTIONNAIRE]],
-- and in particular, be evaluated against the <a>same-origin policy violations</a>
+- and in particular, be evaluated against the
+  <a class="non-normative">same-origin policy violations</a>
   that can arise if sensors expose a new communication channel not governed
   by the same-origin policy.
 
@@ -1549,15 +1653,28 @@ accuracy or other settings defined in [=extension specifications=].
 The following definitions must be specified for
 each [=sensor type=] in [=extension specifications=]:
 
--   An [=interface=] whose [=inherited interfaces=] contains {{Sensor}}.
-    This interface must be constructible.
+-   An <dfn export>extension sensor interface</dfn>, which is an [=interface=]
+    whose [=inherited interfaces=] contains {{Sensor}}.
+    The [=extension sensor interface=] must be constructible.
     Its [{{Constructor!!extended-attribute}}] must take, as an argument,
     an optional [=dictionary=] whose [=inherited dictionaries=] contains {{SensorOptions}}.
-    Its [=attributes=] which expose [=sensor readings=] are [=read only=] and
-    their getters must return the result of invoking [=get value from latest reading=]
-    with <strong>this</strong> and [=attribute=] [=identifier=] as arguments.
--   A {{PermissionName}}, if the [=sensor type=] is not representing
-    [=sensor fusion=] (otherwise, {{PermissionName|PermissionNames}}
+
+    The [=extension sensor interface=] has a [=ordered set|set=] of supported options
+    referred to as <dfn export>supported sensor options</dfn>.
+    Unless the [=extension specification=] defines otherwise,
+    [=supported sensor options=] [=set/contain=] a single item which is "frequency".
+
+    The user agent must remove items from [=supported sensor options=] for a given
+    [=extension sensor interface=] if it cannot support the corresponding sensor
+    options.
+
+    The [=extension sensor interface=] [=attributes=] which expose [=sensor readings=] are
+    [=read only=] and their getters must return the result of invoking
+    [=get value from latest reading=] with <strong>this</strong> and
+    [=attribute=] [=identifier=] as arguments.
+
+-   A [=permission name=], if the [=sensor type=] is not representing
+    [=sensor fusion=] (otherwise, [=permission names=]
     associated with the fusion source [=sensor types=] must be used).
 
 An [=extension specification=] may specify the following definitions
@@ -1574,8 +1691,8 @@ for each [=sensor types=]:
 <h3 id="permission-api">Extending the Permission API</h3>
 
 An implementation of the {{Sensor}} interface for each [=sensor type=] must protect its
-[=sensor reading|reading=] by associated {{PermissionName}} or {{PermissionDescriptor}}.
-A [=Low-level=] {{Sensor|sensor}} may use its interface name as a {{PermissionName}},
+[=sensor reading|reading=] by associated [=permission name=] or {{PermissionDescriptor}}.
+A [=Low-level=] {{Sensor|sensor}} may use its interface name as a [=permission name=],
 for instance, "gyroscope" or "accelerometer". [=sensor fusion|Fusion sensors=] must
 [=request permission to use|request permission to access=] each of the sensors that are
 used as a source of fusion.
@@ -1612,11 +1729,11 @@ Note: The [=default allowlist=] of <code>["self"]</code> allows {{Sensor}} inter
 implementation usage in same-origin nested frames but prevents third-party content
 from [=sensor readings=] access.
 
-The [=sensor feature names=] [=ordered set|set=] must contain [=feature names=] of
-every associated [=policy-controlled feature|feature=].
+The [=sensor feature names=] [=ordered set|set=] must contain [=policy-controlled feature=]
+tokens of every associated [=policy-controlled feature|feature=].
 
-A [=Low-level=] {{Sensor|sensor}} may use its interface name as a [=feature name=],
-for instance, "gyroscope" or "accelerometer". Unless the [=extension specification=] tells
+A [=Low-level=] {{Sensor|sensor}} may use its interface name as a [=policy-controlled feature=] token,
+for instance, "gyroscope" or "accelerometer". Unless the [=extension specification=] defines
 otherwise, the [=sensor feature names=] matches the same [=sensor type|type=]-associated
 [=sensor permission names=].
 
