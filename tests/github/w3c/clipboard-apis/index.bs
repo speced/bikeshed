@@ -8,6 +8,7 @@ Status: ED
 TR: https://www.w3.org/TR/clipboard-apis/
 ED: https://w3c.github.io/clipboard-apis/
 Repository: w3c/clipboard-apis
+!Explainer: <a href="https://github.com/w3c/clipboard-apis/blob/master/explainer.adoc">Async Clipboard API Explainer</a>
 Editor: Gary Kacmarcik, Google, garykac@google.com
 Editor: Grisha Lyukshin, Microsoft, glyuk@microsoft.com
 Editor: Hallvord R. M. Steen, Mozilla - emeritus
@@ -260,7 +261,7 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 			data will be copied to the [=system clipboard=].
 			The current document selection is not affected.
 
-			The [=copy=] event bubbles and is cancelable.
+			The [=copy=] event bubbles, is cancelable, and is composed.
 			
 			See [[#copy-action]] for a detailed description of the processing model for
 			this event.
@@ -284,7 +285,7 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 			be an empty list. Note that the [=cut=] event will still be fired
 			in this case.
 
-			The [=cut=] event bubbles and is cancelable.
+			The [=cut=] event bubbles, is cancelable, and is composed.
 
 			See [[#cut-action]] for a detailed description of the processing model for
 			this event.
@@ -306,7 +307,7 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 			The paste action has no effect in a non-[=editable context=],
 			but the [=paste=] event fires regardless.
 
-			The [=paste=] event bubbles and is cancelable.
+			The [=paste=] event bubbles, is cancelable, and is composed.
 
 			See [[#paste-action]] for a detailed description of the processing model for
 			this event.
@@ -514,6 +515,52 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 		});
 		</pre>
 
+	<h3 id="mandatory-data-types-x"><dfn>Mandatory data types</dfn></h3>
+
+		The implementation must recognise the native OS clipboard format description
+		for the following data types, to be able to populate the
+		{{DataTransferItemList}} with the correct description for paste events, and
+		set the correct data format on the OS clipboard in response to copy and cut
+		events.
+
+		<h4 id="reading-from-clipboard">Reading from the clipboard</h4>
+
+			These data types must be exposed by <em>paste</em> events if a
+			corresponding native type exists on the clipboard:
+
+			* text/plain
+			* text/uri-list
+			* text/csv
+			* text/css
+			* text/html
+			* application/xhtml+xml
+			* image/png
+			* image/jpg, image/jpeg
+			* image/gif
+			* image/svg+xml
+			* application/xml, text/xml
+			* application/javascript
+			* application/json
+			* application/octet-stream
+
+		<h4 id="writing-to-clipboard">Writing to the clipboard</h4>
+
+			These data types must be placed on the clipboard with a corresponding
+			native type description if added to a {{DataTransfer}} object during
+			<em>copy</em> and <em>cut</em> events.
+
+			* text/plain
+			* text/uri-list
+			* text/csv
+			* text/html
+			* image/svg+xml
+			* application/xml, text/xml
+			* application/json
+
+			Advisement: Warning! The data types that untrusted scripts are allowed to write to the
+			clipboard are limited as a security precaution. Untrusted scripts can
+			attempt to exploit security vulnerabilities in local software by placing
+			data known to trigger those vulnerabilities on the clipboard.
 
 
 <h2 id="async-clipboard-api">Asynchronous Clipboard API</h2>
@@ -553,10 +600,12 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 		The [=read()=] method must run these steps:
 
 			1. Let |p| be a new [=Promise=].
-
-			1. If the result of [=check clipboard read permission=] is false, then reject |p|
-
+			
 			1. Run the following steps [=in parallel=]:
+
+				1. Let |r| be the result of running [=check clipboard read permission=] [=in parallel=]
+				
+				1. If |r| is not "granted", then reject |p|
 
 				1. Let |data| be a copy of the [=system clipboard data=].
 
@@ -586,9 +635,11 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 
 			1. Let |p| be a new [=Promise=].
 
-			1. If the result of [=check clipboard read permission=] is false, then reject |p|
-
 			1. Run the following steps [=in parallel=]:
+
+				1. Let |r| be the result of running [=check clipboard read permission=] [=in parallel=]
+				
+				1. If |r| is not "granted", then reject |p|
 
 				1. Let |data| be a copy of the [=system clipboard data=].
 				
@@ -605,7 +656,7 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 			<div></div>
 
 			<pre class="example javascript">
-				navigator.clipboard.read().then(function(data) {
+				navigator.clipboard.readText().then(function(data) {
 					console.log(“Your string: ”, data);
 				});
 			</pre>
@@ -618,9 +669,11 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 
 			1. Let |p| be a new [=Promise=].
 			
-			1. If the result of [=check clipboard write permission=] is false, then reject |p|
-
 			1. Run the following steps [=in parallel=]:
+
+				1. Let |r| be the result of running [=check clipboard write permission=] [=in parallel=]
+				
+				1. If |r| is not "granted", then reject |p|
 
 				1. Let |cleanItemList| be an empty {{DataTransferItemList}}.
 
@@ -659,9 +712,11 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 
 			1. Let |p| be a new [=Promise=].
 
-			1. If the result of [=check clipboard write permission=] is false, then reject |p|
-
 			1. Run the following steps [=in parallel=]:
+
+				1. Let |r| be the result of running [=check clipboard write permission=] [=in parallel=]
+				
+				1. If |r| is not "granted", then reject |p|
 
 				1. Let |newItemList| be an empty {{DataTransferItemList}}.
 
@@ -860,7 +915,7 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 
 <h2 id="clipboard-permissions">Permissions API Integration</h2>
 
-	The [[permissions]] API provides a uniform way for websites access
+	The [[permissions]] API provides a uniform way for websites to access
 	<a>powerful feature</a>s like the clipboard. It allows websites to request permissions
 	from users and query which permissions they have.
 	
@@ -1008,54 +1063,6 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 			permission.
 
 		</div><!-- algorithm -->
-
-
-<h2 id="mandatory-data-types-x"><dfn>Mandatory data types</dfn></h2>
-
-	The implementation must recognise the native OS clipboard format description
-	for the following data types, to be able to populate the
-	{{DataTransferItemList}} with the correct description for paste events, and
-	set the correct data format on the OS clipboard in response to copy and cut
-	events.
-
-	<h3 id="reading-from-clipboard">Reading from the clipboard</h3>
-
-		These data types must be exposed by <em>paste</em> events if a
-		corresponding native type exists on the clipboard:
-
-		* text/plain
-		* text/uri-list
-		* text/csv
-		* text/css
-		* text/html
-		* application/xhtml+xml
-		* image/png
-		* image/jpg, image/jpeg
-		* image/gif
-		* image/svg+xml
-		* application/xml, text/xml
-		* application/javascript
-		* application/json
-		* application/octet-stream
-
-	<h3 id="writing-to-clipboard">Writing to the clipboard</h3>
-
-		These data types must be placed on the clipboard with a corresponding
-		native type description if added to a {{DataTransfer}} object during
-		<em>copy</em> and <em>cut</em> events.
-
-		* text/plain
-		* text/uri-list
-		* text/csv
-		* text/html
-		* image/svg+xml
-		* application/xml, text/xml
-		* application/json
-
-		Advisement: Warning! The data types that untrusted scripts are allowed to write to the
-		clipboard are limited as a security precaution. Untrusted scripts can
-		attempt to exploit security vulnerabilities in local software by placing
-		data known to trigger those vulnerabilities on the clipboard.
 
 
 <h2 id="security">Security Considerations</h2>
@@ -1335,16 +1342,15 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 		1. Let |target| be set as follows:
 
 			1. If the context is editable, then
-
+			
 				1. Set |target| to be the element that contains the
-					start of the selection in document order, or
-					[=the body element=] if there is no selection or cursor.
-
+					start of the visible selection or cursor in document order,
+					or [=the body element=] if there is no visible selection or cursor.
+					
 			1. Else, if the context is not editable, then
-
-				1. Set |target| to be the element that contains the
-					start of the selection in document order, or
-					[=the body element=] if there is no selection or cursor.
+			
+				1. Set |target| to the focused node, or [=the body element=] if no node
+					has focus.
 
 		1. Process the event as follows:
 
@@ -1428,6 +1434,8 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 		1. Set |e|'s {{ClipboardEvent/clipboardData}} to |clipboard-event-data|.
 
 		1. Set |e|'s {{Event/isTrusted}} to |trusted|.
+
+		1. Set |e|'s {{Event/composed}} to true.
 
 		1. Dispatch the event |e| which bubbles and is cancelable, and which
 			uses the {{ClipboardEvent}} interface, at |target|.

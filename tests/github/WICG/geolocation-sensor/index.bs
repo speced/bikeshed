@@ -14,8 +14,9 @@ Indent: 2
 Markup Shorthands: markdown on
 Inline Github Issues: true
 !Tests: <a href="https://github.com/w3c/web-platform-tests/tree/master/geolocation-sensor">web-platform-tests</a>
-!Polyfill: <a href="https://github.com/w3c/sensors/blob/master/polyfills/geolocation.js">geolocation.js</a>
+!Polyfills: <a href="https://github.com/kenchris/sensor-polyfills/blob/master/src/geolocation-sensor.js">geolocation-sensor.js</a><br><a href="https://github.com/w3c/sensors/blob/master/polyfills/geolocation.js">geolocation.js</a>
 Boilerplate: omit issues-index, omit conformance, omit feedback-header
+Ignored Vars: p, geo, key
 Default Biblio Status: current
 Note class: note
 </pre>
@@ -27,9 +28,19 @@ urlPrefix: https://w3c.github.io/sensors; spec: GENERIC-SENSOR
     text: latest reading
     text: default sensor
     text: construct a sensor object; url: construct-sensor-object
+    text: initialize a sensor object; url: initialize-a-sensor-object
     text: sensor type
     text: security and privacy; url: security-and-privacy
     text: extensible; url: extensibility
+    text: check sensor policy-controlled features; url: check-sensor-policy-controlled-features
+urlPrefix: https://dom.spec.whatwg.org; spec: DOM
+  type: dfn
+    text: add the following abort steps; url: abortsignal-add
+    text: aborted flag; url: abortsignal-aborted-flag
+urlPrefix: http://w3c.github.io/hr-time/; spec: HR-TIME-2
+  type: interface
+    text: DOMHighResTimeStamp; url: dom-domhighrestimestamp
+</pre>
 </pre>
 <pre class="biblio">
 {
@@ -55,21 +66,35 @@ The feature set of the {{GeolocationSensor}} is similar to that of the Geolocati
 [[GEOLOCATION-API]], but it is surfaced through a modern API that is consistent across
 <a href="https://www.w3.org/2009/dap/#sensors">contemporary sensor APIs</a>, improves
 <a>security and privacy</a>, and is <a>extensible</a>. The API aims to be
-<a href="https://github.com/w3c/sensors/blob/master/polyfills/geolocation.js">polyfillable</a>
-(<a href="https://w3c.github.io/sensors/examples/realtime-positioning/">example</a>)
+<a href="https://github.com/kenchris/sensor-polyfills/blob/master/src/geolocation-sensor.js">polyfillable</a>
+(<a href="https://kenchris.github.io/sensor-polyfills/run-geolocation.html">example</a>)
 on top of the existing Geolocation API.
 
 Examples {#examples}
 ========
 
+<p>
+  Get a new geolocation reading every second:
+</p>
 <div class="example">
   <pre highlight="js">
-  let geo = new GeolocationSensor();
+  let geo = new GeolocationSensor({ frequency: 1 });
   geo.start();
 
   geo.onreading = () => console.log(\`lat: ${geo.latitude}, long: ${geo.longitude}\`);
 
   geo.onerror = event => console.error(event.error.name, event.error.message);
+  </pre>
+</div>
+
+<p>
+  Get a one-shot geolocation reading:
+</p>
+<div class="example">
+  <pre highlight="js">
+  GeolocationSensor.read()
+    .then(geo => console.log(\`lat: ${geo.latitude}, long: ${geo.longitude}\`))
+    .catch(error => console.error(error.name));
   </pre>
 </div>
 
@@ -96,9 +121,10 @@ The <dfn>Geolocation Sensor</dfn> <a>sensor type</a>'s associated {{Sensor}} sub
 The <a>Geolocation Sensor</a> has an associated {{PermissionName}} which is
 <a for="PermissionName" enum-value>"geolocation"</a>.
 
-A [=latest reading=] for a {{Sensor}} of <a>Geolocation Sensor</a> <a>sensor type</a> includes seven
-[=map/entries=] whose [=map/keys=] are "latitude", "longitude", "altitude", "accuracy",
-"altitudeAccuracy", "heading", "speed" and whose [=map/values=] contain device's [=geolocation=].
+A <dfn>latest geolocation reading</dfn> is a [=latest reading=] for a {{Sensor}} of
+<a>Geolocation Sensor</a> <a>sensor type</a>. It includes [=map/entries=] whose [=map/keys=]
+are "latitude", "longitude", "altitude", "accuracy", "altitudeAccuracy", "heading", "speed"
+and whose [=map/values=] contain device's [=geolocation=].
 
 Note: Consider adding a visual of the standard coordinate system for the Earth.
 
@@ -109,8 +135,9 @@ The GeolocationSensor Interface {#geolocationsensor-interface}
 -------------------------------
 
 <pre class="idl">
-  [Constructor(optional SensorOptions options), SecureContext, Exposed=Window]
+  [Constructor(optional GeolocationSensorOptions options), SecureContext, Exposed=Window]
   interface GeolocationSensor : Sensor {
+    static Promise&lt;GeolocationSensorReading&gt; read(optional ReadOptions readOptions);
     readonly attribute unrestricted double? latitude;
     readonly attribute unrestricted double? longitude;
     readonly attribute unrestricted double? altitude;
@@ -119,6 +146,26 @@ The GeolocationSensor Interface {#geolocationsensor-interface}
     readonly attribute unrestricted double? heading;
     readonly attribute unrestricted double? speed;
   };
+
+  dictionary GeolocationSensorOptions : SensorOptions {
+    // placeholder for GeolocationSensor-specific options
+  };
+
+  dictionary ReadOptions : GeolocationSensorOptions {
+    AbortSignal? signal;
+  };
+
+  dictionary GeolocationSensorReading {
+    DOMHighResTimeStamp? timestamp;
+    double? latitude;
+    double? longitude;
+    double? altitude;
+    double? accuracy;
+    double? altitudeAccuracy;
+    double? heading;
+    double? speed;
+  };
+
 </pre>
 
 <div class="note">
@@ -136,8 +183,47 @@ Coordinates</a></code> interface of the Geolocation API are the following:
 </ul>
 </div>
 
-To <dfn>construct a <a>Geolocation Sensor</a> object</dfn> the user agent must invoke the
-[=construct a Sensor object=] abstract operation.
+To construct a {{GeolocationSensor}} object the user agent must invoke the
+[=construct a geolocation sensor object=] abstract operation.
+
+### GeolocationSensor.read() ### {#geolocationsensor-read}
+
+The {{GeolocationSensor/read()}} method, when called, must run the following algorithm:
+
+<div algorithm="read">
+<!-- https://dom.spec.whatwg.org/#abortcontroller-api-integration -->
+
+    : input
+    :: |options|, a {{ReadOptions}} object.
+    : output
+    :: |p|, a promise.
+
+    1. Let |p| be a new promise.
+    1. Let |options| be the first argument.
+    1. Let |signal| be the |options|' dictionary member of the same name if present, or null otherwise.
+    1. If |signal|'s <a>aborted flag</a> is set, then reject |p| with an "{{AbortError!!exception}}" {{DOMException}} and return |p|.
+    1. Let |geo| be the result of invoking <a>construct a Geolocation Sensor object</a> with |options|. If this throws a {{DOMException}}, catch it, reject |p| with that {{DOMException}}, and return |p|.
+    1. Invoke |geo|.{{Sensor/start()}}.
+    1. If |signal| is not null, then <a>add the following abort steps</a> to |signal|:
+      1. Invoke |geo|.{{Sensor/stop()}}.
+      1. Reject |p| with an "{{AbortError!!exception}}" {{DOMException}} and abort these steps.
+    1. Run these steps <a>in parallel</a>:
+      1. If <a>notify error</a> is invoked with |geo|, invoke |geo|.{{Sensor/stop()}}, and reject |p| with the {{DOMException}} passed as input to <a>notify error</a>.
+      1. If <a>notify new reading</a> is invoked with |geo|, then <a>resolve geolocation promise</a> with |geo| and |p|.
+    1. Return |p|.
+</div>
+
+<p class="note">
+Implementations can reuse the same promise for multiple concurrent calls within the same browsing context if the arguments passed to {{read()}} are the same.
+</p>
+
+To <dfn>resolve geolocation promise</dfn> means to run the following steps:
+  1. Let |reading| be a {{GeolocationSensorReading}}.
+  1. [=set/For each=] |key| → |value| of <a>latest geolocation reading</a>:
+    1. [=map/Set=] |reading|[key] to |value|.
+  1. Invoke |geo|.{{Sensor/stop()}}.
+  1. Resolve |p| with |reading|.
+
 
 ### GeolocationSensor.latitude ### {#geolocationsensor-latitude}
 
@@ -191,6 +277,27 @@ The {{GeolocationSensor/speed!!attribute}} attribute of the {{GeolocationSensor}
 returns the result of invoking [=get value from latest reading=] with `this` and "speed" as
 arguments. It represents the magnitude of the horizontal component of the velocity in meters
 per second.
+
+Abstract Operations {#abstract-operations}
+===================
+
+<h3 dfn export>Construct a geolocation sensor object</h3>
+
+<div algorithm="construct a geolocation sensor object">
+
+    : input
+    :: |options|, a {{GeolocationSensorOptions}} object.
+    : output
+    :: A {{GeolocationSensor}} object.
+
+    1.  Let |allowed| be the result of invoking [=check sensor policy-controlled features=]
+        with {{GeolocationSensor}}.
+    1.  If |allowed| is false, then:
+        1.  [=Throw=] a {{SecurityError}} {{DOMException}}.
+    1.  Let |geo| be the new {{GeolocationSensor}} object.
+    1.  Invoke [=initialize a sensor object=] with |geo| and |options|.
+    1.  Return |geo|.
+</div>
 
 Acknowledgements {#acknowledgements}
 ================

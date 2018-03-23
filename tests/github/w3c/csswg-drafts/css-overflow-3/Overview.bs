@@ -10,13 +10,15 @@ TR: https://www.w3.org/TR/css-overflow-3/
 Previous version: https://www.w3.org/TR/2016/WD-css-overflow-3-20160531/
 Previous version: https://www.w3.org/TR/2013/WD-css-overflow-3-20130418/
 Editor: L. David Baron, Mozilla https://www.mozilla.org/, https://dbaron.org/, w3cid 15393
+Editor: Elika J. Etemad / fantasai, Invited Expert, http://fantasai.inkedblade.net/contact, w3cid 35400
 Editor: Florian Rivoal, On behalf of Bloomberg, http://florian.rivoal.net/, w3cid 43241
 Abstract: This module contains the features of CSS relating to scrollable overflow handling in visual media.
 !Change Log: <a href="https://hg.csswg.org/drafts/log/tip/css-overflow/Overview.bs">from 27 January 2015 to the present</a>
 !Change Log: <a href="https://hg.csswg.org/drafts/log/tip/css-overflow/Overview.src.html">from 28 March 2013 to 27 January 2015</a>
 !Change Log: <a href="https://hg.csswg.org/drafts/log/tip/css3-overflow/Overview.src.html">from 31 July 2012 to 27 March 2013</a>
 Ignored Vars: B, P
-Ignored Terms: padding edge
+Ignored Terms: padding edge, viewport, line box, flex order
+At Risk: the 'max-lines' property
 Status Text: <strong>This update trims away most of the experimental new ideas
    for handling overflow that were described in the <a href="https://www.w3.org/TR/2013/WD-css-overflow-3-20130418/">previous Working Draft</a>.
    These ideas are not abandoned; they are merely <a href="https://drafts.csswg.org/css-overflow/">deferred until Level 4</a>.</strong>
@@ -29,9 +31,9 @@ Status Text: <strong>This update trims away most of the experimental new ideas
 <!-- - Abstract has the most introductory sentence last -->
 <!-- FIXME: other bikeshed issues -->
 <pre class="link-defaults">
-spec:css-transforms-1; type:property; text:transform-style
+spec:css-transforms-2; type:property; text:transform-style
 type: dfn; spec:css-multicol-1; text:overflow column
-type: dfn; spec:css-transforms-1; text:3d rendering context
+type: dfn; spec:css-transforms-2; text:3d rendering context
 </pre>
 <!-- FIXME: the break-* link doesn't actually work! -->
 <pre class="anchors">
@@ -58,6 +60,7 @@ Introduction</h2>
 	is that the content not be shown.
 
 	This specification introduces the long-standing de-facto 'overflow-x' and 'overflow-y' properties,
+	adds a ''overflow/clip'' value,
 	and defines overflow handling more fully.
 
 	[Something something 'max-lines'.]
@@ -73,7 +76,7 @@ Introduction</h2>
 -->
 
 <h2 id="overflow-concepts">
-Types of overflow</h2>
+Types of Overflow</h2>
 
 	CSS uses the term <dfn export>overflow</dfn> to describe
 	the contents of a box
@@ -83,7 +86,7 @@ Types of overflow</h2>
 	The term might be interpreted as
 	elements or features that cause this overflow,
 	the non-rectangular region occupied by these features,
-	or, more commonly,
+	or, more commonly, as
 	the minimal rectangle that bounds that region.
 	A box's overflow is computed based on the layout and styling of the box itself
 	and of all descendants whose <a>containing block chain</a>
@@ -107,7 +110,7 @@ Types of overflow</h2>
 		<li><a>scrollable overflow</a>
 	</ul>
 
-<h3 id="ink">Ink overflow</h3>
+<h3 id="ink">Ink Overflow</h3>
 
 	The <dfn export>ink overflow</dfn> of a box
 	is the part of that box and its contents that
@@ -124,22 +127,24 @@ Types of overflow</h2>
 	etc.
 
 	Since some effects in CSS (for example, the blurs in
-	'text-shadow' [[CSS3TEXT]] and 'box-shadow' [[CSS3BG]])
+	'text-shadow' [[CSS-TEXT-3]] and 'box-shadow' [[CSS-BACKGROUNDS-3]],
+	which are theoretically infinite)
 	do not define what visual extent they cover, the extent
 	of the <a>ink overflow</a> is undefined.
 
 	The <dfn export>ink overflow region</dfn> is the non-rectangular area
-	occupied by the <a>ink overflow</a>, and the
-	<dfn export>ink overflow rectangle</dfn> is
-	the minimal rectangle whose axis is aligned to the box's axes
-	and contains the <a>ink overflow region</a>.
+	occupied by the <a>ink overflow</a>
+	of a box and its contents,
+	and the <dfn export>ink overflow rectangle</dfn> is
+	the minimal rectangle whose axes are aligned to the box's axes
+	and that contains the <a>ink overflow region</a>.
 	Note that the <a>ink overflow rectangle</a> is a rectangle
 	in the box's coordinate system, but might be non-rectangular
-	in other coordinate systems due to transforms [[CSS3-TRANSFORMS]].
+	in other coordinate systems due to transforms. [[CSS3-TRANSFORMS]]
 
 
 <h3 id="scrollable">
-Scrollable overflow</h3>
+Scrollable Overflow</h3>
 
 	The <dfn export>scrollable overflow</dfn> of a box is the
 	set of things extending outside of that box's padding edge
@@ -148,8 +153,8 @@ Scrollable overflow</h3>
 	The <dfn export>scrollable overflow region</dfn> is the non-rectangular region
 	occupied by the <a>scrollable overflow</a>, and the
 	<dfn export>scrollable overflow rectangle</dfn> is
-	the minimal rectangle whose axis is aligned to the box's axes
-	and contains the <a>scrollable overflow region</a>.
+	the minimal rectangle whose axes are aligned to the box's axes
+	and that contains the <a>scrollable overflow region</a>.
 
 	The <a>scrollable overflow region</a> is the union of:
 	<ul>
@@ -185,7 +190,9 @@ Scrollable overflow</h3>
 
 		<li>
 			the border boxes
-			of all boxes for which it is the containing block,
+			of all boxes for which it is the containing block
+			and whose border boxes are positioned not wholly outside
+			its <a>block-start</a> or <a>inline-start</a> padding edges,
 			accounting for transforms by projecting each box onto
 			the plane of the element that establishes its <a>3D rendering context</a>.
 			[[!CSS3-TRANSFORMS]]
@@ -213,7 +220,7 @@ Scrollable overflow</h3>
 			coincide with the end edges of its content area
 			when scrolled to the end.
 
-			Issue: It's not yet clear if including the end-side padding in the scrollable layer is Web-compatible, so this clause is under investigation.
+			Issue(129): It's not yet clear if including the end-side padding in the scrollable layer is Web-compatible, so this clause is under investigation.
 			It appears that Chrome and Safari include such padding <a href="https://bug748518.bmoattachments.org/attachment.cgi?id=618078">in the block axis</a>;
 			and the behavior in the inline axis is <a href="http://jsbin.com/digadoyohi/1/edit?html,css,output">not</a> <a href="http://jsbin.com/vexahocayi/1/edit?html,css,output">clear</a>.
 
@@ -255,7 +262,7 @@ Scrollable overflow</h3>
 -->
 
 <h2 id="overflow-properties">
-Scrollable Overflow: the 'overflow-x', 'overflow-y', and 'overflow' properties</h2>
+Scrolling and Clipping Overflow: the 'overflow-x', 'overflow-y', and 'overflow' properties</h2>
 
 	These properties specify whether a box’s content
 	(including any <a>ink overflow</a>)
@@ -277,7 +284,7 @@ Scrollable Overflow: the 'overflow-x', 'overflow-y', and 'overflow' properties</
 		Inherited: no
 		Percentages: N/A
 		Media: visual
-		Computed value: as specified, except with ''visible'' computing to ''auto'' if one of 'overflow-x' or 'overflow-y' is not ''visible''
+		Computed value: as specified, except with ''visible''/''clip'' computing to ''auto''/''hidden'' (respectively) if one of 'overflow-x' or 'overflow-y' is neither ''visible'' nor ''clip''
 		Animatable: no
 	</pre>
 
@@ -310,8 +317,8 @@ Scrollable Overflow: the 'overflow-x', 'overflow-y', and 'overflow' properties</
 	<dl dfn-for="overflow, overflow-x, overflow-y" dfn-type="value">
 		<dt><dfn>visible</dfn>
 		<dd>
-			There is no special handling of overflow, that is, it
-			may be rendered outside the box.
+			There is no special handling of overflow, that is,
+			the box’s content is rendered outside the box if positioned there.
 			The box is not a <a>scroll container</a>.
 
 		<dt><dfn>hidden</dfn>
@@ -352,40 +359,46 @@ Scrollable Overflow: the 'overflow-x', 'overflow-y', and 'overflow' properties</
 			whether or not any of its content is clipped.
 			This avoids any problem with scrollbars appearing
 			and disappearing in a dynamic environment.
-			When this value is specified and the target medium is ''print'',
-			overflowing content may be printed.
+			When the target medium is ''print'',
+			overflowing content may be printed;
+			it is not defined where it may be printed.
 
 		<dt><dfn>auto</dfn>
 		<dd>
-			This value indicates that
-			the box’s content is clipped to the padding box,
-			but can be scrolled into view
-			(and therefore the box is a <a>scroll container</a>).
-			However, if the user agent uses a scrolling mechanism
+			Like ''overflow/scroll'' when the box has <a>scrollable overflow</a>;
+			like ''overflow/hidden'' otherwise.
+			Thus, if the user agent uses a scrolling mechanism
 			that is visible on the screen (such as a scroll bar or a panner),
-			that mechanism should only be displayed
+			that mechanism will only be displayed
 			if there is overflow.
 		</dl>
 
-	If the computed value of 'overflow' on a <a>block box</a> is not ''overflow/visible'',
+	If the computed value of 'overflow' on a <a>block box</a>
+	is not ''overflow/visible'',
 	it creates a new <a>block formatting context</a> for its content.
 
-<h3 id="overflow-propagation">
-Overflow Value Propagation</h3>
 
-	UAs must apply the 'overflow' property
-	set on the root element to the viewport.
-	When the root element is an [[!HTML]] <{html}> element
-	(including <a href="https://html.spec.whatwg.org/multipage/introduction.html#html-vs-xhtml">XML syntax for HTML</a>),
-	and that element has a <{body}> element as a child,
-	user agents must instead apply the 'overflow' property
-	from the first such child element to the viewport,
-	if the value on the root element is ''overflow/visible''.
-	The ''overflow/visible'' value when used for the viewport must be interpreted as ''overflow/auto''.
-	The element from which the value is propagated must have a used value for 'overflow' of ''overflow/visible''.
+<h3 id="static-media">
+Overflow in Print and Other Static Media</h3>
 
-	If this application would result in the viewport having ''visible'' overflow,
-	the UA must instead treat the viewport as having ''overflow/auto'' overflow.
+	<p class="advisement">
+		Since scrolling is not possible in static media
+		(such as print)
+		authors should be careful to make content accessible in such media,
+		for example by using ''@media print, (update: none) { &hellip; }''
+		to adjust layout such that all relevant content
+		is simultaneously visible.
+
+	On <a>scroll containers</a> in <a>static media</a>
+	with an 'overflow' value of ''overflow/auto'' or ''overflow/scroll''
+	(but not ''overflow/hidden'')
+	UAs may display an indication of any scrollable overflow,
+	such as by displaying scrollbars
+	or an ellipsis.
+
+	Note: Not all <a>paged media</a> is <a lt="static media">static</a>;
+	for example, e-book readers page content,
+	but are <a lt="interactive media">interactive</a>.
 
 <h3 id="scrollbar-layout">
 Scrollbars and Layout</h3>
@@ -408,10 +421,11 @@ Scrolling Origin, Direction, and Restriction</h3>
 	with respect to its border box,
 	prior to any user or programmatic scrolling that changes it,
 	is dependent on the box’s <a>writing mode</a>,
-	and is by default the <a>block-start</a>/</a>inline-start</a> edge
+	and is by default the <a>block-start</a>/<a>inline-start</a> edge
 	of the box’s <a>padding edge</a>.
 	However, the 'align-content' and 'justify-content' properties [[!CSS-ALIGN-3]]
-	can be used to change this.
+	can be used to change this,
+	see [[css-align-3#overflow-scroll-position]].
 
 	Due to Web-compatibility constraints
 	(caused by authors exploiting legacy bugs to surreptitiously hide content from visual readers but not search engines and/or speech output),
@@ -422,15 +436,32 @@ Scrolling Origin, Direction, and Restriction</h3>
 
 	The viewport uses the <a>principal writing mode</a> for these calculations.
 
-<h2 id="max-lines">
-Limiting Number of Visible Text Lines: the 'max-lines' property</h2>
+<h3 id="overflow-propagation">
+Overflow Viewport Propagation</h3>
 
+	UAs must apply the 'overflow-*' values
+	set on the root element to the <a>viewport</a>.
+	However,
+	when the root element is an [[!HTML]] <{html}> element
+	(including <a href="https://html.spec.whatwg.org/multipage/introduction.html#html-vs-xhtml">XML syntax for HTML</a>)
+	whose 'overflow' value is ''overflow/visible'' (in both axes),
+	and that element has a <{body}> element as a child,
+	user agents must instead apply the 'overflow-*' values
+	of the first such child element to the viewport.
+	The element from which the value is propagated must then have
+	a used 'overflow' value of ''overflow/visible''.
+
+	If ''overflow/visible'' is applied to the viewport,
+	it must be interpreted as ''overflow/auto''.
+
+<h2 id="max-lines">
+Limiting Visible Lines: the 'max-lines' property</h2>
 
 	<pre class=propdef>
 		Name: max-lines
 		Value: none | <<integer>>
 		Initial: none
-		Applies to: all non-inline elements
+		Applies to: <a>block containers</a> (excluding <a>multi-column containers</a>)
 		Inherited: no
 		Animatable: as integer
 		Percentages: N/A
@@ -438,21 +469,256 @@ Limiting Number of Visible Text Lines: the 'max-lines' property</h2>
 		Computed value: specified value
 	</pre>
 
-	Issue: Add back 'max-lines', so we can kill the unspecified WebKit feature that does this poorly.
+	This property allows limiting the contents of a block container
+	to the specified number of lines;
+	remaining content is fragmented away
+	and neither rendered nor measured.
+	Specifically,
+	if the value of 'max-lines' is not <dfn for=max-lines type=value>none</dfn>:
+
+	<ul>
+		<li>The box becomes a <a>fragmentation container</a>
+			that captures <a>region breaks</a>,
+			if it is not already.
+			[[!CSS-BREAK-3]]
+
+		<li>A <a>region break</a>
+			is forced after its <var>N</var>th
+			descendant <a>in-flow</a> <a>line box</a>,
+			where <var>N</var> is the specified value of 'max-lines'.
+			The contents of descendants that are <a>scroll containers</a>
+			or that are not <a>block containers</a>
+			are skipped over while counting line boxes.
+
+			If fewer than <var>N</var> line boxes exist,
+			then 'max-lines' introduces no <a>region break</a>.
+
+		<li>The position of the first forced <a>region break</a>
+			(whether imposed by 'max-lines' or by another mechanism,
+			such as the 'break-before'/'break-after' properties)
+			is treated as the end of the <a>fragmentation container</a>,
+			and the rest of the <a>fragmented flow</a> is laid out in
+			the next <a>fragmentation container</a> in the <a>fragmentation context</a>.
+
+			If there is no subsequent <a>fragmentation container</a>
+			(which is the case if the box became a <a>fragmentation container</a>
+			merely as a consequence of applying the 'max-lines' property),
+			the rest of the <a>fragmented flow</a> is discarded,
+			similar to if it were ''display: none'':
+			it is neither rendered,
+			nor measured as part of the box’s contents for the purpose of
+			finding its <a lt="min-content block size">min-content</a>, <a>max-content</a>, or <a lt="automatic size">automatic</a> <a>block sizes</a>,
+			nor does allow user interaction.
+			However, since intrinsic sizes are calculated across all <a>fragmentation containers</a>,
+			this content <em>is</em> taken into account
+			for the purpose of finding the box’s
+			<a lt="min-content inline size">min-content</a> and <a>max-content</a> <a>inline sizes</a>
+			(see [[css-break-3#varying-size-boxes]]).
+
+			Note: In the case of <a href="https://www.w3.org/TR/css-break-3/#parallel-flows">parallel fragmentation flows</a>,
+			content occuring after the <a>fragmentation break</a> in the box tree
+			could still be rendered,
+			if it is laid out above the position
+			representing the end of this <a>fragmentation container</a>.
+
+			<!-- Honoring forced breaks from other sources
+			is to handle future use cases,
+			such as using 'max-lines' to size the first region
+			in a two-region section,
+			where the first region is for styling the first N lines of the article
+			differently from the rest. -->
+
+	</ul>
+
+	Only positive integers are accepted.
+	Zero or negative integers are invalid
+	and must cause the declaration to be <a>ignored</a>.
+
+	Note: The 'widows', 'orphans', and 'break-inside' properties
+	do not affect the position of the forced <a>region break</a>
+	introduced by the 'max-lines' property.
 
 
-<h2 id="static-media">
-Overflow in static media</h2>
+<h2 id="block-ellipsis">
+Indicating Block-Axis Overflow: the 'block-overflow' property</h2>
 
-	<p class="issue">
-		This specification should define useful behavior
-		for all values of 'overflow'
-		in static media (such as print).
-		Current implementation behavior is quite poor and
-		produces unexpected results when authors have not considered
-		what will happen when
-		the content they produce for interactive media
-		is printed.
+	ISSUE: This section is an unofficial draft, posted here for discussion.
+	See <a href="https://github.com/w3c/csswg-drafts/issues/390">issue</a>.
+
+	<pre class=propdef>
+		Name: block-overflow
+		Value: clip | ellipsis | <<string>>
+		Initial: clip
+		Applies to: <a>block containers</a>
+		Inherited: yes
+		Animatable: no
+		Percentages: N/A
+		Media: visual
+		Computed value: specified value
+	</pre>
+
+	This property allows inserting content into the last line box
+	before a (forced <em>or</em> unforced) <a>region break</a>
+	to indicate the continuity of truncated/interrupted content.
+	It only affects line boxes contained directly by the <a>block container</a> itself,
+	but as it inherits, will have an effect on descendants’ line boxes unless overridden.
+	If the box contains no line box immediately preceding a <a>region break</a>,
+	then this property has no effect.
+
+	ISSUE: Should this apply to other types of fragmentation breaks (e.g. pages, columns)?
+
+	The inserted content is called the <dfn>block overflow ellipsis</dfn>.
+	Values have the following meanings:
+
+	<dl dfn-for="block-overflow" dfn-type=value>
+		<dt><dfn>clip</dfn>
+		<dd>
+			The rendering is unaffected.
+
+		<dt><dfn>ellipsis</dfn>
+		<dd>
+			Render an ellipsis character (U+2026)--
+			or a more typographically-appropriate equivalent--
+			as the <a>block overflow ellipsis</a>
+			at the end of the affected line box.
+			UAs should use the conventions of the
+			<a>content language</a>,
+			writing system, and
+			<a>writing mode</a>
+			to determine the most appropriate ellipsis string.
+
+		<dt><dfn><<string>></dfn>
+		<dd>
+			Render the specified string
+			as the <a>block overflow ellipsis</a>
+			at the end of the affected line box.
+			The UA may truncate this string if it is absurdly long.
+	</dl>
+
+	<div class="example">
+		In this example, the lead paragraph of each article
+		is listed in a shortened menu,
+		truncated to fit within 10 lines
+		that end with “… (continued on next page)”:
+
+		<xmp highlight=css>
+			li {
+				max-lines: 5;
+				block-overflow: "… (continued on next page)";
+			}
+			strong {
+				display: block;
+				text-transform: uppercase;
+			}
+		</xmp>
+
+		<xmp highlight=markup>
+			<li><a href="cheese-is-milk">
+				<strong>Cheese is Actually Made of Milk!</strong>
+				Investigative reporters at the World Wide Web Press Corps
+				have discovered the secret of cheese.
+				Tracing through byzantine layers of bureacracy and shadow corporations,
+				our crack team of journalists have traced the source of camembert.
+			</a></li>
+		</xmp>
+
+		Sample rendering:
+
+		<pre class="figure">
+			+---------------------------------------+
+			| CHEESE IS ACTUALLY MADE OF MILK!      |
+			| Investigative reporters at the World  |
+			| Wide Web Press Corps have discovered  |
+			| the secret of cheese. Tracing through |
+			| byzantine…  (continued on next page)  |
+			+---------------------------------------+
+		</pre>
+	</div>
+
+	When 'block-overflow' is not ''block-overflow/clip'',
+	the <a>block overflow ellipsis</a> string
+	is wrapped in an anonymous inline
+	and placed at the end of the line box
+	as a direct child of the <a>block container</a>’s <a>root inline box</a>,
+	reducing the space in the line box
+	available to the other contents of the line.
+	This inline is assigned ''unicode-bidi: plaintext''
+	and is placed in the line box after the last
+	<a>soft wrap opportunity</a> [[!CSS-TEXT-3]]
+	that would still allow the entire <a>block overflow ellipsis</a> to fit on the line.
+	(This can result in the entire contents of the line box being replaced.)
+	For this purpose, <a>soft wrap opportunities</a> added by 'overflow-wrap' are ignored.
+	Text <a href="https://www.w3.org/TR/css-text-3/#justification">alignment and justification</a>
+	occurs after placement,
+	and measures the inserted <a>block overflow ellipsis</a>
+	together with the rest of the line’s content.
+
+	If there is no next <a>fragmentation container</a>
+	and thus the remainder of the content after the break would be discarded,
+	then the UA may visually replace the contents of the line,
+	as it does for 'text-overflow'.
+	If, however, there is a next <a>fragmentation container</a>
+	that would receive subsequent content,
+	then the content replaced by the <a>block overflow ellipsis</a>
+	must be pushed to the next <a>fragmentation container</a>
+	and the <a>block overflow ellipsis</a> inserted and laid out
+	exactly as if it were part of the <a>in-flow</a> contents of the line.
+	This can result in changes to layout within or impacted by the line.
+	The means of breaking any resulting cycles is up to the UA.
+
+	If the <a>block overflow ellipsis</a>
+	is too long to fit in the line,
+	the result is undefined.
+	(The UA may, for example, treat the <a>block overflow ellipsis</a> as an unbreakable string,
+	or it may lay out the string across more than one line,
+	replacing content in earlier lines as well.)
+
+	The <a>block overflow ellipsis</a> does not capture events:
+	pointer events are dispatched to whatever is underneath
+	or otherwise visually replaced by it.
+
+	It also has no effect on the intrinsic size of the box:
+	its <a lt="min-content size">min-content</a> and <a lt="max-content size">max-content</a> sizes
+	are calculated exactly as if 'block-overflow' were ''block-overflow/clip''.
+
+	Note: Future specifications may extend this feature,
+	for example by providing an ''::ellipsis'' pseudo-element
+	to style the text,
+	or by allowing the selection of a child element of the block
+	to use as either an inline-level or block-level indicator
+	(in which case, it can capture events).
+
+
+<h2 id=line-clamp>
+Setting 'max-lines' and 'block-overflow' together: the 'line-clamp' property</h2>
+
+	<pre class=propdef>
+		Name: line-clamp
+		Value: none | <<integer>>
+		Initial: none
+		Applies to: see individual properties
+		Inherited: see individual properties
+		Animatable: see individual properties
+		Percentages: N/A
+		Media: visual
+		Computed value: see individual properties
+	</pre>
+
+	The 'line-clamp' property is a <a>shorthand</a>
+	for the 'max-lines' and 'block-overflow' properties.
+
+	<dl dfn-for=line-clamp dfn-type=value>
+		<dt><dfn>none</dfn>
+		<dd>Sets 'max-lines' to ''max-lines/none''
+			and 'block-overflow' to ''block-overflow/clip''.
+
+		<dt><dfn><<integer>></dfn>
+		<dd>Sets 'max-lines' to the specified <<integer>>
+			and 'block-overflow' to ''block-overflow/ellipsis''.
+
+	</dl>
+
+	For compatibility with legacy content, UAs that support 'line-clamp' must also support <dfn dfn-type=property>-webkit-line-clamp</dfn> as an alias.
 
 
 Privacy and Security Considerations {#priv-sec}
@@ -469,7 +735,6 @@ Acknowledgments</h2>
 		Bert Bos,
 		Tantek Çelik,
 		John Daggett,
-		fantasai,
 		Daniel Glazman,
 		Vincent Hardy,
 		H&aring;kon Wium Lie,

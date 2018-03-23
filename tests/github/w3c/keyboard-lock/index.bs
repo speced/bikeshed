@@ -76,106 +76,125 @@ spec: ecma-262; urlPrefix: http://tc39.github.io/ecma262/
 	system. The Keyboard Lock API enables websites to capture and use
 	all available keys allowed by the OS.
 
-<h2 id="API">Activating and Deactivating Keyboard Lock</h3>
+<h2 id="API">Keyboard Lock API</h2>
 
-	<pre class="idl" data-highlight="webidl">
-	partial interface Navigator {
-		[SecureContext] Promise&lt;void> keyboardLock(optional sequence&lt;DOMString> keyCodes = []);
-		[SecureContext] void keyboardUnlock();
-	};
-	</pre>
+	<h3 id="navigator-interface">Navigator Interface</h3>
 
-	The navigator has <dfn>enable keyboard lock</dfn>, which is a
-	boolean that is set to true when Keyboard Lock is enabled.
-	By default, this is set to false.
+		<pre class="idl" data-highlight="webidl">
+		partial interface Navigator {
+			[SecureContext, SameObject] readonly attribute Keyboard keyboard;
+		};
+		</pre>
 
-	The navigator has <dfn>reserved key codes</dfn>, which is a
-	set of DOMStrings, each of which is a valid [=key code attribute value=]
-	as defined in [[UIEvents-Code]].
-	By default this set is empty (which would capture all keys
-	if [=enable keyboard lock=] was enabled).
+		<div id="navigator-idl" dfn-for="Navigator">
 
-	<h3 id="keyboardLock">keyboardLock</h3>
+		<div class="algorithm" data-algorithm="navigator-keyboard">
+		<h4 id="h-navigator-keyboard"><dfn>keyboard</dfn></h4>
+		The [=keyboard=] attribute must return the {{Navigator}}'s [=keyboard=] object.
+		</div>
 
-		When {{keyboardLock()}} is called, the user agent must
-		run the following steps:
+		</div><!-- dfn-for Navigator -->
 
-		1. Let |p| be a new [=Promise=].
+	<h3 id="keyboard-interface">Keyboard Interface</h3>
+
+		<pre class="idl" data-highlight="webidl">
+		[SecureContext, Exposed=Window] interface Keyboard {
+			Promise&lt;void> lock(optional sequence&lt;DOMString> keyCodes = []);
+			void unlock();
+		};
+		</pre>
+
+		The keyboard object has <dfn>enable keyboard lock</dfn>, which is a
+		boolean that is set to true when Keyboard Lock is enabled.
+		By default, this is set to false.
+
+		The keyboard object has <dfn>reserved key codes</dfn>, which is a
+		set of DOMStrings, each of which is a valid [=key code attribute value=]
+		as defined in [[UIEvents-Code]].
+		By default this set is empty (which would capture all keys
+		if [=enable keyboard lock=] was enabled).
+
+		<h4 id="keyboard.lock">lock</h4>
+
+			When {{lock()}} is called, the user agent must
+			run the following steps:
+
+			1. Let |p| be a new [=Promise=].
 		
-		1. [=Queue a task=] that runs the following steps:
+			1. [=Queue a task=] that runs the following steps:
 
-			1. Reset [=reserved key codes=] to be an empty set.
+				1. Reset [=reserved key codes=] to be an empty set.
 
-			1. If the optional {{keyCodes}} argument is present, run the
-				following substeps:
+				1. If the optional {{keyCodes}} argument is present, run the
+					following substeps:
 
-				1. [=list/For each=] string |key| in {{keyCodes}}:
+					1. [=list/For each=] string |key| in {{keyCodes}}:
 			
-					1. If |key| contains a valid [=key code attribute value=], then
+						1. If |key| contains a valid [=key code attribute value=], then
 				
-						1. [=set/Append=] |key| to [=reserved key codes=].
+							1. [=set/Append=] |key| to [=reserved key codes=].
 
-			1. If [=enable keyboard lock=] is currently false, run the following
-				substeps:
+				1. If [=enable keyboard lock=] is currently false, run the following
+					substeps:
 
-				1. [=Register a system key press handler=].
+					1. [=Register a system key press handler=].
 
-				1. Set [=enable keyboard lock=] to be true.
+					1. Set [=enable keyboard lock=] to be true.
 			
-			1. Resolve |p|.
+				1. Resolve |p|.
 
-		1. Return |p|.
+			1. Return |p|.
 
-		Note: If {{keyboardLock()}} is called multiple times without an
-		intervening call to {{keyboardUnlock()}}, then only the
-		{{keyCodes}} specified in the last request call will be in effect.
+			Note: If {{lock()}} is called multiple times without an
+			intervening call to {{unlock()}}, then only the
+			{{keyCodes}} specified in the last request call will be in effect.
 		
-		<div class="example">
-		To capture all keys, simply call {{keyboardLock()}} with no arguments:
-		<pre>
-			navigator.keyboardLock();
-		</pre>
-		</div>
+			<div class="example">
+			To capture all keys, simply call {{lock()}} with no arguments:
+			<pre>
+				navigator.keyboard.lock();
+			</pre>
+			</div>
 		
-		<div class="example">
-		To capture the "W", "A", "S", and "D" keys, call {{keyboardLock()}} with
-		a list that contains the [=key code attribute value=] for each of these keys:
-		<pre>
-			navigator.keyboardLock(["KeyW", "KeyA", "KeyS", "KeyD"]);
-		</pre>
-		This will capture these keys regardless of which modifiers are used with the
-		key press. Registering [=KeyW=] will ensure that W, Shift+W, Control+W,
-		Control+Shift+W, and all other key modifier combinations with "W" will be
-		sent to the app. Similarly for [=KeyA=], [=KeyS=] and [=KeyD=].
-		</div>
+			<div class="example">
+			To capture the "W", "A", "S", and "D" keys, call {{lock()}} with
+			a list that contains the [=key code attribute value=] for each of these keys:
+			<pre>
+				navigator.keyboard.lock(["KeyW", "KeyA", "KeyS", "KeyD"]);
+			</pre>
+			This will capture these keys regardless of which modifiers are used with the
+			key press. Registering [=KeyW=] will ensure that W, Shift+W, Control+W,
+			Control+Shift+W, and all other key modifier combinations with "W" will be
+			sent to the app. Similarly for [=KeyA=], [=KeyS=] and [=KeyD=].
+			</div>
 		
-		<div class="example">
-		Note that requesting a key is not a guarantee that all modified versions will
-		be made available to the app. As an example, consider [=Delete=]
-		<pre>
-			navigator.keyboardLock(["Delete"]);
-		</pre>
-		While this will make most Delete key presses available (e.g., Shift+Delete,
-		Control+Delete, Shift+Control+Delete), on Windows it will not make available
-		the “secure attention sequence” Control+Alt+Delete.
-		</div>
+			<div class="example">
+			Note that requesting a key is not a guarantee that all modified versions will
+			be made available to the app. As an example, consider [=Delete=]
+			<pre>
+				navigator.keyboard.lock(["Delete"]);
+			</pre>
+			While this will make most Delete key presses available (e.g., Shift+Delete,
+			Control+Delete, Shift+Control+Delete), on Windows it will not make available
+			the “secure attention sequence” Control+Alt+Delete.
+			</div>
 		
-	<h3 id="keyboardUnlock">keyboardUnlock</h3>
+		<h4 id="keyboard.unlock">unlock</h4>
 
-		When {{keyboardUnlock()}} is called, the user agent must
-		run the following steps:
+			When {{unlock()}} is called, the user agent must
+			run the following steps:
 
-		1. If [=enable keyboard lock=] is true, then run the following substeps:
+			1. If [=enable keyboard lock=] is true, then run the following substeps:
 
-			1. [=Unregister the system key press handler=].
+				1. [=Unregister the system key press handler=].
 
-			1. Set [=enable keyboard lock=] to be false.
+				1. Set [=enable keyboard lock=] to be false.
 
-			1. Reset [=reserved key codes=] to be an empty sequence.
+				1. Reset [=reserved key codes=] to be an empty sequence.
 
-		Note: When a document is closed, the user agent MUST implicitly call
-		{{keyboardUnlock()}} so that the [system key press handler=] (if any) is
-		unregistered.
+			Note: When a document is closed, the user agent MUST implicitly call
+			{{unlock()}} so that the [system key press handler=] (if any) is
+			unregistered.
 		
 <h2 id="handling-events">Handling Keyboard Key Presses</h2>
 

@@ -25,14 +25,72 @@ Default Biblio Status: current
 Note class: note
 </pre>
 <pre class="anchors">
-urlPrefix: https://w3c.github.io/sensors; spec: GENERIC-SENSOR
+urlPrefix: https://w3c.github.io/sensors/; spec: GENERIC-SENSOR
   type: dfn
     text: high-level
     text: sensor
     text: latest reading
     text: default sensor
-    text: construct a sensor object; url: construct-sensor-object
+    text: initialize a sensor object; url: initialize-a-sensor-object
     text: sensor type
+    text: local coordinate system
+    text: sensor readings; url: sensor-reading
+    text: check sensor policy-controlled features; url: check-sensor-policy-controlled-features
+    text: location tracking; url: location-tracking
+    text: keylogging; url: keystroke-monitoring
+    text: fingerprinting; url: device-fingerprinting
+    text: user identifying; url: user-identifying
+    text: generic mitigations; url: mitigation-strategies
+    text: sensor permission name; url: sensor-permission-names
+    text: supported sensor options
+urlPrefix: https://www.w3.org/TR/screen-orientation/; spec: SCREEN-ORIENTATION
+  type: dfn
+    text: current orientation type;  url: dfn-current-orientation-type
+    text: dom screen; url: dom-screen
+</pre>
+
+<pre class=link-defaults>
+  spec: webidl;
+    type:dfn;
+      text:identifier
+</pre>
+
+<pre class=biblio>
+{
+    "KEYSTROKEDEFENSE": {
+        "authors": [
+            "Song, Yihang, et al"
+        ],
+        "id": "KEYSTROKEDEFENSE",
+        "href": "https://arxiv.org/abs/1410.7746",
+        "title": "Two novel defenses against motion-based keystroke inference attacks",
+        "date": "2014",
+        "status": "Informational",
+        "publisher": "arXiv"
+     },
+    "TOUCHSIGNATURES": {
+        "authors": [
+            "Mehrnezhad, Maryam, et al"
+        ],
+        "id": "TOUCHSIGNATURES",
+        "href": "https://arxiv.org/abs/1602.04115",
+        "title": "Touchsignatures: identification of user touch actions and pins based on mobile sensor data via javascript",
+        "date": "2016",
+        "status": "Informational",
+        "publisher": "Journal of Information Security and Applications"
+     },
+    "ACCESSORY": {
+        "authors": [
+            "Owusu, Emmanuel, et al"
+        ],
+        "id": "ACCESSORY",
+        "href": "https://dl.acm.org/citation.cfm?id=2162095",
+        "title": "ACCessory: password inference using accelerometers on smartphones",
+        "date": "2012",
+        "status": "Informational",
+        "publisher": "Proceedings of the Twelfth Workshop on Mobile Computing Systems & Applications"
+     }
+}
 </pre>
 
 Introduction {#intro}
@@ -60,6 +118,42 @@ Examples {#examples}
     </pre>
 </div>
 
+<div class="example">
+    The following example shows how to use gravity sensor that provides
+    readings in the [=screen coordinate system=]. The snippet will print message to the
+    console when the [=dom screen=] is perpendicular to the ground and bottom of the
+    rendered web page is pointing downwards.
+    <pre highlight="js">
+    let sensor = new GravitySensor({frequency: 5, referenceFrame: "screen"});
+
+    sensor.onreading = () => {
+      if (sensor.y >= 9.8) {
+        console.log("Web page is perpendicular to the ground.");
+      }
+    }
+
+    sensor.start();
+    </pre>
+</div>
+
+<div class="example">
+    The following example detects shake gesture along x axis of the device, regardless
+    of the orientation of the [=dom screen=].
+    <pre highlight="js">
+    const shakeThreshold = 25;
+
+    let sensor = new LinearAccelerationSensor({frequency: 60});
+
+    sensor.addEventListener('reading', () => {
+      if (sensor.x > shakeThreshold) {
+        console.log("Shake detected.");
+      }
+    });
+
+    sensor.start();
+    </pre>
+</div>
+
 Use Cases and Requirements {#usecases-requirements}
 ==============================
 
@@ -70,8 +164,18 @@ Sensor use cases</a></cite> documents.
 Security and Privacy Considerations {#security-and-privacy}
 ===================================
 
-There are no specific security and privacy considerations
-beyond those described in the Generic Sensor API [[!GENERIC-SENSOR]].
+[=Sensor readings=] provided by inertial sensors, such as accelerometer, could be used by adversaries
+to exploit various security threats, for example, [=keylogging=], [=location tracking=],
+[=fingerprinting=] and [=user identifying=].
+
+Research papers published by security community, for instance, [[KEYSTROKEDEFENSE]], indicate that
+by throttling the frequency, risks of successful attacks are not fully eliminated, while throttling
+may greatly affect usefulness of a web application with legitimate reasons to use the sensors.
+
+The [[TOUCHSIGNATURES]] and [[ACCESSORY]] research papers propose that implementations can
+provide visual indication when inertial sensors are in use and/or require explicit user consent to
+access [=sensor readings=]. These mitigation strategies complement the [=generic mitigations=] defined
+in the Generic Sensor API [[!GENERIC-SENSOR]].
 
 Model {#model}
 =====
@@ -80,7 +184,7 @@ The <dfn id="accelerometer-sensor-type">Accelerometer</dfn> <a>sensor type</a>'s
 
 The <a>Accelerometer</a> has a [=default sensor=], which is the device's main accelerometer sensor.
 
-The <a>Accelerometer</a> has an associated {{PermissionName}} which is <a for="PermissionName" enum-value>"accelerometer"</a>.
+The <a>Accelerometer</a> has an associated [=sensor permission name=] which is <a for="PermissionName" enum-value>"accelerometer"</a>.
 
 A [=latest reading=] for a {{Sensor}} of <a>Accelerometer</a> <a>sensor type</a> includes three [=map/entries=]
 whose [=map/keys=] are "x", "y", "z" and whose [=map/values=] contain device's [=acceleration=]
@@ -94,7 +198,9 @@ The frame of reference for the [=acceleration=] measurement must be inertial, su
 provide 0 (m/s<sup>2</sup>) [=acceleration=] value for each axis.
 
 The sign of the [=acceleration=] values must be according to the right-hand convention in a [=local coordinate
-system=] defined by the device.
+system=] (see figure below).
+
+<img src="images/accelerometer_coordinate_system.svg" onerror="this.src='images/accelerometer_coordinate_system.png'" style="display: block;margin: auto;" alt="Accelerometer coordinate system.">
 
 The {{LinearAccelerationSensor}} class is an {{Accelerometer}}'s subclass. The {{LinearAccelerationSensor}}'s
 [=latest reading=] contains device's [=linear acceleration=] about the corresponding axes.
@@ -107,10 +213,40 @@ The {{GravitySensor}} class is an {{Accelerometer}}'s subclass. The {{GravitySen
 
 The <dfn>gravity</dfn> is a force that attracts an object to the center of the earth, or towards any other physical object having mass.
 
-Note: The <dfn>local coordinate system</dfn> of a mobile device is usually defined relative to
-the device's screen when the device in its default orientation (see figure below).
+Reference Frame {#reference-frame}
+----------------
 
-<img src="images/accelerometer_coordinate_system.png" srcset="images/accelerometer_coordinate_system.svg" style="display: block;margin: auto;" alt="Accelerometer coordinate system.">
+The [=local coordinate system=] represents the reference frame for the
+{{Accelerometer}}, {{LinearAccelerationSensor}}, and the {{GravitySensor}}
+[=sensor readings|readings=]. It can be either the [=device coordinate system=]
+or the [=screen coordinate system=].
+
+The <dfn export>device coordinate system</dfn> is defined as a three dimensional
+Cartesian coordinate system (x, y, z), which is bound to the physical device.
+For devices with a display, the origin of the [=device coordinate system=] is
+the center of the device display. If the device is held in its default position,
+the Y-axis points towards the top of the display, the X-axis points towards the right of
+the display and Z-axis is the vector product of X and Y axes and it points outwards from
+the display, and towards the viewer. The [=device coordinate system=] remains stationary
+regardless of the [=dom screen=] orientation (see figure below).
+
+<img src="images/device_coordinate_system.svg" onerror="this.src='images/device_coordinate_system.png'" style="display: block;margin: auto;" alt="Device coordinate system.">
+
+The <dfn export>screen coordinate system</dfn> is defined as a three dimensional
+Cartesian coordinate system (x, y, z), which is bound to the [=dom screen=].
+The origin of the [=screen coordinate system=] in the center
+of the [=dom screen=]. The Y-axis always points towards the top of the [=dom screen=],
+the X-axis points towards the right of the [=dom screen=] and Z-axis is the
+vector product of X and Y axes and it and it points outwards from the [=dom screen=],
+and towards the viewer (see figure below).
+
+<img src="images/screen_coordinate_system.svg" onerror="this.src='images/screen_coordinate_system.png'" style="display: block;margin: auto;" alt="Screen coordinate system.">
+
+The main difference between the [=device coordinate system=] and the [=screen coordinate system=],
+is that the [=screen coordinate system=] always follows the [=dom screen=] orientation,
+i.e. it will swap X and Y axes in relation to the device if the [=current orientation type=]
+changes. In contrast, the [=device coordinate system=] will always remain stationary relative to
+the device.
 
 API {#api}
 ===
@@ -119,16 +255,26 @@ The Accelerometer Interface {#accelerometer-interface}
 --------------------------------
 
 <pre class="idl">
-  [Constructor(optional SensorOptions options), SecureContext, Exposed=Window]
+  [Constructor(optional AccelerometerSensorOptions options), SecureContext,
+    Exposed=Window]
   interface Accelerometer : Sensor {
     readonly attribute double? x;
     readonly attribute double? y;
     readonly attribute double? z;
   };
+
+  enum AccelerometerLocalCoordinateSystem { "device", "screen" };
+
+  dictionary AccelerometerSensorOptions : SensorOptions {
+    AccelerometerLocalCoordinateSystem referenceFrame = "device";
+  };
 </pre>
 
-To <dfn>Construct an Accelerometer Object</dfn> the user agent must invoke
-the [=construct a Sensor object=] abstract operation.
+To construct an {{Accelerometer}} object the user agent must invoke
+the [=construct an accelerometer object=] abstract operation for the
+{{Accelerometer}} interface.
+
+[=Supported sensor options=] for {{Accelerometer}} are "frequency" and "referenceFrame".
 
 ### Accelerometer.x ### {#accelerometer-x}
 
@@ -152,13 +298,17 @@ The LinearAccelerationSensor Interface {#linearaccelerationsensor-interface}
 --------------------------------
 
 <pre class="idl">
-  [Constructor(optional SensorOptions options), SecureContext, Exposed=Window]
+  [Constructor(optional AccelerometerSensorOptions options), SecureContext,
+    Exposed=Window]
   interface LinearAccelerationSensor : Accelerometer {
   };
 </pre>
 
-To <dfn>Construct a LinearAccelerationSensor Object</dfn> the user agent must invoke
-the [=construct a Sensor object=] abstract operation.
+To construct a {{LinearAccelerationSensor}} object the user agent must invoke
+the [=construct an accelerometer object=] abstract operation for the
+{{LinearAccelerationSensor}} interface.
+
+[=Supported sensor options=] for {{LinearAccelerationSensor}} are "frequency" and "referenceFrame".
 
 ### LinearAccelerationSensor.x ### {#linearaccelerationsensor-x}
 
@@ -182,13 +332,17 @@ The GravitySensor Interface {#gravitysensor-interface}
 --------------------------------
 
 <pre class="idl">
-  [Constructor(optional SensorOptions options), SecureContext, Exposed=Window]
+  [Constructor(optional AccelerometerSensorOptions options), SecureContext,
+    Exposed=Window]
   interface GravitySensor : Accelerometer {
   };
 </pre>
 
-To <dfn>Construct an GravitySensor Object</dfn> the user agent must invoke
-the [=construct a Sensor object=] abstract operation.
+To construct a {{GravitySensor}} object the user agent must invoke
+the [=construct an accelerometer object=] abstract operation for the
+{{GravitySensor}} interface.
+
+[=Supported sensor options=] for {{GravitySensor}} are "frequency" and "referenceFrame".
 
 ### GravitySensor.x ### {#gravitysensor-x}
 
@@ -210,6 +364,34 @@ The {{Accelerometer/z!!attribute}} attribute of the {{GravitySensor}}
 interface returns the result of invoking [=get value from latest reading=] with
 `this` and "z" as arguments. It represents the effect of [=acceleration=] along z-axis due to
 [=gravity=].
+
+Abstract Operations {#abstract-opertaions}
+==============
+
+<h3 dfn>Construct an accelerometer object</h3>
+
+<div algorithm="construct an accelerometer object">
+
+    : input
+    :: |accelerometer_interface|, an {{Accelerometer}} [=interface=] [=identifier=] or
+       an [=interface=] [=identifier=] whose [=inherited interfaces=] contains {{Accelerometer}}.
+    :: |options|, a {{AccelerometerSensorOptions}} object.
+    : output
+    :: An {{Accelerometer}} object.
+
+    1.  Let |allowed| be the result of invoking [=check sensor policy-controlled features=]
+        with <a>Accelerometer</a>.
+    1.  If |allowed| is false, then:
+        1.  [=Throw=] a {{SecurityError}} {{DOMException}}.
+    1.  Let |accelerometer| be a new instance of the [=interface=] identified by |accelerometer_interface|.
+    1.  Invoke [=initialize a sensor object=] with |accelerometer| and |options|.
+    1.  If |options|.{{referenceFrame!!dict-member}} is "screen", then:
+        1.  Define [=local coordinate system=] for |accelerometer|
+            as the [=screen coordinate system=].
+    1.  Otherwise, define [=local coordinate system=] for |accelerometer|
+        as the [=device coordinate system=].
+    1.  Return |accelerometer|.
+</div>
 
 Acknowledgements {#acknowledgements}
 ================

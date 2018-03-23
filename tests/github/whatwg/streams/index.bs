@@ -10,6 +10,11 @@ Translation: ja https://triple-underscore.github.io/Streams-ja.html
 Opaque Elements: emu-alg
 </pre>
 
+<pre class=link-defaults>
+spec:promises-guide; type:dfn;
+    text:resolve
+</pre>
+
 <pre class="anchors">
 urlPrefix: https://tc39.github.io/ecma262/; spec: ECMASCRIPT
     text: %Uint8Array%; url: #sec-typedarray-objects; type: constructor
@@ -85,14 +90,13 @@ ecosystem to grow around these shared and composable interfaces.
 
 <h2 id="model">Model</h2>
 
-A <dfn>chunk</dfn> is a single piece of data that is written to or read from a stream. It can be of any type; streams
-can even contain chunks of different types. A chunk will often not be the most atomic unit of data for a given stream;
-for example a byte stream might contain chunks consisting of 16 KiB {{Uint8Array}}s, instead of single
-bytes.
+A <dfn export>chunk</dfn> is a single piece of data that is written to or read from a stream. It can be of any type;
+streams can even contain chunks of different types. A chunk will often not be the most atomic unit of data for a given
+stream; for example a byte stream might contain chunks consisting of 16 KiB {{Uint8Array}}s, instead of single bytes.
 
-<h3 id="rs-model">Readable Streams</h3>
+<h3 id="rs-model">Readable streams</h3>
 
-A <dfn>readable stream</dfn> represents a source of data, from which you can read. In other words, data comes
+A <dfn export>readable stream</dfn> represents a source of data, from which you can read. In other words, data comes
 <em>out</em> of a readable stream. Concretely, a readable stream is an instance of the {{ReadableStream}} class.
 
 Although a readable stream can be created with arbitrary behavior, most readable streams wrap a lower-level I/O source,
@@ -106,9 +110,9 @@ constantly being pushed from the OS level, at a rate that can be controlled by c
 synchronously, e.g. if it is held by the operating system's in-memory buffers, or asynchronously, e.g. if it has to be
 read from disk. An example pull source is a file handle, where you seek to specific locations and read specific amounts.
 
-Readable streams are designed to wrap both types of sources behind a single, unified interface. For
-web developer–created streams, the implementation details of a source are provided by an object with certain methods and
-properties that is passed to the {{ReadableStream()}} constructor.
+Readable streams are designed to wrap both types of sources behind a single, unified interface. For web
+developer–created streams, the implementation details of a source are provided by <a href="#underlying-source-api">an
+object with certain methods and properties</a> that is passed to the {{ReadableStream()}} constructor.
 
 <a>Chunks</a> are enqueued into the stream by the stream's <a>underlying source</a>. They can then be read one at a
 time via the stream's public interface, in particular by using a <a>readable stream reader</a> acquired using the
@@ -132,27 +136,27 @@ an <dfn>underlying byte source</dfn>. A readable stream whose underlying source 
 sometimes called a <dfn>readable byte stream</dfn>. Consumers of a readable byte stream can acquire a <a>BYOB reader</a>
 using the stream's {{ReadableStream/getReader()}} method.
 
-<h3 id="ws-model">Writable Streams</h3>
+<h3 id="ws-model">Writable streams</h3>
 
-A <dfn>writable stream</dfn> represents a destination for data, into which you can write. In other words, data goes
-<em>in</em> to a writable stream. Concretely, a writable stream is an instance of the {{WritableStream}} class.
+A <dfn export>writable stream</dfn> represents a destination for data, into which you can write. In other words, data
+goes <em>in</em> to a writable stream. Concretely, a writable stream is an instance of the {{WritableStream}} class.
 
 Analogously to readable streams, most writable streams wrap a lower-level I/O sink, called the
 <dfn>underlying sink</dfn>. Writable streams work to abstract away some of the complexity of the underlying sink, by
 queuing subsequent writes and only delivering them to the underlying sink one by one.
 
 <a>Chunks</a> are written to the stream via its public interface, and are passed one at a time to the stream's
-<a>underlying sink</a>. For web developer-created streams, the implementation details of the sink are provided by an
-object with certain methods that is passed to the {{WritableStream()}} constructor.
+<a>underlying sink</a>. For web developer-created streams, the implementation details of the sink are provided by <a
+href="#underlying-sink-api">an object with certain methods</a> that is passed to the {{WritableStream()}} constructor.
 
 Code that writes into a writable stream using its public interface is known as a <dfn>producer</dfn>.
 
 Producers also have the ability to <dfn lt="abort a writable stream">abort</dfn> a writable stream, using its
 {{WritableStream/abort()}} method. This indicates that the producer believes something has gone wrong, and that future
 writes should be discontinued. It puts the stream in an errored state, even without a signal from the <a>underlying
-sink</a>.
+sink</a>, and it discards all writes in the stream's <a>internal queue</a>.
 
-<h3 id="ts-model">Transform Streams</h3>
+<h3 id="ts-model">Transform streams</h3>
 
 A <dfn>transform stream</dfn> consists of a pair of streams: a <a>writable stream</a>, known as its <dfn>writable
 side</dfn>, and a <a>readable stream</a>, known as its <dfn>readable side</dfn>. In a manner specific to the transform
@@ -162,12 +166,14 @@ side.
 Concretely, any object with a <code>writable</code> property and a <code>readable</code> property can serve as a
 transform stream. However, the standard {{TransformStream}} class makes it much easier to create such a pair that is
 properly entangled. It wraps a <dfn>transformer</dfn>, which defines algorithms for the specific transformation to be
-performed.
+performed. For web developer–created streams, the implementation details of a transformer are provided by <a
+href="#transformer-api">an object with certain methods and properties</a> that is passed to the {{TransformStream()}} constructor.
 
 An <dfn>identity transform stream</dfn> is a type of transform stream which forwards all <a>chunks</a> written to its
 <a>writable side</a> to its <a>readable side</a>, without any changes. This can be useful in <a
 href="#example-transform-identity">a variety of scenarios</a>. By default, the {{TransformStream}} constructor will
-create an identity transform stream, when no <code>transform</code> method is present on the <a>transformer</a> object.
+create an identity transform stream, when no {{transformer/transform()}} method is present on the <a>transformer</a>
+object.
 
 Some examples of potential transform streams include:
 
@@ -179,7 +185,7 @@ Some examples of potential transform streams include:
     corresponding JavaScript objects are read.
 </ul>
 
-<h3 id="pipe-chains">Pipe Chains and Backpressure</h3>
+<h3 id="pipe-chains">Pipe chains and backpressure</h3>
 
 Streams are primarily used by <dfn>piping</dfn> them to each other. A readable stream can be piped directly to a
 writable stream, using its {{ReadableStream/pipeTo()}} method, or it can be piped through one or more transform streams
@@ -210,7 +216,7 @@ Piping <a>locks</a> the readable and writable streams, preventing them from bein
 pipe operation. This allows the implementation to perform important optimizations, such as directly shuttling data from
 the underlying source to the underlying sink while bypassing many of the intermediate queues.
 
-<h3 id="queuing-strategies">Internal Queues and Queuing Strategies</h3>
+<h3 id="queuing-strategies">Internal queues and queuing strategies</h3>
 
 Both readable and writable streams maintain <dfn>internal queues</dfn>, which they use for similar purposes. In the
 case of a readable stream, the internal queue contains <a>chunks</a> that have been enqueued by the <a>underlying
@@ -275,9 +281,9 @@ the {{ReadableStreamDefaultReader/releaseLock()|defaultReader.releaseLock()}},
 {{ReadableStreamBYOBReader/releaseLock()|byobReader.releaseLock()}}, or
 {{WritableStreamDefaultWriter/releaseLock()|writer.releaseLock()}} method, as appropriate.
 
-<h2 id="rs">Readable Streams</h2>
+<h2 id="rs">Readable streams</h2>
 
-<h3 id="rs-intro">Using Readable Streams</h3>
+<h3 id="rs-intro">Using readable streams</h3>
 
 <div class="example" id="example-basic-pipe-to">
   The simplest way to consume a readable stream is to simply <a lt="piping">pipe</a> it to a <a>writable stream</a>.
@@ -309,8 +315,8 @@ the {{ReadableStreamDefaultReader/releaseLock()|defaultReader.releaseLock()}},
     }));
   </code></pre>
 
-  By returning promises from your <code>write</code> implementation, you can signal <a>backpressure</a> to the readable
-  stream.
+  By returning promises from your {{underlying sink/write()}} implementation, you can signal <a>backpressure</a> to the
+  readable stream.
 </div>
 
 <div class="example" id="example-manual-read">
@@ -377,7 +383,7 @@ The {{ReadableStream}} class is a concrete instance of the general <a>readable s
 adaptable to any <a>chunk</a> type, and maintains an internal queue to keep track of data supplied by the <a>underlying
 source</a> but not yet read by any consumer.
 
-<h4 id="rs-class-definition">Class Definition</h4>
+<h4 id="rs-class-definition">Class definition</h4>
 
 <em>This section is non-normative.</em>
 
@@ -386,19 +392,19 @@ like
 
 <pre><code class="lang-javascript">
   class ReadableStream {
-    constructor(underlyingSource = {}, { size, highWaterMark } = {})
+    <a href="#rs-constructor">constructor</a>(<a href="#underlying-source-api">underlyingSource</a> = {}, <a href="#qs-api">strategy</a> = {})
 
-    get locked()
+    get <a href="#rs-locked">locked</a>()
 
-    cancel(reason)
-    getReader()
-    pipeThrough({ writable, readable }, options)
-    pipeTo(dest, { preventClose, preventAbort, preventCancel } = {})
-    tee()
+    <a href="#rs-cancel">cancel</a>(reason)
+    <a href="#rs-get-reader">getReader</a>()
+    <a href="#rs-pipe-through">pipeThrough</a>({ writable, readable }, options)
+    <a href="#rs-pipe-to">pipeTo</a>(dest, { preventClose, preventAbort, preventCancel } = {})
+    <a href="#rs-tee">tee</a>()
   }
 </code></pre>
 
-<h4 id="rs-internal-slots">Internal Slots</h4>
+<h4 id="rs-internal-slots">Internal slots</h4>
 
 Instances of {{ReadableStream}} are created with the internal slots described in the following table:
 
@@ -423,7 +429,7 @@ Instances of {{ReadableStream}} are created with the internal slots described in
   <tr>
     <td>\[[reader]]
     <td class="non-normative">A {{ReadableStreamDefaultReader}} or {{ReadableStreamBYOBReader}} instance, if the stream
-      is <a>locked to a reader</a>, or <emu-val>undefined</emu-val> if it is not
+    is <a>locked to a reader</a>, or <emu-val>undefined</emu-val> if it is not
   </tr>
   <tr>
     <td>\[[state]]
@@ -437,57 +443,23 @@ Instances of {{ReadableStream}} are created with the internal slots described in
   </tr>
 </table>
 
-<h4 id="rs-constructor" constructor for="ReadableStream" lt="ReadableStream(underlyingSource, queuingStrategy)">new
-ReadableStream(<var>underlyingSource</var> = {}, { <var>size</var>, <var>highWaterMark</var> } = {})</h4>
+<h4 id="rs-constructor" constructor for="ReadableStream" lt="ReadableStream(underlyingSource, strategy)">new
+ReadableStream(<var>underlyingSource</var> = {}, <var>strategy</var> = {})</h4>
 
 <div class="note">
-  The <code>underlyingSource</code> object passed to the constructor can implement any of the following methods to
-  govern how the constructed stream instance behaves:
+  The <code>underlyingSource</code> argument represents the <a>underlying source</a>, as described in
+  [[#underlying-source-api]].
 
-  <ul>
-    <li><p><code>start(controller)</code> is called immediately, and is typically used to adapt a <a>push
-      source</a> by setting up relevant event listeners, or to acquire access to a <a>pull source</a>. If this process
-      is asynchronous, it can return a promise to signal success or failure.
-
-    <li><p><code>pull(controller)</code> is called when the stream's <a>internal queue</a> of chunks is not full, and
-      will be called repeatedly until the queue reaches its <a>high water mark</a>. If <code>pull</code> returns a
-      promise, then <code>pull</code> will not be called again until that promise fulfills; if the promise rejects, the
-      stream will become errored.
-
-    <li><p><code>cancel(reason)</code> is called when the consumer signals that they are no longer interested in the
-      stream. It can perform any actions necessary to release access to the <a>underlying source</a>. If this
-      process is asynchronous, it can return a promise to signal success or failure.
-  </ul>
-
-  Both <code>start</code> and <code>pull</code> are given the ability to manipulate the stream's internal queue and
-  state via the passed <code>controller</code> object. This is an example of the
-  <a href="https://blog.domenic.me/the-revealing-constructor-pattern/">revealing constructor pattern</a>.
-
-  If the <code>underlyingSource</code> object contains a property <code>type</code> set to <code>"bytes"</code>, this
-  <a>readable stream</a> is a <a>readable byte stream</a>, and can successfully vend <a>BYOB readers</a>. In that case,
-  the passed <code>controller</code> object will be an instance of {{ReadableByteStreamController}}. Otherwise, it will
-  be an instance of {{ReadableStreamDefaultController}}.
-
-  For <a>readable byte streams</a>, <code>underlyingSource</code> can also contain a property
-  <code>autoAllocateChunkSize</code>, which can be set to a positive integer to enable the auto-allocation feature for
-  this stream. In that case, when a <a>consumer</a> uses a <a>default reader</a>, the stream implementation will
-  automatically allocate an {{ArrayBuffer}} of the given size, and call the <a>underlying source</a> code
-  as if the <a>consumer</a> was using a <a>BYOB reader</a>. This can cut down on the amount of code needed when writing
-  the <a>underlying source</a> implementation, as can be seen by comparing [[#example-rbs-push]] without auto-allocation
-  to [[#example-rbs-pull]] with auto-allocation.
-
-  The constructor also accepts a second argument containing the <a>queuing strategy</a> object with
-  two properties: a non-negative number <code>highWaterMark</code>, and a function <code>size(chunk)</code>. The
-  supplied <code>strategy</code> could be an instance of the built-in {{CountQueuingStrategy}} or
-  {{ByteLengthQueuingStrategy}} classes, or it could be custom. If no strategy is supplied, the default
-  behavior will be the same as a {{CountQueuingStrategy}} with a <a>high water mark</a> of 1. A
-  <code>size(chunk)</code> function is not meaningful for a <a>readable byte stream</a>, as chunks are always measured
-  in bytes. It is not valid to supply <code>size</code> for a byte stream, or to supply one of the built-in strategies.
+  The <code>strategy</code> argument represents the stream's <a>queuing strategy</a>, as described in [[#qs-api]]. If it
+  is not provided, the default behavior will be the same as a {{CountQueuingStrategy}} with a <a>high water mark</a>
+  of 1.
 </div>
 
 <emu-alg>
   1. Perform ! InitializeReadableStream(*this*).
   1. Let _type_ be ? GetV(_underlyingSource_, `"type"`).
+  1. Let _size_ be ? GetV(_readableStrategy_, `"size"`).
+  1. Let _highWaterMark_ be ? GetV(_readableStrategy_, `"highWaterMark"`).
   1. Let _typeString_ be ? ToString(_type_).
   1. If _typeString_ is `"bytes"`,
     1. If _highWaterMark_ is *undefined*, let _highWaterMark_ be *0*.
@@ -503,7 +475,104 @@ ReadableStream(<var>underlyingSource</var> = {}, { <var>size</var>, <var>highWat
   1. Otherwise, throw a *RangeError* exception.
 </emu-alg>
 
-<h4 id="rs-prototype">Properties of the {{ReadableStream}} Prototype</h4>
+<h4 id="underlying-source-api">Underlying source API</h4>
+
+<div class="non-normative">
+
+<em>This section is non-normative.</em>
+
+The {{ReadableStream()}} constructor accepts as its first argument a JavaScript object representing the <a>underlying
+source</a>. Such objects can contain any of the following properties:
+
+<dl>
+  <dt><dfn method for="underlying source">start(<var>controller</var>)</dfn></dt>
+  <dd>
+    <p>A function that is called immediately during creation of the {{ReadableStream}}.</p>
+
+    <p>Typically this is used adapt a <a>push source</a> by setting up relevant event listeners, as in the example of
+    [[#example-rs-push-no-backpressure]], or to acquire access to a <a>pull source</a>, as in [[#example-rs-pull]].</p>
+
+    <p>If this setup process is asynchronous, it can return a promise to signal success or failure; a rejected promise
+    will error the stream. Any thrown exceptions will be re-thrown by the {{ReadableStream()}} constructor.</p>
+  </dd>
+
+  <dt><dfn method for="underlying source">pull(<var>controller</var>)</dfn></dt>
+  <dd>
+    <p>A function that is called whenever the stream's <a>internal queue</a> of chunks becomes not full, i.e. whenever
+    the queue's <a lt="desired size to fill a stream's internal queue">desired size</a> becomes positive. Generally, it
+    will be called repeatedly until the queue reaches its <a>high water mark</a> (i.e. until the <a lt="desired size to
+    fill a stream's internal queue">desired size</a> becomes non-positive).</p>
+
+    <p>For <a>push sources</a>, this can be used to resume a paused flow, as in [[#example-rs-push-backpressure]]. For
+    <a>pull sources</a>, it is used to acquire new <a>chunks</a> to enqueue into the stream, as in
+    [[#example-rs-pull]].</p>
+
+    <p>This function will not be called until {{underlying source/start()}} successfully completes. Additionally, it
+    will only be called repeatedly if it enqueues at least one chunk or fulfills a BYOB request; a no-op
+    {{underlying source/pull()}} implementation will not be continually called.</p>
+
+    <p>If the function returns a promise, then it will not be called again until that promise fulfills. (If the
+    promise rejects, the stream will become errored.) This is mainly used in the case of pull sources, where the
+    promise returned represents the process of acquiring a new chunk. Throwing an exception is treated the same as
+    returning a rejected promise.</p>
+  </dd>
+
+  <dt><dfn method for="underlying source">cancel(<var>reason</var>)</dfn></dt>
+  <dd>
+    <p>A function that is called whenever the <a>consumer</a> <a lt="cancel a readable stream">cancels</a> the stream,
+    via {{ReadableStream/cancel()|stream.cancel()}}, {{ReadableStreamDefaultReader/cancel()|defaultReader.cancel()}}, or
+    {{ReadableStreamBYOBReader/cancel()|byobReader.cancel()}}. It takes as its argument the same value as was passed to
+    those methods by the consumer.</p>
+
+    <p>Readable streams can additionally be canceled under certain conditions during <a>piping</a>; see the definition
+    of the {{ReadableStream/pipeTo()}} method for more details.</p>
+
+    <p>For all streams, this is generally used to release access to the underlying resource; see for example
+    [[#example-rs-push-no-backpressure]].</p>
+
+    <p>If the shutdown process is asynchronous, it can return a promise to signal success or failure; the result will be
+    communicated via the return value of the <code>cancel()</code> method that was called. Additionally, a rejected
+    promise will error the stream, instead of letting it close. Throwing an exception is treated the same as returning
+    a rejected promise.</p>
+  </dd>
+
+  <dt><dfn for="underlying source"><code>type</code></dfn> (byte streams only)</dt>
+  <dd>
+    <p>Can be set to <code>"bytes"</code> to signal that the constructed {{ReadableStream}} is a <a>readable byte
+    stream</a>. This ensures that the resulting {{ReadableStream}} will successfully be able to vend <a>BYOB readers</a>
+    via its {{ReadableStream/getReader()}} method. It also affects the <code>controller</code> argument passed to the
+    {{underlying source/start()}} and {{underlying source/pull()}} methods; see below.</p>
+
+    <p>For an example of how to set up a readable byte stream, including using the different controller interface, see
+    [[#example-rbs-push]].</p>
+
+    <p>Setting any value other than <code>"bytes"</code> or <emu-val>undefined</emu-val> will cause the
+    {{ReadableStream()}} constructor to throw an exception.</p>
+  </dd>
+
+  <dt><dfn for="underlying source"><code>autoAllocateChunkSize</code></dfn> (byte streams only)</dt>
+  <dd>
+    <p>Can be set to a positive integer to cause the implementation to automatically allocate buffers for the
+    underlying source code to write into. In this case, when a <a>consumer</a> is using a <a>default reader</a>, the
+    stream implementation will automatically allocate an {{ArrayBuffer}} of the given size, so that
+    {{ReadableByteStreamController/byobRequest|controller.byobRequest}} is always present, as if the consumer was using
+    a <a>BYOB reader</a>.</p>
+
+    <p>This is generally used to cut down on the amount of code needed to handle consumers that use default readers, as
+    can be seen by comparing [[#example-rbs-push]] without auto-allocation to [[#example-rbs-pull]] with
+    auto-allocation.</p>
+  </dd>
+</dl>
+
+The type of the <code>controller</code> argument passed to the {{underlying source/start()}} and
+{{underlying source/pull()}} methods depends on the value of the <code><a for="underlying source">type</a></code>
+option. If <code><a for="underlying source">type</a></code> is set to <code>undefined</code> (including via omission),
+<code>controller</code> will be a {{ReadableStreamDefaultController}}. If it's set to <code>"bytes"</code>,
+<code>controller</code> will be a {{ReadableByteStreamController}}.
+
+</div>
+
+<h4 id="rs-prototype">Properties of the {{ReadableStream}} prototype</h4>
 
 <h5 id="rs-locked" attribute for="ReadableStream" lt="locked">get locked</h5>
 
@@ -520,8 +589,8 @@ ReadableStream(<var>underlyingSource</var> = {}, { <var>size</var>, <var>highWat
 
 <div class="note">
   The <code>cancel</code> method <a lt="cancel a readable stream">cancels</a> the stream, signaling a loss of interest
-  in the stream by a consumer. The supplied <code>reason</code> argument will be given to the underlying source, which
-  might or might not use it.
+  in the stream by a consumer. The supplied <code>reason</code> argument will be given to the underlying source's
+  {{underlying source/cancel()}} method, which might or might not use it.
 </div>
 
 <emu-alg>
@@ -530,7 +599,7 @@ ReadableStream(<var>underlyingSource</var> = {}, { <var>size</var>, <var>highWat
   1. Return ! ReadableStreamCancel(*this*, _reason_).
 </emu-alg>
 
-<h5 id="rs-get-reader" method for="ReadableStream">getReader({ <var>mode</var> } = {})</h5>
+<h5 id="rs-get-reader" method for="ReadableStream">getReader({ <var ignore>mode</var> } = {})</h5>
 
 <div class="note">
   The <code>getReader</code> method creates a reader of the type specified by the <code>mode</code> option and <a
@@ -590,7 +659,7 @@ ReadableStream(<var>underlyingSource</var> = {}, { <var>size</var>, <var>highWat
 </div>
 
 <h5 id="rs-pipe-through" method for="ReadableStream" lt="pipeThrough(transform, options)">pipeThrough({
-<var>writable</var>, <var>readable</var> }, <var>options</var>)</h5>
+<var ignore>writable</var>, <var ignore>readable</var> }, <var ignore>options</var>)</h5>
 
 <div class="note">
   The <code>pipeThrough</code> method provides a convenient, chainable way of <a>piping</a> this <a>readable stream</a>
@@ -630,8 +699,8 @@ ReadableStream(<var>underlyingSource</var> = {}, { <var>size</var>, <var>highWat
   </code></pre>
 </div>
 
-<h5 id="rs-pipe-to" method for="ReadableStream" lt="pipeTo(dest, options)">pipeTo(<var>dest</var>, {
-<var>preventClose</var>, <var>preventAbort</var>, <var>preventCancel</var> } = {})</h5>
+<h5 id="rs-pipe-to" method for="ReadableStream" lt="pipeTo(dest, options)">pipeTo(<var ignore>dest</var>, {
+<var ignore>preventClose</var>, <var ignore>preventAbort</var>, <var ignore>preventCancel</var> } = {})</h5>
 
 <div class="note">
   The <code>pipeTo</code> method <a lt="piping">pipes</a> this <a>readable stream</a> to a given <a>writable
@@ -678,10 +747,11 @@ ReadableStream(<var>underlyingSource</var> = {}, { <var>size</var>, <var>highWat
   1. Let _writer_ be ! AcquireWritableStreamDefaultWriter(_dest_).
   1. Let _shuttingDown_ be *false*.
   1. Let _promise_ be <a>a new promise</a>.
-  1. <a>In parallel</a>, using _reader_ and _writer_, read all <a>chunks</a> from *this* and write them to _dest_. Due
-     to the locking provided by the reader and writer, the exact manner in which this happens is not observable to
-     author code, and so there is flexibility in how this is done. The following constraints apply regardless of the
-     exact algorithm used:
+  1. <a>In parallel</a> <span class="XXX">but not really; see <a
+     href="https://github.com/whatwg/streams/issues/905">#905</a></span>, using _reader_ and _writer_, read all
+     <a>chunks</a> from *this* and write them to _dest_. Due to the locking provided by the reader and writer, the exact
+     manner in which this happens is not observable to author code, and so there is flexibility in how this is done. The
+     following constraints apply regardless of the exact algorithm used:
      * <strong>Public API must not be used:</strong> while reading or writing, or performing any of the operations
        below, the JavaScript-modifiable reader, writer, and stream APIs (i.e. methods on the appropriate prototypes)
        must not be used. Instead, the streams must be manipulated directly.
@@ -721,7 +791,7 @@ ReadableStream(<var>underlyingSource</var> = {}, { <var>size</var>, <var>highWat
          1. Otherwise, <a href="#rs-pipeTo-shutdown">shutdown</a> with _destClosed_.
      * <i id="rs-pipeTo-shutdown-with-action">Shutdown with an action</i>: if any of the above requirements ask to
        shutdown with an action _action_, optionally with an error _originalError_, then:
-       1. If _dest_.[[state]] is `"writable"` and ! WritableStreamCloseQueuedOrInFlight(dest) is *false*,
+       1. If _dest_.[[state]] is `"writable"` and ! WritableStreamCloseQueuedOrInFlight(_dest_) is *false*,
          1. If any <a>chunks</a> have been read but not yet written, write them to _dest_.
          1. Wait until every <a>chunk</a> that has been read has been written (i.e. the corresponding promises have
             settled).
@@ -734,7 +804,7 @@ ReadableStream(<var>underlyingSource</var> = {}, { <var>size</var>, <var>highWat
           _newError_.
      * <i id="rs-pipeTo-shutdown">Shutdown</i>: if any of the above requirements or steps ask to shutdown, optionally
        with an error _error_, then:
-       1. If _dest_.[[state]] is `"writable"` and ! WritableStreamCloseQueuedOrInFlight(dest) is *false*,
+       1. If _dest_.[[state]] is `"writable"` and ! WritableStreamCloseQueuedOrInFlight(_dest_) is *false*,
          1. If any <a>chunks</a> have been read but not yet written, write them to _dest_.
          1. Wait until every <a>chunk</a> that has been read has been written (i.e. the corresponding promises have
             settled).
@@ -749,6 +819,12 @@ ReadableStream(<var>underlyingSource</var> = {}, { <var>size</var>, <var>highWat
        1. Otherwise, <a>resolve</a> _promise_ with *undefined*.
   1. Return _promise_.
 </emu-alg>
+
+<p class="note">
+  Various abstract operations performed here include object creation (often of promises), which usually would require
+  specifying a realm for the created object. However, because of the locking, none of these objects can be observed by
+  author code. As such, the realm used to create them does not matter.
+</p>
 
 <h5 id="rs-tee" method for="ReadableStream">tee()</h5>
 
@@ -788,7 +864,7 @@ ReadableStream(<var>underlyingSource</var> = {}, { <var>size</var>, <var>highWat
   </code></pre>
 </div>
 
-<h3 id="rs-abstract-ops">General Readable Stream Abstract Operations</h3>
+<h3 id="rs-abstract-ops">General readable stream abstract operations</h3>
 
 The following abstract operations, unlike most in this specification, are meant to be generally useful by other
 specifications, instead of just being part of the implementation of this spec's classes.
@@ -820,7 +896,7 @@ reader</a> for a given stream.
 This abstract operation is meant to be called from other specifications that wish to create {{ReadableStream}}
 instances. The <var>pullAlgorithm</var> and <var>cancelAlgorithm</var> algorithms must return
 promises; if supplied, <var>sizeAlgorithm</var> must be an algorithm accepting <a>chunk</a> objects and returning a
-number; and if supplied, <var>highWaterMark</var> must be a nonnegative, non-NaN number.
+number; and if supplied, <var>highWaterMark</var> must be a non-negative, non-NaN number.
 
 <p class="note">CreateReadableStream throws an exception if and only if the supplied <var>startAlgorithm</var>
 throws.</p>
@@ -844,7 +920,7 @@ throws.</p>
 
 This abstract operation is meant to be called from other specifications that wish to create {{ReadableStream}}
 instances of type "bytes". The <var>pullAlgorithm</var> and <var>cancelAlgorithm</var> algorithms must return
-promises; if supplied, <var>highWaterMark</var> must be a nonnegative, non-NaN number, and if supplied,
+promises; if supplied, <var>highWaterMark</var> must be a non-negative, non-NaN number, and if supplied,
 <var>autoAllocateChunkSize</var> must be a positive integer.
 
 <p class="note">CreateReadableByteStream throws an exception if and only if the supplied <var>startAlgorithm</var>
@@ -916,7 +992,7 @@ The second argument, <var>cloneForBranch2</var>, governs whether or not the data
 (using HTML's <a>serializable objects</a> framework) before appearing in the second of the returned branches. This is
 useful for scenarios where both branches are to be consumed in such a way that they might otherwise interfere with each
 other, such as by <a lt="transferable objects">transferring</a> their <a>chunks</a>. However, it does introduce a
-noticable asymmetry between the two branches, and limits the possible <a>chunks</a> to serializable ones. [[!HTML]]
+noticeable asymmetry between the two branches, and limits the possible <a>chunks</a> to serializable ones. [[!HTML]]
 
 <p class="note">In this standard ReadableStreamTee is always called with <var>cloneForBranch2</var> set to
 <emu-val>false</emu-val>; other specifications pass <emu-val>true</emu-val>.</p>
@@ -976,13 +1052,13 @@ noticable asymmetry between the two branches, and limits the possible <a>chunks<
   1. Set _branch2_ to CreateReadableStream(_startAlgorithm_, _pullAlgorithm_, _cancel2Algorithm_).
   1. <a>Upon rejection</a> of _reader_.[[closedPromise]] with reason _r_,
     1. If _closedOrErrored_ is *false*, then:
-      1. Perform ! ReadableStreamDefaultControllerErrorIfNeeded(_branch1_.[[readableStreamController]], _r_).
-      1. Perform ! ReadableStreamDefaultControllerErrorIfNeeded(_branch2_.[[readableStreamController]], _r_).
+      1. Perform ! ReadableStreamDefaultControllerError(_branch1_.[[readableStreamController]], _r_).
+      1. Perform ! ReadableStreamDefaultControllerError(_branch2_.[[readableStreamController]], _r_).
       1. Set _closedOrErrored_ to *true*.
   1. Return « _branch1_, _branch2_ ».
 </emu-alg>
 
-<h3 id="rs-abstract-ops-used-by-controllers">The Interface Between Readable Streams and Controllers</h3>
+<h3 id="rs-abstract-ops-used-by-controllers">The interface between readable streams and controllers</h3>
 
 In terms of specification factoring, the way that the {{ReadableStream}} class encapsulates the behavior of
 both simple readable streams and <a>readable byte streams</a> into a single class is by centralizing most of the
@@ -1153,7 +1229,7 @@ nothrow>ReadableStreamGetNumReadRequests ( <var>stream</var> )</h4>
 The {{ReadableStreamDefaultReader}} class represents a <a>default reader</a> designed to be vended by a
 {{ReadableStream}} instance.
 
-<h4 id="default-reader-class-definition">Class Definition</h4>
+<h4 id="default-reader-class-definition">Class definition</h4>
 
 <div class="non-normative">
 
@@ -1176,7 +1252,7 @@ would look like
 
 </div>
 
-<h4 id="default-reader-internal-slots">Internal Slots</h4>
+<h4 id="default-reader-internal-slots">Internal slots</h4>
 
 Instances of {{ReadableStreamDefaultReader}} are created with the internal slots described in the following table:
 
@@ -1209,7 +1285,7 @@ lt="ReadableStreamDefaultReader(stream)">new ReadableStreamDefaultReader(<var>st
 
 <div class="note">
   The <code>ReadableStreamDefaultReader</code> constructor is generally not meant to be used directly; instead, a
-  stream's {{ReadableStream/getReader()}} method ought to be be used.
+  stream's {{ReadableStream/getReader()}} method ought to be used.
 </div>
 
 <emu-alg>
@@ -1219,7 +1295,7 @@ lt="ReadableStreamDefaultReader(stream)">new ReadableStreamDefaultReader(<var>st
   1. Set *this*.[[readRequests]] to a new empty List.
 </emu-alg>
 
-<h4 id="default-reader-prototype">Properties of the {{ReadableStreamDefaultReader}} Prototype</h4>
+<h4 id="default-reader-prototype">Properties of the {{ReadableStreamDefaultReader}} prototype</h4>
 
 <h5 id="default-reader-closed" attribute for="ReadableStreamDefaultReader" lt="closed">get closed</h5>
 
@@ -1294,7 +1370,7 @@ lt="ReadableStreamDefaultReader(stream)">new ReadableStreamDefaultReader(<var>st
 The {{ReadableStreamBYOBReader}} class represents a <a>BYOB reader</a> designed to be vended by a {{ReadableStream}}
 instance.
 
-<h4 id="byob-reader-class-definition">Class Definition</h4>
+<h4 id="byob-reader-class-definition">Class definition</h4>
 
 <div class="non-normative">
 
@@ -1317,7 +1393,7 @@ would look like
 
 </div>
 
-<h4 id="byob-reader-internal-slots">Internal Slots</h4>
+<h4 id="byob-reader-internal-slots">Internal slots</h4>
 
 Instances of {{ReadableStreamBYOBReader}} are created with the internal slots described in the following table:
 
@@ -1361,7 +1437,7 @@ ReadableStreamBYOBReader(<var>stream</var>)</h4>
   1. Set *this*.[[readIntoRequests]] to a new empty List.
 </emu-alg>
 
-<h4 id="byob-reader-prototype">Properties of the {{ReadableStreamBYOBReader}} Prototype</h4>
+<h4 id="byob-reader-prototype">Properties of the {{ReadableStreamBYOBReader}} prototype</h4>
 
 <h5 id="byob-reader-closed" attribute for="ReadableStreamBYOBReader" lt="closed">get closed</h5>
 
@@ -1437,7 +1513,7 @@ ReadableStreamBYOBReader(<var>stream</var>)</h4>
   1. Perform ! ReadableStreamReaderGenericRelease(*this*).
 </emu-alg>
 
-<h3 id="rs-reader-abstract-ops">Readable Stream Reader Abstract Operations</h3>
+<h3 id="rs-reader-abstract-ops">Readable stream reader abstract operations</h3>
 
 <h4 id="is-readable-stream-default-reader" aoid="IsReadableStreamDefaultReader" nothrow>IsReadableStreamDefaultReader (
 <var>x</var> )</h4>
@@ -1528,7 +1604,7 @@ The {{ReadableStreamDefaultController}} class has methods that allow control of 
 <a>internal queue</a>. When constructing a {{ReadableStream}} that is not a <a>readable byte stream</a>, the
 <a>underlying source</a> is given a corresponding {{ReadableStreamDefaultController}} instance to manipulate.
 
-<h4 id="rs-default-controller-class-definition">Class Definition</h4>
+<h4 id="rs-default-controller-class-definition">Class definition</h4>
 
 <div class="non-normative">
 
@@ -1551,7 +1627,7 @@ it would look like
 
 </div>
 
-<h4 id="rs-default-controller-internal-slots">Internal Slots</h4>
+<h4 id="rs-default-controller-internal-slots">Internal slots</h4>
 
 Instances of {{ReadableStreamDefaultController}} are created with the internal slots described in the following table:
 
@@ -1627,7 +1703,7 @@ lt="ReadableStreamDefaultController()">new ReadableStreamDefaultController()</h4
   1. Throw a *TypeError*.
 </emu-alg>
 
-<h4 id="rs-default-controller-prototype">Properties of the {{ReadableStreamDefaultController}} Prototype</h4>
+<h4 id="rs-default-controller-prototype">Properties of the {{ReadableStreamDefaultController}} prototype</h4>
 
 <h5 id="rs-default-controller-desired-size" attribute for="ReadableStreamDefaultController" lt="desiredSize">get
 desiredSize</h5>
@@ -1677,12 +1753,10 @@ desiredSize</h5>
 
 <emu-alg>
   1. If ! IsReadableStreamDefaultController(*this*) is *false*, throw a *TypeError* exception.
-  1. Let _stream_ be *this*.[[controlledReadableStream]].
-  1. If _stream_.[[state]] is not `"readable"`, throw a *TypeError* exception.
   1. Perform ! ReadableStreamDefaultControllerError(*this*, _e_).
 </emu-alg>
 
-<h4 id="rs-default-controller-internal-methods">Readable Stream Default Controller Internal Methods</h4>
+<h4 id="rs-default-controller-internal-methods">Readable stream default controller internal methods</h4>
 
 The following are additional internal methods implemented by each {{ReadableStreamDefaultController}} instance. The
 readable stream implementation will polymorphically call to either these or their counterparts for BYOB controllers.
@@ -1708,7 +1782,7 @@ readable stream implementation will polymorphically call to either these or thei
   1. Return _pendingPromise_.
 </emu-alg>
 
-<h3 id="rs-default-controller-abstract-ops">Readable Stream Default Controller Abstract Operations</h3>
+<h3 id="rs-default-controller-abstract-ops">Readable stream default controller abstract operations</h3>
 
 <h4 id="is-readable-stream-default-controller" aoid="IsReadableStreamDefaultController"
 nothrow>IsReadableStreamDefaultController ( <var>x</var> )</h4>
@@ -1737,7 +1811,7 @@ nothrow>ReadableStreamDefaultControllerCallPullIfNeeded ( <var>controller</var> 
       1. Set _controller_.[[pullAgain]] to *false*.
       1. Perform ! ReadableStreamDefaultControllerCallPullIfNeeded(_controller_).
   1. <a>Upon rejection</a> of _pullPromise_ with reason _e_,
-    1. Perform ! ReadableStreamDefaultControllerErrorIfNeeded(_controller_, _e_).
+    1. Perform ! ReadableStreamDefaultControllerError(_controller_, _e_).
 </emu-alg>
 
 <h4 id="readable-stream-default-controller-should-call-pull" aoid="ReadableStreamDefaultControllerShouldCallPull"
@@ -1785,12 +1859,12 @@ asserts).
     1. Let _result_ be the result of performing _controller_.[[strategySizeAlgorithm]], passing in _chunk_, and
        interpreting the result as an ECMAScript completion value.
     1. If _result_ is an abrupt completion,
-      1. Perform ! ReadableStreamDefaultControllerErrorIfNeeded(_controller_, _result_.[[Value]]).
+      1. Perform ! ReadableStreamDefaultControllerError(_controller_, _result_.[[Value]]).
       1. Return _result_.
     1. Let _chunkSize_ be _result_.[[Value]].
     1. Let _enqueueResult_ be EnqueueValueWithSize(_controller_, _chunk_, _chunkSize_).
     1. If _enqueueResult_ is an abrupt completion,
-      1. Perform ! ReadableStreamDefaultControllerErrorIfNeeded(_controller_, _enqueueResult_.[[Value]]).
+      1. Perform ! ReadableStreamDefaultControllerError(_controller_, _enqueueResult_.[[Value]]).
       1. Return _enqueueResult_.
   1. Perform ! ReadableStreamDefaultControllerCallPullIfNeeded(_controller_).
 </emu-alg>
@@ -1805,17 +1879,9 @@ an assert).
 
 <emu-alg>
   1. Let _stream_ be _controller_.[[controlledReadableStream]].
-  1. Assert: _stream_.[[state]] is `"readable"`.
+  1. If _stream_.[[state]] is not `"readable"`, return.
   1. Perform ! ResetQueue(_controller_).
   1. Perform ! ReadableStreamError(_stream_, _e_).
-</emu-alg>
-
-<h4 id="readable-stream-default-controller-error-if-needed" aoid="ReadableStreamDefaultControllerErrorIfNeeded"
-nothrow>ReadableStreamDefaultControllerErrorIfNeeded ( <var>controller</var>, <var>e</var> )</h4>
-
-<emu-alg>
-  1. If _controller_.[[controlledReadableStream]].[[state]] is `"readable"`, perform !
-     ReadableStreamDefaultControllerError(_controller_, _e_).
 </emu-alg>
 
 <h4 id="readable-stream-default-controller-get-desired-size" aoid="ReadableStreamDefaultControllerGetDesiredSize"
@@ -1882,7 +1948,7 @@ throws>SetUpReadableStreamDefaultController(<var>stream</var>, <var>controller</
     1. Assert: _controller_.[[pullAgain]] is *false*.
     1. Perform ! ReadableStreamDefaultControllerCallPullIfNeeded(_controller_).
   1. <a>Upon rejection</a> of _startPromise_ with reason _r_,
-    1. Perform ! ReadableStreamDefaultControllerErrorIfNeeded(_controller_, _r_).
+    1. Perform ! ReadableStreamDefaultControllerError(_controller_, _r_).
 </emu-alg>
 
 <h4 id="set-up-readable-stream-default-controller-from-underlying-source"
@@ -1909,7 +1975,7 @@ The {{ReadableByteStreamController}} class has methods that allow control of a {
 <a>internal queue</a>. When constructing a {{ReadableStream}}, the <a>underlying byte source</a> is given a
 corresponding {{ReadableByteStreamController}} instance to manipulate.
 
-<h4 id="rbs-controller-class-definition">Class Definition</h4>
+<h4 id="rbs-controller-class-definition">Class definition</h4>
 
 <div class="non-normative">
 
@@ -1933,7 +1999,7 @@ would look like
 
 </div>
 
-<h4 id="rbs-controller-internal-slots">Internal Slots</h4>
+<h4 id="rbs-controller-internal-slots">Internal slots</h4>
 
 Instances of {{ReadableByteStreamController}} are created with the internal slots described in the following table:
 
@@ -1970,8 +2036,8 @@ Instances of {{ReadableByteStreamController}} are created with the internal slot
   <tr>
     <td>\[[pullAgain]]
     <td class="non-normative">A boolean flag set to <emu-val>true</emu-val> if the stream's mechanisms requested a call
-      to the <a>underlying byte source</a>'s <code>pull</code> method to pull more data, but the pull could not yet be
-      done since a previous call is still executing
+      to the <a>underlying byte source</a>'s {{underlying source/pull()}} method to pull more data, but the pull could
+      not yet be done since a previous call is still executing
   </tr>
   <tr>
     <td>\[[pullAlgorithm]]
@@ -1980,7 +2046,7 @@ Instances of {{ReadableByteStreamController}} are created with the internal slot
   <tr>
     <td>\[[pulling]]
     <td class="non-normative">A boolean flag set to <emu-val>true</emu-val> while the <a>underlying byte source</a>'s
-      <code>pull</code> method is executing and has not yet fulfilled, used to prevent reentrant calls
+      {{underlying source/pull()}} method is executing and has not yet fulfilled, used to prevent reentrant calls
   </tr>
   <tr>
     <td>\[[pendingPullIntos]]
@@ -2026,7 +2092,7 @@ ReadableByteStreamController()</h4>
   1. Throw a *TypeError* exception.
 </emu-alg>
 
-<h4 id="rbs-controller-prototype">Properties of the {{ReadableByteStreamController}} Prototype</h4>
+<h4 id="rbs-controller-prototype">Properties of the {{ReadableByteStreamController}} prototype</h4>
 
 <h5 id="rbs-controller-byob-request" attribute for="ReadableByteStreamController" lt="byobRequest">get byobRequest</h5>
 
@@ -2041,7 +2107,10 @@ ReadableByteStreamController()</h4>
     1. Let _view_ be ! Construct(<a idl>%Uint8Array%</a>, « _firstDescriptor_.[[buffer]],
        _firstDescriptor_.[[byteOffset]] + _firstDescriptor_.[[bytesFilled]], _firstDescriptor_.[[byteLength]] −
        _firstDescriptor_.[[bytesFilled]] »).
-    1. Set *this*.[[byobRequest]] to ! Construct(`<a idl>ReadableStreamBYOBRequest</a>`, « *this*, _view_ »).
+    1. Let _byobRequest_ be ObjectCreate(the original value of `<a idl>ReadableStreamBYOBRequest</a>`'s `prototype`
+      property).
+    1. Perform ! SetUpReadableStreamBYOBRequest(_byobRequest_, *this*, _view_).
+    1. Set *this*.[[byobRequest]] to _byobRequest_.
   1. Return *this*.[[byobRequest]].
 </emu-alg>
 
@@ -2097,12 +2166,10 @@ ReadableByteStreamController()</h4>
 
 <emu-alg>
   1. If ! IsReadableByteStreamController(*this*) is *false*, throw a *TypeError* exception.
-  1. Let _stream_ be *this*.[[controlledReadableByteStream]].
-  1. If _stream_.[[state]] is not `"readable"`, throw a *TypeError* exception.
   1. Perform ! ReadableByteStreamControllerError(*this*, _e_).
 </emu-alg>
 
-<h4 id="rbs-controller-internal-methods">Readable Stream BYOB Controller Internal Methods</h4>
+<h4 id="rbs-controller-internal-methods">Readable stream BYOB controller internal methods</h4>
 
 The following are additional internal methods implemented by each {{ReadableByteStreamController}} instance. The
 readable stream implementation will polymorphically call to either these or their counterparts for default controllers.
@@ -2150,7 +2217,7 @@ readable stream implementation will polymorphically call to either these or thei
 
 The {{ReadableStreamBYOBRequest}} class represents a pull into request in a {{ReadableByteStreamController}}.
 
-<h4 id="rs-byob-request-class-definition">Class Definition</h4>
+<h4 id="rs-byob-request-class-definition">Class definition</h4>
 
 <div class="non-normative">
 
@@ -2172,7 +2239,7 @@ would look like
 
 </div>
 
-<h4 id="rs-byob-request-internal-slots">Internal Slots</h4>
+<h4 id="rs-byob-request-internal-slots">Internal slots</h4>
 
 Instances of {{ReadableStreamBYOBRequest}} are created with the internal slots described in the following table:
 
@@ -2196,15 +2263,13 @@ Instances of {{ReadableStreamBYOBRequest}} are created with the internal slots d
 
 <h4 id="rs-byob-request-constructor" constructor for="ReadableStreamBYOBRequest"
 lt="ReadableStreamBYOBRequest(controller, view)">new
-ReadableStreamBYOBRequest(<var>controller</var>, <var>view</var>)</h4>
+ReadableStreamBYOBRequest()</h4>
 
 <emu-alg>
-  1. If ! IsReadableByteStreamController(_controller_) is *false*, throw a *TypeError* exception.
-  1. Set *this*.[[associatedReadableByteStreamController]] to _controller_.
-  1. Set *this*.[[view]] to _view_.
+  1. Throw a *TypeError* exception.
 </emu-alg>
 
-<h4 id="rs-byob-request-prototype">Properties of the {{ReadableStreamBYOBRequest}} Prototype</h4>
+<h4 id="rs-byob-request-prototype">Properties of the {{ReadableStreamBYOBRequest}} prototype</h4>
 
 <h5 id="rs-byob-request-view" attribute for="ReadableStreamBYOBRequest" lt="view">get view</h5>
 
@@ -2234,7 +2299,7 @@ for="ReadableStreamBYOBRequest">respondWithNewView(<var>view</var>)</h5>
   1. Return ? ReadableByteStreamControllerRespondWithNewView(*this*.[[associatedReadableByteStreamController]], _view_).
 </emu-alg>
 
-<h3 id="rbs-controller-abstract-ops">Readable Stream BYOB Controller Abstract Operations</h3>
+<h3 id="rbs-controller-abstract-ops">Readable stream BYOB controller abstract operations</h3>
 
 <h4 id="is-readable-stream-byob-request" aoid="IsReadableStreamBYOBRequest" nothrow>IsReadableStreamBYOBRequest (
 <var>x</var> )</h4>
@@ -2273,8 +2338,7 @@ nothrow>ReadableByteStreamControllerCallPullIfNeeded ( <var>controller</var> )</
       1. Set _controller_.[[pullAgain]] to *false*.
       1. Perform ! ReadableByteStreamControllerCallPullIfNeeded(_controller_).
   1. <a>Upon rejection</a> of _pullPromise_ with reason _e_,
-    1. If _controller_.[[controlledReadableByteStream]].[[state]] is `"readable"`, perform
-       ! ReadableByteStreamControllerError(_controller_, _e_).
+    1. Perform ! ReadableByteStreamControllerError(_controller_, _e_).
 </emu-alg>
 
 <h4 id="readable-byte-stream-controller-clear-pending-pull-intos"
@@ -2364,11 +2428,12 @@ nothrow>ReadableByteStreamControllerEnqueue ( <var>controller</var>, <var>chunk<
     1. Assert: ! IsReadableStreamLocked(_stream_) is *false*.
     1. Perform ! ReadableByteStreamControllerEnqueueChunkToQueue(_controller_, _transferredBuffer_, _byteOffset_,
        _byteLength_).
+  1. Perform ! ReadableByteStreamControllerCallPullIfNeeded(_controller_).
 </emu-alg>
 
 <h4 id="readable-byte-stream-controller-enqueue-chunk-to-queue" aoid="ReadableByteStreamControllerEnqueueChunkToQueue"
-nothrow>ReadableByteStreamControllerEnqueueChunkToQueue ( <var>controller</var>, <var>buffer</var>,
-<var>byteOffset</var>, <var>byteLength</var> )</h4>
+nothrow>ReadableByteStreamControllerEnqueueChunkToQueue ( <var>controller</var>, <var ignore>buffer</var>,
+<var ignore>byteOffset</var>, <var ignore>byteLength</var> )</h4>
 
 <emu-alg>
   1. Append Record {[[buffer]]: _buffer_, [[byteOffset]]: _byteOffset_, [[byteLength]]: _byteLength_} as the last
@@ -2381,7 +2446,7 @@ nothrow>ReadableByteStreamControllerError ( <var>controller</var>, <var>e</var> 
 
 <emu-alg>
   1. Let _stream_ be _controller_.[[controlledReadableByteStream]].
-  1. Assert: _stream_.[[state]] is `"readable"`.
+  1. If _stream_.[[state]] is not `"readable"`, return.
   1. Perform ! ReadableByteStreamControllerClearPendingPullIntos(_controller_).
   1. Perform ! ResetQueue(_controller_).
   1. Perform ! ReadableStreamError(_stream_, _e_).
@@ -2540,7 +2605,8 @@ throws>ReadableByteStreamControllerRespond ( <var>controller</var>, <var>bytesWr
 </emu-alg>
 
 <h4 id="readable-byte-stream-controller-respond-in-closed-state" aoid="ReadableByteStreamControllerRespondInClosedState"
-nothrow>ReadableByteStreamControllerRespondInClosedState ( <var>controller</var>, <var>firstDescriptor</var> )</h4>
+nothrow>ReadableByteStreamControllerRespondInClosedState ( <var>controller</var>,
+<var ignore>firstDescriptor</var> )</h4>
 
 <emu-alg>
   1. Set _firstDescriptor_.[[buffer]] to ! TransferArrayBuffer(_firstDescriptor_.[[buffer]]).
@@ -2589,6 +2655,7 @@ throws>ReadableByteStreamControllerRespondInternal ( <var>controller</var>, <var
   1. Otherwise,
     1. Assert: _stream_.[[state]] is `"readable"`.
     1. Perform ? ReadableByteStreamControllerRespondInReadableState(_controller_, _bytesWritten_, _firstDescriptor_).
+  1. Perform ! ReadableByteStreamControllerCallPullIfNeeded(_controller_).
 </emu-alg>
 
 <h4 id="readable-byte-stream-controller-respond-with-new-view" aoid="ReadableByteStreamControllerRespondWithNewView"
@@ -2659,13 +2726,13 @@ throws>SetUpReadableByteStreamController ( <var>stream</var>, <var>controller</v
     1. Assert: _controller_.[[pullAgain]] is *false*.
     1. Perform ! ReadableByteStreamControllerCallPullIfNeeded(_controller_).
   1. <a>Upon rejection</a> of _startPromise_ with reason _r_,
-    1. If _stream_.[[state]] is `"readable"`, perform ! ReadableByteStreamControllerError(_controller_, _r_).
+    1. Perform ! ReadableByteStreamControllerError(_controller_, _r_).
 </emu-alg>
 
 <h4 id="set-up-readable-byte-stream-controller-from-underlying-source"
 aoid="SetUpReadableByteStreamControllerFromUnderlyingSource"
-throws>SetUpReadableByteStreamControllerFromUnderlyingSource ( <var>stream</var>, <var>underlyingByteSource</var>,
-<var>highWaterMark</var> )</h4>
+throws>SetUpReadableByteStreamControllerFromUnderlyingSource ( <var>stream</var>,
+<var ignore>underlyingByteSource</var>, <var>highWaterMark</var> )</h4>
 
 <emu-alg>
   1. Assert: _underlyingByteSource_ is not *undefined*.
@@ -2684,9 +2751,22 @@ throws>SetUpReadableByteStreamControllerFromUnderlyingSource ( <var>stream</var>
      _cancelAlgorithm_, _highWaterMark_, _autoAllocateChunkSize_).
 </emu-alg>
 
-<h2 id="ws">Writable Streams</h2>
+<h4 id="set-up-readable-stream-byob-request"
+aoid="SetUpReadableStreamBYOBRequest"
+nothrow>SetUpReadableStreamBYOBRequest ( <var ignore>request</var>, <var>controller</var>, <var>view</var> )</h4>
 
-<h3 id="ws-intro">Using Writable Streams</h3>
+<emu-alg>
+  1. Assert: ! IsReadableByteStreamController(_controller_) is *true*.
+  1. Assert: Type(_view_) is Object.
+  1. Assert: _view_ has a [[ViewedArrayBuffer]] internal slot.
+  1. Assert: ! IsDetachedBuffer(_view_.[[ViewedArrayBuffer]]) is *false*.
+  1. Set _request_.[[associatedReadableByteStreamController]] to _controller_.
+  1. Set _request_.[[view]] to _view_.
+</emu-alg>
+
+<h2 id="ws">Writable streams</h2>
+
+<h3 id="ws-intro">Using writable streams</h3>
 
 <div class="example" id="example-basic-pipe-to-2">
   The usual way to write to a writable stream is to simply <a lt="piping">pipe</a> a <a>readable stream</a> to it.
@@ -2710,7 +2790,7 @@ throws>SetUpReadableByteStreamControllerFromUnderlyingSource ( <var>stream</var>
   <pre><code class="lang-javascript">
     function writeArrayToStream(array, writableStream) {
       const writer = writableStream.getWriter();
-      array.forEach(chunk => writer.write(chunk));
+      array.forEach(chunk => writer.write(chunk).catch(() => {}));
 
       return writer.close();
     }
@@ -2719,6 +2799,11 @@ throws>SetUpReadableByteStreamControllerFromUnderlyingSource ( <var>stream</var>
       .then(() => console.log("All done!"))
       .catch(e => console.error("Error with the stream: " + e));
   </code></pre>
+
+  Note how we use <code>.catch(() => {})</code> to suppress any rejections from the
+  {{WritableStreamDefaultWriter/write()}} method; we'll be notified of any fatal errors via a rejection of the
+  {{WritableStreamDefaultWriter/close()}} method, and leaving them un-caught would cause potential
+  {{unhandledrejection}} events and console warnings.
 </div>
 
 <div class="example" id="example-manual-write-with-error-handling">
@@ -2738,7 +2823,8 @@ throws>SetUpReadableByteStreamControllerFromUnderlyingSource ( <var>stream</var>
 
   What "success" means is up to a given stream instance (or more precisely, its <a>underlying sink</a>) to decide. For
   example, for a file stream it could simply mean that the OS has accepted the write, and not necessarily that the
-  chunk has been flushed to disk.
+  chunk has been flushed to disk. Some streams might not be able to give such a signal at all, in which case the
+  returned promise will fulfill immediately.
 </div>
 
 <div class="example" id="example-manual-write-with-backpressure">
@@ -2756,19 +2842,58 @@ throws>SetUpReadableByteStreamControllerFromUnderlyingSource ( <var>stream</var>
       await writer.ready;
 
       const bytes = new Uint8Array(writer.desiredSize);
-      window.crypto.getRandomValues(bytes);
+      crypto.getRandomValues(bytes);
 
-      await writer.write(bytes);
+      // Purposefully don't await; awaiting writer.ready is enough.
+      writer.write(bytes).catch(() => {});
     }
   }
 
   writeRandomBytesForever(myWritableStream).catch(e => console.error("Something broke", e));
   </code></pre>
+
+  Note how we don't <code>await</code> the promise returned by {{WritableStreamDefaultWriter/write()}}; this would be
+  redundant with <code>await</code>ing the {{WritableStreamDefaultWriter/ready}} promise. Additionally, similar to <a
+  href="#example-manual-write-batch">a previous example</a>, we use the <code>.catch(() => {})</code> pattern on the
+  promises returned by {{WritableStreamDefaultWriter/write()}}; in this case we'll be notified about any failures
+  <code>await</code>ing the {{WritableStreamDefaultWriter/ready}} promise.
+</div>
+
+<div class="example" id="example-manual-write-dont-await">
+  To further emphasize how it's a bad idea to <code>await</code> the promise returned by
+  {{WritableStreamDefaultWriter/write()}}, consider a modification of the above example, where we continue to use the
+  {{WritableStreamDefaultWriter}} interface directly, but we don't control how many bytes we have to write at a given
+  time. In that case, the <a>backpressure</a>-respecting code looks the same:
+
+  <pre><code class="lang-javascript">
+  async function writeSuppliedBytesForever(writableStream, getBytes) {
+    const writer = writableStream.getWriter();
+
+    while (true) {
+      await writer.ready;
+
+      const bytes = getBytes();
+      writer.write(bytes).catch(() => {});
+    }
+  }
+  </code></pre>
+
+  Unlike the previous example, where—because we were always writing exactly
+  {{WritableStreamDefaultWriter/desiredSize|writer.desiredSize}} bytes each time—the
+  {{WritableStreamDefaultWriter/write()}} and {{WritableStreamDefaultWriter/ready}} promises were synchronized, in this
+  case it's quite possible that the {{WritableStreamDefaultWriter/ready}} promise fulfills before the one returned by
+  {{WritableStreamDefaultWriter/write()}} does. Remember, the {{WritableStreamDefaultWriter/ready}} promise fulfills
+  when the <a lt="desired size to fill a stream's internal queue">desired size</a> becomes positive, which might be
+  before the write succeeds (especially in cases with a larger <a>high water mark</a>).
+
+  In other words, <code>await</code>ing the return value of {{WritableStreamDefaultWriter/write()}} means you never
+  queue up writes in the stream's <a>internal queue</a>, instead only executing a write after the previous one succeeds,
+  which can result in low throughput.
 </div>
 
 <h3 id="ws-class" interface lt="WritableStream">Class <code>WritableStream</code></h3>
 
-<h4 id="ws-class-definition">Class Definition</h4>
+<h4 id="ws-class-definition">Class definition</h4>
 
 <div class="non-normative">
 
@@ -2779,18 +2904,18 @@ like
 
 <pre><code class="lang-javascript">
   class WritableStream {
-    constructor(underlyingSink = {}, { size, highWaterMark = 1 } = {})
+    <a href="#ws-constructor">constructor</a>(<a href="#underlying-sink-api">underlyingSink</a> = {}, <a href="#qs-api">strategy</a> = {})
 
-    get locked()
+    get <a href="#ws-locked">locked</a>()
 
-    abort(reason)
-    getWriter()
+    <a href="#ws-abort">abort</a>(reason)
+    <a href="#ws-get-writer">getWriter</a>()
   }
 </code></pre>
 
 </div>
 
-<h4 id="ws-internal-slots">Internal Slots</h4>
+<h4 id="ws-internal-slots">Internal slots</h4>
 
 Instances of {{WritableStream}} are created with the internal slots described in the following table:
 
@@ -2855,62 +2980,123 @@ Instances of {{WritableStream}} are created with the internal slots described in
 
 <p class="note">
   The \[[inFlightCloseRequest]] slot and \[[closeRequest]] slot are mutually exclusive. Similarly, no element will be
-  removed from \[[writeRequests]] while \[[inFlightWriteRequest]] is not <code>undefined</code>. Implementations can
-  optimize storage for these slots based on these invariants.
+  removed from \[[writeRequests]] while \[[inFlightWriteRequest]] is not <emu-val>undefined</emu-val>. Implementations
+  can optimize storage for these slots based on these invariants.
 </p>
 
-<h4 id="ws-constructor" constructor for="WritableStream" lt="WritableStream(underlyingSink, queuingStrategy)">new
-WritableStream(<var>underlyingSink</var> = {}, { <var>size</var>, <var>highWaterMark</var> = 1 } = {})</h4>
+<h4 id="ws-constructor" constructor for="WritableStream" lt="WritableStream(underlyingSink, strategy)">new
+WritableStream(<var>underlyingSink</var> = {}, <var>strategy</var> = {})</h4>
 
 <div class="note">
-  The <code>underlyingSink</code> object passed to the constructor can implement any of the following methods to govern
-  how the constructed stream instance behaves:
+  The <code>underlyingSink</code> argument represents the <a>underlying sink</a>, as described in
+  [[#underlying-sink-api]].
 
-  <ul>
-    <li><p><code>start(controller)</code> is called immediately, and can perform any actions necessary to acquire
-      access to the <a>underlying sink</a>. If this process is asynchronous, it can return a promise to signal success
-      or failure.
-
-    <li><p><code>write(chunk, controller)</code> is called when a new <a>chunk</a> of data is ready to be written to the
-      <a>underlying sink</a>. It can return a promise to signal success or failure of the write operation. The stream
-      implementation guarantees that this method will be called only after previous writes have succeeded, and never
-      after <code>close</code> or <code>abort</code> is called.
-
-    <li><p><code>close()</code> is called after the producer signals that they are done writing chunks to the
-      stream, and all queued-up writes successfully complete. It can perform any actions necessary to finalize writes
-      to the <a>underlying sink</a>, and release access to it. If this process is asynchronous, it can return a promise
-      to signal success or failure. The stream implementation guarantees that this method will be called only after all
-      queued-up writes have succeeded.
-
-    <li><p><code>abort(reason)</code> is called when the producer signals they wish to abruptly close the stream
-      and put it in an errored state. It can clean up any held resources, much like <code>close</code>, but perhaps
-      with some custom handling. Unlike <code>close</code>, <code>abort</code> will be called even if writes are queued
-      up; those <a>chunks</a> will be thrown away. If this process is asynchronous, it can return a promise to signal
-      success or failure.
-  </ul>
-
-  The <code>controller</code> object passed to <code>start</code>, <code>write</code> and <code>close</code> is an
-  instance of {{WritableStreamDefaultController}}, and has the ability to error the stream.
-
-  The constructor also accepts a second argument containing the <a>queuing strategy</a> object with
-  two properties: a non-negative number <code>highWaterMark</code>, and a function <code>size(chunk)</code>. The
-  supplied <code>strategy</code> could be an instance of the built-in {{CountQueuingStrategy}} or
-  {{ByteLengthQueuingStrategy}} classes, or it could be custom. If no strategy is supplied, the default
-  behavior will be the same as a {{CountQueuingStrategy}} with a <a>high water mark</a> of 1.
+  The <code>strategy</code> argument represents the stream's <a>queuing strategy</a>, as described in [[#qs-api]]. If it
+  is not provided, the default behavior will be the same as a {{CountQueuingStrategy}} with a <a>high water mark</a>
+  of 1.
 </div>
 
 <emu-alg>
   1. Perform ! InitializeWritableStream(_this_).
   1. Let _type_ be ? GetV(_underlyingSink_, `"type"`).
+  1. Let _size_ be ? GetV(_strategy_, `"size"`).
+  1. Let _highWaterMark_ be ? GetV(_strategy_, `"highWaterMark"`).
   1. If _type_ is not *undefined*, throw a *RangeError* exception. <p class="note">This is to allow us to add new
      potential types in the future, without backward-compatibility concerns.</p>
   1. Let _sizeAlgorithm_ be ? MakeSizeAlgorithmFromSizeFunction(_size_).
+  1. If _highWaterMark_ is *undefined*, let _highWaterMark_ be *1*.
   1. Set _highWaterMark_ to ? ValidateAndNormalizeHighWaterMark(_highWaterMark_).
   1. Perform ? SetUpWritableStreamDefaultControllerFromUnderlyingSink(*this*, _underlyingSink_, _highWaterMark_,
      _sizeAlgorithm_).
 </emu-alg>
 
-<h4 id="ws-prototype">Properties of the {{WritableStream}} Prototype</h4>
+<h4 id="underlying-sink-api">Underlying sink API</h4>
+
+<div class="non-normative">
+
+<em>This section is non-normative.</em>
+
+The {{WritableStream()}} constructor accepts as its first argument a JavaScript object representing the <a>underlying
+sink</a>. Such objects can contain any of the following properties:
+
+<dl>
+  <dt><dfn method for="underlying sink">start(<var>controller</var>)</dfn></dt>
+  <dd>
+    <p>A function that is called immediately during creation of the {{WritableStream}}.</p>
+
+    <p>Typically this is used to acquire access to the <a>underlying sink</a> resource being represented.</p>
+
+    <p>If this setup process is asynchronous, it can return a promise to signal success or failure; a rejected promise
+    will error the stream. Any thrown exceptions will be re-thrown by the {{WritableStream()}} constructor.</p>
+  </dd>
+
+  <dt><dfn method for="underlying sink">write(<var>chunk</var>, <var>controller</var>)</dfn></dt>
+  <dd>
+    <p>A function that is called when a new <a>chunk</a> of data is ready to be written to the <a>underlying sink</a>.
+    The stream implementation guarantees that this function will be called only after previous writes have succeeded,
+    and never before {{underlying sink/start()}} has succeeded or after {{underlying sink/close()}} or
+    {{underlying sink/abort()}} have been called.</p>
+
+    <p>This function is used to actually send the data to the resource presented by the <a>underlying sink</a>, for
+    example by calling a lower-level API.</p>
+
+    <p>If the process of writing data is asynchronous, and communicates success or failure signals back to its user,
+    then this function can return a promise to signal success or failure. This promise return value will be communicated
+    back to the caller of {{WritableStreamDefaultWriter/write()|writer.write()}}, so they can monitor that individual
+    write. Throwing an exception is treated the same as returning a rejected promise.</p>
+
+    <p>Note that such signals are not always available; compare e.g. [[#example-ws-no-backpressure]] with
+    [[#example-ws-backpressure]]. In such cases, it's best to not return anything.</p>
+
+    <p>The promise potentially returned by this function also governs whether the given chunk counts as written for the
+    purposes of computed the <a lt="desired size to fill a stream's internal queue">desired size to fill the stream's
+    internal queue</a>. That is, during the time it takes the promise to settle,
+    {{WritableStreamDefaultWriter/desiredSize|writer.desiredSize}} will stay at its previous value, only increasing to
+    signal the desire for more chunks once the write succeeds.</p>
+  </dd>
+
+  <dt><dfn method for="underlying sink">close()</dfn></dt>
+  <dd>
+    <p>A function that is called after the <a>producer</a> signals, via
+    {{WritableStreamDefaultWriter/close()|writer.close()}}, that they are done writing <a>chunks</a> to the stream, and
+    subsequently all queued-up writes have successfully completed.</p>
+
+    <p>This function can perform any actions necessary to finalize or flush writes to the <a>underlying sink</a>, and
+    release access to any held resources.</p>
+
+    <p>If the shutdown process is asynchronous, the function can return a promise to signal success or failure; the
+    result will be communicated via the return value of the called
+    {{WritableStreamDefaultWriter/close()|writer.close()}} method. Additionally, a rejected promise will error the
+    stream, instead of letting it close successfully. Throwing an exception is treated the same as returning a rejected
+    promise.</p>
+  </dd>
+
+  <dt><dfn method for="underlying sink">abort(<var>reason</var>)</dfn></dt>
+  <dd>
+    <p>A function that is called after the <a>producer</a> signals, via {{WritableStream/abort()|stream.abort()}} or
+    {{WritableStreamDefaultWriter/abort()|writer.abort()}}, that they wish to <a lt="abort a writable stream">abort</a>
+    the stream. It takes as its argument the same value as was passed to those methods by the producer.</p>
+
+    <p>Writable streams can additionally be aborted under certain conditions during <a>piping</a>; see the definition
+    of the {{ReadableStream/pipeTo()}} method for more details.</p>
+
+    <p>This function can clean up any held resources, much like {{underlying sink/close()}}, but perhaps with some
+    custom handling.</p>
+
+    <p>If the shutdown process is asynchronous, the function can return a promise to signal success or failure; the
+    result will be communicated via the return value of the called <code>abort()</code> method. Throwing an exception is
+    treated the same as returning a rejected promise. Regardless, the stream will be errored with a new {{TypeError}}
+    indicating that it was aborted.</p>
+  </dd>
+</dl>
+
+The <code>controller</code> argument passed to {{underlying sink/start()}} and {{underlying sink/write()}} is an
+instance of {{WritableStreamDefaultController}}, and has the ability to error the stream. This is mainly used for
+bridging the gap with non-promise-based APIs, as seen for example in [[#example-ws-no-backpressure]].
+
+</div>
+
+<h4 id="ws-prototype">Properties of the {{WritableStream}} prototype</h4>
 
 <h5 id="ws-locked" attribute for="WritableStream" lt="locked">get locked</h5>
 
@@ -2954,7 +3140,7 @@ WritableStream(<var>underlyingSink</var> = {}, { <var>size</var>, <var>highWater
   1. Return ? AcquireWritableStreamDefaultWriter(*this*).
 </emu-alg>
 
-<h3 id="ws-abstract-ops">General Writable Stream Abstract Operations</h3>
+<h3 id="ws-abstract-ops">General writable stream abstract operations</h3>
 
 The following abstract operations, unlike most in this specification, are meant to be generally useful by other
 specifications, instead of just being part of the implementation of this spec's classes.
@@ -2973,7 +3159,7 @@ throws>AcquireWritableStreamDefaultWriter ( <var>stream</var> )</h4>
 This abstract operation is meant to be called from other specifications that wish to create {{WritableStream}}
 instances. The <var>writeAlgorithm</var>, <var>closeAlgorithm</var> and <var>abortAlgorithm</var> algorithms must return
 promises; if supplied, <var>sizeAlgorithm</var> must be an algorithm accepting <a>chunk</a> objects and returning a
-number; and if supplied, <var>highWaterMark</var> must be a nonnegative, non-NaN number.
+number; and if supplied, <var>highWaterMark</var> must be a non-negative, non-NaN number.
 
 <p class="note">CreateWritableStream throws an exception if and only if the supplied <var>startAlgorithm</var>
 throws.</p>
@@ -3028,10 +3214,8 @@ writable stream is <a>locked to a writer</a>.
 
 <emu-alg>
   1. Let _state_ be _stream_.[[state]].
-  1. If _state_ is `"closed"`, return <a>a promise resolved with</a> *undefined*.
-  1. If _state_ is `"errored"`, return <a>a promise rejected with</a> _stream_.[[storedError]].
-  1. Let _error_ be a new *TypeError* indicating that the stream has been requested to abort.
-  1. If _stream_.[[pendingAbortRequest]] is not *undefined*, return <a>a promise rejected with</a> _error_.
+  1. If _state_ is `"closed"` or `"errored"`, return <a>a promise resolved with</a> *undefined*.
+  1. If _stream_.[[pendingAbortRequest]] is not *undefined*, return _stream_.[[pendingAbortRequest]].[[promise]].
   1. Assert: _state_ is `"writable"` or `"erroring"`.
   1. Let _wasAlreadyErroring_ be *false*.
   1. If _state_ is `"erroring"`,
@@ -3040,11 +3224,11 @@ writable stream is <a>locked to a writer</a>.
   1. Let _promise_ be <a>a new promise</a>.
   1. Set _stream_.[[pendingAbortRequest]] to Record {[[promise]]: _promise_, [[reason]]: _reason_,
      [[wasAlreadyErroring]]: _wasAlreadyErroring_}.
-  1. If _wasAlreadyErroring_ is *false*, perform ! WritableStreamStartErroring(_stream_, _error_).
+  1. If _wasAlreadyErroring_ is *false*, perform ! WritableStreamStartErroring(_stream_, _reason_).
   1. Return _promise_.
 </emu-alg>
 
-<h3 id="ws-abstract-ops-used-by-controllers">Writable Stream Abstract Operations Used by Controllers</h3>
+<h3 id="ws-abstract-ops-used-by-controllers">Writable stream abstract operations used by controllers</h3>
 
 To allow future flexibility to add different writable stream behaviors (similar to the distinction between default
 readable streams and <a>readable byte streams</a>), much of the internal state of a <a>writable stream</a> is
@@ -3254,7 +3438,7 @@ nothrow>WritableStreamUpdateBackpressure ( <var>stream</var>, <var>backpressure<
 The {{WritableStreamDefaultWriter}} class represents a <a>writable stream writer</a> designed to be vended by a
 {{WritableStream}} instance.
 
-<h4 id="default-writer-class-definition">Class Definition</h4>
+<h4 id="default-writer-class-definition">Class definition</h4>
 
 <div class="non-normative">
 
@@ -3280,7 +3464,7 @@ would look like
 
 </div>
 
-<h4 id="default-writer-internal-slots">Internal Slots</h4>
+<h4 id="default-writer-internal-slots">Internal slots</h4>
 
 Instances of {{WritableStreamDefaultWriter}} are created with the internal slots described in the following table:
 
@@ -3310,7 +3494,7 @@ lt="WritableStreamDefaultWriter(stream)">new WritableStreamDefaultWriter(<var>st
 
 <div class="note">
   The <code>WritableStreamDefaultWriter</code> constructor is generally not meant to be used directly; instead, a
-  stream's {{WritableStream/getWriter()}} method ought to be be used.
+  stream's {{WritableStream/getWriter()}} method ought to be used.
 </div>
 
 <emu-alg>
@@ -3340,7 +3524,7 @@ lt="WritableStreamDefaultWriter(stream)">new WritableStreamDefaultWriter(<var>st
     1. Set *this*.[[closedPromise]].[[PromiseIsHandled]] to *true*.
 </emu-alg>
 
-<h4 id="default-writer-prototype">Properties of the {{WritableStreamDefaultWriter}} Prototype</h4>
+<h4 id="default-writer-prototype">Properties of the {{WritableStreamDefaultWriter}} prototype</h4>
 
 <h5 id="default-writer-closed" attribute for="WritableStreamDefaultWriter" lt="closed">get closed</h5>
 
@@ -3377,7 +3561,7 @@ lt="WritableStreamDefaultWriter(stream)">new WritableStreamDefaultWriter(<var>st
 
 <div class="note">
   The <code>ready</code> getter returns a promise that will be fulfilled when the <a lt="desired size to fill a stream's
-  internal queue">desired size to fill the stream's internal queue</a> transitions from nonpositive to positive,
+  internal queue">desired size to fill the stream's internal queue</a> transitions from non-positive to positive,
   signaling that it is no longer applying <a>backpressure</a>. Once the <a lt="desired size to fill a stream's internal
   queue">desired size to fill the stream's internal queue</a> dips back to zero or below, the getter will return a new
   promise that stays pending until the next transition.
@@ -3450,9 +3634,9 @@ lt="WritableStreamDefaultWriter(stream)">new WritableStreamDefaultWriter(<var>st
 
 <div class="note">
   The <code>write</code> method writes the given <a>chunk</a> to the writable stream, by waiting until any previous
-  writes have finished successfully, and then sending the <a>chunk</a> to the <a>underlying sink</a>. It will return a
-  promise that fulfills with <emu-val>undefined</emu-val> upon a successful write, or rejects if the write fails or
-  stream becomes errored before the writing process is initiated.
+  writes have finished successfully, and then sending the <a>chunk</a> to the <a>underlying sink</a>'s {{underlying
+  sink/write()}} method. It will return a promise that fulfills with <emu-val>undefined</emu-val> upon a successful
+  write, or rejects if the write fails or stream becomes errored before the writing process is initiated.
 
   Note that what "success" means is up to the <a>underlying sink</a>; it might indicate simply that the <a>chunk</a> has
   been accepted, and not necessarily that it is safely saved to its ultimate destination.
@@ -3464,7 +3648,7 @@ lt="WritableStreamDefaultWriter(stream)">new WritableStreamDefaultWriter(<var>st
   1. Return ! WritableStreamDefaultWriterWrite(*this*, _chunk_).
 </emu-alg>
 
-<h3 id="rs-writer-abstract-ops">Writable Stream Writer Abstract Operations</h3>
+<h3 id="rs-writer-abstract-ops">Writable stream writer abstract operations</h3>
 
 <h4 id="is-writable-stream-default-writer" aoid="IsWritableStreamDefaultWriter" nothrow>IsWritableStreamDefaultWriter (
 <var>x</var> )</h4>
@@ -3593,7 +3777,7 @@ The {{WritableStreamDefaultController}} class has methods that allow control of 
 constructing a {{WritableStream}}, the <a>underlying sink</a> is given a corresponding
 {{WritableStreamDefaultController}} instance to manipulate.
 
-<h4 id="ws-default-controller-class-definition">Class Definition</h4>
+<h4 id="ws-default-controller-class-definition">Class definition</h4>
 
 <div class="non-normative">
 
@@ -3612,7 +3796,7 @@ it would look like
 
 </div>
 
-<h4 id="ws-default-controller-internal-slots">Internal Slots</h4>
+<h4 id="ws-default-controller-internal-slots">Internal slots</h4>
 
 Instances of {{WritableStreamDefaultController}} are created with the internal slots described in the following table:
 
@@ -3679,7 +3863,7 @@ lt="WritableStreamDefaultController()">new WritableStreamDefaultController()</h4
   1. Throw a *TypeError* exception.
 </emu-alg>
 
-<h4 id="ws-default-controller-prototype">Properties of the {{WritableStreamDefaultController}} Prototype</h4>
+<h4 id="ws-default-controller-prototype">Properties of the {{WritableStreamDefaultController}} prototype</h4>
 
 <h5 id="ws-default-controller-error" method for="WritableStreamDefaultController">error(<var>e</var>)</h5>
 
@@ -3699,7 +3883,7 @@ lt="WritableStreamDefaultController()">new WritableStreamDefaultController()</h4
   1. Perform ! WritableStreamDefaultControllerError(*this*, _e_).
 </emu-alg>
 
-<h4 id="ws-default-controller-internal-methods">Writable Stream Default Controller Internal Methods</h4>
+<h4 id="ws-default-controller-internal-methods">Writable stream default controller internal methods</h4>
 
 The following are additional internal methods implemented by each {{WritableStreamDefaultController}} instance. The
 writable stream implementation will call into these.
@@ -3723,7 +3907,7 @@ used polymorphically.
   1. Perform ! ResetQueue(*this*).
 </emu-alg>
 
-<h3 id="ws-default-controller-abstract-ops">Writable Stream Default Controller Abstract Operations</h3>
+<h3 id="ws-default-controller-abstract-ops">Writable stream default controller abstract operations</h3>
 
 <h4 id="is-writable-stream-default-controller" aoid="IsWritableStreamDefaultController"
 nothrow>IsWritableStreamDefaultController ( <var>x</var> )</h4>
@@ -3810,7 +3994,8 @@ nothrow>WritableStreamDefaultControllerGetDesiredSize ( <var>controller</var> )<
 </emu-alg>
 
 <h4 id="writable-stream-default-controller-write" aoid="WritableStreamDefaultControllerWrite"
-nothrow>WritableStreamDefaultControllerWrite ( <var>controller</var>, <var>chunk</var>, <var>chunkSize</var> )</h4>
+nothrow>WritableStreamDefaultControllerWrite ( <var>controller</var>, <var>chunk</var>, <var ignore>chunkSize</var>
+)</h4>
 
 <emu-alg>
   1. Let _writeRecord_ be Record {[[chunk]]: _chunk_}.
@@ -3871,7 +4056,7 @@ nothrow>WritableStreamDefaultControllerProcessClose ( <var>controller</var> )</h
 nothrow>WritableStreamDefaultControllerProcessWrite ( <var>controller</var>, <var>chunk</var> )</h4>
 
 <emu-alg>
-  1. Let _stream_ be _controller_.[[controllerWritableStream]].
+  1. Let _stream_ be _controller_.[[controlledWritableStream]].
   1. Perform ! WritableStreamMarkFirstWriteRequestInFlight(_stream_).
   1. Let _sinkWritePromise_ be the result of performing _controller_.[[writeAlgorithm]], passing in _chunk_.
   1. <a>Upon fulfillment</a> of _sinkWritePromise_,
@@ -3904,9 +4089,9 @@ nothrow>WritableStreamDefaultControllerError ( <var>controller</var>, <var>error
   1. Perform ! WritableStreamStartErroring(_stream_, _error_).
 </emu-alg>
 
-<h2 id="ts">Transform Streams</h2>
+<h2 id="ts">Transform streams</h2>
 
-<h3 id="ts-intro">Using Transform Streams</h3>
+<h3 id="ts-intro">Using transform streams</h3>
 
 <div class="example" id="example-basic-pipe-through">
   The natural way to use a transform stream is to place it in a <a lt="piping">pipe</a> between a <a>readable stream</a>
@@ -3946,8 +4131,9 @@ nothrow>WritableStreamDefaultControllerError ( <var>controller</var>, <var>error
     const { writable, readable } = new TransformStream();
     fetch("...", { body: readable }).then(response => /* ... */);
 
-    writable.write(new Uint8Array([0x73, 0x74, 0x72, 0x65, 0x61, 0x6D, 0x73, 0x21]));
-    writable.close();
+    const writer = writable.getWriter();
+    writer.write(new Uint8Array([0x73, 0x74, 0x72, 0x65, 0x61, 0x6D, 0x73, 0x21]));
+    writer.close();
   </code></pre>
 
   Another use of identity transform streams is to add additional buffering to a <a>pipe</a>. In this example we add
@@ -3964,7 +4150,7 @@ nothrow>WritableStreamDefaultControllerError ( <var>controller</var>, <var>error
 
 <h3 id="ts-class" interface lt="TransformStream">Class <code>TransformStream</code></h3>
 
-<h4 id="ts-class-definition">Class Definition</h4>
+<h4 id="ts-class-definition">Class definition</h4>
 
 <div class="non-normative">
 
@@ -3975,16 +4161,17 @@ like
 
 <pre><code class="lang-javascript">
   class TransformStream {
-    constructor(transformer = {}, writableStrategy = {}, readableStrategy = {})
+    <a href="#ts-constructor">constructor</a>(<a href="#transformer-api">transformer</a> = {}, <a
+    href="#qs-api">writableStrategy</a> = {}, <a href="#qs-api">readableStrategy</a> = {})
 
-    get readable()
-    get writable()
+    get <a href="#ts-readable">readable</a>()
+    get <a href="#ts-writable">writable</a>()
   }
 </code></pre>
 
 </div>
 
-<h4 id="ts-internal-slots">Internal Slots</h4>
+<h4 id="ts-internal-slots">Internal slots</h4>
 
 Instances of {{TransformStream}} are created with the internal slots described in the following table:
 
@@ -4020,44 +4207,18 @@ Instances of {{TransformStream}} are created with the internal slots described i
 </table>
 
 <h4 id="ts-constructor" constructor for="TransformStream" lt="TransformStream(transformer, writableStrategy,
-readableStrategy)">new TransformStream(<var>transformer</var> = {}, <var>writableStrategy</var> = {},
-<var>readableStrategy</var> = {})</h4>
+readableStrategy)">new TransformStream(<var>transformer</var> = {}, <var ignore>writableStrategy</var> = {},
+<var ignore>readableStrategy</var> = {})</h4>
 
 <div class="note">
-  The <code>transformer</code> object passed to the constructor can implement any of the following methods to govern
-  how the constructed stream instance behaves:
+  The <code>transformer</code> argument represents the <a>transformer</a>, as described in [[#transformer-api]].
 
-  <ul>
-    <li><p><code>start(controller)</code> is called immediately, and is typically used to enqueue prefix <a>chunks</a>
-      that will be read from the <a>readable side</a> but don't depend on any writes to the <a>writable side</a>. If
-      this process is asynchronous, it can return a promise to signal success or failure.
-
-    <li>
-      <p><code>transform(chunk, controller)</code> is called when a new chunk originally written to the writable side is
-      ready to be transformed. It can return a promise to signal success or failure of the transformation. The results
-      of the transformation can be enqueued to the readable side using the
-      {{ReadableStreamDefaultController/enqueue(chunk)|controller.enqueue()}} method. This permits a single chunk
-      written to the writable side to result in zero or multiple chunks on the readable side.
-
-      <p>The stream implementation guarantees that <code>transform</code> will be called only after previous
-      transformations have succeeded, and never before <code>start</code> has completed or after <code>flush</code> is
-      called. When no <code>transform</code> method is supplied, the identity transform is used, which enqueues chunks
-      unchanged from the writable side to the readable side.
-
-    <li><p><code>flush(controller)</code> is called after all chunks written to the writable side have been
-      transformed and the writable side has been closed. It is typically used to enqueue suffix chunks to the
-      readable side, before that too becomes closed. If this process is asynchronous, it can return a promise
-      to signal success or failure.
-  </ul>
-
-  The <code>controller</code> object passed to <code>start</code>, <code>transform</code> and <code>flush</code> is an
-  instance of {{TransformStreamDefaultController}}, and has the ability to enqueue chunks to the readable side,
-  or to terminate or error the stream.
-
-  The second and third arguments to the constructor are the <a>queuing strategy</a> objects for the writable and
-  readable sides respectively. These are used in the construction of the {{WritableStream}} and {{ReadableStream}}
-  objects and can be used to add buffering to a {{TransformStream}}, in order to smooth out variations in the speed of
-  the transformation, or to increase the amount of buffering in a <a>pipe</a>.
+  The <code>writableStrategy</code> and <code>readableStrategy</code> arguments are the <a>queuing strategy</a> objects
+  for the writable and readable sides respectively. These are used in the construction of the {{WritableStream}} and
+  {{ReadableStream}} objects and can be used to add buffering to a {{TransformStream}}, in order to smooth out
+  variations in the speed of the transformation, or to increase the amount of buffering in a <a>pipe</a>. If they are
+  not provided, the default behavior will be the same as a {{CountQueuingStrategy}}, with respective <a>high water
+  marks</a> of 1 and 0.
 </div>
 
 <emu-alg>
@@ -4083,7 +4244,76 @@ readableStrategy)">new TransformStream(<var>transformer</var> = {}, <var>writabl
   1. <a>Resolve</a> _startPromise_ with _startResult_.
 </emu-alg>
 
-<h4 id="ts-prototype">Properties of the {{TransformStream}} Prototype</h4>
+<h4 id="transformer-api">Transformer API</h4>
+
+<div class="non-normative">
+
+<em>This section is non-normative.</em>
+
+The {{TransformStream()}} constructor accepts as its first argument a JavaScript object representing the
+<a>transformer</a>. Such objects can contain any of the following methods:
+
+<dl>
+  <dt><dfn method for="transformer">start(<var>controller</var>)</dfn></dt>
+  <dd>
+    <p>A function that is called immediately during creation of the {{TransformStream}}.</p>
+
+    <p>Typically this is used enqueue prefix <a>chunks</a>, using
+    {{TransformStreamDefaultController/enqueue()|controller.enqueue()}}. Those chunks will be read from the <a>readable
+    side</a> but don't depend on any writes to the <a>writable side</a>.</p>
+
+    <p>If this initial process is asynchronous, for example by virtue of taking some effort to acquire the prefix
+    chunks, the function can return a promise to signal success or failure; a rejected promise will error the stream.
+    Any thrown exceptions will be re-thrown by the {{TransformStream()}} constructor.</p>
+  </dd>
+
+  <dt><dfn method for="transformer">transform(<var>chunk</var>, <var>controller</var>)</dfn></dt>
+  <dd>
+    <p>A function called when a new <a>chunk</a> originally written to the <a>writable side</a> is ready to be
+    transformed. The stream implementation guarantees that this function will be called only after previous transforms
+    have succeeded, and never before {{underlying sink/start()}} has completed or after {{transformer/flush()}} has been
+    called.</p>
+
+    <p>This function performs the actual transformation work of the transform stream. It can enqueue the results using
+    {{TransformStreamDefaultController/enqueue()|controller.enqueue()}}. This permits a single chunk written to the
+    writable side to result in zero or multiple chunks on the <a>readable side</a>, depending on how many times
+    {{TransformStreamDefaultController/enqueue()|controller.enqueue()}} is called. [[#example-ts-lipfuzz]] demonstrates
+    this by sometimes enqueuing zero chunks.</p>
+
+    <p>If the process of transforming is asynchronous, this function can return a promise to signal success or failure
+    of the transformation. A rejected promise will error both the readable and writable sides of the transform
+    stream.</p>
+
+    <p>If no {{transformer/transform()}} is supplied, the identity transform is used, which enqueues chunks unchanged
+    from the writable side to the readable side.</p>
+  </dd>
+
+  <dt><dfn method for="transformer">flush(<var>controller</var>)</dfn></dt>
+  <dd>
+    <p>A function called after all <a>chunks</a> written to the <a>writable side</a> have been transformed by
+    successfully passing through {{transformer/transform()}}, and the writable side is about to be closed.</p>
+
+    <p>Typically this is used to enqueue suffix chunks to the <a>readable side</a>, before that too becomes closed. An
+    example can be seen in [[#example-ts-lipfuzz]].</p>
+
+    <p>If the flushing process is asynchronous, the function can return a promise to signal success or failure; the
+    result will be communicated to the caller of {{WritableStreamDefaultWriter/write()|stream.writable.write()}}.
+    Additionally, a rejected promise will error both the readable and writable sides of the stream. Throwing an
+    exception is treated the same as returning a rejected promise.</p>
+
+    <p>(Note that there is no need to call {{TransformStreamDefaultController/terminate()|controller.terminate()}}
+    inside {{transformer/flush()}}; the stream is already in the process of successfully closing down, and terminating
+    it would be counterproductive.)</p>
+  </dd>
+</dl>
+
+The <code>controller</code> object passed to {{transformer/start()}}, {{transformer/transform()}}, and
+{{transformer/flush()}} is an instance of {{TransformStreamDefaultController}}, and has the ability to enqueue
+<a>chunks</a> to the <a>readable side</a>, or to terminate or error the stream.
+
+</div>
+
+<h4 id="ts-prototype">Properties of the {{TransformStream}} prototype</h4>
 
 <h5 id="ts-readable" attribute for="TransformStream" lt="readable">get readable</h5>
 
@@ -4107,7 +4337,7 @@ readableStrategy)">new TransformStream(<var>transformer</var> = {}, <var>writabl
   1. Return *this*.[[writable]].
 </emu-alg>
 
-<h3 id="ts-abstract-ops">General Transform Stream Abstract Operations</h3>
+<h3 id="ts-abstract-ops">General transform stream abstract operations</h3>
 
 <h4 id="create-transform-stream" aoid="CreateTransformStream" throws export>CreateTransformStream (
 <var>startAlgorithm</var>, <var>transformAlgorithm</var>, <var>flushAlgorithm</var>
@@ -4116,7 +4346,7 @@ readableStrategy)">new TransformStream(<var>transformer</var> = {}, <var>writabl
 
 This abstract operation is meant to be called from other specifications that wish to create {{TransformStream}}
 instances. The <var>transformAlgorithm</var> and <var>flushAlgorithm</var> algorithms must return promises; if supplied,
-<var>writableHighWaterMark</var> and <var>readableHighWaterMark</var> must be nonnegative, non-NaN numbers; and if
+<var>writableHighWaterMark</var> and <var>readableHighWaterMark</var> must be non-negative, non-NaN numbers; and if
 supplied, <var>writableSizeAlgorithm</var> and <var>readableSizeAlgorithm</var> must be algorithms accepting
 <a>chunk</a> objects and returning numbers.
 
@@ -4143,15 +4373,15 @@ throws.</p>
 </emu-alg>
 
 <h4 id="initialize-transform-stream" aoid="InitializeTransformStream" nothrow>InitializeTransformStream (
-<var>stream</var>, <var>startPromise</var>, <var>writableHighWaterMark</var>, <var>writableSizeAlgorithm</var>,
+<var>stream</var>, <var ignore>startPromise</var>, <var>writableHighWaterMark</var>, <var>writableSizeAlgorithm</var>,
 <var>readableHighWaterMark</var>, <var>readableSizeAlgorithm</var> )</h4>
 
 <emu-alg>
   1. Let _startAlgorithm_ be an algorithm that returns _startPromise_.
   1. Let _writeAlgorithm_ be the following steps, taking a _chunk_ argument:
     1. Return ! TransformStreamDefaultSinkWriteAlgorithm(_stream_, _chunk_).
-  1. Let _abortAlgorithm_ be the following steps:
-    1. Return ! TransformStreamDefaultSinkAbortAlgorithm(_stream_).
+  1. Let _abortAlgorithm_ be the following steps, taking a _reason_ argument:
+    1. Return ! TransformStreamDefaultSinkAbortAlgorithm(_stream_, _reason_).
   1. Let _closeAlgorithm_ be the following steps:
     1. Return ! TransformStreamDefaultSinkCloseAlgorithm(_stream_).
   1. Set _stream_.[[writable]] to ! CreateWritableStream(_startAlgorithm_, _writeAlgorithm_, _closeAlgorithm_,
@@ -4167,7 +4397,7 @@ throws.</p>
      <p class="note">The [[backpressure]] slot is set to *undefined* so that it can be initialized by
      TransformStreamSetBackpressure. Alternatively, implementations can use a strictly boolean value for
      [[backpressure]] and change the way it is initialized. This will not be visible to user code so long as the
-     initialization is correctly completed before _transformer_'s <code>start()</code> method is is called.</p>
+     initialization is correctly completed before _transformer_'s <l>{{transformer/start()}}</l> method is called.</p>
   1. Perform ! TransformStreamSetBackpressure(_stream_, *true*).
   1. Set _stream_.[[transformStreamController]] to *undefined*.
 </emu-alg>
@@ -4184,8 +4414,7 @@ throws.</p>
 <var>e</var> )</h4>
 
 <emu-alg>
-  1. If _stream_.[[readable]].[[state]] is `"readable"`, perform !
-     ReadableStreamDefaultControllerError(_stream_.[[readable]].[[readableStreamController]], _e_).
+  1. Perform ! ReadableStreamDefaultControllerError(_stream_.[[readable]].[[readableStreamController]], _e_).
   1. Perform ! TransformStreamErrorWritableAndUnblockWrite(_stream_, _e_).
 </emu-alg>
 
@@ -4222,7 +4451,7 @@ The {{TransformStreamDefaultController}} class has methods that allow manipulati
 and {{WritableStream}}. When constructing a {{TransformStream}}, the <a>transformer</a> object is given a corresponding
 {{TransformStreamDefaultController}} instance to manipulate.
 
-<h4 id="ts-default-controller-class-definition">Class Definition</h4>
+<h4 id="ts-default-controller-class-definition">Class definition</h4>
 
 <div class="non-normative">
 
@@ -4245,7 +4474,7 @@ it would look like
 
 </div>
 
-<h4 id="ts-default-controller-internal-slots">Internal Slots</h4>
+<h4 id="ts-default-controller-internal-slots">Internal slots</h4>
 
 Instances of {{TransformStreamDefaultController}} are created with the internal slots described in the following table:
 
@@ -4284,7 +4513,7 @@ lt="TransformStreamDefaultController()">new TransformStreamDefaultController()</
   1. Throw a *TypeError* exception.
 </emu-alg>
 
-<h4 id="ts-default-controller-prototype">Properties of the {{TransformStreamDefaultController}} Prototype</h4>
+<h4 id="ts-default-controller-prototype">Properties of the {{TransformStreamDefaultController}} prototype</h4>
 
 <h5 id="ts-default-controller-desired-size" attribute for="TransformStreamDefaultController" lt="desiredSize">get
 desiredSize</h5>
@@ -4337,7 +4566,7 @@ desiredSize</h5>
   1. Perform ! TransformStreamDefaultControllerTerminate(*this*).
 </emu-alg>
 
-<h3 id="ts-default-controller-abstract-ops">Transform Stream Default Controller Abstract Operations</h3>
+<h3 id="ts-default-controller-abstract-ops">Transform stream default controller abstract operations</h3>
 
 <h4 id="is-transform-stream-default-controller" aoid="IsTransformStreamDefaultController"
 nothrow>IsTransformStreamDefaultController ( <var>x</var> )</h4>
@@ -4435,7 +4664,7 @@ this to streams they did not create.
   1. Perform ! TransformStreamErrorWritableAndUnblockWrite(_stream_, _error_).
 </emu-alg>
 
-<h3 id="ts-default-sink-abstract-ops">Transform Stream Default Sink Abstract Operations</h3>
+<h3 id="ts-default-sink-abstract-ops">Transform stream default sink abstract operations</h3>
 
 <h4 id="transform-stream-default-sink-write-algorithm" aoid="TransformStreamDefaultSinkWriteAlgorithm"
 nothrow>TransformStreamDefaultSinkWriteAlgorithm ( <var>stream</var>, <var>chunk</var> )</h4>
@@ -4457,11 +4686,10 @@ nothrow>TransformStreamDefaultSinkWriteAlgorithm ( <var>stream</var>, <var>chunk
 </emu-alg>
 
 <h4 id="transform-stream-default-sink-abort-algorithm" aoid="TransformStreamDefaultSinkAbortAlgorithm"
-nothrow>TransformStreamDefaultSinkAbortAlgorithm ( <var>stream</var> )</h4>
+nothrow>TransformStreamDefaultSinkAbortAlgorithm ( <var>stream</var>, <var>reason</var> )</h4>
 
 <emu-alg>
-  1. Let _e_ be a *TypeError* exception indicating that the writable stream was aborted.
-  1. Perform ! TransformStreamError(_stream_, _e_).
+  1. Perform ! TransformStreamError(_stream_, _reason_).
   1. Return <a>a promise resolved with</a> *undefined*.
 </emu-alg>
 
@@ -4472,7 +4700,7 @@ nothrow>TransformStreamDefaultSinkCloseAlgorithm( <var>stream</var> )</h4>
   1. Let _readable_ be _stream_.[[readable]].
   1. Let _flushPromise_ be the result of performing _stream_.[[transformStreamController]].[[flushAlgorithm]].
   1. Return the result of <a>transforming</a> _flushPromise_ with:
-    1. A fulfullment handler that performs the following steps:
+    1. A fulfillment handler that performs the following steps:
       1. If _readable_.[[state]] is `"errored"`, throw _readable_.[[storedError]].
       1. Let _readableController_ be _readable_.[[readableStreamController]].
       1. If ! ReadableStreamDefaultControllerCanCloseOrEnqueue(_readableController_) is *true*, perform !
@@ -4482,7 +4710,7 @@ nothrow>TransformStreamDefaultSinkCloseAlgorithm( <var>stream</var> )</h4>
       1. Throw _readable_.[[storedError]].
 </emu-alg>
 
-<h3 id="ts-default-source-abstract-ops">Transform Stream Default Source Abstract Operations</h3>
+<h3 id="ts-default-source-abstract-ops">Transform stream default source abstract operations</h3>
 
 <h4 id="transform-stream-default-source-pull"
 aoid="TransformStreamDefaultSourcePullAlgorithm" nothrow>TransformStreamDefaultSourcePullAlgorithm( <var>stream</var>
@@ -4495,9 +4723,51 @@ aoid="TransformStreamDefaultSourcePullAlgorithm" nothrow>TransformStreamDefaultS
   1. Return _stream_.[[backpressureChangePromise]].
 </emu-alg>
 
-<h2 id="other-stuff">Other Stream APIs and Operations</h2>
+<h2 id="other-stuff">Other stream APIs and operations</h2>
 
-<h3 id="blqs-class" interface lt="ByteLengthQueuingStrategy">Class <code>ByteLengthQueuingStrategy</code></h3>
+<h3 id="qs">Queuing strategies</h3>
+
+<h4 id="qs-api">The queuing strategy API</h4>
+
+<div class="non-normative">
+
+<em>This section is non-normative.</em>
+
+The {{ReadableStream()}}, {{WritableStream()}}, and {{TransformStream()}} constructors all accept at least one argument
+representing an appropriate <a>queuing strategy</a> for the stream being created. Such objects contain the following
+properties:
+
+<dl>
+  <dt><dfn method for="queuing strategy">size(<var>chunk</var>)</dfn> (non-byte streams only)</dt>
+  <dd>
+    <p>A function that computes and returns the size of the given <a>chunk</a> value.</p>
+
+    <p>The result is used to determine <a>backpressure</a>, manifesting via the appropriate <code>desiredSize</code>
+    property: either
+    {{ReadableStreamDefaultController/desiredSize|defaultController.desiredSize}},
+    {{ReadableByteStreamController/desiredSize|byteController.desiredSize}}, or
+    {{WritableStreamDefaultWriter/desiredSize|writer.desiredSize}}, depending on where the queuing strategy is being
+    used. For readable streams, it also governs when the <a>underlying source</a>'s {{underlying source/pull()}} method
+    is called.</p>
+
+    <p>This function has to be idempotent and not cause side effects; very strange results can occur otherwise.</p>
+
+    <p>For <a>readable byte streams</a>, this function is not used, as chunks are always measured in bytes.</p>
+  </dd>
+
+  <dt><dfn for="queuing strategy"><code>highWaterMark</code></dfn></dt>
+  <dd>
+    <p>A non-negative number indicating the <a>high water mark</a> of the stream using this queuing strategy.</p>
+  </dd>
+</dl>
+
+Any object with these properties can be used when a queuing strategy object is expected. However, we provide two
+built-in queuing strategy classes that provide a common vocabulary for certain cases: {{ByteLengthQueuingStrategy}} and
+{{CountQueuingStrategy}}.
+
+</div>
+
+<h4 id="blqs-class" interface lt="ByteLengthQueuingStrategy">Class <code>ByteLengthQueuingStrategy</code></h4>
 
 A common <a>queuing strategy</a> when dealing with bytes is to wait until the accumulated <code>byteLength</code>
 properties of the incoming <a>chunks</a> reaches a specified high-water mark. As such, this is provided as a built-in
@@ -4534,7 +4804,7 @@ properties of the incoming <a>chunks</a> reaches a specified high-water mark. As
   chunks in bytes. Attempting to construct a byte stream with a {{ByteLengthQueuingStrategy}} will fail.
 </p>
 
-<h4 id="blqs-class-definition">Class Definition</h4>
+<h5 id="blqs-class-definition">Class definition</h5>
 
 <div class="non-normative">
 
@@ -4555,8 +4825,8 @@ Each {{ByteLengthQueuingStrategy}} instance will additionally have an own data p
 
 </div>
 
-<h4 id="blqs-constructor" constructor for="ByteLengthQueuingStrategy" lt="ByteLengthQueuingStrategy(options)">new
-ByteLengthQueuingStrategy({ <var>highWaterMark</var> })</h4>
+<h5 id="blqs-constructor" constructor for="ByteLengthQueuingStrategy" lt="ByteLengthQueuingStrategy(options)">new
+ByteLengthQueuingStrategy({ <var>highWaterMark</var> })</h5>
 
 <div class="note">
   The constructor takes a non-negative number for the high-water mark, and stores it on the object as a property.
@@ -4566,9 +4836,9 @@ ByteLengthQueuingStrategy({ <var>highWaterMark</var> })</h4>
   1. Perform ! CreateDataProperty(*this*, `"highWaterMark"`, _highWaterMark_).
 </emu-alg>
 
-<h4 id="blqs-prototype">Properties of the {{ByteLengthQueuingStrategy}} Prototype</h4>
+<h5 id="blqs-prototype">Properties of the {{ByteLengthQueuingStrategy}} prototype</h5>
 
-<h5 id="blqs-size" method for="ByteLengthQueuingStrategy">size(<var>chunk</var>)</h5>
+<h6 id="blqs-size" method for="ByteLengthQueuingStrategy">size(<var>chunk</var>)</h6>
 
 <div class="note">
   The <code>size</code> method returns the given chunk's <code>byteLength</code> property. (If the chunk doesn't have
@@ -4582,7 +4852,7 @@ ByteLengthQueuingStrategy({ <var>highWaterMark</var> })</h4>
   1. Return ? GetV(_chunk_, `"byteLength"`).
 </emu-alg>
 
-<h3 id="cqs-class" interface lt="CountQueuingStrategy">Class <code>CountQueuingStrategy</code></h3>
+<h4 id="cqs-class" interface lt="CountQueuingStrategy">Class <code>CountQueuingStrategy</code></h4>
 
 A common <a>queuing strategy</a> when dealing with streams of generic objects is to simply count the number of chunks
 that have been accumulated so far, waiting until this number reaches a specified high-water mark. As such, this
@@ -4613,7 +4883,7 @@ strategy is also provided out of the box.
   <a>backpressure</a> signals to any <a>producers</a>.
 </div>
 
-<h4 id="cqs-class-definition">Class Definition</h4>
+<h5 id="cqs-class-definition">Class definition</h5>
 
 <div class="non-normative">
 
@@ -4634,8 +4904,8 @@ set by its constructor.
 
 </div>
 
-<h4 id="cqs-constructor" constructor for="CountQueuingStrategy" lt="CountQueuingStrategy(options)">new
-CountQueuingStrategy({ <var>highWaterMark</var> })</h4>
+<h5 id="cqs-constructor" constructor for="CountQueuingStrategy" lt="CountQueuingStrategy(options)">new
+CountQueuingStrategy({ <var>highWaterMark</var> })</h5>
 
 <div class="note">
   The constructor takes a non-negative number for the high-water mark, and stores it on the object as a property.
@@ -4645,9 +4915,9 @@ CountQueuingStrategy({ <var>highWaterMark</var> })</h4>
   1. Perform ! CreateDataProperty(*this*, `"highWaterMark"`, _highWaterMark_).
 </emu-alg>
 
-<h4 id="cqs-prototype">Properties of the {{CountQueuingStrategy}} Prototype</h4>
+<h5 id="cqs-prototype">Properties of the {{CountQueuingStrategy}} prototype</h5>
 
-<h5 id="cqs-size" method for="CountQueuingStrategy">size()</h5>
+<h6 id="cqs-size" method for="CountQueuingStrategy">size()</h6>
 
 <div class="note">
   The <code>size</code> method returns one always, so that the total queue size is a count of the number of chunks in
@@ -4661,7 +4931,7 @@ CountQueuingStrategy({ <var>highWaterMark</var> })</h4>
   1. Return *1*.
 </emu-alg>
 
-<h3 id="queue-with-sizes">Queue-with-Sizes Operations</h3>
+<h3 id="queue-with-sizes">Queue-with-sizes operations</h3>
 
 The streams in this specification use a "queue-with-sizes" data structure to store queued up values, along with their
 determined sizes. Various specification objects contain a queue-with-sizes, represented by the object having two paired
@@ -4691,7 +4961,7 @@ chunks, or when trillions of chunks are enqueued.)</p>
 </emu-alg>
 
 <h4 id="enqueue-value-with-size" aoid="EnqueueValueWithSize" throws>EnqueueValueWithSize ( <var>container</var>,
-<var>value</var>, <var>size</var> )</h4>
+<var ignore>value</var>, <var>size</var> )</h4>
 
 <emu-alg>
   1. Assert: _container_ has [[queue]] and [[queueTotalSize]] internal slots.
@@ -4718,13 +4988,13 @@ chunks, or when trillions of chunks are enqueued.)</p>
   1. Set _container_.[[queueTotalSize]] to *0*.
 </emu-alg>
 
-<h3 id="misc-abstract-ops">Miscellaneous Operations</h3>
+<h3 id="misc-abstract-ops">Miscellaneous operations</h3>
 
 A few abstract operations are used in this specification for utility purposes. We define them here.
 
 <h4 id="create-algorithm-from-underlying-method" aoid="CreateAlgorithmFromUnderlyingMethod"
-throws>CreateAlgorithmFromUnderlyingMethod ( <var>underlyingObject</var>, <var>methodName</var>,
-<var>algoArgCount</var>, <var>extraArgs</var> )</h4>
+throws>CreateAlgorithmFromUnderlyingMethod ( <var ignore>underlyingObject</var>, <var ignore>methodName</var>,
+<var ignore>algoArgCount</var>, <var ignore>extraArgs</var> )</h4>
 
 <emu-alg>
   1. Assert: _underlyingObject_ is not *undefined*.
@@ -4742,7 +5012,8 @@ throws>CreateAlgorithmFromUnderlyingMethod ( <var>underlyingObject</var>, <var>m
   1. Return an algorithm which returns <a>a promise resolved with</a> *undefined*.
 </emu-alg>
 
-<h4 id="invoke-or-noop" aoid="InvokeOrNoop" throws>InvokeOrNoop ( <var>O</var>, <var>P</var>, <var>args</var> )</h4>
+<h4 id="invoke-or-noop" aoid="InvokeOrNoop" throws>InvokeOrNoop ( <var>O</var>, <var ignore>P</var>, <var>args</var>
+)</h4>
 
 <div class="note">
   InvokeOrNoop is a slight modification of the [[!ECMASCRIPT]] <a abstract-op>Invoke</a> abstract operation to return
@@ -4776,7 +5047,8 @@ throws>CreateAlgorithmFromUnderlyingMethod ( <var>underlyingObject</var>, <var>m
   1. Return *true*.
 </emu-alg>
 
-<h4 id="promise-call" aoid="PromiseCall" nothrow>PromiseCall ( <var>F</var>, <var>V</var>, <var>args</var> )</h4>
+<h4 id="promise-call" aoid="PromiseCall" nothrow>PromiseCall ( <var ignore>F</var>, <var ignore>V</var>,
+<var>args</var> )</h4>
 
 <div class="note">
   PromiseCall is a variant of <a>promise-calling</a> that works on methods.
@@ -4825,7 +5097,7 @@ throws>MakeSizeAlgorithmFromSizeFunction ( <var>size</var> )</h4>
     1. Return ? Call(_size_, *undefined*, « _chunk_ »).
 </emu-alg>
 
-<h2 id="globals">Global Properties</h2>
+<h2 id="globals">Global properties</h2>
 
 The following constructors must be exposed on the global object as data properties of the same name:
 
@@ -4846,7 +5118,7 @@ The attributes of these properties must be { \[[Writable]]: <emu-val>true</emu-v
   {{TransformStreamDefaultController}} classes are specifically not exposed, as they are not independently useful.
 </div>
 
-<h2 id="creating-examples">Examples of Creating Streams</h2>
+<h2 id="creating-examples">Examples of creating streams</h2>
 
 <div class="non-normative">
 
@@ -4859,7 +5131,7 @@ using the {{ReadableStream}} or {{WritableStream}} constructors.
 
 The following function creates <a>readable streams</a> that wrap {{WebSocket}} instances [[HTML]], which are <a>push sources</a>
 that do not support backpressure signals. It illustrates how, when adapting a push source, usually most of the work
-happens in the <code>start</code> function.
+happens in the {{underlying source/start()}} function.
 
 <pre><code class="lang-javascript">
   function makeReadableWebSocketStream(url, protocols) {
@@ -4890,6 +5162,21 @@ writable stream:
     .then(() => console.log("All data successfully written!"))
     .catch(e => console.error("Something went wrong!", e));
 </code></pre>
+
+<div class="note" id="note-web-socket-wrapping-examples">
+  This specific style of wrapping a web socket interprets web socket messages directly as <a>chunks</a>.
+  This can be a convenient abstraction, for example when <a>piping</a> to a <a>writable stream</a> or <a>transform
+  stream</a> for which each web socket message makes sense as a chunk to consume or transform.
+
+  However, often when people talk about "adding streams support to web sockets", they are hoping instead for a new
+  capability to send an individual web socket message in a streaming fashion, so that e.g. a file could be transferred
+  in a single message without holding all of its contents in memory on the client side. To accomplish this goal, we'd
+  instead want to allow individual web socket messages to themselves be {{ReadableStream}} instances. That isn't what we
+  show in the above example.
+
+  For more background, see <a href="https://github.com/w3c/webrtc-pc/issues/1732#issuecomment-358428651">this
+  discussion</a>.
+</div>
 
 <h3 id="example-rs-push-backpressure">A readable stream with an underlying push source and backpressure support</h3>
 
@@ -5010,7 +5297,7 @@ The following function returns <a>readable streams</a> that wrap portions of the
 <a href="https://nodejs.org/api/fs.html">Node.js file system API</a> (which themselves map fairly directly to C's
 <code>fopen</code>, <code>fread</code>, and <code>fclose</code> trio). Files are a typical example of <a>pull
 sources</a>. Note how in contrast to the examples with push sources, most of the work here happens on-demand in the
-<code>pull</code> function, and not at startup time in the <code>start</code> function.
+{{underlying source/pull()}} function, and not at startup time in the {{underlying source/start()}} function.
 
 <pre><code class="lang-javascript">
   const fs = require("pr/fs"); // https://github.com/jden/pr
@@ -5166,6 +5453,9 @@ We can then use this function to create writable streams for a web socket, and p
     .catch(e => console.error("Something went wrong!", e));
 </code></pre>
 
+<p class="note">See <a href="#note-web-socket-wrapping-examples">the earlier note</a> about this style of wrapping web
+sockets into streams.</p>
+
 <h3 id="example-ws-backpressure">A writable stream with backpressure and success signals</h3>
 
 The following function returns <a>writable streams</a> that wrap portions of the <a
@@ -5226,8 +5516,8 @@ The way in which the writable stream queues up writes is especially important in
 <a href="https://nodejs.org/api/fs.html#fs_fs_write_fd_data_position_encoding_callback">the documentation for
 <code>fs.write</code></a>, "it is unsafe to use <code>fs.write</code> multiple times on the same file without waiting
 for the [promise]." But we don't have to worry about that when writing the <code>makeWritableFileStream</code>
-function, since the stream implementation guarantees that the <a>underlying sink</a>'s <code>write</code> method will
-not be called until any promises returned by previous calls have fulfilled!
+function, since the stream implementation guarantees that the <a>underlying sink</a>'s {{underlying sink/write()}}
+method will not be called until any promises returned by previous calls have fulfilled!
 
 <h3 id="example-both">A { readable, writable } stream pair wrapping the same underlying resource</h3>
 
@@ -5329,6 +5619,9 @@ APIs:
 
 Note how in this setup canceling the <code>readable</code> side will implicitly close the <code>writable</code> side,
 and similarly, closing or aborting the <code>writable</code> side will implicitly close the <code>readable</code> side.
+
+<p class="note">See <a href="#note-web-socket-wrapping-examples">the earlier note</a> about this style of wrapping web
+sockets into streams.</p>
 
 </div>
 
@@ -5457,6 +5750,8 @@ Exceptions error the stream in a natural way:
 
 <h2 id="conventions" class="no-num">Conventions</h2>
 
+This specification depends on the Infra Standard. [[!INFRA]]
+
 This specification uses algorithm conventions very similar to those of [[!ECMASCRIPT]], whose rules should be used to
 interpret it (apart from the exceptions enumerated below). In particular, the objects specified here should be treated
 as <a href="https://tc39.github.io/ecma262/#sec-ecmascript-standard-built-in-objects">built-in objects</a>. For example,
@@ -5487,6 +5782,7 @@ values, and all arithmetic operations performed on them must be done in the stan
 
 The editors would like to thank
 Anne van Kesteren,
+AnthumChris,
 Ben Kelly,
 Bert Belder,
 Brian di Palma,
@@ -5503,6 +5799,7 @@ Jake Archibald,
 Jake Verbaten,
 Janessa Det,
 Jens Nockert,
+Lennart Grahl,
 Mangala Sadhu Sangeet Singh Khalsa,
 Marcos Caceres,
 Marvin Hagemeister,
