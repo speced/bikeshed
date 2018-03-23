@@ -3,6 +3,7 @@ from __future__ import division, unicode_literals
 import re
 from collections import OrderedDict, defaultdict
 
+from . import attr
 from . import biblio
 from . import config
 from . import Line
@@ -51,15 +52,17 @@ def transformDataBlocks(doc, lines):
     newLines = []
     for line in lines:
         # Look for the start of a block.
-        match = re.match(r"\s*<(pre|xmp)(.*)", line.text, re.I)
+        match = re.match(r"\s*<(pre|xmp)[\s>]", line.text, re.I)
         # Note that, by design, I don't pay attention to anything on the same line as the start tag,
         # unless it's single-line.
         if match and not inBlock:
             inBlock = True
             tagName = match.group(1)
-            typeMatch = re.search("|".join(blockTypes.keys()), match.group(2))
-            if typeMatch:
-                blockType = typeMatch.group(0)
+            blockClasses = classesFromLine(line)
+            for t in blockTypes.keys():
+                if t in blockClasses:
+                    blockType = t
+                    break
             else:
                 blockType = "pre"
         # Look for the end of a block.
@@ -725,3 +728,195 @@ def parseInfoTree(lines, indent=4, lineNum=0):
     # Grab the last bit of data.
     extendData(datas, infoLevels[:lastIndent + 1])
     return datas
+
+
+def classesFromLine(line):
+    tag = parseTag(line.text.strip(), lineNumber=line.i)
+    if tag is None:
+        return set()
+    if "class" not in tag.attrs:
+        return set()
+    return set(tag.attrs["class"].strip().split())
+
+@attr.s(slots=True)
+class StartTag(object):
+    tag = attr.ib()
+    attrs = attr.ib(default=attr.Factory(dict))
+
+def parseTag(text, lineNumber):
+    '''
+    Parses a tag from a string,
+    conformant to the HTML parsing algorithm.
+    The text must start with the opening < character.
+    '''
+
+    def parseerror(index, state):
+        die("Tried to parse a start tag from '{0}', but failed at character {1} '{2}' and parse-state '{3}'.", text, index, text[index], state, lineNum=lineNumber)
+        return
+    def eof(i,text):
+        return i >= len(text)
+    i = 0
+    state = "data"
+    while True:
+        if eof(i, text):
+            parseerror(i, state)
+            return
+        if state == "data":
+            if text[i] == "<":
+                state = "tag-open"
+                i += 1
+                continue
+            else:
+                parseerror(i, state)
+                return
+        elif state == "tag-open":
+            if text[i].isalpha():
+                state = "tag-name"
+                continue
+            else:
+                parseerror(i, state)
+                return
+        elif state == "tag-name":
+            tagname = ""
+            while not eof(i,text) and re.match(r"[^\s/>]", text[i]):
+                tagname += text[i].lower()
+                i += 1
+            tag = StartTag(tagname)
+            if text[i] == ">":
+                return tag
+            elif text[i] == "/":
+                state = "self-closing-start-tag"
+                i += 1
+                continue
+            elif text[i].isspace():
+                state = "before-attribute-name"
+                i += 1
+                continue
+            else:
+                parseerror(i, state)
+                return
+        elif state == "self-closing-start-tag":
+            if text[i] == ">":
+                return tag
+            else:
+                parseerror(i, state)
+                return
+        elif state == "before-attribute-name":
+            if text[i].isspace():
+                i += 1
+                continue
+            elif text[i] == "/" or text[i] == ">":
+                state = "after-attribute-name"
+                continue
+            elif text[i] == "=":
+                parseerror(i, state)
+                return
+            else:
+                state = "attribute-name"
+                continue
+        elif state == "attribute-name":
+            attrName = ""
+            while not eof(i,text) and re.match(r"[^\s/>=\"'<]", text[i]):
+                attrName += text[i]
+                i += 1
+            tag.attrs[attrName] = ""
+            if text[i].isspace() or text[i] == "/" or text[i] == ">":
+                state = "after-attribute-name"
+                continue
+            elif text[i] == "=":
+                state = "before-attribute-value"
+                i += 1
+                continue
+            else:
+                parseerror(i,state)
+                return
+        elif state == "after-attribute-name":
+            if text[i].isspace():
+                i += 1
+                continue 
+            elif text[i] == "/":
+                state = "self-closing-start-tag"
+                i += 1
+                continue
+            elif text[i] == "=":
+                state = "before-attribute-value"
+                i += 1
+                continue
+            elif text[i] == ">":
+                return tag
+            else:
+                state = "attribute-name"
+                continue
+        elif state == "before-attribute-value":
+            if text[i].isspace():
+                i += 1
+                continue
+            elif text[i] == '"':
+                state = "attribute-value-double-quoted"
+                i += 1
+                continue
+            elif text[i] == "'":
+                state = "attribute-value-single-quoted"
+                i += 1
+                continue
+            elif text[i] == "=":
+                parseerror(i,state)
+                return
+            else:
+                state = "attribute-value-unquoted"
+                continue
+        elif state == "attribute-value-double-quoted":
+            attrValue = ""
+            while not eof(i,text) and not text[i] == '"':
+                attrValue += text[i]
+                i += 1
+            tag.attrs[attrName] = attrValue
+            if text[i] == '"':
+                state = "after-attribute-value-quoted"
+                i += 1
+                continue
+            else:
+                parseerror(i,state)
+                return
+        elif state == "attribute-value-single-quoted":
+            attrValue = ""
+            while not eof(i,text) and not text[i] == "'":
+                attrValue += text[i]
+                i += 1
+            tag.attrs[attrName] = attrValue
+            if text[i] == "'":
+                state = "after-attribute-value-quoted"
+                i += 1
+                continue
+            else:
+                parseerror(i,state)
+                return
+        elif state == "attribute-value-unquoted":
+            attrValue = ""
+            while not eof(i,text) and re.match("[^\s<>'\"=`]", text[i]):
+                attrValue += text[i]
+                i += 1
+            tag.attrs[attrName] = attrValue
+            if text[i].isspace():
+                state = "before-attribute-name"
+                i += 1
+                continue
+            elif text[i] == ">":
+                return tag
+            else:
+                parseerror(i,state)
+                return
+        elif state == "after-attribute-value-quoted":
+            if text[i].isspace():
+                state = "before-attribute-name"
+                i += 1
+                continue
+            elif text[i] == "/":
+                state = "self-closing-start-tag"
+                i += 1
+                continue
+            elif text[i] == ">":
+                return tag
+            else:
+                parseerror(i,state)
+                return
