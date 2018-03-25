@@ -45,7 +45,7 @@ def parse(string):
     activeCommands = {"0": tree}
     blockNames = "And|Seq|Sequence|Stack|Or|Choice|Opt|Optional|Plus|OneOrMore|Star|ZeroOrMore"
     textNames = "T|Terminal|N|NonTerminal|C|Comment|S|Skip"
-    for i, line in enumerate(lines):
+    for i, line in enumerate(lines, 1):
         indent = 0
         while line.startswith(indentText):
             indent += 1
@@ -74,6 +74,9 @@ def parse(string):
                 prelude = ""
             text = match.group(3).strip()
             node = {"command": command, "prelude": prelude, "text":text, "children": [], "line": i}
+        else:
+            die("Line {0} doesn't contain a valid railroad-diagram command. Got:\n{1}", i, line.strip())
+            return
 
         activeCommands[str(indent)]['children'].append(node)
         activeCommands[str(indent + 1)] = node
