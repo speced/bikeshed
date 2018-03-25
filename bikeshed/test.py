@@ -34,7 +34,7 @@ def runAllTests(Spec, testFiles=None, md=None):
     oldDataChoice = config.useReadonlyData
     config.useReadonlyData = True
     if not testFiles:
-        testFiles = sorted(findTestFiles())
+        testFiles = sorted(findTestFiles(), key=lambda x:("/" in testNameForPath(x), x))
         if len(testFiles) == 0:
             p("No tests were found")
             return True
