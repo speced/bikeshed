@@ -59,11 +59,16 @@ def transformDataBlocks(doc, lines):
             inBlock = True
             tagName = match.group(1)
             blockClasses = classesFromLine(line)
+            seenClasses = []
             for t in blockTypes.keys():
                 if t in blockClasses:
-                    blockType = t
-                    break
+                    seenClasses.append(t)
+            if not seenClasses:
+                blockType = "pre"
+            elif len(seenClasses) == 1:
+                blockType = seenClasses[0]
             else:
+                die("Found {0} classes on the <{1}>, so can't tell which to process the block as. Please use only one.", config.englishFromList(("'{0}'".format(x) for x in seenClasses), "and"), tagName, lineNum=line.i)
                 blockType = "pre"
         # Look for the end of a block.
         match = re.match(r"(.*)</" + tagName + ">(.*)", line.text, re.I)
