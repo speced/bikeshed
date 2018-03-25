@@ -19,14 +19,14 @@ testAnnotationURL = "https://test.csswg.org/harness/annotate.js"
 refStatus = Enum("current", "snapshot")
 
 
-def englishFromList(items):
+def englishFromList(items, conjunction="or"):
     # Format a list of strings into an English list.
     items = list(items)
     if len(items) == 1:
         return items[0]
     if len(items) == 2:
-        return "{0} or {1}".format(*items)
-    return "{0}, or {1}".format(", ".join(items[:-1]), items[-1])
+        return "{0} {2} {1}".format(items[0], items[1], conjunction)
+    return "{0}, {2} {1}".format(", ".join(items[:-1]), items[-1], conjunction)
 
 
 def intersperse(iterable, delimiter):
