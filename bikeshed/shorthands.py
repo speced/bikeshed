@@ -270,14 +270,11 @@ def biblioReplacer(match):
     else:
         type = "informative"
     if linkText is None:
-        linkText = term
+        linkText = "[{0}]".format(term)
     attrs = {"data-lt":term, "data-link-type":"biblio", "data-biblio-type":type, "bs-autolink-syntax":match.group(0)}
     if status is not None:
         attrs['data-biblio-status'] = status.strip()
-    return E.a(attrs,
-               "[",
-               linkText,
-               "]")
+    return E.a(attrs, linkText)
 
 sectionRe = re.compile(r"""
                         (\\)?
