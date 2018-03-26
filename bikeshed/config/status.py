@@ -80,12 +80,12 @@ shortToLongStatus = {
 snapshotStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/WG-NOTE", "w3c/IG-NOTE", "w3c/NOTE", "w3c/MO"]
 unlevelledStatuses = ["LS", "LD", "DREAM", "w3c/UD", "LS-COMMIT", "LS-BRANCH", "FINDING", "DRAFT-FINDING"]
 deadlineStatuses = ["w3c/LCWD", "w3c/PR"]
-noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DRAFT-FINDING", "DREAM"]
+noEDStatuses = ["LS", "LS-COMMIT", "LS-BRANCH", "LD", "FINDING", "DRAFT-FINDING", "DREAM", "iso/NP"]
 
 megaGroups = {
     "w3c": frozenset(["act-framework", "audiowg", "csswg", "dap", "fxtf", "geolocation", "houdini", "html", "i18n", "mediacapture", "ricg", "serviceworkers", "svg", "texttracks", "uievents", "wasm", "web-bluetooth-cg", "webappsec", "webauthn", "web-payments", "webperf", "webplatform", "webspecs", "webvr", "wicg"]),
     "tc39": frozenset(["tc39"]),
-    "iso": frozenset(["wg21"]),
+    "iso": frozenset(["wg14", "wg21"]),
     "fido": frozenset(["fido"]),
     "priv-sec": frozenset(["audiowg", "csswg", "dap", "fxtf", "geolocation", "houdini", "html", "mediacapture", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"])
 }
