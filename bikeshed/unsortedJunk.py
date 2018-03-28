@@ -28,32 +28,34 @@ class MarkdownCodeSpans(func.Functor):
         newText = ""
         mode = "text"
         indexSoFar = 0
-        escapeLen = 0
-        for m in re.finditer(r"(\\`)|(`+)", text):
+        backtickCount = 0
+        for m in re.finditer(r"(\\`)|([\w-]*)(`+)", text):
             if mode == "text":
                 if m.group(1):
                     newText += text[indexSoFar:m.start()] + m.group(1)[1]
                     indexSoFar = m.end()
-                elif m.group(2):
+                elif m.group(3):
                     mode = "code"
                     newText += text[indexSoFar:m.start()]
                     indexSoFar = m.end()
-                    escapeLen = len(m.group(2))
+                    backtickCount = len(m.group(3))
+                    tag = m.group(2)
             elif mode == "code":
                 if m.group(1):
                     pass
-                elif m.group(2):
-                    if len(m.group(2)) != escapeLen:
+                elif m.group(3):
+                    if len(m.group(3)) != backtickCount:
                         pass
                     else:
                         mode = "text"
-                        self.__codeSpanReplacements__.append(text[indexSoFar:m.start()])
+                        replacement = (tag, text[indexSoFar:m.start()] + m.group(2))
+                        self.__codeSpanReplacements__.append(replacement)
                         newText += "\ue0ff"
                         indexSoFar = m.end()
         if mode == "text":
             newText += text[indexSoFar:]
         elif mode == "code":
-            newText += "`"*escapeLen + text[indexSoFar:]
+            newText += tag + "`"*backtickCount + text[indexSoFar:]
         self.__val__ = newText
 
     def map(self, fn):
@@ -64,15 +66,19 @@ class MarkdownCodeSpans(func.Functor):
 
     def extract(self):
         if self.__codeSpanReplacements__:
+            # Reverse the list, so I can use pop() to get them starting from the first.
             repls = self.__codeSpanReplacements__[::-1]
             def codeSpanReviver(_):
                 # Match object is the PUA character, which I can ignore.
-                # Instead, sub back the replacement in order,
-                # massaged per the Commonmark rules.
-                import string
-                t = escapeHTML(repls.pop()).strip(string.whitespace)
-                t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
-                return "<code data-opaque>" + t + "</code>"
+                repl = repls.pop()
+                if repl[0] == "":
+                    # Markdown code span, so massage per CommonMark rules.
+                    import string
+                    t = escapeHTML(repl[1]).strip(string.whitespace)
+                    t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
+                    return "<code data-opaque>" + t + "</code>"
+                else:
+                    return "<code data-opaque data-span-tag={0}>{1}</code>".format(repl[0], escapeHTML(repl[1]))
             return re.sub("\ue0ff", codeSpanReviver, self.__val__)
         else:
             return self.__val__
