@@ -80,6 +80,7 @@ class MetadataManager:
         self.maxToCDepth = float('inf')
         self.metadataInclude = config.BoolSet(default=True)
         self.metadataOrder = ["*", "!*"]
+        self.noAbstract = False
         self.noEditor = False
         self.noteClass = "note"
         self.opaqueElements = ["pre", "xmp", "script", "style"]
@@ -168,9 +169,7 @@ class MetadataManager:
             'title': 'Title'
         }
         recommendedSingularKeys = {}
-        requiredMultiKeys = {
-            'abstract': 'Abstract'
-        }
+        requiredMultiKeys = {}
 
         if self.status not in config.noEDStatuses:
             requiredSingularKeys['ED'] = 'ED'
@@ -185,6 +184,8 @@ class MetadataManager:
             die("Unknown Status '{0}' used.", self.status)
         if not self.noEditor:
             requiredMultiKeys['editors'] = "Editor"
+        if not self.noAbstract:
+            requiredMultiKeys['abstract'] = "Abstract"
         if self.group and self.group.lower() == "csswg":
             requiredSingularKeys['workStatus'] = "Work Status"
         if self.group and self.group.lower() == "wg21":
@@ -240,6 +241,9 @@ class MetadataManager:
         if self.abstract:
             macros["abstract"] = "\n".join(markdown.parse(self.abstract, self.indent))
             macros["abstractattr"] = escapeAttr("  ".join(self.abstract).replace("<<","<").replace(">>",">"))
+        elif self.noAbstract:
+            macros["abstract"] = ""
+            macros["abstractattr"] = ""
         macros["year"] = unicode(self.date.year)
         macros["date"] = unicode(self.date.strftime("{0} %B %Y".format(self.date.day)), encoding="utf-8")
         macros["cdate"] = unicode(self.date.strftime("%Y%m%d"), encoding="utf-8")
@@ -932,6 +936,7 @@ knownKeys = {
     "Max Toc Depth": Metadata("Max ToC Depth", "maxToCDepth", joinValue, parseMaxToCDepth),
     "Metadata Include": Metadata("Metadata Include", "metadataInclude", joinBoolSet, partial(parseBoolishList, default=True)),
     "Metadata Order": Metadata("Metadata Order", "metadataOrder", joinValue, parseMetadataOrder),
+    "No Abstract": Metadata("No Abstract", "noAbstract", joinValue, parseBoolean),
     "No Editor": Metadata("No Editor", "noEditor", joinValue, parseBoolean),
     "Note Class": Metadata("Note Class", "noteClass", joinValue, parseLiteral),
     "Opaque Elements": Metadata("Opaque Elements", "opaqueElements", joinList, parseCommaSeparated),

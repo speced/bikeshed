@@ -112,9 +112,14 @@ def addCopyright(doc):
 
 
 def addAbstract(doc):
-    html = config.retrieveBoilerplateFile(doc, 'abstract')
-    html = doc.fixText(html)
-    fillWith('abstract', parseHTML(html), doc=doc)
+    if not doc.md.noAbstract:
+        html = config.retrieveBoilerplateFile(doc, 'abstract')
+        html = doc.fixText(html)
+        fillWith('abstract', parseHTML(html), doc=doc)
+    else:
+        container = getFillContainer("abstract", doc, default=False)
+        if container is not None:
+            removeNode(container)
 
 
 def addStatusSection(doc):
