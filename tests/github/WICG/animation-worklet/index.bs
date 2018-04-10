@@ -10,7 +10,7 @@ Abstract:
 Editor: Majid Valipour, majidvp@google.com
 Editor: Robert Flack, flackr@chromium.org
 Editor: Stephen McGruer, smcgruer@chromium.org
-
+Ignored Terms: AnimationWorklet
 </pre>
 
 <pre class="link-defaults">
@@ -187,7 +187,7 @@ partial interface Window {
 <pre class='idl'>
 callback VoidFunction = void ();
 
-[Global=Worklet]
+[ Exposed=AnimationWorklet, Global=AnimationWorklet ]
 interface AnimationWorkletGlobalScope : WorkletGlobalScope {
     void registerAnimator(DOMString name, VoidFunction animatorCtor);
 };
@@ -417,6 +417,8 @@ To <dfn>migrate an animator instance</dfn> from one {{WorkletGlobalScope}} to an
 
         If |definition| does not exist then abort the following steps.
 
+     3. Let |animatorCtor| be the <a>class constructor</a> of |definition|.
+
      4. Let |prototype| be the result of <a>Get</a>(|animatorCtor|, "prototype").
 
      5. Let |onDestroyFunction| be the result of <a>Get</a>(|prototype|, "onDestroy").
@@ -504,10 +506,11 @@ Creating a Worklet Animation {#creating-worklet-animation}
 
 <pre class='idl'>
 
+
 [Constructor (DOMString animatorName,
-              optional (AnimationEffectReadOnly or array<AnimationEffectReadOnly>)? effects = null,
-              AnimationTimeline? timeline,
-              optional WorkletAnimationOptions)]
+              optional (AnimationEffectReadOnly or sequence<AnimationEffectReadOnly>)? effects = null,
+              optional AnimationTimeline? timeline,
+              optional any options)]
 interface WorkletAnimation : Animation {
         readonly attribute DOMString animatorName;
 };
@@ -516,7 +519,7 @@ interface WorkletAnimation : Animation {
 
 
 <div algorithm="create-worklet-animation">
-<dfn constructor for=WorkletAnimation>WorkletAnimation(animatorName, effects, timeline, options)</dfn>
+<dfn constructor for=WorkletAnimation>WorkletAnimation(|animatorName|, |effects|, |timeline|, |options|)</dfn>
 
 Creates a new {{WorkletAnimation}} object using the following procedure.
 
@@ -628,7 +631,7 @@ To <dfn>disassociate animator instance of worklet animation</dfn> given
 <div algorithm="set-animator-instance">
 
 To <dfn>set animator instance of worklet animation</dfn> given
-|workletAnimation|, the user age <em>must</em> run the following steps:
+|workletAnimation|, the user agent <em>must</em> run the following steps:
 
   1. <a>disassociate animator instance of worklet animation</a> given |workletAnimation|.
   2. <a>associate animator instance of worklet animation</a> given |workletAnimation|.
@@ -637,12 +640,12 @@ To <dfn>set animator instance of worklet animation</dfn> given
 
 When a given |workletAnimation|'s <a>play state</a> changes to <a>pending</a>, <a>running</a>, or
 <a>paused</a>, run the procedure to
-<a>associate a worklet animation with its animator instance</a> given |workletAnimation|.
+<a>associate animator instance of worklet animation</a> given |workletAnimation|.
 
 
 When a given |workletAnimation|'s <a>play state</a> changes to <a>idle</a> or <a>finished</a>,
 run the procedure to
-<a>disassociate a worklet animation with its animator instance</a> given |workletAnimation|.
+<a>disassociate animator instance of worklet animation</a> given |workletAnimation|.
 
 When the procedure to <a>set the target effect of an animation</a> for a given |workletAnimation|
 is called, then <a>set animator instance of worklet animation</a> given |workletAnimation|.
@@ -687,7 +690,7 @@ interface WorkletGroupEffect :  WorkletGroupEffectReadOnly {};
 WorkletGroupEffect implements AnimationEffectMutable;
 WorkletGroupEffect implements GroupEffectMutable;
 
-[Exposed=Worklet]
+[Exposed=AnimationWorklet]
 partial interface AnimationEffectReadOnly {
     // Intended for use inside Animation Worklet scope to drive the effect.
     attribute double localTime;
@@ -748,22 +751,21 @@ animates fully to close or open position depending on its current position.
 </div>
 
 <script>
-animationWorklet.addModule('hidey-bar-animator.js').then( _ => {
-  const scrollTimeline = new ScrollTimeline($scrollingContainer, {timeRange: 100});
-  const documentTimeline = document.timeline;
+await animationWorklet.addModule('hidey-bar-animator.js');
+const scrollTimeline = new ScrollTimeline($scrollingContainer, {timeRange: 1000});
+const documentTimeline = document.timeline;
 
-  // Note we pass in two timelines in the options bag which allows the animation to read their
-  // currenTime values directly.
-  const workletAnim = new WorkletAnimation('hidey-bar',
-        new KeyFrameEffect($header,
-                          [{transform: 'translateX(100px)'}, {transform: 'translateX(0px)'}],
-                          {duration: 100, iterations: 1, fill: 'both' }]),
-        scrollTimeline,
-        {scrollTimeline, documentTimeline});
-});
+// Note we pass in two timelines in the options bag which allows the animation to read their
+// currenTime values directly.
+const animation = new WorkletAnimation(
+    'hidey-bar',
+    new KeyFrameEffect($header,
+                        [{transform: 'translateX(100px)'}, {transform: 'translateX(0px)'}],
+                        {duration: 1000, iterations: 1, fill: 'both' }]),
+    scrollTimeline,
+    {scrollTimeline, documentTimeline});
 
-
-workletAnim.timeline == scrollTimeline; // true
+animation.play();
 </script>
 </xmp>
 
@@ -772,7 +774,6 @@ workletAnim.timeline == scrollTimeline; // true
 // Inside AnimationWorkletGlobalScope
 
 registerAnimator('hidey-bar', class {
-
   constructor(options) {
     this.scrollTimeline_ = options.scrollTimeline;
     this.documentTimeline_ = options.documentTimeline;
@@ -797,7 +798,7 @@ registerAnimator('hidey-bar', class {
       localTime = this.direction_ * (time - this.startTime_);
     }
 
-    // Drive the output effects by setting its local time.
+    // Drive the output effect by setting its local time.
     effect.localTime = localTime;
   }
 });
@@ -817,34 +818,34 @@ sync with scroll offset.
 
 
 <xmp class='lang-markup'>
-// In document scope
+// In document scope.
 <div id='scrollingContainer'>
   <div id='header' style='height: 150px'></div>
   <div id='avatar'><img></div>
 </div>
 
 <script>
-animationWorklet.addModule('twitter-header-animator.js').then( _ => {
-  const workletAnim = new WorkletAnimation('twitter-header',
+await animationWorklet.addModule('twitter-header-animator.js');
+const animation = new WorkletAnimation(
+    'twitter-header',
     [new KeyFrameEffect($avatar,  /* scales down as we scroll up */
-                        [{transform: 'scale(1)'}, {transform: 'scale(0.5)'}],
-                        {duration: 1, iterations: 1}),
-     new KeyFrameEffect($header, /* loses transparency as we scroll up */
-                        [{opacity: 0}, {opacity: 0.8}],
-                        {duration: 1, iterations: 1})],
-     new ScrollTimeline($scrollingContainer, {timeRange: 1, startScrollOffset: 0, endScrollOffset: $header.clientHeight}),
-  );
+                    [{transform: 'scale(1)'}, {transform: 'scale(0.5)'}],
+                    {duration: 1000, iterations: 1}),
+    new KeyFrameEffect($header, /* loses transparency as we scroll up */
+                    [{opacity: 0}, {opacity: 0.8}],
+                    {duration: 1000, iterations: 1})],
+    new ScrollTimeline($scrollingContainer, {timeRange: 1000, startScrollOffset: 0, endScrollOffset: $header.clientHeight}));
+animation.play();
 
-  // Same animation instance is accessible via different animation targets
-  workletAnim == $avatarEl.getAnimations()[0] == $headerEl.getAnimations()[0];
+// Since this animation is using a group effect, the same animation instance 
+// is accessible via different handles: $avatarEl.getAnimations()[0], $headerEl.getAnimations()[0]
 
-});
 </script>
 
 </xmp>
 
 <xmp class='lang-javascript'>
-// Ins AnimationWorkletGlobalScope.
+// Inside AnimationWorkletGlobalScope.
 registerAnimator('twitter-header', class {
   constructor(options) {
     this.timing_ = new CubicBezier('ease-out');
@@ -855,17 +856,66 @@ registerAnimator('twitter-header', class {
   }
 
   animate(currentTime, effect) {
-    const scroll = currentTime;  // scroll is in [0, 1] range
+    const scroll = currentTime;  // scroll is in [0, 1000] range
 
     // Drive the output group effect by setting its children local times individually.
     effect.children[0].localTime = scroll;
-    effect.children[1].localTime = this.timing_(clamp(scroll, 0, 0.5));
+    effect.children[1].localTime = this.timing_(clamp(scroll, 0, 500));
   }
 });
 </xmp>
 
 Example 3: Parallax backgrounds. {#example-3}
 -----------------------------------------
-<!-- Big Text: TODO -->
+A simple parallax background example.
 
-TODO
+<xmp class='lang-markup'>
+<style>
+.parallax {
+    position: fixed;
+    top: 0;
+    left: 0;
+    opacity: 0.5;
+}
+</style>
+<div id='scrollingContainer'>
+  <div id="slow" class="parallax"></div>
+  <div id="fast" class="parallax"></div>
+</div>
+
+<script>
+await animationWorklet.addModule('parallax-animator.js');
+const scrollTimeline = new ScrollTimeline($scrollingContainer, {timeRange: 1000});
+const scrollRange = $scrollingContainer.scrollHeight - $scrollingContainer.clientHeight;
+
+const slowParallax = new WorkletAnimation(
+    'parallax',
+    new KeyframeEffect($parallax_slow, [{'transform': 'translateY(0)'}, {'transform': 'translateY(' + -scrollRange + 'px)'}], {duration: 1000}),
+    scrollTimeline,
+    {rate : 0.4}
+);
+slowParallax.play();
+
+const fastParallax = new WorkletAnimation(
+    'parallax',
+    new KeyframeEffect($parallax_fast, [{'transform': 'translateY(0)'}, {'transform': 'translateY(' + -scrollRange + 'px)'}], {duration: 1000}),
+    scrollTimeline,
+    {rate : 0.8}
+);
+fastParallax.play();
+</script>
+
+</xmp>
+
+<xmp class='lang-javascript'>
+// Inside AnimationWorkletGlobalScope.
+registerAnimator('parallax', class {
+  constructor(options) {
+    this.rate_ = options.rate;
+  }
+
+  animate(currentTime, effect) {
+    effect.localTime = currentTime * this.rate_;
+  }
+});
+</xmp>
