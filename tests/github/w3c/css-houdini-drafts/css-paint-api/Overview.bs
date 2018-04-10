@@ -3,7 +3,7 @@ Title:  CSS Painting API Level 1
 Status: ED
 Group: houdini
 ED: https://drafts.css-houdini.org/css-paint-api-1/
-TR: http://www.w3.org/TR/2016/WD-css-paint-api-1-20160607/
+TR: http://www.w3.org/TR/css-paint-api-1/
 Previous Version: http://www.w3.org/TR/2016/WD-css-paint-api-1-20160607/
 Shortname: css-paint-api
 Level: 1
@@ -422,13 +422,26 @@ When the user agent is to <dfn>create a PaintRenderingContext2D object</dfn> for
 |height|, and |paintRenderingContext2DSettings|, it <em>must</em> run the following steps:
     1. Create a new {{PaintRenderingContext2D}}.
     2. <a>Set bitmap dimensions</a> for the context's <a>output bitmap</a> to the rounded values of |width| and |height|.
-    3. Set the {{PaintRenderingContext2D}}'s <a>alpha</a> flag to |paintRenderingContext2DSettings.alpha|.
+    3. Set the {{PaintRenderingContext2D}}'s <a>alpha</a> flag to |paintRenderingContext2DSettings|'s {{alpha}}.
     4. Return the new {{PaintRenderingContext2D}}.
 
 Note: The initial state of the rendering context is set inside the <a>set bitmap dimensions</a>
     algorithm, as it invokes <a>reset the rendering context to its default state</a> and clears the
     <a>output bitmap</a>.
 </div>
+
+Drawing a CSSImageValue {#drawing-a-cssimagevalue}
+--------------------------------------------------
+
+The {{CanvasImageSource}} typedef is extended to also include the {{CSSImageValue}} type to be used
+as an image source.
+
+For interfaces which use the {{CanvasDrawImage}} mixin:
+     - When a {{CanvasImageSource}} object represents an {{CSSImageValue}}, the result of invoking
+         the value's underlying image algorithm must be used as the source image for the purposes of
+         {{CanvasDrawImage/drawImage}}.
+
+Note: This should eventually be moved to the canvas section of the HTML specification.
 
 Drawing an image {#drawing-an-image}
 ====================================
@@ -451,8 +464,13 @@ Note: The user agent can optionally defer drawing images which are <a>paint-inva
 </div>
 
 The <a>draw a paint image</a> function is invoked by the user agent during the <a>object size
-negotiation</a> algorithm which is responsible for rendering an <<image>>, with |concreteObjectSize|
-set to the <a>concrete object size</a> of the <a>box</a>.
+negotiation</a> algorithm which is responsible for rendering an <<image>>, with
+|snappedConcreteObjectSize| defined as follows. Let |concreteObjectSize| be the <a>concrete object
+size</a> of the <a>box</a>.  The |snappedConcreteObjectSize| is usually the same as the
+|concreteObjectSize|. However, the user agent may adjust the size such that it paints to pixel
+boundaries. If it does, the user agent should adjust the |snappedConcreteObjectSize| by the
+proportional change from its original size such that the <<paint()>> function can adjust the drawing
+accordingly.
 
 For the purposes of the <a>object size negotiation</a> algorithm, the paint image has no
 <a>intrinsic dimensions</a>.
@@ -463,16 +481,16 @@ Note: In a future version of the spec, the author could have the ability to spec
     dimensions</a> based on computed style and size changes.
 
 The {{PaintSize}} object represents the size of the image that the author should draw. This is
-the <a>concrete object size</a> given by the user agent.
+the |snappedConcreteObjectSize| given by the user agent.
 
 Note: See [[css-images-3#object-sizing-examples]] for examples on how the <a>concrete object
     size</a> is calculated.
 
 The <a>draw a paint image</a> function may be speculatively invoked by the user agent at any point,
-with any |concreteObjectSize|. The resulting image is not displayed.
+with any |snappedConcreteObjectSize|. The resulting image is not displayed.
 
-Note: User agents may use any heuristic to speculate a possible future value for |concretObjectSize|,
-    for example speculating that the size remains unchanged.
+Note: User agents may use any heuristic to speculate a possible future value for
+    |snappedConcreteObjectSize|, for example speculating that the size remains unchanged.
 
 Note: Although the image is not displayed, it may still be cached, and subsequent invocations of
     <<paint()>> may use the cached image.
@@ -488,12 +506,12 @@ interface PaintSize {
 <div algorithm>
 When the user agent wants to <dfn>draw a paint image</dfn> of a <<paint()>> function for a |box|
 into its appropriate stacking level (as defined by the property the CSS property its associated
-with), given |concreteObjectSize| it <em>must</em> run the following steps:
+with), given |snappedConcreteObjectSize| it <em>must</em> run the following steps:
     1. Let |paintFunction| be the <<paint()>> function on the |box| which the user agent wants to
         draw.
 
     2. If the <a>paint valid flag</a> for the |paintFunction| is <a>paint-valid</a>, and the
-        previous invocation had the same |concreteObjectSize|, the user agent <em>may</em> use the
+        previous invocation had the same |snappedConcreteObjectSize|, the user agent <em>may</em> use the
         drawn image from the previous invocation. If so it <em>may</em> abort all these steps and
         use the previously drawn image.
 
@@ -560,19 +578,13 @@ with), given |concreteObjectSize| it <em>must</em> run the following steps:
         </div>
 
     12. Let |workletGlobalScope| be a {{PaintWorkletGlobalScope}} from the list of <a>worklet's
-        WorkletGlobalScopes</a> from the paint {{Worklet}}.
-
-        The user agent <em>must</em> have, and select from at least two {{PaintWorkletGlobalScope}}s
-        in the <a>worklet's WorkletGlobalScopes</a> <a>list</a>, unless the user agent is under
-        memory constraints.
-
-        Note: This is to ensure that authors do not rely on being able to store state on the global
-            object or non-regeneratable state on the class.
+        WorkletGlobalScopes</a> from the paint {{Worklet}}, following the rules defined in
+        [[#global-scope-selection]].
 
         The user agent <em>may</em> also <a>create a WorkletGlobalScope</a> at this time, given the
         paint {{Worklet}}.
 
-    13. Run <a>invoke a paint callback</a> given |name|, |inputArguments|, |concreteObjectSize|,
+    13. Run <a>invoke a paint callback</a> given |name|, |inputArguments|, |snappedConcreteObjectSize|,
         |workletGlobalScope| optionally <a>in parallel</a>.
 
         Note: If the user agent runs <a>invoke a paint callback</a> on a thread <a>in parallel</a>,
@@ -581,7 +593,7 @@ with), given |concreteObjectSize| it <em>must</em> run the following steps:
 
 <div algorithm>
 When the user agent wants to <dfn>invoke a paint callback</dfn> given |name|, |inputArguments|,
-|concreteObjectSize|, and |workletGlobalScope|, it <em>must</em> run the following steps:
+|snappedConcreteObjectSize|, and |workletGlobalScope|, it <em>must</em> run the following steps:
 
     1. Let |paintDefinitionMap| be |workletGlobalScope|'s <a>paint definitions</a> map.
 
@@ -646,7 +658,7 @@ When the user agent wants to <dfn>invoke a paint callback</dfn> given |name|, |i
             images.
 
     9. Let |paintSize| be a new {{PaintSize}} initialized to the width and height defined by
-        |concreteObjectSize|.
+        |snappedConcreteObjectSize|.
 
     10. At this stage the user agent may re-use an image from a previous invocation if |paintSize|,
         |styleMap|, |inputArguments| are equivalent to that previous invocation. If so let the image
@@ -710,6 +722,23 @@ When the user agent wants to <dfn>invoke a paint callback</dfn> given |name|, |i
 Note: The contents of the resulting image are not designed to be accessible. Authors can communicate
     any useful information through the standard accessibility APIs.
 </div>
+
+Global Scope Selection {#global-scope-selection}
+------------------------------------------------
+
+When the user agent needs to select a {{PaintWorkletGlobalScope}} from the paint <a>worklet's
+WorkletGlobalScopes</a> <a>list</a> it <em>must</em>:
+
+    - Select from at <em>least</em> two {{PaintWorkletGlobalScope}}s, unless the user agent is under
+        memory constraints.
+
+    - <em>Not</em> re-use the same {{PaintWorkletGlobalScope}} more than 1000 times in a row.
+
+        Note: The 1000 limit was picked as a high upper bound, this limit may improve (downwards)
+            over time.
+
+Note: These rules exist to ensure that authors do not rely on being able to store state on the
+    global object or non-regeneratable state on the class. See [[worklets-1#code-idempotency]].
 
 Examples {#examples}
 ====================
@@ -999,3 +1028,13 @@ registerPaint('overdraw', class {
     }
 });
 </pre>
+
+Security Considerations {#security-considerations}
+==================================================
+
+There are no known security issues introduced by these features.
+
+Privacy Considerations {#privacy-considerations}
+================================================
+
+There are no known privacy issues introduced by these features.

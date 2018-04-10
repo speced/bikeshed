@@ -431,6 +431,7 @@ would have been {{Event/AT_TARGET}}.
 interface Event {
   readonly attribute DOMString type;
   readonly attribute EventTarget? target;
+  readonly attribute EventTarget? srcElement; // historical
   readonly attribute EventTarget? currentTarget;
   sequence&lt;EventTarget> composedPath();
 
@@ -446,6 +447,7 @@ interface Event {
 
   readonly attribute boolean bubbles;
   readonly attribute boolean cancelable;
+           attribute boolean returnValue;  // historical
   void preventDefault();
   readonly attribute boolean defaultPrevented;
   readonly attribute boolean composed;
@@ -466,24 +468,33 @@ dictionary EventInit {
 <p>An {{Event}} object is simply named an <dfn export id=concept-event>event</dfn>. It allows for
 signaling that something has occurred, e.g., that an image has completed downloading.</p>
 
-<p>An <a>event</a> has an associated <dfn export for=Event>relatedTarget</dfn> (null or an
-{{EventTarget}} object). Unless stated otherwise it is null.</p>
+<p>A <dfn export>potential event target</dfn> is null or an {{EventTarget}} object.
 
-<p class="note">Other specifications use <a for=Event>relatedTarget</a> to define a
+<p>An <a>event</a> has an associated <dfn export for=Event>target</dfn> (a
+<a>potential event target</a>). Unless stated otherwise it is null.
+
+<p>An <a>event</a> has an associated <dfn export for=Event>relatedTarget</dfn> (a
+<a>potential event target</a>). Unless stated otherwise it is null.
+
+<p class=note>Other specifications use <a for=Event>relatedTarget</a> to define a
 <code>relatedTarget</code> attribute. [[UIEVENTS]]
+
+<p>An <a>event</a> has an associated <dfn export for=Event>touch target list</dfn> (a
+<a for=/>list</a> of zero or more <a>potential event targets</a>). Unless stated otherwise it is the
+empty list.
+
+<p class=note>The <a for=Event>touch target list</a> is for the exclusive use of defining the
+{{TouchEvent}} interface and related interfaces. [[TOUCH-EVENTS]]
 
 <p>An <a>event</a> has an associated <dfn export for=Event>path</dfn>. A <a for=Event>path</a> is a
 <a for=/>list</a> of <a for=/>structs</a>. Each <a for=/>struct</a> consists of an
-<dfn for=Event/path>item</dfn> (an {{EventTarget}} object), <dfn for=Event/path>target</dfn> (null
-or an {{EventTarget}} object), a <dfn for=Event/path>relatedTarget</dfn> (null or an
-{{EventTarget}} object), <dfn for=Event/path>root-of-closed-tree</dfn> (a boolean), and a
-<dfn for=Event/path>slot-in-closed-tree</dfn> (a boolean). A <a for=Event>path</a> is initially the
-empty list.</p>
-
-<p><a lt="Other applicable specifications">Specifications</a> may define
-<dfn export for=Event>retargeting steps</dfn> for all or some <a>events</a>.
-The algorithm is passed <var>event</var>, as indicated in the <a>dispatch</a>
-algorithm below.
+<dfn for=Event/path>item</dfn> (an {{EventTarget}} object), <dfn for=Event/path>target</dfn> (a
+<a>potential event target</a>), a
+<dfn id=event-path-relatedtarget for=Event/path>relatedTarget</dfn> (a
+<a>potential event target</a>), a <dfn for=Event/path>touch target list</dfn> (a <a for=/>list</a>
+of <a>potential event targets</a>), a <dfn for=Event/path>root-of-closed-tree</dfn> (a boolean), and
+a <dfn for=Event/path>slot-in-closed-tree</dfn> (a boolean). A <a for=Event>path</a> is initially
+the empty list.</p>
 
 <dl class=domintro>
  <dt><code><var>event</var> = new <a constructor lt="Event()">Event</a>(<var>type</var> [, <var>eventInitDict</var>])</code>
@@ -500,7 +511,8 @@ algorithm below.
  "<code>submit</code>".
 
  <dt><code><var>event</var> . {{Event/target}}</code>
- <dd>Returns the object to which <var>event</var> is <a>dispatched</a>.
+ <dd>Returns the object to which <var>event</var> is <a>dispatched</a> (its
+ <a for=Event>target</a>).
 
  <dt><code><var>event</var> . {{Event/currentTarget}}</code>
  <dd>Returns the object whose <a>event listener</a>'s <a for="event listener">callback</a> is currently being
@@ -530,8 +542,8 @@ algorithm below.
 
  <dt><code><var>event</var> . {{Event/bubbles}}</code>
  <dd>Returns true or false depending on how <var>event</var> was initialized. True if
- <var>event</var> goes through its {{Event/target}} attribute value's <a>ancestors</a>
- in reverse <a>tree order</a>, and false otherwise.
+ <var>event</var> goes through its <a for=Event>target</a>'s <a for=tree>ancestors</a> in reverse
+ <a>tree order</a>, and false otherwise.
 
  <dt><code><var>event</var> . {{Event/cancelable}}</code>
  <dd>Returns true or false depending on how <var>event</var> was initialized. Its return
@@ -551,7 +563,7 @@ algorithm below.
  <dt><code><var>event</var> . {{Event/composed}}</code>
  <dd>Returns true or false depending on how <var>event</var> was initialized. True if
  <var>event</var> invokes listeners past a {{ShadowRoot}} <a>node</a> that is the
- <a for=tree>root</a> of its {{Event/target}} attribute value, and false otherwise.
+ <a for=tree>root</a> of its <a for=Event>target</a>, and false otherwise.
 
  <dt><code><var>event</var> . {{Event/isTrusted}}</code>
  <dd>Returns true if <var>event</var> was
@@ -563,16 +575,18 @@ algorithm below.
  the <a>time origin</a>.
 </dl>
 
-The <dfn attribute for=Event><code>type</code></dfn> attribute must
-return the value it was initialized to. When an
-<a>event</a> is created the attribute must be
-initialized to the empty string.
+<p>The <dfn attribute for=Event><code>type</code></dfn> attribute must return the value it was
+initialized to. When an <a>event</a> is created the attribute must be initialized to the empty
+string.
 
-The <dfn attribute for=Event><code>target</code></dfn> and
-<dfn attribute for=Event><code>currentTarget</code></dfn>
-attributes must return the values they were initialized to. When an
-<a>event</a> is created the attributes must be
-initialized to null.
+<p>The <dfn attribute for=Event><code>target</code></dfn> attribute's getter, when invoked, must
+return the <a>context object</a>'s <a for=Event>target</a>.
+
+<p>The <dfn attribute for=Event><code>srcElement</code></dfn> attribute's getter, when invoked, must
+return the <a>context object</a>'s <a for=Event>target</a>.
+
+<p>The <dfn attribute for=Event><code>currentTarget</code></dfn> attribute must return the value it
+was initialized to. When an <a>event</a> is created the attribute must be initialized to null.
 
 <p>The <dfn method for=Event><code>composedPath()</code></dfn> method, when invoked, must run these
 steps:
@@ -584,10 +598,10 @@ steps:
 
  <li><p>Let <var>hasSeenCurrentTarget</var> be false.
 
- <li><p>Let <var>currentTarget</var> be <a>context object</a>'s {{Event/currentTarget}}
+ <li><p>Let <var>currentTarget</var> be the <a>context object</a>'s {{Event/currentTarget}}
  attribute value.
 
- <li><p>Let <var>reversedPath</var> be <a>context object</a>'s <a for=Event>path</a>, in reverse
+ <li><p>Let <var>reversedPath</var> be the <a>context object</a>'s <a for=Event>path</a>, in reverse
  order.
 
  <li>
@@ -612,37 +626,33 @@ steps:
  <li><p>Return <var>reversedComposedPath</var>, in reverse order.
 </ol>
 
-The <dfn attribute for=Event><code>eventPhase</code></dfn>
-attribute must return the value it was initialized to, which must be one of
-the following:
+<p>The <dfn attribute for=Event><code>eventPhase</code></dfn> attribute must return the value it was
+initialized to, which must be one of the following:
+
 <dl>
  <dt><dfn const for=Event>NONE</dfn> (numeric value 0)
  <dd><a>Events</a> not currently
  <a>dispatched</a> are in this phase.
+
  <dt><dfn const for=Event>CAPTURING_PHASE</dfn> (numeric value 1)
- <dd>When an <a>event</a> is
- <a>dispatched</a> to an object that
- <a>participates</a> in a
- <a>tree</a> it will be in this phase before it
- reaches its {{Event/target}} attribute value.
+ <dd>When an <a>event</a> is <a>dispatched</a> to an object that <a>participates</a> in a
+ <a>tree</a> it will be in this phase before it reaches its <a for=Event>target</a>.
+
  <dt><dfn const for=Event>AT_TARGET</dfn> (numeric value 2)
- <dd>When an <a>event</a> is
- <a>dispatched</a> it will be in this
- phase on its {{Event/target}} attribute value.
+ <dd>When an <a>event</a> is <a>dispatched</a> it will be in this phase on its
+ <a for=Event>target</a>.
+
  <dt><dfn const for=Event>BUBBLING_PHASE</dfn> (numeric value 3)
- <dd>When an <a>event</a> is
- <a>dispatched</a> to an object that
- <a>participates</a> in a
- <a>tree</a> it will be in this phase after it
- reaches its {{Event/target}} attribute value.
+ <dd>When an <a>event</a> is <a>dispatched</a> to an object that <a>participates</a> in a
+ <a>tree</a> it will be in this phase after it reaches its <a for=Event>target</a>.
 </dl>
-Initially the attribute must be initialized to
-{{Event/NONE}}.
+
+<p>Initially the attribute must be initialized to {{Event/NONE}}.
 
 <hr>
 
-Each <a>event</a> has the following associated
-flags that are all initially unset:
+<p>Each <a>event</a> has the following associated flags that are all initially unset:
+
 <ul>
  <li><dfn export for=Event id=stop-propagation-flag>stop propagation flag</dfn>
  <li><dfn export for=Event id=stop-immediate-propagation-flag>stop immediate propagation flag</dfn>
@@ -656,40 +666,50 @@ flags that are all initially unset:
 <p>The <dfn method for=Event><code>stopPropagation()</code></dfn> method, when invoked, must set the
 <a>context object</a>'s <a>stop propagation flag</a>.</p>
 
-<p>The <dfn attribute for=Event><code>cancelBubble</code></dfn> attribute's getter must return true
-if <a>context object</a>'s <a>stop propagation flag</a> is set, and false otherwise.
+<p>The <dfn attribute for=Event><code>cancelBubble</code></dfn> attribute's getter, when invoked,
+must return true if the <a>context object</a>'s <a>stop propagation flag</a> is set, and false
+otherwise.
 
-<p>The {{Event/cancelBubble}} attribute's setter must set <a>context object</a>'s
+<p>The {{Event/cancelBubble}} attribute's setter, when invoked, must set the <a>context object</a>'s
 <a>stop propagation flag</a> if the given value is true, and do nothing otherwise.
 
 <p>The <dfn method for=Event><code>stopImmediatePropagation()</code></dfn> method, when invoked,
-must set <a>context object</a>'s <a>stop propagation flag</a> and <a>context object</a>'s
+must set the <a>context object</a>'s <a>stop propagation flag</a> and the <a>context object</a>'s
 <a>stop immediate propagation flag</a>.</p>
 
-The <dfn attribute for=Event><code>bubbles</code></dfn> and
-<dfn attribute for=Event><code>cancelable</code></dfn> attributes
-must return the values they were initialized to.
+<p>The <dfn attribute for=Event><code>bubbles</code></dfn> and
+<dfn attribute for=Event><code>cancelable</code></dfn> attributes must return the values they were
+initialized to.
 
-The <dfn method for=Event><code>preventDefault()</code></dfn> method, when invoked, must set the
-<a>canceled flag</a> if the {{Event/cancelable}} attribute value is true and the
-<a>in passive listener flag</a> is unset.
+<p>To <dfn>set the canceled flag</dfn>, given an <a>event</a> <var>event</var>, if
+<var>event</var>'s {{Event/cancelable}} attribute value is true and <var>event</var>'s
+<a>in passive listener flag</a> is unset, then set <var>event</var>'s <a>canceled flag</a>, and do
+nothing otherwise.
 
-<p class="note no-backref">This means there are scenarios where invoking {{Event/preventDefault()}}
-has no effect. User agents are encouraged to log the precise cause in a developer console, to aid
+<p>The <dfn attribute for=Event><code>returnValue</code></dfn> attribute's getter, when invoked,
+must return false if <a>context object</a>'s <a>canceled flag</a> is set, and true otherwise.
+
+<p>The {{Event/returnValue}} attribute's setter, when invoked, must <a>set the canceled flag</a>
+with the <a>context object</a> if the given value is false, and do nothing otherwise.
+
+<p>The <dfn method for=Event><code>preventDefault()</code></dfn> method, when invoked, must
+<a>set the canceled flag</a> with the <a>context object</a>.
+
+<p class="note no-backref">There are scenarios where invoking {{Event/preventDefault()}} has no
+effect. User agents are encouraged to log the precise cause in a developer console, to aid
 debugging.
 
-<p>The <dfn attribute for=Event><code>defaultPrevented</code></dfn> attribute's getter must return
-true if <a>context object</a>'s <a>canceled flag</a> is set, and false otherwise.</p>
+<p>The <dfn attribute for=Event><code>defaultPrevented</code></dfn> attribute's getter, when
+invoked, must return true if the <a>context object</a>'s <a>canceled flag</a> is set, and false
+otherwise.</p>
 
-<p>The <dfn attribute for=Event><code>composed</code></dfn> attribute's getter must return true if
-<a>context object</a>'s <a>composed flag</a> is set, and false otherwise.</p>
+<p>The <dfn attribute for=Event><code>composed</code></dfn> attribute's getter, when invoked, must
+return true if the <a>context object</a>'s <a>composed flag</a> is set, and false otherwise.</p>
 
 <hr>
 
-<p>The <dfn attribute for=Event><code>isTrusted</code></dfn> attribute
-must return the value it was initialized to. When an
-<a>event</a> is created the attribute must be
-initialized to false.
+<p>The <dfn attribute for=Event><code>isTrusted</code></dfn> attribute must return the value it was
+initialized to. When an <a>event</a> is created the attribute must be initialized to false.
 
 <p class="note no-backref">{{Event/isTrusted}} is a convenience that indicates whether an
 <a>event</a> is <a>dispatched</a> by the user agent (as opposed to using
@@ -697,30 +717,29 @@ initialized to false.
 the user agent to dispatch an <a>event</a> whose {{Event/isTrusted}} attribute is initialized to
 false.
 
-The <dfn attribute for=Event><code>timeStamp</code></dfn> attribute must return the value it was
+<p>The <dfn attribute for=Event><code>timeStamp</code></dfn> attribute must return the value it was
 initialized to.
 
 <hr>
 
-To <dfn export for=Event id=concept-event-initialize>initialize</dfn> an
-<var>event</var>, with <var>type</var>,
-<var>bubbles</var>, and <var>cancelable</var>, run these steps:
+<p>To <dfn export for=Event id=concept-event-initialize>initialize</dfn> an <var>event</var>, with
+<var>type</var>, <var>bubbles</var>, and <var>cancelable</var>, run these steps:
 
 <ol>
- <li>Set the <a>initialized flag</a>.
- <li>Unset the <a>stop propagation flag</a>,
- <a>stop immediate propagation flag</a>, and
- <a>canceled flag</a>.
- <li>Set the {{Event/isTrusted}} attribute
- to false.
- <li>Set the {{Event/target}} attribute to
- null.
- <li>Set the {{Event/type}} attribute to
- <var>type</var>.
- <li>Set the {{Event/bubbles}} attribute to
- <var>bubbles</var>.
- <li>Set the {{Event/cancelable}} attribute
- to <var>cancelable</var>.
+ <li><p>Set <var>event</var>'s <a>initialized flag</a>.
+
+ <li><p>Unset <var>event</var>'s <a>stop propagation flag</a>,
+ <a>stop immediate propagation flag</a>, and <a>canceled flag</a>.
+
+ <li><p>Set <var>event</var>'s {{Event/isTrusted}} attribute to false.
+
+ <li><p>Set <var>event</var>'s <a for=Event>target</a> to null.
+
+ <li><p>Set <var>event</var>'s {{Event/type}} attribute to <var>type</var>.
+
+ <li><p>Set <var>event</var>'s {{Event/bubbles}} attribute to <var>bubbles</var>.
+
+ <li><p>Set <var>event</var>'s {{Event/cancelable}} attribute to <var>cancelable</var>.
 </ol>
 
 <p>The
@@ -728,9 +747,9 @@ To <dfn export for=Event id=concept-event-initialize>initialize</dfn> an
 method, when invoked, must run these steps:</p>
 
 <ol>
- <li><p>If <a>context object</a>'s <a>dispatch flag</a> is set, then return.
+ <li><p>If the <a>context object</a>'s <a>dispatch flag</a> is set, then return.
 
- <li><p><a>Initialize</a> <a>context object</a> with <var>type</var>, <var>bubbles</var>, and
+ <li><p><a>Initialize</a> the <a>context object</a> with <var>type</var>, <var>bubbles</var>, and
  <var>cancelable</var>.
 </ol>
 
@@ -771,26 +790,32 @@ dictionary CustomEventInit : EventInit {
  <!-- initCustomEvent is dead -->
 </dl>
 
-The <dfn attribute for=CustomEvent><code>detail</code></dfn> attribute
-must return the value it was initialized to.
+<p>The <dfn attribute for=CustomEvent><code>detail</code></dfn> attribute must return the value it
+was initialized to.
 
-The
+<p>The
 <dfn method for=CustomEvent><code>initCustomEvent(<var>type</var>, <var>bubbles</var>, <var>cancelable</var>, <var>detail</var>)</code></dfn>
 method must, when invoked, run these steps:
 
 <ol>
- <li>If <a>context object</a>'s <a>dispatch flag</a> is set, then return.
+ <li><p>If the <a>context object</a>'s <a>dispatch flag</a> is set, then return.
 
- <li><a>Initialize</a> the
- <a>context object</a> with <var>type</var>, <var>bubbles</var>, and
+ <li><p><a>Initialize</a> the <a>context object</a> with <var>type</var>, <var>bubbles</var>, and
  <var>cancelable</var>.
 
- <li>Set <a>context object</a>'s {{CustomEvent/detail}}
- attribute to <var>detail</var>.
+ <li><p>Set the <a>context object</a>'s {{CustomEvent/detail}} attribute to <var>detail</var>.
 </ol>
 
 
 <h3 id=constructing-events>Constructing events</h3>
+
+<a lt="Other applicable specifications">Specifications</a> may define
+<dfn export id=concept-event-constructor-ext>event constructing steps</dfn> for all or some
+<a for=/>events</a>. The algorithm is passed an <var>event</var> as indicated in the
+<a>inner event creation steps</a>.
+
+<p class=note>This construct can be used by {{Event}} subclasses that have a more complex structure
+than a simple 1:1 mapping between their initializing dictionary members and IDL attributes.
 
 <p>When a <dfn export for=Event id=concept-event-constructor>constructor</dfn> of the {{Event}}
 interface, or of an interface that inherits from the {{Event}} interface, is invoked, these steps
@@ -865,6 +890,8 @@ correct defaults.</p>
  <li><p><a for=map>For each</a> <var>member</var> → <var>value</var> in <var>dictionary</var>, if
  <var>event</var> has an attribute whose <a spec=webidl>identifier</a> is <var>member</var>, then
  initialize that attribute to <var>value</var>.
+
+ <li><p>Run the <a>event constructing steps</a> with <var>event</var>.
 
  <li><p>Return <var>event</var>.
 </ol>
@@ -1109,7 +1136,7 @@ invoked, must run these steps:
 
  <li><p>Initialize <var>event</var>'s {{Event/isTrusted}} attribute to false.
 
- <li><p>Return the result of <a>dispatching</a> <var>event</var> to <a>context object</a>.
+ <li><p>Return the result of <a>dispatching</a> <var>event</var> to the <a>context object</a>.
 </ol>
 
 
@@ -1154,149 +1181,164 @@ for discussion).
   <p class="note"><var>legacy target override flag</var> is only used by HTML and only when
   <var>target</var> is a {{Window}} object.
 
- <li>Let <var>relatedTarget</var> be the result of <a>retargeting</a> <var>event</var>'s
- <a for=Event>relatedTarget</a> against <var>target</var> if <var>event</var>'s
- <a for=Event>relatedTarget</a> is non-null, and null otherwise.
+ <li><p>Let <var>activationTarget</var> be null.
 
- <li><p>If <var>target</var> is <var>relatedTarget</var> and <var>target</var> is not
- <var>event</var>'s <a for=Event>relatedTarget</a>, then return true.
-
- <li><p><a>Append to an event path</a> with <var>event</var>, <var>target</var>,
- <var>targetOverride</var>, <var>relatedTarget</var>, and false.
-
- <li><p>Let <var>isActivationEvent</var> be true, if <var>event</var> is a {{MouseEvent}} object and
- <var>event</var>'s {{Event/type}} attribute is "<code>click</code>", and false otherwise.
-
- <li><p>Let <var>activationTarget</var> be <var>target</var>, if <var>isActivationEvent</var> is
- true and <var>target</var> has <a for=EventTarget>activation behavior</a>, and null otherwise.
-
- <li><p>Let <var>slotable</var> be <var>target</var>, if <var>target</var> is
- <a for=slotable>assigned</a>, and null otherwise.
-
- <li><p>Let <var>slot-in-closed-tree</var> be false.
-
- <li><p>Let <var>parent</var> be the result of invoking <var>target</var>'s <a>get the parent</a>
- with <var>event</var>.
+ <li><p>Let <var>relatedTarget</var> be the result of <a>retargeting</a> <var>event</var>'s
+ <a for=Event>relatedTarget</a> against <var>target</var>.
 
  <li>
-  <p>While <var>parent</var> is non-null:</p>
+  <p>If <var>target</var> is not <var>relatedTarget</var> or <var>target</var> is <var>event</var>'s
+  <a for=Event>relatedTarget</a>, then:
 
   <ol>
-   <li>
-    <p>If <var>slotable</var> is non-null:
+   <li><p>Let <var>touchTargets</var> be a new <a for=/>list</a>.
 
-    <ol>
-     <li><p>Assert: <var>parent</var> is a <a for=/>slot</a>.
+   <li><p><a for=list>For each</a> <var>touchTarget</var> of <var>event</var>'s
+   <a for=Event>touch target list</a>, <a for=list>append</a> the result of <a>retargeting</a>
+   <var>touchTarget</var> against <var>target</var> to <var>touchTargets</var>.
 
-     <li><p>Set <var>slotable</var> to null.
+   <li><p><a>Append to an event path</a> with <var>event</var>, <var>target</var>,
+   <var>targetOverride</var>, <var>relatedTarget</var>, <var>touchTargets</var>, and false.
 
-     <li><p>If <var>parent</var>'s <a for=tree>root</a> is a <a for=/>shadow root</a> whose
-     <a for=ShadowRoot>mode</a> is "<code>closed</code>", then set <var>slot-in-closed-tree</var> to
-     true.
-    </ol>
+   <li><p>Let <var>isActivationEvent</var> be true, if <var>event</var> is a {{MouseEvent}} object
+   and <var>event</var>'s {{Event/type}} attribute is "<code>click</code>", and false otherwise.
 
-   <li><p>If <var>parent</var> is <a for=slotable>assigned</a>, then set <var>slotable</var> to
-   <var>parent</var>.
+   <li><p>If <var>isActivationEvent</var> is true and <var>target</var> has
+   <a for=EventTarget>activation behavior</a>, then set <var>activationTarget</var> to
+   <var>target</var>.
 
-   <li><p>Let <var>relatedTarget</var> be the result of <a>retargeting</a> <var>event</var>'s
-   <a for=Event>relatedTarget</a> against <var>parent</var> if <var>event</var>'s
-   <a for=Event>relatedTarget</a> is non-null, and null otherwise.
+   <li><p>Let <var>slotable</var> be <var>target</var>, if <var>target</var> is a <a>slotable</a>
+   and is <a for=slotable>assigned</a>, and null otherwise.
 
-   <li>
-    <p>If <var>target</var>'s <a for=tree>root</a> is a
-    <a>shadow-including inclusive ancestor</a> of <var>parent</var>, then:
+   <li><p>Let <var>slot-in-closed-tree</var> be false.
 
-    <ol>
-     <li><p>If <var>isActivationEvent</var> is true, <var>event</var>'s {{Event/bubbles}} attribute
-     is true, <var>activationTarget</var> is null, and <var>parent</var> has
-     <a for=EventTarget>activation behavior</a>, then set <var>activationTarget</var> to
-     <var>parent</var>.
-
-     <li><p><a>Append to an event path</a> with <var>event</var>, <var>parent</var>, null,
-     <var>relatedTarget</var>, and <var>slot-in-closed-tree</var>.
-    </ol>
-
-   <li><p>Otherwise, if <var>parent</var> and <var>relatedTarget</var> are identical, then set
-   <var>parent</var> to null.
+   <li><p>Let <var>parent</var> be the result of invoking <var>target</var>'s <a>get the parent</a>
+   with <var>event</var>.
 
    <li>
-    <p>Otherwise, set <var>target</var> to <var>parent</var> and then:
+    <p>While <var>parent</var> is non-null:</p>
 
     <ol>
-     <li><p>If <var>isActivationEvent</var> is true, <var>activationTarget</var> is null, and
-     <var>target</var> has <a for=EventTarget>activation behavior</a>, then set
-     <var>activationTarget</var> to <var>target</var>.
+     <li>
+      <p>If <var>slotable</var> is non-null:
 
-     <li><p><a>Append to an event path</a> with <var>event</var>, <var>parent</var>,
-     <var>target</var>, <var>relatedTarget</var>, and <var>slot-in-closed-tree</var>.
+      <ol>
+       <li><p>Assert: <var>parent</var> is a <a for=/>slot</a>.
+
+       <li><p>Set <var>slotable</var> to null.
+
+       <li><p>If <var>parent</var>'s <a for=tree>root</a> is a <a for=/>shadow root</a> whose
+       <a for=ShadowRoot>mode</a> is "<code>closed</code>", then set <var>slot-in-closed-tree</var>
+       to true.
+      </ol>
+
+     <li><p>If <var>parent</var> is a <a>slotable</a> and is <a for=slotable>assigned</a>, then set
+     <var>slotable</var> to <var>parent</var>.
+
+     <li><p>Let <var>relatedTarget</var> be the result of <a>retargeting</a> <var>event</var>'s
+     <a for=Event>relatedTarget</a> against <var>parent</var>.
+
+     <li><p>Let <var>touchTargets</var> be a new <a for=/>list</a>.
+
+     <li><p><a for=list>For each</a> <var>touchTarget</var> of <var>event</var>'s
+     <a for=Event>touch target list</a>, <a for=list>append</a> the result of <a>retargeting</a>
+     <var>touchTarget</var> against <var>parent</var> to <var>touchTargets</var>.
+
+     <li>
+      <p>If <var>parent</var> is a <a>node</a> and <var>target</var>'s <a for=tree>root</a> is a
+      <a>shadow-including inclusive ancestor</a> of <var>parent</var>, then:
+
+      <ol>
+       <li><p>If <var>isActivationEvent</var> is true, <var>event</var>'s {{Event/bubbles}}
+       attribute is true, <var>activationTarget</var> is null, and <var>parent</var> has
+       <a for=EventTarget>activation behavior</a>, then set <var>activationTarget</var> to
+       <var>parent</var>.
+
+       <li><p><a>Append to an event path</a> with <var>event</var>, <var>parent</var>, null,
+       <var>relatedTarget</var>, <var>touchTargets</var>, and <var>slot-in-closed-tree</var>.
+      </ol>
+
+     <li><p>Otherwise, if <var>parent</var> is <var>relatedTarget</var>, then set <var>parent</var>
+     to null.
+
+     <li>
+      <p>Otherwise, set <var>target</var> to <var>parent</var> and then:
+
+      <ol>
+       <li><p>If <var>isActivationEvent</var> is true, <var>activationTarget</var> is null, and
+       <var>target</var> has <a for=EventTarget>activation behavior</a>, then set
+       <var>activationTarget</var> to <var>target</var>.
+
+       <li><p><a>Append to an event path</a> with <var>event</var>, <var>parent</var>,
+       <var>target</var>, <var>relatedTarget</var>, <var>touchTargets</var>, and
+       <var>slot-in-closed-tree</var>.
+      </ol>
+
+     <li><p>If <var>parent</var> is non-null, then set <var>parent</var> to the result of invoking
+     <var>parent</var>'s <a>get the parent</a> with <var>event</var>.
+
+     <li><p>Set <var>slot-in-closed-tree</var> to false.
     </ol>
 
-   <li><p>If <var>parent</var> is non-null, then set <var>parent</var> to the result of invoking
-   <var>parent</var>'s <a>get the parent</a> with <var>event</var>.
+   <li><p>Let <var>clearTargetsTuple</var> be the last tuple in <var>event</var>'s
+   <a for=Event>path</a> whose <a for=Event/path>target</a> is non-null.
 
-   <li><p>Set <var>slot-in-closed-tree</var> to false.
+   <li><p>Let <var>clearTargets</var> be true if <var>clearTargetsTuple</var>'s
+   <a for=Event/path>target</a>, <var>clearTargetsTuple</var>'s <a for=Event/path>relatedTarget</a>,
+   or an {{EventTarget}} object in <var>clearTargetsTuple</var>'s
+   <a for=Event/path>touch target list</a> is a <a for=/>node</a> and its <a for=tree>root</a> is a
+   <a for=/>shadow root</a>, and false otherwise.
+
+   <li><p>Set <var>event</var>'s {{Event/eventPhase}} attribute to {{Event/CAPTURING_PHASE}}.
+
+   <li><p>If <var>activationTarget</var> is non-null and <var>activationTarget</var> has
+   <a for=EventTarget>legacy-pre-activation behavior</a>, then run <var>activationTarget</var>'s
+   <a for=EventTarget>legacy-pre-activation behavior</a>.
+
+   <li>
+    <p>For each <var>tuple</var> in <var>event</var>'s <a for=Event>path</a>, in reverse order:
+
+    <ol>
+     <li><p>If <var>tuple</var>'s <a for=Event/path>target</a> is null, then <a>invoke</a> with
+     <var>tuple</var>, <var>event</var>, and <var>legacyOutputDidListenersThrowFlag</var> if given.
+    </ol>
+
+   <li>
+    <p>For each <var>tuple</var> in <var>event</var>'s <a for=Event>path</a>, in order:
+
+    <ol>
+     <li><p>If <var>tuple</var>'s <a for=Event/path>target</a> is non-null, then set
+     <var>event</var>'s {{Event/eventPhase}} attribute to {{Event/AT_TARGET}}.
+
+     <li><p>Otherwise, set <var>event</var>'s {{Event/eventPhase}} attribute to
+     {{Event/BUBBLING_PHASE}}.
+
+     <li><p>If either <var>event</var>'s {{Event/eventPhase}} attribute is {{Event/BUBBLING_PHASE}}
+     and <var>event</var>'s {{Event/bubbles}} attribute is true or <var>event</var>'s
+     {{Event/eventPhase}} attribute is {{Event/AT_TARGET}}, then <a>invoke</a> with
+     <var>tuple</var>, <var>event</var>, and <var>legacyOutputDidListenersThrowFlag</var> if given.
+    </ol>
   </ol>
-
- <li><p>Set <var>event</var>'s {{Event/eventPhase}} attribute to {{Event/CAPTURING_PHASE}}.
-
- <li><p>If <var>activationTarget</var> is non-null and <var>activationTarget</var> has
- <a for=EventTarget>legacy-pre-activation behavior</a>, then run <var>activationTarget</var>'s
- <a for=EventTarget>legacy-pre-activation behavior</a>.
-
- <li>
-  <p>For each <var>tuple</var> in <var>event</var>'s <a for=Event>path</a>, in reverse order:
-
-  <ol>
-   <li><p>Set <var>event</var>'s {{Event/target}} attribute to the <b>target</b> of the last tuple
-   in <var>event</var>'s <a for=Event>path</a>, that is either <var>tuple</var> or preceding
-   <var>tuple</var>, whose <b>target</b> is non-null.
-
-   <li><p>Set <var>event</var>'s <a for=Event>relatedTarget</a> to <var>tuple</var>'s
-   <b>relatedTarget</b>.
-
-   <li><p>Run the <a>retargeting steps</a> with <var>event</var>.
-
-   <li><p>If <var>tuple</var>'s <b>target</b> is null, then <a>invoke</a> <var>tuple</var>'s
-   <b>item</b> with <var>event</var> and <var>legacyOutputDidListenersThrowFlag</var> if given.
-  </ol>
-
- <li>
-  <p>For each <var>tuple</var> in <var>event</var>'s <a for=Event>path</a>, in order:
-
-  <ol>
-   <li><p>Set <var>event</var>'s {{Event/target}} attribute to the <b>target</b> of the last tuple
-   in <var>event</var>'s <a for=Event>path</a>, that is either <var>tuple</var> or preceding
-   <var>tuple</var>, whose <b>target</b> is non-null.
-
-   <li><p>Set <var>event</var>'s <a for=Event>relatedTarget</a> to <var>tuple</var>'s
-   <b>relatedTarget</b>.
-
-   <li><p>Run the <a>retargeting steps</a> with <var>event</var>.
-
-   <li><p>If <var>tuple</var>'s <b>target</b> is non-null, then set <var>event</var>'s
-   {{Event/eventPhase}} attribute to {{Event/AT_TARGET}}.
-
-   <li><p>Otherwise, set <var>event</var>'s {{Event/eventPhase}} attribute to
-   {{Event/BUBBLING_PHASE}}.
-
-   <li><p>If either <var>event</var>'s {{Event/eventPhase}} attribute is {{Event/BUBBLING_PHASE}}
-   and <var>event</var>'s {{Event/bubbles}} attribute is true or <var>event</var>'s
-   {{Event/eventPhase}} attribute is {{Event/AT_TARGET}}, then <a>invoke</a> <var>tuple</var>'s
-   <b>item</b> with <var>event</var> and <var>legacyOutputDidListenersThrowFlag</var> if given.
-  </ol>
-
- <li><p>Unset <var>event</var>'s <a>dispatch flag</a>, <a>stop propagation flag</a>, and
- <a>stop immediate propagation flag</a>.
 
  <li><p>Set <var>event</var>'s {{Event/eventPhase}} attribute to {{Event/NONE}}.
-
- <li><p>If {{Event/target}}'s <a for=tree>root</a> is a <a for=/>shadow root</a>, then set
- <var>event</var>'s {{Event/target}} attribute and <var>event</var>'s <a for=Event>relatedTarget</a>
- to null.
 
  <li><p>Set <var>event</var>'s {{Event/currentTarget}} attribute to null.
 
  <li><p>Set <var>event</var>'s <a for=Event>path</a> to the empty list.
+
+ <li><p>Unset <var>event</var>'s <a>dispatch flag</a>, <a>stop propagation flag</a>, and
+ <a>stop immediate propagation flag</a>.
+
+ <li>
+  <p>If <var>clearTargets</var>, then:
+
+  <ol>
+   <li><p>Set <var>event</var>'s <a for=Event>target</a> to null.
+
+   <li><p>Set <var>event</var>'s <a for=Event>relatedTarget</a> to null.
+
+   <li><p>Set <var>event</var>'s <a for=Event>touch target list</a> to the empty list.
+  </ol>
 
  <li>
   <p>If <var>activationTarget</var> is non-null, then:
@@ -1314,8 +1356,8 @@ for discussion).
 </ol>
 
 <p>To <dfn noexport id=concept-event-path-append>append to an event path</dfn>, given an
-<var>event</var>, <var>target</var>, <var>targetOverride</var>, <var>relatedTarget</var>, and a
-<var>slot-in-closed-tree</var>, run these steps:</p>
+<var>event</var>, <var>target</var>, <var>targetOverride</var>, <var>relatedTarget</var>,
+<var>touchTargets</var>, and a <var>slot-in-closed-tree</var>, run these steps:</p>
 
 <ol>
  <li><p>Let <var>root-of-closed-tree</var> be false.
@@ -1326,30 +1368,40 @@ for discussion).
  <li><p><a for=list>Append</a> a new <a for=/>struct</a> to <var>event</var>'s <a for=Event>path</a>
  whose <a for=Event/path>item</a> is <var>target</var>, <a for=Event/path>target</a> is
  <var>targetOverride</var>, <a for=Event/path>relatedTarget</a> is <var>relatedTarget</var>,
+ <a for=Event/path>touch target list</a> is <var>touchTargets</var>,
  <a for=Event/path>root-of-closed-tree</a> is <var>root-of-closed-tree</var>, and
  <a for=Event/path>slot-in-closed-tree</a> is <var>slot-in-closed-tree</var>.
 </ol>
 
-<p>To <dfn noexport id=concept-event-listener-invoke>invoke</dfn> an <var>object</var> with
-<var>event</var> and an optional <var>legacyOutputDidListenersThrowFlag</var>, run these steps:
+<p>To <dfn noexport id=concept-event-listener-invoke>invoke</dfn>, given a <var>tuple</var>,
+<var>event</var>, and an optional <var>legacyOutputDidListenersThrowFlag</var>, run these steps:
 
 <ol>
+ <li><p>Set <var>event</var>'s <a for=Event>target</a> to the <a for=Event/path>target</a> of the
+ last tuple in <var>event</var>'s <a for=Event>path</a>, that is either <var>tuple</var> or
+ preceding <var>tuple</var>, whose <a for=Event/path>target</a> is non-null.
+
+ <li><p>Set <var>event</var>'s <a for=Event>relatedTarget</a> to <var>tuple</var>'s
+ <a for=Event/path>relatedTarget</a>.
+
+ <li><p>Set <var>event</var>'s <a for=Event>touch target list</a> to <var>tuple</var>'s
+ <a for=Event/path>touch target list</a>.
+
  <li><p>If <var>event</var>'s <a>stop propagation flag</a> is set, then return.
 
- <li><p>Let <var>listeners</var> be a new <a for=/>list</a>.
+ <li><p>Let <var>object</var> be <var>tuple</var>'s <a for=Event/path>item</a>.
 
  <li>
-  <p><a for=list>For each</a> <var>listener</var> of <var>object</var>'s
-  <a for=EventTarget>event listener list</a>, <a for=list>append</a> <var>listener</var> to
-  <var>listeners</var>.
+  <p>Let <var>listeners</var> be a <a for=list>clone</a> of <var>object</var>'s
+  <a for=EventTarget>event listener list</a>.
 
   <p class="note no-backref">This avoids <a>event listeners</a> added after this point from being
   run. Note that removal still has an effect due to the <a for="event listener">removed</a> field.
 
  <li><p>Initialize <var>event</var>'s {{Event/currentTarget}} attribute to <var>object</var>.
 
- <li><p>Let <var>found</var> be the result of running <a>inner invoke</a> <var>object</var> with
- <var>event</var>, <var>listeners</var>, and <var>legacyOutputDidListenersThrowFlag</var> if given.
+ <li><p>Let <var>found</var> be the result of running <a>inner invoke</a> with <var>event</var>,
+ <var>listeners</var>, and <var>legacyOutputDidListenersThrowFlag</var> if given.
 
  <li>
   <p>If <var>found</var> is false and <var>event</var>'s {{Event/isTrusted}} attribute is true,
@@ -1373,15 +1425,15 @@ for discussion).
       <tr><td>"<code>transitionend</code>"<td>"<code>webkitTransitionEnd</code>"
     </table>
 
-   <li><p><a>Inner invoke</a> <var>object</var> with <var>event</var>, <var>listeners</var>, and
+   <li><p><a>Inner invoke</a> with <var>event</var>, <var>listeners</var>, and
    <var>legacyOutputDidListenersThrowFlag</var> if given.
 
    <li><p>Set <var>event</var>'s {{Event/type}} attribute value to <var>originalEventType</var>.
   </ol>
 </ol>
 
-<p>To <dfn noexport id=concept-event-listener-inner-invoke>inner invoke</dfn> an <var>object</var>
-with <var>event</var>, <var>listeners</var>, and an optional
+<p>To <dfn noexport id=concept-event-listener-inner-invoke>inner invoke</dfn>, given an
+<var>event</var>, <var>listeners</var>, and an optional
 <var>legacyOutputDidListenersThrowFlag</var>, run these steps:
 
 <ol>
@@ -1398,14 +1450,16 @@ with <var>event</var>, <var>listeners</var>, and an optional
    <li><p>Set <var>found</var> to true.
 
    <li><p>If <var>event</var>'s {{Event/eventPhase}} attribute value is {{Event/CAPTURING_PHASE}}
-   and <var>listener</var>'s <a for="event listener">capture</a> is false, then <a for=iteration>continue</a>.
+   and <var>listener</var>'s <a for="event listener">capture</a> is false, then
+   <a for=iteration>continue</a>.
 
    <li><p>If <var>event</var>'s {{Event/eventPhase}} attribute value is {{Event/BUBBLING_PHASE}} and
-   <var>listener</var>'s <a for="event listener">capture</a> is true, then <a for=iteration>continue</a>.
+   <var>listener</var>'s <a for="event listener">capture</a> is true, then
+   <a for=iteration>continue</a>.
 
    <li><p>If <var>listener</var>'s <a for="event listener">once</a> is true, then
-   <a for=list>remove</a> <var>listener</var> from <var>object</var>'s
-   <a for=EventTarget>event listener list</a>.
+   <a for=list>remove</a> <var>listener</var> from <var>event</var>'s {{Event/currentTarget}}
+   attribute value's <a for=EventTarget>event listener list</a>.
    <!-- Do this before invocation to avoid reentrancy issues. No need to set removed to true since
         each listener in listeners is run once anyway. -->
 
@@ -1596,11 +1650,12 @@ invoked, must run these steps:
  <li><p>Return <var>controller</var>.
 </ol>
 
-<p>The <dfn attribute for=AbortController><code>signal</code></dfn> attribute's getter must return
-<a>context object</a>'s <a for=AbortController>signal</a>.
+<p>The <dfn attribute for=AbortController><code>signal</code></dfn> attribute's getter, when
+invoked, must return the <a>context object</a>'s <a for=AbortController>signal</a>.
 
 <p>The <dfn method for=AbortController><code>abort()</code></dfn> method, when invoked, must
-<a for=AbortSignal>signal abort</a> on <a>context object</a>'s <a for=AbortController>signal</a>.
+<a for=AbortSignal>signal abort</a> on the <a>context object</a>'s
+<a for=AbortController>signal</a>.
 
 
 <h3 id=interface-AbortSignal>Interface {{AbortSignal}}</h3>
@@ -1645,8 +1700,8 @@ requirements to react in a reasonable way to {{AbortController/abort()}}. For ex
 [=AbortSignal/aborted flag=] might need to be propagated to a cross-thread environment, such as a
 service worker.
 
-<p>The <dfn attribute for=AbortSignal>aborted</dfn> attribute's getter must return true if
-<a>context object</a>'s [=AbortSignal/aborted flag=] is set, and false otherwise.
+<p>The <dfn attribute for=AbortSignal>aborted</dfn> attribute's getter, when invoked, must return
+true if the <a>context object</a>'s [=AbortSignal/aborted flag=] is set, and false otherwise.
 
 <p class=note>Changes to an {{AbortSignal}} object represent the wishes of the corresponding
 {{AbortController}} object, but an API observing the {{AbortSignal}} object can chose to ignore
@@ -2258,9 +2313,9 @@ before a <var>child</var>, with an optional <i>suppress observers flag</i>, run 
  <i>suppress observers flag</i> set.
 
  <li>
-  If <var>node</var> is a {{DocumentFragment}} <a>node</a>,
-  <a>queue a mutation record</a> of "<code>childList</code>" for
-  <var>node</var> with removedNodes <var>nodes</var>.
+  <p>If <var>node</var> is a {{DocumentFragment}} <a for=/>node</a>, then
+  <a>queue a tree mutation record</a> for <var>node</var> with « », <var>nodes</var>, null, and
+  null.
 
   <p class="note no-backref">This step intentionally does not pay attention to the
   <i>suppress observers flag</i>.
@@ -2318,10 +2373,8 @@ before a <var>child</var>, with an optional <i>suppress observers flag</i>, run 
    </li>
   </ol>
 
- <li>If <i>suppress observers flag</i> is unset,
- <a>queue a mutation record</a> of "<code>childList</code>" for
- <var>parent</var> with addedNodes <var>nodes</var>, nextSibling
- <var>child</var>, and previousSibling <var>previousSibling</var>.
+ <li><p>If <i>suppress observers flag</i> is unset, then <a>queue a tree mutation record</a> for
+ <var>parent</var> with <var>nodes</var>, « », <var>previousSibling</var>, and <var>child</var>.
 </ol>
 
 
@@ -2439,12 +2492,10 @@ within a <var>parent</var>, run these steps:
  <li><p><a for=/>Insert</a> <var>node</var> into <var>parent</var> before <var>reference child</var>
  with the <i>suppress observers flag</i> set.
 
- <li><a>Queue a mutation record</a> of "<code>childList</code>" for target
- <var>parent</var> with addedNodes <var>nodes</var>, removedNodes <var>removedNodes</var>,
- nextSibling <var>reference child</var>, and previousSibling
- <var>previousSibling</var>.
+ <li><p><a>Queue a tree mutation record</a> for <var>parent</var> with <var>nodes</var>,
+ <var>removedNodes</var>, <var>previousSibling</var>, and <var>reference child</var>.
 
- <li>Return <var>child</var>.
+ <li><p>Return <var>child</var>.
 </ol>
 
 
@@ -2474,9 +2525,8 @@ To <dfn export for=Node id=concept-node-replace-all>replace all</dfn> with a
  <li><p>If <var>node</var> is not null, then <a for=/>insert</a> <var>node</var> into
  <var>parent</var> before null with the <i>suppress observers flag</i> set.
 
- <li><a>Queue a mutation record</a> of "<code>childList</code>" for
- <var>parent</var> with addedNodes <var>addedNodes</var> and
- removedNodes <var>removedNodes</var>.
+ <li><p><a>Queue a tree mutation record</a> for <var>parent</var> with <var>addedNodes</var>,
+ <var>removedNodes</var>, null, and null.
 </ol>
 
 <p class="note no-backref">This algorithm does not make any checks with regards to the
@@ -2573,23 +2623,23 @@ with an optional <i>suppress observers flag</i>, run these steps:
   </ol>
  </li>
 
- <li>For each <a for=tree>inclusive ancestor</a> <var>inclusiveAncestor</var> of
- <var>parent</var>, if <var>inclusiveAncestor</var> has any <a>registered observers</a>
- whose <b>options</b>' {{MutationObserverInit/subtree}} is true, then for each
- such <a>registered observer</a> <var>registered</var>, append a
- <a>transient registered observer</a> whose <b>observer</b> and <b>options</b>
- are identical to those of <var>registered</var> and <b>source</b>  which is
- <var>registered</var> to <var>node</var>'s list of
- <a>registered observers</a>.
+ <li><p>For each <a for=tree>inclusive ancestor</a> <var>inclusiveAncestor</var> of
+ <var>parent</var>, and then <a for=list>for each</a> <var>registered</var> of
+ <var>inclusiveAncestor</var>'s <a>registered observer list</a>, if <var>registered</var>'s
+ <a for="registered observer">options</a>'s {{MutationObserverInit/subtree}} is true, then
+ <a for=list>append</a> a new <a>transient registered observer</a> whose
+ <a for="registered observer">observer</a> is <var>registered</var>'s
+ <a for="registered observer">observer</a>, <a for="registered observer">options</a> is
+ <var>registered</var>'s <a for="registered observer">options</a>, and
+ <a for="transient registered observer">source</a> is <var>registered</var> to <var>node</var>'s
+ <a>registered observer list</a>.
 
- <li>If <i>suppress observers flag</i> is unset,
- <a>queue a mutation record</a> of "<code>childList</code>" for
- <var>parent</var> with removedNodes a list solely containing <var>node</var>,
- nextSibling <var>oldNextSibling</var>, and previousSibling
- <var>oldPreviousSibling</var>.
+ <li><p>If <i>suppress observers flag</i> is unset, then <a>queue a tree mutation record</a> for
+ <var>parent</var> with « », « <var>node</var> », <var>oldPreviousSibling</var>, and
+ <var>oldNextSibling</var>.
 
- <li>If <var>node</var> is a {{Text}} node, run the <a>child text content change steps</a> for
- <var>parent</var>.
+ <li><p>If <var>node</var> is a {{Text}} node, then run the <a>child text content change steps</a>
+ for <var>parent</var>.
 </ol>
 
 
@@ -2613,7 +2663,7 @@ DocumentFragment includes NonElementParentNode;
 </dl>
 
 <p>The <dfn method for=NonElementParentNode><code>getElementById(<var>elementId</var>)</code></dfn>
-method, when invoked, must return the first <a for="/">element</a>, in <a>tree order</a>, within
+method, when invoked, must return the first <a for="/">element</a>, in <a>tree order</a>, within the
 <a>context object</a>'s <a>descendants</a>, whose <a for=Element>ID</a> is <var>elementId</var>, and
 null if there is no such <a for="/">element</a> otherwise.
 
@@ -3089,76 +3139,80 @@ invoked, must run these steps:
 
 <h3 id=mutation-observers>Mutation observers</h3>
 
-Each
-<a>unit of related similar-origin browsing contexts</a> has a
-<dfn export>mutation observer compound microtask queued flag</dfn>, which is initially unset, and an
-associated list of {{MutationObserver}} objects, which is initially empty.
+<p>Each <a>unit of related similar-origin browsing contexts</a> has a
+<dfn noexport>mutation observer compound microtask queued flag</dfn>, which is initially unset.
 [[!HTML]]
 
-To <dfn export>queue a mutation observer compound microtask</dfn>, run these steps:
+<p>Each <a>unit of related similar-origin browsing contexts</a> also has a
+<dfn noexport>mutation observer list</dfn> (a <a for=/>list</a> of zero or more {{MutationObserver}}
+objects), which is initially empty.
+
+<p>To <dfn export>queue a mutation observer compound microtask</dfn>, run these steps:
 
 <ol>
- <li>If <a>mutation observer compound microtask queued flag</a> is set, then return.
+ <li><p>If <a>mutation observer compound microtask queued flag</a> is set, then return.
 
- <li>Set <a>mutation observer compound microtask queued flag</a>.
+ <li><p>Set <a>mutation observer compound microtask queued flag</a>.
 
- <li><a lt="queue a microtask">Queue</a> a
- <a>compound microtask</a> to
+ <li><p><a lt="queue a microtask">Queue</a> a <a>compound microtask</a> to
  <a>notify mutation observers</a>.
 </ol>
 
-To <dfn export>notify mutation observers</dfn>, run these steps:
+<p>To <dfn export>notify mutation observers</dfn>, run these steps:
 
 <ol>
- <li>Unset <a>mutation observer compound microtask queued flag</a>.
+ <li><p>Unset <a>mutation observer compound microtask queued flag</a>.
 
- <li>Let <var>notify list</var> be a copy of
- <a>unit of related similar-origin browsing contexts</a>'
- list of {{MutationObserver}} objects.
+ <li><p>Let <var>notifyList</var> be a <a for=list>clone</a> of
+ <a>unit of related similar-origin browsing contexts</a>' <a>mutation observer list</a>.
 
- <li><p>Let <var>signalList</var> be a copy of
+ <li><p>Let <var>signalList</var> be a <a for=list>clone</a> of
  <a>unit of related similar-origin browsing contexts</a>' <a>signal slot list</a>.
 
- <li><p>Empty <a>unit of related similar-origin browsing contexts</a>' <a>signal slot list</a>.
+ <li><p><a for=list>Empty</a> <a>unit of related similar-origin browsing contexts</a>'
+ <a>signal slot list</a>.
 
  <li>
-  For each {{MutationObserver}} object <var>mo</var> in <var>notify list</var>,
+  <p><a for=list>For each</a> <var>mo</var> of <var>notifyList</var>,
   <a>execute a compound microtask subtask</a> to run these steps: [[!HTML]]
 
   <ol>
-   <li>Let <var>queue</var> be a copy of <var>mo</var>'s <a>record queue</a>.
+   <li><p>Let <var>records</var> be a <a for=queue>clone</a> of <var>mo</var>'s
+   <a for=MutationObserver>record queue</a>.
 
-   <li>Empty <var>mo</var>'s <a>record queue</a>.
+   <li><p><a for=queue>Empty</a> <var>mo</var>'s <a for=MutationObserver>record queue</a>.
 
-   <li>Remove all <a>transient registered observers</a>
-   whose <b>observer</b> is <var>mo</var>.
+   <li><p><a for=list>For each</a> <var>node</var> of <var>mo</var>'s
+   <a for=MutationObserver>node list</a>, <a for=list>remove</a> all
+   <a>transient registered observers</a> whose <a for="registered observer">observer</a> is
+   <var>mo</var> from <var>node</var>'s <a>registered observer list</a>.
 
-   <li>If <var>queue</var> is non-empty, then <a spec=webidl>invoke</a> <var>mo</var>'s
-   <a for=MutationObserver>callback</a> with « <var>queue</var>, <var>mo</var> », and <var>mo</var>.
-   If this throws an exception, then <a>report the exception</a>.
+   <li><p>If <var>records</var> <a for=queue>is not empty</a>, then <a spec=webidl>invoke</a>
+   <var>mo</var>'s <a for=MutationObserver>callback</a> with « <var>records</var>, <var>mo</var> »,
+   and <var>mo</var>. If this throws an exception, then <a>report the exception</a>.
   </ol>
 
- <li><p>For each <a>slot</a> <var>slot</var> in <var>signalList</var>, in order,
- <a>fire an event</a> named <code>slotchange</code>, with its {{Event/bubbles}} attribute set to
- true, at <var>slot</var>.
+ <li><p><a for=list>For each</a> <var>slot</var> of <var>signalList</var>, <a>fire an event</a>
+ named <code>slotchange</code>, with its {{Event/bubbles}} attribute set to true, at
+ <var>slot</var>.
 </ol>
 
 <hr>
 
-Each <a>node</a> has an associated list of
-<a>registered observers</a>.
-<!-- XXX also mention this in the {{Node}} section non-normatively? -->
+<p>Each <a for=/>node</a> has a <dfn noexport>registered observer list</dfn> (a <a for=/>list</a> of
+zero or more <a>registered observers</a>), which is initially empty.
 
-A <dfn export for=MutationObserver id=registered-observer>registered observer</dfn> consists of an
-<b>observer</b> (a {{MutationObserver}} object) and <b>options</b> (a
-{{MutationObserverInit}} dictionary). A
-<dfn export for=MutationObserver id=transient-registered-observer>transient registered observer</dfn>
-is a specific type of <a>registered observer</a> that has a <b>source</b> which is a
-<a>registered observer</a>.
+<p>A <dfn noexport id=registered-observer>registered observer</dfn> consists of an
+<dfn noexport for="registered observer">observer</dfn> (a {{MutationObserver}} object) and
+<dfn noexport for="registered observer">options</dfn> (a {{MutationObserverInit}} dictionary).
 
-<p class="note no-backref"><a>Transient registered observers</a> are used to track
-mutations within a given <a>node</a>'s <a>descendants</a> after <a>node</a> has been
-removed so they do not get lost when <code>subtree</code> is set to true on <a>node</a>'s
+<p>A <dfn noexport id=transient-registered-observer>transient registered observer</dfn> is a
+<a>registered observer</a> that also consists of a
+<dfn for="transient registered observer">source</dfn> (a <a>registered observer</a>).
+
+<p class="note no-backref"><a>Transient registered observers</a> are used to track mutations within
+a given <a for=/>node</a>'s <a for=tree>descendants</a> after <a for=/>node</a> has been removed so
+they do not get lost when {{MutationObserverInit/subtree}} is set to true on <a for=/>node</a>'s
 <a for=tree>parent</a>.
 
 
@@ -3186,16 +3240,17 @@ dictionary MutationObserverInit {
 };
 </pre>
 
-A {{MutationObserver}} object can be used to observe mutations
-to the <a>tree</a> of
+<p>A {{MutationObserver}} object can be used to observe mutations to the <a>tree</a> of
 <a for=/>nodes</a>.
 
-Each {{MutationObserver}} object has these associated concepts:
+<p>Each {{MutationObserver}} object has these associated concepts:
+
 <ul>
- <li>A <dfn export for=MutationObserver id=concept-mo-callback>callback</dfn> set on creation.
- <li>A list of <a for=/>nodes</a> on which it is a <a>registered observer</a>'s <b>observer</b> that is initially empty.
- <li>A list of {{MutationRecord}} objects called the
- <dfn export for=MutationObserver id=concept-mo-queue>record queue</dfn> that is initially empty.
+ <li>A <dfn noexport for=MutationObserver id=concept-mo-callback>callback</dfn> set on creation.
+ <li>A <dfn noexport for=MutationObserver>node list</dfn> (a <a for=/>list</a> of
+ <a for=/>nodes</a>), which is initially empty.
+ <li>A <dfn export for=MutationObserver id=concept-mo-queue>record queue</dfn> (a <a for=/>queue</a>
+ of zero or more {{MutationRecord}} objects), which is initially empty.
 </ul>
 
 <dl class=domintro>
@@ -3273,10 +3328,17 @@ Each {{MutationObserver}} object has these associated concepts:
 
 <p>The
 <dfn constructor for=MutationObserver><code>MutationObserver(<var>callback</var>)</code></dfn>
-constructor, when invoked, must create a new {{MutationObserver}} object with its
-<a for=MutationObserver>callback</a> set to <var>callback</var>, append it to the
-<a>unit of related similar-origin browsing contexts</a>' list of {{MutationObserver}} objects, and
-then return it.
+constructor, when invoked, must run these steps:
+
+<ol>
+ <li><p>Let <var>mo</var> be a new {{MutationObserver}} object whose
+ <a for=MutationObserver>callback</a> is <var>callback</var>.
+
+ <li><p><a for=list>Append</a> <var>mo</var> to
+ <a>unit of related similar-origin browsing contexts</a>' <a>mutation observer list</a>.
+
+ <li><p>Return <var>mo</var>.
+</ol>
 
 <p>The
 <dfn method for=MutationObserver><code>observe(<var>target</var>, <var>options</var>)</code></dfn>
@@ -3309,53 +3371,78 @@ method, when invoked, must run these steps:
  <code>TypeError</code>.
 
  <li>
-  <p>For each <a>registered observer</a> <var>registered</var> in <var>target</var>'s list of
-  <a>registered observers</a> whose <b>observer</b> is the <a>context object</a>:
+  <p><a for=list>For each</a> <var>registered</var> of <var>target</var>'s
+  <a>registered observer list</a>, if <var>registered</var>'s
+  <a for="registered observer">observer</a> is the <a>context object</a>:
 
   <ol>
-   <li><p>Remove all <a>transient registered observers</a> whose <b>source</b> is
-   <var>registered</var>.
+   <li><p><a for=list>For each</a> <var>node</var> of the <a>context object</a>'s
+   <a for=MutationObserver>node list</a>, <a for=list>remove</a> all
+   <a>transient registered observers</a> whose <a for="transient registered observer">source</a> is
+   <var>registered</var> from <var>node</var>'s <a>registered observer list</a>.
 
-   <li><p>Replace <var>registered</var>'s <b>options</b> with <var>options</var>.
+   <li><p>Set <var>registered</var>'s <a for="registered observer">options</a> to
+   <var>options</var>.
   </ol>
 
- <li><p>Otherwise, add a new <a>registered observer</a> to <var>target</var>'s list of
- <a>registered observers</a> with the <a>context object</a> as the <b>observer</b> and
- <var>options</var> as the <b>options</b>, and add <var>target</var> to <a>context object</a>'s list
- of <a for=/>nodes</a> on which it is registered.
+ <li>
+  <p>Otherwise:
+
+  <ol>
+   <li><p><a for=list>Append</a> a new <a>registered observer</a> whose
+   <a for="registered observer">observer</a> is the <a>context object</a> and
+   <a for="registered observer">options</a> is <var>options</var> to <var>target</var>'s
+   <a>registered observer list</a>.
+
+   <li><p><a for=list>Append</a> <var>target</var> to the <a>context object</a>'s
+   <a for=MutationObserver>node list</a>.
+  </ol>
 </ol>
 
 <p>The <dfn method for=MutationObserver><code>disconnect()</code></dfn> method, when invoked, must
-for each <a>node</a> <var>node</var> in <a>context object</a>'s list of <a for=/>nodes</a>, remove any
-<a>registered observer</a> on <var>node</var> for which <a>context object</a> is the
-<b>observer</b>, and also empty <a>context object</a>'s <a>record queue</a>.
+run these steps:
+
+<ol>
+ <li><p><a for=list>For each</a> <var>node</var> of the <a>context object</a>'s
+ <a for=MutationObserver>node list</a>, <a for=list>remove</a> any <a>registered observer</a> from
+ <var>node</var>'s <a>registered observer list</a> for which the <a>context object</a> is the
+ <a for="registered observer">observer</a>.
+
+ <li><p><a for=queue>Empty</a> the <a>context object</a>'s <a for=MutationObserver>record queue</a>.
+</ol>
 
 <p>The <dfn method for=MutationObserver><code>takeRecords()</code></dfn> method, when invoked, must
-return a copy of the <a>record queue</a> and then empty the <a>record queue</a>.
+run these steps:
+
+<ol>
+ <li><p>Let <var>records</var> be a <a for=queue>clone</a> of the <a>context object</a>'s
+ <a for=MutationObserver>record queue</a>.
+
+ <li><p><a for=queue>Empty</a> the <a>context object</a>'s <a for=MutationObserver>record queue</a>.
+
+ <li><p>Return <var>records</var>.
+</ol>
 
 
 <h4 id=queueing-a-mutation-record>Queuing a mutation record</h4>
 
-To <dfn export>queue a mutation record</dfn> of <var>type</var> for
-<var>target</var> with one or more of (depends on
-<var>type</var>) name <var>name</var>, namespace
-<var>namespace</var>, oldValue <var>oldValue</var>, addedNodes
-<var>addedNodes</var>, removedNodes <var>removedNodes</var>,
-previousSibling <var>previousSibling</var>, and nextSibling
-<var>nextSibling</var>, run these steps:
+<p>To <dfn noexport>queue a mutation record</dfn> of <var>type</var> for <var>target</var> with
+<var>name</var>, <var>namespace</var>, <var>oldValue</var>, <var>addedNodes</var>,
+<var>removedNodes</var>, <var>previousSibling</var>, and <var>nextSibling</var>, run these steps:
 
 <ol>
- <li>Let <var>interested observers</var> be an initially empty set
- of {{MutationObserver}} objects optionally paired with a string.
+ <li><p>Let <var>interestedObservers</var> be an empty <a for=/>map</a>.
 
- <li>Let <var>nodes</var> be the <a for=tree>inclusive ancestors</a> of <var>target</var>.
+ <li><p>Let <var>nodes</var> be the <a for=tree>inclusive ancestors</a> of <var>target</var>.
 
  <li>
-  <p>For each <var>node</var> in <var>nodes</var>, and then for each <var>registered observer</var>
-  (with <var>registered observer</var>'s <b>options</b> as <var>options</var>) in <var>node</var>'s
-  list of <a>registered observers</a>:
+  <p>For each <var>node</var> in <var>nodes</var>, and then <a for=list>for each</a>
+  <var>registered</var> of <var>node</var>'s <a>registered observer list</a>:
 
   <ol>
+   <li><p>Let <var>options</var> be <var>registered</var>'s
+   <a for="registered observer">options</a>.
+
    <li>
     <p>If none of the following are true
 
@@ -3383,62 +3470,50 @@ previousSibling <var>previousSibling</var>, and nextSibling
     <p>then:
 
     <ol>
-     <li><p>If <var>registered observer</var>'s <b>observer</b> is not in
-     <var>interested observers</var>, append <var>registered observer</var>'s <b>observer</b> to
-     <var>interested observers</var>.
+     <li><p>Let <var>mo</var> be <var>registered</var>'s <a for="registered observer">observer</a>.
+
+     <li><p>If <var>interestedObservers</var>[<var>mo</var>] does not <a for=map>exist</a>, then
+     <a for=map>set</a> <var>interestedObservers</var>[<var>mo</var>] to null.
 
      <li><p>If either <var>type</var> is "<code>attributes</code>" and <var>options</var>'s
      {{MutationObserverInit/attributeOldValue}} is true, or <var>type</var> is
      "<code>characterData</code>" and <var>options</var>'s
-     {{MutationObserverInit/characterDataOldValue}} is true, set the paired string of
-     <var>registered observer</var>'s <b>observer</b> in <var>interested observers</var> to
-     <var>oldValue</var>.
+     {{MutationObserverInit/characterDataOldValue}} is true, then <a for=map>set</a>
+     <var>interestedObservers</var>[<var>mo</var>] to <var>oldValue</var>.
     </ol>
   </ol>
 
  <li>
-  <p>For each <var>observer</var> in <var>interested observers</var>:
+  <p><a for=map>For each</a> <var>observer</var> → <var>mappedOldValue</var> of
+  <var>interestedObservers</var>:
 
   <ol>
-   <li>Let <var>record</var> be a new {{MutationRecord}}
-   object with its {{MutationRecord/type}} set to
-   <var>type</var> and
-   {{MutationRecord/target}} set to
-   <var>target</var>.
+   <li><p>Let <var>record</var> be a new {{MutationRecord}} object with its {{MutationRecord/type}}
+   set to <var>type</var>, {{MutationRecord/target}} set to <var>target</var>,
+   {{MutationRecord/attributeName}} set to <var>name</var>, {{MutationRecord/attributeNamespace}}
+   set to <var>namespace</var>, {{MutationRecord/oldValue}} set to <var>mappedOldValue</var>,
+   {{MutationRecord/addedNodes}} set to <var>addedNodes</var>,
+   {{MutationRecord/removedNodes}} set to <var>removedNodes</var>,
+   {{MutationRecord/previousSibling}} set to <var>previousSibling</var>, and
+   {{MutationRecord/nextSibling}} set to <var>nextSibling</var>.
 
-   <li>If <var>name</var> and <var>namespace</var> are given,
-   set <var>record</var>'s
-   {{MutationRecord/attributeName}} to
-   <var>name</var>, and <var>record</var>'s
-   {{MutationRecord/attributeNamespace}}
-   to <var>namespace</var>.
-
-   <li>If <var>addedNodes</var> is given, set <var>record</var>'s
-   {{MutationRecord/addedNodes}} to
-   <var>addedNodes</var>.
-
-   <li>If <var>removedNodes</var> is given, set <var>record</var>'s
-   {{MutationRecord/removedNodes}} to
-   <var>removedNodes</var>,
-
-   <li>If <var>previousSibling</var> is given, set <var>record</var>'s
-   {{MutationRecord/previousSibling}} to
-   <var>previousSibling</var>.
-
-   <li>If <var>nextSibling</var> is given, set <var>record</var>'s
-   {{MutationRecord/nextSibling}} to
-   <var>nextSibling</var>.
-
-   <li>If <var>observer</var> has a paired string,
-   set <var>record</var>'s {{MutationRecord/oldValue}}
-   to <var>observer</var>'s paired string.
-
-   <li>Append <var>record</var> to <var>observer</var>'s
-   <a>record queue</a>.
+   <li><p><a for=queue>Enqueue</a> <var>record</var> to <var>observer</var>'s
+   <a for=MutationObserver>record queue</a>.
   </ol>
 
- <li><a>Queue a mutation observer compound microtask</a>.
+ <li><p><a>Queue a mutation observer compound microtask</a>.
 </ol>
+
+<p>To <dfn noexport>queue a tree mutation record</dfn> for <var>target</var> with
+<var>addedNodes</var>, <var>removedNodes</var>, <var>previousSibling</var>, and
+<var>nextSibling</var>, <a>queue a mutation record</a> of "<code>childList</code>" for
+<var>target</var> with null, null, null, <var>addedNodes</var>, <var>removedNodes</var>,
+<var>previousSibling</var>, and <var>nextSibling</var>.
+
+<p>To <dfn noexport>queue an attribute mutation record</dfn> for <var>target</var> with
+<var>name</var>, <var>namespace</var>, and <var>oldValue</var>, <a>queue a mutation record</a> of
+"<code>attributes</code>" for <var>target</var> with <var>name</var>, <var>namespace</var>,
+<var>oldValue</var>, « », « », null, and null.
 
 
 <h4 id=interface-mutationrecord>Interface {{MutationRecord}}</h4>
@@ -3510,33 +3585,24 @@ interface MutationRecord {
  "<code>childList</code>", it is null.
 </dl>
 
-The <dfn attribute for=MutationRecord>type</dfn> and
-<dfn attribute for=MutationRecord>target</dfn>
-attributes must return the values they were initialized to.
-
-The <dfn attribute for="MutationRecord">addedNodes</dfn> and
-<dfn attribute for="MutationRecord">removedNodes</dfn>
-attributes must return the values they were initialized to. Unless stated
-otherwise, when a {{MutationRecord}} object is created, they must
-both be initialized to an empty {{NodeList}}.
-
-The
+<p>The <dfn attribute for=MutationRecord>type</dfn>, <dfn attribute for=MutationRecord>target</dfn>,
+<dfn attribute for="MutationRecord">addedNodes</dfn>,
+<dfn attribute for="MutationRecord">removedNodes</dfn>,
 <dfn attribute for="MutationRecord">previousSibling</dfn>,
 <dfn attribute for="MutationRecord">nextSibling</dfn>,
 <dfn attribute for="MutationRecord">attributeName</dfn>,
 <dfn attribute for="MutationRecord">attributeNamespace</dfn>, and
-<dfn attribute for="MutationRecord">oldValue</dfn>
-attributes must return the values they were initialized to. Unless stated
-otherwise, when a {{MutationRecord}} object is created, they must
-be initialized to null.
+<dfn attribute for="MutationRecord">oldValue</dfn> attributes must return the values they were
+initialized to.
+
 
 <h4 id=garbage-collection>Garbage collection</h4>
 
-<p><a for=/>Nodes</a> have a strong reference to <a>registered observers</a> in their list of
-<a>registered observers</a>.
+<p><a for=/>Nodes</a> have a strong reference to <a>registered observers</a> in their
+<a>registered observer list</a>.
 
-<p><a>Registered observers</a> in a <a for=/>node</a>'s list of <a>registered observers</a> have a
-weak reference to the <a for=/>node</a>.
+<p><a>Registered observers</a> in a <a for=/>node</a>'s <a>registered observer list</a> have a weak
+reference to the <a for=/>node</a>.
 
 
 <h3 id=interface-node>Interface {{Node}}</h3>
@@ -3609,9 +3675,9 @@ dictionary GetRootNodeOptions {
 is used by all <a for=/>nodes</a> ({{Document}}, {{DocumentType}}, {{DocumentFragment}}, {{Element}},
 {{Text}}, {{ProcessingInstruction}}, and {{Comment}}).
 
-Each <a>node</a> has an associated
-<dfn export for=Node id=concept-node-document>node document</dfn>, set upon creation,
-that is a <a>document</a>.
+<p>Each <a>node</a> has an associated
+<dfn export for=Node id=concept-node-document>node document</dfn>, set upon creation, that is a
+<a>document</a>.
 
 <p class="note no-backref">A <a>node</a>'s <a for=Node>node document</a> can be changed by the
 <a>adopt</a> algorithm.
@@ -3619,6 +3685,8 @@ that is a <a>document</a>.
 <p>A <a>node</a>'s <a>get the parent</a> algorithm, given an <var>event</var>, returns the
 <a>node</a>'s <a>assigned slot</a>, if <a>node</a> is <a>assigned</a>, and <a>node</a>'s
 <a for=tree>parent</a> otherwise.
+
+<p class="note no-backref">Each <a for=/>node</a> also has a <a>registered observer list</a>.
 
 <hr>
 
@@ -5307,7 +5375,6 @@ method, when invoked, must run these steps:
 </ol>
 
 
-
 <h4 id=interface-domimplementation>Interface {{DOMImplementation}}</h4>
 
 User agents must create a {{DOMImplementation}} object whenever
@@ -5621,12 +5688,23 @@ is an object or one of its <a>shadow-including ancestors</a>.
 <var>B</var>, repeat these steps until they return an object:</p>
 
 <ol>
- <li><p>If <var>A</var>'s <a for=tree>root</a> is not a <a for=/>shadow root</a>, or <var>A</var>'s
- <a for=tree>root</a> is a <a>shadow-including inclusive ancestor</a> of <var>B</var>, then return
- <var>A</var>.
+ <li>
+  <p>If one of the following is true
+
+  <ul class=brief>
+   <li><var>A</var> is not a <a>node</a>
+   <li><var>A</var>'s <a for=tree>root</a> is not a <a for=/>shadow root</a>
+   <li><var>B</var> is a <a>node</a> and <var>A</var>'s <a for=tree>root</a> is a
+   <a>shadow-including inclusive ancestor</a> of <var>B</var>
+  </ul>
+
+  <p>then return <var>A</var>.
 
  <li><p>Set <var>A</var> to <var>A</var>'s <a for=tree>root</a>'s <a for=DocumentFragment>host</a>.
 </ol>
+
+<p class=note>The <a>retargeting</a> algorithm is used by <a lt=dispatch>event dispatch</a> as well
+as other specifications, such as <cite>Fullscreen</cite>. [[FULLSCREEN]]
 
 
 <h3 id=interface-element>Interface {{Element}}</h3>
@@ -5952,13 +6030,9 @@ from an <a for="/">element</a> <var>element</var>
 to <var>value</var>, run these steps:
 
 <ol>
- <li><a>Queue a mutation record</a> of "<code>attributes</code>"
- for <var>element</var> with name <var>attribute</var>'s
- <a for=Attr>local name</a>, namespace
- <var>attribute</var>'s
- <a for=Attr>namespace</a>, and oldValue
- <var>attribute</var>'s
- <a for=Attr>value</a>.
+ <li><p><a>Queue an attribute mutation record</a> for <var>element</var> with <var>attribute</var>'s
+ <a for=Attr>local name</a>, <var>attribute</var>'s <a for=Attr>namespace</a>, and
+ <var>attribute</var>'s <a for=Attr>value</a>.
 
  <li>If <var>element</var> is <a for=Element>custom</a>, then
  <a>enqueue a custom element callback reaction</a> with <var>element</var>, callback name
@@ -5980,12 +6054,8 @@ an <a for="/">element</a> <var>element</var>,
 run these steps:
 
 <ol>
- <li><a>Queue a mutation record</a> of "<code>attributes</code>"
- for <var>element</var> with name <var>attribute</var>'s
- <a for=Attr>local name</a>, namespace
- <var>attribute</var>'s
- <a for=Attr>namespace</a>, and oldValue
- null.
+ <li><p><a>Queue an attribute mutation record</a> for <var>element</var> with <var>attribute</var>'s
+ <a for=Attr>local name</a>, <var>attribute</var>'s <a for=Attr>namespace</a>, and null.
 
  <li>If <var>element</var> is <a for=Element>custom</a>, then
  <a>enqueue a custom element callback reaction</a> with <var>element</var>, callback name
@@ -6010,13 +6080,9 @@ from an <a for="/">element</a> <var>element</var>,
 run these steps:
 
 <ol>
- <li><a>Queue a mutation record</a> of "<code>attributes</code>"
- for <var>element</var> with name <var>attribute</var>'s
- <a for=Attr>local name</a>, namespace
- <var>attribute</var>'s
- <a for=Attr>namespace</a>, and oldValue
- <var>attribute</var>'s
- <a for=Attr>value</a>.
+ <li><p><a>Queue an attribute mutation record</a> for <var>element</var> with <var>attribute</var>'s
+ <a for=Attr>local name</a>, <var>attribute</var>'s <a for=Attr>namespace</a>, and
+ <var>attribute</var>'s <a for=Attr>value</a>.
 
  <li>If <var>element</var> is <a for=Element>custom</a>, then
  <a>enqueue a custom element callback reaction</a> with <var>element</var>, callback name
@@ -6040,10 +6106,9 @@ To <dfn export id=concept-element-attributes-replace lt="replace an attribute">r
 in an <a for="/">element</a> <var>element</var>, run these steps:
 
 <ol>
- <li><p><a>Queue a mutation record</a> of "<code>attributes</code>" for <var>element</var>
- with name <var>oldAttr</var>'s <a for=Attr>local name</a>,
- namespace <var>oldAttr</var>'s <a for=Attr>namespace</a>,
- and oldValue <var>oldAttr</var>'s <a for=Attr>value</a>.
+ <li><p><a>Queue an attribute mutation record</a> for <var>element</var> with <var>oldAttr</var>'s
+ <a for=Attr>local name</a>, <var>oldAttr</var>'s <a for=Attr>namespace</a>, and
+ <var>oldAttr</var>'s <a for=Attr>value</a>.
 
  <li>If <var>element</var> is <a for=Element>custom</a>, then
  <a>enqueue a custom element callback reaction</a> with <var>element</var>, callback name
@@ -6254,6 +6319,24 @@ the <a>context object</a>'s <a for=Element>namespace</a>.
 
 <hr>
 
+<dl class=domintro>
+ <dt><code><var>element</var> . <a attribute for=Element>id</a> [ = <var>value</var> ]</code>
+ <dd><p>Returns the value of <var>element</var>'s <code>id</code> content attribute. Can be set to
+ change it.
+
+ <dt><code><var>element</var> . <a attribute for=Element>className</a> [ = <var>value</var> ]</code>
+ <dd><p>Returns the value of <var>element</var>'s <code>class</code> content attribute. Can be set
+ to change it.
+
+ <dt><code><var>element</var> . <a attribute for=Element>classList</a></code>
+ <dd><p>Allows for manipulation of <var>element</var>'s <code>class</code> content attribute as a
+ set of whitespace-separated tokens through a {{DOMTokenList}} object.
+
+ <dt><code><var>element</var> . <a attribute for=Element>slot</a> [ = <var>value</var> ]</code>
+ <dd><p>Returns the value of <var>element</var>'s <code>slot</code> content attribute. Can be set to
+ change it.
+</dl>
+
 <p>IDL attributes that are defined to <dfn export for=Attr id=concept-reflect>reflect</dfn> a
 content <a>attribute</a> of a given <var>name</var>, must have a getter and setter that follow these
 steps:</p>
@@ -6288,6 +6371,49 @@ superglobal attributes as they can appear on any element, regardless of that ele
 namespace.</p>
 
 <hr>
+
+<dl class=domintro>
+ <dt><code><var>element</var> . <a method for=Element lt=hasAttributes()>hasAttributes</a>()</code>
+ <dd><p>Returns true if <var>element</var> has attributes, and false otherwise.
+
+ <dt><code><var>element</var> . <a method for=Element lt=getAttributeNames()>getAttributeNames</a>()</code>
+ <dd><p>Returns the <a for=Attr>qualified names</a> of all <var>element</var>'s <a>attributes</a>.
+ Can contain duplicates.
+
+ <dt><code><var>element</var> . <a method for=Element lt=getAttribute()>getAttribute</a>(<var>qualifiedName</var>)</code>
+ <dd><p>Returns <var>element</var>'s first <a>attribute</a> whose <a for=Attr>qualified name</a> is
+ <var>qualifiedName</var>, and null if there is no such <a>attribute</a> otherwise.
+
+ <dt><code><var>element</var> . <a method for=Element lt=getAttributeNS()>getAttributeNS</a>(<var>namespace</var>, <var>localName</var>)</code>
+ <dd><p>Returns <var>element</var>'s <a>attribute</a> whose <a for=Attr>namespace</a> is
+ <var>namespace</var> and <a for=Attr>local name</a> is <var>localName</var>, and null if there is
+ no such <a>attribute</a> otherwise.
+
+ <dt><code><var>element</var> . <a method for=Element lt=setAttribute()>setAttribute</a>(<var>qualifiedName</var>, <var>value</var>)</code>
+ <dd><p>Sets the <a for=Attr>value</a> of <var>element</var>'s first <a>attribute</a> whose
+ <a for=Attr>qualified name</a> is <var>qualifiedName</var> to <var>value</var>.
+
+ <dt><code><var>element</var> . <a method for=Element lt=setAttributeNS()>setAttributeNS</a>(<var>namespace</var>, <var>localName</var>, <var>value</var>)</code>
+ <dd><p>Sets the <a for=Attr>value</a> of <var>element</var>'s <a>attribute</a> whose
+ <a for=Attr>namespace</a> is <var>namespace</var> and <a for=Attr>local name</a> is
+ <var>localName</var> to <var>value</var>.
+
+ <dt><code><var>element</var> . <a method for=Element lt=removeAttribute()>removeAttribute</a>(<var>qualifiedName</var>)</code>
+ <dd><p>Removes <var>element</var>'s first <a>attribute</a> whose <a for=Attr>qualified name</a> is
+ <var>qualifiedName</var>.
+
+ <dt><code><var>element</var> . <a method for=Element lt=removeAttributeNS()>removeAttributeNS</a>(<var>namespace</var>, <var>localName</var>)</code>
+ <dd><p>Removes <var>element</var>'s <a>attribute</a> whose <a for=Attr>namespace</a> is
+ <var>namespace</var> and <a for=Attr>local name</a> is <var>localName</var>.
+
+ <dt><code><var>element</var> . <a method for=Element lt=hasAttribute()>hasAttribute</a>(<var>qualifiedName</var>)</code>
+ <dd><p>Returns true if <var>element</var> has an <a>attribute</a> whose
+ <a for=Attr>qualified name</a> is <var>qualifiedName</var>, and false otherwise.
+
+ <dt><code><var>element</var> . <a method for=Element lt=hasAttributeNS()>hasAttributeNS</a>(<var>namespace</var>, <var>localName</var>)</code>
+ <dd><p>Returns true if <var>element</var> has an <a>attribute</a> whose <a for=Attr>namespace</a>
+ is <var>namespace</var> and <a for=Attr>local name</a> is <var>localName</var>.
+</dl>
 
 <p>The <dfn method for=Element><code>hasAttributes()</code></dfn> method, when invoked, must return
 false if <a>context object</a>'s <a for=Element>attribute list</a> <a for=list>is empty</a>, and
@@ -6880,9 +7006,8 @@ To <dfn export id=concept-cd-replace>replace data</dfn> of node <var>node</var> 
  <li>If <var>offset</var> plus <var>count</var> is greater than <var>length</var>, then set
  <var>count</var> to <var>length</var> minus <var>offset</var>.
 
- <li><a>Queue a mutation record</a> of "<code>characterData</code>"
- for <var>node</var> with oldValue <var>node</var>'s
- <a for=CharacterData>data</a>.
+ <li><p><a>Queue a mutation record</a> of "<code>characterData</code>" for <var>node</var> with
+ null, null, <var>node</var>'s <a for=CharacterData>data</a>, « », « », null, and null.
 
  <li>Insert <var>data</var> into <var>node</var>'s
  <a for=CharacterData>data</a> after <var>offset</var>
@@ -7135,14 +7260,12 @@ must <a lt="split a Text node">split</a> <a>context object</a> with offset <var>
 <a>contiguous <code>Text</code> nodes</a> of the <a>context object</a>, in <a>tree order</a>.
 
 
-
 <h3 id=interface-cdatasection>Interface {{CDATASection}}</h3>
 
 <pre class=idl>
 [Exposed=Window]
 interface CDATASection : Text {
 };</pre>
-
 
 
 <h3 id=interface-processinginstruction>Interface {{ProcessingInstruction}}</h3>
@@ -7159,7 +7282,6 @@ have an associated <dfn export id=concept-pi-target for=ProcessingInstruction>ta
 
 The <dfn attribute for=ProcessingInstruction>target</dfn>
 attribute must return the <a for=ProcessingInstruction>target</a>.
-
 
 
 <h3 id=interface-comment>Interface {{Comment}}</h3>
@@ -7764,8 +7886,8 @@ method, when invoked, must run these steps:
    </dl>
 
   <li>
-   If the <a for=Range>position</a> of
-   <var>this point</var> relative to <var>other point</var> is
+   <p>If the <a for="boundary point">position</a> of <var>this point</var> relative to
+   <var>other point</var> is
 
    <dl class=switch>
     <dt><a for="boundary point">before</a>
@@ -8070,8 +8192,8 @@ run these steps:
    whose <a for=range>end</a> is
    (<var>first partially contained child</var>, <var>first partially contained child</var>'s <a>length</a>).
 
-   <li>Let <var>subfragment</var> be the result of
-   <a lt="extract a range">extracting</a> <var>subrange</var>.
+   <li><p>Let <var>subfragment</var> be the result of <a for="live range">extracting</a>
+   <var>subrange</var>.
 
    <li><a>Append</a> <var>subfragment</var> to
    <var>clone</var>.
@@ -8125,8 +8247,8 @@ run these steps:
    <a for=range>end</a> is
    (<var>original end node</var>, <var>original end offset</var>).
 
-   <li>Let <var>subfragment</var> be the result of
-   <a lt="extract a range">extracting</a> <var>subrange</var>.
+   <li><p>Let <var>subfragment</var> be the result of <a for="live range">extracting</a>
+   <var>subrange</var>.
 
    <li><a>Append</a> <var>subfragment</var> to
    <var>clone</var>.
@@ -8140,7 +8262,7 @@ run these steps:
 </ol>
 
 <p>The <dfn method for=Range><code>extractContents()</code></dfn> method, when invoked, must return
-the result of <a lt="extract a range">extracting</a> <a>context object</a>.
+the result of <a for="live range">extracting</a> the <a>context object</a>.
 
 <p>To
 <dfn export id=concept-range-clone for="live range" lt="clone the contents|cloning the contents">clone the contents</dfn>
@@ -8493,7 +8615,7 @@ check first thing, which matches everyone but Firefox.
   <p class=note>For historical reasons {{Text}}, {{ProcessingInstruction}}, and {{Comment}}
   <a for=/>nodes</a> are not checked here and end up throwing later on as a side effect.
 
- <li><p>Let <var>fragment</var> be the result of <a lt="extract a range">extracting</a>
+ <li><p>Let <var>fragment</var> be the result of <a lt="live range">extracting</a> the
  <a>context object</a>.
  <!-- If the range contains a DocumentType, Firefox 4.0 and Opera 11.00 don't
  immediately throw here. Firefox removes the non-DocumentType nodes and
@@ -8761,7 +8883,8 @@ associated <a for=traversal>active flag</a>,
 
 <ol>
  <li><p>If <var>toBeRemovedNode</var> is not an <a for=tree>inclusive ancestor</a> of the
- <var>nodeIterator</var>'s {{NodeIterator/referenceNode}} attribute value, then return.
+ <var>nodeIterator</var>'s {{NodeIterator/referenceNode}} attribute value, or
+ <var>toBeRemovedNode</var> is <var>nodeIterator</var>'s <a for=traversal>root</a>, then return.
 
  <li>
   <p>If <var>nodeIterator</var>'s {{NodeIterator/pointerBeforeReferenceNode}} attribute value is
@@ -8882,261 +9005,212 @@ interface TreeWalker {
 };</pre>
 
 
-<p class="note no-backref">{{TreeWalker}} objects can be created using the
-{{createTreeWalker()}} method.
+<p class="note no-backref">{{TreeWalker}} objects can be created using the {{createTreeWalker()}}
+method.
 
-<p class="note no-backref">As mentioned earlier {{TreeWalker}} objects have an
-associated <a for=traversal>root</a>
-<a>node</a>,
-<a for=traversal>whatToShow</a> bitmask, and
-<a for=traversal>filter</a> callback.
+<p class="note no-backref">As mentioned earlier {{TreeWalker}} objects have an associated
+<a for=traversal>root</a> (a <a for=/>node</a>), <a for=traversal>whatToShow</a> (a bitmask), and
+<a for=traversal>filter</a> (a callback).
 
-<p>The <dfn attribute for=TreeWalker><code>root</code></dfn> attribute's getter must return
-<a for=traversal>root</a>.
+<p>The <dfn attribute for=TreeWalker><code>root</code></dfn> attribute's getter must return the
+<a>context object</a>'s <a for=traversal>root</a>.
 
 <p>The <dfn attribute for=TreeWalker><code>whatToShow</code></dfn> attribute's getter must return
-<a for=traversal>whatToShow</a>.
+the <a>context object</a>'s <a for=traversal>whatToShow</a>.
 
-<p>The <dfn attribute for=TreeWalker><code>filter</code></dfn> attribute's getter must return
-<a for=traversal>filter</a>.
+<p>The <dfn attribute for=TreeWalker><code>filter</code></dfn> attribute's getter must return the
+<a>context object</a>'s <a for=traversal>filter</a>.
 
 <p>The <dfn attribute for=TreeWalker><code>currentNode</code></dfn> attribute must return what it
 was initialized to.
 
 <p>Setting the {{TreeWalker/currentNode}} attribute must set it to the new value.
 
+<hr>
 
 <p>The <dfn method for=TreeWalker><code>parentNode()</code></dfn> method, when invoked, must run
 these steps:
 
 <ol>
- <li>Let <var>node</var> be the value of the
- {{TreeWalker/currentNode}} attribute.
+ <li><p>Let <var>node</var> be the value of the <a>context object</a>'s {{TreeWalker/currentNode}}
+ attribute.
 
  <li>
-  <p>While <var>node</var> is not null and is not <a for=traversal>root</a>:
+  <p>While <var>node</var> is non-null and is not the <a>context object</a>'s
+  <a for=traversal>root</a>:
 
   <ol>
-   <li>Let <var>node</var> be <var>node</var>'s
-   <a for=tree>parent</a>.
+   <li><p>Set <var>node</var> to <var>node</var>'s <a for=tree>parent</a>.
 
-   <li>If <var>node</var> is not null and
-   <a for=Node>filtering</a> <var>node</var>
-   returns {{NodeFilter/FILTER_ACCEPT}},
-   then set the {{TreeWalker/currentNode}}
-   attribute to <var>node</var>, return <var>node</var>.
+   <li><p>If <var>node</var> is non-null and <a for=Node>filtering</a> <var>node</var> returns
+   {{NodeFilter/FILTER_ACCEPT}}, then set the <a>context object</a>'s {{TreeWalker/currentNode}}
+   attribute to <var>node</var> and return <var>node</var>.
   </ol>
 
- <li>Return null.
+ <li><p>Return null.
 </ol>
 
-To <dfn export for=TreeWalker id=concept-traverse-children>traverse children</dfn> of type
-<var>type</var>, run these steps:
+<p>To <dfn noexport for=TreeWalker id=concept-traverse-children>traverse children</dfn>, given a
+<var>walker</var> and <var>type</var>, run these steps:
 
 <ol>
- <li>Let <var>node</var> be the value
- of the {{TreeWalker/currentNode}} attribute.
+ <li><p>Let <var>node</var> be the value of <var>walker</var>'s {{TreeWalker/currentNode}}
+ attribute.
 
- <li>Set <var>node</var> to <var>node</var>'s
- <a for=tree>first child</a> if
- <var>type</var> is first, and <var>node</var>'s
- <a>last child</a> if
- <var>type</var> is last.
-
- <li>If <var>node</var> is null, return null.
+ <li><p>Set <var>node</var> to <var>node</var>'s <a for=tree>first child</a> if <var>type</var> is
+ first, and <var>node</var>'s <a for=tree>last child</a> if <var>type</var> is last.
 
  <li>
-  <p><dfn export id=concept-traverse-children-main lt="Traverse children main step">Main</dfn>:
-  while true:
+  <p>While <var>node</var> is non-null:
 
   <ol>
-   <li><a for=Node>Filter</a>
-   <var>node</var> and let <var>result</var> be the return
-   value.
+   <li><p>Let <var>result</var> be the result of <a for=Node>filtering</a> <var>node</var>.
 
-   <li>If <var>result</var> is
-   {{NodeFilter/FILTER_ACCEPT}}, then set
-   the {{TreeWalker/currentNode}}
-   attribute to <var>node</var> and return <var>node</var>.
+   <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then set <var>walker</var>'s
+   {{TreeWalker/currentNode}} attribute to <var>node</var> and return <var>node</var>.
 
    <li>
     <p>If <var>result</var> is {{NodeFilter/FILTER_SKIP}}, then:
 
     <ol>
-     <li>Let <var>child</var> be <var>node</var>'s
-     <a for=tree>first child</a> if
-     <var>type</var> is first, and <var>node</var>'s
-     <a>last child</a> if
-     <var>type</var> is last.
+     <li><p>Let <var>child</var> be <var>node</var>'s <a for=tree>first child</a> if <var>type</var>
+     is first, and <var>node</var>'s <a for=tree>last child</a> if <var>type</var> is last.
 
-     <li>If <var>child</var> is not null, set <var>node</var>
-     to <var>child</var> and goto
-     <a lt="Traverse children main step">Main</a>.
+     <li><p>If <var>child</var> is non-null, then set <var>node</var> to <var>child</var> and
+     <a for=iteration>continue</a>.
     </ol>
 
    <li>
-    <p>While true:
+    <p>While <var>node</var> is non-null:
 
     <ol>
-     <li>Let <var>sibling</var> be <var>node</var>'s
-     <a for=tree>next sibling</a> if
-     <var>type</var> is first, and <var>node</var>'s
-     <a>previous sibling</a> if
+     <li><p>Let <var>sibling</var> be <var>node</var>'s <a for=tree>next sibling</a> if
+     <var>type</var> is first, and <var>node</var>'s <a for=tree>previous sibling</a> if
      <var>type</var> is last.
 
-     <li>If <var>sibling</var> is not null, set
-     <var>node</var> to <var>sibling</var> and goto
-     <a lt="Traverse children main step">Main</a>.
+     <li><p>If <var>sibling</var> is non-null, then set <var>node</var> to <var>sibling</var> and
+     <a for=iteration>break</a>.
 
-     <li>Let <var>parent</var> be <var>node</var>'s
-     <a for=tree>parent</a>.
+     <li><p>Let <var>parent</var> be <var>node</var>'s <a for=tree>parent</a>.
 
-     <li>If <var>parent</var> is null, <var>parent</var> is
-     <a for=traversal>root</a>, or
-     <var>parent</var> is
-     {{TreeWalker/currentNode}} attribute's
-     value, return null.
+     <li><p>If <var>parent</var> is null, <var>walker</var>'s <a for=traversal>root</a>, or
+     <var>walker</var>'s  {{TreeWalker/currentNode}} attribute's value, then return null.
 
-     <li>Otherwise, set <var>node</var> to <var>parent</var>.
+     <li><p>Set <var>node</var> to <var>parent</var>.
     </ol>
   </ol>
+
+ <li><p>Return null.
 </ol>
 
 <p>The <dfn method for=TreeWalker><code>firstChild()</code></dfn> method, when invoked, must
-<a>traverse children</a> of type first.
+<a>traverse children</a> with the <a>context object</a> and first.
 
 <p>The <dfn method for=TreeWalker><code>lastChild()</code></dfn> method, when invoked, must
-<a>traverse children</a> of type last.
+<a>traverse children</a> with the <a>context object</a> and last.
 
-<p>To <dfn export id=concept-traverse-siblings>traverse siblings</dfn> of type <var>type</var>, run
-these steps:
+<p>To <dfn noexport id=concept-traverse-siblings>traverse siblings</dfn>, given a <var>walker</var>
+and <var>type</var>, run these steps:
 
 <ol>
- <li>Let <var>node</var> be the value of the
- {{TreeWalker/currentNode}} attribute.
+ <li><p>Let <var>node</var> be the value of <var>walker</var>'s {{TreeWalker/currentNode}}
+ attribute.
 
- <li>If <var>node</var> is
- <a for=traversal>root</a>, return null.
+ <li><p>If <var>node</var> is <a for=traversal>root</a>, then return null.
 
  <li>
   <p>While true:
 
   <ol>
-   <li>Let <var>sibling</var> be <var>node</var>'s
-   <a for=tree>next sibling</a> if
-   <var>type</var> is next, and <var>node</var>'s
-   <a>previous sibling</a> if
+   <li><p>Let <var>sibling</var> be <var>node</var>'s <a for=tree>next sibling</a> if
+   <var>type</var> is next, and <var>node</var>'s <a for=tree>previous sibling</a> if
    <var>type</var> is previous.
 
    <li>
-    <p>While <var>sibling</var> is not null:
+    <p>While <var>sibling</var> is non-null:
 
     <ol>
-     <li>Set <var>node</var> to <var>sibling</var>.
+     <li><p>Set <var>node</var> to <var>sibling</var>.
 
-     <li><a for=Node>Filter</a>
-     <var>node</var> and let <var>result</var> be the return
-     value.
+     <li><p>Let <var>result</var> be the result of <a for=Node>filtering</a> <var>node</var>.
 
-     <li>If <var>result</var> is
-     {{NodeFilter/FILTER_ACCEPT}}, then set
-     the {{TreeWalker/currentNode}}
-     attribute to <var>node</var> and return <var>node</var>.
+     <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then set <var>walker</var>'s
+     {{TreeWalker/currentNode}} attribute to <var>node</var> and return <var>node</var>.
 
-     <li>Set <var>sibling</var> to <var>node</var>'s
-     <a for=tree>first child</a> if
-     <var>type</var> is next, and <var>node</var>'s
-     <a>last child</a> if
-     <var>type</var> is previous.
+     <li><p>Set <var>sibling</var> to <var>node</var>'s <a for=tree>first child</a> if
+     <var>type</var> is next, and <var>node</var>'s <a for=tree>last child</a> if <var>type</var> is
+     previous.
 
-     <li>If <var>result</var> is
-     {{NodeFilter/FILTER_REJECT}} or
-     <var>sibling</var> is null, then set <var>sibling</var> to
-     <var>node</var>'s
-     <a for=tree>next sibling</a> if
-     <var>type</var> is next, and <var>node</var>'s
-     <a>previous sibling</a> if
-     <var>type</var> is previous.
+     <li><p>If <var>result</var> is {{NodeFilter/FILTER_REJECT}} or <var>sibling</var> is null, then
+     set <var>sibling</var> to <var>node</var>'s <a for=tree>next sibling</a> if <var>type</var> is
+     next, and <var>node</var>'s <a for=tree>previous sibling</a> if <var>type</var> is previous.
     </ol>
 
-   <li>Set <var>node</var> to its
-   <a for=tree>parent</a>.
+   <li><p>Set <var>node</var> to <var>node</var>'s <a for=tree>parent</a>.
 
-   <li>If <var>node</var> is null or is
-   <a for=traversal>root</a>, return null.
+   <li><p>If <var>node</var> is null or <var>walker</var>'s <a for=traversal>root</a>, then return
+   null.
 
-   <li><a for=Node>Filter</a>
-   <var>node</var> and if the return value is
-   {{NodeFilter/FILTER_ACCEPT}}, then
-   return null.
-   <!-- XXX WTF? -->
+   <li><p>If the return value of <a for=Node>filtering</a> <var>node</var> is
+   {{NodeFilter/FILTER_ACCEPT}}, then return null.
   </ol>
 </ol>
 
 <p>The <dfn method for=TreeWalker><code>nextSibling()</code></dfn> method, when invoked, must
-<a>traverse siblings</a> of type next.
+<a>traverse siblings</a> with the <a>context object</a> and next.
 
 <p>The <dfn method for=TreeWalker><code>previousSibling()</code></dfn> method, when invoked, must
-<a>traverse siblings</a> of type previous.
+<a>traverse siblings</a> with the <a>context object</a> and previous.
 
 <p>The <dfn method for=TreeWalker><code>previousNode()</code></dfn> method, when invoked, must run
 these steps:
 
 <ol>
- <li>Let <var>node</var> be the value of the
- {{TreeWalker/currentNode}} attribute.
+ <li><p>Let <var>node</var> be the value of the <a>context object</a>'s {{TreeWalker/currentNode}}
+ attribute.
 
  <li>
-  <p>While <var>node</var> is not <a for=traversal>root</a>:
+  <p>While <var>node</var> is not the <a>context object</a>'s <a for=traversal>root</a>:
 
   <ol>
-   <li>Let <var>sibling</var> be the
-   <a>previous sibling</a> of
-   <var>node</var>.
+   <li><p>Let <var>sibling</var> be <var>node</var>'s <a for=tree>previous sibling</a>.
 
    <li>
-    <p>While <var>sibling</var> is not null:
+    <p>While <var>sibling</var> is non-null:
 
     <ol>
-     <li>Set <var>node</var> to <var>sibling</var>.
+     <li><p>Set <var>node</var> to <var>sibling</var>.
 
-     <li><a for=Node>Filter</a>
-     <var>node</var> and let <var>result</var> be the return
-     value.
+     <li><p>Let <var>result</var> be the result of <a for=Node>filtering</a> <var>node</var>.
 
-     <li>While <var>result</var> is not
-     {{NodeFilter/FILTER_REJECT}} and
-     <var>node</var> has a
-     <a for=tree>child</a>, set <var>node</var>
-     to its <a>last child</a> and then
-     <a for=Node>filter</a> <var>node</var> and
-     set <var>result</var> to the return value.
+     <li>
+      <p>While <var>result</var> is not {{NodeFilter/FILTER_REJECT}} and <var>node</var> has a
+      <a for=tree>child</a>:
 
-     <li>If <var>result</var> is
-     {{NodeFilter/FILTER_ACCEPT}}, then set
-     the {{TreeWalker/currentNode}}
-     attribute to <var>node</var> and return <var>node</var>.
+      <ol>
+       <li><p>Set <var>node</var> to <var>node</var>'s <a for=tree>last child</a>.
 
-     <li>Set <var>sibling</var> to the
-     <a>previous sibling</a> of
+       <li><p>Set <var>result</var> to the result of <a for=Node>filtering</a> <var>node</var>.
+      </ol>
+
+     <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then set the
+     <a>context object</a>'s {{TreeWalker/currentNode}} attribute to <var>node</var> and return
      <var>node</var>.
+
+     <li><p>Set <var>sibling</var> to <var>node</var>'s <a for=tree>previous sibling</a>.
     </ol>
 
-   <li>If <var>node</var> is
-   <a for=traversal>root</a> or <var>node</var>'s
-   <a for=tree>parent</a> is null, return null.
+   <li><p>If <var>node</var> is the <a>context object</a>'s <a for=traversal>root</a> or
+   <var>node</var>'s <a for=tree>parent</a> is null, then return null.
 
-   <li>Set <var>node</var> to its
-   <a for=tree>parent</a>.
+   <li><p>Set <var>node</var> to <var>node</var>'s <a for=tree>parent</a>.
 
-   <li><a for=Node>Filter</a>
-   <var>node</var> and if the return value is
-   {{NodeFilter/FILTER_ACCEPT}}, then set
-   the {{TreeWalker/currentNode}} attribute
-   to <var>node</var> and return <var>node</var>.
+   <li><p>If the return value of <a for=Node>filtering</a> <var>node</var> is
+   {{NodeFilter/FILTER_ACCEPT}}, then set the <a>context object</a>'s {{TreeWalker/currentNode}}
+   attribute to <var>node</var> and return <var>node</var>.
   </ol>
 
- <li>Return null.
+ <li><p>Return null.
 </ol>
 
 <p>The <dfn method for=TreeWalker><code>nextNode()</code></dfn> method, when invoked, must run these
@@ -9161,21 +9235,34 @@ steps:
      <li><p>Set <var>result</var> to the result of <a for=Node>filtering</a> <var>node</var>.
 
      <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then set the
-     {{TreeWalker/currentNode}} attribute to <var>node</var> and return <var>node</var>.
+     <a>context object</a>'s {{TreeWalker/currentNode}} attribute to <var>node</var> and return
+     <var>node</var>.
     </ol>
 
-   <li><p>If there is a <a>node</a> that is <a>following</a> <var>node</var> and is not
-   <a>following</a> <a for=traversal>root</a>, then set <var>node</var> to the first such
-   <a>node</a>. Otherwise, return null.
-   <!-- Implemented as iterating over parent/nextSibling -->
+   <li><p>Let <var>sibling</var> be null.
+
+   <li><p>Let <var>temporary</var> be <var>node</var>.
+
+   <li>
+    <p>While <var>temporary</var> is non-null:
+
+    <ol>
+     <li><p>If <var>temporary</var> is the <a>context object</a>'s <a for=traversal>root</a>, then
+     return null.
+
+     <li><p>Set <var>sibling</var> to <var>temporary</var>'s <a for=tree>next sibling</a>.
+
+     <li><p>If <var>sibling</var> is non-null, then <a for=iteration>break</a>.
+
+     <li><p>Set <var>temporary</var> to <var>temporary</var>'s <a for=tree>parent</a>.
+    </ol>
 
    <li><p>Set <var>result</var> to the result of <a for=Node>filtering</a> <var>node</var>.
 
-   <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then set the
+   <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then set the <a>context object</a>'s
    {{TreeWalker/currentNode}} attribute to <var>node</var> and return <var>node</var>.
   </ol>
 </ol>
-
 
 
 <h3 id="interface-nodefilter">Interface {{NodeFilter}}</h3>
@@ -9820,6 +9907,7 @@ Tab Atkins,
 Takashi Sakamoto,
 Takayoshi Kochi,
 Theresa O'Connor,
+Theodore Dubois,
 <i>timeless</i>,
 Timo Tijhof,
 Tobie Langel,
