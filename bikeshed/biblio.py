@@ -128,6 +128,7 @@ class SpecBasedBiblioEntry(BiblioEntry):
     '''
 
     def __init__(self, spec, preferredURL=None):
+        super(SpecBasedBiblioEntry, self).__init__()
         if preferredURL is None:
             preferredURL = config.refStatus.snapshot
         self.spec = spec
