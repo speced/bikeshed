@@ -1,0 +1,194 @@
+<pre class='metadata'>
+Title: Fail or succeed: there is no atomic lattice
+Shortname: P0418
+Revision: 1
+Audience: SG1, LWG
+Status: P
+Group: WG21
+URL: http://wg21.link/p0418r1
+!Source: <a href="https://github.com/jfbastien/papers/blob/master/source/P0418r1.bs">github.com/jfbastien/papers/blob/master/source/P0418r1.bs</a>
+Editor: JF Bastien, Google, cxx@jfbastien.com
+Editor: Hans Boehm, Google, hboehm@google.com
+Abstract: Try to resolve [[LWG2445]].
+Date: 2016-08-02
+Markup Shorthands: markdown yes
+Toggle Diffs: yes
+</pre>
+
+Background {#bg}
+==========
+
+[[LWG2445]] was discussed and resolved by SG1 in Urbana.
+
+LWG issue #2445 {#issue}
+---------------
+
+<blockquote>
+
+  The definitions of compare and exchange in [util.smartptr.shared.atomic] ¶32
+  and [atomics.types.operations.req] ¶21 state:
+
+  <blockquote>
+
+    Requires: The failure argument shall not be `memory_order_release` nor
+    `memory_order_acq_rel`. The failure argument shall be no stronger than the
+    success argument.
+
+  </blockquote>
+
+  The term "stronger" isn't defined by the standard.
+
+  It is hinted at by [atomics.types.operations.req] ¶22:
+
+  <blockquote>
+
+    When only one `memory_order` argument is supplied, the value of `success` is
+    `order`, and the value of `failure` is `order` except that a value of
+    `memory_order_acq_rel` shall be replaced by the value `memory_order_acquire`
+    and a value of `memory_order_release` shall be replaced by the value
+    `memory_order_relaxed`.
+
+  </blockquote>
+
+  Should the standard define a partial ordering for memory orders, where consume
+  and acquire are incomparable with release?
+
+</blockquote>
+
+Proposed SG1 resolution from Urbana {#old-res}
+-----------------------------------
+
+Add the following note:
+
+<blockquote><ins>
+
+  [Note: Memory orders have the following relative strengths implied by their
+  definitions:
+
+<pre class="railroad-diagram">
+    T: relaxed
+    Choice:
+        T: release
+        Sequence:
+            T: consume
+            T: acquire
+    T: acq_rel
+    T: seq_cst
+</pre>
+
+—end note]
+
+</ins></blockquote>
+
+Further issue {#moar}
+-------------
+
+Nonetheless:
+
+* The resolution isn't on the LWG tracker.
+* The proposed note was never moved to the draft Standard.
+
+Furthermore, the resolution which SG1 came to in Urbana resolves what "stronger"
+means by specifying a lattice, but isn't not clear on what "The failure argument
+shall be no stronger than the success argument" means given the lattice.
+
+There is no relationship, "stronger" or otherwise, between release and
+consume/acquire. The current wording says "shall be no stronger" which isn't the
+same as "shall not be stronger" in this context. Is that on purpose? At a
+minimum it's not clear and should be clarified.
+
+Should the following be valid:
+
+```
+  compare_exchange_strong(x, y, z, memory_order_release, memory_order_acquire);
+```
+
+Or does the code need to be:
+
+```
+  compare_exchange_strong(x, y, z, memory_order_acq_rel, memory_order_acquire);
+```
+
+Similar questions can be asked for `memory_order_consume` ordering on `failure`.
+
+Is there even a point in restricting `success`/`failure` orderings? On
+architectures with load-linked/store-conditional instructions the load and store
+are distinct instructions which can each have their own memory ordering (with
+appropriate leading/trailing fences if required), whereas architectures with
+compare-and-exchange already have a limited set of instructions to choose
+from. The current limitation (assuming [[LWG2445]] is resolved) only seems to
+restrict compilers on load-linked/store-conditional architectures.
+
+The following code could be valid if the stored data didn't need to be published
+nor ordered, whereas any retry needs to read additional data:
+
+```
+  compare_exchange_strong(x, y, z, memory_order_relaxed, memory_order_acquire);
+```
+
+Even if—for lack of clever instruction—architectures cannot take advantage of
+such code, compiler are able to optimize atomics in all sorts of clever ways as
+discussed in [[N4455]].
+
+Updated proposal {#new-res}
+================
+
+This paper proposes removing the "stronger" restrictions between
+compare-exchange's `success` and `failure` ordering, and doesn't add a lattice
+to order atomic orderings. The only remaining restriction is that
+`memory_order_release` and `memory_order_acq_rel` for `failure` are still
+disallowed: a failed compare-exchange doesn't store, the current model is
+therefore not sensible with these orderings.
+
+There have been discussions about `memory_order_release` loads, e.g. for
+seqlock. Such potential changes are left up to future papers.
+
+Modify [util.smartptr.shared.atomic] ¶32 as follows:
+
+<blockquote>
+
+  Requires: The failure argument shall not be `memory_order_release` nor
+  `memory_order_acq_rel`.<del> The failure argument shall be no stronger than
+  the success argument.</del>
+
+</blockquote>
+
+Modify [atomics.types.operations.req] ¶21 as follows:
+
+<blockquote>
+
+  Requires: The failure argument shall not be `memory_order_release` nor
+  `memory_order_acq_rel`.<del> The failure argument shall be no stronger than
+  the success argument.</del>
+
+</blockquote>
+
+Leave [atomics.types.operations.req] ¶22 as-is:
+
+<blockquote>
+
+  Effects: Atomically, compares the contents of the memory pointed to by
+  `object` or by `this` for equality with that in `expected`, and if `true`,
+  replaces the contents of the memory pointed to by `object` or by `this` with
+  that in `desired`, and if `false`, updates the contents of the memory in
+  `expected` with the contents of the memory pointed to by `object` or by
+  `this`. Further, if the comparison is `true`, memory is affected according to
+  the value of `success`, and if the comparison is `false`, memory is affected
+  according to the value of `failure`.
+
+  When only one `memory_order` argument is supplied, the value of `success` is
+  `order`, and the value of `failure` is `order` except that a value of
+  `memory_order_acq_rel` shall be replaced by the value `memory_order_acquire`
+  and a value of `memory_order_release` shall be replaced by the value
+  `memory_order_relaxed`.
+
+  If the operation returns `true`, these operations are atomic read-modify-write
+  operations (1.10). Otherwise, these operations are atomic load operations.
+
+</blockquote>
+
+Acknowledgement {#ack}
+===============
+
+Thanks to John McCall for pointing out that the proposed resolution was still
+insufficient, and for providing ample feedback.

@@ -1,0 +1,434 @@
+<pre class='metadata'>
+Title: The Curious Case of Padding Bits, Featuring Atomic Compare-and-Exchange
+Shortname: P0528
+Revision: 0
+Audience: SG1, LEWG, LWG, CWG
+Status: P
+Group: WG21
+URL: http://wg21.link/P0528r0
+!Source: <a href="https://github.com/jfbastien/papers/blob/master/source/P0528r0.bs">github.com/jfbastien/papers/blob/master/source/P0528r0.bs</a>
+Editor: JF Bastien, Apple, jfbastien@apple.com
+Editor: Michael Spencer, Sony Playstation, bigcheesegs@gmail.com
+Abstract: I was thinking how nothing lasts—especially a struct's padding bits—and what a shame that is when used with atomic compare-and-exchange.
+Date: 2016-11-12
+Markup Shorthands: markdown yes
+</pre>
+
+This issue has been discussed by the authors at every recent Standards meetings,
+yet a full solution has been elusive despite helpful proposals. We believe that
+this proposal can fix this oft-encountered problem once and for all.
+
+
+Story Time {#story}
+==========
+
+The Curious Case of `struct` {#struct}
+----------------------------
+
+Using the Standard's atomic compare-and-exchange on `struct`s with padding bits
+is fraught with peril: the `desired` value is passed by value to all of the
+methods, which doesn't guarantee than any particular bit pattern is preserved in
+the bits which don't participate in the <em>value representation</em>. the
+padding bits mean that there are multiple <em>object representations</em> for
+the same value representation.
+
+Indeed:
+
+* Object initialization doesn't guarantee any particular value for padding bits.
+* Copying an object can change its padding bits, on <strong>every copy</strong>.
+
+Whereas using compare-and-exchange acts on the <strong>entire</strong> object,
+padding bits included. From 29.6.5 Requirements for operations on atomic types
+[<strong>atomics.types.operations.req</strong>], ¶24:
+
+<blockquote>
+    [ <em>Note:</em> For example, the effect of `atomic_compare_exchange_strong` is
+          <pre>
+          if (memcmp(object, expected, sizeof(*object)) == 0)
+              memcpy(object, &desired, sizeof(*object));
+          else
+              memcpy(expected, object, sizeof(*object));
+          </pre>
+    <em>— end note</em> ]
+</blockquote>
+
+Compare-and-exchange is specified this way because that's how hardware works:
+`cmpxchg` or load-linked / store-conditional instuctions must operate on the
+entire address range to be atomic.
+
+The interactions between non-atomic and atomic objects which contain padding
+bits means that compare-and-exchange is <strong>never</strong> guaranteed to
+succeed, even if the program only ever uses a single value representation.
+
+We've included a [[#sample]] which exhibits this behavior.
+
+A `union` Born in Unusual Circumstances {#union}
+---------------------------------------
+
+Unions can exhibit a similar problem: they can contain padding, but can also
+contain bits which don't participate in their active member's value
+representation.
+
+Points are Floating, Even `NaN`wards {#fp}
+------------------------------------
+
+Astute readers will note that value representations with multiple object
+representations exist for more than simply `struct` and `union`. Even with
+`std::atomic`'s requirement that objects be trivially copyable, it is possible
+for boolean, signed integral and floating-point values to suffer from this
+problem.
+
+The common example where this happens is when signaling `NaN`s are present: some
+platforms canonicalize them to quiet a `NaN`. This is a similar problem to
+padding bits: copying can change the object representation.
+
+You Never Know What's Storing {#store}
+-----------------------------
+
+Another surprising case is when atomic `store` or `exchange` operations are
+implemented using compare-and-exchange. This happens when the target
+architecture doesn't have a suitably-sized `store` or `exchange` instructions,
+but has an appropriate `cmpxchg` or load-linked / store-conditional. To
+guarantee lock-freedom, implementations rely on compare-and-exchange. This is
+transparent to the developer, but can lead to permanent failure to `store` or
+`exchange` if padding bits are present.
+
+The same implementation approach is possible for `load`s, but failure to perform
+an idempotent compare-and-exchange is the same as a `load`, regardless of
+padding bits since it yields the previous value.
+
+Defining the Opportunities We'll Miss {#miss}
+-------------------------------------
+
+This problem is valid for `union`, some scalar representations, and some `store`
+/ `exchange` implementations. The authors nonetheless believe that it is a
+separable from that of padding bits on `struct`s. Indeed, all `struct` with
+padding bits exhibit this problem, whereas only limited scalar values are
+affected. The same applies for `union`: the issue can only surface when the
+widest member isn't the active member (though `union`s do suffer of the padding
+problem). Only some `store` / `exchange` implementations are affected, in which
+case their `struct`s with padding bits are also affected. We don't believe
+`std::atomic<bool>` suffers from this problem.
+
+Put another way: compare-and-exchange of a `struct` with padding bits is
+<strong>always</strong> wrong, whereas the other similar issues are
+<strong>sometimes</strong> wrong.
+
+This leads us to the following conclusions:
+
+  1. For types with padding bits a simple solution exists using the existing
+     Standard: developers should explicitly define padding members if they
+     intend to compare-and-exchange a type. Were an approach such as [[N3986]]
+     adopted, developers could rely on this facility to avoid padding bits more
+     easily.
+
+  2. Other types which don't have unique object representations merit another
+     solution: developers should never compare-and-exchange a value which has
+     multiple object representations. All other values of that type can be
+     compare-and-exchanged without issue.
+
+  3. Implementations which rely on compare-and-exchange for the `store` and
+     `exchange` functions of certain instantiations of `atomic<T>` could apply a
+     similar solution to that proposed in this paper. The authors are interested
+     in writing a separate paper to address the issue.
+
+This paper only addresses the first conclusion.
+
+Making the Greatest Impression {#impression}
+------------------------------
+
+Conclusion 1. above is addressable by developers, but the authors believe that
+this Standard should prevent this dangerous usage of compare-and-exchange. This
+is better handled as a requirement of the methods than as a QoI warning.
+
+The authors therefore propose using concepts' `requires` clause to all the
+compare-and-exchange functions, forbidding their usage on a type which has
+padding bits. All other `std::atomic` operations would remain valid, only
+compare-and-exchange would become a compilation error if used.
+
+The Standard, if [[P0020r3]] is adopted, will specify 4 specializations for
+`std::atomic`:
+
+* `std::atomic<T>`
+* `std::atomic<T*>`
+* `std::atomic<integral>`
+* `std::atomic<floating-point>`
+
+Since [[P0258r2]] the Standard contains the type trait
+`has_unique_object_representations`, as defined in 20.15.4.3 Type properties
+[<strong>meta.unary.prop</strong>] ¶9. This trait initially seems ideally suited
+to our purpose:
+
+<blockquote>
+
+  The predicate condition for a template specialization
+  `has_unique_object_representations<T>::value` shall be satisfied if and only
+  if:
+
+  * T is trivially copyable, and
+
+  * any two objects of type `T` with the same value have the same object
+    representation, where two objects of array or non-union class type are
+    considered to have the same value if their respective sequences of direct
+    subobjects have the same values, and two objects of union type are
+    considered to have the same value if they have the same active member and
+    the corresponding members have the same value.
+
+  The set of scalar types for which this condition holds is
+  implementation-defined. [ <em>Note:</em> If a type has padding bits, the
+  condition does not hold; otherwise, the condition holds true for unsigned
+  integral types. <em>— end note</em> ]
+
+</blockquote>
+
+We could apply it to the `std::atomic<T>` variants of compare-and-exchange only,
+avoiding the pointer, integral and floating-point specializations. This
+unfortunately leaves out what seems like a useful case:
+
+<xmp>
+struct T {
+  float a;
+  float b;
+};
+std::atomic<T> t;
+static_assert(std::has_unique_object_representations_v<T>);
+</xmp>
+
+This type typically has no padding bits, fits the `std::atomic<T>`
+specialization, yet on some platforms does <strong>not</strong> have a unique
+object representation because of its floating-point members. The above type is
+often spelled as `std::atomic<std::complex<float>>`, which is a very useful
+type, even atomically. Naïvely adding `requires
+has_unique_object_representations_v<T>` on the compare-and-exchange members of
+`std::atomic<T>` would—among other things—forbid using compare-and-exchange on
+complex numbers. The authors believe this is unacceptable.
+
+Standards Can Only Be Understood Backward, they Must Be Lived Forward {#life}
+------------------------------------------------------------------
+
+We find ourselves unable to use `has_unique_object_representations`, which was
+intended for future `std::hash` proposals but was hoped to also be usable for
+our present usecase. We thus propose a new type trait, tentatively named
+`has_padding_bits`.
+
+If this sounds familar, that's because it is:
+
+  * [[P0258r2]] introduced `has_unique_object_representations`.
+  * [[p0258r1]] proposed `is_contiguous_layout`.
+  * [[P0029r0]] proposed `is_uniquely_represented`.
+  * [[N3980]] proposed `is_contiguously_hashable`.
+  * [[N3333]] proposed `is_contiguous_layout`.
+  * [[N4130]] discussed the padding bits issue, and wondered whether a
+    `has_padding_bits` trait was sensible. It was reviewed by SG1 in the 2014
+    Redmond meeting. Guidance was sought to also resolve [[LWG2334]] as well as
+    WG14 DR 431 while keeping C compatibility, but no conclusion was reached.
+
+The reader now also understands this paper's Benjamin Button theme.
+
+
+Proposed Wording {#word}
+================
+
+Header `<type_traits>` synopsis [<strong>meta.type.synop</strong>] {#word-meta-type-synop}
+------------------------------------------------------------------
+
+Add a new typetrait:
+
+<pre><ins>template &lt;class T&gt; struct has_padding_bits;</ins></pre>
+
+and:
+
+<pre><ins>template &lt;class T&gt; constexpr bool has_padding_bits_v = has_padding_bits&lt;T&gt;::value;</ins></pre>
+
+Type properties [<strong>meta.unary.prop</strong>] {#word-mta-unary-prop}
+--------------------------------------------------
+
+Add to Table — Type property predicates:
+
+<table>
+  <thead>
+    <tr>
+      <th>Template</th>
+      <th>Condition</th>
+      <th>Preconditions</th>
+    </tr>
+  </thead>
+  <tr>
+    <td>᠁</td>
+    <td>᠁</td>
+    <td>᠁</td>
+  </tr>
+  <tr>
+    <td><pre><ins>template &lt;class T&gt; struct has_padding_bits;</ins></pre></td>
+    <td>
+    <ins>
+      For an array type `T`, the same result as
+      `has_padding_bits<remove_all_extents_t<T>>::value`, otherwise
+      <em>see below</em></td>
+    </ins>
+    <td>
+    <ins>
+      `T` shall be a complete type, (possibly cv-qualified) `void`, or an
+      array of unknown bound.
+    </ins>
+    </td>
+  </tr>
+  <tr>
+    <td>᠁</td>
+    <td>᠁</td>
+    <td>᠁</td>
+  </tr>
+</table>
+
+Add the following paragraph:
+
+<blockquote>
+
+  <ins>The predicate condition for a template specialization
+    `has_padding_bits<T>::value` shall be satisfied if and only if:</ins>
+
+  * <ins>`T` is trivially copyable, and</ins>
+  * <ins>there exists at least one bit in the object representations of an
+    object of type `T` which never participates in the value representation.
+    </ins>
+    
+</blockquote>
+    
+Or alternatively for the 2nd bullet:
+
+<blockquote>
+
+  * <ins>given two objects of type `T`, for each bit in their object
+    representations that bit does not participate in their value
+    representations.</ins>
+
+</blockquote>
+
+Requirements for operations on atomic types [<strong>atomics.types.operations.req</strong>] {#word-atomics-types-operations-req}
+-------------------------------------------------------------------------------------------
+
+Precede each of the following functions:
+
+* `atomic_compare_exchange_weak`
+* `atomic_compare_exchange_strong`
+* `atomic_compare_exchange_weak_explicit`
+* `atomic_compare_exchange_strong_explicit`
+* `A::atomic_compare_exchange_weak`
+* `A::atomic_compare_exchange_strong`
+
+With this concept: <ins>requires `has_padding_bits_v<C>`</ins>.
+
+Update the following paragraph:
+
+<blockquote>
+
+  <em>Requires:</em> The `failure` argument shall not be `memory_order_release`
+  nor `memory_order_acq_rel`. <ins>`has_padding_bits_v<C>` shall be
+  `false`.</ins>
+
+</blockquote>
+
+Update the following note:
+
+<blockquote>
+
+  [ <em>Note:</em>
+
+  The `memcpy` and `memcmp` semantics of the compare-and-exchange operations may
+  result in failed comparisons for values that compare equal with `operator==`
+  if the underlying type has <del>padding bits</del><ins>bits which don't
+  participate in active member's value representation</ins>, trap bits, or
+  alternate representations of the same value. Thus,
+  <del>`compare_exchange_strong`</del><ins>compare-and-exchange operations</ins>
+  should be used with extreme care.<del> On the other hand,
+  `compare_exchange_weak` should converge rapidly.</del>
+
+  <em>— end note</em> ]
+
+</blockquote>
+
+Atomic types [<strong>atomics.types.generic</strong>] {#word-atomics-types-generic}
+-----------------------------------------------------
+
+For all functions modified in [[#word-atomics-types-operations-req]], add the
+same concepts to `atomic<T>`'s `compare_exchange_weak` and
+`compare_exchange_strong` and all its specializations.
+
+Header `<atomic>` synopsis [<strong>atomics.syn</strong>] {#word-atomics.syn}
+---------------------------------------------------------
+
+Add the same concept for all overloads of the following free function:
+
+* `atomic_compare_exchange_weak`
+* `atomic_compare_exchange_strong`
+* `atomic_compare_exchange_weak_explicit`
+* `atomic_compare_exchange_strong_explicit`
+
+
+Sample Program {#sample}
+==============
+
+This program uses compare-and-exchange on a `struct` which has padding bits. It
+may loop infinitely, or not.
+
+<xmp>
+#include <atomic>
+#include <cstring>
+#include <new>
+#include <stdio.h>
+#include <type_traits>
+
+struct Padded {
+  char c = 0xFF;
+  // Padding here.
+  int i = 0xFEEDFACE;
+  Padded() = default;
+};
+typedef std::atomic<Padded> Atomic;
+typedef std::aligned_storage<sizeof(Atomic)>::type Storage;
+
+void peek(const char* what, void *into) {
+  printf("%16s %08x %08x\n", what, *(int*)into, *(1 + (int*)into));
+}
+
+Storage* create() {
+  auto* storage = new Storage();
+  std::memset(storage, 0xBA, sizeof(Storage));
+  asm volatile("":::"memory");
+  peek("storage", storage);
+  return storage;
+}
+
+Atomic* change(Storage* storage) {
+  // As if we used an allocator which reuses memory.
+  auto* atomic = new(storage) Atomic;
+  peek("atomic placed", atomic);
+  std::atomic_init(atomic, Padded()); // Which bits go in?
+  peek("atomic init", atomic);
+  return atomic;
+}
+
+Padded infloop_maybe(Atomic* atomic) {
+  Padded desired;  // Padding unknown.
+  Padded expected; // Could be different.
+  peek("desired before", &desired);
+  peek("expected before", &expected);
+  peek("atomic before", atomic);
+  while (
+    !atomic->compare_exchange_strong(
+      expected,
+      desired // Padding bits added and removed here ˙ ͜ʟ˙
+  ));
+  peek("expected after", &expected);
+  peek("atomic after", atomic);
+  return expected; // Maybe changed here as well.
+}
+
+int main() {
+  auto* storage = create();
+  auto* atomic = change(storage);
+  Padded p = infloop_maybe(atomic);
+  peek("main", &p);
+  return 0;
+}
+</xmp>

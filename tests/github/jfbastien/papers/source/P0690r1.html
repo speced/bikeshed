@@ -1,0 +1,1880 @@
+<!doctype html><html lang="en">
+ <head>
+  <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+  <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
+  <title>p0690R1: Tearable Atomics</title>
+<style data-fill-with="stylesheet">/******************************************************************************
+ *                   Style sheet for the W3C specifications                   *
+ *
+ * Special classes handled by this style sheet include:
+ *
+ * Indices
+ *   - .toc for the Table of Contents (<ol class="toc">)
+ *     + <span class="secno"> for the section numbers
+ *   - #toc for the Table of Contents (<nav id="toc">)
+ *   - ul.index for Indices (<a href="#ref">term</a><span>, in §N.M</span>)
+ *   - table.index for Index Tables (e.g. for properties or elements)
+ *
+ * Structural Markup
+ *   - table.data for general data tables
+ *     -> use 'scope' attribute, <colgroup>, <thead>, and <tbody> for best results !
+ *     -> use <table class='complex data'> for extra-complex tables
+ *     -> use <td class='long'> for paragraph-length cell content
+ *     -> use <td class='pre'> when manual line breaks/indentation would help readability
+ *   - dl.switch for switch statements
+ *   - ol.algorithm for algorithms (helps to visualize nesting)
+ *   - .figure and .caption (HTML4) and figure and figcaption (HTML5)
+ *     -> .sidefigure for right-floated figures
+ *   - ins/del
+ *
+ * Code
+ *   - pre and code
+ *
+ * Special Sections
+ *   - .note       for informative notes             (div, p, span, aside, details)
+ *   - .example    for informative examples          (div, p, pre, span)
+ *   - .issue      for issues                        (div, p, span)
+ *   - .assertion  for assertions                    (div, p, span)
+ *   - .advisement for loud normative statements     (div, p, strong)
+ *   - .annoying-warning for spec obsoletion notices (div, aside, details)
+ *
+ * Definition Boxes
+ *   - pre.def   for WebIDL definitions
+ *   - table.def for tables that define other entities (e.g. CSS properties)
+ *   - dl.def    for definition lists that define other entitles (e.g. HTML elements)
+ *
+ * Numbering
+ *   - .secno for section numbers in .toc and headings (<span class='secno'>3.2</span>)
+ *   - .marker for source-inserted example/figure/issue numbers (<span class='marker'>Issue 4</span>)
+ *   - ::before styled for CSS-generated issue/example/figure numbers:
+ *     -> Documents wishing to use this only need to add
+ *        figcaption::before,
+ *        .caption::before { content: "Figure "  counter(figure) " ";  }
+ *        .example::before { content: "Example " counter(example) " "; }
+ *        .issue::before   { content: "Issue "   counter(issue) " ";   }
+ *
+ * Header Stuff (ignore, just don't conflict with these classes)
+ *   - .head for the header
+ *   - .copyright for the copyright
+ *
+ * Miscellaneous
+ *   - .overlarge for things that should be as wide as possible, even if
+ *     that overflows the body text area. This can be used on an item or
+ *     on its container, depending on the effect desired.
+ *     Note that this styling basically doesn't help at all when printing,
+ *     since A4 paper isn't much wider than the max-width here.
+ *     It's better to design things to fit into a narrower measure if possible.
+ *   - js-added ToC jump links (see fixup.js)
+ *
+ ******************************************************************************/
+
+/******************************************************************************/
+/*                                   Body                                     */
+/******************************************************************************/
+
+	body {
+		counter-reset: example figure issue;
+
+		/* Layout */
+		max-width: 50em;               /* limit line length to 50em for readability   */
+		margin: 0 auto;                /* center text within page                     */
+		padding: 1.6em 1.5em 2em 50px; /* assume 16px font size for downlevel clients */
+		padding: 1.6em 1.5em 2em calc(26px + 1.5em); /* leave space for status flag     */
+
+		/* Typography */
+		line-height: 1.5;
+		font-family: sans-serif;
+		widows: 2;
+		orphans: 2;
+		word-wrap: break-word;
+		overflow-wrap: break-word;
+		hyphens: auto;
+
+		/* Colors */
+		color: black;
+		background: white top left fixed no-repeat;
+		background-size: 25px auto;
+	}
+
+
+/******************************************************************************/
+/*                         Front Matter & Navigation                          */
+/******************************************************************************/
+
+/** Header ********************************************************************/
+
+	div.head { margin-bottom: 1em }
+	div.head hr { border-style: solid; }
+
+	div.head h1 {
+		font-weight: bold;
+		margin: 0 0 .1em;
+		font-size: 220%;
+	}
+
+	div.head h2 { margin-bottom: 1.5em;}
+
+/** W3C Logo ******************************************************************/
+
+	.head .logo {
+		float: right;
+		margin: 0.4rem 0 0.2rem .4rem;
+	}
+
+	.head img[src*="logos/W3C"] {
+		display: block;
+		border: solid #1a5e9a;
+		border-width: .65rem .7rem .6rem;
+		border-radius: .4rem;
+		background: #1a5e9a;
+		color: white;
+		font-weight: bold;
+	}
+
+	.head a:hover > img[src*="logos/W3C"],
+	.head a:focus > img[src*="logos/W3C"] {
+		opacity: .8;
+	}
+
+	.head a:active > img[src*="logos/W3C"] {
+		background: #c00;
+		border-color: #c00;
+	}
+
+	/* see also additional rules in Link Styling section */
+
+/** Copyright *****************************************************************/
+
+	p.copyright,
+	p.copyright small { font-size: small }
+
+/** Back to Top / ToC Toggle **************************************************/
+
+	@media print {
+		#toc-nav {
+			display: none;
+		}
+	}
+	@media not print {
+		#toc-nav {
+			position: fixed;
+			z-index: 2;
+			bottom: 0; left: 0;
+			margin: 0;
+			min-width: 1.33em;
+			border-top-right-radius: 2rem;
+			box-shadow: 0 0 2px;
+			font-size: 1.5em;
+			color: black;
+		}
+		#toc-nav > a {
+			display: block;
+			white-space: nowrap;
+
+			height: 1.33em;
+			padding: .1em 0.3em;
+			margin: 0;
+
+			background: white;
+			box-shadow: 0 0 2px;
+			border: none;
+			border-top-right-radius: 1.33em;
+			background: white;
+		}
+		#toc-nav > #toc-jump {
+			padding-bottom: 2em;
+			margin-bottom: -1.9em;
+		}
+
+		#toc-nav > a:hover,
+		#toc-nav > a:focus {
+			background: #f8f8f8;
+		}
+		#toc-nav > a:not(:hover):not(:focus) {
+			color: #707070;
+		}
+
+		/* statusbar gets in the way on keyboard focus; remove once browsers fix */
+		#toc-nav > a[href="#toc"]:not(:hover):focus:last-child {
+			padding-bottom: 1.5rem;
+		}
+
+		#toc-nav:not(:hover) > a:not(:focus) > span + span {
+			/* Ideally this uses :focus-within on #toc-nav */
+			display: none;
+		}
+		#toc-nav > a > span + span {
+			padding-right: 0.2em;
+		}
+
+		#toc-toggle-inline {
+			vertical-align: 0.05em;
+			font-size: 80%;
+			color: gray;
+			color: hsla(203,20%,40%,.7);
+			border-style: none;
+			background: transparent;
+			position: relative;
+		}
+		#toc-toggle-inline:hover:not(:active),
+		#toc-toggle-inline:focus:not(:active) {
+			text-shadow: 1px 1px silver;
+			top: -1px;
+			left: -1px;
+		}
+
+		#toc-nav :active {
+			color: #C00;
+		}
+	}
+
+/** ToC Sidebar ***************************************************************/
+
+	/* Floating sidebar */
+	@media screen {
+		body.toc-sidebar #toc {
+			position: fixed;
+			top: 0; bottom: 0;
+			left: 0;
+			width: 23.5em;
+			max-width: 80%;
+			max-width: calc(100% - 2em - 26px);
+			overflow: auto;
+			padding: 0 1em;
+			padding-left: 42px;
+			padding-left: calc(1em + 26px);
+			background: inherit;
+			background-color: #f7f8f9;
+			z-index: 1;
+			box-shadow: -.1em 0 .25em rgba(0,0,0,.1) inset;
+		}
+		body.toc-sidebar #toc h2 {
+			margin-top: .8rem;
+			font-variant: small-caps;
+			font-variant: all-small-caps;
+			text-transform: lowercase;
+			font-weight: bold;
+			color: gray;
+			color: hsla(203,20%,40%,.7);
+		}
+		body.toc-sidebar #toc-jump:not(:focus) {
+			width: 0;
+			height: 0;
+			padding: 0;
+			position: absolute;
+			overflow: hidden;
+		}
+	}
+	/* Hide main scroller when only the ToC is visible anyway */
+	@media screen and (max-width: 28em) {
+		body.toc-sidebar {
+			overflow: hidden;
+		}
+	}
+
+	/* Sidebar with its own space */
+	@media screen and (min-width: 78em) {
+		body:not(.toc-inline) #toc {
+			position: fixed;
+			top: 0; bottom: 0;
+			left: 0;
+			width: 23.5em;
+			overflow: auto;
+			padding: 0 1em;
+			padding-left: 42px;
+			padding-left: calc(1em + 26px);
+			background: inherit;
+			background-color: #f7f8f9;
+			z-index: 1;
+			box-shadow: -.1em 0 .25em rgba(0,0,0,.1) inset;
+		}
+		body:not(.toc-inline) #toc h2 {
+			margin-top: .8rem;
+			font-variant: small-caps;
+			font-variant: all-small-caps;
+			text-transform: lowercase;
+			font-weight: bold;
+			color: gray;
+			color: hsla(203,20%,40%,.7);
+		}
+
+		body:not(.toc-inline) {
+			padding-left: 29em;
+		}
+		/* See also Overflow section at the bottom */
+
+		body:not(.toc-inline) #toc-jump:not(:focus) {
+			width: 0;
+			height: 0;
+			padding: 0;
+			position: absolute;
+			overflow: hidden;
+		}
+	}
+	@media screen and (min-width: 90em) {
+		body:not(.toc-inline) {
+			margin: 0 4em;
+		}
+	}
+
+/******************************************************************************/
+/*                                Sectioning                                  */
+/******************************************************************************/
+
+/** Headings ******************************************************************/
+
+	h1, h2, h3, h4, h5, h6, dt {
+		page-break-after: avoid;
+		page-break-inside: avoid;
+		font: 100% sans-serif;   /* Reset all font styling to clear out UA styles */
+		font-family: inherit;    /* Inherit the font family. */
+		line-height: 1.2;        /* Keep wrapped headings compact */
+		hyphens: manual;         /* Hyphenated headings look weird */
+	}
+
+	h2, h3, h4, h5, h6 {
+		margin-top: 3rem;
+	}
+
+	h1, h2, h3 {
+		color: #005A9C;
+		background: transparent;
+	}
+
+	h1 { font-size: 170%; }
+	h2 { font-size: 140%; }
+	h3 { font-size: 120%; }
+	h4 { font-weight: bold; }
+	h5 { font-style: italic; }
+	h6 { font-variant: small-caps; }
+	dt { font-weight: bold; }
+
+/** Subheadings ***************************************************************/
+
+	h1 + h2,
+	#subtitle {
+		/* #subtitle is a subtitle in an H2 under the H1 */
+		margin-top: 0;
+	}
+	h2 + h3,
+	h3 + h4,
+	h4 + h5,
+	h5 + h6 {
+		margin-top: 1.2em; /* = 1 x line-height */
+	}
+
+/** Section divider ***********************************************************/
+
+	:not(.head) > hr {
+		font-size: 1.5em;
+		text-align: center;
+		margin: 1em auto;
+		height: auto;
+		border: transparent solid 0;
+		background: transparent;
+	}
+	:not(.head) > hr::before {
+		content: "\2727\2003\2003\2727\2003\2003\2727";
+	}
+
+/******************************************************************************/
+/*                            Paragraphs and Lists                            */
+/******************************************************************************/
+
+	p {
+		margin: 1em 0;
+	}
+
+	dd > p:first-child,
+	li > p:first-child {
+		margin-top: 0;
+	}
+
+	ul, ol {
+		margin-left: 0;
+		padding-left: 2em;
+	}
+
+	li {
+		margin: 0.25em 0 0.5em;
+		padding: 0;
+	}
+
+	dl dd {
+		margin: 0 0 .5em 2em;
+	}
+
+	.head dd + dd { /* compact for header */
+		margin-top: -.5em;
+	}
+
+	/* Style for algorithms */
+	ol.algorithm ol:not(.algorithm),
+	.algorithm > ol ol:not(.algorithm) {
+	 border-left: 0.5em solid #DEF;
+	}
+
+	/* Put nice boxes around each algorithm. */
+	[data-algorithm]:not(.heading) {
+	  padding: .5em;
+	  border: thin solid #ddd; border-radius: .5em;
+	  margin: .5em calc(-0.5em - 1px);
+	}
+	[data-algorithm]:not(.heading) > :first-child {
+	  margin-top: 0;
+	}
+	[data-algorithm]:not(.heading) > :last-child {
+	  margin-bottom: 0;
+	}
+
+	/* Style for switch/case <dl>s */
+	dl.switch > dd > ol.only,
+	dl.switch > dd > .only > ol {
+	 margin-left: 0;
+	}
+	dl.switch > dd > ol.algorithm,
+	dl.switch > dd > .algorithm > ol {
+	 margin-left: -2em;
+	}
+	dl.switch {
+	 padding-left: 2em;
+	}
+	dl.switch > dt {
+	 text-indent: -1.5em;
+	 margin-top: 1em;
+	}
+	dl.switch > dt + dt {
+	 margin-top: 0;
+	}
+	dl.switch > dt::before {
+	 content: '\21AA';
+	 padding: 0 0.5em 0 0;
+	 display: inline-block;
+	 width: 1em;
+	 text-align: right;
+	 line-height: 0.5em;
+	}
+
+/** Terminology Markup ********************************************************/
+
+
+/******************************************************************************/
+/*                                 Inline Markup                              */
+/******************************************************************************/
+
+/** Terminology Markup ********************************************************/
+	dfn   { /* Defining instance */
+		font-weight: bolder;
+	}
+	a > i { /* Instance of term */
+		font-style: normal;
+	}
+	dt dfn code, code.idl {
+		font-size: medium;
+	}
+	dfn var {
+		font-style: normal;
+	}
+
+/** Change Marking ************************************************************/
+
+	del { color: red;  text-decoration: line-through; }
+	ins { color: #080; text-decoration: underline;    }
+
+/** Miscellaneous improvements to inline formatting ***************************/
+
+	sup {
+		vertical-align: super;
+		font-size: 80%
+	}
+
+/******************************************************************************/
+/*                                    Code                                    */
+/******************************************************************************/
+
+/** General monospace/pre rules ***********************************************/
+
+	pre, code, samp {
+		font-family: Menlo, Consolas, "DejaVu Sans Mono", Monaco, monospace;
+		font-size: .9em;
+		page-break-inside: avoid;
+		hyphens: none;
+		text-transform: none;
+	}
+	pre code,
+	code code {
+		font-size: 100%;
+	}
+
+	pre {
+		margin-top: 1em;
+		margin-bottom: 1em;
+		overflow: auto;
+	}
+
+/** Inline Code fragments *****************************************************/
+
+  /* Do something nice. */
+
+/******************************************************************************/
+/*                                    Links                                   */
+/******************************************************************************/
+
+/** General Hyperlinks ********************************************************/
+
+	/* We hyperlink a lot, so make it less intrusive */
+	a[href] {
+		color: #034575;
+		text-decoration: none;
+		border-bottom: 1px solid #707070;
+		/* Need a bit of extending for it to look okay */
+		padding: 0 1px 0;
+		margin: 0 -1px 0;
+	}
+	a:visited {
+		border-bottom-color: #BBB;
+	}
+
+	/* Use distinguishing colors when user is interacting with the link */
+	a[href]:focus,
+	a[href]:hover {
+		background: #f8f8f8;
+		background: rgba(75%, 75%, 75%, .25);
+		border-bottom-width: 3px;
+		margin-bottom: -2px;
+	}
+	a[href]:active {
+		color: #C00;
+		border-color: #C00;
+	}
+
+	/* Backout above styling for W3C logo */
+	.head .logo,
+	.head .logo a {
+		border: none;
+		text-decoration: none;
+		background: transparent;
+	}
+
+/******************************************************************************/
+/*                                    Images                                  */
+/******************************************************************************/
+
+	img {
+		border-style: none;
+	}
+
+	/* For autogen numbers, add
+	   .caption::before, figcaption::before { content: "Figure " counter(figure) ". "; }
+	*/
+
+	figure, .figure, .sidefigure {
+		page-break-inside: avoid;
+		text-align: center;
+		margin: 2.5em 0;
+	}
+	.figure img,    .sidefigure img,    figure img,
+	.figure object, .sidefigure object, figure object {
+		max-width: 100%;
+		margin: auto;
+	}
+	.figure pre, .sidefigure pre, figure pre {
+		text-align: left;
+		display: table;
+		margin: 1em auto;
+	}
+	.figure table, figure table {
+		margin: auto;
+	}
+	@media screen and (min-width: 20em) {
+		.sidefigure {
+			float: right;
+			width: 50%;
+			margin: 0 0 0.5em 0.5em
+		}
+	}
+	.caption, figcaption, caption {
+		font-style: italic;
+		font-size: 90%;
+	}
+	.caption::before, figcaption::before, figcaption > .marker {
+		font-weight: bold;
+	}
+	.caption, figcaption {
+		counter-increment: figure;
+	}
+
+	/* DL list is indented 2em, but figure inside it is not */
+	dd > .figure, dd > figure { margin-left: -2em }
+
+/******************************************************************************/
+/*                             Colored Boxes                                  */
+/******************************************************************************/
+
+	.issue, .note, .example, .assertion, .advisement, blockquote {
+		padding: .5em;
+		border: .5em;
+		border-left-style: solid;
+		page-break-inside: avoid;
+	}
+	span.issue, span.note {
+		padding: .1em .5em .15em;
+		border-right-style: solid;
+	}
+
+	.issue,
+	.note,
+	.example,
+	.advisement,
+	.assertion,
+	blockquote {
+		margin: 1em auto;
+	}
+	.note  > p:first-child,
+	.issue > p:first-child,
+	blockquote > :first-child {
+		margin-top: 0;
+	}
+	blockquote > :last-child {
+		margin-bottom: 0;
+	}
+
+/** Blockquotes ***************************************************************/
+
+	blockquote {
+		border-color: silver;
+	}
+
+/** Open issue ****************************************************************/
+
+	.issue {
+		border-color: #E05252;
+		background: #FBE9E9;
+		counter-increment: issue;
+		overflow: auto;
+	}
+	.issue::before, .issue > .marker {
+		text-transform: uppercase;
+		color: #AE1E1E;
+		padding-right: 1em;
+		text-transform: uppercase;
+	}
+	/* Add .issue::before { content: "Issue " counter(issue) " "; } for autogen numbers,
+	   or use class="marker" to mark up the issue number in source. */
+
+/** Example *******************************************************************/
+
+	.example {
+		border-color: #E0CB52;
+		background: #FCFAEE;
+		counter-increment: example;
+		overflow: auto;
+		clear: both;
+	}
+	.example::before, .example > .marker {
+		text-transform: uppercase;
+		color: #827017;
+		min-width: 7.5em;
+		display: block;
+	}
+	/* Add .example::before { content: "Example " counter(example) " "; } for autogen numbers,
+	   or use class="marker" to mark up the example number in source. */
+
+/** Non-normative Note ********************************************************/
+
+	.note {
+		border-color: #52E052;
+		background: #E9FBE9;
+		overflow: auto;
+	}
+
+	.note::before, .note > .marker,
+	details.note > summary::before,
+	details.note > summary > .marker {
+		text-transform: uppercase;
+		display: block;
+		color: hsl(120, 70%, 30%);
+	}
+	/* Add .note::before { content: "Note"; } for autogen label,
+	   or use class="marker" to mark up the label in source. */
+
+	details.note > summary {
+		display: block;
+		color: hsl(120, 70%, 30%);
+	}
+	details.note[open] > summary {
+		border-bottom: 1px silver solid;
+	}
+
+/** Assertion Box *************************************************************/
+	/*  for assertions in algorithms */
+
+	.assertion {
+		border-color: #AAA;
+		background: #EEE;
+	}
+
+/** Advisement Box ************************************************************/
+	/*  for attention-grabbing normative statements */
+
+	.advisement {
+		border-color: orange;
+		border-style: none solid;
+		background: #FFEECC;
+	}
+	strong.advisement {
+		display: block;
+		text-align: center;
+	}
+	.advisement > .marker {
+		color: #B35F00;
+	}
+
+/** Spec Obsoletion Notice ****************************************************/
+	/* obnoxious obsoletion notice for older/abandoned specs. */
+
+	details {
+		display: block;
+	}
+	summary {
+		font-weight: bolder;
+	}
+
+	.annoying-warning:not(details),
+	details.annoying-warning:not([open]) > summary,
+	details.annoying-warning[open] {
+		background: #fdd;
+		color: red;
+		font-weight: bold;
+		padding: .75em 1em;
+		border: thick red;
+		border-style: solid;
+		border-radius: 1em;
+	}
+	.annoying-warning :last-child {
+		margin-bottom: 0;
+	}
+
+@media not print {
+	details.annoying-warning[open] {
+		position: fixed;
+		left: 1em;
+		right: 1em;
+		bottom: 1em;
+		z-index: 1000;
+	}
+}
+
+	details.annoying-warning:not([open]) > summary {
+		text-align: center;
+	}
+
+/** Entity Definition Boxes ***************************************************/
+
+	.def {
+		padding: .5em 1em;
+		background: #DEF;
+		margin: 1.2em 0;
+		border-left: 0.5em solid #8CCBF2;
+	}
+
+/******************************************************************************/
+/*                                    Tables                                  */
+/******************************************************************************/
+
+	th, td {
+		text-align: left;
+		text-align: start;
+	}
+
+/** Property/Descriptor Definition Tables *************************************/
+
+	table.def {
+		/* inherits .def box styling, see above */
+		width: 100%;
+		border-spacing: 0;
+	}
+
+	table.def td,
+	table.def th {
+		padding: 0.5em;
+		vertical-align: baseline;
+		border-bottom: 1px solid #bbd7e9;
+	}
+
+	table.def > tbody > tr:last-child th,
+	table.def > tbody > tr:last-child td {
+		border-bottom: 0;
+	}
+
+	table.def th {
+		font-style: italic;
+		font-weight: normal;
+		padding-left: 1em;
+		width: 3em;
+	}
+
+	/* For when values are extra-complex and need formatting for readability */
+	table td.pre {
+		white-space: pre-wrap;
+	}
+
+	/* A footnote at the bottom of a def table */
+	table.def           td.footnote {
+		padding-top: 0.6em;
+	}
+	table.def           td.footnote::before {
+		content: " ";
+		display: block;
+		height: 0.6em;
+		width: 4em;
+		border-top: thin solid;
+	}
+
+/** Data tables (and properly marked-up index tables) *************************/
+	/*
+		 <table class="data"> highlights structural relationships in a table
+		 when correct markup is used (e.g. thead/tbody, th vs. td, scope attribute)
+
+		 Use class="complex data" for particularly complicated tables --
+		 (This will draw more lines: busier, but clearer.)
+
+		 Use class="long" on table cells with paragraph-like contents
+		 (This will adjust text alignment accordingly.)
+		 Alternately use class="longlastcol" on tables, to have the last column assume "long".
+	*/
+
+	table {
+		word-wrap: normal;
+		overflow-wrap: normal;
+		hyphens: manual;
+	}
+
+	table.data,
+	table.index {
+		margin: 1em auto;
+		border-collapse: collapse;
+		border: hidden;
+		width: 100%;
+	}
+	table.data caption,
+	table.index caption {
+		max-width: 50em;
+		margin: 0 auto 1em;
+	}
+
+	table.data td,  table.data th,
+	table.index td, table.index th {
+		padding: 0.5em 1em;
+		border-width: 1px;
+		border-color: silver;
+		border-top-style: solid;
+	}
+
+	table.data thead td:empty {
+		padding: 0;
+		border: 0;
+	}
+
+	table.data  thead,
+	table.index thead,
+	table.data  tbody,
+	table.index tbody {
+		border-bottom: 2px solid;
+	}
+
+	table.data colgroup,
+	table.index colgroup {
+		border-left: 2px solid;
+	}
+
+	table.data  tbody th:first-child,
+	table.index tbody th:first-child  {
+		border-right: 2px solid;
+		border-top: 1px solid silver;
+		padding-right: 1em;
+	}
+
+	table.data th[colspan],
+	table.data td[colspan] {
+		text-align: center;
+	}
+
+	table.complex.data th,
+	table.complex.data td {
+		border: 1px solid silver;
+		text-align: center;
+	}
+
+	table.data.longlastcol td:last-child,
+	table.data td.long {
+	 vertical-align: baseline;
+	 text-align: left;
+	}
+
+	table.data img {
+		vertical-align: middle;
+	}
+
+
+/*
+Alternate table alignment rules
+
+	table.data,
+	table.index {
+		text-align: center;
+	}
+
+	table.data  thead th[scope="row"],
+	table.index thead th[scope="row"] {
+		text-align: right;
+	}
+
+	table.data  tbody th:first-child,
+	table.index tbody th:first-child  {
+		text-align: right;
+	}
+
+Possible extra rowspan handling
+
+	table.data  tbody th[rowspan]:not([rowspan='1']),
+	table.index tbody th[rowspan]:not([rowspan='1']),
+	table.data  tbody td[rowspan]:not([rowspan='1']),
+	table.index tbody td[rowspan]:not([rowspan='1']) {
+		border-left: 1px solid silver;
+	}
+
+	table.data  tbody th[rowspan]:first-child,
+	table.index tbody th[rowspan]:first-child,
+	table.data  tbody td[rowspan]:first-child,
+	table.index tbody td[rowspan]:first-child{
+		border-left: 0;
+		border-right: 1px solid silver;
+	}
+*/
+
+/******************************************************************************/
+/*                                  Indices                                   */
+/******************************************************************************/
+
+
+/** Table of Contents *********************************************************/
+
+	.toc a {
+		/* More spacing; use padding to make it part of the click target. */
+		padding-top: 0.1rem;
+		/* Larger, more consistently-sized click target */
+		display: block;
+		/* Reverse color scheme */
+		color: black;
+		border-color: #3980B5;
+		border-bottom-width: 3px !important;
+		margin-bottom: 0px !important;
+	}
+	.toc a:visited {
+		border-color: #054572;
+	}
+	.toc a:not(:focus):not(:hover) {
+		/* Allow colors to cascade through from link styling */
+		border-bottom-color: transparent;
+	}
+
+	.toc, .toc ol, .toc ul, .toc li {
+		list-style: none; /* Numbers must be inlined into source */
+		/* because generated content isn't search/selectable and markers can't do multilevel yet */
+		margin:  0;
+		padding: 0;
+		line-height: 1.1rem; /* consistent spacing */
+	}
+
+	/* ToC not indented until third level, but font style & margins show hierarchy */
+	.toc > li             { font-weight: bold;   }
+	.toc > li li          { font-weight: normal; }
+	.toc > li li li       { font-size:   95%;    }
+	.toc > li li li li    { font-size:   90%;    }
+	.toc > li li li li li { font-size:   85%;    }
+
+	.toc > li             { margin: 1.5rem 0;    }
+	.toc > li li          { margin: 0.3rem 0;    }
+	.toc > li li li       { margin-left: 2rem;   }
+
+	/* Section numbers in a column of their own */
+	.toc .secno {
+		float: left;
+		width: 4rem;
+		white-space: nowrap;
+	}
+	.toc > li li li li .secno {
+		font-size: 85%;
+	}
+	.toc > li li li li li .secno {
+		font-size: 100%;
+	}
+
+	:not(li) > .toc              { margin-left:  5rem; }
+	.toc .secno                  { margin-left: -5rem; }
+	.toc > li li li .secno       { margin-left: -7rem; }
+	.toc > li li li li .secno    { margin-left: -9rem; }
+	.toc > li li li li li .secno { margin-left: -11rem; }
+
+	/* Tighten up indentation in narrow ToCs */
+	@media (max-width: 30em) {
+		:not(li) > .toc              { margin-left:  4rem; }
+		.toc .secno                  { margin-left: -4rem; }
+		.toc > li li li              { margin-left:  1rem; }
+		.toc > li li li .secno       { margin-left: -5rem; }
+		.toc > li li li li .secno    { margin-left: -6rem; }
+		.toc > li li li li li .secno { margin-left: -7rem; }
+	}
+	@media screen and (min-width: 78em) {
+		body:not(.toc-inline) :not(li) > .toc              { margin-left:  4rem; }
+		body:not(.toc-inline) .toc .secno                  { margin-left: -4rem; }
+		body:not(.toc-inline) .toc > li li li              { margin-left:  1rem; }
+		body:not(.toc-inline) .toc > li li li .secno       { margin-left: -5rem; }
+		body:not(.toc-inline) .toc > li li li li .secno    { margin-left: -6rem; }
+		body:not(.toc-inline) .toc > li li li li li .secno { margin-left: -7rem; }
+	}
+	body.toc-sidebar #toc :not(li) > .toc              { margin-left:  4rem; }
+	body.toc-sidebar #toc .toc .secno                  { margin-left: -4rem; }
+	body.toc-sidebar #toc .toc > li li li              { margin-left:  1rem; }
+	body.toc-sidebar #toc .toc > li li li .secno       { margin-left: -5rem; }
+	body.toc-sidebar #toc .toc > li li li li .secno    { margin-left: -6rem; }
+	body.toc-sidebar #toc .toc > li li li li li .secno { margin-left: -7rem; }
+
+	.toc li {
+		clear: both;
+	}
+
+
+/** Index *********************************************************************/
+
+	/* Index Lists: Layout */
+	ul.index       { margin-left: 0; columns: 15em; text-indent: 1em hanging; }
+	ul.index li    { margin-left: 0; list-style: none; break-inside: avoid; }
+	ul.index li li { margin-left: 1em }
+	ul.index dl    { margin-top: 0; }
+	ul.index dt    { margin: .2em 0 .2em 20px;}
+	ul.index dd    { margin: .2em 0 .2em 40px;}
+	/* Index Lists: Typography */
+	ul.index ul,
+	ul.index dl { font-size: smaller; }
+	@media not print {
+		ul.index li span {
+			white-space: nowrap;
+			color: transparent; }
+		ul.index li a:hover + span,
+		ul.index li a:focus + span {
+			color: #707070;
+		}
+	}
+
+/** Index Tables *****************************************************/
+	/* See also the data table styling section, which this effectively subclasses */
+
+	table.index {
+		font-size: small;
+		border-collapse: collapse;
+		border-spacing: 0;
+		text-align: left;
+		margin: 1em 0;
+	}
+
+	table.index td,
+	table.index th {
+		padding: 0.4em;
+	}
+
+	table.index tr:hover td:not([rowspan]),
+	table.index tr:hover th:not([rowspan]) {
+		background: #f7f8f9;
+	}
+
+	/* The link in the first column in the property table (formerly a TD) */
+	table.index th:first-child a {
+		font-weight: bold;
+	}
+
+/******************************************************************************/
+/*                                    Print                                   */
+/******************************************************************************/
+
+	@media print {
+		/* Pages have their own margins. */
+		html {
+			margin: 0;
+		}
+		/* Serif for print. */
+		body {
+			font-family: serif;
+		}
+	}
+	@page {
+		margin: 1.5cm 1.1cm;
+	}
+
+/******************************************************************************/
+/*                                    Legacy                                  */
+/******************************************************************************/
+
+	/* This rule is inherited from past style sheets. No idea what it's for. */
+	.hide { display: none }
+
+
+
+/******************************************************************************/
+/*                             Overflow Control                               */
+/******************************************************************************/
+
+	.figure .caption, .sidefigure .caption, figcaption {
+		/* in case figure is overlarge, limit caption to 50em */
+		max-width: 50rem;
+		margin-left: auto;
+		margin-right: auto;
+	}
+	.overlarge > table {
+		/* limit preferred width of table */
+		max-width: 50em;
+		margin-left: auto;
+		margin-right: auto;
+	}
+
+	@media (min-width: 55em) {
+		.overlarge {
+			margin-left: calc(13px + 26.5rem - 50vw);
+			margin-right: calc(13px + 26.5rem - 50vw);
+			max-width: none;
+		}
+	}
+	@media screen and (min-width: 78em) {
+		body:not(.toc-inline) .overlarge {
+			/* 30.5em body padding 50em content area */
+			margin-left: calc(40em - 50vw) !important;
+			margin-right: calc(40em - 50vw) !important;
+		}
+	}
+	@media screen and (min-width: 90em) {
+		body:not(.toc-inline) .overlarge {
+			/* 4em html margin 30.5em body padding 50em content area */
+			margin-left: 0 !important;
+			margin-right: calc(84.5em - 100vw) !important;
+		}
+	}
+
+	@media not print {
+		.overlarge {
+			overflow-x: auto;
+			/* See Lea Verou's explanation background-attachment:
+			 * http://lea.verou.me/2012/04/background-attachment-local/
+			 *
+			background: top left  / 4em 100% linear-gradient(to right,  #ffffff, rgba(255, 255, 255, 0)) local,
+			            top right / 4em 100% linear-gradient(to left, #ffffff, rgba(255, 255, 255, 0)) local,
+			            top left  / 1em 100% linear-gradient(to right,  #c3c3c5, rgba(195, 195, 197, 0)) scroll,
+			            top right / 1em 100% linear-gradient(to left, #c3c3c5, rgba(195, 195, 197, 0)) scroll,
+			            white;
+			background-repeat: no-repeat;
+			*/
+		}
+	}
+</style>
+<style type="text/css">
+    table, th, td {
+      border: 1px solid black;
+      border-collapse: collapse;
+      vertical-align: top;
+    }
+    th, td {
+      border-left: none;
+      border-right: none;
+      padding: 0px 10px;
+    }
+    th {
+      text-align: center;
+    }
+  </style>
+  <link href="http://wg21.link/P0690" rel="canonical">
+<style>/* style-md-lists */
+
+/* This is a weird hack for me not yet following the commonmark spec
+   regarding paragraph and lists. */
+[data-md] > :first-child {
+    margin-top: 0;
+}
+[data-md] > :last-child {
+    margin-bottom: 0;
+}</style>
+<style>/* style-selflinks */
+
+.heading, .issue, .note, .example, li, dt {
+    position: relative;
+}
+a.self-link {
+    position: absolute;
+    top: 0;
+    left: calc(-1 * (3.5rem - 26px));
+    width: calc(3.5rem - 26px);
+    height: 2em;
+    text-align: center;
+    border: none;
+    transition: opacity .2s;
+    opacity: .5;
+}
+a.self-link:hover {
+    opacity: 1;
+}
+.heading > a.self-link {
+    font-size: 83%;
+}
+li > a.self-link {
+    left: calc(-1 * (3.5rem - 26px) - 2em);
+}
+dfn > a.self-link {
+    top: auto;
+    left: auto;
+    opacity: 0;
+    width: 1.5em;
+    height: 1.5em;
+    background: gray;
+    color: white;
+    font-style: normal;
+    transition: opacity .2s, background-color .2s, color .2s;
+}
+dfn:hover > a.self-link {
+    opacity: 1;
+}
+dfn > a.self-link:hover {
+    color: black;
+}
+
+a.self-link::before            { content: "¶"; }
+.heading > a.self-link::before { content: "§"; }
+dfn > a.self-link::before      { content: "#"; }</style>
+<style>/* style-counters */
+
+body {
+    counter-reset: example figure issue;
+}
+.issue {
+    counter-increment: issue;
+}
+.issue:not(.no-marker)::before {
+    content: "Issue " counter(issue);
+}
+
+.example {
+    counter-increment: example;
+}
+.example:not(.no-marker)::before {
+    content: "Example " counter(example);
+}
+.invalid.example:not(.no-marker)::before,
+.illegal.example:not(.no-marker)::before {
+    content: "Invalid Example" counter(example);
+}
+
+figcaption {
+    counter-increment: figure;
+}
+figcaption:not(.no-marker)::before {
+    content: "Figure " counter(figure) " ";
+}</style>
+<style>/* style-line-numbers */
+
+.line-numbered {
+    display: grid !important;
+    grid-template-columns: min-content 1fr;
+    grid-auto-flow: row;
+}
+.line-no {
+    grid-column: 1;
+    color: gray;
+}
+.line {
+    grid-column: 2;
+}
+.line:hover {
+    background: rgba(0,0,0,.05);
+}
+.line-no[line]::before {
+    padding: 0 .5em 0 .1em;
+    content: attr(line);
+}
+.line-no[line-end]::after {
+    padding: 0 .5em 0 .1em;
+    content: attr(line-end);
+}
+</style>
+<style>/* style-autolinks */
+
+.css.css, .property.property, .descriptor.descriptor {
+    color: #005a9c;
+    font-size: inherit;
+    font-family: inherit;
+}
+.css::before, .property::before, .descriptor::before {
+    content: "‘";
+}
+.css::after, .property::after, .descriptor::after {
+    content: "’";
+}
+.property, .descriptor {
+    /* Don't wrap property and descriptor names */
+    white-space: nowrap;
+}
+.type { /* CSS value <type> */
+    font-style: italic;
+}
+pre .property::before, pre .property::after {
+    content: "";
+}
+[data-link-type="property"]::before,
+[data-link-type="propdesc"]::before,
+[data-link-type="descriptor"]::before,
+[data-link-type="value"]::before,
+[data-link-type="function"]::before,
+[data-link-type="at-rule"]::before,
+[data-link-type="selector"]::before,
+[data-link-type="maybe"]::before {
+    content: "‘";
+}
+[data-link-type="property"]::after,
+[data-link-type="propdesc"]::after,
+[data-link-type="descriptor"]::after,
+[data-link-type="value"]::after,
+[data-link-type="function"]::after,
+[data-link-type="at-rule"]::after,
+[data-link-type="selector"]::after,
+[data-link-type="maybe"]::after {
+    content: "’";
+}
+
+[data-link-type].production::before,
+[data-link-type].production::after,
+.prod [data-link-type]::before,
+.prod [data-link-type]::after {
+    content: "";
+}
+
+[data-link-type=element],
+[data-link-type=element-attr] {
+    font-family: Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    font-size: .9em;
+}
+[data-link-type=element]::before { content: "<" }
+[data-link-type=element]::after  { content: ">" }
+
+[data-link-type=biblio] {
+    white-space: pre;
+}</style>
+<style>/* style-syntax-highlighting */
+
+.highlight:not(.idl) { background: hsl(24, 20%, 95%); }
+code.highlight { padding: .1em; border-radius: .3em; }
+pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
+.highlight .c { color: #708090 } /* Comment */
+.highlight .k { color: #990055 } /* Keyword */
+.highlight .l { color: #000000 } /* Literal */
+.highlight .n { color: #0077aa } /* Name */
+.highlight .o { color: #999999 } /* Operator */
+.highlight .p { color: #999999 } /* Punctuation */
+.highlight .cm { color: #708090 } /* Comment.Multiline */
+.highlight .cp { color: #708090 } /* Comment.Preproc */
+.highlight .c1 { color: #708090 } /* Comment.Single */
+.highlight .cs { color: #708090 } /* Comment.Special */
+.highlight .kc { color: #990055 } /* Keyword.Constant */
+.highlight .kd { color: #990055 } /* Keyword.Declaration */
+.highlight .kn { color: #990055 } /* Keyword.Namespace */
+.highlight .kp { color: #990055 } /* Keyword.Pseudo */
+.highlight .kr { color: #990055 } /* Keyword.Reserved */
+.highlight .kt { color: #990055 } /* Keyword.Type */
+.highlight .ld { color: #000000 } /* Literal.Date */
+.highlight .m { color: #000000 } /* Literal.Number */
+.highlight .s { color: #a67f59 } /* Literal.String */
+.highlight .na { color: #0077aa } /* Name.Attribute */
+.highlight .nc { color: #0077aa } /* Name.Class */
+.highlight .no { color: #0077aa } /* Name.Constant */
+.highlight .nd { color: #0077aa } /* Name.Decorator */
+.highlight .ni { color: #0077aa } /* Name.Entity */
+.highlight .ne { color: #0077aa } /* Name.Exception */
+.highlight .nf { color: #0077aa } /* Name.Function */
+.highlight .nl { color: #0077aa } /* Name.Label */
+.highlight .nn { color: #0077aa } /* Name.Namespace */
+.highlight .py { color: #0077aa } /* Name.Property */
+.highlight .nt { color: #669900 } /* Name.Tag */
+.highlight .nv { color: #222222 } /* Name.Variable */
+.highlight .ow { color: #999999 } /* Operator.Word */
+.highlight .mb { color: #000000 } /* Literal.Number.Bin */
+.highlight .mf { color: #000000 } /* Literal.Number.Float */
+.highlight .mh { color: #000000 } /* Literal.Number.Hex */
+.highlight .mi { color: #000000 } /* Literal.Number.Integer */
+.highlight .mo { color: #000000 } /* Literal.Number.Oct */
+.highlight .sb { color: #a67f59 } /* Literal.String.Backtick */
+.highlight .sc { color: #a67f59 } /* Literal.String.Char */
+.highlight .sd { color: #a67f59 } /* Literal.String.Doc */
+.highlight .s2 { color: #a67f59 } /* Literal.String.Double */
+.highlight .se { color: #a67f59 } /* Literal.String.Escape */
+.highlight .sh { color: #a67f59 } /* Literal.String.Heredoc */
+.highlight .si { color: #a67f59 } /* Literal.String.Interpol */
+.highlight .sx { color: #a67f59 } /* Literal.String.Other */
+.highlight .sr { color: #a67f59 } /* Literal.String.Regex */
+.highlight .s1 { color: #a67f59 } /* Literal.String.Single */
+.highlight .ss { color: #a67f59 } /* Literal.String.Symbol */
+.highlight .vc { color: #0077aa } /* Name.Variable.Class */
+.highlight .vg { color: #0077aa } /* Name.Variable.Global */
+.highlight .vi { color: #0077aa } /* Name.Variable.Instance */
+.highlight .il { color: #000000 } /* Literal.Number.Integer.Long */
+</style>
+ <body class="h-entry">
+  <div class="head">
+   <p data-fill-with="logo"></p>
+   <h1 class="p-name no-ref" id="title">p0690R1<br>Tearable Atomics</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Published Proposal, <time class="dt-updated" datetime="2018-02-10">10 February 2018</time></span></h2>
+   <div data-fill-with="spec-metadata">
+    <dl>
+     <dt>This version:
+     <dd><a class="u-url" href="http://wg21.link/P0690">http://wg21.link/P0690</a>
+     <dt>Authors:
+     <dd>
+      <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:jfbastien@apple.com">JF Bastien</a> (<span class="p-org org">Apple</span>)
+     <dd>
+      <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:bion@microsoft.com">Billy Robert O'Neal III</a> (<span class="p-org org">Microsoft</span>)
+     <dd>
+      <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:ahh@google.com">Andrew Hunter</a> (<span class="p-org org">Google</span>)
+     <dt>Audience:
+     <dd>SG1
+     <dt>Project:
+     <dd>ISO JTC1/SC22/WG21: Programming Language C++
+     <dt>Source:
+     <dd><a href="https://github.com/jfbastien/papers/blob/master/source/P0690r1.bs">github.com/jfbastien/papers/blob/master/source/P0690r1.bs</a>
+    </dl>
+   </div>
+   <div data-fill-with="warning"></div>
+   <hr title="Separator for header">
+  </div>
+  <div class="p-summary" data-fill-with="abstract">
+   <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
+   <p>Atomics which can tear—which are more relaxed than relaxed—seem useless. This paper shows otherwise.</p>
+  </div>
+  <nav data-fill-with="table-of-contents" id="toc">
+   <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
+   <ol class="toc" role="directory">
+    <li>
+     <a href="#edit"><span class="secno">1</span> <span class="content">Edit History</span></a>
+     <ol class="toc">
+      <li><a href="#r0r1"><span class="secno">1.1</span> <span class="content">r0 → r1</span></a>
+     </ol>
+    <li><a href="#bg"><span class="secno">2</span> <span class="content">Background</span></a>
+    <li>
+     <a href="#usecases"><span class="secno">3</span> <span class="content">Usecases</span></a>
+     <ol class="toc">
+      <li><a href="#spec-load"><span class="secno">3.1</span> <span class="content">Speculative Load</span></a>
+      <li><a href="#seqlock"><span class="secno">3.2</span> <span class="content">Seqlock</span></a>
+      <li><a href="#wsdeque"><span class="secno">3.3</span> <span class="content">Work-Stealing Deque</span></a>
+     </ol>
+    <li><a href="#moar"><span class="secno">4</span> <span class="content">Further Considerations</span></a>
+    <li><a href="#proposal"><span class="secno">5</span> <span class="content">Proposal</span></a>
+    <li>
+     <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
+     <ol class="toc">
+      <li><a href="#informative"><span class="secno"></span> <span class="content">Informative References</span></a>
+     </ol>
+   </ol>
+  </nav>
+  <main>
+   <h2 class="heading settled" data-level="1" id="edit"><span class="secno">1. </span><span class="content">Edit History</span><a class="self-link" href="#edit"></a></h2>
+   <h3 class="heading settled" data-level="1.1" id="r0r1"><span class="secno">1.1. </span><span class="content">r0 → r1</span><a class="self-link" href="#r0r1"></a></h3>
+   <p>In Toronto, SG1 discussed <a data-link-type="biblio" href="#biblio-p0690r0">[p0690r0]</a>, the different approaches that it
+proposed, and didn’t really conclude anything. This update proposes a single one
+among all approaches that were proposed in r0.</p>
+   <h2 class="heading settled" data-level="2" id="bg"><span class="secno">2. </span><span class="content">Background</span><a class="self-link" href="#bg"></a></h2>
+   <p>Is it useful for C++ to support "tearable" atomic memory ordering, where the
+access participates in atomic ordering as strongly as <code class="highlight"><span class="n">memory_order_relaxed</span></code> accesses, but where the memory is allowed to tear (i.e. isn’t single-copy
+atomic). In C++ standards speak: particular atomic object are <strong>not</strong> indivisible with respect to all other atomic accesses to that object.</p>
+   <p>Indeed, advanced concurrency and parallelism users will sometimes find a need
+for objects which are accessed by multiple threads, yet either:</p>
+   <ol>
+    <li data-md="">
+     <p>Rely on separate atomic objects to provide inter-thread observability
+ guarantees; or</p>
+    <li data-md="">
+     <p>Use lock-free accesses on a memory locations on which they would also like
+ to speculate.</p>
+   </ol>
+   <p>What we describe often amounts to a <em>data race</em>:</p>
+   <ul>
+    <li data-md="">
+     <p>Two accesses to the same <em>memory location</em> by different threads are <em>not
+ordered</em></p>
+    <li data-md="">
+     <p>At least one of them stores to the memory location</p>
+    <li data-md="">
+     <p>At least one of them is not a synchronization action</p>
+   </ul>
+   <p>Data races are <em>undefined behavior</em>, and it is often said that there is no such
+thing as a "benign" data race <a data-link-type="biblio" href="#biblio-benign">[benign]</a>. Issues that arise when mixing atomic
+and non-atomic accesses have been discussed before in the context of the C
+language’s memory model <a data-link-type="biblio" href="#biblio-n4136">[n4136]</a>.</p>
+   <p>Reconciling these types of issue is discussed in the concurrency and parallelism
+group from time to time, and so far only one-off solutions have been proposed to
+the Committee, or the problem has been punted. We believe that this proposal can
+fix this interesting problem once and for all by looking at how other areas have
+solved this issue.</p>
+   <p>After all, this has been solved in non-C++ contexts. To assembly programmers, or
+to those used to memory models such as Linux’s memory model <a data-link-type="biblio" href="#biblio-p0124r2">[p0124r2]</a>, the
+distinctions the Standard makes seems overly complex. Their code simply defines
+atomicity as a property or <em>code</em> rather than C++'s definition of atomicity as a
+property of <em>particular memory locations</em> during an object’s lifetime. Indeed,
+in assembly a memory location can be concurrently accessed with a regular
+non-atomic memory instruction as well as an atomic memory instruction.</p>
+   <h2 class="heading settled" data-level="3" id="usecases"><span class="secno">3. </span><span class="content">Usecases</span><a class="self-link" href="#usecases"></a></h2>
+   <p>Sample usecases include:</p>
+   <ol>
+    <li data-md="">
+     <p>Speculative load before a compare-and-exchange instruction</p>
+    <li data-md="">
+     <p>Sequence locks</p>
+    <li data-md="">
+     <p>Work-stealing deque</p>
+   </ol>
+   <p>Others exist, but we will focus on these three.</p>
+   <h3 class="heading settled" data-level="3.1" id="spec-load"><span class="secno">3.1. </span><span class="content">Speculative Load</span><a class="self-link" href="#spec-load"></a></h3>
+   <p>Consider the following code:</p>
+<pre class="highlight"><span class="k">struct</span> <span class="nf">alignas</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="kt">intptr_t</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span><span class="p">)</span> <span class="n">Node</span> <span class="p">{</span>
+    <span class="kt">intptr_t</span> <span class="n">l</span><span class="p">,</span> <span class="n">r</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="n">Node</span> <span class="nf">action</span><span class="p">(</span><span class="k">const</span> <span class="n">Node</span><span class="o">&amp;</span> <span class="n">old</span><span class="p">);</span>
+
+<span class="kt">void</span> <span class="nf">do_action</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="n">Node</span><span class="o">></span> <span class="o">*</span><span class="n">n</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">Node</span> <span class="n">old</span> <span class="o">=</span> <span class="n">n</span><span class="o">-></span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span> <span class="c1">// Relaxed loads can’t tear.</span>
+<span class="c1"></span>    <span class="k">while</span> <span class="p">(</span><span class="o">!</span><span class="n">n</span><span class="o">-></span><span class="n">compare_exchange_weak</span><span class="p">(</span><span class="n">old</span><span class="p">,</span> <span class="n">action</span><span class="p">(</span><span class="n">old</span><span class="p">),</span> <span class="n">std</span><span class="o">::</span><span class="n">memory_order_release</span><span class="p">,</span>
+                                     <span class="n">std</span><span class="o">::</span><span class="n">memory_order_acquire</span><span class="p">))</span>
+      <span class="p">;</span>
+<span class="p">}</span>
+<span class="p">};</span>
+</pre>
+   <p>In this example, all lock-free operations (including load / store) <em>must</em> be
+implemented as a compare-and-exchange or load-linked / store-conditional:</p>
+   <ul>
+    <li data-md="">
+     <p>On recent x86-64 using <code class="highlight"><span class="n">cmpxchg16b</span></code>.</p>
+    <li data-md="">
+     <p>On A32 without LPAE using <code class="highlight"><span class="n">ldrexd</span></code>, <code class="highlight"><span class="n">clrex</span></code>, and <code class="highlight"><span class="n">strexd</span></code>.</p>
+   </ul>
+   <p>The relaxed memory access could instead speculate by using a tearable load /
+store, potentially cheaper than a compare-and-exchange or load-link /
+store-conditional, as long as a compare-and-exchange retry loop follows it to
+handle races. If tearing occurs then the compare-and-exchange does the right
+thing.</p>
+   <ul>
+    <li data-md="">
+     <p>On x86-64 using two <code class="highlight"><span class="n">movq</span></code> instructions (two instructions are never locked
+and can tear).</p>
+    <li data-md="">
+     <p>On A32 using <code class="highlight"><span class="n">ldrd</span></code> (without LPAE the instruction isn’t single-copy atomic).</p>
+   </ul>
+   <h3 class="heading settled" data-level="3.2" id="seqlock"><span class="secno">3.2. </span><span class="content">Seqlock</span><a class="self-link" href="#seqlock"></a></h3>
+   <p>In the case of sequence locks, the data being protected can be accessed
+non-atomically and is known to be race-free if the sequence number hasn’t
+changed before and after the data was retrieved, and if it isn’t "tagged" as
+being modified (below, by being odd):</p>
+<pre class="highlight"><span class="k">template</span><span class="o">&lt;</span><span class="k">typename</span> <span class="n">T</span><span class="o">></span>
+<span class="k">struct</span> <span class="n">Data</span> <span class="p">{</span>
+  <span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">unsigned</span><span class="o">></span> <span class="n">sequence_number</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+  <span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span> <span class="n">value0</span><span class="p">;</span>
+  <span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span> <span class="n">value1</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="n">std</span><span class="o">::</span><span class="n">tuple</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span> <span class="n">T</span><span class="o">></span> <span class="n">reader</span><span class="p">(</span><span class="k">const</span> <span class="n">Data</span><span class="o">&amp;</span> <span class="n">data</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">T</span> <span class="n">value0</span><span class="p">,</span> <span class="n">value1</span><span class="p">;</span>
+  <span class="kt">unsigned</span> <span class="n">sequence_before</span><span class="p">,</span> <span class="n">sequence_after</span><span class="p">;</span>
+  <span class="k">do</span> <span class="p">{</span>
+    <span class="n">sequence_before</span> <span class="o">=</span> <span class="n">data</span><span class="p">.</span><span class="n">sequence_number</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_acquire</span><span class="p">);</span>
+    <span class="n">value0</span> <span class="o">=</span> <span class="n">data</span><span class="p">.</span><span class="n">value0</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span>
+    <span class="n">value1</span> <span class="o">=</span> <span class="n">data</span><span class="p">.</span><span class="n">value1</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">atomic_thread_fence</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_acquire</span><span class="p">);</span>
+    <span class="n">sequence_after</span> <span class="o">=</span> <span class="n">data</span><span class="p">.</span><span class="n">sequence_number</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span>
+  <span class="p">}</span> <span class="k">while</span> <span class="p">(</span><span class="n">sequence_before</span> <span class="o">!=</span> <span class="n">sequence_after</span> <span class="o">||</span> <span class="n">sequence_before</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">);</span>
+  <span class="k">return</span> <span class="p">{</span><span class="n">value0</span><span class="p">,</span> <span class="n">value1</span><span class="p">};</span>
+<span class="p">}</span>
+
+<span class="kt">void</span> <span class="n">writer</span><span class="p">(</span><span class="n">Data</span><span class="o">&amp;</span> <span class="n">data</span><span class="p">,</span> <span class="n">T</span> <span class="n">value0</span><span class="p">,</span> <span class="n">T</span> <span class="n">value1</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">auto</span> <span class="n">sequence_start</span> <span class="o">=</span> <span class="n">data</span><span class="p">.</span><span class="n">sequence_number</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span>
+  <span class="n">data</span><span class="p">.</span><span class="n">sequence_number</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">sequence_start</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">memory_order_relaxed</span><span class="p">);</span>
+  <span class="n">data</span><span class="p">.</span><span class="n">value0</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">value0</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">memory_order_release</span><span class="p">);</span>
+  <span class="n">data</span><span class="p">.</span><span class="n">value1</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">value1</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">memory_order_release</span><span class="p">);</span>
+  <span class="n">data</span><span class="p">.</span><span class="n">sequence_number</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">sequence_start</span> <span class="o">+</span> <span class="mi">2</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">memory_order_release</span><span class="p">);</span>
+<span class="p">}</span>
+</pre>
+   <p>Notice that in C++ the values being protected must be atomic because this
+algorithm doesn’t use more common acquire / release patterns which C++
+encourages. Doing otherwise would be a data race according to the memory
+model. One would need to add fences for non-atomic accesses to not be racy.</p>
+   <p>A more in-depth discussion of seqlock <a data-link-type="biblio" href="#biblio-seqlock">[seqlock]</a> is available.</p>
+   <p>For the purpose of our discussion, it is especially interesting to considers
+value types <code class="highlight"><span class="n">T</span></code> which are never lock-free.</p>
+   <h3 class="heading settled" data-level="3.3" id="wsdeque"><span class="secno">3.3. </span><span class="content">Work-Stealing Deque</span><a class="self-link" href="#wsdeque"></a></h3>
+   <p>It appears intended that implementations of the parallelism TS <a data-link-type="biblio" href="#biblio-n4578">[N4578]</a> back
+scheduling of partitioned work using an ABP work-stealing scheduler, originally
+described in <a data-link-type="biblio" href="#biblio-threadsched">[ThreadSched]</a>.</p>
+   <p>Under this model, each thread has a local deque of work where it can access the
+"bottom" of the deque without any synchronization overhead, but other threads
+can concurrently remove work from the "top". A similar data structure was
+presented implementable on hardware without double-wide CAS instructions in <a data-link-type="biblio" href="#biblio-wsdeque">[WSDeque]</a>.</p>
+   <p>In the Chase-Lev deque, the "top" counter is used to track concurrent access to
+the top of the deque; and access to the actual elements in the top of the deque
+is unsynchronized. From the original paper:</p>
+<pre class="highlight line-numbered" line-numbers="" line-start="10"><span class="line-no" line="10"></span><div class="line"><span class="k">public</span> <span class="n">Object</span> <span class="nf">steal</span><span class="p">()</span> <span class="p">{</span></div><span class="line-no" line="11"></span><div class="line">    <span class="kt">long</span> <span class="n">t</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="n">top</span><span class="p">;</span></div><span class="line-no" line="12"></span><div class="line">    <span class="kt">long</span> <span class="n">b</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="n">bottom</span><span class="p">;</span></div><span class="line-no" line="13"></span><div class="line">    <span class="n">CircularArray</span> <span class="n">a</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="n">activeArray</span><span class="p">;</span></div><span class="line-no" line="14"></span><div class="line">    <span class="kt">long</span> <span class="n">size</span> <span class="o">=</span> <span class="n">b</span> <span class="o">-</span> <span class="n">t</span><span class="p">;</span></div><span class="line-no" line="15"></span><div class="line">    <span class="k">if</span> <span class="p">(</span><span class="n">size</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="k">return</span> <span class="n">Empty</span><span class="p">;</span></div><span class="line-no" line="16"></span><div class="line">    <span class="n">Object</span> <span class="n">o</span> <span class="o">=</span> <span class="n">a</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="n">t</span><span class="p">);</span></div><span class="line-no" line="17"></span><div class="line">    <span class="k">if</span> <span class="p">(</span><span class="o">!</span> <span class="n">casTop</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span></div><span class="line-no" line="18"></span><div class="line">        <span class="k">return</span> <span class="n">Abort</span><span class="p">;</span></div><span class="line-no" line="19"></span><div class="line">    <span class="k">return</span> <span class="n">o</span><span class="p">;</span></div><span class="line-no" line="20"></span><div class="line"><span class="p">}</span></div></pre>
+   <p>or translated to C++:</p>
+<pre class="highlight line-numbered" line-numbers="" line-start="10"><span class="line-no" line="10"></span><div class="line"><span class="n">variant</span><span class="o">&lt;</span><span class="n">empty_t</span><span class="p">,</span> <span class="n">abort_t</span><span class="p">,</span> <span class="n">T</span><span class="o">></span> <span class="n">steal</span><span class="p">()</span> <span class="p">{</span></div><span class="line-no" line="11"></span><div class="line">    <span class="kt">int64_t</span> <span class="n">t</span> <span class="o">=</span> <span class="n">top</span><span class="p">.</span><span class="n">load</span><span class="p">();</span></div><span class="line-no" line="12"></span><div class="line">    <span class="kt">int64_t</span> <span class="n">b</span> <span class="o">=</span> <span class="n">bottom</span><span class="p">.</span><span class="n">load</span><span class="p">();</span></div><span class="line-no" line="13"></span><div class="line">    <span class="n">T</span> <span class="o">*</span> <span class="n">a</span> <span class="o">=</span> <span class="n">activeArray</span><span class="p">.</span><span class="n">load</span><span class="p">();</span></div><span class="line-no" line="14"></span><div class="line">    <span class="kt">int64_t</span> <span class="n">size</span> <span class="o">=</span> <span class="n">b</span> <span class="o">-</span> <span class="n">t</span><span class="p">;</span></div><span class="line-no" line="15"></span><div class="line">    <span class="k">if</span> <span class="p">(</span><span class="n">size</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="k">return</span> <span class="n">empty_t</span><span class="p">{};</span></div><span class="line-no" line="16"></span><div class="line">    <span class="n">T</span> <span class="n">o</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="n">t</span> <span class="o">%</span> <span class="n">aSize</span><span class="p">];</span></div><span class="line-no" line="17"></span><div class="line">    <span class="k">if</span> <span class="p">(</span><span class="o">!</span> <span class="n">top</span><span class="p">.</span><span class="n">compare_exchange_strong</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span></div><span class="line-no" line="18"></span><div class="line">        <span class="k">return</span> <span class="n">abort_t</span><span class="p">{};</span></div><span class="line-no" line="19"></span><div class="line">    <span class="k">return</span> <span class="n">o</span><span class="p">;</span></div><span class="line-no" line="20"></span><div class="line"><span class="p">}</span></div></pre>
+   <p>If the deque contains only one element, this causes undefined behavior in C++'s
+memory model, because the element accessed on line 16 may be concurrently
+written by the owning thread of the deque. However, if a data race occurs, the
+CAS on line 17 fails, and the result of this speculative read is never
+observed. Only one thread can win the CAS race to increment top.</p>
+   <p>Of note, imposing that <code class="highlight"><span class="n">T</span></code> be an atomic type in this instance defeats the entire
+purpose of using the work-stealing deque, as it would require the owning
+"bottom" thread to use synchronized access to read from the bottom (including
+potentially taking a lock of <code class="highlight"><span class="n">T</span></code> is large; egregious for a data structure whose
+purpose is to be lock-free) in the uncontended cases, even though the
+correctness of the algorithm is maintained by discarding any potentially torn
+results.</p>
+   <h2 class="heading settled" data-level="4" id="moar"><span class="secno">4. </span><span class="content">Further Considerations</span><a class="self-link" href="#moar"></a></h2>
+   <p>Extrapolating from the above examples, it is also useful to consider a few extra
+usecases where:</p>
+   <ul>
+    <li data-md="">
+     <p>Alignment of the datastructures is purposefully <em>not</em> natural. In contrast, <code class="highlight"><span class="n">std</span><span class="o">::</span><span class="n">atomic</span></code> is specified as always being suitably aligned by the
+implementation.</p>
+    <li data-md="">
+     <p>Padding of the datastructure isn’t the same as that mandated by <code class="highlight"><span class="n">std</span><span class="o">::</span><span class="n">atomic</span></code> (although padding bits are their own bag of special
+as <a data-link-type="biblio" href="#biblio-p0528r0">[p0528r0]</a> and <a data-link-type="biblio" href="#biblio-p0528r1">[p0528r1]</a> show).</p>
+    <li data-md="">
+     <p>The datastructure isn’t always accessed by memory operations of the same
+byte-size. This could occur without dangerous type aliasing by using
+properly type-punned <code class="highlight"><span class="k">union</span></code>, <code class="highlight"><span class="n">memcpy</span></code>, or <code class="highlight"><span class="n">std</span><span class="o">::</span><span class="n">variant</span></code>, as well as with
+SIMD types that sometimes perform element accesses.</p>
+    <li data-md="">
+     <p>The datastructure being accessed is large, making it non-lock-free and
+requiring an implementation-provided lock. Many implementations rely on lock
+sharding for this, but some embed a lock in every large <code class="highlight"><span class="n">std</span><span class="o">::</span><span class="n">atomic</span></code> object.</p>
+   </ul>
+   <h2 class="heading settled" data-level="5" id="proposal"><span class="secno">5. </span><span class="content">Proposal</span><a class="self-link" href="#proposal"></a></h2>
+   <p>A previous version of this paper <a data-link-type="biblio" href="#biblio-p0690r0">[p0690r0]</a> considered several
+possible solutions for making the above examples well-formed. Here we
+select one based on SG1 feedback. (We would like to emphasize that
+none of the authors are deeply invested in this particular solution,
+but all of us would like to make progress towards C++ supporting our
+use cases <em>somehow</em>; if a different solution would be much more
+acceptable, that is excellent feedback.)  We give strawman wording for
+our definitions, but with no expectation at all that it is final.</p>
+   <p>In particular our solution is an adaption of <a data-link-type="biblio" href="#biblio-p0603r0">[p0603r0]</a>. We define two new member functions for <code class="highlight"><span class="n">std</span><span class="o">::</span><span class="n">atomic</span></code>:</p>
+   <blockquote>
+<pre class="highlight"><span class="n">T</span> <span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="n">T</span><span class="o">>::</span><span class="n">nonatomic_load</span><span class="p">(</span>
+    <span class="n">memory_order</span> <span class="n">order</span> <span class="o">=</span> <span class="n">memory_order_seq_cst</span><span class="p">)</span> <span class="k">const</span> <span class="k">noexcept</span><span class="p">;</span>
+</pre>
+    <p><em>Effects</em>: equivalent to <code class="highlight"><span class="n">load</span><span class="p">(</span><span class="n">order</span><span class="p">)</span></code>, but if there exists a
+potentially concurrent conflicting action X (i.e. a modification to A)
+which neither happens before nor happens after this call, this call
+returns an indeterminate value.  If this occurs, this call is
+considered to "read the value written by X" as described in
+[<strong>atomics.fences</strong>].</p>
+    <p><em>Remarks</em>: Lock free, regardless of the values of <code class="highlight"><span class="n">is_lock_free</span><span class="p">()</span></code> and <code class="highlight"><span class="n">is_always_lock_free</span><span class="p">()</span></code>.</p>
+   </blockquote>
+   <p>We would also require wording changes to [<strong>dcl.init.12</strong>]'s definition of
+indeterminate values, allowing expressions like</p>
+<pre class="highlight"><span class="k">auto</span> <span class="n">a</span> <span class="o">=</span> <span class="n">atomic_var</span><span class="p">.</span><span class="n">nonatomic_load</span><span class="p">();</span>
+</pre>
+   <p>to produce indeterminate values without invoking undefined
+behavior. (We don’t provide such wording here.)</p>
+   <p>This function allows a simple and correct <a href="#seqlock">§3.2 Seqlock</a> and <a href="#wsdeque">§3.3 Work-Stealing Deque</a> but does <strong>not</strong> fix <a href="#spec-load">§3.1 Speculative Load</a> without some
+additional work. Even with a relaxation of [<strong>dcl.init</strong>], an
+indeterminately-valued <code class="highlight"><span class="n">Node</span></code> is unsafe to use in <code class="highlight"><span class="n">action</span><span class="p">()</span></code>. Clearly
+the intention of that code is that any sequence of arbitrary bytes is
+well-defined as a <code class="highlight"><span class="n">Node</span></code>, but more wording work would be required to
+allow this.</p>
+   <p>(Note that <code class="highlight"><span class="n">race_or</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span></code> as proposed in <a data-link-type="biblio" href="#biblio-n3710">[n3710]</a> does no better, as
+the speculatively loaded <code class="highlight"><span class="n">Node</span></code> must be realized from its <code class="highlight"><span class="n">race_or</span></code> holder, even when the value is in fact racy; this was defined in that
+paper as undefined behavior).</p>
+   <p>We also have the matching write variant:</p>
+   <blockquote>
+<pre class="highlight"><span class="kt">void</span> <span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="n">T</span><span class="o">>::</span><span class="n">nonatomic_store</span><span class="p">(</span>
+    <span class="n">T</span> <span class="n">desired</span><span class="p">,</span> <span class="n">memory_order</span> <span class="n">order</span> <span class="o">=</span> <span class="n">memory_order_seq_cst</span><span class="p">)</span> <span class="k">const</span> <span class="k">noexcept</span><span class="p">;</span>
+</pre>
+    <p><em>Requires</em>: The <code class="highlight"><span class="n">order</span></code> argument shall not be <code class="highlight"><span class="n">memory_order_consume</span></code>, <code class="highlight"><span class="n">memory_order_acquire</span></code>, nor <code class="highlight"><span class="n">memory_order_acq_rel</span></code>.</p>
+    <p><em>Effects</em>: Replaces (non-atomically) the value of <code class="highlight"><span class="k">this</span></code> with the value of <code class="highlight"><span class="n">desired</span></code>, affecting memory according to the value of <code class="highlight"><span class="n">order</span></code>. If there
+exists a potentially concurrent conflicting action X, which neither happens
+before nor happens after this call, then:</p>
+    <ul>
+     <li data-md="">
+      <p>if X is a write, the value pointed to by this is indeterminate.</p>
+     <li data-md="">
+      <p>if X is a read, then X returns an indeterminate value. X is considered to "read the value written by" this call as described in [<strong>atomics.fences</strong>].</p>
+    </ul>
+    <p>If no such action X exists, then this call is exactly equivalent to <code class="highlight"><span class="n">store</span><span class="p">(</span><span class="n">desired</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span></code>.</p>
+    <p><em>Remarks</em>: Lock free, regardless of the values of <code class="highlight"><span class="n">is_lock_free</span><span class="p">()</span></code> and <code class="highlight"><span class="n">is_always_lock_free</span><span class="p">()</span></code>.</p>
+   </blockquote>
+   <p>This function optimizes the write-side of a seqlock or deque, but
+isn’t strictly necessary for its correctness. (In the seqlock case the
+performance advantage is minor; in the deque case, this is more likely
+to be significant.)  One difficulty here is that we’d need even more
+extensions to the indeterminate value changes, since we can
+effectively "poison" a <code class="highlight"><span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span></code> with an indeterminate value in
+the case of two racy writes.</p>
+  </main>
+<script>
+(function() {
+  "use strict";
+  var collapseSidebarText = '<span aria-hidden="true">←</span> '
+                          + '<span>Collapse Sidebar</span>';
+  var expandSidebarText   = '<span aria-hidden="true">→</span> '
+                          + '<span>Pop Out Sidebar</span>';
+  var tocJumpText         = '<span aria-hidden="true">↑</span> '
+                          + '<span>Jump to Table of Contents</span>';
+
+  var sidebarMedia = window.matchMedia('screen and (min-width: 78em)');
+  var autoToggle   = function(e){ toggleSidebar(e.matches) };
+  if(sidebarMedia.addListener) {
+    sidebarMedia.addListener(autoToggle);
+  }
+
+  function toggleSidebar(on) {
+    if (on == undefined) {
+      on = !document.body.classList.contains('toc-sidebar');
+    }
+
+    /* Don’t scroll to compensate for the ToC if we’re above it already. */
+    var headY = 0;
+    var head = document.querySelector('.head');
+    if (head) {
+      // terrible approx of "top of ToC"
+      headY += head.offsetTop + head.offsetHeight;
+    }
+    var skipScroll = window.scrollY < headY;
+
+    var toggle = document.getElementById('toc-toggle');
+    var tocNav = document.getElementById('toc');
+    if (on) {
+      var tocHeight = tocNav.offsetHeight;
+      document.body.classList.add('toc-sidebar');
+      document.body.classList.remove('toc-inline');
+      toggle.innerHTML = collapseSidebarText;
+      if (!skipScroll) {
+        window.scrollBy(0, 0 - tocHeight);
+      }
+      tocNav.focus();
+      sidebarMedia.addListener(autoToggle); // auto-collapse when out of room
+    }
+    else {
+      document.body.classList.add('toc-inline');
+      document.body.classList.remove('toc-sidebar');
+      toggle.innerHTML = expandSidebarText;
+      if (!skipScroll) {
+        window.scrollBy(0, tocNav.offsetHeight);
+      }
+      if (toggle.matches(':hover')) {
+        /* Unfocus button when not using keyboard navigation,
+           because I don’t know where else to send the focus. */
+        toggle.blur();
+      }
+    }
+  }
+
+  function createSidebarToggle() {
+    /* Create the sidebar toggle in JS; it shouldn’t exist when JS is off. */
+    var toggle = document.createElement('a');
+      /* This should probably be a button, but appearance isn’t standards-track.*/
+    toggle.id = 'toc-toggle';
+    toggle.class = 'toc-toggle';
+    toggle.href = '#toc';
+    toggle.innerHTML = collapseSidebarText;
+
+    sidebarMedia.addListener(autoToggle);
+    var toggler = function(e) {
+      e.preventDefault();
+      sidebarMedia.removeListener(autoToggle); // persist explicit off states
+      toggleSidebar();
+      return false;
+    }
+    toggle.addEventListener('click', toggler, false);
+
+
+    /* Get <nav id=toc-nav>, or make it if we don’t have one. */
+    var tocNav = document.getElementById('toc-nav');
+    if (!tocNav) {
+      tocNav = document.createElement('p');
+      tocNav.id = 'toc-nav';
+      /* Prepend for better keyboard navigation */
+      document.body.insertBefore(tocNav, document.body.firstChild);
+    }
+    /* While we’re at it, make sure we have a Jump to Toc link. */
+    var tocJump = document.getElementById('toc-jump');
+    if (!tocJump) {
+      tocJump = document.createElement('a');
+      tocJump.id = 'toc-jump';
+      tocJump.href = '#toc';
+      tocJump.innerHTML = tocJumpText;
+      tocNav.appendChild(tocJump);
+    }
+
+    tocNav.appendChild(toggle);
+  }
+
+  var toc = document.getElementById('toc');
+  if (toc) {
+    createSidebarToggle();
+    toggleSidebar(sidebarMedia.matches);
+
+    /* If the sidebar has been manually opened and is currently overlaying the text
+       (window too small for the MQ to add the margin to body),
+       then auto-close the sidebar once you click on something in there. */
+    toc.addEventListener('click', function(e) {
+      if(e.target.tagName.toLowerCase() == "a" && document.body.classList.contains('toc-sidebar') && !sidebarMedia.matches) {
+        toggleSidebar(false);
+      }
+    }, false);
+  }
+  else {
+    console.warn("Can’t find Table of Contents. Please use <nav id='toc'> around the ToC.");
+  }
+
+  /* Wrap tables in case they overflow */
+  var tables = document.querySelectorAll(':not(.overlarge) > table.data, :not(.overlarge) > table.index');
+  var numTables = tables.length;
+  for (var i = 0; i < numTables; i++) {
+    var table = tables[i];
+    var wrapper = document.createElement('div');
+    wrapper.className = 'overlarge';
+    table.parentNode.insertBefore(wrapper, table);
+    wrapper.appendChild(table);
+  }
+
+})();
+</script>
+  <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
+  <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
+  <dl>
+   <dt id="biblio-benign">[BENIGN]
+   <dd>Hans-J. Boehm. <a href="http://hboehm.info/boehm-hotpar11.pdf">How to miscompile programs with “benign” data races</a>. May 2011. URL: <a href="http://hboehm.info/boehm-hotpar11.pdf">http://hboehm.info/boehm-hotpar11.pdf</a>
+   <dt id="biblio-n3710">[N3710]
+   <dd>H. Boehm, et al.. <a href="https://wg21.link/n3710">Specifying the absence of "out of thin air" results (LWG2265)</a>. URL: <a href="https://wg21.link/n3710">https://wg21.link/n3710</a>
+   <dt id="biblio-n4136">[N4136]
+   <dd>M. Batty, P. Sewell, et al.. <a href="https://wg21.link/n4136">C Concurrency Challenges Draft</a>. 13 October 2014. URL: <a href="https://wg21.link/n4136">https://wg21.link/n4136</a>
+   <dt id="biblio-n4578">[N4578]
+   <dd>Jared Hoberock. <a href="https://wg21.link/n4578">Working Draft, Technical Specification for C++ Extensions for Parallelism Version 2</a>. 22 February 2016. URL: <a href="https://wg21.link/n4578">https://wg21.link/n4578</a>
+   <dt id="biblio-p0124r2">[P0124R2]
+   <dd>Paul E. McKenney, Ulrich Weigand, Andrea Parri, Boqun Feng. <a href="https://wg21.link/p0124r2">Linux-Kernel Memory Model</a>. 26 June 2016. URL: <a href="https://wg21.link/p0124r2">https://wg21.link/p0124r2</a>
+   <dt id="biblio-p0528r0">[P0528R0]
+   <dd>JF Bastien, Michael Spencer. <a href="https://wg21.link/p0528r0">The Curious Case of Padding Bits, Featuring Atomic Compare-and-Exchange</a>. 12 November 2016. URL: <a href="https://wg21.link/p0528r0">https://wg21.link/p0528r0</a>
+   <dt id="biblio-p0528r1">[P0528R1]
+   <dd>JF Bastien; Michael Spencer. <a href="https://wg21.link/p0528r1">The Curious Case of Padding Bits, Featuring Atomic Compare-and-Exchange</a>. 6 February 2018. URL: <a href="https://wg21.link/p0528r1">https://wg21.link/p0528r1</a>
+   <dt id="biblio-p0603r0">[P0603R0]
+   <dd>Andrew Hunter. <a href="https://wg21.link/p0603r0">safe memcpy: A simpler implementation primitive for seqlock and friends</a>. URL: <a href="https://wg21.link/p0603r0">https://wg21.link/p0603r0</a>
+   <dt id="biblio-p0690r0">[P0690R0]
+   <dd>JF Bastien, Billy Robert O'Neal III. <a href="https://wg21.link/p0690r0">Tearable Atomics</a>. URL: <a href="https://wg21.link/p0690r0">https://wg21.link/p0690r0</a>
+   <dt id="biblio-seqlock">[SEQLOCK]
+   <dd>Hans-J. Boehm. <a href="http://safari.ece.cmu.edu/MSPC2012/slides_posters/boehm-slides.pdf">Can Seqlocks Get Along with Programming Language Memory Models?</a>. 16 June 2012. URL: <a href="http://safari.ece.cmu.edu/MSPC2012/slides_posters/boehm-slides.pdf">http://safari.ece.cmu.edu/MSPC2012/slides_posters/boehm-slides.pdf</a>
+   <dt id="biblio-threadsched">[ThreadSched]
+   <dd>Nimar S. Arora; Robert D. Blumofe; C. Greg Plaxton. <a href="https://www.eecis.udel.edu/~cavazos/cisc879-spring2008/papers/arora98thread.pdf">Thread Scheduling for Multiprogrammed Microprocessors</a>. June 1998. URL: <a href="https://www.eecis.udel.edu/~cavazos/cisc879-spring2008/papers/arora98thread.pdf">https://www.eecis.udel.edu/~cavazos/cisc879-spring2008/papers/arora98thread.pdf</a>
+   <dt id="biblio-wsdeque">[WSDeque]
+   <dd>David Chase; Yossi Lev. <a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.170.1097&amp;rep=rep1&amp;type=pdf">Dynamic Circular Work-Stealing Deque</a>. July 2005. URL: <a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.170.1097&amp;rep=rep1&amp;type=pdf">http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.170.1097&amp;rep=rep1&amp;type=pdf</a>
+  </dl>

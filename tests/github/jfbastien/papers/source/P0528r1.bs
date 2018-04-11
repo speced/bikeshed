@@ -1,0 +1,208 @@
+<pre class='metadata'>
+Title: The Curious Case of Padding Bits, Featuring Atomic Compare-and-Exchange
+Shortname: P0528
+Revision: 1
+Audience: SG1, EWG, CWG
+Status: P
+Group: WG21
+URL: http://wg21.link/P0528r1
+!Source: <a href="https://github.com/jfbastien/papers/blob/master/source/P0528r1.bs">github.com/jfbastien/papers/blob/master/source/P0528r1.bs</a>
+Editor: JF Bastien, Apple, jfbastien@apple.com
+Editor: Michael Spencer, Sony Playstation, bigcheesegs@gmail.com
+Abstract: Compare-and-exchange on a struct with padding bits should Just Work.
+Date: 2018-02-11
+Markup Shorthands: markdown yes
+</pre>
+
+This issue has been discussed by the authors at every recent Standards meetings,
+yet a full solution has been elusive despite helpful proposals. We believe that
+this proposal can fix this oft-encountered problem once and for all.
+
+[[P0528r0]] details extensive background on this problem (not repeated here),
+and proposed standardizing a trait, `has_padding_bits`, and using it on
+`compare_and_exchange_*`. This paper applies EWG guidance and simply adds a
+note.
+
+
+Edit History {#edit}
+============
+
+r0 → r1 {#r0r1}
+-------
+
+In Albuquerque, EWG voted to make the padding bits of `atomic` and the incoming
+value of `T` have a consistent value for the purposes of read/modify/write
+atomic operations?
+
+Purposefully not addressed in this paper:
+
+  * `union` with padding bits
+  * Types with trap representations
+
+Proposed Wording {#word}
+================
+
+In Operations on atomic types [**atomics.types.operations**], insert a new
+paragraph after the note in ❡1:
+
+<blockquote>
+
+[*Note:* Many operations are volatile-qualified. The "volatile as device
+register" semantics have not changed in the standard. This qualification means
+that volatility is preserved when applying these operations to volatile objects.
+It does not mean that operations on non-volatile objects become volatile. —*end
+note*]
+
+<ins>
+
+Atomic operations, both through `atomic<T>` and free-functions, can be performed
+on types `T` which contain bits that never participate in the object's
+representation. In such cases an implementation shall ensure that
+initialization, assignment, store, exchange, and read-modify-write operations
+replace bits which never participate in the object's representation with an
+implementation-defined value. A compatible implementation-defined value shall be
+used for compare-and-exchange operations' copy of the `expected` value.
+
+As a consequence, the following code is guaranteed to avoid spurious failure:
+
+<xmp>
+
+struct padded {
+  char c = 0x42;
+  // Padding here.
+  unsigned i = 0xC0DEFEFE;
+};
+atomic<padded> pad = ATOMIC_VAR_INIT({});
+
+bool success() {
+  padded expected, desired { 0, 0 };
+  return pad.compare_exchange_strong(expected, desired);
+}
+
+</xmp>
+
+[*Note:*
+
+  Types which contain bits that sometimes participate in the object's
+  representation, such as a `union` containing a type with padding bits and a
+  type without, may always fail compare-and-exchange when these bits are not
+  participating in the object's representation because they have an
+  indeterminate value. Such a program is ill-formed, no diagnostic required.
+
+—*end note*]
+
+</ins>
+
+</blockquote>
+
+Edit ❡17 and onwards as follows:
+
+<blockquote>
+
+*Requires:* The `failure` argument shall not be `memory_order::release` nor
+`memory_order::acq_rel`.
+
+*Effects:* Retrieves the value in `expected`. <ins>Bits in the retrieved value
+which never participate in the object's representation are set to a value
+compatible to that previously stored in the atomic object.</ins> It then
+atomically compares the contents of the memory pointed to by `this` for equality
+with that previously retrieved from `expected`, and if true, replaces the
+contents of the memory pointed to by `this` with that in `desired`. If and only
+if the comparison is true, memory is affected according to the value of
+`success`, and if the comparison is false, memory is affected according to the
+value of `failure`. When only one `memory_order` argument is supplied, the value
+of `success` is `order`, and the value of `failure` is `order` except that a
+value of `memory_order::acq_rel` shall be replaced by the value
+`memory_order::acquire` and a value of `memory_order::release` shall be replaced
+by the value `memory_order::relaxed`. If and only if the comparison is false
+then, after the atomic operation, the contents of the memory in `expected` are
+replaced by the value read from the memory pointed to by `this` during the
+atomic comparison. If the operation returns `true`, these operations are atomic
+read-modify-write operations on the memory pointed to by `this`. Otherwise,
+these operations are atomic load operations on that memory.
+
+*Returns:* The result of the comparison.
+
+[*Note:*
+
+  For example, the effect of `compare_exchange_strong` is
+  
+  <xmp>
+  
+    if (memcmp(this, &expected, sizeof(*this)) == 0)
+      memcpy(this, &desired, sizeof(*this));
+    else
+       memcpy(expected, this, sizeof(*this));
+
+  </xmp>
+
+—*end note*]
+
+[*Example:*
+
+  The expected use of the compare-and-exchange operations is as follows. The
+  compare-and-exchange operations will update `expected` when another iteration
+  of the loop is needed.
+  
+  <xmp>
+
+    expected = current.load();
+    do {
+      desired = function(expected);
+    } while (!current.compare_exchange_weak(expected, desired));
+
+  </xmp>
+  
+—*end example*]
+  
+[*Example:*
+
+  Because the expected value is updated only on failure, code releasing the
+  memory containing the `expected` value on success will work. E.g. list head
+  insertion will act atomically and would not introduce a data race in the
+  following code:
+  
+  <xmp>
+
+    do {
+      p->next = head; // make new list node point to the current head
+    } while (!head.compare_exchange_weak(p->next, p)); // try to insert
+
+  </xmp>
+  
+—*end example*]
+
+Implementations should ensure that weak compare-and-exchange operations do not
+consistently return `false` unless either the atomic object has value different
+from `expected` or there are concurrent modifications to the atomic object.
+
+
+*Remarks:* A weak compare-and-exchange operation may fail spuriously. That is,
+even when the contents of memory referred to by `expected` and `this` are equal,
+it may return `false` and store back to `expected` the same memory contents that
+were originally there.
+
+[*Note:*
+
+  This spurious failure enables implementation of compare-and-exchange on a
+  broader class of machines, e.g., load-locked store-conditional machines. A
+  consequence of spurious failure is that nearly all uses of weak
+  compare-and-exchange will be in a loop. When a compare-and-exchange is in a
+  loop, the weak version will yield better performance on some platforms. When a
+  weak compare-and-exchange would require a loop and a strong one would not, the
+  strong one is preferable.
+
+—*end note*]
+
+[*Note:*
+
+  The `memcpy` and `memcmp` semantics of the compare-and-exchange operations may
+  result in failed comparisons for values that compare equal with `operator==`
+  if the underlying type has padding bits<ins> which sometimes participate in
+  the object's representation</ins>, trap bits, or alternate representations of
+  the same value<ins> other than those caused by padding bits which never
+  participate in the object's representation</ins>.
+
+—*end note*]
+
+</blockquote>
