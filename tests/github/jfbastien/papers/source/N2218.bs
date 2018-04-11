@@ -1,0 +1,250 @@
+<pre class='metadata'>
+Title: Signed Integers are Two's Complement
+Shortname: 2218
+Revision: 0
+Status: NP
+Group: WG14
+!Source: <a href="https://github.com/jfbastien/papers/blob/master/source/N2218.bs">github.com/jfbastien/papers/blob/master/source/N2218.bs</a>
+Editor: JF Bastien, Apple, jfbastien@apple.com
+Abstract: There is One True Representation for signed integers, and that representation is two's complement.
+Date: 2018-03-26
+Markup Shorthands: markdown yes
+Toggle Diffs: no
+</pre>
+
+
+Introduction {#intro}
+============
+
+[[C11]] Integer types allows three representations for signed integral types:
+
+  * Signed magnitude
+  * Ones' complement
+  * Two's complement
+
+See [[#c-sign]] for full wording.
+
+C++17 goes further than C and only requires that "the representations of
+integral types shall define values by use of a pure binary numeration
+system". To the author's knowledge no modern machine uses both C++ and a signed
+integer representation other than two's complement (see [[#survey]]). None of
+[[MSVC]], [[GCC]], and [[LLVM]] support other representations. This means that
+the C++ that is taught is effectively two's complement, and the C++ that is
+written is two's complement. It is extremely unlikely that there exist any
+significant codebase developed for two's complement machines that would actually
+work when run on a non-two's complement machine.
+
+C and C++ as specified, however, are not two's complement. Signed integers
+currently allow the existence of an extraordinary value which traps, extra
+padding bits, integral negative zero, and introduce undefined behavior and
+implementation-defined behavior for the sake of this *extremely* abstract
+machine.
+
+[[P0907r1]] stands to change C++20 and make two's complement the only signed
+integer representation that is supported. WG21 wants to hear from WG14 before
+making this change, and hopes that WG14 will be interested in making the same
+changes. Aaron Ballman has volunteered to present this paper at the WG14 Brno
+meeting, as well as with the C Safety and Security study group.
+
+Based on guidance received from this paper, The author is happy to write a
+follow-up proposal with wording for WG14. The author will communicate WG14's
+feedback to WG21 at the Rappersvil meeting in June 2018.
+
+Details {#details}
+=======
+
+The following is proposed to C++:
+
+  * *Status-quo* Signed integer arithmetic remains non-commutative in general
+    (though some implementations may guarantee that it is).
+  * *Change* `bool` is represented as `0` for `false` and `1` for `true`. All
+    other representations are undefined.
+  * *Change* `bool` only has value bits, no padding bits.
+  * *Change* Signed integers are two's complement.
+  * *Change* If there are *M* value bits in the signed type and *N* in the
+    unsigned type, then *M = N-1* (whereas C says *M ≤ N*).
+  * *Status-quo* If a signed operation would naturally produce a value that is
+    not within the range of the result type, the behavior is undefined.
+  * *Change* None of the integral types have extraordinary values.
+  * *Change* C11 note 53 has wording aroung trap representations within padding
+    bits, e.g. for parity bits. C++ has no such wording.
+  * *Change* Conversion from signed to unsigned is always well-defined: the
+    result is the unique value of the destination type that is congruent to the
+    source integer modulo 2<sup>N</sup>.
+  * *Change* Conversion from enumeration type to integral is the same as that of
+    converting from the enumeration's underlying type and then to the
+    destination type, even if the original value cannot be represented by the
+    specified type.
+  * *Status-quo* Conversion from integral type to enumeration is unchanged: if
+    the original value is not within the range of the enumeration values the
+    behavior is undefined.
+  * *Change* Left-shift on signed integer types produces the same results as
+    left-shift on the corresponding unsigned integer type.
+  * *Change* Right-shift is an arithmetic right shift which performs
+    sign-extension.
+  * *Status-quo* shift by larger-than or equal-to bit-width remains undefined.
+  * *Status-quo* `constexpr` evaluation of signed integer arithmetic with
+    undefined result is not a *core constant expression*.
+  * *Change* the range of enumerations without a fixed underlying type is
+    simplified because of two's complement.
+  * *Status-quo* `is_modulo` type trait remains `false` for signed integer types
+    unless an implementation chooses to defined overflow as wrap.
+  * `has_unique_object_representations<T>` is `true` for `bool` and signed
+    integer types, in addition to unsigned integer types and others before.
+  * *Status-quo* atomic operations on signed integer types continues not to have
+    undefined behavior, and is still specified to wrap as two's complement (the
+    definition is clarified to act as-if casting to unsigned and back).
+  * *Change* address [[LWG3047]] to remove undefined behavior in pre-increment
+    atomic operations.
+
+
+C Signed Integer Wording {#c-sign}
+========================
+
+The following is the wording on integers from the C11 Standard.
+
+<blockquote>
+
+  For unsigned integer types other than unsigned char, the bits of the object
+  representation shall be divided into two groups: value bits and padding bits
+  (there need not be any of the latter). If there are *N* value bits, each bit
+  shall represent a different power of 2 between 1 and 2<sup>N−1</sup>, so that
+  objects of that type shall be capable of representing values from 0 to
+  2<sup>N</sup> − 1 using a pure binary representation; this shall be known as
+  the value representation. The values of any padding bits are unspecified.
+
+  For signed integer types, the bits of the object representation shall be
+  divided into three groups: value bits, padding bits, and the sign bit. There
+  need not be any padding bits; `signed char` shall not have any padding bits.
+  There shall be exactly one sign bit. Each bit that is a value bit shall have
+  the same value as the same bit in the object representation of the
+  corresponding unsigned type (if there are *M* value bits in the signed type
+  and *N* in the unsigned type, then M ≤ N). If the sign bit is zero, it shall
+  not affect the resulting value. If the sign bit is one, the value shall be
+  modified in one of the following ways:
+
+    * the corresponding value with sign bit 0 is negated (*sign and magnitude*);
+    * the sign bit has the value −(2<sup>M</sup>) (*two’s complement*);
+    * the sign bit has the value −(2<sup>M</sup> − 1) (*ones’ complement*).
+
+  Which of these applies is implementation-defined, as is whether the value with
+  sign bit 1 and all value bits zero (for the first two), or with sign bit and
+  all value bits 1 (for ones’ complement), is a trap representation or a normal
+  value. In the case of sign and magnitude and ones’ complement, if this
+  representation is a normal value it is called a *negative zero*.
+
+  If the implementation supports negative zeros, they shall be generated only
+  by:
+
+    * the `&`, `|`, `^`, `~`, `<<`, and `>>` operators with operands that produce such a value;
+    * the `+`, `-`, `*`, `/`, and `%` operators where one operand is a negative zero and the result is zero;
+    * compound assignment operators based on the above cases.
+
+  It is unspecified whether these cases actually generate a negative zero or a
+  normal zero, and whether a negative zero becomes a normal zero when stored in
+  an object.
+
+  If the implementation does not support negative zeros, the behavior of the
+  `&`, `|`, `^`, `~`, `<<`, and `>>` operators with operands that would produce
+  such a value is undefined.
+
+  The values of any padding bits are unspecified. A valid (non-trap) object
+  representation of a signed integer type where the sign bit is zero is a valid
+  object representation of the corresponding unsigned type, and shall represent
+  the same value. For any integer type, the object representation where all the
+  bits are zero shall be a representation of the value zero in that type.
+
+  The *precision* of an integer type is the number of bits it uses to represent
+  values, excluding any sign and padding bits. The *width* of an integer type is
+  the same but including any sign bit; thus for unsigned integer types the two
+  values are the same, while for signed integer types the width is one greater
+  than the precision.
+
+</blockquote>
+
+
+Survey of Signed Integer Representations {#survey}
+========================================
+
+Here is a non-comprehensive history of signed integer representations:
+
+  * Two's complement
+  
+      * John von Neumann suggested use of two's complement binary representation in his 1945 First Draft of a Report on the EDVAC proposal for an electronic stored-program digital computer.
+      * The 1949 EDSAC, which was inspired by the First Draft, used two's complement representation of binary numbers.
+      * Early commercial two's complement computers include the Digital Equipment Corporation PDP-5 and the 1963 PDP-6.
+      * The System/360, introduced in 1964 by IBM, then the dominant player in the computer industry, made two's complement the most widely used binary representation in the computer industry.
+      * The first minicomputer, the PDP-8 introduced in 1965, uses two's complement arithmetic as do the 1969 Data General Nova, the 1970 PDP-11.
+  
+  * Ones' complement
+  
+      * Many early computers, including the CDC 6600, the LINC, the PDP-1, and the UNIVAC 1107.
+      * Successors of the CDC 6600 continued to use ones' complement until the late 1980s.
+      * Descendants of the UNIVAC 1107, the UNIVAC 1100/2200 series, continue to do so, although ClearPath machines are a common platform that implement either the 1100/2200 architecture (the ClearPath IX series) or the Burroughs large systems architecture (the ClearPath NX series). Everything is common except the actual CPUs, which are implemented as ASICs. In addition to the IX (1100/2200) CPUs and the NX (Burroughs large systems) CPU, the architecture had Xeon (and briefly Itanium) CPUs. Unisys' goal was to provide an orderly transition for their 1100/2200 customers to a more modern architecture.
+  
+  * Signed magnitude
+  
+      * The IBM 700/7000 series scientific machines use sign/magnitude notation, except for the index registers which are two's complement.
+
+<a href="https://en.wikipedia.org/wiki/Two%27s_complement">Wikipedia</a> offers
+more details and has comprehensive sources for the above.
+
+Thomas Rodgers surveyed popular DSPs and found the following:
+
+  * SHARC family ships
+    [a C++ compiler](http://www.analog.com/media/en/dsp-documentation/software-manuals/cces-SharcCompiler-manual.pdf)
+    which supports C++11, and where signed integers are two's complement.
+  * Freescale/NXP ships
+    [a C++ compiler](https://www.nxp.com/docs/en/reference-manual/SC_COMPILER_USERS_GUIDE.pdf)
+    which supports C++03, and where signed integers are two's complement
+    ([reference](https://www.nxp.com/docs/en/reference-manual/MNSC140CORE.pdf)).
+  * Texas Instruments ships
+    [a C++ compiler](http://www.ti.com/lit/ug/slau132r/slau132r.pdf) which
+    supports C++14, and where signed integers are two's complement.
+  * CML Microcircuits has fixed ASIC for radio processing, and doesn't seem to
+    support C++.
+  * [Cirrus Logic](https://www.cirrus.com/products/cs4970xx/) (formerly Wolfson)
+    has
+    [a C compiler only](https://d3uzseaevmutz1.cloudfront.net/pubs/manual/cirrus_c_compiler_um15.pdf)
+    which is probably two's complement.
+  * Synaptics (formerly Connexant) makes audio input subsystem for voice
+    assistants. The DSP runs fixed far-field signal processing algorithms and
+    has programmable functions which run on standard ARM controller, using
+    Raspbian.
+
+In short, the only machine the author could find using non-two's complement are
+made by Unisys, and no counter-example was brought by any member of the C++
+standards committee. Nowadays Unisys emulates their old architecture using x86
+CPUs with attached FPGAs for customers who have legacy applications which
+they've been unable to migrate. These applications are unlikely to be well
+served by modern C++, signed integers are the least of their
+problem. Post-modern C++ should focus on serving its existing users well, and
+incoming users should be blissfully unaware of integer esoterica.
+
+
+<pre class=biblio>
+{
+    "C11": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf",
+        "title": "Programming Languages — C",
+        "publisher": "ISO/IEC JTC1 SC22 WG14"
+    },
+    "MSVC": {
+        "href": "https://docs.microsoft.com/en-us/cpp/c-language/integers",
+        "title": "MSVC C Implementation-Defined Behavior: Integers"
+    },
+    "GCC": {
+        "href": "https://gcc.gnu.org/onlinedocs/gcc/Integers-implementation.html",
+        "title": "GCC C Implementation-Defined Behavior: Integers"
+    },
+    "LLVM": {
+        "href": "https://llvm.org/docs/LangRef.html",
+        "title": "LLVM Language Reference Manual"
+    },
+    "P0907r1": {
+        "href": "https://wg21.link/P0907r1",
+        "title": "Signed integers are two's complement",
+        "authors": ["JF Bastien"]
+    }
+}
+</pre>

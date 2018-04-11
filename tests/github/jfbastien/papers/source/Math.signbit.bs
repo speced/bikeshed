@@ -1,0 +1,150 @@
+<pre class='metadata'>
+Title: Math.signbit
+Shortname: Math.signbit
+Revision: 0
+Status: Stage1
+Group: TC39
+!Source: <a href="https://github.com/jfbastien/papers/blob/master/source/Math.signbit.bs">github.com/jfbastien/papers/blob/master/source/Math.signbit.bs</a>
+Editor: JF Bastien, Apple, jfbastien@apple.com
+ED:
+Abstract:
+Date: 2017-01-26
+Markup Shorthands: markdown yes
+</pre>
+
+IEEE 754 has a precise meaning for *sign bit*. JavaScript's `Math.sign` falls
+short on `-0.0` and `+0.0`. This is a shortcoming of a "batteries included"
+approach to language design.
+
+Correctly obtaining the sign bit of a Number in JavaScript is somewhat
+unintuitive: the naïve `x < 0` approach fails if `x` is `-0.0` because `0.0` and
+`-0.0` compare equal to each other.
+
+One can instead rely on division by zero returning one of `-Infinity` or
+`+Infinity`: `1.0 / x < 0`. This now has the interesting caveat of returning
+`NaN` if `x` was `NaN`. It's also highly counter-intuitive.
+
+JavaScript aficionado will know that `Object.is(-0, x)` will return `true` when
+`x` is `-0` but not when it's `0`. This is surprising for developers who are
+more numerics-oriented than object-—dare I say prototype-?—oriented. These
+developers just want the sign bit, IEEE 754 has a very precise definition of
+what the sign bit is, and why can't JavaScript just give them the sign bit?
+
+This issue [has been discussed previously](https://esdiscuss.org/topic/math-sign-vs-0)
+but was never addressed. We believe that this proposal can fix this
+oft-encountered problem once and for all.
+
+
+Revision History {#rev}
+================
+
+* Presented at the [2017-01](https://github.com/tc39/agendas/blob/master/2017/01.md) TC39 meeting and moved to Stage 1.
+
+
+Background {#bg}
+==========
+
+IEEE 754 {#ieee754}
+--------
+
+[[IEEE754]] section 5.5.1 defines *sign bit operations*. These operations are
+quiet-computational operations which only affect the sign bit of the arithmetic
+format. The operations treat floating-point numbers and NaNs alike, and signal
+no exception. As defined, they may propagate non-canonical encodings.
+
+The following operations are defined:
+
+* `copy`
+* `negate`
+* `abs`
+
+C / C++ {#cpp}
+-------
+
+[[C]] and [[Cpp]] define `signbit` in `<math.h>` and `<cmath>` respectively. It
+returns a nonzero `int` value if and only if the sign of its argument value is
+negative. The `signbit` macro reports the sign of all values, including
+infinities, zeros, and NaNs.
+
+Go {#go}
+---
+
+[[Go]]'s math package defines `Signbit` as `true` if `x` is negative or negative
+zero. While the specification is silent on NaN,
+[the implementation](https://golang.org/src/math/signbit.go) clearly extracts the
+sign bit regardless of NaN-ness.
+
+`Math.sign` {#sign}
+-----------
+
+JavaScript provides `Math.sign` which is specified as follows:
+
+<blockquote>
+
+  Returns the sign of the x, indicating whether x is positive, negative or zero.
+
+  * If `x` is `NaN`, the result is `NaN`.
+  * If `x` is `-0`, the result is `-0`.
+  * If `x` is `+0`, the result is `+0`.
+  * If `x` is negative and not `-0`, the result is `-1`.
+  * If `x` is positive and not `+0`, the result is `+1`.
+
+</blockquote>
+
+This falls short when dealing with `-0` and `+0` since these values both compare
+equal.
+
+
+Proposal {#proposal}
+========
+
+Given existing precedent as well as common hardware support, we propose adding
+`Math.signbit` to JavaScript as follows.
+
+`Math.signbit(x)` {#spec}
+-----------------
+
+Returns whether the sign bit of `x` is set.
+
+1. If `n` is `NaN`, the result is `false`.
+1. If `n` is `-0`, the result is `true`.
+1. If `n` is negative, the result is `true`.
+1. Otherwise, the result is `false`.
+
+  Note: The "Function Properties of the Math Object" section already states:
+  "Each of the following `Math` object functions applies the `ToNumber` abstract
+  operation to each of its argument."
+
+Alternatives {#alts}
+------------
+
+This proposal makes decisions which TC39 may want to consider modifying:
+
+* Coercison `ToNumber`.
+* The return type is Boolean.
+* NaN is equivalent to a positive number.
+
+
+<pre class=biblio>
+{
+    "IEEE754": {
+        "href": "https://standards.ieee.org/findstds/standard/754-2008.html",
+        "title": "IEEE 754-2008",
+        "publisher": "IEEE Computer Society"
+    },
+    "C": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf",
+        "title": "Programming Languages — C",
+        "publisher": "ISO/IEC JTC1 SC22 WG14"
+    },
+    "Cpp": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3797.pdf",
+        "title": "Programming Languages — C++",
+        "publisher": "ISO/IEC JTC1 SC22 WG21"
+    },
+    "Go": {
+        "href": "https://golang.org/pkg/math/",
+        "title": "The Go Programming Language — Package math"
+    }
+}
+</pre>

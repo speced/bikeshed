@@ -1,0 +1,130 @@
+<pre class='metadata'>
+Title: Throwing out of a parallel algorithm terminates—but how?
+Shortname: P0502
+Revision: 0
+Audience: SG1, LWG
+Status: P
+Group: WG21
+URL: http://wg21.link/P0502r0
+!Source: <a href="https://github.com/jfbastien/papers/blob/master/source/P0502r0.bs">github.com/jfbastien/papers/blob/master/source/P0502r0.bs</a>
+Editor: JF Bastien, Apple, jfbastien@apple.com
+Editor: Bryce Adelstein Lelbach, Lawrence Berkeley National Laboratory, balelbach@lbl.gov
+Editor: H. Carter Edwards, Sandia National Laboratory, hcedwar@sandia.gov
+Abstract: The Committee approves of terminating if exceptions leave parallel algorithms, but where to mandate termination should be updated.
+Date: 2016-11-09
+Markup Shorthands: markdown yes
+Toggle Diffs: yes
+</pre>
+
+Background {#bg}
+==========
+
+The Standard was simplified in [[P0394r4]]: exceptions leaving parallel algorithms lead to `std::terminate()` being called. This matches the behavior of exceptions leaving `main()` as well as `std::thread()`.
+
+The following National Body comments from [[P0488R0]] were discussed in SG1 at Issaquah, along with [[p0451r0]]:
+
+* US 15, US 167: Don't `terminate()` when a parallel algorithm exits via uncaught exception and either re-add `exception_list`, add `noexcept` policies + re-add `exception_list`, make it UB or throw an unspecified exception (revert [[P0394r4]]).
+* US 17, US 169: Don't `terminate()` when a parallel algorithm exits via uncaught exception and re-add `exception_list` (revert [[P0394r4]]).
+* US 16, US 168: Clarify which exception is thrown when a parallel algorithm exits via uncaught exception.
+* US 170: Add a customization point for `ExecutionPolicy`s which defines their exception handling behavior (don't re-add `exception_list`).
+* CA 17: Preserve the `terminate()`-on-uncaught-exception behavior in the parallel algorithms (keep [[P0394r4]]).
+
+Straw Polls {#straw}
+-----------
+
+The following straw polls were taken:
+
+**Straw Poll A:** In 25.2.4 ❡2, have uncaught exception behavior be defined by `ExecutionPolicy`. In 20.19 define the behavior for the three standard policies in C++17 (`seq`, `par`, `par_unseq`) as `terminate()`.
+
+<table class="def">
+<tr><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+<tr><th>Many</th><th>7</th><th>1</th><th>1</th><th>0</th></tr>
+</table>
+
+⟹ Consensus to write a paper for this before the end of the week. Bryce, JF, and Carter will write it.
+
+**Straw Poll B:** Do we want to rename the policies to reflect the fact that they call `terminate()` instead of throwing exceptions.
+
+<table class="def">
+<tr><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+<tr><th>1</th><th>7</th><th>9</th><th>6</th><th>7</th></tr>
+</table>
+
+⟹ No consensus for change.
+
+**Straw Poll C:** Beyond the changes from the first straw poll, additional changes are required.
+
+<table class="def">
+<tr><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+<tr><th>2</th><th>0</th><th>10</th><th>11</th><th>6</th></tr>
+</table>
+
+⟹ No consensus for change.
+
+Action {#boom}
+------
+
+This paper follows the guidance from *straw poll A*: there is no behavior change, but the behavior is specified to allow future execution policies which exhibit different behavior.
+
+
+Proposed Wording {#word}
+================
+
+Apply the following edits to section 15.5.1 ❡1 note, bullet 1.13:
+
+<blockquote>
+
+  15.5.1 The `std::terminate()` function [**except.terminate**]
+
+  1. In some situations exception handling must be abandoned for less subtle error handling techniques. [ *Note:* These situations are:
+
+  […]
+
+  (1.13) — <ins>for parallel algorithms whose `ExecutionPolicy` specify such behavior (20.19.4, 20.19.5, 20.19.6), </ins>when execution of an element access function (25.2.1) of a parallel algorithm exits via an exception (25.2.4), or
+
+  […]
+
+  *— end note* ]
+
+</blockquote>
+
+Apply the following edits to section 20.19:
+
+<blockquote>
+
+  20.19.4 Sequential execution policy [**execpol.seq**]
+
+  <xmp>class execution::sequenced_policy { unspecified };</xmp>
+
+  1. The class `execution::sequenced_policy` is an execution policy type used as a unique type to disambiguate parallel algorithm overloading and require that a parallel algorithm’s execution may not be parallelized.
+  2. <ins>During the execution of a parallel algorithm with the `execution::sequenced_policy` policy, if the invocation of an element access function exits via an uncaught exception, `terminate()` shall be called.</ins>
+
+  20.19.5 Parallel execution policy [**execpol.par**]
+
+  <xmp>class execution::parallel_policy { unspecified };</xmp>
+
+  1. The class `execution::parallel_policy` is an execution policy type used as a unique type to disambiguate parallel algorithm overloading and indicate that a parallel algorithm’s execution may be parallelized.
+  2. <ins>During the execution of a parallel algorithm with the `execution::parallel_policy` policy, if the invocation of an element access function exits via an uncaught exception, `terminate()` shall be called.</ins>
+
+  20.19.6 Parallel+Vector execution policy [**execpol.vec**]
+
+  <xmp>class execution::parallel_unsequenced_policy { unspecified };</xmp>
+
+  1. The class `execution::parallel_unsequenced_policy` is an execution policy type used as a unique type to disambiguate parallel algorithm overloading and indicate that a parallel algorithm’s execution may be parallelized and vectorized.
+  2. <ins>During the execution of a parallel algorithm with the `execution::parallel_unsequenced_policy` policy, if the invocation of an element access function exits via an uncaught exception, `terminate()` shall be called.</ins>
+
+</blockquote>
+
+Apply the following edits to section 25.2.4 [**algorithms.parallel.exceptions**] ❡2:
+
+<blockquote>
+
+  During the execution of a parallel algorithm, if the invocation of an element access function exits via an uncaught exception, <ins>the behavior is determined by the `ExecutionPolicy`.</ins><del>`terminate()` is called.</del>
+
+</blockquote>
+
+
+Acknowledgement {#ack}
+===============
+
+Thank you to all SG1 participants: David Sankel, Alisdair Meredith, Hartmut Kaiser, Pablo Halpern, Jared Hoberock, Michael Wong, Pete Becker. Special thanks to the scribe Paul McKenney.

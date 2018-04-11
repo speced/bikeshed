@@ -1,0 +1,460 @@
+<pre class='metadata'>
+Title: Improving atomic_flag
+Shortname: P0995
+Revision: 0
+Audience: SG1, LEWG
+Status: P
+Group: WG21
+URL: http://wg21.link/P0995r0
+!Source: <a href="https://github.com/jfbastien/papers/blob/master/source/P0995r0.bs">github.com/jfbastien/papers/blob/master/source/P0995r0.bs</a>
+Editor: JF Bastien, Apple, jfbastien@apple.com
+Editor: Olivier Giroux, NVIDIA, ogiroux@nvidia.com
+Editor: Andrew Hunter, Google, ahh@google.com
+Abstract: atomic_flag is marginally useful. Improve it in light of the new wait / notify APIs.
+Date: 2018-03-17
+Markup Shorthands: markdown yes
+Toggle Diffs: no
+</pre>
+
+<style>
+ins .highlight:not(.idl) { background: rgba(0, 136, 0, 0.2); }
+</style>
+
+Introduction {#intro}
+============
+
+C++11 added `atomic_flag` to the language as the minimally-required class which
+could be used to implement `atomic<>` on hardware which seemed relevant at the
+time. Detailed `atomic_flag` history can be found in [[N2145]], [[N2324]], and
+[[N2393]]. The specification was quite successful at minimalism—the only member
+functions of `atomic_flag` are `test_and_set` and `clear`—but `atomic<>` was
+wildly more successful and to our knowledge has always been implemented with
+compiler support instead of with the very inefficient (but beautifully simple)
+`atomic_flag`. Our experience is that `atomic_flag`'s interface is so minimal as
+to be mostly useless, in particular it doesn't have a method which can load the
+flag's value without modifying it.
+
+We've heard of it being used as:
+
+  * A questionable spinloop (as was originally intended);
+  * A "check-in" flag used to know when at least one thread has reached a
+    program location.
+
+The one special power `atomic_flag` has is in being the only type which is
+guaranteed to be lock-free, albeit a mostly powerless one.
+
+SG1 tried to salvage `atomic_flag` in [[P0514R0]] by adding `set`, `test`,
+`wait`, `wait_until`, and `wait_for` methods but decided to leave it as-is and
+implement efficient waiting differently, eventually going for [[P0514R3]].
+
+The time has come to thank `atomic_flag` for serving its purpose as an
+implementability stand-in, and help it find its true purpose. We propose:
+
+  * Adding a `test` method to it as [[P0514R0]] did. This could technically
+    forbids some ancestral processors from implementing modern C++, but these
+    platforms already don't support any C++.
+  * Add `atomic_flag` overloads to [[P0514R3]]'s waiting and notify functions.
+  * Add optional always-lock-free integral type aliases, which are encouraged to
+    be sized such that waiting on them is most efficient.
+
+This paper was written in Jacksonville and presented to SG1, which unanimously
+forwarded the paper to LEWG. LEWG looked at the paper and took the following
+poll:
+
+<table class="def">
+<tr><th></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+<tr><th>Make the type aliases non-optional.</th>
+<th>1</th><th>4</th><th>4</th><th>2</th><th>2</th></tr>
+</table>
+
+The types were made optional in case an architecture, such as PA-RISC, cannot
+support always-lock-free integral types because no compare-and-exchange
+instruction is available. There was no consensus for making aliases required,
+though concern was expressed that LEWG doesn't usually make functionality
+optional. In the C++ standard library optionality is present as follows:
+
+  * `intN_t` / `uintN_t` are mandated by C, "if an implementation provides integer
+    types with widths of 8, 16, 32, or 64 bits, no padding bits, and (for the
+    signed types) that have a two’s complement representation";
+  * `abs` and `div` overloads "if and only if the type `intmax_t` designates an
+    extended integer type";
+  * The library `allocator_traits` template has optional requirements.
+
+There was also discussion about ABI breakage to `atomic_flag`. An argument was
+made that `atomic_flag` should also be sized such that waiting on them is most
+efficient (which would be an ABI breakage), and if that breakage doesn't occur
+then adding wait / notify overloads is actively misleading. LEWG want SG1 to
+reconsider whether the overloads should be provided.
+
+
+Wording {#word}
+=======
+
+Under Header `<atomic>` synopsis [**atomics.syn**] edit as follows:
+
+<blockquote>
+
+<xmp>
+// 32.3, type aliases
+
+// ...
+</xmp>
+
+<ins>
+<xmp>
+using atomic_signed_lock_free   = see below; // optional
+using atomic_unsigned_lock_free = see below; // optional
+</xmp>
+</ins>
+
+<xmp>
+// 32.8, flag type and operations
+struct atomic_flag;
+</xmp>
+<ins>
+<xmp>
+bool atomic_flag_test(volatile atomic_flag*) noexcept;
+bool atomic_flag_test(atomic_flag*) noexcept;
+bool atomic_flag_test_explicit(volatile atomic_flag*, memory_order) noexcept;
+bool atomic_flag_test_explicit(atomic_flag*, memory_order) noexcept;
+</xmp>
+</ins>
+<xmp>
+bool atomic_flag_test_and_set(volatile atomic_flag*) noexcept;
+bool atomic_flag_test_and_set(atomic_flag*) noexcept;
+bool atomic_flag_test_and_set_explicit(volatile atomic_flag*, memory_order) noexcept; bool atomic_flag_test_and_set_explicit(atomic_flag*, memory_order) noexcept;
+void atomic_flag_clear(volatile atomic_flag*) noexcept;
+void atomic_flag_clear(atomic_flag*) noexcept;
+void atomic_flag_clear_explicit(volatile atomic_flag*, memory_order) noexcept;
+void atomic_flag_clear_explicit(atomic_flag*, memory_order) noexcept;
+#define ATOMIC_FLAG_INIT see below
+</xmp>
+
+<xmp>
+// 32.10, waiting and notifying functions
+template <class T>
+  void atomic_notify_one(const volatile atomic<T>*);
+template <class T>
+  void atomic_notify_one(const atomic<T>*);
+</xmp>
+
+<ins>
+<xmp>
+void atomic_notify_one(const volatile atomic_flag*);
+void atomic_notify_one(const atomic_flag*);
+</xmp>
+</ins>
+
+<xmp>
+template <class T>
+  void atomic_notify_all(const volatile atomic<T>*);
+template <class T>
+  void atomic_notify_all(const atomic<T>*);
+</xmp>
+
+<ins>
+<xmp>
+void atomic_notify_all(const volatile atomic_flag*);
+void atomic_notify_all(const atomic_flag*);
+</xmp>
+</ins>
+
+<xmp>
+template <class T>
+  void atomic_wait(const volatile atomic<T>*,
+                   typename atomic<T>::value_type);
+template <class T>
+  void atomic_wait(const atomic<T>*, typename atomic<T>::value_type);
+</xmp>
+
+<ins>
+<xmp>
+void atomic_wait(const volatile atomic_flag*, bool);
+void atomic_wait(const atomic_flag*, bool);
+</xmp>
+</ins>
+
+<xmp>
+template <class T>
+  void atomic_wait_explicit(const volatile atomic<T>*,
+                            typename atomic<T>::value_type,
+                            memory_order);
+template <class T>
+  void atomic_wait_explicit(const atomic<T>*,
+                            typename atomic<T>::value_type, memory_order);
+</xmp>
+
+<ins>
+<xmp>
+void atomic_wait_explicit(const volatile atomic_flag*, bool, memory_order);
+void atomic_wait_explicit(const atomic_flag*, bool, memory_order);
+</xmp>
+</ins>
+
+</blockquote>
+
+In Atomic operations library [**atomics**], under Type aliases
+[**atomics.alias**], edit as follows:
+
+<blockquote>
+
+The type aliases `atomic_intN_t`, `atomic_uintN_t`, `atomic_intptr_t`, and
+`atomic_uintptr_t` are defined if and only if `intN_t`, `uintN_t`, `intptr_t`,
+and `uintptr_t` are defined, respectively.
+
+<ins>
+
+The type aliases `atomic_signed_lock_free` and `atomic_unsigned_lock_free` are
+defined to be specializations of `atomic` whose template arguments are integral
+types, respectively signed and unsigned, other than `bool`.
+`is_always_lock_free` shall be `true` for `atomic_signed_lock_free` and
+`atomic_unsigned_lock_free`. These aliases are optional. If an implementation
+provides a integral specialization of `atomic` other than `bool` for which
+`is_always_lock_free` is `true`, it shall define the aliases to such a
+type. Otherwise, they shall not be defined. An implementation should choose the
+integral specialization of `atomic` for which the waiting and notifying
+functions are most efficient.
+
+</ins>
+
+</blockquote>
+
+
+In Atomic operations library [**atomics**], under Flag type and operations
+[**atomics.flag**], edit as follows:
+
+<blockquote>
+
+<xmp>
+namespace std {
+  struct atomic_flag {
+</xmp>
+
+<ins>
+<xmp>
+    bool test(memory_order = memory_order_seq_cst) volatile noexcept;
+    bool test(memory_order = memory_order_seq_cst) noexcept;
+</xmp>
+</ins>
+
+<xmp>
+    bool test_and_set(memory_order = memory_order_seq_cst) volatile noexcept;
+    bool test_and_set(memory_order = memory_order_seq_cst) noexcept;
+    void clear(memory_order = memory_order_seq_cst) volatile noexcept;
+    void clear(memory_order = memory_order_seq_cst) noexcept;
+    atomic_flag() noexcept = default;
+    atomic_flag(const atomic_flag&) = delete;
+    atomic_flag& operator=(const atomic_flag&) = delete;
+    atomic_flag& operator=(const atomic_flag&) volatile = delete;
+  };
+</xmp>
+<ins>
+<xmp>
+bool atomic_flag_test(volatile atomic_flag*) noexcept;
+bool atomic_flag_test(atomic_flag*) noexcept;
+bool atomic_flag_test_explicit(volatile atomic_flag*, memory_order) noexcept;
+bool atomic_flag_test_explicit(atomic_flag*, memory_order) noexcept;
+</xmp>
+</ins>
+<xmp>
+  bool atomic_flag_test_and_set(volatile atomic_flag*) noexcept;
+  bool atomic_flag_test_and_set(atomic_flag*) noexcept;
+  bool atomic_flag_test_and_set_explicit(volatile atomic_flag*, memory_order) noexcept;
+  bool atomic_flag_test_and_set_explicit(atomic_flag*, memory_order) noexcept;
+  void atomic_flag_clear(volatile atomic_flag*) noexcept;
+  void atomic_flag_clear(atomic_flag*) noexcept;
+  void atomic_flag_clear_explicit(volatile atomic_flag*, memory_order) noexcept;
+  void atomic_flag_clear_explicit(atomic_flag*, memory_order) noexcept;
+  #define ATOMIC_FLAG_INIT see below
+}
+</xmp>
+
+The `atomic_flag` type provides the classic test-and-set functionality. It has
+two states, set and clear.
+
+Operations on an object of type `atomic_flag` shall be lock-free. [ *Note:*
+Hence the operations should also be address-free. *—end note*]
+
+The `atomic_flag` type is a standard-layout struct. It has a trivial default
+constructor and a trivial destructor.
+
+The macro `ATOMIC_FLAG_INIT` shall be defined in such a way that it can be used to initialize an object of
+type `atomic_flag` to the clear state. The macro can be used in the form:
+
+<xmp>atomic_flag guard = ATOMIC_FLAG_INIT;</xmp>
+
+It is unspecified whether the macro can be used in other initialization
+contexts. For a complete static-duration object, that initialization shall be
+static. Unless initialized with `ATOMIC_FLAG_INIT`, it is unspecified whether an
+`atomic_flag` object has an initial state of set or clear.
+
+<ins>
+<xmp>
+   bool atomic_flag_test(volatile atomic_flag* object) noexcept;
+   bool atomic_flag_test(atomic_flag* object) noexcept;
+   bool atomic_flag_test_explicit(volatile atomic_flag* object, memory_order order) noexcept;
+   bool atomic_flag_test_explicit(atomic_flag* object, memory_order order) noexcept;
+   bool atomic_flag::test(memory_order order = memory_order_seq_cst) volatile noexcept;
+   bool atomic_flag::test(memory_order order = memory_order_seq_cst) noexcept;
+</xmp>
+
+*Requires:* The `order` argument shall not be `memory_order_release` nor
+`memory_order_acq_rel`.
+
+*Effects:* Memory is affected according to the value of `order`.
+
+*Returns:* Atomically returns the value pointed to by `object` or `this`.
+
+</ins>
+
+<xmp>
+   bool atomic_flag_test_and_set(volatile atomic_flag* object) noexcept;
+   bool atomic_flag_test_and_set(atomic_flag* object) noexcept;
+   bool atomic_flag_test_and_set_explicit(volatile atomic_flag* object, memory_order order) noexcept;
+   bool atomic_flag_test_and_set_explicit(atomic_flag* object, memory_order order) noexcept;
+   bool atomic_flag::test_and_set(memory_order order = memory_order_seq_cst) volatile noexcept;
+   bool atomic_flag::test_and_set(memory_order order = memory_order_seq_cst) noexcept;
+</xmp>
+
+*Effects:* Atomically sets the value pointed to by `object` or by `this` to
+`true`. Memory is affected according to the value of `order`. These operations
+are atomic read-modify-write operations (4.7).
+
+*Returns:* Atomically, the value of the object immediately before the effects.
+
+<xmp>
+void atomic_flag_clear(volatile atomic_flag* object) noexcept;
+void atomic_flag_clear(atomic_flag* object) noexcept;
+void atomic_flag_clear_explicit(volatile atomic_flag* object, memory_order order) noexcept;
+void atomic_flag_clear_explicit(atomic_flag* object, memory_order order) noexcept;
+void atomic_flag::clear(memory_order order = memory_order_seq_cst) volatile noexcept;
+void atomic_flag::clear(memory_order order = memory_order_seq_cst) noexcept;
+</xmp>
+
+*Requires:* The `order` argument shall not be `memory_order_consume`,
+`memory_order_acquire`, nor `memory_order_acq_rel`.
+
+*Effects:* Atomically sets the value pointed to by `object` or by `this` to
+`false`. Memory is affected according to the value of `order`.
+
+</blockquote>
+
+
+In Atomic operations library [**atomics**], under Waiting and notifying
+functions [**atomics.wait**], edit as follows:
+
+<blockquote>
+
+The functions in this subclause provide a mechanism to wait for the value of an
+atomic object to change, more efficiently than can be achieved with polling.
+Waiting functions in this facility may block until they are unblocked by
+notifying functions, according to each function’s effects. [*Note:* Programs
+are not guaranteed to observe transient atomic values, an issue known as the
+A-B-A problem, resulting in continued blocking if a condition is only
+temporarily met. *– End Note.*]
+
+The functions `atomic_wait` and `atomic_wait_explicit` are waiting
+functions. The functions `atomic_notify_one` and `atomic_notify_all` are
+notifying functions.
+
+<xmp>
+template <class T>
+  void atomic_notify_one(const volatile atomic<T>* object);
+template <class T>
+  void atomic_notify_one(const atomic<T>* object);
+</xmp>
+
+<ins>
+<xmp>
+void atomic_notify_one(const volatile atomic_flag* object);
+void atomic_notify_one(const atomic_flag* object);
+</xmp>
+</ins>
+
+*Effects:* unblocks up to execution of a waiting function that blocked after
+observing the result of an atomic operation X, if there exists another atomic
+operation Y, such that X precedes Y in the modification order of `*object`, and
+Y happens-before this call.
+
+<xmp>
+template <class T>
+  void atomic_notify_all(const volatile atomic<T>* object);
+template <class T>
+  void atomic_notify_all(const atomic<T>* object);
+</xmp>
+
+<ins>
+<xmp>
+void atomic_notify_all(const volatile atomic_flag* object);
+void atomic_notify_all(const atomic_flag* object);
+</xmp>
+</ins>
+
+*Effects:* unblocks each execution of a waiting function that blocked after
+observing the result of an atomic operation X, if there exists another atomic
+operation Y, such that X precedes Y in the modification order of `*object`, and
+Y happens-before this call.
+
+<xmp>
+template <class T>
+  void atomic_wait_explicit(const volatile atomic<T>* object,
+                            typename atomic<T>::value_type old,
+                            memory_order order);
+template <class T>
+  void atomic_wait_explicit(const atomic<T>* object,
+                            typename atomic<T>::value_type old,
+                            memory_order order);
+</xmp>
+
+*Requires:* The order argument shall not be `memory_order_release` nor
+ `memory_order_acq_rel`.
+
+*Effects:* Repeatedly performs the following steps, in order:
+
+  1. Evaluates `object->load(order) != old` then, if the result is `true`, returns.
+  2. Blocks until an implementation-defined condition has been met. [*Note:*
+     Consequently, it may unblock for reasons other than a call to a notifying
+     function. *- end note*]
+
+<ins>
+<xmp>
+void atomic_wait_explicit(const volatile atomic_flag* object, bool old, memory_order order);
+void atomic_wait_explicit(const atomic_flag* object, bool old, memory_order order);
+</xmp>
+
+*Effects:* Repeatedly performs the following steps, in order:
+
+  1. Evaluates `object->test(order) != old` then, if the result is `true`, returns.
+  2. Blocks until an implementation-defined condition has been met. [*Note:*
+     Consequently, it may unblock for reasons other than a call to a notifying
+     function. *- end note*]
+
+</ins>
+
+<xmp>
+template <class T>
+  void atomic_wait(const volatile atomic<T>* object,
+                   typename atomic<T>::value_type old);
+template <class T>
+  void atomic_wait(const atomic<T>* object,
+                   typename atomic<T>::value_type old);
+</xmp>
+
+<ins>
+<xmp>
+void atomic_wait(const volatile atomic_flag* object, bool old);
+void atomic_wait(const atomic_flag* object, bool old);
+</xmp>
+</ins>
+
+*Effects:* Equivalent to: `atomic_wait_explicit(object, old, memory_order_seq_cst);`
+
+</blockquote>
+
+Two feature test macros should be added:
+
+  * `__cpp_lib_atomic_flag_test` implies the `test` methods for `atomic_flag`
+    and free functions, as well as the notify and wait overloads for
+    `atomic_flag`, are available.
+  * `__cpp_lib_atomic_lock_free_type_aliases` implies `atomic_signed_lock_free`
+    and `atomic_unsigned_lock_free` types are defined.
