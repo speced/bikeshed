@@ -354,7 +354,7 @@ def lexerFromLang(lang):
     try:
         from pygments.lexers import get_lexer_by_name
         return get_lexer_by_name(lang, encoding="utf-8", stripAll=True)
-    except pyg.util.ClassNotFound:
+    except:
         return None
 
 
