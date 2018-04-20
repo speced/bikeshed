@@ -380,7 +380,7 @@ def addIndexOfExternallyDefinedTerms(doc, container):
         return
 
     ul = E.ul({"class": "index"})
-    for spec, refGroups in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0]):
+    for spec, refGroups in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0].upper()):
         # ref.spec is always lowercase; if the same string shows up in biblio data,
         # use its casing instead.
         biblioRef = doc.refs.getBiblioRef(spec, quiet=True)
