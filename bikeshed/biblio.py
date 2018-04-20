@@ -420,3 +420,100 @@ def findCloseBiblios(biblioKeys, target, n=5):
         else:
             addName(name, levenshtein(name, target))
     return sorted(s.strip() for s in superStrings) + [name.strip() for name,d in names]
+
+
+def dedupBiblioReferences(doc):
+    '''
+    SpecRef has checks in its database preventing multiple references from having the same URL.
+    Shepherd, while it doesn't have an explicit check for this,
+    should also generally have unique URLs.
+    But these aren't uniqued against each other.
+    So, if you explicitly biblio-link to a SpecRef spec,
+    and autolink to a Shepherd spec,
+    you might get two distinct biblio entries with the exact same URL.
+
+    This code checks for this,
+    and deletes Shepherd biblio if there's a SpecRef biblio with the same URL.
+    It then adjusts doc.externalRefsUsed to point to the SpecRef biblio.
+    '''
+
+    def isShepherdRef(ref):
+        return type(ref) == SpecBasedBiblioEntry
+
+    normSpecRefRefs = {}
+    normShepherdRefs = {}
+    informSpecRefRefs = {}
+    informShepherdRefs = {}
+    for ref in doc.normativeRefs.values():
+        if isShepherdRef(ref):
+            normShepherdRefs[ref.url] = ref
+        else:
+            normSpecRefRefs[ref.url] = ref
+    for ref in doc.informativeRefs.values():
+        if isShepherdRef(ref):
+            informShepherdRefs[ref.url] = ref
+        else:
+            informSpecRefRefs[ref.url] = ref
+    normSpecRefUrls    = set(normSpecRefRefs.keys())
+    normShepherdUrls   = set(normShepherdRefs.keys())
+    informSpecRefUrls  = set(informSpecRefRefs.keys())
+    informShepherdUrls = set(informShepherdRefs.keys())
+    specRefUrls = normSpecRefUrls | informSpecRefUrls
+    shepherdUrls = normShepherdUrls | informShepherdUrls
+    normativeUrls = normShepherdUrls | normSpecRefUrls
+    informativeUrls = informShepherdUrls | informSpecRefUrls
+    dupedUrls = shepherdUrls & specRefUrls
+
+    if not dupedUrls:
+        return
+
+    # If an informative duped URL is SpecRef,
+    # and a normative Shepherd version also exists,
+    # mark it for "upgrading", so the SpecRef becomes normative.
+    upgradeUrls = dupedUrls & informSpecRefUrls & normShepherdUrls
+    upgradeRefs = {}
+    for key,ref in doc.informativeRefs.items():
+        if ref.url in upgradeUrls:
+            upgradeRefs[ref.url] = ref
+            doc.informativeRefs.pop(key)
+
+    for key,ref in doc.normativeRefs.items():
+        if ref.url in upgradeUrls:
+            doc.normativeRefs[key] = upgradeRefs[ref.url]
+
+    for url in upgradeUrls:
+        normShepherdUrls.discard(url)
+        informSpecRefUrls.discard(url)
+        normSpecRefUrls.add(url)
+    shepherdUrls = normShepherdUrls | informShepherdUrls
+    specRefUrls = normSpecRefUrls | informSpecRefUrls
+    normativeUrls = normShepherdUrls | normSpecRefUrls
+    informativeUrls = informShepherdUrls | informSpecRefUrls
+    dupedUrls = shepherdUrls & specRefUrls
+
+    # Remove all the Shepherd refs that are left in duped
+    poppedKeys = defaultdict(dict)
+    for key,ref in doc.informativeRefs.items():
+        if ref.url in dupedUrls:
+            if isShepherdRef(ref):
+                doc.informativeRefs.pop(key)
+                poppedKeys[ref.url]["shepherd"] = key
+            else:
+                poppedKeys[ref.url]["specref"] = key
+    for key,ref in doc.normativeRefs.items():
+        if ref.url in dupedUrls:
+            if isShepherdRef(ref):
+                doc.normativeRefs.pop(key)
+                poppedKeys[ref.url]["shepherd"] = key
+            else:
+                poppedKeys[ref.url]["specref"] = key
+
+    # For every key that was popped,
+    # swap out the "externalRefsUsed" for that key
+    for keys in poppedKeys.values():
+        if "shepherd" not in keys or "specref" not in keys:
+            continue
+        if keys["shepherd"] in doc.externalRefsUsed:
+            for k,v in doc.externalRefsUsed[keys["shepherd"]].items():
+                doc.externalRefsUsed[keys["specref"]][k] = v
+        del doc.externalRefsUsed[keys["shepherd"]]

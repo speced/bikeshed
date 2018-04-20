@@ -8,6 +8,7 @@ import os
 from collections import defaultdict, OrderedDict
 from datetime import datetime
 
+from . import biblio
 from . import boilerplate
 from . import caniuse
 from . import config
@@ -180,6 +181,7 @@ class Spec(object):
         formatArgumentdefTables(self)
         formatElementdefTables(self)
         processAutolinks(self)
+        biblio.dedupBiblioReferences(self)
         caniuse.addCanIUsePanels(self)
         boilerplate.addIndexSection(self)
         boilerplate.addExplicitIndexes(self)
