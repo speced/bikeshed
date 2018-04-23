@@ -13,8 +13,8 @@ Editor:
     Gary Kacmarcik, Google, garykac@google.com
 Abstract:
 	This specification defines an API that allows websites to convert from a given
-	{{KeyboardEvent}}.{{KeyboardEvent/code}} value to a
-	{{KeyboardEvent}}.{{KeyboardEvent/key}} value that can be shown to the user to
+	{{KeyboardEvent/code}} value to a
+	valid {{KeyboardEvent/key}} value that can be shown to the user to
 	identify the given key.
 	The conversion from {{KeyboardEvent/code}} to {{KeyboardEvent/key}} is based on
 	the user's currently selected keyboard layout.
@@ -85,66 +85,69 @@ urlPrefix: http://www.w3.org/TR/uievents-code/#code-; type: dfn; spec: uievents-
 	<h3 id="keyboard-map-interface">Keyboard Interface</h3>
 
 		<pre class="idl" data-highlight="webidl">
-		interface KeyboardMap {
+		interface KeyboardLayoutMap {
 			readonly maplike&lt;DOMString, DOMString>;
 		};
 		</pre>
 		
-		<div id="keyboardmap-idl" dfn-for="KeyboardMap">
+		<div id="keyboardlayoutmap-idl" dfn-for="KeyboardLayoutMap">
 
-		The {{KeyboardMap}} is a readonly collection of mappings from
+		The {{KeyboardLayoutMap}} is a readonly collection of mappings from
 		{{KeyboardEvent/code}} values to {{KeyboardEvent/key}} values.
 
-		</div><!-- dfn-for KeyboardMap -->
+		</div><!-- dfn-for KeyboardLayoutMap -->
 		
 	<h3 id="keyboard-interface">Keyboard Interface</h3>
 
 		<pre class="idl" data-highlight="webidl">
 		[SecureContext, Exposed=Window] interface Keyboard {
-			KeyboardMap getKeyboardMap();
+			Promise&lt;KeyboardLayoutMap> getLayoutMap();
 		};
 		</pre>
 
-		Issue: Have getKeyboardMap return a Promise&lt;KeyboardMap&gt;?
-		See <a href="https://github.com/wicg/keyboard-map/issues/5">Github Issue #5</a>
-
 		<div id="keyboard-idl" dfn-for="Keyboard">
 
-		<div class="algorithm" data-algorithm="keyboard-getkeyboardmap">
-		<h4 id="h-keyboard-getkeyboardmap"><dfn>getKeyboardMap()</dfn></h4>
+		<div class="algorithm" data-algorithm="keyboard-getlayoutmap">
+		<h4 id="h-keyboard-getlayoutmap"><dfn>getLayoutMap()</dfn></h4>
 
-			When [=getKeyboardMap()=] is called, the user agent must
+			When [=getLayoutMap()=] is called, the user agent must
 			run the following steps:
 
-			1. Let |map| be a new {{KeyboardMap}} that is initially empty.
-		
-			1. For each value |code| in the "KeyboardEvent.code" column of the
-				[=Writing System Keys=] table
-
-				1. Let |layout| be the highest priority ASCII-capable keyboard layout,
-					or the highest priority keyboard layout if none of the available
-					layouts are ASCII-capable.
-
-					Issue: Do we need the ability to select the highest-prio layout
-					regardless of whether or not it is ASCII-capable?
-					See <a href="https://github.com/wicg/keyboard-map/issues/1">Github Issue #1</a>
-
-				1. If |code| is not a valid key in the |layout|, then continue
-				
-				1. Let |key| be the {{KeyboardEvent/key}} value that would be generated
-					by |layout|
-					if the key identified by |code| was pressed with no modifiers.
-
-				1. If |key| is a [=dead key=], then
-				
-					1. Set |key| to the string formed by a space " " followed by the
-						combining character that corresponds to the [=dead key=].
-						
-				1. Create a map entry |e| from the pair < |code|, |key| >
-				
-				1. Add |e| to |map|.
+			1. Let |p| be a new {{Promise}}.
 			
-			1. Return |map|.
+			1. Run the following steps [=in parallel=]:
+			
+				1. Let |map| be a new {{KeyboardLayoutMap}} that is initially empty.
+		
+				1. For each value |code| in the "KeyboardEvent code" column of the
+					[=Writing System Keys=] table
+
+					1. Let |layout| be the highest priority ASCII-capable keyboard layout,
+						or the highest priority keyboard layout if none of the available
+						layouts are ASCII-capable.
+
+						Issue: Do we need the ability to select the highest-prio layout
+						regardless of whether or not it is ASCII-capable?
+						See <a href="https://github.com/wicg/keyboard-map/issues/1">Github Issue #1</a>
+
+					1. If |code| is not a valid key in the |layout|, then continue
+				
+					1. Let |key| be the {{KeyboardEvent/key}} value that would be generated
+						by |layout|
+						if the key identified by |code| was pressed with no modifiers.
+
+					1. If |key| is a [=dead key=], then
+				
+						1. Set |key| to the string formed by a space " " followed by the
+							combining character that corresponds to the [=dead key=].
+						
+					1. Create a map entry |e| from the pair < |code|, |key| >
+				
+					1. Add |e| to |map|.
+			
+				1. Resolve |p| with |map|.
+			
+			1. Return |p|.
 
 			<div></div>
 			
@@ -155,9 +158,10 @@ urlPrefix: http://www.w3.org/TR/uievents-code/#code-; type: dfn; spec: uievents-
 			<div class="example">
 			To show instructions about which key to press in a game:
 			<pre>
-				var map = navigator.keyboard.getKeyboardMap();
-				var keyUp = map.KeyW;
-				showUserDialog("Press " + keyUp + " to move up.");
+				navigator.keyboard.getLayoutMap().then(function(map) {
+					var keyUp = map.get("KeyW");
+					showUserDialog("Press " + keyUp + " to move up.");
+				});
 			</pre>
 			</div>
 
@@ -169,7 +173,7 @@ urlPrefix: http://www.w3.org/TR/uievents-code/#code-; type: dfn; spec: uievents-
 			U+0020 U+0301 (which is a space followed by the Unicode Combining Acute Accent).
 			</div>
 
-		</div><!-- getKeyboardMap() -->
+		</div><!-- getLayoutMap() -->
 
 		</div><!-- dfn-for Keyboard -->
 
