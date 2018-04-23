@@ -392,7 +392,6 @@ on an {{XMLHttpRequestUpload}} object will result in a <a>CORS-preflight request
 because registering an event listener causes the <a>upload listener flag</a> to be set, which in
 turn causes the <a>use-CORS-preflight flag</a> to be set.)
 
-<hr>
 
 <h4 id=the-open()-method>The <code>open()</code> method</h4>
 
@@ -495,6 +494,7 @@ methods, when invoked, must run these steps:
    <a>network error</a>.
    <li><p>Set <a>received bytes</a> to the empty byte sequence.
    <li><p>Set <a>response object</a> to null.
+   <li><p>Set <a>override MIME type</a> to null.
   </ul>
 
  <li>
@@ -715,7 +715,7 @@ method must run these steps:
 
     <p>Set <a>request body</a> to <var>body</var>,
     <a lt="fragment serializing algorithm">serialized</a>,
-    <a lt="obtain Unicode">converted to Unicode</a>, and <a lt="UTF-8 encode">utf-8 encoded</a>.
+    <a lt="obtain Unicode">converted to Unicode</a>, and <a lt="UTF-8 encode">UTF-8 encoded</a>.
 
    <dt id=dom-xmlhttprequest-send-bodyinit>{{BodyInit}}
    <dd>
@@ -731,17 +731,34 @@ method must run these steps:
   <a for="header list">append</a> `<code>Content-Type</code>`/<var>mimeType</var> to
   <a>author request headers</a>.
 
-  <p>Otherwise, if the <a>header</a> whose <a for=header>name</a> is a <a>byte-case-insensitive</a>
-  match for `<code>Content-Type</code>` in <a>author request headers</a> has a
-  <a for=header>value</a> that is a <a>valid MIME type</a>, which has a `<code>charset</code>`
-  parameter whose value is not a <a>byte-case-insensitive</a> match for <var>encoding</var>, and
-  <var>encoding</var> is not null, then set all the `<code>charset</code>` parameters whose value is
-  not a <a>byte-case-insensitive</a> match for <var>encoding</var> of that <a>header</a>'s
-  <a for=header>value</a> to <var>encoding</var>.
-  <!-- XXX could still be better with parameter cross-ref -->
+  <p>Otherwise, if <var>encoding</var> is non-null and <a>author request headers</a>
+  <a for="header list">contains</a> `<code>Content-Type</code>`:
 
-  <!-- reminder: if we ever change this to always include charset it has
-  to be included as the first parameter for compatibility reasons -->
+  <ol>
+   <li><p>Let <var>value</var> be the <a for=header>value</a> of the <a>header</a> whose
+   <a for=header>name</a> is a <a>byte-case-insensitive</a> match for `<code>Content-Type</code>` in
+   <a>author request headers</a>.
+   <!-- XXX: add a primitive for this in Fetch -->
+
+   <li><p>Let <var>mimeTypeRecord</var> be <var>value</var>,
+   <a lt="parse a MIME type from bytes">parsed</a>.
+
+   <li>
+    <p>If <var>mimeTypeRecord</var> is not failure and
+    <var>mimeTypeRecord</var>'s <a for="MIME type">parameters</a>["<code>charset</code>"]
+    <a for=map>exists</a>, then:
+
+    <ol>
+     <li><p><a for=map>Set</a> <var>mimeTypeRecord</var>'s
+     <a for="MIME type">parameters</a>["<code>charset</code>"] to <var>encoding</var>.
+
+     <li><p>Let <var>newValue</var> be <var>mimeTypeRecord</var>,
+     <a lt="serialize a MIME type to bytes">serialized</a>.
+
+     <li><p><a for="header list">Set</a> `<code>Content-Type</code>`/<var>newValue</var> in
+     <a>author request headers</a>.
+    </ol>
+  </ol>
 
  <li><p>If one or more event listeners are registered on the associated
  {{XMLHttpRequestUpload}} object, then set <a>upload listener flag</a>.
@@ -1144,7 +1161,6 @@ when invoked, must run these steps:
 </ol>
 
 
-
 <h3 id=xmlhttprequest-response>Response</h3>
 
 <p>An {{XMLHttpRequest}} has an associated <dfn>response</dfn>. Unless stated
@@ -1153,6 +1169,7 @@ otherwise it is a
 
 <p>An {{XMLHttpRequest}} also has an associated <dfn>received bytes</dfn> (a byte
 sequence). Unless stated otherwise it is the empty byte sequence.
+
 
 <h4 id=the-responseurl-attribute>The <code>responseURL</code> attribute</h4>
 
@@ -1282,19 +1299,32 @@ transfer-encoding: chunked</code></pre>
  <li><p>Return <var>mimeType</var>.
 </ol>
 
-<p>The <dfn id=override-mime-type>override MIME type</dfn> is initially null and can get a value if
-{{overrideMimeType()}} is invoked. <dfn id=final-mime-type>Final MIME type</dfn> is the
+<p>The <dfn id=override-mime-type>override MIME type</dfn> is initially null and can get a value
+when {{overrideMimeType()}} is invoked. The <dfn id=final-mime-type>final MIME type</dfn> is the
 <a>override MIME type</a> unless that is null in which case it is the <a>response MIME type</a>.
 
-<p>The <dfn id=response-charset>response charset</dfn> is the value of
-the <code>charset</code> parameter of the `<code>Content-Type</code>` header
-or null if there was no `<code>charset</code>` parameter or the header could
-not be parsed or was omitted. The
-<dfn id=override-charset>override charset</dfn> is initially null and
-can get a value if <a><code>overrideMimeType()</code></a> is invoked.
-<dfn id=final-charset>Final charset</dfn> is the
-<a>override charset</a> unless
-that is null in which case it is the <a>response charset</a>.
+<p>The <dfn id=final-charset>final charset</dfn> is the return value of these steps:
+
+<ol>
+ <li><p>Let <var>label</var> be null.
+
+ <li><p>If <a>response MIME type</a>'s <a for="MIME type">parameters</a>["<code>charset</code>"]
+ <a for=map>exists</a>, then set <var>label</var> to it.
+
+ <li><p>If <a>override MIME type</a>'s <a for="MIME type">parameters</a>["<code>charset</code>"]
+ <a for=map>exists</a>, then set <var>label</var> to it.
+
+ <li><p>If <var>label</var> is null, then return null.
+
+ <li><p>Let <var>encoding</var> be the result of <a>getting an encoding</a> from <var>label</var>.
+
+ <li><p>If <var>encoding</var> is failure, then return null.
+
+ <li><p>Return <var>encoding</var>.
+</ol>
+
+<p class=note>The above steps intentionally do not use the <a>final MIME type</a> as it would yield
+the wrong result.
 
 <hr>
 
@@ -1319,7 +1349,7 @@ or null). Unless stated otherwise it is null.
 
 <ol>
  <li><p>Set <a>response object</a> to a new {{Blob}} object representing <a>received bytes</a> with
- {{Blob/type}} <a>final MIME type</a>.
+ {{Blob/type}} set to the <a>final MIME type</a>.
 
  <li><p>Return <a>response object</a>.
 </ol>
@@ -1331,11 +1361,11 @@ or null). Unless stated otherwise it is null.
  <li><p>If <a>response</a>'s
  <a for=response>body</a> is null, then return null.
 
- <li><p>If <a>final MIME type</a> is not an <a>HTML MIME type</a> or an <a>XML MIME type</a>, then
- return null.
+ <li><p>If the <a>final MIME type</a> is not an <a>HTML MIME type</a> or an <a>XML MIME type</a>,
+ then return null.
 
  <li>
-  <p>If {{XMLHttpRequest/responseType}} is the empty string and <a>final MIME type</a> is an
+  <p>If {{XMLHttpRequest/responseType}} is the empty string and the <a>final MIME type</a> is an
   <a>HTML MIME type</a>, then return null.
 
   <p class=note>This is restricted to
@@ -1344,7 +1374,7 @@ or null). Unless stated otherwise it is null.
   content.
 
  <li>
-  <p>If <a>final MIME type</a> is an <a>HTML MIME type</a>, then run these substeps:
+  <p>If the <a>final MIME type</a> is an <a>HTML MIME type</a>, then:
 
   <ol>
    <li><p>Let <var>charset</var> be the <a>final charset</a>.
@@ -1355,8 +1385,7 @@ or null). Unless stated otherwise it is null.
    that does not terminate unsuccessfully then let <var>charset</var> be
    the return value.
 
-   <li><p>If <var>charset</var> is null, set <var>charset</var> to
-   <a>utf-8</a>.
+   <li><p>If <var>charset</var> is null, then set <var>charset</var> to <a>UTF-8</a>.
 
    <li><p>Let <var>document</var> be a
    <a>document</a> that
@@ -1381,15 +1410,14 @@ or null). Unless stated otherwise it is null.
   <p class=note>Resources referenced will not be loaded and no associated XSLT will be
   applied. <!-- XXX more formally?! -->
 
- <li><p>If <var>charset</var> is null, set <var>charset</var> to
- <a>utf-8</a>.
+ <li><p>If <var>charset</var> is null, then set <var>charset</var> to <a>UTF-8</a>.
  <!-- can only happen in the XML case -->
 
  <li><p>Set <var>document</var>'s
  <a for=Document>encoding</a> to
  <var>charset</var>.
 
- <li><p>Set <var>document</var>'s <a>content type</a> to <a>final MIME type</a>.
+ <li><p>Set <var>document</var>'s <a>content type</a> to the <a>final MIME type</a>.
 
  <li><p>Set <var>document</var>'s
  <a for=Document>URL</a> to
@@ -1428,7 +1456,7 @@ or null). Unless stated otherwise it is null.
  <li><p>Let <var>charset</var> be the <a>final charset</a>.
 
  <li>
-  <p>If {{XMLHttpRequest/responseType}} is the empty string, <var>charset</var> is null, and
+  <p>If {{XMLHttpRequest/responseType}} is the empty string, <var>charset</var> is null, and the
   <a>final MIME type</a> is an <a>XML MIME type</a>, then use the rules set forth in the XML
   specifications to determine the encoding. Let <var>charset</var> be the determined encoding.
   [[!XML]] [[!XMLNS]]
@@ -1439,17 +1467,14 @@ or null). Unless stated otherwise it is null.
   {{XMLHttpRequest/responseType}} value
   "<code>text</code>" simple.
 
- <li><p>If <var>charset</var> is null, set <var>charset</var> to
- <a>utf-8</a>.
+ <li><p>If <var>charset</var> is null, then set <var>charset</var> to <a>UTF-8</a>.
 
  <li><p>Return the result of running
  <a>decode</a> on <a>received bytes</a> using fallback
  encoding <var>charset</var>.
 </ol>
 
-<p class=note>Authors are strongly encouraged to always encode their
-resources using <a>utf-8</a>.
-
+<p class=note>Authors are strongly encouraged to always encode their resources using <a>UTF-8</a>.
 
 
 <h4 id=the-overridemimetype()-method>The <code>overrideMimeType()</code> method</h4>
@@ -1457,34 +1482,29 @@ resources using <a>utf-8</a>.
 <dl class=domintro>
  <dt><code><var>client</var> . <a method for=XMLHttpRequest>overrideMimeType(<var>mime</var>)</a></code>
  <dd>
-  <p>Acts as if the `<code>Content-Type</code>` header for <a>response</a> is <var>mime</var>.
+  <p>Acts as if the `<code>Content-Type</code>` header value for <a>response</a> is <var>mime</var>.
+  (It does not actually change the header though.)
 
   <p>Throws an "{{InvalidStateError!!exception}}" {{DOMException}} if <a>state</a> is <i>loading</i>
   or <i>done</i>.
 </dl>
 
-<p>The
-<dfn method for=XMLHttpRequest><code>overrideMimeType(<var>mime</var>)</code></dfn>
-method must run these steps:
+<p>The <dfn method for=XMLHttpRequest><code>overrideMimeType(<var>mime</var>)</code></dfn> method,
+when invoked, must run these steps:
 
 <ol>
  <li><p>If <a>state</a> is <i>loading</i> or <i>done</i>, then <a>throw</a> an
  "{{InvalidStateError!!exception}}" {{DOMException}}.
 
- <li><p>Set <a>override MIME type</a> to `<code>application/octet-stream</code>`.
+ <li><p>Set <a>override MIME type</a> to the result of <a lt="parse a MIME type">parsing</a>
+ <var>mime</var>.
 
- <li><p>If <var>mime</var> is a <a>parsable MIME type</a>, then set <a>override MIME type</a> to its
- <a>MIME type portion</a>.
- <!-- XXX Ignore string to byte sequence conversion issues until some point in the future -->
-
- <li><p>If <a>override MIME type</a> has a `<code>charset</code>` parameter, then set
- <a>override charset</a> to its value.
+ <li><p>If <a>override MIME type</a> is failure, then set <a>override MIME type</a> to
+ <code>application/octet-stream</code>.
 </ol>
 
 
-
 <h4 id=the-responsetype-attribute>The <code>responseType</code> attribute</h4>
-
 
 <dl class=domintro>
  <dt><code><var>client</var> . <a attribute for=XMLHttpRequest>responseType</a> [ = <var>value</var> ]</code>
@@ -1533,8 +1553,6 @@ attribute must run these steps:
  {{XMLHttpRequest/responseType}}
  attribute's value to the given value.
 </ol>
-
-
 
 
 <h4 id=the-response-attribute>The <code>response</code> attribute</h4>
@@ -1597,7 +1615,6 @@ steps:
 </dl>
 
 
-
 <h4 id=the-responsetext-attribute>The <code>responseText</code> attribute</h4>
 
 <dl class=domintro>
@@ -1651,9 +1668,6 @@ attribute must return the result of running these steps:
 
  <li><p>Return the <a>document response</a>.
 </ol>
-
-<p class=note>The {{XMLHttpRequest/responseXML}} attribute has XML in its name for historical
-reasons. It also returns HTML resources as <a for=/>documents</a>.
 
 
 <h3 id=events>Events summary</h3>
@@ -1725,45 +1739,38 @@ interface FormData {
   iterable&lt;USVString, FormDataEntryValue>;
 };</pre>
 
-<p>The {{FormData}} object represents an ordered list of
-<dfn id=concept-formdata-entry export for=FormData lt=entry|entries>entries</dfn>. Each <a>entry</a>
-consists of a <dfn id=concept-formdata-entry-name export for=FormData/entry>name</dfn> and a
+<p>Each {{FormData}} object has an associated
+<dfn id=concept-formdata-entry-list export for=FormData>entry list</dfn> (a <a for=/>list</a> of
+<a>entries</a>). It is initially the empty list.
+
+<p>An <dfn id=concept-formdata-entry export for=FormData lt=entry|entries>entry</dfn> consists of a
+<dfn id=concept-formdata-entry-name export for=FormData/entry>name</dfn> and a
 <dfn id=concept-formdata-entry-value export for=FormData/entry>value</dfn>.
 
-<p>For the purposes of interaction with other algorithms, an
-<a>entry</a>'s type is "string" if its
-<a>value</a> is a string and "file" otherwise. If
-an <a>entry</a>'s type is "file", its filename is
-the empty string if <a>value</a> is not
-a {{File}} object, and otherwise its filename is the
-value of <a>entry</a>'s
-<a>value</a>'s
-{{File/name}} attribute.
+<p>For the purposes of interaction with other algorithms, an <a for=FormData>entry</a>'s type is
+"string" if its <a for=FormData/entry>value</a> is a string and "file" otherwise. If an
+<a for=FormData>entry</a>'s type is "file", its filename is the empty string if
+<a for=FormData/entry>value</a> is not a {{File}} object, and otherwise its filename is the value of
+<a for=FormData>entry</a>'s <a for=FormData/entry>value</a>'s {{File/name}} attribute.
 
 <p>To <dfn>create an entry</dfn> for <var>name</var>, <var>value</var>, and optionally a
 <var>filename</var>, run these steps:
 
 <ol>
- <li><p>Let <var>entry</var> be a new <a>entry</a>.
+ <li><p>Let <var>entry</var> be a new <a for=FormData>entry</a>.
 
- <li><p>Set <var>entry</var>'s <a>name</a> to
- <var>name</var>.
+ <li><p>Set <var>entry</var>'s <a for=FormData/entry>name</a> to <var>name</var>.
 
- <li><p>If <var>value</var> is a {{Blob}} object and not a
- {{File}} object, then set <var>value</var> to a new
- {{File}} object, representing the same bytes, whose
- {{File/name}} attribute value is
- "<code>blob</code>".
+ <li><p>If <var>value</var> is a {{Blob}} object and not a {{File}} object, then set
+ <var>value</var> to a new {{File}} object, representing the same bytes, whose {{File/name}}
+ attribute value is "<code>blob</code>".
  <!-- XXX at some point File API should get internal slots for this -->
 
- <li><p>If <var>value</var> is (now) a {{File}} object and
- <var>filename</var> is given, then set <var>value</var> to a new
- {{File}} object, representing the same bytes, whose
- {{File/name}} attribute value is
- <var>filename</var>.
+ <li><p>If <var>value</var> is (now) a {{File}} object and <var>filename</var> is given, then set
+ <var>value</var> to a new {{File}} object, representing the same bytes, whose {{File/name}}
+ attribute value is <var>filename</var>.
 
- <li><p>Set <var>entry</var>'s <a>value</a> to
- <var>value</var>.
+ <li><p>Set <var>entry</var>'s <a for=FormData/entry>value</a> to <var>value</var>.
 
  <li><p>Return <var>entry</var>.
 </ol>
@@ -1777,9 +1784,8 @@ constructor must run these steps:
 <ol>
  <li><p>Let <var>fd</var> be a new {{FormData}} object.
 
- <li><p>If <var>form</var> is given, set <var>fd</var>'s
- <a>entries</a> to the result of
- <a>constructing the form data set</a> for <var>form</var>.
+ <li><p>If <var>form</var> is given, then set <var>fd</var>'s <a for=FormData>entry list</a> to the
+ result of <a>constructing the form data set</a> for <var>form</var>.
 
  <li><p>Return <var>fd</var>.
 </ol>
@@ -1793,37 +1799,35 @@ methods, when invoked, must run these steps:
 <ol>
  <li><p>Let <var>value</var> be <var>value</var> if given, and <var>blobValue</var> otherwise.
 
- <li><p>Let <var>entry</var> be the result of <a lt="create an entry">creating an entry</a>
- with <var>name</var>, <var>value</var>, and <var>filename</var> if given.
+ <li><p>Let <var>entry</var> be the result of <a lt="create an entry">creating an entry</a> with
+ <var>name</var>, <var>value</var>, and <var>filename</var> if given.
 
- <li><p>Append <var>entry</var> to <a>context object</a>'s list of
- <a>entries</a>.
+ <li><p><a for=list>Append</a> <var>entry</var> to the <a>context object</a>'s
+ <a for=FormData>entry list</a>.
 </ol>
 
 <p class=note>The reason there is an argument named <var>value</var> as well as <var>blobValue</var>
 is due to a limitation of the editing software used to write the XMLHttpRequest Standard.
 
-<p>The
-<dfn id=dom-formdata-delete method for=FormData><code>delete(<var>name</var>)</code></dfn>
-method, when invoked, must remove all <a>entries</a>
-whose <a>name</a> is <var>name</var>.
+<p>The <dfn id=dom-formdata-delete method for=FormData><code>delete(<var>name</var>)</code></dfn>
+method, when invoked, must <a for=list>remove</a> all <a for=FormData>entries</a> whose
+<a for=FormData/entry>name</a> is <var>name</var> from the <a>context object</a>'s
+<a for=FormData>entry list</a>.
 
-<p>The <dfn id=dom-formdata-get method for=FormData><code>get(<var>name</var>)</code></dfn> method, when
-invoked, must return the <a>value</a> of the first
-<a>entry</a> whose
-<a>name</a> is <var>name</var>, and null
-otherwise.
+<p>The <dfn id=dom-formdata-get method for=FormData><code>get(<var>name</var>)</code></dfn> method,
+when invoked, must return the <a for=FormData/entry>value</a> of the first <a for=FormData>entry</a>
+whose <a for=FormData/entry>name</a> is <var>name</var> from the <a>context object</a>'s
+<a for=FormData>entry list</a>, and null otherwise.
 
-<p>The <dfn id=dom-formdata-getall method for=FormData><code>getAll(<var>name</var>)</code></dfn> method,
-when invoked, must return the <a>values</a> of
-all <a>entries</a> whose
-<a>name</a> is <var>name</var>, in list order, and
-the empty sequence otherwise.
+<p>The <dfn id=dom-formdata-getall method for=FormData><code>getAll(<var>name</var>)</code></dfn>
+method, when invoked, must return the <a for=FormData/entry>values</a> of all
+<a for=FormData>entries</a> whose <a for=FormData/entry>name</a> is <var>name</var>, in order, from
+the <a>context object</a>'s <a for=FormData>entry list</a>, and the empty list otherwise.
 
-<p>The <dfn id=dom-formdata-has method for=FormData><code>has(<var>name</var>)</code></dfn> method, when
-invoked, must return true if there is an <a>entry</a>
-whose <a>name</a> is <var>name</var>, and false
-otherwise.
+<p>The <dfn id=dom-formdata-has method for=FormData><code>has(<var>name</var>)</code></dfn> method,
+when invoked, must return true if there is an <a for=FormData>entry</a> whose
+<a for=FormData/entry>name</a> is <var>name</var> in the <a>context object</a>'s
+<a for=FormData>entry list</a>, and false otherwise.
 
 <p>The
 <dfn id=dom-formdata-set method for=FormData><code>set(<var>name</var>, <var>value</var>)</code></dfn>
@@ -1834,26 +1838,24 @@ methods, when invoked, must run these steps:
 <ol>
  <li><p>Let <var>value</var> be <var>value</var> if given, and <var>blobValue</var> otherwise.
 
- <li><p>Let <var>entry</var> be the result of <a lt="create an entry">creating an entry</a>
- with <var>name</var>, <var>value</var>, and <var>filename</var> if given.
+ <li><p>Let <var>entry</var> be the result of <a lt="create an entry">creating an entry</a> with
+ <var>name</var>, <var>value</var>, and <var>filename</var> if given.
 
- <li><p>If there are any <a>entries</a> in
- <a>context object</a>'s list of
- <a>entries</a> whose
- <a>name</a> is <var>name</var>, then replace the first such
- <a>entry</a> with <var>entry</var> and remove the others.
+ <li><p>If there are any <a for=FormData>entries</a> in the <a>context object</a>'s
+ <a for=FormData>entry list</a> whose <a for=FormData/entry>name</a> is <var>name</var>, then
+ <a for=list>replace</a> the first such <a for=FormData>entry</a> with <var>entry</var> and
+ <a for=list>remove</a> the others.
 
- <li><p>Otherwise, append <var>entry</var> to <a>context object</a>'s
- list of <a>entries</a>.
+ <li><p>Otherwise, <a for=list>append</a> <var>entry</var> to the <a>context object</a>'s
+ <a for=FormData>entry list</a>.
 </ol>
 
 <p class=note>The reason there is an argument named <var>value</var> as well as <var>blobValue</var>
 is due to a limitation of the editing software used to write the XMLHttpRequest Standard.
 
-<p>The <a>value pairs to iterate over</a> are the
-<a>entries</a> with the key being the
-<a>name</a> and the value the
-<a>value</a>.
+<p>The <a>value pairs to iterate over</a> are the <a>context object</a>'s
+<a for=FormData>entry list</a>'s <a for=FormData>entries</a> with the key being the
+<a for=FormData/entry>name</a> and the value the <a for=FormData/entry>value</a>.
 
 
 <h2 id=interface-progressevent>Interface {{ProgressEvent}}</h2>
@@ -1964,7 +1966,7 @@ attributes initialized to false, so it is suggested that for consistency all
 "<code><dfn>sync-xhr</dfn></code>". Its <a>default allowlist</a> is <code>*</code>.
 
 
-<h3 id=security-considerations>Security Considerations</h3>
+<h3 id=security-considerations>Security considerations</h3>
 
 <p>For cross-origin requests some kind of opt-in, e.g. the
 <a>CORS protocol</a> defined in the Fetch Standard, has to be

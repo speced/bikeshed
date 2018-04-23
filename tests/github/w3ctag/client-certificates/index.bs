@@ -1,0 +1,114 @@
+<pre class="metadata"> 
+Title: Keygen and Client Certificates
+Group: tag
+Shortname: client-certificates 
+Status: WD
+Level: 1
+Editor: Travis Leithead, Microsoft https://www.microsoft.com/, travil@microsoft.com 
+ED: https://w3ctag.github.io/client-certificates
+Abstract: The TAG considers the HTML &lt;keygen> element and its use cases; related 
+	security issues are also reviewed and requirements and a recommendation to replace 
+	&lt;keygen> is presented.
+Default Biblio Status: current 
+!Participate: <a href="https://github.com/w3ctag/client-certificates">GitHub w3ctag/client-certificates</a> (<a href="https://github.com/w3ctag/client-certificates/issues/new">file an issue</a>; <a href="https://github.com/w3ctag/client-certificates/issues?state=open">open issues</a>)
+</pre> 
+
+# &lt;keygen> and use cases
+
+The <a href="http://www.w3.org/TR/html5/forms.html#the-keygen-element">HTMLKeygenElement</a> [[HTML5]] enables web sites to generate a public/private key pair during form submission (see also <a href="https://en.wikipedia.org/wiki/Public-key_cryptography">Public Key Cryptography</a>). &lt;keygen> is a browser feature grandfathered into the <a href="http://www.w3.org/TR/html5">HTML5 specification</a>. This element is a form-associated element with UI, but does not expose its generated private key to JavaScript. (Note: a Service Worker [[service-workers]] may be able to retrieve the public key from a form submission request.) The private key is stored in a secured browser-managed or OS-managed key store on behalf of the user.
+
+The primary use case for &lt;keygen> is to establish a trusted identity for an individual; the identity can later be used to authenticate to a web site or set of web sites. Because it uses an identity tied to a private key, authentication is fundamentally more secure than systems which use shared passwords. 
+ 
+Extending the above use case, &lt;keygen> is commonly the first stage in provisioning a user's device to receive a client certificate. For example, &lt;keygen> is used to generate the key material for later inclusion in an X509 certificate. The certificate is intended to be long-lived and may serve to authenticate wireless accounts, educational portals, internal business intranets, etc.
+
+<img alt="Sequence diagram showing how keygen provisions a client certificate." src="images/sequence_diagram.png" style="width:100%" />
+
+The diagram above describes a typical scenario in which the &lt;keygen> element is used for provisioning a client certificate.
+
+1. The user agent navigates to a provisioning site (at a specific origin). The HTML resource containing the keygen element with optional challenge attribute is received by the user agent. The keygen element is included in a form intended to be submitted back to the server.
+2. The user may select from among two options in the keygen element's UI to choose a "weak" or "strong" key length.
+3. The user submits the form. Alternately, JavaScript code in the user agent can submit the form. When submitted the keygen element causes an asymmetric key pair to be generated: a public and private key. These keys are not exposed via a DOM API (although the public key may be retrieved from the form in an installed Service Worker). 
+4. The private key is used to optionally sign a challenge and then it is placed into a secure key store (either browser or OS-provided).
+5. The public key is encoded (ASN.1 DER) and submitted in the form to the server.
+6. In the POST response, the server may have packaged the public key and other related information into a client certificate which is sent with an <code>application/x-x509-*-cert</code> mimetype to the user agent. The user agent relays this certificate into the user's certificate store for later use.
+
+# Client certificates and user agents
+
+Keygen is one way to generate the crypto material needed for a client certificate in the browser (the Web Crypto API [[webcryptoapi]] provides another--though it has drawbacks described later). Once a client certificate has been issued and registered with the user agent (either via a browser or OS-supplied certificate store), the certificate may be used for authentication. This is relatively uncommon; when it does happen, user agents do not provide a good experience.
+
+A server can require a TLS client certificate to be used when it receives a request for a protected resource. The server may also include a challenge to be signed by the client as proof that the user has possession of the private key associated with the public key in the client certificate. Starting with the server's response to the protected resource request, the experience typically follows this pattern:
+
+1. The user agent asks the user to select a client certificate to use in the negotiation (there may be more than one). One or more client certificates are presented to the user. Little effort is made to differentiate or extract meaningful information from each certificate in order to help the user select the right one. The user chooses a certificate.
+2. [Typically] a second prompt (issuing from the secure keystore) is presented to confirm and approve use of a private key in order to perform a signature (for the challenge). Unfortunately, little context is actually provided in the message presented to the user, making it unclear why and for what purpose the private key is being accessed.
+3. The signed challenge and client certificate are sent to the server for verification to release the resource.
+
+Note: The ability to use client certificates for authentication is currently not allowed in the HTTP2 protocol (it requires an older TLS re-negotiation protocol). The IETF is investigating how to improve support for client certificate authentication in HTTP2.
+
+# Threat Model
+
+User agents are now considering removing support for the &lt;keygen> element due (in part) to security issues present in its design and implementation. The following threat model frames these issues.
+
+The trust boundaries in the threat model separate the user agent and server, as well as the user agent and secure keystore.
+
+## User agent/server boundary
+
+This trust boundary may be either protected via an HTTPS connection, or open using an untrusted link. The keygen element is not currently considered a "powerful feature" and thus it works in both insecure and secure contexts [[powerful-features]]. (Keygen would certainly be considered a powerful feature by today's standards.) When using an insecure connection, the content provided by the server cannot be trusted, including the behavior of script from that resource.
+
+## User agent/secure keystore boundary
+
+Some user agents defer to their host OS to manage and secure crypto key material (an alternative, e.g., in Mozilla Firefox, is to have a browser-provided keystore). For host OS-managed cases, a trust boundary exists between the user agent and the OS (data that flows across this boundary is generally implicitly trusted). The risk to user agents relying on an OS-provided keystore is that changes to the keystore have a global impact on the user's device. This is particularly dangerous if keystore changes happen without user-consent and automatically by script. Since the host OS's keystore is a shared resource, all apps are put at risk. Of course, when the browser implements its own keystore, the risk to the OS and other applications is mitigated.
+
+## Known Threats
+
+1. Untrusted script can launch denial-of-service attacks against the user's keystore, since form submission (including keygen) does not require user action.
+2. Keygen form submission has unmitigated access to the keystore; script can affect either 1) global OS state changes without user permission, or 2) origin-unaware certificate installation (in user agents that implement their own keystore). At a minimum, this violates the same origin policy.
+3. While not specifically impacting keygen, user agents may automatically install client certificates via a special mime-type. As noted, this can affect state outside the boundary of the browser sandbox without user permission.
+
+# Principles
+
+* Web pages must not be allowed to change shared state outside the browser sandbox without user permission; such permission may be indirectly granted by a related explicit user action. The user must be in control. This principle is correctly applied to resources such as cameras and microphones in WebRTC and Geolocation, which all ask for permission from the user before enabling access (which may simultaneously cause implicit revocation of the resource by another entity).
+
+* Users must be able to create identity on the web which can be shared with others. For example, people identify themselves using their Facebook or Twitter names: a site can then log them in using a form of redirected authentication involving facebook.com or twitter.com, and then can give them access to things, allow them to participate, etc, as a function of that identity. Public key based systems are generally superior to these in that they use private and public keys instead of passwords, and their strength is not tied to the user's ability to generate a good password.
+
+# Replacing &lt;keygen>
+
+The keygen element should be replaced by a new API better suited for modern day application requirements. While keygen can conceivably be updated in some ways improve its hashing algorithm and container formats, for example, its function as an element tied to form submission locks it into a specific declarative protocol. While convenient in some respects, it is also limiting in that it is not very extensible, cannot be applied in scenarios outside of its protocol (e.g., outside of form submission scenarios), and isn't designed with user-permission in mind. We believe keygen isn't suitable for updating in its existing form; rather we think starting over with a new API untethered from the past has the better potential to succeed. In order to better understand the requirements for an API intended to replace keygen, we first consider where it is weak and what improvements should be made to meet modern requirements.
+
+* The MD5 hashing algorithm, as currently defined in HTML5 and interoperably implemented in several user agents is quite dated. Security researchers now <b>recommend more secure hashing algorithms</b> such as SHA-2.
+* Keygen is a powerful feature. Its use <b>should be restricted to a secure context</b>.
+* Keygen must <b>not write private keys into origin-unaware keystores without user permission</b>. User permission must be granted prior to writing new private keys into any keystore (whether OS-provided or not).
+* Keygen's operations are potentially compute-intensive and <b>should be asynchronous</b> in order to not block user interaction (as can happen in form submission currently). Asynchronous operation is also necessary for obtaining user permission.
+* Keygen's container structure for uploading public key material to the server is dated. Alternative, or <b>author-defined container structures should be available</b>.
+* <b>The user interface for keygen should be reconsidered</b>. Users are not in the best position to evaluate which type of key strength is needed. This is usually a requirement of the server. Perhaps no user interface is required.
+* <b>Add basic extensibility to keygen</b>, such as the capability to add additional meta-data requests for client certificate extensions, certificate expiration requests, etc.
+
+Additionally, any installation of a client certificate (e.g., the <code>application/x-x509-*-cert</code> mimetype) must also require user consent.
+
+In seeking for a replacement to keygen, we also consider what capabilities are already provided by the Web Crypto API:
+
+* The <code>CryptoKey</code> interface is designed as a general read-only abstraction over key material. The object itself can be used as a proxy for the key material without disclosing the actual key material.
+* APIs needed to generate public/private <code>CryptoKey</code> objects are already defined (<code>generateKey</code>/<code>deriveKey</code>).
+* A flag is available to protect the key material from extraction (the <code>extractable</code> flag in the generation APIs).
+
+Unfortunately, the current capabilities in the Web Crypto API are unsuitable as a direct-replacement for keygen because:
+
+* Protection of the private key material in the <code>CryptoKey</code> is opt-in.
+* There is no mechanism to write to the device's secure keystore (if available)
+
+However, the objects and abstractions defined in the Web Crypto API are a good foundation on which to design a replacement for keygen. We note that provisioning of keys is currently <a href="http://www.w3.org/TR/WebCryptoAPI/#scope-out-of-scope">declared out-of-scope</a> in the current Web Crypto API spec. New work on a keygen replacement would have key provisioning in scope.
+
+# Requirements and Recommendations
+
+In order to replace keygen and simultaneously provide a better way for establishing a trusted identity on the web, we recognize the following requirements. The solution:
+
+* should be similar in workflow and user experience to creating an account with a password. It would omit the steps of checking if the user has picked a strong password including redundant password verification steps.
+* should include a mechanism to associate some personal information (e.g., a nickname, color, picture, biometric, etc) to the key so that it can be readily selected in the future.
+* must be considered a "powerful feature" and only available under secure contexts.
+* must not release the raw private key material to script at any time. Private keys used as a basis for a person's identity should be considered sensitive such that even script should not be trusted with access to the key material.
+* must be asynchronous and require user permission to install the private key into any origin-independent shared persistent storage. Unlike origin-specific storage which follows the same-origin policy, origin-unaware (or general use) storage represents a change to the user's environment outside the scope of web page and the user must be aware of and authorize any such changes. 
+* must be asynchronous and require user permission to use a private key from any origin-independent shared persistent storage. This is needed in order to protect the privacy of the private key.
+* should allow the user to delegate the key persistence and generation to separate secure hardware. Different key generation scenarios may require different assurances in relation to the keystore and/or key generation.
+
+Given these requirements, we recognize that an "improved keygen element" could be built using the new solution as a foundation (e.g., using web components).
+
+We also call on implementations to improve the client certificate UI experience in order to make client-certificate use in authentication more accessible to general users.
