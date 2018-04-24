@@ -40,6 +40,7 @@ class MarkdownCodeSpans(func.Functor):
                     indexSoFar = m.end()
                     backtickCount = len(m.group(3))
                     tag = m.group(2)
+                    literalStart = m.group(0)
             elif mode == "code":
                 if m.group(1):
                     pass
@@ -48,7 +49,9 @@ class MarkdownCodeSpans(func.Functor):
                         pass
                     else:
                         mode = "text"
-                        replacement = (tag, text[indexSoFar:m.start()] + m.group(2))
+                        innerText = text[indexSoFar:m.start()] + m.group(2)
+                        fullText = literalStart + text[indexSoFar:m.start()] + m.group(0)
+                        replacement = (tag, innerText, fullText)
                         self.__codeSpanReplacements__.append(replacement)
                         newText += "\ue0ff"
                         indexSoFar = m.end()
@@ -76,9 +79,9 @@ class MarkdownCodeSpans(func.Functor):
                     import string
                     t = escapeHTML(repl[1]).strip(string.whitespace)
                     t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
-                    return "<code data-opaque>" + t + "</code>"
+                    return "<code data-opaque bs-autolink-syntax='{1}'>{0}</code>".format(t, escapeHTML(repl[2]))
                 else:
-                    return "<code data-opaque data-span-tag={0}>{1}</code>".format(repl[0], escapeHTML(repl[1]))
+                    return "<code data-opaque data-span-tag={0} bs-autolink-syntax='{2}'>{1}</code>".format(repl[0], escapeHTML(repl[1]), escapeHTML(repl[2]))
             return re.sub("\ue0ff", codeSpanReviver, self.__val__)
         else:
             return self.__val__
