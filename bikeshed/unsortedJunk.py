@@ -79,9 +79,9 @@ class MarkdownCodeSpans(func.Functor):
                     import string
                     t = escapeHTML(repl[1]).strip(string.whitespace)
                     t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
-                    return "<code data-opaque bs-autolink-syntax='{1}'>{0}</code>".format(t, escapeHTML(repl[2]))
+                    return "<code data-opaque bs-autolink-syntax='{1}'>{0}</code>".format(t, escapeAttr(repl[2]))
                 else:
-                    return "<code data-opaque data-span-tag={0} bs-autolink-syntax='{2}'>{1}</code>".format(repl[0], escapeHTML(repl[1]), escapeHTML(repl[2]))
+                    return "<code data-opaque data-span-tag={0} bs-autolink-syntax='{2}'>{1}</code>".format(repl[0], escapeHTML(repl[1]), escapeAttr(repl[2]))
             return re.sub("\ue0ff", codeSpanReviver, self.__val__)
         else:
             return self.__val__
