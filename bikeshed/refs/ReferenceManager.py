@@ -17,11 +17,16 @@ from ..htmlhelpers import *
 
 class ReferenceManager(object):
 
-    __slots__ = ["specs", "defaultSpecs", "ignoredSpecs", "replacedSpecs", "biblios", "loadedBiblioGroups",
+    __slots__ = ["dataFile", "specs", "defaultSpecs", "ignoredSpecs", "replacedSpecs", "biblios", "loadedBiblioGroups",
         "biblioKeys", "biblioNumericSuffixes", "preferredBiblioNames", "headings", "defaultStatus", "localRefs", "anchorBlockRefs", "foreignRefs",
         "shortname", "specLevel", "spec"]
 
-    def __init__(self, defaultStatus=None):
+    def __init__(self, defaultStatus=None, fileRequester=None):
+        if fileRequester is None:
+            self.dataFile = config.defaultRequester
+        else:
+            self.dataFile = fileRequester
+
         # Dict of {spec vshortname => spec data}
         self.specs = dict()
 
@@ -60,9 +65,9 @@ class ReferenceManager(object):
         else:
             self.defaultStatus = config.refStatus(defaultStatus)
 
-        self.localRefs = RefSource("local")
-        self.anchorBlockRefs = RefSource("anchor-block")
-        self.foreignRefs = RefSource("foreign", specs=self.specs, ignored=self.ignoredSpecs, replaced=self.replacedSpecs)
+        self.localRefs = RefSource("local", fileRequester=fileRequester)
+        self.anchorBlockRefs = RefSource("anchor-block", fileRequester=fileRequester)
+        self.foreignRefs = RefSource("foreign", specs=self.specs, ignored=self.ignoredSpecs, replaced=self.replacedSpecs, fileRequester=fileRequester)
 
     def initializeRefs(self, doc=None):
         '''
@@ -71,16 +76,16 @@ class ReferenceManager(object):
         '''
 
         def initSpecs():
-            self.specs.update(json.loads(config.retrieveDataFile("specs.json", quiet=True, str=True)))
+            self.specs.update(json.loads(self.dataFile.fetch("specs.json", str=True)))
         initSpecs()
         def initMethods():
-            self.foreignRefs.methods.update(json.loads(config.retrieveDataFile("methods.json", quiet=True, str=True)))
+            self.foreignRefs.methods.update(json.loads(self.dataFile.fetch("methods.json", str=True)))
         initMethods()
         def initFors():
-            self.foreignRefs.fors.update(json.loads(config.retrieveDataFile("fors.json", quiet=True, str=True)))
+            self.foreignRefs.fors.update(json.loads(self.dataFile.fetch("fors.json", str=True)))
         initFors()
         if doc and config.docPath(doc):
-            datablocks.transformInfo(config.retrieveDataFile("link-defaults.infotree", quiet=True, str=True).split("\n"), doc)
+            datablocks.transformInfo(self.dataFile.fetch("link-defaults.infotree", str=True).split("\n"), doc)
             # Get local anchor data
             try:
                 with io.open(config.docPath(doc, "anchors.bsdata"), 'r', encoding="utf-8") as lines:
@@ -97,7 +102,7 @@ class ReferenceManager(object):
     def fetchHeadings(self, spec):
         if spec in self.headings:
             return self.headings[spec]
-        with config.retrieveDataFile("headings", "headings-{0}.json".format(spec), quiet=True, okayToFail=True) as fh:
+        with self.dataFile.fetch("headings", "headings-{0}.json".format(spec), okayToFail=True) as fh:
             try:
                 data = json.load(fh)
             except ValueError:
@@ -107,8 +112,8 @@ class ReferenceManager(object):
             return data
 
     def initializeBiblio(self):
-        self.biblioKeys.update(json.loads(config.retrieveDataFile("biblio-keys.json", quiet=True, str=True)))
-        self.biblioNumericSuffixes.update(json.loads(config.retrieveDataFile("biblio-numeric-suffixes.json", quiet=True, str=True)))
+        self.biblioKeys.update(json.loads(self.dataFile.fetch("biblio-keys.json", str=True)))
+        self.biblioNumericSuffixes.update(json.loads(self.dataFile.fetch("biblio-numeric-suffixes.json", str=True)))
 
         # Get local bibliography data
         try:
@@ -448,7 +453,7 @@ class ReferenceManager(object):
             # Try to load the group up, if necessary
             group = key[0:2]
             if group not in self.loadedBiblioGroups:
-                with config.retrieveDataFile("biblio/biblio-{0}.data".format(group), quiet=True, okayToFail=True) as lines:
+                with self.dataFile.fetch("biblio", "biblio-{0}.data".format(group), okayToFail=True) as lines:
                     biblio.loadBiblioDataFile(lines, self.biblios)
             self.loadedBiblioGroups.add(group)
             # Check if it's there

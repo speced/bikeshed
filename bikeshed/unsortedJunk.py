@@ -1306,7 +1306,7 @@ def inlineRemoteIssues(doc):
 
     logging.captureWarnings(True)
 
-    responses = json.load(config.retrieveDataFile("github-issues.json", quiet=True))
+    responses = json.loads(doc.dataFile.fetch("github-issues.json", str=True))
     for i,issue in enumerate(inlineIssues):
         issueUserRepo = "{0}/{1}".format(*issue)
         key = "{0}/{1}".format(issueUserRepo, issue.num)

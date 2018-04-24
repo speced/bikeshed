@@ -7,47 +7,48 @@ import os
 from ..messages import *
 from .main import scriptPath, docPath, useReadonlyData
 
-def retrieveDataFile(*segs, **kwargs):
-    quiet = kwargs.get("quiet", False)
-    str = kwargs.get("str", False)
-    okayToFail = kwargs.get("okayToFail", False)
-    filename = "/".join(segs)
-    filetype = segs[0]
-    import os
-    cacheLocation = scriptPath("spec-data", *segs)
-    fallbackLocation = scriptPath("spec-data", "readonly", *segs)
 
-    if useReadonlyData:
-        # Only read from the readonly data.
-        cacheLocation = fallbackLocation
+class DataFileRequester(object):
+    def __init__(self, type=None, fallback=None):
+        self.type = type
+        if self.type not in ("readonly", "latest"):
+            raise Exception("Bad value for DataFileRequester.type, got '{0}'.", type)
+        # fallback is another requester, used if the main one fails.
+        self.fallback = fallback
 
-    try:
-        fh = open(cacheLocation, 'r')
-    except IOError:
+    def fetch(self, *segs, **kwargs):
+        str = kwargs.get("str", False)
+        okayToFail = kwargs.get("okayToFail", False)
+        location = self._buildPath(*segs)
         try:
-            fh = open(fallbackLocation, 'r')
+            if str:
+                with io.open(location, "r", encoding="utf-8") as fh:
+                    return fh.read()
+            else:
+                return io.open(location, "r", encoding="utf-8")
         except IOError:
-            if not okayToFail:
-                die("Couldn't retrieve the file '{0}' from cache. Something's wrong, please report this.", filename)
+            if self.fallback:
+                try:
+                    return self.fallback.fetch(*segs, str=str, okayToFail=okayToFail)
+                except IOError:
+                    return self._fail(location, str, okayToFail)
+            return self._fail(location, str, okayToFail)
+
+    def _buildPath(self, *segs):
+        if self.type == "readonly":
+            return scriptPath("spec-data", "readonly", *segs)
+        else:
+            return scriptPath("spec-data", *segs)
+
+    def _fail(self, location, str, okayToFail):
+        if okayToFail:
             if str:
                 return ""
             else:
-                return open(os.devnull)
-        import shutil
-        try:
-            if not quiet:
-                say("Attempting to save the {0} file to cache...", filetype)
-            if not dryRun:
-                shutil.copy(fallbackLocation, cacheLocation)
-            if not quiet:
-                say("Successfully saved the {0} file to cache.", filetype)
-        except:
-            if not quiet:
-                warn("Couldn't save the {0} file to cache. Proceeding...", filetype)
-    if str:
-        return unicode(fh.read(), encoding="utf-8")
-    else:
-        return fh
+                return io.StringIO("")
+        raise IOError("Couldn't find file '{0}'".format(location))
+
+defaultRequester = DataFileRequester(type="latest", fallback=DataFileRequester(type="readonly"))
 
 
 def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):

@@ -88,7 +88,7 @@ def prefixPlusPath(prefix, path):
 
 
 def loadTestData(doc):
-	return set(x.strip() for x in config.retrieveDataFile("wpt-tests.txt", quiet=True).readlines())
+	return set(x.strip() for x in doc.dataFile.fetch("wpt-tests.txt", str=True).split("\n"))
 
 
 def xor(a, b):

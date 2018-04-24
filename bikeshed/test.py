@@ -31,8 +31,7 @@ def testNameForPath(path):
 
 
 def runAllTests(Spec, testFiles=None, md=None):
-    oldDataChoice = config.useReadonlyData
-    config.useReadonlyData = True
+    fileRequester = config.DataFileRequester(type="readonly")
     if not testFiles:
         testFiles = sorted(findTestFiles(), key=lambda x:("/" in testNameForPath(x), x))
         if len(testFiles) == 0:
@@ -45,7 +44,7 @@ def runAllTests(Spec, testFiles=None, md=None):
         testName = testNameForPath(testPath)
         p("{0}/{1}: {2}".format(i, len(testFiles), testName))
         total += 1
-        doc = Spec(inputFilename=testPath)
+        doc = Spec(inputFilename=testPath, fileRequester=fileRequester)
         if md is not None:
             doc.mdCommandLine = md
         addTestMetadata(doc)
@@ -100,8 +99,7 @@ def equalOrEmpty(a, b):
 
 
 def rebase(Spec, files=None, md=None):
-    oldDataChoice = config.useReadonlyData
-    config.useReadonlyData = True
+    fileRequester = config.DataFileRequester(type="readonly")
     if not files:
         files = sorted(findTestFiles())
         if len(files) == 0:
@@ -111,13 +109,12 @@ def rebase(Spec, files=None, md=None):
         resetSeenMessages()
         name = testNameForPath(path)
         p("{0}/{1}: Rebasing {2}".format(i, len(files), name))
-        doc = Spec(path)
+        doc = Spec(path, fileRequester=fileRequester)
         if md:
             doc.mdCommandLine = md
         addTestMetadata(doc)
         doc.preprocess()
         doc.finish()
-    config.useReadonlyData = oldDataChoice
 
 def addTestMetadata(doc):
     doc.mdBaseline.addData("Date", "1970-01-01")

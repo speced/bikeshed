@@ -12,12 +12,17 @@ from .utils import *
 
 class RefSource(object):
 
-    __slots__ = ["source", "_refs", "methods", "fors", "specs", "ignoredSpecs", "replacedSpecs", "_loadedAnchorGroups"]
+    __slots__ = ["dataFile", "source", "_refs", "methods", "fors", "specs", "ignoredSpecs", "replacedSpecs", "_loadedAnchorGroups"]
 
     # Which sources use lazy-loading; other sources always have all their refs loaded immediately.
     lazyLoadedSources = ["foreign"]
 
-    def __init__(self, source, specs=None, ignored=None, replaced=None):
+    def __init__(self, source, specs=None, ignored=None, replaced=None, fileRequester=None):
+        if fileRequester is None:
+            self.dataFile = config.defaultRequester
+        else:
+            self.dataFile = fileRequester
+
         # String identifying which refsource this is.
         self.source = source
 
@@ -49,7 +54,7 @@ class RefSource(object):
             # Group was loaded, but previous check didn't find it, so it's just not here.
             return []
         # Otherwise, load the group file.
-        with config.retrieveDataFile("anchors", "anchors-{0}.data".format(group), quiet=True, okayToFail=True) as fh:
+        with self.dataFile.fetch("anchors", "anchors-{0}.data".format(group), okayToFail=True) as fh:
             self._refs.update(decodeAnchors(fh))
             self._loadedAnchorGroups.add(group)
         return self._refs.get(key, [])
@@ -67,7 +72,7 @@ class RefSource(object):
                 if group in self._loadedAnchorGroups:
                     # Already loaded
                     continue
-                with config.retrieveDataFile("anchors", file, quiet=True) as fh:
+                with self.dataFile.fetch("anchors", file) as fh:
                     self._refs.update(decodeAnchors(fh))
                     self._loadedAnchorGroups.add(group)
         return self._refs.items()
@@ -275,7 +280,7 @@ def decodeAnchors(linesIter):
     anchors = defaultdict(list)
     try:
         while True:
-            key = linesIter.next().decode('utf-8')[:-1]
+            key = linesIter.next()[:-1]
             a = {
                 "type": linesIter.next(),
                 "spec": linesIter.next(),

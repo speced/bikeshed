@@ -33,7 +33,7 @@ from .unsortedJunk import *
 
 class Spec(object):
 
-    def __init__(self, inputFilename, debug=False, token=None, lineNumbers=False):
+    def __init__(self, inputFilename, debug=False, token=None, lineNumbers=False, fileRequester=None):
         self.valid = False
         self.lineNumbers = lineNumbers
         if lineNumbers:
@@ -47,13 +47,17 @@ class Spec(object):
         self.inputSource = inputFilename
         self.debug = debug
         self.token = token
+        if fileRequester is None:
+            self.dataFile = config.defaultRequester
+        else:
+            self.dataFile = fileRequester
 
         self.valid = self.initializeState()
 
     def initializeState(self):
         self.normativeRefs = {}
         self.informativeRefs = {}
-        self.refs = ReferenceManager()
+        self.refs = ReferenceManager(fileRequester=self.dataFile)
         self.externalRefsUsed = defaultdict(lambda:defaultdict(dict))
         self.md = None
         self.mdBaseline = metadata.MetadataManager()
@@ -64,10 +68,10 @@ class Spec(object):
         self.biblios = {}
         self.typeExpansions = {}
         self.macros = defaultdict(lambda x: "???")
-        self.canIUse = json.loads(config.retrieveDataFile("caniuse.json", quiet=True, str=True), object_pairs_hook=OrderedDict)
+        self.canIUse = json.loads(self.dataFile.fetch("caniuse.json", str=True), object_pairs_hook=OrderedDict)
         self.widl = idl.getParser()
-        self.testSuites = json.loads(config.retrieveDataFile("test-suites.json", quiet=True, str=True))
-        self.languages = json.loads(config.retrieveDataFile("languages.json", quiet=True, str=True))
+        self.testSuites = json.loads(self.dataFile.fetch("test-suites.json", str=True))
+        self.languages = json.loads(self.dataFile.fetch("languages.json", str=True))
         self.extraStyles = defaultdict(str)
         self.extraStyles['style-md-lists'] = styleMdLists
         self.extraStyles['style-autolinks'] = styleAutolinks
