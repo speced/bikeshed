@@ -633,7 +633,7 @@ def hashContents(el):
     # Hash the contents of an element into an 8-character alphanum string.
     # Generally used for generating probably-unique IDs.
     # Normalize whitespace away to avoid git-related newline normalization issues.
-    text = re.sub(r"\s+", " ", innerHTML(el).strip().encode("ascii", "xmlcharrefreplace"))
+    text = re.sub(r"\s+", " ", textContent(el).strip().encode("ascii", "xmlcharrefreplace"))
     return hashlib.md5(text).hexdigest()[0:8]
 
 
