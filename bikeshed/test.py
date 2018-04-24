@@ -64,7 +64,6 @@ def runAllTests(Spec, testFiles=None, md=None):
         p(printColor("Failed Tests:", color="red"))
         for fail in fails:
             p("* " + fail)
-    config.useReadonlyData = oldDataChoice
 
 
 def compare(suspect, golden):
