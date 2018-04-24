@@ -18,6 +18,7 @@ from . import headings
 from . import highlight
 from . import HTMLSerializer
 from . import idl
+from . import inlineTags
 from . import lint
 from . import markdown
 from . import markdown
@@ -167,6 +168,7 @@ class Spec(object):
         shorthands.transformMaybePlaceholders(self)
         shorthands.transformAutolinkShortcuts(self)
         shorthands.transformProductionGrammars(self)
+        inlineTags.processTags(self)
         canonicalizeShortcuts(self)
         addImplicitAlgorithms(self)
         fixManualDefTables(self)

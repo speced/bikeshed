@@ -68,6 +68,7 @@ class MetadataManager:
         self.indent = 4
         self.inferCSSDfns = False
         self.inlineGithubIssues = False
+        self.inlineTagCommands = {}
         self.issueClass = "issue"
         self.issues = []
         self.issueTrackerTemplate = None
@@ -701,6 +702,12 @@ def parseWptDisplay(key, val, lineNum):
     return "none"
 
 
+def parseInlineTagCommand(key, val, lineNum):
+    tag,_,command = val.strip().partition(" ")
+    command = command.strip()
+    return {tag: command}
+
+
 def parse(lines):
     # Given HTML document text, in the form of an array of text lines,
     # extracts all <pre class=metadata> lines and parses their contents.
@@ -865,6 +872,13 @@ def joinList(a, b):
     return a + b
 
 
+def joinDict(a,b):
+    x = {}
+    x.update(a)
+    x.update(b)
+    return x
+
+
 def joinBoolSet(a,b):
     x = copy.deepcopy(a)
     x.update(b)
@@ -923,6 +937,7 @@ knownKeys = {
     "Indent": Metadata("Indent", "indent", joinValue, parseInteger),
     "Infer Css Dfns": Metadata("Infer Css Dfns", "inferCSSDfns", joinValue, parseBoolean),
     "Inline Github Issues": Metadata("Inline Github Issues", "inlineGithubIssues", joinValue, parseInlineGithubIssues),
+    "Inline Tag Command": Metadata("Inline Tag Command", "inlineTagCommands", joinDict, parseInlineTagCommand),
     "Issue Class": Metadata("Issue Class", "issueClass", joinValue, parseLiteral),
     "Issue Tracker Template": Metadata("Issue Tracker Template", "issueTrackerTemplate", joinValue, parseLiteral),
     "Issue Tracking": Metadata("Issue Tracking", "issues", joinList, parseLinkedText),
