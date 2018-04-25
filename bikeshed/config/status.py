@@ -63,7 +63,7 @@ shortToLongStatus = {
     "iso/NP-AMD": "New Proposal Amendment",
     "iso/AWI-AMD": "Approved new Work Item Amendment",
     "iso/WD-AMD": "Working Draft Amendment",
-    "iso/CD-AMD": "Committe Draft Amendment",
+    "iso/CD-AMD": "Committee Draft Amendment",
     "iso/PD-AMD": "Proposed Draft Amendment",
     "iso/FPD-AMD": "Final Proposed Draft Amendment",
     "iso/D-AMD": "Draft Amendment",
