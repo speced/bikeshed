@@ -203,7 +203,10 @@ def checkVarHygiene(doc):
         key = foldWhitespace(textContent(el)).strip(), nearestAlgo(el)
         varCounts[key] += 1
     foldedVarCounts = defaultdict(lambda: 0)
+    atLeastOneAlgo = False
     for (var,algo),count in varCounts.items():
+        if algo:
+            atLeastOneAlgo = True
         if count > 1:
             continue
         if var.lower() in doc.md.ignoredVars:
@@ -220,11 +223,53 @@ def checkVarHygiene(doc):
     if varLines:
         warn("The following <var>s were only used once in the document:\n{0}\nIf these are not typos, please add an ignore='' attribute to the <var>.", "\n".join(varLines))
 
+    if atLeastOneAlgo:
+        addVarClickHighlighting(doc)
+
     # Look for algorithms that show up twice; these are errors.
     for algo, count in Counter(el.get('data-algorithm') for el in findAll("[data-algorithm]", doc)).items():
         if count > 1:
             die("Multiple declarations of the '{0}' algorithm.", algo)
             return
+
+
+def addVarClickHighlighting(doc):
+    doc.extraStyles["style-var-click-highlighting"] = '''
+    var { cursor: pointer; }
+    var.selected { background-color: #ff3; }
+    '''
+    doc.extraScripts["script-var-click-highlighting"] = '''
+    document.addEventListener("click", e=>{
+        if(e.target.nodeName == "VAR") {
+            highlightSameAlgoVars(e.target);
+        }
+    });
+    function highlightSameAlgoVars(v) {
+        // Find the algorithm container.
+        let algoContainer = null;
+        let searchEl = v;
+        while(algoContainer == null && searchEl != document.body) {
+            searchEl = searchEl.parentNode;
+            if(searchEl.hasAttribute("data-algorithm")) {
+                algoContainer = searchEl;
+            }
+        }
+
+        // Not highlighting document-global vars,
+        // too likely to be unrelated.
+        if(algoContainer == null) return;
+
+        const varName = v.innerHTML;
+        const addClass = !v.classList.contains("selected");
+
+        // Find all same-name vars, and toggle their class appropriately.
+        for(const el of algoContainer.querySelectorAll("var")) {
+            if(el.innerHTML == varName) {
+                el.classList.toggle("selected", addClass);
+            }
+        }
+    }
+    '''
 
 
 def fixIntraDocumentReferences(doc):
