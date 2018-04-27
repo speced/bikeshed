@@ -1265,7 +1265,13 @@ figcaption:not(.no-marker)::before {
 <style>/* style-var-click-highlighting */
 
     var { cursor: pointer; }
-    var.selected { background-color: #ff3; }
+    var.selected0 { background-color: hsl(60deg, 50%, 90%); }
+    var.selected1 { background-color: hsl(0deg, 50%, 90%); }
+    var.selected2 { background-color: hsl(120deg, 50%, 90%); }
+    var.selected3 { background-color: hsl(180deg, 50%, 90%); }
+    var.selected4 { background-color: hsl(30deg, 50%, 90%); }
+    var.selected5 { background-color: hsl(240deg, 50%, 90%); }
+    var.selected6 { background-color: hsl(330deg, 80%, 93%); }
     </style>
 <style>/* style-autolinks */
 
@@ -3186,29 +3192,79 @@ A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/
             highlightSameAlgoVars(e.target);
         }
     });
-    function highlightSameAlgoVars(v) {
-        // Find the algorithm container.
-        let algoContainer = null;
-        let searchEl = v;
-        while(algoContainer == null && searchEl != document.body) {
-            searchEl = searchEl.parentNode;
-            if(searchEl.hasAttribute("data-algorithm")) {
-                algoContainer = searchEl;
+    {
+        const indexCounts = new Map();
+        const indexNames = new Map();
+        function highlightSameAlgoVars(v) {
+            // Find the algorithm container.
+            let algoContainer = null;
+            let searchEl = v;
+            while(algoContainer == null && searchEl != document.body) {
+                searchEl = searchEl.parentNode;
+                if(searchEl.hasAttribute("data-algorithm")) {
+                    algoContainer = searchEl;
+                }
+            }
+
+            // Not highlighting document-global vars,
+            // too likely to be unrelated.
+            if(algoContainer == null) return;
+
+            const algoName = algoContainer.getAttribute("data-algorithm");
+            const varName = v.innerHTML;
+            const addClass = !v.classList.contains("selected");
+            let highlightClass = null;
+            if(addClass) {
+                const index = chooseHighlightIndex(algoName, varName);
+                console.log("add", index);
+                indexCounts.get(algoName)[index] += 1;
+                indexNames.set(algoName+"///"+varName, index);
+                highlightClass = nameFromIndex(index);
+            } else {
+                const index = previousHighlightIndex(algoName, varName);
+                console.log("remove", index);
+                indexCounts.get(algoName)[index] -= 1;
+                highlightClass = nameFromIndex(index);
+            }
+
+            // Find all same-name vars, and toggle their class appropriately.
+            for(const el of algoContainer.querySelectorAll("var")) {
+                if(el.innerHTML == varName) {
+                    el.classList.toggle("selected", addClass);
+                    el.classList.toggle(highlightClass, addClass);
+                }
             }
         }
-
-        // Not highlighting document-global vars,
-        // too likely to be unrelated.
-        if(algoContainer == null) return;
-
-        const varName = v.innerHTML;
-        const addClass = !v.classList.contains("selected");
-
-        // Find all same-name vars, and toggle their class appropriately.
-        for(const el of algoContainer.querySelectorAll("var")) {
-            if(el.innerHTML == varName) {
-                el.classList.toggle("selected", addClass);
+        function chooseHighlightIndex(algoName, varName) {
+            let indexes = null;
+            if(indexCounts.has(algoName)) {
+                indexes = indexCounts.get(algoName);
+            } else {
+                // 7 classes right now
+                indexes = [0,0,0,0,0,0,0];
+                indexCounts.set(algoName, indexes);
             }
+
+            // If the element was recently unclicked,
+            // *and* that color is still unclaimed,
+            // give it back the same color.
+            const lastIndex = previousHighlightIndex(algoName, varName);
+            if(indexes[lastIndex] === 0) return lastIndex;
+
+            // Find the earliest index with the lowest count.
+            const minCount = Math.min.apply(null, indexes);
+            let index = null;
+            for(var i = 0; i < indexes.length; i++) {
+                if(indexes[i] == minCount) {
+                    return i;
+                }
+            }
+        }
+        function previousHighlightIndex(algoName, varName) {
+            return indexNames.get(algoName+"///"+varName);
+        }
+        function nameFromIndex(index) {
+            return "selected" + index;
         }
     }
     </script>
@@ -3246,7 +3302,6 @@ A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/
                 // open the panel
                 var dfnPanel = document.querySelector(".dfn-panel[data-for='" + el.id + "']");
                 if(dfnPanel) {
-                    console.log(dfnPanel);
                     dfnPanel.classList.add("on");
                     var rect = el.getBoundingClientRect();
                     dfnPanel.style.left = window.scrollX + rect.right + 5 + "px";
