@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 
+import codecs
 import io
 
 from subprocess import Popen, PIPE
@@ -16,5 +17,5 @@ def processTags(doc):
 			continue
 		command = doc.md.inlineTagCommands[tag]
 		p = Popen(command, stdin=PIPE, stdout=PIPE, shell=True)
-		out,err = p.communicate(innerHTML(el))
-		replaceContents(el, parseHTML(out))
+		out,err = p.communicate(codecs.encode(innerHTML(el), 'utf-8'))
+		replaceContents(el, parseHTML(codecs.decode(out, 'utf-8')))
