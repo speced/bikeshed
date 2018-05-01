@@ -90,6 +90,7 @@ class MetadataManager:
         self.previousVersions = []
         self.removeMultipleLinks = False
         self.repository = config.Nil()
+        self.slimBuildArtifact = False
         self.statusText = []
         self.testSuite = None
         self.title = None
@@ -961,6 +962,7 @@ knownKeys = {
     "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
     "Shortname": Metadata("Shortname", "shortname", joinValue, parseLiteralCaseless),
+    "Slim Build Artifact": Metadata("Slim Build Artifact", "slimBuildArtifact", joinValue, parseBoolean),
     "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
     "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),
     "Test Suite": Metadata("Test Suite", "testSuite", joinValue, parseLiteral),

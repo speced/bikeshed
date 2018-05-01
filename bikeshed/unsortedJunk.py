@@ -234,6 +234,8 @@ def checkVarHygiene(doc):
 
 
 def addVarClickHighlighting(doc):
+    if doc.md.slimBuildArtifact:
+        return
     doc.extraStyles["style-var-click-highlighting"] = '''
     var { cursor: pointer; }
     var.selected0 { background-color: hsl(60deg, 50%, 90%); }
@@ -854,6 +856,8 @@ def processAutolinks(doc):
 
 def decorateAutolink(doc, el, linkType, linkText, ref):
     # Add additional effects to autolinks.
+    if doc.md.slimBuildArtifact:
+        return
 
     # Put an ID on every reference, so I can link to references to a term.
     if el.get('id') is None:
@@ -924,6 +928,8 @@ def processIssuesAndExamples(doc):
 
 
 def addSelfLinks(doc):
+    if doc.md.slimBuildArtifact:
+        return
     def makeSelfLink(el):
         return E.a({"href": "#" + escapeUrlFrag(el.get('id', '')), "class":"self-link"})
 
@@ -1249,6 +1255,11 @@ def cleanupHTML(doc):
         removeAttr(el, "line-number")
         removeAttr(el, "caniuse")
         removeAttr(el, "data-silently-dedup")
+        if doc.md.slimBuildArtifact:
+            # Remove *all* data- attributes.
+            for attrName in el.attrib:
+                if attrName.startswith("data-"):
+                    removeAttr(el, attrName)
     for el in strayHeadEls:
         head.append(el)
     for el in styleScoped:

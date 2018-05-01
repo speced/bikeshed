@@ -18,6 +18,8 @@ customLexers = {
 ColoredText = collections.namedtuple('ColoredText', ['text', 'color'])
 
 def addSyntaxHighlighting(doc):
+    if doc.md.slimBuildArtifact:
+        return
     normalizeHighlightMarkers(doc)
 
     # Highlight all the appropriate elements
