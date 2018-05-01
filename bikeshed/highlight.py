@@ -508,6 +508,11 @@ def getLineNumberStyles():
     grid-template-columns: min-content 1fr;
     grid-auto-flow: row;
 }
+.line-numbered > *,
+.line-numbered::before,
+.line-numbered::after {
+    grid-column: 1/-1;
+}
 .line-no {
     grid-column: 1;
     color: gray;
@@ -534,6 +539,11 @@ def getLineHighlightingStyles():
     display: grid;
     grid-template-columns: min-content 1fr;
     grid-auto-flow: rows;
+}
+.line-numbered > *,
+.line-numbered::before,
+.line-numbered::after {
+    grid-column: 1/-1;
 }
 .line-no {
     grid-column: 1;
