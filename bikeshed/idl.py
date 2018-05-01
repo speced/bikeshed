@@ -235,6 +235,13 @@ def markupIDL(doc):
             doc.widl.parse(text)
         addClass(el, "highlight")
         highlightingOccurred = True
+    if doc.md.slimBuildArtifact:
+        # Remove the highlight-only spans
+        for el in idlEls:
+            for span in findAll("span", el):
+                contents = childNodes(span, clear=True)
+                replaceNode(span, *contents)
+        return
     if highlightingOccurred:
         doc.extraStyles['style-syntax-highlighting'] += "pre.idl.highlight { color: #708090; }"
 
