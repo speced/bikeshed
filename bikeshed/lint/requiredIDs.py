@@ -1,0 +1,12 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
+
+from ..htmlhelpers import *
+from ..messages import *
+
+def requiredIDs(doc):
+	for id in doc.md.requiredIDs:
+		if id.startsWith("#"):
+			id = id[1:]
+		if find("#{0}".format(escapeCSSIdent(id)), doc) is None:
+			die("Required ID '{0}' was not found in the document.", id)

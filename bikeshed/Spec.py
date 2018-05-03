@@ -212,6 +212,7 @@ class Spec(object):
         lint.brokenLinks(self)
         lint.accidental2119(self)
         lint.missingExposed(self)
+        lint.requiredIDs(self)
 
         # Any final HTML cleanups
         cleanupHTML(self)
