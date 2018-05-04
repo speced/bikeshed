@@ -55,7 +55,7 @@ def update(path, dryRun=False):
             if len(linkingTexts) == 1 and linkingTexts[0].strip() == "":
                 # Happens if it was marked with an empty lt and Shepherd still picked it up
                 continue
-            if rawAnchor['type'] == "heading":
+            if 'section' in rawAnchor and rawAnchor['section'] == True:
                 addToHeadings(rawAnchor, specHeadings, spec=spec)
             else:
                 addToAnchors(rawAnchor, anchors, spec=spec)
@@ -154,11 +154,11 @@ def fixupAnchor(anchor):
     # This one issue was annoying
     if anchor.get('title', None) == "'@import'":
         anchor['title'] = "@import"
-    
+
     # css3-tables has this a bunch, for some strange reason
     if anchor.get('uri', "").startswith("??"):
         anchor['uri'] = anchor['uri'][2:]
-    
+
     # If any smart quotes crept in, replace them with ASCII.
     linkingTexts = anchor.get('linking_text', [anchor.get('title')])
     for i,t in enumerate(linkingTexts):
@@ -171,7 +171,7 @@ def fixupAnchor(anchor):
             t = re.sub(r"“|”", '"', t)
             linkingTexts[i] = t
     anchor['linking_text'] = linkingTexts
-    
+
     # Normalize whitespace to a single space
     for k,v in anchor.items():
         if isinstance(v, basestring):
