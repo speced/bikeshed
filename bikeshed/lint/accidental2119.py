@@ -16,7 +16,7 @@ def accidental2119(doc):
     keywords = r"\b(may|must|should|shall|optional|recommended|required)\b"
 
     def searchFor2119(el):
-        if isNormative(el):
+        if isNormative(el, doc):
             # 2119 is fine, just look at children
             pass
         elif hasClass(el, "allow-2119"):

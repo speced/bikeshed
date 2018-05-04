@@ -67,6 +67,7 @@ class MetadataManager:
         self.includeCanIUsePanels = False
         self.indent = 4
         self.inferCSSDfns = False
+        self.informativeClasses = []
         self.inlineGithubIssues = False
         self.inlineTagCommands = {}
         self.issueClass = "issue"
@@ -938,6 +939,7 @@ knownKeys = {
     "Include Can I Use Panels": Metadata("Include Can I Use Panels", "includeCanIUsePanels", joinValue, parseBoolean),
     "Indent": Metadata("Indent", "indent", joinValue, parseInteger),
     "Infer Css Dfns": Metadata("Infer Css Dfns", "inferCSSDfns", joinValue, parseBoolean),
+    "Informative Classes": Metadata("Informative Classes", "informativeClasses", joinList, parseCommaSeparated),
     "Inline Github Issues": Metadata("Inline Github Issues", "inlineGithubIssues", joinValue, parseInlineGithubIssues),
     "Inline Tag Command": Metadata("Inline Tag Command", "inlineTagCommands", joinDict, parseInlineTagCommand),
     "Issue Class": Metadata("Issue Class", "issueClass", joinValue, parseLiteral),

@@ -830,7 +830,7 @@ def processAutolinks(doc):
         if ref and ref.spec and doc.refs.spec and ref.spec.lower() != doc.refs.spec.lower():
             spec = ref.spec.lower()
             key = ref.for_[0] if ref.for_ else ""
-            if isNormative(el):
+            if isNormative(el, doc):
                 biblioStorage = doc.normativeRefs
             else:
                 biblioStorage = doc.informativeRefs
@@ -1290,7 +1290,7 @@ def hackyLineNumbers(lines):
 
 def correctH1(doc):
     # If you provided an <h1> manually, use that element rather than whatever the boilerplate contains.
-    h1s = [h1 for h1 in findAll("h1", doc) if isNormative(h1)]
+    h1s = [h1 for h1 in findAll("h1", doc) if isNormative(h1, doc)]
     if len(h1s) == 2:
         replaceNode(h1s[0], h1s[1])
 

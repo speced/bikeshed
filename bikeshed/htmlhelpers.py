@@ -536,14 +536,16 @@ def isOddNode(node):
     return True
 
 
-def isNormative(el):
+def isNormative(el, doc):
     # Returns whether the element is "informative" or "normative" with a crude algo.
     # Currently just tests whether the element is in a class=example or class=note block, or not.
     if el in _normativeElCache:
         return _normativeElCache[el]
-    if hasClass(el, "note") or hasClass(el, "example") or hasClass(el, "non-normative"):
-        _normativeElCache[el] = False
-        return False
+    informativeClasses = ["note", "example", "non-normative", "informative"] + doc.md.informativeClasses
+    for cls in informativeClasses:
+        if hasClass(el, cls):
+            _normativeElCache[el] = False
+            return False
     if hasClass(el, "normative"):
         _normativeElCache[el] = True
         return True
@@ -554,7 +556,7 @@ def isNormative(el):
         _normativeElCache[el] = True
         return True
     # Otherwise, walk the tree
-    norm = isNormative(parent)
+    norm = isNormative(parent, doc)
     _normativeElCache[el] = norm
     return norm
 _normativeElCache = {}

@@ -223,7 +223,7 @@ def markupIDL(doc):
     # Then a real pass to actually mark up the IDL,
     # and collect it for the index.
     for el in idlEls:
-        if isNormative(el):
+        if isNormative(el, doc):
             text = textContent(el)
             # Parse once with a fresh parser, so I can spit out just this <pre>'s markup.
             widl = parser.Parser(text, ui=IDLUI(), symbolTable=symbolTable)
@@ -248,7 +248,7 @@ def processIDL(doc):
     for pre in findAll("pre.idl, xmp.idl", doc):
         if pre.get("data-no-idl") is not None:
             continue
-        if not isNormative(pre):
+        if not isNormative(pre, doc):
             continue
         forcedInterfaces = []
         for x in (treeAttr(pre, "data-dfn-force") or "").split():

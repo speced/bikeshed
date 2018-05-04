@@ -69,7 +69,7 @@ def determineHighlightLang(doc, el):
     else:
         # Highlight-by-default, if applicable.
         if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
-            if isNormative(el):
+            if isNormative(el, doc):
                 # Normative IDL gets 'highlighted' by the IDL parser.
                 return False
             else:

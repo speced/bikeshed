@@ -538,7 +538,7 @@ def addPropertyIndex(doc):
 
 
 def addIDLSection(doc):
-    idlBlocks = filter(isNormative, findAll("pre.idl, xmp.idl", doc))
+    idlBlocks = filter(lambda x:isNormative(x, doc), findAll("pre.idl, xmp.idl", doc))
     if len(idlBlocks) == 0:
         return
     html = getFillContainer('idl-index', doc=doc, default=True)
