@@ -105,7 +105,7 @@ def linkTextVariations(str, linkType):
         elif last1 in "bdfgklmnprstvz":
             yield str + last1 + "ing"
 
-    elif config.linkTypeIn(linkType, "idl"):
+    if config.linkTypeIn(linkType, "idl"):
         # Let people refer to escaped IDL names with their "real" names (without the underscore)
         if str[:1] != "_":
             yield "_" + str
@@ -114,6 +114,12 @@ def linkTextVariations(str, linkType):
         # Since attrs and methods live in the same namespace, this is safe.
         if "(" not in str:
             yield str + "()"
+
+        # Allow linking to an enum-value with or without quotes
+        if str[:1] == '"':
+            yield str[1:-1]
+        if str[:1] != '"':
+            yield '"' + str + '"'
 
 
 def stripLineBreaks(obj):
