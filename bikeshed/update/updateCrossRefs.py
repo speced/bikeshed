@@ -57,7 +57,7 @@ def update(path, dryRun=False):
                 continue
             if 'section' in rawAnchor and rawAnchor['section'] == True:
                 addToHeadings(rawAnchor, specHeadings, spec=spec)
-            else:
+            if rawAnchor['type'] not in ["heading"]:
                 addToAnchors(rawAnchor, anchors, spec=spec)
 
     cleanSpecHeadings(headings)
