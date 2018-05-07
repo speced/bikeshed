@@ -885,6 +885,9 @@ def removeMultipleLinks(doc):
         return
     paras = defaultdict(lambda:defaultdict(list))
     for el in findAll("a[data-link-type]", doc):
+        if hasAncestor(el, lambda x:x.tag in ["pre", "xmp"]):
+            # Don't strip out repeated links from opaque elements
+            continue
         paras[parentElement(el)][el.get("href")].append(el)
     for linkGroups in paras.values():
         for href,links in linkGroups.items():
