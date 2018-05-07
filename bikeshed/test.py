@@ -30,10 +30,14 @@ def testNameForPath(path):
     return path
 
 
+def sortTests(tests):
+    return sorted(tests, key=lambda x:("/" in testNameForPath(x), x))
+
+
 def runAllTests(Spec, testFiles=None, md=None):
     fileRequester = config.DataFileRequester(type="readonly")
     if not testFiles:
-        testFiles = sorted(findTestFiles(), key=lambda x:("/" in testNameForPath(x), x))
+        testFiles = list(sortTests(findTestFiles()))
         if len(testFiles) == 0:
             p("No tests were found")
             return True
@@ -41,8 +45,9 @@ def runAllTests(Spec, testFiles=None, md=None):
     total = 0
     fails = []
     for i,testPath in enumerate(testFiles, 1):
+        justifiedI = unicode(i).rjust(len(str(len(files))))
         testName = testNameForPath(testPath)
-        p("{0}/{1}: {2}".format(i, len(testFiles), testName))
+        p("{0}/{1}: {2}".format(justifiedI, len(testFiles), testName))
         total += 1
         doc = Spec(inputFilename=testPath, fileRequester=fileRequester)
         if md is not None:
@@ -100,14 +105,15 @@ def equalOrEmpty(a, b):
 def rebase(Spec, files=None, md=None):
     fileRequester = config.DataFileRequester(type="readonly")
     if not files:
-        files = sorted(findTestFiles())
+        files = list(sortTests(findTestFiles()))
         if len(files) == 0:
             p("No tests were found")
             return True
     for i,path in enumerate(files, 1):
+        justifiedI = unicode(i).rjust(len(str(len(files))))
         resetSeenMessages()
         name = testNameForPath(path)
-        p("{0}/{1}: Rebasing {2}".format(i, len(files), name))
+        p("{0}/{1}: Rebasing {2}".format(justifiedI, len(files), name))
         doc = Spec(path, fileRequester=fileRequester)
         if md:
             doc.mdCommandLine = md
