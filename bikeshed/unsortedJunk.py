@@ -238,14 +238,24 @@ def addVarClickHighlighting(doc):
         return
     doc.extraStyles["style-var-click-highlighting"] = '''
     var { cursor: pointer; }
-    var.selected0 { background-color: hsl(60deg, 50%, 90%); }
-    var.selected1 { background-color: hsl(0deg, 50%, 90%); }
-    var.selected2 { background-color: hsl(120deg, 50%, 90%); }
-    var.selected3 { background-color: hsl(180deg, 50%, 90%); }
-    var.selected4 { background-color: hsl(30deg, 50%, 90%); }
-    var.selected5 { background-color: hsl(240deg, 50%, 90%); }
-    var.selected6 { background-color: hsl(330deg, 80%, 93%); }
+    var.selected0 { background-color: #F4D200 }
+    var.selected1 { background-color: #FF87A2 }
+    var.selected2 { background-color: #96E885 }
+    var.selected3 { background-color: #3EEED2 }
+    var.selected4 { background-color: #EACFB6 }
+    var.selected5 { background-color: #82DDFF }
+    var.selected6 { background-color: #FFBCF2 }
     '''
+    # Colors were chosen in Lab using https://nixsensor.com/free-color-converter/
+    # D50 2deg illuminant, L in [0,100], a and b in [-128, 128]
+    # 0 = lab(85,0,85)
+    # 1 = lab(85,80,30)
+    # 2 = lab(85,-40,40)
+    # 3 = lab(85,-50,0)
+    # 4 = lab(85,5,15)
+    # 5 = lab(85,-10,-50)
+    # 6 = lab(85,35,-15)
+
     # Color-choosing design.
     # Start with 1, increment as new ones get selected.
     # Specifically: find lowest-indexed color with lowest usage.
