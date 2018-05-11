@@ -98,6 +98,11 @@ class Spec(object):
         return True
 
     def preprocess(self):
+        self.assembleDocument()
+        self.processDocument()
+        return self
+
+    def assembleDocument(self):
         # Textual hacks
         stripBOM(self)
         if self.lineNumbers:
@@ -146,7 +151,9 @@ class Spec(object):
         correctH1(self)
         processInclusions(self)
         metadata.parseDoc(self)
+        return self
 
+    def processDocument(self):
         # Fill in and clean up a bunch of data
         self.fillContainers = locateFillContainers(self)
         lint.exampleIDs(self)

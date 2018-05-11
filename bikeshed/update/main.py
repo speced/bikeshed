@@ -3,6 +3,7 @@ from __future__ import division, unicode_literals
 
 import os
 
+from . import updateBackRefs
 from . import updateCrossRefs
 from . import updateBiblio
 from . import updateCanIUse
@@ -15,7 +16,7 @@ from .. import config
 from ..messages import *
 
 
-def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False, wpt=False, path=None, dryRun=False, force=False):
+def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False, wpt=False, path=None, dryRun=False, force=False):
     if path is None:
         path = config.scriptPath("spec-data")
 
@@ -27,9 +28,11 @@ def update(anchors=False, biblio=False, caniuse=False, linkDefaults=False, testS
             force = True
     if force:
         # If all are False, update everything
-        updateAnyway = not (anchors or biblio or caniuse or linkDefaults or testSuites or languages)
+        updateAnyway = not (anchors or backrefs or biblio or caniuse or linkDefaults or testSuites or languages)
         if anchors or updateAnyway:
             updateCrossRefs.update(path=path, dryRun=dryRun)
+        if backrefs or updateAnyway:
+            updateBackRefs.update(path=path, dryRun=dryRun)
         if biblio or updateAnyway:
             updateBiblio.update(path=path, dryRun=dryRun)
         if caniuse or updateAnyway:

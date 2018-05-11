@@ -91,6 +91,7 @@ def main():
     updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
     updateParser.add_argument("--force", action="store_true", help="Forces a full update, skipping the manifest.")
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
+    updateParser.add_argument("--backrefs", action="store_true", help="Download link backref data.")
     updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
     updateParser.add_argument("--caniuse", action="store_true", help="Download Can I Use... data.")
     updateParser.add_argument("--link-defaults", dest="linkDefaults", action="store_true", help="Download link default data.")
@@ -193,7 +194,7 @@ def main():
 
     update.fixupDataFiles()
     if options.subparserName == "update":
-        update.update(anchors=options.anchors, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, wpt=options.wpt, dryRun=config.dryRun, force=options.force)
+        update.update(anchors=options.anchors, backrefs=options.backrefs, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, wpt=options.wpt, dryRun=config.dryRun, force=options.force)
     elif options.subparserName == "spec":
         doc = Spec(inputFilename=options.infile, debug=options.debug, token=options.ghToken, lineNumbers=options.lineNumbers)
         doc.mdCommandLine = metadata.fromCommandLine(extras)
