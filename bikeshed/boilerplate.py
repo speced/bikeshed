@@ -6,6 +6,7 @@ import re
 import subprocess
 from collections import defaultdict, OrderedDict
 from . import config
+from . import dfnpanels
 from .DefaultOrderedDict import DefaultOrderedDict
 from .htmlhelpers import *
 from .messages import *
@@ -379,7 +380,19 @@ def addIndexOfExternallyDefinedTerms(doc, container):
     if not doc.externalRefsUsed:
         return
 
+    def makeLink(*contents):
+        return E.span({"style":"color:initial"}, *contents)
+
     ul = E.ul({"class": "index"})
+    # Gather all the <a href> in the document, for use in the dfn-panels
+    elsFromHref = DefaultOrderedDict(list)
+    for a in findAll("a", doc):
+        href = a.get("href")
+        if href is None:
+            continue
+        if href.startswith("#"):
+            continue
+        elsFromHref[href].append(a)
     for spec, refGroups in sorted(doc.externalRefsUsed.items(), key=lambda x:x[0].upper()):
         # ref.spec is always lowercase; if the same string shows up in biblio data,
         # use its casing instead.
@@ -396,19 +409,15 @@ def addIndexOfExternallyDefinedTerms(doc, container):
         for text,refs in sorted(refGroups.items(), key=lambda x:x[0]):
             if len(refs) == 1:
                 ref = refs.values()[0]
-                appendChild(termsUl,
-                            E.li(E.a({"href":ref.url}, ref.text)))
+                link = makeLink(ref.text)
             else:
                 for key,ref in sorted(refs.items(), key=lambda x:x[0]):
                     if key:
-                        link = E.a({"href":ref.url},
-                                   ref.text,
-                                   " ",
-                                   E.small({}, "(for {0})".format(key)))
+                        link = makeLink(ref.text, " ", E.small({}, "(for {0})".format(key)))
                     else:
-                        link = E.a({"href":ref.url},
-                                   ref.text)
-                    appendChild(termsUl, E.li(link))
+                        link = makeLink(ref.text)
+            appendChild(termsUl, E.li(link))
+            dfnpanels.addExternalDfnPanel(link, ref, elsFromHref, doc)
     appendChild(container,
                 E.h3({"class":"no-num no-ref", "id":safeID(doc, "index-defined-elsewhere")}, "Terms defined by reference"),
                 ul)

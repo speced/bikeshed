@@ -328,6 +328,19 @@ def relevantHeadings(startEl, levels=None):
             return
 
 
+def sectionName(el):
+    '''
+    Return the name of the nearest section to el,
+    or None if that section isn't meant to be referenced.
+    '''
+    h = nextIter(relevantHeadings(el))
+    if h is None:
+        return "Unnamed section"
+    if hasClass(h, "no-ref"):
+        return None
+    return textContent(h)
+
+
 def scopingElements(startEl, *tags):
     # Elements that could form a "scope" for the startEl
     # Ancestors, and preceding siblings of ancestors.
@@ -787,6 +800,18 @@ def circledDigits(num):
         result = digits[num%10] + result
         num = num // 10
     return result
+
+
+def nextIter(it, default=None):
+    '''
+    Returns the next element of the iterator,
+    returning the default value if it's empty,
+    rather than throwing an error.
+    '''
+    try:
+        return iter(it).next()
+    except StopIteration:
+        return default
 
 
 def createElement(tag, attrs={}, *children):
