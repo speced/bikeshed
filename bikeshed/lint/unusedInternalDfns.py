@@ -1,0 +1,23 @@
+# -*- coding: utf-8 -*-
+from __future__ import division, unicode_literals
+import re
+from ..htmlhelpers import *
+from ..messages import *
+
+def unusedInternalDfns(doc):
+	'''
+	The export/noexport distinction assumes that noexport dfns are meant to be internal-only.
+	If you don't actually *use* a noexport dfn, that's probably an error.
+	In particular, this'll probably help find *untagged* dfns that are defaulting to noexport.
+	'''
+	noexportDfns = [el for el in findAll("dfn", doc) if el.get("data-noexport") is not None]
+
+	def local(el):
+		return (el.get("href").startswith("#")
+			and not hasClass(el, "self-link")
+			and closestAncestor(el, lambda x:hasClass(x, "index")) is None)
+	localHrefs = [el.get("href")[1:] for el in findAll("a", doc) if local(el)]
+
+	for el in noexportDfns:
+		if el.get("id") not in localHrefs:
+			warn("Unexported dfn that's not referenced locally - did you mean to export it?\n{0}", outerHTML(el), el=el)
