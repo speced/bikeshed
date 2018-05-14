@@ -13,7 +13,8 @@ def unusedInternalDfns(doc):
 	noexportDfns = [el for el in findAll("dfn", doc) if el.get("data-noexport") is not None]
 
 	def local(el):
-		return (el.get("href").startswith("#")
+		return (el.get("href") is not None
+			and el.get("href").startswith("#")
 			and not hasClass(el, "self-link")
 			and closestAncestor(el, lambda x:hasClass(x, "index")) is None)
 	localHrefs = [el.get("href")[1:] for el in findAll("a", doc) if local(el)]
