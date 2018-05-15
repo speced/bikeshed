@@ -654,13 +654,9 @@ def classifyDfns(doc, dfns):
             el.set('data-lt', primaryDfnText)
         # Push export/noexport down to the definition
         if el.get('data-export') is None and el.get('data-noexport') is None:
-            for ancestor in el.iterancestors():
-                if ancestor.get('data-export') is not None:
-                    el.set('data-export', '')
-                    break
-                elif ancestor.get('data-noexport') is not None:
-                    el.set('data-noexport', '')
-                    break
+            attr,_ = closestAttr(el, "data-export", "data-noexport")
+            if attr is not None:
+                el.set(attr, "")
             else:
                 if dfnType == "dfn":
                     el.set('data-noexport', '')
