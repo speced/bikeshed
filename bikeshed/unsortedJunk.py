@@ -659,9 +659,9 @@ def classifyDfns(doc, dfns):
                 el.set(attr, "")
             else:
                 if dfnType == "dfn":
-                    el.set('data-noexport', '')
+                    el.set('data-noexport', 'by-default')
                 else:
-                    el.set('data-export', '')
+                    el.set('data-export', 'by-default')
         # If it's an code-ish type such as IDL,
         # and doesn't already have a sole <code> child,
         # wrap the contents in a <code>.
