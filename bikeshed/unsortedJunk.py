@@ -1112,6 +1112,7 @@ def cleanupHTML(doc):
         removeAttr(el, 'data-alternate-id')
         removeAttr(el, 'highlight')
         removeAttr(el, 'nohighlight')
+        removeAttr(el, 'line-numbers')
         removeAttr(el, 'data-opaque')
         removeAttr(el, 'data-no-self-link')
         removeAttr(el, "line-number")

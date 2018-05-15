@@ -365,7 +365,7 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
     # Add an attr for the line number, and if needed, the end line.
     if highlights is None:
         highlights = set()
-    lineWrapper = E.div({"class": "line"})
+    lineWrapper = E.span({"class": "line"})
     for node in childNodes(el, clear=True):
         if isElement(node):
             appendChild(lineWrapper, node)
@@ -376,7 +376,7 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
                     appendChild(lineWrapper, pre)
                     appendChild(el, E.span({"class": "line-no"}))
                     appendChild(el, lineWrapper)
-                    lineWrapper = E.div({"class": "line"})
+                    lineWrapper = E.span({"class": "line"})
                     node = post
                 else:
                     appendChild(lineWrapper, node)
@@ -387,14 +387,8 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
     # Number the lines
     lineNumber = start
     for lineNo, node in grouper(childNodes(el), 2):
-        if isEmpty(node):
-            # Blank line; since I removed the \n from the source
-            # and am relying on <div> for lines now,
-            # this'll collapse to zero-height and mess things up.
-            # Add a single space to keep it one line tall.
-            node.text = " "
         if numbers or lineNumber in highlights:
-            lineNo.set("line", unicode(lineNumber))
+            lineNo.set("data-line", unicode(lineNumber))
         if lineNumber in highlights:
             addClass(node, "highlight-line")
             addClass(lineNo, "highlight-line")
@@ -404,10 +398,10 @@ def addLineWrappers(el, numbers=True, start=1, highlights=None):
                 if (lineNumber + i) in highlights:
                     addClass(lineNo, "highlight-line")
                     addClass(node, "highlight-line")
-                    lineNo.set("line", unicode(lineNumber))
+                    lineNo.set("data-line", unicode(lineNumber))
             lineNumber += internalNewlines
             if numbers:
-                lineNo.set("line-end", unicode(lineNumber))
+                lineNo.set("data-line-end", unicode(lineNumber))
         lineNumber += 1
     addClass(el, "line-numbered")
     return el
@@ -523,13 +517,13 @@ def getLineNumberStyles():
 .line:hover {
     background: rgba(0,0,0,.05);
 }
-.line-no[line]::before {
+.line-no[data-line]::before {
     padding: 0 .5em 0 .1em;
-    content: attr(line);
+    content: attr(data-line);
 }
-.line-no[line-end]::after {
+.line-no[data-line-end]::after {
     padding: 0 .5em 0 .1em;
-    content: attr(line-end);
+    content: attr(data-line-end);
 }
 '''
 
@@ -555,13 +549,13 @@ def getLineHighlightingStyles():
 .line.highlight-line {
     background: rgba(0,0,0,.05);
 }
-.line-no.highlight-line[line]::before {
+.line-no.highlight-line[data-line]::before {
     padding: 0 .5em 0 .1em;
-    content: attr(line);
+    content: attr(data-line);
 }
-.line-no.highlight-line[line-end]::after {
+.line-no.highlight-line[data-line-end]::after {
     padding: 0 .5em 0 .1em;
-    content: attr(line-end);
+    content: attr(data-line-end);
 }
 '''
 
