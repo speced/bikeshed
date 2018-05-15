@@ -154,6 +154,16 @@ def commonPrefix(line1, line2):
 def getWsPrefix(line):
     return re.match(r"(\s*)", line).group(1)
 
+
+'''
+When writing a new transformFoo function,
+PAY ATTENTION TO THE INDENT OF THE FIRST LINE
+OR ELSE YOU'LL MESS UP THE MARKDOWN PARSER.
+Generally, just spam the first-line's indent onto every line;
+if you're outputting a raw element (<pre>/etc),
+just spam it onto the first line.
+'''
+
 def transformPre(lines, tagName, firstLine, **kwargs):
     # If the last line in the source is a </code></pre>,
     # the generic processor will turn that into a final </code> line,
@@ -281,6 +291,10 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
             td = "<td><a href='https://drafts.csswg.org/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>"
         ret.append(tr+th+td)
     ret.append("</table>")
+
+    indent = getWsPrefix(firstLine)
+    ret = [indent+l for l in ret]
+
     return ret
 
 # TODO: Make these functions match transformPropdef's new structure
@@ -313,10 +327,14 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
     for key in vals.viewkeys() - requiredKeys:
         ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
     ret.append("</table>")
+
+    indent = getWsPrefix(firstLine)
+    ret = [indent+l for l in ret]
+
     return ret
 
 
-def transformElementdef(lines, doc, lineNum=None, **kwargs):
+def transformElementdef(lines, doc, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = " line-number={0}".format(lineNum)
@@ -374,6 +392,10 @@ def transformElementdef(lines, doc, lineNum=None, **kwargs):
             continue
         ret.append("<tr><th>{0}:<td>{1}".format(key, val))
     ret.append("</table>")
+
+    indent = getWsPrefix(firstLine)
+    ret = [indent+l for l in ret]
+
     return ret
 
 
@@ -381,7 +403,6 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = " line-number={0}".format(lineNum)
-    wsPrefix,_,_ = firstLine.partition("<")
     attrs = parseDefBlock(lines, "argumentdef", capitalizeKeys=False, lineNum=lineNum)
     el = parseHTML(firstLine + "</pre>")[0]
     if "for" in el.attrib:
@@ -419,7 +440,9 @@ def transformArgumentdef(lines, firstLine, lineNum=None, **kwargs):
     for param,desc in attrs.items()])
 + '''
 </table>''')
-    lines = [wsPrefix+line for line in text.split("\n")]
+
+    indent = getWsPrefix(firstLine)
+    lines = [indent+line for line in text.split("\n")]
 
     return lines
 
@@ -449,7 +472,7 @@ def parseDefBlock(lines, type, capitalizeKeys=True, lineNum=None):
     return vals
 
 
-def transformRailroad(lines, doc, **kwargs):
+def transformRailroad(lines, doc, firstLine, **kwargs):
     import StringIO
     import railroadparser
     ret = ["<div class='railroad'>"]
@@ -462,6 +485,10 @@ def transformRailroad(lines, doc, **kwargs):
         ret.append(temp.getvalue())
         temp.close()
         ret.append("</div>")
+
+        indent = getWsPrefix(firstLine)
+        ret = [indent+l for l in ret]
+
         return ret
     else:
         return []
@@ -478,7 +505,8 @@ def transformBiblio(lines, doc, **kwargs):
 
 def transformAnchors(lines, doc, lineNum=None, **kwargs):
     anchors = parseInfoTree(lines, doc.md.indent, lineNum)
-    return processAnchors(anchors, doc, lineNum)
+    processAnchors(anchors, doc, lineNum)
+    return []
 
 
 def processAnchors(anchors, doc, lineNum=None):
@@ -546,12 +574,12 @@ def processAnchors(anchors, doc, lineNum=None):
         methodishStart = re.match(r"([^(]+\()[^)]", anchor['text'][0])
         if methodishStart:
             doc.refs.anchorBlockRefs.addMethodVariants(anchor['text'][0], anchor.get('for', []), doc.md.shortname)
-    return []
 
 
 def transformLinkDefaults(lines, doc, lineNum=None, **kwargs):
     lds = parseInfoTree(lines, doc.md.indent, lineNum)
-    return processLinkDefaults(lds, doc, lineNum)
+    processLinkDefaults(lds, doc, lineNum)
+    return []
 
 
 def processLinkDefaults(lds, doc, lineNum=None):
@@ -576,12 +604,12 @@ def processLinkDefaults(lds, doc, lineNum=None):
                 doc.md.linkDefaults[text].append((spec, type, ld.get('status', None), _for))
         else:
             doc.md.linkDefaults[text].append((spec, type, ld.get('status', None), None))
-    return []
 
 
 def transformIgnoredSpecs(lines, doc, lineNum=None, **kwargs):
     specs = parseInfoTree(lines, doc.md.indent, lineNum)
-    return processIgnoredSpecs(specs, doc, lineNum)
+    processIgnoredSpecs(specs, doc, lineNum)
+    return []
 
 
 def processIgnoredSpecs(specs, doc, lineNum=None):
@@ -599,7 +627,6 @@ def processIgnoredSpecs(specs, doc, lineNum=None):
                 doc.refs.replacedSpecs.add((specName, replacedBy))
             else:
                 doc.refs.ignoredSpecs.add(specName)
-    return []
 
 
 def transformInfo(lines, doc, lineNum=None, **kwargs):
@@ -607,7 +634,8 @@ def transformInfo(lines, doc, lineNum=None, **kwargs):
     # A <pre class=info> can contain any of the InfoTree collections,
     # identified by an 'info' line.
     infos = parseInfoTree(lines, doc.md.indent, lineNum)
-    return processInfo(infos, doc, lineNum)
+    processInfo(infos, doc, lineNum)
+    return []
 
 
 def processInfo(infos, doc, lineNum=None):
@@ -628,10 +656,9 @@ def processInfo(infos, doc, lineNum=None):
         infoCollections[infoType].append(info)
     for infoType, infos in infoCollections.items():
         knownInfoTypes[infoType](infos, doc, lineNum=0)
-    return []
 
 
-def transformInclude(lines, doc, lineNum=None, **kwargs):
+def transformInclude(lines, doc, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""
     if lineNum is not None:
         lineNumAttr = " line-number={0}".format(lineNum)
@@ -657,7 +684,9 @@ def transformInclude(lines, doc, lineNum=None, **kwargs):
         for i,(k,v) in enumerate(macros.items()):
             el += " macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
         el += "{lineNumAttr}></pre>".format(lineNumAttr=lineNumAttr)
-        return [el]
+
+        indent = getWsPrefix(firstLine)
+        return [indent+el]
     else:
         return []
 
@@ -841,7 +870,7 @@ def parseTag(text, lineNumber):
         elif state == "after-attribute-name":
             if text[i].isspace():
                 i += 1
-                continue 
+                continue
             elif text[i] == "/":
                 state = "self-closing-start-tag"
                 i += 1
