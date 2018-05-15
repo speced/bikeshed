@@ -45,7 +45,7 @@ def runAllTests(Spec, testFiles=None, md=None):
     total = 0
     fails = []
     for i,testPath in enumerate(testFiles, 1):
-        justifiedI = unicode(i).rjust(len(str(len(files))))
+        justifiedI = unicode(i).rjust(len(str(len(testFiles))))
         testName = testNameForPath(testPath)
         p("{0}/{1}: {2}".format(justifiedI, len(testFiles), testName))
         total += 1
