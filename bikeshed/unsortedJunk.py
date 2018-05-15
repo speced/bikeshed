@@ -1117,6 +1117,13 @@ def cleanupHTML(doc):
         removeAttr(el, "line-number")
         removeAttr(el, "caniuse")
         removeAttr(el, "data-silently-dedup")
+
+        # Remove the internal-use-only detail of whether export/noexport is manual or default
+        if el.get("data-export"):
+            el.set("data-export", "")
+        if el.get("data-noexport"):
+            el.set("data-noexport", "")
+
         if doc.md.slimBuildArtifact:
             # Remove *all* data- attributes.
             for attrName in el.attrib:
