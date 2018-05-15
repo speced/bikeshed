@@ -87,10 +87,11 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
 
         # We're either in a nesting raw element or not in a raw element at all,
         # so check if the line starts a new element.
-        match = re.match(r"\s*(`{3,}|~{3,})([^`]*)$", l.text)
+        match = re.match(r"(\s*)(`{3,}|~{3,})([^`]*)$", l.text)
         if match:
-            rawStack.append({"type":"fenced", "tag":match.group(1), "nest":False})
-            infoString = match.group(2).strip()
+            ws,tag,infoString = match.groups()
+            rawStack.append({"type":"fenced", "tag":tag, "nest":False})
+            infoString = infoString.strip()
             if infoString:
                 # For now, I only care about lang
                 lang = infoString.split(" ")[0]
@@ -98,7 +99,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
             else:
                 classAttr = ""
             l.text = '<xmp{0}>'.format(classAttr)
-            tokens.append({'type':'raw', 'prefixlen':float('inf'), 'line':l})
+            tokens.append({'type':'raw', 'prefixlen':prefixLen(ws, numSpacesForIndentation), 'line':l})
             continue
         match = re.match(r"\s*<({0})[ >]".format(rawElements), l.text)
         if match:
