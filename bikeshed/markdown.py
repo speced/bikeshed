@@ -98,7 +98,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
                 classAttr = " class='language-{0}'".format(escapeAttr(lang))
             else:
                 classAttr = ""
-            l.text = '<xmp{0}>'.format(classAttr)
+            l.text = '{0}<xmp{1}>'.format(ws, classAttr)
             tokens.append({'type':'raw', 'prefixlen':prefixLen(ws, numSpacesForIndentation), 'line':l})
             continue
         match = re.match(r"\s*<({0})[ >]".format(rawElements), l.text)
