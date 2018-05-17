@@ -250,8 +250,11 @@ class MetadataManager:
             macros["abstractattr"] = ""
         macros["year"] = unicode(self.date.year)
         macros["date"] = unicode(self.date.strftime("{0} %B %Y".format(self.date.day)), encoding="utf-8")
+        macros["date-dmmy"] = unicode(self.date.strftime("{0} %B %Y".format(self.date.day)), encoding="utf-8") #same as plain 'date'
         macros["cdate"] = unicode(self.date.strftime("%Y%m%d"), encoding="utf-8")
         macros["isodate"] = unicode(self.date.strftime("%Y-%m-%d"), encoding="utf-8")
+        macros["date-my"] = unicode(self.date.strftime("%b %Y"), encoding="utf-8")
+        macros["date-mmy"] = unicode(self.date.strftime("%B %Y"), encoding="utf-8")
         if self.deadline:
             macros["deadline"] = unicode(self.deadline.strftime("{0} %B %Y".format(self.deadline.day)), encoding="utf-8")
             macros["isodeadline"] = unicode(self.deadline.strftime("%Y-%m-%d"), encoding="utf-8")
