@@ -11,7 +11,7 @@ from ..messages import *
 def update(path, dryRun=False):
     try:
         say("Downloading web-platform-tests data...")
-        with closing(urllib2.urlopen("https://wpt.fyi/api/manifest?sha=latest")) as fh:
+        with closing(urllib2.urlopen("https://wpt.fyi/api/manifest")) as fh:
             sha = fh.info().getheader("x-wpt-sha")
             jsonData = json.load(fh, encoding="utf-8")
     except Exception, e:
@@ -20,17 +20,17 @@ def update(path, dryRun=False):
 
     paths = []
     for testType, typePaths in jsonData["items"].items():
-        if testType in ("support", "reftest_node"):
+        if testType not in ("manual", "reftest", "testharness", "wdspec"):
             # Not tests
             continue
-        paths.extend(typePaths.keys())
+        paths.extend((testType, path) for path in typePaths.keys())
 
     if not dryRun:
         try:
             with io.open(os.path.join(path, "wpt-tests.txt"), 'w', encoding="utf-8") as f:
-                f.write(sha + "\n")
+                f.write("sha: {0}\n".format(sha))
                 for path in sorted(paths):
-                    f.write(path + "\n")
+                    f.write("{0} {1}\n".format(*path))
         except Exception, e:
             die("Couldn't save web-platform-tests data to disk.\n{0}", e)
             return
