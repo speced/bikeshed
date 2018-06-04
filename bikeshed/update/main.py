@@ -28,7 +28,7 @@ def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefau
             force = True
     if force:
         # If all are False, update everything
-        updateAnyway = not (anchors or backrefs or biblio or caniuse or linkDefaults or testSuites or languages)
+        updateAnyway = not (anchors or backrefs or biblio or caniuse or linkDefaults or testSuites or languages or wpt)
         if anchors or updateAnyway:
             updateCrossRefs.update(path=path, dryRun=dryRun)
         if backrefs or updateAnyway:
