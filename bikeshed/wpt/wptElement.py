@@ -13,10 +13,13 @@ def processWptElements(doc):
 	if pathPrefix is not None and not pathPrefix.endswith("/"):
 		pathPrefix += "/"
 
+	atLeastOneElement = False
+
 	# <wpt> elements
 	wptElements = findAll("wpt", doc)
 	seenTestNames = set()
 	for el in wptElements:
+		atLeastOneElement = True
 		testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
 		for testName in testNames:
 			if testName not in testData:
@@ -30,15 +33,21 @@ def processWptElements(doc):
 	if len(wptRestElements) > 1:
 		die("Only one <wpt-rest> element allowed per document, you have {0}.", len(wptRestElements))
 		wptRestElements = wptRestElements[0:1]
-	if len(wptRestElements) == 1:
+	elif len(wptRestElements) == 1:
 		if pathPrefix is None:
 			die("Can't use <wpt-rest> without a WPT Path Prefix metadata.")
 			return
+		atLeastOneElement = True
 		prefixedNames = [p for p in testData if p.startswith(pathPrefix) and p not in seenTestNames]
 		if len(prefixedNames) == 0:
 			die("Couldn't find any tests with the path prefix '{0}'.", pathPrefix)
 			return
 		createHTML(doc, wptRestElements[0], prefixedNames)
+	else:
+		checkForOmittedTests(pathPrefix, testData, seenTestNames)
+
+	if atLeastOneElement:
+		doc.extraStyles['style-wpt'] = wptStyle
 
 
 
@@ -46,15 +55,17 @@ def createHTML(doc, blockEl, testNames):
 	if doc.md.wptDisplay == "none":
 		removeNode(blockEl)
 	elif doc.md.wptDisplay == "inline":
-		blockEl.tag == "ul"
+		blockEl.tag = "ul"
 		addClass(blockEl, "wpt-tests-block")
 		clearContents(blockEl)
 		for testName in testNames:
 			_,_,lastNameFragment = testName.rpartition("/")
 			singleTestEl = E.li({"class": "wpt-test"},
-				E.a({"title": testName, "href": "http://w3c-test.org/"+testName}, "Test: " + lastNameFragment),
+				E.a({"href": "https://wpt.fyi/results/"+testName}, lastNameFragment),
 				" ",
-				E.a({"href": "view-source:w3c-test.org/"+testName}, E.small("(source)")))
+				E.a({"title": testName, "href": "http://w3c-test.org/"+testName}, E.small("(live test)")),
+				" ",
+				E.a({"href": "https://github.com/web-platform-tests/wpt/blob/master/"+testName}, E.small("(source)")))
 			appendChild(blockEl, singleTestEl)
 	else:
 		die("Programming error, uncaught WPT Display value in createHTML.")
@@ -85,9 +96,50 @@ def prefixPlusPath(prefix, path):
 		return prefix + path
 
 
-def loadTestData(doc):
-	return set(x.strip() for x in doc.dataFile.fetch("wpt-tests.txt", str=True).split("\n"))
+def checkForOmittedTests(pathPrefix, testData, seenTestNames):
+	unseenTests = []
+	for testPath in testData.keys():
+		if testPath.startswith(pathPrefix):
+			if testPath not in seenTestNames:
+				unseenTests.append(testPath)
+	if unseenTests:
+		die("There are {0} WPT tests underneath your path prefix aren't in your document and must be added:\n{1}",
+			len(unseenTests),
+			"\n".join("  " + path for path in sorted(unseenTests)))
 
+
+def loadTestData(doc):
+	paths = {}
+	for line in doc.dataFile.fetch("wpt-tests.txt", str=True).split("\n")[1:]:
+		testType,_,testPath = line.strip().partition(" ")
+		paths[testPath] = testType
+	return paths
 
 def xor(a, b):
 	return bool(a) != bool(b)
+
+wptStyle = '''
+.wpt-tests-block {
+	list-style: none;
+	border-left: .5em solid hsl(290, 70%, 60%);
+	background: hsl(290, 70%, 95%);
+	margin: 1em auto;
+	padding: .5em;
+	display: grid;
+	grid-template-columns: 1fr auto auto;
+	grid-column-gap: .5em;
+}
+.wpt-tests-block::before {
+	content: "Tests";
+	grid-column: 1/-1;
+	color: hsl(290, 70%, 30%);
+	text-transform: uppercase;
+}
+.wpt-test {
+	display: contents;
+}
+.wpt-test > a {
+	text-decoration: underline;
+	border: none;
+}
+'''
