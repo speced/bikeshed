@@ -44,7 +44,8 @@ def processWptElements(doc):
 			return
 		createHTML(doc, wptRestElements[0], prefixedNames)
 	else:
-		checkForOmittedTests(pathPrefix, testData, seenTestNames)
+		if pathPrefix:
+			checkForOmittedTests(pathPrefix, testData, seenTestNames)
 
 	if atLeastOneElement:
 		doc.extraStyles['style-wpt'] = wptStyle
