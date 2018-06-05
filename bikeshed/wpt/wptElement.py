@@ -15,8 +15,6 @@ def processWptElements(doc):
 
 	# <wpt> elements
 	wptElements = findAll("wpt", doc)
-	if not wptElements:
-		return
 	seenTestNames = set()
 	for el in wptElements:
 		testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
