@@ -34,8 +34,11 @@ def processWptElements(doc):
 		die("Only one <wpt-rest> element allowed per document, you have {0}.", len(wptRestElements))
 		wptRestElements = wptRestElements[0:1]
 	elif len(wptRestElements) == 1:
+		localPrefix = el.get("pathprefix")
+		if localPrefix is not None:
+			pathPrefix = localPrefix
 		if pathPrefix is None:
-			die("Can't use <wpt-rest> without a WPT Path Prefix metadata.")
+			die("Can't use <wpt-rest> without either a pathprefix="" attribute or a 'WPT Path Prefix' metadata.")
 			return
 		atLeastOneElement = True
 		prefixedNames = [p for p in testData if p.startswith(pathPrefix) and p not in seenTestNames]
@@ -43,6 +46,7 @@ def processWptElements(doc):
 			die("Couldn't find any tests with the path prefix '{0}'.", pathPrefix)
 			return
 		createHTML(doc, wptRestElements[0], prefixedNames)
+		warn("<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing.")
 	else:
 		if pathPrefix:
 			checkForOmittedTests(pathPrefix, testData, seenTestNames)
@@ -74,6 +78,9 @@ def createHTML(doc, blockEl, testNames):
 
 def testNamesFromEl(el, pathPrefix=None):
 	testNames = []
+	localPrefix = el.get("pathprefix")
+	if localPrefix is not None:
+		pathPrefix = localPrefix
 	for name in [x.strip() for x in textContent(el).split("\n")]:
 		if name == "":
 			continue
