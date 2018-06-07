@@ -56,6 +56,7 @@ class MetadataManager:
         self.deadline = None
         self.defaultHighlight = None
         self.defaultRefStatus = None
+        self.displayShortname = None
         self.editors = []
         self.editorTerm = {"singular": "Editor", "plural": "Editors"}
         self.favicon = None
@@ -158,6 +159,9 @@ class MetadataManager:
         elif (self.canonicalURL == None or self.canonicalURL == "ED") and self.ED:
             self.canonicalURL = self.ED
 
+        if self.displayShortname:
+            self.shortname = self.displayShortname.lower()
+
     def validate(self):
         if self.group == "byos":
             return True
@@ -220,7 +224,7 @@ class MetadataManager:
             macros["spectitle"] = self.title
         if self.h1:
             macros["spectitle"] = self.h1
-        macros["shortname"] = self.shortname
+        macros["shortname"] = self.displayShortname
         if self.statusText:
             macros["statustext"] = "\n".join(markdown.parse(self.statusText, self.indent))
         else:
@@ -969,7 +973,7 @@ knownKeys = {
     "Repository": Metadata("Repository", "repository", joinValue, parseRepository),
     "Required Ids": Metadata("Required Ids", "requiredIDs", joinList, parseCommaSeparated),
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
-    "Shortname": Metadata("Shortname", "shortname", joinValue, parseLiteralCaseless),
+    "Shortname": Metadata("Shortname", "displayShortname", joinValue, parseLiteral),
     "Slim Build Artifact": Metadata("Slim Build Artifact", "slimBuildArtifact", joinValue, parseBoolean),
     "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
     "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),
