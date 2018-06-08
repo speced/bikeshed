@@ -89,7 +89,7 @@ def main():
                              help="Bring-Your-Own-Spec: turns off all the Bikeshed auto-niceties, so you can piecemeal its features into your existing doc instead. Experimental, let me know if things get crashy or weird.")
 
     updateParser = subparsers.add_parser('update', help="Update supporting files (those in /spec-data).", epilog="If no options are specified, everything is downloaded.")
-    updateParser.add_argument("--force", action="store_true", help="Forces a full update, skipping the manifest.")
+    updateParser.add_argument("--skip-manifest", dest="force", action="store_true", help="Forces Bikeshed to do a full update manually, rather than using the manifest to get the preprocessed update (which can be several minutes old).")
     updateParser.add_argument("--anchors", action="store_true", help="Download crossref anchor data.")
     updateParser.add_argument("--backrefs", action="store_true", help="Download link backref data.")
     updateParser.add_argument("--biblio", action="store_true", help="Download biblio data.")
