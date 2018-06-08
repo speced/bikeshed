@@ -7,7 +7,7 @@ from .messages import *
 
 
 class HTMLSerializer(object):
-    inlineEls = frozenset(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "[]"])
+    inlineEls = frozenset(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "math", "[]"])
     rawEls = frozenset(["xmp", "script", "style"])
     voidEls = frozenset(["area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr"])
     omitEndTagEls = frozenset(["td", "th", "tr", "thead", "tbody", "tfoot", "colgroup", "col", "li", "dt", "dd", "html", "head", "body"])
