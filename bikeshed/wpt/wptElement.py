@@ -10,8 +10,6 @@ from ..messages import *
 def processWptElements(doc):
 	testData = loadTestData(doc)
 	pathPrefix = doc.md.wptPathPrefix
-	if pathPrefix is not None and not pathPrefix.endswith("/"):
-		pathPrefix += "/"
 
 	atLeastOneElement = False
 
@@ -41,7 +39,7 @@ def processWptElements(doc):
 			die("Can't use <wpt-rest> without either a pathprefix="" attribute or a 'WPT Path Prefix' metadata.")
 			return
 		atLeastOneElement = True
-		prefixedNames = [p for p in testData if p.startswith(pathPrefix) and p not in seenTestNames]
+		prefixedNames = [p for p in testData if prefixInPath(pathPrefix, p) and p not in seenTestNames]
 		if len(prefixedNames) == 0:
 			die("Couldn't find any tests with the path prefix '{0}'.", pathPrefix)
 			return
@@ -84,30 +82,39 @@ def testNamesFromEl(el, pathPrefix=None):
 	for name in [x.strip() for x in textContent(el).split("\n")]:
 		if name == "":
 			continue
-		if pathPrefix is None:
-			testNames.append(name)
-		else:
-			if name.startswith("/"):
-				testPath = pathPrefix + name[1:]
-			else:
-				testPath = pathPrefix + name
-			testNames.append(testPath)
+		testName = prefixPlusPath(pathPrefix, name)
+		testNames.append(testName)
 	return testNames
 
 
 def prefixPlusPath(prefix, path):
-	if prefix.endswith("/") and path.startswith("/"):
-		return prefix[:-1] + path
-	elif not prefix.endswith("/") and not path.startswith("/"):
-		return prefix + "/" + path
-	else:
-		return prefix + path
+	# Join prefix to path, normalizing slashes
+	prefix = normalizePathSegment(prefix)
+	if prefix is None:
+		return path
+	if path.startswith("/"):
+		path = path[1:]
+	return prefix + path
 
+def prefixInPath(prefix, path):
+	if prefix is None:
+		return False
+	return path.startswith(normalizePathSegment(prefix))
+
+def normalizePathSegment(pathSeg):
+	# No slash at front, yes slash at end
+	if pathSeg is None:
+		return None
+	if pathSeg.startswith("/"):
+		pathSeg = pathSeg[1:]
+	if not pathSeg.endswith("/"):
+		pathSeg += "/"
+	return pathSeg
 
 def checkForOmittedTests(pathPrefix, testData, seenTestNames):
 	unseenTests = []
 	for testPath in testData.keys():
-		if testPath.startswith(pathPrefix):
+		if prefixInPath(pathPrefix, testPath):
 			if testPath not in seenTestNames:
 				unseenTests.append(testPath)
 	if unseenTests:
