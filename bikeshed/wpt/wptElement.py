@@ -32,7 +32,7 @@ def processWptElements(doc):
 		die("Only one <wpt-rest> element allowed per document, you have {0}.", len(wptRestElements))
 		wptRestElements = wptRestElements[0:1]
 	elif len(wptRestElements) == 1:
-		localPrefix = el.get("pathprefix")
+		localPrefix = wptRestElements[0].get("pathprefix")
 		if localPrefix is not None:
 			pathPrefix = localPrefix
 		if pathPrefix is None:
