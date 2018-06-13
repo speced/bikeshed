@@ -1605,7 +1605,17 @@ for directly accessing the clipboard contents.</p>
       <li><a href="#image-transcode"><span class="secno">10.3</span> <span class="content">Transcoding images</span></a>
       <li><a href="#nuisances"><span class="secno">10.4</span> <span class="content">Nuisance considerations</span></a>
      </ol>
-    <li><a href="#privacy"><span class="secno">11</span> <span class="content">Privacy Considerations</span></a>
+    <li>
+     <a href="#privacy"><span class="secno">11</span> <span class="content">Privacy Considerations</span></a>
+     <ol class="toc">
+      <li><a href="#privacy-events"><span class="secno">11.1</span> <span class="content">Privacy and the Clipboard Event API</span></a>
+      <li>
+       <a href="#privacy-async"><span class="secno">11.2</span> <span class="content">Privacy and the Asychronous Clipboard API</span></a>
+       <ol class="toc">
+        <li><a href="#privacy-permission"><span class="secno">11.2.1</span> <span class="content">Privacy and Clipboard Permission</span></a>
+       </ol>
+      <li><a href="#privacy-other"><span class="secno">11.3</span> <span class="content">Other Privacy Concerns</span></a>
+     </ol>
     <li><a href="#acknowledge"><span class="secno">12</span> <span class="content">Acknowledgements</span></a>
     <li>
      <a href="#algorithms"><span class="secno"></span> <span class="content">Appendix A: Algorithms</span></a>
@@ -2048,7 +2058,7 @@ document.addEventListener('paste', function(e) {
         <li data-md="">
          <p>Let <var>r</var> be the result of running <a data-link-type="dfn" href="#check-clipboard-read-permission" id="ref-for-check-clipboard-read-permission">check clipboard read permission</a> <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel" id="ref-for-in-parallel①">in parallel</a></p>
         <li data-md="">
-         <p>If <var>r</var> is not "granted", then reject <var>p</var></p>
+         <p>If <var>r</var> is not "granted", then reject <var>p</var> with a "NotAllowedError" DOMException</p>
         <li data-md="">
          <p>Let <var>data</var> be a copy of the <a data-link-type="dfn" href="#system-clipboard-data" id="ref-for-system-clipboard-data①">system clipboard data</a>.</p>
         <li data-md="">
@@ -2584,36 +2594,60 @@ did not intend to expose.</p>
     <p>Implementations must handle scripts that try to place excessive amounts
 		of data on the clipboard gracefully.</p>
     <h2 class="heading settled" data-level="11" id="privacy"><span class="secno">11. </span><span class="content">Privacy Considerations</span><a class="self-link" href="#privacy"></a></h2>
-    <p>Untrusted scripts should not get uncontrolled access to a user’s
-	clipboard data. This specification assumes that granting access to the
-	current clipboard data when a user explicitly initiates a paste
-	operation from the user agent’s trusted chrome is acceptable. However,
-	implementors must proceed carefully, and as a minimum implement the
-	precautions below:</p>
+    <p>Because these APIs provide access to the user’s clipboard data, there are serious
+	privacy concerns due to the possibility that the clipboard will contain
+	personally-identifiable information (PII) like names, addresses, or passwords.</p>
+    <p>In general, user agents <em>must</em> ensure that untrusted scripts do not get
+	uncontrolled access to a user’s clipboard data through these APIs.</p>
+    <h3 class="heading settled" data-level="11.1" id="privacy-events"><span class="secno">11.1. </span><span class="content">Privacy and the Clipboard Event API</span><a class="self-link" href="#privacy-events"></a></h3>
+    <p>The Clipboard Event API allows scripts running in the context of a clipboard
+		event handler to access a copy of the system clipboard and potentially modify
+		the data being written to the clipboard.</p>
+    <p>User agents should be aware of the following requirements with regards to
+		securing the data accessed by the Clipboard Event API:</p>
     <ul>
      <li data-md="">
       <p>Objects implementing the <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①⓪">DataTransfer</a></code> interface to return
 clipboard data <em>must not</em> be available outside the
-ClipboardEvent event handler.</p>
+ClipboardEvent event handler that the data is provided to.</p>
      <li data-md="">
       <p>If a script stores a reference to an object implementing the <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①①">DataTransfer</a></code> interface to use from outside the ClipboardEvent
 event handler, all methods <em>must</em> be no-ops when called
 outside the expected context.</p>
      <li data-md="">
       <p>Implementations <em>must not</em> let scripts create synthetic
-clipboard events to get access to real clipboard data except if
-configured to do so.</p>
-     <li data-md="">
-      <p>Implementations <em>should not</em> let scripts call
-document.execCommand("paste") unless the user has explicitly allowed
-it.</p>
+clipboard events to get access to real clipboard data (unless the user
+has configured it to do so).</p>
     </ul>
-    <p>Implementations may choose to further limit the functionality provided
-	by the <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①②">DataTransfer</a></code> interface. For example, an implementation may
-	allow the user to disable this API, or configure which web sites should
-	be granted access to it.</p>
+    <p>Even though the Clipboard Event API is not covered by the Clipboard permission,
+		user agents may choose to provide a method for the user to disable this API or
+		to configure which sites are allowed to access it.</p>
+    <h3 class="heading settled" data-level="11.2" id="privacy-async"><span class="secno">11.2. </span><span class="content">Privacy and the Asychronous Clipboard API</span><a class="self-link" href="#privacy-async"></a></h3>
+    <p>The Asynchronous Clipboard API is a powerful feature because it can allow access
+		to the clipboard data from any script (access is not restricted to Clipboard Event
+		handlers) and data can be accessed in the absence of a user provided gesture.</p>
+    <p>To help prevent abuse, this API <em>must not</em> be available unless the script
+		is executing in the context of the currently focused document.</p>
+    <h4 class="heading settled" data-level="11.2.1" id="privacy-permission"><span class="secno">11.2.1. </span><span class="content">Privacy and Clipboard Permission</span><a class="self-link" href="#privacy-permission"></a></h4>
+    <p>The Clipboard Permission gates access to this API, but user agents get to choose
+			the permission defaults and which of these permission settings can be set by the
+			user. For example, a user agent may choose to only allow access to the
+			Asynchronous Clipboard API when a user gesture is present and always deny script
+			requests for access without a gesture.</p>
+    <p>User agents may opt to have this permission automatically expire sometime after
+			the user grants permission, for example, by having the permission expire:</p>
+    <ul>
+     <li data-md="">
+      <p>After a set time from when the permission was first granted</p>
+     <li data-md="">
+      <p>After a set time from the user’s last visit to a site</p>
+     <li data-md="">
+      <p>When the user navigates away from the page</p>
+    </ul>
+    <h3 class="heading settled" data-level="11.3" id="privacy-other"><span class="secno">11.3. </span><span class="content">Other Privacy Concerns</span><a class="self-link" href="#privacy-other"></a></h3>
+    <p>If the user agent allows clipboard data to be read using <code>document.execCommand("paste")</code> then the user agent <em>must</em> ensure that the user has explicitly allowed that access to take place.</p>
     <h2 class="heading settled" data-level="12" id="acknowledge"><span class="secno">12. </span><span class="content">Acknowledgements</span><a class="self-link" href="#acknowledge"></a></h2>
-    <p><em>This section is informative</em></p>
+    <p><em>This section is non-normative</em></p>
     <p>The editors would like to acknowledge the contributions of the former
 	editors who helped shepherd this specification through various
 	meetings and mailing-list discussions to bring it to its current state.</p>
@@ -2761,7 +2795,7 @@ platforms.</p>
       <li data-md="">
        <p>Let <var>types-to-clear</var> be an empty list</p>
       <li data-md="">
-       <p>Let <var>clipboard-event-data</var> be a new <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①③">DataTransfer</a></code> object with an empty <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-items" id="ref-for-dom-datatransfer-items⑥">items</a></code> list.</p>
+       <p>Let <var>clipboard-event-data</var> be a new <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①②">DataTransfer</a></code> object with an empty <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-items" id="ref-for-dom-datatransfer-items⑥">items</a></code> list.</p>
       <li data-md="">
        <p>Let <var>clipboard-entry</var> be the sequence number of the current
 clipboard content, or null if the OS clipboard does not support
@@ -2870,7 +2904,7 @@ entries in <var>clipboard-event-data</var>’s <code class="idl"><a data-link-ty
          <p>If <var>e</var> is "copy" or "cut", then</p>
          <ol>
           <li data-md="">
-           <p>Set the associated <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①④">DataTransfer</a></code> object’s internal <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode" id="ref-for-drag-data-store-mode②">drag data store mode</a> flag to <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw" id="ref-for-concept-dnd-rw">read/write</a></p>
+           <p>Set the associated <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①③">DataTransfer</a></code> object’s internal <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode" id="ref-for-drag-data-store-mode②">drag data store mode</a> flag to <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw" id="ref-for-concept-dnd-rw">read/write</a></p>
          </ol>
        </ol>
       <li data-md="">
@@ -2888,7 +2922,7 @@ event-specific processing rules are given below:</p>
        <p class="issue" id="issue-7d2ab940"><a class="self-link" href="#issue-7d2ab940"></a> Why here? Why not in the HTML spec?</p>
        <ol>
         <li data-md="">
-         <p>If a script calls <a data-link-type="functionish" href="https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-cleardata" id="ref-for-dom-datatransfer-cleardata">clearData()</a> or <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitemlist-clear" id="ref-for-dom-datatransferitemlist-clear">clear()</a></code> and the <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①⑤">DataTransfer</a></code> object’s internal <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode" id="ref-for-drag-data-store-mode③">drag data store mode</a> flag is <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw" id="ref-for-concept-dnd-rw①">read/write</a>, then</p>
+         <p>If a script calls <a data-link-type="functionish" href="https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransfer-cleardata" id="ref-for-dom-datatransfer-cleardata">clearData()</a> or <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#dom-datatransferitemlist-clear" id="ref-for-dom-datatransferitemlist-clear">clear()</a></code> and the <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①④">DataTransfer</a></code> object’s internal <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/interaction.html#drag-data-store-mode" id="ref-for-drag-data-store-mode③">drag data store mode</a> flag is <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/interaction.html#concept-dnd-rw" id="ref-for-concept-dnd-rw①">read/write</a>, then</p>
          <ol>
           <li data-md="">
            <p>Set the <var>clear-was-called</var> flag to true. If an
@@ -2936,7 +2970,7 @@ implemented.</strong></p>
       <dd data-md="">
        <p><var>clipboard-part</var>, the clipboard part to process</p>
       <dd data-md="">
-       <p><var>clipboard-event-data</var>, the <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①⑥">DataTransfer</a></code> object for this event</p>
+       <p><var>clipboard-event-data</var>, the <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①⑤">DataTransfer</a></code> object for this event</p>
       <dt data-md="">Output
       <dd data-md="">
        <p>None</p>
@@ -3183,9 +3217,9 @@ HTML code.</p>
     <li><a href="#ref-for-datatransfer⑥">6.4.2. Writing to the clipboard</a>
     <li><a href="#ref-for-datatransfer⑦">7.2. Clipboard Interface</a> <a href="#ref-for-datatransfer⑧">(2)</a>
     <li><a href="#ref-for-datatransfer⑨">10.4. Nuisance considerations</a>
-    <li><a href="#ref-for-datatransfer①⓪">11. Privacy Considerations</a> <a href="#ref-for-datatransfer①①">(2)</a> <a href="#ref-for-datatransfer①②">(3)</a>
-    <li><a href="#ref-for-datatransfer①③">fire a clipboard event</a> <a href="#ref-for-datatransfer①④">(2)</a> <a href="#ref-for-datatransfer①⑤">(3)</a>
-    <li><a href="#ref-for-datatransfer①⑥">process an HTML paste event</a>
+    <li><a href="#ref-for-datatransfer①⓪">11.1. Privacy and the Clipboard Event API</a> <a href="#ref-for-datatransfer①①">(2)</a>
+    <li><a href="#ref-for-datatransfer①②">fire a clipboard event</a> <a href="#ref-for-datatransfer①③">(2)</a> <a href="#ref-for-datatransfer①④">(3)</a>
+    <li><a href="#ref-for-datatransfer①⑤">process an HTML paste event</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-datatransferitem">
@@ -3437,7 +3471,7 @@ HTML code.</p>
   </dl>
   <h2 class="no-num no-ref heading settled" id="idl-index"><span class="content">IDL Index</span><a class="self-link" href="#idl-index"></a></h2>
 <pre class="idl highlight def"><span class="kt">dictionary</span> <a class="nv" href="#dictdef-clipboardeventinit"><code>ClipboardEventInit</code></a> : <a class="n" data-link-type="idl-name" href="https://dom.spec.whatwg.org/#dictdef-eventinit" id="ref-for-dictdef-eventinit①">EventInit</a> {
-  <a class="n" data-link-type="idl-name" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①⑦">DataTransfer</a>? <a class="nv" data-default="null" data-type="DataTransfer? " href="#dom-clipboardeventinit-clipboarddata"><code>clipboardData</code></a> = <span class="kt">null</span>;
+  <a class="n" data-link-type="idl-name" href="https://html.spec.whatwg.org/multipage/dnd.html#datatransfer" id="ref-for-datatransfer①⑥">DataTransfer</a>? <a class="nv" data-default="null" data-type="DataTransfer? " href="#dom-clipboardeventinit-clipboarddata"><code>clipboardData</code></a> = <span class="kt">null</span>;
 };
 
 [<a class="nv" href="#dom-clipboardevent-clipboardevent"><code>Constructor</code></a>(<a class="n idl-code" data-link-type="interface" href="https://heycam.github.io/webidl/#idl-DOMString" id="ref-for-idl-DOMString③"><span class="kt">DOMString</span></a> <a class="nv" href="#dom-clipboardevent-clipboardevent-type-eventinitdict-type"><code>type</code></a>, <span class="kt">optional</span> <a class="n" data-link-type="idl-name" href="#dictdef-clipboardeventinit" id="ref-for-dictdef-clipboardeventinit①">ClipboardEventInit</a> <a class="nv" href="#dom-clipboardevent-clipboardevent-type-eventinitdict-eventinitdict"><code>eventInitDict</code></a>), <a class="nv idl-code" data-link-type="extended-attribute" href="https://heycam.github.io/webidl/#Exposed" id="ref-for-Exposed②">Exposed</a>=<span class="n">Window</span>]

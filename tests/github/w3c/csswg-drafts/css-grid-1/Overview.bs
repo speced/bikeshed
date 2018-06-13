@@ -1034,8 +1034,8 @@ Grid Items</h2>
 
 <h3 id="grid-item-display">
 	Grid Item Display</h3>
-	A <a>grid item</a> establishes a new formatting context for its contents.
-	The type of this formatting context is determined by its 'display' value, as usual.
+
+	A <a>grid item</a> [=establishes an independent formatting context=] for its contents.
 	However, grid items are <dfn>grid-level</dfn> boxes, not block-level boxes:
 	they participate in their container's <a>grid formatting context</a>,
 	not in a block formatting context.
@@ -1440,7 +1440,13 @@ Explicit Track Sizing: the 'grid-template-rows' and 'grid-template-columns' prop
 		<dd>
 			A non-negative dimension with the unit ''fr'' specifying the track's <dfn dfn noexport>flex factor</dfn>.
 			Each <<flex>>-sized track takes a share of the remaining space in proportion to its <a>flex factor</a>.
-			See <a href="#fr-unit">Flexible Lengths</a> for more details.
+			For example, given a track listing of ''1fr 2fr'',
+			the tracks will take up ⅓ and ⅔ of the <a>leftover space</a>, respectively.
+			See [[#fr-unit]] for more details.
+
+			Note: If the sum of the <a>flex factors</a> is less than 1,
+			they'll take up only a corresponding fraction of the <a>leftover space</a>,
+			rather than expanding to fill the entire thing.
 
 			When appearing outside a ''minmax()'' notation,
 			implies an automatic minimum (i.e. ''minmax(auto, <<flex>>)'').
@@ -1719,25 +1725,53 @@ Flexible Lengths: the ''fr'' unit</h4>
 	which represents a fraction of the <a>leftover space</a> in the <a>grid container</a>.
 	Tracks sized with ''fr'' units are called <dfn>flexible tracks</dfn>
 	as they flex in response to <a>leftover space</a>
-	similar to how <a>flex items</a> fill space in a <a>flex container</a>.
-
-	Note: <<flex>> values are not <<length>>s
-	(nor are they compatible with <<length>>s, like some <<percentage>> values),
-	so they cannot be represented in or combined with other unit types in ''calc()'' expressions.
+	similar to how <a>flex items</a> with a zero base size fill space in a <a>flex container</a>.
 
 	The distribution of <a>leftover space</a> occurs after all non-flexible <a>track sizing functions</a> have reached their maximum.
 	The total size of such rows or columns is subtracted from the available space, yielding the <a>leftover space</a>,
 	which is then divided among the flex-sized rows and columns in proportion to their <a>flex factor</a>.
 
-	Note: Flexible lengths in a <a>track list</a> work similarly to flexible lengths with a zero base size in [[CSS-FLEXBOX-1]].
-
 	Each column or row's share of the <a>leftover space</a> can be computed as the column or row's
 	<code>&lt;flex> * &lt;leftover space> / &lt;sum of all <a>flex factors</a>&gt;</code>.
 
-	Note: If the sum of the <a>flex factors</a> is less than 1,
-	they'll take up only a corresponding fraction of the <a>leftover space</a>,
-	rather than expanding to fill the entire thing.
-	This is similar to how Flexbox [[CSS-FLEXBOX-1]] acts when the sum of the 'flex' values is less than 1.
+	<details class=note>
+		<summary><<flex>> values between 0fr and 1fr have a somewhat special behavior:
+		when the sum of the flex factors is less than 1,
+		they will take up less than 100% of the leftover space.</summary>
+
+		A track’s <<flex>> value
+		is effectively a request for some proportion of the leftover space,
+		with ''1fr'' meaning “100% of the leftover space”;
+		then if the tracks in that axis are requesting more than 100% in total,
+		the requests are rebalanced to keep the same ratio but use up exactly 100% of it.
+		However, if the tracks request <em>less</em> than the full amount
+		(such as three tracks that are each ''.25fr'')
+		then they'll each get exactly what they request
+		(25% of the leftover space to each,
+		with the final 25% left unfilled).
+		See [[#algo-flex-tracks]] for the exact details
+		of how leftover space is distributed.
+
+		This pattern is required for continuous behavior as ''fr'' values approach zero
+		(which means the tracks wants <em>none</em> of the leftover space).
+		Without this, a ''1fr'' track would take all of the leftover space;
+		but so would a ''0.1fr'' track,
+		and a ''0.01fr'' track,
+		etc.,
+		until finally the value is small enough to underflow to zero
+		and the track suddenly takes up none of the leftover space.
+		With this behavior,
+		the track instead gradually takes less of the leftover space
+		as its flex factor shrinks below ''1fr'',
+		smoothly transitioning to taking none of the leftover space at zero.
+
+		Unless this “partial fill” behavior is <em>specifically</em> what's desired,
+		authors should stick to values &ge; 1;
+		for example, using ''1fr'' and ''2fr'' is usually better
+		than using ''.33fr'' and ''.67fr'',
+		as they're more likely to behave as intended
+		if tracks are added or removed.
+	</details>
 
 	When the available space is infinite
 	(which happens when the <a>grid container</a>’s width or height is <a>indefinite</a>),
@@ -1748,6 +1782,10 @@ Flexible Lengths: the ''fr'' unit</h4>
 	to determine a “hypothetical ''1fr'' size”.
 	The maximum of those is used as the resolved ''1fr'' length (the <dfn>flex fraction</dfn>),
 	which is then multiplied by each <a>grid track</a>’s <a>flex factor</a> to determine its final size.
+
+	Note: <<flex>> values are not <<length>>s
+	(nor are they compatible with <<length>>s, like some <<percentage>> values),
+	so they cannot be represented in or combined with other unit types in ''calc()'' expressions.
 
 <!--
 ████████  ████████  ██████   ███████  ██       ██     ██ ████████ ████████
@@ -1815,6 +1853,11 @@ Resolved Values</h4>
 	except for a small list of legacy 2.1 properties.
 	However, compatibility with early implementations of this module
 	requires us to define 'grid-template-rows' and 'grid-template-columns' as returning used values.
+
+	ISSUE: The CSS Working Group is considering whether to also return used values
+	for the <a>grid-placement properties</a>
+	and is looking for feedback, especially from implementors.
+	See <a href="https://github.com/w3c/csswg-drafts/issues/2681">discussion</a>.
 
 <!--
  ██████   ████████  ████ ████████           ███    ████████  ████████    ███     ██████
@@ -3537,6 +3580,10 @@ Grid Sizing Algorithm</h3>
 			assume the <a>available space</a> that it would have
 			if any row with a <a>definite</a> <a>max track sizing function</a>
 			had that size and all other rows were infinite.
+			If both the <a>grid container</a> and all tracks have <a>definite</a> sizes,
+			also apply 'align-content' to find the final effective size
+			of any gaps spanned by such items;
+			otherwise ignore the effects of track alignment in this estimation.
 
 		<div class="issue">
 			Would it help to have <a href="https://lists.w3.org/Archives/Public/www-style/2016Jan/0128.html">heuristics</a>
@@ -3570,21 +3617,34 @@ Grid Sizing Algorithm</h3>
 
 		<li>
 			Next, the <a>track sizing algorithm</a> resolves the sizes of the <a>grid rows</a>,
-			using the <a>grid column</a> sizes calculated in the previous step.
+			using the <a>grid column</a> sizes calculated in the previous step
+			and the effective column gap sizes after applying 'justify-content'.
 
 		<li>
-			Then, if the <a>min-content contribution</a> of any grid items have changed
-			based on the row sizes calculated in step 2,
-			steps 1 and 2 are repeated with the new <a>min-content contribution</a>
-			and <a>max-content contribution</a> (once only).
+			Then, if the <a>min-content contribution</a> of any grid item has changed
+			based on the row sizes and alignment calculated in step 2,
+			re-resolve the sizes of the <a>grid columns</a>
+			with the new <a lt="min-content contribution">min-content</a>
+			and <a>max-content contributions</a> (once only),
+			using the <a>grid row</a> sizes calculated in the previous step
+			along with the effective row gap sizes calculated by applying 'align-content'.
 
 			<div class="note">
-				This cycle is necessary for cases where the <a>inline size</a> of a <a>grid item</a>
+				This repetition is necessary for cases where the <a>inline size</a> of a <a>grid item</a>
 				depends on the <a>block size</a> of its <a>grid area</a>.
 				Examples include wrapped column <a>flex containers</a> (''flex-flow: column wrap''),
 				<a>orthogonal flows</a> ('writing-mode'),
-				and <a spec=css-multicol>multi-column elements</a>.
+				and <a spec=css-multicol>multi-column containers</a>.
 			</div>
+
+		<li>
+			Next, if the <a>min-content contribution</a> of any grid item has changed
+			based on the column sizes and alignment calculated in step 3,
+			re-resolve the sizes of the <a>grid rows</a>
+			with the new <a lt="min-content contribution">min-content</a>
+			and <a>max-content contributions</a> (once only),
+			using the <a>grid column</a> sizes calculated in the previous step
+			along with the effective column gap sizes calculated by applying 'justify-content'.
 
 		<li>
 			Finally, the <a>grid container</a> is sized
@@ -3790,13 +3850,15 @@ Resolve Intrinsic Track Sizes</h3>
 				<dd>
 					If the track has a ''min-content'' <a>min track sizing function</a>,
 					set its <a>base size</a>
-					to the maximum of the items’ <a>min-content contributions</a>.
+					to the maximum of the items’ <a>min-content contributions</a>,
+					floored at zero.
 
 				<dt>For max-content minimums:
 				<dd>
 					If the track has a ''max-content'' <a>min track sizing function</a>,
 					set its <a>base size</a>
-					to the maximum of the items’ <a>max-content contributions</a>.
+					to the maximum of the items’ <a>max-content contributions</a>,
+					floored at zero.
 
 				<dt>For auto minimums:
 				<dd>
@@ -3808,10 +3870,11 @@ Resolve Intrinsic Track Sizes</h3>
 
 					Otherwise,
 					set its <a>base size</a>
-					to the maximum of its items’ <a>min-size contributions</a>.
+					to the maximum of its items’ <a>min-size contributions</a>,
+					floored at zero.
 					The <dfn noexport>min-size contribution</dfn> of an item is
 					the outer size that would result from assuming
-					the item’s computed 'min-width' or 'min-height' value
+					the item’s used 'min-width' or 'min-height' value
 					(whichever matches the relevant axis)
 					as its specified size ('width' or 'height', whichever matches the relevant axis)
 					if its computed size [=behaves as auto=],
@@ -4357,6 +4420,13 @@ Major Changes</h4>
 						</ins>
 				</ul>
 			</blockquote>
+
+		<li id="change-2017-track-alignment-sizing">
+			Better incorporated the alignment of tracks
+			('align-content'/'justify-content')
+			into the track sizing algorithm.
+			(<a href="https://github.com/w3c/csswg-drafts/issues/2557">Issue 2557</a>,
+			 <a href="https://github.com/w3c/csswg-drafts/issues/2697">Issue 2697</a>)
 
 		<li id="change-2017-repeat-serialization">
 			Require the used value of a track listing

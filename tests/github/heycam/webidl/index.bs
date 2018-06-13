@@ -82,7 +82,6 @@ urlPrefix: https://tc39.github.io/ecma262/; spec: ECMA-262
         text: Promise; url: sec-promise-objects
         text: Set; url: sec-set-objects
         text: SharedArrayBuffer; url: sec-sharedarraybuffer-objects
-        text: %ArrayPrototype%; url: sec-properties-of-the-array-prototype-object
         text: %ErrorPrototype%; url: sec-properties-of-the-error-prototype-object
         text: %FunctionPrototype%; url: sec-properties-of-the-function-prototype-object
         text: %IteratorPrototype%; url: sec-%iteratorprototype%-object
@@ -1042,7 +1041,6 @@ definition.
 limitations.  The following extended attributes must not
 be specified on partial interface definitions:
 [{{Constructor}}],
-[{{LegacyArrayClass}}],
 [{{LegacyWindowAlias}}],
 [{{NamedConstructor}}],
 [{{NoInterfaceObject}}].
@@ -1067,7 +1065,6 @@ The following extended attributes are applicable to interfaces:
 [{{Constructor}}],
 [{{Exposed}}],
 [{{Global}}],
-[{{LegacyArrayClass}}],
 [{{LegacyWindowAlias}}],
 [{{NamedConstructor}}],
 [{{NoInterfaceObject}}],
@@ -8908,101 +8905,6 @@ corresponding to [=interface members=].
     </pre>
 </div>
 
-<h4 id="LegacyArrayClass" extended-attribute lt="LegacyArrayClass">[LegacyArrayClass]</h4>
-
-<div class="advisement">
-
-    The [{{LegacyArrayClass}}] [=extended attribute=] is an undesirable feature.
-    It exists only so that legacy Web platform features can be specified.
-    It should not be used in specifications
-    unless required to specify the behavior of legacy APIs,
-    or for consistency with these APIs.
-    Editors who wish to use this feature are strongly advised to discuss this
-    by <a href="https://github.com/heycam/webidl/issues/new?title=Intent%20to%20use%20[LegacyArrayClass]">filing an issue</a>
-    before proceeding.
-
-    <small class="non-normative">
-        The [{{LegacyArrayClass}}] [=extended attribute=] appears on
-        the following [=interfaces=]:
-        {{DOMRectList}},
-        {{MediaList}},
-        {{StyleSheetList}}, and
-        {{CSSRuleList}}. [[GEOMETRY]] [[CSSOM]]
-    </small>
-
-</div>
-
-If the [{{LegacyArrayClass}}]
-[=extended attribute=]
-appears on an [=interface=]
-that is not defined to [=interface/inherit=]
-from another, it indicates that the \[[Prototype]]
-[=internal slot=] of its [=interface prototype object=]
-will be the intrinsic object {{%ArrayPrototype%}} rather than
-{{%ObjectPrototype%}}.  This allows
-{{ECMAScript/Array}} methods to be used more easily
-with objects implementing the interface.
-
-The [{{LegacyArrayClass}}] extended attribute
-must [=takes no arguments|take no arguments=].
-It must not be used on an interface that
-has any [=inherited interfaces=].
-
-Note: Interfaces using [{{LegacyArrayClass}}] will
-need to define a <code class="idl">length</code> [=attribute=]
-of type {{unsigned long}} that exposes the length
-of the array-like object, in order for the inherited Array
-methods to operate correctly.  Such interfaces would typically also
-[=support indexed properties=],
-which would provide access to the array elements.
-
-See [[#interface-prototype-object]] for the
-specific requirements that the use of [{{LegacyArrayClass}}]
-entails.
-
-<div class="example">
-
-    The following [=IDL fragment=]
-    defines two [=interfaces=]
-    that use [{{LegacyArrayClass}}].
-
-    <pre highlight="webidl">
-        [Exposed=Window, LegacyArrayClass]
-        interface ItemList {
-          attribute unsigned long length;
-          getter object getItem(unsigned long index);
-          setter object setItem(unsigned long index, object item);
-        };
-
-        [Exposed=Window, LegacyArrayClass]
-        interface ImmutableItemList {
-          readonly attribute unsigned long length;
-          getter object getItem(unsigned long index);
-        };
-    </pre>
-
-    In an ECMAScript implementation of the above two interfaces,
-    with appropriate definitions for getItem, setItem and removeItem,
-    {{ECMAScript/Array}} methods to inspect and
-    modify the array-like object can be used.
-
-    <pre highlight="js">
-        var list = getItemList();  // Obtain an instance of ItemList.
-
-        list.concat();             // Clone the ItemList into an Array.
-        list.pop();                // Remove an item from the ItemList.
-        list.unshift({ });         // Insert an item at index 0.
-    </pre>
-
-    <code class="idl">ImmutableItemList</code> has a read only
-    length [=attribute=]
-    and no indexed property [=indexed property setters|setter=].  The
-    mutating {{ECMAScript/Array}} methods will generally not
-    succeed on objects implementing <code class="idl">ImmutableItemList</code>.
-    The exact behavior depends on the definition of the {{ECMAScript/Array}} methods themselves.
-
-</div>
-
 
 <h4 id="LegacyNamespace" extended-attribute lt="LegacyNamespace">[LegacyNamespace]</h4>
 
@@ -9229,7 +9131,7 @@ it indicates that a no-op setter will be generated for the attribute’s
 accessor property.  This results in erroneous assignments to the property
 in strict mode to be ignored rather than causing an exception to be thrown.
 
-The [{{LenientThis}}] extended attribute
+The [{{LenientSetter}}] extended attribute
 must [=takes no arguments|take no arguments=].
 It must not be used on anything other than
 a [=read only=] [=regular attribute=].
@@ -10887,8 +10789,6 @@ with the [{{NoInterfaceObject}}] [=extended attribute=].
         of that [=inherited interface=].
     1.  Otherwise, if |interface| is the {{DOMException}} [=interface=],
         then set |proto| to |realm|.\[[Intrinsics]].[[{{%ErrorPrototype%}}]].
-    1.  Otherwise, if |interface| is declared with the [{{LegacyArrayClass}}] [=extended attribute=],
-        then set |proto| to |realm|.\[[Intrinsics]].[[{{%ArrayPrototype%}}]].
     1.  Otherwise, set |proto| to |realm|.\[[Intrinsics]].[[{{%ObjectPrototype%}}]].
     1.  Assert: <a abstract-op>Type</a>(|proto|) is Object.
     1.  Let |interfaceProtoObj| be [=!=] <a abstract-op>ObjectCreate</a>(|proto|).
@@ -11023,8 +10923,6 @@ for that interface on which named properties are exposed.
     1.  Let |proto| be null.
     1.  If |interface| is declared to inherit from another interface,
         then set |proto| to the [=interface prototype object=] in |realm| for the [=inherited interface=].
-    1.  Otherwise, if |interface| is declared with the [{{LegacyArrayClass}}] [=extended attribute=],
-        then set |proto| to |realm|.\[[Intrinsics]].[[{{%ArrayPrototype%}}]].
     1.  Otherwise, set |proto| to |realm|.\[[Intrinsics]].[[{{%ObjectPrototype%}}]].
     1.  Let |obj| be a newly created object.
     1.  Set |obj|'s internal methods to the definitions specified in

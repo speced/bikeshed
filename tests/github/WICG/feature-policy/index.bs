@@ -137,11 +137,15 @@ spec:fetch; type:dfn; text:value
     indicated, the term "feature" refers to <a>policy-controlled features</a>.
     Other specifications, defining such features, should use the longer term to
     avoid any ambiguity.</div>
+    <div class="issue">This spec currently only deals with features defined in
+    Documents. We should figure out how to word this to include the possibility
+    of features and feature policies in Workers and Worklets as well.</div>
     <p><a>Policy-controlled features</a> are identified by tokens, which are
     character strings used in <a>policy directives</a>.
     <p>Each <a>policy-controlled feature</a> has a <a>default allowlist</a>,
-    which defines whether that feature is available to top-level documents, and
-    how access to that feature is inherited by cross-origin frames.</p>
+    which defines whether that feature is available in documents in top-level
+    browsing contexts, and how access to that feature is inherited in nested
+    browsing contexts.</p>
     <p>A user agent has a set of <dfn>supported features</dfn>, which is the set
     of <a data-lt="policy-controlled feature">features</a> which it allows to be
     controlled through policies. User agents are not required to support every
@@ -156,37 +160,40 @@ spec:fetch; type:dfn; text:value
   </section>
   <section>
     <h3 id="policies">Policies</h3>
-    <p>A {{Document}} has a <dfn>feature policy</dfn>, which consists of:</p>
+    <p>A <dfn>feature policy</dfn> is a struct with the following items:</p>
     <ul>
-      <li>A set of <a data-lt="inherited policy set">inherited policies</a>.
+      <li>An <a data-lt="inherited policy">inherited policy</a>.
       </li>
       <li>A <a data-lt="declared policy">declared policy</a>.
       </li>
     </ul>
-    <p>An <dfn>empty feature policy</dfn> has an <a>inherited policy set</a>
-    which contains 'Enabled' for every <a>policy-controlled feature</a>
-    available, and a <a>declared policy</a> which is an empty map.</p>
+    <p>An <dfn>empty feature policy</dfn> is a <a>feature policy</a> that has
+    an <a>inherited policy</a> which contains 'Enabled' for every <a>supported
+    feature</a>, and a <a>declared policy</a> which is an empty map.</p>
   </section>
   <section>
     <h3 id="inherited-policies">Inherited policies</h3>
+    <p>An <dfn data-lt="inherited policy|inherited policies">inherited
+    policy</dfn> is an ordered map from <a
+    data-lt="policy-controlled feature">features</a> to either 'Enabled' or
+    'Disabled'.</p>
+    <p>The <dfn>inherited policy for a feature</dfn> <var>feature</var> is the
+    value in the <a>inherited policy</a> whose key is <var>feature</var>. After
+    a <a>feature policy</a> has been initialized, its <a>inherited policy</a>
+    will contain a value for each <a>supported feature</a>.</p>
+    <div class="note">
     <p>Each document in a frame tree inherits a set of policies from its parent
     frame, or in the case of the top-level document, from the defined defaults
-    for each <a>policy-controlled feature</a>. This inherited policy set
-    determines the initial state (enabled or disabled) of each feature, and
-    whether it can be controlled by a <a>declared policy</a> in the document.
+    for each <a>policy-controlled feature</a>. This inherited policy determines
+    the initial state ('Enabled' or 'Disabled') of each feature, and whether it
+    can be controlled by a <a>declared policy</a> in the document.
     </p>
     <p>In a {{Document}} in a [=top-level browsing context=], the inherited
-    feature set is based on defined defaults for each feature.</p>
-    <p>In a {{Document}} in a [=nested browsing context=], the inherited feature
-    set is based on the parent document's feature policy, as well as any
-    <a href="#iframe-allow-attribute">allow attributes</a> defined on the
-    browsing context container.</p>
-    <p>An <dfn data-lt="inherited policy|inherited policies">inherited
-    policy</dfn> declares a <a data-lt="policy-controlled feature">feature</a>
-    as Enabled or Disabled.</p>
-    <p>An <dfn>inherited policy set</dfn> for a {{Document}} is the set of
-    <a>inherited policies</a> for each <a
-    data-lt="policy-controlled feature">feature</a> available in that scope.</p>
+    policy is based on defined defaults for each feature.</p>
+    <p>In a {{Document}} in a [=nested browsing context=], the inherited policy
+    is based on the parent document's feature policy, as well as the [=nested
+    browsing context=]'s <a>container policy</a>.
+    </div>
   </section>
   <section>
     <h3 id="declared-policies">Declared policies</h3>
@@ -194,35 +201,33 @@ spec:fetch; type:dfn; text:value
     policy</dfn> is an ordered map from
     <a data-lt="policy-controlled feature">features</a> to <a>allowlists</a>.
     </p>
-    <p>A {{Document}} is considered <dfn>feature-policy-aware</dfn> if it has a
-    <a>declared policy</a> which is not empty.</p>
-    <p>A {{Document}} which is not <a>feature-policy-aware</a> is considered
-    <dfn>feature-policy-oblivious</dfn>.</p>
   </section>
   <section>
     <h3 id="header-policies">Header policies</h3>
     <p>A <dfn>header policy</dfn> is a list of <a>policy directives</a>
-    delivered via an HTTP header with the document. This forms the document's
+    delivered via an HTTP header with a document. This forms the document's
     <a>feature policy</a>'s <a>declared policy</a>.</p>
   </section>
   <section>
     <h3 id="container-policies">Container policies</h3>
-    <p>In addition to the <a>header policy</a>, each frame has a <dfn>container
-    policy</dfn>, which is a <a>policy directive</a>, which may be empty. The
-    <a>container policy</a> can set by attributes on the browsing context
-    container.</p>
-    <p>The <a>container policy</a> for a frame influences the <a>inherited
-    policy</a> of any document loaded into that frame. (See <a href=
-    "#define-inherited-policy"></a>)</p>
+    <p>In addition to the <a>header policy</a>, each [=nested browsing context=]
+    has a <dfn>container policy</dfn>, which is a <a>policy directive</a>, which
+    may be empty. The <a>container policy</a> can set by attributes on the
+    [=browsing context container=].</p>
+    <p>The <a>container policy</a> for a [=nested browsing context=] influences
+    the <a>inherited policy</a> of any document loaded into that context.
+    (See <a href="#define-inherited-policy"></a>)</p>
     <div class="note">
       Currently, the <a>container policy</a> cannot be set directly, but is
       indirectly set by <code>iframe</code> "<a href=
       "#iframe-allowfullscreen-attribute"><code>allowfullscreen</code></a>",
       "<a href=
       "#iframe-allowpaymentrequest-attribute"><code>allowpaymentrequest</code></a>",
-      and "<a href="#iframe-allow-attribute"><code>allow</code></a>"
-      attributes. Future revisions to this spec may introduce a mechanism to
-      explicitly declare the full <a>container policy</a>.
+      "<a href=
+      "#iframe-allowusermedia-attribute"><code>allowusermedia</code></a>", and
+      "<a href="#iframe-allow-attribute"><code>allow</code></a>" attributes.
+      Future revisions to this spec may introduce a mechanism to explicitly
+      declare the full <a>container policy</a>.
     </div>
   </section>
   <section>
@@ -268,24 +273,26 @@ spec:fetch; type:dfn; text:value
     <h3 id="default-allowlists">Default Allowlists</h3>
     <p>Every <a>policy-controlled feature</a> has a <dfn export lt=
     "default allowlist|default allowlists">default allowlist</dfn>. The
-    <a>default allowlist</a> controls the origins which are allowed to access
-    the feature when used in a top-level document with no declared policy, and
-    also determines whether access to the feature is automatically delegated to
-    child documents.</p>
+    <a>default allowlist</a> determines whether the feature is allowed in a
+    document with no declared policy in a top-level browsing context, and also
+    whether access to the feature is automatically delegated to documents in
+    nested browsing contexts.</p>
     <p>The <a>default allowlist</a> for a <a
     data-lt="policy-controlled feature">feature</a> is one of these values:</p>
     <dl>
       <dt><code>*</code></dt>
-      <dd>The feature is allowed at the top level by default, and when allowed,
-      is allowed by default to documents in child frames.</dd>
+      <dd>The feature is allowed in documents in top-level browsing contexts by
+      default, and when allowed, is allowed by default to documents in nested
+      browsing contexts.</dd>
       <dt><code>'self'</code></dt>
-      <dd>The feature is allowed at the top level by default, and when allowed,
-      is allowed by default to same-origin domain documents in child frames,
-      but is disallowed by default in cross-origin documents in child
-      frames.</dd>
+      <dd>The feature is allowed in documents in top-level browsing contexts by
+      default, and when allowed, is allowed by default to same-origin domain
+      documents in nested browsing contexts, but is disallowed by default in
+      cross-origin documents in nested browsing contexts.</dd>
       <dt>'none'</dt>
-      <dd>The feature is disallowed at the top level by default, and is also
-      disallowed by default to documents in child frames.</dd>
+      <dd>The feature is disallowed in documents in top-level browsing contexts
+      by default, and is also disallowed by default to documents in nested
+      browsing contexts.</dd>
     </dl>
   </section>
 </section>
@@ -348,8 +355,8 @@ partial interface HTMLIFrameElement {
     </p>
     <p>When not empty, the "<code>allow</code>" attribute will result in adding
     an <a>allowlist</a> for each recognized
-    <a data-lt="policy-controlled feature">feature</a> to the frame's
-    <a>container policy</a>, when it is constructed.</p>
+    <a data-lt="policy-controlled feature">feature</a> to the [=nested browsing
+    context=]'s <a>container policy</a>, when it is constructed.</p>
   </section>
   <section>
     <h3 id="legacy-attributes">Additional attributes to support legacy
@@ -367,8 +374,8 @@ partial interface HTMLIFrameElement {
       "<code>allowfullscreen</code>" attribute must have no effect.</p>
       <p>Otherwise, the presence of an "<code>allowfullscreen</code>" attribute
       on an iframe will result in adding an <a>allowlist</a> of <code>*</code>
-      for the "<code>fullscreen</code>" feature to the frame's <a>container
-      policy</a>, when it is constructed.</p>
+      for the "<code>fullscreen</code>" feature to the [=nested browsing
+      context=]'s <a>container policy</a>, when it is constructed.</p>
       <div class="note">
         This is different from the behaviour of <code>&lt;iframe
         allow="fullscreen"&gt;</code>, and is for compatibility with existing
@@ -387,8 +394,8 @@ partial interface HTMLIFrameElement {
       "<code>allowpaymentrequest</code>" attribute must have no effect.</p>
       <p>Otherwise, the presence of an "<code>allowpaymentrequest</code>"
       attribute on an iframe will result in adding an <a>allowlist</a> of
-      <code>*</code> for the "<code>payment</code>" feature to the frame's
-      <a>container policy</a>, when it is constructed.</p>
+      <code>*</code> for the "<code>payment</code>" feature to the [=nested
+      browsing context=]'s <a>container policy</a>, when it is constructed.</p>
       <div class="note">
         This is different from the behaviour of <code>&lt;iframe
         allow="payment"&gt;</code>, and is for compatibility with existing uses
@@ -408,8 +415,8 @@ partial interface HTMLIFrameElement {
       <p>Otherwise, the presence of an "<code>allowusermedia</code>" attribute
       on an iframe will result in adding an <a>allowlist</a> of <code>*</code>
       for each of the "<code>camera</code>" and "<code>microphone</code>"
-      features to the frame's <a>container policy</a>, when it is
-      constructed.</p>
+      features to the [=nested browsing context=]'s <a>container policy</a>,
+      when it is constructed.</p>
       <div class="note">
         This is different from the behaviour of <code>&lt;iframe
         allow="camera; microphone"&gt;</code>, and is for compatibility with
@@ -777,21 +784,21 @@ partial interface HTMLIFrameElement {
     <p>Given a Document object (<var>document</var>), this algorithm
     initialises <var>document</var>'s <a>Feature Policy</a></p>
     <ol>
-      <li>Let <var>inherited policies</var> be a new ordered map.</li>
-      <li>Let <var>declared policies</var> be a new ordered map.</li>
+      <li>Let <var>inherited policy</var> be a new ordered map.</li>
+      <li>Let <var>declared policy</var> be a new ordered map.</li>
       <li>For each <var>feature</var> supported,
         <ol>
           <li>Let <var>isInherited</var> be the result of running <a href=
           "#define-inherited-policy"></a> on <var>feature</var> and
           <var>document</var>'s browsing context.
           </li>
-          <li>Set <var>inherited policies</var>[<var>feature</var>] to
+          <li>Set <var>inherited policy</var>[<var>feature</var>] to
             <var>isInherited</var>.</li>
         </ol>
       </li>
       <li>Let <var>policy</var> be a new <a>feature policy</a>, with inherited
-      policy set <var>inherited policies</var> and declared policy set
-      <var>declared policies</var>.
+      policy <var>inherited policy</var> and declared policy <var>declared
+      policy</var>.
       </li>
       <li>
         <a>Enforce</a> the policy <var>policy</var> on <var>document</var>.
@@ -806,22 +813,22 @@ partial interface HTMLIFrameElement {
     <a>Feature Policy</a></p>
     <ol>
       <li>Initialize <var>document</var>'s Feature Policy</li>
-      <li>Let <var>inherited policies</var> be <var>document</var>'s Feature
-      Policy's inherited policy set.</li>
-      <li>Let <var>declared policies</var> be a new ordered map.</li>
+      <li>Let <var>inherited policy</var> be <var>document</var>'s Feature
+      Policy's <a>inherited policy</a>.</li>
+      <li>Let <var>declared policy</var> be a new ordered map.</li>
       <li>Let <var>d</var> be the result of running <a
       href="#process-response-policy">Process response policy</a> on
       <var>response</var> and <var>document</var>'s origin.</li>
       <li>For each <var>feature</var> → <var>allowlist</var> of <var>d</var>:
         <ol>
-          <li>If <var>inherited policies</var>[<var>feature</var>] is true, then
-	  set <var>declared policies</var>[<var>feature</var>] to
+          <li>If <var>inherited policy</var>[<var>feature</var>] is true, then
+	  set <var>declared policy</var>[<var>feature</var>] to
 	  <var>allowlist</var>.</li>
         </ol>
       </li>
       <li>Let <var>policy</var> be a new <a>feature policy</a>, with inherited
-      policy set <var>inherited policies</var> and declared policy set
-      <var>declared policies</var>.
+      policy <var>inherited policy</var> and declared policy <var>declared
+      policy</var>.
       </li>
       <li>
         <a>Enforce</a> the policy <var>policy</var> on <var>document</var>.
@@ -831,7 +838,7 @@ partial interface HTMLIFrameElement {
   <section>
     <h3 id="define-inherited-policy">Define an inherited policy for
     <var>feature</var></h3>
-    <p>Given a string (<var>feature</var>) and a browsing context
+    <p>Given a feature (<var>feature</var>) and a browsing context
     (<var>context</var>), this algorithm returns the <a>inherited policy</a>
     for that feature.</p>
     <ol>
@@ -849,18 +856,19 @@ partial interface HTMLIFrameElement {
               <li>If the <a>allowlist</a> for <var>feature</var> in
               <var>container policy</var> <a>matches</a> <var>origin</var>, and
               <var>parent</var>'s <a>inherited policy</a> for
-              <var>feature</var> is Enabled, return Enabled.
+              <var>feature</var> is 'Enabled', return 'Enabled'.
               </li>
-              <li>Otherwise return Disabled.</li>
+              <li>Otherwise return 'Disabled'.</li>
             </ol>
           </li>
-          <li>Otherwise, if feature is enabled in <var>parent</var> for
-	  <var>origin</var>, return Enabled.
+          <li>Otherwise, if <a href="is-feature-enabled"><var>feature</var> is
+	  enabled in <var>parent</var> for <var>origin</var></a>, return
+	  'Enabled'.
           </li>
-          <li>Otherwise, return Disabled.</li>
+          <li>Otherwise, return 'Disabled'.</li>
         </ol>
       </li>
-      <li>Otherwise, return Enabled.</li>
+      <li>Otherwise, return 'Enabled'.</li>
     </ol>
   </section>
   <section>
