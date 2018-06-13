@@ -86,9 +86,9 @@ spec: Feature Policy; urlPrefix: https://wicg.github.io/feature-policy/#
 </style>
 
 
-<b style="color: red; font-size: 1.3em">DO NOT IMPLEMENT</b>
+<b style="color: red; font-size: 1.3em">UNSTABLE API</b>
 
-<b>The version of the WebXR Device API represented in this document is incomplete and changing rapidly. Do not implement it at this time.</b>
+<b>The version of the WebXR Device API represented in this document is incomplete and may change at any time.</b>
 
 While this specification is under development some concepts may be represented better by the <a href="https://github.com/w3c/webvr/blob/master/explainer.md">WebXR Device API Explainer</a>.
 
@@ -216,13 +216,11 @@ The following code finds an available {{XRDevice}}.
 
 <pre highlight="js">
 navigator.xr.requestDevice().then(device => {
-  // Resolves to an XRDevice if one is available, or to null otherwise.
-  if (device) {
-    onXRAvailable(device);
-  }
+  // Resolves if an XRDevice is available.
+  onXRAvailable(device);
 }).catch(error => {
-  // An error occurred while requesting an XRDevice.
-  console.error('Unable to request an XR device: ', error);
+  // An error occurred while requesting an XRDevice or none is available.
+  console.error('Unable to retrieve an XR device: ', error);
 });
 </pre>
 </div>
@@ -232,7 +230,7 @@ XRDevice {#xrdevice-interface}
 ---------
 
 <pre class="idl">
-[SecureContext, Exposed=Window] interface XRDevice : EventTarget {
+[SecureContext, Exposed=Window] interface XRDevice {
   // Methods
   Promise&lt;void&gt; supportsSession(optional XRSessionCreationOptions options);
   Promise&lt;XRSession&gt; requestSession(optional XRSessionCreationOptions options);
@@ -510,17 +508,23 @@ XRPresentationFrame {#xrpresentationframe-interface}
 
 <pre class="idl">
 [SecureContext, Exposed=Window] interface XRPresentationFrame {
+  readonly attribute XRSession session;
   readonly attribute FrozenArray&lt;XRView&gt; views;
 
   XRDevicePose? getDevicePose(XRCoordinateSystem coordinateSystem);
+  XRInputPose? getInputPose(XRInputSource inputSource, XRCoordinateSystem coordinateSystem);
 };
 </pre>
 
 An {{XRPresentationFrame}} provides all the values needed to render a single frame of an XR scene to the {{XRDevice}}'s display. Applications can only aquire an {{XRPresentationFrame}} by calling {{XRSession/requestAnimationFrame()}} on an {{XRSession}} with an {{XRFrameRequestCallback}}. When the callback is called it will be passed an {{XRPresentationFrame}}.
 
+<dfn attribute for="XRPresentationFrame">session</dfn>
+
 <dfn attribute for="XRPresentationFrame">views</dfn>
 
 <dfn method for="XRPresentationFrame">getDevicePose(coordinateSystem)</dfn>
+
+<dfn method for="XRPresentationFrame">getInputPose(inputSource, coordinateSystem)</dfn>
 
 Coordinate Systems {#coordinatesystems}
 ==================
@@ -697,15 +701,15 @@ enum XRHandedness {
   "right"
 };
 
-enum XRPointerOrigin {
-  "head",
-  "hand",
-  "screen"
+enum XRTargetRayMode {
+  "gazing",
+  "pointing",
+  "tapping"
 };
 
 interface XRInputSource {
   readonly attribute XRHandedness handedness;
-  readonly attribute XRPointerOrigin pointerOrigin;
+  readonly attribute XRTargetRayMode targetRayMode;
 };
 </pre>
 
@@ -717,7 +721,7 @@ XRInputPose {#xrinputpose-interface}
 <pre class="idl">
 interface XRInputPose {
   readonly attribute boolean emulatedPosition;
-  readonly attribute Float32Array pointerMatrix;
+  readonly attribute Float32Array targetRayMatrix;
   readonly attribute Float32Array? gripMatrix;
 };
 </pre>
@@ -737,6 +741,22 @@ An {{XRLayer}} defines a source of bitmap images and a description of how the im
 XRWebGLLayer {#xrwebgllayer-interface}
 -------
 
+Each {{XRSession}} MUST identify a <dfn>native WebGL framebuffer resolution</dfn>, which is the pixel resolution of a WebGL framebuffer required to match the physical pixel resolution of the {{XRDevice}}.
+
+<div class="algorithm" data-algorithm="native-webgl-framebuffer-resolution">
+
+The [=native WebGL framebuffer resolution=] is detemined by running the following steps:
+
+  1. Let |session| be the target {{XRSession}}.
+  1. If |session|'s {{XRSession/exclusive}} value is <code>true</code>, set the [=native WebGL framebuffer resolution=] to the resolution required to have a 1:1 ratio between the pixels of a framebuffer large enough to contain all of the session's {{XRView}}s and the physical screen pixels in the area of the display under the highest magnification and abort these steps. If no method exists to determine the native resolution as described, the [=recommended WebGL framebuffer resolution=] MAY be used.
+  1. If |session|'s {{XRSession/exclusive}} value is <code>false</code>, set the [=native WebGL framebuffer resolution=] to the size of the |session|'s {{XRSession/outputContext}}'s {{XRPresentationContext/canvas}} in physical display pixels and reevaluate these steps every time the size of the canvas changes.
+
+</div>
+
+Additionally, the {{XRSession}} MUST identify a <dfn>recommended WebGL framebuffer resolution</dfn>, which represents a best estimate of the WebGL framebuffer resolution large enough to contain all of the session's {{XRView}}s that provides an average application a good balance between performance and quality. It MAY be smaller than, larger than, or equal to the [=native WebGL framebuffer resolution=].
+
+NOTE: The user agent is free to use and method of it's choosing to estimate the [=recommended WebGL framebuffer resolution=]. If there are platform-specific methods for querying a recommended size it is recommended that they be used, but not required.
+
 <pre class="idl">
 typedef (WebGLRenderingContext or
          WebGL2RenderingContext) XRWebGLRenderingContext;
@@ -747,7 +767,7 @@ dictionary XRWebGLLayerInit {
   boolean stencil = false;
   boolean alpha = true;
   boolean multiview = false;
-  double framebufferScaleFactor;
+  double framebufferScaleFactor = 1.0;
 };
 
 [SecureContext, Exposed=Window, Constructor(XRSession session,
@@ -770,6 +790,9 @@ interface XRWebGLLayer : XRLayer {
   // Methods
   XRViewport? getViewport(XRView view);
   void requestViewportScaling(double viewportScaleFactor);
+
+  // Static Methods
+  static double getNativeFramebufferScaleFactor(XRSession session);
 };
 </pre>
 
@@ -810,6 +833,16 @@ The <dfn method for="XRWebGLLayer">getViewport(|view|)</dfn> method, when invoke
 </div>
 
 <dfn method for="XRWebGLLayer">requestViewportScaling(viewportScaleFactor)</dfn>
+
+<div class="algorithm" data-algorithm="get-native-framebuffer-scale-factor">
+
+The <dfn method for="XRWebGLLayer">getNativeFramebufferScaleFactor(|session|)</dfn> method, when invoked, MUST run the following steps:
+
+  1. Let |session| be the target {{XRSession}}.
+  1. If |session|'s [=ended=] value is <code>true</code>, return <code>0.0</code> and abort these steps.
+  1. Return the value that the |session|'s [=recommended WebGL framebuffer resolution=] must be multiplied by to yield the |session|'s [=native WebGL framebuffer resolution=].
+
+</div>
 
 Issue: Document what it means when a context <dfn>supports multiview</dfn>.
 
@@ -928,6 +961,9 @@ function onXRSessionStarted(xrSession) {
 
 Canvas Rendering Context {#canvas-rendering-context}
 ========================
+
+XRPresentationContext {#xrpresentationcontext-interface}
+---------------------
 
 <pre class="idl">
 [SecureContext, Exposed=Window] interface XRPresentationContext {

@@ -1,24 +1,52 @@
+<link rel="icon" href="logo-cookies.png">
 <pre class='metadata'>
-Title: Cookie-Store
+Title: Cookie Store API
 Shortname: cookiestore
 Level: 1
-Status: LD
-Group: cookie-store
+Status: ED
+Group: WICG
+ED: https://wicg.github.io/cookie-store/
 Repository: WICG/cookie-store
-URL: https://github.com/WICG/cookie-store
-Editor: Your Name, Your Company http://example.com/your-company, your-email@example.com, http://example.com/your-personal-website
-Markup Shorthands: markdown yes
+Editor: Victor Costan, Google Inc. https://google.com, costan@google.com
+Editor: Raymond Toy, Google Inc. https://google.com, rtoy@google.com
+Editor: Joshua Bell, Google Inc. https://google.com, jsbell@google.com
+Markup Shorthands: markdown yes, css no
 Abstract: An asynchronous Javascript cookies API for documents and workers
 </pre>
 
-<h2 id="intro">
-Introduction</h2>
+<pre class=link-defaults>
+spec:infra; type:dfn; text:list
+</pre>
+
+<style>
+dl.domintro dt {
+    font-family: Menlo, Consolas, "DejaVu Sans Mono", Monaco, monospace;
+
+    padding-top: 0.5em;
+    padding-bottom: 1em;
+}
+dl.domintro dt a {
+    color: inherit; border-bottom-style: none;
+}
+dl.domintro dt code {
+    font-size: inherit;
+}
+</style>
+
+<img src="logo-cookies.svg" alt="logo"
+    style="height: 100px; width: 100px; position: absolute; right: 20px; top: 30px;">
+
+<!-- ============================================================ -->
+# Introduction # {#intro}
+<!-- ============================================================ -->
+
+*This section is non-normative.*
 
 This is a proposal to bring an asynchronous cookie API to scripts running in HTML documents and [service workers](https://github.com/slightlyoff/ServiceWorker).
 
-[HTTP cookies](https://tools.ietf.org/html/rfc6265) have, since their origins at Netscape [(documentation preserved by archive.org)](https://web.archive.org/web/0/http://wp.netscape.com/newsref/std/cookie_spec.html), provided a [valuable state-management mechanism](http://www.montulli-blog.com/2013/05/the-reasoning-behind-web-cookies.html) for the web. 
+[HTTP cookies](https://tools.ietf.org/html/rfc6265) have, since their origins at Netscape [(documentation preserved by archive.org)](https://web.archive.org/web/0/http://wp.netscape.com/newsref/std/cookie_spec.html), provided a [valuable state-management mechanism](http://www.montulli-blog.com/2013/05/the-reasoning-behind-web-cookies.html) for the web.
 
-The synchronous single-threaded script-level `document.cookie` and `<meta http-equiv="set-cookie" ...>` interface to cookies has been a source of [complexity and performance woes](https://lists.w3.org/Archives/Public/public-whatwg-archive/2009Sep/0083.html) further exacerbated by the move in many browsers from:
+The synchronous single-threaded script-level {{Document/cookie|document.cookie}} interface to cookies has been a source of [complexity and performance woes](https://lists.w3.org/Archives/Public/public-whatwg-archive/2009Sep/0083.html) further exacerbated by the move in many browsers from:
   - a single browser process,
   - a single-threaded event loop model, and
   - no general expectation of responsiveness for scripted event handling while processing cookie operations
@@ -33,11 +61,12 @@ On the modern web a cookie operation in one part of a web application cannot blo
   - the rest of the web origin, or
   - the browser as a whole.
 
-Newer parts of the web built in service workers [need access to cookies too](https://github.com/slightlyoff/ServiceWorker/issues/707) but cannot use the synchronous, blocking `document.cookie` and `<meta http-equiv="set-cookie" ...>` interfaces at all as they both have no `document` and also cannot block the event loop as that would interfere with handling of unrelated events.
+Newer parts of the web built in service workers [need access to cookies too](https://github.com/slightlyoff/ServiceWorker/issues/707) but cannot use the synchronous, blocking {{Document/cookie|document.cookie}} interface at all as they both have no `document` and also cannot block the event loop as that would interfere with handling of unrelated events.
 
-<h3 id="intro-proposed-change">
-A Taste of the Proposed Change
-</h3>
+<!-- ============================================================ -->
+## A Taste of the Proposed Change ## {#intro-proposed-change}
+
+<!-- ============================================================ -->
 
 Although it is tempting to [rethink cookies](https://discourse.wicg.io/t/rethinking-cookies/744) entirely, web sites today continue to rely heavily on them, and the script APIs for using them are largely unchanged over their first decades of usage.
 
@@ -90,36 +119,36 @@ This also has the advantage of not relying on `document` and not blocking, which
 
 This proposal also includes a power-efficient monitoring API to replace `setTimeout`-based polling cookie monitors with cookie change observers.
 
-<h3 id="intro-summary">
-Summary
-</h3>
+<!-- ============================================================ -->
+## Summary ## {#intro-summary}
+<!-- ============================================================ -->
 
 This proposal outlines an asynchronous API using Promises/async functions for the following cookie operations:
 
-	* [=set a cookie|write=] (or "set") cookies
-	* [=clearing|delete=] (or "expire") cookies
-	* [=read=] (or "get") [script-visible](#script-visibility) cookies
-		* ... including for specified in-scope request paths in
-			[service worker](https://github.com/slightlyoff/ServiceWorker) contexts
-	* [monitor](#monitoring) [script-visible](#script-visibility) cookies for changes
-		* ... [using `CookieObserver`](#single-execution-context) in long-running script contexts (e.g. `document`)
-		* ... [using `CookieChangeEvent`](#service-worker) after registration during the `InstallEvent`
-			in ephemeral [service worker](https://github.com/slightlyoff/ServiceWorker) contexts
-		* ... again including for script-supplied in-scope request paths
-			in [service worker](https://github.com/slightlyoff/ServiceWorker) contexts
+    * [=set a cookie|write=] (or "set") cookies
+    * [=clearing|delete=] (or "expire") cookies
+    * [=read=] (or "get") [=script-visible=] cookies
+        * ... including for specified in-scope request paths in
+            [service worker](https://github.com/slightlyoff/ServiceWorker) contexts
+    * [=monitor=] [=script-visible=] cookies for changes using `CookieChangeEvent`
+        * ... in long-running script contexts (e.g. `document`)
+        * ... after registration during the `InstallEvent`
+            in ephemeral [service worker](https://github.com/slightlyoff/ServiceWorker) contexts
+        * ... again including for script-supplied in-scope request paths
+            in [service worker](https://github.com/slightlyoff/ServiceWorker) contexts
 
-<h4 id="script-visibility">
-Script visibility
-</h4>
+<!-- ============================================================ -->
+### Script visibility ### {#script-visibility}
+<!-- ============================================================ -->
 
-A cookie is script-visible when it is in-scope and does not have the `HttpOnly` cookie flag.
+A cookie is <dfn>script-visible</dfn> when it is in-scope and does not have the `HttpOnly` cookie flag.
 
-<h4 id="intro-motivation">
-Motivations
-</h4>
+<!-- ============================================================ -->
+### Motivations ### {#intro-motivation}
+<!-- ============================================================ -->
 
 Some service workers [need access to cookies](https://github.com/slightlyoff/ServiceWorker/issues/707) but
-cannot use the synchronous, blocking `document.cookie` interface as they both have no `document` and
+cannot use the synchronous, blocking {{Document/cookie|document.cookie}} interface as they both have no `document` and
 also cannot block the event loop as that would interfere with handling of unrelated events.
 
 A new API may also provide a rare and valuable chance to address
@@ -132,23 +161,23 @@ can be used to replace power-hungry polling cookie scanners.
 
 The API must interoperate well enough with existing cookie APIs (HTTP-level, HTML-level and script-level) that it can be adopted incrementally by a large or complex website.
 
-<h4 id="intro-opinions">
-Opinions
-</h4>
+<!-- ============================================================ -->
+### Opinions ### {#intro-opinions}
+<!-- ============================================================ -->
 
 This API defaults cookie paths to `/` for cookie write operations, including deletion/expiration. The implicit relative path-scoping of cookies to `.` has caused a lot of additional complexity for relatively little gain given their security equivalence under the same-origin policy and the difficulties arising from multiple same-named cookies at overlapping paths on the same domain. Cookie paths without a trailing `/` are treated as if they had a trailing `/` appended for cookie write operations. Cookie paths must start with `/` for write operations, and must not contain any `..` path segments. Query parameters and URL fragments are not allowed in paths for cookie write operations.
 
 URLs without a trailing `/` are treated as if the final path segment had been removed for cookie read operations, including change monitoring. Paths for cookie read operations are resolved relative to the default read cookie path.
 
-This API defaults cookies to "Secure" when they are written from a secure web origin. This is intended to prevent unintentional leakage to unsecured connections on the same domain. Furthermore it disallows (to the extent permitted by the browser implementation) [creation or modification of `Secure`-flagged cookies from unsecured web origins](https://tools.ietf.org/html/draft-ietf-httpbis-cookie-alone-00) and [enforces special rules for the `__Host-` and `__Secure-` cookie name prefixes](https://tools.ietf.org/html/draft-ietf-httpbis-cookie-prefixes-00).
+This API defaults cookies to "Secure" when they are written from a secure web origin. This is intended to prevent unintentional leakage to unsecured connections on the same domain. Furthermore it disallows (to the extent permitted by the browser implementation) [creation or modification of Secure-flagged cookies from unsecured web origins](https://tools.ietf.org/html/draft-ietf-httpbis-cookie-alone-00) and [enforces special rules for the __Host- and __Secure- cookie name prefixes](https://tools.ietf.org/html/draft-ietf-httpbis-cookie-prefixes-00).
 
 This API defaults cookies to "Domain"-less, which in conjunction with "Secure" provides origin-scoped cookie
-behavior in most modern browsers. When practical the [`__Host-` cookie name prefix](https://tools.ietf.org/html/draft-ietf-httpbis-cookie-prefixes-00) should be used with these cookies so that cooperating browsers origin-scope them.
+behavior in most modern browsers. When practical the [__Host- cookie name prefix](https://tools.ietf.org/html/draft-ietf-httpbis-cookie-prefixes-00) should be used with these cookies so that cooperating browsers origin-scope them.
 
 Serialization of expiration times for non-session cookies in a special cookie-specific format has proven cumbersome,
 so this API allows JavaScript Date objects and numeric timestamps (milliseconds since the beginning of the Unix epoch) to be used instead. The inconsistently-implemented Max-Age parameter is not exposed, although similar functionality is available for the specific case of expiring a cookie.
 
-Cookies without `=` in their HTTP Cookie header serialization are treated as having an empty name, consistent with the majority of current browsers. Cookies with an empty name cannot be set using values containing `=` as this would result in ambiguous serializations in the majority of current browsers.
+Cookies without U+003D (=) [=code points=] in their HTTP Cookie header serialization are treated as having an empty name, consistent with the majority of current browsers. Cookies with an empty name cannot be set using values containing U+003D (=) [=code points=] as this would result in ambiguous serializations in the majority of current browsers.
 
 Internationalized cookie usage from scripts has to date been slow and browser-specific due to lack of interoperability because although several major browsers use UTF-8 interpretation for cookie data, historically Safari and browsers based on WinINet have not. This API mandates UTF-8 interpretation for cookies read or written by this API.
 
@@ -156,101 +185,86 @@ Use of cookie-change-driven scripts has been hampered by the absence of a power-
 
 Scripts should not have to write and then read "test cookies" to determine whether script-initiated cookie write access is possible, nor should they have to correlate with cooperating server-side versions of the same write-then-read test to determine that script-initiated cookie read access is impossible despite cookies working at the HTTP level.
 
-<h4 id="intro-compat">
-Compatiblity
-</h4>
+<!-- ============================================================ -->
+### Compatiblity ### {#intro-compat}
+<!-- ============================================================ -->
 
 Some user-agents implement non-standard extensions to cookie behavior. The intent of this specification,
 though, is to first capture a useful and interoperable (or mostly-interoperable) subset of cookie behavior implemented
 across modern browsers. As new cookie features are specified and adopted it is expected that this API will be
-extended to include them. A secondary goal is to converge with `document.cookie` behavior, `<meta http-equiv=set-cookie>`,
+extended to include them. A secondary goal is to converge with {{Document/cookie|document.cookie}} behavior
 and the http cookie specification. See https://github.com/whatwg/html/issues/804 and https://inikulin.github.io/cookie-compat/
 for the current state of this convergence.
 
 Differences across browsers in how bytes outside the printable-ASCII subset are interpreted has led to
 long-lasting user- and developer-visible incompatibilities across browsers making internationalized use of cookies
-needlessly cumbersome. This API requires UTF-8 interpretation of cookie data and uses `USVString` for the script interface,
-with the additional side-effects that subsequent uses of `document.cookie` to read a cookie read or written through this interface and subsequent uses of `document.cookie` or
-`<meta http-equiv=set-cookie>` to update a cookie previously read or written through this interface will also use a UTF-8 interpretation of the cookie data. In practice this
+needlessly cumbersome. This API requires UTF-8 interpretation of cookie data and uses {{USVString}} for the script interface,
+with the additional side-effects that subsequent uses of {{Document/cookie|document.cookie}} to read a cookie read or written through this interface and subsequent uses of {{Document/cookie|document.cookie}} to update a cookie previously read or written through this interface will also use a UTF-8 interpretation of the cookie data. In practice this
 will change the behavior of `WinINet`-based user agents and Safari but should bring their behavior into concordance
 with other modern user agents.
 
-<h2 id="CookieStore">
-The {{CookieStore}} Interface</h2>
+
+<!-- ============================================================ -->
+# The {{CookieStore}} Interface # {#CookieStore}
+<!-- ============================================================ -->
 
 <xmp class="idl">
-[
-  Exposed=(ServiceWorker,Window),
-] interface CookieStore : EventTarget {
-  [RaisesException] Promise<CookieList?> getAll(
-      USVString name, optional CookieStoreGetOptions options);
-  [RaisesException] Promise<CookieList?> getAll(
-      optional CookieStoreGetOptions options);
-  [RaisesException] Promise<CookieListItem?> get(
-      USVString name, optional CookieStoreGetOptions options);
-  [RaisesException] Promise<CookieListItem?> get(
-      optional CookieStoreGetOptions options);
-  [RaisesException] Promise<boolean> has(
-      USVString name, optional CookieStoreGetOptions options);
-  [RaisesException] Promise<boolean> has(
-      optional CookieStoreGetOptions options);
+[Exposed=(ServiceWorker,Window)]
+interface CookieStore : EventTarget {
+  Promise<CookieListItem?> get(USVString name, optional CookieStoreGetOptions options);
+  Promise<CookieListItem?> get(optional CookieStoreGetOptions options);
 
-  [RaisesException] Promise<void> set(
-      USVString name, USVString value, optional CookieStoreSetOptions options);
-  [RaisesException] Promise<void> set(
-      CookieStoreSetOptions options);
+  Promise<CookieList?> getAll(USVString name, optional CookieStoreGetOptions options);
+  Promise<CookieList?> getAll(optional CookieStoreGetOptions options);
 
-  [RaisesException] Promise<void> delete(
-      USVString name, optional CookieStoreSetOptions options);
-  [RaisesException] Promise<void> delete(
-      CookieStoreSetOptions options);
+  Promise<boolean> has(USVString name, optional CookieStoreGetOptions options);
+  Promise<boolean> has(optional CookieStoreGetOptions options);
+
+  Promise<void> set(USVString name, USVString value, optional CookieStoreSetOptions options);
+  Promise<void> set(optional CookieStoreSetOptions options); // TODO: Make non-optional.
+
+  Promise<void> delete(USVString name, optional CookieStoreSetOptions options);
+  Promise<void> delete(optional CookieStoreSetOptions options); // TODO: Make non-optional.
 
   attribute EventHandler onchange;
 };
 </xmp>
 
-<h3 id="CookieStore-attributes">
-Attributes</h3>
+<!-- ============================================================ -->
+## Attributes ## {#CookieStore-attributes}
+<!-- ============================================================ -->
 
-<h4 id="CookieStore-attributes-onchange">
-{{onchange}}
-</h4>
+<!-- ============================================================ -->
+### {{onchange}} ### {#CookieStore-attributes-onchange}
+<!-- ============================================================ -->
+
 <dl dfn-type=attribute dfn-for=CookieStore>
-	: <dfn>onchange</dfn>
-	::
-		An {{EventHandler}} of type {{CookieChangeEvent}}.
+    : <dfn>onchange</dfn>
+    ::
+        An {{EventHandler}} of type {{CookieChangeEvent}}.
 </dl>
 
-<h3 id="CookieStore-methods">
-Methods</h3>
+<!-- ============================================================ -->
+## Methods ## {#CookieStore-methods}
+<!-- ============================================================ -->
 
-<h4 id="CookieStore-methods-getAll">
-{{CookieStore/getAll}}</h4>
+<!-- ============================================================ -->
+### {{CookieStore/get}} ### {#CookieStore-get}
+<!-- ============================================================ -->
 
-<dl dfn-type=method dfn-for="CookieStore">
-	: <dfn>getAll(name, options)</dfn>
-	::
-		Get all the cookies
+<div class=note>
 
-		<pre class=argumentdef for="CookieStore/getAll(name, options)">
-			name: name
-			options: options
-		</pre>
-	: <dfn>getAll(options)</dfn>
-	::
-		Get all the cookies
+  <dl class=domintro>
+    <dt><var>cookie</var> = await cookieStore .
+        {{CookieStore/get(name, options)|get}}(<var>name</var>, <var>options</var>)</dt>
+    <dt><var>cookie</var> = await cookieStore .
+        {{CookieStore/get(options)|get}}(<var>options</var>)</dt>
+    <dd>
 
-		<pre class=argumentdef for="CookieStore/getAll(options)">
-			options: options
-		</pre>
-</dl>
 
-<h4 id="CookieStore-methods-get">
-{{CookieStore/get}}</h4>
-
-You can <dfn>read</dfn> the first in-scope script-visible value for a given cookie name. In a service worker context this defaults to the path
+You can <dfn>read</dfn> the first in-scope [=script-visible=] value for a given cookie name. In a service worker context this defaults to the path
 of the service worker's registered scope. In a document it defaults to the path of the current document and does not respect
-changes from `replaceState` or `document.domain`.
+changes from {{History/replaceState()}} or {{Document/domain|document.domain}}.
 
 <div class="example">
 ```js
@@ -259,11 +273,11 @@ function getOneSimpleOriginCookie() {
     console.log(cookie ? ('Current value: ' + cookie.value) : 'Not set');
   });
 }
-getOneSimpleOriginCookie().then(function() {
-  console.log('getOneSimpleOriginCookie succeeded!');
-}, function(reason) {
-  console.error('getOneSimpleOriginCookie did not succeed: ', reason);
-});
+
+getOneSimpleOriginCookie().then(
+  () => console.log('getOneSimpleOriginCookie succeeded!'),
+  reason => console.error('getOneSimpleOriginCookie did not succeed: ', reason)
+);
 ```
 </div>
 
@@ -271,10 +285,11 @@ You can use exactly the same Promise-based API with the newer `async` ... `await
 
 <div class="example">
 ```js
-let getOneSimpleOriginCookieAsync = async () => {
+async function getOneSimpleOriginCookieAsync() {
   let cookie = await cookieStore.get('__Host-COOKIENAME');
   console.log(cookie ? ('Current value: ' + cookie.value) : 'Not set');
-};
+}
+
 getOneSimpleOriginCookieAsync().then(
   () => console.log('getOneSimpleOriginCookieAsync succeeded!'),
   reason => console.error('getOneSimpleOriginCookieAsync did not succeed: ', reason));
@@ -287,23 +302,74 @@ In a service worker context you can read a cookie from the point of view of a pa
 
 <div class="example">
 ```js
-let getOneCookieForRequestUrl = async () => {
+async function getOneCookieForRequestUrl() {
   let cookie = await cookieStore.get('__Secure-COOKIENAME', {url: '/cgi-bin/reboot.php'});
   console.log(cookie ? ('Current value in /cgi-bin is ' + cookie.value) : 'Not set in /cgi-bin');
-};
+}
 ```
 </div>
+</dd>
+</div>
 
-Sometimes you need to see the whole script-visible in-scope subset of the cookie jar, including potential reuse of the same
+<div class=algorithm>
+The <dfn method for=CookieStore>get(|name|, |options|)</dfn> method, when invoked, must run these steps:
+
+1. Let |origin| be |environment|’s [=/origin=].
+1. If |origin| is an [=opaque origin=], then return a new promise rejected with a "{{SecurityError}}" {{DOMException}}.
+1. Let |p| be a new promise.
+1. Run the following steps in parallel:
+    1. Let |list| be the results of running the steps to [=query cookies=] with
+        |name|,
+        |options|' {{CookieStoreGetOptions/url}} dictionary member (if present), and
+        |options|' {{CookieStoreGetOptions/matchType}} dictionary member.
+    1. If |list| is failure, reject |p| with a new {{TypeError}}.
+    1. If |list| [=list/is empty=], resolve |p| with undefined.
+    1. Otherwise, resolve |p| with the first item of |list|.
+1. Return |p|.
+
+</div>
+
+<div class=algorithm>
+The <dfn method for=CookieStore>get(|options|)</dfn> method, when invoked, must run these steps:
+
+1. Let |origin| be |environment|’s [=/origin=].
+1. If |origin| is an [=opaque origin=], then return a new promise rejected with a "{{SecurityError}}" {{DOMException}}.
+1. Let |p| be a new promise.
+1. Run the following steps in parallel:
+    1. Let |list| be the results of running the steps to [=query cookies=] with
+        |options|' {{CookieStoreGetOptions/name}} member,
+        |options|' {{CookieStoreGetOptions/url}} dictionary member (if present), and
+        |options|' {{CookieStoreGetOptions/matchType}} dictionary member.
+    1. If |list| is failure, reject |p| with a new {{TypeError}}.
+    1. If |list| [=list/is empty=], resolve |p| with undefined.
+    1. Otherwise, resolve |p| with the first item of |list|.
+1. Return |p|.
+
+</div>
+
+<!-- ============================================================ -->
+### {{CookieStore/getAll}} ### {#CookieStore-getAll}
+<!-- ============================================================ -->
+
+<div class=note>
+
+  <dl class=domintro>
+    <dt><var>cookies</var> = await cookieStore .
+        {{CookieStore/getAll(name, options)|getAll}}(<var>name</var>, <var>options</var>)</dt>
+    <dt><var>cookies</var> = await cookieStore .
+        {{CookieStore/getAll(options)|getAll}}(<var>options</var>)</dt>
+    <dd>
+
+Sometimes you need to see the whole [=script-visible=] in-scope subset of the cookie jar, including potential reuse of the same
 cookie name at multiple paths and/or domains (the paths and domains are not exposed to script by this API, though):
 
 <div class="example">
 ```js
-let countCookies = async () => {
+async function countCookies() {
   let cookieList = await cookieStore.getAll();
   console.log('How many cookies? %d', cookieList.length);
   cookieList.forEach(cookie => console.log('Cookie %s has value %o', cookie.name, cookie.value));
-};
+}
 ```
 </div>
 
@@ -311,65 +377,109 @@ Sometimes an expected cookie is known by a prefix rather than by an exact name, 
 
 <div class="example">
 ```js
-let countMatchingSimpleOriginCookies = async () => {
+async function countMatchingSimpleOriginCookies() {
   let cookieList = await cookieStore.getAll({name: '__Host-COOKIEN', matchType: 'startsWith'});
   console.log('How many matching cookies? %d', cookieList.length);
   cookieList.forEach(({name, value}) => console.log('Matching cookie %s has value %o', name, value));
-};
+}
 ```
 </div>
-
-<dl dfn-type=method dfn-for="CookieStore">
-	: <dfn>get(name, options)</dfn>
-	::
-		Get something
-
-		<pre class=argumentdef for="CookieStore/get(name, options)">
-			name: name
-			options: options
-		</pre>
-	: <dfn>get(options)</dfn>
-	::
-		Get something
-
-		<pre class=argumentdef for="CookieStore/get(options)">
-			options: options
-		</pre>
-</dl>
+</dd>
+</div>
 
 
-<h4 id="CookieStore-methods-has">
-{{CookieStore/has}}</h4>
+<div class=algorithm>
+The <dfn method for=CookieStore>getAll(|name|, |options|)</dfn> method, when invoked, must run these steps:
 
-<dl dfn-type=method dfn-for="CookieStore">
-	: <dfn>has(name, options)</dfn>
-	::
-		Has something
+1. Let |origin| be |environment|’s [=/origin=].
+1. If |origin| is an [=opaque origin=], then return a new promise rejected with a "{{SecurityError}}" {{DOMException}}.
+1. Let |p| be a new promise.
+1. Run the following steps in parallel:
+    1. Let |list| be the results of running the steps to [=query cookies=] with
+        |name|,
+        |options|' {{CookieStoreGetOptions/url}} dictionary member (if present), and
+        |options|' {{CookieStoreGetOptions/matchType}} dictionary member.
+    1. If |list| is failure, reject |p| with a new {{TypeError}}.
+    1. Otherwise, resolve |p| with |list|.
+1. Return |p|.
 
-		<pre class=argumentdef for="CookieStore/has(name, options)">
-			name: name
-			options: options
-		</pre>
-	: <dfn>has(options)</dfn>
-	::
-		Has something
+</div>
 
-		<pre class=argumentdef for="CookieStore/has(options)">
-			options: options
-		</pre>
-</dl>
+<div class=algorithm>
+The <dfn method for=CookieStore>getAll(|options|)</dfn> method, when invoked, must run these steps:
 
-<h4 id="CookieStore-methods-set">
-{{CookieStore/set(name, value, options)|set}}</h4>
+1. Let |origin| be |environment|’s [=/origin=].
+1. If |origin| is an [=opaque origin=], then return a new promise rejected with a "{{SecurityError}}" {{DOMException}}.
+1. Let |p| be a new promise.
+1. Run the following steps in parallel:
+    1. Let |list| be the results of running the steps to [=query cookies=] with
+        |options|' {{CookieStoreGetOptions/name}} member,
+        |options|' {{CookieStoreGetOptions/url}} dictionary member (if present), and
+        |options|' {{CookieStoreGetOptions/matchType}} dictionary member.
+    1. If |list| is failure, reject |p| with a new {{TypeError}}.
+    1. Otherwise, resolve |p| with |list|.
+1. Return |p|.
 
-You can <dfn>set a cookie</dfn> using these methods.  For example:
+</div>
+
+
+
+<!-- ============================================================ -->
+### {{CookieStore/has}} ### {#CookieStore-has}
+<!-- ============================================================ -->
+
+<div class=algorithm>
+The <dfn method for=CookieStore>has(|name|, |options|)</dfn> method, when invoked, must run these steps:
+
+1. Let |origin| be |environment|’s [=/origin=].
+1. If |origin| is an [=opaque origin=], then return a new promise rejected with a "{{SecurityError}}" {{DOMException}}.
+1. Let |p| be a new promise.
+1. Run the following steps in parallel:
+    1. Let |list| be the results of running the steps to [=query cookies=] with
+        |name|,
+        |options|' {{CookieStoreGetOptions/url}} dictionary member (if present), and
+        |options|' {{CookieStoreGetOptions/matchType}} dictionary member.
+    1. If |list| is failure, reject |p| with a new {{TypeError}}.
+    1. If |list| [=list/is empty=], resolve |p| with false.
+    1. Otherwise, resolve |p| with true.
+1. Return |p|.
+
+</div>
+
+<div class=algorithm>
+The <dfn method for=CookieStore>has(|options|)</dfn> method, when invoked, must run these steps:
+
+1. Let |origin| be |environment|’s [=/origin=].
+1. If |origin| is an [=opaque origin=], then return a new promise rejected with a "{{SecurityError}}" {{DOMException}}.
+1. Let |p| be a new promise.
+1. Run the following steps in parallel:
+    1. Let |list| be the results of running the steps to [=query cookies=]\ with
+        |options|' {{CookieStoreGetOptions/name}} member,
+        |options|' {{CookieStoreGetOptions/url}} dictionary member (if present), and
+        |options|' {{CookieStoreGetOptions/matchType}} dictionary member.
+    1. If |list| is failure, reject |p| with a new {{TypeError}}.
+    1. If |list| [=list/is empty=], resolve |p| with false.
+    1. Otherwise, resolve |p| with true.
+1. Return |p|.
+
+</div>
+
+
+
+<!-- ============================================================ -->
+### {{CookieStore/set(name, value, options)|set}} ### {#CookieStore-set}
+<!-- ============================================================ -->
+
+<div class=note>
+
+You can set a cookie using these methods.  For example:
 
 <div class="example">
 ```js
-let setOneSimpleOriginSessionCookie = async () => {
+async function setOneSimpleOriginSessionCookie() {
   await cookieStore.set('__Host-COOKIENAME', 'cookie-value');
   console.log('Set!');
-};
+}
 ```
 </div>
 
@@ -377,7 +487,7 @@ That defaults to path "/" and *implicit* domain, and defaults to a Secure-if-htt
 
 <div class="example">
 ```js
-let setOneDaySecureCookieWithDate = async () => {
+async function setOneDaySecureCookieWithDate() {
   // one day ahead, ignoring a possible leap-second
   let inTwentyFourHours = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await cookieStore.set('__Secure-COOKIENAME', 'cookie-value', {
@@ -387,7 +497,7 @@ let setOneDaySecureCookieWithDate = async () => {
       domain: 'example.org'
     });
   console.log('Set!');
-};
+}
 ```
 </div>
 
@@ -396,7 +506,7 @@ Of course the numeric form (milliseconds since the beginning of 1970 UTC) works 
 
 <div class="example">
 ```js
-let setOneDayUnsecuredCookieWithMillisecondsSinceEpoch = async () => {
+async function setOneDayUnsecuredCookieWithMillisecondsSinceEpoch() {
   // one day ahead, ignoring a possible leap-second
   let inTwentyFourHours = Date.now() + 24 * 60 * 60 * 1000;
   await cookieStore.set('LEGACYCOOKIENAME', 'cookie-value', {
@@ -406,7 +516,7 @@ let setOneDayUnsecuredCookieWithMillisecondsSinceEpoch = async () => {
       domain: 'example.org'
     });
   console.log('Set!');
-};
+}
 ```
 </div>
 
@@ -414,7 +524,7 @@ Sometimes an expiration date comes from existing script it's not easy or conveni
 
 <div class="example">
 ```js
-let setSecureCookieWithHttpLikeExpirationString = async () => {
+async function setSecureCookieWithHttpLikeExpirationString() {
   await cookieStore.set('__Secure-COOKIENAME', 'cookie-value', {
       path: '/cgi-bin/',
       expires: 'Mon, 07 Jun 2021 07:07:07 GMT',
@@ -422,7 +532,7 @@ let setSecureCookieWithHttpLikeExpirationString = async () => {
       domain: 'example.org'
     });
   console.log('Set!');
-};
+}
 ```
 </div>
 
@@ -432,7 +542,7 @@ You can set multiple cookies too, but - as with HTTP `Set-Cookie` - the multiple
 
 <div class="example">
 ```js
-let setThreeSimpleOriginSessionCookiesSequentially = async () => {
+async function setThreeSimpleOriginSessionCookiesSequentially() {
   await cookieStore.set('__Host-🍪', '🔵cookie-value1🔴');
   await cookieStore.set('__Host-🌟', '🌠cookie-value2🌠');
   await cookieStore.set('__Host-🌱', '🔶cookie-value3🔷');
@@ -453,7 +563,7 @@ let setThreeSimpleOriginSessionCookiesSequentially = async () => {
       JSON.stringify(actual)].join(''));
   }
   console.log('All verified!');
-};
+}
 ```
 </div>
 
@@ -461,7 +571,7 @@ If the relative order is unimportant the operations can be performed without spe
 
 <div class="example">
 ```js
-let setThreeSimpleOriginSessionCookiesNonsequentially = async () => {
+async function setThreeSimpleOriginSessionCookiesNonsequentially() {
   await Promise.all([
     cookieStore.set('__Host-unordered🍪', '🔵unordered-cookie-value1🔴'),
     cookieStore.set('__Host-unordered🌟', '🌠unordered-cookie-value2🌠'),
@@ -484,38 +594,45 @@ let setThreeSimpleOriginSessionCookiesNonsequentially = async () => {
       JSON.stringify(actual)].join(''));
   }
   console.log('All verified!');
-};
+}
 ```
 </div>
 
-<dl dfn-type=method dfn-for="CookieStore">
-	: <dfn>set(name, value, options)</dfn>
-	::
-		Set cookie
+</div>
 
-		<pre class=argumentdef for="CookieStore/set(name, value, options)">
-			name: name
-		value: value
-		options: options
-		</pre>
-	: <dfn>set(options)</dfn>
-	::
-		Set cookie
+<div class=algorithm>
+The <dfn method for=CookieStore>set(|name|, |value|, |options|)</dfn> method, when invoked, must run these steps:
 
-		<pre class=argumentdef for="CookieStore/set(options)">
-			options: options
-		</pre>
+1. Let |origin| be |environment|’s [=/origin=].
+1. If |origin| is an [=opaque origin=], then return a new promise rejected with a "{{SecurityError}}" {{DOMException}}.
+1. Let |p| be a new promise.
+1. Run the following steps in parallel:
+    1. Let |r| be the result of running the steps to [=set a cookie=] with ... |name| ... |value| ... |options| ...
+    1. If |r| is failure, reject |p| with a new {{TypeError}}.
+    1. Resolve |p| with undefined.
+1. Return |p|.
 
-</dl>
+</div>
 
-<h4 id="CookieStore-methods-delete">
-{{CookieStore/delete(name, options)|delete}}</h4>
+<aside class=issue>
+Flesh out call to [=set a cookie=]
+</aside>
+
+<aside class=issue>
+Define other `set` overload.
+</aside>
+
+<!-- ============================================================ -->
+### {{CookieStore/delete(name, options)|delete}} ### {#CookieStore-delete}
+<!-- ============================================================ -->
+
+<div class=note>
 
 <dfn>Clearing</dfn> (deleting) a cookie is accomplished by expiration, that is by replacing it with an equivalent-scope cookie with
 an expiration in the past:
 
 ```js
-let setExpiredSecureCookieWithDomainPathAndFallbackValue = async () => {
+async function setExpiredSecureCookieWithDomainPathAndFallbackValue() {
   let theVeryRecentPast = Date.now();
   let expiredCookieSentinelValue = 'EXPIRED';
   await cookieStore.set('__Secure-COOKIENAME', expiredCookieSentinelValue, {
@@ -525,7 +642,7 @@ let setExpiredSecureCookieWithDomainPathAndFallbackValue = async () => {
       domain: 'example.org'
     });
   console.log('Expired! Deleted!! Cleared!!1!');
-};
+}
 ```
 
 In this case the cookie's value is not important unless a clock is somehow re-set incorrectly or otherwise behaves nonmonotonically or incoherently.
@@ -533,50 +650,60 @@ In this case the cookie's value is not important unless a clock is somehow re-se
 A syntactic shorthand is also provided which is equivalent to the above except that the clock's accuracy and monotonicity becomes irrelevant:
 
 ```js
-let deleteSimpleOriginCookie = async () => {
+async function deleteSimpleOriginCookie() {
   await cookieStore.delete('__Host-COOKIENAME');
   console.log('Expired! Deleted!! Cleared!!1!');
-};
+}
 ```
 
 Again, the path and/or domain can be specified explicitly here.
 
 ```js
-let deleteSecureCookieWithDomainAndPath = async () => {
+async function deleteSecureCookieWithDomainAndPath() {
   await cookieStore.delete('__Secure-COOKIENAME', {
       path: '/cgi-bin/',
       domain: 'example.org',
       secure: true
     });
   console.log('Expired! Deleted!! Cleared!!1!');
-};
+}
 ```
 
 This API has semantics aligned with the interpretation of `Max-Age=0` common to most modern browsers.
 
-<dl dfn-type=method dfn-for="CookieStore">
-	: <dfn>delete(name, options)</dfn>
-	::
-		Delete something
+</div>
 
-		<pre class=argumentdef for="CookieStore/delete(name, options)">
-			name: name
-			options: options
-		</pre>
-	: <dfn>delete(options)</dfn>
-	::
-		Delete something
 
-		<pre class=argumentdef for="CookieStore/delete(options)">
-			options: options
-		</pre>
-</dl>
+<div class=algorithm>
+The <dfn method for=CookieStore>delete(|name|, |options|)</dfn> method, when invoked, must run these steps:
 
-<h3 id="CookieStore-dictionaries">
-Dictionaries</h3>
+1. Let |origin| be |environment|’s [=/origin=].
+1. If |origin| is an [=opaque origin=], then return a new promise rejected with a "{{SecurityError}}" {{DOMException}}.
+1. Let |p| be a new promise.
+1. Run the following steps in parallel:
+    1. Let |r| be the result of running the steps to [=delete a cookie=] with ... |name| ... |value| ... |options| ...
+    1. If |r| is failure, reject |p| with a new {{TypeError}}.
+    1. Resolve |p| with undefined.
+1. Return |p|.
 
-<h4 dictionary lt="CookieStoreGetOptions">
-{{CookieStoreGetOptions}}</h4>
+</div>
+
+<aside class=issue>
+Flesh out call to [=delete a cookie=]
+</aside>
+
+<aside class=issue>
+Define other `delete` overload.
+</aside>
+
+
+<!-- ============================================================ -->
+## Dictionaries ## {#Dictionaries}
+<!-- ============================================================ -->
+
+<!-- ============================================================ -->
+### {{CookieStoreGetOptions}} ### {#CookieStoreGetOptions}
+<!-- ============================================================ -->
 
 <pre class="idl">
 enum CookieMatchType {
@@ -593,22 +720,20 @@ dictionary CookieStoreGetOptions {
 };
 </pre>
 
-<h5 id="dictionary-get-options-members">
-Dictionary {{CookieStoreGetOptions}} Members</h5>
-
 <dl dfn-type=dict-member dfn-for="CookieStoreGetOptions">
-	: <dfn>name</dfn>
-	:: name of cookie
+    : <dfn>name</dfn>
+    :: name of cookie
 
-	: <dfn>url</dfn>
-	:: some url
+    : <dfn>url</dfn>
+    :: some url
 
-	: <dfn>matchType</dfn>
-	:: how to match a cookie
+    : <dfn>matchType</dfn>
+    :: how to match a cookie
 </dl>
 
-<h4 dictionary lt="CookieStoreSetOptions">
-{{CookieStoreSetOptions}}</h4>
+<!-- ============================================================ -->
+### {{CookieStoreSetOptions}} ### {#CookieStoreSetOptions}
+<!-- ============================================================ -->
 
 <pre class="idl">
 dictionary CookieStoreSetOptions {
@@ -622,34 +747,32 @@ dictionary CookieStoreSetOptions {
 };
 </pre>
 
-<h5 id="dictionary-set-options-members">
-Dictionary {{CookieStoreSetOptions}} Members</h5>
-
 <dl dfn-type=dict-member dfn-for="CookieStoreSetOptions">
-	: <dfn>name</dfn>
-	:: name of cookie
+    : <dfn>name</dfn>
+    :: name of cookie
 
-	: <dfn>value</dfn>
-	:: value for cookie
+    : <dfn>value</dfn>
+    :: value for cookie
 
-	: <dfn>expires</dfn>
-	:: expiration
+    : <dfn>expires</dfn>
+    :: expiration
 
-	: <dfn>domain</dfn>
-	:: domain
+    : <dfn>domain</dfn>
+    :: domain
 
-	: <dfn>path</dfn>
-	:: path
+    : <dfn>path</dfn>
+    :: path
 
-	: <dfn>secure</dfn>
-	:: secure
+    : <dfn>secure</dfn>
+    :: secure
 
-	: <dfn>httpOnly</dfn>
-	:: http only
+    : <dfn>httpOnly</dfn>
+    :: http only
 </dl>
 
-<h4 dictionary lt="CookieItemList">
-{{CookieItemList}}</h4>
+<!-- ============================================================ -->
+### {{CookieListItem}} ### {#CookieListItem}
+<!-- ============================================================ -->
 
 <xmp class="idl">
 dictionary CookieListItem {
@@ -660,46 +783,45 @@ dictionary CookieListItem {
 typedef sequence<CookieListItem> CookieList;
 </xmp>
 
-<h5 id="dictionary-cookie-list-item-members">
-Dictionary {{CookieListItem}} Members</h5>
-
 <dl dfn-type=dict-member dfn-for="CookieListItem">
-	: <dfn>name</dfn>
-	:: name of cookie
+    : <dfn>name</dfn>
+    :: name of cookie
 
-	: <dfn>value</dfn>
-	:: value of cookie
+    : <dfn>value</dfn>
+    :: value of cookie
 </dl>
 
 
-<h4 id="CookieChangeEvent">
-The {{CookieChangeEvent}} Interface</h4>
+<!-- ============================================================ -->
+## Events ## {#Events}
+<!-- ============================================================ -->
+
+<!-- ============================================================ -->
+### {{CookieChangeEvent}} ### {#CookieChangeEvent}
+<!-- ============================================================ -->
 
 This is an {{Event}} object which is dispatched to {{CookieStore}}.
 
 <pre class="idl">
-[
-  Exposed=(ServiceWorker,Window),
-  Constructor(DOMString type, optional CookieChangeEventInit eventInitDict)
-] interface CookieChangeEvent : Event {
+[Exposed=(ServiceWorker,Window),
+ Constructor(DOMString type, optional CookieChangeEventInit eventInitDict)]
+interface CookieChangeEvent : Event {
   readonly attribute CookieList changed;
   readonly attribute CookieList deleted;
 };
 </pre>
 
-<h5 id="CookieChangeEvent-attributes">
-Attributes</h5>
-
 <dl dfn-type=attribute dfn-for="CookieChangeEvent">
-	: <dfn>changed</dfn>
-	:: changed
+    : <dfn>changed</dfn>
+    :: changed
 
-	: <dfn>deleted</dfn>
-	:: deleted cookies
+    : <dfn>deleted</dfn>
+    :: deleted cookies
 </dl>
 
-<h5 id="CookieChangeEventInit">
-{{CookieChangeEventInit}}</h5>
+<!-- ============================================================ -->
+#### {{CookieChangeEventInit}} #### {#CookieChangeEventInit}
+<!-- ============================================================ -->
 
 <pre class="idl">
 dictionary CookieChangeEventInit : EventInit {
@@ -708,84 +830,154 @@ dictionary CookieChangeEventInit : EventInit {
 };
 </pre>
 
-<h6 id="CookieChangeEventInit-members">
-{{CookieChangeEventInit}} Members
-</h5>
 <dl dfn-type=dict-member dfn-for="CookieChangeEventInit">
-	: <dfn>changed</dfn>
-	:: changed
+    : <dfn>changed</dfn>
+    :: changed
 
-	: <dfn>deleted</dfn>
-	:: deleted cookies
+    : <dfn>deleted</dfn>
+    :: deleted cookies
 </dl>
 
 
-<h2 id="ServiceWorkerGlobalScopeCookieStore">
-The ServiceWorkerGlobalScopeCookieStore Interface</h2>
+<!-- ============================================================ -->
+# The ServiceWorkerGlobalScope Interface # {#ServiceWorkerGlobalScope}
+<!-- ============================================================ -->
 
 <pre class="idl">
 partial interface ServiceWorkerGlobalScope {
-    [Replaceable, SameObject] readonly attribute CookieStore cookieStore;
+  [Replaceable, SameObject] readonly attribute CookieStore cookieStore;
 };
 </pre>
 
-<h3 id="ServiceWorkerCookieStore-attributes">
-Attributes</h3>
-<h4 id="ServiceWorkerCookieStore-attributes-cookiestore">
-{{ServiceWorkerGlobalScope/cookieStore}}</h4>
+<!-- ============================================================ -->
+## Attributes ## {#ServiceWorkerGlobalScope-attributes}
+<!-- ============================================================ -->
+
+<!-- ============================================================ -->
+### {{ServiceWorkerGlobalScope/cookieStore}} ### {#ServiceWorkerGlobalScope-cookieStore}
+<!-- ============================================================ -->
 
 <dl dfn-type=attribute dfn-for=ServiceWorkerGlobalScope>
-	: <dfn>cookieStore</dfn>
-	:: Cookie store a {{ServiceWorker}}
+    : <dfn>cookieStore</dfn>
+    :: Cookie store a {{ServiceWorker}}
 </dl>
 
 
-<h2 id="WindowCookieStore">
-The WindowCookieStore Interface</h2>
+<!-- ============================================================ -->
+# The Window Interface # {#Window}
+<!-- ============================================================ -->
 
 <pre class="idl">
 partial interface Window {
-    [Replaceable, SameObject] readonly attribute CookieStore cookieStore;
+  [Replaceable, SameObject] readonly attribute CookieStore cookieStore;
 };
 </pre>
 
-<h3 id="WindowCookieStore-attributes">
-Attributes</h3>
-<h4 id="WindowCookieStore-attributes-cookiestore">
-{{Window/cookieStore}}</h4>
+<!-- ============================================================ -->
+## Attributes ## {#Window-attributes}
+<!-- ============================================================ -->
+
+<!-- ============================================================ -->
+### {{Window/cookieStore}} ### {#Window-cookieStore}
+<!-- ============================================================ -->
 
 <dl dfn-type=attribute dfn-for=Window>
-	: <dfn>cookieStore</dfn>
-	:: Cookie store a {{Window}}
+    : <dfn>cookieStore</dfn>
+    :: Cookie store a {{Window}}
 </dl>
 
-<h2 id="Security">
-Security</h2>
+<!-- ============================================================ -->
+# Algorithms # {#algorithms}
+<!-- ============================================================ -->
+
+<!-- ============================================================ -->
+## Query Cookies ## {#query-cookies-algorithm}
+<!-- ============================================================ -->
+
+<div class=algorithm>
+
+<div class=issue>Specify the [=query cookies=] algorithm.</div>
+
+To <dfn>query cookies</dfn> with |name|, optional |url|, and |matchType|, run the following steps:
+
+1. If ..., return failure.
+1. ...
+1. ... |name| ... |url| ... |matchType| ...
+1. ...
+1. Let |list| be a new [=list=].
+1. ...
+1. ...
+1. ...
+1. ...
+1. Return |list|.
+
+</div>
+
+<!-- ============================================================ -->
+## Set A Cookie ## {#set-cookie-algorithm}
+<!-- ============================================================ -->
+
+<div class=algorithm>
+
+<aside class=issue>Specify the [=set a cookie=] algorithm.</aside>
+
+To <dfn>set a cookie</dfn> with |name| ..., run the following steps:
+
+1. If ..., return failure.
+1. ...
+1. ... |name|
+
+</div>
+
+<!-- ============================================================ -->
+## Delete A Cookie ## {#delete-cookie-algorithm}
+<!-- ============================================================ -->
+
+<div class=algorithm>
+
+<aside class=issue>Specify the [=delete a cookie=] algorithm.</aside>
+
+To <dfn>delete a cookie</dfn> with |name| ..., run the following steps:
+
+1. If ..., return failure.
+1. ...
+1. ... |name|
+
+</div>
+
+
+<!-- ============================================================ -->
+# Security # {#security}
+<!-- ============================================================ -->
+
 Other than cookie access from service worker contexts, this API is not intended to expose any new capabilities to the web.
 
-<h3 id="gotcha">
-Gotcha!</h3>
+<!-- ============================================================ -->
+## Gotcha! ## {#gotcha}
+<!-- ============================================================ -->
 
 Although browser cookie implementations are now evolving in the direction of better security and fewer surprising and error-prone defaults, there are at present few guarantees about cookie data security.
 
-	* unsecured origins can typically overwrite cookies used on secure origins
-	* superdomains can typically overwrite cookies seen by subdomains
-	* cross-site scripting attacts and other script and header injection attacks can be used to forge cookies too
-	* cookie read operations (both from script and on web servers) don't give any indication of where the cookie came from
-	* browsers sometimes truncate, transform or evict cookie data in surprising and counterintuitive ways
-		* ... due to reaching storage limits
-		* ... due to character encoding differences
-		* ... due to differing syntactic and semantic rules for cookies
+    * unsecured origins can typically overwrite cookies used on secure origins
+    * superdomains can typically overwrite cookies seen by subdomains
+    * cross-site scripting attacts and other script and header injection attacks can be used to forge cookies too
+    * cookie read operations (both from script and on web servers) don't give any indication of where the cookie came from
+    * browsers sometimes truncate, transform or evict cookie data in surprising and counterintuitive ways
+        * ... due to reaching storage limits
+        * ... due to character encoding differences
+        * ... due to differing syntactic and semantic rules for cookies
 
 For these reasons it is best to use caution when interpreting any cookie's value, and never execute a cookie's value as script, HTML, CSS, XML, PDF, or any other executable format.
 
-<h3 id="restrict">
-Restrict?</h3>
+<!-- ============================================================ -->
+## Restrict? ## {#restrict}
+<!-- ============================================================ -->
 
 This API may have the unintended side-effect of making cookies easier to use and consequently encouraging their further use. If it causes their further use in unsecured `http` contexts this could result in a web less safe for users. For that reason it may be desirable to restrict its use, or at least the use of the `set` and `delete` operations, to secure origins running in secure contexts.
 
-<h3 id="surprises">
-Surprises</h3>
+<!-- ============================================================ -->
+## Surprises ## {#surprises}
+<!-- ============================================================ -->
 
 Some existing cookie behavior (especially domain-rather-than-origin orientation, unsecured contexts being able to set cookies readable in secure contexts, and script being able to set cookies unreadable from script contexts) may be quite surprising from a web security standpoint.
 
@@ -793,25 +985,28 @@ Other surprises are documented in [Section 1 of HTTP State Management Mechanism 
 
 Further complicating this are historical differences in cookie-handling across major browsers, although some of those (e.g. port number handling) are now handled with more consistency than they once were.
 
-<h3 id="prefixes">
-Prefixes</h3>
+<!-- ============================================================ -->
+## Prefixes ## {#prefixes}
+<!-- ============================================================ -->
 
-Where feasible the examples use the `__Host-` and `__Secure-` name prefixes from [Cookie Prefixes](https://tools.ietf.org/html/draft-ietf-httpbis-cookie-prefixes-00) which causes some current browsers to disallow overwriting from unsecured contexts, disallow overwriting with no `Secure` flag, and -- in the case of `__Host-` -- disallow overwriting with an explicit `Domain` or non-'/' `Path` attribute (effectively enforcing same-origin semantics.) These prefixes provide important security benefits in those browsers implementing Secure Cookies and degrade gracefully (i.e. the special semantics may not be enforced in other cookie APIs but the cookies work normally and the async cookies API enforces the secure semantics for write operations) in other browsers. A major goal of this API is interoperation with existing cookies, though, so a few examples have also been provided using cookie names lacking these prefixes.
+Where feasible the examples use the `__Host-` and `__Secure-` name prefixes from [Cookie Prefixes](https://tools.ietf.org/html/draft-ietf-httpbis-cookie-prefixes-00) which causes some current browsers to disallow overwriting from unsecured contexts, disallow overwriting with no `Secure` flag, and &mdash; in the case of `__Host-` &mdash; disallow overwriting with an explicit `Domain` or non-'/' `Path` attribute (effectively enforcing same-origin semantics.) These prefixes provide important security benefits in those browsers implementing Secure Cookies and degrade gracefully (i.e. the special semantics may not be enforced in other cookie APIs but the cookies work normally and the async cookies API enforces the secure semantics for write operations) in other browsers. A major goal of this API is interoperation with existing cookies, though, so a few examples have also been provided using cookie names lacking these prefixes.
 
 Prefix rules are also enforced in write operations by this API, but may not be enforced in the same browser for other APIs. For this reason it is inadvisable to rely on their enforcement too heavily until and unless they are more broadly adopted.
 
-<h3 id="url-scoping">
-URL scoping</h3>
+<!-- ============================================================ -->
+## URL scoping ## {#url-scoping}
+<!-- ============================================================ -->
 
 Although a service worker script cannot directly access cookies today, it can already use controlled rendering of in-scope HTML and script resources to inject cookie-monitoring code under the remote control of the service worker script. This means that cookie access inside the scope of the service worker is technically possible already, it's just not very convenient.
 
 When the service worker is scoped more narrowly than `/` it may still be able to read path-scoped cookies from outside its scope's path space by successfully guessing/constructing a 404 page URL which allows IFRAME-ing and then running script inside it the same technique could expand to the whole origin, but a carefully constructed site (one where no out-of-scope pages are IFRAME-able) can actually deny this capability to a path-scoped service worker today and I was reluctant to remove that restriction without further discussion of the implications.
 
-<h3 id="aversion">
-Cookie aversion</h3>
+<!-- ============================================================ -->
+## Cookie aversion ## {#aversion}
+<!-- ============================================================ -->
 
 To reduce complexity for developers and eliminate the need for ephemeral test cookies, this async cookies API will explicitly reject attempts to write or delete cookies when the operation would be ignored. Likewise it will explicitly reject attempts to read cookies when that operation would ignore actual cookie data and simulate an empty cookie jar. Attempts to observe cookie changes in these contexts will still "work", but won't invoke the callback until and unless read access becomes allowed (due e.g. to changed site permissions.)
 
-Today writing to `document.cookie` in contexts where script-initiated cookie-writing is disallowed typically is a no-op. However, many cookie-writing scripts and frameworks always write a test cookie and then check for its existence to determine whether script-initiated cookie-writing is possible.
+Today writing to {{Document/cookie|document.cookie}} in contexts where script-initiated cookie-writing is disallowed typically is a no-op. However, many cookie-writing scripts and frameworks always write a test cookie and then check for its existence to determine whether script-initiated cookie-writing is possible.
 
-Likewise, today reading `document.cookie` in contexts where script-initiated cookie-reading is disallowed typically returns an empty string. However, a cooperating web server can verify that server-initiated cookie-writing and cookie-reading work and report this to the script (which still sees empty string) and the script can use this information to infer that script-initiated cookie-reading is disallowed.
+Likewise, today reading {{Document/cookie|document.cookie}} in contexts where script-initiated cookie-reading is disallowed typically returns an empty string. However, a cooperating web server can verify that server-initiated cookie-writing and cookie-reading work and report this to the script (which still sees empty string) and the script can use this information to infer that script-initiated cookie-reading is disallowed.
