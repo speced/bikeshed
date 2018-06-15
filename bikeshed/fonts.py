@@ -1,10 +1,16 @@
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 import io
 import re
 from itertools import *
-from . import config
-from .messages import *
+
+if __name__ == "__main__":
+	import bikeshed.config
+	from bikeshed.messages import *
+else:
+	from . import config
+	from .messages import *
 
 '''
 Explanation of the BSFONT font file format:
@@ -196,3 +202,15 @@ def writeOutputLines(outputFilename, inputFilename, lines):
                 f.write(''.join(lines))
     except Exception, e:
         die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)
+
+if __name__ == "__main__":
+    import argparse
+    argparser = argparse.ArgumentParser(description="Outputs text as giant ASCII art.")
+    argparser.add_argument("--font", dest="fontPath", default=config.scriptPath("bigblocks.bsfont"),
+                           help="What .bsfont file to use to render the text with.")
+    argparser.add_argument("text",
+                           help="Text to ASCII-ify.")
+    options = argparser.parse_args()
+    font = Font(options.fontPath)
+    for line in font.write(options.text):
+        print line,
