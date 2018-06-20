@@ -1317,13 +1317,10 @@ class ChildProduction(Production):
         return self.parent.parser
 
 
-class ReadOnlyAttribute(ChildProduction):   # "readonly" AttributeRest
+class MixinAttribute(ChildProduction):   # ReadOnly AttributeRest
     @classmethod
     def peek(cls, tokens):
-        tokens.pushPosition(False)
-        if (Symbol.peek(tokens, 'readonly')):
-            return tokens.popPosition(AttributeRest.peek(tokens))
-        return tokens.popPosition(False)
+        return AttributeRest.peek(tokens)
 
     def __init__(self, tokens, parent):
         ChildProduction.__init__(self, tokens, parent)

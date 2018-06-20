@@ -341,7 +341,7 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | Spe
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
-        return tokens.popPosition(Const.peek(tokens) or 
+        return tokens.popPosition(Const.peek(tokens) or
                                   Stringifier.peek(tokens) or StaticMember.peek(tokens) or
                                   Iterable.peek(tokens) or Maplike.peek(tokens) or
                                   Setlike.peek(tokens) or Attribute.peek(tokens) or
@@ -421,13 +421,13 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | Spe
         return output + repr(self.member) + ']'
 
 
-class MixinMember(Construct): # [ExtendedAttributes] Const | Operation | Stringifier | ReadOnlyAttribute
+class MixinMember(Construct): # [ExtendedAttributes] Const | Operation | Stringifier | ReadOnly AttributeRest
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
         return tokens.popPosition(Const.peek(tokens) or Stringifier.peek(tokens) or
-                                  ReadOnlyAttribute.peek(tokens) or Operation.peek(tokens))
+                                  MixinAttribute.peek(tokens) or Operation.peek(tokens))
 
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent)
@@ -435,8 +435,8 @@ class MixinMember(Construct): # [ExtendedAttributes] Const | Operation | Stringi
             self.member = Const(tokens, parent)
         elif (Stringifier.peek(tokens)):
             self.member = Stringifier(tokens, parent)
-        elif (ReadOnlyAttribute.peek(tokens)):
-            self.member = ReadOnlyAttribute(tokens, parent)
+        elif (MixinAttribute.peek(tokens)):
+            self.member = MixinAttribute(tokens, parent)
         else:
             self.member = Operation(tokens, parent)
         self._didParse(tokens)

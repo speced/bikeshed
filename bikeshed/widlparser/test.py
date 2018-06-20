@@ -296,6 +296,7 @@ interface Interface {
 interface mixin Mixin {
   const double constantMember = 10.0;
   readonly attribute long readOnlyAttributeMember;
+  attribute long attributeMember;
   DOMString? operationMember(long argument);
   stringifier;
 };
@@ -303,10 +304,6 @@ interface mixin Mixin {
 Interface includes Mixin;
 
 [NoInterfaceObject] Interface includes Mixin;
-
-interface mixin MixinCanNotIncludeAttribute {
-  attribute long attributeMember;
-};
 
 interface mixin MixinCanNotIncludeSpecialOperation {
   getter long (unsigned long argument);
