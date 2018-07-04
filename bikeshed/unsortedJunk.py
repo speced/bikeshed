@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import urllib
 from collections import defaultdict, namedtuple
 from functools import partial as curry
 
@@ -351,7 +352,7 @@ def fixIntraDocumentReferences(doc):
     ids = {el.get('id'):el for el in findAll("[id]", doc)}
     headingIDs = {el.get('id'):el for el in findAll("[id].heading", doc)}
     for el in findAll("a[href^='#']:not([href='#']):not(.self-link):not([data-link-type])", doc):
-        targetID = el.get("href")[1:]
+        targetID = urllib.unquote(el.get("href")[1:])
         if el.get('data-section') is not None and targetID not in headingIDs:
             die("Couldn't find target document section {0}:\n{1}", targetID, outerHTML(el), el=el)
             continue
