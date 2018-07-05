@@ -489,7 +489,7 @@ def addPropertyIndex(doc):
             *[E.td(prop.get(column,"")) for column in columns[1:]])
     if len(props):
         # Set up the initial table columns for properties
-        columns = ["Name", "Value", "Initial", "Applies to", "Inherited", "Percentages", "Media"]
+        columns = ["Name", "Value", "Initial", "Applies to", "Inherited", "Percentages"]
         # Add any additional keys used in the document.
         allKeys = set()
         for prop in props:
