@@ -229,7 +229,7 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
     elif "shorthand" in firstLine:
         attrs["Name"] = None
         attrs["Value"] = None
-        for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Media", "Computed value", "Animation type"]:
+        for defaultKey in ["Initial", "Applies to", "Inherited", "Percentages", "Computed value", "Animation type"]:
             attrs[defaultKey] = "see individual properties"
         attrs["Canonical order"] = "per grammar"
         ret = ["<table class='def propdef'{forHint}{lineNumAttr}>".format(forHint=forHint, lineNumAttr=lineNumAttr)]
@@ -240,7 +240,6 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
         attrs["Applies to"] = "all elements"
         attrs["Inherited"] = None
         attrs["Percentages"] = "n/a"
-        attrs["Media"] = "visual"
         attrs["Computed value"] = "as specified"
         attrs["Canonical order"] = "per grammar"
         attrs["Animation type"] = "discrete"
