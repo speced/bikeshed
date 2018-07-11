@@ -221,9 +221,9 @@ class MetadataManager:
         # Fills up a set of text macros based on metadata.
         if self.title:
             macros["title"] = self.title
-            macros["spectitle"] = self.title
+            macros["h1"] = self.title
         if self.h1:
-            macros["spectitle"] = self.h1
+            macros["h1"] = self.h1
         macros["shortname"] = self.displayShortname
         if self.statusText:
             macros["statustext"] = "\n".join(markdown.parse(self.statusText, self.indent))
