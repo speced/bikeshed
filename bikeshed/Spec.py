@@ -533,7 +533,7 @@ dfn > a.self-link::before      { content: "#"; }'''
 
 styleCounters = '''
 body {
-    counter-reset: example figure issue;
+    counter-reset: example figure issue table;
 }
 .issue {
     counter-increment: issue;
@@ -558,4 +558,17 @@ figcaption {
 }
 figcaption:not(.no-marker)::before {
     content: "Figure " counter(figure) " ";
-}'''
+}
+
+figure.table {
+    counter-increment: table;
+}
+figure.table figcaption {
+    counter-increment: none;
+}
+figure.table figcaption:not(.no-marker)::before {
+    content: "Table " counter(table) " ";
+}
+'''
+
+# For some reason, doing the counter-increment on `figure.table figcaption` like with figures does not seem to work for tables...
