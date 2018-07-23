@@ -18,6 +18,7 @@ from . import headings
 from . import highlight
 from . import HTMLSerializer
 from . import idl
+from . import includes
 from . import inlineTags
 from . import lint
 from . import markdown
@@ -149,7 +150,7 @@ class Spec(object):
         self.head = find("head", self)
         self.body = find("body", self)
         correctH1(self)
-        processInclusions(self)
+        includes.processInclusions(self)
         metadata.parseDoc(self)
         return self
 
