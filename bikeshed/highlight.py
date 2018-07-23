@@ -69,11 +69,7 @@ def determineHighlightLang(doc, el):
     else:
         # Highlight-by-default, if applicable.
         if el.tag in ["pre", "xmp"] and hasClass(el, "idl"):
-            if isNormative(el, doc):
-                # Normative IDL gets 'highlighted' by the IDL parser.
-                return False
-            else:
-                return "webidl"
+            return "webidl"
         else:
             return doc.md.defaultHighlight
 
@@ -140,30 +136,80 @@ def highlightEl(el, lang):
 
 def highlightWithWebIDL(text, el):
     from .widlparser.widlparser import parser
+    '''
+    Trick the widlparser emitter,
+    which wants to output HTML via wrapping with start/end tags,
+    into instead outputting a stack-based text format.
+    A \1 indicates a new stack push;
+    the text between the \1 and the \2 is the attr to be pushed.
+    A \3 indicates a stack pop.
+    All other text is colored with the attr currently on top of the stack.
+    '''
     class IDLUI(object):
         def warn(self, msg):
             die("{0}", msg.rstrip())
     class HighlightMarker(object):
         # Just applies highlighting classes to IDL stuff.
         def markupTypeName(self, text, construct):
-            return ('<span class=n>', '</span>')
+            return ('\1n\2', '\3')
         def markupName(self, text, construct):
-            return ('<span class=nv>', '</span>')
+            return ('\1g\2', '\3')
         def markupKeyword(self, text, construct):
-            return ('<span class=kt>', '</span>')
+            return ('\1b\2', '\3')
         def markupEnumValue(self, text, construct):
-            return ('<span class=s>', '</span>')
+            return ('\1s\2', '\3')
+
+    if "\1" in text or "\2" in text or "\3" in text:
+        die("WebIDL text contains some U+0001-0003 characters, which are used by the highlighter. This block can't be highlighted. :(", el=el)
+        return
 
     widl = parser.Parser(text, IDLUI())
-    nested = parseHTML(unicode(widl.markup(HighlightMarker())))
-    coloredText = collections.deque()
-    for n in childNodes(flattenHighlighting(nested)):
-        if isElement(n):
-            coloredText.append(ColoredText(textContent(n), n.get('class')))
-        else:
-            coloredText.append(ColoredText(n, None))
-    return coloredText
+    return coloredTextFromWidlStack(unicode(widl.markup(HighlightMarker())))
 
+def coloredTextFromWidlStack(widlText):
+    coloredTexts = collections.deque()
+    colors = []
+    currentText = ""
+    mode = "text"
+    for char in widlText:
+        if mode == "text":
+            if char == "\1":
+                if colors:
+                    coloredTexts.append(ColoredText(currentText, colors[-1]))
+                else:
+                    coloredTexts.append(ColoredText(currentText, None))
+                currentText = ""
+                mode = "color"
+                continue
+            elif char == "\2":
+                assert False, r"Encountered a \2 while in text mode"
+                continue
+            elif char == "\3":
+                assert colors, r"Encountered a \3 without any colors on stack."
+                coloredTexts.append(ColoredText(currentText, colors.pop()))
+                currentText = ""
+                continue
+            else:
+                currentText += char
+        elif mode == "color":
+            if char == "\1":
+                assert False, r"Encountered a \1 while in color mode."
+                continue
+            elif char == "\2":
+                colors.append(currentText)
+                currentText = ""
+                mode = "text"
+                continue
+            elif char == "\3":
+                assert False, r"Encountered a \3 while in color mode."
+                continue
+            else:
+                currentText += char
+                continue
+    assert len(colors) == 0, r"Colors stack wasn't empty at end, \1 and \3s aren't balanced?"
+    if currentText:
+        coloredTexts.append(ColoredText(currentText, None))
+    return coloredTexts
 
 def highlightWithPygments(text, lang, el):
     import pygments
@@ -185,7 +231,7 @@ def mergeHighlighting(el, coloredText):
     # the markup structure is a flat list of sibling elements containing raw text
     # (and maybe some un-highlighted raw text between them).
     def createEl(color, text):
-        return E.span({"class":color}, text)
+        return createElement("c-", {color:""}, text)
 
     def colorizeEl(el, coloredText):
         for node in childNodes(el, clear=True):
@@ -218,30 +264,6 @@ def mergeHighlighting(el, coloredText):
         return nodes
     colorizeEl(el, coloredText)
 
-def flattenHighlighting(el):
-    # Given a highlighted chunk of markup that is "nested",
-    # flattens it into a sequence of text and els with just text,
-    # by merging classes upward.
-    container = E.div()
-    for node in childNodes(el):
-        if not isElement(node):
-            # raw text
-            appendChild(container, node)
-        elif not hasChildElements(node):
-            # el with just text
-            appendChild(container, node)
-        else:
-            # el with internal structure
-            overclass = el.get("class", '') if isElement(el) else ""
-            flattened = flattenHighlighting(node)
-            for subnode in childNodes(flattened):
-                if isElement(subnode):
-                    addClass(subnode, overclass)
-                    appendChild(container, subnode)
-                else:
-                    appendChild(container, E.span({"class":overclass},subnode))
-    return container
-
 def coloredTextFromRawTokens(text):
     colorFromName = {
         "Token.Comment": "c",
@@ -250,20 +272,20 @@ def coloredTextFromRawTokens(text):
         "Token.Name": "n",
         "Token.Operator": "o",
         "Token.Punctuation": "p",
-        "Token.Comment.Multiline": "cm",
+        "Token.Comment.Multiline": "d",
         "Token.Comment.Preproc": "cp",
         "Token.Comment.Single": "c1",
         "Token.Comment.Special": "cs",
         "Token.Keyword.Constant": "kc",
-        "Token.Keyword.Declaration": "kd",
+        "Token.Keyword.Declaration": "a",
         "Token.Keyword.Namespace": "kn",
         "Token.Keyword.Pseudo": "kp",
         "Token.Keyword.Reserved": "kr",
-        "Token.Keyword.Type": "kt",
+        "Token.Keyword.Type": "b",
         "Token.Literal.Date": "ld",
         "Token.Literal.Number": "m",
         "Token.Literal.String": "s",
-        "Token.Name.Attribute": "na",
+        "Token.Name.Attribute": "e",
         "Token.Name.Class": "nc",
         "Token.Name.Constant": "no",
         "Token.Name.Decorator": "nd",
@@ -273,8 +295,8 @@ def coloredTextFromRawTokens(text):
         "Token.Name.Label": "nl",
         "Token.Name.Namespace": "nn",
         "Token.Name.Property": "py",
-        "Token.Name.Tag": "nt",
-        "Token.Name.Variable": "nv",
+        "Token.Name.Tag": "f",
+        "Token.Name.Variable": "g",
         "Token.Operator.Word": "ow",
         "Token.Literal.Number.Bin": "mb",
         "Token.Literal.Number.Float": "mf",
@@ -284,13 +306,13 @@ def coloredTextFromRawTokens(text):
         "Token.Literal.String.Backtick": "sb",
         "Token.Literal.String.Char": "sc",
         "Token.Literal.String.Doc": "sd",
-        "Token.Literal.String.Double": "s2",
+        "Token.Literal.String.Double": "u",
         "Token.Literal.String.Escape": "se",
         "Token.Literal.String.Heredoc": "sh",
         "Token.Literal.String.Interpol": "si",
         "Token.Literal.String.Other": "sx",
         "Token.Literal.String.Regex": "sr",
-        "Token.Literal.String.Single": "s1",
+        "Token.Literal.String.Single": "t",
         "Token.Literal.String.Symbol": "ss",
         "Token.Name.Variable.Class": "vc",
         "Token.Name.Variable.Global": "vg",
@@ -441,58 +463,58 @@ def getHighlightStyles():
 .highlight:not(.idl) { background: hsl(24, 20%, 95%); }
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
-.highlight .c { color: #708090 } /* Comment */
-.highlight .k { color: #990055 } /* Keyword */
-.highlight .l { color: #000000 } /* Literal */
-.highlight .n { color: #0077aa } /* Name */
-.highlight .o { color: #999999 } /* Operator */
-.highlight .p { color: #999999 } /* Punctuation */
-.highlight .cm { color: #708090 } /* Comment.Multiline */
-.highlight .cp { color: #708090 } /* Comment.Preproc */
-.highlight .c1 { color: #708090 } /* Comment.Single */
-.highlight .cs { color: #708090 } /* Comment.Special */
-.highlight .kc { color: #990055 } /* Keyword.Constant */
-.highlight .kd { color: #990055 } /* Keyword.Declaration */
-.highlight .kn { color: #990055 } /* Keyword.Namespace */
-.highlight .kp { color: #990055 } /* Keyword.Pseudo */
-.highlight .kr { color: #990055 } /* Keyword.Reserved */
-.highlight .kt { color: #990055 } /* Keyword.Type */
-.highlight .ld { color: #000000 } /* Literal.Date */
-.highlight .m { color: #000000 } /* Literal.Number */
-.highlight .s { color: #a67f59 } /* Literal.String */
-.highlight .na { color: #0077aa } /* Name.Attribute */
-.highlight .nc { color: #0077aa } /* Name.Class */
-.highlight .no { color: #0077aa } /* Name.Constant */
-.highlight .nd { color: #0077aa } /* Name.Decorator */
-.highlight .ni { color: #0077aa } /* Name.Entity */
-.highlight .ne { color: #0077aa } /* Name.Exception */
-.highlight .nf { color: #0077aa } /* Name.Function */
-.highlight .nl { color: #0077aa } /* Name.Label */
-.highlight .nn { color: #0077aa } /* Name.Namespace */
-.highlight .py { color: #0077aa } /* Name.Property */
-.highlight .nt { color: #669900 } /* Name.Tag */
-.highlight .nv { color: #222222 } /* Name.Variable */
-.highlight .ow { color: #999999 } /* Operator.Word */
-.highlight .mb { color: #000000 } /* Literal.Number.Bin */
-.highlight .mf { color: #000000 } /* Literal.Number.Float */
-.highlight .mh { color: #000000 } /* Literal.Number.Hex */
-.highlight .mi { color: #000000 } /* Literal.Number.Integer */
-.highlight .mo { color: #000000 } /* Literal.Number.Oct */
-.highlight .sb { color: #a67f59 } /* Literal.String.Backtick */
-.highlight .sc { color: #a67f59 } /* Literal.String.Char */
-.highlight .sd { color: #a67f59 } /* Literal.String.Doc */
-.highlight .s2 { color: #a67f59 } /* Literal.String.Double */
-.highlight .se { color: #a67f59 } /* Literal.String.Escape */
-.highlight .sh { color: #a67f59 } /* Literal.String.Heredoc */
-.highlight .si { color: #a67f59 } /* Literal.String.Interpol */
-.highlight .sx { color: #a67f59 } /* Literal.String.Other */
-.highlight .sr { color: #a67f59 } /* Literal.String.Regex */
-.highlight .s1 { color: #a67f59 } /* Literal.String.Single */
-.highlight .ss { color: #a67f59 } /* Literal.String.Symbol */
-.highlight .vc { color: #0077aa } /* Name.Variable.Class */
-.highlight .vg { color: #0077aa } /* Name.Variable.Global */
-.highlight .vi { color: #0077aa } /* Name.Variable.Instance */
-.highlight .il { color: #000000 } /* Literal.Number.Integer.Long */
+c-[a] { color: #990055 } /* Keyword.Declaration */
+c-[b] { color: #990055 } /* Keyword.Type */
+c-[c] { color: #708090 } /* Comment */
+c-[d] { color: #708090 } /* Comment.Multiline */
+c-[e] { color: #0077aa } /* Name.Attribute */
+c-[f] { color: #669900 } /* Name.Tag */
+c-[g] { color: #222222 } /* Name.Variable */
+c-[k] { color: #990055 } /* Keyword */
+c-[l] { color: #000000 } /* Literal */
+c-[m] { color: #000000 } /* Literal.Number */
+c-[n] { color: #0077aa } /* Name */
+c-[o] { color: #999999 } /* Operator */
+c-[p] { color: #999999 } /* Punctuation */
+c-[s] { color: #a67f59 } /* Literal.String */
+c-[t] { color: #a67f59 } /* Literal.String.Single */
+c-[u] { color: #a67f59 } /* Literal.String.Double */
+c-[cp] { color: #708090 } /* Comment.Preproc */
+c-[c1] { color: #708090 } /* Comment.Single */
+c-[cs] { color: #708090 } /* Comment.Special */
+c-[kc] { color: #990055 } /* Keyword.Constant */
+c-[kn] { color: #990055 } /* Keyword.Namespace */
+c-[kp] { color: #990055 } /* Keyword.Pseudo */
+c-[kr] { color: #990055 } /* Keyword.Reserved */
+c-[ld] { color: #000000 } /* Literal.Date */
+c-[nc] { color: #0077aa } /* Name.Class */
+c-[no] { color: #0077aa } /* Name.Constant */
+c-[nd] { color: #0077aa } /* Name.Decorator */
+c-[ni] { color: #0077aa } /* Name.Entity */
+c-[ne] { color: #0077aa } /* Name.Exception */
+c-[nf] { color: #0077aa } /* Name.Function */
+c-[nl] { color: #0077aa } /* Name.Label */
+c-[nn] { color: #0077aa } /* Name.Namespace */
+c-[py] { color: #0077aa } /* Name.Property */
+c-[ow] { color: #999999 } /* Operator.Word */
+c-[mb] { color: #000000 } /* Literal.Number.Bin */
+c-[mf] { color: #000000 } /* Literal.Number.Float */
+c-[mh] { color: #000000 } /* Literal.Number.Hex */
+c-[mi] { color: #000000 } /* Literal.Number.Integer */
+c-[mo] { color: #000000 } /* Literal.Number.Oct */
+c-[sb] { color: #a67f59 } /* Literal.String.Backtick */
+c-[sc] { color: #a67f59 } /* Literal.String.Char */
+c-[sd] { color: #a67f59 } /* Literal.String.Doc */
+c-[se] { color: #a67f59 } /* Literal.String.Escape */
+c-[sh] { color: #a67f59 } /* Literal.String.Heredoc */
+c-[si] { color: #a67f59 } /* Literal.String.Interpol */
+c-[sx] { color: #a67f59 } /* Literal.String.Other */
+c-[sr] { color: #a67f59 } /* Literal.String.Regex */
+c-[ss] { color: #a67f59 } /* Literal.String.Symbol */
+c-[vc] { color: #0077aa } /* Name.Variable.Class */
+c-[vg] { color: #0077aa } /* Name.Variable.Global */
+c-[vi] { color: #0077aa } /* Name.Variable.Instance */
+c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
 '''
 
 def getLineNumberStyles():

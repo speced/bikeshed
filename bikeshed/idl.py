@@ -64,16 +64,16 @@ class IDLMarker(object):
         return (None, None)
 
     def markupPrimitiveType(self, text, construct):
-        return ("<a class=n data-link-type=interface>", "</a>")
+        return ("<a data-link-type=interface>", "</a>")
 
     def markupStringType(self, text, construct):
-        return ("<a class=n data-link-type=interface>", "</a>")
+        return ("<a data-link-type=interface>", "</a>")
 
     def markupBufferType(self, text, construct):
-        return ("<a class=n data-link-type=interface>", "</a>")
+        return ("<a data-link-type=interface>", "</a>")
 
     def markupObjectType(self, text, construct):
-        return ("<a class=n data-link-type=interface>", "</a>")
+        return ("<a data-link-type=interface>", "</a>")
 
     def markupTypeName(self, text, construct):
         # Fires for non-defining type names, such as arg types.
@@ -81,7 +81,7 @@ class IDLMarker(object):
         # The names in [Exposed=Foo] are [Global] tokens, not interface names.
         # Since I don't track globals as a link target yet, don't link them at all.
         if construct.idlType == "extended-attribute" and construct.name == "Exposed":
-            return ("<span class=n>", "</span>")
+            return (None, None)
 
         # The name in [PutForwards=foo] is an attribute of the same interface.
         if construct.idlType == "extended-attribute" and construct.name == "PutForwards":
@@ -95,17 +95,17 @@ class IDLMarker(object):
             typeName = str(type).strip()
             if typeName.endswith("?"):
                 typeName = typeName[:-1]
-            return ('<a class=n data-link-type=attribute data-link-for="{0}">'.format(typeName), '</a>')
+            return ('<a data-link-type=attribute data-link-for="{0}">'.format(typeName), '</a>')
 
         # LegacyWindowAlias defines additional names for the construct,
         # so all the names should be forced <dfn>s, just like the interface name itself.
         if construct.idlType == "extended-attribute" and construct.name == "LegacyWindowAlias":
-            return ('<idl class=nv data-idl-type=interface data-lt="{0}">'.format(text), '</idl>')
+            return ('<idl data-idl-type=interface data-lt="{0}">'.format(text), '</idl>')
 
         if construct.idlType == "constructor":
             # This shows up for the method name in a [NamedConstructor] extended attribute.
             # The "NamedConstructor" Name already got markup up, so ignore this one.
-            return ("<span class=n>", "</span>")
+            return (None, None)
 
         return ('<a class=n data-link-type="idl-name">', '</a>')
 
@@ -117,16 +117,16 @@ class IDLMarker(object):
         if text == "stringifier":
             if construct.name is None:
                 # If no name was defined, you're required to define stringification behavior.
-                return ("<a class=kt dfn for='{0}' data-lt='stringification behavior'>".format(construct.parent.fullName), "</a>")
+                return ("<a dfn for='{0}' data-lt='stringification behavior'>".format(construct.parent.fullName), "</a>")
             else:
                 # Otherwise, you *can* point to/dfn stringification behavior if you want.
-                return ("<idl class=kt data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
-        return ("<span class=kt>", "</span>")
+                return ("<idl data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
+        return (None, None)
 
     def markupName(self, text, construct):
         # Fires for defining names: method names, arg names, interface names, etc.
         if construct.idlType not in config.idlTypes:
-            return ("<span class=nv>", "</span>")
+            return (None, None)
 
         idlType = construct.idlType
         extraParameters = ''
@@ -171,10 +171,10 @@ class IDLMarker(object):
                 idlFor = "data-idl-for='{0}'".format(construct.parent.fullName)
         else:
             idlFor = ""
-        return ('<{name} class=nv data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters, name=elementName, refType=refType), '</{0}>'.format(elementName))
+        return ('<{name} data-lt="{0}" data-{refType}-type="{1}" {2} {3}>'.format(idlTitle, idlType, idlFor, extraParameters, name=elementName, refType=refType), '</{0}>'.format(elementName))
 
     def markupEnumValue(self, text, construct):
-        return ("<idl class=s data-idl-type=enum-value data-idl-for='{0}' data-lt='{1}'>".format(escapeAttr(construct.name), escapeAttr(text)), "</idl>")
+        return ("<idl data-idl-type=enum-value data-idl-for='{0}' data-lt='{1}'>".format(escapeAttr(construct.name), escapeAttr(text)), "</idl>")
 
     def encode(self, text):
         return escapeHTML(text)
