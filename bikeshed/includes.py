@@ -1,13 +1,17 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 
+import hashlib
 import itertools
+import io
 
+from . import config
+from . import datablocks
+from . import markdown
 from .htmlhelpers import *
 from .messages import *
 
 def processInclusions(doc):
-    import hashlib
     iters = 0
     while True:
         iters += 1
@@ -25,7 +29,6 @@ def processInclusions(doc):
                     break
                 k,_,v = m.partition(" ")
                 macros[k.lower()] = v
-            print outerHTML(el)
             if el.get("path"):
                 path = el.get("path")
                 try:
@@ -62,7 +65,6 @@ def processInclusions(doc):
                 for childInclude in findAll("pre.include", E.div({}, *subtree)):
                     childInclude.set("hash", hash)
                     childInclude.set("depth", str(depth + 1))
-                print "".join(outerHTML(x) for x in subtree)
                 replaceNode(el, *subtree)
             else:
                 die("Whoops, an include-block didn't get parsed correctly, so I can't include anything.")
