@@ -6,12 +6,12 @@ TR: https://www.w3.org/TR/service-workers/
 Shortname: service-workers
 Level:
 Editor: Alex Russell, Google, slightlyoff@chromium.org
-Editor: Jungkee Song, Samsung Electronics, jungkee.song@samsung.com
+Editor: Jungkee Song, Microsoft&sbquo; represented Samsung until April 2018, jungkee.song@microsoft.com
 Editor: Jake Archibald, Google, jakearchibald@chromium.org
 Editor: Marijn Kruisselbrink, Google, mek@chromium.org
 Repository: w3c/ServiceWorker
 Group: serviceworkers
-!Tests: <a href=https://github.com/w3c/web-platform-tests/tree/master/service-workers>web-platform-tests service-workers/</a> (<a href=https://github.com/w3c/web-platform-tests/labels/service-workers>ongoing work</a>)
+!Tests: <a href=https://github.com/web-platform-tests/wpt/tree/master/service-workers>web-platform-tests service-workers/</a> (<a href=https://github.com/web-platform-tests/wpt/labels/service-workers>ongoing work</a>)
 Status Text: This is a living document. Readers need to be aware that this specification may include unimplemented features, and details that may change. <a href="https://w3c.github.io/ServiceWorker/v1/">Service Workers 1</a> is a version that is advancing toward a W3C Recommendation.
 Abstract: This specification describes a method that enables applications to take advantage of persistent background processing, including hooks to enable bootstrapping of web applications while offline.
 Abstract:
@@ -151,8 +151,6 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
 
     A [=/service worker=] has an associated <dfn export id="dfn-service-worker-global-object" for="service worker">global object</dfn> (a {{ServiceWorkerGlobalScope}} object or null).
 
-    A [=/service worker=] has <dfn export id="dfn-lifecycle-events">lifecycle events</dfn>, {{install!!event}} and {{activate!!event}}, and <dfn export id="dfn-functional-events">functional events</dfn> including {{fetch!!event}}, which target the {{ServiceWorkerGlobalScope}}.
-
     A [=/service worker=] has an associated <dfn export id="dfn-script-resource">script resource</dfn> (a <a>script</a>), which represents its own script resource. It is initially set to null.
 
     A <a>script resource</a> has an associated <dfn export for="script resource" id="dfn-has-ever-been-evaluated-flag">has ever been evaluated flag</dfn>. It is initially unset.
@@ -180,6 +178,12 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
 
         * Has no event to handle.
         * Detects abnormal operation: such as infinite loops and tasks exceeding imposed time limits (if any) while handling the events.
+    </section>
+
+    <section>
+      <h4 id="service-worker-events">Events</h4>
+
+      Service Workers specification defines <dfn export id="dfn-lifecycle-events">lifecycle events</dfn> (each of which is an [=event=]), {{install!!event}} and {{activate!!event}}. Service Workers and other specifications that <a href="#extensibility">extend</a> Service Workers define set of events called <dfn export id="dfn-functional-events">functional events</dfn> (each of which is an [=event=]) including {{fetch!!event}}. (See the <a href="#execution-context-events">list</a> of [=lifecycle events=] and [=functional events=].)
     </section>
   </section>
 
@@ -221,6 +225,13 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
     <h3 id="service-worker-client-concept">Service Worker Client</h3>
 
     A <dfn export id="dfn-service-worker-client" for="">service worker client</dfn> is an [=environment=].
+
+    A [=/service worker client=] has an associated <dfn export>discarded flag</dfn>. It is initially unset.
+
+    Each [=/service worker client=] has the following [=environment discarding steps=]:
+        1. Set |client|'s [=discarded flag=].
+
+    Note: Implementations can discard clients whose [=discarded flag=] is set.
 
     A [=/service worker client=] has an algorithm defined as the <dfn export for="service worker client">origin</dfn> that returns the [=/service worker client=]'s [=environment settings object/origin=] if the [=/service worker client=] is an [=environment settings object=], and the [=/service worker client=]'s <a>creation URL</a>'s [=url/origin=] otherwise.
 
@@ -1147,28 +1158,9 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
         1. Let |promise| be a new <a>promise</a>.
         1. Run these substeps <a>in parallel</a>:
             1. For each [=/service worker client=] |client| whose [=service worker client/origin=] is the <a lt="same origin">same</a> as the associated [=ServiceWorkerGlobalScope/service worker=]'s [=environment settings object/origin=]:
-                1. If |client|'s [=environment/id=] is not |id|, continue to the next iteration of the loop.
-                1. If |client| is an [=environment settings object=], then:
-                    1. If |client| is not a <a>secure context</a>, reject |promise| with a "{{SecurityError}}" {{DOMException}} and abort these steps.
-                1. Else:
-                    1. If |client|’s <a>creation URL</a> is not a <a>potentially trustworthy URL</a>, reject |promise| with a "{{SecurityError}}" {{DOMException}} and abort these steps.
-                1. If |client| is an [=environment settings object=] and is not a [=window client=], then:
-                    1. Let |clientObject| be the result of running <a>Create Client</a> algorithm with |client| as the argument.
-                    1. Resolve |promise| with |clientObject| and abort these steps.
-                1. Else:
-                    1. Let |browsingContext| be null.
-                    1. Let |visibilityState| be null.
-                    1. Let |focusState| be false.
-                    1. Let |ancestorOriginsList| be the empty list.
-                    1. If |client| is an [=environment settings object=], set |browsingContext| to |client|'s [=environment settings object/global object=]'s [=/browsing context=].
-                    1. Else, set |browsingContext| to |client|’s [=environment/target browsing context=].
-                    1. <a>Queue a task</a> |task| to run the following substeps on |browsingContext|'s <a>event loop</a> using the <a>user interaction task source</a>:
-                        1. Set |visibilityState| to |browsingContext|'s <a>active document</a>'s {{Document/visibilityState}} attribute value.
-                        1. Set |focusState| to the result of running the <a>has focus steps</a> with |browsingContext|'s <a>active document</a> as the argument.
-                        1. If |client| is a <a>window client</a>, set |ancestorOriginsList| to |browsingContext|'s <a>active document</a>'s <a>relevant global object</a>'s {{Location}} object's [=Location/ancestor origins list=]'s associated list.
-                    1. Wait for |task| to have executed.
-                    1. Let |windowClient| be the result of running <a>Create Window Client</a> algorithm with |client|, |visibilityState|, |focusState|, and |ancestorOriginsList| as the arguments.
-                    1. Resolve |promise| with |windowClient| and abort these steps.
+                1. If |client|'s [=environment/id=] is not |id|, [=continue=].
+                1. Wait for either |client|'s [=environment/execution ready flag=] to be set or for |client|'s [=discarded flag=] to be set.
+                1. If |client|'s [=environment/execution ready flag=] is set, then invoke [=Resolve Get Client Promise=] with |client| and |promise|, and abort these steps.
             1. Resolve |promise| with undefined.
         1. Return |promise|.
     </section>
@@ -1359,7 +1351,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
     <pre class="idl" id="fetch-event-init-dictionary">
       dictionary FetchEventInit : ExtendableEventInit {
         required Request request;
-        required Promise&lt;any&gt; preloadResponse;
+        Promise&lt;any&gt; preloadResponse;
         DOMString clientId = "";
         DOMString resultingClientId = "";
         DOMString targetClientId = "";
@@ -1383,7 +1375,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
     <section>
       <h4 id="fetch-event-preloadresponse">{{FetchEvent/preloadResponse|event.preloadResponse}}</h4>
 
-      <dfn attribute for="FetchEvent"><code>preloadResponse</code></dfn> attribute *must* return the value it was initialized to.
+      <dfn attribute for="FetchEvent"><code>preloadResponse</code></dfn> attribute *must* return the value it was initialized to. When an <a>event</a> is created the attribute *must* be initialized to [=a promise resolved with=] undefined.
     </section>
 
     <section>
@@ -1541,6 +1533,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
         <tr>
           <th>Event name</th>
           <th>Interface</th>
+          <th>Category</th>
           <th>Dispatched when&mldr;</th>
         </tr>
       </thead>
@@ -1548,26 +1541,67 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
         <tr>
           <td><dfn event id="service-worker-global-scope-install-event"><code>install</code></dfn></td>
           <td>{{ExtendableEvent}}</td>
-          <td>[<a>Lifecycle event</a>] The [=ServiceWorkerGlobalScope/service worker=]'s <a>containing service worker registration</a>'s <a>installing worker</a> changes. (See step 11.2 of the <a>Install</a> algorithm.)</td>
+          <td>[=Lifecycle Event|Lifecycle=]</td>
+          <td>The [=ServiceWorkerGlobalScope/service worker=]'s <a>containing service worker registration</a>'s <a>installing worker</a> changes. (See step 11.2 of the <a>Install</a> algorithm.)</td>
         </tr>
         <tr>
           <td><dfn event id="service-worker-global-scope-activate-event"><code>activate</code></dfn></td>
           <td>{{ExtendableEvent}}</td>
-          <td>[<a>Lifecycle event</a>] The [=ServiceWorkerGlobalScope/service worker=]'s <a>containing service worker registration</a>'s <a>active worker</a> changes. (See step 12.2 of the <a>Activate</a> algorithm.)</td>
+          <td>[=Lifecycle Event|Lifecycle=]</td>
+          <td>The [=ServiceWorkerGlobalScope/service worker=]'s <a>containing service worker registration</a>'s <a>active worker</a> changes. (See step 12.2 of the <a>Activate</a> algorithm.)</td>
         </tr>
         <tr>
           <td><dfn event id="service-worker-global-scope-fetch-event"><code>fetch</code></dfn></td>
           <td>{{FetchEvent}}</td>
-          <td>[<a>Functional event</a>] The [=/http fetch=] invokes <a>Handle Fetch</a> with |request|. As a result of performing <a>Handle Fetch</a>, the [=ServiceWorkerGlobalScope/service worker=] returns a [=/response=] to the [=/http fetch=]. The [=/response=], represented by a {{Response}} object, can be retrieved from a {{Cache}} object or directly from network using {{WindowOrWorkerGlobalScope/fetch(input, init)|self.fetch(input, init)}} method. (A custom {{Response}} object can be another option.)</td>
+          <td>[=Functional event|Functional=]</td>
+          <td>The [=/http fetch=] invokes <a>Handle Fetch</a> with |request|. As a result of performing <a>Handle Fetch</a>, the [=ServiceWorkerGlobalScope/service worker=] returns a [=/response=] to the [=/http fetch=]. The [=/response=], represented by a {{Response}} object, can be retrieved from a {{Cache}} object or directly from network using {{WindowOrWorkerGlobalScope/fetch(input, init)|self.fetch(input, init)}} method. (A custom {{Response}} object can be another option.)</td>
+        </tr>
+        <tr>
+          <td><a href="https://w3c.github.io/push-api/#dfn-push">push</a></td>
+          <td><a href="https://w3c.github.io/push-api/#dom-pushevent"><code>PushEvent</code></a></td>
+          <td>[=Functional event|Functional=]</td>
+          <td>(See <a href="https://w3c.github.io/push-api/#dfn-fire-the-push-event">Firing a push event</a>.)</td>
+        </tr>
+        <tr>
+          <td><a href="https://notifications.spec.whatwg.org/#dom-serviceworkerglobalscope-onnotificationclick">notificationclick</a></td>
+          <td><a href="https://notifications.spec.whatwg.org/#notificationevent"><code>NotificationEvent</code></a></td>
+          <td>[=Functional event|Functional=]</td>
+          <td>(See <a href="https://notifications.spec.whatwg.org/#activating-a-notification">Activating a notification.</a>)</td>
+        </tr>
+        <tr>
+          <td><a href="https://notifications.spec.whatwg.org/#dom-serviceworkerglobalscope-onnotificationclose">notificationclose</a></td>
+          <td><a href="https://notifications.spec.whatwg.org/#notificationevent"><code>NotificationEvent</code></a></td>
+          <td>[=Functional event|Functional=]</td>
+          <td>(See <a href="https://notifications.spec.whatwg.org/#closing-a-notification">Closing a notification.</a>)</td>
+        </tr>
+        <tr>
+          <td><a href="https://wicg.github.io/BackgroundSync/spec/#sync">sync</a></td>
+          <td><a href="https://wicg.github.io/BackgroundSync/spec/#syncevent"><code>SyncEvent</code></a></td>
+          <td>[=Functional event|Functional=]</td>
+          <td>(See <a href="https://wicg.github.io/BackgroundSync/spec/#fire-a-sync-event">Firing a sync event</a>.)</td>
+        </tr>
+        <tr>
+          <td><a href="https://w3c.github.io/payment-handler/#the-canmakepaymentevent">canmakepayment</a></td>
+          <td><a href="https://w3c.github.io/payment-handler/#dom-canmakepaymentevent">CanMakePaymentEvent</a></td>
+          <td>[=Functional event|Functional=]</td>
+          <td>(See <a href="https://w3c.github.io/payment-handler/#dfn-handling-a-canmakepaymentevent">Handling a CanMakePaymentEvent</a>.)</td>
+        </tr>
+        <tr>
+          <td><a href="https://w3c.github.io/payment-handler/#the-paymentrequestevent">paymentrequest</a></td>
+          <td><a href="https://w3c.github.io/payment-handler/#dom-paymentrequestevent">PaymentRequestEvent</a></td>
+          <td>[=Functional event|Functional=]</td>
+          <td>(See <a href="https://w3c.github.io/payment-handler/#dfn-handling-a-paymentrequestevent">Handling a PaymentRequestEvent</a>.)</td>
         </tr>
         <tr>
           <td><dfn event><code>message</code></dfn></td>
           <td>{{ExtendableMessageEvent}}</td>
+          <td>Legacy</td>
           <td>When it receives a message.</td>
         </tr>
         <tr>
           <td><dfn event><code>messageerror</code></dfn></td>
           <td>{{MessageEvent}}</td>
+          <td>Legacy</td>
           <td>When it was sent a message that cannot be deserialized.</td>
         </tr>
       </tbody>
@@ -2028,7 +2062,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
             * |registration|'s [=last update check time=] is not null and the time difference in seconds calculated by the current time minus |registration|’s [=last update check time=] is greater than 86400.
         1. Let |response| be the result of [=fetch|fetching=] |request|.
         1. Set |response| to |response|'s [=unsafe response=].
-        1. If |response|’s <a for="response" href="https://github.com/whatwg/fetch/issues/376">cache state</a> is not "`local`", set |registration|’s [=service worker registration/last update check time=] to the current time.
+        1. If |response|’s [=response/cache state=] is not "`local`", set |registration|’s [=service worker registration/last update check time=] to the current time.
         1. [=Extract a MIME type=] from the |response|'s [=response/header list=]. If this MIME type (ignoring parameters) is not a [=JavaScript MIME type=], return a [=network error=].
         1. If |response|'s [=response/type=] is not "`error`", and |response|'s [=response/status=] is an <a>ok status</a>, then:
             1. [=map/Set=] |serviceWorker|'s [=script resource map=][|request|'s [=request/url=]] to |response|.
@@ -2067,7 +2101,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
 <section>
   <h2 id="extensibility">Extensibility</h2>
 
-  [=/Service workers=] are extensible from other specifications.
+  Service Workers specification is extensible from other specifications.
 
   <section>
     <h3 id="extension-to-service-worker-registration">Define API bound to Service Worker Registration</h3>
@@ -2110,13 +2144,9 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
   </section>
 
   <section>
-    <h3 id="request-functional-event-dispatch">Request Functional Event Dispatch</h3>
+    <h3 id="firing-functional-events">Firing Functional Events</h3>
 
-    To request a <a>functional event</a> dispatch to a [=/service worker=], specifications *may* invoke <a>Handle Functional Event</a> algorithm with its [=/service worker registration=] <var ignore>registration</var> and the algorithm |callbackSteps| as the arguments.
-
-    Specifications *may* define an algorithm |callbackSteps| where the corresponding <a>functional event</a> can be created and fired with specification specific objects. The algorithm is passed <var ignore>globalObject</var> (a {{ServiceWorkerGlobalScope}} object) at which it *may* fire its <a>functional events</a>. This algorithm is called on a <a>task</a> <a lt="queue a task">queued</a> by <a>Handle Functional Event</a> algorithm.
-
-    Note: See an <a href="https://notifications.spec.whatwg.org/#activating-a-notification">example</a> hook defined in <a biblio data-biblio-type="informative" lt="notifications">Notifications API</a>.
+    To request a [=functional event=] dispatch to the [=service worker registration/active worker=] of a [=/service worker registration=], specifications *should* invoke [=Fire Functional Event=].
   </section>
 </section>
 
@@ -2412,10 +2442,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
               1. Invoke [=Reject Job Promise=] with |job| and "{{SecurityError}}" {{DOMException}}.
               1. Asynchronously complete these steps with a <a>network error</a>.
           1. Set |updatedResourceMap|[|request|'s [=request/url=]] to |response|.
-          1. If |response|'s <a for="response" href="https://github.com/whatwg/fetch/issues/376">cache state</a> is not "<code>local</code>", set |registration|'s <a>last update check time</a> to the current time.
-
-              Issue: The response's cache state concept had been removed from fetch. The fetch issue <a href="https://github.com/whatwg/fetch/issues/376">#376</a> tracks the request to restore the concept or add some similar way to check this state.
-
+          1. If |response|'s [=response/cache state=] is not "`local`", set |registration|'s [=last update check time=] to the current time.
           1. If |newestWorker| is null, or |newestWorker|'s [=script resource map=][|request|'s [=request/url=]]'s [=response/body=] is not byte-for-byte identical with |response|'s [=response/body=], set |hasUpdatedResources| to true.
           1. Else if |newestWorker|'s [=classic scripts imported flag=] is set, then:
               1. [=map/For each=] |url| → |storedResponse| of |newestWorker|'s [=script resource map=]:
@@ -2427,7 +2454,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
                   1. Let |fetchedResponse| be the result of [=fetch|fetching=] |request|.
                   1. Set |fetchedResponse| to |fetchedResponse|'s [=unsafe response=].
                   1. Set |updatedResourceMap|[|request|'s [=request/url=]] to |fetchedResponse|.
-                  1. If |fetchedResponse|'s <a for="response" href="https://github.com/whatwg/fetch/issues/376">cache state</a> is not "<code>local</code>", set |registration|’s [=last update check time=] to the current time.
+                  1. If |fetchedResponse|'s [=response/cache state=] is not "`local`", set |registration|’s [=last update check time=] to the current time.
                   1. [=Extract a MIME type=] from the |fetchedResponse|'s [=response/header list=]. If this MIME type (ignoring parameters) is not a [=JavaScript MIME type=], asynchronously complete these steps with a [=network error=].
                   1. If |fetchedResponse|'s [=response/type=] is "`error`", or |fetchedResponse|'s [=response/status=] is not an [=ok status=], asynchronously complete these steps with a [=network error=].
                   1. If |fetchedResponse|'s [=response/body=] is not byte-for-byte identical with |storedResponse|'s [=response/body=], set |hasUpdatedResources| to true.
@@ -2782,35 +2809,57 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
   </section>
 
   <section algorithm>
-    <h3 id="handle-functional-event-algorithm"><dfn export>Handle Functional Event</dfn></h3>
+    <h3 id="fire-functional-event-algorithm"><dfn export lt="Fire Functional Event|Fire a functional event">Fire Functional Event</dfn></h3>
 
       : Input
-      :: |event|, an {{ExtendableEvent}} object
+      :: |eventName|, a string
+      :: |eventConstructor|, an event constructor that extends {{ExtendableEvent}}
       :: |registration|, a [=/service worker registration=]
-      :: |callbackSteps|, an algorithm
+      :: |initialization|, optional property initialization for |event|, constructed from |eventConstructor|
+      :: |postDispatchSteps|, optional steps to run on the [=service worker registration/active worker=]'s event loop, with |dispatchedEvent| set to the instance of |eventConstructor| that was [=dispatched=].
       : Output
       :: None
 
-      1. Assert: <a>scope to registration map</a> contains a value equal to |registration|.
-      1. Assert: |registration|'s <a>active worker</a> is not null.
-      1. Let |activeWorker| be |registration|'s <a>active worker</a>.
-      1. If |activeWorker|'s <a>set of event types to handle</a> does not [=set/contain=] |event|'s {{Event/type}}, then:
-          1. Return and continue running these steps <a>in parallel</a>.
-          1. If the time difference in seconds calculated by the current time minus |registration|'s <a>last update check time</a> is greater than 86400, invoke <a>Soft Update</a> algorithm with |registration|.
+      1. Assert: [=scope to registration map=] contains a value equal to |registration|.
+      1. Assert: |registration|'s [=active worker=] is not null.
+      1. Let |activeWorker| be |registration|'s [=active worker=].
+      1. If |activeWorker|'s [=set of event types to handle=] does not [=set/contain=] |eventName|, then return and run the following steps [=in parallel=]:
+          1. If the time difference in seconds calculated by the current time minus |registration|'s [=last update check time=] is greater than 86400, invoke [=Soft Update=] algorithm with |registration|.
           1. Abort these steps.
 
           Note: To avoid unnecessary delays, the Handle Functional Event enforces early return when no event listeners have been deterministically added in the service worker's global during the very first script execution.
 
-      1. If |activeWorker|'s <a>state</a> is *activating*, wait for |activeWorker|'s <a>state</a> to become *activated*.
-      1. Invoke <a>Run Service Worker</a> algorithm with |activeWorker| as the argument.
-      1. <a>Queue a task</a> |task| to run these substeps:
-          1. Invoke |callbackSteps| with |activeWorker|'s [=service worker/global object=] as its argument.
+      1. If |activeWorker|'s [=state=] is *activating*, wait for |activeWorker|'s [=state=] to become *activated*.
+      1. Invoke [=Run Service Worker=] algorithm with |activeWorker| as the argument.
+      1. [=Queue a task=] |task| to run these substeps:
+          1. Let |event| be the result of [=creating an event=] with |eventConstructor| and the [=relevant realm=] of |activeWorker|'s [=service worker/global object=].
+          1. If |initialization| is not null, then initialize |event| with |initialization|.
+          1. [=Dispatch=] |event| on |activeWorker|'s [=service worker/global object=].
           1. Invoke [=Update Service Worker Extended Events Set=] with |activeWorker| and |event|.
+          1. If |postDispatchSteps| is not null, then run |postDispatchSteps| passing |event| as |dispatchedEvent|.
 
-          The |task| *must* use |activeWorker|'s <a>event loop</a> and the <a>handle functional event task source</a>.
+          The |task| *must* use |activeWorker|'s [=event loop=] and the [=handle functional event task source=].
 
       1. Wait for |task| to have executed or been discarded.
-      1. If the time difference in seconds calculated by the current time minus |registration|'s <a>last update check time</a> is greater than 86400, invoke <a>Soft Update</a> algorithm with |registration|.
+      1. If the time difference in seconds calculated by the current time minus |registration|'s [=last update check time=] is greater than 86400, invoke [=Soft Update=] algorithm with |registration|.
+
+      <div class="example">
+        To fire an "`amazingthing`" event (which is of type `AmazingThingEvent`) on a particular |serviceWorkerRegistration|, and initialize the event object's properties, the prose would be:
+
+        1. [=Fire Functional Event=] "`amazingthing`" using `AmazingThingEvent` on |serviceWorkerRegistration| with the following properties:
+            : propertyName
+            :: value
+            : anotherPropertyName
+            :: anotherValue
+
+            Then run the following steps with |dispatchedEvent|:
+
+            1. Do whatever you need to with |dispatchedEvent| on the service worker's event loop.
+
+        Note that the initialization steps and post-dispatch steps are optional. If they aren't needed, the prose would be:
+
+        1. [=Fire Functional Event=] "`whatever`" using {{ExtendableEvent}} on |serviceWorkerRegistration|.
+      </div>
   </section>
 
   <section algorithm>
@@ -3218,6 +3267,40 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
           1. [=Throw=] the exception.
 
           Note: When an exception is [=throw|thrown=], the implementation does undo (roll back) any changes made to the cache storage during the batch operation job.
+  </section>
+
+  <section algorithm>
+    <h3 id="resolve-get-client-promise-algorithm"><dfn>Resolve Get Client Promise</dfn></h3>
+
+      : Input
+      :: |client|, a [=/service worker client=]
+      :: |promise|, a [=promise=]
+
+      : Output
+      :: none
+
+      1. If |client| is an [=environment settings object=], then:
+          1. If |client| is not a [=secure context=], reject |promise| with a "{{SecurityError}}" {{DOMException}} and abort these steps.
+      1. Else:
+          1. If |client|’s [=creation URL=] is not a [=potentially trustworthy URL=], reject |promise| with a "{{SecurityError}}" {{DOMException}} and abort these steps.
+      1. If |client| is an [=environment settings object=] and is not a [=window client=], then:
+          1. Let |clientObject| be the result of running [=Create Client=] algorithm with |client| as the argument.
+          1. Resolve |promise| with |clientObject| and abort these steps.
+      1. Else:
+          1. Let |browsingContext| be null.
+          1. Let |visibilityState| be null.
+          1. Let |focusState| be false.
+          1. Let |ancestorOriginsList| be the empty list.
+          1. If |client| is an [=environment settings object=], set |browsingContext| to |client|'s [=environment settings object/global object=]'s [=/browsing context=].
+          1. Else, set |browsingContext| to |client|’s [=environment/target browsing context=].
+          1. [=Queue a task=] |task| to run the following substeps on |browsingContext|'s [=event loop=] using the [=user interaction task source=]:
+              1. Set |visibilityState| to |browsingContext|'s [=active document=]'s {{Document/visibilityState}} attribute value.
+              1. Set |focusState| to the result of running the [=has focus steps=] with |browsingContext|'s [=active document=] as the argument.
+              1. If |client| is a [=window client=], set |ancestorOriginsList| to |browsingContext|'s [=active document=]'s [=relevant global object=]'s {{Location}} object's [=Location/ancestor origins list=]'s associated list.
+          1. Wait for |task| to have executed.
+          1. If |client|'s [=discarded flag=] is set, resolve |promise| with undefined and abort these steps.
+          1. Let |windowClient| be the result of running [=Create Window Client=] algorithm with |client|, |visibilityState|, |focusState|, and |ancestorOriginsList| as the arguments.
+          1. Resolve |promise| with |windowClient|.
   </section>
 </section>
 

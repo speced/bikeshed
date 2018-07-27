@@ -82,7 +82,6 @@ urlPrefix: https://tc39.github.io/ecma262/; spec: ECMA-262
         text: Promise; url: sec-promise-objects
         text: Set; url: sec-set-objects
         text: SharedArrayBuffer; url: sec-sharedarraybuffer-objects
-        text: %ArrayPrototype%; url: sec-properties-of-the-array-prototype-object
         text: %ErrorPrototype%; url: sec-properties-of-the-error-prototype-object
         text: %FunctionPrototype%; url: sec-properties-of-the-function-prototype-object
         text: %IteratorPrototype%; url: sec-%iteratorprototype%-object
@@ -1042,7 +1041,6 @@ definition.
 limitations.  The following extended attributes must not
 be specified on partial interface definitions:
 [{{Constructor}}],
-[{{LegacyArrayClass}}],
 [{{LegacyWindowAlias}}],
 [{{NamedConstructor}}],
 [{{NoInterfaceObject}}].
@@ -1067,7 +1065,6 @@ The following extended attributes are applicable to interfaces:
 [{{Constructor}}],
 [{{Exposed}}],
 [{{Global}}],
-[{{LegacyArrayClass}}],
 [{{LegacyWindowAlias}}],
 [{{NamedConstructor}}],
 [{{NoInterfaceObject}}],
@@ -2036,8 +2033,8 @@ There are three kinds of operation:
 
 If an operation has an identifier but no <emu-t>static</emu-t>
 keyword, then it declares a <dfn id="dfn-regular-operation" export>regular operation</dfn>.
-If the operation has one or more
-[=special keywords=]
+If the operation has a 
+[=special keyword=]
 used in its declaration (that is, any keyword matching
 <emu-nt><a href="#prod-Special">Special</a></emu-nt>, or
 the <emu-t>stringifier</emu-t> keyword),
@@ -2374,13 +2371,7 @@ The following extended attributes are applicable to operations:
 
 <pre class="grammar" id="prod-SpecialOperation">
     SpecialOperation :
-        Special Specials RegularOperation
-</pre>
-
-<pre class="grammar" id="prod-Specials">
-    Specials :
-        Special Specials
-        ε
+        Special RegularOperation
 </pre>
 
 <pre class="grammar" id="prod-Special">
@@ -2463,7 +2454,7 @@ The <dfn id="dfn-json-types" export lt="JSON type">JSON types</dfn> are:
 *   [=typedefs=] whose [=type being given a new name=] is a [=JSON type=],
 *   [=sequence types=] whose parameterized type is a [=JSON type=],
 *   [=frozen array types=] whose parameterized type is a [=JSON type=],
-*   [=dictionaries=] where all of their [=dictionary members|members=] are [=JSON types=],
+*   [=dictionary types=] where the types of all [=dictionary members|members=] declared on the dictionary and all its [=inherited dictionaries=] are [=JSON types=],
 *   [=records=] where all of their [=map/values=] are [=JSON types=],
 *   {{object}},
 *   [=interface types=] that have a <code>toJSON</code> operation declared on themselves or
@@ -2554,8 +2545,8 @@ in which case the [=default toJSON operation=] is exposed instead.
 A <dfn id="dfn-special-operation" export>special operation</dfn> is a
 declaration of a certain kind of special behavior on objects implementing
 the interface on which the special operation declarations appear.
-Special operations are declared by using one or more
-<dfn id="dfn-special-keyword" export>special keywords</dfn>
+Special operations are declared by using a
+<dfn id="dfn-special-keyword" export>special keyword</dfn>
 in an operation declaration.
 
 There are four kinds of special operations. The table below indicates
@@ -7446,12 +7437,12 @@ the object (or its prototype chain) correspond to [=dictionary members=].
 
 <div id="es-to-dictionary" algorithm="convert an ECMAScript value to dictionary">
 
-    An ECMAScript value |V| is [=converted to an IDL value|converted=]
+    An ECMAScript value |esDict| is [=converted to an IDL value|converted=]
     to an IDL [=dictionary type=] value by
     running the following algorithm (where |D| is the [=dictionary type=]):
 
-    1.  If <a abstract-op>Type</a>(|V|) is not Undefined, Null or Object, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
-    1.  Let |dict| be an empty dictionary value of type |D|;
+    1.  If <a abstract-op>Type</a>(|esDict|) is not Undefined, Null or Object, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+    1.  Let |idlDict| be an empty dictionary value of type |D|;
         every [=dictionary member=]
         is initially considered to be [=not present=].
     1.  Let |dictionaries| be a list consisting of |D| and all of |D|’s [=inherited dictionaries=],
@@ -7459,24 +7450,24 @@ the object (or its prototype chain) correspond to [=dictionary members=].
     1.  For each dictionary |dictionary| in |dictionaries|, in order:
         1.  For each dictionary member |member| declared on |dictionary|, in lexicographical order:
             1.  Let |key| be the [=identifier=] of |member|.
-            1.  Let |value| be an ECMAScript value, depending on <a abstract-op>Type</a>(|V|):
+            1.  Let |esMemberValue| be an ECMAScript value, depending on <a abstract-op>Type</a>(|esDict|):
                 <dl class="switch">
                      :  Undefined
                      :  Null
                      :: <emu-val>undefined</emu-val>
                      :  anything else
-                     :: [=?=] <a abstract-op>Get</a>(|V|, |key|)
+                     :: [=?=] <a abstract-op>Get</a>(|esDict|, |key|)
                 </dl>
-            1.  If |value| is not <emu-val>undefined</emu-val>, then:
-                1.  Let |idlValue| be the result of [=converted to an IDL value|converting=] |value| to an IDL value whose type is the type |member| is declared to be of.
-                1.  Set the dictionary member on |dict| with key name |key| to the value |idlValue|.  This dictionary member is considered to be [=present=].
-            1.  Otherwise, if |value| is <emu-val>undefined</emu-val> but |member| has a [=dictionary member/default value=], then:
-                1.  Let |idlValue| be |member|’s default value.
-                1.  Set the dictionary member on |dict| with key name |key| to the value |idlValue|.  This dictionary member is considered to be [=present=].
-            1.  Otherwise, if |value| is
+            1.  If |esMemberValue| is not <emu-val>undefined</emu-val>, then:
+                1.  Let |idlMemberValue| be the result of [=converted to an IDL value|converting=] |esMemberValue| to an IDL value whose type is the type |member| is declared to be of.
+                1.  Set the dictionary member on |idlDict| with key name |key| to the value |idlMemberValue|.  This dictionary member is considered to be [=present=].
+            1.  Otherwise, if |esMemberValue| is <emu-val>undefined</emu-val> but |member| has a [=dictionary member/default value=], then:
+                1.  Let |idlMemberValue| be |member|’s default value.
+                1.  Set the dictionary member on |idlDict| with key name |key| to the value |idlMemberValue|.  This dictionary member is considered to be [=present=].
+            1.  Otherwise, if |esMemberValue| is
                 <emu-val>undefined</emu-val> and |member| is a
                 [=required dictionary member=], then throw a {{ECMAScript/TypeError}}.
-    1.  Return |dict|.
+    1.  Return |idlDict|.
 </div>
 
 Note: The order that [=dictionary members=] are looked
@@ -8908,101 +8899,6 @@ corresponding to [=interface members=].
     </pre>
 </div>
 
-<h4 id="LegacyArrayClass" extended-attribute lt="LegacyArrayClass">[LegacyArrayClass]</h4>
-
-<div class="advisement">
-
-    The [{{LegacyArrayClass}}] [=extended attribute=] is an undesirable feature.
-    It exists only so that legacy Web platform features can be specified.
-    It should not be used in specifications
-    unless required to specify the behavior of legacy APIs,
-    or for consistency with these APIs.
-    Editors who wish to use this feature are strongly advised to discuss this
-    by <a href="https://github.com/heycam/webidl/issues/new?title=Intent%20to%20use%20[LegacyArrayClass]">filing an issue</a>
-    before proceeding.
-
-    <small class="non-normative">
-        The [{{LegacyArrayClass}}] [=extended attribute=] appears on
-        the following [=interfaces=]:
-        {{DOMRectList}},
-        {{MediaList}},
-        {{StyleSheetList}}, and
-        {{CSSRuleList}}. [[GEOMETRY]] [[CSSOM]]
-    </small>
-
-</div>
-
-If the [{{LegacyArrayClass}}]
-[=extended attribute=]
-appears on an [=interface=]
-that is not defined to [=interface/inherit=]
-from another, it indicates that the \[[Prototype]]
-[=internal slot=] of its [=interface prototype object=]
-will be the intrinsic object {{%ArrayPrototype%}} rather than
-{{%ObjectPrototype%}}.  This allows
-{{ECMAScript/Array}} methods to be used more easily
-with objects implementing the interface.
-
-The [{{LegacyArrayClass}}] extended attribute
-must [=takes no arguments|take no arguments=].
-It must not be used on an interface that
-has any [=inherited interfaces=].
-
-Note: Interfaces using [{{LegacyArrayClass}}] will
-need to define a <code class="idl">length</code> [=attribute=]
-of type {{unsigned long}} that exposes the length
-of the array-like object, in order for the inherited Array
-methods to operate correctly.  Such interfaces would typically also
-[=support indexed properties=],
-which would provide access to the array elements.
-
-See [[#interface-prototype-object]] for the
-specific requirements that the use of [{{LegacyArrayClass}}]
-entails.
-
-<div class="example">
-
-    The following [=IDL fragment=]
-    defines two [=interfaces=]
-    that use [{{LegacyArrayClass}}].
-
-    <pre highlight="webidl">
-        [Exposed=Window, LegacyArrayClass]
-        interface ItemList {
-          attribute unsigned long length;
-          getter object getItem(unsigned long index);
-          setter object setItem(unsigned long index, object item);
-        };
-
-        [Exposed=Window, LegacyArrayClass]
-        interface ImmutableItemList {
-          readonly attribute unsigned long length;
-          getter object getItem(unsigned long index);
-        };
-    </pre>
-
-    In an ECMAScript implementation of the above two interfaces,
-    with appropriate definitions for getItem, setItem and removeItem,
-    {{ECMAScript/Array}} methods to inspect and
-    modify the array-like object can be used.
-
-    <pre highlight="js">
-        var list = getItemList();  // Obtain an instance of ItemList.
-
-        list.concat();             // Clone the ItemList into an Array.
-        list.pop();                // Remove an item from the ItemList.
-        list.unshift({ });         // Insert an item at index 0.
-    </pre>
-
-    <code class="idl">ImmutableItemList</code> has a read only
-    length [=attribute=]
-    and no indexed property [=indexed property setters|setter=].  The
-    mutating {{ECMAScript/Array}} methods will generally not
-    succeed on objects implementing <code class="idl">ImmutableItemList</code>.
-    The exact behavior depends on the definition of the {{ECMAScript/Array}} methods themselves.
-
-</div>
-
 
 <h4 id="LegacyNamespace" extended-attribute lt="LegacyNamespace">[LegacyNamespace]</h4>
 
@@ -9229,7 +9125,7 @@ it indicates that a no-op setter will be generated for the attribute’s
 accessor property.  This results in erroneous assignments to the property
 in strict mode to be ignored rather than causing an exception to be thrown.
 
-The [{{LenientThis}}] extended attribute
+The [{{LenientSetter}}] extended attribute
 must [=takes no arguments|take no arguments=].
 It must not be used on anything other than
 a [=read only=] [=regular attribute=].
@@ -10004,7 +9900,7 @@ influences whether it is [=exposed=] in a given ECMAScript global environment.
 If [{{SecureContext}}] appears on an [=overloaded=] [=operation=],
 then it must appear on all overloads.
 
-The {{SecureContext}}] [=extended attribute=] must not be specified both on
+The [{{SecureContext}}] [=extended attribute=] must not be specified both on
 an [=interface member|interface=], [=interface mixin member|mixin=], or [=namespace member=], and on
 the [=partial interface=], [=partial interface mixin=], or [=partial namespace=] definition
 the [=member=] is declared on.
@@ -10887,8 +10783,6 @@ with the [{{NoInterfaceObject}}] [=extended attribute=].
         of that [=inherited interface=].
     1.  Otherwise, if |interface| is the {{DOMException}} [=interface=],
         then set |proto| to |realm|.\[[Intrinsics]].[[{{%ErrorPrototype%}}]].
-    1.  Otherwise, if |interface| is declared with the [{{LegacyArrayClass}}] [=extended attribute=],
-        then set |proto| to |realm|.\[[Intrinsics]].[[{{%ArrayPrototype%}}]].
     1.  Otherwise, set |proto| to |realm|.\[[Intrinsics]].[[{{%ObjectPrototype%}}]].
     1.  Assert: <a abstract-op>Type</a>(|proto|) is Object.
     1.  Let |interfaceProtoObj| be [=!=] <a abstract-op>ObjectCreate</a>(|proto|).
@@ -11023,8 +10917,6 @@ for that interface on which named properties are exposed.
     1.  Let |proto| be null.
     1.  If |interface| is declared to inherit from another interface,
         then set |proto| to the [=interface prototype object=] in |realm| for the [=inherited interface=].
-    1.  Otherwise, if |interface| is declared with the [{{LegacyArrayClass}}] [=extended attribute=],
-        then set |proto| to |realm|.\[[Intrinsics]].[[{{%ArrayPrototype%}}]].
     1.  Otherwise, set |proto| to |realm|.\[[Intrinsics]].[[{{%ObjectPrototype%}}]].
     1.  Let |obj| be a newly created object.
     1.  Set |obj|'s internal methods to the definitions specified in

@@ -165,12 +165,18 @@ Languages and Typesetting</h3>
     the element is declared to be in, according to the rules of the
     <a href="https://www.w3.org/TR/CSS21/conform.html#doclanguage">document language</a>.
     For example, the rules for determining the <a>content language</a> of an HTML
-    element use the <code>lang</code> attribute and are defined in [[HTML5]],
+    are <a href="https://html.spec.whatwg.org/multipage/dom.html#language">defined</a> in [[HTML]],
     and the rules for determining the <a>content language</a> of an XML element use
-    the <code>xml:lang</code> attribute and are
-    <a href="https://www.w3.org/TR/REC-xml/#sec-lang-tag">defined</a> in [[XML10]].
+    are <a href="https://www.w3.org/TR/REC-xml/#sec-lang-tag">defined</a> in [[XML10]].
     Note that it is possible for the <a>content language</a> of an element
-    to be unknown.
+    to be unknown--
+    e.g. untagged content,
+    or content in a <a>document language</a> that does not have a language-tagging facility
+    is considered to have an unknown <a>content language</a>.
+
+    Note: Authors can tag content using the global <code>lang</code> attribute in HTML,
+    the universal <code>xml:lang</code> attribute in XML,
+    and the HTTP <code>Content-Language</code> header for content served over HTTP.
 
     Language and writing system conventions can affect
     line breaking, hyphenation, justification, glyph selection,
@@ -412,7 +418,7 @@ Characters and Letters</h3>
 
   <pre class="propdef">
   Name: white-space
-  Value: normal | pre | nowrap | pre-wrap | pre-line
+  Value: normal | pre | nowrap | pre-wrap | break-spaces | pre-line
   Initial: normal
   Applies to: <a>inline boxes</a>
   Inherited: yes
@@ -450,6 +456,20 @@ Characters and Letters</h3>
     <dt><dfn>pre-wrap</dfn></dt>
     <dd>Like ''pre'', this value preserves <a>white space</a>;
       but like ''white-space/normal'', it allows wrapping.
+    <dt><dfn>break-spaces</dfn></dt>
+    <dd>The behavior is identical to that of ''white-space/pre-wrap'',
+      except that:
+      * Any sequence of <a>preserved</a> white space always takes up space,
+        including at the end of the line.
+      * A line breaking opportunity exists after every <a>preserved</a> <a>white space</a> character,
+        including between white space characters.
+
+      As preserved spaces take up space and do not hang,
+      they affect the box's intrinsic sizes ([=min-content size=] and [=max-content size=]).
+
+      <p class="note">This value does not guarantee that there will never be any overflow due to spaces:
+      for example, if the line length is so short that even a single space does not fit,
+      overflow is unavoidable.</p>
     <dt><dfn>pre-line</dfn></dt>
     <dd>Like ''white-space/normal'', this value collapses consecutive spaces and allows wrapping,
       but preserves <a>segment breaks</a> in the source as <a>forced line breaks</a>.
@@ -467,6 +487,7 @@ Characters and Letters</h3>
         <th>New Lines</th>
         <th>Spaces and Tabs</th>
         <th>Text Wrapping</th>
+        <th>End-of-line spaces</th>
       </tr>
     </thead>
     <tbody>
@@ -475,23 +496,34 @@ Characters and Letters</h3>
         <td>Collapse</td>
         <td>Collapse</td>
         <td>Wrap</td>
+	<td>Remove</td>
       </tr>
       <tr>
         <th>''pre''</th>
         <td>Preserve</td>
         <td>Preserve</td>
         <td>No wrap</td>
+	<td>Preserve</td>
       </tr>
       <tr>
         <th>''nowrap''</th>
         <td>Collapse</td>
         <td>Collapse</td>
         <td>No wrap</td>
+	<td>Remove</td>
       </tr>
       <tr>
         <th>''pre-wrap''</th>
         <td>Preserve</td>
         <td>Preserve</td>
+        <td>Wrap</td>
+	<td>Collapse or hang</td>
+      </tr>
+      <tr>
+        <th>''break-spaces''</th>
+        <td>Preserve</td>
+        <td>Preserve</td>
+        <td>Wrap</td>
         <td>Wrap</td>
       </tr>
       <tr>
@@ -499,6 +531,7 @@ Characters and Letters</h3>
         <td>Preserve</td>
         <td>Collapse</td>
         <td>Wrap</td>
+        <td>Remove</td>
     </tbody>
   </table>
 
@@ -561,7 +594,7 @@ Characters and Letters</h3>
   <p>
     Form feeds (U+000C) and carriage returns (U+000D)
     (that are not <a>segment breaks</a>)
-    are <span class="issue">not rendered | rendered as a zero-width space</span>.
+    are rendered as a zero-width space (U+200B). <!-- thus can disrupt shaping -->
     Control characters (<a>Unicode category</a> <code>Cc</code>)
     other than tab (U+0009), line feed (U+000A), form feed (U+000C), and carriage return (U+000D)
     must be rendered as a visible glyph
@@ -617,7 +650,7 @@ Characters and Letters</h3>
           invisible, but retains its <a>soft wrap opportunity</a>, if any.)</li>
       </ol>
     </li>
-    <li><p>If 'white-space' is set to ''pre'' or ''pre-wrap'',
+    <li><p>If 'white-space' is set to ''pre'', ''pre-wrap'', or ''break-spaces''
       any sequence of spaces is treated as a sequence of non-breaking spaces.
       However, a <a>soft wrap opportunity</a> exists at the end of the sequence.
 
@@ -663,7 +696,7 @@ Characters and Letters</h3>
     <h4 id="line-break-transform">
       Segment Break Transformation Rules</h4>
 
-      <p>When 'white-space' is ''pre'', ''pre-wrap'', or ''pre-line'',
+      <p>When 'white-space' is ''pre'', ''pre-wrap'', ''break-spaces'', or ''pre-line'',
       <a>segment breaks</a> are not <a>collapsible</a>
       and are instead transformed into a preserved line feed (U+000A).
 
@@ -724,17 +757,19 @@ Characters and Letters</h3>
         (ignoring any intervening <a>inline box</a> boundaries)
         is removed.
       <li>If spaces or tabs at the end of a line are non-collapsible
-         but have 'white-space' set to ''pre-wrap''
-         the UA must either <a>hang</a> the <a>white space</a>
-         or visually collapse the character advance widths
-         of any overflowing spaces
-         such that they don't take up space in the line.
-         However, if 'overflow-wrap' is set to ''break-spaces'',
-         collapsing their advance width is not allowed,
-         as this would prevent the preserved spaces from wrapping.
+        <ul>
+          <li>If 'white-space' is set to ''pre-wrap'',
+             the UA must either <a>hang</a> the <a>white space</a>
+             or visually collapse the character advance widths
+             of any overflowing spaces
+             such that they don't take up space in the line.
 
-         Note: Hanging the white space rather than collapsing it
-         allows users to see the space when selecting or editing text.
+             Note: Hanging the white space rather than collapsing it
+             allows users to see the space when selecting or editing text.
+          <li>If 'white-space' is set to ''break-spaces'',
+             hanging or collapsing the advance width of spaces at the end of the line is not allowed.
+        </ul>
+
     </ol>
 
     Issue: Add example of hanging white space + same example right-aligned.
@@ -774,7 +809,12 @@ Characters and Letters</h3>
     it is a <dfn>soft wrap break</dfn>.
     The process of breaking inline-level content into lines is called <dfn lt="line-breaking-process">line breaking</dfn>.
 
-  <p>Wrapping is only performed at an allowed break point, called a <dfn export>soft wrap opportunity</dfn>.
+  <p>Wrapping is only performed at an allowed break point,
+    called a <dfn export>soft wrap opportunity</dfn>.
+    When wrapping is enabled (see 'white-space'),
+    the UA must minimize the amount of content overflowing a line
+    by wrapping the line at a <a>soft wrap opportunity</a>,
+    if one exists.
 
   <p>In most writing systems,
     in the absence of hyphenation a <a>soft wrap opportunity</a> occurs only at word boundaries.
@@ -1009,7 +1049,7 @@ Line Breaking Details</h3>
       <dd>There is a <a>soft wrap opportunity</a> around every <a>typographic character unit</a>,
       including around any punctuation character or preserved spaces,
       or in the middle of words,
-      disregarding any prohibition against line breaks introduced by characters with the GL, WJ, or ZJW character class (see [[UAX14]]).
+      disregarding any prohibition against line breaks introduced by characters with the GL, WJ, or ZWJ character class (see [[UAX14]]).
       The different wrapping opportunities must not be prioritized.
       Hyphenation is not applied.
 
@@ -1175,16 +1215,15 @@ Line Breaking Details</h3>
 
     <p>Correct automatic hyphenation requires a hyphenation resource
       appropriate to the language of the text being broken.
-      The UA is therefore only required to automatically hyphenate text
+      The UA must therefore only automatically hyphenate text
       for which the <a>content language</a> is known
       and for which it has an appropriate hyphenation resource.
 
     <p class="advisement">
       Authors should correctly tag their content’s <a lt="content language">language</a>
-      (e.g. using the HTML ''lang'' attribute)
+      (e.g. using the HTML <code>lang</code> attribute
+      or the HTTP <code>Content-Language</code> header)
       in order to obtain correct automatic hyphenation.
-      UAs may refuse to automatically hyphenate untagged content
-      regardless of the 'hyphens' property value.
 
     <p>When shaping scripts such as Arabic are allowed to break within words
       due to hyphenation,
@@ -1207,7 +1246,7 @@ Line Breaking Details</h3>
 
   <pre class="propdef">
   Name: overflow-wrap, word-wrap
-  Value: normal | break-word || break-spaces
+  Value: normal | break-word
   Initial: normal
   Applies to: <a>inline boxes</a>
   Inherited: yes
@@ -1239,27 +1278,11 @@ Line Breaking Details</h3>
       Shaping characters are still shaped as if the word were not
       broken, and grapheme clusters must stay together as one unit.
       No hyphenation character is inserted at the break point.
-    <dt><dfn>break-spaces</dfn></dt>
-    <dd>Line breaks are handled as usual,
-      except that any sequence of <a>preserved</a> white space
-      that would otherwise overflow the line and <a>hang</a> as per <a href="#white-space-phase-2">Trimming and Positioning</a>
-      must be broken after the last white space character that would fit the line,
-      or after the first white space in the sequence if none would fit.
-
-      <p class="note">This value does not guarantee that there will never be any overflow due to spaces.
-      For example, if 'overflow-wrap' is set to ''break-spaces''
-      and 'white-space' to ''pre-wrap'',
-      and there is a single <a>preserved</a> space at the end of the line,
-      and that space overflows,
-      the rules of ''break-spaces'' do not introduce any additional line break,
-      and that space does overflow and <a>hang</a>.
-      Also, if the line length is so short that even a single space does not fit,
-      overflow is unavoidable.</p>
 
     </dl>
 
     <p><a>Soft wrap opportunities</a> introduced by ''overflow-wrap: break-word''
-       are not considered when calculating <a lt="min-content size">min-content intrinsic sizes</a>.
+       <em>are</em> considered when calculating <a lt="min-content size">min-content intrinsic sizes</a>.
 
     <p>For legacy reasons, UAs must treat 'word-wrap' as an alternate name
       for the 'overflow-wrap' property, as if it were a <a>shorthand</a> of 'overflow-wrap'.
@@ -1987,7 +2010,7 @@ Cursive Scripts</h4>
     Initial: 0
     Applies to: block containers
     Inherited: yes
-    Percentages: refers to width of containing block
+    Percentages: refers to block container’s own <a>inline-axis</a> <a>inner size</a>
     Computed value: the percentage as specified or the absolute length, plus any keywords as specified
     Animation type: <a href="https://drafts.csswg.org/css-transitions-1/#animtype-lpcalc">length, percentage, or calc</a>, but only if keywords match
     Canonical order: <abbr title="follows order of property value definition">per grammar</abbr>
@@ -2132,12 +2155,18 @@ Cursive Scripts</h4>
       does not <a>hang</a> at the end edge of a line.
       At most one punctuation character may <a>hang</a> at each edge of the line.
 
-    <p>A <a lt=hang>hanging</a> punctuation mark is still enclosed inside its inline box
-      and participates in text justification:
-      its character advance width is just not measured when determining
+    <p>A <a lt=hang>hanging</a> punctuation mark
+      is still enclosed inside its parent inline box,
+      is still counted as part of the <a>scrollable overflow region</a> [[!CSS-OVERFLOW-3]],
+      and still participates in text justification:
+      its character advance is just not measured when determining
       how much content fits on the line,
       how much the line's contents need to be expanded or compressed for justification,
       or how to position the content within the line box for text alignment.
+      Effectively, the <a>hanging</a> punctuation mark’s character advance
+      is re-interpreted as an additional negative margin
+      on the affected edge of its parent <a>inline box</a>;
+      the line is otherwise laid out as usual.
 
     <p><dfn lt="stop or comma">Stops and commas</dfn> allowed to <a>hang</a> include:
     <table class="data">
@@ -2506,6 +2535,7 @@ Changes</h2>
         since that handles symbols better.
     <li>Added ''line-break: anywhere''.
     <li>Tweaked handling of Ambiguous characters during <a href="#line-break-transform">segment break transformation</a> to respond to language context.
+    <li>Changed ''overflow-wrap: break-word'' to affect min-content intrinsic sizes.
   </ul>
 
   <h3 class="no-num" id="changes-2013">

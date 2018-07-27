@@ -28,6 +28,7 @@ urlPrefix: https://tc39.github.io/ecma262/; spec: ECMASCRIPT
     text: Invoke; url: #sec-invoke; type: abstract-op
     text: DestructuringAssignmentEvaluation; url: #sec-runtime-semantics-destructuringassignmentevaluation; type: abstract-op
     text: map; url: #sec-array.prototype.map; type: method; for: Array.prototype
+    text: CreateIterResultObject; url: #sec-createiterresultobject; type: abstract-op
 </pre>
 
 <style>
@@ -457,19 +458,19 @@ ReadableStream(<var>underlyingSource</var> = {}, <var>strategy</var> = {})</h4>
 
 <emu-alg>
   1. Perform ! InitializeReadableStream(*this*).
-  1. Let _type_ be ? GetV(_underlyingSource_, `"type"`).
   1. Let _size_ be ? GetV(_strategy_, `"size"`).
   1. Let _highWaterMark_ be ? GetV(_strategy_, `"highWaterMark"`).
+  1. Let _type_ be ? GetV(_underlyingSource_, `"type"`).
   1. Let _typeString_ be ? ToString(_type_).
   1. If _typeString_ is `"bytes"`,
+    1. If _size_ is not *undefined*, throw a *RangeError* exception.
     1. If _highWaterMark_ is *undefined*, let _highWaterMark_ be *0*.
     1. Set _highWaterMark_ to ? ValidateAndNormalizeHighWaterMark(_highWaterMark_).
-    1. If _size_ is not *undefined*, throw a *RangeError* exception.
     1. Perform ? SetUpReadableByteStreamControllerFromUnderlyingSource(*this*, _underlyingSource_, _highWaterMark_).
   1. Otherwise, if _type_ is *undefined*,
+    1. Let _sizeAlgorithm_ be ? MakeSizeAlgorithmFromSizeFunction(_size_).
     1. If _highWaterMark_ is *undefined*, let _highWaterMark_ be *1*.
     1. Set _highWaterMark_ to ? ValidateAndNormalizeHighWaterMark(_highWaterMark_).
-    1. Let _sizeAlgorithm_ be ? MakeSizeAlgorithmFromSizeFunction(_size_).
     1. Perform ? SetUpReadableStreamDefaultControllerFromUnderlyingSource(*this*, _underlyingSource_, _highWaterMark_,
        _sizeAlgorithm_).
   1. Otherwise, throw a *RangeError* exception.
@@ -791,12 +792,12 @@ option. If <code><a for="underlying source">type</a></code> is set to <code>unde
          1. Otherwise, <a href="#rs-pipeTo-shutdown">shutdown</a> with _destClosed_.
      * <i id="rs-pipeTo-shutdown-with-action">Shutdown with an action</i>: if any of the above requirements ask to
        shutdown with an action _action_, optionally with an error _originalError_, then:
+       1. If _shuttingDown_ is *true*, abort these substeps.
+       1. Set _shuttingDown_ to *true*.
        1. If _dest_.[[state]] is `"writable"` and ! WritableStreamCloseQueuedOrInFlight(_dest_) is *false*,
          1. If any <a>chunks</a> have been read but not yet written, write them to _dest_.
          1. Wait until every <a>chunk</a> that has been read has been written (i.e. the corresponding promises have
             settled).
-       1. If _shuttingDown_ is *true*, abort these substeps.
-       1. Set _shuttingDown_ to *true*.
        1. Let _p_ be the result of performing _action_.
        1. <a>Upon fulfillment</a> of _p_, <a href="#rs-pipeTo-finalize">finalize</a>, passing along _originalError_ if
           it was given.
@@ -804,12 +805,12 @@ option. If <code><a for="underlying source">type</a></code> is set to <code>unde
           _newError_.
      * <i id="rs-pipeTo-shutdown">Shutdown</i>: if any of the above requirements or steps ask to shutdown, optionally
        with an error _error_, then:
+       1. If _shuttingDown_ is *true*, abort these substeps.
+       1. Set _shuttingDown_ to *true*.
        1. If _dest_.[[state]] is `"writable"` and ! WritableStreamCloseQueuedOrInFlight(_dest_) is *false*,
          1. If any <a>chunks</a> have been read but not yet written, write them to _dest_.
          1. Wait until every <a>chunk</a> that has been read has been written (i.e. the corresponding promises have
             settled).
-       1. If _shuttingDown_ is *true*, abort these substeps.
-       1. Set _shuttingDown_ to *true*.
        1. <a href="#rs-pipeTo-finalize">Finalize</a>, passing along _error_ if it was given.
      * <i id="rs-pipeTo-finalize">Finalize</i>: both forms of shutdown will eventually ask to finalize, optionally with
        an error _error_, which means to perform the following steps:
@@ -1048,8 +1049,8 @@ noticeable asymmetry between the two branches, and limits the possible <a>chunks
       1. <a>Resolve</a> _cancelPromise_ with _cancelResult_.
     1. Return _cancelPromise_.
   1. Let _startAlgorithm_ be an algorithm that returns *undefined*.
-  1. Set _branch1_ to CreateReadableStream(_startAlgorithm_, _pullAlgorithm_, _cancel1Algorithm_).
-  1. Set _branch2_ to CreateReadableStream(_startAlgorithm_, _pullAlgorithm_, _cancel2Algorithm_).
+  1. Set _branch1_ to ! CreateReadableStream(_startAlgorithm_, _pullAlgorithm_, _cancel1Algorithm_).
+  1. Set _branch2_ to ! CreateReadableStream(_startAlgorithm_, _pullAlgorithm_, _cancel2Algorithm_).
   1. <a>Upon rejection</a> of _reader_.[[closedPromise]] with reason _r_,
     1. If _closedOrErrored_ is *false*, then:
       1. Perform ! ReadableStreamDefaultControllerError(_branch1_.[[readableStreamController]], _r_).
@@ -1087,25 +1088,25 @@ implementations to affect their associated {{ReadableStream}} object. This trans
 controller into developer-facing results visible through the {{ReadableStream}}'s public API.
 
 <h4 id="readable-stream-add-read-into-request" aoid="ReadableStreamAddReadIntoRequest"
-nothrow>ReadableStreamAddReadIntoRequest ( <var>stream</var> )</h4>
+nothrow>ReadableStreamAddReadIntoRequest ( <var>stream</var>, <var>forAuthorCode</var> )</h4>
 
 <emu-alg>
   1. Assert: ! IsReadableStreamBYOBReader(_stream_.[[reader]]) is *true*.
   1. Assert: _stream_.[[state]] is `"readable"` or `"closed"`.
   1. Let _promise_ be <a>a new promise</a>.
-  1. Let _readIntoRequest_ be Record {[[promise]]: _promise_}.
+  1. Let _readIntoRequest_ be Record {[[promise]]: _promise_, [[forAuthorCode]]: _forAuthorCode_}.
   1. Append _readIntoRequest_ as the last element of _stream_.[[reader]].[[readIntoRequests]].
   1. Return _promise_.
 </emu-alg>
 
 <h4 id="readable-stream-add-read-request" aoid="ReadableStreamAddReadRequest" nothrow>ReadableStreamAddReadRequest (
-<var>stream</var> )</h4>
+<var>stream</var>, <var>forAuthorCode</var> )</h4>
 
 <emu-alg>
   1. Assert: ! IsReadableStreamDefaultReader(_stream_.[[reader]]) is *true*.
   1. Assert: _stream_.[[state]] is `"readable"`.
   1. Let _promise_ be <a>a new promise</a>.
-  1. Let _readRequest_ be Record {[[promise]]: _promise_}.
+  1. Let _readRequest_ be Record {[[promise]]: _promise_, [[forAuthorCode]]: _forAuthorCode_}.
   1. Append _readRequest_ as the last element of _stream_.[[reader]].[[readRequests]].
   1. Return _promise_.
 </emu-alg>
@@ -1131,7 +1132,8 @@ nothrow>ReadableStreamAddReadIntoRequest ( <var>stream</var> )</h4>
   1. If _reader_ is *undefined*, return.
   1. If ! IsReadableStreamDefaultReader(_reader_) is *true*,
     1. Repeat for each _readRequest_ that is an element of _reader_.[[readRequests]],
-      1. <a>Resolve</a> _readRequest_.[[promise]] with ! CreateIterResultObject(*undefined*, *true*).
+      1. <a>Resolve</a> _readRequest_.[[promise]] with ! ReadableStreamCreateReadResult(*undefined*, *true*,
+         _readRequest_.[[forAuthorCode]]).
     1. Set _reader_.[[readRequests]] to an empty List.
   1. <a>Resolve</a> _reader_.[[closedPromise]] with *undefined*.
 </emu-alg>
@@ -1143,6 +1145,38 @@ nothrow>ReadableStreamAddReadIntoRequest ( <var>stream</var> )</h4>
   controller's <code>close</code> method to be called and silently do nothing, since the cancelation was outside the
   control of the underlying source.
 </div>
+
+<h4 id="readable-stream-create-read-result" aoid="ReadableStreamCreateReadResult" nothrow>ReadableStreamCreateReadResult
+( <var>value</var>, <var>done</var>, <var>forAuthorCode</var> )</h4>
+
+<div class="note" id="rs-read-result-for-author-code">
+  When <var>forAuthorCode</var> is <emu-val>true</emu-val>, this abstract operation gives the same result
+  as <a abstract-op>CreateIterResultObject</a>(<var>value</var>, <var>done</var>). This provides the expected semantics
+  when the object is to be returned from the {{ReadableStreamDefaultReader/read()|defaultReader.read()}} or
+  {{ReadableStreamBYOBReader/read()|byobReader.read()}} methods.
+
+  However, resolving promises with such objects will unavoidably result in an access to
+  <code>Object.prototype.then</code>. For internal use, particularly in {{ReadableStream/pipeTo()}} and in other
+  specifications, it is important that reads not be observable by author code—even if that author code has tampered with
+  <code>Object.prototype</code>. For this reason, a <emu-val>false</emu-val> value of <var>forAuthorCode</var> results
+  in an object with a <emu-val>null</emu-val> prototype, keeping promise resolution unobservable.
+
+  The underlying issue here is that reading from streams always uses promises for <code>{ value, done }</code> objects,
+  even in specifications. Although it is conceivable we could rephrase all of the internal algorithms to not use
+  promises and not use JavaScript objects, and instead only package up the results into promise-for-<code>{ value, done
+  }</code> when a <code>read()</code> method is called, this would be a large undertaking, which we have not done. See
+  <a href="https://github.com/whatwg/infra/issues/181">whatwg/infra#181</a> for more background on this subject.
+</div>
+
+<emu-alg>
+  1. Let _prototype_ be *null*.
+  1. If _forAuthorCode_ is *true*, set _prototype_ to %ObjectPrototype%.
+  1. Assert: Type(_done_) is Boolean.
+  1. Let _obj_ be ObjectCreate(_prototype_).
+  1. Perform CreateDataProperty(_obj_, `"value"`, _value_).
+  1. Perform CreateDataProperty(_obj_, `"done"`, _done_).
+  1. Return _obj_.
+</emu-alg>
 
 <h4 id="readable-stream-error" aoid="ReadableStreamError" nothrow>ReadableStreamError ( <var>stream</var>, <var>e</var>
 )</h4>
@@ -1175,7 +1209,8 @@ nothrow>ReadableStreamFulfillReadIntoRequest ( <var>stream</var>, <var>chunk</va
   1. Let _readIntoRequest_ be the first element of _reader_.[[readIntoRequests]].
   1. Remove _readIntoRequest_ from _reader_.[[readIntoRequests]], shifting all other elements downward (so that the
      second becomes the first, and so on).
-  1. <a>Resolve</a> _readIntoRequest_.[[promise]] with ! CreateIterResultObject(_chunk_, _done_).
+  1. <a>Resolve</a> _readIntoRequest_.[[promise]] with ! ReadableStreamCreateReadResult(_chunk_, _done_,
+     _readIntoRequest_.[[forAuthorCode]]).
 </emu-alg>
 
 <h4 id="readable-stream-fulfill-read-request" aoid="ReadableStreamFulfillReadRequest"
@@ -1186,7 +1221,8 @@ nothrow>ReadableStreamFulfillReadRequest ( <var>stream</var>, <var>chunk</var>, 
   1. Let _readRequest_ be the first element of _reader_.[[readRequests]].
   1. Remove _readRequest_ from _reader_.[[readRequests]], shifting all other elements downward (so that the second
      becomes the first, and so on).
-  1. <a>Resolve</a> _readRequest_.[[promise]] with ! CreateIterResultObject(_chunk_, _done_).
+  1. <a>Resolve</a> _readRequest_.[[promise]] with ! ReadableStreamCreateReadResult(_chunk_, _done_,
+     _readRequest_.[[forAuthorCode]]).
 </emu-alg>
 
 <h4 id="readable-stream-get-num-read-into-requests" aoid="ReadableStreamGetNumReadIntoRequests"
@@ -1343,7 +1379,7 @@ lt="ReadableStreamDefaultReader(stream)">new ReadableStreamDefaultReader(<var>st
 <emu-alg>
   1. If ! IsReadableStreamDefaultReader(*this*) is *false*, return <a>a promise rejected with</a> a *TypeError* exception.
   1. If *this*.[[ownerReadableStream]] is *undefined*, return <a>a promise rejected with</a> a *TypeError* exception.
-  1. Return ! ReadableStreamDefaultReaderRead(*this*).
+  1. Return ! ReadableStreamDefaultReaderRead(*this*, *true*).
 </emu-alg>
 
 <h5 id="default-reader-release-lock" method for="ReadableStreamDefaultReader">releaseLock()</h5>
@@ -1492,7 +1528,7 @@ ReadableStreamBYOBReader(<var>stream</var>)</h4>
   1. If ! IsDetachedBuffer(_view_.[[ViewedArrayBuffer]]) is *true*, return <a>a promise rejected with</a> a *TypeError*
      exception.
   1. If _view_.[[ByteLength]] is *0*, return <a>a promise rejected with</a> a *TypeError* exception.
-  1. Return ! ReadableStreamBYOBReaderRead(*this*, _view_).
+  1. Return ! ReadableStreamBYOBReaderRead(*this*, _view_, *true*).
 </emu-alg>
 
 <h5 id="byob-reader-release-lock" method for="ReadableStreamBYOBReader">releaseLock()</h5>
@@ -1575,28 +1611,35 @@ nothrow>ReadableStreamReaderGenericRelease ( <var>reader</var> )</h4>
 </emu-alg>
 
 <h4 id="readable-stream-byob-reader-read" aoid="ReadableStreamBYOBReaderRead" nothrow>ReadableStreamBYOBReaderRead
-( <var>reader</var>, <var>view</var> )</h4>
+( <var>reader</var>, <var>view</var> [, <var>forAuthorCode</var> ] )</h4>
 
 <emu-alg>
+  1. If _forAuthorCode_ was not passed, set it to *false*.
   1. Let _stream_ be _reader_.[[ownerReadableStream]].
   1. Assert: _stream_ is not *undefined*.
   1. Set _stream_.[[disturbed]] to *true*.
   1. If _stream_.[[state]] is `"errored"`, return <a>a promise rejected with</a> _stream_.[[storedError]].
-  1. Return ! ReadableByteStreamControllerPullInto(_stream_.[[readableStreamController]], _view_).
+  1. Return ! ReadableByteStreamControllerPullInto(_stream_.[[readableStreamController]], _view_, _forAuthorCode_).
 </emu-alg>
 
 <h4 id="readable-stream-default-reader-read" aoid="ReadableStreamDefaultReaderRead" nothrow
-export>ReadableStreamDefaultReaderRead ( <var>reader</var> )</h4>
+export>ReadableStreamDefaultReaderRead ( <var>reader</var> [, <var>forAuthorCode</var> ] )</h4>
+
+<p class="note">Other specifications ought to leave <var>forAuthorCode</var> as its default value of
+<emu-val>false</emu-val>, unless they are planning to directly expose the resulting <code>{ value, done }</code> object
+to authors. See <a href="#rs-read-result-for-author-code">the note regarding ReadableStreamCreateReadResult</a> for more
+information.</p>
 
 <emu-alg>
+  1. If _forAuthorCode_ was not passed, set it to *false*.
   1. Let _stream_ be _reader_.[[ownerReadableStream]].
   1. Assert: _stream_ is not *undefined*.
   1. Set _stream_.[[disturbed]] to *true*.
-  1. If _stream_.[[state]] is `"closed"`, return <a>a promise resolved with</a> ! CreateIterResultObject(*undefined*,
-     *true*).
+  1. If _stream_.[[state]] is `"closed"`, return <a>a promise resolved with</a> !
+     ReadableStreamCreateReadResult(*undefined*, *true*, _forAuthorCode_).
   1. If _stream_.[[state]] is `"errored"`, return <a>a promise rejected with</a> _stream_.[[storedError]].
   1. Assert: _stream_.[[state]] is `"readable"`.
-  1. Return ! _stream_.[[readableStreamController]].<a abstract-op>[[PullSteps]]</a>().
+  1. Return ! _stream_.[[readableStreamController]].<a abstract-op>[[PullSteps]]</a>(_forAuthorCode_).
 </emu-alg>
 
 <h3 id="rs-default-controller-class" interface lt="ReadableStreamDefaultController">Class
@@ -1770,7 +1813,7 @@ readable stream implementation will polymorphically call to either these or thei
   1. Return the result of performing *this*.[[cancelAlgorithm]], passing _reason_.
 </emu-alg>
 
-<h5 id="rs-default-controller-private-pull"><a abstract-op>\[[PullSteps]]</a>()</h5>
+<h5 id="rs-default-controller-private-pull"><a abstract-op>\[[PullSteps]]</a>( <var>forAuthorCode</var> )</h5>
 
 <emu-alg>
   1. Let _stream_ be *this*.[[controlledReadableStream]].
@@ -1778,8 +1821,8 @@ readable stream implementation will polymorphically call to either these or thei
     1. Let _chunk_ be ! DequeueValue(*this*).
     1. If *this*.[[closeRequested]] is *true* and *this*.[[queue]] is empty, perform ! ReadableStreamClose(_stream_).
     1. Otherwise, perform ! ReadableStreamDefaultControllerCallPullIfNeeded(*this*).
-    1. Return <a>a promise resolved with</a> ! CreateIterResultObject(_chunk_, *false*).
-  1. Let _pendingPromise_ be ! ReadableStreamAddReadRequest(_stream_).
+    1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_chunk_, *false*, _forAuthorCode_).
+  1. Let _pendingPromise_ be ! ReadableStreamAddReadRequest(_stream_, _forAuthorCode_).
   1. Perform ! ReadableStreamDefaultControllerCallPullIfNeeded(*this*).
   1. Return _pendingPromise_.
 </emu-alg>
@@ -1825,7 +1868,8 @@ nothrow>ReadableStreamDefaultControllerShouldCallPull ( <var>controller</var> )<
   1. If _controller_.[[started]] is *false*, return *false*.
   1. If ! IsReadableStreamLocked(_stream_) is *true* and ! ReadableStreamGetNumReadRequests(_stream_) > *0*, return
      *true*.
-  1. Let _desiredSize_ be ReadableStreamDefaultControllerGetDesiredSize(_controller_).
+  1. Let _desiredSize_ be ! ReadableStreamDefaultControllerGetDesiredSize(_controller_).
+  1. Assert: _desiredSize_ is not *null*.
   1. If _desiredSize_ > *0*, return *true*.
   1. Return *false*.
 </emu-alg>
@@ -1876,8 +1920,7 @@ export>ReadableStreamDefaultControllerError ( <var>controller</var>, <var>e</var
 
 This abstract operation can be called by other specifications that wish to move a readable stream to an errored state,
 in the same way a developer would error a stream using its associated controller object. Specifications should
-<em>not</em> do this to streams they did not create, and must ensure they have obeyed the precondition (listed here as
-an assert).
+<em>not</em> do this to streams they did not create.
 
 <emu-alg>
   1. Let _stream_ be _controller_.[[controlledReadableStream]].
@@ -2104,7 +2147,7 @@ ReadableByteStreamController()</h4>
 </div>
 
 <emu-alg>
-  1. If IsReadableByteStreamController(*this*) is *false*, throw a *TypeError* exception.
+  1. If ! IsReadableByteStreamController(*this*) is *false*, throw a *TypeError* exception.
   1. If *this*.[[byobRequest]] is *undefined* and *this*.[[pendingPullIntos]] is not empty,
     1. Let _firstDescriptor_ be the first element of *this*.[[pendingPullIntos]].
     1. Let _view_ be ! Construct(<a idl>%Uint8Array%</a>, « _firstDescriptor_.[[buffer]],
@@ -2187,7 +2230,7 @@ readable stream implementation will polymorphically call to either these or thei
   1. Return the result of performing *this*.[[cancelAlgorithm]], passing in _reason_.
 </emu-alg>
 
-<h5 id="rbs-controller-private-pull"><a abstract-op>\[[PullSteps]]</a>()</h5>
+<h5 id="rbs-controller-private-pull"><a abstract-op>\[[PullSteps]]</a>( <var>forAuthorCode</var> )</h5>
 
 <emu-alg>
   1. Let _stream_ be *this*.[[controlledReadableByteStream]].
@@ -2201,7 +2244,7 @@ readable stream implementation will polymorphically call to either these or thei
     1. Perform ! ReadableByteStreamControllerHandleQueueDrain(*this*).
     1. Let _view_ be ! Construct(<a idl>%Uint8Array%</a>, « _entry_.[[buffer]], _entry_.[[byteOffset]],
        _entry_.[[byteLength]] »).
-    1. Return <a>a promise resolved with</a> ! CreateIterResultObject(_view_, *false*).
+    1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_view_, *false*, _forAuthorCode_).
   1. Let _autoAllocateChunkSize_ be *this*.[[autoAllocateChunkSize]].
   1. If _autoAllocateChunkSize_ is not *undefined*,
     1. Let _buffer_ be Construct(%ArrayBuffer%, « _autoAllocateChunkSize_ »).
@@ -2210,7 +2253,7 @@ readable stream implementation will polymorphically call to either these or thei
        _autoAllocateChunkSize_, [[bytesFilled]]: *0*, [[elementSize]]: *1*, [[ctor]]: <a idl>%Uint8Array%</a>,
        [[readerType]]: `"default"`}.
     1. Append _pullIntoDescriptor_ as the last element of *this*.[[pendingPullIntos]].
-  1. Let _promise_ be ! ReadableStreamAddReadRequest(_stream_).
+  1. Let _promise_ be ! ReadableStreamAddReadRequest(_stream_, _forAuthorCode_).
   1. Perform ! ReadableByteStreamControllerCallPullIfNeeded(*this*).
   1. Return _promise_.
 </emu-alg>
@@ -2231,12 +2274,12 @@ would look like
 
 <pre><code class="lang-javascript">
   class ReadableStreamBYOBRequest {
-    <a href="rs-byob-request-constructor">constructor</a>(controller, view)
+    <a href="#rs-byob-request-constructor">constructor</a>(controller, view)
 
-    get <a href="rs-byob-request-view">view</a>()
+    get <a href="#rs-byob-request-view">view</a>()
 
-    <a href="rs-byob-request-respond">respond</a>(bytesWritten)
-    <a href="rs-byob-request-respond-with-new-view">respondWithNewView</a>(view)
+    <a href="#rs-byob-request-respond">respond</a>(bytesWritten)
+    <a href="#rs-byob-request-respond-with-new-view">respondWithNewView</a>(view)
   }
 </code></pre>
 
@@ -2558,7 +2601,7 @@ nothrow>ReadableByteStreamControllerProcessPullIntoDescriptorsUsingQueue ( <var>
 </emu-alg>
 
 <h4 id="readable-byte-stream-controller-pull-into" aoid="ReadableByteStreamControllerPullInto"
-nothrow>ReadableByteStreamControllerPullInto ( <var>controller</var>, <var>view</var> )</h4>
+nothrow>ReadableByteStreamControllerPullInto ( <var>controller</var>, <var>view</var>, <var>forAuthorCode</var> )</h4>
 
 <emu-alg>
   1. Let _stream_ be _controller_.[[controlledReadableByteStream]].
@@ -2577,21 +2620,21 @@ nothrow>ReadableByteStreamControllerPullInto ( <var>controller</var>, <var>view<
      [[ctor]]: _ctor_, [[readerType]]: `"byob"`}.
   1. If _controller_.[[pendingPullIntos]] is not empty,
     1. Append _pullIntoDescriptor_ as the last element of _controller_.[[pendingPullIntos]].
-    1. Return ! ReadableStreamAddReadIntoRequest(_stream_).
+    1. Return ! ReadableStreamAddReadIntoRequest(_stream_, _forAuthorCode_).
   1. If _stream_.[[state]] is `"closed"`,
     1. Let _emptyView_ be ! Construct(_ctor_, « _pullIntoDescriptor_.[[buffer]], _pullIntoDescriptor_.[[byteOffset]], *0* »).
-    1. Return <a>a promise resolved with</a> ! CreateIterResultObject(_emptyView_, *true*).
+    1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_emptyView_, *true*, _forAuthorCode_).
   1. If _controller_.[[queueTotalSize]] > *0*,
     1. If ! ReadableByteStreamControllerFillPullIntoDescriptorFromQueue(_controller_, _pullIntoDescriptor_) is *true*,
       1. Let _filledView_ be ! ReadableByteStreamControllerConvertPullIntoDescriptor(_pullIntoDescriptor_).
       1. Perform ! ReadableByteStreamControllerHandleQueueDrain(_controller_).
-      1. Return <a>a promise resolved with</a> ! CreateIterResultObject(_filledView_, *false*).
+      1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_filledView_, *false*, _forAuthorCode_).
     1. If _controller_.[[closeRequested]] is *true*,
       1. Let _e_ be a *TypeError* exception.
       1. Perform ! ReadableByteStreamControllerError(_controller_, _e_).
       1. Return <a>a promise rejected with</a> _e_.
   1. Append _pullIntoDescriptor_ as the last element of _controller_.[[pendingPullIntos]].
-  1. Let _promise_ be ! ReadableStreamAddReadIntoRequest(_stream_).
+  1. Let _promise_ be ! ReadableStreamAddReadIntoRequest(_stream_, _forAuthorCode_).
   1. Perform ! ReadableByteStreamControllerCallPullIfNeeded(_controller_).
   1. Return _promise_.
 </emu-alg>
@@ -2615,7 +2658,7 @@ nothrow>ReadableByteStreamControllerRespondInClosedState ( <var>controller</var>
   1. Set _firstDescriptor_.[[buffer]] to ! TransferArrayBuffer(_firstDescriptor_.[[buffer]]).
   1. Assert: _firstDescriptor_.[[bytesFilled]] is *0*.
   1. Let _stream_ be _controller_.[[controlledReadableByteStream]].
-  1. If ReadableStreamHasBYOBReader(_stream_) is *true*,
+  1. If ! ReadableStreamHasBYOBReader(_stream_) is *true*,
     1. Repeat the following steps while ! ReadableStreamGetNumReadIntoRequests(_stream_) > *0*,
       1. Let _pullIntoDescriptor_ be ! ReadableByteStreamControllerShiftPendingPullInto(_controller_).
       1. Perform ! ReadableByteStreamControllerCommitPullIntoDescriptor(_stream_, _pullIntoDescriptor_).
@@ -2697,7 +2740,9 @@ nothrow>ReadableByteStreamControllerShouldCallPull ( <var>controller</var> )</h4
      return *true*.
   1. If ! ReadableStreamHasBYOBReader(_stream_) is *true* and ! ReadableStreamGetNumReadIntoRequests(_stream_) > *0*,
      return *true*.
-  1. If ! ReadableByteStreamControllerGetDesiredSize(_controller_) > *0*, return *true*.
+  1. Let _desiredSize_ be  ! ReadableByteStreamControllerGetDesiredSize(_controller_).
+  1. Assert: _desiredSize_ is not *null*.
+  1. If _desiredSize_ > *0*, return *true*.
   1. Return *false*.
 </emu-alg>
 
@@ -2748,6 +2793,7 @@ throws>SetUpReadableByteStreamControllerFromUnderlyingSource ( <var>stream</var>
   1. Let _cancelAlgorithm_ be ? CreateAlgorithmFromUnderlyingMethod(_underlyingByteSource_, `"cancel"`, *1*, « »).
   1. Let _autoAllocateChunkSize_ be ? GetV(_underlyingByteSource_, `"autoAllocateChunkSize"`).
   1. If _autoAllocateChunkSize_ is not *undefined*,
+    1. Set _autoAllocateChunkSize_ to ? ToNumber(_autoAllocateChunkSize_).
     1. If ! IsInteger(_autoAllocateChunkSize_) is *false*, or if _autoAllocateChunkSize_ ≤ *0*, throw a *RangeError*
        exception.
   1. Perform ? SetUpReadableByteStreamController(_stream_, _controller_, _startAlgorithm_, _pullAlgorithm_,
@@ -3001,9 +3047,9 @@ WritableStream(<var>underlyingSink</var> = {}, <var>strategy</var> = {})</h4>
 
 <emu-alg>
   1. Perform ! InitializeWritableStream(_this_).
-  1. Let _type_ be ? GetV(_underlyingSink_, `"type"`).
   1. Let _size_ be ? GetV(_strategy_, `"size"`).
   1. Let _highWaterMark_ be ? GetV(_strategy_, `"highWaterMark"`).
+  1. Let _type_ be ? GetV(_underlyingSink_, `"type"`).
   1. If _type_ is not *undefined*, throw a *RangeError* exception. <p class="note">This is to allow us to add new
      potential types in the future, without backward-compatibility concerns.</p>
   1. Let _sizeAlgorithm_ be ? MakeSizeAlgorithmFromSizeFunction(_size_).
@@ -3293,8 +3339,8 @@ nothrow>WritableStreamDealWithRejection ( <var>stream</var>, <var>error</var> )<
   1. Repeat for each _writeRequest_ that is an element of _stream_.[[writeRequests]],
     1. <a>Reject</a> _writeRequest_ with _storedError_.
   1. Set _stream_.[[writeRequests]] to an empty List.
-  1. if _stream_.[[pendingAbortRequest]] is *undefined*,
-    1. Perform !  WritableStreamRejectCloseAndClosedPromiseIfNeeded(_stream_).
+  1. If _stream_.[[pendingAbortRequest]] is *undefined*,
+    1. Perform ! WritableStreamRejectCloseAndClosedPromiseIfNeeded(_stream_).
     1. Return.
   1. Let _abortRequest_ be _stream_.[[pendingAbortRequest]].
   1. Set _stream_.[[pendingAbortRequest]] to *undefined*.
@@ -3901,7 +3947,9 @@ used polymorphically.
 <var>reason</var> )</h5>
 
 <emu-alg>
-  1. Return the result of performing *this*.[[abortAlgorithm]], passing _reason_.
+  1. Let _result_ be the result of performing *this*.[[abortAlgorithm]], passing _reason_.
+  1. Perform ! WritableStreamDefaultControllerClearAlgorithms(*this*).
+  1. Return _result_.
 </emu-alg>
 
 <h5 id="ws-default-controller-private-error">\[[ErrorSteps]]()</h5>
@@ -3967,6 +4015,26 @@ throws>SetUpWritableStreamDefaultControllerFromUnderlyingSink ( <var>stream</var
   1. Let _abortAlgorithm_ be ? CreateAlgorithmFromUnderlyingMethod(_underlyingSink_, `"abort"`, *1*, « »).
   1. Perform ? SetUpWritableStreamDefaultController(_stream_, _controller_, _startAlgorithm_, _writeAlgorithm_,
      _closeAlgorithm_, _abortAlgorithm_, _highWaterMark_, _sizeAlgorithm_).
+</emu-alg>
+
+<h4 id="writable-stream-default-controller-clear-algorithms" aoid="WritableStreamDefaultControllerClearAlgorithms"
+nothrow>WritableStreamDefaultControllerClearAlgorithms ( <var>controller</var> )</h4>
+
+This abstract operation is called once the stream is closed or errored and the algorithms will not be executed any more.
+By removing the algorithm references it permits the <a>underlying sink</a> object to be garbage collected even if the
+{{WritableStream}} itself is still referenced.
+
+<p class="note">The results of this algorithm are not currently observable, but could become so if JavaScript eventually
+adds <a href="https://github.com/tc39/proposal-weakrefs/">weak references</a>. But even without that factor,
+implementations will likely want to include similar steps.</p>
+
+<p class="note">This operation will be performed multiple times in some edge cases. After the first time it will do
+nothing.</p>
+
+<emu-alg>
+  1. Set _controller_.[[writeAlgorithm]] to *undefined*.
+  1. Set _controller_.[[closeAlgorithm]] to *undefined*.
+  1. Set _controller_.[[abortAlgorithm]] to *undefined*.
 </emu-alg>
 
 <h4 id="writable-stream-default-controller-close" aoid="WritableStreamDefaultControllerClose"
@@ -4049,6 +4117,7 @@ nothrow>WritableStreamDefaultControllerProcessClose ( <var>controller</var> )</h
   1. Perform ! DequeueValue(_controller_).
   1. Assert: _controller_.[[queue]] is empty.
   1. Let _sinkClosePromise_ be the result of performing _controller_.[[closeAlgorithm]].
+  1. Perform ! WritableStreamDefaultControllerClearAlgorithms(_controller_).
   1. <a>Upon fulfillment</a> of _sinkClosePromise_,
     1. Perform ! WritableStreamFinishInFlightClose(_stream_).
   1. <a>Upon rejection</a> of _sinkClosePromise_ with reason _reason_,
@@ -4072,6 +4141,7 @@ nothrow>WritableStreamDefaultControllerProcessWrite ( <var>controller</var>, <va
       1. Perform ! WritableStreamUpdateBackpressure(_stream_, _backpressure_).
     1. Perform ! WritableStreamDefaultControllerAdvanceQueueIfNeeded(_controller_).
   1. <a>Upon rejection</a> of _sinkWritePromise_ with _reason_,
+    1. If _stream_.[[state]] is `"writable"`, perform ! WritableStreamDefaultControllerClearAlgorithms(_controller_).
     1. Perform ! WritableStreamFinishInFlightWriteWithError(_stream_, _reason_).
 </emu-alg>
 
@@ -4089,6 +4159,7 @@ nothrow>WritableStreamDefaultControllerError ( <var>controller</var>, <var>error
 <emu-alg>
   1. Let _stream_ be _controller_.[[controlledWritableStream]].
   1. Assert: _stream_.[[state]] is `"writable"`.
+  1. Perform ! WritableStreamDefaultControllerClearAlgorithms(_controller_).
   1. Perform ! WritableStreamStartErroring(_stream_, _error_).
 </emu-alg>
 
@@ -4225,18 +4296,18 @@ readableStrategy)">new TransformStream(<var>transformer</var> = {}, <var ignore>
 </div>
 
 <emu-alg>
-  1. Let _readableType_ be ? GetV(_transformer_, `"readableType"`).
-  1. If _readableType_ is not *undefined*, throw a *RangeError* exception.
+  1. Let _writableSizeFunction_ be ? GetV(_writableStrategy_, `"size"`).
+  1. Let _writableHighWaterMark_ be ? GetV(_writableStrategy_, `"highWaterMark"`).
+  1. Let _readableSizeFunction_ be ? GetV(_readableStrategy_, `"size"`).
+  1. Let _readableHighWaterMark_ be ? GetV(_readableStrategy_, `"highWaterMark"`).
   1. Let _writableType_ be ? GetV(_transformer_, `"writableType"`).
   1. If _writableType_ is not *undefined*, throw a *RangeError* exception.
-  1. Let _writableSizeFunction_ be ? GetV(_writableStrategy_, `"size"`).
   1. Let _writableSizeAlgorithm_ be ? MakeSizeAlgorithmFromSizeFunction(_writableSizeFunction_).
-  1. Let _writableHighWaterMark_ be ? GetV(_writableStrategy_, `"highWaterMark"`).
   1. If _writableHighWaterMark_ is *undefined*, set _writableHighWaterMark_ to *1*.
   1. Set _writableHighWaterMark_ to ? ValidateAndNormalizeHighWaterMark(_writableHighWaterMark_).
-  1. Let _readableSizeFunction_ be ? GetV(_readableStrategy_, `"size"`).
+  1. Let _readableType_ be ? GetV(_transformer_, `"readableType"`).
+  1. If _readableType_ is not *undefined*, throw a *RangeError* exception.
   1. Let _readableSizeAlgorithm_ be ? MakeSizeAlgorithmFromSizeFunction(_readableSizeFunction_).
-  1. Let _readableHighWaterMark_ be ? GetV(_readableStrategy_, `"highWaterMark"`).
   1. If _readableHighWaterMark_ is *undefined*, set _readableHighWaterMark_ to *0*.
   1. Set _readableHighWaterMark_ be ? ValidateAndNormalizeHighWaterMark(_readableHighWaterMark_).
   1. Let _startPromise_ be <a>a new promise</a>.
@@ -4428,6 +4499,7 @@ algorithms do not need to check stream states when responding to an error condit
 nothrow>TransformStreamErrorWritableAndUnblockWrite ( <var>stream</var>, <var>e</var> )</h4>
 
 <emu-alg>
+  1. Perform ! TransformStreamDefaultControllerClearAlgorithms(_stream_.[[transformStreamController]]);
   1. Perform ! WritableStreamDefaultControllerErrorIfNeeded(_stream_.[[writable]].[[writableStreamController]], _e_).
   1. If _stream_.[[backpressure]] is *true*, perform ! TransformStreamSetBackpressure(_stream_, *false*).
 </emu-alg>
@@ -4618,6 +4690,22 @@ throws>SetUpTransformStreamDefaultControllerFromTransformer ( <var>stream</var>,
   1. Perform ! SetUpTransformStreamDefaultController(_stream_, _controller_, _transformAlgorithm_, _flushAlgorithm_).
 </emu-alg>
 
+<h4 id="transform-stream-default-controller-clear-algorithms" aoid="TransformStreamDefaultControllerClearAlgorithms"
+nothrow>TransformStreamDefaultControllerClearAlgorithms ( <var>controller</var> )</h4>
+
+This abstract operation is called once the stream is closed or errored and the algorithms will not be executed any more.
+By removing the algorithm references it permits the <a>transformer</a> object to be garbage collected even if the
+{{TransformStream}} itself is still referenced.
+
+<p class="note">The results of this algorithm are not currently observable, but could become so if JavaScript eventually
+adds <a href="https://github.com/tc39/proposal-weakrefs/">weak references</a>. But even without that factor,
+implementations will likely want to include similar steps.</p>
+
+<emu-alg>
+  1. Set _controller_.[[transformAlgorithm]] to *undefined*.
+  1. Set _controller_.[[flushAlgorithm]] to *undefined*.
+</emu-alg>
+
 <h4 id="transform-stream-default-controller-enqueue" aoid="TransformStreamDefaultControllerEnqueue"
 throws export>TransformStreamDefaultControllerEnqueue ( <var>controller</var>, <var>chunk</var> )</h4>
 
@@ -4701,7 +4789,9 @@ nothrow>TransformStreamDefaultSinkCloseAlgorithm( <var>stream</var> )</h4>
 
 <emu-alg>
   1. Let _readable_ be _stream_.[[readable]].
-  1. Let _flushPromise_ be the result of performing _stream_.[[transformStreamController]].[[flushAlgorithm]].
+  1. Let _controller_ be _stream_.[[transformStreamController]].
+  1. Let _flushPromise_ be the result of performing _controller_.[[flushAlgorithm]].
+  1. Perform ! TransformStreamDefaultControllerClearAlgorithms(_controller_).
   1. Return the result of <a>transforming</a> _flushPromise_ with:
     1. A fulfillment handler that performs the following steps:
       1. If _readable_.[[state]] is `"errored"`, throw _readable_.[[storedError]].
@@ -5695,10 +5785,16 @@ The class would be used in code like:
   const ts = new TransformStream(new LipFuzzTransformer(data));
 
   fetchEvent.respondWith(
-    fetch(url).then(response => {
-      const transformedBody = response.body.pipeThrough(ts);
+    fetch(fetchEvent.request.url).then(response => {
+      const transformedBody = response.body
+        // Decode the binary-encoded response to string
+        .pipeThrough(new TextDecoderStream())
+        // Apply the LipFuzzTransformer
+        .pipeThrough(ts)
+        // Encode the transformed string
+        .pipeThrough(new TextEncoderStream());
       return new Response(transformedBody);
-    )
+    })
   );
 </code></pre>
 
@@ -5786,6 +5882,7 @@ values, and all arithmetic operations performed on them must be done in the stan
 The editors would like to thank
 Anne van Kesteren,
 AnthumChris,
+Arthur Langereis,
 Ben Kelly,
 Bert Belder,
 Brian di Palma,

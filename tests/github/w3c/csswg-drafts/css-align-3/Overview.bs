@@ -20,11 +20,12 @@ Previous Version: https://www.w3.org/TR/2014/WD-css-align-3-20141218/
 Previous Version: https://www.w3.org/TR/2013/WD-css3-align-20130514/
 Previous Version: https://www.w3.org/TR/2012/WD-css3-align-20120612/
 Abstract: This module contains the features of <a href="https://www.w3.org/TR/CSS/">CSS</a> relating to the alignment of boxes within their containers in the various CSS box layout models: block layout, table layout, flex layout, and grid layout. (The alignment of text and inline-level content is defined in [[CSS-TEXT-3]] and [[CSS-INLINE-3]].)
-Ignored Terms: table cell, stretch, scrollable overflow region
+Ignored Terms: table cell, stretch, scrollable overflow region, static position, static-position containing block, static positions
 At Risk: ''[ first | last ]? baseline''
 At Risk: the <<overflow-position>> keywords
 At Risk: the scrollable-area safety trigger into ''safe'' mode when no <<overflow-position>> is specified
 At Risk: the ''legacy'' keyword for 'justify-items'
+At Risk: the effect of the <a>box alignment properties</a> on absolutely-positioned boxes with ''left/auto'' offsets
 </pre>
 
 <pre class=link-defaults>
@@ -46,7 +47,7 @@ spec:css-inline-3; type:property;
 	text:dominant-baseline
 	text:alignment-baseline
 spec:css-multicol-1; type:dfn;
-	text:multi-column element
+	text:multi-column container
 	text:column box
 spec:css-overflow-3; type:dfn; text:scroll container
 spec:css-position-3; type:property; text:left
@@ -321,7 +322,7 @@ Positional Alignment: the ''center'', ''start'', ''end'', ''self-start'', ''self
 			and on boxes that are not <a>flex containers</a>,
 			this value behaves as ''end'' when used in the <a>content-distribution properties</a>.
 
-		<dt><dfn for="<self-position>, <content-position>">left</dfn> <small>([[#self-alignment|self]], [[#content-distribution|content]])</small>
+		<dt><dfn for="justify-content, justify-self, justify-items">left</dfn> <small>(only 'justify-*')</small>
 		<dd>Aligns the <a>alignment subject</a> to be flush with
 			the <a>alignment container</a>’s <a href="https://www.w3.org/TR/css3-writing-modes/#line-left">line-left</a>
 			or <a>physical left</a> edge,
@@ -329,7 +330,7 @@ Positional Alignment: the ''center'', ''start'', ''end'', ''self-start'', ''self
 			If the property's axis is not parallel with either left↔right axis,
 			this value behaves as ''start''.
 
-		<dt><dfn for="<self-position>, <content-position>">right</dfn> <small>([[#self-alignment|self]], [[#content-distribution|content]])</small>
+		<dt><dfn for="justify-content, justify-self, justify-items">right</dfn> <small>(only 'justify-*')</small>
 		<dd>Aligns the <a>alignment subject</a> to be flush with
 			the <a>alignment container</a>’s <a href="https://www.w3.org/TR/css3-writing-modes/#line-right">line-right</a>
 			or <a>physical right</a> edge,
@@ -361,10 +362,10 @@ Positional Alignment: the ''center'', ''start'', ''end'', ''self-start'', ''self
 			</pre>
 	</dl>
 
-	Note: ''left'' and ''right'' are excluded from <<self-position>>,
-	despite being valid [=positional alignment=] values for 'justify-self'/'justify-items',
-	because they are not allowed in 'align-self'.
-	They are instead explicitly included in the 'justify-self' and 'justify-items' grammars.
+	Note: ''left'' and ''right'' are excluded from <<self-position>> and <<content-position>>,
+	despite being valid [=positional alignment=] values for 'justify-content'/'justify-self'/'justify-items',
+	because they are not allowed in the 'align-*' properties.
+	They are instead explicitly included in the 'justify-*' properties’ grammars.
 
 	<aside class=example>
 		The ''<self-position>/start'' and ''<self-position>/end'' keywords
@@ -844,7 +845,7 @@ Overflow Alignment: the ''safe'' and ''unsafe'' keywords and scroll safety limit
 -->
 
 <h2 id='content-distribution' dfn lt="content-distribution" export>
-Content Distribution: aligning a box's contents within itself</h2>
+Content Distribution: Aligning a Box’s Contents Within Itself</h2>
 
 	Content-distribution controls alignment of the box's content within its content box.
 	It is specified by the <dfn export>content-distribution properties</dfn> 'align-content' and 'justify-content'
@@ -855,7 +856,7 @@ Content Distribution: aligning a box's contents within itself</h2>
 	</div>
 
 <h3 id='align-justify-content'>
-The 'justify-content' And 'align-content' Properties</h3>
+The 'justify-content' and 'align-content' Properties</h3>
 
 	<pre class="propdef">
 	Name: align-content
@@ -909,11 +910,13 @@ The 'justify-content' And 'align-content' Properties</h3>
 		<tr>
 			<th>'justify-content' Axis
 			<td>
-				Does not apply to and has no effect on <a>block containers</a>.
+				Does not apply to and has no effect on <a>block containers</a>
+				except insofar as it affects absolutely-positioned elements,
+				see [[#distribution-abspos-static]].
 		<tr>
 			<th>''justify-content/normal'' Behavior
 			<td>
-				All values other than ''justify-content/normal'' force the block container to establish a new formatting context.
+				All values other than ''justify-content/normal'' force the block container to [=establish an independent formatting context=].
 
 				For table cells, the behavior of the ''justify-content/normal'' depends on the computed value of 'vertical-align':
 				''vertical-align/top'' makes it behave as ''start'',
@@ -925,13 +928,50 @@ The 'justify-content' And 'align-content' Properties</h3>
 				''justify-content/normal'' otherwise behaves as ''start''.
 	</table>
 
+### Static Position of Absolutely-Positioned Boxes ### {#distribution-abspos-static}
+
+	When applying the layout rules for absolutely-positioned elements
+	([[CSS2#abs-non-replaced-width]] and [[CSS2#abs-replaced-width]])
+	wherever the 'direction' property of the <a>static-position containing block</a> is referenced,
+	instead reference the value of its 'justify-content' or 'align-content' property
+	(whichever is defined to apply to the <a>static-position containing block</a>’s <a>inline axis</a>),
+	treating ''justify-content/normal'' as ''start''
+	and any <a>distributed alignment</a> value as its <a>fallback alignment</a>.
+	For example,
+	when 'direction' is ''ltr'' and 'justify-content' is ''justify-content/end'',
+	apply the rules for ''direction: rtl'';
+	when 'direction' is ''rtl'' and 'justify-content' is ''justify-content/space-between'',
+	apply the rules for ''direction: rtl'';
+	etc.
+
+	For the case of ''justify-content/center'' (or its equivalent),
+	split the difference:
+	when both 'inset-inline-start' and 'inset-inline-end'
+	('left' and 'right' in horizontal LTR <a>writing modes</a>)
+	are ''left/auto'',
+	set each to its <a>static position</a>,
+	and if the resulting “shrink-to-fit” <a>inline size</a> conflicts,
+    re-solve the equation for 'inset-inline-end'.
+
+    Note: What this means is that,
+    instead of always sizing an absolutely-positioned element
+    within the available space between
+    its inline-start <a>static position</a>
+    and its inline-end <a>containing block</a> edge,
+    the author can choose to instead use the space between
+    its inline-start <a>containing block</a> edge
+    and inline-end <a>static position</a>
+    or between its inline-start and inline-end <a>static positions</a>
+    by changing the <a>static-position containing block</a>’s
+    <a>content-distribution properties</a>.
+
 ### Multicol Containers ### {#distribution-multicol}
 
 	<table class="data align-details">
 		<tr>
 			<th><a>Alignment Container</a>
 			<td>
-				The <a>multi-column element</a>’s content box.
+				The <a>multi-column container</a>’s content box.
 		<tr>
 			<th><a lt="alignment subject">Alignment Subject(s)</a>
 			<td>
@@ -958,7 +998,7 @@ The 'justify-content' And 'align-content' Properties</h3>
 				both are defined as described in the column-sizing rules
 				of [[!CSS-MULTICOL-1]].
 
-				In the case of multi-column elements with a non-''column-width/auto'' 'column-width',
+				In the case of multi-column containers with a non-''column-width/auto'' 'column-width',
 				'justify-content' values other than ''justify-content/normal'' or ''justify-content/stretch''
 				cause the columns to take their specified 'column-width'
 				rather than stretching to fill the container.
@@ -1056,14 +1096,14 @@ Content-Distribution Shorthand: the 'place-content' property</h3>
 <h3 id="overflow-scroll-position">
 Overflow and Scroll Positions</h3>
 
-	The <a>content-distribution properties</a> also affect the initial scroll position,
-	setting it to display the appropriate portion of the scrollable area.
-	In other words,
-	the <a>scrollable overflow region</a> is aligned relative to the viewport
-	as specified by the <a>content-distribution properties</a>.
-	Additionally, so that the content remains in the <a>scrollable overflow region</a> in order to be scrollable,
-	the ''overflow/scroll'' and ''overflow/auto'' values of 'overflow'
-	trigger ''safe'' content alignment always.
+	Content that overflows a <a>scroll container</a>
+	is aligned exactly like content in a non-scrollable container.
+	However, to prevent content from being shifted into the unscrollable region,
+	when the <a>content-distribution properties</a> are set on a <a>scroll container</a>,
+	the zero coordinate of its <a>scrollable overflow region</a>
+	(that is, the point beyond which content is unreachable)
+	is set to the top left corner of the <a>alignment subject</a>,
+	effectively changing the <a>initial scroll position</a>.
 
 	<div class='example'>
 		For example,
@@ -1114,7 +1154,7 @@ Baseline Content-Alignment</h3>
 
 	Additionally, if <a>self-alignment</a> applies to the box in an axis,
 	in order to participate in <a>baseline content-alignment</a> in that axis
-	it must also have a <dfn>coordinated self-alignment preference</dfn>;
+	it must also have a <dfn noexport>coordinated self-alignment preference</dfn>;
 	that is:
 
 	* If its <a>baseline alignment preference</a> is “first” (“last”),
@@ -1144,7 +1184,7 @@ Baseline Content-Alignment</h3>
 -->
 
 <h2 id='self-alignment' dfn lt="self-alignment" export>
-Self-Alignment: Aligning the Box within its Parent</h2>
+Self-Alignment: Aligning the Box Within Its Parent</h2>
 
 	Self-alignment controls alignment of the box within its containing block.
 	It is specified by the <dfn export>self-alignment properties</dfn> 'align-self' and 'justify-self'
@@ -1747,7 +1787,7 @@ Self-Alignment Shorthand: the 'place-items' property</h3>
 
 	<pre class="propdef">
 	Name: place-items
-	Value: <'align-items'> <'justify-items'>?
+	Value: <<'align-items'>> <<'justify-items'>>?
 	Initial: see individual properties
 	Applies to: all elements
 	Inherited: no
@@ -1797,7 +1837,7 @@ Row and Column Gutters: the 'row-gap' and 'column-gap' properties</h3>
 	Name: row-gap, column-gap
 	Value: normal | <<length-percentage>>
 	Initial: normal
-	Applies to: <a>multi-column elements</a>, <a>flex containers</a>, <a>grid containers</a>
+	Applies to: <a>multi-column containers</a>, <a>flex containers</a>, <a>grid containers</a>
 	Inherited: no
 	Percentages: refer to corresponding dimension of the content area
 	Computed value: as specified, with <<length>>s made absolute
@@ -1826,15 +1866,15 @@ Row and Column Gutters: the 'row-gap' and 'column-gap' properties</h3>
 			see subsections below for details.
 
 			Negative values are invalid.
-			Percentages resolve to zero
-			when specified against a content-based size
-			(such as the <a>logical width</a> of a float
-			or the ''height/auto'' <a>logical height</a>
-			of a <a>block-level</a> <a>grid container</a>).
+			<a href="https://www.w3.org/TR/css-sizing-3/#percentage-sizing">As in the min size properties and margins/paddings</a> [[CSS-SIZING-3]],
+			percentages resolve against zero
+			for determining intrinsic size contributions,
+			but resolve against the box’s content box
+			when laying out the box’s contents.
 
 		: <dfn>normal</dfn>
 		:: The ''gap/normal'' represents
-			a used value of ''1em'' on <a>multi-column elements</a>,
+			a used value of ''1em'' on <a>multi-column containers</a>,
 			and a used value of ''0px'' in all other contexts.
 	</dl>
 
@@ -1845,7 +1885,7 @@ Row and Column Gutters: the 'row-gap' and 'column-gap' properties</h3>
 	The exact handling of these properties varies by layout container:
 
 	<dl>
-		<dt id="gap-multicol"><a>multi-column elements</a>
+		<dt id="gap-multicol"><a>multi-column containers</a>
 		<dd>
 			'column-gap' specifes the [=gutter=] between adjacent <a>column boxes</a>.
 			See [[CSS-MULTICOL-1]] for details on how this affects the layout of multicol elements.
@@ -1889,7 +1929,7 @@ Gap Shorthand: the 'gap' property</h3>
 	Name: gap
 	Value: <<'row-gap'>> <<'column-gap'>>?
 	Initial: see individual properties
-	Applies to: <a>multi-column elements</a>, <a>flex containers</a>, <a>grid containers</a>
+	Applies to: <a>multi-column containers</a>, <a>flex containers</a>, <a>grid containers</a>
 	Inherited: no
 	Percentages: refer to corresponding dimension of the content area
 	Computed value: see individual properties
@@ -2156,6 +2196,22 @@ Aligning Boxes by Baseline</h3>
 
 <h2 id="changes">
 Changes</h2>
+
+	Changes since the <a href="https://www.w3.org/TR/2017/WD-css-align-3-20170720/#changes">6 September 2017 Working Draft</a> include:
+	<ul>
+		<li>Added more illustrations! Many thanks to Melanie Richards for working through a difficult diagramming problem.
+		<li>Fixed errors in property definition table of 'gap' shorthand.
+		<li>Defining percentage gaps to resolve to zero when the containing block’s size depends on the gaps.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/509">Issue 509</a>,
+		<a href="https://github.com/w3c/csswg-drafts/issues/2297">Issue 2297</a>)
+		<li>Fixed errors in handling <css>left</css> and <css>right</css> in the grammars.
+		<li>Fixed discrepency in ''align-content/space-align'' fallback alignment.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/2316">Issue 2316</a>)
+		<li>Tightened up handling of baseline alignment in cases where the box edges don't align.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/1556">Issue 1556</a>,
+		<a href="https://github.com/w3c/csswg-drafts/issues/1611">Issue 1611</a>)
+		<li>Miscellaneous clarifications.
+	</ul>
 
 	Changes since the <a href="https://www.w3.org/TR/2017/WD-css-align-3-20170720/#changes">20 July 2017 Working Draft</a> include:
 	<ul>

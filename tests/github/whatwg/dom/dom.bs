@@ -2,7 +2,7 @@
 Group: WHATWG
 H1: DOM
 Shortname: dom
-Text Macro: TWITTER domstandard
+Text Macro: TWITTER thedomstandard
 Abstract: DOM defines a platform-neutral model for events, aborting activities, and node trees.
 Translation: ja https://triple-underscore.github.io/DOM4-ja.html
 Ignored Terms: EmptyString, Array, Document
@@ -93,8 +93,7 @@ This specification standardizes the DOM. It does so as follows:
 [[!XML-NAMES]]
 
 <p>The term <dfn export>context object</dfn> means the object on which the algorithm,
-attribute getter, attribute setter, or method being discussed was called. When the
-<a>context object</a> is unambiguous, the term can be omitted.
+attribute getter, attribute setter, or method being discussed was called.
 
 <p>When extensions are needed, the DOM Standard can be updated accordingly, or a new standard
 can be written that hooks into the provided extensibility hooks for
@@ -483,7 +482,8 @@ empty list.
 
 <p>An <a>event</a> has an associated <dfn export for=Event>path</dfn>. A <a for=Event>path</a> is a
 <a for=/>list</a> of <a for=/>structs</a>. Each <a for=/>struct</a> consists of an
-<dfn for=Event/path>item</dfn> (an {{EventTarget}} object), <dfn for=Event/path>target</dfn> (a
+<dfn for=Event/path>item</dfn> (an {{EventTarget}} object), an
+<dfn for=Event/path>item-in-shadow-tree</dfn> (a boolean), a <dfn for=Event/path>target</dfn> (a
 <a>potential event target</a>), a
 <dfn id=event-path-relatedtarget for=Event/path>relatedTarget</dfn> (a
 <a>potential event target</a>), a <dfn for=Event/path>touch target list</dfn> (a <a for=/>list</a>
@@ -750,6 +750,25 @@ method, when invoked, must run these steps:</p>
 
 <p class="note no-backref">As <a>events</a> have constructors {{Event/initEvent()}} is redundant and
 incapable of setting {{Event/composed}}. It has to be supported for legacy content.
+
+
+<h3 id=interface-window-extensions>Legacy extensions to the {{Window}} interface</h3>
+
+<pre class=idl>
+partial interface Window {
+  [Replaceable] readonly attribute any event; // historical
+};
+</pre>
+
+<p>Each {{Window}} object has an associated <dfn for=Window>current event</dfn> (undefined or an
+{{Event}} object). Unless stated otherwise it is undefined.
+
+<p>The <dfn attribute for=Window><code>event</code></dfn> attribute's getter, when invoked, must
+return the <a>context object</a>'s <a for=Window>current event</a>.
+
+<p class=note>Web developers are strongly encouraged to instead rely on the {{Event}} object passed
+to event listeners, as that will result in more portable code. This attribute is not available in
+workers or worklets, and is inaccurate for events dispatched in <a>shadow trees</a>.
 
 
 <h3 id=interface-customevent>Interface {{CustomEvent}}</h3>
@@ -1101,6 +1120,19 @@ method, when invoked, must run these steps:
  <var>once</var>.
 </ol>
 
+<p>To <dfn>remove an event listener</dfn>, given an {{EventTarget}} object <var>eventTarget</var>
+and an <a>event listener</a> <var>listener</var>, set <var>listener</var>'s
+<a for="event listener">removed</a> to true and <a for=list>remove</a> <var>listener</var> from
+<var>eventTarget</var>'s <a for=EventTarget>event listener list</a>.
+<!-- Intentionally not exported. -->
+
+<p>To <dfn export>remove all event listeners</dfn>, given an {{EventTarget}} object
+<var>eventTarget</var>, <a for=list>for each</a> <var>listener</var> of <var>eventTarget</var>'s
+<a for=EventTarget>event listener list</a>, <a>remove an event listener</a> with
+<var>eventTarget</var> and <var>listener</var>.
+
+<p class="note">HTML needs this to define <code>document.open()</code>. [[HTML]]
+
 <p>The
 <dfn method for=EventTarget><code>removeEventListener(<var>type</var>, <var>callback</var>, <var>options</var>)</code></dfn>
 method, when invoked, must run these steps:
@@ -1117,9 +1149,8 @@ method, when invoked, must run these steps:
  <li><p>If the <a>context object</a>'s <a for=EventTarget>event listener list</a>
  <a for=list>contains</a> an <a>event listener</a> whose <a for="event listener">type</a> is
  <var>type</var>, <a for="event listener">callback</a> is <var>callback</var>, and
- <a for="event listener">capture</a> is <var>capture</var>, then set that <a>event listener</a>'s
- <a for="event listener">removed</a> to true and <a for=list>remove</a> it from the
- <a>context object</a>'s <a for=EventTarget>event listener list</a>.
+ <a for="event listener">capture</a> is <var>capture</var>, then <a>remove an event listener</a>
+ with the <a>context object</a> and that <a>event listener</a>.
 </ol>
 
 <p>The <dfn method for=EventTarget><code>dispatchEvent(<var>event</var>)</code></dfn> method, when
@@ -1355,14 +1386,20 @@ for discussion).
 <var>touchTargets</var>, and a <var>slot-in-closed-tree</var>, run these steps:</p>
 
 <ol>
+ <li><p>Let <var>item-in-shadow-tree</var> be false.
+
+ <li><p>If <var>target</var> is a <a for=/>node</a> and its <a for=tree>root</a> is a
+ <a for=/>shadow root</a>, then set <var>item-in-shadow-tree</var> to true.
+
  <li><p>Let <var>root-of-closed-tree</var> be false.
 
  <li><p>If <var>target</var> is a <a for=/>shadow root</a> whose <a for=ShadowRoot>mode</a> is
  "<code>closed</code>", then set <var>root-of-closed-tree</var> to true.
 
  <li><p><a for=list>Append</a> a new <a for=/>struct</a> to <var>event</var>'s <a for=Event>path</a>
- whose <a for=Event/path>item</a> is <var>target</var>, <a for=Event/path>target</a> is
- <var>targetOverride</var>, <a for=Event/path>relatedTarget</a> is <var>relatedTarget</var>,
+ whose <a for=Event/path>item</a> is <var>target</var>, <a for=Event/path>item-in-shadow-tree</a> is
+ <var>item-in-shadow-tree</var>, <a for=Event/path>target</a> is <var>targetOverride</var>,
+ <a for=Event/path>relatedTarget</a> is <var>relatedTarget</var>,
  <a for=Event/path>touch target list</a> is <var>touchTargets</var>,
  <a for=Event/path>root-of-closed-tree</a> is <var>root-of-closed-tree</var>, and
  <a for=Event/path>slot-in-closed-tree</a> is <var>slot-in-closed-tree</var>.
@@ -1384,16 +1421,15 @@ for discussion).
 
  <li><p>If <var>event</var>'s <a>stop propagation flag</a> is set, then return.
 
- <li><p>Let <var>object</var> be <var>tuple</var>'s <a for=Event/path>item</a>.
+ <li><p>Initialize <var>event</var>'s {{Event/currentTarget}} attribute to <var>tuple</var>'s
+ <a for=Event/path>item</a>.
 
  <li>
-  <p>Let <var>listeners</var> be a <a for=list>clone</a> of <var>object</var>'s
-  <a for=EventTarget>event listener list</a>.
+  <p>Let <var>listeners</var> be a <a for=list>clone</a> of <var>event</var>'s
+  {{Event/currentTarget}} attribute value's <a for=EventTarget>event listener list</a>.
 
   <p class="note no-backref">This avoids <a>event listeners</a> added after this point from being
   run. Note that removal still has an effect due to the <a for="event listener">removed</a> field.
-
- <li><p>Initialize <var>event</var>'s {{Event/currentTarget}} attribute to <var>object</var>.
 
  <li><p>Let <var>found</var> be the result of running <a>inner invoke</a> with <var>event</var>,
  <var>listeners</var>, and <var>legacyOutputDidListenersThrowFlag</var> if given.
@@ -1458,6 +1494,21 @@ for discussion).
    <!-- Do this before invocation to avoid reentrancy issues. No need to set removed to true since
         each listener in listeners is run once anyway. -->
 
+   <li><p>Let <var>global</var> be <var>listener</var> <a for="event listener">callback</a>'s
+   <a>associated Realm</a>'s <a for=Realm>global object</a>.
+
+   <li><p>Let <var>currentEvent</var> be undefined.
+
+   <li>
+    <p>If <var>global</var> is a {{Window}} object, then:
+
+    <ol>
+     <li><p>Set <var>currentEvent</var> to <var>global</var>'s <a for=Window>current event</a>.
+
+     <li><p>If <var>tuple</var>'s <a for=Event/path>item-in-shadow-tree</a> is false, then set
+     <var>global</var>'s <a for=Window>current event</a> to <var>event</var>.
+    </ol>
+
    <li><p>If <var>listener</var>'s <a for="event listener">passive</a> is true, then set
    <var>event</var>'s <a>in passive listener flag</a>.
 
@@ -1477,6 +1528,9 @@ for discussion).
     </ol>
 
    <li><p>Unset <var>event</var>'s <a>in passive listener flag</a>.
+
+   <li><p>If <var>global</var> is a {{Window}} object, then set <var>global</var>'s
+   <a for=Window>current event</a> to <var>currentEvent</var>.
 
    <li><p>If <var>event</var>'s <a>stop immediate propagation flag</a> is set, then return
    <var>found</var>.
@@ -5342,31 +5396,40 @@ new <a>live range</a> with (<a>context object</a>, 0) as its <a for=range>start<
 
 <hr>
 
-The
+<p>The
 <dfn method for=Document><code>createNodeIterator(<var>root</var>, <var>whatToShow</var>, <var>filter</var>)</code></dfn>
 method, when invoked, must run these steps:
 
 <ol>
- <li>Create a {{NodeIterator}} object.
- <li>Set <a for=traversal>root</a> to <var>root</var> and initialize the
- {{NodeIterator/referenceNode}} attribute to <var>root</var>.
- <li>Initialize the {{NodeIterator/pointerBeforeReferenceNode}} attribute to true.
- <li>Set <a for=traversal>whatToShow</a> to <var>whatToShow</var>.
- <li>Set <a for=traversal>filter</a> to <var>filter</var>.
- <li>Return the newly created {{NodeIterator}} object.
+ <li><p>Let <var>iterator</var> be a new {{NodeIterator}} object.
+
+ <li><p>Set <var>iterator</var>'s <a for=traversal>root</a> and <var>iterator</var>'s
+ <a for=NodeIterator>reference</a> to <var>root</var>.
+
+ <li><p>Set <var>iterator</var>'s <a for=NodeIterator>pointer before reference</a> to true.
+
+ <li><p>Set <var>iterator</var>'s <a for=traversal>whatToShow</a> to <var>whatToShow</var>.
+
+ <li><p>Set <var>iterator</var>'s <a for=traversal>filter</a> to <var>filter</var>.
+
+ <li><p>Return <var>iterator</var>.
 </ol>
 
-The
+<p>The
 <dfn method for=Document><code>createTreeWalker(<var>root</var>, <var>whatToShow</var>, <var>filter</var>)</code></dfn>
 method, when invoked, must run these steps:
 
 <ol>
- <li>Create a {{TreeWalker}} object.
- <li>Set <a for=traversal>root</a> to <var>root</var> and initialize the
- {{TreeWalker/currentNode}} attribute to <var>root</var>.
- <li>Set <a for=traversal>whatToShow</a> to <var>whatToShow</var>.
- <li>Set <a for=traversal>filter</a> to <var>filter</var>.
- <li>Return the newly created {{TreeWalker}} object.
+ <li><p>Let <var>walker</var> be a new {{TreeWalker}} object.
+
+ <li><p>Set <var>walker</var>'s <a for=traversal>root</a> and <var>walker</var>'s
+ <a for=TreeWalker>current</a> to <var>root</var>.
+
+ <li><p>Set <var>walker</var>'s <a for=traversal>whatToShow</a> to <var>whatToShow</var>.
+
+ <li><p>Set <var>walker</var>'s <a for=traversal>filter</a> to <var>filter</var>.
+
+ <li>Return <var>walker</var>.
 </ol>
 
 
@@ -5726,6 +5789,7 @@ interface Element : Node {
   [CEReactions] void setAttributeNS(DOMString? namespace, DOMString qualifiedName, DOMString value);
   [CEReactions] void removeAttribute(DOMString qualifiedName);
   [CEReactions] void removeAttributeNS(DOMString? namespace, DOMString localName);
+  [CEReactions] boolean toggleAttribute(DOMString qualifiedName, optional boolean force);
   boolean hasAttribute(DOMString qualifiedName);
   boolean hasAttributeNS(DOMString? namespace, DOMString localName);
 
@@ -6401,6 +6465,14 @@ namespace.</p>
  <dd><p>Removes <var>element</var>'s <a>attribute</a> whose <a for=Attr>namespace</a> is
  <var>namespace</var> and <a for=Attr>local name</a> is <var>localName</var>.
 
+ <dt><code><var>element</var> . <a method for=Element lt=toggleAttribute()>toggleAttribute</a>(<var>qualifiedName</var> [, <var>force</var>])</code>
+ <dd>
+  <p>If <var>force</var> is not given, "toggles" <var>qualifiedName</var>, removing it if it is
+  present and adding it if it is not present. If <var>force</var> is true, adds
+  <var>qualifiedName</var>. If <var>force</var> is false, removes <var>qualifiedName</var>.
+
+  <p>Returns true if <var>qualifiedName</var> is now present, and false otherwise.
+
  <dt><code><var>element</var> . <a method for=Element lt=hasAttribute()>hasAttribute</a>(<var>qualifiedName</var>)</code>
  <dd><p>Returns true if <var>element</var> has an <a>attribute</a> whose
  <a for=Attr>qualified name</a> is <var>qualifiedName</var>, and false otherwise.
@@ -6512,6 +6584,42 @@ when invoked, must run these steps:
  <li><p>Return true if the <a>context object</a> <a lt="has an attribute">has</a> an
  <a>attribute</a> whose <a for=Attr>qualified name</a> is <var>qualifiedName</var>, and false
  otherwise.
+</ol>
+
+<p>The <dfn method for=Element><code>toggleAttribute(<var>qualifiedName</var>, <var>force</var>)</code></dfn>
+method, when invoked, must run these steps:
+
+<ol>
+ <li><p>If <var>qualifiedName</var> does not match the <code><a type>Name</a></code> production in
+ XML, then <a>throw</a> an "{{InvalidCharacterError!!exception}}" {{DOMException}}.
+
+ <li><p>If the <a>context object</a> is in the <a>HTML namespace</a> and its
+ <a for=Node>node document</a> is an <a>HTML document</a>, then set <var>qualifiedName</var> to
+ <var>qualifiedName</var> in <a>ASCII lowercase</a>.
+
+ <li><p>Let <var>attribute</var> be the first <a>attribute</a> in the <a>context object</a>'s
+ <a for=Element>attribute list</a> whose <a for=Attr>qualified name</a> is <var>qualifiedName</var>,
+ and null otherwise.
+ <!-- This is step 2 of "get an attribute by name", modified as appropriate -->
+
+ <li>
+  <p>If <var>attribute</var> is null, then:
+
+  <ol>
+   <li><p>If <var>force</var> is not given or is true, create an <a>attribute</a> whose
+   <a for="Attr">local name</a> is <var>qualifiedName</var>, <a for=Attr>value</a> is the empty
+   string, and <a for=Node>node document</a> is the <a>context object</a>'s
+   <a for=Node>node document</a>, then <a lt="append an attribute">append</a> this <a>attribute</a>
+   to the <a>context object</a>, and then return true.
+
+   <li><p>Return false.
+  </ol>
+
+ <li><p>Otherwise, if <var>force</var> is not given or is false,
+ <a lt="remove an attribute by name">remove an attribute</a> given <var>qualifiedName</var> and the
+ <a>context object</a>, and then return false.
+
+ <li><p>Return true.
 </ol>
 
 <p>The
@@ -8800,41 +8908,43 @@ and {{Range/getBoundingClientRect()}} methods are defined in other specification
 
 <h2 id="traversal">Traversal</h2>
 
-{{NodeIterator}} and {{TreeWalker}} objects can be used
-to filter and traverse <a>node</a>
+<p>{{NodeIterator}} and {{TreeWalker}} objects can be used to filter and traverse <a for=/>node</a>
 <a>trees</a>.
 
-Each {{NodeIterator}} and {{TreeWalker}} object has an associated <dfn export
-id=concept-traversal-active for=traversal>active flag</dfn> to avoid
-recursive invocations.  It is initially unset.
+<p>Each {{NodeIterator}} and {{TreeWalker}} object has an associated
+<dfn noexport id=concept-traversal-active for=traversal>active flag</dfn> to avoid recursive
+invocations. It is initially unset.
 
-Each {{NodeIterator}} and {{TreeWalker}} object also
-has an associated <dfn export id=concept-traversal-root for=traversal>root</dfn>
-<a>node</a>,
-<dfn export id=concept-traversal-whattoshow for=traversal>whatToShow</dfn> bitmask, and
-<dfn export id=concept-traversal-filter for=traversal>filter</dfn> callback.
+<p>Each {{NodeIterator}} and {{TreeWalker}} object also has an associated
+<dfn noexport id=concept-traversal-root for=traversal>root</dfn> (a <a for=/>node</a>), a
+<dfn noexport id=concept-traversal-whattoshow for=traversal>whatToShow</dfn> (a bitmask), and a
+<dfn noexport id=concept-traversal-filter for=traversal>filter</dfn> (a callback).
 
-<p>To <dfn export id=concept-node-filter for=Node>filter</dfn> <var>node</var> run these steps:
+<p>To <dfn noexport id=concept-node-filter>filter</dfn> a <a for=/>node</a> <var>node</var> within
+a {{NodeIterator}} or {{TreeWalker}} object <var>traverser</var>, run these steps:
 
 <ol>
- <li><p>If the <a for=traversal>active flag</a> is set, then throw an
+ <li><p>If <var>traverser</var>'s <a for=traversal>active flag</a> is set, then throw an
  "{{InvalidStateError!!exception}}" {{DOMException}}.
 
- <li><p>Let <var>n</var> be <var>node</var>'s {{Node/nodeType}} attribute value minus 1.
+ <li><p>Let <var>n</var> be <var>node</var>'s {{Node/nodeType}} attribute value &minus; 1.
 
  <li><p>If the <var>n</var><sup>th</sup> bit (where 0 is the least significant bit) of
- <a for=traversal>whatToShow</a> is not set, then return {{NodeFilter/FILTER_SKIP}}.
+ <var>traverser</var>'s <a for=traversal>whatToShow</a> is not set, then return
+ {{NodeFilter/FILTER_SKIP}}.
  <!-- !((1 << (node.nodeType - 1)) & whatToShow) -->
 
- <li><p>If <a for=traversal>filter</a> is null, then return {{NodeFilter/FILTER_ACCEPT}}.
+ <li><p>If <var>traverser</var>'s <a for=traversal>filter</a> is null, then return
+ {{NodeFilter/FILTER_ACCEPT}}.
 
- <li><p>Set the <a for=traversal>active flag</a>.
+ <li><p>Set <var>traverser</var>'s <a for=traversal>active flag</a>.
 
  <li><p>Let <var>result</var> be the return value of <a>call a user object's operation</a> with
- <a for=traversal>filter</a>, "<code>acceptNode</code>", and « <var>node</var> ». If this throws an
- exception, then unset the <a for=traversal>active flag</a> and rethrow the exception.
+ <var>traverser</var>'s <a for=traversal>filter</a>, "<code>acceptNode</code>", and
+ « <var>node</var> ». If this throws an exception, then unset <var>traverser</var>'s
+ <a for=traversal>active flag</a> and rethrow the exception.
 
- <li><p>Unset the <a for=traversal>active flag</a>.
+ <li><p>Unset <var>traverser</var>'s <a for=traversal>active flag</a>.
 
  <li><p>Return <var>result</var>.
 </ol>
@@ -8859,31 +8969,30 @@ interface NodeIterator {
 </pre>
 
 <p class="note no-backref">{{NodeIterator}} objects can be created using the
-{{createNodeIterator()}} method.
+{{createNodeIterator()}} method on {{Document}} objects.
 
-Each {{NodeIterator}} object has an associated
-<dfn export for=NodeIterator id="iterator-collection">iterator collection</dfn>, which is a
-<a>collection</a> rooted at
-<a for=traversal>root</a>, whose filter matches any
-<a>node</a>.
+<p>Each {{NodeIterator}} object has an associated
+<dfn noexport for=NodeIterator id="iterator-collection">iterator collection</dfn>, which is a
+<a for=/>collection</a> rooted at the {{NodeIterator}} object's <a for=traversal>root</a>, whose
+filter matches any <a for=/>node</a>.
 
-<p class="note no-backref">As mentioned earlier, {{NodeIterator}} objects have an
-associated <a for=traversal>active flag</a>,
-<a for=traversal>root</a> <a>node</a>,
-<a for=traversal>whatToShow</a> bitmask, and
-<a for=traversal>filter</a> callback as well.
+<p>Each {{NodeIterator}} object also has an associated <dfn for=NodeIterator>reference</dfn> (a
+<a for=/>node</a>) and <dfn for=NodeIterator>pointer before reference</dfn> (a boolean).
+
+<p class="note no-backref">As mentioned earlier, {{NodeIterator}} objects have an associated
+<a for=traversal>active flag</a>, <a for=traversal>root</a>, <a for=traversal>whatToShow</a>, and
+<a for=traversal>filter</a> as well.
 
 <p>The <dfn><code>NodeIterator</code> pre-removing steps</dfn> given a <var>nodeIterator</var> and
 <var>toBeRemovedNode</var>, are as follows:
 
 <ol>
- <li><p>If <var>toBeRemovedNode</var> is not an <a for=tree>inclusive ancestor</a> of the
- <var>nodeIterator</var>'s {{NodeIterator/referenceNode}} attribute value, or
- <var>toBeRemovedNode</var> is <var>nodeIterator</var>'s <a for=traversal>root</a>, then return.
+ <li><p>If <var>toBeRemovedNode</var> is not an <a for=tree>inclusive ancestor</a> of
+ <var>nodeIterator</var>'s <a for=NodeIterator>reference</a>, or <var>toBeRemovedNode</var> is
+ <var>nodeIterator</var>'s <a for=traversal>root</a>, then return.
 
  <li>
-  <p>If <var>nodeIterator</var>'s {{NodeIterator/pointerBeforeReferenceNode}} attribute value is
-  true, then:
+  <p>If <var>nodeIterator</var>'s <a for=NodeIterator>pointer before reference</a> is true, then:
 
   <ol>
    <li><p>Let <var>next</var> be <var>toBeRemovedNode</var>'s first <a>following</a>
@@ -8892,16 +9001,16 @@ associated <a for=traversal>active flag</a>,
    <var>toBeRemovedNode</var>, and null if there is no such <a>node</a>.
 
    <li><p>If <var>next</var> is non-null, then set <var>nodeIterator</var>'s
-   {{NodeIterator/referenceNode}} attribute to <var>next</var> and return.
+   <a for=NodeIterator>reference</a> to <var>next</var> and return.
 
    <li>
-    <p>Otherwise, set <var>nodeIterator</var>'s
-    {{NodeIterator/pointerBeforeReferenceNode}} attribute to false.
+    <p>Otherwise, set <var>nodeIterator</var>'s <a for=NodeIterator>pointer before reference</a> to
+    false.
 
     <p class="note no-backref">Steps are not terminated here.
   </ol>
 
- <li><p>Set <var>nodeIterator</var>'s {{NodeIterator/referenceNode}} attribute to
+ <li><p>Set <var>nodeIterator</var>'s <a for=NodeIterator>reference</a> to
  <var>toBeRemovedNode</var>'s <a for=tree>parent</a>, if <var>toBeRemovedNode</var>'s
  <a>previous sibling</a> is null, and to the <a>inclusive descendant</a> of
  <var>toBeRemovedNode</var>'s <a>previous sibling</a> that appears last in <a>tree order</a>
@@ -8910,27 +9019,30 @@ associated <a for=traversal>active flag</a>,
 
 <hr>
 
-<p>The <dfn attribute for=NodeIterator><code>root</code></dfn> attribute's getter must return
-<a for=traversal>root</a>.
+<p>The <dfn attribute for=NodeIterator><code>root</code></dfn> attribute's getter, when invoked,
+must return the <a>context object</a>'s <a for=traversal>root</a>.
 
-<p>The <dfn attribute for=NodeIterator><code>referenceNode</code></dfn> and
-<dfn attribute for=NodeIterator><code>pointerBeforeReferenceNode</code></dfn>
-attributes must return what they were initialized to.
+<p>The <dfn attribute for=NodeIterator><code>referenceNode</code></dfn> attribute's getter, when
+invoked, must return the <a>context object</a>'s <a for=NodeIterator>reference</a>.
 
-<p>The <dfn attribute for=NodeIterator><code>whatToShow</code></dfn> attribute's getter must return
-<a for=traversal>whatToShow</a>.
+<p>The <dfn attribute for=NodeIterator><code>pointerBeforeReferenceNode</code></dfn> attribute's
+getter, when invoked, must return the <a>context object</a>'s
+<a for=NodeIterator>pointer before reference</a>.
 
-<p>The <dfn attribute for=NodeIterator><code>filter</code></dfn> attribute's getter must return
-<a for=traversal>filter</a>.
+<p>The <dfn attribute for=NodeIterator><code>whatToShow</code></dfn> attribute's getter, when
+invoked, must return the <a>context object</a>'s <a for=traversal>whatToShow</a>.
 
-<p>To <dfn export id=concept-nodeiterator-traverse for=NodeIterator>traverse</dfn> in direction
-<var>direction</var> run these steps:
+<p>The <dfn attribute for=NodeIterator><code>filter</code></dfn> attribute's getter, when invoked,
+must return the <a>context object</a>'s <a for=traversal>filter</a>.
+
+<p>To <dfn export id=concept-nodeiterator-traverse for=NodeIterator>traverse</dfn>, given a
+{{NodeIterator}} object <var>iterator</var> and a direction <var>direction</var>, run these steps:
 
 <ol>
- <li><p>Let <var>node</var> be the value of the {{NodeIterator/referenceNode}} attribute.
+ <li><p>Let <var>node</var> be <var>iterator</var>'s <a for=NodeIterator>reference</a>.
 
- <li><p>Let <var>beforeNode</var> be the value of the {{NodeIterator/pointerBeforeReferenceNode}}
- attribute.
+ <li><p>Let <var>beforeNode</var> be <var>iterator</var>'s
+ <a for=NodeIterator>pointer before reference</a>.
 
  <li>
   <p>While true:
@@ -8942,38 +9054,42 @@ attributes must return what they were initialized to.
     <dl class=switch>
      <dt>next
      <dd>
-      <p>If <var>beforeNode</var> is false, then set <var>node</var> to the first <a>node</a>
-      <a>following</a> <var>node</var> in the <a>iterator collection</a>. If there is no such
-      <a>node</a>, then return null.
+      <p>If <var>beforeNode</var> is false, then set <var>node</var> to the first <a for=/>node</a>
+      <a>following</a> <var>node</var> in <var>iterator</var>'s
+      <a for=NodeIterator>iterator collection</a>. If there is no such <a for=/>node</a>, then
+      return null.
 
       <p>If <var>beforeNode</var> is true, then set it to false.
 
      <dt>previous
      <dd>
-      <p>If <var>beforeNode</var> is true, then set <var>node</var> to the first <a>node</a>
-      <a>preceding</a> <var>node</var> in the <a>iterator collection</a>. If there is no such
-      <a>node</a>, then return null.
+      <p>If <var>beforeNode</var> is true, then set <var>node</var> to the first <a for=/>node</a>
+      <a>preceding</a> <var>node</var> in <var>iterator</var>'s
+      <a for=NodeIterator>iterator collection</a>. If there is no such <a for=/>node</a>, then
+      return null.
 
       <p>If <var>beforeNode</var> is false, then set it to true.
     </dl>
 
-   <li><p>Let <var>result</var> be the result of <a for=Node>filtering</a> <var>node</var>.
+   <li><p>Let <var>result</var> be the result of <a for=Node>filtering</a> <var>node</var> within
+   <var>iterator</var>.
 
    <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then <a for=iteration>break</a>.
   </ol>
 
- <li><p>Set the {{NodeIterator/referenceNode}} attribute to <var>node</var>.
+ <li><p>Set <var>iterator</var>'s <a for=NodeIterator>reference</a> to <var>node</var>.
 
- <li><p>Set the {{NodeIterator/pointerBeforeReferenceNode}} attribute to <var>beforeNode</var>.
+ <li><p>Set <var>iterator</var>'s <a for=NodeIterator>pointer before reference</a> to
+ <var>beforeNode</var>.
 
  <li><p>Return <var>node</var>.
 </ol>
 
 <p>The <dfn method for=NodeIterator><code>nextNode()</code></dfn> method, when invoked, must return
-the result of <a for=NodeIterator>traversing</a> in direction next.
+the result of <a for=NodeIterator>traversing</a> with the <a>context object</a> and next.
 
 <p>The <dfn method for=NodeIterator><code>previousNode()</code></dfn> method, when invoked, must
-return the result of <a for=NodeIterator>traversing</a> in direction previous.
+return the result of <a for=NodeIterator>traversing</a> with the <a>context object</a> and previous.
 
 <p>The <dfn method for=NodeIterator><code>detach()</code></dfn> method, when invoked, must do
 nothing. <span class=note>Its functionality (disabling a {{NodeIterator}} object) was removed, but
@@ -8999,27 +9115,29 @@ interface TreeWalker {
   Node? nextNode();
 };</pre>
 
-
 <p class="note no-backref">{{TreeWalker}} objects can be created using the {{createTreeWalker()}}
-method.
+method on {{Document}} objects.
+
+<p>Each {{TreeWalker}} object has an associated <dfn for=TreeWalker>current</dfn> (a
+<a for=/>node</a>).
 
 <p class="note no-backref">As mentioned earlier {{TreeWalker}} objects have an associated
-<a for=traversal>root</a> (a <a for=/>node</a>), <a for=traversal>whatToShow</a> (a bitmask), and
-<a for=traversal>filter</a> (a callback).
+<a for=traversal>root</a>, <a for=traversal>whatToShow</a>, and <a for=traversal>filter</a> as well.
 
-<p>The <dfn attribute for=TreeWalker><code>root</code></dfn> attribute's getter must return the
-<a>context object</a>'s <a for=traversal>root</a>.
+<p>The <dfn attribute for=TreeWalker><code>root</code></dfn> attribute's getter, when invoked, must
+return the <a>context object</a>'s <a for=traversal>root</a>.
 
-<p>The <dfn attribute for=TreeWalker><code>whatToShow</code></dfn> attribute's getter must return
-the <a>context object</a>'s <a for=traversal>whatToShow</a>.
+<p>The <dfn attribute for=TreeWalker><code>whatToShow</code></dfn> attribute's getter, when invoked,
+must return the <a>context object</a>'s <a for=traversal>whatToShow</a>.
 
-<p>The <dfn attribute for=TreeWalker><code>filter</code></dfn> attribute's getter must return the
-<a>context object</a>'s <a for=traversal>filter</a>.
+<p>The <dfn attribute for=TreeWalker><code>filter</code></dfn> attribute's getter, when invoked,
+must return the <a>context object</a>'s <a for=traversal>filter</a>.
 
-<p>The <dfn attribute for=TreeWalker><code>currentNode</code></dfn> attribute must return what it
-was initialized to.
+<p>The <dfn attribute for=TreeWalker><code>currentNode</code></dfn> attribute's getter, when
+invoked, must return the <a>context object</a>'s <a for=TreeWalker>current</a>.
 
-<p>Setting the {{TreeWalker/currentNode}} attribute must set it to the new value.
+<p>The {{TreeWalker/currentNode}} attribute's setter, when invoked, must set the
+<a>context object</a>'s <a for=TreeWalker>current</a> to the given value.
 
 <hr>
 
@@ -9027,8 +9145,7 @@ was initialized to.
 these steps:
 
 <ol>
- <li><p>Let <var>node</var> be the value of the <a>context object</a>'s {{TreeWalker/currentNode}}
- attribute.
+ <li><p>Let <var>node</var> be the <a>context object</a>'s <a for=TreeWalker>current</a>.
 
  <li>
   <p>While <var>node</var> is non-null and is not the <a>context object</a>'s
@@ -9037,9 +9154,9 @@ these steps:
   <ol>
    <li><p>Set <var>node</var> to <var>node</var>'s <a for=tree>parent</a>.
 
-   <li><p>If <var>node</var> is non-null and <a for=Node>filtering</a> <var>node</var> returns
-   {{NodeFilter/FILTER_ACCEPT}}, then set the <a>context object</a>'s {{TreeWalker/currentNode}}
-   attribute to <var>node</var> and return <var>node</var>.
+   <li><p>If <var>node</var> is non-null and <a for=Node>filtering</a> <var>node</var> within the
+   <a>context object</a> returns {{NodeFilter/FILTER_ACCEPT}}, then set the <a>context object</a>'s
+   <a for=TreeWalker>current</a> to <var>node</var> and return <var>node</var>.
   </ol>
 
  <li><p>Return null.
@@ -9049,8 +9166,7 @@ these steps:
 <var>walker</var> and <var>type</var>, run these steps:
 
 <ol>
- <li><p>Let <var>node</var> be the value of <var>walker</var>'s {{TreeWalker/currentNode}}
- attribute.
+ <li><p>Let <var>node</var> be <var>walker</var>'s <a for=TreeWalker>current</a>.
 
  <li><p>Set <var>node</var> to <var>node</var>'s <a for=tree>first child</a> if <var>type</var> is
  first, and <var>node</var>'s <a for=tree>last child</a> if <var>type</var> is last.
@@ -9059,10 +9175,11 @@ these steps:
   <p>While <var>node</var> is non-null:
 
   <ol>
-   <li><p>Let <var>result</var> be the result of <a for=Node>filtering</a> <var>node</var>.
+   <li><p>Let <var>result</var> be the result of <a for=Node>filtering</a> <var>node</var> within
+   <var>walker</var>.
 
    <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then set <var>walker</var>'s
-   {{TreeWalker/currentNode}} attribute to <var>node</var> and return <var>node</var>.
+   <a for=TreeWalker>current</a> to <var>node</var> and return <var>node</var>.
 
    <li>
     <p>If <var>result</var> is {{NodeFilter/FILTER_SKIP}}, then:
@@ -9089,7 +9206,7 @@ these steps:
      <li><p>Let <var>parent</var> be <var>node</var>'s <a for=tree>parent</a>.
 
      <li><p>If <var>parent</var> is null, <var>walker</var>'s <a for=traversal>root</a>, or
-     <var>walker</var>'s  {{TreeWalker/currentNode}} attribute's value, then return null.
+     <var>walker</var>'s <a for=TreeWalker>current</a>, then return null.
 
      <li><p>Set <var>node</var> to <var>parent</var>.
     </ol>
@@ -9108,8 +9225,7 @@ these steps:
 and <var>type</var>, run these steps:
 
 <ol>
- <li><p>Let <var>node</var> be the value of <var>walker</var>'s {{TreeWalker/currentNode}}
- attribute.
+ <li><p>Let <var>node</var> be <var>walker</var>'s <a for=TreeWalker>current</a>.
 
  <li><p>If <var>node</var> is <a for=traversal>root</a>, then return null.
 
@@ -9127,10 +9243,11 @@ and <var>type</var>, run these steps:
     <ol>
      <li><p>Set <var>node</var> to <var>sibling</var>.
 
-     <li><p>Let <var>result</var> be the result of <a for=Node>filtering</a> <var>node</var>.
+     <li><p>Let <var>result</var> be the result of <a for=Node>filtering</a> <var>node</var> within
+     <var>walker</var>.
 
      <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then set <var>walker</var>'s
-     {{TreeWalker/currentNode}} attribute to <var>node</var> and return <var>node</var>.
+     <a for=TreeWalker>current</a> to <var>node</var> and return <var>node</var>.
 
      <li><p>Set <var>sibling</var> to <var>node</var>'s <a for=tree>first child</a> if
      <var>type</var> is next, and <var>node</var>'s <a for=tree>last child</a> if <var>type</var> is
@@ -9146,8 +9263,8 @@ and <var>type</var>, run these steps:
    <li><p>If <var>node</var> is null or <var>walker</var>'s <a for=traversal>root</a>, then return
    null.
 
-   <li><p>If the return value of <a for=Node>filtering</a> <var>node</var> is
-   {{NodeFilter/FILTER_ACCEPT}}, then return null.
+   <li><p>If the return value of <a for=Node>filtering</a> <var>node</var> within <var>walker</var>
+   is {{NodeFilter/FILTER_ACCEPT}}, then return null.
   </ol>
 </ol>
 
@@ -9161,8 +9278,7 @@ and <var>type</var>, run these steps:
 these steps:
 
 <ol>
- <li><p>Let <var>node</var> be the value of the <a>context object</a>'s {{TreeWalker/currentNode}}
- attribute.
+ <li><p>Let <var>node</var> be the <a>context object</a>'s <a for=TreeWalker>current</a>.
 
  <li>
   <p>While <var>node</var> is not the <a>context object</a>'s <a for=traversal>root</a>:
@@ -9176,7 +9292,8 @@ these steps:
     <ol>
      <li><p>Set <var>node</var> to <var>sibling</var>.
 
-     <li><p>Let <var>result</var> be the result of <a for=Node>filtering</a> <var>node</var>.
+     <li><p>Let <var>result</var> be the result of <a for=Node>filtering</a> <var>node</var> within
+     the <a>context object</a>.
 
      <li>
       <p>While <var>result</var> is not {{NodeFilter/FILTER_REJECT}} and <var>node</var> has a
@@ -9185,11 +9302,12 @@ these steps:
       <ol>
        <li><p>Set <var>node</var> to <var>node</var>'s <a for=tree>last child</a>.
 
-       <li><p>Set <var>result</var> to the result of <a for=Node>filtering</a> <var>node</var>.
+       <li><p>Set <var>result</var> to the result of <a for=Node>filtering</a> <var>node</var>
+       within the <a>context object</a>.
       </ol>
 
      <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then set the
-     <a>context object</a>'s {{TreeWalker/currentNode}} attribute to <var>node</var> and return
+     <a>context object</a>'s <a for=TreeWalker>current</a> to <var>node</var> and return
      <var>node</var>.
 
      <li><p>Set <var>sibling</var> to <var>node</var>'s <a for=tree>previous sibling</a>.
@@ -9200,9 +9318,9 @@ these steps:
 
    <li><p>Set <var>node</var> to <var>node</var>'s <a for=tree>parent</a>.
 
-   <li><p>If the return value of <a for=Node>filtering</a> <var>node</var> is
-   {{NodeFilter/FILTER_ACCEPT}}, then set the <a>context object</a>'s {{TreeWalker/currentNode}}
-   attribute to <var>node</var> and return <var>node</var>.
+   <li><p>If the return value of <a for=Node>filtering</a> <var>node</var> within the
+   <a>context object</a> is {{NodeFilter/FILTER_ACCEPT}}, then set the <a>context object</a>'s
+   <a for=TreeWalker>current</a> to <var>node</var> and return <var>node</var>.
   </ol>
 
  <li><p>Return null.
@@ -9212,7 +9330,7 @@ these steps:
 steps:
 
 <ol>
- <li><p>Let <var>node</var> be the value of the {{TreeWalker/currentNode}} attribute.
+ <li><p>Let <var>node</var> be the <a>context object</a>'s <a for=TreeWalker>current</a>.
 
  <li><p>Let <var>result</var> be {{NodeFilter/FILTER_ACCEPT}}.
 
@@ -9227,10 +9345,11 @@ steps:
     <ol>
      <li><p>Set <var>node</var> to its <a for=tree>first child</a>.
 
-     <li><p>Set <var>result</var> to the result of <a for=Node>filtering</a> <var>node</var>.
+     <li><p>Set <var>result</var> to the result of <a for=Node>filtering</a> <var>node</var> within
+     the <a>context object</a>.
 
      <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then set the
-     <a>context object</a>'s {{TreeWalker/currentNode}} attribute to <var>node</var> and return
+     <a>context object</a>'s <a for=TreeWalker>current</a> to <var>node</var> and return
      <var>node</var>.
     </ol>
 
@@ -9252,10 +9371,11 @@ steps:
      <li><p>Set <var>temporary</var> to <var>temporary</var>'s <a for=tree>parent</a>.
     </ol>
 
-   <li><p>Set <var>result</var> to the result of <a for=Node>filtering</a> <var>node</var>.
+   <li><p>Set <var>result</var> to the result of <a for=Node>filtering</a> <var>node</var> within
+   the <a>context object</a>.
 
    <li><p>If <var>result</var> is {{NodeFilter/FILTER_ACCEPT}}, then set the <a>context object</a>'s
-   {{TreeWalker/currentNode}} attribute to <var>node</var> and return <var>node</var>.
+   <a for=TreeWalker>current</a> to <var>node</var> and return <var>node</var>.
   </ol>
 </ol>
 
@@ -9289,14 +9409,12 @@ callback interface NodeFilter {
 };
 </pre>
 
-{{NodeFilter}} objects can be used as
-<a for=traversal>filter</a> callback and provide
-constants for the <a for=traversal>whatToShow</a>
-bitmask.
+<p class="note no-backref">{{NodeFilter}} objects can be used as <a for=traversal>filter</a> for
+{{NodeIterator}} and {{TreeWalker}} objects and also provide constants for their
+<a for=traversal>whatToShow</a> bitmask. A {{NodeFilter}} object is typically implemented as a
+JavaScript function.
 
-<p class="note no-backref">It is typically implemented as a JavaScript function.
-
-These constants can be used as callback return value:
+<p>These constants can be used as <a for=traversal>filter</a> return value:
 
 <ul class="brief">
  <li><dfn const for=NodeFilter><code>FILTER_ACCEPT</code></dfn> (1);
@@ -9304,8 +9422,7 @@ These constants can be used as callback return value:
  <li><dfn const for=NodeFilter><code>FILTER_SKIP</code></dfn> (3).
 </ul>
 
-These constants can be used for the
-<a for=traversal>whatToShow</a> bitmask:
+<p>These constants can be used for <a for=traversal>whatToShow</a>:
 
 <ul class="brief">
  <li><dfn const for=NodeFilter><code>SHOW_ALL</code></dfn> (4294967295, FFFFFFFF in hexadecimal);
@@ -9557,7 +9674,7 @@ method, when invoked, must run these steps:
    <var>token</var> from <a>context object</a>'s <a>token set</a>, run the <a>update steps</a> and
    return false.
 
-   <li><p>Otherwise, return true.
+   <li><p>Return true.
   </ol>
 
  <li><p>Otherwise, if <var>force</var> not given or is true, <a for=set>append</a> <var>token</var>
@@ -9843,6 +9960,7 @@ Joe Kesselman,
 John Atkins,
 John Dai,
 Jonas Sicking,
+Jonathan Kingston,
 Jonathan Robie,
 Joris van der Wel,
 Joshua Bell,

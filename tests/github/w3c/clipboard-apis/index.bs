@@ -605,7 +605,7 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 
 				1. Let |r| be the result of running [=check clipboard read permission=] [=in parallel=]
 				
-				1. If |r| is not "granted", then reject |p|
+				1. If |r| is not "granted", then reject |p| with a "NotAllowedError" DOMException
 
 				1. Let |data| be a copy of the [=system clipboard data=].
 
@@ -1164,36 +1164,71 @@ urlPrefix: https://w3c.github.io/permissions/#dom-permissionstate-; type: dfn;
 
 <h2 id="privacy">Privacy Considerations</h2>
 
-	Untrusted scripts should not get uncontrolled access to a user's
-	clipboard data. This specification assumes that granting access to the
-	current clipboard data when a user explicitly initiates a paste
-	operation from the user agent's trusted chrome is acceptable. However,
-	implementors must proceed carefully, and as a minimum implement the
-	precautions below:
+	Because these APIs provide access to the user's clipboard data, there are serious
+	privacy concerns due to the possibility that the clipboard will contain
+	personally-identifiable information (PII) like names, addresses, or passwords.
+	
+	In general, user agents <em>must</em> ensure that untrusted scripts do not get
+	uncontrolled access to a user's clipboard data through these APIs.
+	
+	<h3 id="privacy-events">Privacy and the Clipboard Event API</h3>
 
-	* Objects implementing the {{DataTransfer}} interface to return
-		clipboard data <em>must not</em> be available outside the
-		ClipboardEvent event handler.
-	* If a script stores a reference to an object implementing the
-		{{DataTransfer}} interface to use from outside the ClipboardEvent
-		event handler, all methods <em>must</em> be no-ops when called
-		outside the expected context.
-	* Implementations <em>must not</em> let scripts create synthetic
-		clipboard events to get access to real clipboard data except if
-		configured to do so.
-	* Implementations <em>should not</em> let scripts call
-		document.execCommand("paste") unless the user has explicitly allowed
-		it.
+		The Clipboard Event API allows scripts running in the context of a clipboard
+		event handler to access a copy of the system clipboard and potentially modify
+		the data being written to the clipboard.
 
-	Implementations may choose to further limit the functionality provided
-	by the {{DataTransfer}} interface. For example, an implementation may
-	allow the user to disable this API, or configure which web sites should
-	be granted access to it.
+		User agents should be aware of the following requirements with regards to
+		securing the data accessed by the Clipboard Event API:
+
+		* Objects implementing the {{DataTransfer}} interface to return
+			clipboard data <em>must not</em> be available outside the
+			ClipboardEvent event handler that the data is provided to.
+		* If a script stores a reference to an object implementing the
+			{{DataTransfer}} interface to use from outside the ClipboardEvent
+			event handler, all methods <em>must</em> be no-ops when called
+			outside the expected context.
+		* Implementations <em>must not</em> let scripts create synthetic
+			clipboard events to get access to real clipboard data (unless the user
+			has configured it to do so).
+
+		Even though the Clipboard Event API is not covered by the Clipboard permission,
+		user agents may choose to provide a method for the user to disable this API or
+		to configure which sites are allowed to access it.
+
+	<h3 id="privacy-async">Privacy and the Asychronous Clipboard API</h3>
+
+		The Asynchronous Clipboard API is a powerful feature because it can allow access
+		to the clipboard data from any script (access is not restricted to Clipboard Event
+		handlers) and data can be accessed in the absence of a user provided gesture.
+
+		To help prevent abuse, this API <em>must not</em> be available unless the script
+		is executing in the context of the currently focused document.
+
+		<h4 id="privacy-permission">Privacy and Clipboard Permission</h4>
+
+			The Clipboard Permission gates access to this API, but user agents get to choose
+			the permission defaults and which of these permission settings can be set by the
+			user. For example, a user agent may choose to only allow access to the
+			Asynchronous Clipboard API when a user gesture is present and always deny script
+			requests for access without a gesture.
+
+			User agents may opt to have this permission automatically expire sometime after
+			the user grants permission, for example, by having the permission expire:
+			
+			* After a set time from when the permission was first granted
+			* After a set time from the user's last visit to a site
+			* When the user navigates away from the page
+		
+	<h3 id="privacy-other">Other Privacy Concerns</h3>
+
+		If the user agent allows clipboard data to be read using
+		<code>document.execCommand("paste")</code> then the user agent <em>must</em>
+		ensure that the user has explicitly allowed that access to take place.
 
 
 <h2 id="acknowledge">Acknowledgements</h2>
 
-	<em>This section is informative</em>
+	<em>This section is non-normative</em>
 
 	The editors would like to acknowledge the contributions of the former
 	editors who helped shepherd this specification through various

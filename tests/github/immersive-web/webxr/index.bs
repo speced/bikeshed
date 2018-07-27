@@ -13,7 +13,7 @@ Mailing List Archives: https://lists.w3.org/Archives/Public/public-webvr/
 !Participate: <a href="irc://irc.w3.org:6665/">W3C's #webvr IRC</a>
 
 Editor: Brandon Jones, Google http://google.com/, bajones@google.com
-Editor: Nell Waliczek, Microsoft https://microsoft.com/, nell.waliczek@microsoft.com
+Editor: Nell Waliczek, Amazon [Microsoft until 2018] https://amazon.com/, nhw@amazon.com
 
 Abstract: This specification describes support for accessing virtual reality (VR) and augmented reality (AR) devices, including sensors and head-mounted displays, on the Web.
 
@@ -86,9 +86,9 @@ spec: Feature Policy; urlPrefix: https://wicg.github.io/feature-policy/#
 </style>
 
 
-<b style="color: red; font-size: 1.3em">DO NOT IMPLEMENT</b>
+<b style="color: red; font-size: 1.3em">UNSTABLE API</b>
 
-<b>The version of the WebXR Device API represented in this document is incomplete and changing rapidly. Do not implement it at this time.</b>
+<b>The version of the WebXR Device API represented in this document is incomplete and may change at any time.</b>
 
 While this specification is under development some concepts may be represented better by the <a href="https://github.com/w3c/webvr/blob/master/explainer.md">WebXR Device API Explainer</a>.
 
@@ -128,7 +128,7 @@ The WebXR Device API provides powerful new features which bring with them severa
 Gaze Tracking {#gazetracking-security}
 -------------
 
-While the API does not yet expose eye tracking capabilites a lot can be inferred about where the user is looking by tracking the orientation of their head. This is especially true of XR devices that have limited input capabilities, such as Google Carboard, which frequently require users to control a "gaze cursor" with their head orientation. This means that it may be possible for a malicious page to infer what a user is typing on a virtual keyboard or how they are interacting with a virtual UI based solely on monitoring their head movements. For example: if not prevented from doing so a page could estimate what URL a user is entering into the user agent's URL bar.
+While the API does not yet expose eye tracking capabilites a lot can be inferred about where the user is looking by tracking the orientation of their head. This is especially true of XR devices that have limited input capabilities, such as Google Cardboard, which frequently require users to control a "gaze cursor" with their head orientation. This means that it may be possible for a malicious page to infer what a user is typing on a virtual keyboard or how they are interacting with a virtual UI based solely on monitoring their head movements. For example: if not prevented from doing so a page could estimate what URL a user is entering into the user agent's URL bar.
 
 To prevent this risk the user agent MUST [=blur all sessions=] when the users is interacting with sensitive, trusted UI such as URL bars or system dialogs. Additionally, to prevent a malicious page from being able to monitor input on a other pages the user agent MUST [=blur all sessions=] on non-focused pages.
 
@@ -216,13 +216,11 @@ The following code finds an available {{XRDevice}}.
 
 <pre highlight="js">
 navigator.xr.requestDevice().then(device => {
-  // Resolves to an XRDevice if one is available, or to null otherwise.
-  if (device) {
-    onXRAvailable(device);
-  }
+  // Resolves if an XRDevice is available.
+  onXRAvailable(device);
 }).catch(error => {
-  // An error occurred while requesting an XRDevice.
-  console.error('Unable to request an XR device: ', error);
+  // An error occurred while requesting an XRDevice or none is available.
+  console.error('Unable to retrieve an XR device: ', error);
 });
 </pre>
 </div>
@@ -232,7 +230,7 @@ XRDevice {#xrdevice-interface}
 ---------
 
 <pre class="idl">
-[SecureContext, Exposed=Window] interface XRDevice : EventTarget {
+[SecureContext, Exposed=Window] interface XRDevice {
   // Methods
   Promise&lt;void&gt; supportsSession(optional XRSessionCreationOptions options);
   Promise&lt;XRSession&gt; requestSession(optional XRSessionCreationOptions options);
@@ -241,9 +239,9 @@ XRDevice {#xrdevice-interface}
 
 An {{XRDevice}} represents a physical unit of XR hardware that can present imagery to the user somehow. On desktop devices this may take the form of a headset peripheral; on mobile devices it may represent the device itself in conjunction with a viewer harness. It may also represent devices without the ability to present content in stereo but with advanced (6DoF) tracking capabilities.
 
-Each {{XRDevice}} has a <dfn>supports exclusive</dfn> value, which is a boolean which MUST be set to <code>true</code> if the device can support exclusive sessions and <code>false</code> if it cannot.
+Each {{XRDevice}} has a <dfn>supports immersive</dfn> value, which is a boolean which MUST be set to <code>true</code> if the device can support [=immersive sessions=] and <code>false</code> if it cannot.
 
-Each {{XRDevice}} has an <dfn>exclusive session</dfn>, which MUST be initially <code>null</code>, and a <dfn>list of non-exclusive sessions</dfn>, which MUST be initially empty.
+Each {{XRDevice}} has an <dfn>active immersive session</dfn>, which MUST be initially <code>null</code>, and a <dfn>list of non-immersive sessions</dfn>, which MUST be initially empty.
 
 <div class="algorithm" data-algorithm="supports-session">
 
@@ -261,24 +259,24 @@ When the <dfn method for="XRDevice">requestSession(|options|)</dfn> method is in
 
   1. Let |device| be the target {{XRDevice}} object.
   1. If the |options| are not [=supported by the device=] |device|, [=reject=] |promise| with a {{NotSupportedError}} and abort these steps.
-  1. Let |exclusive| be the {{XRSessionCreationOptions/exclusive}} attribute of the |options| argument.
-  1. If |exclusive| is <code>true</code> and |device|'s [=exclusive session=] is not <code>null</code>, [=reject=] |promise| with an {{InvalidStateError}} and abort these steps.
-  1. If |exclusive| is <code>true</code> and the algorithm is not [=triggered by user activation=], [=reject=] |promise| with a {{SecurityError}} and abort these steps.
+  1. Let |immersive| be the {{XRSessionCreationOptions/immersive}} attribute of the |options| argument.
+  1. If |immersive| is <code>true</code> and |device|'s [=active immersive session=] is not <code>null</code>, [=reject=] |promise| with an {{InvalidStateError}} and abort these steps.
+  1. If |immersive| is <code>true</code> and the algorithm is not [=triggered by user activation=], [=reject=] |promise| with a {{SecurityError}} and abort these steps.
   1. Let |session| be a new {{XRSession}}.
   1. [=Initialize the session=] |session| with the [=session description=] given by |options|.
-  1. If |exclusive| is <code>true</code> set the |device|'s [=exclusive session=] to |session|.
-  1. Else append |session| to |device|'s [=list of non-exclusive sessions=].
+  1. If |immersive| is <code>true</code> set the |device|'s [=active immersive session=] to |session|.
+  1. Else append |session| to |device|'s [=list of non-immersive sessions=].
   1. [=/Resolve=] |promise| with |session|.
 
 </div>
 
 <div class="example">
-The following code attempts to retrieve an exclusive {{XRSession}}.
+The following code attempts to retrieve an immersive {{XRSession}}.
 
 <pre highlight="js">
 let xrSession;
 
-xrDevice.requestSession({ exclusive: true }).then((session) => {
+xrDevice.requestSession({ immersive: true }).then((session) => {
   xrSession = session;
 });
 </pre>
@@ -293,7 +291,7 @@ XRSessionCreationOptions {#xrsessioncreationoptions-interface}
 
 <pre class="idl">
 dictionary XRSessionCreationOptions {
-  boolean exclusive = false;
+  boolean immersive = false;
   XRPresentationContext outputContext;
 };
 </pre>
@@ -304,23 +302,34 @@ The {{XRSessionCreationOptions}} dictionary provides a <dfn>session description<
 
 To determine if an {{XRSessionCreationOptions}} |options| is <dfn>supported by the device</dfn> |device| run the following steps:
 
-  1. Let |exclusive| be |options|.{{XRSessionCreationOptions/exclusive}}.
-  1. If |exclusive| is <code>true</code> and |device|'s [=supports exclusive=] boolean is <code>false</code> return <code>false</code>.
-  1. If |exclusive| is <code>false</code> and |options|.{{XRSessionCreationOptions/outputContext}} is <code>null</code>, return <code>false</code>
+  1. Let |immersive| be |options|.{{XRSessionCreationOptions/immersive}}.
+  1. If |immersive| is <code>true</code> and |device|'s [=supports immersive=] boolean is <code>false</code> return <code>false</code>.
+  1. If |immersive| is <code>false</code> and |options|.{{XRSessionCreationOptions/outputContext}} is <code>null</code>, return <code>false</code>
 
 </div>
 
-Issue: Document restrictions and capabilities of an [=exclusive session=]
+A session is considered to be an <dfn>immersive session</dfn> if it's output is displayed to the user in a way that makes the user feel the content is present in the same space with them, shown at the proper scale. Sessions are considered <dfn>non-immersive</dfn> (sometimes referred to as <dfn>inline</dfn>) if their output is displayed as an element in an HTML document.
+
+NOTE: Content shown as part of an HTML document is always considered [=non-immersive=] even if headtracking is taken into account, the content is displayed in stereo, or the document is displayed in a headset.
+
+Issue: Document restrictions and capabilities of an [=immersive session=]
 
 XRSession {#xrsession-interface}
 ---------
 
 <pre class="idl">
+enum XREnvironmentBlendMode {
+  "opaque",
+  "additive",
+  "alpha-blend",
+};
+
 [SecureContext, Exposed=Window] interface XRSession : EventTarget {
   // Attributes
   readonly attribute XRDevice device;
-  readonly attribute boolean exclusive;
+  readonly attribute boolean immersive;
   readonly attribute XRPresentationContext outputContext;
+  readonly attribute XREnvironmentBlendMode environmentBlendMode;
 
   attribute double depthNear;
   attribute double depthFar;
@@ -359,7 +368,7 @@ When an {{XRSession}} is created, the user agent MUST <dfn>initialize the sessio
   1. Let |device| be the {{XRDevice}} object that requested |session|'s creation.
   1. Let |options| be the {{XRSessionCreationOptions}} passed to {{requestSession()}}.
   1. Initialize |session|'s {{XRSession/device}} to |device|.
-  1. Initialize |session|'s {{XRSession/exclusive}} to |options| {{XRSessionCreationOptions/exclusive}} value.
+  1. Initialize |session|'s {{XRSession/immersive}} to |options| {{XRSessionCreationOptions/immersive}} value.
   1. Initialize |session|'s {{XRSession/outputContext}} to |options| {{XRSessionCreationOptions/outputContext}} value.
   1. Initialize |session|'s {{XRSession/depthNear}} to <code>0.1</code>.
   1. Initialize |session|'s {{XRSession/depthFar}} to <code>1000.0</code>.
@@ -377,8 +386,8 @@ When an {{XRSession}} is shut down the following steps are run:
   1. Let |session| be the target {{XRSession}} object.
   1. Let |device| be |session|'s {{XRSession/device}}.
   1. Set |session|'s [=ended=] value to <code>true</code>.
-  1. If |device|'s [=exclusive session=] is equal to |session|, set |device|'s [=exclusive session=] to <code>null</code>.
-  1. If |device|'s [=list of non-exclusive sessions=] contains |session|, remove it from the list.
+  1. If |device|'s [=active immersive session=] is equal to |session|, set |device|'s [=active immersive session=] to <code>null</code>.
+  1. If |device|'s [=list of non-immersive sessions=] contains |session|, remove it from the list.
   1. If no other features of the user agent are actively using them, perform the necessary platform-specific steps to shut down the device's tracking and rendering capabilities.
 
 </div>
@@ -391,6 +400,18 @@ The <dfn method for="XRSession">end()</dfn> method provides a way to manually sh
   1. [=/Resolve=] |promise|.
 
 </div>
+
+Each {{XRSession}} has a <dfn>environment blending mode</dfn> value, which is a enum which MUST be set to whichever of the following values best matches the behavior of imagery rendered by the session in relation to the user's surrounding environment.
+
+  - A blend mode of <dfn enum-value for="XREnvironmentBlendMode">opaque</dfn> indicates that the user's surrounding environment is not visible at all. Alpha values in the {{XRSession/baseLayer}} will be ignored, with the compositor treating all alpha values as 1.0.
+
+  - A blend mode of <dfn enum-value for="XREnvironmentBlendMode">additive</dfn> indicates that the user's surrounding environment is visible and the {{XRSession/baseLayer}} will be shown additively against it. Alpha values in the {{XRSession/baseLayer}} will be ignored, with the compositor treating all alpha values as 1.0. When this blend mode is in use black pixels will appear fully transparent, and there is no way to make a pixel appear fully opaque.
+
+  - A blend mode of <dfn enum-value for="XREnvironmentBlendMode">alpha-blend</dfn> indicates that the user's surrounding environment is visible and the {{XRSession/baseLayer}} will be blended with it according to the alpha values of each pixel. Pixels with an alpha value of 1.0 will be fully opaque and pixels with an alpha value of 0.0 will be fully transparent.
+
+The <dfn attribute for="XRSession">environmentBlendMode</dfn> attribute returns the {{XRSession}}'s [=environment blending mode=]
+
+NOTE: Most Virtual Reality devices exhibit {{XREnvironmentBlendMode/opaque}} blending behavior. Augmented Reality devices that use transparent optical elements frequently exhibit {{XREnvironmentBlendMode/additive}} blending behavior, and Augmented Reality devices that use passthrough cameras frequently exhibit {{XREnvironmentBlendMode/alpha-blend}} blending behavior.
 
 <dfn method for="XRSession">requestFrameOfReference(type, options)</dfn>
 
@@ -420,7 +441,7 @@ Animation Frames {#animation-frames}
 ----------------
 
 <pre class="idl">
-callback XRFrameRequestCallback = void (DOMHighResTimeStamp time, XRPresentationFrame frame);
+callback XRFrameRequestCallback = void (DOMHighResTimeStamp time, XRFrame frame);
 </pre>
 
 Each {{XRFrameRequestCallback}} object has a <dfn for="XRFrameRequestCallback">cancelled</dfn> boolean initially set to <code>false</code>.
@@ -450,7 +471,7 @@ When the <dfn method for="XRSession">cancelAnimationFrame(|handle|)</dfn> method
 
 <div class="algorithm" data-algorithm="run-animation-frames">
 
-When the user agent is to <dfn>run the animation frame callbacks</dfn> for an {{XRSession}} |session| with a timestamp |now| and an {{XRPresentationFrame}} |frame|, it MUST run the following steps:
+When the user agent is to <dfn>run the animation frame callbacks</dfn> for an {{XRSession}} |session| with a timestamp |now| and an {{XRFrame}} |frame|, it MUST run the following steps:
 
   1. Let |callbacks| be a list of the entries in |session|'s [=list of animation frame callback=], in the order in which they were added to the list.
   1. Set |session|'s [=list of animation frame callbacks=] to the empty list.
@@ -505,22 +526,28 @@ Then, the frame loop performs the following steps while the session is active:
 Frame Loop {#frame}
 ==========
 
-XRPresentationFrame {#xrpresentationframe-interface}
+XRFrame {#xrpresentationframe-interface}
 -------------------
 
 <pre class="idl">
-[SecureContext, Exposed=Window] interface XRPresentationFrame {
+[SecureContext, Exposed=Window] interface XRFrame {
+  readonly attribute XRSession session;
   readonly attribute FrozenArray&lt;XRView&gt; views;
 
   XRDevicePose? getDevicePose(XRCoordinateSystem coordinateSystem);
+  XRInputPose? getInputPose(XRInputSource inputSource, XRCoordinateSystem coordinateSystem);
 };
 </pre>
 
-An {{XRPresentationFrame}} provides all the values needed to render a single frame of an XR scene to the {{XRDevice}}'s display. Applications can only aquire an {{XRPresentationFrame}} by calling {{XRSession/requestAnimationFrame()}} on an {{XRSession}} with an {{XRFrameRequestCallback}}. When the callback is called it will be passed an {{XRPresentationFrame}}.
+An {{XRFrame}} provides all the values needed to render a single frame of an XR scene to the {{XRDevice}}'s display. Applications can only aquire an {{XRFrame}} by calling {{XRSession/requestAnimationFrame()}} on an {{XRSession}} with an {{XRFrameRequestCallback}}. When the callback is called it will be passed an {{XRFrame}}.
 
-<dfn attribute for="XRPresentationFrame">views</dfn>
+<dfn attribute for="XRFrame">session</dfn>
 
-<dfn method for="XRPresentationFrame">getDevicePose(coordinateSystem)</dfn>
+<dfn attribute for="XRFrame">views</dfn>
+
+<dfn method for="XRFrame">getDevicePose(coordinateSystem)</dfn>
+
+<dfn method for="XRFrame">getInputPose(inputSource, coordinateSystem)</dfn>
 
 Coordinate Systems {#coordinatesystems}
 ==================
@@ -541,8 +568,8 @@ XRFrameOfReference {#xrframeofreference-interface}
 
 <pre class="idl">
 enum XRFrameOfReferenceType {
-  "headModel",
-  "eyeLevel",
+  "head-model",
+  "eye-level",
   "stage",
 };
 
@@ -697,15 +724,15 @@ enum XRHandedness {
   "right"
 };
 
-enum XRPointerOrigin {
-  "head",
-  "hand",
+enum XRTargetRayMode {
+  "gaze",
+  "tracked-pointer",
   "screen"
 };
 
 interface XRInputSource {
   readonly attribute XRHandedness handedness;
-  readonly attribute XRPointerOrigin pointerOrigin;
+  readonly attribute XRTargetRayMode targetRayMode;
 };
 </pre>
 
@@ -717,7 +744,7 @@ XRInputPose {#xrinputpose-interface}
 <pre class="idl">
 interface XRInputPose {
   readonly attribute boolean emulatedPosition;
-  readonly attribute Float32Array pointerMatrix;
+  readonly attribute Float32Array targetRayMatrix;
   readonly attribute Float32Array? gripMatrix;
 };
 </pre>
@@ -737,6 +764,22 @@ An {{XRLayer}} defines a source of bitmap images and a description of how the im
 XRWebGLLayer {#xrwebgllayer-interface}
 -------
 
+Each {{XRSession}} MUST identify a <dfn>native WebGL framebuffer resolution</dfn>, which is the pixel resolution of a WebGL framebuffer required to match the physical pixel resolution of the {{XRDevice}}.
+
+<div class="algorithm" data-algorithm="native-webgl-framebuffer-resolution">
+
+The [=native WebGL framebuffer resolution=] is detemined by running the following steps:
+
+  1. Let |session| be the target {{XRSession}}.
+  1. If |session|'s {{XRSession/immersive}} value is <code>true</code>, set the [=native WebGL framebuffer resolution=] to the resolution required to have a 1:1 ratio between the pixels of a framebuffer large enough to contain all of the session's {{XRView}}s and the physical screen pixels in the area of the display under the highest magnification and abort these steps. If no method exists to determine the native resolution as described, the [=recommended WebGL framebuffer resolution=] MAY be used.
+  1. If |session|'s {{XRSession/immersive}} value is <code>false</code>, set the [=native WebGL framebuffer resolution=] to the size of the |session|'s {{XRSession/outputContext}}'s {{XRPresentationContext/canvas}} in physical display pixels and reevaluate these steps every time the size of the canvas changes.
+
+</div>
+
+Additionally, the {{XRSession}} MUST identify a <dfn>recommended WebGL framebuffer resolution</dfn>, which represents a best estimate of the WebGL framebuffer resolution large enough to contain all of the session's {{XRView}}s that provides an average application a good balance between performance and quality. It MAY be smaller than, larger than, or equal to the [=native WebGL framebuffer resolution=].
+
+NOTE: The user agent is free to use and method of it's choosing to estimate the [=recommended WebGL framebuffer resolution=]. If there are platform-specific methods for querying a recommended size it is recommended that they be used, but not required.
+
 <pre class="idl">
 typedef (WebGLRenderingContext or
          WebGL2RenderingContext) XRWebGLRenderingContext;
@@ -747,7 +790,7 @@ dictionary XRWebGLLayerInit {
   boolean stencil = false;
   boolean alpha = true;
   boolean multiview = false;
-  double framebufferScaleFactor;
+  double framebufferScaleFactor = 1.0;
 };
 
 [SecureContext, Exposed=Window, Constructor(XRSession session,
@@ -770,6 +813,9 @@ interface XRWebGLLayer : XRLayer {
   // Methods
   XRViewport? getViewport(XRView view);
   void requestViewportScaling(double viewportScaleFactor);
+
+  // Static Methods
+  static double getNativeFramebufferScaleFactor(XRSession session);
 };
 </pre>
 
@@ -810,6 +856,16 @@ The <dfn method for="XRWebGLLayer">getViewport(|view|)</dfn> method, when invoke
 </div>
 
 <dfn method for="XRWebGLLayer">requestViewportScaling(viewportScaleFactor)</dfn>
+
+<div class="algorithm" data-algorithm="get-native-framebuffer-scale-factor">
+
+The <dfn method for="XRWebGLLayer">getNativeFramebufferScaleFactor(|session|)</dfn> method, when invoked, MUST run the following steps:
+
+  1. Let |session| be the target {{XRSession}}.
+  1. If |session|'s [=ended=] value is <code>true</code>, return <code>0.0</code> and abort these steps.
+  1. Return the value that the |session|'s [=recommended WebGL framebuffer resolution=] must be multiplied by to yield the |session|'s [=native WebGL framebuffer resolution=].
+
+</div>
 
 Issue: Document what it means when a context <dfn>supports multiview</dfn>.
 
@@ -929,6 +985,9 @@ function onXRSessionStarted(xrSession) {
 Canvas Rendering Context {#canvas-rendering-context}
 ========================
 
+XRPresentationContext {#xrpresentationcontext-interface}
+---------------------
+
 <pre class="idl">
 [SecureContext, Exposed=Window] interface XRPresentationContext {
   readonly attribute HTMLCanvasElement canvas;
@@ -963,18 +1022,18 @@ XRInputSourceEvent {#xrinputsourceevent-interface}
 <pre class="idl">
 [SecureContext, Exposed=Window, Constructor(DOMString type, XRInputSourceEventInit eventInitDict)]
 interface XRInputSourceEvent : Event {
-  readonly attribute XRPresentationFrame frame;
+  readonly attribute XRFrame frame;
   readonly attribute XRInputSource inputSource;
 };
 
 dictionary XRInputSourceEventInit : EventInit {
-  required XRPresentationFrame frame;
+  required XRFrame frame;
   required XRInputSource inputSource;
 };
 </pre>
 
 <dfn attribute for="XRInputSourceEvent">frame</dfn>
-An {{XRPresentationFrame}} that corresponds with the time that the event took place. This frame's {{XRPresentationFrame/views}} array MUST be empty.
+An {{XRFrame}} that corresponds with the time that the event took place. This frame's {{XRFrame/views}} array MUST be empty.
 
 <dfn attribute for="XRInputSourceEvent">inputSource</dfn>
 The {{XRInputSource}} that generated this event.
@@ -1040,7 +1099,7 @@ The following individuals have contributed to the design of the WebXR Device API
   * <a href="mailto:cvan@mozilla.com">Chris Van Wiemeersch</a> (<a href="https://mozilla.org/">Mozilla</a>)
   * <a href="mailto:kgilbert@mozilla.com">Kearwood Gilbert</a> (<a href="https://mozilla.org/">Mozilla</a>)
   * <a href="mailto:rafael.cintron@microsoft.com">Rafael Cintron</a> (<a href="https://microsoft.com/">Microsoft</a>)
-  * <a href="mailto:ssylvan@microsoft.com">Sebastian Sylvan</a> (<a href="https://microsoft.com/">Microsoft</a>)
+  * <a href="mailto:sebastian.sylvan@gmail.com">Sebastian Sylvan</a> (Formerly <a href="https://microsoft.com/">Microsoft</a>)
 
 And a special thanks to <a href="mailto:vladv@unity3d.com">Vladimir Vukicevic</a> (<a href="https://unity3d.com/">Unity</a>) for kick-starting this whole adventure!
 

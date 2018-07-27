@@ -83,11 +83,13 @@ Group: fxtf
 !Participate: IRC: <a href="ircs://irc.w3.org:6667/webanimations">#webanimations</a> on W3C's IRC
 Repository: w3c/csswg-drafts
 !Issue Tracking: <a href="https://github.com/w3c/csswg-drafts/labels/web-animations-1">GitHub</a>
-!Tests: <a href="https://github.com/w3c/web-platform-tests/tree/master/web-animations">web-platform-tests web-animations/</a> (<a href="https://github.com/w3c/web-platform-tests/labels/web-animations">ongoing work</a>)
+!Tests: <a href="https://github.com/web-platform-tests/wpt/tree/master/web-animations">web-platform-tests web-animations/</a> (<a href="https://github.com/web-platform-tests/wpt/labels/web-animations">ongoing work</a>)
 
 Editor: Brian Birtles 43194, Mozilla, bbirtles@mozilla.com
-Editor: Shane Stephens 47691, Google Inc, shans@google.com
-Editor: Douglas Stockwell, Google Inc, dstockwell@google.com
+Editor: Robert Flack 98451, Google Inc, flackr@google.com
+Editor: Antoine Quint 51377, Apple Inc, graouts@apple.com
+Former Editor: Shane Stephens 47691, Google Inc, shans@google.com
+Former Editor: Douglas Stockwell, Google Inc, dstockwell@google.com
 Former Editor: Alex Danilo 31960, Google Inc, adanilo@google.com
 Former Editor: Tab Atkins 42199, Google Inc, jackalmage@gmail.com
 Abstract: This specification defines a model for synchronization and
@@ -144,6 +146,8 @@ urlPrefix: https://html.spec.whatwg.org/multipage/webappapis.html; type: dfn; sp
     text: queue a microtask
     text: relevant Realm; url: concept-relevant-realm
     text: update the rendering
+urlPrefix: https://html.spec.whatwg.org/multipage/webappapis.html; type: interface; spec: html
+    text: EventHandler
 urlPrefix: https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html.html; type: dfn; spec: html
     text: animation frame callbacks; url: animation-frames
     text: run the animation frame callbacks
@@ -168,6 +172,8 @@ urlPrefix: https://drafts.csswg.org/css-transitions/; type: dfn; spec: css-trans
     text: events from CSS transitions; url: transition-events
 urlPrefix: https://drafts.csswg.org/css-animations/; type: dfn; spec: css-animations-1
     text: events from CSS animations; url: events
+urlPrefix: https://drafts.csswg.org/css-writing-modes-4/; type: dfn; spec: css-writing-modes-4
+    text: equivalent physical property; url: logical-to-physical
 </pre>
 <pre class="link-defaults">
 spec:dom; type:interface; text:EventTarget
@@ -599,8 +605,8 @@ a {{Document}} |doc| at timestamp |now|, run these steps:
      <a lt="timeline current time">current time</a> of a [=timeline=] also
      involves:
 
-     *    Updating the [=current time=] of any [=animations=] associated with
-          the timeline.
+     *    Updating the [=current time=] of any [=animations=] <a lt="associated
+          with a timeline">associated with</a> the timeline.
      *    Running the [=update an animation's finished state=] procedure for any
           animations whose [=current time=] has been updated.
      *    Queueing [=animation events=] for any such animations.
@@ -803,9 +809,6 @@ follows:
     <var>animation</var>, if any.
 1.  If <var>new effect</var> is the same object as <var>old effect</var>,
     abort this procedure.
-1.  If <var>new effect</var> is null and <var>old effect</var> is not null,
-    run the procedure to <a>reset an animation's pending tasks</a> on
-    <var>animation</var>.
 1.  If <var>animation</var> has a <a>pending pause task</a>, reschedule that
     task to run as soon as <var>animation</var> is <a>ready</a>.
 1.  If <var>animation</var> has a <a>pending play task</a>, reschedule that task
@@ -1713,7 +1716,7 @@ as follows:
         origin-relative time">convert timeline times to origin-relative
         time</a>, let the [=scheduled event time=] be the result of applying
         that procedure to |timeline time|.
-        Otherwise, the [scheduled event time=] is an [=unresolved=] [=time
+        Otherwise, the [=scheduled event time=] is an [=unresolved=] [=time
         value=].
 
         Otherwise, [=queue a task=] to [=dispatch=] |cancelEvent| at
@@ -3049,7 +3052,7 @@ types</a>.
 
 For <a>animation types</a> that do not define a specific procedure
 for <a lt="animation addition">addition</a> or which are defined as
-<dfn>not additive</dfn>, the <a
+<dfn export>not additive</dfn>, the <a
 lt="animation addition">addition procedure</a> is simply
 <var>V</var><sub>res</sub> = <var>V</var><sub>b</sub>.
 
@@ -3351,6 +3354,9 @@ a <a>target element</a> for which computed property values can be calculated.
         corresponding property and computed value to <var>computed
         keyframe</var>.
         For shorthand properties, add the equivalent longhand properties.
+        For logical properties [[!CSS-LOGICAL-1]], add the [=equivalent physical
+        properties=] [[!CSS-WRITING-MODES-4]] based on the computed value of
+        'writing-mode' and/or 'direction' for <a>target element</a>.
 
         For example, if <var>keyframe</var> has a value of &lsquo;12pt&rsquo;
         for the 'border-width' property, the user agent may produce a computed
@@ -3362,10 +3368,9 @@ a <a>target element</a> for which computed property values can be calculated.
         each of the longhand properties, and each with the computed value,
         &lsquo;16px&rsquo;.
 
-        If conflicts arise when expanding shorthand properties due to
-        shorthand properties overlapping with existing longhand properties or
-        other with other shorthand properties, apply the following rules in
-        order until the conflict is resolved:
+        If conflicts arise when expanding shorthand properties or replacing
+        logical properties with physical propertiess, apply the following rules
+        in order until the conflict is resolved:
 
         1.  Longhand properties override shorthand properties (e.g.
             'border-top-color' overrides 'border-top').
@@ -3377,6 +3382,7 @@ a <a>target element</a> for which computed property values can be calculated.
             IDL attribute</a> algorithm [[!CSSOM]]) appears earlier when
             sorted in ascending order by the Unicode codepoints that make up
             each IDL name, override those who appear later.
+        1.  Physical properties override logical properties.
 
 1.  Apply the procedure to <a>compute missing keyframe offsets</a> to
     <var>computed keyframes</var>.
@@ -4072,9 +4078,8 @@ interface Animation : EventTarget {
     </div>
 
 :   <dfn method for=Animation lt='play()'>void play()</dfn>
-::  Unpauses the animation and rewinds if it has finished playing using
-    the procedure to <a>play an animation</a> for this object
-    with the <var>auto-rewind</var> flag set to true.
+::  Begins or resumes playback of the animation by running the procedure to
+    [=play an animation=] passing true as the value of the |auto-rewind| flag.
 :   <dfn method for=Animation lt='pause()'>void pause()</dfn>
 ::  Suspends the playback of this animation by running the procedure to
     <a>pause an animation</a> for this object.
@@ -5012,7 +5017,7 @@ typedef (sequence&lt;Keyframe&gt; or PropertyIndexedKeyframes) KeyframeArgument;
 
 The meaning and allowed values of each argument is as follows:
 
-:   <dfn id="dom-keyframe-offset">offset</dfn>
+:   offset
 ::  The <a>keyframe offset</a> of the <a>keyframe</a> specified as
     a number between 0.0 and 1.0 inclusive or <code>null</code>.
 
@@ -5025,7 +5030,7 @@ The meaning and allowed values of each argument is as follows:
     Keyframes that specify an offset must be provided in increasing
     order of offset. Adjacent and equal offsets, however, are permitted.
 
-:   <dfn id="dom-keyframe-easing">easing</dfn>
+:   easing
 ::  The <a>timing function</a> used to transform the progress of time
     from this keyframe until the next keyframe in the series.
 
@@ -5033,7 +5038,7 @@ The meaning and allowed values of each argument is as follows:
     is identical to that defined for the {{EffectTiming/easing}} attribute
     of the {{EffectTiming}} interface.
 
-:   <dfn id="dom-keyframe-composite">composite</dfn>
+:   composite
 ::  The <a>keyframe-specific composite operation</a> used to combine the values
     specified in this keyframe with the <a>underlying value</a>.
 
@@ -5887,7 +5892,7 @@ additional technologies defined in terms of this specification in
 which case the definitions provided in this specification will form
 part of the conformance criteria of the additional technology.
 
-A <dfn>conforming scripted Web Animations user agent</dfn> is a user
+A <dfn export>conforming scripted Web Animations user agent</dfn> is a user
 agent that implements the <abbr
 title="Application Programming Interface">API</abbr> defined in
 [[#programming-interface]].
@@ -5916,6 +5921,9 @@ The following changes have been made since the <a
 *   Dropped global clock definition and added the [=update animations
     and send events=] procedure so that the updating of animations can be
     integrated with HTML's [=update the rendering=] procedure.
+*   Removed step to reset pending tasks when a null effect it set on an
+    animation
+    (<a href="https://github.com/w3c/csswg-drafts/issues/2077">#2077</a>).
 *   Clarified that the [=pending play task=] and [=pending pause task=] must be
     run asynchronously.
 *   Fixed a mistake in the calculation of the <a>hold time</a> when an pause

@@ -23,7 +23,11 @@ urlPrefix: https://w3c.github.io/performance-timeline/; spec: PERFORMANCE-TIMELI
         text: entryType; url: #dom-performanceentry-entrytype
         text: startTime; url: #dom-performanceentry-starttime
         text: duration; url: #dom-performanceentry-duration
-urlPrefix: https://w3c.github.io/hr-time/#idl-def-domhighrestimestamp; spec: HR-TIME-2; type: typedef; text: DOMHighResTimeStamp
+urlPrefix: https://w3c.github.io/hr-time/; spec: HR-TIME-2;
+    type: typedef; url: #idl-def-domhighrestimestamp; text: DOMHighResTimeStamp;
+    type: interface; url: #dfn-performance; text: Performance;
+    type: attribute; for: Performance;
+        text: now(); url: #dom-performance-now
 </pre>
 
 Introduction {#intro}
@@ -107,11 +111,11 @@ Long Task timing involves the following new interfaces
     * <code>unknown</code>: none of the above
 * The {{PerformanceEntry/entryType}} attribute must return <code>"longtask"</code>.
 * The {{PerformanceEntry/startTime}} attribute MUST return a {{DOMHighResTimeStamp}} of when the task started.
-* The {{PerformanceEntry/duration}} attribute MUST return a {{DOMHighResTimeStamp}} equal to the elapsed time between the start and end of task
+* The {{PerformanceEntry/duration}} attribute MUST return a {{DOMHighResTimeStamp}} equal to the elapsed time between the start and end of task.
 
 {{PerformanceLongTaskTiming}} adds the following attributes:
 
-* The <dfn attribute for=PerformanceEntry>attribution</dfn> field returns a sequence of {{TaskAttributionTiming}} entries.
+* The <dfn attribute for=PerformanceLongTaskTiming>attribution</dfn> field returns a sequence of {{TaskAttributionTiming}} entries.
 
 {{TaskAttributionTiming}} interface {#sec-TaskAttributionTiming}
 ----------------------------------------------------------------
@@ -127,8 +131,8 @@ Long Task timing involves the following new interfaces
 
 {{TaskAttributionTiming}} extends the following attributes of {{PerformanceEntry}} interface:
 
-* The {{PerformanceEntry/name}} attribute must return {{DOMString}} indicating type of attribution. Currently this can <code>"script"</code>.
-* The {{PerformanceEntry/entryType}} attribute must return {{DOMString}} <code>"taskattribution"</code>
+* The {{PerformanceEntry/name}} attribute must return {{DOMString}} indicating type of attribution. Currently this can only be <code>"script"</code>.
+* The {{PerformanceEntry/entryType}} attribute must return {{DOMString}} <code>"taskattribution"</code>.
 * The {{PerformanceEntry/startTime}} attribute MUST return 0.
 * The {{PerformanceEntry/duration}} attribute MUST return 0.
 
@@ -148,8 +152,8 @@ Long task represents the top level event loop task. Within this task, different 
 
 Thus pointing to the culprit has couple of facets:
 
-* Pointing to the overall frame to blame for the long task on the whole: this is refered to as "minimal frame attribution" and is captured in the {{PerformanceEntry/name}} field
-* Pointing to the type of work involved in the task, and its associated frame context: this is captured in {{TaskAttributionTiming}} objects in the {{PerformanceLongTaskTiming/attribution}} field of {{PerformanceLongTaskTiming}}
+* Pointing to the overall frame to blame for the long task on the whole: this is refered to as "minimal frame attribution" and is captured in the {{PerformanceEntry/name}} field.
+* Pointing to the type of work involved in the task, and its associated frame context: this is captured in {{TaskAttributionTiming}} objects in the {{PerformanceLongTaskTiming/attribution}} field of {{PerformanceLongTaskTiming}}.
 
 Therefore, {{PerformanceEntry/name}} and {{PerformanceLongTaskTiming/attribution}} fields on {{PerformanceLongTaskTiming}} together paint the picture for where the blame rests for a long task.
 When delivering this information the web origin-policy must be adhered to.
@@ -223,7 +227,7 @@ Additions to the Long Task Spec {#sec-additions-to-spec}
 
 Given a task |task|, perform the following algorithm:
 
-1. If |end time| minus |start time| is less than the long tasks threshold of 50 ms, abort these steps.
+1. If |task|'s [=task/end time=] minus [=task/start time=] is less than the long tasks threshold of 50 ms, abort these steps.
 
 2. Let |destinationRealms| be an empty set.
 
@@ -259,23 +263,23 @@ Given a task |task|, perform the following algorithm:
                 2. If |culpritSettings|'s responsible browsing context is a descendant of |destinationBC|, set name to <code>“cross-origin-descendant”</code>.
 
 5. Create a new {{TaskAttributionTiming}} object |attribution| and set its attributes as follows:
-    1. Set |attribution|'s name attribute to <code>"script"</code>.
-    2. Set |attribution|'s entryType attribute to <code>“taskattribution”</code>
-    3. Set |attribution|'s startTime and duration to 0.
-    4. If |culpritSettings| is not null, and |culpritSettings|'s responsible browsing context has a browsing context container that is an iframe element, then let iframe be that element, and perform the following steps:
-        1. Set |attribution|'s frameName attribute to the value of iframe's name content attribute, or null if the attribute is absent.
-        2. Set |attribution|'s frameSrc attribute to the value of iframe's src content attribute, or null if the attribute is absent.
+    1. Set |attribution|'s {{PerformanceEntry/name}} attribute to <code>"script"</code>.
+    2. Set |attribution|'s {{PerformanceEntry/entryType}} attribute to <code>“taskattribution”</code>.
+    3. Set |attribution|'s {{PerformanceEntry/startTime}} and {{PerformanceEntry/duration}} to 0.
+    4. If |culpritSettings| is not null, and |culpritSettings|'s responsible browsing context has a browsing context container that is an iframe element, then let |iframe| be that element, and perform the following steps:
+        1. Set |attribution|'s {{containerName}} attribute to the value of |iframe|'s name content attribute, or null if the attribute is absent.
+        2. Set |attribution|'s {{containerSrc}} attribute to the value of |iframe|'s src content attribute, or null if the attribute is absent.
 
             NOTE: it is intentional that we record the frame's src attribute here, and not its current URL, as this is meant primarily to help identify frames, and allowing discovery of the current URL of a cross-origin iframe is a security problem.
-        3. Set |attribution|'s frameId attribute to the value of iframe's id content attribute, or <code>null</code> if the attribute is absent.
+        3. Set |attribution|'s {{containerId}} attribute to the value of |iframe|'s id content attribute, or <code>null</code> if the attribute is absent.
 
 6. Create a new {{PerformanceLongTaskTiming}} object |newEntry| and set its attributes as follows:
 
     1. Set |newEntry|'s {{PerformanceEntry/name}} attribute to |name|.
-    2. Set |newEntry|'s {{PerformanceEntry/entryType}} attribute to <code>“longtask”</code>
-    3. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |start time|
-    4. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |end time| minus |start time|
-    5. Set |newEntry|'s attribution attribute to a new frozen array containing the single value |attribution|.
+    2. Set |newEntry|'s {{PerformanceEntry/entryType}} attribute to <code>“longtask”</code>.
+    3. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |task|'s [=task/start time=].
+    4. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |task|'s [=task/end time=] minus [=task/start time=].
+    5. Set |newEntry|'s {{PerformanceLongTaskTiming/attribution}} attribute to a new frozen array containing the single value |attribution|.
 
         NOTE: future iterations of this API will add more values to the attribution attribute, but for now it only contains a single value.
 

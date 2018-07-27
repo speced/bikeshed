@@ -7,7 +7,7 @@ ED: https://wicg.github.io/picture-in-picture
 Favicon: https://raw.githubusercontent.com/google/material-design-icons/master/action/2x_web/ic_picture_in_picture_alt_black_48dp.png
 Group: WICG
 Repository: wicg/picture-in-picture
-!Web Platform Tests: <a href="https://github.com/w3c/web-platform-tests/tree/master/feature-policy">feature-policy/</a><br/><a href="https://github.com/w3c/web-platform-tests/tree/master/picture-in-picture">picture-in-picture/</a>
+!Web Platform Tests: <a href="https://github.com/web-platform-tests/wpt/tree/master/feature-policy">feature-policy/</a><br/><a href="https://github.com/web-platform-tests/wpt/tree/master/picture-in-picture">picture-in-picture/</a>
 Editor: François Beaufort, Google, fbeaufort@google.com
 Editor: Mounir Lamouri, Google, mlamouri@google.com
 Abstract: This specification intends to provide APIs to allow websites to
@@ -28,6 +28,8 @@ spec: HTML; urlPrefix: https://html.spec.whatwg.org/multipage/
             text: in parallel
         urlPrefix: interaction.html
             text: triggered by user activation
+        urlPrefix: media.html
+            text: media element event task source
 spec: Remote-Playback; urlPrefix: https://w3c.github.io/remote-playback/#dfn-
     type: dfn
         text: local playback device
@@ -38,6 +40,7 @@ spec: Remote-Playback; urlPrefix: https://w3c.github.io/remote-playback/#dfn-
 spec:dom; type:attribute; text:bubbles
 spec:dom; type:dfn; for:NamedNodeMap; text:element
 spec:dom; type:interface; text:Document
+spec:html; type:attribute; for:HTMLMediaElement; text:readyState
 </pre>
 
 # Introduction # {#intro}
@@ -47,7 +50,7 @@ spec:dom; type:interface; text:Document
 Many users want to continue consuming media while they interact with other
 content, sites, or applications on their device. A common UI affordance for
 this type of activity is Picture-in-Picture (PiP), where the video is contained
-in a separate miniature window that is <a>always on top</a> of other windows.
+in a separate miniature window that is always on top of other windows.
 Picture-in-Picture is a common platform-level feature among desktop and mobile
 OSs.
 
@@ -148,14 +151,19 @@ invoked, the user agent MUST run the following steps:
 2. If document is not allowed to use the <a>policy-controlled feature</a> named
     <code>"picture-in-picture"</code>, throw a {{SecurityError}} and abort these
     steps.
-3. OPTIONALLY, if the {{disablePictureInPicture}} attribute is present on
+3. If |video|'s {{readyState}} attribute is {{HAVE_NOTHING}}, throw a
+    {{InvalidStateError}} and abort these steps.
+4. If |video| has no video track, throw a {{InvalidStateError}} and abort
+    these steps.
+5. OPTIONALLY, if the {{disablePictureInPicture}} attribute is present on
     |video|, throw a {{InvalidStateError}} and abort these steps.
-4. If the algorithm is not <a>triggered by user activation</a>, throw a
+6. If the algorithm is not <a>triggered by user activation</a>, throw a
     {{NotAllowedError}} and abort these steps.
-5. Set {{pictureInPictureElement}} to |video|.
-6. Let <dfn>Picture-in-Picture window</dfn> be a new instance of
+7. If |video| is {{pictureInPictureElement}}, abort these steps.
+8. Set {{pictureInPictureElement}} to |video|.
+9. Let <dfn>Picture-in-Picture window</dfn> be a new instance of
     {{PictureInPictureWindow}} associated with {{pictureInPictureElement}}.
-7. <a>Queue a task</a> to <a>fire an event</a> with the name
+10. <a>Queue a task</a> to <a>fire an event</a> with the name
     {{enterpictureinpicture}} at the |video| with its {{bubbles}} attribute
     initialized to true.
 
@@ -182,6 +190,12 @@ the user agent MUST run the following steps:
 4. <a>Queue a task</a> to <a>fire an event</a> with the name
     {{leavepictureinpicture}} at the |video| with its {{bubbles}} attribute
     initialized to true.
+
+It is NOT RECOMMENDED that video playback state changes when the <a>exit
+Picture-in-Picture algorithm</a> is invoked. The website SHOULD be in control
+of the experience if it is website initiated. However, user agent MAY expose
+Picture-in-Picture window controls that change video playback state (e.g.
+pause).
 
 ## Disable Picture-in-Picture ## {#disable-pip}
 
@@ -216,7 +230,7 @@ Picture-in-Picture.
 ## Interaction with Media Session ## {#media-session}
 
 The API will have to be used with the [[MediaSession]] API for customizing the
-avaiable controls on the Picture-in-Picture window.
+available controls on the Picture-in-Picture window.
 
 ## One Picture-in-Picture window ## {#one-pip-window}
 
@@ -240,13 +254,12 @@ in order to notify the website of the Picture-in-Picture status changes.
 
 <pre class="idl">
 partial interface HTMLVideoElement {
-  Promise&lt;PictureInPictureWindow> requestPictureInPicture();
+  [NewObject] Promise&lt;PictureInPictureWindow> requestPictureInPicture();
 
   attribute EventHandler onenterpictureinpicture;
   attribute EventHandler onleavepictureinpicture;
 
-  [CEReactions]
-  attribute boolean disablePictureInPicture;
+  [CEReactions] attribute boolean disablePictureInPicture;
 };
 </pre>
 
@@ -267,7 +280,7 @@ parallel</a>:
 partial interface Document {
   readonly attribute boolean pictureInPictureEnabled;
 
-  Promise&lt;void> exitPictureInPicture();
+  [NewObject] Promise&lt;void> exitPictureInPicture();
 };
 </pre>
 
@@ -311,7 +324,7 @@ The {{pictureInPictureElement}} attribute's getter must run these steps:
 ## Interface <code>PictureInPictureWindow</code> ## {#interface-picture-in-picture-window}
 
 <pre class="idl">
-interface PictureInPictureWindow {
+interface PictureInPictureWindow : EventTarget {
   readonly attribute long width;
   readonly attribute long height;
 
@@ -334,6 +347,10 @@ The {{height}} attribute MUST return the height in <a lt=px value>CSS pixels</a>
 <a>Picture-in-Picture window</a> associated with {{pictureInPictureElement}} if
 the |state| is |opened|. Otherwise, it MUST return 0.
 
+When the size of the <a>Picture-in-Picture window</a> associated with
+{{pictureInPictureElement}} changes, the user agent MUST <a>queue a task</a> to
+<a>fire an event</a> with the name {{resize}} at {{pictureInPictureElement}}.
+
 ## Event types ## {#event-types}
 
 : <dfn event for="HTMLVideoElement"><code>enterpictureinpicture</code></dfn>
@@ -342,6 +359,11 @@ the |state| is |opened|. Otherwise, it MUST return 0.
 :: Fired on a {{HTMLVideoElement}} when it leaves Picture-in-Picture.
 : <dfn event for="PictureInPictureWindow"><code>resize</code></dfn>
 :: Fired on a {{PictureInPictureWindow}} when it changes size.
+
+## Task source ## {#task-source}
+
+The <a>task source</a> for all the tasks queued in this specification is the
+<a>media element event task source</a> of the video element in question.
 
 # Security considerations # {#security-considerations}
 
