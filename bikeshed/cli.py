@@ -28,8 +28,8 @@ def main():
                            help="Force the preprocessor to run to completion; fatal errors don't stop processing.")
     argparser.add_argument("-d", "--dry-run", dest="dryRun", action="store_true",
                            help="Prevents the processor from actually saving anything to disk, but otherwise fully runs.")
-    argparser.add_argument("--print", dest="printMode", action="store", default="console",
-                           help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup', and 'json'.")
+    argparser.add_argument("--print", dest="printMode", action="store", default=None,
+                           help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup', and 'json'. Defaults to 'console'.")
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
 
@@ -190,7 +190,13 @@ def main():
         config.quiet = float("infinity")
     config.force = options.force
     config.dryRun = options.dryRun
-    config.printMode = options.printMode
+    if options.printMode is None:
+        if "NO_COLOR" in os.environ:
+            config.printMode = "plain"
+        else:
+            config.printMode = "console"
+    else:
+        config.printMode = options.printMode
 
     update.fixupDataFiles()
     if options.subparserName == "update":
