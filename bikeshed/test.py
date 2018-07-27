@@ -41,6 +41,8 @@ def runAllTests(Spec, testFiles=None, md=None):
         if len(testFiles) == 0:
             p("No tests were found")
             return True
+    else:
+        files = [os.path.join(TEST_DIR, x) for x in files]
     numPassed = 0
     total = 0
     fails = []
@@ -109,6 +111,8 @@ def rebase(Spec, files=None, md=None):
         if len(files) == 0:
             p("No tests were found")
             return True
+    else:
+        files = [os.path.join(TEST_DIR, x) for x in files]
     for i,path in enumerate(files, 1):
         justifiedI = unicode(i).rjust(len(str(len(files))))
         resetSeenMessages()
