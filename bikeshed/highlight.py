@@ -554,7 +554,7 @@ def getLineNumberStyles():
 def getLineHighlightingStyles():
     return '''
 .line-numbered {
-    display: grid;
+    display: grid !important;
     grid-template-columns: min-content 1fr;
     grid-auto-flow: rows;
 }
@@ -572,6 +572,11 @@ def getLineHighlightingStyles():
 }
 .line.highlight-line {
     background: rgba(0,0,0,.05);
+}
+.line-no.highlight-line {
+    background: rgba(0,0,0,.05);
+    color: #444;
+    font-weight: bold;
 }
 .line-no.highlight-line[data-line]::before {
     padding: 0 .5em 0 .1em;
