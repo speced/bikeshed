@@ -1482,93 +1482,93 @@ pre .property::before, pre .property::after {
    <h2 class="heading settled" data-level="1" id="bg"><span class="secno">1. </span><span class="content">Background</span><a class="self-link" href="#bg"></a></h2>
    <p>Low-level code often seeks to interpret objects of one type as another: keep the
 same bits, but obtain an object of a different type. Doing so correctly is
-error-prone: using <code class="highlight"><c- k="">reinterpret_cast</c-></code> or <code class="highlight"><c- k="">union</c-></code> runs afoul of type-aliasing
+error-prone: using <code class="highlight"><c- k>reinterpret_cast</c-></code> or <code class="highlight"><c- k>union</c-></code> runs afoul of type-aliasing
 rules yet these are the intuitive solutions developers mistakenly turn to.</p>
-   <p>Attuned developers use <code class="highlight"><c- n="">aligned_storage</c-></code> with <code class="highlight"><c- n="">memcpy</c-></code>, avoiding alignment
+   <p>Attuned developers use <code class="highlight"><c- n>aligned_storage</c-></code> with <code class="highlight"><c- n>memcpy</c-></code>, avoiding alignment
 pitfalls and allowing them to bit-cast non-default-constructible types.</p>
    <p>This facility inevitably ends up being used incorrectly on pointer types, we
 propose using appropriate concepts to prevent misuse. As our sample
-implementation demonstrates we could as well use <code class="highlight"><c- k="">static_assert</c-></code> or template
+implementation demonstrates we could as well use <code class="highlight"><c- k>static_assert</c-></code> or template
 SFINAE, but the timing of this library feature will likely coincide with
 concept’s standardization.</p>
-   <p>Furthermore, it is currently impossible to implement a <code class="highlight"><c- k="">constexpr</c-></code> bit-cast
-function, as <code class="highlight"><c- n="">memcpy</c-></code> itself isn’t <code class="highlight"><c- k="">constexpr</c-></code>. Marking our proposed function as <code class="highlight"><c- k="">constexpr</c-></code> doesn’t require or prevent <code class="highlight"><c- n="">memcpy</c-></code> from becoming <code class="highlight"><c- k="">constexpr</c-></code>. This
-leaves implementations free to use their own internal solution (e.g. LLVM has <a href="http://llvm.org/docs/LangRef.html#bitcast-to-instruction">a <code class="highlight"><c- n="">bitcast</c-></code> opcode</a>).</p>
+   <p>Furthermore, it is currently impossible to implement a <code class="highlight"><c- k>constexpr</c-></code> bit-cast
+function, as <code class="highlight"><c- n>memcpy</c-></code> itself isn’t <code class="highlight"><c- k>constexpr</c-></code>. Marking our proposed function as <code class="highlight"><c- k>constexpr</c-></code> doesn’t require or prevent <code class="highlight"><c- n>memcpy</c-></code> from becoming <code class="highlight"><c- k>constexpr</c-></code>. This
+leaves implementations free to use their own internal solution (e.g. LLVM has <a href="http://llvm.org/docs/LangRef.html#bitcast-to-instruction">a <code class="highlight"><c- n>bitcast</c-></code> opcode</a>).</p>
    <p>We propose to standardize this oft-used idiom, and avoid the pitfalls once and
 for all.</p>
    <h2 class="heading settled" data-level="2" id="word"><span class="secno">2. </span><span class="content">Proposed Wording</span><a class="self-link" href="#word"></a></h2>
    <p>Below, substitute the <code class="highlight">�</code> character with a number the editor finds appropriate
 for the sub-section.</p>
    <h3 class="heading settled" data-level="2.1" id="syn"><span class="secno">2.1. </span><span class="content">Synopsis</span><a class="self-link" href="#syn"></a></h3>
-   <p>Under 20.2 Header <code class="highlight"><c- o="">&lt;</c-><c- n="">utility</c-><c- o="">></c-></code> synopsis [<strong>utility</strong>]:</p>
-<pre class="highlight"><c- k="">namespace</c-> <c- n="">std</c-> <c- p="">{</c->
-  <c- c1="">// ...</c->
-<c- c1=""></c->  
-  <c- c1="">// 20.2.� bit-casting:</c->
-<c- c1=""></c->  <c- k="">template</c-><c- o="">&lt;</c-><c- k="">typename</c-> <c- n="">To</c-><c- p="">,</c-> <c- k="">typename</c-> <c- n="">From</c-><c- o="">></c->
-  <c- n="">requires</c->
-    <c- k="">sizeof</c-><c- p="">(</c-><c- n="">To</c-><c- p="">)</c-> <c- o="">==</c-> <c- k="">sizeof</c-><c- p="">(</c-><c- n="">From</c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
-    <c- n="">is_trivially_copyable_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-    <c- n="">is_trivially_copyable_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-    <c- n="">is_standard_layout_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-    <c- n="">is_standard_layout_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-    <c- o="">!</c-><c- p="">(</c-><c- n="">is_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-      <c- n="">is_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
-    <c- o="">!</c-><c- p="">(</c-><c- n="">is_member_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-      <c- n="">is_member_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
-    <c- o="">!</c-><c- p="">(</c-><c- n="">is_member_object_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-      <c- n="">is_member_object_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
-    <c- o="">!</c-><c- p="">(</c-><c- n="">is_member_function_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-      <c- n="">is_member_function_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-><c- p="">)</c->
-  <c- k="">constexpr</c-> <c- n="">To</c-> <c- n="">bit_cast</c-><c- p="">(</c-><c- k="">const</c-> <c- n="">From</c-><c- o="">&amp;</c-> <c- n="">from</c-><c- p="">)</c-> <c- k="">noexcept</c-><c- p="">;</c->
+   <p>Under 20.2 Header <code class="highlight"><c- o>&lt;</c-><c- n>utility</c-><c- o>></c-></code> synopsis [<strong>utility</strong>]:</p>
+<pre class="highlight"><c- k>namespace</c-> <c- n>std</c-> <c- p>{</c->
+  <c- c1>// ...</c->
   
-  <c- c1="">// ...</c->
-<c- c1=""></c-><c- p="">}</c->
+  <c- c1>// 20.2.� bit-casting:</c->
+  <c- k>template</c-><c- o>&lt;</c-><c- k>typename</c-> <c- n>To</c-><c- p>,</c-> <c- k>typename</c-> <c- n>From</c-><c- o>></c->
+  <c- n>requires</c->
+    <c- k>sizeof</c-><c- p>(</c-><c- n>To</c-><c- p>)</c-> <c- o>==</c-> <c- k>sizeof</c-><c- p>(</c-><c- n>From</c-><c- p>)</c-> <c- o>&amp;&amp;</c->
+    <c- n>is_trivially_copyable_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+    <c- n>is_trivially_copyable_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+    <c- n>is_standard_layout_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+    <c- n>is_standard_layout_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+    <c- o>!</c-><c- p>(</c-><c- n>is_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+      <c- n>is_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-><c- p>)</c-> <c- o>&amp;&amp;</c->
+    <c- o>!</c-><c- p>(</c-><c- n>is_member_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+      <c- n>is_member_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-><c- p>)</c-> <c- o>&amp;&amp;</c->
+    <c- o>!</c-><c- p>(</c-><c- n>is_member_object_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+      <c- n>is_member_object_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-><c- p>)</c-> <c- o>&amp;&amp;</c->
+    <c- o>!</c-><c- p>(</c-><c- n>is_member_function_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+      <c- n>is_member_function_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-><c- p>)</c->
+  <c- k>constexpr</c-> <c- n>To</c-> <c- n>bit_cast</c-><c- p>(</c-><c- k>const</c-> <c- n>From</c-><c- o>&amp;</c-> <c- n>from</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c->
+  
+  <c- c1>// ...</c->
+<c- p>}</c->
 </pre>
    <h3 class="heading settled" data-level="2.2" id="det"><span class="secno">2.2. </span><span class="content">Details</span><a class="self-link" href="#det"></a></h3>
    <p>Under 20.2.<code class="highlight">�</code> Bit-casting [<strong>utility.bitcast</strong>]:</p>
-<pre class="highlight"><c- k="">template</c-><c- o="">&lt;</c-><c- k="">typename</c-> <c- n="">To</c-><c- p="">,</c-> <c- k="">typename</c-> <c- n="">From</c-><c- o="">></c->
-<c- n="">requires</c->
-  <c- k="">sizeof</c-><c- p="">(</c-><c- n="">To</c-><c- p="">)</c-> <c- o="">==</c-> <c- k="">sizeof</c-><c- p="">(</c-><c- n="">From</c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
-  <c- n="">is_trivially_copyable_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-  <c- n="">is_trivially_copyable_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-  <c- n="">is_standard_layout_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-  <c- n="">is_standard_layout_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-  <c- o="">!</c-><c- p="">(</c-><c- n="">is_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-    <c- n="">is_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
-  <c- o="">!</c-><c- p="">(</c-><c- n="">is_member_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-    <c- n="">is_member_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
-  <c- o="">!</c-><c- p="">(</c-><c- n="">is_member_object_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-    <c- n="">is_member_object_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
-  <c- o="">!</c-><c- p="">(</c-><c- n="">is_member_function_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-> <c- o="">&amp;&amp;</c->
-    <c- n="">is_member_function_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-><c- p="">)</c->
-<c- k="">constexpr</c-> <c- n="">To</c-> <c- n="">bit_cast</c-><c- p="">(</c-><c- k="">const</c-> <c- n="">From</c-><c- o="">&amp;</c-> <c- n="">from</c-><c- p="">)</c-> <c- k="">noexcept</c-><c- p="">;</c->
+<pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>typename</c-> <c- n>To</c-><c- p>,</c-> <c- k>typename</c-> <c- n>From</c-><c- o>></c->
+<c- n>requires</c->
+  <c- k>sizeof</c-><c- p>(</c-><c- n>To</c-><c- p>)</c-> <c- o>==</c-> <c- k>sizeof</c-><c- p>(</c-><c- n>From</c-><c- p>)</c-> <c- o>&amp;&amp;</c->
+  <c- n>is_trivially_copyable_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+  <c- n>is_trivially_copyable_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+  <c- n>is_standard_layout_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+  <c- n>is_standard_layout_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+  <c- o>!</c-><c- p>(</c-><c- n>is_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+    <c- n>is_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-><c- p>)</c-> <c- o>&amp;&amp;</c->
+  <c- o>!</c-><c- p>(</c-><c- n>is_member_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+    <c- n>is_member_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-><c- p>)</c-> <c- o>&amp;&amp;</c->
+  <c- o>!</c-><c- p>(</c-><c- n>is_member_object_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+    <c- n>is_member_object_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-><c- p>)</c-> <c- o>&amp;&amp;</c->
+  <c- o>!</c-><c- p>(</c-><c- n>is_member_function_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+    <c- n>is_member_function_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-><c- p>)</c->
+<c- k>constexpr</c-> <c- n>To</c-> <c- n>bit_cast</c-><c- p>(</c-><c- k>const</c-> <c- n>From</c-><c- o>&amp;</c-> <c- n>from</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c->
 </pre>
    <ol>
-    <li data-md="">
-     <p>Requires: <code class="highlight"><c- k="">sizeof</c-><c- p="">(</c-><c- n="">To</c-><c- p="">)</c-> <c- o="">==</c-> <c- k="">sizeof</c-><c- p="">(</c-><c- n="">From</c-><c- p="">)</c-></code>, <code class="highlight"><c- n="">is_trivially_copyable_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-></code> is <code class="highlight">true</code>, <code class="highlight"><c- n="">is_trivially_copyable_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-></code> is <code class="highlight">true</code>, <code class="highlight"><c- n="">is_standard_layout_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-></code> is <code class="highlight">true</code>, <code class="highlight"><c- n="">is_standard_layout_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-></code> is <code class="highlight">true</code>, <code class="highlight"><c- n="">is_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-> <c- o="">&amp;&amp;</c-> <c- n="">is_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-></code> is <code class="highlight">false</code>, <code class="highlight"><c- n="">is_member_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-> <c- o="">&amp;&amp;</c-> <c- n="">is_member_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-></code> is <code class="highlight">false</code>, <code class="highlight"><c- n="">is_member_object_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-> <c- o="">&amp;&amp;</c-> <c- n="">is_member_object_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-></code> is <code class="highlight">false</code>, <code class="highlight"><c- n="">is_member_function_pointer_v</c-><c- o="">&lt;</c-><c- n="">To</c-><c- o="">></c-> <c- o="">&amp;&amp;</c-> <c- n="">is_member_function_pointer_v</c-><c- o="">&lt;</c-><c- n="">From</c-><c- o="">></c-></code> is <code class="highlight">false</code>.</p>
-    <li data-md="">
-     <p>Returns: an object of type <code class="highlight"><c- n="">To</c-></code> whose <em>object representation</em> is equal
-        to the object representation of <code class="highlight"><c- n="">From</c-></code>. If multiple <em>object
+    <li data-md>
+     <p>Requires: <code class="highlight"><c- k>sizeof</c-><c- p>(</c-><c- n>To</c-><c- p>)</c-> <c- o>==</c-> <c- k>sizeof</c-><c- p>(</c-><c- n>From</c-><c- p>)</c-></code>, <code class="highlight"><c- n>is_trivially_copyable_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-></code> is <code class="highlight">true</code>, <code class="highlight"><c- n>is_trivially_copyable_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-></code> is <code class="highlight">true</code>, <code class="highlight"><c- n>is_standard_layout_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-></code> is <code class="highlight">true</code>, <code class="highlight"><c- n>is_standard_layout_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-></code> is <code class="highlight">true</code>, <code class="highlight"><c- n>is_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-></code> is <code class="highlight">false</code>, <code class="highlight"><c- n>is_member_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_member_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-></code> is <code class="highlight">false</code>, <code class="highlight"><c- n>is_member_object_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_member_object_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-></code> is <code class="highlight">false</code>, <code class="highlight"><c- n>is_member_function_pointer_v</c-><c- o>&lt;</c-><c- n>To</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_member_function_pointer_v</c-><c- o>&lt;</c-><c- n>From</c-><c- o>></c-></code> is <code class="highlight">false</code>.</p>
+    <li data-md>
+     <p>Returns: an object of type <code class="highlight"><c- n>To</c-></code> whose <em>object representation</em> is equal
+        to the object representation of <code class="highlight"><c- n>From</c-></code>. If multiple <em>object
         representations</em> could represent the <em>value
-        representation</em> of <code class="highlight"><c- n="">From</c-></code>, then it is unspecified which <code class="highlight"><c- n="">To</c-></code> value is returned. If no <em>value representation</em> corresponds
-        to <code class="highlight"><c- n="">To</c-></code>'s <em>object representation</em> then the returned value is
+        representation</em> of <code class="highlight"><c- n>From</c-></code>, then it is unspecified which <code class="highlight"><c- n>To</c-></code> value is returned. If no <em>value representation</em> corresponds
+        to <code class="highlight"><c- n>To</c-></code>'s <em>object representation</em> then the returned value is
         unspecified.</p>
    </ol>
    <h3 class="heading settled" data-level="2.3" id="test"><span class="secno">2.3. </span><span class="content">Feature testing</span><a class="self-link" href="#test"></a></h3>
-   <p>The <code class="highlight"><c- n="">__cpp_lib_bit_cast</c-></code> feature test macro should be added.</p>
+   <p>The <code class="highlight"><c- n>__cpp_lib_bit_cast</c-></code> feature test macro should be added.</p>
    <h2 class="heading settled" data-level="3" id="appendix"><span class="secno">3. </span><span class="content">Appendix</span><a class="self-link" href="#appendix"></a></h2>
-   <p>The Standard’s [<strong>basic.types</strong>] section explicitly blesses <code class="highlight"><c- n="">memcpy</c-></code>:</p>
+   <p>The Standard’s [<strong>basic.types</strong>] section explicitly blesses <code class="highlight"><c- n>memcpy</c-></code>:</p>
    <blockquote>
-    <p>For any trivially copyable type <code class="highlight"><c- n="">T</c-></code>, if two pointers to <code class="highlight"><c- n="">T</c-></code> point to distinct <code class="highlight"><c- n="">T</c-></code> objects <code class="highlight"><c- n="">obj1</c-></code> and <code class="highlight"><c- n="">obj2</c-></code>, where neither <code class="highlight"><c- n="">obj1</c-></code> nor <code class="highlight"><c- n="">obj2</c-></code> is a base-class
-  subobject, if the <em>underlying bytes</em> (1.7) making up <code class="highlight"><c- n="">obj1</c-></code> are copied into <code class="highlight"><c- n="">obj2</c-></code>, <code class="highlight"><c- n="">obj2</c-></code> shall subsequently hold the same value as <code class="highlight"><c- n="">obj1</c-></code>.</p>
+    <p>For any trivially copyable type <code class="highlight"><c- n>T</c-></code>, if two pointers to <code class="highlight"><c- n>T</c-></code> point to distinct <code class="highlight"><c- n>T</c-></code> objects <code class="highlight"><c- n>obj1</c-></code> and <code class="highlight"><c- n>obj2</c-></code>, where neither <code class="highlight"><c- n>obj1</c-></code> nor <code class="highlight"><c- n>obj2</c-></code> is a base-class
+  subobject, if the <em>underlying bytes</em> (1.7) making up <code class="highlight"><c- n>obj1</c-></code> are copied into <code class="highlight"><c- n>obj2</c-></code>, <code class="highlight"><c- n>obj2</c-></code> shall subsequently hold the same value as <code class="highlight"><c- n>obj1</c-></code>.</p>
     <p>[<em>Example:</em></p>
-<pre class="highlight">    <c- n="">T</c-><c- o="">*</c-> <c- n="">t1p</c-><c- p="">;</c->
-    <c- n="">T</c-><c- o="">*</c-> <c- n="">t2p</c-><c- p="">;</c->
-    <c- c1="">// provided that t2p points to an initialized object ...</c->
-<c- c1=""></c->    <c- n="">std</c-><c- o="">::</c-><c- n="">memcpy</c-><c- p="">(</c-><c- n="">t1p</c-><c- p="">,</c-> <c- n="">t2p</c-><c- p="">,</c-> <c- k="">sizeof</c-><c- p="">(</c-><c- n="">T</c-><c- p="">));</c->
-    <c- c1="">// at this point, every subobject of trivially copyable type in *t1p contains</c->
-<c- c1=""></c->    <c- c1="">// the same value as the corresponding subobject in *t2p</c->
+<pre class="highlight">    <c- n>T</c-><c- o>*</c-> <c- n>t1p</c-><c- p>;</c->
+    <c- n>T</c-><c- o>*</c-> <c- n>t2p</c-><c- p>;</c->
+    <c- c1>// provided that t2p points to an initialized object ...</c->
+    <c- n>std</c-><c- o>::</c-><c- n>memcpy</c-><c- p>(</c-><c- n>t1p</c-><c- p>,</c-> <c- n>t2p</c-><c- p>,</c-> <c- k>sizeof</c-><c- p>(</c-><c- n>T</c-><c- p>));</c->
+    <c- c1>// at this point, every subobject of trivially copyable type in *t1p contains</c->
+    <c- c1>// the same value as the corresponding subobject in *t2p</c->
 </pre>
      — <em>end example</em>] 
    </blockquote>
