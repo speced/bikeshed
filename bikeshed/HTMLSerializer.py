@@ -65,7 +65,10 @@ class HTMLSerializer(object):
         strs = []
         strs.append("<" + tag)
         for attrName, attrVal in sorted(el.items()):
-            strs.append(" " + self.unfuckName(attrName) + '="' + escapeAttr(attrVal) + '"')
+            if attrVal == "":
+                strs.append(" " + self.unfuckName(attrName))
+            else:
+                strs.append(" " + self.unfuckName(attrName) + '="' + escapeAttr(attrVal) + '"')
         strs.append(">")
         write("".join(strs))
 
