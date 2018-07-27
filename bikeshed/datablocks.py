@@ -44,6 +44,7 @@ def transformDataBlocks(doc, lines):
         'ignored-specs': transformIgnoredSpecs,
         'info': transformInfo,
         'include': transformInclude,
+        'include-code': transformIncludeCode,
         'pre': transformPre
     }
     blockType = ""
@@ -688,6 +689,64 @@ def transformInclude(lines, doc, firstLine, lineNum=None, **kwargs):
         return [indent+el]
     else:
         return []
+
+
+def transformIncludeCode(lines, doc, firstLine, lineNum=None, **kwargs):
+    lineNumAttr = ""
+    if lineNum is not None:
+        lineNumAttr = " line-number={0}".format(lineNum)
+    infos = parseInfoTree(lines, doc.md.indent, lineNum)
+    path = None
+    highlight = None
+    lineStart = None
+    show = []
+    lineHighlight = []
+    lineNumbers = False
+    for info in infos:
+        if "path" in info:
+            if path is None:
+                path = info['path'][0]
+            else:
+                die("Include-code blocks must only contain a single 'path'.", lineNum=lineNum)
+        if "highlight" in info:
+            if highlight is None:
+                highlight = info['highlight'][0]
+            else:
+                die("Include-code blocks must only contain a single 'highlight'.", lineNum=lineNum)
+        if "line-start" in info:
+            if lineStart is None:
+                lineStart = info['line-start'][0]
+            else:
+                die("Include-code blocks must only contain a single 'line-start'.", lineNum=lineNum)
+        if "show" in info:
+            show.extend(info['show'])
+        if "line-highlight" in info:
+            lineHighlight.extend(info['line-highlight'])
+        if "line-numbers" in info:
+            lineNumbers = True
+        if "no-line-numbers" in info:
+            lineNumbers = False
+
+
+    if path:
+        attrs = lineNumAttr
+        attrs += " path='{0}'".format(escapeAttr(path))
+        if highlight:
+            attrs += " highlight='{0}'".format(escapeAttr(highlight))
+        if lineStart:
+            attrs += " line-start='{0}'".format(escapeAttr(lineStart))
+        if show:
+            attrs += " data-code-show='{0}'".format(escapeAttr(",".join(show)))
+        if lineHighlight:
+            attrs += " line-highlight='{0}'".format(escapeAttr(",".join(lineHighlight)))
+        if lineNumbers:
+            attrs += " line-numbers"
+        el = "<pre class=include-code{0}></pre>".format(attrs)
+        indent = getWsPrefix(firstLine)
+        return [indent+el]
+    else:
+        return []
+
 
 
 def parseInfoTree(lines, indent=4, lineNum=0):
