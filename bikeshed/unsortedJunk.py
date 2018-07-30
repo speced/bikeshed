@@ -665,6 +665,21 @@ def classifyDfns(doc, dfns):
                     el.set('data-noexport', 'by-default')
                 else:
                     el.set('data-export', 'by-default')
+        # Mark 'proposed' if necessary
+        if dfnType in ('attribute', 'method', 'dict-member'):
+          for construct in [c for c in doc.widl.constructs if
+                            c.name == dfnFor and hasattr(c, 'members')]:
+            if any([m for m in construct.members if
+                    m.name == primaryDfnText and 'proposed' in m.extendedAttributes]):
+              dt = el
+              while dt is not None and dt.tag != 'dt':
+                dt = dt.getparent()
+              if dt is not None:
+                addClass(dt, 'proposed')
+                dd = dt.getnext()
+                if dd is not None and dd.tag == 'dd':
+                  addClass(dd, 'proposed')
+              break
         # If it's an code-ish type such as IDL,
         # and doesn't already have a sole <code> child,
         # wrap the contents in a <code>.

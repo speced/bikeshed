@@ -54,6 +54,8 @@ class IDLMarker(object):
     def markupConstruct(self, text, construct):
         # Fires for every 'construct' in the WebIDL.
         # Some things are "productions", not "constructs".
+        if 'proposed' in construct.extendedAttributes:
+          return ("<span class='proposed'>", "</span>")
         return (None, None)
 
     def markupType(self, text, construct):
