@@ -83,6 +83,8 @@ def main():
                              help="Path to the output file.")
     serveParser.add_argument("--port", dest="port", nargs="?", default="8000",
                              help="Specify the port to serve it over.")
+    serveParser.add_argument("--localhost", dest="localhost", action="store_true",
+                             help="Only allow connections from localhost.")
     serveParser.add_argument("--gh-token", dest="ghToken", nargs="?",
                              help="GitHub access token. Useful to avoid API rate limits. Generate tokens: https://github.com/settings/tokens.")
     serveParser.add_argument("--byos", dest="byos", action="store_true",

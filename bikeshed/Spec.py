@@ -292,7 +292,7 @@ class Spec(object):
             success("Successfully generated, with warnings")
             return
 
-    def watch(self, outputFilename, port=None):
+    def watch(self, outputFilename, port=None, localhost=False):
         import time
         outputFilename = self.fixMissingOutputFilename(outputFilename)
         if self.inputSource == "-" or outputFilename == "-":
@@ -310,7 +310,8 @@ class Spec(object):
                     pass
 
             SocketServer.TCPServer.allow_reuse_address = True
-            server = SocketServer.TCPServer(("", port), SilentServer)
+            server = SocketServer.TCPServer(
+              ("localhost" if localhost else "", port), SilentServer)
 
             print "Serving at port {0}".format(port)
             thread = threading.Thread(target = server.serve_forever)
