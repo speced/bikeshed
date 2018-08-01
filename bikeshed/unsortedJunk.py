@@ -76,12 +76,12 @@ class MarkdownCodeSpans(func.Functor):
             def codeSpanReviver(_):
                 # Match object is the PUA character, which I can ignore.
                 repl = repls.pop()
-                if repl[0] == "":
+                if repl[0] == "" or repl[0].endswith("-"):
                     # Markdown code span, so massage per CommonMark rules.
                     import string
                     t = escapeHTML(repl[1]).strip(string.whitespace)
                     t = re.sub("[" + string.whitespace + "]{2,}", " ", t)
-                    return "<code data-opaque bs-autolink-syntax='{1}'>{0}</code>".format(t, escapeAttr(repl[2]))
+                    return "{2}<code data-opaque bs-autolink-syntax='{1}'>{0}</code>".format(t, escapeAttr(repl[2]), repl[0])
                 else:
                     return "<code data-opaque data-span-tag={0} bs-autolink-syntax='{2}'>{1}</code>".format(repl[0], escapeHTML(repl[1]), escapeAttr(repl[2]))
             return re.sub("\ue0ff", codeSpanReviver, self.__val__)
