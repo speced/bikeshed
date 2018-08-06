@@ -359,12 +359,15 @@ def addExplicitIndexes(doc):
             for ref in entries:
                 ttf = (text, ref.type, "".join(ref.for_) if ref.for_ else None)
                 refsFromTtf[ttf].append(ref)
-        indexEntries = defaultdict(list)
+        filteredRefs = defaultdict(list)
         for ttf, refs in refsFromTtf.items():
             refs = doc.refs.filterObsoletes(refs)
             refs = refUtils.filterOldVersions(refs)
             if refs:
-                indexEntries[ttf[0]].extend({"url":ref.url, "disambiguator":disambiguator(ref)} for ref in refs)
+                filteredRefs[ttf[0]].extend({"url":ref.url, "disambiguator":disambiguator(ref)} for ref in refs)
+
+        # Sort the entries before generating
+        indexEntries = OrderedDict(sorted(filteredRefs.items(), key=lambda x:x[0].lower()))
 
         appendChild(el, htmlFromIndexTerms(indexEntries))
         el.tag = "div"
