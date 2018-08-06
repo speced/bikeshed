@@ -7,6 +7,7 @@ import subprocess
 from collections import defaultdict, OrderedDict
 from . import config
 from . import dfnpanels
+from .refs import utils as refUtils
 from .DefaultOrderedDict import DefaultOrderedDict
 from .htmlhelpers import *
 from .messages import *
@@ -250,7 +251,6 @@ def addExplicitIndexes(doc):
     # Explicit indexes can be requested for specs with <index spec="example-spec-1"></index>
 
     for el in findAll("index", doc):
-        indexEntries = defaultdict(list)
 
         status = el.get('status')
         if status and status not in config.specStatuses:
@@ -293,16 +293,7 @@ def addExplicitIndexes(doc):
         else:
             export = None
 
-        for ref in doc.refs.queryAllRefs(dedupURLs=False):
-            text = ref.text.strip()
-            if export is not None and ref.export != export:
-                continue
-            if specs is not None and ref.spec not in specs:
-                continue
-            if types is not None and ref.type not in types:
-                continue
-            if fors is not None and not (set(ref.for_) & fors):
-                continue
+        def disambiguator(ref):
             disambInfo = []
             if types is None or len(types) > 1:
                 disambInfo.append(ref.type)
@@ -314,34 +305,67 @@ def addExplicitIndexes(doc):
                 except:
                     # todo: The TR version of Position triggers this
                     pass
-            disambiguator = ", ".join(disambInfo)
-            entry = {'url': ref.url, 'disambiguator': disambiguator, 'label': None, 'status': ref.status}
-            # TODO: This is n^2, iterating over all the entries on every new addition.
-            for i,existingEntry in enumerate(indexEntries[text]):
-                if existingEntry['disambiguator'] != disambiguator:
+            return ", ".join(disambInfo)
+
+
+        # Initial filter of the ref database according to the <index> parameters
+        possibleRefs = []
+        for ref in doc.refs.queryAllRefs(dedupURLs=False, latestOnly=False, ignoreObsoletes=False):
+            ref.text = ref.text.strip()
+            if export is not None and ref.export != export:
+                continue
+            if specs is not None and ref.spec not in specs:
+                continue
+            if types is not None and ref.type not in types:
+                continue
+            if fors is not None and not (set(ref.for_) & fors):
+                continue
+            possibleRefs.append(ref)
+
+        # Group entries by linking text,
+        # ensuring no duplicate disambiguators.
+        refsFromText = defaultdict(list)
+        for ref in possibleRefs:
+            for i,existingRef in enumerate(refsFromText[ref.text]):
+                if disambiguator(existingRef) != disambiguator(ref):
                     continue
                 # Whoops, found an identical entry.
-                if existingEntry['status'] != entry['status']:
+                if existingRef.status != ref.status:
                     if status:
-                        if existingEntry['status'] == status:
+                        if existingRef.status == status:
                             # Existing entry matches stated status, do nothing and don't add it.
                             break
-                        elif entry['status'] == status:
+                        elif ref.status == status:
                             # New entry matches status, update and don't re-add it.
-                            indexEntries[text][i] = entry
+                            refsFromText[text][i] = ref
                             break
                     else:
                         # Default to preferring current specs
-                        if existingEntry['status'] == "current":
+                        if existingRef.status == "current":
                             break
-                        elif entry['status'] == "current":
-                            indexEntries[text][i] = entry
+                        elif ref.status == "current":
+                            refsFromText[ref.text][i] = ref
                             break
                 else:
                     # Legit dupes. Shouldn't happen in a good spec, but whatever.
                     pass
             else:
-                indexEntries[text].append(entry)
+                refsFromText[ref.text].append(ref)
+
+        # Group entries by text/type/for,
+        # then filter each group for obsolete/oldversions.
+        refsFromTtf = defaultdict(list)
+        for text,entries in refsFromText.items():
+            for ref in entries:
+                ttf = (text, ref.type, "".join(ref.for_) if ref.for_ else None)
+                refsFromTtf[ttf].append(ref)
+        indexEntries = defaultdict(list)
+        for ttf, refs in refsFromTtf.items():
+            refs = doc.refs.filterObsoletes(refs)
+            refs = refUtils.filterOldVersions(refs)
+            if refs:
+                indexEntries[ttf[0]].extend({"url":ref.url, "disambiguator":disambiguator(ref)} for ref in refs)
+
         appendChild(el, htmlFromIndexTerms(indexEntries))
         el.tag = "div"
         removeAttr(el, "export")
@@ -364,7 +388,7 @@ def htmlFromIndexTerms(entries):
             li = appendChild(topList,
                              E.li(
                                  E.a({"href":item['url']}, text),
-                                 E.span(", in ", item['label']) if item['label'] else ""))
+                                 E.span(", in ", item['label']) if item.get('label') else ""))
         else:
             li = appendChild(topList, E.li(text))
             ul = appendChild(li, E.ul())
@@ -372,7 +396,7 @@ def htmlFromIndexTerms(entries):
                 appendChild(ul,
                             E.li(
                                 E.a({"href":item['url']}, item['disambiguator']),
-                                E.span(", in ", item['label']) if item['label'] else ""))
+                                E.span(", in ", item['label']) if item.get('label') else ""))
     return topList
 
 

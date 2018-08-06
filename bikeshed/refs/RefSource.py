@@ -239,23 +239,7 @@ class RefSource(object):
             # only use the latest level.
             # If generating for a snapshot, prefer the latest snapshot level,
             # unless that doesn't exist, in which case just prefer the latest level.
-            usedStatus = status or statusHint
-            shortnameLevels = defaultdict(lambda:defaultdict(list))
-            snapshotShortnameLevels = defaultdict(lambda:defaultdict(list))
-            for ref in refs:
-                shortnameLevels[ref.shortname][ref.level].append(ref)
-                if usedStatus == ref.status == "snapshot":
-                    snapshotShortnameLevels[ref.shortname][ref.level].append(ref)
-            refs = []
-            for shortname, levelSet in shortnameLevels.items():
-                if usedStatus == "snapshot" and snapshotShortnameLevels[shortname]:
-                    # Get the latest snapshot refs if they exist and you're generating a snapshot...
-                    maxLevel = max(snapshotShortnameLevels[shortname].keys())
-                    refs.extend(snapshotShortnameLevels[shortname][maxLevel])
-                else:
-                    # Otherwise just grab the latest refs regardless.
-                    maxLevel = max(levelSet.keys())
-                    refs.extend(levelSet[maxLevel])
+            refs = filterOldVersions(refs, status=status or statusHint)
 
         return refs, None
 
