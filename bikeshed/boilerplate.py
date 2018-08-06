@@ -311,7 +311,7 @@ def addExplicitIndexes(doc):
         # Initial filter of the ref database according to the <index> parameters
         possibleRefs = []
         for ref in doc.refs.queryAllRefs(dedupURLs=False, latestOnly=False, ignoreObsoletes=False):
-            ref.text = ref.text.strip()
+            ref.text = re.sub(r"\s{2,}", " ", ref.text.strip())
             if export is not None and ref.export != export:
                 continue
             if specs is not None and ref.spec not in specs:
