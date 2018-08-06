@@ -28,24 +28,27 @@ def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefau
             force = True
     if force:
         # If all are False, update everything
-        updateAnyway = not (anchors or backrefs or biblio or caniuse or linkDefaults or testSuites or languages or wpt)
-        if anchors or updateAnyway:
-            updateCrossRefs.update(path=path, dryRun=dryRun)
-        if backrefs or updateAnyway:
+        if  anchors == backrefs == biblio == caniuse == linkDefaults == testSuites == languages == wpt == False:
+            anchors  = backrefs  = biblio  = caniuse  = linkDefaults  = testSuites  = languages  = wpt  = True
+        if anchors:
+            anchorPaths = updateCrossRefs.update(path=path, dryRun=dryRun)
+        if backrefs:
             updateBackRefs.update(path=path, dryRun=dryRun)
-        if biblio or updateAnyway:
+        if biblio:
             updateBiblio.update(path=path, dryRun=dryRun)
-        if caniuse or updateAnyway:
+        if caniuse:
             updateCanIUse.update(path=path, dryRun=dryRun)
-        if linkDefaults or updateAnyway:
+        if linkDefaults:
             updateLinkDefaults.update(path=path, dryRun=dryRun)
-        if testSuites or updateAnyway:
+        if testSuites:
             updateTestSuites.update(path=path, dryRun=dryRun)
-        if languages or updateAnyway:
+        if languages:
             updateLanguages.update(path=path, dryRun=dryRun)
-        if wpt or updateAnyway:
+        if wpt:
             updateWpt.update(path=path, dryRun=dryRun)
         manifest.createManifest(path=path, dryRun=dryRun)
+
+        cleanupFiles(path, anchors=anchorPaths)
 
 
 def fixupDataFiles():
@@ -96,6 +99,24 @@ def updateReadonlyDataFiles():
         return
 
 
+def cleanupFiles(root, anchors=None):
+    paths = set()
+    checkedFiles = []
+    checkedFolders = []
+    if anchors is not None:
+        checkedFiles.extend(["specs.json", "methods.json", "fors.json"])
+        checkedFolders.extend(["headings", "anchors"])
+        paths.update(anchors)
+
+    for absPath, relPath in getDatafilePaths(root):
+        if "/" not in relPath and relPath not in checkedFiles:
+            continue
+        if "/" in relPath and relPath.partition("/")[0] not in checkedFolders:
+            continue
+        if absPath not in paths:
+            os.remove(absPath)
+
+
 def copyanything(src, dst):
     import shutil
     import errno
@@ -113,3 +134,9 @@ def localPath(*segs):
 
 def remotePath(*segs):
     return config.scriptPath("spec-data", "readonly", *segs)
+
+def getDatafilePaths(basePath):
+    for root, dirs, files in os.walk(basePath):
+        for filename in files:
+            filePath = os.path.join(root, filename)
+            yield filePath, os.path.relpath(filePath, basePath)

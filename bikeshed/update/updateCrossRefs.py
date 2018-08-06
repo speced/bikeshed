@@ -66,36 +66,46 @@ def update(path, dryRun=False):
     fors = extractForsData(anchors)
 
     if not dryRun:
+        writtenPaths = set()
         try:
-            with io.open(os.path.join(path, "specs.json"), 'w', encoding="utf-8") as f:
+            p = os.path.join(path, "specs.json")
+            writtenPaths.add(p)
+            with io.open(p, 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(specs, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save spec database to disk.\n{0}", e)
             return
         try:
             for spec, specHeadings in headings.items():
-                with io.open(os.path.join(path, "headings", "headings-{0}.json".format(spec)), 'w', encoding="utf-8") as f:
+                p = os.path.join(path, "headings", "headings-{0}.json".format(spec))
+                writtenPaths.add(p)
+                with io.open(p, 'w', encoding="utf-8") as f:
                     f.write(unicode(json.dumps(specHeadings, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save headings database to disk.\n{0}", e)
             return
         try:
-            writeAnchorsFile(anchors, path)
+            writtenPaths.update(writeAnchorsFile(anchors, path))
         except Exception, e:
             die("Couldn't save anchor database to disk.\n{0}", e)
             return
         try:
-            with io.open(os.path.join(path, "methods.json"), 'w', encoding="utf-8") as f:
+            p = os.path.join(path, "methods.json")
+            writtenPaths.add(p)
+            with io.open(p, 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(methods, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save methods database to disk.\n{0}", e)
             return
         try:
-            with io.open(os.path.join(path, "fors.json"), 'w', encoding="utf-8") as f:
+            p = os.path.join(path, "fors.json")
+            writtenPaths.add(p)
+            with io.open(p, 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(fors, ensure_ascii=False, indent=2, sort_keys=True)))
         except Exception, e:
             die("Couldn't save fors database to disk.\n{0}", e)
             return
+        return writtenPaths
 
     say("Success!")
 
@@ -316,12 +326,15 @@ def writeAnchorsFile(anchors, path):
     for* (one per line, unknown #)
     - (by itself, ends the segment)
     '''
+    writtenPaths = set()
     groupedEntries = defaultdict(dict)
     for key,entries in anchors.items():
         group = config.groupFromKey(key)
         groupedEntries[group][key] = entries
     for group, anchors in groupedEntries.items():
-        with io.open(os.path.join(path, "anchors", "anchors-{0}.data".format(group)), 'w', encoding="utf-8") as fh:
+        p = os.path.join(path, "anchors", "anchors-{0}.data".format(group))
+        writtenPaths.add(p)
+        with io.open(p, 'w', encoding="utf-8") as fh:
             for key, entries in sorted(anchors.items(), key=lambda x:x[0]):
                 for e in entries:
                     fh.write(key + "\n")
@@ -336,3 +349,4 @@ def writeAnchorsFile(anchors, path):
                         if forValue:  # skip empty strings
                             fh.write(forValue + "\n")
                     fh.write("-" + "\n")
+    return writtenPaths
