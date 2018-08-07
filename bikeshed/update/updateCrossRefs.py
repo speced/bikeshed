@@ -289,7 +289,7 @@ def extractMethodData(anchors):
     # Translate the "for" set back to a list for JSONing
     for signatures in methods.values():
         for signature in signatures.values():
-            signature["for"] = list(signature["for"])
+            signature["for"] = sorted(signature["for"])
     return methods
 
 
@@ -306,7 +306,7 @@ def extractForsData(anchors):
             if not anchor["for"]:
                 fors["/"].add(key)
     for key, val in fors.items():
-        fors[key] = list(val)
+        fors[key] = sorted(val)
     return fors
 
 
