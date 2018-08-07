@@ -70,7 +70,7 @@ class Spec(object):
         self.biblios = {}
         self.typeExpansions = {}
         self.macros = defaultdict(lambda x: "???")
-        self.canIUse = json.loads(self.dataFile.fetch("caniuse.json", str=True), object_pairs_hook=OrderedDict)
+        self.canIUse = {}
         self.widl = idl.getParser()
         self.testSuites = json.loads(self.dataFile.fetch("test-suites.json", str=True))
         self.languages = json.loads(self.dataFile.fetch("languages.json", str=True))

@@ -11,6 +11,9 @@ def addCanIUsePanels(doc):
     if not doc.md.includeCanIUsePanels:
         return
 
+    if not doc.canIUse:
+        doc.canIUse = json.loads(self.dataFile.fetch("caniuse.json", str=True), object_pairs_hook=OrderedDict)
+
     features = doc.canIUse["data"]
     lastUpdated = datetime.utcfromtimestamp(doc.canIUse["updated"]).date().isoformat()
 
