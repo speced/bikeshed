@@ -6,13 +6,8 @@ import os
 import sys
 
 from . import config
-from . import metadata
-from . import publish
-from . import test
 from . import update
 from .messages import *
-from .Spec import Spec
-from .refs import ReferenceManager
 
 def main():
     # Hack around argparse's lack of optional subparsers
@@ -202,122 +197,188 @@ def main():
 
     update.fixupDataFiles()
     if options.subparserName == "update":
-        update.update(anchors=options.anchors, backrefs=options.backrefs, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, wpt=options.wpt, dryRun=config.dryRun, force=options.force)
+        handleUpdate(options, extras)
     elif options.subparserName == "spec":
-        doc = Spec(inputFilename=options.infile, debug=options.debug, token=options.ghToken, lineNumbers=options.lineNumbers)
-        doc.mdCommandLine = metadata.fromCommandLine(extras)
-        if options.byos:
-            doc.mdCommandLine.addData("Group", "byos")
-        doc.preprocess()
-        doc.finish(outputFilename=options.outfile)
+        handleSpec(options, extras)
     elif options.subparserName == "echidna":
-        doc = Spec(inputFilename=options.infile, token=options.ghToken)
-        doc.mdCommandLine = metadata.fromCommandLine(extras)
-        doc.mdCommandLine.addData("Prepare For TR", "yes")
-        doc.preprocess()
-        addDirs = [] if options.selfContained else options.additionalDirectories
-        if options.justTar:
-            publish.prepareTar(doc, visibleTar=True, additionalDirectories=addDirs)
-        else:
-            publish.publishEchidna(doc, username=options.un, password=options.pw, decision=options.decision, additionalDirectories=addDirs)
+        handleEchidna(options, extras)
     elif options.subparserName == "watch":
-        # Can't have an error killing the watcher
-        config.force = True
-        doc = Spec(inputFilename=options.infile, token=options.ghToken)
-        doc.mdCommandLine = metadata.fromCommandLine(extras)
-        if options.byos:
-            doc.mdCommandLine.addData("Group", "byos")
-        doc.watch(outputFilename=options.outfile)
+        handleWatch(options, extras)
     elif options.subparserName == "serve":
-        config.force = True
-        doc = Spec(inputFilename=options.infile, token=options.ghToken)
-        doc.mdCommandLine = metadata.fromCommandLine(extras)
-        if options.byos:
-            doc.mdCommandLine.addData("Group", "byos")
-        doc.watch(outputFilename=options.outfile, port=int(options.port))
+        handleServe(options, extras)
     elif options.subparserName == "debug":
-        config.force = True
-        config.quiet = 2
-        if options.printExports:
-            doc = Spec(inputFilename=options.infile)
-            doc.mdCommandLine = metadata.fromCommandLine(extras)
-            doc.preprocess()
-            doc.printTargets()
-        elif options.jsonCode:
-            doc = Spec(inputFilename=options.infile)
-            doc.mdCommandLine = metadata.fromCommandLine(extras)
-            doc.preprocess()
-            exec("print config.printjson({0})".format(options.jsonCode))
-        elif options.code:
-            doc = Spec(inputFilename=options.infile)
-            doc.mdCommandLine = metadata.fromCommandLine(extras)
-            doc.preprocess()
-            exec("print {0}".format(options.code))
-        elif options.linkText:
-            doc = Spec(inputFilename=options.infile)
-            doc.mdCommandLine = metadata.fromCommandLine(extras)
-            doc.preprocess()
-            refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText + "\n"]
-            config.quiet = options.quiet
-            if not config.quiet:
-                p("Refs for '{0}':".format(options.linkText))
-            # Get ready for JSONing
-            for ref in refs:
-                ref['level'] = str(ref['level'])
-            p(config.printjson(refs))
-        elif options.refreshData:
-            config.quiet = 0
-            update.updateReadonlyDataFiles()
-            warn("Don't forget to bump the version number!")
+        handleDebug(options, extras)
     elif options.subparserName == "refs":
-        config.force = True
-        config.quiet = 10
-        doc = Spec(inputFilename=options.infile)
-        if doc.valid:
-            doc.mdCommandLine = metadata.fromCommandLine(extras)
-            doc.preprocess()
-            rm = doc.refs
-        else:
-            rm = ReferenceManager()
-            rm.initializeRefs()
-        if options.text:
-            options.text = unicode(options.text, encoding="utf-8")
-        refs = rm.queryAllRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, latestOnly=options.latestOnly, exact=options.exact)
-        if config.printMode == "json":
-            p(json.dumps(refs, indent=2, default=config.getjson))
-        else:
-            p(config.printjson(refs))
+        handleRefs(options, extras)
     elif options.subparserName == "issues-list":
-        from . import issuelist as il
-        if options.printTemplate:
-            il.printHelpMessage()
-        else:
-            il.printIssueList(options.infile, options.outfile)
+        handleIssuesList(options, extras)
     elif options.subparserName == "source":
-        if not options.bigText:  # If no options are given, do all options.
-            options.bigText = True
-        if options.bigText:
-            from . import fonts
-            font = fonts.Font()
-            fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
+        handleSource(options, extras)
     elif options.subparserName == "test":
-        md = metadata.fromCommandLine(extras)
-        config.force = True
-        config.quiet = 100
-        if options.rebase:
-            test.rebase(Spec, options.testFiles, md=md)
-        else:
-            result = test.runAllTests(Spec, options.testFiles, md=md)
-            sys.exit(0 if result else 1)
+        handleTest(options, extras)
     elif options.subparserName == "profile":
-        root = "--root=\"{0}\"".format(options.root) if options.root else ""
-        leaf = "--leaf=\"{0}\"".format(options.leaf) if options.leaf else ""
-        if options.svgFile:
-            os.system("time python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {svg} && rm stat.prof".format(root=root, leaf=leaf, svg=options.svgFile))
-        else:
-            os.system("time python -m cProfile -o /tmp/stat.prof ~/bikeshed/bikeshed.py -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &".format(root=root, leaf=leaf))
+        handleProfile(options, extras)
     elif options.subparserName == "template":
-        p('''<pre class='metadata'>
+        handleTemplate(options, extras)
+    elif options.subparserName == "wpt":
+        handleWpt(options, extras)
+
+
+def handleUpdate(options, extras):
+    update.update(anchors=options.anchors, backrefs=options.backrefs, biblio=options.biblio, caniuse=options.caniuse, linkDefaults=options.linkDefaults, testSuites=options.testSuites, languages=options.languages, wpt=options.wpt, dryRun=config.dryRun, force=options.force)
+
+
+def handleSpec(options, extras):
+    from . import metadata
+    from .Spec import Spec
+    doc = Spec(inputFilename=options.infile, debug=options.debug, token=options.ghToken, lineNumbers=options.lineNumbers)
+    doc.mdCommandLine = metadata.fromCommandLine(extras)
+    if options.byos:
+        doc.mdCommandLine.addData("Group", "byos")
+    doc.preprocess()
+    doc.finish(outputFilename=options.outfile)
+
+
+def handleEchidna(options, extras):
+    from . import publish
+    doc = Spec(inputFilename=options.infile, token=options.ghToken)
+    doc.mdCommandLine = metadata.fromCommandLine(extras)
+    doc.mdCommandLine.addData("Prepare For TR", "yes")
+    doc.preprocess()
+    addDirs = [] if options.selfContained else options.additionalDirectories
+    if options.justTar:
+        publish.prepareTar(doc, visibleTar=True, additionalDirectories=addDirs)
+    else:
+        publish.publishEchidna(doc, username=options.un, password=options.pw, decision=options.decision, additionalDirectories=addDirs)
+
+
+def handleWatch(options, extras):
+    from . import metadata
+    from .Spec import Spec
+    # Can't have an error killing the watcher
+    config.force = True
+    doc = Spec(inputFilename=options.infile, token=options.ghToken)
+    doc.mdCommandLine = metadata.fromCommandLine(extras)
+    if options.byos:
+        doc.mdCommandLine.addData("Group", "byos")
+    doc.watch(outputFilename=options.outfile)
+
+
+def handleServe(options, extras):
+    from . import metadata
+    from .Spec import Spec
+    config.force = True
+    doc = Spec(inputFilename=options.infile, token=options.ghToken)
+    doc.mdCommandLine = metadata.fromCommandLine(extras)
+    if options.byos:
+        doc.mdCommandLine.addData("Group", "byos")
+    doc.watch(outputFilename=options.outfile, port=int(options.port))
+
+
+def handleDebug(options, extras):
+    from . import metadata
+    from .Spec import Spec
+    config.force = True
+    config.quiet = 2
+    if options.printExports:
+        doc = Spec(inputFilename=options.infile)
+        doc.mdCommandLine = metadata.fromCommandLine(extras)
+        doc.preprocess()
+        doc.printTargets()
+    elif options.jsonCode:
+        doc = Spec(inputFilename=options.infile)
+        doc.mdCommandLine = metadata.fromCommandLine(extras)
+        doc.preprocess()
+        exec("print config.printjson({0})".format(options.jsonCode))
+    elif options.code:
+        doc = Spec(inputFilename=options.infile)
+        doc.mdCommandLine = metadata.fromCommandLine(extras)
+        doc.preprocess()
+        exec("print {0}".format(options.code))
+    elif options.linkText:
+        doc = Spec(inputFilename=options.infile)
+        doc.mdCommandLine = metadata.fromCommandLine(extras)
+        doc.preprocess()
+        refs = doc.refs.refs[options.linkText] + doc.refs.refs[options.linkText + "\n"]
+        config.quiet = options.quiet
+        if not config.quiet:
+            p("Refs for '{0}':".format(options.linkText))
+        # Get ready for JSONing
+        for ref in refs:
+            ref['level'] = str(ref['level'])
+        p(config.printjson(refs))
+    elif options.refreshData:
+        config.quiet = 0
+        update.updateReadonlyDataFiles()
+        warn("Don't forget to bump the version number!")
+
+
+def handleRefs(options, extras):
+    from . import metadata
+    from .ReferenceManager import ReferenceManager
+    from .Spec import Spec
+    config.force = True
+    config.quiet = 10
+    doc = Spec(inputFilename=options.infile)
+    if doc.valid:
+        doc.mdCommandLine = metadata.fromCommandLine(extras)
+        doc.preprocess()
+        rm = doc.refs
+    else:
+        rm = ReferenceManager()
+        rm.initializeRefs()
+    if options.text:
+        options.text = unicode(options.text, encoding="utf-8")
+    refs = rm.queryAllRefs(text=options.text, linkFor=options.linkFor, linkType=options.linkType, status=options.status, spec=options.spec, latestOnly=options.latestOnly, exact=options.exact)
+    if config.printMode == "json":
+        p(json.dumps(refs, indent=2, default=config.getjson))
+    else:
+        p(config.printjson(refs))
+
+
+def handleIssuesList(options, extras):
+    from . import issuelist
+    if options.printTemplate:
+        issuelist.printHelpMessage()
+    else:
+        issuelist.printIssueList(options.infile, options.outfile)
+
+
+def handleSource(options, extras):
+    if not options.bigText:  # If no options are given, do all options.
+        options.bigText = True
+    if options.bigText:
+        from . import fonts
+        font = fonts.Font()
+        fonts.replaceComments(font=font, inputFilename=options.infile, outputFilename=options.outfile)
+
+
+def handleTest(options, extras):
+    from . import metadata
+    from .Spec import Spec
+    from . import test
+    md = metadata.fromCommandLine(extras)
+    config.force = True
+    config.quiet = 100
+    if options.rebase:
+        test.rebase(Spec, options.testFiles, md=md)
+    else:
+        result = test.runAllTests(Spec, options.testFiles, md=md)
+        sys.exit(0 if result else 1)
+
+
+def handleProfile(options, extras):
+    import os
+    root = "--root=\"{0}\"".format(options.root) if options.root else ""
+    leaf = "--leaf=\"{0}\"".format(options.leaf) if options.leaf else ""
+    if options.svgFile:
+        os.system("time python -m cProfile -o stat.prof ~/bikeshed/bikeshed.py -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} stat.prof | dot -Tsvg -o {svg} && rm stat.prof".format(root=root, leaf=leaf, svg=options.svgFile))
+    else:
+        os.system("time python -m cProfile -o /tmp/stat.prof ~/bikeshed/bikeshed.py -f spec && gprof2dot -f pstats --skew=.0001 {root} {leaf} /tmp/stat.prof | xdot &".format(root=root, leaf=leaf))
+
+
+def handleTemplate(options, extras):
+    p('''<pre class='metadata'>
 Title: Your Spec Title
 Shortname: your-spec
 Level: 1
@@ -334,9 +395,10 @@ Introduction {#intro}
 Introduction here.
 ''')
 
-    elif options.subparserName == "wpt":
-        if options.template:
-            p('''
+
+def handleWpt(options, extras):
+    if options.template:
+        p('''
 <!DOCTYPE html>
 <meta charset=utf-8>
 <title>window.offscreenBuffering</title>
