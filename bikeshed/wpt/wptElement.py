@@ -8,16 +8,17 @@ from ..htmlhelpers import findAll, textContent, removeNode, E, addClass, appendC
 from ..messages import *
 
 def processWptElements(doc):
-	testData = loadTestData(doc)
 	pathPrefix = doc.md.wptPathPrefix
 
 	atLeastOneElement = False
-
+	testData = None
 	# <wpt> elements
 	wptElements = findAll("wpt", doc)
 	seenTestNames = set()
 	for el in wptElements:
 		atLeastOneElement = True
+		if testData is None:
+			testData = loadTestData()
 		testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
 		for testName in testNames:
 			if testName not in testData:
@@ -28,6 +29,8 @@ def processWptElements(doc):
 
 	# <wpt-rest> elements
 	wptRestElements = findAll("wpt-rest", doc)
+	if wptRestElements and testData is None:
+		testData = loadTestData
 	if len(wptRestElements) > 1:
 		die("Only one <wpt-rest> element allowed per document, you have {0}.", len(wptRestElements))
 		wptRestElements = wptRestElements[0:1]
@@ -47,6 +50,8 @@ def processWptElements(doc):
 		warn("<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing.")
 	else:
 		if pathPrefix:
+			if testData is None:
+				testData = loadTestData()
 			checkForOmittedTests(pathPrefix, testData, seenTestNames)
 
 	if atLeastOneElement:
