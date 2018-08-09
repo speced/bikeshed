@@ -18,7 +18,7 @@ def processWptElements(doc):
 	for el in wptElements:
 		atLeastOneElement = True
 		if testData is None:
-			testData = loadTestData()
+			testData = loadTestData(doc)
 		testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
 		for testName in testNames:
 			if testName not in testData:
@@ -30,7 +30,7 @@ def processWptElements(doc):
 	# <wpt-rest> elements
 	wptRestElements = findAll("wpt-rest", doc)
 	if wptRestElements and testData is None:
-		testData = loadTestData
+		testData = loadTestData(doc)
 	if len(wptRestElements) > 1:
 		die("Only one <wpt-rest> element allowed per document, you have {0}.", len(wptRestElements))
 		wptRestElements = wptRestElements[0:1]
@@ -51,7 +51,7 @@ def processWptElements(doc):
 	else:
 		if pathPrefix:
 			if testData is None:
-				testData = loadTestData()
+				testData = loadTestData(doc)
 			checkForOmittedTests(pathPrefix, testData, seenTestNames)
 
 	if atLeastOneElement:
