@@ -30,8 +30,7 @@ def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefau
         # If all are False, update everything
         if  anchors == backrefs == biblio == caniuse == linkDefaults == testSuites == languages == wpt == False:
             anchors  = backrefs  = biblio  = caniuse  = linkDefaults  = testSuites  = languages  = wpt  = True
-        if anchors:
-            anchorPaths = updateCrossRefs.update(path=path, dryRun=dryRun)
+        anchorPaths = updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else set()
         if backrefs:
             updateBackRefs.update(path=path, dryRun=dryRun)
         if biblio:
