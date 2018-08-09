@@ -315,7 +315,7 @@ def handleDebug(options, extras):
 
 def handleRefs(options, extras):
     from . import metadata
-    from .ReferenceManager import ReferenceManager
+    from .refs.ReferenceManager import ReferenceManager
     from .Spec import Spec
     config.force = True
     config.quiet = 10
