@@ -16,7 +16,6 @@ def addDfnPanels(doc, dfns):
         if not href.startswith("#"):
             continue
         allRefs[href[1:]].append(a)
-    body = find("body", doc)
     for dfn in dfns:
         id = dfn.get("id")
         if not id:
@@ -54,7 +53,7 @@ def addDfnPanels(doc, dfns):
                     appendChild(li,
                                 " ",
                                 E.a({"href": "#" + escapeUrlFrag(refID), "data-silently-dedup": ""}, "(" + str(i + 1) + ")"))
-        appendChild(body, panel)
+        appendChild(doc.body, panel)
     if atLeastOnePanel:
         doc.extraScripts['script-dfn-panel'] = dfnPanelScript
         doc.extraStyles['style-dfn-panel'] = dfnPanelStyle
@@ -91,7 +90,7 @@ def addExternalDfnPanel(termEl, ref, elsFromHref, doc):
                 appendChild(li,
                             " ",
                             E.a({"href": "#" + escapeUrlFrag(linkID), "data-silently-dedup": ""}, "(" + str(i + 1) + ")"))
-    appendChild(find("body", doc), panel)
+    appendChild(doc.body, panel)
     doc.extraScripts['script-dfn-panel'] = dfnPanelScript
     doc.extraStyles['style-dfn-panel'] = dfnPanelStyle
 

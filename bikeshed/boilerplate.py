@@ -772,7 +772,7 @@ def addSpecMetadataSection(doc):
         md["Audience"] = [", ".join(doc.md.audience)]
     if doc.md.toggleDiffs:
         md["Toggle Diffs"] = [E.label({"for": safeID(doc, "hidedel"), "id": safeID(doc, "hidedel-label")}, "Hide deleted text")]
-        prependChild(find("body", doc),
+        prependChild(doc.body,
                      E.input({"type": "checkbox",
                               "id": safeID(doc, "hidedel"),
                               "style": "display:none"}))
