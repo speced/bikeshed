@@ -42,7 +42,7 @@ def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefau
             "wpt": updateWpt.update(path=path, dryRun=dryRun)if wpt else None
         }
 
-        cleanupFiles(path, touchedPaths=touchedPaths)
+        cleanupFiles(path, touchedPaths=touchedPaths, dryRun=dryRun)
         manifest.createManifest(path=path, dryRun=dryRun)
 
 
@@ -95,7 +95,9 @@ def updateReadonlyDataFiles():
         return
 
 
-def cleanupFiles(root, touchedPaths):
+def cleanupFiles(root, touchedPaths, dryRun=False):
+    if dryRun:
+        return
     paths = set()
     deletableFiles = []
     deletableFolders = []
