@@ -193,6 +193,6 @@ class CanIUseManager(object):
             return self.features[featureName]
         if not self.hasFeature(featureName):
             return
-        data = json.loads(self.dataFile.fetch("caniuse", "feature-{0}.json".format(featureName), str=True))
+        data = json.loads(self.dataFile.fetch("caniuse", "feature-{0}.json".format(featureName), str=True), object_pairs_hook=OrderedDict)
         self.features[featureName] = data
         return data
