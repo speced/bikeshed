@@ -32,19 +32,19 @@ def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefau
             anchors  = backrefs  = biblio  = caniuse  = linkDefaults  = testSuites  = languages  = wpt  = True
 
         touchedPaths = {
-            "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else set(),
-            "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else set(),
-            "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else set(),
-            "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else set(),
-            "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else set(),
-            "testSuites": updateTestSuites.update(path=path, dryRun=dryRun) if testSuites else set(),
-            "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else set(),
-            "wpt": updateWpt.update(path=path, dryRun=dryRun)if wpt else set()
+            "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,
+            "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else None,
+            "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else None,
+            "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else None,
+            "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else None,
+            "testSuites": updateTestSuites.update(path=path, dryRun=dryRun) if testSuites else None,
+            "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else None,
+            "wpt": updateWpt.update(path=path, dryRun=dryRun)if wpt else None
         }
 
+        cleanupFiles(path, touchedPaths=touchedPaths)
         manifest.createManifest(path=path, dryRun=dryRun)
 
-        cleanupFiles(path, touchedPaths=touchedPaths)
 
 
 def fixupDataFiles():
