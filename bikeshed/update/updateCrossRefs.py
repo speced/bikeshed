@@ -105,9 +105,9 @@ def update(path, dryRun=False):
         except Exception, e:
             die("Couldn't save fors database to disk.\n{0}", e)
             return
-        return writtenPaths
 
     say("Success!")
+    return writtenPaths
 
 
 def linearizeAnchorTree(multiTree, list=None):
