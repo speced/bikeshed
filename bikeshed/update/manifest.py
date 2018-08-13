@@ -112,6 +112,14 @@ def updateByManifest(path, dryRun=False):
     for filePath,hash in newFiles.items():
         if hash != oldFiles.get(filePath):
             newPaths.append(filePath)
+    deletedPaths = []
+    for filePath in oldFiles.keys():
+        if filePath not in newFiles:
+            os.remove(localizePath(path, filePath))
+            deletedPaths.append(filePath)
+    if deletedPaths:
+        print "Deleted {0} old data files.".format(len(deletedPaths))
+
     if not dryRun:
         import time
         messageDelta = .5 # seconds of *processor* time, not wall time :(
@@ -120,7 +128,7 @@ def updateByManifest(path, dryRun=False):
             say("Updating {0} file{1}...", len(newPaths), "s" if len(newPaths) > 1 else "")
         for i,filePath in enumerate(newPaths):
             remotePath = ghPrefix + filePath
-            localPath = os.path.join(path, *filePath.split("/"))
+            localPath = localizePath(path, filePath)
             try:
                 with closing(urllib2.urlopen(remotePath)) as fh:
                     newFile = unicode(fh.read(), encoding="utf-8")
@@ -146,6 +154,10 @@ def updateByManifest(path, dryRun=False):
             return False
     say("Done!")
     return True
+
+
+def localizePath(root, relPath):
+    return os.path.join(root, *relPath.split("/"))
 
 
 
