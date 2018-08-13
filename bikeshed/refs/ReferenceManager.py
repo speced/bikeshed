@@ -295,6 +295,10 @@ class ReferenceManager(object):
                               el=el)
                 return localRefs[0]
 
+        if status == "local":
+            # Already checked local refs, can early-exit now.
+            return
+
         # Take defaults into account
         if not spec or not status or not linkFor:
             variedTexts = [v for v in linkTextVariations(text, linkType) if v in self.defaultSpecs]
