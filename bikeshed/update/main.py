@@ -30,24 +30,21 @@ def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefau
         # If all are False, update everything
         if  anchors == backrefs == biblio == caniuse == linkDefaults == testSuites == languages == wpt == False:
             anchors  = backrefs  = biblio  = caniuse  = linkDefaults  = testSuites  = languages  = wpt  = True
-        anchorPaths = updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else set()
-        if backrefs:
-            updateBackRefs.update(path=path, dryRun=dryRun)
-        if biblio:
-            updateBiblio.update(path=path, dryRun=dryRun)
-        if caniuse:
-            updateCanIUse.update(path=path, dryRun=dryRun)
-        if linkDefaults:
-            updateLinkDefaults.update(path=path, dryRun=dryRun)
-        if testSuites:
-            updateTestSuites.update(path=path, dryRun=dryRun)
-        if languages:
-            updateLanguages.update(path=path, dryRun=dryRun)
-        if wpt:
-            updateWpt.update(path=path, dryRun=dryRun)
+
+        touchedPaths = {
+            "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else set(),
+            "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else set(),
+            "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else set(),
+            "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else set(),
+            "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else set(),
+            "testSuites": updateTestSuites.update(path=path, dryRun=dryRun) if testSuites else set(),
+            "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else set(),
+            "wpt": updateWpt.update(path=path, dryRun=dryRun)if wpt else set()
+        }
+
         manifest.createManifest(path=path, dryRun=dryRun)
 
-        cleanupFiles(path, anchors=anchorPaths)
+        cleanupFiles(path, touchedPaths=touchedPaths)
 
 
 def fixupDataFiles():
@@ -98,19 +95,19 @@ def updateReadonlyDataFiles():
         return
 
 
-def cleanupFiles(root, anchors=None):
+def cleanupFiles(root, touchedPaths):
     paths = set()
-    checkedFiles = []
-    checkedFolders = []
-    if anchors is not None:
-        checkedFiles.extend(["specs.json", "methods.json", "fors.json"])
-        checkedFolders.extend(["headings", "anchors"])
-        paths.update(anchors)
+    deletableFiles = []
+    deletableFolders = []
+    if touchedPaths["anchors"] is not None:
+        deletableFiles.extend(["specs.json", "methods.json", "fors.json"])
+        deletableFolders.extend(["headings", "anchors"])
+        paths.update(touchedPaths["anchors"])
 
     for absPath, relPath in getDatafilePaths(root):
-        if "/" not in relPath and relPath not in checkedFiles:
+        if "/" not in relPath and relPath not in deletableFiles:
             continue
-        if "/" in relPath and relPath.partition("/")[0] not in checkedFolders:
+        if "/" in relPath and relPath.partition("/")[0] not in deletableFolders:
             continue
         if absPath not in paths:
             os.remove(absPath)
