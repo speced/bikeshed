@@ -106,6 +106,8 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
         deletableFolders.extend(["headings", "anchors"])
         paths.update(touchedPaths["anchors"])
 
+    say("Cleaning up old data files...")
+    oldPaths = []
     for absPath, relPath in getDatafilePaths(root):
         if "/" not in relPath and relPath not in deletableFiles:
             continue
@@ -113,6 +115,11 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
             continue
         if absPath not in paths:
             os.remove(absPath)
+            oldPaths.append(relPath)
+    if oldPaths:
+        say("Success! Deleted {0} old files.".format(len(oldPaths)))
+    else:
+        say("Success! Nothing to delete.")
 
 
 def copyanything(src, dst):
