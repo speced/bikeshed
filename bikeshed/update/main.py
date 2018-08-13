@@ -109,6 +109,10 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
         deletableFiles.extend(["biblio-keys.json", "biblio-numeric-suffixes.json"])
         deletableFolders.extend(["biblio"])
         paths.update(touchedPaths["biblio"])
+    if touchedPaths["caniuse"] is not None:
+        deletableFiles.extend(["caniuse.json"])
+        deletableFolders.extend(["caniuse"])
+        paths.update(touchedPaths["caniuse"])
 
     say("Cleaning up old data files...")
     oldPaths = []

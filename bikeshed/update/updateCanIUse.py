@@ -25,11 +25,7 @@ def update(path, dryRun=False):
         die("The Can I Use data wasn't valid JSON for some reason. Try downloading again?\n{0}", e)
         return
 
-    # Remove some unused data
-    if "cats" in data:
-        del data["cats"]
-    if "statuses" in data:
-        del data["statuses"]
+    basicData = {"agents":[], "features":{}, "updated": data["updated"]}
 
     # Trim agent data to minimum required - mapping codename to full name
     codeNames = {}
@@ -37,7 +33,7 @@ def update(path, dryRun=False):
     for codename,agent in data["agents"].items():
         codeNames[codename] = agent["browser"]
         agentData[agent["browser"]] = codename
-    data["agents"] = agentData
+    basicData["agents"] = agentData
 
     # Trim feature data to minimum - notes and minimum supported version
     def simplifyStatus(s, *rest):
@@ -61,6 +57,7 @@ def update(path, dryRun=False):
     for featureName,feature in data["data"].items():
         notes = feature["notes"]
         url = feature["spec"]
+        basicData["features"][featureName] = url
         browserData = {}
         for browser,versions in feature["stats"].items():
             descendingVersions = list(reversed(versions.items()))
@@ -87,13 +84,22 @@ def update(path, dryRun=False):
                         break
             browserData[codeNames[browser]] = "{0} {1}".format(status, version)
         featureData[featureName] = {"notes":notes, "url":url, "support":browserData}
-    data["data"] = featureData
 
+    writtenPaths = set()
     if not dryRun:
         try:
-            with io.open(os.path.join(path, "caniuse.json"), 'w', encoding="utf-8") as fh:
-                fh.write(unicode(json.dumps(data, indent=1, ensure_ascii=False, sort_keys=True)))
+            p = os.path.join(path, "caniuse", "data.json")
+            writtenPaths.add(p)
+            with io.open(p, 'w', encoding="utf-8") as fh:
+                fh.write(unicode(json.dumps(basicData, indent=1, ensure_ascii=False, sort_keys=True)))
+
+            for featureName, feature in featureData.items():
+                p = os.path.join(path, "caniuse", "feature-{0}.json".format(featureName))
+                writtenPaths.add(p)
+                with io.open(p, 'w', encoding='utf-8') as fh:
+                    fh.write(unicode(json.dumps(feature, indent=1, ensure_ascii=False, sort_keys=True)))
         except Exception, e:
             die("Couldn't save Can I Use database to disk.\n{0}", e)
             return
     say("Success!")
+    return writtenPaths

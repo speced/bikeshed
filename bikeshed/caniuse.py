@@ -14,13 +14,12 @@ def addCanIUsePanels(doc):
         return
 
     if not doc.canIUse:
-        doc.canIUse = json.loads(doc.dataFile.fetch("caniuse.json", str=True), object_pairs_hook=OrderedDict)
+        doc.canIUse = CanIUseManager(dataFile=doc.dataFile)
 
-    features = doc.canIUse["data"]
-    lastUpdated = datetime.utcfromtimestamp(doc.canIUse["updated"]).date().isoformat()
+    lastUpdated = datetime.utcfromtimestamp(doc.canIUse.updated).date().isoformat()
 
     # e.g. 'iOS Safari' -> 'ios_saf'
-    classFromBrowser = doc.canIUse["agents"]
+    classFromBrowser = doc.canIUse.agents
 
     atLeastOnePanel = False
     elements = findAll("[caniuse]", doc)
@@ -32,9 +31,9 @@ def addCanIUsePanels(doc):
         del dfn.attrib["caniuse"]
 
         featId = featId.lower()
-        if featId not in features:
+        if not doc.canIUse.hasFeature(featId):
             die("Unrecognized Can I Use feature ID: {0}", featId, el=dfn)
-        feature = features[featId]
+        feature = doc.canIUse.getFeature(featId)
 
         addClass(dfn, "caniuse-paneled")
         panel = canIUsePanelFor(id=featId, data=feature, update=lastUpdated, classFromBrowser=classFromBrowser)
@@ -156,8 +155,8 @@ def validateCanIUseURLs(doc, elements):
     urlFeatures = set()
     for url in doc.md.canIUseURLs:
         sawTheURL = False
-        for featureID, feature in doc.canIUse["data"].items():
-            if feature["url"].startswith(url):
+        for featureID, featureUrl in doc.canIUse.urlFromFeature.items():
+            if featureUrl.startswith(url):
                 sawTheURL = True
                 urlFeatures.add(featureID)
         if not sawTheURL and url not in doc.md.ignoreCanIUseUrlFailure:
@@ -175,3 +174,25 @@ def validateCanIUseURLs(doc, elements):
     if unusedFeatures:
         warn("The following Can I Use features are associated with your URLs, but don't show up in your spec:\n{0}",
              "\n".join(" * {0} - https://caniuse.com/#feat={0}".format(x) for x in sorted(unusedFeatures)))
+
+class CanIUseManager(object):
+
+    def __init__(self, dataFile):
+        self.dataFile = dataFile
+        data = json.loads(self.dataFile.fetch("caniuse", "data.json", str=True), object_pairs_hook=OrderedDict)
+        self.updated = data["updated"]
+        self.agents = data["agents"]
+        self.urlFromFeature = data["features"]
+        self.features = {}
+
+    def hasFeature(self, featureName):
+        return featureName in self.urlFromFeature
+
+    def getFeature(self, featureName):
+        if featureName in self.features:
+            return self.features[featureName]
+        if not self.hasFeature(featureName):
+            return
+        data = json.loads(self.dataFile.fetch("caniuse", "feature-{0}.json".format(featureName), str=True))
+        self.features[featureName] = data
+        return data
