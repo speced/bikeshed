@@ -450,12 +450,13 @@ class ReferenceManager(object):
     def getBiblioRef(self, text, status=None, generateFakeRef=False, el=None, quiet=False):
         key = text.lower()
         while True:
-            # Try to load the group up, if necessary
-            group = key[0:2]
-            if group not in self.loadedBiblioGroups:
-                with self.dataFile.fetch("biblio", "biblio-{0}.data".format(group), okayToFail=True) as lines:
-                    biblio.loadBiblioDataFile(lines, self.biblios)
-            self.loadedBiblioGroups.add(group)
+            if key not in self.biblios:
+                # Try to load the group up, if necessary
+                group = key[0:2]
+                if group not in self.loadedBiblioGroups:
+                    with self.dataFile.fetch("biblio", "biblio-{0}.data".format(group), okayToFail=True) as lines:
+                        biblio.loadBiblioDataFile(lines, self.biblios)
+                self.loadedBiblioGroups.add(group)
             # Check if it's there
             if key in self.biblios:
                 candidates = self.biblios[key]
