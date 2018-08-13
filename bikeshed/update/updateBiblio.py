@@ -21,12 +21,15 @@ def update(path, dryRun=False):
     biblio.processSpecrefBiblioFile(getSpecrefData(), biblios, order=3)
     biblio.processSpecrefBiblioFile(getWG21Data(), biblios, order=3)
     biblio.processReferBiblioFile(getCSSWGData(), biblios, order=4)
+    writtenPaths = set()
     if not dryRun:
         groupedBiblios, allNames = groupBiblios(biblios)
         # Save each group to a file
         for group, biblios in groupedBiblios.items():
             try:
-                with io.open(os.path.join(path, "biblio", "biblio-{0}.data".format(group)), 'w', encoding="utf-8") as fh:
+                p = os.path.join(path, "biblio", "biblio-{0}.data".format(group))
+                writtenPaths.add(p)
+                with io.open(p, 'w', encoding="utf-8") as fh:
                     writeBiblioFile(fh, biblios)
             except Exception, e:
                 die("Couldn't save biblio database to disk.\n{0}", e)
@@ -57,7 +60,9 @@ def update(path, dryRun=False):
                 continue
             reducedNames.append(name)
         try:
-            with io.open(os.path.join(path, "biblio-keys.json"), 'w', encoding="utf-8") as fh:
+            p = os.path.join(path, "biblio-keys.json")
+            writtenPaths.add(p)
+            with io.open(p, 'w', encoding="utf-8") as fh:
                 fh.write(unicode(json.dumps(reducedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception, e:
             die("Couldn't save biblio database to disk.\n{0}", e)
@@ -66,11 +71,14 @@ def update(path, dryRun=False):
         # Collect all the number-suffix names which also exist un-numbered
         numberedNames = collectNumberedNames(reducedNames)
         try:
-            with io.open(os.path.join(path, "biblio-numeric-suffixes.json"), 'w', encoding="utf-8") as fh:
+            p = os.path.join(path, "biblio-numeric-suffixes.json")
+            writtenPaths.add(p)
+            with io.open(p, 'w', encoding="utf-8") as fh:
                 fh.write(unicode(json.dumps(numberedNames, indent=0, ensure_ascii=False, sort_keys=True)))
         except Exception, e:
             die("Couldn't save biblio numeric-suffix information to disk.\n{0}", e)
     say("Success!")
+    return writtenPaths
 
 
 def getSpecrefData():
