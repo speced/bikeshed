@@ -114,7 +114,7 @@ def updateByManifest(path, dryRun=False):
             newPaths.append(filePath)
     if not dryRun:
         import time
-        messageDelta = 3
+        messageDelta = .5 # seconds of *processor* time, not wall time :(
         lastMsgTime = time.clock()
         if newPaths:
             say("Updating {0} file{1}...", len(newPaths), "s" if len(newPaths) > 1 else "")
