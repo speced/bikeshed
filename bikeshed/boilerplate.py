@@ -371,11 +371,7 @@ def addExplicitIndexes(doc):
 
         appendChild(el, htmlFromIndexTerms(indexEntries))
         el.tag = "div"
-        removeAttr(el, "export")
-        removeAttr(el, "for")
-        removeAttr(el, "spec")
-        removeAttr(el, "status")
-        removeAttr(el, "type")
+        removeAttr(el, "export", "for", "spec", "status", "type")
 
 
 def htmlFromIndexTerms(entries):

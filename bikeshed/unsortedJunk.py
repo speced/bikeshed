@@ -427,8 +427,7 @@ def fixInterDocumentReferences(doc):
             # Unknown spec
             die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el), el=el)
             continue
-        removeAttr(el, 'data-link-spec')
-        removeAttr(el, 'spec-section')
+        removeAttr(el, 'data-link-spec', 'spec-section')
 
 
 def fillAttributeInfoSpans(doc):
@@ -905,9 +904,7 @@ def removeMultipleLinks(doc):
             if len(links) > 1:
                 for el in links[1:]:
                     el.tag = "span"
-                    removeAttr(el, "href")
-                    removeAttr(el, "data-link-type")
-                    removeAttr(el, "id")
+                    removeAttr(el, "href", "data-link-type", "id")
 
 def processIssuesAndExamples(doc):
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
@@ -1086,39 +1083,16 @@ def cleanupHTML(doc):
 
         # Remove a bunch of attributes
         if el.get("data-attribute-info") is not None or el.get("data-dict-member-info") is not None:
-            removeAttr(el, 'data-attribute-info')
-            removeAttr(el, 'data-dict-member-info')
-            removeAttr(el, 'for')
+            removeAttr(el, 'data-attribute-info', 'data-dict-member-info', 'for')
         if el.tag in ["a", "span"]:
-            removeAttr(el, 'data-link-for')
-            removeAttr(el, 'data-link-for-hint')
-            removeAttr(el, 'data-link-status')
-            removeAttr(el, 'data-link-spec')
-            removeAttr(el, 'data-section')
-            removeAttr(el, 'data-biblio-type')
-            removeAttr(el, 'data-biblio-status')
-            removeAttr(el, 'data-okay-to-fail')
-            removeAttr(el, 'data-lt')
+            removeAttr(el, 'data-link-for', 'data-link-for-hint', 'data-link-status', 'data-link-spec', 'data-section', 'data-biblio-type', 'data-biblio-status', 'data-okay-to-fail', 'data-lt')
         if el.tag != "a":
-            removeAttr(el, 'data-link-for')
-            removeAttr(el, 'data-link-type')
+            removeAttr(el, 'data-link-for', 'data-link-type')
         if el.tag not in config.dfnElements:
-            removeAttr(el, 'data-dfn-for')
-            removeAttr(el, 'data-dfn-type')
-            removeAttr(el, 'data-export')
-            removeAttr(el, 'data-noexport')
+            removeAttr(el, 'data-dfn-for', 'data-dfn-type', 'data-export', 'data-noexport')
         if el.tag == "var":
             removeAttr(el, 'data-var-ignore')
-        removeAttr(el, 'bs-autolink-syntax')
-        removeAttr(el, 'data-alternate-id')
-        removeAttr(el, 'highlight')
-        removeAttr(el, 'nohighlight')
-        removeAttr(el, 'line-numbers')
-        removeAttr(el, 'data-opaque')
-        removeAttr(el, 'data-no-self-link')
-        removeAttr(el, "line-number")
-        removeAttr(el, "caniuse")
-        removeAttr(el, "data-silently-dedup")
+        removeAttr(el, 'bs-autolink-syntax', 'data-alternate-id', 'highlight', 'nohighlight', 'line-numbers', 'data-opaque', 'data-no-self-link', "line-number", "caniuse", "data-silently-dedup")
 
         # Remove the internal-use-only detail of whether export/noexport is manual or default
         if el.get("data-export"):
@@ -1178,8 +1152,7 @@ def formatElementdefTables(doc):
                 continue
             el.tag = "details"
             clearContents(el)
-            removeAttr(el, "data-element-attr-group")
-            removeAttr(el, "data-dfn-type")
+            removeAttr(el, "data-element-attr-group", "data-dfn-type")
             ul = appendChild(el,
                              E.summary(
                                  E.a({"data-link-type":"dfn"}, groupName)),

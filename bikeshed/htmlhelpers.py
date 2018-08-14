@@ -489,10 +489,11 @@ def hasAncestor(el, pred):
     return closestAncestor(el, pred) is not None
 
 
-def removeAttr(el, attrName):
+def removeAttr(el, *attrNames):
     # Remove an attribute, silently ignoring if attr doesn't exist.
-    if attrName in el.attrib:
-        del el.attrib[attrName]
+    for attrName in attrNames:
+        if attrName in el.attrib:
+            del el.attrib[attrName]
     return el
 
 
