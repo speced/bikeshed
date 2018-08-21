@@ -306,7 +306,7 @@ class ReferenceManager(object):
                 for dfnSpec, dfnType, dfnStatus, dfnFor in reversed(self.defaultSpecs[variedTexts[0]]):
                     if not config.linkTypeIn(dfnType, linkType):
                         continue
-                    if linkFor and linkFor != dfnFor:
+                    if linkFor and dfnFor and linkFor != dfnFor:
                         continue
                     spec = spec or dfnSpec
                     status = status or dfnStatus
