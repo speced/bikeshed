@@ -43,9 +43,8 @@ def die(msg, *formatArgs, **namedArgs):
         messages.add(msg)
         if config.quiet < 3:
             p(msg)
-    if not config.force:
-        failure("Did not generate, due to fatal errors")
-        sys.exit(1)
+    if config.errorLevelAt("fatal"):
+        errorAndExit()
 
 
 def linkerror(msg, *formatArgs, **namedArgs):
@@ -68,6 +67,8 @@ def linkerror(msg, *formatArgs, **namedArgs):
         messages.add(msg)
         if config.quiet < 2:
                 p(msg)
+    if config.errorLevelAt("link-error"):
+        errorAndExit()
 
 
 def warn(msg, *formatArgs, **namedArgs):
@@ -82,6 +83,8 @@ def warn(msg, *formatArgs, **namedArgs):
         messages.add(msg)
         if config.quiet < 1:
                 p(msg)
+    if config.errorLevelAt("warning"):
+        errorAndExit()
 
 
 def say(msg, *formatArgs, **namedArgs):
@@ -182,3 +185,7 @@ def formatMessage(type, text, lineNum=None):
         if lineNum is not None:
             headingText = "LINE {0}".format(lineNum)
         return printColor(headingText + ":", color, "bold") + " " + text
+
+def errorAndExit():
+    failure("Did not generate, due to fatal errors")
+    sys.exit(1)

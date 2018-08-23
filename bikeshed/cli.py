@@ -19,12 +19,14 @@ def main():
                            help="Silences one level of message, least-important first.")
     argparser.add_argument("-s", "--silent", dest="silent", action="store_true",
                            help="Shorthand for 'as many -q as you need to shut it up'")
-    argparser.add_argument("-f", "--force", dest="force", action="store_true",
+    argparser.add_argument("-f", "--force", dest="errorLevel", action="store_const", const="nothing",
                            help="Force the preprocessor to run to completion; fatal errors don't stop processing.")
     argparser.add_argument("-d", "--dry-run", dest="dryRun", action="store_true",
                            help="Prevents the processor from actually saving anything to disk, but otherwise fully runs.")
     argparser.add_argument("--print", dest="printMode", action="store", default=None,
                            help="Print mode. Options are 'plain' (just text), 'console' (colored with console color codes), 'markup', and 'json'. Defaults to 'console'.")
+    argparser.add_argument("--die-on", dest="errorLevel", choices=[b"nothing", b"fatal", b"link-error", b"warning", b"everything"],
+                           help="Determines what sorts of errors cause Bikeshed to die (quit immediately with an error status code). Default is 'fatal'; the -f flag is a shorthand for 'nothing'")
 
     subparsers = argparser.add_subparsers(title="Subcommands", dest='subparserName')
 
@@ -185,7 +187,7 @@ def main():
     config.quiet = options.quiet
     if options.silent:
         config.quiet = float("infinity")
-    config.force = options.force
+    config.setErrorLevel(options.errorLevel)
     config.dryRun = options.dryRun
     if options.printMode is None:
         if "NO_COLOR" in os.environ:
@@ -256,7 +258,7 @@ def handleWatch(options, extras):
     from . import metadata
     from .Spec import Spec
     # Can't have an error killing the watcher
-    config.force = True
+    config.setErrorLevel("nothing")
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     doc.mdCommandLine = metadata.fromCommandLine(extras)
     if options.byos:
@@ -267,7 +269,7 @@ def handleWatch(options, extras):
 def handleServe(options, extras):
     from . import metadata
     from .Spec import Spec
-    config.force = True
+    config.setErrorLevel("nothing")
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     doc.mdCommandLine = metadata.fromCommandLine(extras)
     if options.byos:
@@ -278,7 +280,7 @@ def handleServe(options, extras):
 def handleDebug(options, extras):
     from . import metadata
     from .Spec import Spec
-    config.force = True
+    config.setErrorLevel("nothing")
     config.quiet = 2
     if options.printExports:
         doc = Spec(inputFilename=options.infile)
@@ -317,7 +319,7 @@ def handleRefs(options, extras):
     from . import metadata
     from .refs.ReferenceManager import ReferenceManager
     from .Spec import Spec
-    config.force = True
+    config.setErrorLevel("nothing")
     config.quiet = 10
     doc = Spec(inputFilename=options.infile)
     if doc.valid:
@@ -358,7 +360,7 @@ def handleTest(options, extras):
     from .Spec import Spec
     from . import test
     md = metadata.fromCommandLine(extras)
-    config.force = True
+    config.setErrorLevel("nothing")
     config.quiet = 100
     if options.rebase:
         test.rebase(Spec, options.testFiles, md=md)

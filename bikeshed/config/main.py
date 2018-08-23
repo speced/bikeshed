@@ -8,7 +8,7 @@ import re
 
 from ..enum import Enum
 
-force = True
+errorLevel = ["fatal"]
 quiet = True
 useReadonlyData = False
 dryRun = False
@@ -179,3 +179,14 @@ def docPath(doc, *pathSegs):
         return None
     startPath = os.path.dirname(os.path.abspath(doc.inputSource))
     return os.path.join(startPath, *pathSegs)
+
+def errorLevelAt(target):
+    levels = {"nothing":0, "fatal":1, "link-error":2, "warning":3, "everything":1000}
+    currentLevel = levels[errorLevel[0]]
+    targetLevel = levels[target]
+    return currentLevel >= targetLevel
+
+def setErrorLevel(level=None):
+    if level is None:
+        level = "fatal"
+    errorLevel[0] = level
