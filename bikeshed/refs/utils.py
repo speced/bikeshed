@@ -129,6 +129,12 @@ def linkTextVariations(str, linkType):
         elif last1 in "bdfgklmnprstvz":
             yield str + last1 + "ing"
 
+        # Insensitive <-> Insensitively
+        if last2 == "ly":
+            yield str[:-2]
+        else:
+            yield str + "ly"
+
     if config.linkTypeIn(linkType, "idl"):
         # Let people refer to escaped IDL names with their "real" names (without the underscore)
         if str[:1] != "_":
