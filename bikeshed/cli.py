@@ -242,7 +242,9 @@ def handleSpec(options, extras):
 
 
 def handleEchidna(options, extras):
+    from . import metadata
     from . import publish
+    from .Spec import Spec
     doc = Spec(inputFilename=options.infile, token=options.ghToken)
     doc.mdCommandLine = metadata.fromCommandLine(extras)
     doc.mdCommandLine.addData("Prepare For TR", "yes")
