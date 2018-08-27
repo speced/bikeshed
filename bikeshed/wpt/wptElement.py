@@ -67,11 +67,15 @@ def createHTML(doc, blockEl, testNames):
 		addClass(blockEl, "wpt-tests-block")
 		clearContents(blockEl)
 		for testName in testNames:
+			if ".https." in testName or ".serviceworker." in testName:
+				liveTestScheme = "https"
+			else:
+				liveTestScheme = "http"
 			_,_,lastNameFragment = testName.rpartition("/")
 			singleTestEl = E.li({"class": "wpt-test"},
 				E.a({"href": "https://wpt.fyi/results/"+testName}, lastNameFragment),
 				" ",
-				E.a({"title": testName, "href": "http://w3c-test.org/"+testName}, E.small("(live test)")),
+				E.a({"title": testName, "href": "{0}://web-platform-tests.live/{1}".format(liveTestScheme, testName)}, E.small("(live test)")),
 				" ",
 				E.a({"href": "https://github.com/web-platform-tests/wpt/blob/master/"+testName}, E.small("(source)")))
 			appendChild(blockEl, singleTestEl)
