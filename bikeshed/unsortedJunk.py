@@ -732,6 +732,7 @@ def classifyLink(el):
 
 def processBiblioLinks(doc):
     biblioLinks = findAll("a[data-link-type='biblio']", doc)
+    usedLocalBiblios = []
     for el in biblioLinks:
         biblioType = el.get('data-biblio-type')
         if biblioType == "normative":
@@ -779,6 +780,30 @@ def processBiblioLinks(doc):
         id = config.simplifyText(ref.linkText)
         el.set('href', '#biblio-' + id)
         storage[ref.linkText] = ref
+
+        if ref.order == 1:
+            usedLocalBiblios.append(ref)
+
+    verifyUsageOfAllLocalBiblios(doc, usedLocalBiblios)
+
+
+def verifyUsageOfAllLocalBiblios(doc, usedBiblios):
+    '''
+    Verifies that all the locally-declared biblios
+    (those written inline in a <pre class=biblio> block,
+    and thus given order=1)
+    were used in the spec,
+    so you can remove entries when they're no longer necessary.
+    '''
+    localBiblios = [b["linkText"] for bs in doc.refs.biblios.values() for b in bs if b['order'] == 1]
+    usedBiblioKeys = [b.originalLinkText if b.originalLinkText is not None else b.linkText for b in usedBiblios]
+    unusedBiblioKeys = []
+    for b in localBiblios:
+        if b not in usedBiblioKeys:
+            unusedBiblioKeys.append(b)
+    if unusedBiblioKeys:
+        warn("The following locally-defined biblio entries are unused and can be removed:\n{0}",
+             "\n".join("  * {0}".format(b) for b in unusedBiblioKeys))
 
 
 def processAutolinks(doc):
