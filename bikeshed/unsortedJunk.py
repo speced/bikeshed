@@ -1117,7 +1117,7 @@ def cleanupHTML(doc):
             removeAttr(el, 'data-dfn-for', 'data-dfn-type', 'data-export', 'data-noexport')
         if el.tag == "var":
             removeAttr(el, 'data-var-ignore')
-        removeAttr(el, 'bs-autolink-syntax', 'data-alternate-id', 'highlight', 'nohighlight', 'line-numbers', 'data-opaque', 'data-no-self-link', "line-number", "caniuse", "data-silently-dedup")
+        removeAttr(el, 'bs-autolink-syntax', 'data-alternate-id', 'highlight', 'nohighlight', 'line-numbers', 'data-opaque', 'data-no-self-link', "line-number", "caniuse", "data-silently-dedup", "nocrossorigin")
 
         # Remove the internal-use-only detail of whether export/noexport is manual or default
         if el.get("data-export"):
@@ -1343,3 +1343,12 @@ def locateFillContainers(doc):
     for el in findAll("[data-fill-with]", doc):
         fillContainers[el.get("data-fill-with")].append(el)
     return fillContainers
+
+
+def forceCrossorigin(doc):
+    if not doc.md.forceCrossorigin:
+        return
+    for el in findAll("a, link, script[src], audio, video, img", doc):
+        if el.get("crossorigin") is not None or treeAttr(el, "nocrossorigin") is not None:
+            continue
+        el.set("crossorigin", "")

@@ -60,6 +60,7 @@ class MetadataManager:
         self.editors = []
         self.editorTerm = {"singular": "Editor", "plural": "Editors"}
         self.favicon = None
+        self.forceCrossorigin = False
         self.group = None
         self.h1 = None
         self.ignoreCanIUseUrlFailure = []
@@ -938,6 +939,7 @@ knownKeys = {
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),
     "Favicon": Metadata("Favicon", "favicon", joinValue, parseLiteral),
+    "Force Crossorigin": Metadata("Force Crossorigin", "forceCrossorigin", joinValue, parseBoolean),
     "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),
     "Group": Metadata("Group", "group", joinValue, parseLiteral),
     "H1": Metadata("H1", "h1", joinValue, parseLiteral),

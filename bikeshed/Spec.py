@@ -217,6 +217,7 @@ class Spec(object):
         fixIntraDocumentReferences(self)
         fixInterDocumentReferences(self)
         removeMultipleLinks(self)
+        forceCrossorigin(self)
         lint.brokenLinks(self)
         lint.accidental2119(self)
         lint.missingExposed(self)
