@@ -1348,7 +1348,7 @@ def locateFillContainers(doc):
 def forceCrossorigin(doc):
     if not doc.md.forceCrossorigin:
         return
-    for el in findAll("a, link, script[src], audio, video, img", doc):
+    for el in findAll("link, script[src], audio, video, img", doc):
         if el.get("crossorigin") is not None or treeAttr(el, "nocrossorigin") is not None:
             continue
         el.set("crossorigin", "")
