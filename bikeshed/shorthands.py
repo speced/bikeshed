@@ -442,7 +442,7 @@ inlineLinkRe = re.compile(r"""
                             (\\)?
                             \[([^\]]*)\]
                             \(\s*
-                            ([^\s)]*)
+                            ([^\s)]+)
                             \s*(?:"([^"]*)")?\s*
                             \)""", re.X)
 def inlineLinkReplacer(match):
