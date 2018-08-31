@@ -38,6 +38,9 @@ class BiblioEntry(object):
         else:
             raise
 
+        if isinstance(self.authors, basestring):
+            self.authors = [self.authors]
+
     def __str__(self):
         str = ""
         etAl = self.etAl
