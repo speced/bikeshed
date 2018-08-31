@@ -591,8 +591,11 @@ def classifyDfns(doc, dfns):
             continue
         # Some error checking
         if dfnType in config.functionishTypes:
-            if not re.match(r"^[\w\[\]-]+\(.*\)$", primaryDfnText):
-                die("Functions/methods must end with () in their linking text, got '{0}'.", primaryDfnText, el=el)
+            if not re.search(r"\(.*\)$", primaryDfnText):
+                die("Function/methods must end with a () arglist in their linking text. Got '{0}'.", primaryDfnText, el=el)
+                continue
+            if not re.match(r"^[\w\[\]-]+\(", primaryDfnText):
+                die("Function/method names can only contain alphanums, underscores, dashes, or []. Got '{0}'.", primaryDfnText, el=el)
                 continue
             elif el.get('data-lt') is None:
                 if dfnType == "function":
