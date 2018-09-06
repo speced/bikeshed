@@ -240,7 +240,7 @@ def processSpecrefBiblioFile(text, storage, order):
 
     <alias>: {
         *aliasOf: <id>,
-        *id: <id>
+        id: <id>
     }
 
     <legacyRef>: <string>
