@@ -301,6 +301,8 @@ class MetadataManager:
 
 
 def parseDate(key, val, lineNum):
+    if val == "now":
+        return datetime.utcnow().date()
     try:
         return datetime.strptime(val, "%Y-%m-%d").date()
     except:
