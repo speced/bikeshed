@@ -476,7 +476,7 @@ def dedupBiblioReferences(doc):
     upgradeUrls = dupedUrls & informSpecRefUrls & normShepherdUrls
     upgradeRefs = {}
     for key,ref in doc.informativeRefs.items():
-        if ref.url in upgradeUrls:
+        if ref.url in upgradeUrls and not isShepherdRef(ref):
             upgradeRefs[ref.url] = ref
             doc.informativeRefs.pop(key)
 
