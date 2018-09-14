@@ -465,28 +465,34 @@ class ReferenceManager(object):
             if key in self.biblios:
                 candidates = self.biblios[key]
                 break
-            # Otherwise, see if the ref is to a spec I know about thru Shepherd data.
-            if key in self.specs:
-                spec = self.specs[key]
-                # It matched, so it's a real spec.
-                # Did it fail just because SpecRef only has the *un*versioned shortname?
-                if key != spec['shortname']:
-                    if spec['shortname'] in self.biblioNumericSuffixes:
-                        # This shortname has some numeric-suffixed versions,
-                        # but they're not what you asked for!
-                        # That means we shouldn't try to self-correct.
-                        if not quiet:
-                            numericSuffixes = self.biblioNumericSuffixes[spec['shortname']]
-                            die("A biblio link references {0}, but only {1} exists.", text, config.englishFromList(numericSuffixes))
-                    else:
-                        ref = self.getBiblioRef(spec['shortname'], status, el=el, quiet=True)
-                        if ref:
-                            return ref
-                # No, so just generate the ref from the specref data if allowed.
-                if generateFakeRef:
-                    return biblio.SpecBasedBiblioEntry(spec, preferredURL=status)
+
+            # Did it fail because SpecRef *only* has the *un*versioned name?
+            # Aka you said [[foo-1]], but SpecRef only has [[foo]].
+            # "Only" is important - if there are versioned names that just don't match what you gave,
+            # then I shouldn't autofix;
+            # if you say [[foo-2]], and [[foo]] and [[foo-1]] exist,
+            # then [[foo-2]] is just an error.
+            match = re.match(r"(.+)-\d+$", key)
+            failFromWrongSuffix = False
+            if match and match.group(1) in self.biblios:
+                unversionedKey = match.group(1)
+                if unversionedKey in self.biblioNumericSuffixes:
+                    # Nope, there are more numeric-suffixed versions,
+                    # just not the one you asked for
+                    failFromWrongSuffix = True
                 else:
-                    return None
+                    # Load up the unversioned url!
+                    candidates = self.biblios[unversionedKey]
+                    break
+
+            # Did it fail because I only know about the spec from Shepherd?
+            if key in self.specs and generateFakeRef:
+                spec = self.specs[key]
+                return biblio.SpecBasedBiblioEntry(spec, preferredURL=status)
+
+            if failFromWrongSuffix and not quiet:
+                numericSuffixes = self.biblioNumericSuffixes[unversionedKey]
+                die("A biblio link references {0}, but only {1} exists in SpecRef.", text, config.englishFromList(numericSuffixes))
             return None
 
         candidate = stripLineBreaks(sorted(candidates, key=itemgetter('order'))[0])
