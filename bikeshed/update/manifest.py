@@ -112,13 +112,15 @@ def updateByManifest(path, dryRun=False):
     for filePath,hash in newFiles.items():
         if hash != oldFiles.get(filePath):
             newPaths.append(filePath)
-    deletedPaths = []
-    for filePath in oldFiles.keys():
-        if filePath not in newFiles:
-            os.remove(localizePath(path, filePath))
-            deletedPaths.append(filePath)
-    if deletedPaths:
-        print "Deleted {0} old data files.".format(len(deletedPaths))
+
+    if not dryRun:
+        deletedPaths = []
+        for filePath in oldFiles.keys():
+            if filePath not in newFiles:
+                os.remove(localizePath(path, filePath))
+                deletedPaths.append(filePath)
+        if deletedPaths:
+            print "Deleted {0} old data files.".format(len(deletedPaths))
 
     if not dryRun:
         import time
