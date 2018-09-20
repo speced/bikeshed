@@ -38,7 +38,6 @@ def createManifest(path, dryRun=False):
 knownFiles = [
     "fors.json",
     "specs.json",
-    "caniuse.json",
     "methods.json",
     "wpt-tests.txt",
     "languages.json",
@@ -49,7 +48,8 @@ knownFiles = [
 knownFolders = [
     "anchors",
     "biblio",
-    "headings"
+    "headings",
+    "caniuse"
 ]
 
 
@@ -136,6 +136,9 @@ def updateByManifest(path, dryRun=False):
                 warn("Couldn't download file '{0}'.\n{1}", remotePath, e)
                 return False
             try:
+                dirPath = os.path.dirname(localPath)
+                if not os.path.exists(dirPath):
+                    os.makedirs(dirPath)
                 with io.open(localPath, 'w', encoding="utf-8") as fh:
                     fh.write(newFile)
             except Exception,e:
