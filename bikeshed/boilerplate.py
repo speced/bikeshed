@@ -17,7 +17,11 @@ def addBikeshedVersion(doc):
     # Adds a <meta> containing the current Bikeshed semver.
     if "generator" not in doc.md.boilerplate:
         return
-    bikeshedVersion = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=config.scriptPath()).rstrip()
+    try:
+        bikeshedVersion = subprocess.check_output("git rev-parse HEAD", cwd=config.scriptPath(), shell=True).rstrip()
+    except Exception, e:
+        warn("Couldn't discover the current Bikeshed version. Please report this error:\n{0}", e)
+        return
     appendChild(doc.head,
                 E.meta({"name": "generator", "content": "Bikeshed version {0}".format(bikeshedVersion)}))
 
