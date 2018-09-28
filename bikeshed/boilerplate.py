@@ -51,12 +51,12 @@ def addSpecVersion(doc):
     try:
         # Check for a Git repo
         with open(os.devnull, "wb") as fnull:
-            revision = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=fnull).strip()
+            revision = subprocess.check_output("git rev-parse HEAD", stderr=fnull, shell=True).strip()
     except subprocess.CalledProcessError:
         try:
             # Check for an Hg repo
             with open(os.devnull, "wb") as fnull:
-                revision = subprocess.check_output(["hg", "parent", "--temp='{node}'"], stderr=fnull).strip()
+                revision = subprocess.check_output("hg parent --temp='{node}'", stderr=fnull, shell=True).strip()
         except:
             pass
     os.chdir(old_dir)
