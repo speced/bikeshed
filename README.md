@@ -8,8 +8,10 @@ turning a source document
 (containing only the actual spec content, plus several shorthands for linking to terms and other things)
 into a final spec document,
 with appropriate boilerplate, bibliography, indexes, etc all filled in.
-It's currently used on nearly all specs in the CSSWG,
-as well as various specs in the FXTF, SVGWG, WebAppSecurity, WHATWG, and elsewhere!
+It's used on specs for CSS and many other W3C working groups,
+WHATWG,
+the C++ standards committee,
+and elsewhere!
 
 [![Build Status](https://travis-ci.org/tabatkins/bikeshed.svg?branch=master)](https://travis-ci.org/tabatkins/bikeshed)
 [![Gitter](https://img.shields.io/badge/Gitter-Join%20Chat%20↣-blue.svg)](https://gitter.im/tabatkins/bikeshed?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
