@@ -13,6 +13,7 @@ from functools import partial
 
 from . import attr
 from . import config
+from . import datablocks
 from . import markdown
 from .DefaultOrderedDict import DefaultOrderedDict
 from .htmlhelpers import *
@@ -252,8 +253,9 @@ class MetadataManager:
         if self.TR:
             macros["latest"] = self.TR
         if self.abstract:
-            macros["abstract"] = "\n".join(markdown.parse(self.abstract, self.indent))
-            macros["abstractattr"] = escapeAttr("  ".join(self.abstract).replace("<<","<").replace(">>",">"))
+            abstractLines = datablocks.transformDataBlocks(doc, self.abstract)
+            macros["abstract"] = "\n".join(markdown.parse(abstractLines, self.indent))
+            macros["abstractattr"] = escapeAttr("  ".join(abstractLines).replace("<<","<").replace(">>",">"))
         elif self.noAbstract:
             macros["abstract"] = ""
             macros["abstractattr"] = ""
