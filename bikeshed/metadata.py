@@ -117,7 +117,10 @@ class MetadataManager:
     def addData(self, key, val, lineNum=None):
         key = key.strip()
         if isinstance(val, basestring):
-            val = val.strip()
+            if key in ["Abstract"]:
+                val = val.strip("\n")
+            else:
+                val = val.strip()
 
         if key.startswith("!"):
             key = key[1:]
@@ -748,7 +751,7 @@ def parse(lines):
         elif inMetadata:
             if lastKey and (line.text.strip() == "" or re.match(r"\s+", line.text)):
                 # empty lines, or lines that start with 1+ spaces, continue previous key
-                md.addData(lastKey, line.text.lstrip(), lineNum=line.i)
+                md.addData(lastKey, line.text, lineNum=line.i)
             elif re.match(r"([^:]+):\s*(.*)", line.text):
                 match = re.match(r"([^:]+):\s*(.*)", line.text)
                 md.addData(match.group(1), match.group(2), lineNum=line.i)
