@@ -673,7 +673,7 @@ def parseAudience(key, val, lineNum):
         return ["all"]
     elif len(values) >= 1:
         ret = []
-        validAudiences = set(["CWG", "LWG", "EWG", "LEWG"])
+        validAudiences = set(["CWG", "LWG", "EWG", "LEWG", "DIRECTION"])
         for v in values:
             if v in validAudiences:
                 ret.append(v)
