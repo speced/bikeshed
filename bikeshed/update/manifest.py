@@ -116,7 +116,7 @@ def updateByManifest(path, dryRun=False):
     if not dryRun:
         deletedPaths = []
         for filePath in oldFiles.keys():
-            if filePath not in newFiles:
+            if filePath not in newFiles and os.path.exists(localizePath(path, filePath):
                 os.remove(localizePath(path, filePath))
                 deletedPaths.append(filePath)
         if deletedPaths:
