@@ -1,0 +1,1075 @@
+<pre class='metadata'>
+Title: Web Speech API
+Level:
+Status: CG-DRAFT
+Status Text: All feedback is welcome: public-speech-api@w3.org (<a href="https://lists.w3.org/Archives/Public/public-speech-api/">Public archive</a>).
+Group: SACG
+URL: https://w3c.github.io/speech-api/
+Repository: w3c/speech-api
+Shortname: speech-api
+Editor: Glen Shires (Google)
+Editor: Philip Jägenstedt (Google)
+Former Editor: Hans Wennborg (Google)
+!Tests: <a href=https://github.com/web-platform-tests/wpt/tree/master/speech-api>web-platform-tests speech-api/</a> (<a href=https://github.com/web-platform-tests/wpt/labels/speech-api>ongoing work</a>)
+Abstract: This specification defines a JavaScript API to enable web developers to incorporate speech recognition and synthesis into their web pages.
+Abstract: It enables developers to use scripting to generate text-to-speech output and to use speech recognition as an input for forms, continuous dictation and control.
+Abstract: The JavaScript API allows web pages to control activation and timing and to handle results and alternatives.
+</pre>
+
+<pre class=biblio>
+{
+  "HTMLSPEECH": {
+    "authors": [
+      "Michael Bodell",
+      "Björn Bringert",
+      "Robert Brown",
+      "Daniel C. Burnett",
+      "Deborah Dahl",
+      "Dan Druta",
+      "Patrick Ehlen",
+      "Charles Hemphill",
+      "Michael Johnston",
+      "Olli Pettay",
+      "Satish Sampath",
+      "Marc Schröder",
+      "Glen Shires",
+      "Raj Tumuluri",
+      "Milan Young"
+    ],
+    "href": "https://www.w3.org/2005/Incubator/htmlspeech/XGR-htmlspeech-20111206/",
+    "title": "HTML Speech Incubator Group Final Report"
+  }
+}
+</pre>
+
+<h2 id=introduction>Introduction</h2>
+
+<p><em>This section is non-normative.</em></p>
+
+<p>The Web Speech API aims to enable web developers to provide, in a web browser, speech-input and text-to-speech output features that are typically not available when using standard speech-recognition or screen-reader software.
+The API itself is agnostic of the underlying speech recognition and synthesis implementation and can support both server-based and client-based/embedded recognition and synthesis.
+The API is designed to enable both brief (one-shot) speech input and continuous speech input.
+Speech recognition results are provided to the web page as a list of hypotheses, along with other relevant information for each hypothesis.</p>
+
+<p>This specification is a subset of the API defined in the [[HTMLSPEECH|HTML Speech Incubator Group Final Report]].
+That report is entirely informative since it is not a standards track document.
+All portions of that report may be considered informative with regards to this document, and provide an informative background to this document.
+This specification is a fully-functional subset of that report.
+Specifically, this subset excludes the underlying transport protocol, the proposed additions to HTML markup, and it defines a simplified subset of the JavaScript API.
+This subset supports the majority of use-cases and sample code in the Incubator Group Final Report.
+This subset does not preclude future standardization of additions to the markup, API or underlying transport protocols, and indeed the Incubator Report defines a potential roadmap for such future work.</p>
+
+
+<h2 id=use_cases>Use Cases</h2>
+
+<p><em>This section is non-normative.</em></p>
+
+<p>This specification supports the following use cases, as defined in [[HTMLSPEECH#use-cases|Section 4 of the Incubator Report]].</p>
+
+<ul>
+  <li>Voice Web Search</li>
+  <li>Speech Command Interface</li>
+  <li>Domain Specific Grammars Contingent on Earlier Inputs</li>
+  <li>Continuous Recognition of Open Dialog</li>
+  <li>Domain Specific Grammars Filling Multiple Input Fields</li>
+  <li>Speech UI present when no visible UI need be present</li>
+  <li>Voice Activity Detection</li>
+  <li>Temporal Structure of Synthesis to Provide Visual Feedback</li>
+  <li>Hello World</li>
+  <li>Speech Translation</li>
+  <li>Speech Enabled Email Client</li>
+  <li>Dialog Systems</li>
+  <li>Multimodal Interaction</li>
+  <li>Speech Driving Directions</li>
+  <li>Multimodal Video Game</li>
+  <li>Multimodal Search</li>
+</ul>
+
+<p>To keep the API to a minimum, this specification does not directly support the following use case.
+This does not preclude adding support for this as a future API enhancement, and indeed the Incubator report provides a roadmap for doing so.</p>
+
+<ul>
+  <li>Rerecognition</li>
+</ul>
+
+<p>Note that for many usages and implementations, it is possible to avoid the need for Rerecognition by using a larger grammar, or by combining multiple grammars &mdash; both of these techniques are supported in this specification.</p>
+
+<h2 id=security>Security and privacy considerations</h2>
+
+<ol>
+  <li>User agents must only start speech input sessions with explicit, informed user consent.
+  User consent can include, for example:
+  <ul>
+    <li>User click on a visible speech input element which has an obvious graphical representation showing that it will start speech input.</li>
+    <li>Accepting a permission prompt shown as the result of a call to <code>SpeechRecognition.start</code>.</li>
+    <li>Consent previously granted to always allow speech input for this web page.</li>
+  </ul>
+  </li>
+
+  <li>User agents must give the user an obvious indication when audio is being recorded.
+  <ul>
+    <li>In a graphical user agent, this could be a mandatory notification displayed by the user agent as part of its chrome and not accessible by the web page.
+    This could for example be a pulsating/blinking record icon as part of the browser chrome/address bar, an indication in the status bar, an audible notification, or anything else relevant and accessible to the user.
+    This UI element must also allow the user to stop recording.<br>
+    <img src="ui-example.png" alt="Example UI recording notification."></li>
+
+    <li>In a speech-only user agent, the indication may for example take the form of the system speaking the label of the speech input element, followed by a short beep.</li>
+  </ul>
+  </li>
+
+  <li>The user agent may also give the user a longer explanation the first time speech input is used, to let the user know what it is and how they can tune their privacy settings to disable speech recording if required.</li>
+</ol>
+
+<h3 id="implementation-considerations">Implementation considerations</h3>
+
+<p><em>This section is non-normative.</em></p>
+
+<ol>
+  <li>Spoken password inputs can be problematic from a security perspective, but it is up to the user to decide if they want to speak their password.</li>
+
+  <li>Speech input could potentially be used to eavesdrop on users.
+  Malicious webpages could use tricks such as hiding the input element or otherwise making the user believe that it has stopped recording speech while continuing to do so.
+  They could also potentially style the input element to appear as something else and trick the user into clicking them.
+  An example of styling the file input element can be seen at <a href="https://www.quirksmode.org/dom/inputfile.html">https://www.quirksmode.org/dom/inputfile.html</a>.
+  The above recommendations are intended to reduce this risk of such attacks.</li>
+</ol>
+
+<h2 id="api_description">API Description</h2>
+
+<p><em>This section is normative.</em></p>
+
+<h3 id="speechreco-section">The SpeechRecognition Interface</h3>
+
+<p>The speech recognition interface is the scripted web API for controlling a given recognition.</p>
+The term "final result" indicates a SpeechRecognitionResult in which the final attribute is true.
+The term "interim result" indicates a SpeechRecognitionResult in which the final attribute is false.
+
+<pre class="idl">
+[Exposed=Window, Constructor]
+interface SpeechRecognition : EventTarget {
+    // recognition parameters
+    attribute SpeechGrammarList grammars;
+    attribute DOMString lang;
+    attribute boolean continuous;
+    attribute boolean interimResults;
+    attribute unsigned long maxAlternatives;
+    attribute DOMString serviceURI;
+
+    // methods to drive the speech interaction
+    void start();
+    void stop();
+    void abort();
+
+    // event methods
+    attribute EventHandler onaudiostart;
+    attribute EventHandler onsoundstart;
+    attribute EventHandler onspeechstart;
+    attribute EventHandler onspeechend;
+    attribute EventHandler onsoundend;
+    attribute EventHandler onaudioend;
+    attribute EventHandler onresult;
+    attribute EventHandler onnomatch;
+    attribute EventHandler onerror;
+    attribute EventHandler onstart;
+    attribute EventHandler onend;
+};
+
+enum SpeechRecognitionErrorCode {
+    "no-speech",
+    "aborted",
+    "audio-capture",
+    "network",
+    "not-allowed",
+    "service-not-allowed",
+    "bad-grammar",
+    "language-not-supported"
+};
+
+[Exposed=Window,
+ Constructor(DOMString type, SpeechRecognitionErrorEventInit eventInitDict)]
+interface SpeechRecognitionErrorEvent : Event {
+    readonly attribute SpeechRecognitionErrorCode error;
+    readonly attribute DOMString message;
+};
+
+dictionary SpeechRecognitionErrorEventInit : EventInit {
+    required SpeechRecognitionErrorCode error;
+    DOMString message = "";
+};
+
+// Item in N-best list
+[Exposed=Window]
+interface SpeechRecognitionAlternative {
+    readonly attribute DOMString transcript;
+    readonly attribute float confidence;
+};
+
+// A complete one-shot simple response
+[Exposed=Window]
+interface SpeechRecognitionResult {
+    readonly attribute unsigned long length;
+    getter SpeechRecognitionAlternative item(unsigned long index);
+    readonly attribute boolean isFinal;
+};
+
+// A collection of responses (used in continuous mode)
+[Exposed=Window]
+interface SpeechRecognitionResultList {
+    readonly attribute unsigned long length;
+    getter SpeechRecognitionResult item(unsigned long index);
+};
+
+// A full response, which could be interim or final, part of a continuous response or not
+[Exposed=Window,
+ Constructor(DOMString type, SpeechRecognitionEventInit eventInitDict)]
+interface SpeechRecognitionEvent : Event {
+    readonly attribute unsigned long resultIndex;
+    readonly attribute SpeechRecognitionResultList results;
+    readonly attribute any interpretation;
+    readonly attribute Document? emma;
+};
+
+dictionary SpeechRecognitionEventInit : EventInit {
+    unsigned long resultIndex = 0;
+    required SpeechRecognitionResultList results;
+    any interpretation = null;
+    Document? emma = null;
+};
+
+// The object representing a speech grammar
+[Exposed=Window, Constructor]
+interface SpeechGrammar {
+    attribute DOMString src;
+    attribute float weight;
+};
+
+// The object representing a speech grammar collection
+[Exposed=Window, Constructor]
+interface SpeechGrammarList {
+    readonly attribute unsigned long length;
+    getter SpeechGrammar item(unsigned long index);
+    void addFromURI(DOMString src,
+                    optional float weight);
+    void addFromString(DOMString string,
+                    optional float weight);
+};
+</pre>
+
+
+<h4 id="speechreco-attributes">SpeechRecognition Attributes</h4>
+
+<dl>
+  <dt><dfn attribute for=SpeechRecognition>grammars</dfn> attribute</dt>
+  <dd>The grammars attribute stores the collection of SpeechGrammar objects which represent the grammars that are active for this recognition.</dd>
+
+  <dt><dfn attribute for=SpeechRecognition>lang</dfn> attribute</dt>
+  <dd>This attribute will set the language of the recognition for the request, using a valid BCP 47 language tag. [[!BCP47]]
+  If unset it remains unset for getting in script, but will default to use the <a spec=html>language</a> of the html document root element and associated hierarchy.
+  This default value is computed and used when the input request opens a connection to the recognition service.</dd>
+
+  <dt><dfn attribute for=SpeechRecognition>continuous</dfn> attribute</dt>
+  <dd>When the continuous attribute is set to false, the user agent must return no more than one final result in response to starting recognition,
+  for example a single turn pattern of interaction.
+  When the continuous attribute is set to true, the user agent must return zero or more final results representing multiple consecutive recognitions in response to starting recognition,
+  for example a dictation.
+  The default value must be false.  Note, this attribute setting does not affect interim results.</dd>
+
+  <dt><dfn attribute for=SpeechRecognition>interimResults</dfn> attribute</dt>
+  <dd>Controls whether interim results are returned.
+  When set to true, interim results should be returned.
+  When set to false, interim results must not be returned.
+  The default value must be false. Note, this attribute setting does not affect final results.</dd>
+
+  <dt><dfn attribute for=SpeechRecognition>maxAlternatives</dfn> attribute</dt>
+  <dd>This attribute will set the maximum number of {{SpeechRecognitionAlternative}}s per result.
+  The default value is 1.</dd>
+
+  <dt><dfn attribute for=SpeechRecognition>serviceURI</dfn> attribute</dt>
+  <dd>The serviceURI attribute specifies the location of the speech recognition service that the web application wishes to use.
+  If this attribute is unset at the time of the start method call, then the user agent must use the user agent default speech service.
+  Note that the serviceURI is a generic URI and can thus point to local services either through use of a URN with meaning to the user agent or by specifying a URL that the user agent recognizes as a local service.
+  Additionally, the user agent default can be local or remote and can incorporate end user choices via interfaces provided by the user agent such as browser configuration parameters.</dd>
+</dl>
+
+<p class=issue>The group has discussed whether WebRTC might be used to specify selection of audio sources and remote recognizers.
+See <a href="https://lists.w3.org/Archives/Public/public-speech-api/2012Sep/0072.html">Interacting with WebRTC, the Web Audio API and other external sources</a> thread on public-speech-api@w3.org.</p>
+
+<h4 id="speechreco-methods">SpeechRecognition Methods</h4>
+
+<dl>
+  <dt><dfn method for=SpeechRecognition>start()</dfn> method</dt>
+  <dd>When the start method is called it represents the moment in time the web application wishes to begin recognition.
+  When the speech input is streaming live through the input media stream, then this start call represents the moment in time that the service must begin to listen and try to match the grammars associated with this request.
+  Once the system is successfully listening to the recognition the user agent must raise a start event.
+  If the start method is called on an already started object (that is, start has previously been called, and no <a event for=SpeechRecognition>error</a> or <a event for=SpeechRecognition>end</a> event has fired on the object), the user agent must throw an "{{InvalidStateError!!exception}}" {{DOMException}} and ignore the call.</dd>
+
+  <dt><dfn method for=SpeechRecognition>stop()</dfn> method</dt>
+  <dd>The stop method represents an instruction to the recognition service to stop listening to more audio, and to try and return a result using just the audio that it has already received for this recognition.
+  A typical use of the stop method might be for a web application where the end user is doing the end pointing, similar to a walkie-talkie.
+  The end user might press and hold the space bar to talk to the system and on the space down press the start call would have occurred and when the space bar is released the stop method is called to ensure that the system is no longer listening to the user.
+  Once the stop method is called the speech service must not collect additional audio and must not continue to listen to the user.
+  The speech service must attempt to return a recognition result (or a nomatch) based on the audio that it has already collected for this recognition.
+  If the stop method is called on an object which is already stopped or being stopped (that is, start was never called on it, the <a event for=SpeechRecognition>end</a> or <a event for=SpeechRecognition>error</a> event has fired on it, or stop was previously called on it), the user agent must ignore the call.</dd>
+
+  <dt><dfn method for=SpeechRecognition>abort()</dfn> method</dt>
+  <dd>The abort method is a request to immediately stop listening and stop recognizing and do not return any information but that the system is done.
+  When the abort method is called, the speech service must stop recognizing.
+  The user agent must raise an <a event for=SpeechRecognition>end</a> event once the speech service is no longer connected.
+  If the abort method is called on an object which is already stopped or aborting (that is, start was never called on it, the <a event for=SpeechRecognition>end</a> or <a event for=SpeechRecognition>error</a> event has fired on it, or abort was previously called on it), the user agent must ignore the call.</dd>
+</dl>
+
+<h4 id="speechreco-events">SpeechRecognition Events</h4>
+
+<p>The DOM Level 2 Event Model is used for speech recognition events.
+The methods in the EventTarget interface should be used for registering event listeners.
+The SpeechRecognition interface also contains convenience attributes for registering a single event handler for each event type.
+The events do not bubble and are not cancelable.</p>
+
+<p>For all these events, the timeStamp attribute defined in the DOM Level 2 Event interface must be set to the best possible estimate of when the real-world event which the event object represents occurred.
+This timestamp must be represented in the user agent's view of time, even for events where the timestamps in question could be raised on a different machine like a remote recognition service (i.e., in a <a event for=SpeechRecognition>speechend</a> event with a remote speech endpointer).</p>
+
+<p>Unless specified below, the ordering of the different events is undefined.
+For example, some implementations may fire <a event for=SpeechRecognition>audioend</a> before <a event for=SpeechRecognition>speechstart</a> or <a event for=SpeechRecognition>speechend</a> if the audio detector is client-side and the speech detector is server-side.</p>
+
+<dl>
+  <dt><dfn event for=SpeechRecognition>audiostart</dfn> event</dt>
+  <dd>Fired when the user agent has started to capture audio.</dd>
+
+  <dt><dfn event for=SpeechRecognition>soundstart</dfn> event</dt>
+  <dd>Fired when some sound, possibly speech, has been detected.
+  This must be fired with low latency, e.g. by using a client-side energy detector.
+  The <a event for=SpeechRecognition>audiostart</a> event must always have been fired before the soundstart event.</dd>
+
+  <dt><dfn event for=SpeechRecognition>speechstart</dfn> event</dt>
+  <dd>Fired when the speech that will be used for speech recognition has started.
+  The <a event for=SpeechRecognition>audiostart</a> event must always have been fired before the speechstart event.</dd>
+
+  <dt><dfn event for=SpeechRecognition>speechend</dfn> event</dt>
+  <dd>Fired when the speech that will be used for speech recognition has ended.
+  The <a event for=SpeechRecognition>speechstart</a> event must always have been fired before speechend.</dd>
+
+  <dt><dfn event for=SpeechRecognition>soundend</dfn> event</dt>
+  <dd>Fired when some sound is no longer detected.
+  This must be fired with low latency, e.g. by using a client-side energy detector.
+  The <a event for=SpeechRecognition>soundstart</a> event must always have been fired before soundend.</dd>
+
+  <dt><dfn event for=SpeechRecognition>audioend</dfn> event</dt>
+  <dd>Fired when the user agent has finished capturing audio.
+  The <a event for=SpeechRecognition>audiostart</a> event must always have been fired before audioend.</dd>
+
+  <dt><dfn event for=SpeechRecognition>result</dfn> event</dt>
+  <dd>Fired when the speech recognizer returns a result.
+  The event must use the {{SpeechRecognitionEvent}} interface.
+  The <a event for=SpeechRecognition>audiostart</a> event must always have been fired before the result event.</dd>
+
+  <dt><dfn event for=SpeechRecognition>nomatch</dfn> event</dt>
+  <dd>Fired when the speech recognizer returns a final result with no recognition hypothesis that meet or exceed the confidence threshold.
+  The event must use the {{SpeechRecognitionEvent}} interface.
+  The {{SpeechRecognitionEvent/results}} attribute in the event may contain speech recognition results that are below the confidence threshold or may be null.
+  The {{audiostart}} event must always have been fired before the nomatch event.</dd>
+
+  <dt><dfn event for=SpeechRecognition>error</dfn> event</dt>
+  <dd>Fired when a speech recognition error occurs.
+  The event must use the {{SpeechRecognitionErrorEvent}} interface.</dd>
+
+  <dt><dfn event for=SpeechRecognition>start</dfn> event</dt>
+  <dd>Fired when the recognition service has begun to listen to the audio with the intention of recognizing.
+
+  </dd><dt><dfn event for=SpeechRecognition>end</dfn> event</dt>
+  <dd>Fired when the service has disconnected.
+  The event must always be generated when the session ends no matter the reason for the end.</dd>
+</dl>
+
+<h4 id="speechreco-error">SpeechRecognitionErrorEvent</h4>
+
+<p>The {{SpeechRecognitionErrorEvent}} interface is used for the <a event for=SpeechRecognition>error</a> event.</p>
+<dl>
+  <dt><dfn attribute for=SpeechRecognitionErrorEvent>error</dfn> attribute</dt>
+  <dd>The errorCode is an enumeration indicating what has gone wrong.
+  The values are:
+  <dl>
+    <dt><dfn enum-value for=SpeechRecognitionErrorCode>"no-speech"</code></dt>
+    <dd>No speech was detected.</dd>
+
+    <dt><dfn enum-value for=SpeechRecognitionErrorCode>"aborted"</dfn></dt>
+    <dd>Speech input was aborted somehow, maybe by some user-agent-specific behavior such as UI that lets the user cancel speech input.</dd>
+
+    <dt><dfn enum-value for=SpeechRecognitionErrorCode>"audio-capture"</dfn></dt>
+    <dd>Audio capture failed.</dd>
+
+    <dt><dfn enum-value for=SpeechRecognitionErrorCode>"network"</dfn></dt>
+    <dd>Some network communication that was required to complete the recognition failed.</dd>
+
+    <dt><dfn enum-value for=SpeechRecognitionErrorCode>"not-allowed"</dfn></dt>
+    <dd>The user agent is not allowing any speech input to occur for reasons of security, privacy or user preference.</dd>
+
+    <dt><dfn enum-value for=SpeechRecognitionErrorCode>"service-not-allowed"</dfn></dt>
+    <dd>The user agent is not allowing the web application requested speech service, but would allow some speech service, to be used either because the user agent doesn't support the selected one or because of reasons of security, privacy or user preference.</dd>
+
+    <dt><dfn enum-value for=SpeechRecognitionErrorCode>"bad-grammar"</dfn></dt>
+    <dd>There was an error in the speech recognition grammar or semantic tags, or the grammar format or semantic tag format is unsupported.</dd>
+
+    <dt><dfn enum-value for=SpeechRecognitionErrorCode>"language-not-supported"</dfn></dt>
+    <dd>The language was not supported.</dd>
+  </dl>
+  </dd>
+
+  <dt><dfn attribute for=SpeechRecognitionErrorEvent>message</dfn> attribute</dt>
+  <dd>The message content is implementation specific.
+  This attribute is primarily intended for debugging and developers should not use it directly in their application user interface.</dd>
+</dl>
+
+<h4 id="speechreco-alternative">SpeechRecognitionAlternative</h4>
+
+<p>The SpeechRecognitionAlternative represents a simple view of the response that gets used in a n-best list.
+
+<dl>
+  <dt><dfn attribute for=SpeechRecognitionAlternative>transcript</dfn> attribute</dt>
+  <dd>The transcript string represents the raw words that the user spoke.
+  For continuous recognition, leading or trailing whitespace MUST be included where necessary such that concatenation of consecutive SpeechRecognitionResults produces a proper transcript of the session.</dd>
+
+  <dt><dfn attribute for=SpeechRecognitionAlternative>confidence</dfn> attribute</dt>
+  <dd>The confidence represents a numeric estimate between 0 and 1 of how confident the recognition system is that the recognition is correct.
+  A higher number means the system is more confident.
+  <p class=issue>The group has discussed whether confidence can be specified in a speech-recognition-engine-independent manner and whether confidence threshold and nomatch should be included, because this is not a dialog API.
+  See <a href="https://lists.w3.org/Archives/Public/public-speech-api/2012Jun/0143.html">Confidence property</a> thread on public-speech-api@w3.org.</p></dd>
+</dl>
+
+<h4 id="speechreco-result">SpeechRecognitionResult</h4>
+
+<p>The SpeechRecognitionResult object represents a single one-shot recognition match, either as one small part of a continuous recognition or as the complete return result of a non-continuous recognition.</p>
+
+<dl>
+  <dt><dfn attribute for=SpeechRecognitionResult>length</dfn> attribute</dt>
+  <dd>The long attribute represents how many n-best alternatives are represented in the item array.</dd>
+
+  <dt><dfn method for=SpeechRecognitionResult>item(<var>index</var>)</dfn> getter</dt>
+  <dd>The item getter returns a SpeechRecognitionAlternative from the index into an array of n-best values.
+  If index is greater than or equal to length, this returns null.
+  The user agent must ensure that the length attribute is set to the number of elements in the array.
+  The user agent must ensure that the n-best list is sorted in non-increasing confidence order (each element must be less than or equal to the confidence of the preceding elements).</dd>
+
+  <dt><dfn attribute for=SpeechRecognitionResult>isFinal</dfn> attribute</dt>
+  <dd>The final boolean must be set to true if this is the final time the speech service will return this particular index value.
+  If the value is false, then this represents an interim result that could still be changed.</dd>
+</dl>
+
+<h4 id="speechreco-resultlist">SpeechRecognitionResultList</h4>
+
+<p>The SpeechRecognitionResultList object holds a sequence of recognition results representing the complete return result of a continuous recognition.
+For a non-continuous recognition it will hold only a single value.</p>
+
+<dl>
+  <dt><dfn attribute for=SpeechRecognitionResultList>length</dfn> attribute</dt>
+  <dd>The length attribute indicates how many results are represented in the item array.</dd>
+
+  <dt><dfn method for=SpeechRecognitionResultList>item(<var>index</var>)</dfn> getter</dt>
+  <dd>The item getter returns a SpeechRecognitionResult from the index into an array of result values.
+  If index is greater than or equal to length, this returns null.
+  The user agent must ensure that the length attribute is set to the number of elements in the array.</dd>
+</dl>
+
+<h4 id="speechreco-event">SpeechRecognitionEvent</h4>
+
+<p>The SpeechRecognitionEvent is the event that is raised each time there are any changes to interim or final results.</p>
+
+<dl>
+  <dt><dfn attribute for=SpeechRecognitionEvent>resultIndex</dfn> attribute</dt>
+  <dd>The resultIndex must be set to the lowest index in the "results" array that has changed.</dd>
+
+  <dt><dfn attribute for=SpeechRecognitionEvent>results</dfn> attribute</dt>
+  <dd>The array of all current recognition results for this session.
+  Specifically all final results that have been returned, followed by the current best hypothesis for all interim results.
+  It must consist of zero or more final results followed by zero or more interim results.
+  On subsequent SpeechRecognitionResultEvent events, interim results may be overwritten by a newer interim result or by a final result or may be removed (when at the end of the "results" array and the array length decreases).
+  Final results must not be overwritten or removed.
+  All entries for indexes less than resultIndex must be identical to the array that was present when the last SpeechRecognitionResultEvent was raised.
+  All array entries (if any) for indexes equal or greater than resultIndex that were present in the array when the last SpeechRecognitionResultEvent was raised are removed and overwritten with new results.
+  The length of the "results" array may increase or decrease, but must not be less than resultIndex.
+  Note that when resultIndex equals results.length, no new results are returned, this may occur when the array length decreases to remove one or more interim results.</dd>
+
+  <dt><dfn attribute for=SpeechRecognitionEvent>interpretation</dfn> attribute</dt>
+  <dd>The interpretation represents the semantic meaning from what the user said.
+  This might be determined, for instance, through the SISR specification of semantics in a grammar.
+  <p class=issue>The group has discussed options for the value of the interpretation attribute when no interpretation has been returned by the recognizer.
+  Current options are null or a copy of the transcript.
+  See <a href="https://lists.w3.org/Archives/Public/public-speech-api/2012Sep/0044.html">SpeechRecognitionAlternative.interpretation when interpretation can't be provided</a> thread on public-speech-api@w3.org.</p></dd>
+
+  <dt><dfn attribute for=SpeechRecognitionEvent>emma</dfn> attribute</dt>
+  <dd>EMMA 1.0 representation of this result. [[!EMMA]]
+  The contents of this result could vary across user agents and recognition engines, but all implementations must expose a valid XML document complete with EMMA namespace,
+  or if the recognizer does not supply EMMA then the user agent may return null.
+  User agent implementations for recognizers that supply EMMA must contain all annotations and content generated by the recognition resources utilized for recognition, except where infeasible due to conflicting attributes.
+  The user agent may add additional annotations to provide a richer result for the developer.</dd>
+</dl>
+
+<h4 id="speechreco-speechgrammar">SpeechGrammar</h4>
+
+<p>The SpeechGrammar object represents a container for a grammar.</p>
+<p class=issue>The group has discussed options for which grammar formats should be supported, how builtin grammar types are specified, and default grammars when not specified.
+See <a href="https://lists.w3.org/Archives/Public/public-speech-api/2012Jun/0179.html">Default value of SpeechRecognition.grammars</a> thread on public-speech-api@w3.org.</p>
+<p>This structure has the following attributes:</p>
+
+<dl>
+  <dt><dfn attribute for=SpeechGrammar>src</dfn> attribute</dt>
+  <dd>The required src attribute is the URI for the grammar.
+  Note some services may support builtin grammars that can be specified using a builtin URI scheme.</dd>
+
+  <dt><dfn attribute for=SpeechGrammar>weight</dfn> attribute</dt>
+  <dd>The optional weight attribute controls the weight that the speech recognition service should use with this grammar.
+  By default, a grammar has a weight of 1.
+  Larger weight values positively weight the grammar while smaller weight values make the grammar weighted less strongly.</dd>
+</dl>
+
+<h4 id="speechreco-speechgrammarlist">SpeechGrammarList</h4>
+
+<p>The SpeechGrammarList object represents a collection of SpeechGrammar objects.
+This structure has the following attributes:</p>
+
+<dl>
+  <dt><dfn attribute for=SpeechGrammarList>length</dfn> attribute</dt>
+  <dd>The length attribute represents how many grammars are currently in the array.</dd>
+
+  <dt><dfn method for=SpeechGrammarList>item(<var>index</var>)</dfn> getter</dt>
+  <dd>The item getter returns a SpeechGrammar from the index into an array of grammars.
+  The user agent must ensure that the length attribute is set to the number of elements in the array.
+  The user agent must ensure that the index order from smallest to largest matches the order in which grammars were added to the array.</dd>
+
+  <dt><dfn method for=SpeechGrammarList>addFromURI(<var>src</var>, <var>weight</var>)</dfn> method</dt>
+  <dd>This method appends a grammar to the grammars array parameter based on URI.
+  The URI for the grammar is specified by the <var>src</var> parameter, which represents the URI for the grammar.
+  Note, some services may support builtin grammars that can be specified by URI.
+  If the <var>weight</var> parameter is present it represents this grammar's weight relative to the other grammar.
+  If the weight parameter is not present, the default value of 1.0 is used.</dd>
+
+  <dt><dfn method for=SpeechGrammarList>addFromString(<var>string</var>, <var>weight</var>)</dfn> method</dt>
+  <dd>This method appends a grammar to the grammars array parameter based on text.
+  The content of the grammar is specified by the <var>string</var> parameter.
+  This content should be encoded into a data: URI when the SpeechGrammar object is created.
+  If the <var>weight</var> parameter is present it represents this grammar's weight relative to the other grammar.
+  If the weight parameter is not present, the default value of 1.0 is used.</dd>
+</dl>
+
+<h3 id="tts-section">The SpeechSynthesis Interface</h3>
+
+<p>The SpeechSynthesis interface is the scripted web API for controlling a text-to-speech output.</p>
+
+<pre class="idl">
+[Exposed=Window]
+interface SpeechSynthesis : EventTarget {
+    readonly attribute boolean pending;
+    readonly attribute boolean speaking;
+    readonly attribute boolean paused;
+
+    attribute EventHandler onvoiceschanged;
+
+    void speak(SpeechSynthesisUtterance utterance);
+    void cancel();
+    void pause();
+    void resume();
+    sequence&lt;SpeechSynthesisVoice> getVoices();
+};
+
+partial interface Window {
+    [SameObject] readonly attribute SpeechSynthesis speechSynthesis;
+};
+
+[Exposed=Window,
+  Constructor(optional DOMString text)]
+interface SpeechSynthesisUtterance : EventTarget {
+    attribute DOMString text;
+    attribute DOMString lang;
+    attribute SpeechSynthesisVoice? voice;
+    attribute float volume;
+    attribute float rate;
+    attribute float pitch;
+
+    attribute EventHandler onstart;
+    attribute EventHandler onend;
+    attribute EventHandler onerror;
+    attribute EventHandler onpause;
+    attribute EventHandler onresume;
+    attribute EventHandler onmark;
+    attribute EventHandler onboundary;
+};
+
+[Exposed=Window,
+ Constructor(DOMString type, SpeechSynthesisEventInit eventInitDict)]
+interface SpeechSynthesisEvent : Event {
+    readonly attribute SpeechSynthesisUtterance utterance;
+    readonly attribute unsigned long charIndex;
+    readonly attribute float elapsedTime;
+    readonly attribute DOMString name;
+};
+
+dictionary SpeechSynthesisEventInit : EventInit {
+    required SpeechSynthesisUtterance utterance;
+    unsigned long charIndex = 0;
+    float elapsedTime = 0;
+    DOMString name = "";
+};
+
+enum SpeechSynthesisErrorCode {
+    "canceled",
+    "interrupted",
+    "audio-busy",
+    "audio-hardware",
+    "network",
+    "synthesis-unavailable",
+    "synthesis-failed",
+    "language-unavailable",
+    "voice-unavailable",
+    "text-too-long",
+    "invalid-argument",
+    "not-allowed",
+};
+
+[Exposed=Window,
+ Constructor(DOMString type, SpeechSynthesisErrorEventInit eventInitDict)]
+interface SpeechSynthesisErrorEvent : SpeechSynthesisEvent {
+    readonly attribute SpeechSynthesisErrorCode error;
+};
+
+dictionary SpeechSynthesisErrorEventInit : SpeechSynthesisEventInit {
+    required SpeechSynthesisErrorCode error;
+};
+
+[Exposed=Window]
+interface SpeechSynthesisVoice {
+    readonly attribute DOMString voiceURI;
+    readonly attribute DOMString name;
+    readonly attribute DOMString lang;
+    readonly attribute boolean localService;
+    readonly attribute boolean default;
+};
+</pre>
+
+<h4 id="tts-attributes">SpeechSynthesis Attributes</h4>
+
+<dl>
+  <dt><dfn attribute for=SpeechSynthesis>pending</dfn> attribute</dt>
+  <dd>This attribute is true if the queue for the global SpeechSynthesis instance contains any utterances which have not started speaking.</dd>
+
+  <dt><dfn attribute for=SpeechSynthesis>speaking</dfn> attribute</dt>
+  <dd>This attribute is true if an utterance is being spoken.
+  Specifically if an utterance has begun being spoken and has not completed being spoken.
+  This is independent of whether the global SpeechSynthesis instance is in the paused state.</dd>
+
+  <dt><dfn attribute for=SpeechSynthesis>paused</dfn> attribute</dt>
+  <dd>This attribute is true when the global SpeechSynthesis instance is in the paused state.
+  This state is independent of whether anything is in the queue.
+  The default state of a the global SpeechSynthesis instance for a new window is the non-paused state.</dd>
+</dl>
+
+<h4 id="tts-methods">SpeechSynthesis Methods</h4>
+
+<dl>
+  <dt><dfn method for=SpeechSynthesis>speak(<var>utterance</var>)</dfn> method</dt>
+  <dd>This method appends the SpeechSynthesisUtterance object <var>utterance</var> to the end of the queue for the global SpeechSynthesis instance.
+  It does not change the paused state of the SpeechSynthesis instance.
+  If the SpeechSynthesis instance is paused, it remains paused.
+  If it is not paused and no other utterances are in the queue, then this utterance is spoken immediately,
+  else this utterance is queued to begin speaking after the other utterances in the queue have been spoken.
+  If changes are made to the SpeechSynthesisUtterance object after calling this method and prior to the corresponding <a event for=SpeechSynthesisUtterance>end</a> or <a event for=SpeechSynthesisUtterance>error</a> event,
+  it is not defined whether those changes will affect what is spoken, and those changes may cause an error to be returned.
+  The SpeechSynthesis object takes exclusive ownership of the SpeechSynthesisUtterance object.
+  Passing it as a speak() argument to another SpeechSynthesis object should throw an exception.
+  (For example, two frames may have the same origin and each will contain a SpeechSynthesis object.)</dd>
+
+  <dt><dfn method for=SpeechSynthesis>cancel()</dfn> method</dt>
+  <dd>This method removes all utterances from the queue.
+  If an utterance is being spoken, speaking ceases immediately.
+  This method does not change the paused state of the global SpeechSynthesis instance.</dd>
+
+  <dt><dfn method for=SpeechSynthesis>pause()</dfn> method</dt>
+  <dd>This method puts the global SpeechSynthesis instance into the paused state.
+  If an utterance was being spoken, it pauses mid-utterance.
+  (If called when the SpeechSynthesis instance was already in the paused state, it does nothing.)</dd>
+
+  <dt><dfn method for=SpeechSynthesis>resume()</dfn> method</dt>
+  <dd>This method puts the global SpeechSynthesis instance into the non-paused state.
+  If an utterance was speaking, it continues speaking the utterance at the point at which it was paused, else it begins speaking the next utterance in the queue (if any).
+  (If called when the SpeechSynthesis instance was already in the non-paused state, it does nothing.)</dd>
+
+  <dt><dfn method for=SpeechSynthesis>getVoices()</dfn> method</dt>
+  <dd>This method returns the available voices.
+  It is user agent dependent which voices are available.
+  If there are no voices available, or if the the list of available voices is not yet known (for example: server-side synthesis where the list is determined asynchronously),
+  then this method must return a SpeechSynthesisVoiceList of length zero.</dd>
+</dl>
+
+<h4 id="tts-events">SpeechSynthesis Events</h4>
+
+<dl>
+  <dt><dfn event for=SpeechSynthesis>voiceschanged</dfn> event</dt>
+  <dd>Fired when the contents of the SpeechSynthesisVoiceList, that the getVoices method will return, have changed.
+  Examples include: server-side synthesis where the list is determined asynchronously, or when client-side voices are installed/uninstalled.</dd>
+</dl>
+
+<h4 id="utterance-attributes">SpeechSynthesisUtterance Attributes</h4>
+
+<dl>
+  <dt><dfn attribute for=SpeechSynthesisUtterance>text</dfn> attribute</dt>
+  <dd>This attribute specifies the text to be synthesized and spoken for this utterance.
+  This may be either plain text or a complete, well-formed SSML document. [[!SSML]]
+  For speech synthesis engines that do not support SSML, or only support certain tags, the user agent or speech engine must strip away the tags they do not support and speak the text.
+  There may be a maximum length of the text, it may be limited to 32,767 characters.</dd>
+
+  <dt><dfn attribute for=SpeechSynthesisUtterance>lang</dfn> attribute</dt>
+  <dd>This attribute specifies the language of the speech synthesis for the utterance, using a valid BCP 47 language tag. [[!BCP47]]
+  If unset it remains unset for getting in script, but will default to use the <a spec=html>language</a> of the html document root element and associated hierarchy.
+  This default value is computed and used when the input request opens a connection to the recognition service.</dd>
+
+  <dt><dfn attribute for=SpeechSynthesisUtterance>voice</dfn> attribute</dt>
+  <dd>This attribute specifies the speech synthesis voice that the web application wishes to use.
+  When a {{SpeechSynthesisUtterance}} object is created this attribute must be initialized to null.
+  If, at the time of the {{speak()}} method call, this attribute has been set to one of the {{SpeechSynthesisVoice}} objects returned by {{getVoices()}}, then the user agent must use that voice.
+  If this attribute is unset or null at the time of the {{speak()}} method call, then the user agent must use a user agent default voice.
+  The user agent default voice should support the current language (see {{SpeechSynthesisUtterance/lang}}) and can be a local or remote speech service and can incorporate end user choices via interfaces provided by the user agent such as browser configuration parameters.
+  </dd>
+
+  <dt><dfn attribute for=SpeechSynthesisUtterance>volume</dfn> attribute</dt>
+  <dd>This attribute specifies the speaking volume for the utterance.
+  It ranges between 0 and 1 inclusive, with 0 being the lowest volume and 1 the highest volume, with a default of 1.
+  If SSML is used, this value will be overridden by prosody tags in the markup.</dd>
+
+  <dt><dfn attribute for=SpeechSynthesisUtterance>rate</dfn> attribute</dt>
+  <dd>This attribute specifies the speaking rate for the utterance.
+  It is relative to the default rate for this voice.
+  1 is the default rate supported by the speech synthesis engine or specific voice (which should correspond to a normal speaking rate).
+  2 is twice as fast, and 0.5 is half as fast.
+  Values below 0.1 or above 10 are strictly disallowed, but speech synthesis engines or specific voices may constrain the minimum and maximum rates further, for example, a particular voice may not actually speak faster than 3 times normal even if you specify a value larger than 3.
+  If SSML is used, this value will be overridden by prosody tags in the markup.</dd>
+
+  <dt><dfn attribute for=SpeechSynthesisUtterance>pitch</dfn> attribute</dt>
+  <dd>This attribute specifies the speaking pitch for the utterance.
+  It ranges between 0 and 2 inclusive, with 0 being the lowest pitch and 2 the highest pitch.
+  1 corresponds to the default pitch of the speech synthesis engine or specific voice.
+  Speech synthesis engines or voices may constrain the minimum and maximum rates further.
+  If SSML is used, this value will be overridden by prosody tags in the markup.</dd>
+</dl>
+
+<h4 id="utterance-events">SpeechSynthesisUtterance Events</h4>
+
+Each of these events must use the {{SpeechSynthesisEvent}} interface,
+except the error event which must use the {{SpeechSynthesisErrorEvent}} interface.
+These events bubble up to SpeechSynthesis.
+
+<dl>
+  <dt><dfn event for=SpeechSynthesisUtterance>start</dfn> event</dt>
+  <dd>Fired when this utterance has begun to be spoken.</dd>
+
+  <dt><dfn event for=SpeechSynthesisUtterance>end</dfn> event</dt>
+  <dd>Fired when this utterance has completed being spoken.
+  If this event fires, the <a event for=SpeechSynthesisUtterance>error</a> event must not be fired for this utterance.</dd>
+
+  <dt><dfn event for=SpeechSynthesisUtterance>error</dfn> event</dt>
+  <dd>Fired if there was an error that prevented successful speaking of this utterance.
+  If this event fires, the <a event for=SpeechSynthesisUtterance>end</a> event must not be fired for this utterance.</dd>
+
+  <dt><dfn event for=SpeechSynthesisUtterance>pause</dfn> event</dt>
+  <dd>Fired when and if this utterance is paused mid-utterance.</dd>
+
+  <dt><dfn event for=SpeechSynthesisUtterance>resume</dfn> event</dt>
+  <dd>Fired when and if this utterance is resumed after being paused mid-utterance.
+  Adding the utterance to the queue while the global SpeechSynthesis instance is in the paused state, and then calling the resume method
+  does not cause the resume event to be fired, in this case the utterance's <a event for=SpeechSynthesisUtterance>start</a> event will be called when the utterance starts.</dd>
+
+  <dt><dfn event for=SpeechSynthesisUtterance>mark</dfn> event</dt>
+  <dd>Fired when the spoken utterance reaches a named "mark" tag in SSML. [[!SSML]]
+  The user agent must fire this event if the speech synthesis engine provides the event.</dd>
+
+  <dt><dfn event for=SpeechSynthesisUtterance>boundary</dfn> event</dt>
+  <dd>Fired when the spoken utterance reaches a word or sentence boundary.
+  The user agent must fire this event if the speech synthesis engine provides the event.</dd>
+</dl>
+
+<h4 id="speechsynthesisevent-attributes">SpeechSynthesisEvent Attributes</h4>
+
+<dl>
+  <dt><dfn attribute for=SpeechSynthesisEvent>utterance</dfn> attribute</dt>
+  <dd>This attribute contains the SpeechSynthesisUtterance that triggered this event.</dd>
+
+  <dt><dfn attribute for=SpeechSynthesisEvent>charIndex</dfn> attribute</dt>
+  <dd>This attribute indicates the zero-based character index into the original utterance string that most closely approximates the current speaking position of the speech engine.
+  No guarantee is given as to where charIndex will be with respect to word boundaries (such as at the end of the previous word or the beginning of the next word), only that all text before charIndex has already been spoken, and all text after charIndex has not yet been spoken.
+  The user agent must return this value if the speech synthesis engine supports it, otherwise the user agent must return undefined.</dd>
+
+  <dt><dfn attribute for=SpeechSynthesisEvent>elapsedTime</dfn> attribute</dt>
+  <dd>This attribute indicates the time, in seconds, that this event triggered, relative to when this utterance has begun to be spoken.
+  The user agent must return this value if the speech synthesis engine supports it or the user agent can otherwise determine it, otherwise the user agent must return undefined.</dd>
+
+  <dt><dfn attribute for=SpeechSynthesisEvent>name</dfn> attribute</dt>
+  <dd>For <a event for=SpeechSynthesisUtterance>mark</a> events, this attribute indicates the name of the marker, as defined in SSML as the name attribute of a mark element. [[!SSML]]
+  For <a event for=SpeechSynthesisUtterance>boundary</a> events, this attribute indicates the type of boundary that caused the event: "word" or "sentence".
+  For all other events, this value should return undefined.</dd>
+</dl>
+
+<h4 id="speechsynthesiserrorevent-attributes">SpeechSynthesisErrorEvent Attributes</h4>
+
+<p>The SpeechSynthesisErrorEvent is the interface used for the SpeechSynthesisUtterance <a event for=SpeechSynthesisUtterance>error</a> event.</p>
+<dl>
+  <dt><dfn attribute for=SpeechSynthesisErrorEvent>error</dfn> attribute</dt>
+  <dd>The errorCode is an enumeration indicating what has gone wrong.
+  The values are:
+  <dl>
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"canceled"</dfn></dt>
+    <dd>A cancel method call caused the SpeechSynthesisUtterance to be removed from the queue before it had begun being spoken.</dd>
+
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"interrupted"</dfn></dt>
+    <dd>A cancel method call caused the SpeechSynthesisUtterance to be interrupted after it has begun being spoken and before it completed.</dd>
+
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"audio-busy"</dfn></dt>
+    <dd>The operation cannot be completed at this time because the user-agent cannot access the audio output device.
+    (For example, the user may need to correct this by closing another application.)</dd>
+
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"audio-hardware"</dfn></dt>
+    <dd>The operation cannot be completed at this time because the user-agent cannot identify an audio output device.
+    (For example, the user may need to connect a speaker or configure system settings.)</dd>
+
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"network"</dfn></dt>
+    <dd>The operation cannot be completed at this time because some required network communication failed.</dd>
+
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"synthesis-unavailable"</dfn></dt>
+    <dd>The operation cannot be completed at this time because no synthesis engine is available.
+    (For example, the user may need to install or configure a synthesis engine.)</dd>
+
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"synthesis-failed"</dfn></dt>
+    <dd>The operation failed because synthesis engine had an error.</dd>
+
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"language-unavailable"</dfn></dt>
+    <dd>No appropriate voice is available for the language designated in SpeechSynthesisUtterance lang.</dd>
+
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"voice-unavailable"</dfn></dt>
+    <dd>The voice designated in SpeechSynthesisUtterance voice attribute is not available.</dd>
+
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"text-too-long"</dfn></dt>
+    <dd>The contents of the SpeechSynthesisUtterance text attribute is too long to synthesize.</dd>
+
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"invalid-argument"</dfn></dt>
+    <dd>The contents of the SpeechSynthesisUtterance rate, pitch or volume attribute is not supported by synthesizer.</dd>
+
+    <dt><dfn enum-value for=SpeechSynthesisErrorCode>"not-allowed"</dfn></dt>
+    <dd>Synthesis was not allowed to start by the user agent or system in the current context.</dd>
+  </dl>
+  </dd>
+</dl>
+
+<h4 id="speechsynthesisvoice-attributes">SpeechSynthesisVoice Attributes</h4>
+
+<dl>
+  <dt><dfn attribute for=SpeechSynthesisVoice>voiceURI</dfn> attribute</dt>
+  <dd>The voiceURI attribute specifies the speech synthesis voice and the location of the speech synthesis service for this voice.
+  Note that the voiceURI is a generic URI and can thus point to local or remote services, either through use of a URN with meaning to the user agent or by specifying a URL that the user agent recognizes as a local service.</dd>
+
+  <dt><dfn attribute for=SpeechSynthesisVoice>name</dfn> attribute</dt>
+  <dd>This attribute is a human-readable name that represents the voice.
+  There is no guarantee that all names returned are unique.</dd>
+
+  <dt><dfn attribute for=SpeechSynthesisVoice>lang</dfn> attribute</dt>
+  <dd>This attribute is a BCP 47 language tag indicating the language of the voice. [[!BCP47]]</dd>
+
+  <dt><dfn attribute for=SpeechSynthesisVoice>localService</dfn> attribute</dt>
+  <dd>This attribute is true for voices supplied by a local speech synthesizer, and is false for voices supplied by a remote speech synthesizer service.
+  (This may be useful because remote services may imply additional latency, bandwidth or cost, whereas local voices may imply lower quality, however there is no guarantee that any of these implications are true.)</dd>
+
+  <dt><dfn attribute for=SpeechSynthesisVoice>default</dfn> attribute</dt>
+  <dd>This attribute is true for at most one voice per language.
+  There may be a different default for each language.
+  It is user agent dependent how default voices are determined.</dd>
+</dl>
+
+<h2 id="examples">Examples</h2>
+
+<p><em>This section is non-normative.</em></p>
+
+<h3 id="examples-recognition">Speech Recognition Examples</h3>
+
+<div class="example">
+  <p>Using speech recognition to fill an input-field and perform a web search.</p>
+
+  <pre class="lang-html">
+    &lt;script type="text/javascript"&gt;
+      var recognition = new SpeechRecognition();
+      recognition.onresult = function(event) {
+        if (event.results.length &gt; 0) {
+          q.value = event.results[0][0].transcript;
+          q.form.submit();
+        }
+      }
+    &lt;/script&gt;
+
+    &lt;form action="https://www.example.com/search"&gt;
+      &lt;input type="search" id="q" name="q" size=60&gt;
+      &lt;input type="button" value="Click to Speak" onclick="recognition.start()"&gt;
+    &lt;/form&gt;
+  </pre>
+</div>
+
+<div class="example">
+  <p>Using speech recognition to fill an options list with alternative speech results.</p>
+
+  <pre class="lang-html">
+    &lt;script type="text/javascript"&gt;
+      var recognition = new SpeechRecognition();
+      recognition.maxAlternatives = 10;
+      recognition.onresult = function(event) {
+        if (event.results.length &gt; 0) {
+          var result = event.results[0];
+          for (var i = 0; i &lt; result.length; ++i) {
+            var text = result[i].transcript;
+            select.options[i] = new Option(text, text);
+          }
+        }
+      }
+
+      function start() {
+        select.options.length = 0;
+        recognition.start();
+      }
+    &lt;/script&gt;
+
+    &lt;select id="select"&gt;&lt;/select&gt;
+    &lt;button onclick="start()"&gt;Click to Speak&lt;/button&gt;
+  </pre>
+</div>
+
+<div class="example">
+  <p>Using continuous speech recognition to fill a textarea.</p>
+
+  <pre class="lang-html">
+    &lt;textarea id="textarea" rows=10 cols=80&gt;&lt;/textarea&gt;
+    &lt;button id="button" onclick="toggleStartStop()"&gt;&lt;/button&gt;
+
+    &lt;script type="text/javascript"&gt;
+      var recognizing;
+      var recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      reset();
+      recognition.onend = reset;
+
+      recognition.onresult = function (event) {
+        for (var i = event.resultIndex; i &lt; event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            textarea.value += event.results[i][0].transcript;
+          }
+        }
+      }
+
+      function reset() {
+        recognizing = false;
+        button.innerHTML = "Click to Speak";
+      }
+
+      function toggleStartStop() {
+        if (recognizing) {
+          recognition.stop();
+          reset();
+        } else {
+          recognition.start();
+          recognizing = true;
+          button.innerHTML = "Click to Stop";
+        }
+      }
+    &lt;/script&gt;
+  </pre>
+</div>
+
+<div class="example">
+  <p>Using continuous speech recognition, showing final results in black and interim results in grey.</p>
+
+  <pre class="lang-html">
+    &lt;button id="button" onclick="toggleStartStop()"&gt;&lt;/button&gt;
+    &lt;div style="border:dotted;padding:10px"&gt;
+      &lt;span id="final_span"&gt;&lt;/span&gt;
+      &lt;span id="interim_span" style="color:grey"&gt;&lt;/span&gt;
+    &lt;/div&gt;
+
+    &lt;script type="text/javascript"&gt;
+      var recognizing;
+      var recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      reset();
+      recognition.onend = reset;
+
+      recognition.onresult = function (event) {
+        var final = "";
+        var interim = "";
+        for (var i = 0; i &lt; event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        final_span.innerHTML = final;
+        interim_span.innerHTML = interim;
+      }
+
+      function reset() {
+        recognizing = false;
+        button.innerHTML = "Click to Speak";
+      }
+
+      function toggleStartStop() {
+        if (recognizing) {
+          recognition.stop();
+          reset();
+        } else {
+          recognition.start();
+          recognizing = true;
+          button.innerHTML = "Click to Stop";
+          final_span.innerHTML = "";
+          interim_span.innerHTML = "";
+        }
+      }
+    &lt;/script&gt;
+  </pre>
+</div>
+
+<h3 id="examples-synthesis">Speech Synthesis Examples</h3>
+
+<div class="example">
+  <p>Spoken text.</p>
+
+  <pre class="lang-html">
+    &lt;script type="text/javascript"&gt;
+      speechSynthesis.speak(new SpeechSynthesisUtterance('Hello World'));
+    &lt;/script&gt;
+  </pre>
+</div>
+
+<div class="example">
+  <p>Spoken text with attributes and events.</p>
+
+  <pre class="lang-html">
+    &lt;script type="text/javascript"&gt;
+      var u = new SpeechSynthesisUtterance();
+      u.text = 'Hello World';
+      u.lang = 'en-US';
+      u.rate = 1.2;
+      u.onend = function(event) { alert('Finished in ' + event.elapsedTime + ' seconds.'); }
+      speechSynthesis.speak(u);
+    &lt;/script&gt;
+  </pre>
+</div>
+
+<h2 class="no-num" id="acknowledgments">Acknowledgments</h2>
+
+<p style="white-space: pre-line">
+  Peter Beverloo, Google, Inc.
+  Björn Bringert, Google, Inc.
+  Gerardo Capiel, Benetech
+  Jerry Carter
+  Nagesh Kharidi, Openstream, Inc.
+  Dominic Mazzoni, Google, Inc.
+  Olli Pettay, Mozilla Foundation
+  Charles Pritchard
+  Satish Sampath, Google, Inc.
+  Adam Sobieski, Phoster, Inc.
+  Raj Tumuluri, Openstream, Inc.
+  Kagami Sascha Rosylight
+</p>
+
+<p>Also, the members of the HTML Speech Incubator Group, and the corresponding [[HTMLSPEECH|Final Report]], which created the basis for this specification.</p>

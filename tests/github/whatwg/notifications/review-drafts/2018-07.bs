@@ -1,0 +1,1187 @@
+<pre class=metadata>
+Group: WHATWG
+Date: 2018-07-23
+H1: Notifications API
+Shortname: notifications
+Text Macro: TWITTER notifyapi
+Abstract: This standard defines an API to display notifications to the end user, typically outside the top-level browsing context's viewport. It is designed to be compatible with existing notification systems, while remaining platform-independent.
+Translation: ja https://triple-underscore.github.io/notifications-ja.html
+Translation: zh-cn https://w3c-html-ig-zh.github.io/notifications/whatwg/
+</pre>
+
+<h2 id=terminology>Terminology</h2>
+
+<p>This specification depends on the Infra Standard. [[!INFRA]]
+
+<p>Some terms used in this specification are defined in the DOM, Fetch, HTML, IDL, Service Workers,
+URL, and Vibration API Standards.
+[[!DOM]]
+[[!FETCH]]
+[[!HTML]]
+[[!WEBIDL]]
+[[!SERVICE-WORKERS]]
+[[!URL]]
+[[!VIBRATION]]
+
+
+<h2 id=notifications>Notifications</h2>
+
+<p>A <dfn id=concept-notification>notification</dfn> is an abstract
+representation of something that happened, such as the delivery of a message.
+
+<p>A <a>notification</a> <em>can</em> have an associated
+<dfn for=notification id=service-worker-registration>service worker registration</dfn>.
+
+<p>A <a>notification</a> has an associated
+<dfn for=notification id=concept-title>title</dfn> which is a DOMString.
+
+<p>A <a>notification</a> has an associated
+<dfn for=notification id=body>body</dfn> which is a DOMString.
+
+<p>A <a>notification</a> has an associated
+<dfn for=notification id=concept-direction>direction</dfn> which is one of
+<i>auto</i>, <i>ltr</i>, and <i>rtl</i>.
+
+<p>A <a>notification</a> has an associated
+<dfn for=notification id=concept-language>language</dfn> which is a DOMString
+representing either a valid BCP 47 language tag or the empty string.
+
+<p>A <a>notification</a> has an associated
+<dfn for=notification id=tag>tag</dfn> which is a DOMString.
+
+<p>A <a>notification</a> has an associated
+<dfn for=notification id=data>data</dfn>.
+
+<p>A <a>notification</a> has an associated <dfn for=notification id=timestamp>timestamp</dfn> which
+is a {{DOMTimeStamp}} representing the time, in milliseconds since 00:00:00 UTC on 1 January 1970,
+of the event for which the notification was created.
+
+<p class=note>Timestamps can be used to indicate the time at which a notification
+is actual. For example, this could be in the past when a notification is used for
+a message that couldn't immediately be delivered because the device was offline,
+or in the future for a meeting that is about to start.
+
+<p>A <a>notification</a> has an associated
+<dfn for=notification id=concept-origin>origin</dfn>.
+
+<p>A <a>notification</a> has an associated
+<dfn for=notification id=renotify-preference-flag>renotify preference flag</dfn> which is initially
+unset. When set indicates that the end user should be alerted after the <a>replace steps</a> have
+run.
+
+<p>A <a>notification</a> has an associated
+<dfn for=notification id=silent-preference-flag>silent preference flag</dfn> which is initially
+unset. When set indicates that no sounds or vibrations should be made.
+
+<p>A <a>notification</a> has an associated
+<dfn for=notification id=require-interaction-preference-flag>require interaction preference flag</dfn>
+which is initially unset. When set, indicates that on devices with a sufficiently large screen, the
+notification should remain readily available until the user activates or dismisses the notification.
+
+<p>A <a>notification</a> <em>can</em> have these associated graphics: an
+<dfn for=notification id=image-url>image URL</dfn>,
+<dfn for=notification id=icon-url>icon URL</dfn>, and
+<dfn for=notification id=badge-url>badge URL</dfn>; and their corresponding
+<a for=notification>image resource</a>, <a for=notification>icon resource</a>, and
+<a for=notification>badge resource</a>.
+
+<p>An <dfn for=notification id=image-resource>image resource</dfn> is a picture shown as part of the
+content of the <a>notification</a>, and should be displayed with higher visual priority than the
+<a for=notification>icon resource</a> and <a for=notification>badge resource</a>, though it may be
+displayed in fewer circumstances.
+
+<p>An <dfn for=notification id=icon-resource>icon resource</dfn> is an image that reinforces the
+<a>notification</a> (such as an icon, or a photo of the sender).
+
+<p>A <dfn for=notification id=badge-resource>badge resource</dfn> is an icon representing the web
+application, or the category of the <a>notification</a> if the web application sends a wide variety
+of <a>notifications</a>. It <em>may</em> be used to represent the <a>notification</a> when there is
+not enough space to display the <a>notification</a> itself. It <em>may</em> also be displayed inside
+the <a>notification</a>, but then it should have less visual priority than the
+<a for=notification>image resource</a> and <a for=notification>icon resource</a>.
+
+<p>A <a>notification</a> <em>can</em> have a
+<dfn for=notification id=vibration-pattern>vibration pattern</dfn>.
+
+<p class=note>Developers are encouraged to not convey information through an
+<a for=notification lt="image resource">image</a>, <a for=notification lt="icon resource">icon</a>,
+<a for=notification lt="badge resource">badge</a>, or <a for=notification>vibration pattern</a> that
+is not otherwise accessible to the end user, especially since notification platforms that do not
+support these features might ignore them.
+
+<p>A <a>notification</a> has an associated list of
+zero or more <dfn for=notification lt=action id=actions>actions</dfn>. Each
+<a for=notification>action</a> has an associated
+<dfn for=action id=action-title>title</dfn> and <dfn for=action id=action-name>name</dfn> and
+<em>can</em> have an associated <dfn for=action>icon URL</dfn> and
+<dfn for=action>icon resource</dfn>. Users may activate actions, as alternatives to
+activating the notification itself. The user agent must determine the
+<dfn>maximum number of actions</dfn> supported, within the constraints of the
+notification platform.
+
+<p class=note>Since display of actions is platform-dependent, developers are
+encouraged to make sure that any action a user can invoke from a notification is
+also available within the web application.
+
+<p class="note no-backref">Some platforms might modify an <a for=action>icon resource</a> to better
+match the platform's visual style before displaying it to the user, for example by rounding the
+corners or painting it in a specific color. Developers are encouraged to use an icon that handles
+such cases gracefully and does not lose important information through, e.g., loss of color or
+clipped corners.
+
+<p>A <dfn>non-persistent notification</dfn> is a
+<a>notification</a> without an associated
+<a for=notification>service worker registration</a>.
+
+<p>A <dfn>persistent notification</dfn> is a
+<a>notification</a> with an associated
+<a for=notification>service worker registration</a>.
+
+<!-- XXX https://html.spec.whatwg.org/#fingerprinting-vector -->
+
+<hr>
+
+<p>To <dfn lt="create a notification|creating a notification">create a notification</dfn>, given a
+<var>title</var>, <var>options</var>, and optionally a <var>serviceWorkerRegistration</var>, run
+these steps:
+
+<ol>
+  <li><p>Let <var>notification</var> be a new
+  <a>notification</a>.
+
+  <li><p>If a <var>serviceWorkerRegistration</var> was provided, set
+  <var>notification</var>'s <a for=notification>service worker registration</a> to
+  <var>serviceWorkerRegistration</var>.
+
+  <li><p>If a <var>serviceWorkerRegistration</var> was not provided and
+  <var>options</var>'s <code>actions</code> is not empty, <a>throw</a> a
+  <code>TypeError</code> exception.
+
+  <p class=note><a>Actions</a> are only currently supported for
+  <a>persistent notifications</a>.
+
+  <li><p>If <var>options</var>'s <code>silent</code> is true and <var>options</var>'s
+  <code>vibrate</code> is present, <a>throw</a> a <code>TypeError</code>
+  exception.
+
+  <li><p>If <var>options</var>'s <code>renotify</code> is true and
+  <var>options</var>'s <code>tag</code> is the empty string, <a>throw</a> a
+  <code>TypeError</code> exception.
+
+  <li><p>Set <var>notification</var>'s <a for=notification>data</a> to
+  <a abstract-op>StructuredSerializeForStorage</a>(<var>options</var>'s <code>data</code>). Rethrow
+  any exceptions.
+
+  <li><p>Set <var>notification</var>'s <a for=notification>title</a> to <var>title</var>.
+
+  <li><p>Set <var>notification</var>'s
+  <a for=notification>direction</a> to <var>options</var>'s
+  <code>dir</code>.
+
+  <li><p>Set <var>notification</var>'s <a for=notification>language</a> to
+  <var>options</var>'s <code>lang</code>.
+
+  <li><p>Set <var>notification</var>'s <a for=notification>origin</a> to the
+  <a>entry settings object</a>'s <a for="environment settings object">origin</a>.
+
+  <li><p>Set <var>notification</var>'s <a for=notification>body</a> to <var>options</var>'s
+  <code>body</code>.
+
+  <li><p>Set <var>notification</var>'s <a for=notification>tag</a> to <var>options</var>'s
+  <code>tag</code>.
+
+  <li><p>Let <var>baseURL</var> be the API base URL specified by the
+  <a>entry settings object</a>. <span class=XXX>Or incumbent?</span>
+
+  <li><p>If <var>options</var>'s <code>image</code> is present,
+  <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does not
+  return failure, set <var>notification</var>'s <a>image URL</a> to the return
+  value. (Otherwise <a>image URL</a> is not set.)
+
+  <li><p>If <var>options</var>'s <code>icon</code> is present,
+  <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does not
+  return failure, set <var>notification</var>'s <a for=notification>icon URL</a> to the return
+  value. (Otherwise <a for=notification>icon URL</a> is not set.)
+
+  <li><p>If <var>options</var>'s <code>badge</code> is present,
+  <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does not
+  return failure, set <var>notification</var>'s <a for=notification>badge URL</a> to the return
+  value. (Otherwise <a for=notification>badge URL</a> is not set.)
+
+  <li><p>If <var>options</var>'s <code>vibrate</code> is present,
+  <a>validate and normalize</a> it and set <var>notification</var>'s
+  <a for=notification>vibration pattern</a> to the return value. (Otherwise
+  <a for=notification>vibration pattern</a> is not set.)
+
+  <li><p>If <var>options</var>'s <code>timestamp</code> is present, set
+  <var>notification</var>'s <a for=notification>timestamp</a> to the value. Otherwise, set
+  <var>notification</var>'s <a for=notification>timestamp</a> to the number of milliseconds that
+  passed between 00:00:00 UTC on 1 January 1970 and the time at which the
+  <code>Notification</code> constructor was called.
+
+  <li><p>If <var>options</var>'s <code>renotify</code> is true, set
+  <var>notification</var>'s <a for=notification>renotify preference flag</a>.
+
+  <li><p>If <var>options</var>'s <code>silent</code> is true, set
+  <var>notification</var>'s <a for=notification>silent preference flag</a>.
+
+  <li><p>If <var>options</var>'s <code>requireInteraction</code> is true, set
+  <var>notification</var>'s <a for=notification>require interaction preference flag</a>.
+
+  <li><p>Set <var>notification</var>'s list of <a>actions</a> to an empty list,
+  then for each <var>entry</var> in <var>options</var>'s <code>actions</code>,
+  up to the <a>maximum number of actions</a> supported (skip any excess
+  entries), perform the following steps:
+
+  <ol>
+    <li><p>Let <var>action</var> be a new <a lt="actions">action</a>.
+
+    <li><p>Set <var>action</var>'s <a for=action>name</a> to the <var>entry</var>'s
+    <code>action</code>.
+
+    <li><p>Set <var>action</var>'s <a for=action>title</a> to the
+    <var>entry</var>'s <code>title</code>.
+
+    <li><p>If <var>entry</var>'s <code>icon</code> is present,
+    <a lt="url parser">parse</a> it using <var>baseURL</var>, and if that does
+    not return failure, set <var>action</var>'s <a for=action>icon URL</a> to the
+    return value. (Otherwise <a for=action>icon URL</a> is not set.)
+
+    <li><p>Append <var>action</var> to <var>notification</var>'s list of
+    <a>actions</a>.
+  </ol>
+
+  <li><p>Return <var>notification</var>.
+</ol>
+
+
+<h3 id=lifetime-and-ui-integrations>Lifetime and UI integration</h3>
+
+<p>The user agent must keep a <dfn>list of notifications</dfn>, which is a <a for=/>list</a> of zero
+or more <a>notifications</a>.
+
+<p>User agents should run the <a>close steps</a> for a
+<a>non-persistent notification</a> a couple of seconds after they have been
+created.
+
+<p>User agents should not display <a>non-persistent notification</a> in a
+platform's "notification center" (if available).
+
+<p>User agents should persist <a>persistent notifications</a> until they are
+removed from the <a>list of notifications</a>.
+
+<p class=example id=example-38bbd8ee>A <a>persistent notification</a> could have the
+{{Notification/close()}} method invoked of one of its {{Notification}} objects.
+
+<p>User agents should display <a>persistent notifications</a> in a platform's
+"notification center" (if available).
+
+
+<h3 id=permission-model>Permission model</h3>
+
+<p><a>Notifications</a> can only be displayed if the
+user (or user agent on behalf of the user) has granted <dfn>permission</dfn>.
+The <a>permission</a> to show <a>notifications</a>
+for a given <a for=/>origin</a> is one of three strings:
+
+<dl>
+  <dt>"<code>default</code>"
+  <dd><p>This is equivalent to "<code>denied</code>", but the user has made no
+  explicit choice thus far.
+
+  <dt>"<code>denied</code>"
+  <dd><p>This means the user does not want
+  <a>notifications</a>.
+
+  <dt>"<code>granted</code>"
+  <dd><p>This means <a>notifications</a> can be
+  displayed.
+</dl>
+
+<p class=note>There is no equivalent to "<code>default</code>"
+meaning "<code>granted</code>". In that case
+"<code>granted</code>" is simply returned as there would be no reason
+for the application to ask for <a>permission</a>.
+
+
+<h3 id=direction>Direction</h3>
+
+<p>This section is written in terms equivalent to those used in the Rendering
+section of HTML. [[!HTML]]
+
+<!-- keep this in sync with
+     https://html.spec.whatwg.org/multipage/rendering.html#text-rendered-in-native-user-interfaces -->
+
+<p>User agents are expected to honor the Unicode semantics of the text of a
+<a>notification</a>'s <a for=notification>title</a>, <a for=notification>body</a>, and the
+<a for=action>title</a> of each of its <a for=notification>actions</a>. Each is expected
+to be treated as an independent set of one or more bidirectional algorithm
+paragraphs when displayed, as defined by the bidirectional algorithm's rules P1,
+P2, and P3, including, for instance, supporting the paragraph-breaking behavior
+of U+000A LINE FEED (LF) characters. For each paragraph of the
+<a for=notification>title</a>, <a for=notification>body</a> and the
+<a for=action>title</a> of each of the <a for=notification>actions</a>, the
+<a>notification</a>'s
+<a for=notification>direction</a> provides the higher-level override of
+rules P2 and P3 if it has a value other than "<code>auto</code>". [[!BIDI]]
+
+<p>The <a>notification</a>'s <a for=notification>direction</a> also determines the relative order in
+which the <a>notification</a>'s <a for=notification>actions</a> should be displayed to the user, if
+the notification platform displays them side by side.
+
+
+<h3 id=language>Language</h3>
+
+<!-- keep this in sync with
+     https://html.spec.whatwg.org/multipage/dom.html#attr-lang -->
+
+<p>The <a>notification</a>'s <a for=notification>language</a> specifies the primary language for the
+<a>notification</a>'s <a for=notification>title</a>, <a for=notification>body</a> and the
+<a for=notification>title</a> of each of its <a for=notification>actions</a>. Its value is a string.
+The empty string indicates that the primary language is unknown. Any other string must be
+interpreted as a language tag. Validity or well-formedness are not enforced. [[!LANG]]
+
+<p class=note>Developers are encouraged to only use valid language tags.
+
+
+<h3 id=resources>Resources</h3>
+
+<p>The <dfn>fetch steps</dfn> for a given
+<a>notification</a> <var>notification</var> are:
+
+<ol>
+ <!-- XXX https://www.w3.org/Bugs/Public/show_bug.cgi?id=24055 -->
+ <li>
+  <p>If the notification platform supports images, <a for=/>fetch</a>
+  <var>notification</var>'s <a>image URL</a>, if <a>image URL</a> is set.
+
+  <p class=note>The intent is to fetch this resource similar to an
+  <a href="https://html.spec.whatwg.org/multipage/images.html#update-the-image-data"><code>&lt;img&gt;</code></a>,
+  but this <a href="https://www.w3.org/Bugs/Public/show_bug.cgi?id=24055">needs abstracting</a>.
+
+  <p>Then, <a>in parallel</a>:
+
+  <ol>
+   <li><p>Wait for the <a for=/>response</a>.
+
+   <li><p>If the <a for=/>response</a>'s <a>internal response</a>'s <a for=response>type</a> is
+   "<code>default</code>", then attempt to decode the resource as image.
+
+   <li><p>If the image format is supported, set <var>notification</var>'s
+   <a>image resource</a> to the decoded resource. (Otherwise
+   <var>notification</var> has no <a>image resource</a>.)
+  </ol>
+
+ <li>
+  <p>If the notification platform supports icons, <a for=/>fetch</a>
+  <var>notification</var>'s <a for=notification>icon URL</a>, if <a for=notification>icon URL</a>
+  is set.
+
+  <p class=note>The intent is to fetch this resource similar to an
+  <a href="https://html.spec.whatwg.org/multipage/images.html#update-the-image-data"><code>&lt;img&gt;</code></a>,
+  but this <a href="https://www.w3.org/Bugs/Public/show_bug.cgi?id=24055">needs abstracting</a>.
+
+  <p>Then, <a>in parallel</a>:
+
+  <ol>
+   <li><p>Wait for the <a for=/>response</a>.
+
+   <li><p>If the <a for=/>response</a>'s <a>internal response</a>'s <a for=response>type</a> is
+   "<code>default</code>", then attempt to decode the resource as image.
+
+   <li><p>If the image format is supported, set <var>notification</var>'s
+   <a for=notification>icon resource</a> to the decoded resource. (Otherwise
+   <var>notification</var> has no <a for=notification>icon resource</a>.)
+  </ol>
+ </li>
+
+ <li>
+  <p>If the notification platform supports badges, <a for=/>fetch</a> <var>notification</var>'s
+  <a for=notification>badge URL</a>, if <a for=notification>badge URL</a> is set.
+
+  <p class=note>The intent is to fetch this resource similar to an
+  <a href="https://html.spec.whatwg.org/multipage/images.html#update-the-image-data"><code>&lt;img&gt;</code></a>,
+  but this <a href="https://www.w3.org/Bugs/Public/show_bug.cgi?id=24055">needs abstracting</a>.
+
+  <p>Then, <a>in parallel</a>:
+
+  <ol>
+   <li><p>Wait for the <a for=/>response</a>.
+
+   <li><p>If the <a for=/>response</a>'s <a>internal response</a>'s <a for=response>type</a> is
+   "<code>default</code>", then attempt to decode the resource as image.
+
+   <li><p>If the image format is supported, set <var>notification</var>'s
+   <a for=notification>badge resource</a> to the decoded resource. (Otherwise
+   <var>notification</var> has no <a for=notification>badge resource</a>.)
+  </ol>
+ </li>
+
+ <li>
+  <p>If the notification platform supports actions and action icons, then for each <var>action</var>
+  in <var>notification</var>'s list of <a>actions</a> <a for=/>fetch</a> <var>action</var>'s
+  <a for=action>icon URL</a>, if <a for=action>icon URL</a> is set.
+
+  <p class=note>The intent is to fetch this resource similar to an
+  <a href="https://html.spec.whatwg.org/multipage/images.html#update-the-image-data"><code>&lt;img&gt;</code></a>,
+  but this <a href="https://www.w3.org/Bugs/Public/show_bug.cgi?id=24055">needs abstracting</a>.
+
+  <p>Then, <a>in parallel</a>:
+
+  <ol>
+   <li><p>Wait for the <a for=/>response</a>.
+
+   <li><p>If the <a for=/>response</a>'s <a>internal response</a>'s <a for=response>type</a> is
+   "<code>default</code>", then attempt to decode the resource as image.
+
+   <li><p>If the image format is supported, set <var>action</var>'s
+   <a for=action>icon resource</a> to the decoded resource. (Otherwise
+   <var>action</var> has no <a for=action>icon resource</a>.)
+  </ol>
+ </li>
+</ol>
+
+
+<h3 id=showing-a-notification>Showing a notification</h3>
+
+<p>The <dfn>show steps</dfn> for a given
+<a>notification</a> <var>notification</var> are:
+<!-- These steps are invoked from "in parallel" steps -->
+
+<ol>
+ <li><p>Wait for any <a for=/ lt=fetch>fetches</a> to complete and <var>notification</var>'s
+ <a for=notification>image resource</a> <a for=notification>icon resource</a>, and
+ <a for=notification>badge resource</a> to be set (if any), as well as the
+ <a for=action>icon resources</a> for the <var>notification</var>'s <a for=notification>actions</a>
+ (if any).
+
+ <li><p>Let <var>shown</var> be false.
+
+ <li><p>Let <var>oldNotification</var> be the <a>notification</a> in the
+ <a>list of notifications</a> whose <a for=notification>tag</a> is not the empty string and is
+ <var>notification</var>'s <a for=notification>tag</a>, and whose <a for=notification>origin</a> is
+ <a>same origin</a> with <var>notification</var>'s <a for=notification>origin</a>, if any, and null
+ otherwise.
+
+ <li>
+  <p>If <var>oldNotification</var> is non-null, then:
+
+  <ol>
+   <li><p><a>Handle close events</a> with <var>oldNotification</var>.
+
+   <li>
+    <p>If the notification platform supports replacement, then:
+
+    <ol>
+     <li><p><a for=list>Replace</a> <var>oldNotification</var> with <var>notification</var>, in the
+     <a>list of notifications</a>.
+
+     <li><p>Set <var>shown</var> to true.
+    </ol>
+
+    <p class="note no-backref">Notification platforms are strongly encouraged to support native
+    replacement as it leads to a better user experience.
+
+   <li><p>Otherwise, <a for=list>remove</a> <var>oldNotification</var> from the
+   <a>list of notifications</a>.
+  </ol>
+
+ <li>
+  <p>If <var>shown</var> is false, then:
+
+  <ol>
+   <li><p><a for=list>Append</a> <var>notification</var> to the <a>list of notifications</a>.
+
+   <li><p>Display <var>notification</var> on the device (e.g., by calling the appropriate
+   notification platform API).
+  </ol>
+
+ <li><p>If <var>shown</var> is false or <var>oldNotification</var> is non-null and
+ <var>notification</var>'s <a for=notification>renotify preference flag</a> has been set, then run
+ the <a>alert steps</a> for <var>notification</var>.
+
+ <li><p>If <var>notification</var> is a <a>non-persistent notification</a>, then <a>queue a task</a>
+ to <a>fire an event</a> named <code>show</code> on the {{Notification}} object representing
+ <var>notification</var>.
+</ol>
+
+
+<h3 id=activating-a-notification>Activating a notification</h3>
+
+<p>When a <a>notification</a> <var>notification</var>,
+or one of its <a>actions</a>, is activated by the user, assuming the underlying
+notification platform supports activation, the user agent must (unless otherwise
+specified) run these steps:
+
+<ol>
+ <li>
+  <p>If <var>notification</var> is a <a>persistent notification</a>, then:
+
+  <ol>
+   <li><p>Let <var>action</var> be the empty string.
+
+   <li><p>If one of <var>notification</var>'s <a for=notification>actions</a> was activated by the
+   user, then set <var>action</var> to that <a for=notification>action</a>'s <a for=action>name</a>.
+
+   <li><p>Let <var>callback</var> be an algorithm that when invoked with a <var>global</var>,
+   <a lt="fire a service worker notification event named e">fires a service worker notification event</a>
+   named <code>notificationclick</code> given <var>notification</var> and <var>action</var> on
+   <var>global</var>.
+
+   <li><p>Then run <a>Handle Functional Event</a> with <var>notification</var>'s
+   <a for=notification>service worker registration</a> and <var>callback</var>.
+  </ol>
+
+ <li>
+  <p>Otherwise, <a>queue a task</a> to run these steps:
+
+  <ol>
+   <li>
+    <p>Let <var>intoFocus</var> be the result of <a lt="fire an event">firing an event</a> named
+    <code>click</code> on the {{Notification}} object representing <var>notification</var>, with its
+    {{Event/cancelable}} attribute initialized to true.
+
+    <p class="note">User agents are encouraged to make {{Window/focus()}} work from within the event
+    listener for the event named <code>click</code>.
+
+   <li><p>If <var>intoFocus</var> is true, then the user agent should bring the
+   <var>notification</var>'s related <a for=/>browsing context</a>'s viewport into focus.
+  </ol>
+</ol>
+
+<p class="note">Throughout the web platform "activate" is intentionally misnamed as "click".
+
+
+<h3 id=closing-a-notification>Closing a notification</h3>
+
+<p>When a <a>notification</a> is closed, either by the
+underlying notification platform or by the user, the <a>close steps</a> for it
+must be run.
+
+<p>The <dfn>close steps</dfn> for a given <var>notification</var> are:
+
+<ol>
+ <li><p>If the <a>list of notifications</a> does not <a for=list>contain</a>
+ <var>notification</var>, then abort these steps.
+
+ <li><p><a>Handle close events</a> with <var>notification</var>.
+
+ <li><p><a for=list>Remove</a> <var>notification</var> from the <a>list of notifications</a>.
+</ol>
+
+<p>To <dfn>handle close events</dfn> given a <var>notification</var>, run these steps:
+
+<ol>
+ <li>
+  <p>If <var>notification</var> is a <a>persistent notification</a> and
+  <var>notification</var> was closed by the user, then:
+
+  <ol>
+   <li><p>Let <var>callback</var> be an algorithm that when invoked with a <var>global</var>,
+   <a lt="fire a service worker notification event named e">fires a service worker notification event</a>
+   named <code>notificationclose</code> given <var>notification</var> on <var>global</var>.
+
+   <li><p>Then run <a>Handle Functional Event</a> with <var>notification</var>'s
+   <a for=notification>service worker registration</a> and <var>callback</var>.
+  </ol>
+
+ <li><p>If <var>notification</var> is a <a>non-persistent notification</a>, then <a>queue a task</a>
+ to <a>fire an event</a> named <code>close</code> on the {{Notification}} object representing
+ <var>notification</var>.
+</ol>
+
+
+<h3 id=alerting-the-user>Alerting the user</h3>
+
+<p>The <dfn>alert steps</dfn> for alerting the user about a given
+<var>notification</var> are:
+
+<ol>
+ <li><p><a>Perform vibration</a> using <var>notification</var>'s
+ <a for=notification>vibration pattern</a>, if any.
+</ol>
+
+
+<h2 id=api>API</h2>
+
+<pre class=idl>
+[Constructor(DOMString title, optional NotificationOptions options),
+ Exposed=(Window,Worker)]
+interface Notification : EventTarget {
+  static readonly attribute NotificationPermission permission;
+  [Exposed=Window] static Promise&lt;NotificationPermission> requestPermission(optional NotificationPermissionCallback deprecatedCallback);
+
+  static readonly attribute unsigned long maxActions;
+
+  attribute EventHandler onclick;
+  attribute EventHandler onshow;
+  attribute EventHandler onerror;
+  attribute EventHandler onclose;
+
+  readonly attribute DOMString title;
+  readonly attribute NotificationDirection dir;
+  readonly attribute DOMString lang;
+  readonly attribute DOMString body;
+  readonly attribute DOMString tag;
+  readonly attribute USVString image;
+  readonly attribute USVString icon;
+  readonly attribute USVString badge;
+  [SameObject] readonly attribute FrozenArray&lt;unsigned long> vibrate;
+  readonly attribute DOMTimeStamp timestamp;
+  readonly attribute boolean renotify;
+  readonly attribute boolean silent;
+  readonly attribute boolean requireInteraction;
+  [SameObject] readonly attribute any data;
+  [SameObject] readonly attribute FrozenArray&lt;NotificationAction> actions;
+
+  void close();
+};
+
+dictionary NotificationOptions {
+  NotificationDirection dir = "auto";
+  DOMString lang = "";
+  DOMString body = "";
+  DOMString tag = "";
+  USVString image;
+  USVString icon;
+  USVString badge;
+  VibratePattern vibrate;
+  DOMTimeStamp timestamp;
+  boolean renotify = false;
+  boolean silent = false;
+  boolean requireInteraction = false;
+  any data = null;
+  sequence&lt;NotificationAction> actions = [];
+};
+
+enum NotificationPermission {
+  "default",
+  "denied",
+  "granted"
+};
+
+enum NotificationDirection {
+  "auto",
+  "ltr",
+  "rtl"
+};
+
+dictionary NotificationAction {
+  required DOMString action;
+  required DOMString title;
+  USVString icon;
+};
+
+callback NotificationPermissionCallback = void (NotificationPermission permission);
+</pre>
+
+<p>A <a>non-persistent notification</a> is represented by one {{Notification}}
+object and can be created through {{Notification}}'s
+<a constructor lt="Notification(title, options)">constructor</a>.
+
+<p>A <a>persistent notification</a> is represented by zero or more
+{{Notification}} objects and can be created through the
+{{ServiceWorkerRegistration/showNotification()}} method.
+
+
+<h3 id=garbage-collection>Garbage collection</h3>
+
+<p>A {{Notification}} object must not be garbage collected while the <a>list of notifications</a>
+<a for=list>contains</a> its corresponding <a>notification</a> and it has an
+<a for=/>event listener</a> whose <b>type</b> is <code>click</code>, <code>show</code>,
+<code>close</code>, or <code>error</code>.
+
+
+<h3 id=constructors>Constructors</h3>
+
+<p>The <dfn constructor for=Notification><code>Notification(title, options)</code></dfn>
+constructor, when invoked, must run these steps:
+
+<ol>
+  <li><p>If the <a>current global object</a> is a {{ServiceWorkerGlobalScope}} object, then
+  <a>throw</a> a <code>TypeError</code> exception.
+
+  <li><p>Let <var>notification</var> be the result of <a>creating a notification</a> given
+  <var>title</var> and <var>options</var>. Rethrow any exceptions.
+
+  <li><p>Let <var>n</var> be a new {{Notification}} object associated with
+  <var>notification</var>.
+
+  <li><p>Run these steps <a>in parallel</a>:
+
+  <ol>
+    <li><p>If <a>permission</a> for <var>notification</var>'s <a for=notification>origin</a> is not
+    "<code>granted</code>", then <a>queue a task</a> to <a>fire an event</a> named
+    <code>error</code> on <var>n</var>, and abort these steps.
+
+    <li><p>Run the <a>fetch steps</a> for <var>notification</var>.
+
+    <li><p>Run the <a>show steps</a> for <var>notification</var>.
+  </ol>
+
+  <li><p>Return <var>n</var>.
+</ol>
+
+
+<h3 id=static-members>Static members</h3>
+
+<p>The static <dfn attribute for=Notification><code>permission</code></dfn>
+attribute's getter must return <a>permission</a> for the
+<a>entry settings object</a>'s <a for="environment settings object">origin</a>.
+
+<p class=note>If you edit standards please refrain from copying the above. Synchronous
+permissions are like synchronous IO, a bad idea.
+
+<p>The static
+<dfn method for=Notification><code>requestPermission(<var>deprecatedCallback</var>)</code></dfn>
+method, when invoked, must run these steps:
+
+<ol>
+ <li><p>Let <var>promise</var> be a new promise.
+
+ <li>
+  <p>Run these steps <a>in parallel</a>:
+
+  <ol>
+   <li><p>Let <var>permission</var> be <a>permission</a> for
+   <a>entry settings object</a>'s <a for="environment settings object">origin</a>.
+   <!-- XXX context object's global object's environment settings object's origin -->
+
+   <li><p>If <var>permission</var> is "<code>default</code>", ask the user whether showing
+   notifications for the <a>entry settings object</a>'s
+   <a for="environment settings object">origin</a> is acceptable. If it is, set
+   <var>permission</var> to "<code>granted</code>", and "<code>denied</code>" otherwise.
+
+   <li>
+    <p><a>Queue a task</a> to run these steps:
+
+    <ol>
+     <li><p>Set <a>permission</a> for the <a>entry settings object</a>'s
+     <a for="environment settings object">origin</a> to <var>permission</var>.
+
+     <li><p>If <var>deprecatedCallback</var> is given, invoke
+     <var>deprecatedCallback</var> with <var>permission</var> as single argument. If this
+     throws an exception, <a>report the exception</a>.
+
+     <li><p>Fullfil <var>promise</var> with <var>permission</var>.
+    </ol>
+  </ol>
+
+ <li><p>Return <var>promise</var>.
+</ol>
+
+<p class="warning">Notifications are the one instance thus far where asking the
+user upfront makes sense. Specifications for other APIs should not use this
+pattern and instead employ one of the
+<a href="http://robert.ocallahan.org/2011/06/permissions-for-web-applications_30.html">
+many more suitable alternatives</a>.
+
+<p>The static <dfn attribute for=Notification><code>maxActions</code></dfn>
+attribute's getter must return the <a>maximum number of actions</a> supported.
+
+<h3 id=object-members>Object members</h3>
+
+<p>The following are the <a>event handlers</a> (and their corresponding
+<a>event handler event types</a>) that must be supported as attributes by the
+{{Notification}} object.
+
+<table>
+  <thead>
+    <tr>
+      <th><a>event handler</a>
+      <th><a>event handler event type</a>
+ <tbody>
+  <tr>
+   <td><dfn attribute for=Notification><code>onclick</code></dfn>
+   <td><code>click</code>
+  <tr>
+   <td><dfn attribute for=Notification><code>onshow</code></dfn>
+   <td><code>show</code>
+  <tr>
+   <td><dfn attribute for=Notification><code>onerror</code></dfn>
+   <td><code>error</code>
+  <tr>
+   <td><dfn attribute for=Notification><code>onclose</code></dfn>
+   <td><code>close</code>
+</table>
+
+<p>The <dfn method for=Notification><code>close()</code></dfn> method, when
+invoked, must run the <a>close steps</a> for the
+<a>notification</a>.
+
+<p>The <dfn attribute for=Notification><code>title</code></dfn> attribute's getter must return the
+<a>notification</a>'s <a for=notification>title</a>.
+
+<p>The <dfn attribute for=Notification><code>dir</code></dfn> attribute's getter must return the
+<a>notification</a>'s <a for=notification>direction</a>.
+
+<p>The <dfn attribute for=Notification><code>lang</code></dfn> attribute's getter must return the
+<a>notification</a>'s <a for=notification>language</a>.
+
+<p>The <dfn attribute for=Notification><code>body</code></dfn> attribute's getter must return the
+<a>notification</a>'s <a for=notification>body</a>.
+
+<p>The <dfn attribute for=Notification><code>tag</code></dfn> attribute's getter must return the
+<a>notification</a>'s <a for=notification>tag</a>.
+
+<p>The <dfn attribute dfn-for=Notification><code>image</code></dfn> attribute's getter must return
+the <a>notification</a>'s <a for=notification>image URL</a>, <a lt="url serializer">serialized</a>,
+and the empty string if there is no <a>notification</a>'s <a for=notification>image URL</a>
+otherwise.
+
+<p>The <dfn attribute for=Notification><code>icon</code></dfn> attribute's getter must return the
+<a>notification</a>'s <a for=notification>icon URL</a>, <a lt="url serializer">serialized</a>, and
+the empty string if there is no <a>notification</a>'s <a for=notification>icon URL</a> otherwise.
+
+<p>The <dfn attribute for=Notification><code>badge</code></dfn> attribute's getter must return the
+<a>notification</a>'s <a for=notification>badge URL</a>, <a lt="url serializer">serialized</a>, and
+the empty string if there is no <a>notification</a>'s <a for=notification>badge URL</a> otherwise.
+
+<p>The <dfn attribute for=Notification><code>vibrate</code></dfn> attribute's getter must return the
+<a>notification</a>'s <a for=notification>vibration pattern</a>, if any, and the empty list
+otherwise.
+
+<p>The <dfn attribute for=Notification><code>timestamp</code></dfn> attribute's getter must return
+the <a>notification</a>'s <a for=notification>timestamp</a>.
+
+<p>The <dfn attribute for=Notification><code>renotify</code></dfn> attribute's getter must return
+the <a>notification</a>'s <a for=notification>renotify preference flag</a>.
+
+<p>The <dfn attribute for=Notification><code>silent</code></dfn> attribute's getter must return the
+<a>notification</a>'s <a for=notification>silent preference flag</a>.
+
+<p>The <dfn attribute for=Notification><code>requireInteraction</code></dfn> attribute's getter must
+return the <a>notification</a>'s <a for=notification>require interaction preference flag</a>.
+
+<p>The <dfn attribute for=Notification><code>data</code></dfn> attribute's getter must return
+<a abstract-op>StructuredDeserialize</a>(<a>notification</a>'s <a for=notification>data</a>,
+<a>context object</a>'s <a>relevant Realm</a>). If this throws an exception, then return null.
+<!-- Relies on SameObject becoming Cached as proposed -->
+
+<p>The <dfn attribute for=Notification><code>actions</code></dfn> attribute's getter must return the
+result of the following steps:
+
+<ol>
+  <li><p>Let <var>frozenActions</var> be an empty list of type {{NotificationAction}}.
+
+  <li><p>For each <var>entry</var> in the <a>notification</a>'s list of
+  <a for=notification>actions</a>, perform the following steps:
+
+  <ol>
+    <li><p>Let <var>action</var> be a new {{NotificationAction}}.
+
+    <li><p>Set <var>action</var>'s {{NotificationAction/action}} to
+    <var>entry</var>'s <a for=action>name</a>.
+
+    <li><p>Set <var>action</var>'s {{NotificationAction/title}} to
+    <var>entry</var>'s <a for=action>title</a>.
+
+    <li><p>Set <var>action</var>'s {{NotificationAction/icon}} to
+    <var>entry</var>'s <a for=action>icon URL</a>.
+
+    <!-- XXX IDL dictionaries are usually returned by value, so don't need to be
+         immutable. But FrozenArray reifies the dictionaries to mutable JS
+         objects accessed by reference, so we explicitly freeze them.
+         It would be better to do this with IDL primitives instead of JS - see
+         https://www.w3.org/Bugs/Public/show_bug.cgi?id=29004 -->
+    <li><p>Call <a lt="freeze">Object.freeze</a> on <var>action</var>, to
+    prevent accidental mutation by scripts.
+
+    <li><p>Append <var>action</var> to <var>frozenActions</var>.
+  </ol>
+
+  <li><p><a>Create a frozen array</a> from <var>frozenActions</var>.
+</ol>
+
+<h3 id=examples>Examples</h3>
+
+<h4 id=using-events>Using events from a page</h4>
+
+<p><a lt="non-persistent notification">Non-persistent</a> {{Notification}}
+objects dispatch events during their lifecycle, which developers can use to
+generate desired behaviors.
+
+<p>The <code>click</code> event dispatches when the user activates a
+notification.
+
+<pre class=example id=example-08e8ecea>
+var not = new Notification("Gebrünn Gebrünn by Paul Kalkbrenner", { icon: "newsong.svg", tag: "song" });
+not.onclick = function() { displaySong(this); };</pre>
+
+
+<h4 id=using-actions>Using actions from a service worker</h4>
+
+<p><a lt="persistent notification">Persistent notifications</a> fire
+<code>notificationclick</code> events on the {{ServiceWorkerGlobalScope}}.
+
+<p>Here a service worker shows a notification with a single "Archive"
+<a lt="actions">action</a>, allowing users to perform this common task from the
+notification without having to open the website (for example the notification
+platform might show a button on the notification). The user can also activate
+the main body of the notification to open their inbox.
+
+<pre class=example id=example-50e7c86c>
+self.registration.showNotification("New mail from Alice", {
+  actions: [{action: 'archive', title: "Archive"}]
+});
+
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  if (event.action === 'archive') {
+    silentlyArchiveEmail();
+  } else {
+    clients.openWindow("/inbox");
+  }
+}, false);</pre>
+
+
+<h4 id=tags-example>Using the <code>tag</code> member for multiple instances</h4>
+
+<p>Web applications frequently operate concurrently in multiple instances, such
+as when a user opens a mail application in multiple browser tabs. Since the
+desktop is a shared resource, the notifications API provides a way for these
+instances to easily coordinate, by using the <code>tag</code> member.
+
+<p>Notifications which represent the same conceptual event can be tagged in the
+same way, and when both are shown, the user will only receive one notification.
+
+<pre class=example id=example-2e2c735a>
+Instance 1                                   | Instance 2
+                                             |
+// Instance notices there is new mail.       |
+new Notification("New mail from John Doe",   |
+                 { tag: 'message1' });       |
+                                             |
+                                             |  // Slightly later, this instance notices
+                                             |  // there is new mail.
+                                             |  new Notification("New mail from John Doe",
+                                             |                   { tag: 'message1' });</pre>
+
+<p>The result of this situation, if the user agent follows the algorithms here, is a
+<strong>single</strong> notification "New mail from John Doe".
+
+
+<h4 id=using-the-tag-member-for-a-single-instance>Using the <code>tag</code> member for a single instance</h4>
+
+<p>The <code>tag</code> member can also be used by a single instance of an
+application to keep its notifications as current as possible as state changes.
+
+<p>For example, if Alice is using a chat application with Bob, and Bob sends
+multiple messages while Alice is idle, the application may prefer that Alice not
+see a desktop notification for each message.
+
+<pre class=example id=example-a1d95db4>
+// Bob says "Hi"
+new Notification("Bob: Hi", { tag: 'chat_Bob' });
+
+// Bob says "Are you free this afternoon?"
+new Notification("Bob: Hi / Are you free this afternoon?", { tag: 'chat_Bob' });</pre>
+
+<p>The result of this situation is a <i>single</i> notification; the second one
+replaces the first having the same tag. In a platform that queues notifications
+(first-in-first-out), using the tag allows the notification to also maintain its
+position in the queue. Platforms where the newest notifications are shown first,
+a similar result could be achieved using the {{Notification/close()}} method.
+
+
+<h2 id=service-worker-api>Service worker API</h2>
+
+<pre class=idl>
+dictionary GetNotificationOptions {
+  DOMString tag = "";
+};
+
+partial interface ServiceWorkerRegistration {
+  Promise&lt;void> showNotification(DOMString title, optional NotificationOptions options);
+  Promise&lt;sequence&lt;Notification>> getNotifications(optional GetNotificationOptions filter);
+};
+
+[Constructor(DOMString type, NotificationEventInit eventInitDict),
+ Exposed=ServiceWorker]
+interface NotificationEvent : ExtendableEvent {
+  readonly attribute Notification notification;
+  readonly attribute DOMString action;
+};
+
+dictionary NotificationEventInit : ExtendableEventInit {
+  required Notification notification;
+  DOMString action = "";
+};
+
+partial interface ServiceWorkerGlobalScope {
+  attribute EventHandler onnotificationclick;
+  attribute EventHandler onnotificationclose;
+};
+</pre>
+
+<p>The
+<dfn method for=ServiceWorkerRegistration><code>showNotification(title, options)</code></dfn>
+method, when invoked, must run these steps:
+
+<ol>
+  <li><p>Let <var>promise</var> be a new promise.
+
+  <li><p>If the <a>context object</a>'s <a for="service worker registration">active worker</a> is
+  null, then reject <var>promise</var> with a <code>TypeError</code> exception and return
+  <var>promise</var>.
+
+  <li><p>Let <var>serviceWorkerRegistration</var> be the <a>context object</a>.
+
+  <li><p>Let <var>notification</var> be the result of <a>creating a notification</a> given
+  <var>title</var>, <var>options</var>, and <var>serviceWorkerRegistration</var>. If this threw an
+  exception, reject <var>promise</var> with that exception and return <var>promise</var>.
+
+  <li><p>Run these steps <a>in parallel</a>:
+
+  <ol>
+    <li><p>If <a>permission</a> for <var>notification</var>'s <a for=notification>origin</a> is not
+    "<code>granted</code>", then reject <var>promise</var> with a <code>TypeError</code> exception,
+    and abort these steps.
+
+    <li><p>Run the <a>fetch steps</a> for <var>notification</var>.
+
+    <li><p>Run the <a>show steps</a> for <var>notification</var>.
+
+    <li><p>Resolve <var>promise</var> with undefined.
+  </ol>
+
+  <li><p>Return <var>promise</var>.
+</ol>
+
+<p>The
+<dfn method for=ServiceWorkerRegistration><code>getNotifications(<var>filter</var>)</code></dfn>
+method, when invoked, must run these steps:
+
+<ol>
+  <li><p>Let <var>promise</var> be a new promise.
+
+  <li><p>Run these steps <a>in parallel</a>:
+
+  <ol>
+    <li><p>Let <var>tag</var> be <var>filter</var>'s <code>tag</code>.
+
+    <li><p>Let <var>notifications</var> be a <a for=/>list</a> of all <a>notifications</a> in the
+    <a>list of notifications</a> whose <a for=notification>origin</a> is the
+    <a>entry settings object</a>'s <a for="environment settings object">origin</a>, whose
+    <a for=notification>service worker registration</a> is the <a>context object</a>, and whose
+    <a for=notification>tag</a>, if <var>tag</var> is not the empty string, is <var>tag</var>.
+
+    <li><p>Let <var>objects</var> be an empty JavaScript array.
+
+    <li><p><a for=list>For each</a> <a>notification</a> in
+    <var>notifications</var>, in creation order, create a new {{Notification}}
+    object representing <a>notification</a> and push
+    that object to <var>objects</var>.
+
+    <li><p>Resolve <var>promise</var> with <var>objects</var>.
+  </ol>
+
+  <li><p>Return <var>promise</var>.
+</ol>
+
+<p class=note>This method returns zero or more new {{Notification}} objects which might represent
+the same underlying <a>notification</a> of {{Notification}} objects already in existence.
+
+<hr>
+
+<p>To <dfn>fire a service worker notification event named <var>e</var></dfn>
+given <var>notification</var> and <var>action</var>,
+<a>fire an event</a> named <var>e</var>, using {{NotificationEvent}}, with the
+{{NotificationEvent/notification}} attribute initialized to a new
+{{Notification}} object representing <var>notification</var> and the
+{{NotificationEvent/action}} attribute initialized to <var>action</var>.
+<!-- XXX need to define at what the event is fired -->
+
+<p>The {{NotificationEvent/notification}} attribute's getter must return the
+value it was initialized to.
+
+<p>The {{NotificationEvent/action}} attribute's getter must return the value it
+was initialized to.
+
+<p>The following is the <a>event handler</a> (and its corresponding
+<a>event handler event type</a>) that must be supported as attribute by the
+{{ServiceWorkerGlobalScope}} object:
+
+<table>
+  <thead>
+    <tr>
+      <th><a>event handler</a>
+      <th><a>event handler event type</a>
+  <tbody>
+    <tr>
+      <td><dfn attribute for=ServiceWorkerGlobalScope><code>onnotificationclick</code></dfn>
+      <td><code>notificationclick</code>
+    <tr>
+      <td><dfn attribute for=ServiceWorkerGlobalScope><code>onnotificationclose</code></dfn>
+      <td><code>notificationclose</code>
+</table>
+
+
+<h2 id=acknowledgments class=no-num>Acknowledgments</h2>
+
+<p>Thanks to
+Addison Phillips,
+Aharon (Vladimir) Lanin,
+Alex Russell,
+Anssi Kostiainen,
+Arkadiusz Michalski,
+Boris Zbarsky,
+David Håsäther,
+Doug Turner,
+Drew Wilson,
+Ehsan Akhgari,
+Frederick Hirsch,
+Ian Hickson,
+Jake Archibald,
+James Graham,
+John Mellor,
+Jon Lee,
+Jonas Sicking,
+Michael Cooper,
+Michael Henretty,
+Michael™ Smith,
+Michael van Ouwerkerk,
+Nicolás Satragno,
+Olli Pettay,
+Peter Beverloo,
+Philip Jägenstedt,
+Reuben Morais,
+Rich Tibbett,
+Robert Bindar,
+박상현 (Sanghyun Park),
+Simon Pieters,
+Theresa O'Connor,
+timeless, and
+triple-underscore
+for being awesome.
+
+<p>This standard is written by
+<a lang=nl href=https://annevankesteren.nl/>Anne van Kesteren</a>
+(<a href=https://www.mozilla.org/>Mozilla</a>,
+<a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>). An earlier iteration was written
+by John Gregg (<a href=https://www.google.com/>Google</a>,
+<a href=mailto:johnnyg@google.com>johnnyg@google.com</a>).
+
+<pre class="anchors">
+urlPrefix: https://html.spec.whatwg.org/multipage/
+    urlPrefix: webappapis.html; type: dfn
+        text: entry settings object
+urlPrefix: https://w3c.github.io/ServiceWorker/; type: dfn
+    text: handle functional event; url:handle-functional-event-algorithm
+urlPrefix: https://w3c.github.io/vibration/
+    urlPrefix: #dfn-; type: dfn
+        text: perform vibration
+        text: validate and normalize
+    urlPrefix: #idl-def-; type: interface
+        text: VibratePattern; url: vibratepattern
+urlPrefix: https://tc39.github.io/ecma262/#sec-object.; type: dfn
+    text: freeze
+</pre>
+
+<pre class="biblio">
+{
+    "LANG": {
+        "aliasOf" : "BCP47"
+    }
+}
+</pre>

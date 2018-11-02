@@ -1,0 +1,409 @@
+<pre class=metadata>
+Title: Default semantic properties for Custom Elements
+Shortname: aom-aria
+Level: 1
+Status: UD
+URL: https://wicg.github.io/aom
+Group: WICG
+Editor: Alice Boxhall, Google, aboxhall@google.com
+Editor: James Craig, Apple, jcraig@apple.com
+Editor: Dominic Mazzoni, Google, dmazzoni@google.com
+Editor: Alexander Surkov, Mozilla, surkov.alexander@gmail.com
+Abstract: This specification describes the additions to existing
+Abstract: specifications which will make it possible for web authors
+Abstract: to programmatically express semantics for Web Components.
+Markup Shorthands: markdown yes
+Markup Shorthands: dfn yes
+Markup Shorthands: idl yes
+</pre>
+
+<pre class=link-defaults>
+  spec:dom; type:attribute; text:host
+  spec:dom; type:dfn; text:host
+  spec:dom; type:dfn; for:/; text:shadow root
+  spec:dom; type:dfn; for:/; text:element
+</pre>
+
+<pre class=anchors>
+urlPrefix: https://www.w3.org/TR/core-aam-1.1/; spec: core-aam
+    type: dfn;
+        text: accessible object; url: dfn-accessible-object
+        text: accessibility tree; url: dfn-accessibility-tree
+        text: associated; url: include_elements
+        text: mapped; url: mapping_general
+        text: mapped role; url: mapping_role
+        text: mapped "multiselectable" state; url: ariaMultiselectableFalse
+
+urlPrefix: https://www.w3.org/TR/html-aam-1.0/; spec: html-aam
+    type: dfn;
+        text: role of button; url: details-id-17
+
+urlPrefix: https://www.w3.org/TR/wai-aria-1.2/; spec: ARIA
+    type: interface
+        text: AccessibilityRole; url: idl-def-accessibilityrole
+        text: AriaAttributes; url: idl-def-ariaattributes
+    type: attribute
+        text: role; url: idl-def-accessibilityrole-role
+        text: ariaActiveDescendant; url: idl-def-ariaattributes-ariaactivedescendant
+        text: ariaSelected; url: idl-def-ariaattributes-ariaselected
+
+urlPrefix: https://html.spec.whatwg.org/multipage/custom-elements.html; spec: html
+    type: interface
+        text: ElementDefinitionOptions
+        text: CustomElementRegistry
+    type: dfn
+        url: custom-element-definition
+            text: defined
+            text: custom element definition
+
+</pre>
+
+# Defining <a>custom element</a> semantics # {#custom-element-semantics}
+
+<section class="non-normative">
+## Introduction ## {#custom-elements-intro}
+
+<em>This section is non-normative.</em>
+
+Authors may potentially provide semantics for custom elements
+in two ways:
+* as part of the <a>custom element definition</a>
+* via an object provided to each instance of the custom element.
+
+### Defining custom element semantics as part of the <a>custom element definition</a> ### {#custom-element-definition-semantics}
+
+Authors may provide <em>immutable</em> default semantics for a custom element
+by setting properties via the {{ElementDefinitionOptions}} object
+passed in to the {{define()|CustomElementRegistry.define()}} method.
+
+The properties set on the {{ElementDefinitionOptions}} object
+become the default values to be used when <a>mapping</a>
+the custom element to an <a>accessible object</a>.
+
+Note: this is analogous to creating an "immutable class variable" -
+these semantic properties are associated with
+the custom element definition,
+not with each custom element instance.
+The semantics they define apply to <em>all</em> instances
+of the custom element.
+
+<aside class="example" id="custom-tab-example">
+For example, an author creating a custom tab control
+may define three custom elements for the individual tabs,
+the tab list and the tab panel:
+```js
+class TabListElement extends HTMLElement { ... }
+customElements.define("custom-tablist", TabListElement,
+                      { role: "tablist", ariaOrientation: "horizontal" });
+
+class TabElement extends HTMLElement { ... }
+customElements.define("custom-tab", TabElement,
+                      { role: "tab" });
+
+class TabPanelElement extends HTMLElement { ... }
+customElements.define("custom-tabpanel", TabPanelElement,
+                      { role: "tabpanel" });
+```
+
+When a `<custom-tab>` element is <a>mapped</a> into the <a>accessibility tree</a>,
+by default it will have a <a>mapped role</a> of `tab`.
+
+This is analogous to how a `<button>` element is, by default,
+mapped to an <a>accessible object</a> with a <a>role of `button`</a>.
+</aside>
+
+### Defining per-instance custom element semantics ### {#element-semantics}
+
+Note: see <a href="https://github.com/w3c/webcomponents/issues/758">Web Components issue #758</a>
+for up to date information on {{ElementInternals}}.
+
+A <a>custom element</a> author may use the {{ElementInternals}} object,
+created via {{createInternals()}},
+to modify the semantic state of an instance of a custom element
+in response to user interaction.
+
+The properties set on the {{ElementInternals}} object
+are used when <a>mapping</a> the element
+to an <a>accessible object</a>.
+
+Note: this is analogous to setting an "instance variable" -
+a copy of these semantic properties is created for each instance
+of the custom element.
+The semantics defined in each
+apply only to their associated custom element instance object.
+
+<aside class="example" id="custom-tab-example-continued">
+For example, the author creating the
+<a href="#custom-tab-example">`<custom-tab>`</a> and related elements
+may use the {{ElementInternals}} object
+to modify the semantic details for the elements
+as they change in response to user interaction.
+
+```js
+class CustomTab extends HTMLElement {
+  #internals = null;
+  #tablist = null;
+  #tabpanel = null;
+
+  constructor() {
+    super();
+    this.#internals = customElements.createInternals(this);
+    this.#internals.role = "tab";
+  }
+
+  // Observe the custom "active" attribute.
+  static get observedAttributes() { return ["active"]; }
+
+  connectedCallback() {
+    this.#tablist = this.parentElement;
+  }
+
+  setTabPanel(tabpanel) {
+    if (tabpanel.localName !== "custom-tabpanel" || tabPanel.id === "")
+      return;  // fail silently
+
+    this.#tabpanel = tabpanel;
+    tabpanel.setTab(this);
+    this.#internals.ariaControls = tabPanel;    // does not reflect
+  }
+
+  // ... setters/getters for custom properties which reflect to attributes
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    switch(name) {
+      case "active":
+        let active = (newValue != null);
+        this.#tabpanel.shown = active;
+
+        // When the custom "active" attribute changes,
+        // keep the accessible "selected" state in sync.
+        this.#internals.ariaSelected = (newValue !== null);
+
+        if (selected)
+          this.#tablist.setSelectedTab(this);  // ensure no other tab has "active" set
+        break;
+    }
+  }
+}
+
+customElements.define("custom-tab", CustomTab, { role: "tab", needsElementInternals: true });
+```
+
+Authors using these elements may override the default semantics
+using ARIA attributes as normal -
+see [[#semantics-precedence]].
+
+For example, an author may modify the appearance
+of a `<custom-tablist>` element to appear as a vertical list.
+They could add an `aria-orientation` attribute to indicate this,
+overriding the default semantics set in the custom element definition.
+
+```html
+<custom-tablist aria-orientation="vertical" class="vertical-tablist">
+  <custom-tab selected>Tab 1</custom-tab>
+  <custom-tab>Tab 2</custom-tab>
+  <custom-tab>Tab 3</custom-tab>
+</div>
+```
+
+Because the author-provided role overrides the default role,
+the <a>mapped</a> role will be based on the author-provided role in each case.
+
+</aside>
+
+</section>
+
+## Changes to custom element definition ## {#element-definition-options}
+
+Advisement: This section represents changes which should be made to
+[[HTML#custom-elements-core-concepts]], [[HTML#custom-element-definition]],
+[[HTML#custom-elements-api]], [[HTML#element-definition]],
+[[HTML#upgrades]] and [[HTML#custom-element-reactions]].
+
+*[...]*
+
+A custom element may have semantics defined when the custom element is <a>defined</a>. Otherwise, an autonomous custom element does not have any special meaning: it represents its children. A customized built-in element inherits the semantics of the element that it extends.
+
+*[...]*
+
+A custom element definition [includes]:
+
+<dl>
+  <dt>A set of default values for <dfn>semantic properties</dfn> (optional)</dt>
+  <dd>
+    A map, whose keys are each an attribute in either the
+    {{AccessibilityRole}} or {{AriaAttributes}} interface mixin.
+    The corresponding values are {{DOMString}}.
+  </dd>
+</dl>
+
+*[...]*
+
+<pre class="idl">
+// Existing IDL
+/*
+[Exposed=Window]
+interface CustomElementRegistry {
+  [CEReactions] void define(DOMString name, CustomElementConstructor constructor, optional ElementDefinitionOptions options);
+  // ...
+};
+
+dictionary ElementDefinitionOptions {
+  DOMString extends;
+};
+*/
+ElementDefinitionOptions includes AccessibilityRole;
+ElementDefinitionOptions includes AriaAttributes;
+
+dictionary ElementInternals {};
+
+ElementInternals includes AccessibilityRole;
+ElementInternals includes AriaAttributes;
+</pre>
+
+<strong>Element definition</strong> is a process of adding a
+<a>custom element definition</a> to the {{CustomElementRegistry}}.
+This is accomplished by the {{define()}} method.
+When invoked, the {{define(name, constructor, options)}} method must run these steps:
+
+*[...]*
+
+<ol start=11>
+  <li>Run the following substeps:
+    <ol>
+      <li>Let <var>semantics</var> be an empty map.
+      <li>For each key defined in {{AccessibilityRole}} and {{AriaAttributes}}:
+        <ol>
+          <li>If the key exists in <var>options</var>,
+            add an entry to <var>semantics</var> with that key
+            and the value provided in <var>options</var>.
+        </ol>
+      </li>
+      <li>If <var>semantics</var> is empty, set it to `null`.
+    </ol>
+  </li>
+  <li>Let <var ignore>definition</var> be
+    a new <a>custom element definition</a>
+    with name <var ignore>name</var>,
+    local name <var ignore>local name</var>,
+    constructor <var ignore>constructor</var>,
+    observed attributes <var ignore>observedAttributes</var>,
+    lifecycle callbacks <var ignore>lifecycleCallbacks</var>,
+    and, if <var>semantics</var> is non-null,
+    <a>semantic properties</a> <var>semantics</var>.</li>
+  <li>
+    Add <var ignore>definition</var> to this {{CustomElementRegistry}}.
+  </li>
+</ol>
+
+*[...]*
+
+# ARIA semantic precedence between {{ElementDefinitionOptions}}, {{ElementInternals}} and ARIA properties # {#semantics-precedence}
+
+<section class=non-normative>
+## Introduction ## {#semantics-precedence-intro}
+
+<em>This section is non-normative</em>
+
+In general, the precedence of semantic properties is that
+any ARIA property set directly on the {{Element}}
+(either via setting an attribute or via the associated <a>reflected</a> property)
+overrides a value for the same property on
+the `Element`'s {{ElementInternals}} object,
+and any ARIA property set either on the `Element`
+or the {{ElementInternals}} object
+will override a value set via the {{define()|CustomElementRegistry.define()}} method.
+
+<aside class="example">
+Suppose an author had created a custom checkbox element:
+
+```js
+class CustomCheckbox extends HTMLElement { /* ... */ }
+customElements.define("custom-checkbox", CustomCheckbox,
+                      { role: "checkbox", ariaChecked: "false" });
+```
+
+An author using a `<custom-checkbox>` element
+could use the reflected ARIA properties/content attributes to override the
+default values, just as they would when using a native element:</p>
+
+<xmp highlight="html">
+<-- ARIA role overrides implicit role -->
+<input type="checkbox" role="radio">
+
+<-- ARIA role overrides custom element role -->
+<custom-checkbox role="radio">
+</xmp>
+</aside>
+
+<aside class="example">
+In the implementation of the
+<a href="#custom-tab-example">`<custom-tab>`</a> element,
+if the author explicitly defined the default value for
+`ariaSelected` in the <a>custom element definition</a>,
+then the value set on the {{ElementInternals}} object
+in the `attributeChangedCallback()` method
+would override that default value:
+
+```js
+class TabElement extends HTMLElement {
+  // ... many details omitted
+
+  // When the custom "active" attribute changes,
+  // keep the accessible checked state in sync.
+  attributeChangedCallback(name, oldValue, newValue) {
+    switch(name) {
+      case "active":
+        let selected = (newValue != null);
+        this.#tabpanel.shown = selected;
+
+        // Note: overrides value set in custom element definition.
+        this.#internals.ariaSelected = selected;
+
+        // ensure no other tab has "selected" set
+        if (selected)
+          this.#tablist.setSelectedTab(this);
+        break;
+    }
+  }
+}
+
+// ariaSelected value defined here is overridden in attributeChanged callback
+customElements.define("custom-tab", CustomTab,
+                      { role: "tab", ariaSelected: "false" });
+```
+
+Then authors using the `<custom-tablist>` and `<custom-tab>` elements
+as a listbox could still override any semantic properties,
+including those set on the {{ElementInternals}} object,
+but no semantic implementation details would leak out:
+
+```html
+<custom-tablist aria-orientation="vertical">
+  <-- You would probably never want to do this, but it would work -->
+  <custom-tab selected aria-selected="false">Option 1</custom-tab>
+  <custom-tab>Option 2</custom-tab>
+  <custom-tab>Option 3</custom-tab>
+</custom-tablist>
+```
+
+</aside>
+</section>
+
+## Mapping semantics to the accessibility tree ## {#custom-elements-semantics-mapping}
+
+Advisement: This section represents changes which should be made to [[html-aam-1.0#mapping-html-to-accessibility-apis]].
+
+### Rules for exposing semantics of <a>custom elements</a> ### {#custom-eleent-semantics}
+
+If an element is <a>custom</a>,
+for each key in the element's {{ElementInternals}} object,
+the associated value must be mapped to accessibility APIs
+as if they were a property set on the element.
+
+If the element's <a>custom element definition</a> includes <var>semantics</var>,
+the value of each property in <var>semantics</var>
+must be <a>mapped</a> to accessibility APIs as if they were set on the element,
+unless there is a conflicting value for the same property
+in the element's {{ElementInternals}} object,
+or in a property set on the element.

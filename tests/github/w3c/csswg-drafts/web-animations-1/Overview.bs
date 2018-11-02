@@ -1,4 +1,4 @@
-<style type="text/css">
+<style>
 .informative-bg {
   margin: 1.5em 0 1em;
   padding: 1em;
@@ -61,15 +61,21 @@ div.switch > dl > dt:before {
 .esvalue {
   font-weight: bold;
 }
+
+.formula {
+  display: block;
+  margin: .5em 2em;
+}
 </style>
 
 <pre class='metadata'>
 Title: Web Animations
 Status: ED
 Work Status: Refining
-Shortname: web-animations
+Shortname: web-animations-1
 TR: https://www.w3.org/TR/web-animations-1/
 ED: https://drafts.csswg.org/web-animations-1/
+Previous version: https://www.w3.org/TR/2018/WD-web-animations-1-20181011/
 Previous version: https://www.w3.org/TR/2016/WD-web-animations-1-20160913/
 Previous version: https://www.w3.org/TR/2015/WD-web-animations-1-20150707/
 Previous version: https://www.w3.org/TR/2014/WD-web-animations-20140605/
@@ -83,11 +89,14 @@ Group: fxtf
 !Participate: IRC: <a href="ircs://irc.w3.org:6667/webanimations">#webanimations</a> on W3C's IRC
 Repository: w3c/csswg-drafts
 !Issue Tracking: <a href="https://github.com/w3c/csswg-drafts/labels/web-animations-1">GitHub</a>
-!Tests: <a href="https://github.com/w3c/web-platform-tests/tree/master/web-animations">web-platform-tests web-animations/</a> (<a href="https://github.com/w3c/web-platform-tests/labels/web-animations">ongoing work</a>)
+!Tests: <a href="https://github.com/web-platform-tests/wpt/tree/master/web-animations">web-platform-tests web-animations/</a> (<a href="https://github.com/web-platform-tests/wpt/labels/web-animations">ongoing work</a>)
 
 Editor: Brian Birtles 43194, Mozilla, bbirtles@mozilla.com
-Editor: Shane Stephens 47691, Google Inc, shans@google.com
-Editor: Douglas Stockwell, Google Inc, dstockwell@google.com
+Editor: Robert Flack 98451, Google Inc, flackr@google.com
+Editor: Stephen McGruer 96463, Google Inc, smcgruer@google.com
+Editor: Antoine Quint 51377, Apple Inc, graouts@apple.com
+Former Editor: Shane Stephens 47691, Google Inc, shans@google.com
+Former Editor: Douglas Stockwell, Google Inc, dstockwell@google.com
 Former Editor: Alex Danilo 31960, Google Inc, adanilo@google.com
 Former Editor: Tab Atkins 42199, Google Inc, jackalmage@gmail.com
 Abstract: This specification defines a model for synchronization and
@@ -97,7 +106,6 @@ Abstract: This specification defines a model for synchronization and
     specifications will define declarative means for exposing these
     features.
 Ignored Terms: double, boolean, DOMString, unsigned long, unrestricted double, (unrestricted double or DOMString)
-Ignored Vars: RGB|A, G, t
 Link Defaults: css-transforms (property) transform
 </pre>
 <pre class="anchors">
@@ -144,6 +152,8 @@ urlPrefix: https://html.spec.whatwg.org/multipage/webappapis.html; type: dfn; sp
     text: queue a microtask
     text: relevant Realm; url: concept-relevant-realm
     text: update the rendering
+urlPrefix: https://html.spec.whatwg.org/multipage/webappapis.html; type: interface; spec: html
+    text: EventHandler
 urlPrefix: https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html.html; type: dfn; spec: html
     text: animation frame callbacks; url: animation-frames
     text: run the animation frame callbacks
@@ -168,6 +178,8 @@ urlPrefix: https://drafts.csswg.org/css-transitions/; type: dfn; spec: css-trans
     text: events from CSS transitions; url: transition-events
 urlPrefix: https://drafts.csswg.org/css-animations/; type: dfn; spec: css-animations-1
     text: events from CSS animations; url: events
+urlPrefix: https://drafts.csswg.org/css-writing-modes-4/; type: dfn; spec: css-writing-modes-4
+    text: equivalent physical property; url: logical-to-physical
 </pre>
 <pre class="link-defaults">
 spec:dom; type:interface; text:EventTarget
@@ -187,7 +199,7 @@ spec:css-backgrounds-3; type:property;
 <script type="text/x-mathjax-config">
   MathJax.Hub.Config({showMathMenu: false});
 </script>
-<script src="MathJax/MathJax.js?config=MML_SVG" type="text/javascript"></script>
+<script src="MathJax/MathJax.js?config=MML_SVG"></script>
 
 <h2 id="introduction">Introduction</h2>
 <div class='informative-bg'><em>This section is non-normative</em>
@@ -317,7 +329,8 @@ elem.getAnimations().filter(
     impractical to wait for such animations to run to completion.
     Rather, it is desirable to seek the animations to specific times.
 
-<div class='example'><pre class='lang-javascript'>
+<div class='example'>
+<pre class='lang-javascript'>
 // Seek to the half-way point of an animation and check that the opacity is 50%
 elem.getAnimations().forEach(
   animation =&gt;
@@ -599,8 +612,8 @@ a {{Document}} |doc| at timestamp |now|, run these steps:
      <a lt="timeline current time">current time</a> of a [=timeline=] also
      involves:
 
-     *    Updating the [=current time=] of any [=animations=] associated with
-          the timeline.
+     *    Updating the [=current time=] of any [=animations=] <a lt="associated
+          with a timeline">associated with</a> the timeline.
      *    Running the [=update an animation's finished state=] procedure for any
           animations whose [=current time=] has been updated.
      *    Queueing [=animation events=] for any such animations.
@@ -803,9 +816,6 @@ follows:
     <var>animation</var>, if any.
 1.  If <var>new effect</var> is the same object as <var>old effect</var>,
     abort this procedure.
-1.  If <var>new effect</var> is null and <var>old effect</var> is not null,
-    run the procedure to <a>reset an animation's pending tasks</a> on
-    <var>animation</var>.
 1.  If <var>animation</var> has a <a>pending pause task</a>, reschedule that
     task to run as soon as <var>animation</var> is <a>ready</a>.
 1.  If <var>animation</var> has a <a>pending play task</a>, reschedule that task
@@ -1105,14 +1115,12 @@ as CSS Animations [[CSS-ANIMATIONS-1]].
     <var>animation</var> has a <a>pending pause task</a>, and false otherwise.
 1.  Let <var>has pending ready promise</var> be a boolean flag that is
     initially false.
-1.  Let |effective playback rate| be |animation|'s [=pending playback rate=], if
-    set, otherwise let it be |animation|'s [=playback rate=].
 1.  Perform the steps corresponding to the <em>first</em> matching
     condition from the following, if any:
 
     <div class="switch">
 
-    :   If |effective playback rate| &gt; 0,
+    :   If |animation|'s [=effective playback rate=] &gt; 0,
         the <var>auto-rewind</var> flag is true and <em>either</em>
         <var>animation</var>'s:
 
@@ -1121,7 +1129,7 @@ as CSS Animations [[CSS-ANIMATIONS-1]].
         *   <a>current time</a> &ge; <a>target effect end</a>,
 
     ::  Set <var>animation</var>'s <a>hold time</a> to zero.
-    :   If |effective playback rate| &lt; 0,
+    :   If |animation|'s [=effective playback rate=] &lt; 0,
         the <var>auto-rewind</var> flag is true and <em>either</em>
         <var>animation</var>'s:
 
@@ -1134,8 +1142,8 @@ as CSS Animations [[CSS-ANIMATIONS-1]].
         abort these steps.
         Otherwise, set <var>animation</var>'s <a>hold time</a> to <a>target
         effect end</a>.
-    :   If |effective playback rate| = 0 and <var>animation</var>'s
-        <a>current time</a> is <a>unresolved</a>,
+    :   If |animation|'s [=effective playback rate=] = 0 and |animation|'s
+        [=current time=] is [=unresolved=],
     ::  Set <var>animation</var>'s <a>hold time</a> to zero.
 
     </div>
@@ -1617,12 +1625,9 @@ An animation can be advanced to the natural end of its current playback
 direction by using the procedure to <dfn>finish an animation</dfn>
 for <var>animation</var> defined below:
 
-1.  Let |effective playback rate| be |animation|'s [=pending playback rate=], if
-    set, otherwise let it be |animation|'s [=playback rate=].
-
-1.  If the |effective playback rate| is zero,
-    or if |effective playback rate| &gt; 0 and <a>target effect end</a> is
-    infinity,
+1.  If |animation|'s [=effective playback rate=] is zero,
+    or if |animation|'s [=effective playback rate=] &gt; 0
+    and <a>target effect end</a> is infinity,
     <a>throw</a> an <span class=exceptionname>InvalidStateError</span> and
     abort these steps.
 
@@ -1713,7 +1718,7 @@ as follows:
         origin-relative time">convert timeline times to origin-relative
         time</a>, let the [=scheduled event time=] be the result of applying
         that procedure to |timeline time|.
-        Otherwise, the [scheduled event time=] is an [=unresolved=] [=time
+        Otherwise, the [=scheduled event time=] is an [=unresolved=] [=time
         value=].
 
         Otherwise, [=queue a task=] to [=dispatch=] |cancelEvent| at
@@ -1780,6 +1785,10 @@ process).
 
 Initially the [=pending playback rate=] of an [=animation=] is unset.
 
+The <dfn>effective playback rate</dfn> of an |animation| is
+its [=pending playback rate=], if set,
+otherwise it is the animation's [=playback rate=].
+
 When an [=animation=], |animation|, is to <dfn>apply any pending playback
 rate</dfn> the following steps are performed:
 
@@ -1792,6 +1801,16 @@ rate</dfn> the following steps are performed:
 The procedure to <dfn>seamlessly update the playback rate</dfn> an
 [=animation=], |animation|, to |new playback rate| preserving its [=current
 time=] is as follows:
+
+1.  Let |previous play state| be |animation|'s [=play state=].
+
+    Note: It is necessary to record the play state
+    before updating |animation|'s [=effective playback rate=] since,
+    in the following logic,
+    we want to immediately apply the [=pending playback rate=] of |animation|
+    if it is <em>currently</em> <a lt="finished play state">finished</a>
+    regardless of whether or not it will still be finished after we
+    apply the [=pending playback rate=].
 
 1.  Let |animation|'s [=pending playback rate=] be |new playback rate|.
 
@@ -1807,13 +1826,12 @@ time=] is as follows:
         playback rate=] when they run so there is no further action required in
         this case.
 
-    :   If |animation|'s [=play state=] is <a lt="idle play state">idle</a>
+    :   If |previous play state| is <a lt="idle play state">idle</a>
         or <a lt="paused play state">paused</a>,
 
     ::  [=Apply any pending playback rate=] on |animation|.
 
-    :   If |animation|'s [=play state=] is <a lt="finished play
-        state">finished</a>,
+    :   If |previous play state| is <a lt="finished play state">finished</a>,
 
     ::  1.  Let the |unconstrained current time| be the result of calculating
             the [=current time=] of |animation| substituting an [=unresolved=]
@@ -1859,11 +1877,9 @@ The procedure to <dfn>reverse an animation</dfn> of <a>animation</a>
 1.  Let |original pending playback rate| be |animation|'s [=pending playback
     rate=].
 
-1.  Let |effective playback rate| be |animation|'s [=pending playback rate=] if
-    it has one, or |animation|'s [=playback rate=] otherwise.
-
-1.  Let |animation|'s [=pending playback rate=] be <code>&minus;|effective
-    playback rate|</code>.
+1.  Let |animation|'s [=pending playback rate=] be the additive inverse of
+    its [=effective playback rate=]
+    (i.e. <code>-[=effective playback rate=]</code>).
 
 1.  Run the steps to <a>play an animation</a> for <var>animation</var>
     with the <var>auto-rewind</var> flag set to true.
@@ -1917,9 +1933,9 @@ condition from the following:
 :   For <var>animation</var>, <a>current time</a> is <a
     lt=unresolved>resolved</a> and <em>either</em> of the following conditions
     are true:
-    *   [=playback rate=] &gt; 0 and
+    *   |animation|'s [=effective playback rate=] &gt; 0 and
         <a>current time</a> &ge; <a>target effect end</a>; <em>or</em>
-    *   [=playback rate=] &lt; 0 and
+    *   |animation|'s [=effective playback rate=] &lt; 0 and
         <a>current time</a> &le; 0,
 ::  &rarr; <dfn lt="finished play state">finished</dfn>
 :   Otherwise,
@@ -2872,7 +2888,7 @@ It is often desirable to control the rate at which an <a>animation
 effect</a> progresses.
 For example, easing the rate of animation can create a sense of
 momentum and produce a more natural effect.
-The CSS Timing Functions Module [[!CSS-TIMING-1]] defines <a>timing
+The CSS Easing Functions Module [[!CSS-EASING-1]] defines <a>timing
 functions</a> for this purpose.
 
 <a>Animation effects</a> have one <a>timing function</a> associated with
@@ -2903,8 +2919,8 @@ The <dfn>transformed progress</dfn> is calculated from the
 
 1.  Return the result of evaluating the <a>animation effect</a>'s <a>timing
     function</a> passing <a>directed progress</a> as the <a
-    spec=css-timing>input progress value</a> and <var>before flag</var> as the
-    <a spec=css-timing>before flag</a>.
+    spec=css-easing>input progress value</a> and <var>before flag</var> as the
+    <a spec=css-easing>before flag</a>.
 
 <h3 id="the-iteration-progress">The iteration progress</h3>
 
@@ -2933,7 +2949,7 @@ applied to the target properties (see [[#combining-effects]]).
 
 <h3 id="introduction-to-the-animation-model">Introduction</h3>
 
-An <a>animation effect</a> may have zero or more associated properties that
+An <a>animation effect</a> has zero or more associated properties that
 it affects in response to changes to its timing output. These properties
 are referred to as the effect's <dfn lt="target property">target
 properties</dfn>.
@@ -2944,290 +2960,126 @@ an <dfn>effect value</dfn> for each <a>animatable</a> <a>target property</a>
 by applying the procedures from the <a>animation type</a> appropriate to the
 property.
 
-<h3 id="procedures-for-animating-properties">Procedures for animating properties</h3>
+<h3 id="animating-properties">Animating properties</h3>
 
-Unless specifically defined otherwise, all CSS properties are considered
+Unless otherwise specified, all CSS properties are
 <dfn id="concept-animatable">animatable</dfn>.
-In order to animate a property, the following procedures must be defined.
+How property values combine is defined by
+the <dfn export>Animation type</dfn> line
+in each property's property definition table:
 
-*   <dfn lt="animation interpolation">interpolation</dfn> &mdash;
-    given two property values <var>V</var><sub>start</sub> and
-    <var>V</var><sub>end</sub>, produces an intermediate value
-    <var>V</var><sub>result</sub> at a distance of <var>p</var> along the
-    interval between <var>V</var><sub>start</sub> and
-    <var>V</var><sub>end</sub> such that
-    <var>p</var> = 0 produces <var>V</var><sub>start</sub> and
-    <var>p</var> = 1 produces <var>V</var><sub>end</sub>.
-    The range of <var>p</var> is (&minus;&infin;, &infin;) due to the
-    effect of <a>timing functions</a>.
-    As a result, this procedure must also define extrapolation
-    behavior for <var>p</var> outside [0, 1].
+<dl export>
+  <dt><dfn>not animatable</dfn>
+  <dd>
+    The property is not animatable.
+    It is not processed when listed in an animation keyframe,
+    and is not affected by transitions.
 
-*   <dfn lt="animation addition">addition</dfn> &mdash; given two
-    property values
-    <var>V</var><sub>a</sub> and <var>V</var><sub>b</sub>, returns the
-    sum of the two properties, <var>V</var><sub>result</sub>.
-    For addition that is not commutative (for example, matrix
-    multiplication) <var>V</var><sub>a</sub> represents the first term
-    of the operation and <var>V</var><sub>b</sub> represents the
-    second.
+    Note: Properties are typically excluded from animation
+    because animating them would create excessive complications.
+    For example, properties defining animation parameters are <a>not animatable</a>
+    since doing so would create complex recursive behavior.
 
-    <div class='informative-bg'><em>This section is non-normative</em>
+    Note: An <a>animation effect</a> that targets only properties
+    that are <a>not animatable</a> will still exhibit
+    the usual behavior for an <a>animation effect</a>
+    such as firing events and
+    delaying the fulfilment of the <a>animation</a>'s
+    <a>current finished promise</a>.
 
-    While <a lt="animation addition">addition</a> can often be
-    expressed in terms of the same weighted sum function used to
-    define <a lt="animation interpolation">interpolation</a>,
-    this is not always the case.
-    For example, interpolation of transform matrices involves
-    decomposing and interpolating the matrix components whilst
-    addition relies on matrix multiplication.
-
+  <dt><dfn>discrete</dfn>
+  <dd>
+    The property's values cannot be meaningfully combined,
+    thus it is <a>not additive</a> and <a>interpolation</a> swaps
+    from <var ignore>V<sub>a</sub></var> to <var ignore>V<sub>b</sub></var>
+    at 50% (<var ignore>p=0.5</var>),
+    i.e.
+    <div role="math" class="formula">
+      <math xmlns="http://www.w3.org/1998/Math/MathML">
+        <msub><mi>V</mi><mn>result</mn></msub><mo>=</mo>
+        <mrow>
+          <mfenced open="{" close="">
+            <mtable>
+              <mtr>
+                <mtd columnalign="left">
+                  <msub><mi>V</mi><mn>start</mn></msub>
+                </mtd>
+                <mtd columnalign="left">
+                  <mtext>if&nbsp;</mtext><mi>p</mi>
+                  <mo>&lt;</mo><mn>0.5</mn>
+                </mtd>
+              </mtr>
+              <mtr>
+                <mtd columnalign="left">
+                  <msub><mi>V</mi><mn>end</mn></msub>
+                </mtd>
+                <mtd columnalign="left">
+                  <mtext>if&nbsp;</mtext><mi>p</mi>
+                  <mo>&ge;</mo><mn>0.5</mn>
+                </mtd>
+              </mtr>
+            </mtable>
+          </mfenced>
+        </mrow>
+      </math>
     </div>
 
-*   <dfn lt="animation accumulation">accumulation</dfn> &mdash;
-    given two property values
-    <var>V</var><sub>a</sub> and <var>V</var><sub>b</sub>, returns the
-    result, <var>V</var><sub>result</sub>, of combining
-    the two operands such that <var>V</var><sub>b</sub> is treated as
-    a <em>delta</em> from <var>V</var><sub>a</sub>.
-    For accumulation that is not commutative (for example,
-    accumulation of mismatched transform lists)
-    <var>V</var><sub>a</sub> represents the first term of the
-    operation and <var>V</var><sub>b</sub> represents the second.
+  <dt><dfn>by computed value</dfn>
+  <dd>
+    Corresponding individual components of the <a>computed values</a>
+    are combined (interpolated, added, or accumulated)
+    using the indicated procedure for that value type
+    (see [[css-values-4#combining-values]]).
+    If the number of components or the types of corresponding components
+    do not match,
+    or if any component value uses [=discrete=] animation
+    and the two corresponding values do not match,
+    then the property values combine as [=discrete=].
 
-    <div class='informative-bg'><em>This section is non-normative</em>
+  <dt><dfn>repeatable list</dfn>
+  <dd>
+    Same as <a>by computed value</a>
+    except that if the two lists have differing numbers of items,
+    they are first repeated to the least common multiple number of items.
+    Each item is then combined <a>by computed value</a>.
+    If a pair of values cannot be combined
+    or if any component value uses [=discrete=] animation,
+    then the property values combine as [=discrete=].
 
-    For many types of animation such as numbers or lengths, <a
-    lt="animation accumulation">accumulation</a> is defined to
-    be identical to <a lt="animation addition">addition</a>.
+    Note: The repeatable list concept ensures that
+    a list that is conceptually repeated to a certain length
+    (as 'background-origin' is repeated to the length of
+    the 'background-image' list)
+    or repeated infinitely
+    will smoothly transition between any values,
+    and so that the computed value
+    will properly represent the result
+    (and potentially be inherited correctly).
 
-    A common case where the definitions differ is for list-based
-    types where <a lt="animation addition">addition</a> may be
-    defined as appending to a list
-    whilst <a lt="animation accumulation">accumulation</a> may
-    be defined as component-based addition.
-    For example, the filter list values "blur(2)" and
-    "blur(3)", when <a lt="animation addition">added</a>
-    together may produce "blur(2) blur(3)", but when
-    <a lt="animation accumulation">accumulated</a>,
-    may produce "blur(5)".
+  <dt>(See prose)
+  <dd>
+    Some properties have specific interpolation behavior not covered by the
+    above cases;
+    in this case the animation behavior will be specified explicitly
+    for that property.
+</dl>
 
-    </div>
+The [=animation type=] of properties that do not yet include
+an [=Animation type=] line in their property definition,
+is defined in [[#animation-types]].
 
-The above procedures apply to CSS <a lt="computed value">computed
-property values</a> (see [[#calculating-computed-keyframes]]). As a result, it
-is not necessary to define, for example,  how to add a <<length>> value of
-"15pt" with "5em" since such values will be resolved to pixel values before
-being passed to any of the above procedures.
+<h4 id=custom-properties>
+Custom Properties</h4>
 
-<h3 id="animation-types">Animation types</h3>
-
-The specific procedures used for animating a given property
-are referred to as the property's <dfn>animation type</dfn>.
-
-The <a>animation type</a> of each CSS property is defined by the
-"Animatable:" line in the summary of the property's definition or in
-[[CSS-TRANSITIONS-1]] for properties that lack a such a line.
-For <a>custom properties</a> registered using the {{CSS/registerProperty()}}
-method for the <a>current global object</a>, the <a>animation type</a> is
-derived from the type used to define the property's
-{{PropertyDescriptor/syntax}}.
-Where there is no <a>animation type</a> that corresponds to the property's
-specified {{PropertyDescriptor/syntax}} (e.g. when the syntax is "*") the
-<a>animation type</a> is <a lt="discrete animation type">discrete</a>.
-The <a>animation type</a> of all other custom properties is <a lt="discrete
-animation type">discrete</a>.
-
-Issue: The above doesn't explain the animation type to use for of syntax
-such as "&lt;length&gt;+". We will fix this once the definition of animation
-types has moved to CSS Values and Units where we should define generic handling
-for list types etc.
-
-Following is a series of pre-defined <a>animation types</a>.
-[[CSS-TRANSITIONS-1]] provides further CSS-specific <a>animation
-types</a>.
-
-For <a>animation types</a> that do not define a specific procedure
-for <a lt="animation addition">addition</a> or which are defined as
-<dfn>not additive</dfn>, the <a
-lt="animation addition">addition procedure</a> is simply
-<var>V</var><sub>res</sub> = <var>V</var><sub>b</sub>.
-
-For <a>animation types</a> that do not define a specific procedure
-for <a lt="animation accumulation">accumulation</a>, the <a
-lt="animation accumulation">accumulation procedure</a> is identical
-to the <a lt="animation addition">addition procedure</a> for that
-type.
-
-<h4 id="not-animatable-section">Not animatable</h4>
-
-Some properties are specifically defined as <dfn
-id="concept-not-animatable">not animatable</dfn>.
-For example, properties defining animation parameters are <a>not animatable</a>
-since doing so would create complex recursive behavior.
-
-Unlike other <a>animation types</a>, no procedures for
-<a lt="animation interpolation">interpolation</a>,
-<a lt="animation addition">addition</a> and
-<a lt="animation accumulation">accumulation</a>
-are defined for properties whose <a>animation
-type</a> is <a>not animatable</a> since these
-properties should not be modified.
-
-An <a>animation effect</a> that targets a property that is
-<a>not animatable</a> will still exhibit the
-usual behavior for an <a>animation effect</a> such as
-delaying the fulfilment of an <a>animation</a>'s <a>current finished
-promise</a>.
-
-<h4 id="discrete-animation-type-section">Discrete</h4>
-
-A property whose <a>animation type</a> is <dfn
-lt="discrete animation type">discrete</dfn> has the following behavior:
-
-*   <a lt="animation interpolation">interpolation</a>:
-    <div role="math" aria-describedby="math-string-interpolation"
-    style="display: inline">
-    <math xmlns="https://www.w3.org/1998/Math/MathML">
-      <msub><mi>V</mi><mn>result</mn></msub><mo>=</mo>
-      <mrow>
-        <mfenced open="{" close="">
-          <mtable>
-            <mtr>
-              <mtd columnalign="left">
-                <msub><mi>V</mi><mn>start</mn></msub>
-              </mtd>
-              <mtd columnalign="left">
-                <mtext>if&nbsp;</mtext><mi>p</mi>
-                <mo>&lt;</mo><mn>0.5</mn>
-              </mtd>
-            </mtr>
-            <mtr>
-              <mtd columnalign="left">
-                <msub><mi>V</mi><mn>end</mn></msub>
-              </mtd>
-              <mtd columnalign="left">
-                <mtext>if&nbsp;</mtext><mi>p</mi>
-                <mo>&ge;</mo><mn>0.5</mn>
-              </mtd>
-            </mtr>
-          </mtable>
-        </mfenced>
-      </mrow>
-    </math>
-    <div id="math-string-interpolation" class="explanation">
-      <var>V</var><sub>result</sub> =
-        <var>V</var><sub>start</sub>, if <var>p</var> &lt; 0.5 or
-        <var>V</var><sub>end</sub>, if <var>p</var> &ge; 0.5
-    </div>
-    </div>
-
-<h4 id="real-number-animation-type-section">Real number</h4>
-
-A property whose <a>animation type</a> is <dfn
-lt="real number animation type">real number</dfn> has the following behavior:
-
-*   <a lt="animation interpolation">interpolation</a>:
-    <var>V</var><sub>result</sub> =
-      (1 - <var>p</var>) &times; <var>V</var><sub>start</sub> +
-      <var>p</var> &times; <var>V</var><sub>end</sub>
-*   <a lt="animation addition">addition</a>:
-    <var>V</var><sub>result</sub> =
-      <var>V</var><sub>a</sub> + <var>V</var><sub>b</sub>
-
-<h4 id="length-percentage-or-calc-animation-type-section">Length, percentage, or
-calc</h4>
-
-A property whose <a>animation type</a> is <dfn
-lt="length, percentage, or calc animation type">length, percentage, or
-calc</dfn> has the following behavior:
-
-*   <a lt="animation interpolation">interpolation</a>:
-    as defined in [[CSS-TRANSITIONS-1]].
-*   <a lt="animation addition">addition</a>:
-    <var>V</var><sub>result</sub> =
-    calc(<var>V</var><sub>a</sub> + <var>V</var><sub>b</sub>)<br>
-    (Nested <code>calc()</code> functions are expanded when
-    determining the computed value as defined in <a
-    href="https://www.w3.org/TR/css-values-3/#calc-computed-value">CSS
-    Values and Units</a> [[!CSS3VAL]].)
-
-<h4 id="color-animation-type-section">Color</h4>
-
-A property whose <a>animation type</a> is <dfn
-lt="color animation type">color</dfn> has the following behavior:
-
-*   <a lt="animation interpolation">interpolation</a>:
-    as defined in [[CSS-TRANSITIONS-1]].
-*   <a lt="animation addition">addition</a>:
-    as with <a lt="real number animation type">real number</a> but performed on
-    each RGBA color component in premultiplied space.
-
-    Note: Since negative color is not currently supported, clamping of
-          the channel values may be performed upon each addition or once
-          when <a>composition</a> is complete.
-    </p>
-
-<h4 id="transform-list-animation-type-section">Transform list</h4>
-
-A property whose <a>animation type</a> is <dfn
-lt="transform list animation type">transform list</dfn> has the following
-behavior:
-
-*   <a lt="animation interpolation">interpolation</a>:
-    as defined in <a
-    href="https://www.w3.org/TR/css-transforms-1/#interpolation-of-transforms">Interpolation
-    of Transforms</a> [[CSS3-TRANSFORMS]].
-
-*   <a lt="animation addition">addition</a>: performed by
-    concatenating transform lists as
-    &lsquo;<var>V</var><sub>a</sub> <var>V</var><sub>b</sub>&rsquo;.
-
-*   <a lt="animation accumulation">accumulation</a>:
-
-    1.  Beginning at the end of each list, <var>V</var><sub>a</sub>
-        and <var>V</var><sub>b</sub>,
-        find the largest contiguous portion of each list where the
-        corresponding list elements from each list have the same
-        transform type.
-        Call the matching portions from <var>V</var><sub>a</sub> and
-        <var>V</var><sub>b</sub>, <var>V</var><sub>matching-a</sub>
-        and
-        <var>V</var><sub>matching-b</sub> respectively and likewise
-        <var>V</var><sub>remainder-a</sub> and
-        <var>V</var><sub>remainder-b</sub> for the non-matching
-        parts.
-        <p class="issue">
-          We should probably expand 2d functions to their 3d
-          equivalents before matching?
-        </p>
-    2.  Let <var>V</var><sub>combined</sub> be a transform list
-        combining <var>V</var><sub>matching-a</sub> and
-        <var>V</var><sub>matching-b</sub> by adding the numeric
-        components of each corresponding function.
-        <p class="issue">
-          This needs to be more specific, e.g. when combining
-          <code>translate(20px)</code> and <code>translate(30px
-          10px)</code> we have to expand the first function to
-          <code>translate(20px 0px)</code> first.
-          Probably need to define unit conversion too.
-        </p>
-    3.  The result of accumulation is a transform list created by <a
-        lt="animation addition">adding</a> the combined result
-        with the non-matching portions of the two lists as follows:
-        &lsquo;<var>V</var><sub>remainder-a</sub>
-        <var>V</var><sub>remainder-b</sub>
-        <var>V</var><sub>combined</sub>&rsquo;.
-
-<h4 id="other-animation-types">Other animation types</h4>
-
-The set of <a>animation types</a> defined here may be extended
-by other specifications.
-For example, properties with using the &lt;image&gt; type are
-animated using the interpolation behavior defined in <a
-href="https://drafts.csswg.org/css-images/#interpolating-images">CSS Image
-Values and Replaced Content</a>
-[[CSS3-IMAGES]].
+For <a>custom properties</a> registered
+using the {{CSS/registerProperty()}} method for the <a>current global object</a>,
+the <a>animation type</a> is <a>by computed value</a>,
+derived from the type used to define the property's {{PropertyDescriptor/syntax}}.
+Where there is no <a>computed value</a> type that corresponds
+to the property's specified {{PropertyDescriptor/syntax}}
+(e.g. when the syntax is "*")
+or when the <a>custom property</a> is not registered,
+the <a>animation type</a> is <a>discrete</a>.
 
 
 <h3 id="keyframe-effects">Keyframe effects</h3>
@@ -3266,13 +3118,13 @@ The <a>timing function</a> specified on the last keyframe in the
 list is never applied.
 
 Each <a>keyframe</a> may have a <dfn>keyframe-specific composite
-operation</dfn> that, if not null,  is applied to all values
-specified in that <a>keyframe</a>.
+operation</dfn> that, if set, is applied to all values specified in that
+<a>keyframe</a>.
 The possible operations and their meanings are identical to those defined
 for the <a>composite operation</a> associated with the <a>keyframe effect</a>
 as a whole in [[#effect-composition]].
 If the <a>keyframe-specific composite operation</a> for a <a>keyframe</a>
-is null, the <a>composite operation</a> specified for the
+is not set, the <a>composite operation</a> specified for the
 <a>keyframe effect</a> as a whole is used for values specified in that keyframe.
 
 <h4 id="calculating-computed-keyframes">Calculating computed keyframes</h4>
@@ -3351,6 +3203,9 @@ a <a>target element</a> for which computed property values can be calculated.
         corresponding property and computed value to <var>computed
         keyframe</var>.
         For shorthand properties, add the equivalent longhand properties.
+        For logical properties [[!CSS-LOGICAL-1]], add the [=equivalent physical
+        properties=] [[!CSS-WRITING-MODES-4]] based on the computed value of
+        'writing-mode' and/or 'direction' for <a>target element</a>.
 
         For example, if <var>keyframe</var> has a value of &lsquo;12pt&rsquo;
         for the 'border-width' property, the user agent may produce a computed
@@ -3362,10 +3217,9 @@ a <a>target element</a> for which computed property values can be calculated.
         each of the longhand properties, and each with the computed value,
         &lsquo;16px&rsquo;.
 
-        If conflicts arise when expanding shorthand properties due to
-        shorthand properties overlapping with existing longhand properties or
-        other with other shorthand properties, apply the following rules in
-        order until the conflict is resolved:
+        If conflicts arise when expanding shorthand properties or replacing
+        logical properties with physical propertiess, apply the following rules
+        in order until the conflict is resolved:
 
         1.  Longhand properties override shorthand properties (e.g.
             'border-top-color' overrides 'border-top').
@@ -3377,6 +3231,7 @@ a <a>target element</a> for which computed property values can be calculated.
             IDL attribute</a> algorithm [[!CSSOM]]) appears earlier when
             sorted in ascending order by the Unicode codepoints that make up
             each IDL name, override those who appear later.
+        1.  Physical properties override logical properties.
 
 1.  Apply the procedure to <a>compute missing keyframe offsets</a> to
     <var>computed keyframes</var>.
@@ -3484,8 +3339,8 @@ referenced by a <a>keyframe effect</a> as one of its
             on <var>keyframe</var> with the result of combining
             <var>underlying value</var> (<var>V</var><sub>a</sub>) and
             <var>value to combine</var> (<var>V</var><sub>b</sub>)
-            using the <var>composite operation to use</var>
-            procedure defined by the <var>target property</var>'s
+            using the procedure for the <var>composite operation to use</var>
+            corresponding to the <var>target property</var>'s
             <a>animation type</a>.
 
     1.  If this <a>keyframe effect</a> has an <a>iteration
@@ -3499,7 +3354,7 @@ referenced by a <a>keyframe effect</a> as one of its
             keyframes</var> (<var>V</var><sub>a</sub>) with the
             property value on <var>keyframe</var>
             (<var>V</var><sub>b</sub>) using the <a
-            lt="animation accumulation">accumulation procedure</a>
+            lt="value accumulation">accumulation procedure</a>
             defined for <var>target property</var>.
 
         Note: The order of arguments here is important. In the case where
@@ -3527,13 +3382,13 @@ referenced by a <a>keyframe effect</a> as one of its
     <var>interval endpoints</var> passing <var>interval distance</var>
     as the input progress.
 1.  Return the result of applying the <a
-    lt="animation interpolation">interpolation procedure</a> defined
+    lt="interpolation">interpolation procedure</a> defined
     by the <a>animation type</a> of the <var>target property</var>,
     to the values of the <var>target property</var> specified on the
     two keyframes in <var>interval endpoints</var> taking the first such
     value as <var>V</var><sub>start</sub> and the second as
     <var>V</var><sub>end</sub> and using <var>transformed
-    distance</var> as the interpolation parameter <var>p</var>.
+    distance</var> as the interpolation parameter <var ignore>p</var>.
 
 <div class="note">
 
@@ -3610,11 +3465,11 @@ effect</a>'s <a lt="target property">target properties</a>.
 Since it is possible for multiple <a>in effect</a> <a>keyframe effects</a> to
 target the same property it is often necessary to combine the results of several
 <a>keyframe effects</a> together.
-This process is called <dfn lt='composition'>compositing</dfn> and is
-based on establishing an <a>effect stack</a> for each property
+This process is called <dfn lt='composite | composition'>compositing</dfn>
+and is based on establishing an <a>effect stack</a> for each property
 targeted by an <a>in effect</a> <a>animation effect</a>.
 
-After compositing the results of <a>keyframe
+After [=compositing=] the results of <a>keyframe
 effects</a> together, the composited result is combined with other
 values specified for the <a>target property</a>.
 
@@ -3680,8 +3535,10 @@ by one or more <a>keyframe effects</a> is an <dfn>effect
 stack</dfn> that establishes the relative composite order of the <a>keyframe
 effects</a>.
 
-The relative <dfn export>composite order</dfn> of any two <a>keyframe
-effects</a>, <var>A</var> and <var>B</var>, within an <a>effect stack</a> is
+The relative
+<dfn lt="animation composite order" local-lt="composite order" export>composite order</dfn>
+of any two <a>keyframe effects</a>, <var>A</var> and <var>B</var>,
+within an <a>effect stack</a> is
 established by comparing their properties as follows:
 
 1.  Let the <dfn>associated animation of an animation effect</dfn>
@@ -3742,18 +3599,18 @@ follows:
     with the <a>underlying value</a> is simply the <a>effect value</a>.
 :   <dfn lt="composite operation add">add</dfn>
 ::  The <a>effect value</a> is <a
-    lt="animation addition">added</a> to the <a>underlying
+    lt="value addition">added</a> to the <a>underlying
     value</a>.
     For <a>animation types</a> where the
-    <a lt="animation addition">addition operation</a> is defined
+    <a lt="value addition">addition operation</a> is defined
     such that it is not commutative, the order of the operands is
     <code><a>underlying value</a> + <a>effect value</a></code>.
 :   <dfn lt="composite operation accumulate">accumulate</dfn></dt>
 ::  The <a>effect value</a> is <a
-    lt="animation accumulation">accumulated</a>
+    lt="value accumulation">accumulated</a>
     onto the <a>underlying value</a>.
     For <a>animation types</a> where the
-    <a lt="animation accumulation">accumulation operation</a> is
+    <a lt="value accumulation">accumulation operation</a> is
     defined such that it is not commutative, the order of the operands
     is <a>underlying value</a> followed by <a>effect value</a>.
 
@@ -3812,7 +3669,7 @@ as follows:
     iterations.
 :   <dfn lt="iteration composite operation accumulate">accumulate
 ::  Successive iterations of the animation are <a
-    lt="animation accumulation">accumulated</a> with the
+    lt="value accumulation">accumulated</a> with the
     final value of the previous iteration.
 
     The application of the <a>iteration composite operation</a> is
@@ -4072,9 +3929,8 @@ interface Animation : EventTarget {
     </div>
 
 :   <dfn method for=Animation lt='play()'>void play()</dfn>
-::  Unpauses the animation and rewinds if it has finished playing using
-    the procedure to <a>play an animation</a> for this object
-    with the <var>auto-rewind</var> flag set to true.
+::  Begins or resumes playback of the animation by running the procedure to
+    [=play an animation=] passing true as the value of the |auto-rewind| flag.
 :   <dfn method for=Animation lt='pause()'>void pause()</dfn>
 ::  Suspends the playback of this animation by running the procedure to
     <a>pause an animation</a> for this object.
@@ -4348,7 +4204,7 @@ dictionary OptionalEffectTiming {
     produce easing effects.
 
     The syntax of the string is defined by the <<timing-function>>
-    production [[!CSS-TIMING-1]].
+    production [[!CSS-EASING-1]].
 
 </div>
 
@@ -4422,7 +4278,7 @@ the following steps:
 
 1.  If the {{EffectTiming/easing}} member of |input| is <a>present</a>
     but cannot be parsed using the <<timing-function>> production
-    [[!CSS-TIMING-1]], <a>throw</a> a <span class=exceptionname>TypeError</span>
+    [[!CSS-EASING-1]], <a>throw</a> a <span class=exceptionname>TypeError</span>
     and abort this procedure.
 
 1.  Assign each member <a>present</a> in |input| to the corresponding timing
@@ -4664,10 +4520,10 @@ interface KeyframeEffect : AnimationEffect {
       dictionary ComputedKeyframe {
           // ... property-value pairs ...
           // i.e. DOMString propertyName
-          double?             offset = null;
-          double              computedOffset;
-          DOMString           easing = "linear";
-          CompositeOperation? composite = null;
+          double?                  offset = null;
+          double                   computedOffset;
+          DOMString                easing = "linear";
+          CompositeOperationOrAuto composite = "auto";
       };
       </pre>
 
@@ -4696,8 +4552,9 @@ interface KeyframeEffect : AnimationEffect {
       ::  The <a>keyframe-specific composite operation</a> used to combine the
           values specified in this keyframe with the <a>underlying value</a>.
 
-          This member will be <code>null</code> if the <a>composite
-          operation</a> specified on the <a>keyframe effect</a> is being used.
+          This member will be {{CompositeOperationOrAuto/auto}} if the
+          <a>composite operation</a> specified on the <a>keyframe effect</a> is
+          being used.
 
     </div>
 
@@ -4717,10 +4574,10 @@ interface KeyframeEffect : AnimationEffect {
 
             <pre class='idl'>
              dictionary BaseComputedKeyframe {
-                 double?             offset = null;
-                 double              computedOffset;
-                 DOMString           easing = "linear";
-                 CompositeOperation? composite = null;
+                 double?                  offset = null;
+                 double                   computedOffset;
+                 DOMString                easing = "linear";
+                 CompositeOperationOrAuto composite = "auto";
             };
             </pre>
 
@@ -4800,7 +4657,8 @@ The second parameter, representing the list of keyframes, may
 specify multiple properties. (See <a href="#processing-a-keyframes-argument"
 section></a>.)
 
-<div class='example'><pre class='lang-javascript'>
+<div class='example'>
+<pre class='lang-javascript'>
 // Specify multiple properties at once
 var effectA = new KeyframeEffect(elem, { left: '100px', top: '300px' }, 3000);
 
@@ -4994,9 +4852,9 @@ WebIDL-like definition:
 dictionary Keyframe {
     // ... property-value pairs ...
     // i.e. DOMString propertyName
-    double?              offset = null;
-    DOMString            easing = "linear";
-    CompositeOperation?  composite = null;
+    double?                   offset = null;
+    DOMString                 easing = "linear";
+    CompositeOperationOrAuto  composite = "auto";
 };
 
 dictionary PropertyIndexedKeyframes {
@@ -5004,7 +4862,7 @@ dictionary PropertyIndexedKeyframes {
     // i.e. (DOMString or sequence&amp;lt;DOMString&amp;gt;) propertyName
     (double? or sequence&lt;double?&gt;)                         offset = [];
     (DOMString or sequence&lt;DOMString&gt;)                     easing = [];
-    (CompositeOperation? or sequence&lt;CompositeOperation?&gt;) composite = [];
+    (CompositeOperationOrAuto or sequence&lt;CompositeOperationOrAuto&gt;) composite = [];
 };
 
 typedef (sequence&lt;Keyframe&gt; or PropertyIndexedKeyframes) KeyframeArgument;
@@ -5012,7 +4870,7 @@ typedef (sequence&lt;Keyframe&gt; or PropertyIndexedKeyframes) KeyframeArgument;
 
 The meaning and allowed values of each argument is as follows:
 
-:   <dfn id="dom-keyframe-offset">offset</dfn>
+:   offset
 ::  The <a>keyframe offset</a> of the <a>keyframe</a> specified as
     a number between 0.0 and 1.0 inclusive or <code>null</code>.
 
@@ -5025,7 +4883,7 @@ The meaning and allowed values of each argument is as follows:
     Keyframes that specify an offset must be provided in increasing
     order of offset. Adjacent and equal offsets, however, are permitted.
 
-:   <dfn id="dom-keyframe-easing">easing</dfn>
+:   easing
 ::  The <a>timing function</a> used to transform the progress of time
     from this keyframe until the next keyframe in the series.
 
@@ -5033,12 +4891,12 @@ The meaning and allowed values of each argument is as follows:
     is identical to that defined for the {{EffectTiming/easing}} attribute
     of the {{EffectTiming}} interface.
 
-:   <dfn id="dom-keyframe-composite">composite</dfn>
+:   composite
 ::  The <a>keyframe-specific composite operation</a> used to combine the values
     specified in this keyframe with the <a>underlying value</a>.
 
-    If <code>null</code>, the <a>composite operation</a> specified on the
-    <a>keyframe effect</a> will be used.
+    If {{CompositeOperationOrAuto/auto}}, the <a>composite operation</a>
+    specified on the <a>keyframe effect</a> will be used.
 
 
 Since this type cannot be expressed in WebIDL, its processing is defined in
@@ -5091,7 +4949,7 @@ otherwise, using the following procedure:
         dictionary BasePropertyIndexedKeyframe {
             (double? or sequence&lt;double?&gt;)                         offset = [];
             (DOMString or sequence&lt;DOMString&gt;)                     easing = [];
-            (CompositeOperation? or sequence&lt;CompositeOperation?&gt;) composite = [];
+            (CompositeOperationOrAuto or sequence&lt;CompositeOperationOrAuto&gt;) composite = [];
         };
         </pre>
 
@@ -5100,9 +4958,9 @@ otherwise, using the following procedure:
 
         <pre class='idl'>
         dictionary BaseKeyframe {
-            double?             offset = null;
-            DOMString           easing = "linear";
-            CompositeOperation? composite = null;
+            double?                  offset = null;
+            DOMString                easing = "linear";
+            CompositeOperationOrAuto composite = "auto";
         };
         </pre>
 
@@ -5325,11 +5183,11 @@ keyframes using the following procedure:
         1.  If the &ldquo;composite&rdquo; member of the <var>property-indexed
             keyframe</var> is <em>not</em> an empty sequence:
 
-            1.  Let <var>composite modes</var> be a sequence of <a>nullable</a>
-                <a>composite operations</a> assigned from the
+            1.  Let <var>composite modes</var> be a sequence of
+                {{CompositeOperationOrAuto}} values assigned from the
                 &ldquo;composite&rdquo; member of <var>property-indexed
                 keyframe</var>.
-                If that member is a single <a>nullable</a> <a>composite
+                If that member is a single {{CompositeOperationOrAuto}} value
                 operation</a>, let <var>composite modes</var> be a sequence of
                 length one, with the value of the &ldquo;composite&rdquo; as its
                 single item.
@@ -5340,7 +5198,8 @@ keyframes using the following procedure:
                 from the beginning of the list until <var>composite modes</var>
                 has as many items as <var>processed keyframes</var>.
 
-            1.  Assign each non-null value in <var>composite modes</var> to the
+            1.  Assign each value in <var>composite modes</var> that is not
+                {{CompositeOperationOrAuto/auto}} to the
                 <a>keyframe-specific composite operation</a> on the
                 <a>keyframe</a> with the corresponding position in
                 <var>processed keyframes</var> until the end of <var>processed
@@ -5430,7 +5289,8 @@ dictionary KeyframeEffectOptions : EffectTiming {
     animation with the <a>effect stack</a>, as specified by one
     of the <a>CompositeOperation</a> enumeration values.
     This is used for all <a>keyframes</a> that specify
-    a null <a>keyframe-specific composite operation</a>.
+    a {{CompositeOperationOrAuto/auto}} <a>keyframe-specific composite
+    operation</a>.
 
 </div>
 
@@ -5457,9 +5317,9 @@ enum IterationCompositeOperation {"replace", "accumulate"};
     subsequent iterations of an <a>animation effect</a> build
     on the final value of the previous iteration.
 
-<h3 id="the-compositeoperation-enumeration">The <code>CompositeOperation</code> enumeration</h3>
+<h3 id="the-compositeoperation-enumeration">The <code>CompositeOperation</code> and <code>CompositeOperationOrAuto</code> enumerations</h3>
 
-The possible values of an <a>animation effect</a>'s
+The possible values of an <a>keyframe effect</a>'s
 composition behavior are represented by the
 <dfn>CompositeOperation</dfn> enumeration.
 
@@ -5467,28 +5327,40 @@ composition behavior are represented by the
 enum CompositeOperation {"replace", "add", "accumulate"};
 </pre>
 
-:   <code>replace</code>
+:   <dfn enum-value for="CompositeOperation,CompositeOperationOrAuto">replace</dfn>
 ::  Corresponds to the <a
     lt="composite operation replace">replace</a>
     <a>composite operation</a> value such that
     the <a>animation effect</a> overrides the <a>underlying value</a> it
     is combined with.
 
-:   <code>add</code>
+:   <dfn enum-value for="CompositeOperation,CompositeOperationOrAuto">add</dfn>
 ::  Corresponds to the <a
     lt="composite operation add">add</a>
     <a>composite operation</a> value such that
     the <a>animation effect</a> is <a
-    lt="animation addition">added</a> to the <a>underlying value</a>
+    lt="value addition">added</a> to the <a>underlying value</a>
     with which it is combined.
 
-:   <code>accumulate</code>
+:   <dfn enum-value for="CompositeOperation,CompositeOperationOrAuto">accumulate</dfn>
 ::  Corresponds to the <a
     lt="composite operation accumulate">accumulate</a>
     <a>composite operation</a> value such that
     the <a>animation effect</a> is <a
-    lt="animation accumulation">accumulated</a> on to the
+    lt="value accumulation">accumulated</a> on to the
     <a>underlying value</a>.
+
+The possible values of a [=keyframe=]'s composition behavior share the same
+values as the {{CompositeOperation}} enumeration along with the additional
+{{CompositeOperationOrAuto/auto}} value.
+
+<pre class='idl'>
+enum CompositeOperationOrAuto {"replace", "add", "accumulate", "auto"};
+</pre>
+
+:   <dfn enum-value for=CompositeOperationOrAuto>auto</dfn>
+::  Indicates that the [=composite operation=] of the associated [=keyframe
+    effect=] should be used.
 
 <h3 id="the-animatable-interface-mixin">The <code>Animatable</code> interface mixin</h3>
 
@@ -5887,7 +5759,7 @@ additional technologies defined in terms of this specification in
 which case the definitions provided in this specification will form
 part of the conformance criteria of the additional technology.
 
-A <dfn>conforming scripted Web Animations user agent</dfn> is a user
+A <dfn export>conforming scripted Web Animations user agent</dfn> is a user
 agent that implements the <abbr
 title="Application Programming Interface">API</abbr> defined in
 [[#programming-interface]].
@@ -5910,73 +5782,82 @@ animations.
 <h2 id="changes-since-last-publication">Changes since last publication</h2>
 
 The following changes have been made since the <a
-  href="https://www.w3.org/TR/2016/WD-web-animations-1-20160913/">13 September
-2016 Working Draft</a>:
+  href="https://www.w3.org/TR/2018/WD-web-animations-1-20181011/">11 October
+2018 Working Draft</a>:
 
-*   Dropped global clock definition and added the [=update animations
-    and send events=] procedure so that the updating of animations can be
-    integrated with HTML's [=update the rendering=] procedure.
-*   Clarified that the [=pending play task=] and [=pending pause task=] must be
-    run asynchronously.
-*   Fixed a mistake in the calculation of the <a>hold time</a> when an pause
-    operation completes (see [[#pausing-an-animation-section]]).
-*   Adjusted the procedure to <a>update an animation's finished state</a> to
-    accommodate timelines that change direction.
-*   Introduced an asynchronous procedure for updating an [=animation=]'s
-    [=playback rate=]: [=seamlessly update the playback rate=].
-*   Clarified behavior of the procedure to <a>reverse an animation</a> when
-    playing the animation causes an exception to be thrown.
-*   Removed the &ldquo;pending&rdquo; play state and added the
-    {{Animation/pending}} member to the {{Animation}} interface.
-*   Introduced a general [=pending animation event queue=] and defined how
-    different types of animation events are sorted.
-*   Added a definition for the <a>idle phase</a>.
-*   In the procedure to calculate the <a>simple iteration progress</a>, made
-    a negative end delay not trigger the behavior where the end of the last
-    iteration is used instead of the beginning of the next iteration.
-    Also fixed a bug where this behavior would fail to apply when playing in
-    reverse.
-    (<a href="https://github.com/w3c/web-animations/issues/201">#201</a>).
-*   Dropped keyframe spacing, distance calculation, and retention of invalid
-    keyframe property values.
-*   Introduced {{Animation/updatePlaybackRate(playbackRate)}} instead which
-    maintains the current time and synchronizes with animations running on
-    another thread or process.
-*   Revised the <code>&hellip;ReadOnly</code> and timing-related interfaces as
-    follows:
-    *   Replaced <code>AnimationEffectReadOnly</code> with {{AnimationEffect}}.
-    *   Replaced the  <code>timing</code> member of
-        <code>AnimationEffectReadOnly</code> with the
-        {{AnimationEffect/getTiming()}} and
-        {{AnimationEffect/updateTiming()}} methods on {{AnimationEffect}}.
-    *   Removed the <code>AnimationEffectTimingReadOnly</code> and
-        <code>AnimationEffectTiming</code> interfaces.
-    *   Renamed the <code>AnimationEffectTimingProperties</code> dictionary to
-        {{EffectTiming}}.
-    *   Renamed the <code>ComputedTimingProperties</code> dictionary to
-        {{ComputedEffectTiming}}.
-    *   Introduced the {{OptionalEffectTiming}} dictionary for use with the
-        {{AnimationEffect/updateTiming}} method.
-    *   Removed <code>KeyframeEffectReadOnly</code>, leaving only
-        {{KeyframeEffect}}.
-*   Added special handling to allow animating the 'offset' property from the
-    programming interface using <code>cssOffset</code> to avoid conflict with
-    the attribute name used to specify keyframe offsets.
-*   Updated the procedure to <a>process a keyframes argument</a> to allow
-    specifying <code>offset</code>, <code>composite</code> and multiple
-    <code>easing</code> values including allowing <code>null</code> values for
-    <code>composite</code>.
-*   Changed the type of the
-    {{KeyframeEffect/KeyframeEffect(target, keyframes,
-    options)/target}} argument to the {{KeyframeEffect}} and
-    (now obsolete) <code>KeyframeEffectReadOnly</code> constructors,
-    and the {{KeyframeEffect/target}} member of these same interfaces,
-    from <code>Animatable?</code> to <code>(Element or CSSPseudoElement)?</code>
-    (<a href="https://github.com/w3c/web-animations/issues/186">#186</a>).
-*   Dropped the <code>SharedKeyframeList</code> interface.
-*   Converted {{Animatable}} from a <code>[NoInterfaceObject]</code> interface
-    to an [=interface mixin=].
+(None yet)
 
 The <a
   href="https://github.com/w3c/csswg-drafts/commits/master/web-animations-1">changelog</a>
 provides a more detailed history.
+
+
+<h2 id=animation-types>
+Appendix A: Animation types of existing properties</h2>
+
+Typically the [=animation type=] of a property is included along with its
+definition.
+However, for some properties defined in older or very mature specifications
+the [=animation type=] information is not included.
+All such properties are assumed to have an [=animation type=] of
+[=by computed value=] unless they are one of the exceptions listed below.
+
+Animation of 'font-weight' {#animating-font-weight}
+--------------------------
+
+'font-weight' property values prior to level 4 are
+[[css-values-4#combining-values|combined]] as follows:
+
+*   [=Interpolated=] via discrete steps (multiples of 100).
+    The interpolation happens in real number space as for <<number>>s
+    and is converted to an integer by rounding to the nearest multiple of 100,
+    with values halfway between multiples of 100 rounded towards positive
+    infinity.
+
+*   <a lt="value addition">Addition</a> of 'font-weight' values is defined as
+    <var ignore>V<sub>result</sub></var> =
+      <var ignore>V<sub>a</sub></var> + <var ignore>V<sub>b</sub></var>
+
+Note: This definition is obsoleted by [[CSS-FONTS-4]] where
+the requirement that a 'font-weight' value be a multiple of 100 is dropped.
+At that point the [=animation type=] for 'font-weight' is simply
+[=by computed value=].
+
+Animation of 'visibility' {#animating-visibility}
+-------------------------
+
+For the 'visibility' property,
+''visibility/visible'' is [=interpolated=] as a discrete step
+where values of <var ignore>p</var> between 0 and 1
+map to ''visibility/visible''
+and other values of <var ignore>p</var> map to the closer endpoint;
+if neither value is ''visibility/visible'' then [=discrete=] animation is used.
+
+Animation of 'box-shadow' {#animating-shadow-lists}
+-------------------------------
+
+Animation the 'box-shadow' property follows the procedures for
+[[css-values-4#combining-values|combining]]
+<dfn export lt="combining shadow lists" local-lt="shadow lists">shadow lists</dfn>
+as follows:
+
+Each shadow in the list
+(treating ''shadow/none'' as a 0-length list)
+is interpolated component-wise as with [=by computed value=] behavior.
+However, if both input shadows are ''shadow/inset''
+or both input shadows are not ''shadow/inset'',
+then the interpolated shadow must match the input shadows in that regard.
+If any pair of input shadows has one ''shadow/inset''
+and the other not ''shadow/inset'',
+the entire shadow-list uses [=discrete=] animation.
+If the lists of shadows have different lengths,
+then the shorter list is padded at the end
+with shadows whose color is ''transparent'',
+all lengths are ''0'',
+and whose ''shadow/inset'' (or not) matches the longer list.
+
+<a lt="value addition">Addition</a> of [=shadow lists=] follows the
+matching rules for interpolation above, performing addition on each component
+according to its type,
+or falling back to [=discrete=] animation if the ''shadow/inset'' values
+do not match.

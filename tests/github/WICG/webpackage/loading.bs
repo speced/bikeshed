@@ -1,0 +1,1026 @@
+<pre class='metadata'>
+Title: Loading Signed Exchanges
+Shortname: web-package-loading
+Level: none
+Status: ED
+Group: WICG
+Repository: WICG/webpackage
+URL: https://wicg.github.io/webpackage/loading.html
+Editor: Jeffrey Yasskin, Google Inc. https://google.com/, jyasskin@chromium.org, w3cid 72192
+Abstract: How UAs load signed exchanges.
+
+Complain About: accidental-2119 yes, missing-example-ids yes
+Markup Shorthands: markdown yes, css no
+Assume Explicit For: yes
+</pre>
+<pre class='biblio'>
+{
+    "draft-thomson-http-mice": {
+        "authors": [
+            "Martin Thomson"
+        ],
+        "href": "https://tools.ietf.org/html/draft-thomson-http-mice-02",
+        "title": "Merkle Integrity Content Encoding",
+        "status": "ED",
+        "publisher": "IETF"
+    },
+    "draft-yasskin-http-origin-signed-responses": {
+        "authors": [
+            "Jeffrey Yasskin"
+        ],
+        "href": "https://wicg.github.io/webpackage/draft-yasskin-http-origin-signed-responses.html",
+        "title": "Signed HTTP Exchanges",
+        "status": "ED",
+        "publisher": "IETF"
+    },
+    "draft-yasskin-httpbis-origin-signed-exchanges-impl-01": {
+        "authors": [
+            "Jeffrey Yasskin",
+            "Kouhei Ueno"
+        ],
+        "href": "https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-01",
+        "title": "Signed HTTP Exchanges Implementation Checkpoints",
+        "status": "ED",
+        "publisher": "IETF"
+    },
+    "draft-yasskin-wpack-bundled-exchanges": {
+        "authors": [
+            "Jeffrey Yasskin"
+        ],
+        "href": "https://wicg.github.io/webpackage/draft-yasskin-wpack-bundled-exchanges.html",
+        "title": "Bundled HTTP Exchanges",
+        "status": "ED",
+        "publisher": "IETF"
+    },
+    "RFC8446": {
+        "authors": [
+            "E. Rescorla"
+        ],
+        "href": "https://tools.ietf.org/html/draft-ietf-tls-tls13",
+        "title": "The Transport Layer Security (TLS) Protocol Version 1.3",
+        "status": "WD",
+        "publisher": "IETF"
+    },
+    "SHA2": {
+        "href": "http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf",
+        "title": "FIPS PUB 180-4, Secure Hash Standard"
+    }
+}
+</pre>
+<pre class='anchors'>
+spec: app-manifest; urlPrefix: https://w3c.github.io/manifest/#
+    text: start URL; type: dfn; url: dfn-start-
+spec: RFC5280; urlPrefix: https://tools.ietf.org/html/rfc5280#
+    type: dfn
+        text: AlgorithmIdentifier; url: section-4.1.1.2
+        text: Subject Public Key Info; url: section-4.1.2.7
+        text: Certificate Extensions; url: section-4.2
+spec: RFC5480; urlPrefix: https://tools.ietf.org/html/rfc5280#
+    type: dfn
+        text: id-ecPublicKey; url: section-2.1.1
+        text: secp256r1; url: section-2.1.1.1
+spec: RFC6960; urlPrefix: https://tools.ietf.org/html/rfc6960#
+    text: OCSPResponse; type: dfn; url: section-4.2.1
+spec: RFC6962; urlPrefix: https://tools.ietf.org/html/rfc6962#
+    text: SignedCertificateTimestampList; type: dfn; url: section-3.3
+spec: RFC7231; urlPrefix: https://tools.ietf.org/html/rfc7231#
+    type: dfn
+        text: HTTP media type; url: section-3.1.1.1
+        text: Date header field; url: section-7.1.1.2
+spec: RFC8446; urlPrefix: https://tools.ietf.org/html/draft-ietf-tls-tls13-28#
+    text: ecdsa_secp256r1_sha256; type: dfn; url: section-4.2.3
+spec: draft-thomson-http-mice; urlPrefix: https://tools.ietf.org/html/draft-thomson-http-mice-02#
+    type: dfn
+        text: mi-sha256 parameter; url: section-3.1
+        text: integrity proof for the first record; url: section-2.2
+spec: draft-yasskin-wpack-bundled-exchanges; urlPrefix: https://wicg.github.io/webpackage/draft-yasskin-wpack-bundled-exchanges.html#
+    type: dfn
+        text: parsing a CBOR item; url: parse-known-length
+spec: draft-yasskin-http-origin-signed-responses; urlPrefix: https://wicg.github.io/webpackage/draft-yasskin-http-origin-signed-responses.html#
+    type: dfn
+        text: off-path attackers; url: seccons-off-path
+        text: stateful request header; url: stateful-headers
+        text: stateful response header; url: stateful-headers
+spec: draft-yasskin-httpbis-origin-signed-exchanges-impl-01; urlPrefix: https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-01#
+    type: dfn
+        text: canonically-encoded CBOR; url: section-3.4
+        text: CanSignHttpExchanges; url: section-4.2
+        text: cert-chain CDDL; url: section-3.3
+        text: Signature header; url: section-3.1
+spec: draft-ietf-httpbis-header-structure; urlPrefix: https://tools.ietf.org/html/draft-ietf-httpbis-header-structure-07#
+    text: Parsing HTTP1 Header Fields into Structured Headers; type: dfn; url: section-4.2
+spec: SHA2; urlPrefix: http://csrc.nist.gov/publications/fips/fips180-4/fips-180-4.pdf
+    type: dfn
+        text: SHA-256; url: #
+</pre>
+<pre class='link-defaults'>
+spec:fetch; type:dfn; for:/; text:response
+spec:streams; type:interface; text:ReadableStream
+</pre>
+
+<section class="non-normative">
+
+# Introduction # {#intro}
+
+<em>This section is non-normative.</em>
+
+The Signed Exchanges specification
+[[draft-yasskin-http-origin-signed-responses]] describes a way to provide one or
+more signatures for an HTTP exchange and to check whether any of those
+signatures is trusted as authoritative for a particular origin. This
+specification describes how web browsers load those exchanges. It is expressed
+as several monkeypatches to the [[FETCH]] specification which call algorithms
+defined here.
+
+## Overview ## {#overview}
+
+When fetching a resource (`https://distributor.example.org/foo.sxg`) with the
+`application/signed-exchange` [=MIME type=], the UA parses it, checks its
+signatures, and then if all is well, redirects to its request URL
+(`https://publisher.example.org/foo`) with a "stashed" exchange attached to the
+request. The redirect applies all the usual processing, and then when it would
+normally check for an HTTP cache hit, it also checks whether the stashed request
+matches the redirected request and which of the stashed exchange or HTTP cache
+contents is newer. If the stashed exchange matches and is newer, the UA returns
+the stashed response.
+
+A Service Worker for `https://distributor.example.org/` gets to handle the
+original request. A Service Worker for `https://publisher.example.org/` can then
+handle the redirect. If it needs to know that signed exchange content is
+available for the request it's handling, it has two options:
+
+1. If {{ServiceWorkerRegistration/navigationPreload}} is enabled, the signed
+    response will be available in the {{FetchEvent}}'s
+    {{FetchEvent/preloadResponse}}. Note that this will also cause a network
+    request for requests that aren't served from a signed exchange.
+1. {{Request/clone()}} the {{FetchEvent/request}} and set its {{Request/cache}}
+    to {{RequestCache/"only-if-cached"}}, to retrieve the matching response from
+    either the signed exchange or the HTTP cache. Note that
+    {{WindowOrWorkerGlobalScope/fetch()}}ing a *new* {{Request}} with the same
+    {{Request/url}} will *not* retrieve the response from the signed exchange.
+
+## Other interesting details ## {#details}
+
+* Like with `<link rel="prefetch">` and `<link rel="preload">`, the UA will use
+    the stashed response even if its HTTP cache headers have expired. This makes
+    it easier to specify that the contents of the signed exchange don't wind up
+    in the HTTP cache before our security reviewers have gotten comfortable with
+    that idea. The publisher can still control resource expiration by setting
+    the Signature header's [=exchange signature/expiration time=] to the cache
+    expiration time if that's sooner than they'd otherwise have the signature
+    expire.
+
+</section>
+
+# Fetch monkeypatches # {#monkeypatches}
+
+When fetching a signed exchange, the UA needs to look for a trusted and valid
+signature and then redirect to the contained resource. We don't put the
+contained resource in the HTTP cache, so redirects get a new field to store it.
+
+## A request's stashed exchange ## {#mp-request-stashed-exchange}
+
+A [=request=] has an associated <dfn for="request">stashed exchange</dfn>, which
+is null or an [=exchange=].
+
+<h3 algorithm id="mp-request-clone">Request clone</h3>
+
+Rewrite [=request/clone|clone a request=] to run these steps:
+
+<ol>
+ <li>Let |newRequest| be a copy of |request|, except for its [=request/body=]
+  <ins>and [=request/stashed exchange=]</ins>.
+
+ <li>If |request|'s [=request/body=] is non-null, set |newRequest|'s
+  [=request/body=] to the result of [=body/cloning=] |request|'s
+  [=request/body=].
+
+ <li><ins>If |request|'s [=request/stashed exchange=] is non-null, set
+  |newRequest|'s [=request/stashed exchange=] to an exchange whose
+  [=exchange/request=] is the [=request/clone=] of |request|'s [=request/stashed
+  exchange=]'s [=exchange/request=] and whose [=exchange/response=] is the
+  [=response/clone=] of |request|'s [=request/stashed exchange=]'s
+  [=exchange/response=].</ins>
+
+ <li>Return |newRequest|.
+</ol>
+
+<h3 algorithm id="mp-response-date">Response date</h3>
+
+A [=response=] |response|'s <dfn for="response">date</dfn> is the result of:
+
+1. Let |date| be the result of [=extracting header list values=] given `` `Date`
+    `` and |response|'s [=response/header list=].
+1. If |date| is a failure, return the point in time of the beginning of the
+    universe.
+1. Return the point in time represented by |date|, as interpreted for the [=Date
+    header field=].
+
+<h3 algorithm id="mp-http-fetch">Monkeypatch HTTP fetch</h3>
+
+In [=HTTP fetch=], before
+
+> 5. If |actualResponse|’s [=response/status=] is a [=redirect status=], then:
+>     ...
+
+add the following steps:
+
+5. If the [=signed exchange version=] of |actualResponse| is:
+
+    <dl class="switch">
+    : undefined
+    :: Do nothing.
+
+    : `"b1"`
+    ::
+        1. Let |parsedExchange| be the result of [=parsing a b1 signed
+            exchange=] from |actualResponse| in the context of |request|'s
+            [=request/client=].
+        1. If |parsedExchange| is a failure, return a [=network error=].
+        1. Set |actualResponse|'s [=status=] to `303`.
+        1. [=header list/Set=] |actualResponse|'s `` `Location` `` header to
+            the [=ASCII encoding=] of the [=URL serializer|serialization=]
+            of |parsedExchange|'s [=exchange/request=]'s [=request/url=].
+        1. Set |request|'s [=request/stashed exchange=] to |parsedExchange|.
+
+    : Anything else
+    ::
+        1. Let |fallbackUrlBytes| be the result of [=extracting the fallback
+            URL=] from |actualResponse|.
+        1. If |fallbackUrlBytes| is a failure, return a [=network error=].
+        1. Set |actualResponse|'s [=status=] to `303`.
+        1. [=header list/Set=] |actualResponse|'s `` `Location` `` header to
+            |fallbackUrlBytes|.
+
+    </dl>
+
+    Note: The final [[draft-yasskin-http-origin-signed-responses]] will use a
+    version of `` `1` ``, but this specification tracks what's actually
+    implemented in browsers, which still uses draft versions.
+
+<h3 algorithm id="mp-http-network-or-cache-fetch">Monkeypatch HTTP-network-or-cache fetch</h3>
+
+In <a spec="fetch">HTTP-network-or-cache fetch</a>, after
+
+> 5.19. If |httpRequest|’s [=request/cache mode=] is neither "`no-store`" nor
+> "`reload`", then: ...
+
+add the following steps:
+
+20. If |httpRequest|'s [=request/stashed exchange=] isn't null:
+    1. Let |stashedRequest| be |httpRequest|'s [=request/stashed exchange=]'s
+        [=exchange/request=]
+    1. If
+        * |httpRequest| [=matches the stored request=] |stashedRequest| and
+        * |response| is null or |response|'s [=response/date=] is earlier than
+            |httpRequest|'s [=request/stashed exchange=]'s
+            [=exchange/response=]'s [=response/date=]
+
+        then set |response| to |httpRequest|'s [=request/stashed exchange=]'s
+        [=exchange/response=].
+    1. If |response| is null and |httpRequest|'s [=request/initiator=] is
+        "`prefetch`" or "`preload`", return a [=network error=].
+
+        Note: This ensures that prefetching a signed exchange from one origin
+        won't accidentally do a network request from another origin, which could
+        [compromise the user's
+        privacy](https://wicg.github.io/webpackage/draft-yasskin-webpackage-use-cases.html#private-prefetch).
+
+Note: Applying the signed exchange's response here has the effect of letting a
+newer HTTP cache entry override a signed exchange's content, and of not storing
+the signed exchange's response in the HTTP cache.
+
+# Structures # {#structs}
+
+<h3 dfn-type=dfn export>Exchange</h3>
+
+An exchange is a [=struct=] with the following items:
+
+<ul dfn-for="exchange">
+
+* <dfn export>request</dfn>, a [=request=].
+* <dfn export>response</dfn>, a [=response=].
+
+</ul>
+
+<h3 dfn-type=dfn>Read buffer</h3>
+
+A read buffer is a [=struct=] with the following items:
+
+<ul dfn-for="read buffer">
+
+* <dfn>stream</dfn>: A {{ReadableStream}}.
+* <dfn>reader</dfn>: A {{ReadableStreamDefaultReader}} whose stream is [=read
+    buffer/stream=].
+* <dfn>bytes</dfn>: A [=byte sequence=] holding the bytes that have been read
+    from [=read buffer/stream=] but not returned to a calling algorithm yet.
+
+</ul>
+
+<h3 dfn-type=dfn>Augmented Certificate</h3>
+
+An augmented certificate is a [=tuple=] with the following items:
+
+<ol dfn-for="augmented certificate">
+
+1. <dfn>certificate</dfn>, a [=byte sequence=] that's expected to hold a
+    DER-encoded X.509v3 certificate ([[RFC5280]]).
+1. <dfn>OCSP response</dfn>, a [=byte sequence=] that's expected to hold a
+    DER-encoded [=OCSPResponse=] for the [=augmented certificate/certificate=].
+1. <dfn>SCT</dfn>, a [=byte sequence=] that's expected to hold a
+    [=SignedCertificateTimestampList=] for the [=augmented
+    certificate/certificate=].
+
+</ol>
+
+These fields are [=byte sequences=] instead of parsed and validated structures
+because we expect some UAs to pass them to other systems for validation, and
+some of those systems expect plain byte sequences.
+
+A [=augmented certificate/certificate=] contains a <dfn for="certificate">public
+key</dfn> ([=Subject Public Key Info=]), which has an <dfn for="public
+key">algorithm</dfn> ([=AlgorithmIdentifier=]).
+
+A [=augmented certificate/certificate=] contains an <dfn
+for="certificate">extensions</dfn> map ([=Certificate Extensions=]) from OIDs to
+[=byte sequences=].
+
+A <dfn>certificate chain</dfn> is a [=list=] of [=augmented certificates=], of
+which the first [=list/item=] is the <dfn for="certificate chain">leaf</dfn>.
+
+<h3 dfn-type=dfn export>Exchange Signature</h3>
+
+An exchange signature is a [=struct=] with the following items:
+
+<dl dfn-for="exchange signature">
+: <dfn>signature</dfn>
+:: A [=byte sequence=] holding a signature of the exchange.
+: <dfn>certificate chain</dfn>
+:: A [=certificate chain=] whose [=certificate chain/leaf=]'s
+    [=certificate/public key=] can verify the [=exchange signature/signature=]
+    and from which the UA will try to build a path from the [=certificate
+    chain/leaf=] to a trusted root.
+: <dfn>certSha256</dfn>
+:: A [=byte sequence=] holding the SHA-256 hash that verified the [=exchange
+    signature/certificate chain=]'s [=certificate chain/leaf=].
+: <dfn>integrity header</dfn>
+:: A [=list=] that describes the response header and any of its parameters that
+    guard the integrity of the response payload.
+: <dfn>validityUrl</dfn>
+:: A [=URL=] describing where to update this signature.
+: <dfn>validityUrlBytes</dfn>
+:: The bytes that [=exchange signature/validityUrl=] was parsed from.
+: <dfn>date</dfn>
+:: The POSIX time at which the signature starts being valid.
+: <dfn>expiration time</dfn>
+:: The POSIX time at which the signature stops being valid.
+
+</dl>
+
+# Algorithms # {#algorithms}
+
+<h3 algorithm id="identifying-sxg">Identifying signed exchanges</h3>
+
+The <dfn>signed exchange version</dfn> of a [=response=] |response| is the
+result of the following steps:
+
+1. Let |mimeType| be the [=supplied MIME type=] of |response|.
+1. If |mimeType| is undefined, return undefined.
+1. If |mimeType|'s [=MIME type/essence=] is not `"application/signed-exchange"`,
+    return undefined.
+1. Let |params| be |mimeType|'s [=MIME type/parameters=]
+1. If |params|["v"] exists, return it. Otherwise, return undefined.
+
+<h3 algorithm id="parsing-fallback">Extracting the fallback URL</h3>
+
+This section defines how to load a the fallback URL from its invariant location
+in an unrecognized signed exchange version.
+
+<dfn>Extracting the fallback URL</dfn> from a [=response=] |response| returns
+the result of the following steps:
+
+1. Assert: This algorithm is running [=in parallel=].
+1. Assert: The [=signed exchange version=] of |response| is not undefined.
+1. Let |bodyStream| be |response|'s [=response/body=]'s [=body/stream=].
+1. If |bodyStream| is null, return failure.
+1. Let |stream| be a [=new read buffer=] for |bodyStream|.
+1. Let |magic| be the result of [=read buffer/reading=] 8 bytes from |stream|.
+1. If |magic| is a failure, return it.
+1. Let |encodedFallbackUrlLength| be the result of [=read buffer/reading=] 2
+    bytes from |stream|.
+1. If |encodedFallbackUrlLength| is a failure, return it.
+1. Let |fallbackUrlLength| be the result of decoding |encodedFallbackUrlLength|
+    as a big-endian integer.
+1. Let |fallbackUrlBytes| be the result of [=read buffer/reading=]
+    |fallbackUrlLength| bytes from |stream|.
+1. If |fallbackUrlBytes| is a failure, return it.
+1. If the result of running the [=URL parser=] on |fallbackUrl| is a failure, if
+    it has a non-null [=url/fragment=], or if its [=url/scheme=] is something
+    other than `"https"`, return a failure.
+1. Return |fallbackUrlBytes|.
+
+<h3 algorithm id="parsing-b1">Parsing `b1` signed exchanges</h3>
+
+This section defines how to load the format defined in
+[[draft-yasskin-httpbis-origin-signed-exchanges-impl-01]].
+
+<dfn>Parsing a b1 signed exchange</dfn> from a [=response=] |response| in the
+context of an [=environment settings object=] |client| returns the result of the
+following steps:
+
+1. Assert: This algorithm is running [=in parallel=].
+1. Assert: The [=signed exchange version=] of |response| is `"b1"`.
+1. If |response|'s [=response/HTTPS state=] is `"none"`, return failure.
+
+    Note: This ensures that the privacy properties of retrieving an HTTPS
+    resource via a signed exchange are no worse than retrieving it via TLS.
+
+1. Let |bodyStream| be |response|'s [=response/body=]'s [=body/stream=].
+1. If |bodyStream| is null, return failure.
+1. Let |stream| be a [=new read buffer=] for |bodyStream|.
+1. Let |magic| be the result of [=read buffer/reading=] 8 bytes from |stream|.
+1. If |magic| is a failure, return it.
+1. If |magic| is not `` `sxg1-b1\0` ``, return a failure.
+1. Let |encodedSigLength| be the result of [=read buffer/reading=] 3 bytes from
+    |stream|.
+1. Let |encodedHeaderLength| be the result of [=read buffer/reading=] 3 bytes
+    from |stream|.
+1. If |encodedSigLength| or |encodedHeaderLength| is a failure, return a
+    failure.
+1. Let |sigLength| be the result of decoding |encodedSigLength| as a big-endian
+    integer.
+1. Let |headerLength| be the result of decoding |encodedHeaderLength| as a
+    big-endian integer.
+1. If |sigLength| > 16384 or |headerLength| > 524288, return a failure.
+1. Let |signature| be the result of [=read buffer/reading=] |sigLength| bytes
+    from |stream|.
+1. If |signature| is a failure, return it.
+1. Let |parsedSignature| be the result of [=parsing the Signature header field=]
+    |signature| in the context of |client|.
+1. If |parsedSignature| is a failure, return it.
+1. Let |headerBytes| be the result of [=read buffer/reading=] |headerLength|
+    bytes from |stream|.
+1. If |headerBytes| is a failure, return it.
+1. If |parsedSignature| [=exchange signature/is not valid=] for |headerBytes|,
+    return a failure.
+1. Let |parsedExchange| be the result of [=parsing CBOR headers=] |headerBytes|.
+1. If |parsedSignature| [=exchange signature/does not establish cross-origin
+    trust=] for |parsedExchange|, return a failure.
+1. Set |parsedExchange|'s [=exchange/response=]'s [=response/HTTPS state=] to
+    either "`deprecated`" or "`modern`".
+
+    Note: See <a spec="fetch">HTTP-network fetch</a> for details of this choice.
+1. If |parsedExchange|'s [=exchange/response=]'s [=response/status=] is a
+    [=redirect status=] or the [=signed exchange version=] of |parsedExchange|'s
+    [=exchange/response=] is not undefined, return a failure.
+
+    Note: This might simplify the UA's implementation, since it doesn't have to
+    handle nested signed exchanges.
+1. [=Read a body=] from |stream| into |parsedExchange|'s [=exchange/response=]
+    using |parsedSignature| to check its integrity. If this is a failure, return
+    the failure.
+
+    Note: Typically this body’s stream is still being enqueued to after
+    returning.
+1. Return |parsedExchange|.
+
+<h3 algorithm id="parsing-signature">Parsing a Signature Header Field</h3>
+
+<dfn>Parsing the Signature header field</dfn> |signatureString| in the context
+of an [=environment settings object=] |client| returns the [=exchange
+signature=] or failure returned by the following steps:
+
+1. Assert: This algorithm is running [=in parallel=].
+1. If |signatureString| contains any bytes that aren't [=ASCII bytes=], return a
+    failure.
+1. Let |parsed| be the result of [=Parsing HTTP1 Header Fields into Structured
+    Headers=] given an <var ignore>input_string</var> of the [=ASCII decoding=]
+    of |signatureString| and a <var ignore>header_type</var> of "param-list".
+1. If |parsed| has more than one element, return a failure.
+
+    Note: This limitation of current implementations will go away in the future.
+1. If any of the parameters of |parsed|[0] listed here doesn't have the
+    associated type, return a failure:
+
+    : Byte sequence
+    :: "sig", "cert-sha256"
+    : String
+    :: "integrity", "cert-url", "validity-url"
+    : Integer
+    :: "date", "expires"
+1. Let |result| be a new [=exchange signature=] struct.
+1. Set |result|'s [=exchange signature/signature=] to the "sig" parameter of
+    |parsed|[0].
+1. Set |result|'s [=exchange signature/integrity header=] to the result of
+    [=strictly splitting=] the "integrity" parameter of |parsed|[0] on U+002F
+    (`/`).
+1. Let |certUrl| be the result of running the [=URL parser=] on the "cert-url"
+    parameter of |parsed|[0].
+1. If |certUrl| is a failure, if it has a non-null [=url/fragment=], or if its
+    [=url/scheme=] is something other than `"https"` or `"data"`, return a
+    failure.
+1. Set |result|'s [=exchange signature/certSha256=] to the "cert-sha256"
+    parameter of |parsed|[0].
+1. Set |result|'s [=exchange signature/validityUrlBytes=] to the [=ASCII
+    encoding=] of the "validity-url" parameter of |parsed|[0].
+1. Let |validityUrl| be the result of running the [=URL parser=] on the
+    "validity-url" parameter of |parsed|[0]..
+1. If |validityUrl| is a failure, if it has a non-null [=url/fragment=], or if
+    its [=url/scheme=] is something other than `"https"`, return a failure.
+1. Set |result|'s [=exchange signature/validityUrl=] to |validityUrl|.
+1. Set |result|'s [=exchange signature/date=] to the "date" parameter of
+    |parsed|[0].
+1. Set |result|'s [=exchange signature/expiration time=] to the "expires"
+    parameter of |parsed|[0].
+1. If |result|'s [=exchange signature/expiration time=] or |result|'s [=exchange
+    signature/date=] is less than 0 or greater than 2<sup>63</sup>-1, return a
+    failure.
+1. If |result|'s [=exchange signature/expiration time=] &lt;= |result|'s
+    [=exchange signature/date=], return a failure.
+1. Set |result|'s [=exchange signature/certificate chain=] to the result of
+    [=handling the certificate reference=] |certUrl| with a hash of |result|'s
+    [=exchange signature/certSha256=] in the context of |client|. If this is a
+    failure, return it.
+1. Return |result|.
+
+<h4 algorithm id="handling-cert-url">Handling the certificate reference</h4>
+
+<dfn>Handling the certificate reference</dfn> |certUrl| with the SHA-256 hash
+|certSha256|, in the context of an [=environment settings object=] |client|,
+returns the result of the following steps:
+
+1. Assert: This algorithm is running [=in parallel=].
+1. Let |certRequest| be a new [=request=] with the following items:
+
+    : [=request/url=]
+    :: |certUrl|
+    : [=request/header list=]
+    :: «`` `Accept` ``: `` `application/cert-chain+cbor` ``»
+    : [=request/client=]
+    :: |client|
+    : [=request/service-workers mode=]
+    :: "`none`"
+    : [=request/mode=]
+    :: "`cors`"
+1. Let |certResponse| be the result of [=fetching=] |certRequest|.
+1. If |certResponse|'s [=response/status=] is not `200`, or the [=supplied MIME
+    type=] of |certResponse| is not `"application/cert-chain+cbor"`, return a
+    failure.
+1. If |certResponse|'s [=response/body=] is null or that body's [=body/stream=]
+    is null, return a failure.
+1. Let |bytes| be the result of [=ReadableStream/read all bytes|reading all
+    bytes=] from |certResponse|'s [=response/body=]'s [=body/stream=] with a
+    [=ReadableStream/get a reader|new reader=] over the same stream.
+1. Wait for |bytes| to settle.
+1. If |bytes| was rejected, return a failure.
+1. Let |chain| be the [=certificate chain=] produced by parsing |bytes|' value
+    using the [=cert-chain CDDL=]. If |bytes|'s value doesn't match this CDDL or
+    isn't [=canonically-encoded CBOR=], return a failure.
+1. Assert: |chain| has at least one [=list/item=].
+1. If the [=SHA-256=] hash of |chain|'s [=certificate chain/leaf=]'s [=augmented
+    certificate/certificate=] is not equal to |certSha256|, return a failure.
+1. Return |chain|.
+
+<h3 algorithm id="signed-message">The signed message</h3>
+
+The <dfn>b1 signed message</dfn> for an [=exchange signature=] |signature| and a
+[=byte sequence=] |headerBytes| is the concatenation of the following [=byte
+sequences=]:
+
+1. The byte 0x20 (SP) repeated 64 times. This matches the TLS 1.3 ([[RFC8446]])
+    format to avoid cross- protocol attacks if anyone uses the same key in a TLS
+    certificate and an exchange-signing certificate.
+1. `` `HTTP Exchange 1 b1` `` to serve as a context string.
+
+    Note: Each draft of
+    [[draft-yasskin-httpbis-origin-signed-exchanges-impl-01]] and the final RFC
+    for [[draft-yasskin-http-origin-signed-responses]] will use distinct context
+    strings.
+1. A single 0x00 byte which serves as a separator.
+1. The concatenation of the following [=byte sequences=], which is the
+    [=canonically-encoded CBOR=] for a CBOR map:
+    1. 0xA5, the CBOR header for a 5-item map.
+    1. 0x64 followed by `` `date` ``
+    1. The [=CBOR integer encoding=] of |signature|'s [=exchange
+        signature/date=].
+    1. 0x67 followed by `` `expires` ``.
+    1. The [=CBOR integer encoding=] of |signature|'s [=exchange
+        signature/expiration time=].
+    1. 0x67 followed by `` `headers` ``.
+    1. |headerBytes|.
+    1. 0x6B followed by `` `cert-sha256` ``.
+    1. The [=CBOR byte string encoding=] of |signature|'s [=exchange
+        signature/certSha256=].
+    1. 0x6C followed by `` `validity-url` ``.
+    1. The [=CBOR byte string encoding=] of |signature|'s [=exchange
+        signature/validityUrlBytes=].
+
+<h3 algorithm id="validating-signature">Validating a signature</h3>
+
+An [=exchange signature=] |signature| <dfn for="exchange signature" lt="is
+valid|is not valid">is valid</dfn> for a [=byte sequence=] |headerBytes| if the
+following steps return `valid`:
+
+1. Let |clockSkew| be the uncertainty in the UA's estimate of the current time
+    caused by clock skew on the client. The UA MAY set this to 0 or use a more
+    sophisticated estimate.
+1. If the UA's estimate of the current time is more than |clockSkew| before
+    |signature|'s [=exchange signature/date=], return "untrusted".
+
+    Note: We take estimated clock skew into account when checking the
+    signature's [=exchange signature/date=] because we want well-behaved servers
+    to use the time they created the signature, but if they immediately start
+    serving that signature, and skewed clients don't try to correct for their
+    skew, those clients will reject the signature.
+
+    Issue(WICG/webpackage#141): Our security reviewers aren't sure we should
+    allow UAs to take clock skew into account.
+1. If the UA's estimate of the current time is after |signature|'s [=exchange
+    signature/expiration time=], return "untrusted".
+
+    Note: We use the client's best guess of the current time to check the
+    [=exchange signature/expiration time=] so that attackers trying to get an
+    exchange trusted for longer, are constrained to modify the client's clock
+    and can't also attack its estimate of its skew.
+1. Let |message| be the [=b1 signed message=] for |signature| and |headerBytes|.
+1. Let |publicKey| be the [=certificate/public key=] of |parsedSignature|'s
+    [=exchange signature/certificate chain=]'s [=certificate chain/leaf=]. If
+    the certificate can't be parsed enough to find this public key, return
+    `invalid`.
+1. If |publicKey|'s [=public key/algorithm=] is not [=id-ecPublicKey=] on the
+    [=secp256r1=] named curve, return `invalid`.
+1. If |parsedSignature|'s [=exchange signature/signature=] is not a valid
+    signature of |message| by |publicKey| using the [=ecdsa_secp256r1_sha256=]
+    algorithm, return `invalid`.
+1. Return `valid`.
+
+<h3 algorithm id="cross-origin-trust">Cross-origin trust</h3>
+
+A [=exchange signature/is valid|valid=] [=exchange signature=] |signature| <dfn
+for="exchange signature" lt="establishes cross-origin trust|does not establish
+cross-origin trust">establishes cross-origin trust</dfn> in an [=exchange=]
+|exchange| if the following steps return "trusted":
+
+1. Let |requestUrl| be |exchange|'s [=exchange/request=]'s [=request/url=].
+1. If |signature|'s [=exchange signature/validityUrl=]'s [=url/origin=] is not
+    [=same origin=] with |requestUrl|'s [=url/origin=], return "untrusted".
+1. If |exchange|'s [=exchange/request=]'s [=request/header list=] includes a
+    [=stateful request header=] or |exchange|'s [=exchange/response=]'s
+    [=response/header list=] includes a [=stateful response header=], return
+    "untrusted".
+1. If |signature|'s [=exchange signature/expiration time=] is more than 604800
+    seconds (7 days) after |signature|'s [=exchange signature/date=], return
+    "untrusted".
+1. If |signature|'s [=exchange signature/certificate chain=] [=certificate
+    chain/does not have a trusted leaf=] for |requestUrl|'s [=url/origin=],
+    return "untrusted".
+1. Return "trusted".
+
+<h3 algorithm id="trusting-certificate">Establishing trust in a certificate</h3>
+
+The [=certificate chain=] |chain| <dfn for="certificate chain" lt="has a trusted
+leaf|does not have a trusted leaf">has a trusted leaf</dfn> for an [=origin=]
+|origin| if the following steps return `trusted`:
+
+1. Let |leaf| be |chain|'s [=certificate chain/leaf=].
+1. Attempt to build a trustworthy path from |leaf|'s [=augmented
+    certificate/certificate=] to a trusted root with
+
+    * |chain|,
+    * |leaf|'s [=augmented certificate/OCSP response=],
+    * any SCTs from
+        * |leaf|'s [=augmented certificate/SCT=].
+        * An OCSP extension in |leaf|'s [=augmented certificate/OCSP response=].
+        * An X.509 extension in |leaf|'s [=augmented certificate/certificate=].
+
+    as input, using [[!RFC5280]] and any other conventions used in making TLS
+    ([[!RFC8446]]) connections. The UA SHOULD support Certificate Transparency
+    ([[RFC6962]]) for this check. (See [[#seccons-ct]].) The UA MUST check that
+    it has evidence the |leaf|'s [=augmented certificate/certificate=] was not
+    revoked 7 or more days ago (for example using the |leaf|'s [=augmented
+    certificate/OCSP response=]). If no such path can be built, return
+    `untrusted`.
+1. If |leaf|'s [=augmented certificate/certificate=] is not trusted for
+    |origin|'s [=origin/host=], return `untrusted`.
+1. If |leaf|'s [=certificate/extensions=] don't map a [=CanSignHttpExchanges=]
+    OID to the ASN.1/DER encoding of NULL (0x05 0x00), return `untrusted`.
+1. Return `trusted`.
+
+<h3 algorithm id="parse-cbor-headers">Parsing CBOR headers</h3>
+
+<dfn>Parsing CBOR headers</dfn> takes a [=byte sequence=] |headerBytes| and
+returns a failure or an [=exchange=] via the following steps:
+
+1. Let |headers| be the result of [=parsing a CBOR item=] from |headerBytes|,
+    matching the following CDDL rule:
+    ```
+    headers = [
+      {
+        ':method': bstr,
+        ':url': bstr,
+        * bstr => bstr,
+      },
+      {
+        ':status': bstr,
+        * bstr => bstr,
+      }
+    ]
+    ```
+1. If any of the following is true, return a failure:
+
+    * |headers| is an error.
+    * |headers|[0] contains any keys starting with `` `:` `` that aren't `` `:method` `` or `` `:url` ``.
+    * |headers|[0] contains a `` `host` `` key.
+    * |headers|[0][`` `:method` ``] is not `` `GET` ``.
+    * |headers|[1] contains any keys starting with `` `:` `` that aren't `` `:status` ``.
+    * |headers|[1][`` `:status` ``] doesn't consist of exactly 3 digits.
+
+1. Let |requestUrl| be the result of the [=URL parser=] on |headers|[0][``
+    `:url` ``].
+1. If |requestUrl| is a failure, if it has a non-null [=url/fragment=], or if
+    its [=url/scheme=] is something other than `"https"`, return a failure.
+1. Let |requestHeaders| be the result of [=creating a header list from the CBOR
+    map=] |headers|[0].
+1. If |requestHeaders| is a failure, return it.
+1. Let |request| be a new [=request=] with [=request/url=] |requestUrl| and
+    [=request/header list=] |requestHeaders|.
+1. Let |responseHeaders| be the result of [=creating a header list from the CBOR
+    map=] |headers|[1].
+1. If |responseHeaders| is a failure, return it.
+1. Let |response| be a new [=response=] with [=response/status=] |headers|[1][``
+    `:status` ``] and [=response/header list=] |responseHeaders|.
+1. Return an [=exchange=] of |request| and |response|.
+
+<h4 algorithm id="headers-from-map">Converting a map to a header list</h4>
+
+The result of <dfn>creating a header list from the CBOR map</dfn> |map| is
+returned by the following steps:
+
+1. Let |headers| be a new empty [=header list=].
+1. For each |key| → |value| of |map|:
+    1. If |key| starts with `` `:` ``, continue.
+    1. If the [=isomorphic decoding=] of |key| contains any [=ASCII upper
+        alpha=], return a failure.
+    1. If |key| doesn't match the constraints on a [=header/name=] or |value|
+        doesn't match the constraints on a [=header/value=], return a failure.
+    1. Assert: |headers| [=header list/does not contain=] |key|.
+    1. [=header list/Append=] |key|/|value| to |headers|.
+1. Return |headers|.
+
+<h3 algorithm id="read-a-body">Creating the response stream.</h3>
+
+To <dfn lt="reading a body|read a body">read a body</dfn> from a [=read buffer=]
+|stream| into a [=response=] |response| using an [=exchange signature=]
+|signature| to check its integrity, the UA MUST:
+
+1. If |signature|'s [=exchange signature/integrity header=]'s first item is:
+
+    <dl class="switch">
+
+    : "mi-draft2"
+    ::
+        1. If the length of |signature|'s [=exchange signature/integrity header=]
+            isn't 1, return a failure.
+        1. If |response|'s [=response/header list=] [=header list/does not
+            contain=] `` `mi-draft2` ``, return a failure.
+        1. Let |mi| be the [=header/combined value=] of `` `mi-draft2` `` in
+            |response|'s [=response/header list=].
+        1. If |mi| doesn't have an [=mi-sha256 parameter=], return a failure.
+        1. If [=extracting header list values=] for `` `content-encoding` `` in
+            |response|'s [=response/header list=] doesn't include
+            `` `mi-sha256` ``, return a failure.
+        1. Assert: [=Handle content codings=] used the value of the
+            [=mi-sha256 parameter=] as the [=integrity proof for the first
+            record=] when decoding the `mi-sha256` content encoding to produce
+            the bytes in |stream|.
+
+    : Anything else
+    :: Return a failure.
+
+    </dl>
+1. Let |body| be a new [=body=].
+1. Let |cancel| be the following steps, taking |reason| as an argument:
+    1. [=ReadableStream/Cancel=] |stream|'s [=read buffer/stream=] with
+        |reason|.
+1. Let |outputStream| be the result of [=ReadableStream/construct a
+    ReadableStream object|constructing a ReadableStream=] with |cancel|.
+1. Set |body|'s [=body/stream=] to |outputStream|.
+1. Set |response|'s [=response/body=] to |body|.
+1. [=In parallel=]:
+    1. [=read buffer/Dump=] |stream| to |outputStream|.
+
+
+<h3 algorithm id="request-matching">Request matching</h3>
+
+A [=request=] |browserRequest| <dfn>matches the stored request</dfn>
+|storedRequest| if the following steps return "match":
+
+1. If |browserRequest|'s [=request/url=] is not [=url/equal=] to
+    |storedRequest|'s [=request/url=], return "mismatch".
+
+1. Issue: Flesh this out, along the lines of
+    https://docs.google.com/document/d/1JdJkdY7cK2rD9JXbK75sSn069c0rhF9UnLQACBZ1OtY/edit.
+
+
+1. Return "match".
+
+
+## Stream algorithms ## {#stream-algs}
+
+Issue(whatwg/fetch#730): The algorithms in this section create and operate over
+ECMAScript objects like {{ReadableStream}} despite not having a Realm to attach
+them to.
+
+<h4 algorithm id="create-read-buffer">Create a read buffer</h4>
+
+A <dfn>new read buffer</dfn> for a {{ReadableStream}} |stream| is a new [=read
+buffer=] struct whose items are:
+
+: [=read buffer/stream=]
+:: |stream|
+: [=read buffer/reader=]
+:: The result of [=ReadableStream/get a reader|getting a reader=] from
+    |stream|.
+: [=read buffer/bytes=]
+:: An empty [=byte sequence=].
+
+<h4 algorithm id="read-up-to-bytes">Read up to bytes</h4>
+
+To <dfn for="read buffer" lt="reading up to">read up to</dfn> |N| bytes from a
+[=read buffer=] |buffer|, the UA MUST:
+
+1. Assert: This algorithm is running [=in parallel=].
+1. Let |done| be `false`.
+1. While |done| is `false` and the length of |buffer|'s [=read buffer/bytes=]
+    item is less than |N| bytes:
+
+    1. Let |chunk| be the result of [=ReadableStream/read a chunk|reading a
+        chunk=] with |buffer|'s [=read buffer/reader=].
+
+    1. Wait for |chunk| to settle.
+
+    1. If |chunk| is :
+
+        <dl class="switch">
+
+        : Fulfilled with an object whose `done` property is `false` and whose
+            `value` property is a {{Uint8Array}} object:
+
+        ::
+            1. Let |bs| be the [=byte sequence=] represented by the
+                {{Uint8Array}} object.
+            1. Set |buffer| to the concatenation of |buffer| and |bs|.
+
+        : Fulfilled with an object whose `done` property is `true`:
+        :: Set |done| to `true`.
+
+        : Rejected with |e|:
+        :: Return a failure with reason |e|.
+
+        </dl>
+
+1. If |buffer|'s [=read buffer/bytes=] item is at least |N| bytes long:
+    1. Let |result| be a [=byte sequence=] consisting of the first N bytes of
+        |buffer|'s [=read buffer/bytes=] item.
+    1. Set |buffer|'s [=read buffer/bytes=] item to a [=byte sequence=]
+        consisting of the bytes after the |N|th from its old value.
+1. Otherwise:
+    1. Let |result| be |buffer|'s [=read buffer/bytes=] item.
+    1. Set |buffer|'s [=read buffer/bytes=] item to an empty [=byte sequence=].
+
+1. Return |result|.
+
+
+<h4 algorithm id="read-bytes">Read bytes</h4>
+
+To <dfn for="read buffer">read</dfn> |N| bytes from a [=read buffer=] |buffer|,
+the UA MUST:
+
+1. Assert: This algorithm is running [=in parallel=].
+1. Let |bytes| be the result of [=read buffer/reading up to=] |N| bytes from
+    |buffer|.
+1. If |bytes| is a failure, return it.
+1. If |bytes| is exactly |N| bytes long, return it.
+1. Otherwise, return a failure.
+
+<h4 algorithm id="dump-stream">Dump to another stream</h4>
+
+To <dfn for="read buffer">Dump</dfn> a [=read buffer=] |input| to a
+{{ReadableStream}} |output|, the UA MUST:
+
+1. Assert: This algorithm is running [=in parallel=].
+1. Let |enqueue| be the following steps, taking |bytes|:
+    1. [=ReadableStream/Enqueue=] a {{Uint8Array}} object wrapping an
+        {{ArrayBuffer}} containing |bytes| to |output|. Both objects are created
+        in |output|'s realm.
+    1. If that threw an exception |ex|, [=ReadableStream/error=] |output| with
+        |ex| and [=ReadableStream/cancel=] |input|'s [=read buffer/stream=] with
+        |ex|.
+    1. Abort this algorithm.
+1. |enqueue| |input|'s [=read buffer/bytes=].
+1. While |input|'s [=read buffer/stream=] is [=ReadableStream/readable=]:
+    1. Wait until |output| is [=ReadableStream/closed=],
+        [=ReadableStream/errored=], or [=ReadableStream/need more data|needs
+        more data=].
+    1. If |output| is [=ReadableStream/closed=] or [=ReadableStream/errored=],
+        [=ReadableStream/cancel=] |input|'s [=read buffer/stream=] and abort
+        these steps.
+    1. Let |chunk| be the result of [=ReadableStream/read a chunk|reading a
+        chunk=] with |input|'s [=read buffer/reader=].
+    1. Wait for |chunk| to settle.
+    1. If |chunk| is:
+
+        <dl class="switch">
+
+        : Fulfilled with an object whose `done` property is `false` and whose
+            `value` property is a {{Uint8Array}} object |bytes|:
+        :: |enqueue| |bytes|.
+
+        : Fulfilled with an object whose `done` property is `true`:
+        :: [=ReadableStream/Close=] |output|.
+
+        : Rejected with |e|:
+        :: [=ReadableStream/Error=] |output| with reason |e|.
+
+        </dl>
+
+## CBOR encoding ## {#cbor-encoding}
+
+A few algorithms above need to encode rather than parse CBOR. To avoid any
+ambiguity in the resulting bytes, encoding algorithms for a subset of CBOR are
+defined here.
+
+<h4 algorithm id="item-header">Encoding an item header</h4>
+
+The <dfn>CBOR item header</dfn> with major type |type| (an integer between 0 and
+7 inclusive) and argument |arg| (an unsigned 64-bit integer) is the [=byte
+sequence=] return by the following steps:
+
+1. Assert: 0 &lt;= |type| &lt;= 7 and 0 &lt;= |arg| &lt; 2<sup>64</sup>.
+1. Let |additionalData| be an integer.
+1. Let |argBytes| be an empty [=byte sequence=].
+1. If:
+
+    <dl class="switch">
+    : 0 &lt;= |arg| &lt; 0x18
+    :: Set |additionalData| to |arg|.
+
+    : 0x18 &lt;= |arg| &lt; 2<sup>8</sup>
+    ::
+        1. Set |additionalData| to 0x18.
+        1. Set |argBytes| to the 1-element [=byte sequence=] holding |arg|.
+
+    : 2<sup>8</sup> &lt;= |arg| &lt; 2<sup>16</sup>
+    ::
+        1. Set |additionalData| to 0x19.
+        1. Set |argBytes| to the 2-element [=byte sequence=] holding the
+            big-endian encoding of |arg|.
+
+    : 2<sup>16</sup> &lt;= |arg| &lt; 2<sup>32</sup>
+    ::
+        1. Set |additionalData| to 0x1A.
+        1. Set |argBytes| to the 4-element [=byte sequence=] holding the
+            big-endian encoding of |arg|.
+
+    : 2<sup>32</sup> &lt;= |arg| &lt; 2<sup>64</sup>
+    ::
+        1. Set |additionalData| to 0x1B.
+        1. Set |argBytes| to the 8-element [=byte sequence=] holding the
+            big-endian encoding of |arg|.
+
+    </dl>
+1. Let |initialByte| be <code>|type| &lt;&lt; 5 + |additionalData|</code>.
+1. Return the [=byte sequence=] consisting of |initialByte| followed by
+    |argBytes|.
+
+<h4 algorithm id="cbor-int">CBOR integer items</h4>
+
+The <dfn>CBOR integer encoding</dfn> of an integer |int| is:
+
+1. Assert: 0 &lt;= |int| &lt; 2<sup>64</sup>.
+1. Return the [=CBOR item header=] with major type 0 and argument |int|.
+
+<h4 algorithm id="cbor-bytestring">CBOR byte string items</h4>
+
+The <dfn>CBOR byte string encoding</dfn> of a [=byte sequence=] |bytes| is:
+
+1. Let |len| be the [=byte sequence/length=] of |bytes|.
+1. Assert: |len| &lt; 2<sup>64</sup>.
+1. Return the concatenation of:
+    1. The [=CBOR item header=] with major type 2 and argument |len|.
+    1. |bytes|.
+
+# Security Considerations # {#seccons}
+
+The Security Considerations of [[draft-yasskin-http-origin-signed-responses]]
+apply.
+
+## Certificate Transparency ## {#seccons-ct}
+
+To identify [=off-path attackers=], [[#trusting-certificate]] encourages UAs to
+implement Certificate Transparency, which requires that, in order for a
+certificate to be trusted, it must be logged publicly. This means that an
+off-path attacker who has managed to get a mis-issued certificate has to at
+least announce that certificate in a place the legitimate domain owner has a
+chance to notice. Once they notice, they can revoke the certificate, which will
+stop the UA from trusting it no more than 7 days later.

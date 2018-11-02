@@ -139,7 +139,7 @@ Selectors Overview</h2>
 				<td>[[#matches]]
 				<td>4
 			<tr>
-				<td><code>E:something(<var>s1</var>, <var>s2</var>, &hellip;)</code>
+				<td><code>E:where(<var>s1</var>, <var>s2</var>, &hellip;)</code>
 				<td>an E element that matches <a>compound selector</a> <var>s1</var>
 						and/or <a>compound selector</a> <var>s2</var> but contributes no specificity.
 				<td>[[#zero-matches]]
@@ -397,7 +397,7 @@ Selectors Overview</h2>
 				<td>3
 			<tr>
 				<td><code>E:empty</code>
-				<td>an E element that has no children (not even text nodes)
+				<td>an E element that has no children (neither elements nor text)
 				<td>[[#structural-pseudos]]
 				<td>3
 			<tr>
@@ -1115,14 +1115,17 @@ The Matches-any Pseudo-class: '':matches()''</h3>
 	It represents an element that is represented by its argument.
 
 	Note: The specificity of the '':matches()'' pseudo-class
-	is replaced by the specificity of its argument.
-	Thus, a selector written with '':matches()'' has equivalent specificity
+	is replaced by the specificity of its most specific argument.
+	Thus, a selector written with '':matches()''
+	does not necessarily have equivalent specificity
 	to the equivalent selector written without '':matches()''
-	For example,
+	For example, if we have
 	'':matches(ul, ol, .list) > [hidden]'' and ''ul > [hidden], ol > [hidden], .list > [hidden]''
-	are equivalent in both their matching behavior and specificity.
+	a ''[hidden]]'' child of an <{ol}> matches the first selector
+	with a specificity of (0,2,0)
+	whereas it matches the second selector
+	with a specificity of (0,1,1).
 	See [[#specificity-rules]].
-	ISSUE: See also <a href="https://github.com/w3c/csswg-drafts/issues/1027">issue 1027</a>.
 
 	Pseudo-elements cannot be represented by the matches-any pseudo-class;
 	they are not valid within '':matches()''.
@@ -1132,8 +1135,6 @@ The Matches-any Pseudo-class: '':matches()''</h3>
 	within a '':matches()'' pseudo-class,
 	unless that compound selector contains
 	an explicit <a>universal selector</a> or <a>type selector</a>.
-
-	Issue: Why this exception for the explicit universal selector?
 
 	<div class="example">
 		For example, the following selector matches any element that is being
@@ -1199,19 +1200,17 @@ The Negation Pseudo-class: '':not()''</h3>
 
 
 <h3 id="zero-matches">
-The Specificity-adjustment Pseudo-class: '':something()''</h3>
+The Specificity-adjustment Pseudo-class: '':where()''</h3>
 
-	The Specificity-adjustment pseudo-class, <dfn id="something-pseudo">:something()</dfn>,
+	The Specificity-adjustment pseudo-class, <dfn id="where-pseudo">:where()</dfn>,
 	is a functional pseudo-class
 	with the same syntax and functionality as '':matches()''.
-	Unlike '':matches()'', neither the '':something'' pseudo-class, nor any of its arguments
+	Unlike '':matches()'', neither the '':where'' pseudo-class, nor any of its arguments
 	contribute to the specificity of the selector--
 	its specificity is always zero.
 
 	This is useful for introducing filters in a selector
 	while keeping the associated style declarations easy to override.
-
-	ISSUE: This pseudo-class needs a name. See <a href="https://github.com/w3c/csswg-drafts/issues/1170">previous discussion</a>, <a href="https://github.com/w3c/csswg-drafts/issues/2143">open issue</a>.
 
 	<div class="example">
 		Below is a common example where the specificity heuristic fails
@@ -1228,10 +1227,10 @@ The Specificity-adjustment Pseudo-class: '':something()''</h3>
 			}
 		</pre>
 
-		However, by using '':something()'' the author can explicitly declare their intent:
+		However, by using '':where()'' the author can explicitly declare their intent:
 
 		<pre>
-			a:something(:not(:hover)) {
+			a:where(:not(:hover)) {
 				text-decoration: none;
 			}
 
@@ -1278,7 +1277,7 @@ The Relational Pseudo-class: '':has()''</h3>
 		<pre>section:has(:not(h1, h2, h3, h4, h5, h6))</pre>
 
 		...would result matching any <code>&lt;section></code> element
-		which contains anything that's not a header element.
+		which contains anything that's not a heading element.
 	</div>
 
 
@@ -1890,7 +1889,8 @@ The Language Pseudo-class: '':lang()''</h3>
 	argument. Each <dfn>language range</dfn> in '':lang()''
 	must be a valid CSS <<ident>> or <<string>>.
 	(Language ranges containing asterisks, for example,
-		must be quoted as strings.)
+		must be either correctly escaped or quoted as strings,
+		e.g. '':lang(\*-Latn)'' or '':lang("*-Latn")'')
 
 	Note: The <a>content language</a> of an element is defined by the document language.
 	For example, in HTML [[HTML5]], the <a>content language</a> is determined by a
@@ -2237,62 +2237,91 @@ The Focus-Indicated Pseudo-class: '':focus-visible''</h3>
 
 	The <dfn id='focus-visible-pseudo'>:focus-visible</dfn> pseudo-class applies
 	while an element matches the '':focus'' pseudo-class
-	<em>and</em> the UA determines via heuristics
+	<em>and</em> the user agent determines via heuristics
 	that the focus should be made evident on the element.
-	(Many browsers show a “focus ring” by default in this case.)
 
-	<div class=example>
-		For example, UAs typically display focus indicators on text fields
-		any time they're focused,
-		to draw attention to the fact that keyboard input will affect their contents.
 
-		On the other hand, UAs typically only display focus indicators on buttons
-		when they were focused by a keyboard interaction
-		(such as tabbing through the document)--
-		because it's not always immediately obvious
-		where the focus has gone after such an interaction,
-		but is sufficiently self-evident when the button was focused
-		by more obviously-targetted interactions,
-		like clicking on the button with a mouse pointer.
+	Note: The intent of '':focus-visible'' is
+	to allow authors to provide <em>clearly identifiable</em> focus styles
+	which are visible when a user is likely to need to understand where focus is,
+	and not visible in other cases.
+
+	<div class="example">
+		In this example,
+		all focusable elements get a strong yellow outline on '':focus-visible'',
+		and links get both a yellow outline and a yellow background on '':focus-visible''.
+		These styles are consistent throughout the page and are easily visible
+		due to their bold styling,
+		but do not appear unless the user is likely to need to understand
+		where page focus is.
+
+		<pre highlight=css>
+		:root {
+			--focus-gold: #ffbf47;
+		}
+
+		:focus-visible  {
+			outline: 3px solid var(--focus-gold);
+		}
+
+		a:focus-visible {
+			background-color: var(--focus-gold);
+		}
+		</pre>
 	</div>
 
-	<div class=advisement>
-		Page authors should follow these guidelines
-		when deciding whether to use '':focus'' or '':focus-visible''
-		to style the focused state of an element:
+	User agents can choose their own heuristics for when to match '':focus-visible'';
+	however, the following (non-normative) suggestions can be used as a starting point:
 
-		* If the element has “native” focus indicator behavior
-			(such as text fields or buttons),
-			use '':focus-visible''.
-		* Otherwise, if the element is emulating a text input,
-			or something else that is <em>intended</em> to receive keyboard interaction,
-			use '':focus''.
-		* Otherwise,
-			use '':focus-visible''.
+	* If a user has expressed a preference
+		(such as via a system preference or a browser setting)
+		to always see a visible focus indicator,
+		the user agent should honor this
+		by having '':focus-visible'' always match on the active element,
+		regardless of any other factors.
+		(Another option may be for the user agent to show its own focus indicator
+		regardless of author styles.)
+	* Any element which supports keyboard input
+		(such as an <{input}> element,
+		or any other element
+		which may trigger a virtual keyboard to be shown on focus
+		if a physical keyboard is not present)
+		should <strong>always</strong> match '':focus-visible'' when focused.
+	* If the user interacts with the page via the keyboard,
+		the currently focused element should match '':focus-visible''
+		(i.e. keyboard usage may change whether this pseudo-class matches
+		even if it doesn't affect '':focus'').
+	* If the user interacts with the page via a pointing device,
+		such that the focus is moved to a new element
+		which does <em>not</em> support user input,
+		the newly focused element
+		should <strong>not</strong> match '':focus-visible''.
+	* If the active element matches '':focus-visible'',
+		and a script causes focus to move elsewhere,
+		the newly focused element should match '':focus-visible''.
+	* Conversely, if the active element does not match '':focus-visible'',
+		and a script causes focus to move elsewhere,
+		the newly focused element should <strong>not</strong> match '':focus-visible''.
+
+	User agents should also use '':focus-visible'' to specify the default focus style,
+	so that authors using '':focus-visible'' will not also need to disable
+	the default '':focus'' style.
 	</div>
 
-	When UAs choose to specially indicate focus on an element,
-	or whether they specially indicate focus at all,
-	is UA-dependent.
-	Different UAs,
-	the same UA on different operating systems,
-	or the same UA on the same OS,
-	but with different user settings,
-	can make different choices as to when an element matches '':focus-visible''.
-
 	<div class=example>
-		The following guidelines are suggested heuristics
-		for choosing when to apply '':focus-visible''
-		to elements without “native” focus indicator behavior:
+	In this example,
+	authors use a '':not()'' pseudo-class to remove default user agent focus styling
+	if '':focus-visible'' is supported,
+	and provide enhanced focus styling via '':focus-visible''.
 
-		* If the element received focus via a keyboard interaction,
-			including indirectly,
-			such as triggering a dialog
-			by pressing a button using the keyboard,
-			apply '':focus-visible''.
-		* If a keyboard event occurs while an element is focused,
-			even if the element wasn't focused by a keyboard interaction,
-			apply '':focus-visible''.
+	<pre highlight=css>
+	:focus:not(:focus-visible) {
+		outline: 0;
+	}
+
+	:focus-visible {
+ 		outline: 3px solid var(--focus-gold);
+	}
 	</div>
 
 <h3 id="the-focus-within-pseudo">
@@ -2551,6 +2580,26 @@ The Indeterminate-value Pseudo-class: '':indeterminate''</h4>
 <h3 id='ui-validity'>
 Input Value-checking</h3>
 
+<h4 id="blank">
+The Empty-Value Pseudo-class: '':blank''</h4>
+
+	The <dfn id="blank-pseudo">:blank</dfn> pseudo-class
+	applies to user-input elements whose input value is empty
+	(consists of the empty string or otherwise null input).
+
+	<div class="example">
+		Examples of '':blank'' user-input elements would be
+		a <{textarea}> element whose contents are empty,
+		or an <{input}> field whose value is empty.
+		Note that the value under consideration here is the value
+		that would be submitted
+		(see <a href="https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#a-form-control's-value">A form control’s value</a> in [[HTML]]),
+		which in HTML does not necessarily correspond to the value
+		of the element’s <{input/value}> attribute.
+	</div>
+
+	Note: This selector is at-risk.
+
 <h4 id="validity-pseudos">
 The Validity Pseudo-classes: '':valid'' and '':invalid''</h4>
 
@@ -2668,7 +2717,9 @@ Tree-Structural pseudo-classes</h2>
 <h3 id="the-empty-pseudo">
 '':empty'' pseudo-class</h3>
 
-	The <dfn id='empty-pseudo'>:empty</dfn> pseudo-class represents an element that has no children at all.
+	The <dfn id='empty-pseudo'>:empty</dfn> pseudo-class represents
+	an element that has no children
+	except, optionally, <a>document white space characters</a>.
 	In terms of the document tree,
 	only element nodes and content nodes
 	(such as [[DOM]] text nodes, and entity references)
@@ -2678,48 +2729,37 @@ Tree-Structural pseudo-classes</h2>
 
 	<div class="example">
 		Examples:
-		''p:empty'' is a valid representation of the following fragment:
+		''p:empty'' is a valid representation of the <{p}> elements
+		in the following HTML fragment:
 
-		<pre>&lt;p>&lt;/p></pre>
+		<pre class="html">
+			&lt;p>&lt;/p>
+			&lt;p>
+			&lt;p> &lt;/p>
+			&lt;p><!-- comment -->&lt;/p>
+		</pre>
 
-		''foo:empty'' is not a valid representation for the
-		following fragments:
+		''div:empty'' is not a valid representation of the <code>&lt;div></code> elements
+		in the following fragment:
 
-		<pre>&lt;foo>bar&lt;/foo></pre>
-
-		<pre>&lt;foo>&lt;bar>bla&lt;/bar>&lt;/foo></pre>
-
-		<pre>&lt;foo>this is not &lt;bar>:empty&lt;/bar>&lt;/foo></pre>
+		<pre class="html">
+			&lt;div>text&lt;/div>
+			&lt;div>&lt;p>&lt;/p>&lt;/div>
+			&lt;div>&amp;nbsp;&lt;/div>
+			&lt;div>&lt;p>bla&lt;/p>&lt;/div>
+			&lt;div>this is not &lt;p>:empty&lt;/p>&lt;/div>
+		</pre>
 	</div>
 
-	Issue: The WG is considering whether to allow elements containing only white space to match this selector.
-	The advantage would be that--
-	as white space is largely collapsible in HTML and is therefore used for source code formatting, and especially because elements with omitted end tags are likely to absorb such white space into their DOM text contents--
-	many elements which authors perceive of as empty would be selected by this selector, as they expect.
-	The disadvantages are a potential conflict with Web-compat if there exist pages that depend on this selector excluding white space;
-	and that one might consider uncollapsed white space to be significant content, but the selector cannot change its behavior based on the 'white-space' property.
-	See <a href="https://github.com/w3c/csswg-drafts/issues/1967">discussion</a>.
-
-
-<h3 id='the-blank-pseudo'>
-'':blank'' pseudo-class</h3>
-
-	The <dfn id='blank-pseudo'>:blank</dfn> pseudo-class is like the '':empty'' pseudo-class,
-	except that it additionally matches elements that only contain
-	<a href="https://www.w3.org/TR/css3-text/#white-space-rules">code points affected by whitespace processing</a>. [[!CSS3TEXT]]
-
-	<div class='example'>
-		For example, the following element matches '':blank'',
-		but not '':empty'',
-		because it contains at least one linebreak, and possibly other whitespace:
-
-		<pre>&lt;p><br>&lt;/p></pre>
-	</div>
-
-	Issue: The WG is considering whether to rename this or file its definition under the existing '':empty'' pseudo-class.
-	See <a href="https://github.com/w3c/csswg-drafts/issues/1967">discussion</a>.
-	There's also a <a href="https://github.com/w3c/csswg-drafts/issues/1283">related issue</a> on a selector for empty input fields which might legitimately steal this name.
-
+	Note: In Level 2 and Level 3 of Selectors,
+	'':empty'' did not match elements that contained only white space.
+	This was changed so that that--
+	given white space is largely collapsible in HTML
+	and is therefore used for source code formatting,
+	and especially because elements with omitted end tags
+	are likely to absorb such white space into their DOM text contents--
+	elements which authors perceive of as empty
+	can be selected by this selector, as they expect.
 
 <h3 id='child-index'>
 Child-indexed Pseudo-classes</h3>
@@ -2768,8 +2808,9 @@ Child-indexed Pseudo-classes</h3>
 	</div>
 
 	Note: The specificity of the '':nth-child()'' pseudo-class is
-	the specificity of a single pseudo-class plus
-	the specificity of its selector argument <var>S</var>, if any.
+	the specificity of a single pseudo-class plus,
+	if <var>S</var> is specified,
+	the specificity of the most specific <a>complex selector</a> in <var>S</var>.
 	See [[#specificity-rules]].
 	Thus ''<var>S</var>:nth-child(<var>An+B</var>)''
 	and '':nth-child(<var>An+B</var> of <var>S</var>)''
@@ -3187,7 +3228,7 @@ Grid-Structural Selectors</h2>
 	In a column-primary format, these pseudo-classes match against row associations instead.
 
 <h3 id="the-column-combinator">
-Column combinator</h3>
+Column combinator (<code>||</code>)</h3>
 
 	The <dfn export>column combinator</dfn>, which consists of two pipes (<dfn selector id="selectordef-column">||</dfn>)
 	represents the relationship of a column element
@@ -3271,27 +3312,18 @@ Calculating a selector's specificity</h2>
 	A few pseudo-classes provide “evaluation contexts” for other selectors,
 	and so have their specificity defined by their contents and how they match:
 
-	ISSUE: See also <a href="https://github.com/w3c/csswg-drafts/issues/1027">issue 1027</a>.
-
 	<ul>
 		<li>
-			The specificity of a '':matches()'' or '':has()'' pseudo-class is replaced by
-			the specificity applicable to its selector list argument.
-			(When '':matches()'' contains only compound selectors,
-			the full selector's specificity is thus equivalent to
-			expanding out all the combinations in full, without '':matches()'';
-			fully generalized, the specificity of '':matches()'' is
-			the specificity of the most specific selector within it that matches.
-			The behavior for comma-separated arguments to '':has()'' is analogous.)
+			The specificity of a '':matches'', '':not()'', or '':has()'' pseudo-class
+			is replaced by the specificity of
+			the most specific complex selector in its selector list argument.
 		<li>
 			Analogously, the specificity of an '':nth-child()'' or '':nth-last-child()'' selector
 			is the specificity of the pseudo class itself (counting as one pseudo-class selector)
-			plus the specificity of its selector list argument (if any).
+			plus the specificity of
+			the most specific complex selector in its selector list argument (if any).
 		<li>
-			The specificity of a '':not()'' pseudo-class is replaced by
-			the specificity of the most specific complex selector in its selector list argument.
-		<li>
-			The specificity of a '':something()'' pseudo-class is replaced by zero.
+			The specificity of a '':where()'' pseudo-class is replaced by zero.
 	</ul>
 
 	<div class="example">
@@ -3299,18 +3331,25 @@ Calculating a selector's specificity</h2>
 		<ul>
 			<li>
 				'':matches(em, #foo)'' has
-				a specificity of (0,0,1)--like a tag selector--when matched against <code>&lt;em></code>,
-				and a specificity of (1,0,0)--like an ID selector--when matched against  <code>&lt;em id=foo></code>.
+				a specificity of (1,0,0)--
+				like an ID selector--
+				when matched against any of
+				<code>&lt;em></code>, <code>&lt;p id=foo></code>, or <code>&lt;em id=foo></code>.
 			<li>
-				''div:something(em, #foo#bar#baz)'' has
-				a specificity of (0,0,1): only the ''div'' contributes to selector specificity.
+				''div:where(em, #foo#bar#baz)'' has
+				a specificity of (0,0,1):
+				only the ''div'' outside the '':where()''
+				contributes to selector specificity.
 			<li>
 				'':nth-child(even of li, .item)'' has
-				a specificity of (0,1,1)--like a tag selector plus a pseudo-class--when matched against <code>&lt;li></code>,
-				and a specificity of (0,2,0)--like a class selector plus a pseudo-class--when matched against  <code>&lt;li class=item id=foo></code>.
+				a specificity of (0,2,0)--
+				like a class selector plus a pseudo-class--
+				when matched against any of
+				 <code>&lt;li></code>, <code>&lt;ul class=item></code>, or <code>&lt;li class=item id=foo></code>.
 			<li>
 				'':not(em, #foo)'' has
-				a specificity of (1,0,0)--like an ID selector--whenever it matches any element.
+				a specificity of (1,0,0)--like an ID selector--
+				whenever it matches any element.
 		</ul>
 	</div>
 
@@ -3341,9 +3380,7 @@ Calculating a selector's specificity</h2>
 		#x34y           /* a=1 b=0 c=0 */
 		#s12:not(FOO)   /* a=1 b=0 c=1 */
 		.foo :matches(.bar, #baz)
-		                /* Either a=1 b=1 c=0
-		                   or a=0 b=2 c=0, depending
-		                   on the element being matched. */
+		                /* a=1 b=1 c=0 */
 		</pre>
 	</div>
 
@@ -3351,7 +3388,8 @@ Calculating a selector's specificity</h2>
 	same simple selector are allowed and do increase specificity.
 
 	Note: The specificity of the styles
-	specified in an HTML <code>style</code> attribute <a href="https://www.w3.org/TR/css-style-attr/#interpret">is described in CSS Style Attributes</a>. [[CSSSTYLEATTR]]
+	specified in an HTML <code>style</code> attribute
+	<a href="https://www.w3.org/TR/css-style-attr/#interpret">is described in CSS Style Attributes</a>. [[CSSSTYLEATTR]]
 
 <h2 id="grammar" oldids="formal-syntax">
 Grammar</h2>
@@ -3380,7 +3418,7 @@ Grammar</h2>
 	<dfn>&lt;simple-selector></dfn> = <<type-selector>> | <<subclass-selector>>
 
 
-	<dfn>&lt;combinator></dfn> = '>' | '+' | '~' | [ '||' ]
+	<dfn>&lt;combinator></dfn> = '>' | '+' | '~' | [ '|' '|' ]
 
 	<dfn>&lt;type-selector></dfn> = <<wq-name>> | <<ns-prefix>>? '*'
 
@@ -3411,11 +3449,18 @@ Grammar</h2>
 	In interpreting the above grammar,
 	the following rules apply:
 
-	* White space is forbidden between tokens except:
-		* Around commas (denoted with the <a data-link-type="grammar">#</a> multiplier)
-		* Around or in place of a <<combinator>>
-		* Between the parentheses and argument of
-			a functional <<pseudo-class-selector>> or <<pseudo-element-selector>>.
+	* White space is forbidden:
+		* Between any of the top-level components of a <<compound-selector>>
+			(that is, forbidden between the <<type-selector>> and <<subclass-selector>>,
+			or between the <<subclass-selector>> and <<pseudo-element-selector>>,
+			etc).
+		* Between <em>any</em> of the components of a <<type-selector>>
+			or a <<class-selector>>.
+		* Between the ':'s, or between the ':' and <<ident-token>> or <<function-token>>,
+			of a <<pseudo-element-selector>> or a <<pseudo-class-selector>>.
+		* Between <em>any</em> of the components of a <<wq-name>>.
+		* Between the components of an <<attr-matcher>>.
+		* Between the components of a <<combinator>>.
 	* The four <a href="https://www.w3.org/TR/CSS2/selectors.html#pseudo-element-selectors">Level 2</a> <a>pseudo-elements</a>
 		(''::before'', ''::after'', ''::first-line'', and ''::first-letter'')
 		may, for legacy reasons,
@@ -3788,8 +3833,93 @@ Appendix A: Guidance on Mapping Source Documents &amp; Data to an Element Tree</
 	</div>
 
 
+<h2 id="compat">
+Appendix B: Obsolete but Required Parsing Quirks for Web Compat</h2>
+
+	<em>This appendix is normative.</em>
+
+	Due to legacy Web-compat constraints,
+	User Agents expecting to parse Web documents must support the following features:
+
+	* All [=pseudo-elements=] whose names begin with the string “-webkit-”
+		(matched <a>ASCII case-insensitively</a>)
+		and who are not functional notations
+		must be treated as valid at parse time.
+		(That is, <css>::-webkit-asdf</css> is valid at parse time,
+		but <css>::-webkit-jkl()</css> is not.)
+		If they're not otherwise recognized and supported,
+		they must be treated as matching nothing.
+
+		These otherwise-unsupported pseudo-elements
+		must be serialized in ASCII lowercase.
+
+		<details class=note>
+			<summary>What's this quirk about?</summary>
+
+			Selectors have long had a behavior
+			where a single unknown/invalid selector
+			invalidates the entire selector list
+			(rather than just invalidating the one complex selector it finds itself in).
+			This is generally considered a legacy mistake by the WG,
+			but can't be fixed at this point,
+			as too many stylesheets depend on this behavior,
+			intentionally or not.
+
+			One aspect of this is that use of vendor-specific selectors
+			invalidates the entire selector in other User Agents
+			that don't recognize them,
+			and takes the entire style rule down with it.
+			This has been used intentionally in the past--
+			in the severely-not-recommended practice of hiding style rules from some browsers
+			by making them invalid in every other browser--
+			and unintentionally,
+			with people styling an element
+			and also applying those styles to a vendor-specific pseudo-element
+			(such as the various <{input}>-related pseudos some browsers expose),
+			not realizing that this hides the entire rule from other browsers.
+
+			In addition to this more general reasoning,
+			WebKit-derived user agents,
+			such as Safari or Chrome,
+			have an additional quirk related to their vendor-prefixed pseudo-elements,
+			where any <css>::-webkit-</css>-prefixed selectors are considered valid at parse time.
+			(This is probably a leftover quirk of an early CSS feature,
+			since dropped,
+			that intentionally treated all possible pseudo-elements as valid at parse time,
+			in anticipation of a feature letting authors define their own pseudo-elements.)
+
+			Similar to other legacy quirks,
+			such as those documented in [[QUIRKS]],
+			this particular vendor-specific oddity has become common enough
+			that other user agents are seeing sites breaking due to them depending on it,
+			accidentally or not.
+			As such, since the quirk is in practical terms
+			<em>required</em> to render the modern web correctly,
+			specifying it and requiring it for all user agents
+			ensures that today's web pages are more likely to be correctly rendered
+			in user agents both current and future.
+
+			As usual with quirks, however,
+			webpages intentionally relying on this
+			will be met with shaming and derision from members of the CSSWG,
+			and all right-thinking web developers.
+		</details>
+
+
 <h2 id="changes">
 Changes</h2>
+
+	Significant changes since the <a href="https://www.w3.org/TR/2018/WD-selectors-4-20180202/">2 February 2018 Working Draft</a>:
+
+	<ul>
+		<li>Named the zero-specificity selector to '':where()''.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/2143">Issue 2143</a>)
+		<li>Removed '':blank'' and defined '':empty'' to ignored white-space&ndash;only nodes.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/1967">Issue 1967</a>)
+		<li>Changed the specificity of '':matches()'', '':where()'', and '':nth-child()''
+		to not depend on which selector argument matched.
+		(<a href="https://github.com/w3c/csswg-drafts/issues/1027">Issue 1027</a>)
+	</ul>
 
 	Significant changes since the <a href="https://www.w3.org/TR/2013/WD-selectors4-20130502/">2 May 2013 Working Draft</a> include:
 
@@ -3800,7 +3930,7 @@ Changes</h2>
 		<li>Replaced the '':nth-match()'' and '':nth-last-match()'' selectors
 		    with '':nth-child(&hellip; of <var>selector</var>)'' and '':nth-last-child(&hellip; of <var>selector</var>)''.
 		<li>Changed the <css>:active-drop-target</css>, <css>:valid-drop-target</css>, <css>:invalid-drop-target</css> with '':drop()''.
-		<li>Sketched out an empty-or-whitespace-only selector for discussion ('':blank'').
+		<li>Sketched out an empty-or-whitespace-only selector for discussion
 			(See <a href="https://github.com/w3c/csswg-drafts/issues/1967">open issue</a>.)
 		<li>Renamed '':user-error'' to '':user-invalid''.
 		    (See <a href="https://www.w3.org/mid/CADhPm3v+WfeGQfBwwx8QBuiOjn2k38V_DcKW17Cm81VgZb1nbQ@mail.gmail.com">Discussion</a>)
@@ -3822,7 +3952,7 @@ Changes</h2>
 				Issue: Need to define tree for XML.
 				<li>[[#api-hooks]]
 					<ul>
-						<li>Note that earlier versions of this section defined a section on <dfn id="evaluating-selectors">evaluating a selector</dfn>,
+						<li>Note that earlier versions of this section defined a section on <dfn noexport id="evaluating-selectors">evaluating a selector</dfn>,
 						but that section is no longer present.
 						Specifications referencing that section should instead reference
 						the algorithm to <a>match a selector against a tree</a>.
@@ -3838,6 +3968,42 @@ Changes</h2>
 
 	Note: The 1 February 2018 draft included an inadvertent commit of unfinished work;
 	2 February 2018 has reverted this commit (and fixed some links because why not).
+
+	Significant changes since the <a href="https://www.w3.org/TR/2012/WD-selectors4-20120823/">23 August 2012 Working Draft</a> include:
+
+	<ul>
+		<li>Added '':placeholder-shown'' pseudo-classes.
+		<li>Released some restrictions on '':matches()'' and '':not()''.
+		<li>Defined fast and complete Selectors profiles (now called <a>live</a> and <a>snapshot</a>).
+		<li>Improved definition of <a>specificity</a> to better handle <a>:matches()</a>.
+		<li>Updated grammar.
+		<li>Cleaned up definition of <<An+B>> notation.
+		<li>Added definition of <a>scope-relative</a> selectors, changed <i>scope-constrained</i> to scope-filtered for less confusion with scope-contained.
+		<li>The '':local-link()'' pseudo-class now ignores trailing slashes.
+	</ul>
+
+	Significant changes since the <a href="https://www.w3.org/TR/2011/WD-selectors4-20110929/">29 September 2011 Working Draft</a> include:
+
+	<ul>
+		<li>Added language variant handling per RFC 4647.
+		<li>Added scoped selectors.
+		<li>Added <css>:user-error</css> (now called '':user-invalid'').
+		<li>Added <css>:valid-drop-target</css>.
+		<li>Changed <a>column combinator</a> from double slash to double pipe.
+	</ul>
+
+	Additions since <a href="https://www.w3.org/TR/css-cascade-3/">Level 3</a>:
+
+	<ul>
+		<li>Added '':dir()''.
+		<li>Added <css>:nth-match</css>.
+		<li>Made '':indeterminate'' normative.
+		<li>Added column selectors.
+		<li>Added '':scope''.
+		<li>Added '':any-link''.
+		<li>Added case-insensitive attribute-value matching.
+	</ul>
+
 
 <h2 id="acknowledgements">
 Acknowledgements</h2>

@@ -1513,17 +1513,20 @@ Parts of this work may be from another specification document.  If so, those par
       <li><a href="#casing-rules"><span class="secno">2.5</span> <span class="content">Use casing rules consistent with existing APIs</span></a>
       <li><a href="#prefer-dict-to-bool"><span class="secno">2.6</span> <span class="content">Prefer dictionary parameters over boolean parameters or other unreadable parameters</span></a>
       <li><a href="#promises"><span class="secno">2.7</span> <span class="content">Design asynchronous APIs using Promises</span></a>
-      <li><a href="#secure-context"><span class="secno">2.8</span> <span class="content">Consider limiting new features to secure contexts</span></a>
-      <li><a href="#string-constants"><span class="secno">2.9</span> <span class="content">Constants, enums, and bitmasks</span></a>
+      <li><a href="#aborting"><span class="secno">2.8</span> <span class="content">Cancel asynchronous APIs/operations using AbortSignal</span></a>
+      <li><a href="#secure-context"><span class="secno">2.9</span> <span class="content">Consider limiting new features to secure contexts</span></a>
+      <li><a href="#string-constants"><span class="secno">2.10</span> <span class="content">Constants, enums, and bitmasks</span></a>
      </ol>
     <li>
      <a href="#event-design"><span class="secno">3</span> <span class="content">Event Design</span></a>
      <ol class="toc">
-      <li><a href="#always-add-event-handlers"><span class="secno">3.1</span> <span class="content">Always add event handler attributes</span></a>
-      <li><a href="#events-are-for-notification"><span class="secno">3.2</span> <span class="content">Events are for notification</span></a>
-      <li><a href="#favor-asynchronous-events"><span class="secno">3.3</span> <span class="content">Favor asynchronous events</span></a>
-      <li><a href="#state-and-subclassing"><span class="secno">3.4</span> <span class="content">State and <code class="idl"><span>Event</span></code> subclasses</span></a>
-      <li><a href="#events-vs-observers"><span class="secno">3.5</span> <span class="content">How to decide between Events and Observers</span></a>
+      <li><a href="#one-time-events"><span class="secno">3.1</span> <span class="content">Use promises for one time events</span></a>
+      <li><a href="#dont-invent-event-like"><span class="secno">3.2</span> <span class="content">Don’t invent your own event listener-like infrastructure</span></a>
+      <li><a href="#always-add-event-handlers"><span class="secno">3.3</span> <span class="content">Always add event handler attributes</span></a>
+      <li><a href="#events-are-for-notification"><span class="secno">3.4</span> <span class="content">Events are for notification</span></a>
+      <li><a href="#favor-asynchronous-events"><span class="secno">3.5</span> <span class="content">Favor asynchronous events</span></a>
+      <li><a href="#state-and-subclassing"><span class="secno">3.6</span> <span class="content">State and <code class="idl"><span>Event</span></code> subclasses</span></a>
+      <li><a href="#events-vs-observers"><span class="secno">3.7</span> <span class="content">How to decide between Events and Observers</span></a>
      </ol>
     <li>
      <a href="#types-and-units"><span class="secno">4</span> <span class="content">Types and Units</span></a>
@@ -1534,11 +1537,17 @@ Parts of this work may be from another specification document.  If so, those par
       <li><a href="#error-types"><span class="secno">4.4</span> <span class="content">Use Error or DOMException for errors</span></a>
      </ol>
     <li>
-     <a href="#device-apis"><span class="secno">5</span> <span class="content">Device APIs</span></a>
+     <a href="#device-apis"><span class="secno">5</span> <span class="content">OS and Device Wrapper APIs</span></a>
      <ol class="toc">
       <li><a href="#device-ids"><span class="secno">5.1</span> <span class="content">Use care when exposing device identifiers</span></a>
+      <li><a href="#wrapper-apis"><span class="secno">5.2</span> <span class="content">Native APIs don’t typically translate well to the web</span></a>
      </ol>
-    <li><a href="#other-considerations"><span class="secno">6</span> <span class="content">Other API Design Considerations</span></a>
+    <li>
+     <a href="#other-considerations"><span class="secno">6</span> <span class="content">Other API Design Considerations</span></a>
+     <ol class="toc">
+      <li><a href="#design-resources"><span class="secno">6.1</span> <span class="content">Privacy, Security, Accessibility, and Internationalization</span></a>
+      <li><a href="#polyfills"><span class="secno">6.2</span> <span class="content">Polyfills</span></a>
+     </ol>
     <li><a href="#spec-writing"><span class="secno">7</span> <span class="content">Advice on specification writing</span></a>
     <li><a href="#conformance"><span class="secno"></span> <span class="content"> Conformance</span></a>
     <li>
@@ -1668,9 +1677,9 @@ necessary, but should be held as a goal for normal code paths.)</p>
    <h3 class="heading settled" data-level="2.4" id="live-vs-static"><span class="secno">2.4. </span><span class="content">Consider whether objects should be live or static</span><a class="self-link" href="#live-vs-static"></a></h3>
    <p>Objects returned from functions, attribute getters, etc.,
 can either be live or static.
-A <dfn data-dfn-type="dfn" data-noexport id="live-object">live object<a class="self-link" href="#live-object"></a></dfn> is one that continues to reflect
+A <dfn data-dfn-type="dfn" data-export id="live-object">live object<a class="self-link" href="#live-object"></a></dfn> is one that continues to reflect
 changes made after it was returned to the caller.
-A <dfn data-dfn-type="dfn" data-noexport id="static-object">static object<a class="self-link" href="#static-object"></a></dfn> is one that reflects
+A <dfn data-dfn-type="dfn" data-export id="static-object">static object<a class="self-link" href="#static-object"></a></dfn> is one that reflects
 the state at the time it was returned.</p>
    <p>Objects that are the way state is mutated are generally live.
 For example, DOM nodes are returned as live objects,
@@ -1825,7 +1834,25 @@ process before returning the result.</p>
 and on when to use promises and when not to use promises,
 see <strong><a href="https://www.w3.org/2001/tag/doc/promises-guide">Writing
 Promise-Using Specifications</a></strong>.</p>
-   <h3 class="heading settled" data-level="2.8" id="secure-context"><span class="secno">2.8. </span><span class="content">Consider limiting new features to secure contexts</span><a class="self-link" href="#secure-context"></a></h3>
+   <h3 class="heading settled" data-level="2.8" id="aborting"><span class="secno">2.8. </span><span class="content">Cancel asynchronous APIs/operations using AbortSignal</span><a class="self-link" href="#aborting"></a></h3>
+   <p>Async functions that need cancellation should take an <code>AbortSignal</code> as part
+of an options dictionary.</p>
+   <p>Example:</p>
+<pre class="language-js highlight"><c- kr>const</c-> controller <c- o>=</c-> <c- k>new</c-> AbortController<c- p>();</c->
+<c- kr>const</c-> signal <c- o>=</c-> controller<c- p>.</c->signal<c- p>;</c->
+geolocation<c- p>.</c->read<c- p>({</c-> signal <c- p>});</c->
+</pre>
+   <p>Reusing the same primitive everywhere has multiplicative effects throughout
+the platform. In particular, there’s a common pattern of using a single <code>AbortSignal</code> for a bunch of ongoing operations, and then aborting them
+(with the corresponding <code>AbortController</code>) when e.g. the user presses cancel,
+or a single-page-app navigation occurs, or similar. So the minor extra
+complexity for an individual API leads to a large reduction in complexity
+when used with multiple APIs together.</p>
+   <p>There might be cases where cancellation cannot be guaranteed. In these cases,
+the <code>AbortController</code> can still be used because a call to <code>abort()</code> on <code>AbortController</code> is a request to abort. How you react to it depends on your spec.
+Note, requestAbort() was considered in the AbortController design instead
+of abort(), but the latter was chosen for brevity.</p>
+   <h3 class="heading settled" data-level="2.9" id="secure-context"><span class="secno">2.9. </span><span class="content">Consider limiting new features to secure contexts</span><a class="self-link" href="#secure-context"></a></h3>
    <p>It may save you significant time and effort
 to pre-emptively restrict your feature to Secure Contexts.</p>
    <p>The TAG is on the record in supporting
@@ -1876,7 +1903,7 @@ Thus the feature depends
 on the authentication of the origin
 and the integrity of the data,
 and requires secure contexts.</p>
-   <h3 class="heading settled" data-level="2.9" id="string-constants"><span class="secno">2.9. </span><span class="content">Constants, enums, and bitmasks</span><a class="self-link" href="#string-constants"></a></h3>
+   <h3 class="heading settled" data-level="2.10" id="string-constants"><span class="secno">2.10. </span><span class="content">Constants, enums, and bitmasks</span><a class="self-link" href="#string-constants"></a></h3>
    <p>In many other platforms and programming languages, constants and enums are
 commonly expressed using a integer constant, sometimes in conjunction with
 a bitmask mechanism.</p>
@@ -1891,7 +1918,31 @@ bitmask is attempting to express, as object dictionaries can then be passed
 around from method to method as needed as easily as the state in a single
 bitmask value.</p>
    <h2 class="heading settled" data-level="3" id="event-design"><span class="secno">3. </span><span class="content">Event Design</span><a class="self-link" href="#event-design"></a></h2>
-   <h3 class="heading settled" data-level="3.1" id="always-add-event-handlers"><span class="secno">3.1. </span><span class="content">Always add event handler attributes</span><a class="self-link" href="#always-add-event-handlers"></a></h3>
+   <h3 class="heading settled" data-level="3.1" id="one-time-events"><span class="secno">3.1. </span><span class="content">Use promises for one time events</span><a class="self-link" href="#one-time-events"></a></h3>
+   <p>Follow the <a href="https://www.w3.org/2001/tag/doc/promises-guide#one-time-events">advice</a> in the <strong><a href="https://www.w3.org/2001/tag/doc/promises-guide">Writing
+Promise-Using Specifications</a></strong> guideline.</p>
+   <h3 class="heading settled" data-level="3.2" id="dont-invent-event-like"><span class="secno">3.2. </span><span class="content">Don’t invent your own event listener-like infrastructure</span><a class="self-link" href="#dont-invent-event-like"></a></h3>
+   <p>For recurring events, it could be convenient to create a custom pair of APIs to <code>"register"</code>/<code>"unregister"</code>, <code>"subscribe"</code>/<code>"unsubscribe"</code>, etc., that take a
+callback and get invoked multiple times until paired cancel API is called.</p>
+   <p>Instead, use the existing event registration pattern and separate API controls
+to start/stop the underlying process (since event listeners should not have <a href="#events-are-for-notification">side-effects</a>).</p>
+   <p>If the callback would have been provided specific data, then this data should
+be added to an <code>Event</code> object (but see <a href="#state-and-subclassing">State
+and <code>Event</code> subclasses</a> as this is not always necessary).</p>
+   <p>In some cases, you can transfer the state that would be surfaced in callback
+parameters into a more persistent object which, in turn, can inherit from <code>EventTarget</code>.</p>
+   <p>In some cases you might not have an object to inherit from <code>EventTarget</code> but
+it is usually possible to create such an object.</p>
+   <p>For instance with Web Bluetooth you can add event listeners on a <code>Characteristic</code> object, which is obtained via <code>getCharacteristic()</code>. If you need to filter events,
+it might be possible to create a filter like</p>
+<pre class="language-js highlight"><c- kr>const</c-> filter <c- o>=</c-> navigator<c- p>.</c->nfc<c- p>.</c->createReadFilter<c- p>({</c->
+  recordType<c- o>:</c-> <c- u>"json"</c->
+<c- p>});</c->
+
+<c- kr>const</c-> onMessage <c- o>=</c-> message <c- p>=></c-> <c- p>{</c-> … <c- p>};</c->
+filter<c- p>.</c->addEventListener<c- p>(</c-><c- t>'exchange'</c-><c- p>,</c-> onMessage<c- p>);</c->
+</pre>
+   <h3 class="heading settled" data-level="3.3" id="always-add-event-handlers"><span class="secno">3.3. </span><span class="content">Always add event handler attributes</span><a class="self-link" href="#always-add-event-handlers"></a></h3>
    <p>For an object that inherits from <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#eventtarget" id="ref-for-eventtarget">EventTarget</a></code>, there are two techniques available for registering
 an event handler (e.g., an event named "somethingchanged"):</p>
    <ol>
@@ -1916,14 +1967,14 @@ important to continue to define event handler IDL attributes because:</p>
    <p>So, if the object inherits from <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#eventtarget" id="ref-for-eventtarget②">EventTarget</a></code>, add a corresponding <code>on<em>yourevent</em></code> <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes" id="ref-for-event-handler-idl-attributes①">event handler IDL attribute</a> to the interface.</p>
    <p class="note" role="note">Note that for HTML and SVG elements, it is traditional to add the <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes" id="ref-for-event-handler-idl-attributes②">event handler IDL attributes</a> on the <code class="idl"><a data-link-type="idl" href="https://html.spec.whatwg.org/multipage/webappapis.html#globaleventhandlers" id="ref-for-globaleventhandlers">GlobalEventHandlers</a></code> interface, instead of directly on
 the relevant element interface(s).</p>
-   <h3 class="heading settled" data-level="3.2" id="events-are-for-notification"><span class="secno">3.2. </span><span class="content">Events are for notification</span><a class="self-link" href="#events-are-for-notification"></a></h3>
+   <h3 class="heading settled" data-level="3.4" id="events-are-for-notification"><span class="secno">3.4. </span><span class="content">Events are for notification</span><a class="self-link" href="#events-are-for-notification"></a></h3>
    <p>Try to design DOM events to deliver after-the-fact notifications of changes. It may be tempting to try to trigger side-effects from the action of <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#dom-eventtarget-dispatchevent" id="ref-for-dom-eventtarget-dispatchevent">dispatchEvent()</a></code>, but in general this is <a href="https://lists.w3.org/Archives/Public/public-webapps/2014AprJun/0510.html">strongly discouraged</a> as it requires changes to the DOM specification when added. Your design will proceed more quickly if you avoid this pattern.</p>
-   <h3 class="heading settled" data-level="3.3" id="favor-asynchronous-events"><span class="secno">3.3. </span><span class="content">Favor asynchronous events</span><a class="self-link" href="#favor-asynchronous-events"></a></h3>
+   <h3 class="heading settled" data-level="3.5" id="favor-asynchronous-events"><span class="secno">3.5. </span><span class="content">Favor asynchronous events</span><a class="self-link" href="#favor-asynchronous-events"></a></h3>
    <p>A few events in the platform are specified to dispatch synchronously. These events cause problems for engines and performance issues in applications due to the possibility for re-entrant behavior they open up. The deprecated <a href="https://developer.mozilla.org/en-US/docs/Web/Guide/Events/Mutation_events">Mutation Events</a>, for instance, has caused many years of security issues. A more modern approach embodied in <a href="ihttps://developer.mozilla.org/en-US/docs/Web/API/MutationObserver">Mutation Observers</a> addresses most of the same use-cases in a higher-performance way which is easier to develop with and implement.</p>
    <p>If you feel you need a synchronous event in your design, please reconsider and ask the TAG for help in redesigning the API.</p>
-   <h3 class="heading settled" data-level="3.4" id="state-and-subclassing"><span class="secno">3.4. </span><span class="content">State and <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#event" id="ref-for-event">Event</a></code> subclasses</span><a class="self-link" href="#state-and-subclassing"></a></h3>
+   <h3 class="heading settled" data-level="3.6" id="state-and-subclassing"><span class="secno">3.6. </span><span class="content">State and <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#event" id="ref-for-event">Event</a></code> subclasses</span><a class="self-link" href="#state-and-subclassing"></a></h3>
    <p>It’s tempting to create subclasses of <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#event" id="ref-for-event①">Event</a></code> for all event types. This is frequently unnecessary. Consider subclassing <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#event" id="ref-for-event②">Event</a></code> when adding unique methods and large amounts of state. In all other cases, using a "vanilla" event with state captured in the <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#dom-event-target" id="ref-for-dom-event-target">target</a></code> object.</p>
-   <h3 class="heading settled" data-level="3.5" id="events-vs-observers"><span class="secno">3.5. </span><span class="content">How to decide between Events and Observers</span><a class="self-link" href="#events-vs-observers"></a></h3>
+   <h3 class="heading settled" data-level="3.7" id="events-vs-observers"><span class="secno">3.7. </span><span class="content">How to decide between Events and Observers</span><a class="self-link" href="#events-vs-observers"></a></h3>
    <p>Several recent additions to the platform employ an Observer pattern. <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#mutationobserver" id="ref-for-mutationobserver">MutationObserver</a></code>, <code class="idl"><a data-link-type="idl" href="#https://w3c.github.io/IntersectionObserver/" id="ref-for-https://w3c.github.io/IntersectionObserver/">IntersectionObserver</a></code>, <code class="idl"><a data-link-type="idl" href="#https://wicg.github.io/ResizeObserver/" id="ref-for-https://wicg.github.io/ResizeObserver/">ResizeObserver</a></code>, and <a href="https://github.com/WICG/indexed-db-observers">IndexedDB Observers</a> provide precedents for new Observer types.</p>
    <p>Many designs can be described as either Observers or <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#eventtarget" id="ref-for-eventtarget③">EventTarget</a></code>s. How to decide?</p>
    <p>In general, start your design process using an <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#eventtarget" id="ref-for-eventtarget④">EventTarget</a></code> and only move to Observers if and when events can’t be made to work well. Using an <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#eventtarget" id="ref-for-eventtarget⑤">EventTarget</a></code> ensures your feature benefits from improvements to the shared base class, such as the recent addition of the <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#dom-addeventlisteneroptions-once" id="ref-for-dom-addeventlisteneroptions-once">once</a></code>.</p>
@@ -2059,11 +2110,15 @@ However, we no longer believe there was value in this split,
 and therefore suggest that ECMAScript error objects (e.g., <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#exceptiondef-typeerror" id="ref-for-exceptiondef-typeerror">TypeError</a></code>)
 or <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#idl-DOMException" id="ref-for-idl-DOMException①">DOMException</a></code> should be used for errors,
 whether they are exceptions, promise rejection values, or properties.</p>
-   <h2 class="heading settled" data-level="5" id="device-apis"><span class="secno">5. </span><span class="content">Device APIs</span><a class="self-link" href="#device-apis"></a></h2>
+   <h2 class="heading settled" data-level="5" id="device-apis"><span class="secno">5. </span><span class="content">OS and Device Wrapper APIs</span><a class="self-link" href="#device-apis"></a></h2>
    <p>It is increasingly common to see new APIs developed in the web platform for interacting with
 devices. For example, authors wish to be able to use the web to connect with their <a href="https://www.w3.org/TR/mediacapture-streams/">microphones and cameras</a>, <a href="https://www.w3.org/TR/generic-sensor/">generic sensors</a> (such as gyroscope and
 accelerometer), <a href="https://www.w3.org/community/web-bluetooth/">Bluetooth</a> and <a href="https://wicg.github.io/webusb/">USB</a>-connected peripherals, <a href="https://www.w3.org/community/autowebplatform/">automobiles</a>, toothbrush, etc. This
 section contains principles for consideration when designing APIs for devices.</p>
+   <p>These can be functionality provided by the underlying operating system, or provided by a native
+third-party library to interact with a device. These are an abstraction which "wrap" the
+native functionality without introducing significant complexity while securing the API surface
+to the browser, hence are called wrapper APIs.</p>
    <h3 class="heading settled" data-level="5.1" id="device-ids"><span class="secno">5.1. </span><span class="content">Use care when exposing device identifiers</span><a class="self-link" href="#device-ids"></a></h3>
    <p>Exposing device identifiers increases the fingerprinting surface of a user
 agent conversely reducing the user’s privacy. Think carefully about whether it is really necessary
@@ -2108,7 +2163,58 @@ is done in a consistent and privacy-friendly way:</p>
  stable id during the session for the given origin, but also be able to deterministically produce
  the same id in subsequent sessions.</p>
    </dl>
+   <h3 class="heading settled" data-level="5.2" id="wrapper-apis"><span class="secno">5.2. </span><span class="content">Native APIs don’t typically translate well to the web</span><a class="self-link" href="#wrapper-apis"></a></h3>
+   <p>Many modern operating systems come with convenience APIs, which abstract away
+normally complex technology in the form of higher level user-friendly APIs.</p>
+   <p>Exposing these APIs to the web platform is getting more and more common, but you
+need to be careful when exposing these to the web platform.</p>
+   <dl>
+    <dt data-md>Generalize interface when underlying API is overly specific
+    <dd data-md>
+     <p>Don’t blindly map native convenience APIs 1:1 to the web platform.
+Native APIs do not translate well to the web platform, and doing so may result
+in a API shape which is difficult to implement across a variety of underlying
+platforms and native libraries.</p>
+     <p>Especially be careful about exposing the exact lifecycle and data
+structures of the underlying native APIs. Think about making an API that <a href="#string-constants">fits well in with existing web platform APIs</a> and which can be expressed in
+commonly available low-level APIs.</p>
+    <dt data-md>Prefer asynchronous function by returning promises
+    <dd data-md>
+     <p>Even if the underlying API is synchronous, this does not necessarily mean it
+translates well when ported to the web platform. Exposing a synchronous native
+API to the web platform is generally discouraged, and should be
+provided as a promise based API whenever possible.</p>
+     <p>Doing this also allows putting the API behind a permission if it is
+necessary, especially if the API depends on I/O or in the future may need to
+be isolated to a separate process.</p>
+    <dt data-md>Don’t overconstrain or overfit the API to the underlying (wrapped) OS
+    <dd data-md>
+     <p>When designing a wrapper API, you should consider how different implementations
+(operating systems and platforms) provide this functionality. Ideally the entire
+specification is implementable across platforms, but in some cases it may be
+desirable to expose distinctions made on only some platforms.</p>
+     <p>These distinctions should be clearly noted if they are known in advance.</p>
+    <dt data-md>Do not propose black-box proprietary library or dedicated hardware processor dependencies
+    <dd data-md>
+     <p>Black-box dependencies are strongly discouraged, as this not only prevents wide
+implementor adoption, but is unhealthy to the open nature of the web.</p>
+    <dt data-md>Underlying protocols should be open
+    <dd data-md>
+     <p>APIs which require exchange with external hardware or services should not depend
+on closed protocols.</p>
+    <dt data-md>Be offline friendly
+    <dd data-md>
+     <p>Web platform APIs should ideally not have a hard dependency on online services.
+The availability of these services across different regions may vary, users
+may be offline, and the online services have no guarantee of being always
+available.</p>
+    <dt data-md>Avoid additional fingerprinting surfaces
+    <dd data-md>
+     <p>Wrapper APIs can expose unintentionally expose the user to a wider fingerprinting surface.
+Please read the TAG’s finding on <a href="http://www.w3.org/2001/tag/doc/unsanctioned-tracking/">unsanctioned tracking</a> for additional details.</p>
+   </dl>
    <h2 class="heading settled" data-level="6" id="other-considerations"><span class="secno">6. </span><span class="content">Other API Design Considerations</span><a class="self-link" href="#other-considerations"></a></h2>
+   <h3 class="heading settled" data-level="6.1" id="design-resources"><span class="secno">6.1. </span><span class="content">Privacy, Security, Accessibility, and Internationalization</span><a class="self-link" href="#design-resources"></a></h3>
    <p>It is important not to neglect other aspects of API design such as privacy, security, accessibility, and internationalization.
 Please take advantage of these other excellent resources in your design process:</p>
    <ul>
@@ -2120,6 +2226,18 @@ Please take advantage of these other excellent resources in your design process:
      <p><a href="https://w3c.github.io/apa/fast/">Web Technology Accessibility Guidelines</a></p>
     <li data-md>
      <p><a href="https://w3c.github.io/bp-i18n-specdev/">Internationalization Best Practices for Spec Developers</a></p>
+   </ul>
+   <h3 class="heading settled" data-level="6.2" id="polyfills"><span class="secno">6.2. </span><span class="content">Polyfills</span><a class="self-link" href="#polyfills"></a></h3>
+   <p>Polyfills can be hugely beneficial in helping to roll out new features to the web platform. The
+Technical Architecture Group <a href="https://www.w3.org/2001/tag/doc/polyfills/">finding on Polyfills and the Evolution of the Web</a> offers guidance
+that should be considered in the development of new features, notably:</p>
+   <ul>
+    <li data-md>
+     <p>Being "polyfillable" is not essential but <strong>is</strong> beneficial</p>
+    <li data-md>
+     <p><a href="#feature-detect">§2.2 New features should be detectable</a></p>
+    <li data-md>
+     <p>Polyfill development should be encouraged</p>
    </ul>
    <h2 class="heading settled" data-level="7" id="spec-writing"><span class="secno">7. </span><span class="content">Advice on specification writing</span><a class="self-link" href="#spec-writing"></a></h2>
    <p>This document covers API design for the Web,
@@ -2308,44 +2426,44 @@ Specification Guidelines</a> (W3C QA Working Group, 2005)</p>
   <aside class="dfn-panel" data-for="term-for-element">
    <a href="https://dom.spec.whatwg.org/#element">https://dom.spec.whatwg.org/#element</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-element">3.5. How to decide between Events and Observers</a>
+    <li><a href="#ref-for-element">3.7. How to decide between Events and Observers</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-event">
    <a href="https://dom.spec.whatwg.org/#event">https://dom.spec.whatwg.org/#event</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-event">3.4. State and Event subclasses</a> <a href="#ref-for-event①">(2)</a> <a href="#ref-for-event②">(3)</a>
+    <li><a href="#ref-for-event">3.6. State and Event subclasses</a> <a href="#ref-for-event①">(2)</a> <a href="#ref-for-event②">(3)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-eventtarget">
    <a href="https://dom.spec.whatwg.org/#eventtarget">https://dom.spec.whatwg.org/#eventtarget</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-eventtarget">3.1. Always add event handler attributes</a> <a href="#ref-for-eventtarget①">(2)</a> <a href="#ref-for-eventtarget②">(3)</a>
-    <li><a href="#ref-for-eventtarget③">3.5. How to decide between Events and Observers</a> <a href="#ref-for-eventtarget④">(2)</a> <a href="#ref-for-eventtarget⑤">(3)</a> <a href="#ref-for-eventtarget⑥">(4)</a> <a href="#ref-for-eventtarget⑦">(5)</a> <a href="#ref-for-eventtarget⑧">(6)</a> <a href="#ref-for-eventtarget⑨">(7)</a> <a href="#ref-for-eventtarget①⓪">(8)</a> <a href="#ref-for-eventtarget①①">(9)</a>
+    <li><a href="#ref-for-eventtarget">3.3. Always add event handler attributes</a> <a href="#ref-for-eventtarget①">(2)</a> <a href="#ref-for-eventtarget②">(3)</a>
+    <li><a href="#ref-for-eventtarget③">3.7. How to decide between Events and Observers</a> <a href="#ref-for-eventtarget④">(2)</a> <a href="#ref-for-eventtarget⑤">(3)</a> <a href="#ref-for-eventtarget⑥">(4)</a> <a href="#ref-for-eventtarget⑦">(5)</a> <a href="#ref-for-eventtarget⑧">(6)</a> <a href="#ref-for-eventtarget⑨">(7)</a> <a href="#ref-for-eventtarget①⓪">(8)</a> <a href="#ref-for-eventtarget①①">(9)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-mutationobserver">
    <a href="https://dom.spec.whatwg.org/#mutationobserver">https://dom.spec.whatwg.org/#mutationobserver</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-mutationobserver">3.5. How to decide between Events and Observers</a> <a href="#ref-for-mutationobserver①">(2)</a>
+    <li><a href="#ref-for-mutationobserver">3.7. How to decide between Events and Observers</a> <a href="#ref-for-mutationobserver①">(2)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-dictdef-mutationobserverinit">
    <a href="https://dom.spec.whatwg.org/#dictdef-mutationobserverinit">https://dom.spec.whatwg.org/#dictdef-mutationobserverinit</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dictdef-mutationobserverinit">3.5. How to decide between Events and Observers</a>
+    <li><a href="#ref-for-dictdef-mutationobserverinit">3.7. How to decide between Events and Observers</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-mutationrecord">
    <a href="https://dom.spec.whatwg.org/#mutationrecord">https://dom.spec.whatwg.org/#mutationrecord</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-mutationrecord">3.5. How to decide between Events and Observers</a>
+    <li><a href="#ref-for-mutationrecord">3.7. How to decide between Events and Observers</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-node">
    <a href="https://dom.spec.whatwg.org/#node">https://dom.spec.whatwg.org/#node</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-node">3.5. How to decide between Events and Observers</a> <a href="#ref-for-node①">(2)</a> <a href="#ref-for-node②">(3)</a>
+    <li><a href="#ref-for-node">3.7. How to decide between Events and Observers</a> <a href="#ref-for-node①">(2)</a> <a href="#ref-for-node②">(3)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-nodelist">
@@ -2357,14 +2475,14 @@ Specification Guidelines</a> (W3C QA Working Group, 2005)</p>
   <aside class="dfn-panel" data-for="term-for-dom-eventtarget-addeventlistener">
    <a href="https://dom.spec.whatwg.org/#dom-eventtarget-addeventlistener">https://dom.spec.whatwg.org/#dom-eventtarget-addeventlistener</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dom-eventtarget-addeventlistener">3.1. Always add event handler attributes</a> <a href="#ref-for-dom-eventtarget-addeventlistener①">(2)</a>
-    <li><a href="#ref-for-dom-eventtarget-addeventlistener②">3.5. How to decide between Events and Observers</a>
+    <li><a href="#ref-for-dom-eventtarget-addeventlistener">3.3. Always add event handler attributes</a> <a href="#ref-for-dom-eventtarget-addeventlistener①">(2)</a>
+    <li><a href="#ref-for-dom-eventtarget-addeventlistener②">3.7. How to decide between Events and Observers</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-dom-eventtarget-dispatchevent">
    <a href="https://dom.spec.whatwg.org/#dom-eventtarget-dispatchevent">https://dom.spec.whatwg.org/#dom-eventtarget-dispatchevent</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dom-eventtarget-dispatchevent">3.2. Events are for notification</a>
+    <li><a href="#ref-for-dom-eventtarget-dispatchevent">3.4. Events are for notification</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-dom-document-getelementsbytagname">
@@ -2376,7 +2494,7 @@ Specification Guidelines</a> (W3C QA Working Group, 2005)</p>
   <aside class="dfn-panel" data-for="term-for-dom-addeventlisteneroptions-once">
    <a href="https://dom.spec.whatwg.org/#dom-addeventlisteneroptions-once">https://dom.spec.whatwg.org/#dom-addeventlisteneroptions-once</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dom-addeventlisteneroptions-once">3.5. How to decide between Events and Observers</a>
+    <li><a href="#ref-for-dom-addeventlisteneroptions-once">3.7. How to decide between Events and Observers</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-dom-parentnode-queryselectorall">
@@ -2388,7 +2506,7 @@ Specification Guidelines</a> (W3C QA Working Group, 2005)</p>
   <aside class="dfn-panel" data-for="term-for-dom-event-target">
    <a href="https://dom.spec.whatwg.org/#dom-event-target">https://dom.spec.whatwg.org/#dom-event-target</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-dom-event-target">3.4. State and Event subclasses</a>
+    <li><a href="#ref-for-dom-event-target">3.6. State and Event subclasses</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-dom-domhighrestimestamp">
@@ -2400,7 +2518,7 @@ Specification Guidelines</a> (W3C QA Working Group, 2005)</p>
   <aside class="dfn-panel" data-for="term-for-globaleventhandlers">
    <a href="https://html.spec.whatwg.org/multipage/webappapis.html#globaleventhandlers">https://html.spec.whatwg.org/multipage/webappapis.html#globaleventhandlers</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-globaleventhandlers">3.1. Always add event handler attributes</a>
+    <li><a href="#ref-for-globaleventhandlers">3.3. Always add event handler attributes</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-htmlhtmlelement">
@@ -2424,7 +2542,7 @@ Specification Guidelines</a> (W3C QA Working Group, 2005)</p>
   <aside class="dfn-panel" data-for="term-for-event-handler-idl-attributes">
    <a href="https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes">https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-idl-attributes</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-event-handler-idl-attributes">3.1. Always add event handler attributes</a> <a href="#ref-for-event-handler-idl-attributes①">(2)</a> <a href="#ref-for-event-handler-idl-attributes②">(3)</a>
+    <li><a href="#ref-for-event-handler-idl-attributes">3.3. Always add event handler attributes</a> <a href="#ref-for-event-handler-idl-attributes①">(2)</a> <a href="#ref-for-event-handler-idl-attributes②">(3)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-the-img-element">
@@ -2466,7 +2584,7 @@ Specification Guidelines</a> (W3C QA Working Group, 2005)</p>
   <aside class="dfn-panel" data-for="term-for-idbdatabase">
    <a href="https://w3c.github.io/IndexedDB/#idbdatabase">https://w3c.github.io/IndexedDB/#idbdatabase</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-idbdatabase">3.5. How to decide between Events and Observers</a>
+    <li><a href="#ref-for-idbdatabase">3.7. How to decide between Events and Observers</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-urlsearchparams">
@@ -2520,7 +2638,7 @@ Specification Guidelines</a> (W3C QA Working Group, 2005)</p>
   <aside class="dfn-panel" data-for="term-for-xmlhttprequesteventtarget">
    <a href="https://xhr.spec.whatwg.org/#xmlhttprequesteventtarget">https://xhr.spec.whatwg.org/#xmlhttprequesteventtarget</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-xmlhttprequesteventtarget">3.5. How to decide between Events and Observers</a>
+    <li><a href="#ref-for-xmlhttprequesteventtarget">3.7. How to decide between Events and Observers</a>
    </ul>
   </aside>
   <h3 class="no-num no-ref heading settled" id="index-defined-elsewhere"><span class="content">Terms defined by reference</span><a class="self-link" href="#index-defined-elsewhere"></a></h3>

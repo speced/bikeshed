@@ -13,6 +13,16 @@ Link Defaults: html (dfn) queue a task/browsing context/active document/in paral
 Ignored Vars: O, f, args, x, cb
 </pre>
 
+<pre class="link-defaults">
+spec:infra; type:dfn; text:list
+</pre>
+
+<pre class="anchors">
+urlPrefix: https://tc39.github.io/ecma262/; spec: ECMASCRIPT
+    text: PerformPromiseThen; url: #sec-performpromisethen; type: abstract-op
+    text: all(); for: Promise; url: #sec-promise.all; type: method
+</pre>
+
 <h2 id="intro">Introduction</h2>
 
 A <em>promise</em> is an object that represents the eventual result of a single asynchronous operation. They can be returned from asynchronous functions, thus allowing consumers to not only queue up callbacks to be called when the operation succeeds or fails, but also to manipulate the returned promise object, opening up a variety of possibilities.
@@ -151,13 +161,13 @@ Promises abstract away many of the details regarding notifying the developer abo
 
 However, in cases where you need to interface with developer code in more ways than can be mediated via the promise, you'll still need to queue a task. For example, you may want to fire an event, which can call into developer event handlers. Or you may need to perform a structured clone operation, which <a href="http://lists.w3.org/Archives/Public/public-webcrypto/2014Mar/0141.html">can trigger getters</a>. If these things must be done inside the asynchronous portion of your algorithm, you need to specify that they are done via a queued task, and with a specific task queue. This nails down the exact time such developer-observable operations happen both in relation to other queued tasks, and to the microtask queue used by promises.
 
-As an example, the following steps will return a promise resolved after <var>ms</var> milliseconds, but also fire an event named <code>timerfinished</code> on <code>window</code>:
+As an example, the following steps will return a promise resolved after <var>ms</var> milliseconds, but also fire an event named <code>timerfinished</code> on an object |object|:
 
 1. Let <var>p</var> be <a>a new promise</a>.
 1. Run the following steps <a>in parallel</a>:
     1. Wait <var>ms</var> milliseconds.
     1. <a>Resolve</a> <var>p</var> with <b>undefined</b>.
-    1. <a>Queue a task</a> to <a href="https://html.spec.whatwg.org/multipage/webappapis.html#fire-a-simple-event">fire a simple event</a> named <code>timerfinished</code> at the <a>browsing context</a> <a>active document</a>'s <a href="https://html.spec.whatwg.org/multipage/browsers.html#window"><code>Window</code></a> object.
+    1. <a>Queue a task</a> to <a href="https://html.spec.whatwg.org/multipage/webappapis.html#fire-a-simple-event">fire a simple event</a> named <code>timerfinished</code> at the |object|.
 1. Return <var>p</var>.
 
 <h3 id="accepting-promises">Accepting Promises</h3>
@@ -249,9 +259,42 @@ If the algorithm using these shorthands is running <a>in parallel</a>, the short
 
 <h3 id="aggregating-promises">Aggregating Promises</h3>
 
-The result of <dfn id="waiting-for-all" export>waiting for all</dfn> of a collection of promises is a promise created by calling <code>Promise.all(promiseArray)</code>, where <code>promiseArray</code> is that collection in array form and we use the initial value of <a href="https://tc39.github.io/ecma262/#sec-promise.all"><code>Promise.all</code></a>.
+To <dfn id="waiting-for-all" export lt="wait for all|waiting for all">wait for all</dfn> of a <a>list</a> of promises |promises|, with success steps |successSteps| that take a <a>list</a> of JavaScript values and failure steps |failureSteps| that take a rejection reason JavaScript value, perform the following steps:
 
-This phrase is useful when you wish to perform multiple asynchronous operations in parallel that return promises, and then react to them all together. If all of the given promises fulfill, then the resulting promise will be fulfilled with an array corresponding to the fulfillment values. If any of them reject, then the resulting promise will be rejected with the first rejection reason to occur.
+1. Let |fullfilledCount| be 0.
+1. Let |rejected| be false.
+1. Let |rejectionHandler| be a built-in function that takes an argument |arg| and performs the following steps:
+    1. If |rejected| is true, abort these steps.
+    1. Set |rejected| to true.
+    1. Perform |failureSteps| given |arg|.
+1. Let |index| be 0.
+1. Let |total| be |promises|'s [=list/size=].
+1. Let |result| be a <a>list</a> containing |total| null values.
+1. [=list/For each=] |promise| of |promises|:
+    1. Let |promiseIndex| be |index|.
+    1. Let |fulfillmentHandler| be a built-in function that takes an argument |arg| performs the following steps:
+        1. Set |result|[|promiseIndex|] to |arg|.
+        1. Set |fullfilledCount| to |fullfilledCount| + 1.
+        1. If |fullfilledCount| equals |total|, then perform |successSteps| given |result|.
+    1. Perform <a abstract-op>PerformPromiseThen</a>(|promise|, |fulfillmentHandler|, |rejectionHandler|).
+    1. Set |index| to |index| + 1.
+
+This phrase is useful when you wish to aggregate the result of multiple promises, and react to them all together, in the same way that {{Promise/all()|Promise.all()}} functions for JavaScript code.
+
+To <dfn id="waiting-for-all-promise" export lt="get a promise to wait for all|getting a promise to wait for all">get a promise for waiting for all</dfn> of a <a>list</a> of promises |promises|, with success steps |successSteps| that take a <a>list</a> of JavaScript values and optional failure steps |failureSteps| that take a rejection reason JavaScript value, perform the following steps:
+
+1. Let |promise| be <a>a new promise</a>.
+1. If |failureSteps| were not given, let them be steps taking an argument |arg| that throw |arg|.
+1. Let |successStepsWrapper| be the following steps, given |results|:
+    1. Let |stepsResult| be the result of performing |successSteps| given |results|. If these steps threw an exception, <a>reject</a> |promise| with that exception.
+    1. <a>Resolve</a> |promise| with |stepsResult|.
+1. Let |failureStepsWrapper| be the following steps, given |reason|:
+    1. Let |stepsResult| be the result of performing |failureSteps| given |reason|. If these steps threw an exception, <a>reject</a> |promise| with that exception.
+    1. <a>Resolve</a> |promise| with |stepsResult|.
+1. <a>Wait for all</a> of |promises|, given |successStepsWrapper| and |failureStepsWrapper|.
+1. Return |promise|.
+
+This phrase is useful when you wish to aggregate the results of multiple promises, and then produce another promise from them.
 
 An example usage of this phrase is found in [[#example-batch-request]].
 
@@ -483,15 +526,15 @@ The following steps might be inserted toward the end of some algorithm for ready
 
 <h3 id="example-batch-request">batchRequest(<var>urls</var>)</h3>
 
-Several places in [[SERVICE-WORKERS]] use <a>waiting for all</a>. <code>batchRequest</code> illustrates a simplified version of one of their uses. It takes as input an iterable of URLs, and returns a promise for an array of <a href="https://fetch.spec.whatwg.org/#response"><code>Response</code></a> objects created by fetching the corresponding URL. If any of the fetches fail, it will return <a>a promise rejected with</a> that failure.
+Several places in [[SERVICE-WORKERS]] use <a>get a promise to wait for all</a>. <code>batchRequest</code> illustrates a simplified version of one of their uses. It takes as input a <a>list</a> of URLs, and returns a promise for an array of {{Response}} objects created by fetching the corresponding URL. If any of the fetches fail, it will return <a>a promise rejected with</a> that failure.
 
-1. Let <var>responsePromises</var> be a new empty list
+1. Let <var>responsePromises</var> be a new empty <a>list</a>.
 1. For each value <var>url</var> of <var>urls</var>,
-    1. Let <var>url</var> be the result of converting <var>url</var> to a <a href="http://heycam.github.io/webidl/#es-USVString">USVString</a>.
-    1. Let <var>req</var> be the result of creating a new <a href="https://fetch.spec.whatwg.org/#dom-request"><code>Request</code></a> passing <var>url</var> to the constructor.
-    1. Let <var>p</var> be the result of calling <a href="https://fetch.spec.whatwg.org/#dom-global-fetch"><code>fetch</code></a> with <var>req</var>.
+    1. Let <var>url</var> be the result of converting <var>url</var> to a {{USVString}}.
+    1. Let <var>req</var> be the result of creating a new {{Request}} passing <var>url</var> to the constructor.
+    1. Let <var>p</var> be the result of calling {{WindowOrWorkerGlobalScope/fetch()}} with <var>req</var>.
     1. Add <var>p</var> to <var>responsePromises</var>.
-1. Return the result of <a>waiting for all</a> of <var>responsePromises</var>.
+1. Return the result of <a>getting a promise to wait for all</a> of <var>responsePromises</var>, given success steps that take |results| and returns the result of converting that <a>list</a> into a JavaScript Array.
 
 <h2 id="webidl">WebIDL and Promises</h2>
 

@@ -2,17 +2,18 @@
 Title: CSS Logical Properties and Values Level 1
 Shortname: css-logical
 Level: 1
-Status: FPWD
-Work Status: Revising
+Status: ED
+Work Status: Refining
 Group: csswg
-ED: https://drafts.csswg.org/css-logical/
-TR: https://www.w3.org/TR/css-logical/
+ED: https://drafts.csswg.org/css-logical-1/
+TR: https://www.w3.org/TR/css-logical-1/
+Previous version: https://www.w3.org/TR/2017/WD-css-logical-1-20170518/
 Editor: Rossen Atanassov, Microsoft, ratan@microsoft.com, w3cid 49885
 Editor: Elika J. Etemad / fantasai, Invited Expert, http://fantasai.inkedblade.net/contact, w3cid 35400
 Abstract: This module introduces logical properties and values that provide the author with the ability to control layout through logical, rather than physical, direction and dimension mappings. The module defines logical properties and values for the features defined in [[CSS21]]. These properties are writing-mode relative equivalents of their corresponding physical properties.
 Ignored Terms: div, dl, dfn
 Ignored Vars: *
-Link Defaults: css21 (property) width/height/min-width/min-height/max-width/max-height
+Link Defaults: css2 (property) width/height/min-width/min-height/max-width/max-height
 </pre>
 
 <pre class="link-defaults">
@@ -20,11 +21,23 @@ spec:css-writing-modes-3; type:dfn; text:start
 spec:css-writing-modes-3; type:dfn; text:end
 </pre>
 
+<style>
+  @media (min-width: 40em) {
+    #mapping-diagram figure {
+      width: 49%;
+      float: right;
+    }
+    #mapping-diagram figure:first-of-type {
+      margin-right: 2%;
+    }
+  }
+</style>
+
 
 <h2 id="intro">
 Introduction</h2>
 
-  Note: See [[!CSS3-WRITING-MODES]] for a proper introduction to writing modes;
+  Note: See [[!css-writing-modes-4]] for a proper introduction to writing modes;
   this module assumes familiarity with its terminology.
 
   Because different writing systems are written in different directions,
@@ -44,9 +57,36 @@ Introduction</h2>
     lists, headings, and paragraphs are typically left-aligned in English;
     but actually they are start-aligned, because in Arabic the same constructs are right-aligned,
     and a multilingual document will need to accommodate both writing systems accordingly.
-    However the drop shadows on buttons on a page must remain consistent throughout,
-    so their offset will be chosen based on visual considerations and physical directions,
-    and not vary by writing system.
+
+    The following code examplify how using logical syntax can help you write code 
+        that works across different writing systems:
+
+    <figure>
+        <img src="./images/example01.png" width="300" height="109" />
+        <figcaption>Rendering of the below code in a compatible browser</figcaption>
+    </figure>
+
+    <xmp highlight="html">
+        <blockquote dir="auto">Quotation in English</blockquote>
+        <blockquote dir="auto">اقتباس في العربية</blockquote>
+    </xmp>
+
+    <xmp highlight="css">
+
+        blockquote {
+            text-align: start; /* left in latin, right in arabic */
+            margin-inline-start: 0px; /* margin-left in latin, margin-right in arabic */
+            border-inline-start: 5px solid gray; /* border-left in latin, border-right in arabic */
+            padding-inline-start: 5px; /* padding-left in latin, padding-right in arabic */
+        }
+
+    </xmp>
+
+    Documents might need both logical and physical properties. For instance
+      the drop shadows on buttons on a page must remain consistent throughout,
+      so their offset will be chosen based on visual considerations and physical directions,
+      and not vary by writing system.
+
   </div>
 
   Since CSS was originally designed with only physical coordinates in its controls,
@@ -63,35 +103,55 @@ Introduction</h2>
 
   <a href="http://www.w3.org/TR/css-writing-modes/">CSS Writing Modes</a>’ <a href="https://www.w3.org/TR/css-writing-modes-3/#abstract-box">Abstract Box Terminology</a> section
   defines how to map between flow-relative and physical terms.
-  This mapping controls the interpretation of flow-relative keywords and properties.
+  This mapping,
+  which depends on the <a>used values</a> of 'writing-mode' and 'direction',
+  controls the interpretation of flow-relative keywords and properties.
+
+  <div id="mapping-diagram">
+    <figure>
+      <img src="diagrams/sizing-ltr-tb.svg">
+      <figcaption>
+        Correspondence of physical and flow-relative terms in typical English text layout
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="diagrams/sizing-ttb-rl.svg">
+      <figcaption>
+        Correspondence of physical and flow-relative terms in typical Chinese text layout
+      </figcaption>
+    </figure>
+  </div>
+
+  Note: Due to its interaction with ''text-orientation: upright'',
+  the <a lt="used value">used</a> 'direction'
+  depends on the <a>computed values</a> of 'writing-mode' and 'text-orientation'.
 
 <div class="issue">
   <strong>Things That Are Unstable</strong>
   Since implementation of parts of this module is effectively required
-  for shipping an implementation of CSS Writing Modes on the Web
+  for shipping an implementation of <a href="https://www.w3.org/TR/css-writing-modes-3/">CSS Writing Modes</a> on the Web
   (in order to correctly implement the default HTML styles),
-  The CSSWG resolved that although the draft is not very stable overall,
+  the CSSWG resolved that
   the requisite features in
   <a href="#directional-keywords"></a> and <a href="#box"></a>
   are approved for shipping.
-  However, there are a number of unstable features in this draft
-  (which are not required for implementing the HTML default style sheet, incidentally),
-  and these are:
+  (See <a href="https://lists.w3.org/Archives/Public/www-style/2017Dec/0043.html">FPWD announcement</a> for additional background.)
+
+  However, there are a few significant open issues:
   <ul>
-    <li><del>The 'float' and 'clear' keywords,
-        because it is not yet clear what the upcoming 2-dimensional syntax of 'float' will be.</del>
-        (This has been resolved as of April 2017.)
-    <li><del>The 'inset-*' properties,
-        because the name of the prefix is undecided.
-        (It used to be 'offset-*', but ended up conflicting with another CSS feature.)</del>
-        (This has been resolved as of June 2017.)
     <li>The ''border/logical'' keyword on shorthands,
         because the name of the keyword may change or it may be replaced by some other syntactic marker.
-    <li>The 'background-image-transform' and 'border-image-transform' properties,
-        because they have, as far as the editor is aware,
-        received no review from anyone and may or may not be well-designed.
+        (This feature will be deferred from this level for further development
+        if there is no clearly satisfactory mechanism proposed,
+        see <a href="https://github.com/w3c/csswg-drafts/issues/1282">Issue 1282</a>.)
+    <li>Whether flow-relative longhands inherit from their namesake on the parent,
+        or are mapped to a physical property and inherit from that property.
+        (See <a href="https://github.com/w3c/csswg-drafts/issues/3029">Issue 3029</a>.)
+    <li>Whether shorthands like 'margin' expand to both sets of longhands,
+        or only the ones that were set.
+        (See <a href="https://github.com/w3c/csswg-drafts/issues/3030">Issue 3030</a>.)
   </ul>
-  Comments and suggestions are welcome on these issues.
+  Comments, suggestions, and use cases are welcome on these issues.
   Please file them in GitHub, tweet them to @csswg, or send them to www-style@w3.org.
 </div>
 
@@ -117,14 +177,19 @@ Logical Values for the 'caption-side' Property</h3>
   <pre class="propdef partial">
     Name: caption-side
     New values: inline-start | inline-end
+    Computed value: specified keyword
   </pre>
 
   These two values are added only for implementations that support
   ''caption-side/left'' and ''caption-side/right'' values for 'caption-side'.
+  The ''caption-side/left'' and ''caption-side/right'' values themselves
+  are defined to be <a>line-relative</a>.
+
   The existing ''caption/top'' and ''caption/bottom'' values are idiosyncratically redefined
   as assigning to the <a>block-start</a> and <a>block-end</a> sides of the table, respectively.
-  The mapping on this property uses the <a>writing mode</a> of the element’s <a>containing block</a>
-  (that is, the table wrapper box).
+
+  The mapping on this property uses the <a>writing mode</a> of the caption’s <a>containing block</a>
+  (that is, the <a>table wrapper box</a>).
 
 <h3 id="float-clear">
 Flow-Relative Values for the 'float' and 'clear' Properties</h3>
@@ -132,9 +197,10 @@ Flow-Relative Values for the 'float' and 'clear' Properties</h3>
   <pre class="propdef partial">
     Name: float, clear
     New values: inline-start | inline-end
+    Computed value: as specified
   </pre>
 
-  The mapping on this property uses the <a>writing mode</a> of the element’s <a>containing block</a>.
+  The mapping on these properties uses the <a>writing mode</a> of the element’s <a>containing block</a>.
 
   Note: These properties are 1-dimensional in CSS2,
   but are planned to be expanded to two dimensions,
@@ -146,9 +212,10 @@ Flow-Relative Values for the 'text-align' Property</h3>
   <pre class="propdef partial">
     Name: text-align
     New values: start | end
+    Computed value: specified keyword
   </pre>
 
-  These values are normatively defined in [[!CSS3TEXT]].
+  These values are normatively defined in [[!css-text-3]].
 
 <h3 id="resize">
 Flow-Relative Values for the 'resize' Property</h3>
@@ -156,6 +223,7 @@ Flow-Relative Values for the 'resize' Property</h3>
   <pre class="propdef partial">
     Name: resize
     New values: block | inline
+    Computed value: specified keyword
   </pre>
 
 <h2 id="page">
@@ -183,7 +251,8 @@ Flow-Relative Page Classifications</h2>
         and 'right' in right-to-left page progressions.
   </dl>
 
-  These values are further defined in [[!CSS3-BREAK]].
+  These values are computed as specified
+  and are further defined in [[!css-break-3]].
 
   Although authors typically place page numbers using physical placements,
   the contents of headers often follows conventions depending
@@ -210,26 +279,45 @@ Flow-Relative Page Classifications</h2>
 Flow-Relative Box Model Properties</h2>
 
   This specification introduces new CSS properties
-  that are flow-relative equivalents
-  of physical box model properties.
+  that are <a>flow-relative</a> equivalents
+  of <a>physical</a> box model properties.
+  Each set of related flow-relative longhand properties
+  and their parallel physical properties
+  form a <dfn export>logical property group</dfn>.
+  For example, the 'padding-*' properties
+  form a single <a>logical property group</a>,
+  the 'margin-*' properties
+  form a separate <a>logical property group</a>,
+  etc.
+  The type of directional or axis mapping
+  (<a>flow-relative</a> or <a>physical</a>)
+  is called the property’s <dfn export>mapping logic</dfn>.
 
-  The specified values of these properties are separate from
+  Note: Each longhand property is in at most one <a>logical property group</a>.
+
+  The <a>specified values</a> of the <a>flow-relative</a> properties
+  are distinct from
   the specified values of the parallel physical properties,
   but the flow-relative and physical properties share computed values.
   Which pairs of properties share computed values
   depends on the element’s computed values of
   'writing-mode', 'direction', and 'text-orientation'.
 
-  Note: Depending on the element’s own writing mode
+  Note: Depending on the element’s own <a>writing mode</a>
+  for mapping every <a>flow-relative</a> property
+  to its <a>physical</a> equivalent
   simplifies the cascading calculations
   and gives a straightforward model for authors to reason about.
   However, it is problematic in many cases,
   see for example <a href="https://www.w3.org/mid/20161108202634.GA7235@mail.internode.on.net">this discussion</a>.
+  Authors may need to use nested elements
+  to get the correct mapping behavior
+  when changing an element’s <a>writing mode</a> from its parent.
 
   A computed value that has flow-relative and physical properties as input
   is determined by applying the CSS cascade to declarations of both.
   Overriding is not determined by whether a declaration is flow-relative or physical,
-  but only by the rules of the CSS cascade [[!CSS3-CASCADE]].
+  but only by the rules of the CSS cascade [[!css-cascade-3]].
 
   <p class="note">
     Note that this requires implementations to maintain
@@ -262,9 +350,13 @@ Flow-Relative Box Model Properties</h2>
     is after the declaration of 'margin-left'.
   </div>
 
-  [[CSSOM!]] APIs that return computed values
+  [[!CSSOM]] APIs that return computed values
   (such as <code>getComputedStyle()</code>)
   must return the same value for equivalent pairs of such properties.
+
+  ISSUE: There are some open questions on
+  the <a href="https://github.com/w3c/csswg-drafts/issues/3029">order of inheritance vs mapping in flow-relative properties</a>
+  and on the <a href="https://github.com/w3c/csswg-drafts/issues/3030">interaction of shorthands and logical properties</a>.
 
 <h3 id="dimension-properties">
 Logical Height and Logical Width: the 'block-size' and 'inline-size' properties</h3>
@@ -276,7 +368,8 @@ Logical Height and Logical Width: the 'block-size' and 'inline-size' properties<
   Applies to: Same as 'width' and 'height'
   Inherited: No
   Percentages: As for the corresponding physical property
-  Computed value: Same as 'width' and 'height'
+  Computed value: Same as 'width', 'height'
+  Animation type: by computed value type
   </pre>
 
   These properties correspond to the
@@ -290,7 +383,8 @@ Logical Height and Logical Width: the 'block-size' and 'inline-size' properties<
   Applies to: same as 'width' and 'height'
   Inherited: No
   Percentages: As for the corresponding physical property
-  Computed value: Same as 'min-width' and 'min-height'
+  Computed value: Same as 'min-width', 'min-height'
+  Animation type: by computed value type
   </pre>
 
   These properties correspond to the
@@ -304,7 +398,8 @@ Logical Height and Logical Width: the 'block-size' and 'inline-size' properties<
   Applies to: same as 'width' and 'height'
   Inherited: no
   Percentages: As for the corresponding physical property
-  Computed value: Same as 'max-width' and 'max-height'
+  Computed value: Same as 'max-width', 'max-height'
+  Animation type: by computed value type
   </pre>
 
   These properties correspond to the
@@ -317,12 +412,13 @@ the 'margin-block-start', 'margin-block-end', 'margin-inline-start', 'margin-inl
 
   <pre class="propdef">
   Name: margin-block-start, margin-block-end, margin-inline-start, margin-inline-end
-  Value: <<'margin-left'>>
+  Value: <<'margin-top'>>
   Initial: 0
-  Applies to: Same as 'margin'
+  Applies to: Same as 'margin-top'
   Inherited: no
   Percentages: As for the corresponding physical property
-  Computed value: the percentage as specified or the absolute length or auto (see text)
+  Computed value: Same as corresponding 'margin-*' properties
+  Animation type: by computed value type
   </pre>
 
   These properties correspond to the 'margin-top', 'margin-bottom', 'margin-left', and 'margin-right' properties.
@@ -346,6 +442,11 @@ the 'margin-block-start', 'margin-block-end', 'margin-inline-start', 'margin-inl
 Flow-relative Offsets:
 the 'inset-block-start', 'inset-block-end', 'inset-inline-start', 'inset-inline-end' properties and 'inset-block', 'inset-inline', and 'inset' shorthands</h3>
 
+  The 'top', 'left', 'bottom', 'right' physical properites,
+  their 'inset-block-start', 'inset-block-end', 'inset-inline-start', 'inset-inline-end' flow-relative correspondants,
+  and the 'inset-block', 'inset-inline', and 'inset' shorthands,
+  are colectively known as the <dfn export>inset properties</dfn>.
+
   <pre class="propdef">
   Name: inset-block-start, inset-block-end, inset-inline-start, inset-inline-end
   Value: <<'top'>>
@@ -353,7 +454,8 @@ the 'inset-block-start', 'inset-block-end', 'inset-inline-start', 'inset-inline-
   Applies to: positioned elements
   Inherited: no
   Percentages: As for the corresponding physical property
-  Computed value: Same as box offsets: 'top', 'right', 'bottom', 'left' properties except that directions are flow-relative
+  Computed value: Same as corresponding 'top'/'right'/'bottom'/'left' properties
+  Animation type: by computed value type
   </pre>
 
   These properties correspond to the
@@ -389,12 +491,13 @@ the 'padding-block-start', 'padding-block-end', 'padding-inline-start', 'padding
 
   <pre class="propdef">
   Name: padding-block-start, padding-block-end, padding-inline-start, padding-inline-end
-  Value: <<'padding-left'>>
+  Value: <<'padding-top'>>
   Initial: 0
   Applies to: all elements
   Inherited: no
   Percentages: As for the corresponding physical property
-  Computed value: length (see text)
+  Computed value: Same as corresponding 'padding-*' properties
+  Animation type: by computed value type
   </pre>
 
   These properties correspond to the
@@ -429,7 +532,8 @@ the 'border-block-start-width', 'border-block-end-width', 'border-inline-start-w
   Applies to: all elements
   Inherited: no
   Percentages: n/a
-  Computed value: absolute length; 0 if the border style is none or hidden (see text)
+  Computed value: Same as corresponding 'border-*-width' properties
+  Animation type: by computed value type
   </pre>
 
   These properties correspond to the
@@ -462,7 +566,8 @@ the 'border-block-start-style', 'border-block-end-style', 'border-inline-start-s
   Applies to: all elements
   Inherited: no
   Percentages: n/a
-  Computed value: specified value (see text)
+  Computed value: Same as corresponding 'border-*-style' properties
+  Animation type: discrete
   </pre>
 
   These properties correspond to the
@@ -489,12 +594,13 @@ the 'border-block-start-color', 'border-block-end-color', 'border-inline-start-c
 
   <pre class="propdef">
   Name: border-block-start-color, border-block-end-color, border-inline-start-color, border-inline-end-color
-  Value: color
+  Value: <<'border-top-color'>>
   Initial: currentcolor
   Applies to: all elements
   Inherited: no
   Percentages: n/a
-  Computed value: computed color (see text)
+  Computed value: Same as corresponding 'border-*-color' properties
+  Animation type: by computed value type
   </pre>
 
   These properties correspond to the
@@ -539,6 +645,25 @@ the 'border-block-start', 'border-block-end', 'border-inline-start', 'border-inl
   'border-inline-start' &amp; 'border-inline-end',
   respectively.
 
+<h3 id="border-radius-properties">
+Flow-relative Corner Rounding:
+the 'border-start-start-radius', 'border-start-end-radius', 'border-end-start-radius', 'border-end-end-radius' properties</h3>
+
+  <pre class="propdef">
+  Name: border-start-start-radius, border-start-end-radius, border-end-start-radius, border-end-end-radius
+  Value: <<'border-top-left-radius'>>
+  Initial: Same as 'border-top-left-radius'
+  Applies to: all elements
+  Inherited: no
+  Percentages: Same as 'border-top-left-radius'
+  Computed value: Same as corresponding physical 'border-*-radius' properties
+  Animation type: by computed value type
+  </pre>
+
+  These properties correspond to the
+  'border-top-left-radius', 'border-bottom-left-radius', 'border-top-right-radius', and 'border-bottom-right-radius' properties.
+  The mapping depends on the element's 'writing-mode', 'direction', and 'text-orientation'.
+
 <h3 id="logical-shorthand-keyword">
 Four-Directional Shorthand Properties: the 'margin', 'padding', 'border-width', 'border-style', and 'border-color' shorthands</h3>
 
@@ -550,18 +675,24 @@ Four-Directional Shorthand Properties: the 'margin', 'padding', 'border-width', 
   to indicate that the values map to the flow-relative properties instead of the physical ones.
 
   <p class="issue">
-    other candidates of the keyword are: ''relative'', ''script'',
-    ''writing-mode'', ''beas'', or the value itself (e.g., ''vertical-lr-ltr'')
+    The proposed syntax for this feature is <a href="https://github.com/w3c/csswg-drafts/issues/1282">under discussion</a>
+    and is almost guaranteed to change from what is described here.
+    This section remains in the draft to promote discussion of alternatives,
+    to document the affected properties,
+    and to specify the expected impact on the interpretation
+    of whatever syntactic switch is ultimately chosen.
 
   The following [[!CSS21]] shorthand properties
-  (and additionally the new 'inset' shorthand defined above)
   accept the ''margin/logical'' keyword:
   <ul>
+    <li>'inset'
     <li>'margin'
     <li>'padding'
     <li>'border-width'
     <li>'border-style'
     <li>'border-color'
+    <li>'scroll-padding'
+    <li>'scroll-margin'
   </ul>
 
   The syntax for these properties is effectively changed by replacing
@@ -570,8 +701,9 @@ Four-Directional Shorthand Properties: the 'margin', 'padding', 'border-width', 
   with
     <pre class="prod">logical? &lt;<var>value-type</var>&gt;{1,4}</pre>
 
-  When the ''margin/logical'' keyword is present in the value, the values that follow are
-  assigned to the flow-relative properties as follows:
+  When the ''margin/logical'' keyword is present in the value,
+  the values that follow are assigned to its flow-relative longhands
+  as follows:
 
   <ul>
     <li>If only one value is set, the value applies to all four flow-relative <a>longhands</a>.
@@ -601,113 +733,6 @@ Four-Directional Shorthand Properties: the 'margin', 'padding', 'border-width', 
     </pre>
   </div>
 
-<h2 id="background-and-borders">
-Logical Background and Border Images</h2>
-
-  [[!CSS3BG]] is handled separately because it can fill an area with specified images,
-  and the area to fill can be rotated or flipped depending on the text flow.
-
-<h3 id="background-image-transform-prop">
-Background Image Transform: The ''background-image-transform'' property</h3>
-
-  <pre class="propdef">
-  Name: background-image-transform
-  Value: logical | physical | rotate
-  Initial: physical
-  Applies to: all elements
-  Inherited: yes
-  Percentages: n/a
-  Computed value: as specified
-  </pre>
-
-  <p class="issue">
-    is this the right default? we need to investigate which is more common
-
-  This property defines whether background images are transformed
-  to match to the value of 'writing-mode' property,
-  and whether 'background-size' widths and heights are flow-relative or physical.
-  Values have the following meanings:
-
-  <dl dfn-type="value" dfn-for="background-image-transform">
-    <dt><dfn>logical</dfn></dt>
-    <dd>
-      The values for the 'background-size' property are flow-relative.
-      The background images are transformed to match to the flow-relative axis.
-
-    <dt><dfn>physical</dfn></dt>
-    <dd>
-      The values for the 'background-size' property are physical.
-      The background images remain unchanged.
-
-    <dt><dfn>rotate</dfn></dt>
-    <dd>
-      Similar to ''background-image-transform/logical'', except that the <a>inline base direction</a> is ignored.
-      The result is affected only by the <a>block flow direction</a>.
-  </dl>
-
-<h3 id="background-repeat-prop">
-The 'background-repeat' property</h3>
-
-  The ''repeat-x'' and ''repeat-y'' values are physical,
-  but in CSS3 this property can also accept double values
-  to specify horizontal and vertical behaviors separately.
-  The double values are considered flow-relative
-  if the ''background-image-transform/logical'' keyword is specified,
-  otherwise physical.
-
-  <p class="issue">
-    should also add repeat-horizontal and repeat-vertical for the physical value?
-
-<h3 id="border-image-transform-prop">
-Border Image Transform: The 'border-image-transform' property</h3>
-
-  <pre class="propdef">
-  Name: border-image-transform
-  Value: logical | physical | rotate
-  Initial: rotate
-  Applies to: All elements, except internal table elements when 'border-collapse' is ''collapse''
-  Inherited: yes
-  Percentages: n/a
-  Computed value: as specified
-  </pre>
-
-  <p class="issue">
-    is this the right initial default?
-
-  This property defines whether border images are transformed
-  to match to the value of 'writing-mode' property,
-  with the reference writing mode being
-  ''writing-mode: horizontal-tb; direction: ltr''.
-  Values have the following meanings:
-
-  <dl dfn-type="value" dfn-for="border-image-transform">
-    <dt><dfn>logical</dfn></dt>
-    <dd>
-      The values for the border-image-* properties are flow-relative.
-      The border images are transformed to match to the flow-relative axis.
-
-    <dt><dfn>physical</dfn></dt>
-    <dd>
-      The values for the border-image-* properties are physical.
-      The border images remain unchanged.
-
-    <dt><dfn>rotate</dfn></dt>
-    <dd>
-      Similar to ''border-image-transform/logical'',
-      except that the <a>inline base direction</a> is ignored.
-      The result is affected only by the <a>block flow direction</a>.
-  </dl>
-
-  The following properties use the value of this property
-  to determine how directional mappings are done:
-  <ul>
-    <li>'border-image-slice'
-    <li>'border-image-width'
-    <li>'border-image-outset'
-    <li>'border-image-repeat'
-    <li>'border-image'
-  </ul>
-
 <h2 id="acknowledgements">Acknowledgements</h2>
 
   Cameron McCormack, David Baron, Shinyu Murakami, Tab Atkins
@@ -715,12 +740,19 @@ Border Image Transform: The 'border-image-transform' property</h3>
 <h2 id="changes">
 Changes</h2>
 
-  Changes since the earler Editors Drafts include:
+  Changes since the previous Working Draft include:
+  <ul>
+    <li>Removing the features for logical background and border-images.
+        (These ideas may be revisited in a future draft.)
+    <li>Adding the logical 'border-radius' longhands.
+  </ul>
+
+  Changes between the earlier Editors Drafts and the <a href="https://www.w3.org/TR/2017/WD-css-logical-1-20170518/">18 May 2017 First Public Working Draft</a> include:
   <ul>
     <li>Making all properties cascade using the <a>writing mode</a> specified on the element, not on its parent.
     <li>Making the ordering of longhands within 'margin'-like shorthands put inline-start before inline-end.
     <li>Adding the '*-inline' and '*-block' shorthand forms for margins/borders/padding.
-    <li>Renaming the <css>outset-*</css> properties to 'inset-*' and marking an issue for discussion.
+    <li>Renaming the <css>offset-*</css> properties to 'inset-*' and marking an issue for discussion.
     <li>Adding an Introduction section.
     <li>Updating to current terminology of CSS Writing Modes.
     <li>Miscellaneous prose cleanup.

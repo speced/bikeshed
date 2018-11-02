@@ -174,9 +174,9 @@ much like a data property as possible. Specific guidance in this regard includes
 
 Objects returned from functions, attribute getters, etc.,
 can either be live or static.
-A <dfn>live object</dfn> is one that continues to reflect
+A <dfn export>live object</dfn> is one that continues to reflect
 changes made after it was returned to the caller.
-A <dfn>static object</dfn> is one that reflects
+A <dfn export>static object</dfn> is one that reflects
 the state at the time it was returned.
 
 Objects that are the way state is mutated are generally live.
@@ -379,6 +379,33 @@ and on when to use promises and when not to use promises,
 see <strong><a href="https://www.w3.org/2001/tag/doc/promises-guide">Writing
 Promise-Using Specifications</a></strong>.
 
+<h3 id="aborting">Cancel asynchronous APIs/operations using AbortSignal</h3>
+
+Async functions that need cancellation should take an `AbortSignal` as part
+of an options dictionary.
+
+Example:
+
+```js
+const controller = new AbortController();
+const signal = controller.signal;
+geolocation.read({ signal });
+```
+
+Reusing the same primitive everywhere has multiplicative effects throughout
+the platform. In particular, there's a common pattern of using a single
+`AbortSignal` for a bunch of ongoing operations, and then aborting them
+(with the corresponding `AbortController`) when e.g. the user presses cancel,
+or a single-page-app navigation occurs, or similar. So the minor extra
+complexity for an individual API leads to a large reduction in complexity
+when used with multiple APIs together.
+
+There might be cases where cancellation cannot be guaranteed. In these cases,
+the `AbortController` can still be used because a call to `abort()` on
+`AbortController` is a request to abort. How you react to it depends on your spec.
+Note, requestAbort() was considered in the AbortController design instead
+of abort(), but the latter was chosen for brevity.
+
 <h3 id="secure-context">Consider limiting new features to secure contexts</h3>
 
 It may save you significant time and effort
@@ -460,6 +487,46 @@ around from method to method as needed as easily as the state in a single
 bitmask value.
 
 <h2 id="event-design">Event Design</h2>
+
+<h3 id="one-time-events">Use promises for one time events</h3>
+
+Follow the <a href="https://www.w3.org/2001/tag/doc/promises-guide#one-time-events">advice</a>
+in the <strong><a href="https://www.w3.org/2001/tag/doc/promises-guide">Writing
+Promise-Using Specifications</a></strong> guideline.
+
+<h3 id="dont-invent-event-like">Don't invent your own event listener-like infrastructure</h3>
+
+For recurring events, it could be convenient to create a custom pair of APIs to
+`"register"`/`"unregister"`, `"subscribe"`/`"unsubscribe"`, etc., that take a
+callback and get invoked multiple times until paired cancel API is called.
+
+Instead, use the existing event registration pattern and separate API controls
+to start/stop the underlying process (since event listeners should not have
+<a href="#events-are-for-notification">side-effects</a>).
+
+If the callback would have been provided specific data, then this data should
+be added to an `Event` object (but see <a href="#state-and-subclassing">State
+and `Event` subclasses</a> as this is not always necessary).
+
+In some cases, you can transfer the state that would be surfaced in callback
+parameters into a more persistent object which, in turn, can inherit from
+`EventTarget`.
+
+In some cases you might not have an object to inherit from `EventTarget` but
+it is usually possible to create such an object.
+
+For instance with Web Bluetooth you can add event listeners on a `Characteristic`
+object, which is obtained via `getCharacteristic()`. If you need to filter events,
+it might be possible to create a filter like
+
+```js
+const filter = navigator.nfc.createReadFilter({
+  recordType: "json"
+});
+
+const onMessage = message => { … };
+filter.addEventListener('exchange', onMessage);
+```
 
 <h3 id="always-add-event-handlers">Always add event handler attributes</h3>
 
@@ -662,7 +729,7 @@ or {{DOMException}}
 should be used for errors,
 whether they are exceptions, promise rejection values, or properties.
 
-<h2 id="device-apis">Device APIs</h2>
+<h2 id="device-apis">OS and Device Wrapper APIs</h2>
 
 It is increasingly common to see new APIs developed in the web platform for interacting with
 devices. For example, authors wish to be able to use the web to connect with their
@@ -673,6 +740,11 @@ accelerometer),
 <a href="https://wicg.github.io/webusb/">USB</a>-connected peripherals,
 <a href="https://www.w3.org/community/autowebplatform/">automobiles</a>, toothbrush, etc. This
 section contains principles for consideration when designing APIs for devices.
+
+These can be functionality provided by the underlying operating system, or provided by a native
+third-party library to interact with a device. These are an abstraction which "wrap" the
+native functionality without introducing significant complexity while securing the API surface
+to the browser, hence are called wrapper APIs.
 
 <h3 id="device-ids">Use care when exposing device identifiers</h3>
 
@@ -717,8 +789,66 @@ is done in a consistent and privacy-friendly way:
      stable id during the session for the given origin, but also be able to deterministically produce
      the same id in subsequent sessions.
 
+<h3 id="wrapper-apis">Native APIs don't typically translate well to the web</h3>
+
+Many modern operating systems come with convenience APIs, which abstract away
+normally complex technology in the form of higher level user-friendly APIs.
+
+Exposing these APIs to the web platform is getting more and more common, but you
+need to be careful when exposing these to the web platform.
+
+ : Generalize interface when underlying API is overly specific
+ :: Don't blindly map native convenience APIs 1:1 to the web platform.
+    Native APIs do not translate well to the web platform, and doing so may result
+    in a API shape which is difficult to implement across a variety of underlying
+    platforms and native libraries.
+
+    Especially be careful about exposing the exact lifecycle and data
+    structures of the underlying native APIs. Think about making an API that
+    [[#string-constants|fits well in with existing web platform APIs]] and which can be expressed in
+    commonly available low-level APIs.
+
+ : Prefer asynchronous function by returning promises
+ :: Even if the underlying API is synchronous, this does not necessarily mean it
+    translates well when ported to the web platform. Exposing a synchronous native
+    API to the web platform is generally discouraged, and should be
+    provided as a promise based API whenever possible.
+
+    Doing this also allows putting the API behind a permission if it is
+    necessary, especially if the API depends on I/O or in the future may need to
+    be isolated to a separate process.
+
+ : Don't overconstrain or overfit the API to the underlying (wrapped) OS
+ :: When designing a wrapper API, you should consider how different implementations
+    (operating systems and platforms) provide this functionality. Ideally the entire
+    specification is implementable across platforms, but in some cases it may be
+    desirable to expose distinctions made on only some platforms.
+
+    These distinctions should be clearly noted if they are known in advance.
+
+ : Do not propose black-box proprietary library or dedicated hardware processor dependencies
+ :: Black-box dependencies are strongly discouraged, as this not only prevents wide
+    implementor adoption, but is unhealthy to the open nature of the web.
+
+ : Underlying protocols should be open
+ :: APIs which require exchange with external hardware or services should not depend
+    on closed protocols.
+
+ : Be offline friendly
+ :: Web platform APIs should ideally not have a hard dependency on online services.
+    The availability of these services across different regions may vary, users
+    may be offline, and the online services have no guarantee of being always
+    available.
+
+ : Avoid additional fingerprinting surfaces
+ :: Wrapper APIs can expose unintentionally expose the user to a wider fingerprinting surface.
+    Please read the TAG's finding on
+    <a href="http://www.w3.org/2001/tag/doc/unsanctioned-tracking/">unsanctioned tracking</a>
+    for additional details.
 
 <h2 id="other-considerations">Other API Design Considerations</h2>
+
+<h3 id="design-resources">Privacy, Security, Accessibility, and Internationalization</h3>
 
 It is important not to neglect other aspects of API design such as privacy, security, accessibility, and internationalization.
 Please take advantage of these other excellent resources in your design process:
@@ -727,6 +857,16 @@ Please take advantage of these other excellent resources in your design process:
 * <a href="https://www.w3.org/TR/security-privacy-questionnaire/">Self-Review Questionnaire: Security and Privacy</a>
 * <a href="https://w3c.github.io/apa/fast/">Web Technology Accessibility Guidelines</a>
 * <a href="https://w3c.github.io/bp-i18n-specdev/">Internationalization Best Practices for Spec Developers</a> <!-- also at https://www.w3.org/TR/international-specs/ -->
+
+<h3 id="polyfills">Polyfills</h3>
+
+Polyfills can be hugely beneficial in helping to roll out new features to the web platform. The 
+Technical Architecture Group <a href="https://www.w3.org/2001/tag/doc/polyfills/">finding on Polyfills and the Evolution of the Web</a> offers guidance
+that should be considered in the development of new features, notably:
+
+* Being "polyfillable" is not essential but <strong>is</strong> beneficial
+* [[#feature-detect]]
+* Polyfill development should be encouraged
 
 <h2 id="spec-writing">Advice on specification writing</h2>
 

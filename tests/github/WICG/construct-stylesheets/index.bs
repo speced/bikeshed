@@ -6,20 +6,37 @@ Status: DREAM
 ED: https://wicg.github.io/construct-stylesheets/index.html
 Editor: Tab Atkins Jr., Google, http://xanthir.com/contact/
 Editor: Eric Willigers, Google, ericwilligers@google.com
-Abstract: This draft defines additions to CSSOM to make StyleSheet objects directly constructable, along with methods and APIs to make it easier to deal with stylesheets in the context of custom elements and similar.  It also defines constructors for CSSRule objects.
-Ignored Terms: ShadowRoot, create a medialist object, add a css style sheet, document css style sheets
+Editor: Rakina Zata Amni, Google, rakina@google.com
+Repository: https://github.com/WICG/construct-stylesheets/
+Abstract: This draft defines additions to CSSOM to make {{CSSStyleSheet}} objects directly constructable, along with a way to use them in {{DocumentOrShadowRoot}}s.
+Ignored Terms: create a medialist object, add a css style sheet, document css style sheets
 </pre>
 
 <pre class='link-defaults'>
 spec:dom; type:interface; text:Document
 </pre>
 
-Adding Stylesheets In Script {#adding-stylesheets}
+Motivation {#motivation}
+============================
+
+Most web components uses Shadow DOM. For a style sheet to take effect within the Shadow DOM, it currently must be specified using a style element within each shadow root. 
+As a web page may contain tens of thousands of web components, this can easily have a large time and memory cost if user agents force the style sheet rules to be parsed and stored once for every style element. However, the duplications are actually not needed as the web components will most likely use the same styling, perhaps one for each component library.
+
+Some user agents might attempt to optimize by sharing internal style sheet representations across different instances of the style element. However, component libraries may use JavaScript to modify the style sheet rules, which will thwart style sheet sharing and have large costs in performance and memory.
+
+
+Proposed Solution {#proposed-solution}
+============================
+
+We are proposing to provide an API for creating stylesheet objects from script, without needing style elements, and also a way to reuse them in multiple places. Script can optionally add or remove rules from a stylesheet object. Each stylesheet object can be added directly to any number of shadow roots (and/or the top level document).
+
+Constructing Stylesheets {#constructing-stylesheets}
 =================================
 
 <pre class='idl'>
-[Constructor(DOMString text, optional CSSStyleSheetInit options)]
-partial interface CSSStyleSheet {
+partial interface Document {
+	[NewObject] Promise&lt;CSSStyleSheet> createCSSStyleSheet(optional DOMString text = "", optional CSSStyleSheetInit options);
+	[NewObject] CSSStyleSheet createCSSStyleSheetSync(optional DOMString text = "", optional CSSStyleSheetInit options);
 };
 
 dictionary CSSStyleSheetInit {
@@ -28,28 +45,25 @@ dictionary CSSStyleSheetInit {
 	boolean alternate = false;
 	boolean disabled = false;
 };
-
-partial interface DocumentOrShadowRoot {
-	attribute StyleSheetList moreStyleSheets;
-};
 </pre>
 
 <dl>
-	<dt><dfn constructor for=CSSStyleSheet lt="CSSStyleSheet(text)|CSSStyleSheet(text, options)">CSSStyleSheet(text, options)</dfn></dt>
+	<dt><dfn method for=Document lt="createCSSStyleSheet(text)|createCSSStyleSheet(text, options)">createCSSStyleSheet(text, options)</dfn></dt>
 	<dd>
 		When called, execute these steps:
 
 		1. Construct a new {{CSSStyleSheet}} object <var>sheet</var>,
-			with location set to <code>null</code>,
+			with location set to the {{Document}}'s <a spec=html>base URL</a>,
 			no parent CSS style sheet,
 			no owner node,
 			no owner CSS rule,
+			associated document to <var>this</var>,
 			and a title set to the {{CSSStyleSheetInit/title}} attribute of <var>options</var>.
 			Set <var>sheet’s</var> origin-clean flag.
 		2. If the {{CSSStyleSheetInit/media}} attribute of <var>options</var> is a string,
 			<a>create a MediaList object</a> from the string
 			and assign it as <var>sheet’s</var> media.
-			Otherwise, assign the value of the attribute as <var>sheet’s</var> media.
+			Otherwise, assign a copy of the value of the attribute as <var>sheet’s</var> media.
 		3. If the {{CSSStyleSheetInit/alternate}} attribute of <var>options</var> is true,
 			set <var>sheet’s</var> alternate flag.
 		4. If the {{CSSStyleSheetInit/disabled}} attribute of <var>options</var> is true,
@@ -59,15 +73,72 @@ partial interface DocumentOrShadowRoot {
 			assign the list as <var>sheet’s</var> CSS rules;
 			otherwise,
 			set <var>sheet’s</var> CSS rules to an empty list.
-		6. Return <var>sheet</var>.
+		6. Let <var>promise</var> be a promise.
+		7. In parallel, wait for loading of <a spec=css-cascade-4>@import</a> rules in <var>sheet</var> and any nested <a spec=css-cascade-4>@import</a>s from those rules.
+			* If any of them failed to load or resulted in a resource with a <a spec=html>Content-Type metadata</a> of anything other than <code>text/css</code>, reject <var>promise</var> with reason set to "{{NotAllowedError}}" {{DOMException}}.
+		    * Otherwise, resolve <var>promise</var> with <var>sheet</var> once all of them have finished loading.
+		8. Return <var>promise</var>.
 	</dd>
-	<dt><dfn attribute for=DocumentOrShadowRoot>moreStyleSheets</dfn></dt>
+
+    <dt><dfn method for=Document lt="createCSSStyleSheetSync(text)|createCSSStyleSheetSync(text, options)">createCSSStyleSheetSync(text, options)</dfn></dt>
 	<dd>
-		Style sheets assigned to this attribute are part of the <a>document CSS style sheets</a>.
-		They are ordered after the stylesheets in {{Document/styleSheets}}.
+		When called, execute these steps:
+
+		1. Construct a new {{CSSStyleSheet}} object <var>sheet</var>,
+			with location set to the {{Document}}'s <a spec=html>base URL</a>,
+			no parent CSS style sheet,
+			no owner node,
+			no owner CSS rule,
+			associated document to <var>this</var>,
+			and a title set to the {{CSSStyleSheetInit/title}} attribute of <var>options</var>.
+			Set <var>sheet’s</var> origin-clean flag.
+		2. If the {{CSSStyleSheetInit/media}} attribute of <var>options</var> is a string,
+			<a>create a MediaList object</a> from the string
+			and assign it as <var>sheet’s</var> media.
+			Otherwise, assign a copy of the value of the attribute as <var>sheet’s</var> media.
+		3. If the {{CSSStyleSheetInit/alternate}} attribute of <var>options</var> is true,
+			set <var>sheet’s</var> alternate flag.
+		4. If the {{CSSStyleSheetInit/disabled}} attribute of <var>options</var> is true,
+			set <var>sheet’s</var> disabled flag.
+		5. <a spec=css-syntax-3>Parse a stylesheet</a> from {{text}}.
+			If it returned a list of rules,
+			assign the list as <var>sheet’s</var> CSS rules;
+			otherwise,
+			set <var>sheet’s</var> CSS rules to an empty list.
+		6. If <var>sheet</var> contains one or more <a spec=css-cascade-4>@import</a> rules, throw a "{{NotAllowedError}}" {{DOMException}}.
+		7. Return <var>sheet</var>.
+	</dd>
+
+</dl>
+
+Using Constructed Stylesheets {#using-constructed-stylesheets}
+=============================
+
+<pre class='idl'>
+partial interface DocumentOrShadowRoot {
+	attribute FrozenArray&lt;CSSStyleSheet> adoptedStyleSheets;
+};
+</pre>
+
+
+<dl>
+	<dt><dfn attribute for=DocumentOrShadowRoot lt="adoptedStyleSheets">adoptedStyleSheets</dfn></dt>
+	<dd>
+		On getting, {{adoptedStyleSheets}} returns this {{DocumentOrShadowRoot}}'s [=adopted stylesheets=].
+
+		On setting, {{adoptedStyleSheets}} performs the following steps:
+
+		1. Let <var>adopted</var> be the result of converting the given value to a FrozenArray&lt;CSSStyleSheet>
+		2. If any entry of <var>adopted</var> has no associated document (e.g. it's not made by factory methods to construct stylesheets), throw a "{{NotAllowedError}}" {{DOMException}}. 
+		3. Set this {{DocumentOrShadowRoot}}'s [=adopted stylesheets=] to <var>adopted</var>.
 	</dd>
 </dl>
 
-Applying Styles In All Contexts {#styles-in-all-contexts}
-===================
+Every {{DocumentOrShadowRoot}} has <dfn>adopted stylesheets</dfn>.
+
+The user agent must include all style sheets in the {{DocumentOrShadowRoot}}'s
+[=adopted stylesheets=] inside its <a>document or shadow root CSS style sheets</a>. The [=adopted stylesheets=] are ordered after all the other style sheets (i.e. those derived from {{DocumentOrShadowRoot/styleSheets}}).
+
+
+
 

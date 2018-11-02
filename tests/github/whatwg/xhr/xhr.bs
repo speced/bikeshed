@@ -494,8 +494,10 @@ methods, when invoked, must run these steps:
    <a>network error</a>.
    <li><p>Set <a>received bytes</a> to the empty byte sequence.
    <li><p>Set <a>response object</a> to null.
-   <li><p>Set <a>override MIME type</a> to null.
   </ul>
+
+  <p class=note><a>Override MIME type</a> is not overridden here as the
+  <code>overrideMimeType()</code> method can be invoked before the <code>open()</code> method.
 
  <li>
   <p>If the <a>state</a> is not
@@ -528,12 +530,6 @@ the editing software used to write the XMLHttpRequest Standard.
   <p>Throws a "{{SyntaxError!!exception}}" {{DOMException}} if <var>name</var> is not a header name
   or if <var>value</var> is not a header value.
 </dl>
-
-<p class=note>As indicated in the algorithm below certain headers cannot
-be set and are left up to the user agent. In addition there are certain
-other headers the user agent will take control of if they are not set by
-the author as indicated at the end of the
-<a><code>send()</code></a> method section.
 
 <p>The
 <dfn id=dom-xmlhttprequest-setrequestheader method for=XMLHttpRequest><code>setRequestHeader(<var>name</var>, <var>value</var>)</code></dfn>
@@ -676,10 +672,8 @@ object has an associated {{XMLHttpRequestUpload}} object.
 <dl class=domintro>
  <dt><code><var>client</var> . <a method for=XMLHttpRequest lt="send(body)">send([<var>body</var> = null])</a></code>
  <dd>
-  <p>Initiates the request. The optional argument provides the
-  <a>request body</a>. The argument is ignored if
-  <a>request method</a> is <code>GET</code> or
-  <code>HEAD</code>.
+  <p>Initiates the request. The <var>body</var> argument provides the <a>request body</a>, if any,
+  and is ignored if the <a>request method</a> is <code>GET</code> or <code>HEAD</code>.
 
   <p>Throws an "{{InvalidStateError!!exception}}" {{DOMException}} if either <a>state</a> is not
   <i>opened</i> or the <a><code>send()</code> flag</a> is set.
@@ -699,64 +693,68 @@ method must run these steps:
  <code>HEAD</code>, set <var>body</var> to null.
 
  <li>
-  <p>If <var>body</var> is null, go to the next step.
-
-  <p>Otherwise, let <var>encoding</var> and <var>mimeType</var> be null, and then follow these
-  rules, switching on <var>body</var>:
-
-  <dl class=switch>
-   <dt id=dom-xmlhttprequest-send-document>{{Document}}
-   <dd>
-    <p>Set <var>encoding</var> to `<code>UTF-8</code>`.
-
-    <p>Set <var>mimeType</var> to `<code>text/html</code>` if <var>body</var> is an
-    <a>HTML document</a>, and to `<code>application/xml</code>` otherwise. Then append
-    `<code>;charset=UTF-8</code>` to <var>mimeType</var>.
-
-    <p>Set <a>request body</a> to <var>body</var>,
-    <a lt="fragment serializing algorithm">serialized</a>,
-    <a lt="obtain Unicode">converted to Unicode</a>, and <a lt="UTF-8 encode">UTF-8 encoded</a>.
-
-   <dt id=dom-xmlhttprequest-send-bodyinit>{{BodyInit}}
-   <dd>
-    <p>If <var>body</var> is a string, set <var>encoding</var> to
-    `<code>UTF-8</code>`.
-
-    <p>Set <a>request body</a> and <var>mimeType</var> to the result of
-    <a for=BodyInit>extracting</a> <var>body</var>.
-  </dl>
-
-  <p>If <var>mimeType</var> is non-null and <a>author request headers</a>
-  <a for="header list">does not contain</a> `<code>Content-Type</code>`, then
-  <a for="header list">append</a> `<code>Content-Type</code>`/<var>mimeType</var> to
-  <a>author request headers</a>.
-
-  <p>Otherwise, if <var>encoding</var> is non-null and <a>author request headers</a>
-  <a for="header list">contains</a> `<code>Content-Type</code>`:
+  <p>If <var>body</var> is not null, then:
 
   <ol>
-   <li><p>Let <var>value</var> be the <a for=header>value</a> of the <a>header</a> whose
-   <a for=header>name</a> is a <a>byte-case-insensitive</a> match for `<code>Content-Type</code>` in
-   <a>author request headers</a>.
-   <!-- XXX: add a primitive for this in Fetch -->
+   <li><p>Let <var>extractedContentType</var> be null.
 
-   <li><p>Let <var>mimeTypeRecord</var> be <var>value</var>,
-   <a lt="parse a MIME type from bytes">parsed</a>.
+   <li><p>If <var>body</var> is a {{Document}}, then set <a>request body</a> to
+   <var>body</var>, <a lt="fragment serializing algorithm">serialized</a>,
+   <a lt="obtain Unicode">converted to Unicode</a>, and <a lt="UTF-8 encode">UTF-8 encoded</a>.
+
+   <li><p>Otherwise, set <a>request body</a> and <var>extractedContentType</var> to the result of
+   <a for=BodyInit>extracting</a> <var>body</var>.
 
    <li>
-    <p>If <var>mimeTypeRecord</var> is not failure and
-    <var>mimeTypeRecord</var>'s <a for="MIME type">parameters</a>["<code>charset</code>"]
-    <a for=map>exists</a>, then:
+    <p>If <a>author request headers</a> <a for="header list">contains</a>
+    `<code>Content-Type</code>`, then:
 
     <ol>
-     <li><p><a for=map>Set</a> <var>mimeTypeRecord</var>'s
-     <a for="MIME type">parameters</a>["<code>charset</code>"] to <var>encoding</var>.
+     <li>
+      <p>If <var>body</var> is a {{Document}} or a {{USVString}}, then:
 
-     <li><p>Let <var>newValue</var> be <var>mimeTypeRecord</var>,
-     <a lt="serialize a MIME type to bytes">serialized</a>.
+      <ol>
+       <li><p>Let <var>originalAuthorContentType</var> be the <a for=header>value</a> of the
+       <a>header</a> whose <a for=header>name</a> is a <a>byte-case-insensitive</a> match for
+       `<code>Content-Type</code>` in <a>author request headers</a>.
+       <!-- XXX: add a primitive for this in Fetch -->
 
-     <li><p><a for="header list">Set</a> `<code>Content-Type</code>`/<var>newValue</var> in
+       <li><p>Let <var>contentTypeRecord</var> be the result of
+       <a lt="parse a MIME type from bytes">parsing</a> <var>originalAuthorContentType</var>.
+
+       <li>
+        <p>If <var>contentTypeRecord</var> is not failure, <var>contentTypeRecord</var>'s
+        <a for="MIME type">parameters</a>["<code>charset</code>"] <a for=map>exists</a>, and
+        <a for="MIME type">parameters</a>["<code>charset</code>"] is not an
+        <a>ASCII case-insensitive</a> match for "<code>UTF-8</code>", then:
+
+        <ol>
+         <li><p><a for=map>Set</a> <var>contentTypeRecord</var>'s
+         <a for="MIME type">parameters</a>["<code>charset</code>"] to "<code>UTF-8</code>".
+
+         <li><p>Let <var>newContentTypeSerialized</var> be the result of
+         <a lt="serialize a MIME type to bytes">serializing</a> <var>contentTypeRecord</var>.
+
+         <li><p><a for="header list">Set</a>
+         `<code>Content-Type</code>`/<var>newContentTypeSerialized</var> in
+         <a>author request headers</a>.
+        </ol>
+      </ol>
+    </ol>
+   <li>
+    Otherwise:
+
+    <ol>
+     <li><p>If <var>body</var> is a <a>HTML document</a>, <a for="header list">set</a>
+     `<code>Content-Type</code>`/`<code>text/html;charset=UTF-8</code>` in
      <a>author request headers</a>.
+
+     <li><p>Otherwise, if <var>body</var> is an <a>XML document</a>, <a for="header list">set</a>
+     `<code>Content-Type</code>`/`<code>application/xml;charset=UTF-8</code>` in
+     <a>author request headers</a>.
+
+     <li><p>Otherwise, if <var>extractedContentType</var> is not null, <a for="header list">set</a>
+     `<code>Content-Type</code>`/<var>extractedContentType</var> in <a>author request headers</a>.
     </ol>
   </ol>
 
@@ -1045,7 +1043,7 @@ method must run these steps:
  <li><p>Let <var>length</var> be <var>response</var>'s <a for=response>body</a>'s
  <a for=body>total bytes</a>.
 
- <li><p><a>Fire a progress event</a> named
+ <li><p>If the <a>synchronous flag</a> is unset, <a>fire a progress event</a> named
  <a event><code>progress</code></a> with <var>transmitted</var> and <var>length</var>.
 
  <li><p>Set <a>state</a> to <i>done</i>.
@@ -1066,12 +1064,12 @@ method must run these steps:
 <ol>
  <li><p>If the <a><code>send()</code> flag</a> is unset, return.
 
+ <li><p>If the <a>timed out flag</a> is set, then run the <a>request error steps</a> for event
+ <a event><code>timeout</code></a> and exception "{{TimeoutError!!exception}}" {{DOMException}}.
+
  <li><p>If <var>response</var> is a <a>network error</a>, then run the <a>request error steps</a>
  for event <a event><code>error</code></a> and exception "{{NetworkError!!exception}}"
  {{DOMException}}.
-
- <li><p>If the <a>timed out flag</a> is set, then run the <a>request error steps</a> for event
- <a event><code>timeout</code></a> and exception "{{TimeoutError!!exception}}" {{DOMException}}.
 
  <li>
   <p>Otherwise, if <var>response</var>'s <a for=response>body</a>'s <a for=body>stream</a> is
@@ -1720,6 +1718,12 @@ attribute must return the result of running these steps:
 </table>
 
 
+<h3 id=feature-policy-integration>Feature Policy integration</h3>
+
+<p>This specification defines a <a>policy-controlled feature</a> identified by the string
+"<code><dfn>sync-xhr</dfn></code>". Its <a>default allowlist</a> is <code>*</code>.
+
+
 <h2 id=interface-formdata>Interface {{FormData}}</h2>
 
 <pre class=idl>
@@ -1747,11 +1751,10 @@ interface FormData {
 <dfn id=concept-formdata-entry-name export for=FormData/entry>name</dfn> and a
 <dfn id=concept-formdata-entry-value export for=FormData/entry>value</dfn>.
 
-<p>For the purposes of interaction with other algorithms, an <a for=FormData>entry</a>'s type is
-"string" if its <a for=FormData/entry>value</a> is a string and "file" otherwise. If an
-<a for=FormData>entry</a>'s type is "file", its filename is the empty string if
-<a for=FormData/entry>value</a> is not a {{File}} object, and otherwise its filename is the value of
-<a for=FormData>entry</a>'s <a for=FormData/entry>value</a>'s {{File/name}} attribute.
+<p>For the purposes of interaction with other algorithms, an <a for=FormData>entry</a>'s filename is
+the empty string if <a for=FormData/entry>value</a> is not a {{File}} object, and otherwise its
+filename is the value of <a for=FormData>entry</a>'s <a for=FormData/entry>value</a>'s {{File/name}}
+attribute.
 
 <p>To <dfn>create an entry</dfn> for <var>name</var>, <var>value</var>, and optionally a
 <var>filename</var>, run these steps:
@@ -1785,7 +1788,7 @@ constructor must run these steps:
  <li><p>Let <var>fd</var> be a new {{FormData}} object.
 
  <li><p>If <var>form</var> is given, then set <var>fd</var>'s <a for=FormData>entry list</a> to the
- result of <a>constructing the form data set</a> for <var>form</var>.
+ result of <a>constructing the entry list</a> for <var>form</var>.
 
  <li><p>Return <var>fd</var>.
 </ol>
@@ -1960,12 +1963,6 @@ attributes initialized to false, so it is suggested that for consistency all
 {{ProgressEvent}} interface do the same.
 
 
-<h3 id=feature-policy-integration>Feature Policy Integration</h3>
-
-<p>This specification defines a <a>policy-controlled feature</a> identified by the string
-"<code><dfn>sync-xhr</dfn></code>". Its <a>default allowlist</a> is <code>*</code>.
-
-
 <h3 id=security-considerations>Security considerations</h3>
 
 <p>For cross-origin requests some kind of opt-in, e.g. the
@@ -2077,6 +2074,7 @@ Julian Reschke,
 呂康豪 (Kang-Hao Lu),
 Karl Dubost,
 Keith Yeung,
+田村健人 (Kent TAMURA),
 Lachlan Hunt,
 Maciej Stachowiak,
 Magnus Kristiansen,
@@ -2099,6 +2097,7 @@ Philip Taylor,
 Robin Berjon,
 Rune <span title=Fabulous>F.</span> Halvorsen,
 Ruud Steltenpool,
+Ryo Onodera,
 Sergiu Dumitriu,
 Shivakumar Jagalur Matt,
 Sigbjørn Finne,
