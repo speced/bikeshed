@@ -1,0 +1,160 @@
+<pre class='metadata'>
+Title: Down with ()!
+Shortname: P1102
+Revision: 0
+Audience: CWG
+Status: P
+Group: WG21
+URL: http://wg21.link/P1102R0
+!Source: <a href="https://github.com/jfbastien/papers/blob/master/source/p1102r0.bs">https://github.com/jfbastien/papers/blob/master/source/p1102r0.bs</a>
+Editor: Alex Christensen, Apple, achristensen@apple.com
+Editor: JF Bastien, Apple, jfbastien@apple.com
+Abstract: A proposal for removing unnecessary ()'s from C++ lambdas.
+Date: 2018-06-20
+Markup Shorthands: markdown yes
+</pre>
+
+Introduction and motivation {#intro}
+===========================
+
+Currently, C++ lambdas with no parameters do not require a parameter declaration
+clause. The specification even contains this language in [**expr.prim.lambda**]
+section 8.4.5 ❡4:
+
+> If a lambda-expression does not include a lambda-declarator, it is as if the
+> lambda-declarator were `()`.
+
+This allows us to omit the unused `()` in simple lambdas such as this:
+
+<xmp>
+std::string s1 = "abc";
+auto withParen = [s1 = std::move(s1)] () {
+	std::cout << s1 << '\n'; 
+};
+
+std::string s2 = "abc";
+auto noSean = [s2 = std::move(s2)] { // Note no syntax error.
+	std::cout << s2 << '\n'; 
+};
+</xmp>
+
+These particular lambdas have ownership of the strings, so they ought to be able
+to mutate it, but `s1` and `s2` are const (because the `const` operator is
+declared `const` by default) so we need to add the `mutable` keyword:
+
+<xmp>
+std::string s1 = "abc";
+auto withParen = [s1 = std::move(s1)] () mutable {
+	s1 += "d";
+	std::cout << s1 << '\n'; 
+};
+
+std::string s2 = "abc";
+auto noSean = [s2 = std::move(s2)] mutable { // Currently a syntax error.
+	s2 += "d";
+	std::cout << s2 << '\n'; 
+};
+</xmp>
+
+Confusingly, the current Standard requires the empty parens when using the
+`mutable` keyword. This rule is unintuitive, causes common syntax errors, and
+clutters our code. When compiling with clang, we even get a syntax error that
+indicates the compiler knows exactly what is going on:
+
+<xmp>
+example.cpp:11:54: error: lambda requires '()' before 'mutable'
+auto noSean = [s2 = std::move(s2)] mutable { // Currently a syntax error.
+                                   ^
+                                   () 
+1 error generated.
+</xmp>
+
+This proposal would make these parentheses unnecessary like they were before we
+added `mutable`. This will apply to:
+
+  * lambda template parameters
+  * `constexpr`
+  * `mutable`
+  * Exception specifications and `noexcept`
+  * attributes
+  * trailing return types
+  * `requires`
+
+EWG discussed this change as [[EWG135]]
+in [Lenexa](http://wiki.edg.com/bin/view/Wg21lenexa/EWGIssuesResolutionMinutes)
+and voted 15 to 1 on forwarding to core. It became [[CWG2121]], discussed
+in
+[Kona](http://wiki.edg.com/bin/view/Wg21kona2015/CoreWorkingGroup#CWG_2121_More_flexible_lambda_sy) and
+needed someone to volunteer wording.
+
+This paper was discussed on the EWG reflector in June, Nina Ranns provided
+feedback, and EWG chair agreed that the paper should move to CWG directly given
+previous polls.
+
+
+Impact {#impact}
+======
+
+This change will not break existing code.
+
+
+Wording {#word}
+=======
+
+Modify Lambda expressions [**expr.prim.lambda**] as follows:
+
+<blockquote>
+
+    <style>
+    indent1 { padding-left: 4em; }
+    indent2 { padding-left: 8em; }
+    indent3 { padding-left: 12em; }
+    </style>
+    <i>
+    <indent1>lambda-expression :<br/></indent1>
+        <indent2>lambda-introducer lambda-declarator requires-clause<sub>opt</sub> compound-statement<br/></indent2>
+        <indent2><del>lambda-introducer < template-parameter-list > requires-clause<sub>opt</sub> compound-statement</del><br/></indent2>
+        <indent2>lambda-introducer < template-parameter-list > requires-clause<sub>opt</sub> <br/></indent2>
+            <indent3>lambda-declarator requires-clause<sub>opt</sub> compound-statement<br/></indent3>
+    <indent1>lambda-introducer :<br/></indent1>
+        <indent2>[ lambda-capture<sub>opt</sub> ]<br/></indent2>
+        <indent1>lambda-declarator :<br/></indent1>
+        <indent2>( parameter-declaration-clause )<sub><ins>opt</ins></sub> decl-specifier-seq<sub>opt</sub> <br/></indent2>
+            <indent3>noexcept-specifier<sub>opt</sub> attribute-specifier-seq<sub>opt</sub> trailing-return-type<sub>opt</sub><br/></indent3>
+    </i>
+
+</blockquote>
+
+Modify ❡4:
+
+<blockquote>
+
+If a <del>*lambda-expression*</del><ins>*lambda-declarator*</ins> does not
+include <del>a *lambda-declarator*</del><ins>`(` *parameter-declaration-clause*
+`)`</ins>, it is as if the <del>*lambda-declarator*</del><ins>`(`
+*parameter-declaration-clause* `)`</ins> were `()`. The lambda return type is
+`auto`, which is replaced by the type specified by the *trailing-return-type* if
+provided and/or deduced from `return` statements as described in 10.1.7.4.
+
+</blockquote>
+
+Keep Closure types [**expr.prim.lambda.closure**] ❡3 as-is:
+
+<blockquote>
+
+  The return type and function parameters of the function call operator template
+  are derived from the *lambda-expression*'s *trailing-return-type* and
+  *parameter-declaration-clause* by replacing each occurrence of `auto` in the
+  *decl-specifier*s of the *parameter-declaration-clause* with the name of the
+  corresponding invented *template-parameter*. The *requires-clause* of the
+  function call operator template is the *requires-clause* immediately following
+  `<` *template-parameter-list* `>`, if any. The trailing *requires-clause* of
+  the function call operator or operator template is the *requires-clause*
+  following the *lambda-declarator*, if any.
+
+</blockquote>
+
+  Note: The first sentence can remain as-is because the modification to
+  **[expr.prim.lambda**] ❡4 create an empty *parameter-declaration-clause* if
+  none is provided. Similarly, the second and third sentences bind the
+  *requires-clause* unambiguously.

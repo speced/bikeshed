@@ -4,14 +4,16 @@ Status: ED
 Group: houdini
 ED: https://drafts.css-houdini.org/css-typed-om-1/
 TR: https://www.w3.org/TR/css-typed-om-1/
+Previous Version: https://www.w3.org/TR/2018/WD-css-typed-om-1-20180410/
 Previous Version: https://www.w3.org/TR/2017/WD-css-typed-om-1-20170801/
 Previous Version: https://www.w3.org/TR/2016/WD-css-typed-om-1-20160607/
 Shortname: css-typed-om
 Level: 1
 Abstract: Converting CSSOM value strings into meaningfully typed JavaScript representations and back can incur a significant performance overhead. This specification exposes CSS values as typed JavaScript objects to facilitate their performant manipulation.
-Former Editor: Shane Stephens, shanestephens@google.com, w3cid 47691
 Editor: Tab Atkins-Bittner, Google, http://xanthir.com/contact/, w3cid 42199
-Editor: Naina Raisinghani, Google, nainar@google.com, w3cid 100915
+Editor: François Remy, Microsoft, w3cid 53348
+Former Editor: Shane Stephens, shanestephens@google.com, w3cid 47691
+Former Editor: Naina Raisinghani, Google, nainar@google.com, w3cid 100915
 Repository: w3c/css-houdini-drafts
 Inline Github Issues: title
 Ignored Vars: type, unit
@@ -43,7 +45,7 @@ urlPrefix: http://www.ecma-international.org/ecma-262/6.0/#sec-; type: dfn; spec
 </pre>
 
 <pre class=link-defaults>
-spec:css21; type:property;
+spec:css-sizing; type:property;
     text:max-height;
     text:max-width;
     text:min-height;
@@ -55,7 +57,9 @@ spec:cssom-1;
         text: CSS declaration block
         text: declarations; for: CSSStyleDeclaration
 spec:css-align-3; type:property; text:column-gap
-spec:css-color-3; type:property; text:color;
+spec:css-color-4;
+    type:property; text:color;
+    type:value; text:currentcolor;
 spec:css-position-3; type:value; for:left; text:auto;
 spec:css-shapes-1; type: property;
     text: shape-margin
@@ -203,6 +207,18 @@ and return the result.
         Otherwise,
         let |whole value| be the parsed result.
 
+        <div class='note'>
+            The behavior of custom properties are different when modified via JavaScript
+            than when defined in style sheets.
+
+            When a custom property is defined with an invalid syntax in a style sheet,
+            then the value is recorded as "unset", to avoid having to reparse every style sheet when a custom property is registered.
+
+            Conversely, when a custom property is modified via the JavaScript API,
+            any parse errors are propagated to the progamming environment via a {{TypeError}}.
+            This allows more immediate feedback of errors to developers.
+        </div>
+
     4. [=Subdivide into iterations=] |whole value|,
         according to |property|,
         and let |values| be the result.
@@ -331,11 +347,11 @@ interface StylePropertyMap : StylePropertyMapReadOnly {
 
     1. Standardized properties
         (not [=custom properties=] or vendor-prefixed properties),
-        [=ASCII-lowercased=]
+        [=ASCII lowercased=]
         and then sorted in increasing code-point order.
     2. Vendor-prefixed/experimental properties
         (those whose name starts with a single dash),
-        [=ASCII-lowercased=]
+        [=ASCII lowercased=]
         and then sorted in increasing code-point order.
     3. [=Custom properties=],
         sorted in increasing code-point order.
@@ -470,7 +486,7 @@ probably in an appendix.
     1. If |property| is not a [=custom property name string=],
         set |property| to |property| [=ASCII lowercased=].
 
-    2. If |property| is not a [[=valid CSS property=],
+    2. If |property| is not a [=valid CSS property=],
         [=throw=] a {{TypeError}}.
 
     3. If |property| is a [=single-valued property=] and |values| has more than one [=list/item=],
@@ -484,12 +500,11 @@ probably in an appendix.
         and one or more of the [=list/items=] are a {{CSSUnparsedValue}} or {{CSSVariableReferenceValue}} object,
         [=throw=] a {{TypeError}}.
 
-        Note: When a property is set via string-based APIs,
-        the presence of ''var()'' in a property
-        prevents the entire thing from being interpreted.
-        In other words,
-        everything *besides* the ''var()'' is a plain [=component value=],
-        not a meaningful type.
+        Note: Having 2+ values implies that you're setting multiple items of a list-valued property,
+        but the presence of a ''var()'' function in the string-based OM disables all syntax parsing,
+        including splitting into individual iterations
+        (because there might be more commas inside of the ''var()'' value,
+        so you can't tell how many items are actually going to show up).
         This step's restriction preserves the same semantics in the Typed OM.
 
     5. Let |props| be the value of |this|’s {{[[declarations]]}} internal slot.
@@ -592,7 +607,7 @@ probably in an appendix.
         Return |value|'s associated value.
 
     : If |value| is a {{CSSStyleValue}} subclass,
-    :: If |value| does not [=match a CSS production|match the grammar=] of a [=list-valued property iteration=] of |property|,
+    :: If |value| does not [=match a grammar|match the grammar=] of a [=list-valued property iteration=] of |property|,
         [=throw=] a {{TypeError}}.
 
         If any component of |property|’s CSS grammar has a limited numeric range,
@@ -610,15 +625,33 @@ probably in an appendix.
 </div>
 
 <div algorithm>
-    A {{CSSStyleValue}} is said to <dfn>match a CSS production</dfn>
+    CSS properties express their valid inputs with grammars,
+    which are written with the assumption of being matched against strings parsed into CSS tokens,
+    as defined in [[css-syntax-3#tokenization]].
+    {{CSSStyleValue}} objects can also be matched against these grammars, however.
+
+    A {{CSSStyleValue}} is said to <dfn for=CSSStyleValue>match a grammar</dfn>
     based on the following rules:
 
-    * A {{CSSKeywordValue}} always matches <<ident>>.
-    * A {{CSSTransformValue}} always matches <<transform-list>>.
-    * A {{CSSPositionValue}} always matches <<position>>.
+    * A {{CSSKeywordValue}} matches an [=ident=] specified in a grammar
+        if its {{CSSKeywordValue/value}} internal slot
+        matches the [=ident=].
+
+        If case-folding rules are in effect normally for that [=ident=]
+        (such as ''Auto'' matching the keyword ''auto'' specified in the grammar for 'width'),
+        they apply to this comparison as well.
+    * A {{CSSTransformValue}} matches <<transform-list>>.
     * A {{CSSNumericValue}} matches what its type [=CSSNumericValue/matches=].
-    * A {{CSSURLImageValue}} always matches <<url>>.
-    * Any subclass of {{CSSImageValue}} always matches <<image>>.
+    * A {{CSSURLImageValue}} matches <<url>>.
+    * Any subclass of {{CSSImageValue}} matches <<image>>.
+    * A {{CSSUnparsedValue}} matches any grammar.
+    * A direct {{CSSStyleValue}} object (not a subclass)
+        with a non-null {{CSSStyleValue/[[associatedProperty]]}} slot
+        matches the grammar of the property specified in its {{CSSStyleValue/[[associatedProperty]]}} slot,
+        regardless of what it is.
+
+    Note: As the ability to create more complex values in Typed OM increases,
+    this section will become more complex.
 </div>
 
 A [=string=] is a <dfn>custom property name string</dfn>
@@ -641,7 +674,7 @@ partial interface Element {
 };
 </pre>
 
-<dfn>Computed StylePropertyMap</dfn> objects
+<dfn export>Computed StylePropertyMap</dfn> objects
 represent the [=computed values=] of an {{Element}},
 and are accessed by calling the {{Element/computedStyleMap()}} method.
 
@@ -1108,7 +1141,7 @@ The following are the arithmetic operations you can perform on dimensions:
         if |values| is « 1, 2, 3, 4 »,
         the result must be (((1 × 2) × 3) × 4).
 
-    5. Let |type| be the result of [=multiplying=] the [=types=] of every [=list/item=] in |values|.
+    5. Let |type| be the result of [=CSSNumericValue/multiplying=] the [=types=] of every [=list/item=] in |values|.
         If |type| is failure,
         [=throw=] a {{TypeError}}.
 
@@ -1591,7 +1624,7 @@ The following are the arithmetic operations you can perform on dimensions:
             2. Set |type|’s sole [=map/value=] to |power|.
             3. [=list/Append=] |type| to |types|.
 
-        3. Return the result of [=multiplying=] all the [=list/items=] of |types|.
+        3. Return the result of [=CSSNumericValue/multiplying=] all the [=list/items=] of |types|.
     </div>
 
     <div algorithm>
@@ -1648,10 +1681,10 @@ rather than on {{CSSNumericValue}} instances.
 
 ### Numeric Value Typing ### {#numeric-typing}
 
-Each {{CSSNumericValue}} has an associated <dfn for=CSSNumericValue>type</dfn>,
+Each {{CSSNumericValue}} has an associated <dfn export for=CSSNumericValue>type</dfn>,
 which is a [=ordered map|map=] of [=base types=] to integers,
 and an associated [=percent hint=].
-The <dfn for=CSSNumericValue lt="base type">base types</dfn> are
+The <dfn export for=CSSNumericValue lt="base type">base types</dfn> are
 "length",
 "angle",
 "time",
@@ -1660,11 +1693,15 @@ The <dfn for=CSSNumericValue lt="base type">base types</dfn> are
 "flex",
 and "percent".
 The ordering of a [=type=]’s entries always matches this [=base type=] ordering.
-The <dfn for=CSSNumericValue>percent hint</dfn>
+The <dfn export for=CSSNumericValue>percent hint</dfn>
 is either null or a [=base type=] other than "percent".
 
+Note: As new unit types are added to CSS,
+they'll be added to this list of [=base types=],
+and to the CSS [=math functions=].
+
 <div algorithm>
-    To <dfn lt="create a type|creating a type">create a type</dfn> from a string |unit|,
+    To <dfn export for="CSSNumericValue" lt="create a type|creating a type">create a type</dfn> from a string |unit|,
     follow the appropriate branch of the following:
 
     <dl class=switch>
@@ -1692,7 +1729,7 @@ is either null or a [=base type=] other than "percent".
 </div>
 
 <div algorithm>
-    To <dfn local-lt="add | addition">add two types</dfn> |type1| and |type2|,
+    To <dfn export for=CSSNumericValue local-lt="add | addition">add two types</dfn> |type1| and |type2|,
     perform the following steps:
 
     1. Replace |type1| with a fresh copy of |type1|,
@@ -1773,7 +1810,7 @@ is either null or a [=base type=] other than "percent".
 </div>
 
 <div algorithm>
-    To <dfn for=CSSNumericValue local-lt="multiply | multiplication">multiply two types</dfn> |type1| and |type2|,
+    To <dfn export for=CSSNumericValue local-lt="multiply | multiplication">multiply two types</dfn> |type1| and |type2|,
     perform the following steps:
 
     1. Replace |type1| with a fresh copy of |type1|,
@@ -1804,7 +1841,19 @@ is either null or a [=base type=] other than "percent".
     5. Return |finalType|.
 </div>
 
-A [=type=] is said to <dfn for=CSSNumericValue>match</dfn> a CSS production in some circumstances:
+<div algorithm>
+    To <dfn export for=CSSNumericValue>invert a type</dfn> |type|,
+    perform the following steps:
+
+    1. Let |result| be a new [=type=]
+        with an initially empty [=ordered map=]
+        and an initially null [=percent hint=]
+    1. [=map/For each=] |unit| → |exponent| of |type|,
+        set |result|[|unit|] to (-1 * |exponent|).
+    3. Return |result|.
+</div>
+
+A [=type=] is said to <dfn export for=CSSNumericValue>match</dfn> a CSS production in some circumstances:
 
 * A [=type=] matches <<length>>
     if its only non-zero [=map/entry=] is «[ "length" → 1 ]»
@@ -1813,14 +1862,14 @@ A [=type=] is said to <dfn for=CSSNumericValue>match</dfn> a CSS production in s
 * A [=type=] matches <<percentage>>
     if its only non-zero [=map/entry=] is «[ "percent" → 1 ]».
 * A [=type=] matches <<length-percentage>>
-    if its only non-zero [=map/entry=] is either «[ "length" → 1 ]» or «[ "percentage" → 1 ]»
+    if its only non-zero [=map/entry=] is either «[ "length" → 1 ]» or «[ "percent" → 1 ]»
     Same for <<angle-percentage>>, <<time-percentage>>, etc.
 * A [=type=] matches <<number>>
     if it has no non-zero [=map/entries=]
     and its [=percent hint=] is null.
 * A [=type=] matches <<number-percentage>>
     if it has no non-zero [=map/entries=],
-    or its only non-zero [=map/entry=] is «[ "percentage" → 1 ]».
+    or its only non-zero [=map/entry=] is «[ "percent" → 1 ]».
 
 Many specifications use ''[ <<length>> | <<percentage>> ]''
 instead of ''<<length-percentage>>'' in their grammar,
@@ -1891,7 +1940,7 @@ are represented as {{CSSUnitValue}}s.
 </div>
 
 <div algorithm>
-    The <dfn>[=type=] of a {{CSSUnitValue}}</dfn>
+    The <dfn export>[=type=] of a {{CSSUnitValue}}</dfn>
     is the result of [=creating a type=] from its {{CSSUnitValue/unit}} internal slot.
 </div>
 
@@ -2005,6 +2054,14 @@ interface CSSMathMax : CSSMathValue {
     readonly attribute CSSNumericArray values;
 };
 
+[Exposed=(Window, Worker, PaintWorklet, LayoutWorklet),
+ Constructor(CSSNumberish min, CSSNumberish val, CSSNumberish max)]
+interface CSSMathClamp : CSSMathValue {
+    readonly attribute CSSNumericValue min;
+    readonly attribute CSSNumericValue val;
+    readonly attribute CSSNumericValue max;
+};
+
 [Exposed=(Window, Worker, PaintWorklet, LayoutWorklet)]
 interface CSSNumericArray {
     iterable<CSSNumericValue>;
@@ -2019,6 +2076,7 @@ enum CSSMathOperator {
     "invert",
     "min",
     "max",
+    "clamp",
 };
 </xmp>
 
@@ -2028,7 +2086,7 @@ It exists solely to host the common attributes
 of all the "math" operations.
 
 <div algorithm="CSSMathValue.operator">
-    The <dfn attribute for="CSSMathValue, CSSMathSum, CSSMathProduct, CSSMathMin, CSSMathMax, CSSMathNegate, CSSMathInvert">operator</dfn> attribute
+    The <dfn attribute for="CSSMathValue, CSSMathSum, CSSMathProduct, CSSMathMin, CSSMathMax, CSSMathClamp, CSSMathNegate, CSSMathInvert">operator</dfn> attribute
     of a {{CSSMathValue}} |this| must,
     on getting,
     return the following string,
@@ -2046,6 +2104,9 @@ of all the "math" operations.
 
         : {{CSSMathMax}}
         :: <code>"max"</code>
+
+        : {{CSSMathClamp}}
+        :: <code>"clamp"</code>
 
         : {{CSSMathNegate}}
         :: <code>"negate"</code>
@@ -2085,9 +2146,26 @@ of all the "math" operations.
 
     The <dfn constructor for="CSSMathProduct">CSSMathProduct(...|args|)</dfn> constructor
     is defined identically to the above,
-    except that in step 3 it [=multiplies=] the types instead of [=adding=],
+    except that in step 3 it [=CSSNumericValue/multiplies=] the types instead of [=adding=],
     and in the last step
     it returns a {{CSSMathProduct}}.
+</div>
+
+<div algorithm="CSSMathClamp(min, val, max)">
+    The <dfn constructor for="CSSMathClamp">CSSMathClamp(|min|, |val|, |max|)</dfn> constructor must,
+    when called,
+    perform the following steps:
+
+    1. Replace |min|, |val|, and |max|
+        with the result of [=rectifying a numberish value=] for each.
+
+    2. Let |type| be the result of [=adding=] the [=types=] of |min|, |val|, and |max|.
+        If |type| is failure,
+        [=throw=] a {{TypeError}}.
+
+    3. Return a new {{CSSMathClamp}}
+        whose {{CSSMathClamp/min}}, {{CSSMathClamp/val}}, and {{CSSMathClamp/max}} internal slots
+        are set to |min|, |val|, and |max|, respectively.
 </div>
 
 <div algorithm="CSSMathNegate(arg)">
@@ -2098,7 +2176,7 @@ of all the "math" operations.
     1. Replace |arg|
         with the result of [=rectifying a numberish value=] for |arg|.
 
-    1. Return a new {{CSSMathNegate}}
+    2. Return a new {{CSSMathNegate}}
         whose {{CSSMathNegate/value}} internal slot
         is set to |arg|.
 
@@ -2109,7 +2187,7 @@ of all the "math" operations.
 </div>
 
 <div algorithm>
-    The <dfn>[=type=] of a CSSMathValue</dfn>
+    The <dfn export>[=type=] of a CSSMathValue</dfn>
     depends on its class:
 
     <dl class=switch>
@@ -2119,8 +2197,12 @@ of all the "math" operations.
         :: The [=type=] is the result of [=adding=] the [=types=]
             of each of the [=list/items=] in its {{CSSMathSum/values}} internal slot.
 
+        : {{CSSMathClamp}}
+        :: The [=type=] is the result of [=adding=] the [=types=]
+            of the {{CSSMathClamp/min}}, {{CSSMathClamp/val}}, and {{CSSMathClamp/max}} internal slots.
+
         : {{CSSMathProduct}}
-        :: The [=type=] is the result of [=multiplying=] the [=types=]
+        :: The [=type=] is the result of [=CSSNumericValue/multiplying=] the [=types=]
             of each of the [=list/items=] in its {{CSSMathProduct/values}} internal slot.
 
         : {{CSSMathNegate}}
@@ -2134,7 +2216,7 @@ of all the "math" operations.
 
 The <dfn attribute for=CSSNumericArray>length</dfn> attribute of {{CSSNumericArray}} indicates how many {{CSSNumericValue}}s are contained within the {{CSSNumericArray}}.
 
-The <dfn for=CSSNumericArray>indexed getter</dfn> of {{CSSNumericArray}} retrieves the {{CSSNumericValue}} at the provided index.
+The <dfn export for=CSSNumericArray>indexed getter</dfn> of {{CSSNumericArray}} retrieves the {{CSSNumericValue}} at the provided index.
 
 <!--
 ██    ██ ██     ██ ██     ██        ██████   ██████   ██████
@@ -2219,21 +2301,6 @@ partial namespace CSS {
     to avoid defining the unit individually for all ~20 functions.
 </div>
 
-<div class=example>
-    For example, rather than creating a new {{CSSPositionValue}} with code like:
-
-    <pre class=lang-js>
-        let pos = new CSSPositionValue(
-            new CSSUnitValue(5, "px"),
-            new CSSUnitValue(10, "px"));
-    </pre>
-
-    One can instead write:
-
-    <pre class=lang-js>
-        let pos = new CSSPositionValue(CSS.px(5), CSS.px(10));
-    </pre>
-</div>
 
 <!--
 ████████ ████████     ███    ██    ██  ██████  ████████  ███████  ████████  ██     ██
@@ -2704,86 +2771,6 @@ This list is the object's [=values to iterate over=].
     respectively.
 </div>
 
-<!--
-████████   ███████   ██████  ████ ████████ ████  ███████  ██    ██
-██     ██ ██     ██ ██    ██  ██     ██     ██  ██     ██ ███   ██
-██     ██ ██     ██ ██        ██     ██     ██  ██     ██ ████  ██
-████████  ██     ██  ██████   ██     ██     ██  ██     ██ ██ ██ ██
-██        ██     ██       ██  ██     ██     ██  ██     ██ ██  ████
-██        ██     ██ ██    ██  ██     ██     ██  ██     ██ ██   ███
-██         ███████   ██████  ████    ██    ████  ███████  ██    ██
--->
-
-{{CSSPositionValue}} objects {#positionvalue-objects}
---------------------------------------------------
-
-{{CSSPositionValue}} objects represent <<position>> values,
-used by properties such as 'object-position'.
-
-<pre class='idl'>
-[Exposed=(Window, Worker, PaintWorklet, LayoutWorklet),
- Constructor(CSSNumericValue x, CSSNumericValue y)]
-interface CSSPositionValue : CSSStyleValue {
-    attribute CSSNumericValue x;
-    attribute CSSNumericValue y;
-};
-</pre>
-
-The {{CSSPositionValue/x}} attribute expresses the offset from the left edge of the container;
-{{CSSPositionValue/y}} expresses the offset from the top edge of the container.
-
-<div algorithm>
-    The <dfn constructor for=CSSPositionValue>CSSPositionValue(|x|, |y|)</dfn> constructor must,
-    when called,
-    perform the following steps:
-
-    1. If |x| or |y| doesn't [=CSSNumericValue/match=] <<length-percentage>>,
-        [=throw=] a {{TypeError}}.
-
-    2. Otherwise, return a new {{CSSPositionValue}}
-        whose {{CSSPositionValue/x}} internal slot is set to |x|,
-        and whose {{CSSPositionValue/y}} internal slot is set to |y|.
-</div>
-
-<div algorithm="CSSPositionValue.x">
-    The <dfn attribute for=CSSPositionValue>x</dfn> and <dfn attribute for=CSSPositionValue>y</dfn> attribute of a {{CSSPositionValue}} |this| must,
-    on setting a value |value|,
-    perform the following steps:
-
-    1. If |value| doesn't [=CSSNumericValue/match=] <<length-percentage>>,
-        [=throw=] a {{TypeError}}.
-
-    2. Otherwise, set |this|’s {{CSSPositionValue/x}} or {{CSSPositionValue/y}} internal slot,
-        as appropriate,
-        to |value|.
-
-    On reading, the attributes must return the value of the {{CSSPositionValue/x}} or {{CSSPositionValue/y}} internal slot,
-        as appropriate.
-</div>
-
-<div class='example'>
-    <<position>> values accept a complicated combination of keywords and values,
-    but Typed OM always simplifies to just two offsets as per the [[#reify-position]] algorithm.
-    For example, the following style sheet:
-
-    <pre class='lang-css'>
-    .example {
-        object-position: center bottom 10px;
-    }
-    </pre>
-
-    Will produce the following behavior:
-
-    <pre class='lang-javascript'>
-    let map = document.querySelector('.example').computedStyleMap();
-
-    map.get('object-position').x;
-    // CSS.percent(50)
-
-    map.get('object-position').y;
-    // CSSMathSum(CSS.percent(100), CSS.px(-10))
-    </pre>
-</div>
 
 <!--
 ████ ██     ██    ███     ██████   ████████
@@ -2861,16 +2848,22 @@ has the same behavior as in normal CSS.
 This section describes how Typed OM objects are constructed from [=underlying values=],
 a process called <dfn export for=CSS lt="reify | reification">reification</dfn>.
 
+Some general principles apply to all [=reification=],
+and so aren't stated in each individual instance:
+
+* If an [=underlying value=] is from a [=list-valued=] property,
+    this list defines how to reify a single iteration of the property;
+    multiple iterations are reflected by returning multiple values from {{StylePropertyMap}}.{{getAll()}}.
+
+* If an [=underlying value=] contains a ''var()'' reference,
+    then it is reified by [=reify a list of component values|reifying a list of component values=],
+    regardless of what property it is for.
+
+Property-specific Rules {#reify-property}
+-----------------------------------------
+
 The following list defines the [=reification=] behavior for every single property in CSS,
 for both specified and computed values.
-
-If an [=underlying value=] is from a [=list-valued=] property,
-this list defines how to reify a single iteration of the property;
-multiple iterations are reflected by returning multiple values from {{StylePropertyMap}}.{{getAll()}}.
-
-If an [=underlying value=] contains a ''var()'' reference,
-then it is reified by [=reify a list of component values|reifying a list of component values=],
-regardless of what property it is for.
 
 <dl link-type=property>
 : unregistered [=custom properties=]
@@ -4725,7 +4718,7 @@ CSS <<number>>, <<percentage>>, and <<dimension>> values become {{CSSNumericValu
 <div algorithm>
     To <dfn export>reify a numeric value</dfn> |num|:
 
-    1. If |num| is a ''calc()'', ''min()'', or ''max()'' expression,
+    1. If |num| is a [=math function=],
         [=reify a math expression=] from |num|
         and return the result.
 
@@ -4743,6 +4736,17 @@ CSS <<number>>, <<percentage>>, and <<dimension>> values become {{CSSNumericValu
         set to "number" if |num| is a <<number>>,
         "percent" if |num| is a <<percentage>>,
         and |num|’s unit if |num| is a <<dimension>>.
+
+        If the value being [=reified=] is a computed value,
+        the unit used must be the appropriate [=canonical unit=] for the value's type,
+        with the numeric value scaled accordingly.
+
+        <div class=example highlight=js>
+            For example, if an element has `style="width: 1in;"`,
+            `el.attributeStyleMap.get('width')` will return `CSS.in(1)`,
+            but `el.computedStyleMap.get('width')` will return `CSS.px(96)`,
+            as ''px'' is the [=canonical unit=] for absolute lengths.
+        </div>
 </div>
 
 <div algorithm>
@@ -4964,79 +4968,6 @@ while CSS <<transform-function>> values become {{CSSTransformComponent}}s.
     </dl>
 </div>
 
-<<position>> Values {#reify-position}
------------------------------------------------
-
-CSS <<position>> values become {{CSSPositionValue}}s in the Typed OM, with <var>x</var> and <var>y</var>
-components determined via the following process. If this process, or any sub-process referenced by this
-process fails, then reification as a whole fails.
-
-1.  Initialize both <var>x</var> and <var>y</var> to a {{CSSNumericValue}} value representing 50%.
-1.  If the provided value is a single keyword, length, percentage, or calc expression, then follow
-        the procedure outlined in [[#from-single-keyword]] with <var>value</var> given
-        by the provided value and an auto <var>bias</var>.
-1.  Otherwise, if the provided value consists of a combination of two keywords, then:
-
-        1.  follow the procedure outlined in [[#from-single-keyword]] with <var>value</var> given by the
-                first keyword and an auto <var>bias</var>.
-        1.  if <var>bias</var> is horizontal, set it to vertical. Otherwise, set it to horizontal.
-        1.  follow the procedure again with <var>value</var> given by the second keyword, using the existing <var>bias</var>.
-
-1.  Otherwise, if the provided value consists of a combination of two keywords, lengths, percentages, and
-        calc expressions, then follow the procedure outlined in [[#from-single-keyword]] with
-        <var>value</var> given by the first part of the provided value and a horizontal <var>bias</var>, then follow the
-        procedure again with <var>value</var> given by the second part of the provided value and a vertical <var>bias</var>.
-1.  Otherwise:
-
-        1.  if the provided value starts with a keyword followed by a length, percentage, or calc expression, then follow
-                the procedure outlined in [[#from-keyword-and-length]] with <var>keyword</var> set to the
-                keyword, <var>length</var> set to the length, percentage, or calc expression, and auto <var>bias</var>.
-        1.  otherwise, follow the procedure outlined in [[#from-single-keyword]] with <var>value</var>
-                set to the first component of the provided value and an auto <var>bias</var>.
-        1.  if <var>bias</var> is horizontal, set it to vertical. Otherwise, set it to horizontal.
-        1.  if the remainder of the provided value is a single keyword, length, percentage or calc expression, follow
-                the procedure outlined in
-                [[#from-single-keyword]] with <var>value</var> set to the keyword and the existing
-                <var>bias</var>.
-        1.  otherwise, if the remainder of the provided value consists of a keyword followed by a length, percentage or
-                calc expression, follow the procedure outlined in [[#from-keyword-and-length]] with
-                <var>keyword</var> set to the keyword, <var>length</var> set to the length, percentage, or calc expression, and
-                the existing <var>bias</var>.
-        1.  Otherwise, the process fails.
-
-<h4 id='from-single-keyword'>Determining <var>x</var> or <var>y</var> from a single value</h4>
-
-The following process sets a value for either <var>x</var> or <var>y</var>, depending on an input <var>value</var>
-and <var>bias</var>. The process also updates <var>bias</var> based on the <var>value</var>.
-
-1.  If <var>value</var> is the keyword "left" and <var>bias</var> is not vertical, then set <var>x</var> to a
-        {{CSSNumericValue}} value representing 0% and <var>bias</var> to horizontal and exit this process.
-1.  If <var>value</var> is the keyword "right" and <var>bias</var> is not vertical, then set <var>x</var> to a
-        {{CSSNumericValue}} value representing 100% and <var>bias</var> to horizontal and exit this process.
-1.  If <var>value</var> is the keyword "top" and <var>bias</var> is not horizontal, then set <var>y</var> to a
-        {{CSSNumericValue}} value representing 0% and <var>bias</var> to vertical and exit this process.
-1.  If <var>value</var> is the keyword "bottom" and <var>bias</var> is not horizontal, then set <var>y</var> to a
-        {{CSSNumericValue}} value representing 100% and <var>bias</var> to vertical and exit this process.
-1.  If <var>value</var> [=CSSNumericValue/matches=] the <<length-percentage>> production, then set <var>norm</var> to the result of
-        [=reify a numeric value|reifying |value| as a numeric value=]. If <var>bias</var> is vertical,
-        set <var>y</var> to <var>norm</var>, otherwise set <var>x</var> to <var>norm</var> and <var>bias</var> to
-        horizontal. Exit this process.
-1.  If <var>value</var> is not the keyword "center", then this process fails.
-
-<h4 id='from-keyword-and-length'>Determining <var>x</var> or <var>y</var> from a keyword and a length</h4>
-
-The following process sets a value for either <var>x</var> or<var>y</var>, depending on an input <var>keyword</var>,
-<var>length</var>, and <var>bias</var>. The process also updates <var>bias</var> based on the <var>keyword</var> and
-<var>length</var>.
-
-1.  Follow the procedure outlined in [[#from-single-keyword]] with <var>value</var> given by
-        <var>keyword</var>, using the provided <var>bias</var>
-1.  Let <var>adjustment</var> be the result of
-    [=reify a numeric value|reifying |length| as a numeric value=].
-1.  If the keyword is "right" or "bottom", let <var>adjustment</var> be the result of subtracting
-        <var>adjustment</var> from a zero length.
-1.  Amend <var>x</var> (if <var>bias</var> is horizontal) or <var>y</var> (if <var>bias</var> is vertical) by
-        adding <var>adjustment</var> to it.
 
 <<url>> (and subtype) Values {#reify-url}
 --------------------------------------------------------------
@@ -5160,7 +5091,7 @@ length3.toString(); // "42px";
     3. If |unit| is "number",
         return |s|.
 
-    4. Otherwise, if |unit| is "percentage",
+    4. Otherwise, if |unit| is "percent",
         append "%" to |s|,
         then return |s|.
 
@@ -5479,17 +5410,6 @@ length3.toString(); // "42px";
         of |this|’s {{CSSMatrixComponent/matrix}} internal slot.
 </div>
 
-
-{{CSSPositionValue}} Serialization {#positionvalue-serialization}
------------------------------------------------------------------
-
-{{CSSPositionValue}} objects are serialized by:
-*   serializing the {{CSSPositionValue/x}} attribute according to
-    the rules for {{CSSNumericValue}} objects above.
-*   serializing the {{CSSPositionValue/y}} attribute according to
-    the rules for {{CSSNumericValue}} objects above.
-*   returning the concatenation of the two serializations (x before y), separated
-    by a space.
 
 {{CSSURLImageValue}} Serialization {#urlimagevalue-serialization}
 -----------------------------------------------------------

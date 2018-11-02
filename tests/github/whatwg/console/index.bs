@@ -47,7 +47,6 @@ namespace console { // but see namespace object requirements below
   // Logging
   void assert(optional boolean condition = false, any... data);
   void clear();
-  void count(optional DOMString label = "default");
   void debug(any... data);
   void error(any... data);
   void info(any... data);
@@ -58,6 +57,10 @@ namespace console { // but see namespace object requirements below
   void dir(any item, optional object? options);
   void dirxml(any... data);
 
+  // Counting
+  void count(optional DOMString label = "default");
+  void countReset(optional DOMString label = "default");
+
   // Grouping
   void group(any... data);
   void groupCollapsed(any... data);
@@ -65,6 +68,7 @@ namespace console { // but see namespace object requirements below
 
   // Timing
   void time(optional DOMString label = "default");
+  void timeLog(optional DOMString label = "default", any... data);
   void timeEnd(optional DOMString label = "default");
 };
 </pre>
@@ -75,8 +79,7 @@ namespace console { // but see namespace object requirements below
 
 <p class="note">
   It is important that {{console}} is always visible and usable to scripts, even if the developer
-  console has not been opened or
-  does not exist.
+  console has not been opened or does not exist.
 </p>
 
 For historical web-compatibility reasons, the <a>namespace object</a> for {{console}} must have as
@@ -84,9 +87,6 @@ its \[[Prototype]] an empty object, created as if by
 <a abstract-op>ObjectCreate</a>({{%ObjectPrototype%}}), instead of {{%ObjectPrototype%}}.
 
 <h3 id="logging">Logging methods</h3>
-
-Each {{console}} namespace object has an associated <dfn>count map</dfn>, which is a <a>map</a> of
-<a>strings</a> to labels, initially empty.
 
 <h4 id="assert" oldids="assert-condition-data,dom-console-assert" method for="console">assert(|condition|, ...|data|)</h4>
 
@@ -106,15 +106,6 @@ Each {{console}} namespace object has an associated <dfn>count map</dfn>, which 
 
 1. [=stack/Empty=] the appropriate <a>group stack</a>.
 1. If possible for the environment, clear the console. (Otherwise, do nothing.)
-
-<h4 id="count" oldids="count-label,dom-console-count" method for="console">count(|label|)</h4>
-
-1. Let |map| be the associated <a>count map</a>.
-1. If |map|[|label|] [=map/exists=], [=map/set=] |map|[|label|] to |map|[|label|] + 1.
-1. Otherwise, [=map/set=] |map|[|label|] to 1.
-1. Let |concat| be the concatenation of |label|, U+003A (:), U+0020 SPACE, and
-   <a abstract-op>ToString</a>(|map|[|label|]).
-1. Perform <a abstract-op>Logger</a>("count", « |concat| »).
 
 <h4 id="debug" oldids="debug-data,dom-console-debug" method for="console">debug(...|data|)</h4>
 
@@ -171,6 +162,29 @@ back to just logging the argument if it can't be parsed as tabular.
   1. Append |converted| to |finalList|.
 1. Perform <a abstract-op>Logger</a>("dirxml", |finalList|).
 
+<h3 id="counting">Counting methods</h3>
+
+Each {{console}} namespace object has an associated <dfn>count map</dfn>, which is a <a>map</a> of
+<a>strings</a> to numbers, initially empty.
+
+<h4 id="count" oldids="count-label,dom-console-count" method for="console">count(|label|)</h4>
+
+1. Let |map| be the associated <a>count map</a>.
+1. If |map|[|label|] [=map/exists=], [=map/set=] |map|[|label|] to |map|[|label|] + 1.
+1. Otherwise, [=map/set=] |map|[|label|] to 1.
+1. Let |concat| be the concatenation of |label|, U+003A (:), U+0020 SPACE, and
+   <a abstract-op>ToString</a>(|map|[|label|]).
+1. Perform <a abstract-op>Logger</a>("count", « |concat| »).
+
+<h4 id="countreset" method for="console">countReset(|label|)</h4>
+
+1. Let |map| be the associated <a>count map</a>.
+1. If |map|[|label|] [=map/exists=], [=map/set=] |map|[|label|] to 0.
+1. Otherwise:
+  1. Let |message| be a string without any formatting specifiers indicating generically that the
+    given label does not have an associated count.
+  1. Perform <a abstract-op>Logger</a>("countReset", « |message| »);
+
 <h3 id="grouping">Grouping methods</h3>
 
 A <dfn id="concept-group">group</dfn> is an implementation-specific, potentially-interactive view
@@ -220,16 +234,49 @@ Each {{console}} namespace object has an associated <dfn>timer table</dfn>, whic
 1. Otherwise, [=map/set=] the value of the entry with key |label| in the associated
    <a>timer table</a> to the current time.
 
-<h4 id="timeend" oldids="timeend-label,dom-console-timeend" method for="console">timeEnd(|label|)</h4>
+<h4 id="timelog" method for="console">timeLog(|label|, ...|data|)</h4>
 
-1. Let |startTime| be the result of [=map/getting=] the value of the entry with key |label| in the
-   associated <a>timer table</a>.
+1. Let |timerTable| be the associated <a>timer table</a>.
+1. Let |startTime| be |timerTable|[|label|].
 1. Let |duration| be a string representing the difference between the current time and
    |startTime|, in an implementation-defined format.
    <p class="example" id="duration-string-example">"4650", "4650.69 ms", "5 seconds", and "00:05"
    are all reasonable ways of displaying a 4650.69 ms duration.</p>
 1. Let |concat| be the concatenation of |label|, U+003A (:), U+0020 SPACE, and |duration|.
-1. Perform <a abstract-op>Logger</a>("timeEnd", « |concat| »).
+1. [=list/prepend|Prepend=] |concat| to |data|.
+1. Perform <a abstract-op>Printer</a>("timeLog", data).
+
+<div class="example" id="timelog-example">
+  The |data| parameter in calls to {{console/timeLog()}} is included in the call to
+  <a abstract-op>Logger</a> to make it easier for users to supply intermediate timer logs with
+  some extra data throughout the life of a timer. For example:
+
+  <pre><code class="lang-javascript">
+    console.time("MyTimer");
+    console.timeLog("MyTimer", "Starting application up…");
+    // Perhaps some code runs to bootstrap a complex app
+    // ...
+    console.timeLog("MyTimer", "UI is setup, making API calls now");
+    // Perhaps some fetch()'s here filling the app with data
+    // ...
+    console.timeEnd("MyTimer");
+  </code></pre>
+</div>
+
+<h4 id="timeend" oldids="timeend-label,dom-console-timeend" method for="console">timeEnd(|label|)</h4>
+
+1. Let |timerTable| be the associated <a>timer table</a>.
+1. Let |startTime| be |timerTable|[|label|].
+1. [=map/Remove=] |timerTable|[|label|].
+1. Let |duration| be a string representing the difference between the current time and
+   |startTime|, in an implementation-defined format.
+1. Let |concat| be the concatenation of |label|, U+003A (:), U+0020 SPACE, and |duration|.
+1. Perform <a abstract-op>Printer</a>("timeEnd", « |concat| »).
+
+<p class="note">See <a href="https://github.com/whatwg/console/issues/134">whatwg/console#134</a>
+for plans to make {{console/timeEnd()}} and {{console/timeLog()}} formally report warnings to the
+console when a given |label| does not exist in the associated <a>timer table</a>.
+</p>
 
 <h2 id="supporting-ops">Supporting abstract operations</h2>
 
@@ -268,7 +315,7 @@ more arguments are left. It returns a [=list=] of objects suitable for printing.
 1. Let |current| be the second element of |args|.
 1. Find the first possible format specifier |specifier|, from the left to the right in |target|.
   1. If |specifier| is `%s`, let |converted| be the result of
-     [$Call$]({{%String%}}, **undefined**, « |current| »).
+     [$Call$](<a idl>%String%</a>, **undefined**, « |current| »).
   1. If |specifier| is `%d` or `%i`:
     1. If [$Type$](|current|) is Symbol, let |converted| be `NaN`
     1. Otherwise, let |converted| be the result of
@@ -305,17 +352,17 @@ The following is an informative summary of the format specifiers processed by th
   <tr>
     <td>`%s`</td>
     <td>Element which substitutes is converted to a string</td>
-    <td><a abstract-op>ToString</a>(|element|)</td>
+    <td><a idl>%String%</a>(|element|)</td>
   </tr>
   <tr>
     <td>`%d` or `%i`</td>
     <td>Element which substitutes is converted to an integer</td>
-    <td><a abstract-op>%parseInt%</a>(|element|, 10)</td>
+    <td><a>%parseInt%</a>(|element|, 10)</td>
   </tr>
   <tr>
     <td>`%f`</td>
     <td>Element which substitutes is converted to a float</td>
-    <td><a abstract-op>%parseFloat%</a>(|element|, 10)</td>
+    <td><a>%parseFloat%</a>(|element|, 10)</td>
   </tr>
   <tr>
     <td>`%o`</td>
@@ -380,7 +427,7 @@ their output similarly, in four broad categories. This table summarizes these co
     <td>log</td>
     <td>
       {{console/log()}}, {{console/trace()}}, {{console/dir()}}, {{console/dirxml()}},
-      {{console/group()}}, {{console/groupCollapsed()}}, {{console/debug()}}
+      {{console/group()}}, {{console/groupCollapsed()}}, {{console/debug()}}, {{console/timeLog()}}
     </td>
     <td>
       A generic log
@@ -395,7 +442,9 @@ their output similarly, in four broad categories. This table summarizes these co
   </tr>
   <tr>
     <td>warn</td>
-    <td>{{console/warn()}}</td>
+    <td>
+      {{console/warn()}}, {{console/countReset()}}
+    </td>
     <td>
       A log warning the user of something indicated by the message
     </td>
@@ -512,6 +561,7 @@ Ian Kilpatrick,
 Jeff Carpenter,
 Joseph Pecoraro,
 Justin Woo,
+Luc Martin,
 Noah Bass,
 Paul Irish,
 Raphaël, and

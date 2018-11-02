@@ -1677,7 +1677,7 @@ It also includes a series of prose shorthands you can use in your specification 
    <h4 class="heading settled" data-level="4.2.3" id="queue-tasks"><span class="secno">4.2.3. </span><span class="content">Queue Tasks to Invoke Developer Code</span><a class="self-link" href="#queue-tasks"></a></h4>
    <p>Promises abstract away many of the details regarding notifying the developer about async operations. For example, you can say "<a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise①">resolve</a> <var>p</var> with <var>x</var>" instead of e.g. "<a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task" id="ref-for-queue-a-task">queue a task</a> to call the callback <var>cb</var> with <var>x</var>," and it’s understood that this will use the normal promise mechanisms. (Namely, the developer can wait for fulfillment or rejection by passing callbacks to the promise’s <code>then</code> method, which will call those callbacks in the next microtask.) So in most cases, you will not need to explicitly queue tasks inside your promise-based asynchronous algorithms.</p>
    <p>However, in cases where you need to interface with developer code in more ways than can be mediated via the promise, you’ll still need to queue a task. For example, you may want to fire an event, which can call into developer event handlers. Or you may need to perform a structured clone operation, which <a href="http://lists.w3.org/Archives/Public/public-webcrypto/2014Mar/0141.html">can trigger getters</a>. If these things must be done inside the asynchronous portion of your algorithm, you need to specify that they are done via a queued task, and with a specific task queue. This nails down the exact time such developer-observable operations happen both in relation to other queued tasks, and to the microtask queue used by promises.</p>
-   <p>As an example, the following steps will return a promise resolved after <var>ms</var> milliseconds, but also fire an event named <code>timerfinished</code> on <code>window</code>:</p>
+   <p>As an example, the following steps will return a promise resolved after <var>ms</var> milliseconds, but also fire an event named <code>timerfinished</code> on an object <var>object</var>:</p>
    <ol>
     <li data-md>
      <p>Let <var>p</var> be <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise①">a new promise</a>.</p>
@@ -1689,7 +1689,7 @@ It also includes a series of prose shorthands you can use in your specification 
       <li data-md>
        <p><a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise②">Resolve</a> <var>p</var> with <b>undefined</b>.</p>
       <li data-md>
-       <p><a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task" id="ref-for-queue-a-task①">Queue a task</a> to <a href="https://html.spec.whatwg.org/multipage/webappapis.html#fire-a-simple-event">fire a simple event</a> named <code>timerfinished</code> at the <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/browsers.html#browsing-context" id="ref-for-browsing-context">browsing context</a> <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/browsers.html#active-document" id="ref-for-active-document">active document</a>’s <a href="https://html.spec.whatwg.org/multipage/browsers.html#window"><code>Window</code></a> object.</p>
+       <p><a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task" id="ref-for-queue-a-task①">Queue a task</a> to <a href="https://html.spec.whatwg.org/multipage/webappapis.html#fire-a-simple-event">fire a simple event</a> named <code>timerfinished</code> at the <var>object</var>.</p>
      </ol>
     <li data-md>
      <p>Return <var>p</var>.</p>
@@ -1752,8 +1752,78 @@ It also includes a series of prose shorthands you can use in your specification 
     <p>respectively. (More complicated transforms are of course possible as well, as shown in the <a href="#example-resource-open"><code>resource.open</code> example</a> below.)</p>
    </div>
    <h3 class="heading settled" data-level="5.4" id="aggregating-promises"><span class="secno">5.4. </span><span class="content">Aggregating Promises</span><a class="self-link" href="#aggregating-promises"></a></h3>
-   <p>The result of <dfn class="dfn-paneled" data-dfn-type="dfn" data-export id="waiting-for-all">waiting for all</dfn> of a collection of promises is a promise created by calling <code>Promise.all(promiseArray)</code>, where <code>promiseArray</code> is that collection in array form and we use the initial value of <a href="https://tc39.github.io/ecma262/#sec-promise.all"><code>Promise.all</code></a>.</p>
-   <p>This phrase is useful when you wish to perform multiple asynchronous operations in parallel that return promises, and then react to them all together. If all of the given promises fulfill, then the resulting promise will be fulfilled with an array corresponding to the fulfillment values. If any of them reject, then the resulting promise will be rejected with the first rejection reason to occur.</p>
+   <p>To <dfn class="dfn-paneled" data-dfn-type="dfn" data-export data-lt="wait for all|waiting for all" id="waiting-for-all">wait for all</dfn> of a <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list" id="ref-for-list">list</a> of promises <var>promises</var>, with success steps <var>successSteps</var> that take a <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list" id="ref-for-list①">list</a> of JavaScript values and failure steps <var>failureSteps</var> that take a rejection reason JavaScript value, perform the following steps:</p>
+   <ol>
+    <li data-md>
+     <p>Let <var>fullfilledCount</var> be 0.</p>
+    <li data-md>
+     <p>Let <var>rejected</var> be false.</p>
+    <li data-md>
+     <p>Let <var>rejectionHandler</var> be a built-in function that takes an argument <var>arg</var> and performs the following steps:</p>
+     <ol>
+      <li data-md>
+       <p>If <var>rejected</var> is true, abort these steps.</p>
+      <li data-md>
+       <p>Set <var>rejected</var> to true.</p>
+      <li data-md>
+       <p>Perform <var>failureSteps</var> given <var>arg</var>.</p>
+     </ol>
+    <li data-md>
+     <p>Let <var>index</var> be 0.</p>
+    <li data-md>
+     <p>Let <var>total</var> be <var>promises</var>’s <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list-size" id="ref-for-list-size">size</a>.</p>
+    <li data-md>
+     <p>Let <var>result</var> be a <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list" id="ref-for-list②">list</a> containing <var>total</var> null values.</p>
+    <li data-md>
+     <p><a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list-iterate" id="ref-for-list-iterate">For each</a> <var>promise</var> of <var>promises</var>:</p>
+     <ol>
+      <li data-md>
+       <p>Let <var>promiseIndex</var> be <var>index</var>.</p>
+      <li data-md>
+       <p>Let <var>fulfillmentHandler</var> be a built-in function that takes an argument <var>arg</var> performs the following steps:</p>
+       <ol>
+        <li data-md>
+         <p>Set <var>result</var>[<var>promiseIndex</var>] to <var>arg</var>.</p>
+        <li data-md>
+         <p>Set <var>fullfilledCount</var> to <var>fullfilledCount</var> + 1.</p>
+        <li data-md>
+         <p>If <var>fullfilledCount</var> equals <var>total</var>, then perform <var>successSteps</var> given <var>result</var>.</p>
+       </ol>
+      <li data-md>
+       <p>Perform <a data-link-type="abstract-op" href="https://tc39.github.io/ecma262/#sec-performpromisethen" id="ref-for-sec-performpromisethen">PerformPromiseThen</a>(<var>promise</var>, <var>fulfillmentHandler</var>, <var>rejectionHandler</var>).</p>
+      <li data-md>
+       <p>Set <var>index</var> to <var>index</var> + 1.</p>
+     </ol>
+   </ol>
+   <p>This phrase is useful when you wish to aggregate the result of multiple promises, and react to them all together, in the same way that <code class="idl"><a data-link-type="idl" href="https://tc39.github.io/ecma262/#sec-promise.all" id="ref-for-sec-promise.all">Promise.all()</a></code> functions for JavaScript code.</p>
+   <p>To <dfn class="dfn-paneled" data-dfn-type="dfn" data-export data-lt="get a promise to wait for all|getting a promise to wait for all" id="waiting-for-all-promise">get a promise for waiting for all</dfn> of a <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list" id="ref-for-list③">list</a> of promises <var>promises</var>, with success steps <var>successSteps</var> that take a <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list" id="ref-for-list④">list</a> of JavaScript values and optional failure steps <var>failureSteps</var> that take a rejection reason JavaScript value, perform the following steps:</p>
+   <ol>
+    <li data-md>
+     <p>Let <var>promise</var> be <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise②">a new promise</a>.</p>
+    <li data-md>
+     <p>If <var>failureSteps</var> were not given, let them be steps taking an argument <var>arg</var> that throw <var>arg</var>.</p>
+    <li data-md>
+     <p>Let <var>successStepsWrapper</var> be the following steps, given <var>results</var>:</p>
+     <ol>
+      <li data-md>
+       <p>Let <var>stepsResult</var> be the result of performing <var>successSteps</var> given <var>results</var>. If these steps threw an exception, <a data-link-type="dfn" href="#reject-promise" id="ref-for-reject-promise">reject</a> <var>promise</var> with that exception.</p>
+      <li data-md>
+       <p><a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise③">Resolve</a> <var>promise</var> with <var>stepsResult</var>.</p>
+     </ol>
+    <li data-md>
+     <p>Let <var>failureStepsWrapper</var> be the following steps, given <var>reason</var>:</p>
+     <ol>
+      <li data-md>
+       <p>Let <var>stepsResult</var> be the result of performing <var>failureSteps</var> given <var>reason</var>. If these steps threw an exception, <a data-link-type="dfn" href="#reject-promise" id="ref-for-reject-promise①">reject</a> <var>promise</var> with that exception.</p>
+      <li data-md>
+       <p><a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise④">Resolve</a> <var>promise</var> with <var>stepsResult</var>.</p>
+     </ol>
+    <li data-md>
+     <p><a data-link-type="dfn" href="#waiting-for-all" id="ref-for-waiting-for-all">Wait for all</a> of <var>promises</var>, given <var>successStepsWrapper</var> and <var>failureStepsWrapper</var>.</p>
+    <li data-md>
+     <p>Return <var>promise</var>.</p>
+   </ol>
+   <p>This phrase is useful when you wish to aggregate the results of multiple promises, and then produce another promise from them.</p>
    <p>An example usage of this phrase is found in <a href="#example-batch-request">§6.7 batchRequest(urls)</a>.</p>
    <h3 class="heading settled" data-level="5.5" id="shorthand-promise-calling"><span class="secno">5.5. </span><span class="content">Promise-Calling</span><a class="self-link" href="#shorthand-promise-calling"></a></h3>
    <p>The result of <dfn class="dfn-paneled" data-dfn-type="dfn" data-export id="promise-calling">promise-calling</dfn> <var>f</var>(...<var>args</var>) is:</p>
@@ -1807,14 +1877,14 @@ assert<c- p>(</c->windowA<c- p>.</c->f<c- p>().</c->constructor <c- o>===</c-> o
     <li data-md>
      <p>If <var>ms</var> is <b>NaN</b>, let <var>ms</var> be <b>+0</b>; otherwise let <var>ms</var> be the maximum of <var>ms</var> and <b>+0</b>.</p>
     <li data-md>
-     <p>Let <var>p</var> be <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise②">a new promise</a>.</p>
+     <p>Let <var>p</var> be <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise③">a new promise</a>.</p>
     <li data-md>
      <p>Run the following steps <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel" id="ref-for-in-parallel④">in parallel</a>:</p>
      <ol>
       <li data-md>
        <p>Wait <var>ms</var> milliseconds.</p>
       <li data-md>
-       <p><a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise③">Resolve</a> <var>p</var> with <b>undefined</b>.</p>
+       <p><a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise⑤">Resolve</a> <var>p</var> with <b>undefined</b>.</p>
      </ol>
     <li data-md>
      <p>Return <var>p</var>.</p>
@@ -1853,14 +1923,14 @@ assert<c- p>(</c->windowA<c- p>.</c->f<c- p>().</c->constructor <c- o>===</c-> o
     <li data-md>
      <p>If <var>ms</var> is less than zero, return <a data-link-type="dfn" href="#a-promise-rejected-with" id="ref-for-a-promise-rejected-with①">a promise rejected with</a> a <b>RangeError</b>.</p>
     <li data-md>
-     <p>Let <var>p</var> be <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise③">a new promise</a>.</p>
+     <p>Let <var>p</var> be <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise④">a new promise</a>.</p>
     <li data-md>
      <p>Run the following steps <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel" id="ref-for-in-parallel⑤">in parallel</a>:</p>
      <ol>
       <li data-md>
        <p>Wait <var>ms</var> milliseconds.</p>
       <li data-md>
-       <p><a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise④">Resolve</a> <var>p</var> with <b>undefined</b>.</p>
+       <p><a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise⑥">Resolve</a> <var>p</var> with <b>undefined</b>.</p>
      </ol>
     <li data-md>
      <p>Return <var>p</var>.</p>
@@ -1887,7 +1957,7 @@ assert<c- p>(</c->windowA<c- p>.</c->f<c- p>().</c->constructor <c- o>===</c-> o
     <li data-md>
      <p>If <var>ms</var> is <b>NaN</b>, let <var>ms</var> be <b>+0</b>; otherwise let <var>ms</var> be the maximum of <var>ms</var> and <b>+0</b>.</p>
     <li data-md>
-     <p>Let <var>p</var> be <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise④">a new promise</a>.</p>
+     <p>Let <var>p</var> be <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise⑤">a new promise</a>.</p>
     <li data-md>
      <p>Let <var>resolvedToPromise</var> be the result of resolving <var>promise</var> to a promise.</p>
     <li data-md>
@@ -1896,7 +1966,7 @@ assert<c- p>(</c->windowA<c- p>.</c->f<c- p>().</c->constructor <c- o>===</c-> o
       <li data-md>
        <p>Wait <var>ms</var> milliseconds.</p>
       <li data-md>
-       <p><a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise⑤">Resolve</a> <var>p</var> with <var>v</var>.</p>
+       <p><a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise⑦">Resolve</a> <var>p</var> with <var>v</var>.</p>
      </ol>
     <li data-md>
      <p><a data-link-type="dfn" href="#upon-rejection" id="ref-for-upon-rejection">Upon rejection</a> of <var>resolvedToPromise</var> with reason <var>r</var>, perform the following steps <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel" id="ref-for-in-parallel⑦">in parallel</a>:</p>
@@ -1904,7 +1974,7 @@ assert<c- p>(</c->windowA<c- p>.</c->f<c- p>().</c->constructor <c- o>===</c-> o
       <li data-md>
        <p>Wait <var>ms</var> milliseconds.</p>
       <li data-md>
-       <p><a data-link-type="dfn" href="#reject-promise" id="ref-for-reject-promise">Reject</a> <var>p</var> with <var>r</var>.</p>
+       <p><a data-link-type="dfn" href="#reject-promise" id="ref-for-reject-promise②">Reject</a> <var>p</var> with <var>r</var>.</p>
      </ol>
     <li data-md>
      <p>Return <var>p</var>.</p>
@@ -1969,13 +2039,13 @@ assert<c- p>(</c->windowA<c- p>.</c->f<c- p>().</c->constructor <c- o>===</c-> o
    </div>
    <h3 class="heading settled" data-level="6.5" id="example-environment-ready"><span class="secno">6.5. </span><span class="content">environment.ready</span><a class="self-link" href="#example-environment-ready"></a></h3>
    <p><code>environment.ready</code> is a property that signals when some part of some environment becomes "ready," e.g. a DOM document. It illustrates how to encode environmental asynchronicity.</p>
-   <p>Let every <code>Environment</code> object have a [[ready]] internal slot, initialized with <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise⑤">a new promise</a>. When the getter for <code>environment.ready</code> is called, return the value of this <code>Environment</code> object’s [[ready]] internal slot.</p>
+   <p>Let every <code>Environment</code> object have a [[ready]] internal slot, initialized with <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise⑥">a new promise</a>. When the getter for <code>environment.ready</code> is called, return the value of this <code>Environment</code> object’s [[ready]] internal slot.</p>
    <p>The following steps might be inserted toward the end of some algorithm for readying <code>Environment</code> objects:</p>
    <ol>
     <li data-md>
-     <p>If the environment becomes ready successfully, <a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise⑥">resolve</a> this <code>Environment</code> object’s [[ready]] promise with <b>undefined</b>.</p>
+     <p>If the environment becomes ready successfully, <a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise⑧">resolve</a> this <code>Environment</code> object’s [[ready]] promise with <b>undefined</b>.</p>
     <li data-md>
-     <p>If the environment fails to become ready, <a data-link-type="dfn" href="#reject-promise" id="ref-for-reject-promise①">reject</a> this <code>Environment</code> object’s [[ready]] promise with an <b>Error</b> instance explaining the load failure.</p>
+     <p>If the environment fails to become ready, <a data-link-type="dfn" href="#reject-promise" id="ref-for-reject-promise③">reject</a> this <code>Environment</code> object’s [[ready]] promise with an <b>Error</b> instance explaining the load failure.</p>
    </ol>
    <h3 class="heading settled" data-level="6.6" id="example-add-bookmark"><span class="secno">6.6. </span><span class="content">addBookmark()</span><a class="self-link" href="#example-add-bookmark"></a></h3>
    <p><code>addBookmark</code> is a function that requests that the user add the current web page as a bookmark. It’s drawn from <a href="https://github.com/domenic/promises-unwrapping/issues/85">some iterative design work</a> and illustrates a more real-world scenario of appealing to environmental asynchrony, as well as immediate rejections.</p>
@@ -1985,7 +2055,7 @@ assert<c- p>(</c->windowA<c- p>.</c->f<c- p>().</c->constructor <c- o>===</c-> o
     <li data-md>
      <p>If the document’s mode of operation is standalone, return <a data-link-type="dfn" href="#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③">a promise rejected with</a> a new <code>DOMException</code> whose name is <code>"NotSupported"</code>.</p>
     <li data-md>
-     <p>Let <var>promise</var> be <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise⑥">a new promise</a>.</p>
+     <p>Let <var>promise</var> be <a data-link-type="dfn" href="#a-new-promise" id="ref-for-a-new-promise⑦">a new promise</a>.</p>
     <li data-md>
      <p>Let <var>info</var> be the result of getting a web application’s metadata.</p>
     <li data-md>
@@ -1995,33 +2065,33 @@ assert<c- p>(</c->windowA<c- p>.</c->f<c- p>().</c->constructor <c- o>===</c-> o
        <p>Using <var>info</var>, and in a manner that is user-agent specific, allow the end user to make a choice as to whether they want to add the bookmark.</p>
        <ol>
         <li data-md>
-         <p>If the end-user aborts the request to add the bookmark (e.g., they hit escape, or press a "cancel" button), <a data-link-type="dfn" href="#reject-promise" id="ref-for-reject-promise②">reject</a> <var>promise</var> with a new <code>DOMException</code> whose name is <code>"AbortError"</code>.</p>
+         <p>If the end-user aborts the request to add the bookmark (e.g., they hit escape, or press a "cancel" button), <a data-link-type="dfn" href="#reject-promise" id="ref-for-reject-promise④">reject</a> <var>promise</var> with a new <code>DOMException</code> whose name is <code>"AbortError"</code>.</p>
         <li data-md>
-         <p>Otherwise, <a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise⑦">resolve</a> <var>promise</var> with <b>undefined</b>.</p>
+         <p>Otherwise, <a data-link-type="dfn" href="#resolve-promise" id="ref-for-resolve-promise⑨">resolve</a> <var>promise</var> with <b>undefined</b>.</p>
        </ol>
      </ol>
     <li data-md>
      <p>Return <var>promise</var>.</p>
    </ol>
    <h3 class="heading settled" data-level="6.7" id="example-batch-request"><span class="secno">6.7. </span><span class="content">batchRequest(<var>urls</var>)</span><a class="self-link" href="#example-batch-request"></a></h3>
-   <p>Several places in <a data-link-type="biblio" href="#biblio-service-workers">[SERVICE-WORKERS]</a> use <a data-link-type="dfn" href="#waiting-for-all" id="ref-for-waiting-for-all">waiting for all</a>. <code>batchRequest</code> illustrates a simplified version of one of their uses. It takes as input an iterable of URLs, and returns a promise for an array of <a href="https://fetch.spec.whatwg.org/#response"><code>Response</code></a> objects created by fetching the corresponding URL. If any of the fetches fail, it will return <a data-link-type="dfn" href="#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④">a promise rejected with</a> that failure.</p>
+   <p>Several places in <a data-link-type="biblio" href="#biblio-service-workers">[SERVICE-WORKERS]</a> use <a data-link-type="dfn" href="#waiting-for-all-promise" id="ref-for-waiting-for-all-promise">get a promise to wait for all</a>. <code>batchRequest</code> illustrates a simplified version of one of their uses. It takes as input a <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list" id="ref-for-list⑤">list</a> of URLs, and returns a promise for an array of <code class="idl"><a data-link-type="idl" href="https://fetch.spec.whatwg.org/#response" id="ref-for-response">Response</a></code> objects created by fetching the corresponding URL. If any of the fetches fail, it will return <a data-link-type="dfn" href="#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④">a promise rejected with</a> that failure.</p>
    <ol>
     <li data-md>
-     <p>Let <var>responsePromises</var> be a new empty list</p>
+     <p>Let <var>responsePromises</var> be a new empty <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list" id="ref-for-list⑥">list</a>.</p>
     <li data-md>
      <p>For each value <var>url</var> of <var>urls</var>,</p>
      <ol>
       <li data-md>
-       <p>Let <var>url</var> be the result of converting <var>url</var> to a <a href="http://heycam.github.io/webidl/#es-USVString">USVString</a>.</p>
+       <p>Let <var>url</var> be the result of converting <var>url</var> to a <code class="idl"><a data-link-type="idl" href="https://heycam.github.io/webidl/#idl-USVString" id="ref-for-idl-USVString">USVString</a></code>.</p>
       <li data-md>
-       <p>Let <var>req</var> be the result of creating a new <a href="https://fetch.spec.whatwg.org/#dom-request"><code>Request</code></a> passing <var>url</var> to the constructor.</p>
+       <p>Let <var>req</var> be the result of creating a new <code class="idl"><a data-link-type="idl" href="https://fetch.spec.whatwg.org/#request" id="ref-for-request">Request</a></code> passing <var>url</var> to the constructor.</p>
       <li data-md>
-       <p>Let <var>p</var> be the result of calling <a href="https://fetch.spec.whatwg.org/#dom-global-fetch"><code>fetch</code></a> with <var>req</var>.</p>
+       <p>Let <var>p</var> be the result of calling <code class="idl"><a data-link-type="idl" href="https://fetch.spec.whatwg.org/#dom-global-fetch" id="ref-for-dom-global-fetch">fetch()</a></code> with <var>req</var>.</p>
       <li data-md>
        <p>Add <var>p</var> to <var>responsePromises</var>.</p>
      </ol>
     <li data-md>
-     <p>Return the result of <a data-link-type="dfn" href="#waiting-for-all" id="ref-for-waiting-for-all①">waiting for all</a> of <var>responsePromises</var>.</p>
+     <p>Return the result of <a data-link-type="dfn" href="#waiting-for-all-promise" id="ref-for-waiting-for-all-promise①">getting a promise to wait for all</a> of <var>responsePromises</var>, given success steps that take <var>results</var> and returns the result of converting that <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list" id="ref-for-list⑦">list</a> into a JavaScript Array.</p>
    </ol>
    <h2 class="heading settled" data-level="7" id="webidl"><span class="secno">7. </span><span class="content">WebIDL and Promises</span><a class="self-link" href="#webidl"></a></h2>
    <div class="note" role="note">This section is primarily for spec writers, dealing with how promises integrate with an interface definition language often used in web specs.</div>
@@ -2250,6 +2320,8 @@ interface ResourceConsumer {
    <li><a href="#a-new-promise">A new promise</a><span>, in §5.1</span>
    <li><a href="#a-promise-rejected-with">A promise rejected with</a><span>, in §5.1</span>
    <li><a href="#a-promise-resolved-with">A promise resolved with</a><span>, in §5.1</span>
+   <li><a href="#waiting-for-all-promise">get a promise to wait for all</a><span>, in §5.4</span>
+   <li><a href="#waiting-for-all-promise">getting a promise to wait for all</a><span>, in §5.4</span>
    <li><a href="#promise-calling">promise-calling</a><span>, in §5.5</span>
    <li><a href="#reject-promise">Reject</a><span>, in §5.2</span>
    <li><a href="#resolve-promise">Resolve</a><span>, in §5.2</span>
@@ -2257,18 +2329,37 @@ interface ResourceConsumer {
    <li><a href="#transforming-by">Transforming</a><span>, in §5.3</span>
    <li><a href="#upon-fulfillment">Upon fulfillment</a><span>, in §5.3</span>
    <li><a href="#upon-rejection">Upon rejection</a><span>, in §5.3</span>
+   <li><a href="#waiting-for-all">wait for all</a><span>, in §5.4</span>
    <li><a href="#waiting-for-all">waiting for all</a><span>, in §5.4</span>
   </ul>
-  <aside class="dfn-panel" data-for="term-for-active-document">
-   <a href="https://html.spec.whatwg.org/multipage/browsers.html#active-document">https://html.spec.whatwg.org/multipage/browsers.html#active-document</a><b>Referenced in:</b>
+  <aside class="dfn-panel" data-for="term-for-sec-performpromisethen">
+   <a href="https://tc39.github.io/ecma262/#sec-performpromisethen">https://tc39.github.io/ecma262/#sec-performpromisethen</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-active-document">4.2.3. Queue Tasks to Invoke Developer Code</a>
+    <li><a href="#ref-for-sec-performpromisethen">5.4. Aggregating Promises</a>
    </ul>
   </aside>
-  <aside class="dfn-panel" data-for="term-for-browsing-context">
-   <a href="https://html.spec.whatwg.org/multipage/browsers.html#browsing-context">https://html.spec.whatwg.org/multipage/browsers.html#browsing-context</a><b>Referenced in:</b>
+  <aside class="dfn-panel" data-for="term-for-sec-promise.all">
+   <a href="https://tc39.github.io/ecma262/#sec-promise.all">https://tc39.github.io/ecma262/#sec-promise.all</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-browsing-context">4.2.3. Queue Tasks to Invoke Developer Code</a>
+    <li><a href="#ref-for-sec-promise.all">5.4. Aggregating Promises</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-request">
+   <a href="https://fetch.spec.whatwg.org/#request">https://fetch.spec.whatwg.org/#request</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-request">6.7. batchRequest(urls)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-response">
+   <a href="https://fetch.spec.whatwg.org/#response">https://fetch.spec.whatwg.org/#response</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-response">6.7. batchRequest(urls)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-dom-global-fetch">
+   <a href="https://fetch.spec.whatwg.org/#dom-global-fetch">https://fetch.spec.whatwg.org/#dom-global-fetch</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-dom-global-fetch">6.7. batchRequest(urls)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-in-parallel">
@@ -2302,17 +2393,65 @@ interface ResourceConsumer {
     <li><a href="#ref-for-responsible-event-loop">5.2. Manipulating Promises</a>
    </ul>
   </aside>
+  <aside class="dfn-panel" data-for="term-for-list-iterate">
+   <a href="https://infra.spec.whatwg.org/#list-iterate">https://infra.spec.whatwg.org/#list-iterate</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-list-iterate">5.4. Aggregating Promises</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-list">
+   <a href="https://infra.spec.whatwg.org/#list">https://infra.spec.whatwg.org/#list</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-list">5.4. Aggregating Promises</a> <a href="#ref-for-list①">(2)</a> <a href="#ref-for-list②">(3)</a> <a href="#ref-for-list③">(4)</a> <a href="#ref-for-list④">(5)</a>
+    <li><a href="#ref-for-list⑤">6.7. batchRequest(urls)</a> <a href="#ref-for-list⑥">(2)</a> <a href="#ref-for-list⑦">(3)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-list-size">
+   <a href="https://infra.spec.whatwg.org/#list-size">https://infra.spec.whatwg.org/#list-size</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-list-size">5.4. Aggregating Promises</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-idl-USVString">
+   <a href="https://heycam.github.io/webidl/#idl-USVString">https://heycam.github.io/webidl/#idl-USVString</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-idl-USVString">6.7. batchRequest(urls)</a>
+   </ul>
+  </aside>
   <h3 class="no-num no-ref heading settled" id="index-defined-elsewhere"><span class="content">Terms defined by reference</span><a class="self-link" href="#index-defined-elsewhere"></a></h3>
   <ul class="index">
    <li>
+    <a data-link-type="biblio">[ECMASCRIPT]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-sec-performpromisethen" style="color:initial">PerformPromiseThen</span>
+     <li><span class="dfn-paneled" id="term-for-sec-promise.all" style="color:initial">all()</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[FETCH]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-request" style="color:initial">Request</span>
+     <li><span class="dfn-paneled" id="term-for-response" style="color:initial">Response</span>
+     <li><span class="dfn-paneled" id="term-for-dom-global-fetch" style="color:initial">fetch(input)</span>
+    </ul>
+   <li>
     <a data-link-type="biblio">[HTML]</a> defines the following terms:
     <ul>
-     <li><span class="dfn-paneled" id="term-for-active-document" style="color:initial">active document</span>
-     <li><span class="dfn-paneled" id="term-for-browsing-context" style="color:initial">browsing context</span>
      <li><span class="dfn-paneled" id="term-for-in-parallel" style="color:initial">in parallel</span>
      <li><span class="dfn-paneled" id="term-for-queue-a-task" style="color:initial">queue a task</span>
      <li><span class="dfn-paneled" id="term-for-relevant-settings-object" style="color:initial">relevant settings object</span>
      <li><span class="dfn-paneled" id="term-for-responsible-event-loop" style="color:initial">responsible event loop</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[INFRA]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-list-iterate" style="color:initial">for each</span>
+     <li><span class="dfn-paneled" id="term-for-list" style="color:initial">list</span>
+     <li><span class="dfn-paneled" id="term-for-list-size" style="color:initial">size</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[WEBIDL]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-idl-USVString" style="color:initial">USVString</span>
     </ul>
   </ul>
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
@@ -2320,8 +2459,12 @@ interface ResourceConsumer {
   <dl>
    <dt id="biblio-ecmascript">[ECMASCRIPT]
    <dd><a href="https://tc39.github.io/ecma262/">ECMAScript Language Specification</a>. URL: <a href="https://tc39.github.io/ecma262/">https://tc39.github.io/ecma262/</a>
+   <dt id="biblio-fetch">[FETCH]
+   <dd>Anne van Kesteren. <a href="https://fetch.spec.whatwg.org/">Fetch Standard</a>. Living Standard. URL: <a href="https://fetch.spec.whatwg.org/">https://fetch.spec.whatwg.org/</a>
    <dt id="biblio-html">[HTML]
    <dd>Anne van Kesteren; et al. <a href="https://html.spec.whatwg.org/multipage/">HTML Standard</a>. Living Standard. URL: <a href="https://html.spec.whatwg.org/multipage/">https://html.spec.whatwg.org/multipage/</a>
+   <dt id="biblio-infra">[INFRA]
+   <dd>Anne van Kesteren; Domenic Denicola. <a href="https://infra.spec.whatwg.org/">Infra Standard</a>. Living Standard. URL: <a href="https://infra.spec.whatwg.org/">https://infra.spec.whatwg.org/</a>
    <dt id="biblio-rfc2119">[RFC2119]
    <dd>S. Bradner. <a href="https://tools.ietf.org/html/rfc2119">Key words for use in RFCs to Indicate Requirement Levels</a>. March 1997. Best Current Practice. URL: <a href="https://tools.ietf.org/html/rfc2119">https://tools.ietf.org/html/rfc2119</a>
    <dt id="biblio-webidl">[WEBIDL]
@@ -2337,11 +2480,12 @@ interface ResourceConsumer {
    <ul>
     <li><a href="#ref-for-a-new-promise">4.2.2. Note Parallel Steps Explicitly</a>
     <li><a href="#ref-for-a-new-promise①">4.2.3. Queue Tasks to Invoke Developer Code</a>
-    <li><a href="#ref-for-a-new-promise②">6.1. delay(ms)</a>
-    <li><a href="#ref-for-a-new-promise③">6.2. validatedDelay(ms)</a>
-    <li><a href="#ref-for-a-new-promise④">6.3. addDelay(promise, ms)</a>
-    <li><a href="#ref-for-a-new-promise⑤">6.5. environment.ready</a>
-    <li><a href="#ref-for-a-new-promise⑥">6.6. addBookmark()</a>
+    <li><a href="#ref-for-a-new-promise②">5.4. Aggregating Promises</a>
+    <li><a href="#ref-for-a-new-promise③">6.1. delay(ms)</a>
+    <li><a href="#ref-for-a-new-promise④">6.2. validatedDelay(ms)</a>
+    <li><a href="#ref-for-a-new-promise⑤">6.3. addDelay(promise, ms)</a>
+    <li><a href="#ref-for-a-new-promise⑥">6.5. environment.ready</a>
+    <li><a href="#ref-for-a-new-promise⑦">6.6. addBookmark()</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="a-promise-resolved-with">
@@ -2371,19 +2515,21 @@ interface ResourceConsumer {
    <ul>
     <li><a href="#ref-for-resolve-promise">4.2.2. Note Parallel Steps Explicitly</a>
     <li><a href="#ref-for-resolve-promise①">4.2.3. Queue Tasks to Invoke Developer Code</a> <a href="#ref-for-resolve-promise②">(2)</a>
-    <li><a href="#ref-for-resolve-promise③">6.1. delay(ms)</a>
-    <li><a href="#ref-for-resolve-promise④">6.2. validatedDelay(ms)</a>
-    <li><a href="#ref-for-resolve-promise⑤">6.3. addDelay(promise, ms)</a>
-    <li><a href="#ref-for-resolve-promise⑥">6.5. environment.ready</a>
-    <li><a href="#ref-for-resolve-promise⑦">6.6. addBookmark()</a>
+    <li><a href="#ref-for-resolve-promise③">5.4. Aggregating Promises</a> <a href="#ref-for-resolve-promise④">(2)</a>
+    <li><a href="#ref-for-resolve-promise⑤">6.1. delay(ms)</a>
+    <li><a href="#ref-for-resolve-promise⑥">6.2. validatedDelay(ms)</a>
+    <li><a href="#ref-for-resolve-promise⑦">6.3. addDelay(promise, ms)</a>
+    <li><a href="#ref-for-resolve-promise⑧">6.5. environment.ready</a>
+    <li><a href="#ref-for-resolve-promise⑨">6.6. addBookmark()</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="reject-promise">
    <b><a href="#reject-promise">#reject-promise</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-reject-promise">6.3. addDelay(promise, ms)</a>
-    <li><a href="#ref-for-reject-promise①">6.5. environment.ready</a>
-    <li><a href="#ref-for-reject-promise②">6.6. addBookmark()</a>
+    <li><a href="#ref-for-reject-promise">5.4. Aggregating Promises</a> <a href="#ref-for-reject-promise①">(2)</a>
+    <li><a href="#ref-for-reject-promise②">6.3. addDelay(promise, ms)</a>
+    <li><a href="#ref-for-reject-promise③">6.5. environment.ready</a>
+    <li><a href="#ref-for-reject-promise④">6.6. addBookmark()</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="upon-fulfillment">
@@ -2410,7 +2556,13 @@ interface ResourceConsumer {
   <aside class="dfn-panel" data-for="waiting-for-all">
    <b><a href="#waiting-for-all">#waiting-for-all</a></b><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-waiting-for-all">6.7. batchRequest(urls)</a> <a href="#ref-for-waiting-for-all①">(2)</a>
+    <li><a href="#ref-for-waiting-for-all">5.4. Aggregating Promises</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="waiting-for-all-promise">
+   <b><a href="#waiting-for-all-promise">#waiting-for-all-promise</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-waiting-for-all-promise">6.7. batchRequest(urls)</a> <a href="#ref-for-waiting-for-all-promise①">(2)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="promise-calling">

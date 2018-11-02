@@ -15,46 +15,93 @@ Indent: 2
 <pre class="link-defaults">
 spec:infra; type:dfn; text:list
 spec:fetch; type:interface; text:ReadableStream
+spec:promises-guide-1; type:dfn; text:resolve
 </pre>
+
+<pre class="anchors">
+urlPrefix: https://tc39.github.io/ecma262/; spec: ECMA-262
+  type: dfn
+    text: realm; url: realm
+
+urlPrefix: https://tools.ietf.org/html/rfc7230
+  type: dfn
+    text: HTTP ABNF; url: section-7
+
+spec: webdriver; urlPrefix: https://w3c.github.io/webdriver/webdriver-spec.html#
+  type: dfn
+    text: extension command; url: dfn-extension-command
+    text: extension command URI template; url: dfn-extension-command-uri-template
+    text: remote end steps; url: dfn-remote-end-steps
+    text: current top-level browsing context; url: dfn-current-top-level-browsing-context
+    text: no longer open; url: dfn-no-longer-open
+    text: WebDriver success; url: dfn-success
+    text: WebDriver error; url: dfn-errors
+    text: WebDriver error code; url: dfn-error-code
+    text: no such window; url: dfn-no-such-window
+    text: url variable; url: dfn-url-variables
+</pre>
+
+<style>
+  .algorithm dl {
+    overflow: hidden;
+  }
+  .algorithm dt {
+    font-weight: normal;
+    float: left;
+    clear: left;
+    line-height: 1.5;
+    margin-right: 0.3em;
+  }
+  .algorithm dt::after {
+    content: '- ';
+  }
+  .algorithm dd {
+    margin-left: 0em;
+  }
+</style>
 
 # Introduction # {#intro}
 
-A [=service worker=] is capable of fetching and caching assets, the size of which is restricted only by [origin storage](https://storage.spec.whatwg.org/#usage-and-quota). However, if the user navigates away from the site or closes the browser, the service worker is [[service-workers#service-worker-lifetime|likely to be killed]]. This can happen even if there's a pending promise passed to {{ExtendableEvent/waitUntil()}}; if it hasn't resolved within a few minutes the browser may consider it an abuse of [=service worker=] and kill the process.
+A [=service worker=] is capable of fetching and caching assets, the size of which is restricted only by [origin storage](https://storage.spec.whatwg.org/#usage-and-quota). However, if the user navigates away from the site or closes the browser, the service worker is [[service-workers#service-worker-lifetime|likely to be killed]]. This can happen even if there's a pending promise passed to {{ExtendableEvent/waitUntil()}} - if it hasn't resolved within a few minutes the browser may consider it an abuse of [=service worker=] and kill the process.
 
-This makes it difficult to download and cache large assets such as podcasts and movies, and upload video and images. Even if the [=service worker=] isn't killed, having to keep the [=service worker=] in memory during this potentially long operation is wasteful.
+This is excellent for battery and privacy, but it makes it difficult to download and cache large assets such as podcasts and movies, and upload video and images.
 
 This specification aims to:
 
-* Allow [=/fetches=] to continue even if the user closes all windows & worker to the origin.
+* Allow fetches (requests & responses) to continue even if the user closes all windows & workers to the origin.
 * Allow a single job to involve many requests, as defined by the app.
-* Allow the browser/OS to show UI to indicate the progress of the [=/fetch=], and allow the user to pause/abort.
-* Allow the browser/OS to deal with poor connectivity by pausing/resuming the download/upload (may be tricky with uploads, as ranged uploads aren't standardized)
-* Allow the app to react to success/failure of the background fetch group, perhaps by caching the results.
-* Allow access to background-fetched resources as they [=/fetch=].
-* Allow the app to display progress information about a background fetch.
-* Allow the app to suggest which connection types the [=/fetch=] should be restricted to.
+* Allow the browser/OS to show UI to indicate the progress of that job, and allow the user to pause/abort.
+* Allow the browser/OS to deal with poor connectivity by pausing/resuming the download.
+* Allow the app to react to success/failure of the job, perhaps by caching the results.
+* Allow access to background-fetched resources as they fetch.
+
+# Realms # {#realms}
+
+All platform objects are created in the [=context object=]'s [=relevant Realm=] unless otherwise specified.
 
 # Infrastructure # {#infrastructure}
+
+A resource is considered <dfn>temporarily unavailable</dfn> if the user agent believes the resource may soon become available. Reasons may include:
+
+* The user agent is offline.
+* The user agent is behind a captive portal.
+
+The <dfn>background fetch task source</dfn> is a [=task source=].
+
+<div algorithm>
+  To <dfn>queue a bgfetch task</dfn> on an optional |eventLoop| (an [=event loop=], defaulting to the caller's [=context object=]'s [=relevant settings object=]'s [=responsible event loop=]) with |steps| (steps), [=queue a task=] on |eventLoop| using the [=background fetch task source=] to run |steps|.
+</div>
 
 ## Extensions to service worker registration ## {#service-worker-registration-concept-extensions}
 
 A [=/service worker registration=] additionally has:
 
 <div dfn-for="service worker registration">
-  * An associated <dfn>active background fetches</dfn> (a [=map=]), where each key is a DOMString, and each item is a [=/background fetch=]. It is initially an empty [=map=].
-  * An associated <dfn>active background fetches edit queue</dfn> (a [=parallel queue=]), initially the result of [=starting a new parallel queue=].
+  * <dfn>Active background fetches</dfn> (a [=map=]), where each key is a DOMString, and each item is a [=/background fetch=]. It is initially an empty [=map=].
+  * An <dfn>active background fetches edit queue</dfn> (a [=parallel queue=]), initially the result of [=starting a new parallel queue=].
 </div>
 
-<div algorithm>
-  To determine whether an [=active background fetches=] <dfn for="active background fetches">contains</dfn> |bgFetch| (a [=/background fetch=]), run the following steps:
-
-  1. Let |id| be |bgFetch|'s [=background fetch/id=].
-  1. If |activeBgFetches|[|id|] does not [=map/exist=], then return false.
-  1. If |activeBgFetches|[|id|] does not equal |bgFetch|, then return false.
-  1. Return true.
-</div>
-
-## Background fetch ## {#background-fetch-concept}
+## [=/Background fetch=] ## {#background-fetch-concept}
 
 A <dfn>background fetch</dfn> consists of:
 
@@ -64,10 +111,65 @@ A <dfn>background fetch</dfn> consists of:
   * A <dfn>title</dfn> (a DOMString).
   * A <dfn>download total</dfn> (a number).
   * An <dfn>upload total</dfn> (a number).
-  * A <dfn>last reported download</dfn> (a number), initially 0.
-  * <dfn>Icons</dfn> (a [=list=] of {{IconDefinition}}s).
+  * A <dfn>uploaded</dfn> (a number), initially 0.
+  * A <dfn>result</dfn> (a {{BackgroundFetchResult}}), initially the empty string.
+  * A <dfn>failure reason</dfn> (a {{BackgroundFetchFailureReason}}), initially the empty string.
+  * A <dfn>records available flag</dfn> initially set.
+  * <dfn>Icons</dfn> (a [=list=] of {{ImageResource}}s).
   * A <dfn>service worker registration</dfn> (a [=/service worker registration=]).
-  * A <dfn>progress handling queue</dfn> (a [=parallel queue=]), initially the result of [=starting a new parallel queue=].
+  * A <dfn>update handling queue</dfn> (a [=parallel queue=]), initially the result of [=starting a new parallel queue=].
+  * A <dfn>paused flag</dfn>, initially unset.
+  * A <dfn>abort all flag</dfn>, initially unset.
+
+  <div algorithm>
+    To get a [=/background fetch=]'s (|bgFetch|) <dfn>stored body bytes total</dfn>, run these steps:
+
+    1. Let |total| be 0.
+    1. [=list/For each=] |record| of |bgFetch|'s [=background fetch/records=]:
+      1. Increment |total| by the [=byte sequence/length=] of |record|'s [=background fetch record/response data=]'s [=background fetch response/bytes=].
+    1. Return |total|.
+  </div>
+
+  ### [=background fetch/Display=] ### {#background-fetch-display-algorithm}
+
+  <div algorithm>
+    To <dfn>display</dfn> a [=/background fetch=] (|bgFetch|) for a given |environment| (an [=environment settings object=]), the user agent must present a user interface that follows these rules:
+
+    * The UI must prominently display the |bgFetch|'s [=background fetch/service worker registration=]'s [=service worker registration/scope url=]'s [=url/origin=]
+    * If the |bgFetch|'s [=background fetch/paused flag=] is unset, and |bgFetch|'s [=background fetch/result=] is not the empty string, then the UI must indicate that bandwidth is being used.
+    * The UI cannot be dismissed without aborting (e.g. swiped away) until |bgFetch|'s [=background fetch/result=] is not the empty string.
+    * The UI may display |bgFetch|'s [=background fetch/title=].
+    * The UI may [=select an icon=] for display from |bgFetch|'s [=background fetch/icons=], and [=/fetch=] it using a new [=/request=] with the following properties:
+      : [=request/URL=]
+      :: The {{ImageResource}}'s [=ImageResource/src=].
+      : [=request/Client=]
+      :: |environment|.
+      : [=request/Keepalive flag=]
+      :: Set.
+      : [=request/Service-workers mode=]
+      :: "`none`".
+      : [=request/Destination=]
+      :: "`image`".
+      : [=request/Mode=]
+      :: "`no-cors`".
+      : [=request/Credentials mode=]
+      :: "`include`".
+
+      Issue: [manifest/pull/710](https://github.com/w3c/manifest/pull/710).
+
+    * The UI may use |bgFetch|'s [=background fetch/download total=], [=background fetch/upload total=], [=background fetch/stored body bytes total=], [=background fetch/uploaded=], [=background fetch/paused flag=], and [=background fetch/result=] to present the progress of the fetch.
+    * The UI must provide a way for the user to abort the |bgFetch| by setting |bgFetch|'s [=background fetch/abort all flag=].
+    * If every [=background fetch record/request=] in |bgFetch|'s [=background fetch/records=] has the [=request/method=] \``GET`\`, the UI may provide a way to toggle |bgFetch|'s [=background fetch/paused flag=].
+
+      Note: If a [=request/method=] is not \``GET`\`, reissuing the request may have unwanted side effects.
+
+    * The UI may be activated (for example, by clicking), in which case [=fire a background fetch click event=] for |bgFetch|.
+    * The UI may remain once the operation is complete, in which case it can still be activated.
+
+    Let |permission| be the [=permission state=] for a {{PermissionDescriptor}} with {{PermissionDescriptor/name}} `"background-fetch"` and |environment|. If |permission| is `"prompt"`, then the user agent may set |bgFetch|'s [=background fetch/paused flag=] at the beginning of this algorithm. The user agent should allow the user to either accept the background fetch (unsetting |bgFetch|'s [=background fetch/paused flag=]), or refuse the background fetch (setting |bgFetch|'s [=background fetch/abort all flag=]). The user agent may also provide always-allow and alway-deny options, which can be used as [=new information about the user's intent=] for this permission.
+
+    The user agent may also consider setting |bgFetch|'s [=background fetch/paused flag=] if the user is on a metered connection, or the background fetch was started in the background.
+  </div>
 </div>
 
 ## Background fetch record ## {#background-fetch-record-concept}
@@ -76,108 +178,408 @@ A <dfn>background fetch record</dfn> consists of:
 
 <div dfn-for="background fetch record">
   * A <dfn>request</dfn> (a [=/request=]).
-  * A <dfn>response</dfn> (a [=/response=]), initially null.
-  * A <dfn>response body</dfn> (a byte sequence), initially null.
+  * A <dfn>response data</dfn> (a [=background fetch response=]), initially a new [=background fetch response=].
+</div>
+
+## Background fetch response ## {#background-fetch-response-concept}
+
+A <dfn>Background fetch response</dfn> consists of:
+
+<div dfn-for="background fetch response">
+  * A <dfn>response</dfn> (a [=/response=] or null), initially null.
+  * <dfn>Bytes</dfn> (a [=byte sequence=]), initially an empty [=byte sequence=].
+  * A <dfn>result</dfn>, (any {{BackgroundFetchFailureReason}}, `"success"`, or `"redundant"`), initially the empty string.
+
+  The [=background fetch response/response=] can be <dfn>exposed</dfn> if the [=background fetch response/result=] is the empty string, `"success"`, or `"bad-status"`.
 </div>
 
 # Algorithms # {#algorithms}
 
-## [=Attempt a background fetch=] ## {#attempt-a-background-fetch-algorithm}
+## [=Perform a background fetch=] ## {#perform-a-background-fetch-algorithm}
+
+Note: This is the algorithm that manages the 'background' parts of a background fetch. Only one instance of this algorithm runs per [=/background fetch=].
 
 <div algorithm>
-  To <dfn>attempt a background fetch</dfn> for |bgFetch| (a [=/background fetch=]), run the following steps:
+  To <dfn>perform a background fetch</dfn> for |bgFetch| (a [=/background fetch=]), run these steps:
 
   1. Let |swRegistration| be |bgFetch|'s [=background fetch/service worker registration=].
-  1. Let |completeFetches| be 0.
-  1. Let |abandoned| be false.
-  1. Let |aborted| be false.
-  1. Let |completeFetchesEditQueue| be the result of [=starting a new parallel queue=].
-  1. [=list/For each=] |record| in |bgFetch|'s [=background fetch/records=], run the following steps [=in parallel=]:
-    1. Let |request| be a copy of |record|'s [=background fetch record/request=].
-    1. Set |request|'s [=request/keepalive flag=].
-    1. Set |request|'s [=request/synchronous flag=].
-    1. Let |response| be the result of [=/fetching=] |request|.
+  1. Let |settledFetches| be 0.
+  1. Let |immediateFailure| be false.
+  1. Let |failureReason| be the empty string.
+  1. [=list/For each=] |record| in |bgFetch|'s [=background fetch/records=], run these steps [=in parallel=]:
+    1. [=Complete a record=] for |bgFetch| and |record|.
+    1. Let |result| be |record|'s [=background fetch record/response data=]'s [=background fetch response/result=].
+    1. If |failureReason| is not the empty string:
+      1. Assert: |result| is not `"redundant"`.
+      1. Set |failureReason| to |result|.
+    1. Increment |settledFetches| by 1.
+    1. If |result| is `"download-total-exceeded"`, then set |immediateFailure| to true.
+  1. Wait for |settledFetches| to be |bgFetch|'s [=background fetch/records=]'s [=list/size=], or |immediateFailure| to be true.
+  1. If |immediateFailure| is true, set |bgFetch|'s [=background fetch/abort all flag=].
 
-      Issue: Fetch waits for the whole body before returning |response|. Let's pretend it *doesn't* do that ([issue](https://github.com/whatwg/fetch/issues/536#issuecomment-330184276)).
+    Note: The [=complete a record=] algorithm listens to this flag and terminates the fetch when set.
 
-    1. If |response|'s [=response/aborted flag=] is set, then set |abandoned| to true and |aborted| to true.
-    1. Otherwise, if one of the following is true:
-      * |response| failed due to a failed CORS check.
-
-        Issue: Fetch doesn't currently expose this ([issue](https://github.com/whatwg/fetch/issues/605)).
-      * |response| is a [=network error=] and |request|'s [=request/method=] is not \``GET`\`.
-
-        Issue: Do we want to enable retrying of uploads? ([issue](https://github.com/WICG/background-fetch/issues/58))
-      * TODO: other failure reasons?
-
-      Then set |abandoned| to true.
-    1. Otherwise, if |response| wasn't a terminal failure:
-      1. TODO: Resume download somehow.
-    1. Otherwise:
-      1. Set |record|'s [=background fetch record/response=] to a copy of |response| except for its [=response/body=].
-      1. Let |stream| be |response|'s [=response/body=]'s [=body/stream=].
-      1. Whenever one or more bytes are transmitted from |stream|, let |bytes| be the transmitted bytes and run these steps:
-        1. Append |bytes| to |record|'s [=background fetch record/response body=].
-        1. [=Report progress for background fetch=] |bgFetch|.
-      1. If at any point the bytes transmission for |stream| is done normally, then [=enqueue the following steps=] to |completeFetchesEditQueue|:
-        1. Increment |completeFetches|.
-      1. If at any point |stream| becomes [=stream/errored=], then:
-        1. If |response|'s [=response/aborted flag=] is set, then set |aborted| to true.
-        1. Set |abandoned| to true. TODO: if |aborted| isn't true, this could be another resume point.
-  1. Wait for either |abandoned| to be true, or |completeFetches| to be |bgFetch|'s [=background fetch/records=]'s [=list/size=].
-  1. Let |operationAborted| be |aborted|.
-  1. If |abandoned| is true:
-      1. TODO: terminate all related fetches.
   1. [=Enqueue the following steps=] to |swRegistration|'s [=active background fetches edit queue=]:
     1. Let |activeBgFetches| be |swRegistration|'s [=active background fetches=].
     1. Let |id| be |bgFetch|'s [=background fetch/id=].
-    1. If |activeBgFetches| [=active background fetches/contains=] |bgFetch|, then remove |activeBgFetches|[|id|].
-    1. Otherwise, set |operationAborted| to true.
+    1. If |activeBgFetches| [=contains background fetch=] |bgFetch|, then remove |activeBgFetches|[|id|].
+    1. Otherwise, set |failureReason| to `"aborted"`.
 
       Note: This handles a race condition where {{BackgroundFetchRegistration/abort()}} was successfully called but one of the fetches failed at the same time. If we've returned true from {{BackgroundFetchRegistration/abort()}}, this ensures we fire the related abort event.
-    1. If |operationAborted| is true, then [=fire a functional event=] named "`backgroundfetchabort`" using {{BackgroundFetchSettledEvent}} on |swRegistration| with the following properties:
-      : {{BackgroundFetchSettledEvent/fetches}}
-      :: A new {{BackgroundFetchSettledFetches}}. TODO: associate this with |bgFetch|'s [=background fetch/records=].
 
-      Issue: The above prose is based on [ServiceWorker/#1199](https://github.com/w3c/ServiceWorker/pull/1199).
-    1. Otherwise, if |abandoned| is true, then [=fire a functional event=] named "`backgroundfetchfail`" using {{BackgroundFetchUpdateEvent}} on |swRegistration| with the following properties:
-      : {{BackgroundFetchSettledEvent/fetches}}
-      :: A new {{BackgroundFetchSettledFetches}}. TODO: associate this with |bgFetch|'s [=background fetch/records=].
-    1. Otherwise, [=fire a functional event=] named "`backgroundfetched`" using {{BackgroundFetchUpdateEvent}} on |swRegistration| with the following properties:
-      : {{BackgroundFetchSettledEvent/fetches}}
-      :: A new {{BackgroundFetchSettledFetches}}. TODO: associate this with |bgFetch|'s [=background fetch/records=].
+    1. If |failureReason| is not the empty string, then:
+      1. Set |bgFetch|'s [=background fetch/result=] to `"failure"`.
+      1. Set |bgFetch|'s [=background fetch/failure reason=] to |failureReason|.
+    1. Otherwise, set |bgFetch|'s [=background fetch/result=] to `"success"`.
+    1. [=Update background fetch instances=] for |bgFetch|.
+    1. Let |eventName| be the empty string.
+    1. Let |eventConstructor| be null.
+    1. If |failureReason| is `"aborted"`, then:
+      1. Set |eventName| to "`backgroundfetchabort`".
+      1. Set |eventConstructor| to {{BackgroundFetchEvent}}.
+    1. Otherwise, if |failureReason| is not the empty string, then:
+      1. Set |eventName| to "`backgroundfetchfail`".
+      1. Set |eventConstructor| to {{BackgroundFetchUpdateUIEvent}}.
+    1. Otherwise:
+      1. Set |eventName| to "`backgroundfetchsuccess`".
+      1. Set |eventConstructor| to {{BackgroundFetchUpdateUIEvent}}.
+
+    1. [=Fire a functional event=] named |eventName| using |eventConstructor| on |swRegistration| with the following properties:
+      : {{BackgroundFetchEvent/registration}}
+      :: The result of [=getting a BackgroundFetchRegistration instance=] for |bgFetch| in the event object's [=relevant Realm=].
+
+      Then run these steps with |dispatchedEvent| [=in parallel=]:
+
+      1. Wait until |dispatchedEvent| is not {{ExtendableEvent/active}}.
+
+        Issue: [ServiceWorker/1348](https://github.com/w3c/ServiceWorker/pull/1348).
+
+      1. Unset |bgFetch|'s [=background fetch/records available flag=].
+      1. [=Update background fetch instances=] for |bgFetch|.
 </div>
 
-## [=Report progress for background fetch=] ## {#report-progress-for-background-fetch-algorithm}
+## [=Complete a record=] ## {#complete-a-record-algorithm}
+
+Note: This algorithm manages the fetching of a [=/background fetch record=]. One instance of this algorithm is started per [=/background fetch record=], but it is called recursively to retry fetches or to fetch the next part of a partial response.
 
 <div algorithm>
-  To <dfn>report progress for background fetch</dfn> |bgFetch| (a [=/background fetch=]), [=enqueue the following steps=] to |bgFetch|'s [=background fetch/progress handling queue=]:
+  To <dfn>complete a record</dfn> for |bgFetch| (a [=/background fetch=]) and |record| (a [=/background fetch record=]), run these steps:
 
-  1. Let |downloaded| be 0.
-  1. [=list/For each=] |record| in |bgFetch|'s [=background fetch/records=], increment |downloaded| by the number of bytes in [=background fetch record/response body=].
-  1. If |downloaded| is equal to |bgFetch|'s [=background fetch/last reported download=], then abort these steps.
-  1. Set |bgFetch|'s [=background fetch/last reported download=] to |downloaded|.
-  1. For each [=environment settings object=] |env| whose [=environment settings object/origin=] is equal to |bgFetch|'s [=background fetch/service worker registration=]'s [=service worker registration/scope URL=]'s [=url/origin=], [=queue a task=] on |env|'s [=environment settings object/responsible event loop=] using the [=networking task source=] to run the following steps:
-    1. Let |bgFetchRegistration| be the instance of {{BackgroundFetchRegistration}} within this environment whose [=BackgroundFetchRegistration/background fetch=] is equal to |bgFetch|, or null if none exists.
+  1. Let |responseData| be |record|'s [=background fetch record/response data=].
+  1. Let |downloadTotal| be |bgFetch|'s [=background fetch/download total=] if it is not 0, otherwise infinity.
+  1. Wait for |bgFetch|'s [=background fetch/paused flag=] to be unset.
+  1. Let |request| be a copy of |record|'s [=background fetch record/request=].
 
-      Note: There will be at most one per environment, because of the [=get a BackgroundFetchRegistration instance=] algorithm.
-    1. If |bgFetchRegistration| is not null, then:
-      1. Set [=BackgroundFetchRegistration/downloaded=] to |downloaded|.
-      1. [=fire an event=] named "`progress`" at |bgFetchRegistration|.
+    Note: At this point the request is entirely held in storage, even if it started as a stream.
+
+  1. Set |request|'s [=request/keepalive flag=].
+  1. Set |request|'s [=request/service-workers mode=] to "`none`".
+  1. Let |rangeStart| be the [=byte sequence/length=] of |responseData|'s [=background fetch response/bytes=].
+  1. If |rangeStart| is not 0, then [=request/add a range header=] to |request| with |rangeStart|.
+
+    Note: If the |rangeStart| is 0, a normal request is made. This allows the initial request to make use of content encoding, since `Accept-Encoding: identity` is added to requests with a range header.
+
+  1. Let |fetchAttemptComplete| be false.
+  1. Let |lastTransmittedSize| be 0.
+  1. [=/Fetch=] |request|.
+
+    Issue: The remainder of this step uses fetch "callbacks" which currently queue tasks. This isn't desirable or possible here, so let's pretend that tasks aren't queued. ([issue](https://github.com/whatwg/fetch/issues/536#issuecomment-330184276))
+
+    To [=process request body=] for |request|, run these steps:
+      1. Let |transmittedSize| be |request|'s [=request/body=]'s [=body/transmitted bytes=].
+      1. Increment |bgFetch|'s [=background fetch/uploaded=] by |transmittedSize| minus |lastTransmittedSize|.
+      1. Set |lastTransmittedSize| to |transmittedSize|.
+      1. [=Update background fetch instances=] for |bgFetch|.
+
+    To [=process response=] for |response|, run these steps:
+      1. If |response| is a [=network error=], then:
+        1. If the resource is [=temporarily unavailable=] and |request|'s [=request/method=] is \``GET`\`, then wait until the resource is not [=temporarily unavailable=], then set |fetchAttemptComplete| to true and abort these steps.
+
+          Note: If |request|'s [=request/method=] is not \``GET`\`, reissuing the request may have unwanted side effects. If a standard method to resume requests becomes available, it'll be adopted here.
+
+        1. If |response| is an [=aborted network error=], then set |responseData|'s [=background fetch response/result=] to `"aborted"`, otherwise `"fetch-error"`.
+        1. Set |fetchAttemptComplete| to true, and abort these steps.
+      1. If |response|'s [=response/status=] is `206`, then:
+        1. If [=validate a partial response=] for |rangeStart|, |response|, and |responseData|'s [=background fetch response/response=] returns invalid, then:
+          1. Set |responseData|'s [=background fetch response/result=] to `"fetch-error"`.
+          1. Set |fetchAttemptComplete| to true.
+          1. [=fetch/Terminate=] the ongoing fetch, and abort these steps.
+      1. Otherwise:
+        1. Set |responseData|'s [=background fetch response/result=] to `"redundant"`.
+        1. Set |responseData| to a new [=background fetch response=].
+        1. Set |record|'s [=background fetch record/response data=] to |responseData|.
+
+          Note: The [=create record objects=] algorithm may hold a reference to the previous [=background fetch response=].
+
+        1. [=Update background fetch instances=] for |bgFetch|.
+      1. If |rangeStart| is 0 or |response|'s [=response/status=] is not `206`, then set |responseData|'s [=background fetch response/response=] to a copy of |response| except for its [=response/body=].
+      1. Let |stream| be the |response| [=response/body=]'s [=body/stream=].
+      1. Whenever one or more bytes are transmitted from |stream|, let |bytes| be the transmitted bytes and run these steps:
+        1. If |bgFetch|'s [=background fetch/stored body bytes total=] plus the size of |bytes| is greater than |downloadTotal|, then:
+          1. [=ReadableStream/Cancel=] |stream|.
+          1. Set |responseData|'s [=background fetch response/result=] to `"download-total-exceeded"`, |fetchAttemptComplete| to true, and abort these steps.
+        1. Append |bytes| to |responseData|'s [=background fetch response/bytes=].
+        1. If the previous step fails due to exceeding a quota limit, set |responseData|'s [=background fetch response/result=] to `"quota-exceeded"`, |fetchAttemptComplete| to true, and abort these steps.
+        1. [=Update background fetch instances=] for |bgFetch|.
+      1. If at any point the bytes transmission for |stream| is done normally, then:
+        1. If |response|'s [=response/status=] is `206`, then:
+          1. Let <var ignore>firstBytePos</var>, <var ignore>lastBytePos</var>, and |completeLength| be the result of [=extracting content-range values=] from |response|.
+          1. If |completeLength| is not null, and equal to the [=byte sequence/length=] of |responseData|'s [=background fetch response/bytes=], set |responseData|'s [=background fetch response/result=] to `"success"`.
+
+            Note: Although we ask for the whole resource, or the remainder of the resource, the server may not have returned the remainder, in which case we need to make an additional request.
+
+        1. Otherwise, if |response|'s [=response/status=] is not an [=ok status=], set |responseData|'s [=background fetch response/result=] to `"bad-status"`.
+        1. Otherwise, set |responseData|'s [=background fetch response/result=] to `"success"`.
+        1. Set |fetchAttemptComplete| to true.
+      1. If at any point |stream| becomes [=ReadableStream/errored=], then:
+        1. If the resource is [=temporarily unavailable=] and |request|'s [=request/method=] is \``GET`\`, then   wait until the resource is not [=temporarily unavailable=], then set |fetchAttemptComplete| to true.
+        1. Otherwise, set |responseData|'s [=background fetch response/result=] to `"fetch-error"` and |fetchAttemptComplete| to true.
+  1. Let |result| be the empty string.
+  1. Run these steps, but [=abort when=] |bgFetch|'s [=background fetch/paused flag=] or [=background fetch/abort all flag=] is set:
+    1. Wait for |fetchAttemptComplete| to be true.
+    1. Set |result| to |responseData|'s [=background fetch response/result=].
+  1. [=If aborted=], then:
+    1. If |bgFetch|'s [=background fetch/paused flag=] is set, then assert |request|'s [=request/method=] is \``GET`\`.
+    1. If |bgFetch|'s [=background fetch/abort all flag=] is set, then set |responseData|'s [=background fetch response/result=] to `"aborted"`.
+    1. Set |result| to |responseData|'s [=background fetch response/result=].
+
+      Note: The result is stored now, as terminating the fetch may change the result.
+
+    1. [=fetch/Terminate=] the ongoing fetch.
+  1. If |result| is the empty string, then [=complete a record=] for |bgFetch| and |record|.
+</div>
+
+## [=Update background fetch instances=] ## {#update-background-fetch-instance-algorithm}
+
+<div algorithm>
+  To <dfn>update background fetch instances</dfn> for |bgFetch| (a [=/background fetch=]), [=enqueue the following steps=] to |bgFetch|'s [=background fetch/update handling queue=]:
+
+  1. Let |downloaded| be |bgFetch|'s [=background fetch/stored body bytes total=].
+  1. Let |uploaded| be |bgFetch|'s [=background fetch/uploaded=].
+  1. Let |result| be |bgFetch|'s [=background fetch/result=].
+  1. Let |failureReason| be |bgFetch|'s [=background fetch/failure reason=].
+  1. Let |recordsAvailable| be true if |bgFetch|'s [=background fetch/records available flag=] is set, otherwise false.
+  1. For each [=environment settings object=] |env| whose [=environment settings object/origin=] is equal to |bgFetch|'s [=background fetch/service worker registration=]'s [=service worker registration/scope URL=]'s [=url/origin=], [=queue a bgfetch task=] on |env|'s [=environment settings object/responsible event loop=] to run these steps:
+    1. Let |bgFetchRegistration| be the instance of {{BackgroundFetchRegistration}} within the [=relevant realm=] whose [=BackgroundFetchRegistration/background fetch=] is equal to |bgFetch|, or null if none exists.
+
+      Note: There will be at most one per environment, due to the [=get a BackgroundFetchRegistration instance=] algorithm.
+
+    1. If |bgFetchRegistration| is null, then abort these steps.
+    1. If |recordsAvailable| is false and |bgFetchRegistration|'s [=BackgroundFetchRegistration/records available flag=] is set, then unset |bgFetchRegistration|'s [=BackgroundFetchRegistration/records available flag=].
+    1. If |bgFetchRegistration|'s [=BackgroundFetchRegistration/result=] is not the empty string, then abort these steps.
+
+      Note: This prevents progress being reported after the background fetch has settled. This is possible when the operation has aborted, but some fetches haven't yet terminated.
+
+    1. If all of the following are true:
+      * |bgFetchRegistration|'s [=BackgroundFetchRegistration/downloaded=] is equal to |downloaded|.
+      * |bgFetchRegistration|'s [=BackgroundFetchRegistration/uploaded=] is equal to |uploaded|.
+      * |bgFetchRegistration|'s [=BackgroundFetchRegistration/result=] is equal to |result|.
+      * |bgFetchRegistration|'s [=BackgroundFetchRegistration/failure reason=] is equal to |failureReason|.
+
+      Then abort these steps.
+    1. Set |bgFetchRegistration|'s [=BackgroundFetchRegistration/downloaded=] to |downloaded|.
+    1. Set |bgFetchRegistration|'s [=BackgroundFetchRegistration/uploaded=] to |uploaded|.
+    1. Set |bgFetchRegistration|'s [=BackgroundFetchRegistration/result=] to |result|.
+    1. Set |bgFetchRegistration|'s [=BackgroundFetchRegistration/failure reason=] to |failureReason|.
+    1. [=Fire an event=] named "`progress`" at |bgFetchRegistration|.
+
+    Issue: I need to debounce this similar to how mouse move events debounce.
+</div>
+
+## [=Fire a background fetch click event=] ## {#fire-a-background-fetch-click-event-algorithm}
+
+<div algorithm>
+  To <dfn>fire a background fetch click event</dfn> for a |bgFetch| (a [=/background fetch=]), [=fire a functional event=] named "`backgroundfetchclick`" using {{BackgroundFetchEvent}} on |bgFetch|'s [=background fetch/service worker registration=] with the following properties:
+      : {{BackgroundFetchEvent/registration}}
+      :: The result of [=getting a BackgroundFetchRegistration instance=] for |bgFetch| in the event object's [=relevant Realm=].
 </div>
 
 ## [=Get a BackgroundFetchRegistration instance=] ## {#get-a-backgroundfetchregistration-instance-algorithm}
 
-<div algorithm>
-  To <dfn data-lt="get a BackgroundFetchRegistration instance|getting a BackgroundFetchRegistration instance">get a BackgroundFetchRegistration instance</dfn> for an |instancesMap| (a [=BackgroundFetchRegistration instances=]) and a |bgFetch| (a [=/background fetch=]), run the following steps:
+Note: This algorithm ensures the same {{BackgroundFetchRegistration}} instance is returned for a given [=/background fetch=] throughout the life of a {{BackgroundFetchManager}}. It's okay for browsers to optimise this, as long as there's no way to tell that more than one instance has been created for a given [=/background fetch=] (e.g. through equality, expandos, or weakly-associated data).
 
+<div algorithm>
+  To <dfn data-lt="get a BackgroundFetchRegistration instance|getting a BackgroundFetchRegistration instance">get a BackgroundFetchRegistration instance</dfn> for a |bgFetch| (a [=/background fetch=]) in |realm| (a [=Realm=]), run these steps:
+
+  1. Let |instancesMap| be the [=BackgroundFetchRegistration instances=] of the only instance of {{BackgroundFetchManager}} within this |realm|.
   1. If |instancesMap|[|bgFetch|] [=map/exists=], then return |instancesMap|[|bgFetch|].
-  1. Let |instance| be a new {{BackgroundFetchRegistration}} whose [=BackgroundFetchRegistration/background fetch=] is set to |bgFetch|.
+  1. Let |instance| be a new {{BackgroundFetchRegistration}} in |realm|, with its [=BackgroundFetchRegistration/background fetch=] set to |bgFetch|.
   1. Set |instancesMap|[|bgFetch|] to |instance|.
   1. Return |instance|.
-
-  Note: This is to ensure the same instance is returned for a given [=/background fetch=] throughout the life of a {{BackgroundFetchManager}}. It's okay for browsers to optimise this, as long as there's no way to tell that more than one instance has been created for a given [=/background fetch=] (e.g through equality, expandos, or weakly-associated data).
 </div>
+
+## [=Validate a partial response=] ## {#validate-partial-response-algorithm}
+
+Note: This algorithm checks if a partial response reasonably matches what was requested, and optionally checks if it should be combined with a previous response.
+
+<div algorithm>
+  To <dfn>validate a partial response</dfn> for an |expectedRangeStart| (a number), a |partialResponse| (a [=/response=]), and an optional |previousResponse| (a [=/response=] or null, null unless otherwise specified), run these steps:
+
+  1. Assert: |partialResponse|'s [=response/status=] is `206`.
+  1. Let |responseFirstBytePos|, <var ignore>responseLastBytePos</var>, and |responseCompleteLength| be the result of [=extracting content-range values=] from |partialResponse|. If this fails, then return invalid.
+  1. If |responseFirstBytePos| does not equal |expectedRangeStart|, then return invalid.
+  1. If |previousResponse| is not null, then:
+    1. If |previousResponse|'s [=response/header list=] [=header list/contains=] \``ETag`\`, and [=header equality=] for \``ETag`\`, |previousResponse|'s [=response/header list=], and |partialResponse|'s [=response/header list=] is false, then return invalid.
+    1. If |previousResponse|'s [=response/header list=] [=header list/contains=] \``Last-Modified`\`, and [=header equality=] for \``Last-Modified`\`, |previousResponse|'s [=response/header list=], and |partialResponse|'s [=response/header list=] is false, then return invalid.
+    1. If |previousResponse|'s [=response/status=] is `206`, then:
+      1. Let <var ignore>previousResponseFirstBytePos</var>, <var ignore>previousResponseLastBytePos</var>, and |previousResponseCompleteLength| be the result of [=extracting content-range values=] from |previousResponse|. If this fails, then return invalid.
+      1. If |previousResponseCompleteLength| is not null, and |responseCompleteLength| does not equal |previousResponseCompleteLength|, then return invalid.
+  1. Return valid.
+</div>
+
+## [=Extract content-range values=] ## {#extract-content-range-values-algorithm}
+
+Note: This algorithm parses \``Content-Range`\` as a [=single byte content-range=] and extracts the values.
+
+<div algorithm>
+  To <dfn lt="extract content-range values|extracting content-range values">extract content-range values</dfn> from a |response| (a [=/response=]), run these steps:
+
+  1. If |response|'s [=response/header list=] does not [=header list/contain=] \``Content-Range`\`, then return failure.
+  1. Let |contentRangeValue| be the [=header/value=] of the first [=header=] whose [=header/name=] is a [=byte-case-insensitive=] match for \``Content-Range`\` in |response|'s [=response/header list=].
+  1. If parsing |contentRangeValue| per [=single byte content-range=] fails, then return failure.
+  1. Let |firstBytePos| be the portion of |contentRangeValue| named `first-byte-pos` when parsed as [=single byte content-range=], parsed as an integer.
+  1. Let |lastBytePos| be the portion of |contentRangeValue| named `last-byte-pos` when parsed as [=single byte content-range=], parsed as an integer.
+  1. Let |completeLength| be the portion of |contentRangeValue| named `complete-length` when parsed as [=single byte content-range=].
+  1. If |completeLength| is `"*"`, then set |completeLength| to null, otherwise set |completeLength| to |completeLength| parsed as an integer.
+  1. Return |firstBytePos|, |lastBytePos|, and |completeLength|.
+
+  Issue: Parsing as an integer [infra/189](https://github.com/whatwg/infra/issues/189).
+</div>
+
+## [=Header equality=] ## {#header-equality-algorithm}
+
+Note: This algorithm returns true if two [=/header lists=] contain the same value for a given header name, or neither has a header of that name.
+
+<div algorithm>
+  To determine <dfn>header equality</dfn> for a |headerName| (a [=byte sequence=]), in |headerList1| (a [=/header list=]), and |headerList2| (a [=/header list=]), run these steps:
+
+  1. If |headerList1| does not [=header list/contain=] |headerName|, and |headerList2| does not [=header list/contain=] |headerName|, then return true.
+  1. If |headerList1| [=header list/contains=] |headerName|, and |headerList2| [=header list/contains=] |headerName|, then:
+    1. Let |header1Value| be the [=header/value=] of the first [=header=] whose [=header/name=] is a [=byte-case-insensitive=] match for |headerName| in |headerList1|.
+    1. Let |header2Value| be the [=header/value=] of the first [=header=] whose [=header/name=] is a [=byte-case-insensitive=] match for |headerName| in |headerList2|.
+    1. If |header1Value| is identical to |header2Value|, then return true, otherwise return false.
+  1. Return false.
+</div>
+
+## [=Create record objects=] ## {#create-settled-fetches-algorithm}
+
+Note: This algorithm creates platform objects for [=background fetch records=]. It also manages the streaming of the [=/response=] from the stored [=background fetch response/bytes=]. The background fetch operation may still be in progress at this point.
+
+<div algorithm>
+  To <dfn lt="create record objects|creating record objects">create record objects</dfn> from |records| (a [=/list=] of [=background fetch records=]) in |realm| (a [=/Realm=]), run these steps:
+
+  All platform objects must be created in |realm|.
+
+  1. Let |recordObjects| be a new [=/list=].
+  1. [=list/For each=] |record| of |records|:
+    1. Let |responseData| be |record|'s [=background fetch record/response data=].
+    1. Let |recordObject| be a new {{BackgroundFetchRecord}}.
+    1. Set |recordObject|'s {{BackgroundFetchRecord/responseReady}} to [=a new promise=].
+    1. Let |requestObject| be a new {{Request}} object with the following set:
+      : [=Request/Request=]
+      :: A copy of |record|'s [=background fetch record/request=].
+      : [=Request/Headers=]
+      :: A new {{Headers}} object associated with this {{Request}}'s [=Request/request=]'s [=request/header list=].
+    1. Set |recordObject|'s {{BackgroundFetchRecord/request}} to |requestObject|.
+    1. Let |transmittedBytes| be 0.
+    1. Let |stream| be [=construct a ReadableStream object|a new readable stream=] with a pull action that returns [=a new promise=] |promise| and runs these steps [=in parallel=]:
+      1. Wait for the [=byte sequence/length=] of |responseData|'s [=background fetch response/bytes=] to be greater than |transmittedBytes|, or |responseData|'s [=background fetch response/result=] not to be the empty string.
+      1. Let |bytes| be null.
+      1. If the [=byte sequence/length=] of |responseData|'s [=background fetch response/bytes=] is greater than |transmittedBytes| and |responseData| may be [=background fetch response/exposed=], then:
+        1. Set |bytes| to a user agent determined slice of |responseData|'s [=background fetch response/bytes=], starting from an offset of |transmittedBytes|.
+
+          Note: This allows the user agent to stream the resource from storage at an appropriate rate.
+
+        1. Increment |transmittedBytes| by |bytes|' [=byte sequence/length=].
+      1. [=Queue a task=] in |stream|'s [=relevant settings object=]'s [=responsible event loop=] using the [=networking task source=] to run these steps:
+        1. If |bytes| is not null, then:
+          1. Let |array| be a new {{Uint8Array}} wrapping a new {{ArrayBuffer}} of |bytes|.
+          1. [=ReadableStream/Enqueue=] |array| into |stream|.
+        1. If |responseData| may be [=background fetch response/exposed=], |responseData|'s [=background fetch response/result=] is not the empty string, and |transmittedBytes| is the [=byte sequence/length=] of |responseData|'s [=background fetch response/bytes=], then [=ReadableStream/close=] |stream|.
+        1. Otherwise, if |responseData|'s [=background fetch response/result=] is `"aborted"`, then [=ReadableStream/error=] |stream| with an {{AbortError}} {{DOMException}}.
+        1. Otherwise, if |responseData| may not be [=background fetch response/exposed=], then [=ReadableStream/error=] |stream| with a {{TypeError}}.
+        1. [=Resolve=] |promise|.
+    1. Run these steps [=in parallel=]:
+      1. Wait for |responseData|'s [=background fetch response/response=] to not be not-null.
+      1. If |responseData| may be [=background fetch response/exposed=], then:
+        1. Let |response| be a copy of |responseData|'s [=background fetch response/response=].
+        1. [=header list/Delete=] \``Content-Range`\` from |response|'s [=response/header list=].
+        1. [=header list/Delete=] \``Content-Length`\` from |response|'s [=response/header list=].
+        1. Let |body| be a new [=/body=] with [=body/stream=] set to |stream|.
+        1. Set |response|'s [=response/body=] to |body|.
+        1. [=Queue a task=] in |recordObject|'s [=relevant settings object=]'s [=responsible event loop=] using the [=networking task source=] to run these steps:
+          1. Let |responseObject| be a new {{Response}} object with the following set:
+            : [=Response/Response=]
+            :: |response|.
+            : [=Response/Headers=]
+            :: A new {{Headers}} object associated with this {{Response}}'s [=Response/response=]'s [=response/header list=].
+          1. [=Resolve=] |recordObject|'s {{BackgroundFetchRecord/responseReady}} with |responseObject|.
+      1. Otherwise, if |responseData|'s [=background fetch response/result=] is `"aborted"`, then [=reject=] |recordObject|'s {{BackgroundFetchRecord/responseReady}} with an {{AbortError}} {{DOMException}}.
+      1. Otherwise, [=reject=] |recordObject|'s {{BackgroundFetchRecord/responseReady}} with a {{TypeError}}.
+    1. [=list/Append=] |recordObject| to |recordObjects|.
+  1. Return |recordObjects|.
+</div>
+
+## [=Contains background fetch=] ## {#contains-background-fetch-algorithm}
+
+<div algorithm>
+  To determine whether a |map| (a [=map=]) <dfn>contains background fetch</dfn> |bgFetch| (a [=/background fetch=]), run these steps:
+
+  1. Let |id| be |bgFetch|'s [=background fetch/id=].
+  1. If |map|[|id|] does not [=map/exist=], then return false.
+  1. If |map|[|id|] does not equal |bgFetch|, then return false.
+  1. Return true.
+</div>
+
+<div algorithm>
+  To determine whether a |map| (a [=map=]) <dfn>does not contain background fetch</dfn> |bgFetch| (a [=/background fetch=]), run these steps:
+
+  1. If |map| [=contains background fetch=] |bgFetch|, then return false.
+  1. Return true.
+</div>
+
+# Header syntax # {#header-syntax}
+
+The following is [=HTTP ABNF=] for a <dfn>single byte content-range</dfn>:
+
+<pre>
+"bytes=" first-byte-pos "-" last-byte-pos "/" complete-length
+first-byte-pos = 1*DIGIT
+last-byte-pos  = 1*DIGIT
+complete-length = ( 1*DIGIT / "*" )</pre>
+
+Note: This is a subset of what <a href="https://tools.ietf.org/html/rfc7233#section-3.1">RFC 7233</a> allows.
+
+<div class="note">
+
+  The above as a railroad diagram:
+
+  <pre class="railroad">
+  T: "bytes="
+  Stack:
+    Sequence:
+      Comment: first-byte-pos
+      OneOrMore:
+        N: digit
+      Comment: /first-byte-pos
+      N: "/"
+    Sequence:
+      Comment: last-byte-pos
+      OneOrMore:
+        N: digit
+      Comment: /last-byte-pos
+      N: "/"
+    Sequence:
+      Comment: complete-length
+      Choice:
+        N: "*"
+        OneOrMore:
+          N: digit
+      Comment: /complete-length
+  </pre>
+</div>
+
+
 
 # API # {#api}
 
@@ -185,7 +587,7 @@ A <dfn>background fetch record</dfn> consists of:
 
 <script type="idl">
 partial interface ServiceWorkerGlobalScope {
-  attribute EventHandler onbackgroundfetched;
+  attribute EventHandler onbackgroundfetchsuccess;
   attribute EventHandler onbackgroundfetchfail;
   attribute EventHandler onbackgroundfetchabort;
   attribute EventHandler onbackgroundfetchclick;
@@ -206,24 +608,24 @@ The following is the <a>event handler</a> (and its corresponding <a>event handle
   </thead>
   <tbody dfn-for="ServiceWorkerGlobalScope" dfn-type="event">
     <tr>
-      <td><dfn>backgroundfetched</dfn></td>
-      <td>{{ServiceWorkerGlobalScope/onbackgroundfetched}}</td>
-      <td>{{BackgroundFetchUpdateEvent}}</td>
+      <td><dfn>backgroundfetchsuccess</dfn></td>
+      <td>{{ServiceWorkerGlobalScope/onbackgroundfetchsuccess}}</td>
+      <td>{{BackgroundFetchUpdateUIEvent}}</td>
     </tr>
     <tr>
       <td><dfn>backgroundfetchfail</dfn></td>
       <td>{{ServiceWorkerGlobalScope/onbackgroundfetchfail}}</td>
-      <td>{{BackgroundFetchUpdateEvent}}</td>
+      <td>{{BackgroundFetchUpdateUIEvent}}</td>
     </tr>
     <tr>
       <td><dfn>backgroundfetchabort</dfn></td>
       <td>{{ServiceWorkerGlobalScope/onbackgroundfetchabort}}</td>
-      <td>{{BackgroundFetchSettledEvent}}</td>
+      <td>{{BackgroundFetchEvent}}</td>
     </tr>
     <tr>
       <td><dfn>backgroundfetchclick</dfn></td>
       <td>{{ServiceWorkerGlobalScope/onbackgroundfetchclick}}</td>
-      <td>{{BackgroundFetchClickEvent}}</td>
+      <td>{{BackgroundFetchEvent}}</td>
     </tr>
   </tbody>
 </table>
@@ -236,9 +638,12 @@ partial interface ServiceWorkerRegistration {
 };
 </script>
 
-Each {{ServiceWorkerRegistration}} instance has a unique instance of {{BackgroundFetchManager}}, allocated when the {{ServiceWorkerRegistration}} object is created. It's [=BackgroundFetchManager/service worker registration=] is set to {{ServiceWorkerRegistration}}'s [=/service worker registration=].
+<div dfn-for="ServiceWorkerRegistration">
 
-The <dfn attribute for="ServiceWorkerRegistration">backgroundFetch</dfn> attribute must return the {{BackgroundFetchManager}} object that is associated with the [=context object=].
+  A {{ServiceWorkerRegistration}} has a <dfn>background fetch manager</dfn> (a {{BackgroundFetchManager}}), initially a new {{BackgroundFetchManager}} whose [=BackgroundFetchManager/service worker registration=] is the [=context object=]'s [=/service worker registration=].
+
+  The <dfn attribute>backgroundFetch</dfn> attribute's getter must return the [=context object=]'s [=ServiceWorkerRegistration/background fetch manager=].
+</div>
 
 ## {{BackgroundFetchManager}} ## {#background-fetch-manager}
 
@@ -247,22 +652,16 @@ The <dfn attribute for="ServiceWorkerRegistration">backgroundFetch</dfn> attribu
 interface BackgroundFetchManager {
   Promise<BackgroundFetchRegistration> fetch(DOMString id, (RequestInfo or sequence<RequestInfo>) requests, optional BackgroundFetchOptions options);
   Promise<BackgroundFetchRegistration?> get(DOMString id);
-  Promise<FrozenArray<DOMString>> getIds();
-  // TODO: in future this should become an async iterator for BackgroundFetchRegistration objects
+  Promise<sequence<DOMString>> getIds();
 };
 
-dictionary BackgroundFetchOptions {
-  sequence<IconDefinition> icons = [];
-  DOMString title = "";
+dictionary BackgroundFetchUIOptions {
+  sequence<ImageResource> icons;
+  DOMString title;
+};
+
+dictionary BackgroundFetchOptions : BackgroundFetchUIOptions {
   unsigned long long downloadTotal = 0;
-};
-
-// This is taken from https://w3c.github.io/manifest/#icons-member.
-// This definition should probably be moved somewhere more general.
-dictionary IconDefinition {
-  DOMString src;
-  DOMString sizes = "";
-  DOMString type = "";
 };
 </script>
 
@@ -271,38 +670,51 @@ dictionary IconDefinition {
   A {{BackgroundFetchManager}} has:
 
   <div dfn-for="BackgroundFetchManager">
-    * A <dfn>BackgroundFetchRegistration instances</dfn> (a [=map=]), where the keys are [=/background fetch|background fetches=] and the values are {{BackgroundFetchRegistration}} objects. It is initially empty.
+    * <dfn>BackgroundFetchRegistration instances</dfn> (a [=map=]), where the keys are [=/background fetch|background fetches=] and the values are {{BackgroundFetchRegistration}} objects. It is initially an empty [=map=].
     * A <dfn>service worker registration</dfn> (a [=/service worker registration=]).
   </div>
 
   ### {{BackgroundFetchManager/fetch()}} ### {#background-fetch-manager-fetch}
 
   <div algorithm>
-    The <dfn method>fetch(|id|, |requests|, |options|)</dfn> method, when invoked, run the following steps:
+    The <dfn method>fetch(|id|, |requests|, |options|)</dfn> method, when invoked, run these steps:
 
     1. Let |registration| be the [=context object=]'s [=BackgroundFetchManager/service worker registration=].
-    1. Let |bgFetchInstances| be [=context object=]'s [=BackgroundFetchRegistration instances=].
     1. Let |records| be a new [=list=].
     1. Let |uploadTotal| be 0.
     1. If |requests| is a {{RequestInfo}}, set |requests| to « |requests| ».
     1. If |requests| is [=list/empty=], then return [=a promise rejected with=] a {{TypeError}}.
     1. [=list/For each=] |request| of |requests|:
-      1. Let |internalRequest| be the [=Request/request=] of the result of invoking the {{Request}} constructor with |request|.
+      1. Let |internalRequest| be the [=Request/request=] of the result of invoking the {{Request}} constructor with |request|. If this throws an exception, return [=a promise rejected with=] the exception.
       1. If |internalRequest|'s [=request/mode=] is "`no-cors`", then return [=a promise rejected with=] a {{TypeError}}.
-      1. If |internalRequest|'s [=request/body=] is not null, then:
-        1. If |internalRequest|'s [=request/body=]'s [=body/source=] is a {{ReadableStream}}, then return [=a promise rejected with=] a {{TypeError}}.
-        1. Increment |uploadTotal| by |internalRequest|'s [=request/body=]'s [=body/total bytes=].
-
-          Issue: This isn't correctly set in fetch ([issue](https://github.com/whatwg/fetch/issues/604)).
       1. Set |internalRequest|'s [=request/client=] to null.
       1. Let |record| be a new [=background fetch record=].
-      1. Set |record|'s [=background fetch record/request=] to |internalReqeust|.
+      1. Set |record|'s [=background fetch record/request=] to |internalRequest|.
       1. [=list/Append=] |record| to |records|.
     1. Let |promise| be [=a new promise=].
     1. [=Enqueue the following steps=] to |registration|'s [=active background fetches edit queue=]:
+      1. Let |permission| be the [=permission state=] for a {{PermissionDescriptor}} with {{PermissionDescriptor/name}} `"background-fetch"`, and the [=context object=]'s [=relevant settings object=].
+      1. If |permission| is `"denied"`, then reject |promise| with a {{NotAllowedError}} {{DOMException}} and abort these steps.
       1. Let |bgFetchMap| be |registration|'s [=active background fetches=].
       1. If |registration|'s [=service worker registration/active worker=] is null, then reject |promise| with a {{TypeError}} and abort these steps.
-      1. If |bgFetchMap|[|id|] [=map/exists=], reject |promise| with a {{TypeError}} and abort these steps.
+      1. If |bgFetchMap|[|id|] [=map/exists=], [=reject=] |promise| with a {{TypeError}} and abort these steps.
+      1. Let |requestBodiesRemaining| be the [=list/size=] of |requests|.
+      1. Let |requestReadFailed| be false.
+      1. [=list/For each=] |request| of |requests|:
+        1. If |request|'s [=request/body=] is null, then [=continue=].
+        1. Let |stream| be |request|'s [=request/body=]'s [=body/stream=].
+        1. Run these steps [=in parallel=]:
+          1. Run these steps but [=abort when=] |requestReadFailed| is true:
+            1. [=body/Wait=] for |request|'s [=request/body=].
+            1. If |stream| has [=ReadableStream/errored=], then set |requestReadFailed| to true.
+
+            Note: This ensures we have a copy of the request bytes before resolving.
+          1. [=If aborted=] and |stream| is [=ReadableStream/readable=], then [=ReadableStream/error=] |stream| with an {{AbortError}} {{DOMException}} and abort these steps.
+          1. Increment |uploadTotal| by |request|'s [=request/body=]'s [=body/total bytes=].
+          1. Decrement |requestBodiesRemaining| by 1.
+      1. If at any point storing |requests| fails due to exceeding a quota limit, [=reject=] |promise| with a {{QuotaExceededError}} {{DOMException}} and abort these steps.
+      1. Wait for |requestBodiesRemaining| to be 0, or |requestReadFailed| to be true.
+      1. If |requestReadFailed| is true, then [=reject=] |promise| with a {{TypeError}} and abort these steps.
       1. Let |bgFetch| be a new [=/background fetch=] with:
         : [=background fetch/id=]
         :: |id|.
@@ -313,31 +725,30 @@ dictionary IconDefinition {
         : [=background fetch/upload total=]
         :: |uploadTotal|.
         : [=background fetch/icons=]
-        :: |options|' `icons` member.
+        :: |options|' `icons` member if present, otherwise an empty [=/list=].
         : [=background fetch/title=]
-        :: |options|' `title` member.
+        :: |options|' `title` member if present, otherwise the empty string.
         : [=background fetch/service worker registration=]
         :: |registration|.
       1. Set |bgFetchMap|[|id|] to |bgFetch|.
-      1. If storing |bgFetch| fails due to exceeding a quota limit, [=reject=] |promise| with a {{QuotaExceededError}} {{DOMException}} and abort these steps.
-      1. [=Resolve=] |promise| with the result of [=getting a BackgroundFetchRegistration instance=] passing |bgFetchInstances| and |bgFetch|.
-      1. [=Attempt a background fetch=] with |bgFetch|.
+      1. [=Queue a bgfetch task=] to run these steps:
+        1. [=Resolve=] |promise| with the result of [=getting a BackgroundFetchRegistration instance=] for |bgFetch| in the [=context object=]'s [=relevant Realm=].
+      1. [=In parallel=], [=background fetch/display=] |bgFetch| from the [=context object=]'s [=relevant settings object=].
+      1. [=In parallel=], [=perform a background fetch=] with |bgFetch|.
     1. Return |promise|.
   </div>
 
   ### {{BackgroundFetchManager/get()}} ### {#background-fetch-manager-get}
 
   <div algorithm>
-    The <dfn method>get(|id|)</dfn> method, when invoked, must return [=a new promise=] |promise| and run the following steps [=in parallel=]:
+    The <dfn method>get(|id|)</dfn> method, when invoked, must return [=a new promise=] |promise| and run these steps [=in parallel=]:
 
     1. Let |registration| be the [=context object=]'s associated [=BackgroundFetchManager/service worker registration=].
     1. Let |bgFetch| be |registration|'s [=active background fetches=][|id|].
-    1. If |bgFetch| is nothing, then [=resolve=] |promise| with undefined and abort these steps.
-    1. Let |downloaded| be |bgFetch|'s [=background fetch/last reported downloaded=].
-    1. [=Enqueue the following steps=] to |bgFetch|'s [=background fetch/progress handling queue=]:
-      1. [=Queue a task=] |task| to run the following steps:
-        1. Let |bgFetchRegistration| be the result of [=getting a BackgroundFetchRegistration instance=] passing the [=context object=]'s [=BackgroundFetchRegistration instances=] and |bgFetch|.
-        1. Set |bgFetchRegistration|'s [=BackgroundFetchRegistration/downloaded=] to |downloaded|.
+    1. If |bgFetch| is undefined, then [=resolve=] |promise| with undefined and abort these steps.
+    1. [=Enqueue the following steps=] to |bgFetch|'s [=background fetch/update handling queue=]:
+      1. [=Queue a bgfetch task=] |task| to run these steps:
+        1. Let |bgFetchRegistration| be the result of [=getting a BackgroundFetchRegistration instance=] for |bgFetch| in the [=context object=]'s [=relevant Realm=].
         1. [=Resolve=] |promise| with |bgFetchRegistration|.
       1. Wait for |task| to complete.
 
@@ -347,11 +758,10 @@ dictionary IconDefinition {
   ### {{BackgroundFetchManager/getIds()}} ### {#background-fetch-manager-get-ids}
 
   <div algorithm>
-    The <dfn method>getIds()</dfn> method, when invoked, must return [=a new promise=] |promise| and run the following steps [=in parallel=]:
+    The <dfn method>getIds()</dfn> method, when invoked, must return [=a new promise=] |promise| and run these steps [=in parallel=]:
 
     1. Let |registration| be the [=context object=]'s associated [=BackgroundFetchManager/service worker registration=].
-    1. Let |ids| be the result of [=map/getting the keys=] of |registration|'s [=active background fetches=].
-    1. [=Resolve=] |promise| with |ids|.
+    1. [=Resolve=] |promise| with the result of [=map/getting the keys=] of |registration|'s [=active background fetches=].
   </div>
 </div>
 
@@ -365,49 +775,67 @@ interface BackgroundFetchRegistration : EventTarget {
   readonly attribute unsigned long long uploaded;
   readonly attribute unsigned long long downloadTotal;
   readonly attribute unsigned long long downloaded;
-  readonly attribute BackgroundFetchActiveFetches activeFetches;
+  readonly attribute BackgroundFetchResult result;
+  readonly attribute BackgroundFetchFailureReason failureReason;
+  readonly attribute boolean recordsAvailable;
 
   attribute EventHandler onprogress;
 
   Promise<boolean> abort();
+  Promise<BackgroundFetchRecord> match(RequestInfo request, optional CacheQueryOptions options);
+  Promise<sequence<BackgroundFetchRecord>> matchAll(optional RequestInfo request, optional CacheQueryOptions options);
 };
 
-[Exposed=(Window,Worker)]
-interface BackgroundFetchFetch {
-  readonly attribute Request request;
-};
+enum BackgroundFetchResult { "", "success", "failure" };
 
-[Exposed=(Window,Worker)]
-interface BackgroundFetchActiveFetches {
-  Promise<BackgroundFetchActiveFetch> match(RequestInfo request);
-  Promise<FrozenArray<BackgroundFetchActiveFetch>> values();
-};
-
-[Exposed=(Window,Worker)]
-interface BackgroundFetchActiveFetch : BackgroundFetchFetch {
-  readonly attribute Promise<Response> responseReady;
-  // In future this will include a fetch observer
+enum BackgroundFetchFailureReason {
+  // The background fetch has not completed yet, or was successful.
+  "",
+  // The operation was aborted by the user, or abort() was called.
+  "aborted",
+  // A response had a not-ok-status.
+  "bad-status",
+  // A fetch failed for other reasons, e.g. CORS, MIX, an invalid partial response,
+  // or a general network failure for a fetch that cannot be retried.
+  "fetch-error",
+  // Storage quota was reached during the operation.
+  "quota-exceeded",
+  // The provided downloadTotal was exceeded.
+  "download-total-exceeded"
 };
 </script>
 
 <div dfn-for="BackgroundFetchRegistration">
-  A {{BackgroundFetchRegistration}} instance has an associated <dfn>background fetch</dfn> (a [=/background fetch=]).
 
-  A {{BackgroundFetchRegistration}} instance has an associated <dfn>downloaded</dfn> (a number), initially 0.
+  A {{BackgroundFetchRegistration}} instance has:
 
-  A {{BackgroundFetchRegistration}} instance has an associated <dfn>id</dfn>, <dfn>uploadTotal</dfn>, and <dfn>downloadTotal</dfn>, which are copied from the [=BackgroundFetchRegistration/background fetch=] upon instantiation.
+  * A <dfn>background fetch</dfn> (a [=/background fetch=]).
+  * A <dfn>downloaded</dfn> (a number), initially a copy of [=BackgroundFetchRegistration/background fetch=]'s [=background fetch/stored body bytes total=].
+  * A <dfn>uploaded</dfn> (a number), initially a copy of [=BackgroundFetchRegistration/background fetch=]'s [=background fetch/uploaded=].
+  * A <dfn>result</dfn> (a {{BackgroundFetchResult}}), initially a copy of [=BackgroundFetchRegistration/background fetch=]'s [=background fetch/result=].
+  * A <dfn>failure reason</dfn> (a {{BackgroundFetchFailureReason}}), initially a copy of [=BackgroundFetchRegistration/background fetch=]'s [=background fetch/failure reason=].
+  * An <dfn>id</dfn> (a number), a copy of [=BackgroundFetchRegistration/background fetch=]'s [=background fetch/id=].
+  * An <dfn>upload total</dfn> (a number), a copy of [=BackgroundFetchRegistration/background fetch=]'s [=background fetch/upload total=].
+  * A <dfn>download total</dfn> (a number), a copy of [=BackgroundFetchRegistration/background fetch=]'s [=background fetch/download total=].
+  * A <dfn>records available flag</dfn> initially set if [=BackgroundFetchRegistration/background fetch=]'s [=background fetch/records available flag=] is set, otherwise unset.
+
+  Note: The above values are copied so they're available synchronously.
 
   The <dfn attribute>id</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRegistration/id=].
 
-  The <dfn attribute>uploadTotal</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRegistration/uploadTotal=].
+  The <dfn attribute>uploadTotal</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRegistration/upload total=].
 
-  The <dfn attribute>downloadTotal</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRegistration/downloadTotal=].
+  The <dfn attribute>downloadTotal</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRegistration/download total=].
 
-  The <dfn attribute>uploaded</dfn> attribute's getter must return TODO.
+  The <dfn attribute>uploaded</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRegistration/uploaded=].
 
   The <dfn attribute>downloaded</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRegistration/downloaded=].
 
-  The <dfn attribute>activeFetches</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRegistration/background fetch=]'s TODO.
+  The <dfn attribute>result</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRegistration/result=].
+
+  The <dfn attribute>failureReason</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRegistration/failure reason=].
+
+  The <dfn attribute>recordsAvailable</dfn> attribute's getter must return true if the [=context object=]'s [=BackgroundFetchRegistration/records available flag=] is set, otherwise false.
 
   ### Events ### {#background-fetch-registration-events}
 
@@ -418,127 +846,165 @@ interface BackgroundFetchActiveFetch : BackgroundFetchFetch {
   ### {{BackgroundFetchRegistration/abort()}} ### {#background-fetch-registration-abort}
 
   <div algorithm>
-    The <dfn method>abort()</dfn> method, when invoked, must return [=a new promise=] |promise| and run the following steps [=in parallel=]:
+    The <dfn method>abort()</dfn> method, when invoked, must return [=a new promise=] |promise| and run these steps [=in parallel=]:
 
     1. Let |bgFetch| be the [=context object=]'s associated [=BackgroundFetchRegistration/background fetch=].
     1. Let |swRegistration| be |bgFetch|'s [=background fetch/service worker registration=].
     1. [=Enqueue the following steps=] to |swRegistration|'s [=active background fetches edit queue=]:
       1. Let |activeBgFetches| be |swRegistration|'s [=active background fetches=].
       1. Let |id| be |bgFetch|'s [=background fetch/id=].
-      1. If |activeBgFetches| does not [=active background fetches/contain=] |bgFetch|, then [=resolve=] |promise| with false and abort these steps.
+      1. If |activeBgFetches| [=does not contain background fetch=] |bgFetch|, then [=resolve=] |promise| with false and abort these steps.
       1. Remove |activeBgFetches|[|id|].
       1. [=Resolve=] |promise| with true.
-      1. TODO: [=fetch/Terminate=] related fetches with the *aborted* flag set.
+      1. Set |bgFetch|'s [=background fetch/abort all flag=].
+  </div>
+
+  ### {{BackgroundFetchRegistration/match()}} ### {#background-fetch-registration-match}
+
+  <div algorithm>
+    The <dfn method>match(|request|, |options|)</dfn> method, when invoked, must run these steps:
+
+    1. Let |promise| be the result of calling the algorithm {{BackgroundFetchRegistration/matchAll()}} passing |request| and |options|.
+    1. Return the result of [=transforming=] |promise| with a fulfilment handler that, when called with argument |matches|, returns |matches|[0].
+
+    Note: User agents are encouraged to optimise the above so it's faster than calling {{BackgroundFetchRegistration/matchAll()}}.
+  </div>
+
+  ### {{BackgroundFetchRegistration/matchAll()}} ### {#background-fetch-registration-match-all}
+
+  <div algorithm>
+    The <dfn method>matchAll(|request|, |options|)</dfn> method, when invoked, must run these steps:
+
+    1. If the [=context object=]'s [=BackgroundFetchRegistration/records available flag=] is unset, return [=a promise rejected with=] an {{InvalidStateError}} {{DOMException}}.
+    1. Let |promise| be [=a new promise=].
+    1. Run these steps [=in parallel=]:
+      1. Let |matchingRecords| be an empty [=list=].
+      1. For each |record| of [=context object=]'s [=BackgroundFetchRegistration/background fetch=]'s [=background fetch/records=]:
+        1. If [=request matches cached item=] for |request|, |record|'s [=background fetch record/request=], |record|'s [=background fetch record/response data=]'s [=background fetch response/response=], and |options| returns true, then [=list/append=] |record| to |matchingRecords|.
+      1. [=Queue a bgfetch task=] to [=resolve=] |promise| with the result of [=creating record objects=] from |matchingRecords| in the [=context object=]'s [=relevant Realm=].
+    1. Return |promise|.
   </div>
 </div>
 
-### {{BackgroundFetchEvent}} ### {#background-fetch-event}
+## {{BackgroundFetchRecord}} ## {#background-fetch-record-interface}
+
+<script type="idl">
+[Exposed=(Window,Worker)]
+interface BackgroundFetchRecord {
+  readonly attribute Request request;
+  readonly attribute Promise<Response> responseReady;
+};
+</script>
+
+<div dfn-for="BackgroundFetchRecord">
+  A {{BackgroundFetchRecord}} has:
+
+  * A <dfn>request</dfn> (a [=/request=]).
+  * A <dfn>response promise</dfn> (a {{Promise}} for a [=/response=]).
+
+  The <dfn attribute>request</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRecord/request=].
+
+  The <dfn attribute>responseReady</dfn> attribute's getter must return the [=context object=]'s [=BackgroundFetchRecord/response promise=].
+</div>
+
+## {{BackgroundFetchEvent}} ## {#background-fetch-event}
 
 <script type="idl">
 [Constructor(DOMString type, BackgroundFetchEventInit init), Exposed=ServiceWorker]
 interface BackgroundFetchEvent : ExtendableEvent {
-  readonly attribute DOMString id;
+  readonly attribute BackgroundFetchRegistration registration;
 };
 
 dictionary BackgroundFetchEventInit : ExtendableEventInit {
-  required DOMString id;
+  required BackgroundFetchRegistration registration;
 };
 </script>
 
 <div dfn-for="BackgroundFetchEvent">
-  A {{BackgroundFetchEvent}} has an associated <dfn>id</dfn>, a DOMString.
+  A {{BackgroundFetchEvent}} has a <dfn>background fetch</dfn> (a [=/background fetch=]), initially the [=BackgroundFetchRegistration/background fetch=] of the value {{BackgroundFetchEvent/registration}} was initialized to.
 
-  The <dfn attribute>id</dfn> attribute must return the [=BackgroundFetchEvent/id=].
-
-  TODO
+  The <dfn attribute>registration</dfn> attribute must return the value it was initialized to.
 </div>
 
-<div algorithm>
-  The <dfn constructor for="BackgroundFetchEvent">BackgroundFetchEvent(|type|, |init|)</dfn> constructor, when invoked, must run these steps:
-
-  1. TODO
-</div>
-
-### {{BackgroundFetchSettledEvent}} ### {#background-fetch-settled-event}
+## {{BackgroundFetchUpdateUIEvent}} ## {#background-fetch-update-ui-event}
 
 <script type="idl">
-[Constructor(DOMString type, BackgroundFetchSettledEventInit init), Exposed=ServiceWorker]
-interface BackgroundFetchSettledEvent : BackgroundFetchEvent {
-  readonly attribute BackgroundFetchSettledFetches fetches;
-};
-
-dictionary BackgroundFetchSettledEventInit : BackgroundFetchEventInit {
-  required BackgroundFetchSettledFetches fetches;
-};
-
-[Exposed=ServiceWorker]
-interface BackgroundFetchSettledFetches {
-  Promise<BackgroundFetchSettledFetch> match(RequestInfo request);
-  Promise<FrozenArray<BackgroundFetchSettledFetch>> values();
-};
-
-[Exposed=ServiceWorker]
-interface BackgroundFetchSettledFetch : BackgroundFetchFetch {
-  readonly attribute Response? response;
+[Constructor(DOMString type, BackgroundFetchEventInit init), Exposed=ServiceWorker]
+interface BackgroundFetchUpdateUIEvent : BackgroundFetchEvent {
+  Promise<void> updateUI(optional BackgroundFetchUIOptions options);
 };
 </script>
 
-<div dfn-for="BackgroundFetchSettledEvent">
-  The <dfn attribute>fetches</dfn> attribute must return TODO.
-</div>
+<div dfn-for="BackgroundFetchUpdateUIEvent">
 
-<div algorithm>
-  The <dfn constructor for="BackgroundFetchSettledEvent">BackgroundFetchSettledEvent(|type|, |init|)</dfn> constructor, when invoked, must run these steps:
+  A {{BackgroundFetchUpdateUIEvent}} has an <dfn>UI updated flag</dfn> which is initially unset.
 
-  1. TODO
-</div>
-
-### {{BackgroundFetchUpdateEvent}} ### {#background-fetch-update-event}
-
-<script type="idl">
-[Constructor(DOMString type, BackgroundFetchSettledEventInit init), Exposed=ServiceWorker]
-interface BackgroundFetchUpdateEvent : BackgroundFetchSettledEvent {
-  Promise<void> updateUI(DOMString title);
-};
-</script>
-
-<div dfn-for="BackgroundFetchUpdateEvent">
-  <div algorithm>
-    The <dfn constructor>BackgroundFetchUpdateEvent(|type|, |init|)</dfn> constructor, when invoked, must run these steps:
-
-    1. TODO
-  </div>
+  ### {{BackgroundFetchUpdateUIEvent/updateUI()}} ### {#background-fetch-update-ui-event-update-ui}
 
   <div algorithm>
-    The <dfn method>updateUI(|title|)</dfn> method, when invoked, must return [=a new promise=] |promise| and run the following steps [=in parallel=]:
+    The <dfn method>updateUI(|options|)</dfn> method, when invoked, must return [=a new promise=] |promise| and run these steps [=in parallel=]:
 
-    1. TODO
+    1. If any of the following is true:
+      * The [=context object=]'s {{Event/isTrusted}} attribute is false.
+      * The [=context object=]'s [=BackgroundFetchUpdateUIEvent/UI updated flag=] is set.
+      * The [=context object=] is not [=ExtendableEvent/active=].
+
+        Issue: [ServiceWorker/1348](https://github.com/w3c/ServiceWorker/pull/1348).
+
+      Throw an {{InvalidStateError}} {{DOMException}}.
+
+    1. Set the [=context object=]'s [=BackgroundFetchUpdateUIEvent/UI updated flag=].
+    1. If |options| is null, return.
+    1. Let |bgFetch| be the [=context object=]'s [=BackgroundFetchEvent/background fetch=].
+    1. If |options|'s {{BackgroundFetchUIOptions/icons}} member is present, set |bgFetch|'s [=background fetch/icons=] to |options|'s {{BackgroundFetchUIOptions/icons}}.
+    1. If |options|'s {{BackgroundFetchUIOptions/title}} member is present, set |bgFetch|'s [=background fetch/title=] to |options|'s {{BackgroundFetchUIOptions/title}}.
+    1. [=Resolve=] |promise|.
   </div>
 </div>
 
-### {{BackgroundFetchClickEvent}} ### {#background-fetch-click-event}
+# Automation # {#automation}
 
-<script type="idl">
-[Constructor(DOMString type, BackgroundFetchClickEventInit init), Exposed=ServiceWorker]
-interface BackgroundFetchClickEvent : BackgroundFetchEvent {
-  readonly attribute BackgroundFetchState state;
-};
+For the purposes of user-agent automation and application testing, this document defines the following [=extension command=] for the [[WebDriver]] specification.
 
-dictionary BackgroundFetchClickEventInit : BackgroundFetchEventInit {
-  required BackgroundFetchState state;
-};
+## [=background fetch click|Click=] ## {#automation-click}
 
-enum BackgroundFetchState { "pending", "succeeded", "failed" };
-</script>
+<div algorithm>
+  <table>
+    <tbody>
+      <tr>
+        <th>[=request/Method=]</th>
+        <th>[=extension command URI template|URI Template=]</a></th>
+      </tr>
+      <tr>
+        <td>POST</td>
+        <td>/session/{session id}/backgroundfetch/{|id|}/click</td>
+      </tr>
+    </tbody>
+  </table>
+
+  The <dfn>background fetch click</dfn> [=extension command=] simulates the user activating the [=background fetch/display=] of a [=/background fetch=]. The [=remote end steps=] are:
+
+  1. If the [=current top-level browsing context=] is [=no longer open=], then return a [=WebDriver error=] with [=WebDriver error code=] [=no such window=].
+  1. Let |pageURL| be the [=current top-level browsing context=]'s [=active document=]'s [=Document/URL=].
+  1. Let |swRegistration| be the [=Match Service Worker Registration|matching service worker registration=] for |pageURL|.
+  1. If |swRegistration| is null, then return a [=WebDriver error=] with [=response/status=] `400` and JSON error code "`invalid service worker state`".
+  1. Let |bgFetch| be the newest [=/background fetch=] with an [=background fetch/id=] of [=url variable=] |id| and a [=background fetch/service worker registration=] of |swRegistration|, or null if none exists.
+  1. If |bgFetch| is null, then return a [=WebDriver error=] with [=response/status=] `404` and JSON error code "`background fetch not found`".
+  1. [=Fire a background fetch click event=] for |bgFetch|.
+  1. Return [=WebDriver success=].
+</div>
 
 # Privacy and bandwidth usage # {#privacy-and-bandwidth-use}
 
-It's the recommendation of this standard that user agents make background fetch operations highly visible and easily abortable rather than asking permission up front. However, given that background fetches can be paused and retried, a user agent that immediately paused a background fetch and user interaction to resume would be compliant.
+Fetches can be large and take a long time to complete. During this time the user will be fetching data from one or more servers. The user's IP address, which may change during the operation, could be used to track the user's location over time.
 
-The [=/origin=] of a background fetch should have equal or great visibility to the developer-provided information, such as a the [=background fetch/icons=] and [=background fetch/title=].
+To mitigate this, the steps for [=background fetch/displaying=] a [=/background fetch=] require:
 
-A user agent may pause background downloads depending on network conditions or battery state. For example, a user agent may download automatically when connected to WiFi, but require user confirmation to download using mobile data. If an implementation has this restriction, the user should be able to persist granting mobile data use for the [=/origin=].
+* Displaying the [=url/origin=] of the site making the fetch.
+* The UI cannot be dismissed while the [=/background fetch=] is active.
+* Allowing the operation to be easily aborted.
+* Allowing the operation to start in a paused state, requiring user interaction to begin.
 
-If the user agent provides a way for a user to abort a background fetch operation, it should [=fetch/terminate=] all fetches associated with the [=/background fetch=]'s [=background fetch/records=], with the *abort* flag set.
+The steps also allow a user agent to pause the [=/background fetch=] if the user is on a metered connection.
 
-A background fetch exposes the user's external IPs to the server throughout the duration of the background fetch. An attacker could use an extremely slow background fetch as a way to persistently track the user once they've left the site. Good visibility into the progress of the background fetch will help the user identify unwanted use.
+All data stored is associated with a particular [=/service worker registration=]. Clearing a [=/service worker registration=] will clear all associated [=/background fetches=].

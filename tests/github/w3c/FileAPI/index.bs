@@ -5,14 +5,14 @@ Shortname: FileAPI
 Level: 1
 Group: webplatform
 Editor: Marijn Kruisselbrink, Google, mek@chromium.org, w3cid 72440
-Editor: Vsevolod Shmyroff, Yandex, w3cid 93074
 Former Editor: Arun Ranganathan, Mozilla Corporation, http://arunranga.com/, arun@mozilla.com, w3cid 37240
+Prepare For TR: true
 Status: ED
 ED: https://w3c.github.io/FileAPI/
 TR: https://www.w3.org/TR/FileAPI/
 Repository: w3c/FileAPI
 Previous Version: https://www.w3.org/TR/2017/WD-FileAPI-20171026/
-!Tests: <a href=https://github.com/w3c/web-platform-tests/tree/master/FileAPI>web-platform-tests FileAPI/</a> (<a href=https://github.com/w3c/web-platform-tests/labels/FileAPI>ongoing work</a>)
+!Tests: <a href=https://github.com/web-platform-tests/wpt/tree/master/FileAPI>web-platform-tests FileAPI/</a> (<a href=https://github.com/web-platform-tests/wpt/labels/FileAPI>ongoing work</a>)
 Abstract: This specification provides an API for representing file objects in web applications,
   as well as programmatically selecting them and accessing their data. This includes:
 
@@ -37,6 +37,8 @@ Abstract: This specification provides an API for representing file objects in we
 Status Text: Previous discussion of this specification has taken place on two other mailing lists: <a href="mailto:public-webapps@w3.org">public-webapps@w3.org</a> (<a href="http://lists.w3.org/Archives/Public/public-webapps/">archive</a>) and <a href="mailto:public-webapi@w3.org">public-webapi@w3.org</a> (<a href="http://lists.w3.org/Archives/Public/public-webapi/">archive</a>). Ongoing discussion will be on the <a href="mailto:public-webapps@w3.org">public-webapps@w3.org</a> mailing list.
 
   This draft consists of changes made to the previous Last Call Working Draft. Please send comments to the <a href="mailto:public-webapi@w3.org">public-webapi@w3.org</a> as described above. You can see Last Call Feedback on the W3C Wiki: <a href="http://www.w3.org/wiki/Webapps/LCWD-FileAPI-20130912">http://www.w3.org/wiki/Webapps/LCWD-FileAPI-20130912</a>
+
+  An [implementation report](https://wpt.fyi/results/FileAPI) is automatically generated from the test suite.
 Translate Ids: dictdef-blobpropertybag dfn-BlobPropertyBag, dictdef-filepropertybag dfn-FilePropertyBag, filereadersync dfn-FileReaderSync, filelist dfn-filelist, filereader dfn-filereader, file dfn-file, blob dfn-Blob, blob-section blob, file-section file
 Markup Shorthands: css no, markdown yes
 </pre>
@@ -451,7 +453,7 @@ Attributes</h3>
 
     Note: The type <var ignore>t</var> of a {{Blob}} is considered a <a>parsable MIME type</a>,
     if performing the <a>parse a MIME type</a> algorithm to a byte sequence converted from
-    the ASCII-encoded string representing the Blob object's type does not return undefined.
+    the ASCII-encoded string representing the Blob object's type does not return failure.
 
     Note: Use of the {{Blob/type}} attribute informs the <a>encoding determination</a>
     and determines the `Content-Type` header when [=/fetching=] [=blob URLs=].
@@ -952,7 +954,7 @@ interface FileReader: EventTarget {
   // async read methods
   void readAsArrayBuffer(Blob blob);
   void readAsBinaryString(Blob blob);
-  void readAsText(Blob blob, optional DOMString label);
+  void readAsText(Blob blob, optional DOMString encoding);
   void readAsDataURL(Blob blob);
 
   void abort();
@@ -1136,11 +1138,11 @@ the user agent must run the steps below.
 The {{FileReader/readAsText()}} method</h5>
 
 The {{FileReader/readAsText()}} method can be called with an optional parameter,
-<dfn argument for="FileReader/readAsText(blob, label), FileReader/readAsText(), FileReaderSync/readAsText(blob, label)" id="dfn-label">label</dfn>,
+<dfn argument for="FileReader/readAsText(blob, encoding), FileReader/readAsText(), FileReaderSync/readAsText(blob, encoding)" id="dfn-encoding" oldids="dfn-label">encoding</dfn>,
 which is a {{DOMString}} argument that represents the label of an encoding [[!Encoding]];
 if provided, it must be used as part of the <a>encoding determination</a> used when processing this method call.
 
-When the <dfn method for=FileReader id="dfn-readAsText">readAsText(blob, label)</dfn> method is called,
+When the <dfn method for=FileReader id="dfn-readAsText">readAsText(blob, encoding)</dfn> method is called,
 the user agent must run the steps below.
 
 1. If {{FileReader/readyState}} = {{FileReader/LOADING}} throw an {{InvalidStateError}} and <a>terminate this algorithm</a>.
@@ -1263,7 +1265,7 @@ take a {{Blob}} parameter.
 This section defines this parameter.
 
 <dl>
-  <dt><dfn id="dfn-fileBlob" argument for="FileReader/readAsArrayBuffer(blob), FileReader/readAsBinaryString(blob), FileReader/readAsText(blob, label), FileReader/readAsText(), FileReader/readAsDataURL(blob), URL/createObjectURL(blob), FileReaderSync/readAsArrayBuffer(blob), FileReaderSync/readAsBinaryString(blob), FileReaderSync/readAsText(blob, label), FileReaderSync/readAsDataURL(blob)">blob</dfn>
+  <dt><dfn id="dfn-fileBlob" argument for="FileReader/readAsArrayBuffer(blob), FileReader/readAsBinaryString(blob), FileReader/readAsText(blob, encoding), FileReader/readAsText(), FileReader/readAsDataURL(blob), URL/createObjectURL(blob), FileReaderSync/readAsArrayBuffer(blob), FileReaderSync/readAsBinaryString(blob), FileReaderSync/readAsText(blob, encoding), FileReaderSync/readAsDataURL(blob)">blob</dfn>
   <dd>This is a {{Blob}} argument
     and must be a reference to a single {{File}} in a {{FileList}}
     or a {{Blob}} argument not obtained from the underlying OS file system.
@@ -1277,8 +1279,8 @@ When reading {{Blob}} objects using the {{FileReader/readAsText()}} <a>read meth
 the following <dfn id="encoding-determination">encoding determination</dfn> steps must be followed:
 
 1. Let |encoding| be null.
-2. If the {{FileReader/readAsText()/label}} argument is present when calling the method,
-  set |encoding| to the result of the <a>getting an encoding</a> from {{FileReader/readAsText()/label}}.
+2. If the {{FileReader/readAsText()/encoding}} argument is present when calling the method,
+  set |encoding| to the result of the <a>getting an encoding</a> from {{FileReader/readAsText()/encoding}}.
 3. If the <a>getting an encoding</a> steps above return failure,
   then set |encoding| to null.
 4. If |encoding| is null,
@@ -1422,7 +1424,7 @@ interface FileReaderSync {
 
   ArrayBuffer readAsArrayBuffer(Blob blob);
   DOMString readAsBinaryString(Blob blob);
-  DOMString readAsText(Blob blob, optional DOMString label);
+  DOMString readAsText(Blob blob, optional DOMString encoding);
   DOMString readAsDataURL(Blob blob);
 };
 </pre>
@@ -1439,7 +1441,7 @@ the {{FileReaderSync}} constructor must be available.
 <h5 id="readAsTextSync">
 The {{FileReaderSync/readAsText()}} method</h5>
 
-When the <dfn method for=FileReaderSync id="dfn-readAsTextSync">readAsText(blob, label)</dfn> method is called,
+When the <dfn method for=FileReaderSync id="dfn-readAsTextSync">readAsText(blob, encoding)</dfn> method is called,
 the following steps must be followed:
 
 1. Initiate a <a>read operation</a> using the <code>blob</code> argument,
@@ -1760,7 +1762,7 @@ The <dfn method for=URL id="dfn-revokeObjectURL">revokeObjectURL(|url|)</dfn> st
 1. [=Remove an entry from the Blob URL Store=] for |url|.
 
 Note: This means that rather than throwing some kind of error, attempting to revoke a URL that isn't registered will silently fail.
-User agents might display a message on the error console is this happens.
+User agents might display a message on the error console if this happens.
 
 Note: Attempts to dereference |url| after it has been revoked will result in a [=network error=].
 Requests that were started before the |url| was revoked should still succeed.
@@ -1933,7 +1935,7 @@ Acknowledgements</h2>
 
 This specification was originally developed by the SVG Working Group. Many thanks to Mark Baker and Anne van Kesteren for their feedback.
 
-Thanks to Robin Berjon and Jonas Sicking for editing the original specification.
+Thanks to Robin Berjon, Jonas Sicking and Vsevolod Shmyroff for editing the original specification.
 
 Special thanks to Olli Pettay, Nikunj Mehta, Garrett Smith, Aaron Boodman, Michael Nordman, Jian Li, Dmitry Titov, Ian Hickson, Darin Fisher, Sam Weinig, Adrian Bateman and Julian Reschke.
 

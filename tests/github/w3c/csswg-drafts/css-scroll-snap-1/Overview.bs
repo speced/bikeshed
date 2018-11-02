@@ -5,6 +5,7 @@ Shortname: css-scroll-snap
 TR: https://www.w3.org/TR/css-scroll-snap-1/
 Level: 1
 Status: ED
+Previous Version: https://www.w3.org/TR/2017/CR-css-scroll-snap-1-20171214/
 Previous Version: https://www.w3.org/TR/2017/CR-css-scroll-snap-1-20170824/
 Previous Version: https://www.w3.org/TR/2017/CR-css-scroll-snap-1-20170209/
 Previous Version: https://www.w3.org/TR/2016/CR-css-scroll-snap-1-20161020/
@@ -101,7 +102,7 @@ Motivating Examples {#examples}
                 /* Specifies that the center of each photo
                    should align with the center of the scroll
                    container in the X axis when snapping */
-                scroll-snap-align: center none;
+                scroll-snap-align: none center;
             }
             .photoGallery {
                 width: 500px;
@@ -130,7 +131,7 @@ Motivating Examples {#examples}
 
             <figcaption>
                 The layout of the scroll container’s contents in the example.
-                The snapport is represented by the red rectangle, and the snap area is represented by the yellow rectangle.  Since the scroll-snap-align is “center” in the X axis, a snap position is established at each scroll position which aligns the X-center of the snapport (represented by a red dotted line) with the X-center of a snap area (represented by a yellow dotted line).
+                The snapport is represented by the red rectangle, and the snap area is represented by the yellow rectangle.  Since the scroll-snap-align is “center” in the inline (horizontal) axis, a snap position is established at each scroll position which aligns the X-center of the snapport (represented by a red dotted line) with the X-center of a snap area (represented by a yellow dotted line).
             </figcaption>
         </figure>
     </div>
@@ -146,7 +147,7 @@ Motivating Examples {#examples}
             .page {
                 /* Defines the top of each page as the
                    edge that should be used for snapping */
-                scroll-snap-align: none start;
+                scroll-snap-align: start none;
             }
             .docScroller {
                 width: 500px;
@@ -207,7 +208,8 @@ Overview {#overview}
     Using the 'scroll-snap-type' property on the relevant <a>scroll container</a>,
     the author can request a particular bias
     for the scrollport to land on a <a>snap position</a>
-    after scrolling operations.
+    after scrolling operations
+    (including programmatic scrolls such as the {{Window/scrollTo()}} method).
 
     <a>Snap positions</a> are specified
     as a particular alignment ('scroll-snap-align')
@@ -261,8 +263,8 @@ Scroll Snapping Rules: the 'scroll-snap-type' property {#scroll-snap-type}
     Applies to: all elements
     Inherited: no
     Percentages: n/a
-    Computed value: as specified
-    Animatable: no
+    Computed value: specified keyword(s)
+    Animation type: discrete
     </pre>
 
     The 'scroll-snap-type' property specifies
@@ -343,7 +345,7 @@ Scroll Snap Strictness: the ''scroll-snap-type/none'', ''proximity'', and ''mand
             If specified on a <a>scroll container</a>,
             the <a>scroll container</a> is required to be <a>snapped</a> to a snap position
             when there are no active scrolling operations.
-            If a reachable snap position exists
+            If a valid <a>snap position</a> exists
             then the scroll container must <a>snap</a> at the termination of a scroll
             (if none exist then no <a>snapping</a> occurs).
 
@@ -399,26 +401,18 @@ Scroll Snap Strictness: the ''scroll-snap-type/none'', ''proximity'', and ''mand
 Scroll Snapport: the 'scroll-padding' property {#scroll-padding}
 ----------------------------------------------------------------
 
-    <pre class="propdef">
+    <pre class="propdef shorthand">
     Name: scroll-padding
-    Value: <<length-percentage>>{1,4}
-    Initial: 0
+    Value: [ <<length-percentage>> | auto ]{1,4}
+    Initial: auto
     Applies to: <a>scroll containers</a>
     Inherited: no
     Percentages: relative to the corresponding dimension of the scroll container’s scrollport
-    Computed value: as specified, with lengths made absolute
-    Animatable: as length, percentage, or calc
+    Computed value: per side, either the keyword ''scroll-padding/auto'' or a computed <<length-percentage>> value
+    Animation type: by computed value type
     </pre>
 
-    This property is a <a>shorthand property</a> that sets
-    all of the <a href="#longhands"><css>scroll-padding-*</css> longhands</a>
-    in one declaration,
-    assigning values to the longhands representing each side
-    exactly as the 'padding' property does for its longhands.
-
-    Values must be non-negative
-    and represent inward offsets from the corresponding edge of the scrollport.
-    These offsets define the
+    This property specifies offsets that define the
     <dfn export>optimal viewing region</dfn> of the scrollport:
     the region used as the target region for placing things in view of the user.
     This allows the author to exclude regions of the scrollport
@@ -427,7 +421,35 @@ Scroll Snapport: the 'scroll-padding' property {#scroll-padding}
     or simply to put more breathing room
     between a targetted element and the edges of the scrollport.
 
-    The 'scroll-padding' offsets effectively reduce the region of the viewport
+    The 'scroll-padding' property is a <a>shorthand property</a> that sets
+    all of the <a href="#longhands"><css>scroll-padding-*</css> longhands</a>
+    in one declaration,
+    assigning values to the longhands representing each side
+    exactly as the 'padding' property does for its longhands.
+    Values have the following meanings:
+
+    <dl dfn-for="scroll-padding, scroll-padding-inline, scroll-padding-inline-start, scroll-padding-inline-end, scroll-padding-block, scroll-padding-block-start, scroll-padding-block-end" dfn-type=value>
+        : <dfn><<length-percentage>></dfn>
+        ::
+            Defines an inward offset from the corresponding edge of the [=scrollport=].
+
+        : <dfn>auto</dfn>
+        ::
+            Indicates that the offset for the corresponding edge of the [=scrollport=] is UA-determined.
+            This should generally default to a used length of ''0px'',
+            but UAs may use heuristics to detect when a non-zero value is more appropriate.
+
+            <div class=example>
+                For example, a UA could detect when a ''position:fixed'' element
+                is being used as an opaque unscrollable “header”
+                that obscures the content below it,
+                and resolve the top offset to the height of that element
+                so that a “page down” operation (such as pressing <kbd>PgDn</kbd>)
+                automatically scrolls by one “visible page” of content.
+            </div>
+    </dl>
+
+    These offsets reduce the region of the viewport
     that is considered “viewable” <em>for scrolling operations</em>:
     they have no effect on layout,
     on the scroll origin or initial position,
@@ -464,7 +486,7 @@ Scroll Snapport: the 'scroll-padding' property {#scroll-padding}
                 right: 0;
             }
             img {
-                scroll-snap-align: center none;
+                scroll-snap-align: none center;
             }
         </pre>
     </div>
@@ -492,8 +514,8 @@ Scroll Snapping Area: the 'scroll-margin' property {#scroll-margin}
     Applies to: all elements
     Inherited: no
     Percentages: n/a
-    Computed value: as specified, with lengths made absolute
-    Animatable: as length
+    Computed value: per side, a computed <<length-percentage>> value
+    Animation type: by computed value type
     </pre>
 
     This property is a <a>shorthand property</a> that sets
@@ -505,9 +527,10 @@ Scroll Snapping Area: the 'scroll-margin' property {#scroll-margin}
     Values represent outsets defining the
     <dfn lt="scroll snap area" local-lt="snap area">scroll snap area</dfn>
     that is used for snapping this box to the snapport.
-    The <a>scroll snap area</a> is the rectangular bounding box of the transformed border box,
-    plus the specified outsets,
-    axis-aligned in the <a>scroll container’s</a> coordinate space.
+    The <a>scroll snap area</a> is determined by taking the transformed border box,
+    finding its rectangular bounding box
+    (axis-aligned in the <a>scroll container’s</a> coordinate space),
+    then adding the specified outsets.
 
     Note: This ensures that the <a>scroll snap area</a> is always rectangular
     and axis-aligned to the <a>scroll container’s</a> coordinate space.
@@ -541,7 +564,7 @@ Scroll Snapping Alignment: the 'scroll-snap-align' property {#scroll-snap-align}
     Inherited: no
     Percentages: n/a
     Computed value: two keywords
-    Animatable: no
+    Animation type: discrete
     </pre>
 
     The 'scroll-snap-align' property specifies
@@ -549,7 +572,7 @@ Scroll Snapping Alignment: the 'scroll-snap-align' property {#scroll-snap-align}
     its <a>snap area</a> (as the <a>alignment subject</a>)
     within its <a>snap container’s</a> <a>snapport</a> (as the <a>alignment container</a>).
     The two values specify the snapping alignment
-    in the <a>inline axis</a> and <a>block axis</a>, respectively.
+    in the <a>block axis</a> and <a>inline axis</a>, respectively.
     If only one value is specified, the second value defaults to the same value.
 
     Values are defined as follows:
@@ -586,28 +609,36 @@ Scoping Valid Snap Positions to Visible Boxes</h4>
 
     Since the purpose of scroll snapping is to align content within the viewport
     for optimal viewing,
-    a <a>scroll container</a> cannot be <a>snapped</a> to a <a>snap area</a>
-    if no part of it is within the <a>snapport</a>.
-    For example, a <a>snap area</a> is top-aligned to the <a>snapport</a>
-    if its top edge is coincident with the <a>snapport</a>’s top edge;
-    however, this scroll position is nonetheless not a valid <a>snap position</a>
-    if the entire <a>snap area</a> is outside the <a>snapport</a>
-    (because the required alignment, though satisfied, would not be relevant to the viewer).
+    a scroll position cannot be considered a valid <a>snap position</a>
+    if <a>snapping</a> to it would leave the contributing <a>snap area</a>
+    entirely outside the <a>snapport</a>,
+    even if it otherwise satisfies the required alignment of the <a>snap area</a>.
 
-    <figure>
-        <pre class="ascii-art">
-            ╔════viewport════╗┈┈┈┈┈┈┈┈┌──────────────┐
-            ║  ┌─────┐ ┌──┐  ║        │ top-snapping │
-            ║  ├──┐  │ └──┘  ║        │   element    │
-            ║  └──┴──┘       ║        │              │
-            ╚════════════════╝        │              │
-                                      └──────────────┘
-        </pre>
-        <figcaption>
-          Alignment of an off-screen element
-          is not considered <a>snapping</a>.
-        </figcaption>
-    </figure>
+    <div class="example">
+        For example, a <a>snap area</a> is top-aligned to the <a>snapport</a>
+        if its top edge is coincident with the <a>snapport</a>’s top edge;
+        and this would be considered a valid <a>snap position</a>
+        for block-axis start-aligned snapping of that <a>snap area</a>
+        <em>if at least part of the <a>snap area</a> is on-screen</em>.
+        If the entire <a>snap area</a> is outside the <a>snapport</a>, however,
+        then the <a>scroll container</a> cannot be considered to be <a>snapped</a>
+        because the required alignment, though satisfied, would not be relevant to the viewer.
+
+        <figure>
+            <pre class="ascii-art">
+                ╔════viewport════╗┈┈┈┈┈┈┈┈┌──────────────┐
+                ║  ┌─────┐ ┌──┐  ║        │ top-snapping │
+                ║  ├──┐  │ └──┘  ║        │   element    │
+                ║  └──┴──┘       ║        │              │
+                ╚════════════════╝        │              │
+                                          └──────────────┘
+            </pre>
+            <figcaption>
+              Alignment of an off-screen element
+              is not considered <a>snapping</a>.
+            </figcaption>
+        </figure>
+    </div>
 
     <details class="note">
         <summary>Why limit snapping to only when the element is visible?</summary>
@@ -750,8 +781,8 @@ Scroll Snap Limits: the 'scroll-snap-stop' property {#scroll-snap-stop}
     Applies to: all elements
     Inherited: no
     Percentages: n/a
-    Computed value: as specified
-    Animatable: no
+    Computed value: specified keyword
+    Animation type: discrete
     </pre>
 
     When scrolling with an intended direction,
@@ -951,13 +982,13 @@ Physical Longhands for 'scroll-padding' {#padding-longhands-physical}
 
     <pre class="propdef">
     Name: scroll-padding-top, scroll-padding-right, scroll-padding-bottom, scroll-padding-left
-    Value: <<length-percentage>>
-    Initial: 0
+    Value: auto | <<length-percentage>>
+    Initial: auto
     Applies to: <a>scroll containers</a>
     Inherited: no
     Percentages: relative to the scroll container’s scrollport
-    Computed value: as specified, with lengths made absolute
-    Animatable: as length, percentage, or calc
+    Computed value: the keyword ''scroll-padding/auto'' or a computed <<length-percentage>> value
+    Animation type: by computed value type
     </pre>
 
     These <a>longhands</a> of 'scroll-padding' specify
@@ -969,28 +1000,27 @@ Flow-relative Longhands for 'scroll-padding'  {#padding-longhands-logical}
 
     <pre class="propdef">
     Name: scroll-padding-inline-start, scroll-padding-block-start, scroll-padding-inline-end, scroll-padding-block-end
-    Value: <<length-percentage>>
-    Initial: 0
+    Value: auto | <<length-percentage>>
+    Initial: auto
     Applies to: <a>scroll containers</a>
     Inherited: no
     Percentages: relative to the scroll container’s scrollport
-    Computed value: as specified, with lengths made absolute
-    Animatable: as length, percentage, or calc
+    Computed value: the keyword ''scroll-padding/auto'' or a computed <<length-percentage>> value
+    Animation type: by computed value type
     </pre>
 
     These <a>longhands</a> of 'scroll-padding' specify
     the block-start, inline-start, block-end, and inline-end edges
     of the <a>snapport</a>, respectively.
 
-    <pre class="propdef">
+    <pre class="propdef shorthand">
     Name: scroll-padding-block, scroll-padding-inline
-    Value: <<length-percentage>>{1,2}
-    Initial: 0
+    Value: [ auto | <<length-percentage>> ]{1,2}
+    Initial: auto
     Applies to: all elements
     Inherited: no
     Percentages: relative to the scroll container’s scrollport
-    Computed value: as specified, with lengths made absolute
-    Animatable: as length, percentage, or calc
+    Animation type: by computed value
     </pre>
 
     These <a>shorthands</a> of 'scroll-padding-block-start' + 'scroll-padding-block-end'
@@ -1011,8 +1041,8 @@ Physical Longhands for 'scroll-margin'  {#margin-longhands-physical}
     Applies to: all elements
     Inherited: no
     Percentages: n/a
-    Computed value: as specified, with lengths made absolute
-    Animatable: as length
+    Computed value: a computed <<length-percentage>> value
+    Animation type: by computed value type
     </pre>
 
     These <a>longhands</a> of 'scroll-margin' specify
@@ -1029,23 +1059,22 @@ Flow-relative Longhands for 'scroll-margin'  {#margin-longhands-logical}
     Applies to: all elements
     Inherited: no
     Percentages: n/a
-    Computed value: as specified, with lengths made absolute
-    Animatable: as length
+    Computed value: a computed <<length-percentage>> value
+    Animation type: by computed value type
     </pre>
 
     These <a>longhands</a> of 'scroll-margin' specify the
     block-start, inline-start, block-end, and inline-end edges
     of the <a>scroll snap area</a>, respectively.
 
-    <pre class="propdef">
+    <pre class="propdef shorthand">
     Name: scroll-margin-block, scroll-margin-inline
     Value: <<length>>{1,2}
     Initial: 0
     Applies to: all elements
     Inherited: no
     Percentages: n/a
-    Computed value: as specified, with lengths made absolute
-    Animatable: as length
+    Animation type: by computed value type
     </pre>
 
     These <a>shorthands</a> of 'scroll-margin-block-start' + 'scroll-margin-block-end'
@@ -1072,7 +1101,7 @@ Acknowledgements {#acknowledgements}
     David Baron,
     Simon Fraser,
     Håkon Wium Lie,
-    Edward O’Connor,
+    Theresa O’Connor,
     François Remy,
     Majid Valpour,
     and most especially Robert O’Callahan
@@ -1081,6 +1110,53 @@ Acknowledgements {#acknowledgements}
 
 Changes {#changes}
 ==================
+
+Changes Since 14 August 2018 CR {#changes-20180814}
+---------------------------------------------------
+
+	Changes since the <a href="https://www.w3.org/TR/2018/CR-css-scroll-snap-1-20180814/">14 August 2018 Candidate Recommendation</a> include:
+
+	<ul>
+		<li id="change-2018-padding-intial">
+			Corrected 'scroll-padding' longhand property definition tables to list the new ''scroll-padding/auto'' keyword as their initial value.
+		<li id="change-2018-computed-animation">
+			Fixed up “Computed value” and “Animation type” lines in the property definition tables.
+	</ul>
+
+Changes Since 14 December 2017 CR {#changes-20171214}
+---------------------------------------------------
+
+	Changes since the <a href="https://www.w3.org/TR/2017/CR-css-scroll-snap-1-20171214/">14 December 2017 Candidate Recommendation</a> include:
+
+	<ul>
+		<li id="change-2017-align-values-backwards">
+			Fixed 'scroll-snap-align' shorthand to assign
+			block-axis value first, inline-axis value second,
+			accordingly to logical shorthand conventions.
+			(<a href="https://github.com/w3c/csswg-drafts/issues/2232">Issue 2232</a>
+		<li id="change-2017-scroll-padding-auto">
+			Added ''scroll-padding/auto'' keyword to 'scroll-padding as its initial value
+			to account for UA heuristics.
+			(<a href="https://github.com/w3c/csswg-drafts/issues/2728">Issue 2728</a>
+		<li id="change-2017-snap-vs-api-scroll">
+			Clarified in the definition of 'scroll-snap-type'
+			that programmatig scrolls such as {{Window/scrollTo()}}
+			are also subject to snapping.
+			(<a href="https://github.com/w3c/csswg-drafts/issues/2593">Issue 2593</a>)
+			<blockquote>
+				Using the 'scroll-snap-type' property on the relevant <a>scroll container</a>,
+				the author can request a particular bias
+				for the scrollport to land on a <a>snap position</a>
+				after scrolling operations
+				<ins>(including programmatic scrolls such as the {{Window/scrollTo()}} method)</ins>.
+			</blockquote>
+		<li id="change-2017-clarify-mandatory-visibility">
+			Adjusted wording in [[#snap-scope]] to be clearer--
+			compared to <a href="https://www.w3.org/TR/2017/CR-css-scroll-snap-1-20171214/#snap-scope">old version</a>.
+			(<a href="https://github.com/w3c/csswg-drafts/issues/2526">Issue 2526</a>)
+	</ul>
+
+	A <a href="https://drafts.csswg.org/css-scroll-snap-1/issues-cr-2017-12">Disposition of Comments</a> is available.
 
 Changes Since 24 August 2017 CR {#changes-20170824}
 ---------------------------------------------------

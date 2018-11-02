@@ -1,5 +1,3 @@
-<h2 id=tagline class="no-num no-toc">Breaking the Web, one fragment at a time</h2>
-
 <pre class='metadata'>
 Title: CSS Fragmentation Module Level 3
 Status: ED
@@ -19,6 +17,8 @@ Ignored Terms: background positioning area, region chain, … message topic …,
 At Risk: the ''region'' and ''break-after/avoid-region'' values of 'break-*'
 </pre>
 
+<h1>CSS Fragmentation Module Level 3 <br> <small>Breaking the Web, one fragment at a time</small></h1>
+
 <h2 id="intro">
 Introduction</h2>
 
@@ -31,7 +31,7 @@ Introduction</h2>
     more discrete display surfaces. In order to avoid awkward breaks
     (such as halfway through a line of text), the layout engine must be
     able to shift around content that would fall across the page break.
-    This process is called <dfn>pagination</dfn>.
+    This process is called <dfn export>pagination</dfn>.
   </p>
   <p>
     In CSS, in addition to paged media, certain layout features such as
@@ -83,7 +83,7 @@ Fragmentation Model and Terminology</h2>
     <dt><dfn>fragmentation context</dfn></dt>
     <dd>
       An ordered series of <a>fragmentainers</a>,
-      such as created by a <a href="https://www.w3.org/TR/css3-multicol/">multi-column element</a>,
+      such as created by a <a href="https://www.w3.org/TR/css3-multicol/">multi-column container</a>,
       a chain of <a href="https://www.w3.org/TR/css3-regions">CSS regions</a>,
       or a <a href="https://www.w3.org/TR/css3-page/">paged media display</a>.
       A given fragmentation context can only have one block flow direction
@@ -114,11 +114,7 @@ Fragmentation Model and Terminology</h2>
       A box in continuous flow always consists of only one fragment.
       A box in a fragmented flow consists of one or more fragments.
       Each fragment has its own share of the box’s border, padding, and margin,
-      and therefore has its own
-      <a href="https://www.w3.org/TR/CSS2/box.html#box-padding-area">padding area</a>,
-      <a href="https://www.w3.org/TR/CSS2/box.html#box-border-area">border area</a>,
-      and
-      <a href="https://www.w3.org/TR/CSS2/box.html#box-margin-area">margin area</a>.
+      and therefore has its own <a>padding area</a>, <a>border area</a>, and <a>margin area</a>.
       (See 'box-decoration-break', which controls how these are affected by fragmentation.)
     <dt><dfn>remaining fragmentainer extent</dfn></dt>
     <dd>
@@ -141,6 +137,20 @@ Fragmentation Model and Terminology</h2>
     <a href="https://www.w3.org/TR/CSS21/visuren.html#inline-boxes">inline boxes</a>
     across <a href="https://www.w3.org/TR/CSS21/visuren.html#line-box">line boxes</a>.
     However, inline breaking is not covered here; see [[!CSS21]]/[[CSS3TEXT]].
+  </p>
+
+  <p class="note">
+    A box can be broken into multiple <a>fragments</a>
+    also due to bidi reordering of text
+    (see [[css-writing-modes-3#bidi-algo|Applying the Bidirectional Reorderign Algorithm]]
+    in [[css-writing-modes-3#text-direction|CSS Writing Modes]])
+    or higher-level <a>display type</a> box splitting,
+    e.g. <a href="https://www.w3.org/TR/CSS2/visuren.html#img-anon-block">block-in-inline splitting</a>
+    (see <a href="https://www.w3.org/TR/CSS2/visuren.html#box-gen">CSS2&sect;9.2</a>)
+    or <a href="https://www.w3.org/TR/css-multicol-1/#spanning-columns">column-spanner-in-block</a> splitting
+    (see <a href="https://www.w3.org/TR/css-multicol-1/#spanning-columns">CSS Multi-column Layout</a>).
+    The division into <a>box fragments</a> in these cases
+    does not depend on layout (sizing/positioning of content).
   </p>
 
 <h3 id="parallel-flows">
@@ -204,9 +214,9 @@ Nested Fragmentation Flows</h3>
   </div>
 
   <div class="note">
-    Note that when a multi-column element breaks across pages,
+    Note that when a multi-column container breaks across pages,
     it generates a new row of columns on the next page for the rest of its content,
-    so that a page break within a multi-column element
+    so that a page break within a multi-column container
     is always both a page break and a column break.
   </div>
 
@@ -241,8 +251,10 @@ Breaks Between Boxes: the 'break-before' and 'break-after' properties</h3>
   Name: break-before, break-after
   Value: auto | avoid | avoid-page | page | left | right | recto | verso | avoid-column | column | avoid-region | region
   Initial: auto
-  Applies to: block-level elements, table row groups, table rows (but see prose)
+  Applies to: block-level boxes, grid items, flex items, table row groups, table rows (but see prose)
   Inherited: no
+  Computed value: specified keyword
+  Animation type: discrete
   </pre>
 
   <p>
@@ -257,20 +269,12 @@ Breaks Between Boxes: the 'break-before' and 'break-after' properties</h3>
   </p>
 
   <p>
-    Since breaks are only allowed between siblings,
-    not between a box and its container (see <a href="#possible-breaks">Possible Break Points</a>),
-    a 'break-before' value on a first-child box is propagated to its container.
-    Likewise a 'break-after' value on a last-child box is propagated to its container.
-    (Conflicting values <a href="#forced-breaks">combine</a> as defined below.)
-    This propagation stops before it breaks through the nearest matching fragmentation context.
-  </p>
-
-  <p>
     Values for 'break-before' and 'break-after' are defined in the sub-sections below.
     User Agents must apply these properties to boxes in the normal flow of the <a>fragmentation root</a>.
     User agents should also apply these properties to floated boxes
     whose containing block is in the normal flow of the root fragmented element.
     User agents may also apply these properties to other boxes.
+    User agents must not apply these properties to absolutely-positioned boxes.
   </p>
 
 <h4 id="generic-break-values" class="no-num">
@@ -365,6 +369,37 @@ Region Break Values</h4>
     </dd>
   </dl>
 
+<h4 id="break-propagation">
+Child→Parent Break Propagation</h4>
+
+  <p>
+    Since breaks are only allowed between siblings,
+    not between a box and its container
+    (see <a href="#possible-breaks">Possible Break Points</a>),
+    break values applied to children at the start/end of a parent
+    are <dfn lt="propagate|propagation">propagated</dfn> to the parent,
+    where they can take effect.
+  </p>
+
+  <p>
+    Specifically--
+    except in layout modes which define more specific rules
+    to account for reordering and parallel layout
+    (e.g. in <a href="http://www.w3.org/TR/css-flexbox-1/#pagination">flex layout</a> [[CSS-FLEXBOX-1]]
+    or <a href="http://www.w3.org/TR/css-grid-1/#pagination">grid layout</a> [[CSS-GRID-1]])--
+    a 'break-before' value on a first <a>in-flow</a> child box
+    is <a>propagated</a> to its container.
+    Likewise a 'break-after' value on a last <a>in-flow</a> child box
+    is <a>propagated</a> to its container.
+    (Conflicting values <a href="#forced-breaks">combine</a> as defined below.)
+    This propagation stops before it breaks through the nearest matching fragmentation context.
+  </p>
+
+  <p>
+    Break <a>propagation</a> does not affect <a>computed values</a>;
+    it is part of interpeting the elements’ computed values for layout.
+  </p>
+
 <h3 id="break-within">
 Breaks Within Boxes: the 'break-inside' property</h3>
 
@@ -372,9 +407,10 @@ Breaks Within Boxes: the 'break-inside' property</h3>
   Name: break-inside
   Value: auto | avoid | avoid-page | avoid-column | avoid-region
   Initial: auto
-  Applies to: elements in the normal flow that establish formatting contexts,
-      or that are block containers, table row groups, or table rows
+  Applies to: all elements except inline-level boxes, internal ruby boxes, table column boxes, table column group boxes, absolutely-positioned boxes
   Inherited: no
+  Computed value: specified keyword
+  Animation type: discrete
   </pre>
 
   <p>
@@ -412,8 +448,10 @@ Breaks Between Lines: 'orphans', 'widows'</h3>
   Name: orphans, widows
   Value: <<integer>>
   Initial: 2
-  Applies to: block containers
+  Applies to: <a>block containers</a> that establish an <a>inline formatting context</a>
   Inherited: yes
+  Computed value: specified integer
+  Animation type: by computed value type
   </pre>
 
   <p>
@@ -443,7 +481,7 @@ Page Break Aliases: the 'page-break-before', 'page-break-after', and 'page-break
   UAs that conform to [[!CSS21]] must alias the
   'page-break-before', 'page-break-after', and 'page-break-inside' properties
   to 'break-before', 'break-after', and 'break-inside'
-  by treating the 'page-break-*' properties as shorthands for the 'break-*' properties
+  by treating the 'page-break-*' properties as [=legacy shorthands=] for the 'break-*' properties
   with the following value mappings:
 
   <table class="data">
@@ -527,7 +565,7 @@ Possible Break Points</h3>
 
   <p class="note">
     Other layout models may add breakpoints to the above classes.
-    For example, [[CSS3-FLEXBOX]] adds certain points within a flex formatting context
+    For example, [[CSS-FLEXBOX-1]] adds certain points within a flex formatting context
     to classes A and C.
   </p>
 
@@ -552,8 +590,13 @@ Possible Break Points</h3>
   <p>
     Since line boxes contain no possible break points,
     ''inline-block'' and ''inline-table'' boxes
-    (and other inline-level <a>display types</a> that establish a new <a>formatting context</a>)
-    may also be considered <a>monolithic</a>.
+    (and other inline-level <a>display types</a> that establish an <a>independent formatting context</a>)
+    may also be considered <a>monolithic</a>:
+    that is,
+    in the cases where a single line box is too large
+    to fit within its fragmentainer even by itself
+    and the UA chooses to split the line box,
+    it may fragment such boxes or it may treat them as monolithic.
 
 <h3 id="break-types">
 Types of Breaks</h3>
@@ -604,8 +647,8 @@ Forced Breaks</h3>
   <p>
     A <dfn export>forced break</dfn> is one explicitly indicated by the style sheet author.
     A <a>forced break</a> occurs at a <a href="#btw-blocks">class A break point</a> if,
-    among the 'break-after' properties specified on or propagated to the earlier sibling box
-    and the 'break-before' properties specified on or propagated to the later sibling box
+    among the 'break-after' properties specified on or <a>propagated</a> to the earlier sibling box
+    and the 'break-before' properties specified on or <a>propagated</a> to the later sibling box
     there is at least one with a <a>forced break value</a>.
     (Thus a <a>forced break value</a> effectively overrides any <a>avoid break value</a>
     that also applies at that break point.)
@@ -765,6 +808,17 @@ Optimizing Unforced Breaks</h3>
       </li>
     </ul>
   </div>
+
+  Additionally, CSS imposes one requirement:
+  a zero-sized <a>box fragment</a>,
+  since it does not take up space,
+  must appear on the earlier side of a <a>fragmentation break</a>
+  if it is able to fit within the <a>fragmentainer</a>.
+
+  Note: A zero-sized <a>box fragment</a> will be pushed
+  to the next <a>fragmentainer</a>
+  if it is placed immediately after content
+  that itself overflows the <a>fragmentainer</a>.
 
 <h2 id="breaking-boxes">
 Box Model for Breaking</h2>
@@ -930,6 +984,8 @@ Fragmented Borders and Backgrounds: the 'box-decoration-break' property</h3>
   Initial: slice
   Applies to: all elements
   Inherited: no
+  Computed value: specified keyword
+  Animation type: discrete
   </pre>
 
   <p>
@@ -984,10 +1040,19 @@ Fragmented Borders and Backgrounds: the 'box-decoration-break' property</h3>
     on the left, the value ''slice'', on the right the value ''clone''.
   </div>
 
-  <p>UAs may also apply 'box-decoration-break' to control rendering
-  at bidi-imposed breaks, i.e. when bidi reordering causes an inline
-  to split into non-contiguous fragments. Otherwise such breaks are
-  always handled as ''slice''.
+  <p>UAs should also apply 'box-decoration-break'
+  to control rendering at bidi-imposed breaks--
+  i.e. when bidi reordering causes an inline to split into non-contiguous fragments--
+  and/or at display-type&ndash;imposed breaks--
+  i.e. when a higher-level <a>display type</a>
+  (such as a <a>block-level box</a> / <a href="https://www.w3.org/TR/css-multicol-1/#spanning-columns">column spanner</a>)
+  splits an incompatible ancestor
+  (such as an <a>inline box</a> / <a>block container</a>).
+  Otherwise such breaks must be handled as ''slice''.
+  See [[css-writing-modes-3#bidi-algo|Applying the Bidirectional Reorderign Algorithm]]
+  in [[css-writing-modes-3#text-direction|CSS Writing Modes]],
+  <a href="https://www.w3.org/TR/CSS2/visuren.html#box-gen">CSS2&sect;9.2 Block-level elements and block boxes</a>,
+  and <a href="https://www.w3.org/TR/css-multicol-1/#spanning-columns">CSS Multi-column Layout &sect;6 Spanning Columns</a>.
 
   <p class=note>
   For inline elements, which side of a fragment is considered the broken edge
@@ -1027,7 +1092,7 @@ Joining Boxes for ''slice''</h4>
     <dt>For boxes broken across columns</dt>
     <dd>
       Fragments are connected as if the column boxes were glued together
-      in the <a>block flow direction</a> of the multi-column element.
+      in the <a>block flow direction</a> of the multi-column container.
     </dd>
 
     <dt>For boxes broken across pages</dt>
@@ -1101,6 +1166,105 @@ Transforms, Positioning, and Pagination</h3>
 
 <h2 class="no-num" id="changes">
 Changes</h2>
+
+  <p>The following significant changes were made since the
+    <a href="https://www.w3.org/TR/2016/CR-css-break-3-20160114/">14 January 2016 Candidate Recommendation</a>:
+
+  <ul>
+    <li id="change-2018-aliasing">
+      Clarified the mechanism of aliasing for the page-break-* properties.
+      (<a href="https://github.com/w3c/csswg-drafts/issues/866">Issue 866</a>)
+      <blockquote>
+        <p>by treating the 'page-break-*' properties as <del>shorthands</del> <ins>[=legacy shorthands=]</ins> for the 'break-*' properties
+      </blockquote>
+    <li id="change-2017-propagation">
+      Clarified that break propagation does not affect computed values
+      and that other layout modes (e.g. flex and grid) make adjustments
+      to the basic break propagation rules,
+      and corrected child-to-parent propagation to ignore <a>out-of-flow</a> children.
+      (<a href="https://github.com/w3c/csswg-drafts/issues/2614">Issue 2614</a>)
+      See [[#break-propagation]].
+
+    <li id="change-2017-widows-applies-to">
+      Clarified that 'widows' and 'orphans' have no effect on block containers
+      that do not directly contain line boxes.
+      (<a href="https://github.com/w3c/csswg-drafts/issues/1823">Issue 1823</a>)
+      <blockquote>
+        <p>Applies to: block containers <ins>that establish a new inline formatting context</ins>
+      </blockquote>
+
+    <li id="change-2017-inline-block-fragmentation">
+      Clarified what it means if a UA chooses not to treat atomic inlines as not <a>monolithic</a>.
+      (<a href="https://github.com/w3c/csswg-drafts/issues/1111">Issue 1111</a>)
+      <blockquote>
+        <p>Since line boxes contain no possible break points,
+        ''inline-block'' and ''inline-table'' boxes
+        (and other inline-level <a>display types</a> that establish an <a>independent formatting context</a>)
+        may also be considered <a>monolithic</a>
+        <ins>that is,
+        in the cases where a single line box is too large
+        to fit within its fragmentainer even by itself
+        and the UA chooses to split the line box,
+        it may fragment such boxes or it may treat them as monolithic</ins>.
+      </blockquote>
+
+    <li id="change-2017-zero-fragment">
+      Added requirement that zero-sized fragments must stay on the previous fragmentainer.
+      (<a href="https://github.com/w3c/csswg-drafts/issues/1529">Issue 1529</a>)
+      <blockquote>
+        <ins><p>Additionally, CSS imposes one requirement:
+          a zero-sized <a>box fragment</a>,
+          since it does not take up space,
+          must appear on the earlier side of a <a>fragmentation break</a>
+          if it is able to fit within the <a>fragmentainer</a>.</p>
+
+          <p class="note">A zero-sized <a>box fragment</a> can be pushed
+          to the next <a>fragmentainer</a>
+          if it is placed immediately after content
+          that itself overflows the <a>fragmentainer</a>.</p>
+        </ins>
+      </blockquote>
+
+    <li id="change-2018-bidi-split-breaks">
+      Clarify that bidi-imposed breaks and block-in-inline breaks create fragments,
+      and that their formatting should be controlled by 'box-decoration-break'.
+      (<a href="https://github.com/w3c/csswg-drafts/issues/1706">Issue 1706</a>)
+      <blockquote>
+        <ins><p class="note">
+        A box can be broken into multiple <a>fragments</a>
+        also due to bidi reordering of text
+        (see [[css-writing-modes-3#bidi-algo|Applying the Bidirectional Reorderign Algorithm]]
+        in [[css-writing-modes-3#text-direction|CSS Writing Modes]])
+        or higher-level <a>display type</a> box splitting,
+        e.g. <a href="https://www.w3.org/TR/CSS2/visuren.html#img-anon-block">block-in-inline splitting</a>
+        (see <a href="https://www.w3.org/TR/CSS2/visuren.html#box-gen">CSS2&sect;9.2</a>)
+        or <a href="https://www.w3.org/TR/css-multicol-1/#spanning-columns">column-spanner-in-block</a> splitting
+        (see <a href="https://www.w3.org/TR/css-multicol-1/#spanning-columns">CSS Multi-column Layout</a>).
+        The division into <a>box fragments</a> in these cases
+        does not depend on layout (sizing/positioning of content).</p></ins>
+      </blockquote>
+      <blockquote>
+        <p>UAs <del>may</del><ins>should</ins> also apply 'box-decoration-break' to control rendering
+        at bidi-imposed breaks--
+        i.e. when bidi reordering causes an inline
+        to split into non-contiguous fragments<ins>--
+        and/or at display-type&ndash;imposed breaks--
+        i.e. when a higher-level <a>display type</a>
+        (such as a <a>block-level box</a> / <a href="https://www.w3.org/TR/css-multicol-1/#spanning-columns">column spanner</a>)
+        splits an incompatible ancestor
+        (such as an <a>inline box</a> / <a>block container</a>)</ins>.
+        Otherwise such breaks must be handled as ''slice''.
+        <ins>See [[css-writing-modes-3#bidi-algo|Applying the Bidirectional Reorderign Algorithm]]
+        in [[css-writing-modes-3#text-direction|CSS Writing Modes]],
+        <a href="https://www.w3.org/TR/CSS2/visuren.html#box-gen">CSS2&sect;9.2 Block-level elements and block boxes</a>,
+        and <a href="https://www.w3.org/TR/css-multicol-1/#spanning-columns">CSS Multi-column Layout &sect;6 Spanning Columns</a>.</ins></p>
+      </blockquote>
+
+    <li id="change-2017-trivial">
+      Made a handful of trivial wording fixes.
+  </ul>
+
+  <p>A <a href="https://drafts.csswg.org/css-break-3/issues-cr-2016">Disposition of Comments</a> is available.
 
   <p>The following significant changes were made since the
     <a href="https://www.w3.org/TR/2015/WD-css3-break-20150129/">29 January 2015 Working Draft</a>:

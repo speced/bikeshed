@@ -5,6 +5,7 @@ Shortname: fullscreen
 Text Macro: TWITTER fullscreenapi
 Abstract: The Fullscreen API standard defines an API for elements to display themselves fullscreen.
 Translation: ja https://triple-underscore.github.io/fullscreen-ja.html
+Markup Shorthands: css no
 </pre>
 
 <pre class=link-defaults>
@@ -88,9 +89,12 @@ its <a>node document</a>'s <a>top layer</a>.
  <li><p><a>Exit fullscreen</a> <var>document</var>.
 </ol>
 
-<p>Whenever the <a>removing steps</a> run with a <var>removedNode</var>, run these steps:
+<p id=removing-steps>Whenever the <a>removing steps</a> run with a <var>removedNode</var>, run
+these steps:
 
 <ol>
+ <li><p>Let <var>document</var> be <var>removedNode</var>'s <a>node document</a>.
+
  <li><p>Let <var>nodes</var> be <var>removedNode</var>'s
  <a>shadow-including inclusive descendants</a> that have their <a>fullscreen flag</a> set, in
  <a>shadow-including tree order</a>.
@@ -99,11 +103,18 @@ its <a>node document</a>'s <a>top layer</a>.
   <p><a>For each</a> <var>node</var> in <var>nodes</var>:
 
   <ol>
-   <li><p>If <var>node</var> is its <a>node document</a>'s <a>fullscreen element</a>,
-   <a>exit fullscreen</a> that <a for=/>document</a>.
+   <li><p>If <var>node</var> is <var>document</var>'s <a>fullscreen element</a>,
+   <a>exit fullscreen</a> <var>document</var>.
 
-   <li><p>Otherwise, <a lt="unfullscreen an element">unfullscreen <var>node</var></a> within its
-   <a>node document</a>.
+   <li><p>Otherwise, <a lt="unfullscreen an element">unfullscreen <var>node</var></a>.
+
+   <li>
+    <p>If <var>document</var>'s <a>top layer</a> <a for=set>contains</a> <var>node</var>,
+    <a for=set>remove</a> <var>node</var> from <var>document</var>'s <var>top layer</var>.
+
+    <p class=note>Other specifications can add and remove elements from <a>top layer</a>, so
+    <var>node</var> might not be <var>document</var>'s <a>fullscreen element</a>. For example,
+    <var>node</var> could be an open <{dialog}> element.
   </ol>
 </ol>
 
@@ -154,8 +165,18 @@ steps:
 <h2 id=api>API</h2>
 
 <pre class=idl>
+enum <dfn>FullscreenNavigationUI</dfn> {
+  "auto",
+  "show",
+  "hide"
+};
+
+dictionary <dfn>FullscreenOptions</dfn> {
+  FullscreenNavigationUI navigationUI = "auto";
+};
+
 partial interface Element {
-  Promise&lt;void> requestFullscreen();
+  Promise&lt;void> requestFullscreen(optional FullscreenOptions options);
 
   attribute EventHandler onfullscreenchange;
   attribute EventHandler onfullscreenerror;
@@ -171,7 +192,7 @@ partial interface Document {
   attribute EventHandler onfullscreenerror;
 };
 
-partial interface DocumentOrShadowRoot {
+partial interface mixin DocumentOrShadowRoot {
   [LenientSetter] readonly attribute Element? fullscreenElement;
 };
 </pre>
@@ -179,8 +200,15 @@ partial interface DocumentOrShadowRoot {
      interface, which is implemented by Document and HTMLElement, not Element. -->
 
 <dl class=domintro>
- <dt><code><var>promise</var> = <var>element</var> . {{Element/requestFullscreen()}}</code>
- <dd><p>Displays <var>element</var> fullscreen and resolves <var>promise</var> when done.
+ <dt><code><var>promise</var> = <var>element</var> . <a method for=Element lt=requestFullscreen()>requestFullscreen([<var>options</var>])</a></code>
+ <dd>
+  Displays <var>element</var> fullscreen and resolves <var>promise</var> when done.
+
+  When supplied, <var>options</var>'s <code>navigationUI</code> member indicates whether showing
+  navigation UI while in fullscreen is preferred or not. If set to "<code>show</code>", navigation
+  simplicity is preferred over screen space, and if set to "<code>hide</code>", more screen space
+  is preferred. User agents are always free to honor user preference over the application's. The
+  default value "<code>auto</code>" indicates no application preference.
 
  <dt><code><var>document</var> . {{Document/fullscreenEnabled}}</code>
  <dd><p>Returns true if <var>document</var> has the ability to display <a>elements</a> fullscreen
@@ -203,13 +231,13 @@ if all of the following are true, and false otherwise:
 <ul>
  <li><p><var>element</var> is <a>connected</a>.
 
- <li><p><var>element</var>'s <a>node document</a> is <a>allowed to use</a> the feature indicated by
- attribute name <code>allowfullscreen</code>.
+ <li><p><var>element</var>'s <a>node document</a> is <a>allowed to use</a> the "<code><a
+ data-lt="fullscreen-feature">fullscreen</a></code>" feature.
  <!-- cross-process, recursive -->
 </ul>
 
-<p>The <dfn method for=Element><code>requestFullscreen()</code></dfn> method, when invoked, must run
-these steps:
+<p>The <dfn method for=Element><code>requestFullscreen(<var>options</var>)</code></dfn> method,
+when invoked, must run these steps:
 
 <ol>
  <li><p>Let <var>pending</var> be the <a>context object</a>.
@@ -244,11 +272,36 @@ these steps:
 
  <li><p>Return <var>promise</var>, and run the remaining steps <a>in parallel</a>.
 
- <li><p>If <var>error</var> is false: Resize <var>pendingDoc</var>'s
- <a>top-level browsing context</a>'s <a>active document</a>'s viewport's dimensions to match the
- dimensions of the screen of the output device. Optionally display a message how the end user can
- revert this.
- <!-- cross-process -->
+ <li>
+  <p>If <var>error</var> is false: Resize <var>pendingDoc</var>'s
+  <a>top-level browsing context</a>'s <a>active document</a>'s viewport's dimensions, optionally
+  taking into account <var>options</var>'s <code>navigationUI</code> member:
+  <!-- cross-process -->
+
+  <table>
+    <thead>
+      <tr>
+      <th>value</th>
+      <th>viewport dimensions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>"<code>hide</code>"</td>
+        <td>full dimensions of the screen of the output device</td>
+      </tr>
+      <tr>
+        <td>"<code>show</code>"</td>
+        <td>dimensions of the screen of the output device clamped to allow the user agent to show page navigation controls</td>
+      </tr>
+      <tr>
+        <td>"<code>auto</code>"</td>
+        <td>user-agent defined, but matching one of the above</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Optionally display a message how the end user can revert this.
 
  <li>
   <p>If any of the following conditions are false, then set <var>error</var> to true:
@@ -309,8 +362,9 @@ these steps:
 exercise to the reader. Input welcome on potential improvements.
 
 <p>The <dfn attribute for=Document><code>fullscreenEnabled</code></dfn> attribute's getter must
-return true if the <a>context object</a> is <a>allowed to use</a> the feature indicated by attribute
-name <code>allowfullscreen</code> and <a>fullscreen is supported</a>, and false otherwise.
+return true if the <a>context object</a> is <a>allowed to use</a> the "<code><a
+data-lt="fullscreen-feature">fullscreen</a></code>" feature and <a>fullscreen is supported</a>, and
+false otherwise.
 
 <p>The <dfn attribute for=Document><code>fullscreen</code></dfn> attribute's getter must return
 false if <a>context object</a>'s <a>fullscreen element</a> is null, and true otherwise.
@@ -395,6 +449,13 @@ could be an open <{dialog}> element.
  <li><p>If <var>topLevelDoc</var> is in <var>docs</var>, and it is a
  <a>simple fullscreen document</a>, then set <var>doc</var> to <var>topLevelDoc</var> and
  <var>resize</var> to true.
+
+ <li><p>If <var>doc</var>'s <a>fullscreen element</a> is not <a>connected</a>:
+  <ol>
+   <li><p><a for=set>Append</a> (<code>fullscreenchange</code>, <var>doc</var>'s
+   <a>fullscreen element</a>) to <var>doc</var>'s
+   <a>list of pending fullscreen events</a>.
+  </ol>
 
  <li><p>Return <var>promise</var>, and run the remaining steps <a>in parallel</a>.
 
@@ -628,6 +689,25 @@ iframe:fullscreen {
 
 
 
+<h2 id=feature-policy-integration>Feature Policy Integration</h2>
+
+<p>This specification defines a <a>policy-controlled feature</a> identified by the string
+"<code><dfn data-lt="fullscreen-feature">fullscreen</dfn></code>". Its <a>default allowlist</a> is
+<code>'self'</code>.
+
+<div class="note">
+<p>A <a>document</a>'s <a>feature policy</a> determines whether any content in that document is allowed to
+go fullscreen. If disabled in any document, no content in the document will be <a>allowed to use</a>
+fullscreen.
+
+<p>The <{iframe/allowfullscreen}> attribute of the HTML <{iframe}> element affects the <a>container
+policy</a> for any document nested in that iframe. Unless overridden by the <{iframe/allow}>
+attribute, setting <{iframe/allowfullscreen}> on an iframe is equivalent to <code>&lt;iframe
+allow="fullscreen *"&gt;</code>, as described in
+[[FEATURE-POLICY#iframe-allowfullscreen-attribute]].
+</div>
+
+
 <h2 id=security-and-privacy-considerations>Security and Privacy Considerations</h2>
 
 <p>User agents should ensure, e.g. by means of an overlay, that the end user is aware something is
@@ -637,8 +717,12 @@ user agent or even operating system environment when fullscreen. See also the de
 {{Element/requestFullscreen()}}.
 
 <p>To enable content in a <a>nested browsing context</a> to go fullscreen, it needs to be
-specifically allowed via the <code>allowfullscreen</code> attribute of the HTML <{iframe}> element.
-This prevents e.g. content from third parties to go fullscreen without explicit permission.
+specifically allowed via feature policy, either through the <{iframe/allowfullscreen}> attribute of
+the HTML <{iframe}> element, or an appropriate declaration in the <{iframe/allow}> attribute of the
+HTML <{iframe}> element, or through a `<a http-header><code>Feature-Policy</code></a>` HTTP header
+delivered with the <a>document</a> through which it is nested.
+
+<p>This prevents e.g. content from third parties to go fullscreen without explicit permission.
 
 
 
@@ -651,13 +735,16 @@ This prevents e.g. content from third parties to go fullscreen without explicit 
 Andy Earnshaw,
 Chris Pearce,
 Darin Fisher,
+Dave Tapuska,
 <i>fantasai</i>,
 Giuseppe Pascale,
 Glenn Maynard,
+Ian Clelland,
 Ian Hickson,
 Ignacio Solla,
 João Eiras,
 Josh Soref,
+Kagami Sascha Rosylight,
 Matt Falkenhagen,
 Mihai Balan,
 Mounir Lamouri,

@@ -5,7 +5,7 @@ Shortname: keyboard-lock
 Level:
 Group: webplatform
 Status: ED
-TR: http://www.w3.org/TR/keyboard-lock/
+TR: https://w3c.github.io/keyboard-lock/
 ED: https://w3c.github.io/keyboard-lock/
 Repository: w3c/keyboard-lock
 Previous Version:
@@ -32,6 +32,7 @@ urlPrefix: https://fullscreen.spec.whatwg.org/#; type: dfn; spec: fullscreen;
 	text: fullscreen element
 urlPrefix: https://html.spec.whatwg.org/#; type: dfn; spec: html;
 	text: currently focused area of a top-level browsing context
+	text: top-level browsing context
 urlPrefix: http://www.w3.org/TR/uievents-code/#code-; type: dfn; spec: uievents-code;
 	text: Delete
 	text: KeyA
@@ -89,12 +90,17 @@ spec: ecma-262; urlPrefix: http://tc39.github.io/ecma262/
 		<div id="navigator-idl" dfn-for="Navigator">
 
 		<div class="algorithm" data-algorithm="navigator-keyboard">
-		<h4 id="h-navigator-keyboard"><dfn>keyboard</dfn></h4>
-		The [=keyboard=] attribute must return the {{Navigator}}'s [=keyboard=] object.
+		<h4 id="h-navigator-keyboard"><dfn>keyboard</h4>
+		The [=keyboard=] attribute must return the {{Navigator}}'s {{Keyboard}} object.
 		</div>
 
 		</div><!-- dfn-for Navigator -->
 
+		Note: The [=keyboard=] object is also defined in the 
+		<a href="https://wicg.github.io/keyboard-map/#navigator-interface">Keyboard Map</a>
+		specification. These two definitions will be reconciled once we decide on a final
+		home for these specifications.
+		
 	<h3 id="keyboard-interface">Keyboard Interface</h3>
 
 		<pre class="idl" data-highlight="webidl">
@@ -103,6 +109,8 @@ spec: ecma-262; urlPrefix: http://tc39.github.io/ecma262/
 			void unlock();
 		};
 		</pre>
+
+		<div id="keyboard-idl" dfn-for="Keyboard">
 
 		The keyboard object has <dfn>enable keyboard lock</dfn>, which is a
 		boolean that is set to true when Keyboard Lock is enabled.
@@ -114,14 +122,22 @@ spec: ecma-262; urlPrefix: http://tc39.github.io/ecma262/
 		By default this set is empty (which would capture all keys
 		if [=enable keyboard lock=] was enabled).
 
-		<h4 id="keyboard.lock">lock</h4>
+		The keyboard object has a <dfn>keyboard lock task queue</dfn> which is
+		initialized to the result of [=starting a new parallel queue=].
+		
+		<div class="algorithm" data-algorithm="keyboard-lock">
+		<h4 id="h-keyboard-lock"><dfn>lock()</dfn></h4>
 
 			When {{lock()}} is called, the user agent must
 			run the following steps:
 
 			1. Let |p| be a new [=Promise=].
 		
-			1. [=Queue a task=] that runs the following steps:
+			1. If not currently executing in the currently active [=top-level browsing context=], then
+		
+				1. Reject |p| with an "{{InvalidStateError}}" {{DOMException}}.
+
+			1. [=Enqueue the following steps=] to the [=keyboard lock task queue=]:
 
 				1. Reset [=reserved key codes=] to be an empty set.
 
@@ -130,24 +146,38 @@ spec: ecma-262; urlPrefix: http://tc39.github.io/ecma262/
 
 					1. [=list/For each=] string |key| in {{keyCodes}}:
 			
-						1. If |key| contains a valid [=key code attribute value=], then
+						1. If |key| is not a valid [=key code attribute value=], then
 				
-							1. [=set/Append=] |key| to [=reserved key codes=].
+							1. Set [=enable keyboard lock=] to be false.
 
+							1. Reject |p| with an "{{InvalidAccessError}}" {{DOMException}}.
+
+						1. [=set/Append=] |key| to [=reserved key codes=].
+				
 				1. If [=enable keyboard lock=] is currently false, run the following
 					substeps:
 
-					1. [=Register a system key press handler=].
+					1. Optionally, [=register a system key press handler=].
 
 					1. Set [=enable keyboard lock=] to be true.
-			
+
+				1. If there is a pending {{lock()}} task in the [=keyboard lock task queue=], then
+		
+					1. Set [=enable keyboard lock=] to be false.
+
+					1. Reject the |p| with an "{{AbortError}}" DOMException.
+						
 				1. Resolve |p|.
 
 			1. Return |p|.
 
+			<div></div>
+
 			Note: If {{lock()}} is called multiple times without an
 			intervening call to {{unlock()}}, then only the
 			{{keyCodes}} specified in the last request call will be in effect.
+			If a second call to {{lock()}} is made before the first one has finished,
+			then the first one will be rejected with "{{AbortError}}".
 		
 			<div class="example">
 			To capture all keys, simply call {{lock()}} with no arguments:
@@ -163,9 +193,10 @@ spec: ecma-262; urlPrefix: http://tc39.github.io/ecma262/
 				navigator.keyboard.lock(["KeyW", "KeyA", "KeyS", "KeyD"]);
 			</pre>
 			This will capture these keys regardless of which modifiers are used with the
-			key press. Registering [=KeyW=] will ensure that W, Shift+W, Control+W,
-			Control+Shift+W, and all other key modifier combinations with "W" will be
-			sent to the app. Similarly for [=KeyA=], [=KeyS=] and [=KeyD=].
+			key press. Assuming a standard US QWERTY layout, registering [=KeyW=] will
+			ensure that "W", Shift+"W", Control+"W", Control+Shift+"W", and all other key
+			modifier combinations with "W" will be sent to the app. Similarly for
+			[=KeyA=], [=KeyS=] and [=KeyD=].
 			</div>
 		
 			<div class="example">
@@ -179,22 +210,33 @@ spec: ecma-262; urlPrefix: http://tc39.github.io/ecma262/
 			the “secure attention sequence” Control+Alt+Delete.
 			</div>
 		
-		<h4 id="keyboard.unlock">unlock</h4>
+		</div><!-- lock() -->
+		
+		<div class="algorithm" data-algorithm="keyboard-unlock">
+		<h4 id="h-keyboard-unlock"><dfn>unlock()</dfn></h4>
 
 			When {{unlock()}} is called, the user agent must
 			run the following steps:
 
-			1. If [=enable keyboard lock=] is true, then run the following substeps:
+			1. [=Enqueue the following steps=] to the [=keyboard lock task queue=]:
 
-				1. [=Unregister the system key press handler=].
+				1. If [=enable keyboard lock=] is true, then run the following substeps:
 
-				1. Set [=enable keyboard lock=] to be false.
+					1. [=Unregister the system key press handler=].
 
-				1. Reset [=reserved key codes=] to be an empty sequence.
+					1. Set [=enable keyboard lock=] to be false.
+
+					1. Reset [=reserved key codes=] to be an empty sequence.
+
+			<div></div>
 
 			Note: When a document is closed, the user agent MUST implicitly call
 			{{unlock()}} so that the [system key press handler=] (if any) is
 			unregistered.
+
+		</div><!-- unlock() -->
+
+		</div><!-- dfn-for Keyboard -->
 		
 <h2 id="handling-events">Handling Keyboard Key Presses</h2>
 
@@ -275,7 +317,8 @@ spec: ecma-262; urlPrefix: http://tc39.github.io/ecma262/
 
 					1. If the key is held for 2 seconds, then exit from the
 						keyboard handler and pass the key on to the user agent
-						for normal processing (which will exit fullscreen).
+						for normal processing (which will exit fullscreen
+						(and pointer lock, if active)).
 
 				1. Dispatch |keyEvent| directly to the fullsceen document or element,
 					bypassing any normal user agent processing.
@@ -291,25 +334,86 @@ spec: ecma-262; urlPrefix: http://tc39.github.io/ecma262/
 		Ctrl-Alt-Del on Windows) that applications cannot override; this
 		specification does not supersede that.
 
-<h2 id="fullscreen-considerations">Fullscreen Considerations</h2>
+		Note: When implementing this API, user agents should take care not to change
+		the order in which keyboard events are dispatched to the page. Keys that are
+		included in the set of [=reserved key codes=] must be dispatched in the same
+		relative order that they would have been sent had they not been included in the
+		set.
 
-	There are two different types of fullscreen available in modern user agents:
-	JavaScript-initiated fullscreen (via the [[Fullscreen]] API) and
-	user-initiated fullscreen (when the user enters fullscreen using a keyboard
-	shortcut). The user-initiated fullscreen is often referred to as "F11"
-	fullscreen since that is a common key shortcut used to enter and exit
-	fullscreen mode.
+<h2 id="interactions">Intergration With Other Web Platform APIs</h2>
 
-	F11 fullscreen and JavaScript (JS) fullscreen do not behave the same way.
-	When a user enters F11 fullscreen, they can only exit it via the same
-	keyboard shortcut that they used to enter it -- the exitFullscreen()
-	function will not work in this case. In addition, fullscreen events that are
-	normally fired for JS fullscreen are not sent for F11 fullscreen.
+	[[Fullscreen]] and [[PointerLock]] are APIs that allow the page to temporarily take
+	control of part of the user's experience (screen and mouse cursor, respectively).
+	Because of the concern for abuse of these features, they provide an "escape" or
+	"unlock" gesture that the user can rely on to exit those features. By default,
+	this gesture is pressing the Escape key, which is one of the keys that can be
+	captured by this API.
 
-	Because of these differences (and because there is no standard shortcut
-	for F11 fullscreen), the Keyboard Lock API is only valid when the
-	a JavaScript-initiated fullscreen is active. During F11 fullscreen, no
-	Keyboard Lock processing of keyboard events will take place.
+	<h3 id="escape-key">Special Considerations with the Escape Key</h3>
+
+		Because of the special actions associated with the Escape key, when the {{lock()}}
+		request includes the Escape key, the user agent may need to make additional
+		changes to the UX to account for the changed behavior.
+
+		For example, if the user agent shows a user message "Press ESC to exit fullscreen"
+		when Javascript-initiated fullscreen is activated, then that message will need to
+		be updated when keyboard lock is in effect to read "Press and hold ESC to exit
+		fullscreen".
+
+		If keyboard lock is activated after fullscreen is already in effect, then the user
+		my see multiple messages about how to exit fullscreen.
+		For this reason, we recommend that developers call {{lock()}} before they enter
+		fullscreen:
+	
+		<pre>
+			navigator.keyboard.lock();
+			document.documentElement.requestFullscreen();
+		</pre>
+
+		A similar concern with multiple user messages exists when exiting keyboard lock and
+		fullscreen, so it is recommended to call them in the reverse order:
+	
+		<pre>
+			document.exitFullscreen();
+			navigator.keyboard.unlock();
+		</pre>
+
+		In general, developers should only include the Escape key in the set of locked
+		keys if they actually have need for that key. And it is recommended that, if the
+		Escape key is locked, the developer should maintain its primary meaning of
+		allowing the user to exit their current state.
+
+	<h3 id="fullscreen-considerations">Fullscreen Considerations</h3>
+
+		There are two different types of fullscreen available in modern user agents:
+		JavaScript-initiated fullscreen (via the [[Fullscreen]] API) and
+		user-initiated fullscreen (when the user enters fullscreen using a keyboard
+		shortcut). The user-initiated fullscreen is often referred to as "F11"
+		fullscreen since that is a common key shortcut used to enter and exit
+		fullscreen mode.
+
+		F11 fullscreen and JavaScript (JS) fullscreen do not behave the same way.
+		When a user enters F11 fullscreen, they can only exit it via the same
+		keyboard shortcut that they used to enter it -- the exitFullscreen()
+		function will not work in this case. In addition, fullscreen events that are
+		normally fired for JS fullscreen are not sent for F11 fullscreen.
+
+		Because of these differences (and because there is no standard shortcut
+		for F11 fullscreen), the Keyboard Lock API is only valid when the
+		a JavaScript-initiated fullscreen is active. During F11 fullscreen, no
+		Keyboard Lock processing of keyboard events will take place.
+
+	<h2 id="pointerlock-considerations">Pointer Lock Considerations</h2>
+
+		Other than the UX changes noted earlier, there are no changes to the operation
+		of Pointer Lock.
+
+		When Pointer Lock is enabled outside of fullscreen, then Keyboard Lock cannot
+		be enabled.
+		
+		When Pointer Lock, Keyboard Lock and Fullscreen are all enabled, then the behavior
+		is unchanged unless Keyboard Lock includes the Escape key. In that case, the
+		only chages are to the UX (as noted above).
 
 <h2 id="mobile">Mobile Device Considerations</h2>
 

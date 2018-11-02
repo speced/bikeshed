@@ -26,7 +26,12 @@ urlPrefix: https://heycam.github.io/webidl/; type: dfn;
         text: exception
         text: throw
         url: throw; text: thrown
-    url: es-invoking-callback-functions; text: Invoke
+    urlPrefix: #;
+        url: Function; text: Function
+        url: VoidFunction; text: VoidFunction
+    url: invoke-a-callback-function; text: Invoke
+    url: construct-a-callback-function; text: constructing
+    url: es-type-mapping; text: converting
 urlPrefix: https://html.spec.whatwg.org/#; type: dfn;
     url: run-the-animation-frame-callbacks; text: running the animation frame callbacks
 urlPrefix: http://w3c.github.io/html/infrastructure.html#; type: dfn;
@@ -58,18 +63,10 @@ urlPrefix: https://w3c.github.io/web-animations/#; type: dfn;
     text: composite operation
     text: animation class
 urlPrefix: https://w3c.github.io/web-animations/level-2/#;
-    type: interface;
-        text: GroupEffectReadOnly
-        text: AnimationEffectReadOnly
-        text: AnimationEffectMutable
-        text: GroupEffectMutable
-        text: Animation
     type: dfn;
         text: group effect
         text: child effect
 urlPrefix: https://tc39.github.io/ecma262/#sec-; type: dfn;
-    text: constructor
-    text: Construct
     text: IsCallable
     text: IsConstructor
     text: HasProperty
@@ -77,7 +74,6 @@ urlPrefix: https://tc39.github.io/ecma262/#sec-; type: dfn;
     url: map-objects; text:map object
     url: get-o-p; text: Get
     url: set-o-p-v-throw; text: Set
-    url: terms-and-definitions-function; text: function
     urlPrefix: native-error-types-used-in-this-standard-
         text: TypeError
 urlPrefix: https://www.w3.org/TR/hr-time-2/#dom-; type: dfn
@@ -106,6 +102,8 @@ urlPrefix: https://wicg.github.io/scroll-animations/#; type: dfn
 
 Introduction {#intro}
 =====================
+<em>This section is not normative.</em>
+
 This document introduces a new primitive for creating scroll-linked and other high performance
 procedural animations on the web. For details on the rationale and motivation see [[explainer]].
 
@@ -128,6 +126,7 @@ animations.
 
 Threading Model {#threading-model}
 ==================================
+<em>This section is not normative.</em>
 
 <a>Animation Worklet</a> is designed to be thread-agnostic. Rendering engines may create one or more
 parallel worklet execution contexts separate from the main javascript execution context, e.g., on
@@ -146,7 +145,7 @@ limit themselves to animating properties which do not require the user agent to 
 will have a much better chance of meeting the strict frame budgets required for smooth playback.
 
 If a Worklet Animation animation is executing in a parallel worklet execution context, the last
-known state of its animation effects must be periodically synced back to the main javascript
+known state of its animation effects should be periodically synced back to the main javascript
 execution context. The synchronization of <a>effect values</a> from the parallel worklet execution
 context to the main javascript execution context <em>must</em> occur before <a>running the animation
 frame callbacks</a> as part of the document lifecycle. Note that due to the asynchronous nature of
@@ -175,23 +174,21 @@ animations. The worklet can be accessed via {{animationWorklet}} attribute.
 
 The {{animationWorklet}}'s <a>worklet global scope type</a> is {{AnimationWorkletGlobalScope}}.
 
-{{AnimationWorkletGlobalScope}} represents a <dfn>global execution context</dfn> of
-{{animationWorklet}}.
+{{AnimationWorkletGlobalScope}} represents the global execution context of {{animationWorklet}}.
 
-<pre class='idl'>
-partial interface Window {
+<xmp class='idl'>
+[Exposed=Window]
+partial namespace CSS {
     [SameObject] readonly attribute Worklet animationWorklet;
 };
-</pre>
+</xmp>
 
-<pre class='idl'>
-callback VoidFunction = void ();
-
-[ Exposed=AnimationWorklet, Global=AnimationWorklet ]
+<xmp class='idl'>
+[Exposed=AnimationWorklet, Global=AnimationWorklet]
 interface AnimationWorkletGlobalScope : WorkletGlobalScope {
     void registerAnimator(DOMString name, VoidFunction animatorCtor);
 };
-</pre>
+</xmp>
 
 
 <div class='note'>
@@ -217,19 +214,21 @@ animation as needed by {{AnimationWorkletGlobalScope}}. It consists of:
 
  - An <dfn>animator name</dfn> <<ident>>#.
 
- - A <dfn>class constructor</dfn> which is the class <a>constructor</a>.
+ - A <dfn>class constructor</dfn> which is a <a>VoidFunction</a> <a>callback function</a> type.
 
- - An <dfn>animate function</dfn> which is the animate <a>function</a> callback.
+ - An <dfn>animate function</dfn> which is a <a>Function</a> <a>callback function</a> type.
+
+ - A <dfn>destroy function</dfn> which is a <a>Function</a> <a>callback function</a> type.
 
 
 Registering an Animator Definition {#registering-animator-definition}
 -------------------------------------
 An {{AnimationWorkletGlobalScope}} has a <dfn>animator name to animator definition map</dfn>.
-The map gets populated when {{registerAnimator(name, animatorCtor)}} is called.
+The map gets populated when {{registerAnimator(name, animatorCtorValue)}} is called.
 
 <div algorithm="register-animator">
 
-When the <dfn method for=AnimationWorkletGlobalScope>registerAnimator(|name|, |animatorCtor|)</dfn>
+When the <dfn method for=AnimationWorkletGlobalScope>registerAnimator(|name|, |animatorCtorValue|)</dfn>
 method is called in a {{AnimationWorkletGlobalScope}}, the user agent <em>must</em> run the
 following steps:
 
@@ -239,20 +238,32 @@ following steps:
     2. If |name| exists as a key in the <a>animator name to animator definition map</a>,
         <a>throw</a> a <a>NotSupportedError</a> and abort all these steps.
 
-    3. If the result of <a>IsConstructor</a>(|animatorCtor|) is false, <a>throw</a> a
+    3. If the result of <a>IsConstructor</a>(|animatorCtorValue|) is false, <a>throw</a> a
         <a>TypeError</a> and abort all these steps.
 
-    4. Let |prototype| be the result of <a>Get</a>(|animatorCtor|, "prototype").
+    4. Let |animatorCtor| be the result of <a>converting</a> animatorCtorValue to the
+        <a>VoidFunction</a> <a>callback function</a> type. If an exception is thrown, rethrow the
+        exception and abort all these steps.
+
+    4. Let |prototype| be the result of <a>Get</a>(|animatorCtorValue|, "prototype").
 
     5. If the result of <a>Type</a>(|prototype|) is not Object, <a>throw</a> a <a>TypeError</a>
         and abort all these steps.
 
-    6. Let |animate| be the result of <a>Get</a>(|prototype|, "animate").
+    6. Let |animateValue| be the result of <a>Get</a>(|prototype|, "animate").
 
-    7. If the result of <a>IsCallable</a>(|animate|) is false, <a>throw</a> a <a>TypeError</a> and
-        abort all these steps.
+    7. Let |animate| be the result of <a>converting</a> |animateValue| to the <a>Function</a>
+        <a>callback function</a> type. If an exception is thrown, rethrow the exception and abort
+        all these steps.
 
-    10. Let |definition| be a new <a>animator definition</a> with:
+    8. Let |destroyValue| be the result of <a>Get</a>(|prototype|, "onDestroy").
+
+    9. Let |destroy| be the result of <a>converting</a> |destroyValue| to the <a>Function</a>
+        <a>callback function</a> type. If an exception is thrown, rethrow the exception and abort
+        all these steps.
+
+
+    8. Let |definition| be a new <a>animator definition</a> with:
 
         - <a>animator name</a> being |name|
 
@@ -260,7 +271,10 @@ following steps:
 
         - <a>animate function</a> being |animate|
 
-    11. Add the key-value pair (|name| - |definition|) to the <a>animator name to animator
+        - <a>destroy function</a> being |destroy|
+
+
+    9. Add the key-value pair (|name| - |definition|) to the <a>animator name to animator
         definition map</a>.
 </div>
 
@@ -315,10 +329,9 @@ To <dfn>create a new animator instance</dfn> given a |name|, |timeline|, |effect
 
     5. Let |state| be <a>StructuredDeserialize</a>(|serializedState|).
 
-    6. Let |animatorInstance| be the result of <a>Construct</a>(|animatorCtor|, [|options|, |state|]).
-
-        If <a>Construct</a> throws an exception, abort the following steps.
-
+    6. Let |animatorInstance| be the result of <a>constructing</a> |animatorCtor| with
+        [|options|, |state| as args. If an exception is thrown, rethrow the exception and abort all
+        these steps.
 
     7. Set the following on |animatorInstance| with:
         - <a>animator name</a> being |name|
@@ -417,22 +430,17 @@ To <dfn>migrate an animator instance</dfn> from one {{WorkletGlobalScope}} to an
 
         If |definition| does not exist then abort the following steps.
 
-     3. Let |animatorCtor| be the <a>class constructor</a> of |definition|.
+     3. Let |destroyFunction| be the <a>destroy function</a> of |definition|.
 
-     4. Let |prototype| be the result of <a>Get</a>(|animatorCtor|, "prototype").
 
-     5. Let |onDestroyFunction| be the result of <a>Get</a>(|prototype|, "onDestroy").
+     4. <a>Invoke</a> |destroyFunction| with |instance| as the <a>callback this value</a> and
+        let |state| be the result of the invocation. If any exception is thrown, rethrow the
+        exception and abort the following steps.
 
-     6. If the result of <a>IsCallable</a>(|onDestroyFunction|) is false then abort the following
-        steps.
-
-     7. <a>Invoke</a> |onDestroyFunction| with |instance| as the <a>callback this value</a> and let
-        |state| be the result of the invocation.
-
-     8. Set |serializedState| to be the result of <a>StructuredSerialize</a>(|state|).
+     5. Set |serializedState| to be the result of <a>StructuredSerialize</a>(|state|).
         If any exception is thrown, then abort the following steps.
 
-     9. Run the procedure to <a>remove an animator instance</a> given |instance|, and
+     6. Run the procedure to <a>remove an animator instance</a> given |instance|, and
         |sourceWorkletGlobalScope|.
 
   2. Wait for the above task to complete. If the task is aborted, abort the following steps.
@@ -504,18 +512,17 @@ animation's output.
 Creating a Worklet Animation {#creating-worklet-animation}
 -----------------------------------------------------------
 
-<pre class='idl'>
-
-
-[Constructor (DOMString animatorName,
-              optional (AnimationEffectReadOnly or sequence<AnimationEffectReadOnly>)? effects = null,
+<xmp class='idl'>
+[Exposed=Window,
+ Constructor (DOMString animatorName,
+              optional (AnimationEffect or sequence<AnimationEffect>)? effects = null,
               optional AnimationTimeline? timeline,
               optional any options)]
 interface WorkletAnimation : Animation {
         readonly attribute DOMString animatorName;
 };
 
-</pre>
+</xmp>
 
 
 <div algorithm="create-worklet-animation">
@@ -531,9 +538,9 @@ Creates a new {{WorkletAnimation}} object using the following procedure.
         {{Window}} that is the <a>current global object</a>.
 
     3. Let |effect| be the result corresponding to the first matching condition from below.
-         : If |effects| is a {{AnimationEffectReadOnly}} object,
+         : If |effects| is a {{AnimationEffect}} object,
          :: Let effect be |effects|.
-         : If |effects| is a <a>list</a> of {{AnimationEffectReadOnly}}</a> objects,
+         : If |effects| is a <a>list</a> of {{AnimationEffect}}</a> objects,
          :: Let |effect| be a new {{WorkletGroupEffect}} with its children set to |effects|.
          : Otherwise,
          :: Let |effect| be undefined.
@@ -574,7 +581,7 @@ Here are a few implications of the above semantics:
     necessarily change its output, but may change the animation <a>play state</a>.
  - Similarly, invoking {{Animation/finish()}} or updating a <a>worklet animation's</a> <a>playback
     rate</a> will only change the animation <a>play state</a> and may not change the output.
- - Querying the animation effect's local time using {{AnimationEffectReadOnly/getComputedTiming()}}
+ - Querying the animation effect's local time using {{AnimationEffect/getComputedTiming()}}
     may return stale information, in the case where the <a>animator instance</a> is running in a
     parallel execution context.
 
@@ -682,20 +689,18 @@ corresponding <a>animator instance</a> can directly control the <a>child effects
 times</a>. This allows a single worklet animation to coordinate multiple effects - see
 [[#example-2]] for an example of such a use-case.
 
-<pre class='idl'>
-
-interface WorkletGroupEffectReadOnly :  GroupEffectReadOnly {};
-
-interface WorkletGroupEffect :  WorkletGroupEffectReadOnly {};
-WorkletGroupEffect implements AnimationEffectMutable;
-WorkletGroupEffect implements GroupEffectMutable;
+<xmp class='idl'>
+[Exposed=AnimationWorklet]
+interface WorkletGroupEffect {
+  sequence<AnimationEffect> getChildren();
+};
 
 [Exposed=AnimationWorklet]
-partial interface AnimationEffectReadOnly {
+partial interface AnimationEffect {
     // Intended for use inside Animation Worklet scope to drive the effect.
     attribute double localTime;
 };
-</pre>
+</xmp>
 
 <div algorithm="set-local-time">
 
@@ -713,9 +718,9 @@ action that corresponds to the first matching condition from the following:
 
 </div>
 
-Issue: The above algorithm should probably only apply to within the AnimationWorkletGlobalScope?
-
-[Issue](https://github.com/w3c/web-animations/issues/191)
+Issue(w3c/csswg-drafts#2071): The above interface exposes a conservative subset
+of GroupEffect proposed as part of web-animation-2. Once that is available we
+should switch to it.
 
 
 Effect Stack and Composite Order {#effect-stack-composite-order}
@@ -725,15 +730,6 @@ As with other animations, <a>worklet animations</a> participate in the <a>effect
 worklet animation does not have a specific <a>animation class</a> which means it has the same
 composite order as other Javascript created web animations.
 
-Security Considerations {#security-considerations}
-==================================================
-
-Issue: Need to decide what security considerations there are for this spec.
-
-Privacy Considerations {#privacy-considerations}
-================================================
-
-Issue: Need to decide what privacy considerations there are for this spec.
 
 Examples {#examples}
 ====================
@@ -751,7 +747,7 @@ animates fully to close or open position depending on its current position.
 </div>
 
 <script>
-await animationWorklet.addModule('hidey-bar-animator.js');
+await CSS.animationWorklet.addModule('hidey-bar-animator.js');
 const scrollTimeline = new ScrollTimeline($scrollingContainer, {timeRange: 1000});
 const documentTimeline = document.timeline;
 
@@ -759,7 +755,7 @@ const documentTimeline = document.timeline;
 // currenTime values directly.
 const animation = new WorkletAnimation(
     'hidey-bar',
-    new KeyFrameEffect($header,
+    new KeyframeEffect($header,
                         [{transform: 'translateX(100px)'}, {transform: 'translateX(0px)'}],
                         {duration: 1000, iterations: 1, fill: 'both' }]),
     scrollTimeline,
@@ -825,19 +821,19 @@ sync with scroll offset.
 </div>
 
 <script>
-await animationWorklet.addModule('twitter-header-animator.js');
+await CSS.animationWorklet.addModule('twitter-header-animator.js');
 const animation = new WorkletAnimation(
     'twitter-header',
-    [new KeyFrameEffect($avatar,  /* scales down as we scroll up */
+    [new KeyframeEffect($avatar,  /* scales down as we scroll up */
                     [{transform: 'scale(1)'}, {transform: 'scale(0.5)'}],
                     {duration: 1000, iterations: 1}),
-    new KeyFrameEffect($header, /* loses transparency as we scroll up */
+    new KeyframeEffect($header, /* loses transparency as we scroll up */
                     [{opacity: 0}, {opacity: 0.8}],
                     {duration: 1000, iterations: 1})],
     new ScrollTimeline($scrollingContainer, {timeRange: 1000, startScrollOffset: 0, endScrollOffset: $header.clientHeight}));
 animation.play();
 
-// Since this animation is using a group effect, the same animation instance 
+// Since this animation is using a group effect, the same animation instance
 // is accessible via different handles: $avatarEl.getAnimations()[0], $headerEl.getAnimations()[0]
 
 </script>
@@ -884,7 +880,7 @@ A simple parallax background example.
 </div>
 
 <script>
-await animationWorklet.addModule('parallax-animator.js');
+await CSS.animationWorklet.addModule('parallax-animator.js');
 const scrollTimeline = new ScrollTimeline($scrollingContainer, {timeRange: 1000});
 const scrollRange = $scrollingContainer.scrollHeight - $scrollingContainer.clientHeight;
 
