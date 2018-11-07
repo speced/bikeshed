@@ -286,7 +286,7 @@ def transformPropdef(lines, doc, firstLine, lineNum=None, **kwargs):
         elif key == "Computed value":
             th = "<th><a href='https://drafts.csswg.org/css-cascade/#computed'>{0}:</a>".format(key)
         elif key in ("Animatable", "Animation type"):
-            th = "<th><a href='https://drafts.csswg.org/css-transitions/#animatable-properties'>{0}:</a>".format(key)
+            th = "<th><a href='https://drafts.csswg.org/web-animations/#animation-type'>{0}:</a>".format(key)
         elif key == "Applies to" and val.lower() == "all elements":
             td = "<td><a href='https://drafts.csswg.org/css-pseudo/#generated-content' title='Includes ::before and ::after pseudo-elements.'>all elements</a>"
         ret.append(tr+th+td)
