@@ -930,7 +930,7 @@ def removeMultipleLinks(doc):
             if len(links) > 1:
                 for el in links[1:]:
                     el.tag = "span"
-                    removeAttr(el, "href", "data-link-type", "id")
+                    removeAttr(el, "href", "data-link-type")
 
 def processIssuesAndExamples(doc):
     # Add an auto-genned and stable-against-changes-elsewhere id to all issues and
