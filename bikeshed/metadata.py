@@ -295,7 +295,8 @@ class MetadataManager:
         elif self.status == "FINDING":
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-NOTE"
         else:
-            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(self.rawStatus)
+            shortStatus = self.rawStatus.partition("/")[2] if (self.rawStatus and "/" in self.rawStatus) else self.rawStatus
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(shortStatus)
         if self.customWarningText is not None:
             macros["customwarningtext"] = "\n".join(markdown.parse(self.customWarningText, self.indent))
         if self.customWarningTitle is not None:
