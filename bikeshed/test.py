@@ -42,7 +42,7 @@ def runAllTests(Spec, testFiles=None, md=None):
             p("No tests were found")
             return True
     else:
-        files = [os.path.join(TEST_DIR, x) for x in files]
+        testFiles = [os.path.join(TEST_DIR, x) for x in testFiles]
     numPassed = 0
     total = 0
     fails = []
