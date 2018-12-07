@@ -76,15 +76,25 @@ def extractHeaderInfo(lines, infilename):
     title = None
     url = None
     status = None
+    ed = None
+    date = None
+    cdate = None
     for line in lines:
-        match = re.match("(Draft|Title|Status):\s*(.*)", line)
+        match = re.match("(Draft|Title|Status|Date|ED):\s*(.*)", line)
         if match:
             if match.group(1) == "Draft":
                 url = match.group(2)
             elif match.group(1) == "Title":
                 title = match.group(2)
             elif match.group(1) == "Status":
-                status = match.group(2).upper()
+                status = match.group(2).rstrip()
+            elif match.group(1) == "Date":
+                date = match.group(2).rstrip()
+                cdate = date
+                if not re.match("(\d{4})-(\d\d)-(\d\d)$", date):
+                    die("Incorrect Date format. Expected YYYY-MM-DD, but got:\n{0}", date)
+            elif match.group(1) == "ED":
+                ed = match.group(2).rstrip()
     if url is None:
         die("Missing 'Draft' metadata.")
         return
@@ -99,25 +109,41 @@ def extractHeaderInfo(lines, infilename):
             status = match.group(1)
             if status == "WD" and re.search("LC", infilename, re.I):
                 status = "LCWD"
-        shortname = match.group(2)
-        cdate = match.group(3)
-        date = "{0}-{1}-{2}".format(*re.match("(\d{4})(\d\d)(\d\d)", cdate).groups())
+        if ed is None:
+            shortname = match.group(2)
+            ed = "http://dev.w3.org/csswg/{}/".format(shortname)
+        if date is None:
+            cdate = match.group(3)
+            date = "{0}-{1}-{2}".format(*re.match("(\d{4})(\d\d)(\d\d)", cdate).groups())
     else:
-        die("Draft url needs to have the format /status-shortname-date/. Got:\n{0}", url)
+        warn("Autodetection of Shortname, Date, and Status failed; draft url does not match the format /status-shortname-date/. Got:\n{0}", url)
+
+    if date is None:
+        die("Missing 'Date' metadata.")
         return
+    if status is None:
+        die("Missing 'Status' metadata.")
+        return
+    if ed is None:
+        die("Missing 'ED' metadata.")
+        return
+
     return {
         'title': title,
         'date': date,
         'cdate': cdate,
-        'shortname': shortname,
+        'ed': ed,
         'status': status,
         'url': url
     }
 
 
 def printHelpMessage():
-        say('''Draft:    http://www.w3.org/TR/2013/WD-css-foo-3-20130103/
-Title:    CSS Foo Level 3
+        say('''Draft:    http://www.w3.org/TR/2013/WD-css-foo-3-20130103/ (Mandatory)
+Title:    CSS Foo Level 3 (Mandatory)
+Date:     YYYY-MM-DD (Optional if can be autodetected from the Draft's URL)
+Status:   CR/FPWD/LCWD/LS/Version/… (Optional if can be autodetected from the Draft's URL)
+ED:       https://url.to.the.editor.s/draft/ (Optional, defaults to a csswg editor's draft if shortname can be infered from the Draft's URL)
 ... anything else you want here, except 4 dashes ...
 
 ----
@@ -151,7 +177,7 @@ def printHeader(outfile, headerInfo):
 
 <p>Review document: <a href="{url}">{url}</a>
 
-<p>Editor's draft: <a href="http://dev.w3.org/csswg/{shortname}/">http://dev.w3.org/csswg/{shortname}/</a>
+<p>Editor's draft: <a href="{ed}">{ed}</a>
 
 <p>The following color coding convention is used for comments:</p>
 
