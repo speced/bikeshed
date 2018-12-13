@@ -59,7 +59,9 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
     if group is None and doc.md.group is not None:
         group = doc.md.group.lower()
     if status is None:
-        status = doc.md.rawStatus
+        megaGroup,_,status = doc.md.rawStatus.partition("/")
+        if status == "":
+            status = megaGroup
 
     def boilerplatePath(*segs):
         return scriptPath("boilerplate", *segs)
