@@ -58,7 +58,7 @@ def retrieveBoilerplateFile(doc, name, group=None, status=None, error=True):
     # Filenames must be of the format NAME.include or NAME-STATUS.include
     if group is None and doc.md.group is not None:
         group = doc.md.group.lower()
-    if status is None:
+    if status is None and doc.md.rawStatus is not None:
         megaGroup,_,status = doc.md.rawStatus.partition("/")
         if status == "":
             status = megaGroup
