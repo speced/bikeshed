@@ -22,7 +22,7 @@ def processWptElements(doc):
 		testNames = testNamesFromEl(el, pathPrefix=pathPrefix)
 		for testName in testNames:
 			if testName not in testData:
-				die("Couldn't find WPT test '{0}' - did you misspell something?", testName, el=el)
+				warn("Couldn't find WPT test '{0}' - did you misspell something?", testName, el=el)
 				continue
 			seenTestNames.add(testName)
 		createHTML(doc, el, testNames)
@@ -44,7 +44,7 @@ def processWptElements(doc):
 		atLeastOneElement = True
 		prefixedNames = [p for p in testData if prefixInPath(pathPrefix, p) and p not in seenTestNames]
 		if len(prefixedNames) == 0:
-			die("Couldn't find any tests with the path prefix '{0}'.", pathPrefix)
+			warn("Couldn't find any tests with the path prefix '{0}'.", pathPrefix)
 			return
 		createHTML(doc, wptRestElements[0], prefixedNames)
 		warn("<wpt-rest> is intended for debugging only. Move the tests to <wpt> elements next to what they're testing.")
@@ -127,7 +127,7 @@ def checkForOmittedTests(pathPrefix, testData, seenTestNames):
 			if testPath not in seenTestNames:
 				unseenTests.append(testPath)
 	if unseenTests:
-		die("There are {0} WPT tests underneath your path prefix aren't in your document and must be added:\n{1}",
+		warn("There are {0} WPT tests underneath your path prefix aren't in your document and must be added:\n{1}",
 			len(unseenTests),
 			"\n".join("  " + path for path in sorted(unseenTests)))
 
