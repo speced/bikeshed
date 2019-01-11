@@ -613,14 +613,14 @@ def parseRepository(key, val, lineNum):
         return Repository(url=pieces[0], name=pieces[1])
     elif len(pieces) == 1:
         # Try to recognize a GitHub url
-        match = re.match("https://github.com/([\w-]+)/([\w-]+)/?$", val)
+        match = re.match("https://github.([\w-.]+)/([\w-]+)/([\w-]+)/?$", val)
         if match:
             return GithubRepository(*match.groups())
-        # If you just provide a user/repo pair, assume it's a github repo.
+        # If you just provide a user/repo pair, assume it's a github.com repo.
         # Will provide ways to opt into other repos when people care.
         match = re.match("([\w-]+)/([\w-]+)$", val)
         if match:
-            return GithubRepository(*match.groups())
+            return GithubRepository("com", *match.groups())
         # Otherwise just use the url as the shortname
         return Repository(url=val)
     else:

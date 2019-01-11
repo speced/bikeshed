@@ -27,16 +27,16 @@ class Repository(object):
 
 
 class GithubRepository(Repository):
-    def __init__(self, user, repo):
-        super(GithubRepository, self).__init__("https://github.com/{0}/{1}".format(user, repo), "{0}/{1}".format(user, repo))
+    def __init__(self, ns, user, repo):
+        super(GithubRepository, self).__init__("https://github.{0}/{1}/{2}".format(ns, user, repo), "{0}/{1}".format(user, repo))
         self.user = user
         self.repo = repo
-        self.type = "github"
+        self.type = "github"+ns
 
     def formatIssueUrl(self, id=None):
         if id is None:
-            return "https://github.com/{0}/{1}/issues/".format(self.user, self.repo)
-        return "https://github.com/{0}/{1}/issues/{2}".format(self.user, self.repo, id)
+            return "https://github.{0}/{1}/{2}/issues/".format(self.ns, self.user, self.repo)
+        return "https://github.{0}/{1}/{2}/issues/{2}".format(self.ns, self.user, self.repo, id)
 
     def __str__(self):
         return "{0}/{1}".format(self.user, self.repo)
