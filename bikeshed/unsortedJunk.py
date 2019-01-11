@@ -1246,8 +1246,8 @@ def inlineRemoteIssues(doc):
     for i,issue in enumerate(inlineIssues):
         issueUserRepo = "{0}/{1}".format(*issue)
         key = "{0}/{1}".format(issueUserRepo, issue.num)
-        href = "https://github.com/{0}/issues/{1}".format(issueUserRepo, issue.num)
-        url = "https://api.github.com/repos/{0}/issues/{1}".format(issueUserRepo, issue.num)
+        href = "https://github.{0}/{1}/issues/{2}".format(doc.md.repository.ns, issueUserRepo, issue.num)
+        url = "{0}/repos/{1}/issues/{2}".format(doc.md.repository.api, issueUserRepo, issue.num)
         say("Fetching issue {:-3d}/{:d}: {:s}".format(i+1, len(inlineIssues), key))
 
         # Fetch the issues

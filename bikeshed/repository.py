@@ -8,8 +8,9 @@ class Repository(object):
     '''
 
     def __init__(self, url, name=None, type=None):
+        self.ns = "com"
         self.url = url
-
+        self.api = "https://api.github.com"
         if name:
             self.name = name
         else:
@@ -29,14 +30,16 @@ class Repository(object):
 class GithubRepository(Repository):
     def __init__(self, ns, user, repo):
         super(GithubRepository, self).__init__("https://github.{0}/{1}/{2}".format(ns, user, repo), "{0}/{1}".format(user, repo))
+        self.ns = ns
         self.user = user
         self.repo = repo
-        self.type = "github"+ns
+        self.type = "github"
+        self.api = "https://github.{0}/api/v3".format(ns)
 
     def formatIssueUrl(self, id=None):
         if id is None:
             return "https://github.{0}/{1}/{2}/issues/".format(self.ns, self.user, self.repo)
-        return "https://github.{0}/{1}/{2}/issues/{2}".format(self.ns, self.user, self.repo, id)
+        return "https://github.{0}/{1}/{2}/issues/{3}".format(self.ns, self.user, self.repo, id)
 
     def __str__(self):
         return "{0}/{1}".format(self.user, self.repo)
