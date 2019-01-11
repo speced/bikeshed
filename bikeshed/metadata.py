@@ -613,7 +613,7 @@ def parseRepository(key, val, lineNum):
         return Repository(url=pieces[0], name=pieces[1])
     elif len(pieces) == 1:
         # Try to recognize a GitHub url
-        match = re.match("https://github.([\w-.]+)/([\w-]+)/([\w-]+)/?$", val)
+        match = re.match("https://github\.([\w.-]+)/([\w-]+)/([\w-]+)/?$", val)
         if match:
             return GithubRepository(*match.groups())
         # If you just provide a user/repo pair, assume it's a github.com repo.
@@ -831,10 +831,10 @@ def getSpecRepository(doc):
             with open(os.devnull, "wb") as fnull:
                 remotes = subprocess.check_output(["git", "remote", "-v"], stderr=fnull)
             os.chdir(old_dir)
-            search = re.search(r"origin\tgit@github\.com:([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
+            search = re.search(r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
             if search:
                 return GithubRepository(*search.groups())
-            search = re.search(r"origin\thttps://github.com/([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
+            search = re.search(r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
             if search:
                 return GithubRepository(*search.groups())
             return config.Nil()
