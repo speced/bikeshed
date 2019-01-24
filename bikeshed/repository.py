@@ -34,7 +34,10 @@ class GithubRepository(Repository):
         self.user = user
         self.repo = repo
         self.type = "github"
-        self.api = "https://github.{0}/api/v3".format(ns)
+        if ns == "com":
+            self.api = "https://api.github.com"
+        else:
+            self.api = "https://github.{0}/api/v3".format(ns)
 
     def formatIssueUrl(self, id=None):
         if id is None:

@@ -1293,7 +1293,11 @@ def inlineRemoteIssues(doc):
                 die("403 error when fetching GitHub Issues:\n{0}", config.printjson(error))
             continue
         elif res.status_code >= 400:
-            die("{0} error when fetching GitHub Issues:\n{1}", res.status_code, config.printjson(res.json()))
+            try:
+                error = config.printjson(res.json())
+            except:
+                error = "First 100 characters of error:\n" + res.text[0:100]
+            die("{0} error when fetching GitHub Issues:\n{1}", res.status_code, error)
             continue
         responses[key] = data
         # Put the issue data into the DOM
