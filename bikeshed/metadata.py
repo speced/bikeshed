@@ -96,6 +96,7 @@ class MetadataManager:
         self.repository = config.Nil()
         self.requiredIDs = []
         self.slimBuildArtifact = False
+        self.snapshotURL = None
         self.statusText = []
         self.testSuite = None
         self.title = None
@@ -269,7 +270,9 @@ class MetadataManager:
         if self.deadline:
             macros["deadline"] = unicode(self.deadline.strftime("{0} %B %Y".format(self.deadline.day)), encoding="utf-8")
             macros["isodeadline"] = unicode(self.deadline.strftime("%Y-%m-%d"), encoding="utf-8")
-        if self.status in config.snapshotStatuses:
+        if self.snapshotURL and self.status in config.datedStatuses:
+            macros["version"] = self.snapshotURL
+        elif self.status in config.snapshotStatuses:
             macros["version"] = "https://www.w3.org/TR/{year}/{status}-{vshortname}-{cdate}/".format(**macros)
         elif self.ED:
             macros["version"] = self.ED
@@ -987,6 +990,7 @@ knownKeys = {
     "Required Ids": Metadata("Required Ids", "requiredIDs", joinList, parseCommaSeparated),
     "Revision": Metadata("Revision", "level", joinValue, parseLevel),
     "Shortname": Metadata("Shortname", "displayShortname", joinValue, parseLiteral),
+    "Snapshot": Metadata("Snapshot", "snapshotURL", joinValue, parseLiteral),
     "Slim Build Artifact": Metadata("Slim Build Artifact", "slimBuildArtifact", joinValue, parseBoolean),
     "Status Text": Metadata("Status Text", "statusText", joinList, parseLiteralList),
     "Status": Metadata("Status", "rawStatus", joinValue, parseLiteral),

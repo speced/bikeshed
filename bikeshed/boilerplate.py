@@ -731,7 +731,7 @@ def addSpecMetadataSection(doc):
         md["This version"].append(E.a({"href":mac['version'], "class":"u-url"}, mac['version']))
     if doc.md.TR:
         md["Latest published version"].append(E.a({"href": doc.md.TR}, doc.md.TR))
-    if doc.md.ED and doc.md.status in config.snapshotStatuses:
+    if doc.md.ED and doc.md.status in config.datedStatuses and ( not 'version' in mac or mac['version'] != doc.md.ED):
         md["Editor's Draft"].append(E.a({"href": doc.md.ED}, doc.md.ED))
     if doc.md.previousVersions:
         md["Previous Versions"] = [E.a({"href":ver, "rel":"prev"}, ver) for ver in doc.md.previousVersions]
