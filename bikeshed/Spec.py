@@ -151,6 +151,7 @@ class Spec(object):
         self.body = find("body", self)
         correctH1(self)
         includes.processInclusions(self)
+        includes.processSVGInclusions(self)
         metadata.parseDoc(self)
         return self
 

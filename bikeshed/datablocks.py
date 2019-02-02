@@ -44,6 +44,7 @@ def transformDataBlocks(doc, lines):
         'ignored-specs': transformIgnoredSpecs,
         'info': transformInfo,
         'include': transformInclude,
+        'include-svg': transformIncludeSVG,
         'include-code': transformIncludeCode,
         'pre': transformPre
     }
@@ -690,6 +691,37 @@ def transformInclude(lines, doc, firstLine, lineNum=None, **kwargs):
     else:
         return []
 
+def transformIncludeSVG(lines, doc, firstLine, lineNum=None, **kwargs):
+    lineNumAttr = ""
+    if lineNum is not None:
+        lineNumAttr = " line-number={0}".format(lineNum)
+    infos = parseInfoTree(lines, doc.md.indent, lineNum)
+    path = None
+    macros = {}
+    for info in infos:
+        if "path" in info:
+            if path is None:
+                path = info['path'][0]
+            else:
+                die("Include-svg blocks must only contain a single 'path'.", lineNum=lineNum)
+        if "macros" in info:
+            for k,v in info.items():
+                if k == "macros":
+                    continue
+                if k not in macros and len(v) == 1:
+                    macros[k] = v[0]
+                else:
+                    die("Include-svg block defines the '{0}' local macro more than once.", k, lineNum=lineNum)
+    if path:
+        el = "<pre class=include-svg path='{0}'".format(escapeAttr(path))
+        for i,(k,v) in enumerate(macros.items()):
+            el += " macro-{0}='{1} {2}'".format(i, k, escapeAttr(v))
+        el += "{lineNumAttr}></pre>".format(lineNumAttr=lineNumAttr)
+
+        indent = getWsPrefix(firstLine)
+        return [indent+el]
+    else:
+        return []
 
 def transformIncludeCode(lines, doc, firstLine, lineNum=None, **kwargs):
     lineNumAttr = ""

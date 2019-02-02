@@ -8,6 +8,7 @@ from collections import Counter, defaultdict
 from lxml import etree
 from lxml import html
 from lxml.cssselect import CSSSelector
+from .SVGParser import parse as svgparse
 
 from . import config
 from .messages import *
@@ -172,6 +173,24 @@ def parseHTML(text):
 def parseDocument(text):
     doc = html5lib.parse(text, treebuilder='lxml', namespaceHTMLElements=False)
     return doc
+
+
+def parseSVG(text):
+    doc = svgparse(text, treebuilder='lxml', namespaceHTMLElements=False)
+    head = doc.getroot()[0]
+    body = doc.getroot()[1]
+    if len(body) or body.text is not None:
+        # Body contains something, so return that.
+        contents = [body.text] if body.text is not None else []
+        contents.extend(body.iterchildren())
+        return contents
+    elif len(head) or head.text is not None:
+        # Okay, anything in the head?
+        contents = [head.text] if head.text is not None else []
+        contents.extend(head.iterchildren())
+        return contents
+    else:
+        return []
 
 
 def escapeHTML(text):
