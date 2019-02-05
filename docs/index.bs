@@ -34,6 +34,9 @@ spec:html; type:element;
 Installing {#installing}
 ========================
 
+If you use Bikeshed frequently in different environments, it may be helpful to run Bikeshed from a docker image
+as this avoids having to install Bikeshed's dependencies. In this case, skip directly down to [[#install-docker]].
+
 If you use Bikeshed infrequently,
 or are okay with requiring a network roundtrip every time you invoke Bikeshed,
 you probably want to use [the Bikeshed API instead](https://api.csswg.org/bikeshed/).
@@ -236,6 +239,49 @@ These instructions have worked for a lot of people on all OSes,
 but it's possible that you'll run into a new error,
 because computers are terrible.)
 
+Building a Bikeshed docker image {#install-docker}
+--------------------------------------------------
+
+- If needed, download and install [docker community engine](https://hub.docker.com/search/?type=edition&offering=community)
+
+- Build the Bikeshed image from the project's directory:
+
+    ```
+    docker build --tag=bikeshed:latest .
+    ```
+
+- Optionally, deploy the Bikeshed image to a docker registry
+
+    For example, on a unix system (for Windows, consider the Windows Subsystem for Linux):
+
+    ```
+    TAG=$(docker iamge inspect --format='{{.Id}}' bikeshed:latest)
+    DATE=$(date '+%Y.%m.%d')
+    ```
+
+    Login to a docker registry.
+
+    ```
+    docker login
+    ```
+
+    Tag the image to be pushed as organization/artifact:version
+
+    ```
+    docker tag $TAG <organization>/bikeshed:$DATE
+    ```
+
+    Push the tagged image to the docker registry
+
+    ```
+    docker push <organization>/bikeshed:$DATE
+    ```
+
+- Running Bikeshed using a docker image.
+
+    See [[#cli-docker]]
+
+
 Updating Bikeshed {#updating-bikeshed}
 --------------------------------------
 
@@ -368,6 +414,38 @@ Invoking Bikeshed Locally {#cli}
 Locally-installed Bikeshed is invoked via the command-line.
 There's a bunch of options,
 but you'll only use a few in day-to-day use.
+
+Invoking Bikeshed using a docker image {#cli-docker}
+----------------------------------------------------
+
+Typically, this requires login to the docker registry and pulling a Bikeshed image.
+
+    For some `<organization>` and some `<date>`:
+
+    ```
+    docker login
+    docker pull <organization>/bikeshed:<date>
+    ```
+
+Regardless of host environment's operating system, running Bikeshed from a docker image
+requires two things:
+- mapping a host directory to a path in the docker image (e.g. `/data`)
+- specifying the location of Bikeshed's input and output relative to the path in the docker image (i.e., `/data`)
+
+Example for a Unix host:
+
+    ```
+    docker run --rm -v $(pwd):/data <organization>/bikeshed:<date> bikeshed spec /data/<some *.bs file> [/data/<some output file>]
+    ```
+
+Example for a Windows host:
+
+    ```
+    docker run --rm --volume C:\mystuff\project1\:\data bikeshed spec \data\Index.bs \data\out\Index.html
+    ```
+
+Note that the [[#cli-options]] apply to running Bikeshed from a docker image.
+Since the Bikeshed docker image is read-only, it does not make sense to execute the Bikeshed `update` command from a docker image.
 
 Global Options {#cli-options}
 -----------------------------
