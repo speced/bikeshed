@@ -127,7 +127,7 @@ def checkForOmittedTests(pathPrefix, testData, seenTestNames):
 			if testPath not in seenTestNames:
 				unseenTests.append(testPath)
 	if unseenTests:
-		die("There are {0} WPT tests underneath your path prefix aren't in your document and must be added:\n{1}",
+		warn("There are {0} WPT tests underneath your path prefix aren't in your document and must be added:\n{1}",
 			len(unseenTests),
 			"\n".join("  " + path for path in sorted(unseenTests)))
 
