@@ -120,7 +120,7 @@ class IDLMarker(object):
                 return ("<a dfn for='{0}' data-lt='stringification behavior'>".format(construct.parent.fullName), "</a>")
             else:
                 # Otherwise, you *can* point to/dfn stringification behavior if you want.
-                return ("<idl data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
+                return ("<idl data-export data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
         return (None, None)
 
     def markupName(self, text, construct):
