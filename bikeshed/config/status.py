@@ -76,7 +76,8 @@ shortToLongStatus = {
     "fido/RD": "Review Draft",
     "fido/ID": "Implementation Draft",
     "fido/PS": "Proposed Standard",
-    "fido/FD": "Final Document"
+    "fido/FD": "Final Document",
+    "khronos/ED": "Editor's Draft"
 }
 snapshotStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/WG-NOTE", "w3c/IG-NOTE", "w3c/NOTE", "w3c/MO"]
 datedStatuses = ["w3c/WD", "w3c/FPWD", "w3c/LCWD", "w3c/CR", "w3c/PR", "w3c/REC", "w3c/PER", "w3c/WG-NOTE", "w3c/IG-NOTE", "w3c/NOTE", "w3c/MO", "whatwg/RD"]
@@ -90,7 +91,8 @@ megaGroups = {
     "tc39": frozenset(["tc39"]),
     "iso": frozenset(["wg14", "wg21"]),
     "fido": frozenset(["fido"]),
-    "priv-sec": frozenset(["audiowg", "csswg", "dap", "fxtf", "fxtf-csswg", "geolocation", "houdini", "html", "mediacapture", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"])
+    "priv-sec": frozenset(["audiowg", "csswg", "dap", "fxtf", "fxtf-csswg", "geolocation", "houdini", "html", "mediacapture", "ricg", "svg", "texttracks", "uievents", "web-bluetooth-cg", "webappsec", "webplatform", "webspecs", "whatwg"]),
+    "khronos": frozenset(["webgl"])
 }
 
 
