@@ -283,6 +283,8 @@ class Spec(object):
         fatals = messageCounts['fatal']
         links = messageCounts['linkerror']
         warnings = messageCounts['warning']
+        if self.lineNumbers:
+            warn("Because --line-numbers was used, no output was saved.")
         if fatals:
             success("Successfully generated, but fatal errors were suppressed")
             return
