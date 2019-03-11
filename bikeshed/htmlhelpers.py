@@ -184,8 +184,7 @@ def escapeAttr(text):
 
 
 def clearContents(el):
-    for child in el.iterchildren():
-        el.remove(child)
+    del el[:]
     el.text = ''
     return el
 
