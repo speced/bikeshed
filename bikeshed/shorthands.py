@@ -79,6 +79,8 @@ def transformProductionPlaceholders(doc):
             el.text = "<{0}>".format(interior)
             continue
         die("Shorthand <<{0}>> does not match any recognized shorthand grammar.", text, el=el)
+        el.tag = "span"
+        el.text = el.get("bs-autolink-syntax")
         continue
 
 def formatValue(val):
