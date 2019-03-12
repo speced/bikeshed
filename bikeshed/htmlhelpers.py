@@ -686,9 +686,11 @@ def replaceAwkwardCSSShorthands(text):
     # Replace the <<production>> shortcuts, because they won't survive the HTML parser.
     def replaceProduction(match):
         syntaxAttr = escapeAttr(match.group(0))
-        text = match.group(1)
+        escape, text = match.groups()
+        if escape:
+            return escapeHTML(match.group(0)[1:])
         return "<fake-production-placeholder class=production bs-autolink-syntax='{0}'>{1}</fake-production-placeholder>".format(syntaxAttr, text)
-    text = re.sub(r"<<([^>\n]+)>>", replaceProduction, text)
+    text = re.sub(r"(\\)?<<([^>\n]+)>>", replaceProduction, text)
 
     # Replace the ''maybe link'' shortcuts.
     # They'll survive the HTML parser,
@@ -696,9 +698,11 @@ def replaceAwkwardCSSShorthands(text):
     # (The other shortcuts are "atomic" and can't contain elements.)
     def replaceMaybe(match):
         syntaxAttr = escapeAttr(match.group(0))
-        text = match.group(1)
+        escape, text = match.groups()
+        if escape:
+            return escapeHTML(match.group(0)[1:])
         return "<fake-maybe-placeholder bs-autolink-syntax='{0}'>{1}</fake-maybe-placeholder>".format(syntaxAttr, text)
-    text = re.sub(r"''([^=\n]+?)''", replaceMaybe, text)
+    text = re.sub(r"(\\)?''([^=\n]+?)''", replaceMaybe, text)
     return text
 
 
