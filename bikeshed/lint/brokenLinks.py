@@ -25,7 +25,7 @@ def brokenLinks(doc):
             continue
         try:
             res = requests.get(href, verify=False)
-        except Exception, e:
+        except Exception as e:
             warn("The following link caused an error when I tried to request it:\n{0}\n{1}", outerHTML(el), e)
             continue
         if res.status_code >= 400:

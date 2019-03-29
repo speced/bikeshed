@@ -14,7 +14,7 @@ def update(path, dryRun=False):
         with closing(urllib2.urlopen("https://wpt.fyi/api/manifest")) as fh:
             sha = fh.info().getheader("x-wpt-sha")
             jsonData = json.load(fh, encoding="utf-8")
-    except Exception, e:
+    except Exception as e:
         die("Couldn't download web-platform-tests data.\n{0}", e)
         return
 
@@ -31,7 +31,7 @@ def update(path, dryRun=False):
                 f.write("sha: {0}\n".format(sha))
                 for path in sorted(paths):
                     f.write("{0} {1}\n".format(*path))
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save web-platform-tests data to disk.\n{0}", e)
             return
     say("Success!")

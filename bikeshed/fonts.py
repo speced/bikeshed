@@ -68,7 +68,7 @@ class Font(object):
     def __init__(self, fontfilename=config.scriptPath("bigblocks.bsfont")):
         try:
             lines = io.open(fontfilename, 'r', encoding="utf-8").readlines()
-        except Exception, e:
+        except Exception as e:
             die("Couldn't find font file “{0}”:\n{1}", fontfilename, e)
         self.metadata, lines = parseMetadata(lines)
         self.characters = parseCharacters(self.metadata, lines)
@@ -200,7 +200,7 @@ def writeOutputLines(outputFilename, inputFilename, lines):
         else:
             with io.open(outputFilename, "w", encoding="utf-8") as f:
                 f.write(''.join(lines))
-    except Exception, e:
+    except Exception as e:
         die("Something prevented me from saving the output document to {0}:\n{1}", outputFilename, e)
 
 if __name__ == "__main__":

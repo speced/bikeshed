@@ -23,7 +23,7 @@ def update(path, dryRun=False):
             die("Unrecognized test suite content-type '{0}'.", res.contentType)
             return
         rawTestSuiteData = res.data
-    except Exception, e:
+    except Exception as e:
         die("Couldn't download test suite data.  Error was:\n{0}", str(e))
         return
 
@@ -47,6 +47,6 @@ def update(path, dryRun=False):
         try:
             with io.open(os.path.join(path, "test-suites.json"), 'w', encoding="utf-8") as f:
                 f.write(unicode(json.dumps(testSuites, ensure_ascii=False, indent=2, sort_keys=True)))
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save test-suite database to disk.\n{0}", e)
     say("Success!")

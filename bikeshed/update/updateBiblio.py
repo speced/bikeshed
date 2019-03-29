@@ -31,7 +31,7 @@ def update(path, dryRun=False):
                 writtenPaths.add(p)
                 with io.open(p, 'w', encoding="utf-8") as fh:
                     writeBiblioFile(fh, biblios)
-            except Exception, e:
+            except Exception as e:
                 die("Couldn't save biblio database to disk.\n{0}", e)
                 return
 
@@ -64,7 +64,7 @@ def update(path, dryRun=False):
             writtenPaths.add(p)
             with io.open(p, 'w', encoding="utf-8") as fh:
                 fh.write(unicode(json.dumps(reducedNames, indent=0, ensure_ascii=False, sort_keys=True)))
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save biblio database to disk.\n{0}", e)
             return
 
@@ -75,7 +75,7 @@ def update(path, dryRun=False):
             writtenPaths.add(p)
             with io.open(p, 'w', encoding="utf-8") as fh:
                 fh.write(unicode(json.dumps(numberedNames, indent=0, ensure_ascii=False, sort_keys=True)))
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save biblio numeric-suffix information to disk.\n{0}", e)
     say("Success!")
     return writtenPaths
@@ -100,7 +100,7 @@ def getSpecrefData():
                 warn("Your Python is too old (pre-2.7.10) to talk to SpecRef over HTTPS, and something's wrong with the CSSWG proxy as well. Report this to the Bikeshed repo, please?")
                 raise
                 return "{}"
-    except Exception, e:
+    except Exception as e:
         die("Couldn't download the SpecRef biblio data.\n{0}", e)
         return "{}"
 
@@ -109,7 +109,7 @@ def getWG21Data():
     try:
         with closing(urllib2.urlopen("https://wg21.link/specref.json")) as fh:
             return unicode(fh.read(), encoding="utf-8")
-    except Exception, e:
+    except Exception as e:
         die("Couldn't download the WG21 biblio data.\n{0}", e)
         return "{}"
 
@@ -118,7 +118,7 @@ def getCSSWGData():
     try:
         with closing(urllib2.urlopen("https://raw.githubusercontent.com/w3c/csswg-drafts/master/biblio.ref")) as fh:
             return [unicode(line, encoding="utf-8") for line in fh.readlines()]
-    except Exception, e:
+    except Exception as e:
         die("Couldn't download the CSSWG biblio data.\n{0}", e)
         return []
 

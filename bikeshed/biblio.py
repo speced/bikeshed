@@ -269,7 +269,7 @@ def processSpecrefBiblioFile(text, storage, order):
     import json
     try:
         datas = json.loads(text)
-    except Exception, e:
+    except Exception as e:
         die("Couldn't read the local JSON file:\n{0}", str(e))
         return storage
 
