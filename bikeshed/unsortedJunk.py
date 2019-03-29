@@ -1321,7 +1321,7 @@ def inlineRemoteIssues(doc):
     try:
         with io.open(config.scriptPath("spec-data", "github-issues.json"), 'w', encoding="utf-8") as f:
             f.write(unicode(json.dumps(responses, ensure_ascii=False, indent=2, sort_keys=True)))
-    except Exception, e:
+    except Exception as e:
         warn("Couldn't save GitHub Issues cache to disk.\n{0}", e)
     return
 

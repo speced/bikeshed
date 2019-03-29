@@ -23,7 +23,7 @@ def createManifest(path, dryRun=False):
                 continue
             with io.open(absPath, 'r', encoding="utf-8") as fh:
                 manifests.append((relPath, hashFile(fh)))
-    except Exception, err:
+    except Exception as err:
         raise
     if not dryRun:
         try:
@@ -31,7 +31,7 @@ def createManifest(path, dryRun=False):
                 fh.write(unicode(datetime.datetime.utcnow()) + "\n")
                 for p,h in sorted(manifests, key=keyManifest):
                     fh.write("{0} {1}\n".format(h, p))
-        except Exception, err:
+        except Exception as err:
             raise
 
 
@@ -86,13 +86,13 @@ def updateByManifest(path, dryRun=False):
     try:
         with io.open(os.path.join(path, "manifest.txt"), 'r', encoding="utf-8") as fh:
             oldManifest = fh.readlines()
-    except Exception, e:
+    except Exception as e:
         warn("Couldn't find local manifest file.\n{0}", e)
         return False
     try:
         with closing(urllib2.urlopen(ghPrefix + "manifest.txt")) as fh:
             newManifest = [unicode(line, encoding="utf-8") for line in fh]
-    except Exception, e:
+    except Exception as e:
         warn("Couldn't download remote manifest file.\n{0}", e)
         return False
 

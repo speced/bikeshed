@@ -13,7 +13,7 @@ def update(path, dryRun=False):
         say("Downloading link defaults...")
         with closing(urllib2.urlopen("https://raw.githubusercontent.com/tabatkins/bikeshed/master/bikeshed/spec-data/readonly/link-defaults.infotree")) as fh:
             data = unicode(fh.read(), encoding="utf-8")
-    except Exception, e:
+    except Exception as e:
         die("Couldn't download link defaults data.\n{0}", e)
         return
 
@@ -21,7 +21,7 @@ def update(path, dryRun=False):
         try:
             with io.open(os.path.join(path, "link-defaults.infotree"), 'w', encoding="utf-8") as f:
                 f.write(data)
-        except Exception, e:
+        except Exception as e:
             die("Couldn't save link-defaults database to disk.\n{0}", e)
             return
     say("Success!")

@@ -703,7 +703,7 @@ def parseMaxToCDepth(key, val, lineNum):
         return float('inf')
     try:
         v = int(val)
-    except ValueError, e:
+    except ValueError as e:
         die("Max ToC Depth metadata must be 'none' or an integer 1-5. Got '{0}'.", val, lineNum=lineNum)
         return float('inf')
     if not (1 <= v <= 5):
@@ -798,7 +798,7 @@ def fromJson(data, source=""):
     md = MetadataManager()
     try:
         defaults = json.loads(data)
-    except Exception, e:
+    except Exception as e:
         if data != "":
             if source == "computed-metadata":
                 die("Error loading computed-metadata JSON.\nCheck if you need to JSON-escape some characters in a text macro?\n{0}", str(e))

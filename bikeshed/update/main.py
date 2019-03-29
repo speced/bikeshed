@@ -59,7 +59,7 @@ def fixupDataFiles():
         localVersion = None
     try:
         remoteVersion = int(open(remotePath("version.txt"), 'r').read())
-    except IOError, err:
+    except IOError as err:
         warn("Couldn't check the datafile version. Bikeshed may be unstable.\n{0}", err)
         return
 
@@ -73,7 +73,7 @@ def fixupDataFiles():
     try:
         for filename in os.listdir(remotePath()):
             copyanything(remotePath(filename), localPath(filename))
-    except Exception, err:
+    except Exception as err:
         warn("Couldn't update datafiles from cache. Bikeshed may be unstable.\n{0}", err)
         return
 
@@ -90,7 +90,7 @@ def updateReadonlyDataFiles():
             if filename.startswith("readonly"):
                 continue
             copyanything(localPath(filename), remotePath(filename))
-    except Exception, err:
+    except Exception as err:
         warn("Error copying over the datafiles:\n{0}", err)
         return
 

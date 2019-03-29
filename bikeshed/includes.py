@@ -40,7 +40,7 @@ def handleBikeshedInclude(el, doc):
         try:
             with io.open(config.docPath(doc, path), 'r', encoding="utf-8") as f:
                 lines = f.readlines()
-        except Exception, err:
+        except Exception as err:
             die("Couldn't find include file '{0}'. Error was:\n{1}", path, err, el=el)
             removeNode(el)
             return
@@ -86,7 +86,7 @@ def handleCodeInclude(el, doc):
     try:
         with io.open(config.docPath(doc, path), 'r', encoding="utf-8") as f:
             lines = f.readlines()
-    except Exception, err:
+    except Exception as err:
         die("Couldn't find include-code file '{0}'. Error was:\n{1}", path, err, el=el)
         removeNode(el)
         return

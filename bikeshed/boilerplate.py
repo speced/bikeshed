@@ -19,7 +19,7 @@ def addBikeshedVersion(doc):
         return
     try:
         bikeshedVersion = subprocess.check_output("git rev-parse HEAD", cwd=config.scriptPath(), shell=True).rstrip()
-    except Exception, e:
+    except Exception as e:
         warn("Couldn't discover the current Bikeshed version. Please report this error:\n{0}", e)
         return
     appendChild(doc.head,

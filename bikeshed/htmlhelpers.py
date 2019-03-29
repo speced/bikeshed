@@ -24,7 +24,7 @@ def findAll(sel, context):
         context = context.document
     try:
         return CSSSelector(sel, namespaces={"svg":"http://www.w3.org/2000/svg"})(context)
-    except Exception, e:
+    except Exception as e:
         die("The selector '{0}' returned an error:\n{1}", sel, e)
         return []
 
