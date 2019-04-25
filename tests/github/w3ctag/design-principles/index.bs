@@ -18,9 +18,13 @@ Link Defaults: html (dfn) queue a task/in parallel/reflect
 </pre>
 <pre class="link-defaults">
 spec:html; type:dfn; for:/; text:browsing context
+spec:webidl; type:dfn; text:namespace
+spec:webidl; type:extended-attribute; text:Constructor
 </pre>
 <pre class="anchors">
 url: https://tc39.github.io/ecma262/#sec-error-objects; type: dfn; text: ECMAScript error objects;
+url: https://www.w3.org/TR/WebCryptoAPI/#dfn-Crypto; type: interface; text: Crypto
+url: https://w3c.github.io/touch-events/#idl-def-touchevent; type: interface; text: TouchEvent
 url: https://w3c.github.io/IntersectionObserver/;
     type: interface; text: IntersectionObserver; url: #intersectionobserver
     type: interface; text: IntersectionObserverEntry; url: #intersectionobserverentry
@@ -352,6 +356,99 @@ For example,
 is more readable than
 <code highlight="js">window.scrollBy(50, 0)</code>.
 
+<h3 id="constructors">Classes should have constructors when possible</h3>
+
+By default, [[!WEBIDL]] interfaces are reified in JavaScript as "non-constructible" classes: trying
+to create instances of them using the normal pattern in JavaScript, `new X()`, will throw a
+{{TypeError}}. This is a poor experience for JavaScript developers, and doesn't match the design of
+most of the JavaScript standard library or of the classes JavaScript developers themselves create.
+
+From a naive perspective, it's not even coherent: how can instances of this thing ever exist, if
+they can't be constructed? The answer is that the platform has magic powers: it can create instances
+of Web IDL-derived classes without ever actually calling their constructor.
+
+You should strive to reduce such magic in designing your own APIs, and give them constructors which
+allow JavaScript developers to create them, just like the platform does. This means adding an
+appropriate [{{Constructor}}] extended attribute to your interface, and defining the algorithm for
+creating new instances of your class.
+
+Apart from reducing the magic in the platform, adding constructors allows JavaScript developers to
+create instances of the class for their own purposes, such as testing, mocking, or interfacing with
+third-party libraries which accept instances of that class. Additionally, because of how
+JavaScript's class design works, it is only possible to create a subclass of the class if it is
+constructible.
+
+Sometimes this isn't the right answer: for example, some objects essentially wrap handles to
+privileged resources, and it isn't reasonable to create some representation of that privileged
+resource in JavaScript so that you can pass it to the constructor. Or the object's lifecycle needs
+to be very carefully controlled, so that creating new ones is only possible through privileged
+operations. Or the interface represents an abstract base class for which it doesn't make sense to
+construct an instance, or create an author-defined subclass. But cases like these should be the
+exception, not the norm.
+
+<p class="example">The {{Event}} class, and all its derived interfaces, are constructible. This
+allows JavaScript developers to synthesize instances of them, which can be useful in testing or
+shimming scenarios. For example, a library designed for {{MouseEvent}} instances can still be used
+by another library that accepts as input {{TouchEvent}} instances, by writing a small bit of adapter
+code that creates synthetic {{MouseEvent}}s.</p>
+
+<p class="example">The {{DOMTokenList}} class is, very unfortunately, <a
+href="https://www.w3.org/Bugs/Public/show_bug.cgi?id=27114">not constructible</a>. This prevents the
+creation of <a>custom elements</a> that expose their token list attributes as {{DOMTokenList}}s.</p>
+
+<p class="example">No HTML elements are constructible. This is largely due to some unfortunate
+design decisions that <a href="https://github.com/whatwg/html/issues/896">would take some effort to
+work around</a>. In the meantime, for the purposes of the <a>customized built-in elements</a>
+feature, they have been made subclassable through a specifically-designed one-off solution: the
+[{{HTMLConstructor}}] extended attribute.</p>
+
+<p class="example">The {{Window}} class is not constructible, because creating a new window is a
+privileged operation with significant side effects. Instead, the {{Window/open|window.open()}}
+method is used to create new windows.</p>
+
+<p class="example">The {{ImageBitmap}} class is not constructible, as it represents an immutable,
+ready-to-paint bitmap image, and the process of getting it ready to paint must be done
+asynchronously. Instead, the {{createImageBitmap()}} method is used to create it.</p>
+
+<p class="example">Several non-constructible classes, like {{Navigator}}, {{History}}, or
+{{Crypto}}, are non-constructible because they are singletons representing access to per-window
+information. In these cases, the Web IDL <a>namespace</a> feature or some evolution of it might have
+been a better fit, but they were designed before namespaces existed, and somewhat exceed the current
+capabilities of namespaces. If you're designing a new singleton, strongly consider using a
+<a>namespace</a> instead of a non-constructible class; if namespaces don't yet have enough
+capabilities, <a href="https://github.com/heycam/webidl/issues/new">file an issue on Web IDL</a> to
+discuss.</p>
+
+<div class="note">
+    <p>For any JavaScript developers still incredulous that it is possible to create an instance of
+    a non-constructible class, we provide the following code example:</p>
+
+    <pre highlight="js">
+        const secret = {};
+
+        class NonConstructible {
+            constructor(theSecret = undefined) {
+                if (theSecret !== secret) {
+                    throw new TypeError("Illegal constructor.");
+                }
+
+                // Set up the object.
+            }
+        }
+    </pre>
+
+    <p>If the author of this code never exposes the `secret` variable to the outside world, they can
+    reserve the ability to create instances of `NonConstructible` for themself: they can always do
+    <code highlight="js">const instance = new NonConstructible(secret)</code>. But the outside world
+    can never successfully "guess" the secret, and thus will always receive a {{TypeError}} when
+    trying to construct an instance of `NonConstructible`.</p>
+
+    <p>From this perspective, what browsers are doing when they create non-constructible classes
+    isn't magic: it's just very tricky. The above section is aimed at urging browsers to avoid such
+    tricks (or their equivalents in C++/Rust/etc.) whenever reasonable.</p>
+</div>
+
+
 <h3 id="promises">Design asynchronous APIs using Promises</h3>
 
 Asynchronous APIs should generally be designed using promises
@@ -494,6 +591,17 @@ Follow the <a href="https://www.w3.org/2001/tag/doc/promises-guide#one-time-even
 in the <strong><a href="https://www.w3.org/2001/tag/doc/promises-guide">Writing
 Promise-Using Specifications</a></strong> guideline.
 
+<h3 id="promises-and-events">Events should fire before Promises resolve</h3>
+
+In the case that an asynchronous algorithm (Promise based) intends to dispatch
+events, then such events should be dispatched before the Promise resolves, rather
+than after.
+
+This ensures consistency, for instance if you have event handlers changing
+state, you want all that state to be applied before acting on the resolved
+promise, as you can subscribe to a promise at any time (before/after it has
+resolved or rejected).
+
 <h3 id="dont-invent-event-like">Don't invent your own event listener-like infrastructure</h3>
 
 For recurring events, it could be convenient to create a custom pair of APIs to
@@ -552,8 +660,9 @@ So, if the object inherits from {{EventTarget}}, add a corresponding
 <code>on<em>yourevent</em></code> [=event handler IDL attribute=] to the interface.
 
 <p class="note">Note that for HTML and SVG elements, it is traditional to add the
-[=event handler IDL attributes=] on the {{GlobalEventHandlers}} interface, instead of directly on
-the relevant element interface(s).</p>
+[=event handler IDL attributes=] on the {{GlobalEventHandlers}} interface mixin, instead of
+directly on the relevant element interface(s). Similarly, [=event handler IDL attributes=]
+are traditionally added to {{WindowEventHandlers}} rather than {{Window}}.</p>
 
 
 <h3 id="events-are-for-notification">Events are for notification</h3>
@@ -638,7 +747,7 @@ Observers involve defining a new class, dictionaries for options, and a new type
 rare that its more specific ones are actually appropriate.
 
 JavaScript has only one numeric type, Number: IEEE 754 double-precision
-floating point, including ±0, ±Infinity, and NaN (although thankfully only one). The Web IDL "types" are coercion rules that apply when accepting an argument or triggering a setter. For example, a Web IDL <code>unsigned short</code> roughly says: "when someone passes this as an argument, take it modulo 65535 before doing any further processing". That is very rarely a useful thing to do.
+floating point, including ±0, ±Infinity, and NaN (although thankfully only one). The Web IDL "types" are coercion rules that apply when accepting an argument or triggering a setter. For example, a Web IDL <code>unsigned short</code> roughly says: "when someone passes this as an argument, take it modulo 65536 before doing any further processing". That is very rarely a useful thing to do.
 
 Instead, you will want to stick with one of:
 
@@ -656,28 +765,53 @@ Instead, you will want to stick with one of:
   :: Any nonnegative JavaScript number in the integer-representable range, throwing a
       <code highlight="js">TypeError</code> outside the range and rounding inside of it
 
-Additionally, you can combine any of the above with an extra line in your algorithm to validate
-that the number is within the expected domain-specific range, and throwing or performing other
-actions in response. (While it is very rarely appropriate to modify author input by taking it
-modulo 65535, it might be appropriate to take it modulo 360, for example.)
+  : <code>bigint</code>
+  :: When the possible integer values range more broadly than JavaScript numbers can accurately represent
 
-A special case of domain-specific validation, which Web IDL already has you covered for, is the
-0–255 range. This can be written as <code>[EnforcedRange] octet</code>: any JavaScript number in
-the range 0–255, throwing a <code highlight="js">TypeError</code> outside the range and rounding inside of it.
-(And indeed, if it turns out that the other power-of-two ranges are semantically meaningful for
-your domain, such that you want the modulo or range-checking behavior, feel free to use them.)
+Additionally, you can combine any of the above with an extra line in your
+algorithm to validate that the number is within the expected domain-specific
+range, and throwing or performing other actions in response. (While it is very
+rarely appropriate to modify author input by taking it modulo 65536, it might be
+appropriate to take it modulo 360, for example.)
+
+A special case of domain-specific validation, which Web IDL already has you
+covered for, is the 0–255 range. This can be written as <code>[EnforceRange]
+octet</code>: any JavaScript number in the range 0–255, throwing a <code
+highlight="js">TypeError</code> outside the range and rounding inside of it.
+(And indeed, if it turns out that the other power-of-two ranges are semantically
+meaningful for your domain, such that you want the modulo or range-checking
+behavior, feel free to use them.)
 
 <div class="note">
-Those coming from other languages should carefully note that despite their names,
-<code>long long</code> and <code>unsigned long long</code> only have 53 bits of precision, and
-not 64.
+Those coming from other languages should carefully note that despite their
+names, <code>long long</code> and <code>unsigned long long</code> only have 53
+bits of precision, and not 64.
 </div>
+
+<code>bigint</code> is recommended to be used <em>only</em> in circumstances
+where a <code>[EnforceRange] long long</code> or <code>[EnforceRange] unsigned
+long long</code> would not work in terms of expressivity: that is, only when
+values greater than 2<sup>53</sup> or less than -2<sup>53</sup> are expected. In
+particular, APIs should not use the <code>bigint</code> type simply because the
+input is an integer&mdash;<code>bigint</code> is for big integers (hence the
+name!).
+
+Transparent support for inputs being either JavaScript Number of BigInt types is
+discouraged, unless there is a domain-specific requirement to support it. As far
+as ergonomics, JavaScript developers are expected to keep track of whether their
+values are Numbers or BigInts. Sloppiness or implicit conversions here could
+lead to a loss of precision, defeating the purpose of using BigInt.
+
+Further, try to resist doubling up the surface area of an API in order to
+provide both `BigInt` and `Number` variants of an API. As an API designer,
+consider it your job to chose the correct numeric type for the feature being
+exposed.
 
 <h3 id="milliseconds">Use milliseconds for time measurement</h3>
 
-Any web API that accepts a time measurement should do so in milliseconds. This is a tradition
-stemming from <code highlight="js">setTimeout</code> and the <code highlight="js">Date</code> API, and carried through since
-then.
+Any web API that accepts a time measurement should do so in milliseconds. This
+is a tradition stemming from <code highlight="js">setTimeout</code> and the
+<code highlight="js">Date</code> API, and carried through since then.
 
 Even if seconds (or some other unit) are more natural in the domain of an API, sticking with
 milliseconds ensures interoperability with the rest of the platform, allowing easy arithmetic with
@@ -860,7 +994,7 @@ Please take advantage of these other excellent resources in your design process:
 
 <h3 id="polyfills">Polyfills</h3>
 
-Polyfills can be hugely beneficial in helping to roll out new features to the web platform. The 
+Polyfills can be hugely beneficial in helping to roll out new features to the web platform. The
 Technical Architecture Group <a href="https://www.w3.org/2001/tag/doc/polyfills/">finding on Polyfills and the Evolution of the Web</a> offers guidance
 that should be considered in the development of new features, notably:
 
@@ -868,16 +1002,96 @@ that should be considered in the development of new features, notably:
 * [[#feature-detect]]
 * Polyfill development should be encouraged
 
-<h2 id="spec-writing">Advice on specification writing</h2>
+<h2 id="spec-writing">Writing good specifications</h2>
 
-This document covers API design for the Web,
+This document mostly covers API design for the Web,
 but those who design APIs are hopefully also writing specifications
 for the APIs that they design.
+
+<h3 id="writing-resources">Other resources</h3>
+
 Some useful advice on how to write specifications is available elsewhere:
   * <a href="https://ln.hixie.ch/?start=1140242962&amp;count=1">Writing
     specifications: Kinds of statements</a> (Ian Hickson, 2006)
   * <a href="https://www.w3.org/TR/qaframe-spec/">QA Framework:
     Specification Guidelines</a> (W3C QA Working Group, 2005)
+
+<h3 id="algorithms">Specify clearly enough so that algorithms are unambiguous</h3>
+
+Specification text is often more precise
+when it is written using an explicit sequence of steps.
+Using an ordered sequence of steps makes it clear how the required behaviors interact.
+For example, if there are multiple error conditions present,
+a specification that describes the behavior using a sequence of steps
+will make it clear which error will be reported,
+since the different errors would be checked and reported in different steps.
+
+Likewise, describing state using explicit flags also makes behavior clearer.
+Using explicit flags makes it clear
+whether or not the state changes in different error conditions,
+and makes it clear when the state described by the flags is reset.
+
+Whenever these differences could be observable to web content
+and there isn't a good reason to allow variation between implementations,
+it is important that they be specified unambiguously,
+so that implementations interoperate
+and web content doesn't end up
+depending on the behavior of one implementation and failing in another
+(which can cause higher development costs to fix the content for all browsers,
+or costs to users of broken content if it wasn't detected).
+
+However, sequences of steps are not the only way of making the specification precise enough.
+When there are particular characteristics
+that specification editors want to ensure the specification always satisfies,
+it may be better to use a less algorithmic way of formal specification
+that ensures these characteristics are always true.
+Developing these other ways of specifying behavior formally
+is more important when the algorithms would be more repetitive.
+These formal specification techniques can include dependencies on
+languages such as [[WEBIDL]], on grammar productions,
+or the development of new languages for defining pieces of the specification.
+Merely having a formal syntax is not sufficient, though;
+the requirements that the formal definitions place on implementations must still be clearly defined,
+which generally requires specifying some algorithms (or, sometimes, another layer of formal syntax) that define what the formal syntax means,
+and then using the more-readable formal syntax to avoid
+excessive repetition of the less-readable algorithms.
+There are also possibilities in-between, for example,
+if it is desirable to ensure that an algorithm can be implemented with a state machine,
+it may be preferable to specify it in an algorithmic way that incorporates explicit states
+so that the specification authors avoid accidentally creating more states than intended.
+
+When specifying in an algorithmic way,
+it is generally good to match the algorithms that implementations would use,
+even if this is somewhat less convenient for specification authors,
+as long as doing so would not significantly increase the specification's complexity.
+For example, it is better to specify CSS selector matching
+by moving right to left across <a>combinators</a>,
+since that is what implementations do.
+This avoids the risk of future problems caused by new features
+that would be slightly different (in unimportant ways)
+between implementations based on one algorithm and implementations based on a different one.
+Thus, it avoids small future divergence in behavior between specification and implementations.
+It also helps to keep the costs of specifying features aligned with implementing them,
+since the complexity of adding a feature to the specification is more likely to be related
+to the cost of adding it to implementations.
+
+Algorithms in specifications should also reflect best practices in programming.
+For example, they should explictly describe the inputs and outputs of the algorithm,
+rather than relying on "stack introspection" or handwaving.
+They should also avoid side-effects when possible.
+
+The Infra Standard offers
+<a href="https://infra.spec.whatwg.org/#algorithms">some useful definitions
+and terminology</a>
+for defining algorithms.
+
+Specifications that define things using step-by-step algorithms should still be readable.
+Partly, this is through good practices that also apply to writing code,
+such as avoiding unneeded extra steps, and by using good naming.
+However, it's often useful to explain the purpose of the algorithm in prose
+(e.g., "take the following steps, which ensure that there is at most one pending X
+callback per toplevel browsing context")
+so that readers can quickly decide whether they need to read the steps in detail.
 
 <pre class="anchors">
 url: https://w3c.github.io/hr-time/#dom-domhighrestimestamp; spec: HIGHRES-TIME; type: typedef

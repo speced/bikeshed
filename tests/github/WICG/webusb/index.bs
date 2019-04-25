@@ -1,6 +1,6 @@
 <pre class="metadata">
 Title: WebUSB API
-Status: ED
+Status: CG-DRAFT
 ED: https://wicg.github.io/webusb
 Shortname: webusb
 Level: 1
@@ -276,6 +276,11 @@ The <code>iLandingPage</code> field, when non-zero, indicates a
 <dfn>landing page</dfn> which the device manufacturer would like the user to
 visit in order to control their device. The UA MAY suggest the user navigate
 to this URL when the device is connected.
+
+Note: The USB is a little-endian bus and so according to [[RFC4122]] the UUID
+above MUST be sent over the wire as the byte sequence <code>{0x38, 0xB6, 0x08,
+0x34, 0xA9, 0x09, 0xA0, 0x47, 0x8B, 0xFD, 0xA0, 0x76, 0x88, 0x15, 0xB6,
+0x65}</code>.
 
 ## WebUSB Device Requests ## {#device-requests}
 
@@ -950,42 +955,45 @@ parallel:
      and <a>resolve</a> |promise|.
 
 The {{USBDevice/claimInterface(interfaceNumber)}} method, when invoked, MUST
-return a new {{Promise}} and run the following steps <a>in parallel</a>:
+return a new {{Promise}} |promise| and run the following steps <a>in
+parallel</a>:
 
   1. If the device is no longer connected to the system, <a>reject</a> |promise|
      with a {{NotFoundError}} and abort these steps.
-  2. Let |interface| be the interface in the <a>active configuration</a> with
+  1. Let |interface| be the interface in the <a>active configuration</a> with
      <code>bInterfaceNumber</code> equal to |interfaceNumber|. If no such
      interface exists, <a>reject</a> |promise| with a {{NotFoundError}} and
      abort these steps.
-  3. If <code>|device|.{{USBDevice/opened}}</code> is not <code>true</code> and
-     <code>|interface|.{{USBInterface/claimed}}</code> is not <code>false</code>,
+  1. If <code>|device|.{{USBDevice/opened}}</code> is not <code>true</code>,
      <a>reject</a> |promise| with an {{InvalidStateError}} and abort these
      steps.
-  4. Perform the necessary platform-specific steps to request exclusive control
+  1. If <code>|interface|.{{USBInterface/claimed}}</code> is <code>true</code>,
+     <a>resolve</a> |promise| and abort these steps.
+  1. Perform the necessary platform-specific steps to request exclusive control
      over |interface| for the current execution context. If this fails,
      <a>reject</a> |promise| with a {{NetworkError}} and abort these steps.
-  5. Set <code>|interface|.{{USBInterface/claimed}}</code> to <code>true</code>
+  1. Set <code>|interface|.{{USBInterface/claimed}}</code> to <code>true</code>
      and <a>resolve</a> |promise|.
 
 The {{USBDevice/releaseInterface(interfaceNumber)}} method, when invoked, MUST
-return a new {{Promise}} |promise| and run the following steps in
-parallel:
+return a new {{Promise}} |promise| and run the following steps <a>in
+parallel</a>:
 
   1. Let |device| be the target {{USBDevice}} object.
-  2. If |device| is no longer connected to the system, <a>reject</a> |promise|
+  1. If |device| is no longer connected to the system, <a>reject</a> |promise|
      with a {{NotFoundError}} and abort these steps.
-  3. Let |interface| be the interface in the <a>active configuration</a> with
+  1. Let |interface| be the interface in the <a>active configuration</a> with
      <code>bInterfaceNumber</code> equal to |interfaceNumber|. If no such
      interface exists, <a>reject</a> |promise| with a {{NotFoundError}} and
      abort these steps.
-  4. If <code>|device|.{{USBDevice/opened}}</code> or
-     <code>|interface|.{{USBInterface/claimed}}</code> is not <code>true</code>,
+  1. If <code>|device|.{{USBDevice/opened}}</code> is not <code>true</code>,
      <a>reject</a> |promise| with an {{InvalidStateError}} and abort these
      steps.
-  5. Perform the necessary platform-specific steps to reliquish exclusive
+  1. If <code>|interface|.{{USBInterface/claimed}}</code> is <code>false</code>,
+     <a>resolve</a> |promise| and abort these steps.
+  1. Perform the necessary platform-specific steps to reliquish exclusive
      control over |interface|.
-  6. Set <code>|interface|.{{USBInterface/claimed}}</code> to <code>false</code>
+  1. Set <code>|interface|.{{USBInterface/claimed}}</code> to <code>false</code>
      and <a>resolve</a> |promise|.
 
 The {{USBDevice/selectAlternateInterface(interfaceNumber, alternateSetting)}}
@@ -1024,10 +1032,7 @@ parallel:
      and abort these steps.
   1. <a>Check the validity of the control transfer parameters</a> and abort
      these steps if |promise| is rejected.
-  1. If |length| is greater than the <code>bMaxPacketSize0</code> field of the
-     device's <a>device descriptor</a>, <a>reject</a> |promise| with a
-     {{TypeError}} and abort these steps.
-  1. If |length| is greather than 0, let |buffer| be a host buffer with space
+  1. If |length| is greater than 0, let |buffer| be a host buffer with space
      for |length| bytes.
   1. Issue a <a>control transfer</a> to |device| with the setup packet parameters
      provided in |setup|, the data transfer direction in
@@ -1056,32 +1061,28 @@ parallel</a>:
 
   1. If the device is no longer connected to the system, <a>reject</a> |promise|
      with a {{NotFoundError}} and abort these steps.
-  2. If <code>|device|.{{USBDevice/opened}}</code> is not equal to
+  1. If <code>|device|.{{USBDevice/opened}}</code> is not equal to
      <code>true</code> <a>reject</a> |promise| with an {{InvalidStateError}} and
      abort these
      steps.
-  3. <a>Check the validity of the control transfer parameters</a> and abort
+  1. <a>Check the validity of the control transfer parameters</a> and abort
      these steps if |promise| is rejected.
-  4. If <code>|data|.length</code> is greater than the
-     <code>bMaxPacketSize0</code> field of the device's <a>device
-     descriptor</a>, <a>reject</a> |promise| with a {{TypeError}} and abort
-     these steps.
-  5. Issue a <a>control transfer</a> with the <a>setup packet</a> populated by
+  1. Issue a <a>control transfer</a> with the <a>setup packet</a> populated by
      |setup| and the data transfer direction in <code>bmRequestType</code> set
      to "host to device" and <code>wLength</code> set to
-     <code>|data|.length</code>.  Transmit |data| in the <a>data stage</a> of
+     <code>|data|.length</code>. Transmit |data| in the <a>data stage</a> of
      the transfer.
-  6. Let |result| be a new {{USBOutTransferResult}}.
-  7. If the device responds by stalling the
+  1. Let |result| be a new {{USBOutTransferResult}}.
+  1. If the device responds by stalling the
      <a>default control pipe</a> set
      <code>|result|.{{USBOutTransferResult/status}}</code> to {{"stall"}}.
-  8. If the device acknowledges the transfer set
+  1. If the device acknowledges the transfer set
      <code>|result|.{{USBOutTransferResult/status}}</code> to {{"ok"}} and
      <code>|result|.{{USBOutTransferResult/bytesWritten}}</code> to
      <code>|data|.length</code>.
-  9. If the transfer fails for any other reason <a>reject</a> |promise| with a
+  1. If the transfer fails for any other reason <a>reject</a> |promise| with a
      {{NetworkError}} and abort these steps.
-  10. <a>Resolve</a> |promise| with |result|.
+  1. <a>Resolve</a> |promise| with |result|.
 
 The {{USBDevice/clearHalt(direction, endpointNumber)}} method, when invoked,
 MUST return a new {{Promise}} |promise| and run the following steps <a>in
@@ -1793,6 +1794,12 @@ depending on what type of traffic is being sent.
 
 <pre class="biblio">
 {
+  "RFC4122": {
+    "href": "https://tools.ietf.org/html/rfc4122",
+    "title": "A Universally Unique IDentifier (UUID) URN Namespace",
+    "publisher": "Internet Engineering Task Force",
+    "date": "July 2005"
+  },
   "USB31": {
     "href": "http://www.usb.org/developers/docs/",
     "title": "Universal Serial Bus 3.1 Specification",

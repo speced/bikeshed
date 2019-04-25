@@ -3,7 +3,7 @@ Title:  CSS Animation Worklet API
 Status: ED
 Group: houdini
 ED: https://drafts.css-houdini.org/css-animationworklet-1/
-Shortname: css-workletanimation
+Shortname: css-animationworklet
 Level: 1
 Abstract:
 Editor: Majid Valipour, majidvp@google.com
@@ -89,12 +89,17 @@ urlPrefix: https://wicg.github.io/scroll-animations/#; type: dfn
 <pre class=biblio>
 {
     "explainer": {
-        "href": "https://github.com/WICG/animation-worklet/blob/gh-pages/README.md",
+        "href": "https://github.com/w3c/css-houdini-drafts/blob/master/css-animationworklet/README.md",
         "title": "Animation Worklet Explainer",
-        "status": "CR",
-        "publisher": "WICG",
         "deliveredBy": [
-            "https://github.com/WICG/animation-worklet//"
+            "https://github.com/w3c/css-houdini-drafts"
+        ]
+    },
+    "principles": {
+        "href": "https://github.com/w3c/css-houdini-drafts/blob/master/css-animationworklet/principles.md",
+        "title": "Animation Worklet Design Principles and Goals",
+        "deliveredBy": [
+            "https://github.com/w3c/css-houdini-drafts"
         ]
     }
 }
@@ -104,8 +109,9 @@ Introduction {#intro}
 =====================
 <em>This section is not normative.</em>
 
-This document introduces a new primitive for creating scroll-linked and other high performance
-procedural animations on the web. For details on the rationale and motivation see [[explainer]].
+This document introduces a new primitive that provides extensibility in web animations and enables
+high performance interactive procedural animations on the web. For details on the rationale and
+motivation see both [[explainer]] and [[principles]].
 
 The <a>Animation Worklet</a> API provides a method to create scripted animations that control a set
 of <a>animation effects</a>. The API is designed to make it possible for user agents to run such
@@ -114,14 +120,11 @@ thread.
 
 Relationship to the Web Animations API {#relationship-to-web-animations}
 ------------------------------------------------------------------------
+<em>This section is not normative.</em>
 
 Animations running inside an <a>Animation Worklet</a> execution context expose the {{Animation}}
 interface from the Web Animations specification on the main javascript execution context. This means
-they can be controlled and inspected from main thread using many of the Web Animation APIs. However
-Animation Worklet animations follow a different timing model that enables them to be script-driven,
-stateful, and runnable in a parallel worklet execution context. As such Web Animation APIs that seek
-or alter the input time (reverse, finish, etc.) have different semantics for Animation Worklet
-animations.
+they can be controlled and inspected from main thread using the same Web Animation APIs.
 
 
 Threading Model {#threading-model}
@@ -220,7 +223,7 @@ interface StatelessAnimator {
 <div class='note'>
     This is how the class should look.
     <pre class='lang-javascript'>
-        class FooAnimator extends StatelessAnimator{
+        class FooAnimator extends StatelessAnimator {
             constructor(options) {
                 // Called when a new animator is instantiated.
             }
@@ -250,13 +253,13 @@ effect is mutable only in a certain thread). Animation worklet guarantees that a
 instance's state is maintained even if the instance is respawned in a different global scope.
 
 The basic mechanism for maintaining the state is that the animation worklet snapshots the local
-state that is exposed via {{StatefulAnimator/state}} attribute and then reifies it at a later time
-to be passed into the constructor when the animator instance is respawned in a potentially different
-global scope. This processes is specified is details in <a>migrate an animator instance</a>
-algorithm.
+state that is exposed via the {{StatefulAnimator/state}} function and then reifies it so that it can
+be passed into the constructor when the animator instance is respawned at a later time in a
+potentially different global scope. The <a>migrate an animator instance</a> algorithm specifies this
+process in details.
 
 A user-defined stateful animator is expected to fulfill the required contract which is that its
-state attribute is an object representing its state that can be serialized using structured
+state function returns an object representing its state that can be serialized using structured
 serialized algorithm and that it can also recreate its state given that same object passed to
 its constructor.
 
@@ -264,7 +267,7 @@ its constructor.
 [Exposed=AnimationWorklet, Global=AnimationWorklet,
 Constructor (optional any options, optional any state)]
 interface StatefulAnimator {
-  attribute any state;
+  any state();
 };
 </xmp>
 
@@ -281,7 +284,7 @@ interface StatefulAnimator {
                 // Animation frame logic goes here and can rely on this.currentVelocity.
                 this.currentVelocity += 0.1;
             }
-            get state {
+            state() {
               // The returned object should be serializable using structured clonable algorithm.
               return {
                 velocity: this.currentVelocity;
@@ -300,29 +303,34 @@ animation as needed by {{AnimationWorkletGlobalScope}}. It consists of:
 
  - An <dfn>animator name</dfn> <<ident>>#.
 
- - A <dfn>class constructor</dfn> which is a <a>VoidFunction</a> <a>callback function</a> type.
+ - A <dfn>class constructor</dfn> which is a {{AnimatorInstanceConstructor}} <a>callback function</a> type.
 
  - An <dfn>animate function</dfn> which is a <a>Function</a> <a>callback function</a> type.
 
  - A <dfn>stateful flag</dfn>
 
 
+
 Registering an Animator Definition {#registering-animator-definition}
 -------------------------------------
 An {{AnimationWorkletGlobalScope}} has a <dfn>animator name to animator definition map</dfn>.
-The map gets populated when {{registerAnimator(name, animatorCtorValue)}} is called.
+The map gets populated when {{registerAnimator(name, animatorCtor)}} is called.
 
 
 <xmp class='idl'>
+
 [ Exposed=AnimationWorklet, Global=AnimationWorklet ]
 interface AnimationWorkletGlobalScope : WorkletGlobalScope {
-    void registerAnimator(DOMString name, VoidFunction animatorCtor);
+    void registerAnimator(DOMString name, AnimatorInstanceConstructor animatorCtor);
 };
+
+callback AnimatorInstanceConstructor = any (any options, optional any state);
+
 </xmp>
 
 <div algorithm="register-animator">
 
-When the <dfn method for=AnimationWorkletGlobalScope>registerAnimator(|name|, |animatorCtorValue|)</dfn>
+When the <dfn method for=AnimationWorkletGlobalScope>registerAnimator(|name|, |animatorCtor|)</dfn>
 method is called in a {{AnimationWorkletGlobalScope}}, the user agent <em>must</em> run the
 following steps:
 
@@ -332,18 +340,15 @@ following steps:
     2. If |name| exists as a key in the <a>animator name to animator definition map</a>,
         <a>throw</a> a <a>NotSupportedError</a> and abort all these steps.
 
-    3. If the result of <a>IsConstructor</a>(|animatorCtorValue|) is false, <a>throw</a> a
+    3. If the result of <a>IsConstructor</a>(|animatorCtor|) is <b>false</b>, <a>throw</a> a
         <a>TypeError</a> and abort all these steps.
 
-    4. Let |animatorCtor| be the result of <a>converting</a> animatorCtorValue to the
-        <a>VoidFunction</a> <a>callback function</a> type. If an exception is thrown, rethrow the
-        exception and abort all these steps.
 
-    4. Let |prototype| be the result of <a>Get</a>(|animatorCtorValue|, "prototype").
+    4. Let |prototype| be the result of <a>Get</a>(|animatorCtor|, "prototype").
 
 
     5. If <a>SameValue</a>(|prototype|, {{StatelessAnimator}}) is <b>true</b> set |stateful| to be
-        <b>false</b>, otherwise if <a>SameValue</a>(|prototype|, {{StatefulAnimator}}) is 
+        <b>false</b>, otherwise if <a>SameValue</a>(|prototype|, {{StatefulAnimator}}) is
         <b>true</b> set |stateful| to be <b>true</b>, otherwise <a>throw</a> a <a>TypeError</a> and
         abort all these steps.
 
@@ -423,8 +428,8 @@ To <dfn>create a new animator instance</dfn> given a |name|, |timeline|, |effect
     5. Let |state| be <a>StructuredDeserialize</a>(|serializedState|).
 
     6. Let |animatorInstance| be the result of <a>constructing</a> |animatorCtor| with
-        [|options|, |state| as args. If an exception is thrown, rethrow the exception and abort all
-        these steps.
+        «|options|, |state|» as arguments. If an exception is thrown, rethrow the exception and
+        abort all these steps.
 
     7. Set the following on |animatorInstance| with:
         - <a>animator name</a> being |name|
@@ -527,10 +532,11 @@ To <dfn>migrate an animator instance</dfn> from one {{WorkletGlobalScope}} to an
 
      3. Let |stateful| be the <a>stateful flag</a> of |definition|.
 
-     4. If |stateful| is <a>false</a> then abort the following steps.
+     4. If |stateful| is <b>false</b> then abort the following steps.
 
-     5. Let |state| be the result of <a>Get</a>(|instance|, "state"). If any exception is thrown,
-        rethrow the exception and abort the following steps.
+     5. Let |state| be the result of <a>Invoke</a> |stateFunction| with |instance| as the
+        <a>callback this value</a>.  If any exception is thrown, rethrow the exception and abort
+        the following steps.
 
      6. Set |serializedState| to be the result of <a>StructuredSerialize</a>(|state|).
         If any exception is thrown, then abort the following steps.
@@ -683,7 +689,7 @@ Here are a few implications of the above semantics:
     may return stale information, in the case where the <a>animator instance</a> is running in a
     parallel execution context.
 
-Issue(63): Come with appropriate mechanism's for <a>animator instance</a> to get notified when its
+Issue(811): Come with appropriate mechanism's for <a>animator instance</a> to get notified when its
    animation currentTime is changing e.g., via reverse(), finish() or playbackRate change. So that
    it can react appropriately.
 
@@ -762,7 +768,7 @@ is called, then <a>set animator instance of worklet animation</a> given |worklet
 Timeline Attachment {#timeline-attachment}
 -------------------
 
-Issue(61): Define semantics of attachment and detachment.
+Issue(810): Define semantics of attachment and detachment.
 
 ScrollTimeline {#scroll-timeline}
 ---------------------------------
@@ -817,8 +823,8 @@ action that corresponds to the first matching condition from the following:
 </div>
 
 Issue(w3c/csswg-drafts#2071): The above interface exposes a conservative subset
-of GroupEffect proposed as part of web-animation-2. Once that is available we
-should switch to it.
+of GroupEffect proposed as part of web-animation-2. We should instead move this
+into a delta spec against the web-animation.
 
 
 Effect Stack and Composite Order {#effect-stack-composite-order}
@@ -828,6 +834,16 @@ As with other animations, <a>worklet animations</a> participate in the <a>effect
 worklet animation does not have a specific <a>animation class</a> which means it has the same
 composite order as other Javascript created web animations.
 
+
+Security Considerations {#security-considerations}
+==================================================
+
+There are no known security issues introduced by these features.
+
+Privacy Considerations {#privacy-considerations}
+================================================
+
+There are no known privacy issues introduced by these features.
 
 Examples {#examples}
 ====================

@@ -18,6 +18,8 @@ spec:promises-guide; type:dfn;
 <pre class="anchors">
 urlPrefix: https://tc39.github.io/ecma262/; spec: ECMASCRIPT
     text: %Uint8Array%; url: #sec-typedarray-objects; type: constructor
+    text: %AsyncIteratorPrototype%; url: #sec-asynciteratorprototype; type: interface
+    text: AsyncIterator; url: #sec-asynciterator-interface; type: interface
     text: ArrayBuffer; url: #sec-arraybuffer-objects; type: interface
     text: DataView; url: #sec-dataview-objects; type: interface
     text: Number; url: #sec-ecmascript-language-types-number-type; type: interface
@@ -399,10 +401,14 @@ like
     get <a href="#rs-locked">locked</a>()
 
     <a href="#rs-cancel">cancel</a>(reason)
-    <a href="#rs-get-reader">getReader</a>()
-    <a href="#rs-pipe-through">pipeThrough</a>({ writable, readable }, options)
-    <a href="#rs-pipe-to">pipeTo</a>(dest, { preventClose, preventAbort, preventCancel } = {})
+    <a href="#rs-get-iterator">getIterator</a>({ preventCancel } = {})
+    <a href="#rs-get-reader">getReader</a>({ mode } = {})
+    <a href="#rs-pipe-through">pipeThrough</a>({ writable, readable },
+                { preventClose, preventAbort, preventCancel, signal } = {})
+    <a href="#rs-pipe-to">pipeTo</a>(dest, { preventClose, preventAbort, preventCancel, signal } = {})
     <a href="#rs-tee">tee</a>()
+
+    <a href="#rs-asynciterator">[@@asyncIterator]</a>({ preventCancel } = {})
   }
 </code></pre>
 
@@ -601,6 +607,23 @@ option. If <code><a for="underlying source">type</a></code> is set to <code>unde
   1. Return ! ReadableStreamCancel(*this*, _reason_).
 </emu-alg>
 
+<h5 id="rs-get-iterator" method for="ReadableStream">getIterator({ <var>preventCancel</var> } = {})</h5>
+
+<div class="note">
+  The <code>getIterator</code> method returns an async iterator which can be used to consume the stream. The
+  {{ReadableStreamAsyncIteratorPrototype/return()}} method of this iterator object will, by default,
+  <a lt="cancel a readable stream">cancel</a> the stream; it will also release the reader.
+</div>
+
+<emu-alg>
+  1. If ! IsReadableStream(*this*) is *false*, throw a *TypeError* exception.
+  1. Let _reader_ be ? AcquireReadableStreamDefaultReader(*this*).
+  1. Let _iterator_ be ! ObjectCreate(`<a idl>ReadableStreamAsyncIteratorPrototype</a>`).
+  1. Set _iterator_.[[asyncIteratorReader]] to _reader_.
+  1. Set _iterator_.[[preventCancel]] to ! ToBoolean(_preventCancel_).
+  1. Return _iterator_.
+</emu-alg>
+
 <h5 id="rs-get-reader" method for="ReadableStream">getReader({ <var ignore>mode</var> } = {})</h5>
 
 <div class="note">
@@ -625,9 +648,9 @@ option. If <code><a for="underlying source">type</a></code> is set to <code>unde
 
 <emu-alg>
   1. If ! IsReadableStream(*this*) is *false*, throw a *TypeError* exception.
-  1. If _mode_ is *undefined*, return ? AcquireReadableStreamDefaultReader(*this*).
+  1. If _mode_ is *undefined*, return ? AcquireReadableStreamDefaultReader(*this*, *true*).
   1. Set _mode_ to ? ToString(_mode_).
-  1. If _mode_ is `"byob"`, return ? AcquireReadableStreamBYOBReader(*this*).
+  1. If _mode_ is `"byob"`, return ? AcquireReadableStreamBYOBReader(*this*, *true*).
   1. Throw a *RangeError* exception.
 </emu-alg>
 
@@ -661,31 +684,31 @@ option. If <code><a for="underlying source">type</a></code> is set to <code>unde
 </div>
 
 <h5 id="rs-pipe-through" method for="ReadableStream" lt="pipeThrough(transform, options)">pipeThrough({
-<var ignore>writable</var>, <var ignore>readable</var> }, <var ignore>options</var>)</h5>
+<var ignore>writable</var>, <var ignore>readable</var> }, { <var>preventClose</var>, <var>preventAbort</var>,
+<var>preventCancel</var>, <var>signal</var> } = {})</h5>
 
 <div class="note">
   The <code>pipeThrough</code> method provides a convenient, chainable way of <a>piping</a> this <a>readable stream</a>
   through a <a>transform stream</a> (or any other <code>{ writable, readable }</code> pair). It simply pipes the stream
   into the writable side of the supplied pair, and returns the readable side for further use.
 
-  Piping a stream will generally <a lt="locked to a reader">lock</a> it for the duration of the pipe, preventing any
-  other consumer from acquiring a reader.
-
-  This method is intentionally generic; it does not require that its <emu-val>this</emu-val> value be a
-  {{ReadableStream}} object. It also does not require that its <code>writable</code> argument be a {{WritableStream}}
-  instance, or that its <code>readable</code> argument be a {{ReadableStream}} instance.
+  Piping a stream will <a lt="locked to a reader">lock</a> it for the duration of the pipe, preventing any other
+  consumer from acquiring a reader.
 </div>
 
 <emu-alg>
-  1. If _writable_ is *undefined* or _readable_ is *undefined*, throw a *TypeError* exception indicating that undefined
-     values are not permitted.
-     <p class="note"><emu-val>undefined</emu-val> is special-cased here to make it easier to debug errors such as
-     <code>rs.pipeThrough(writable, readable)</code> which otherwise would silently do nothing. <code><a
-     lt="pipeThrough()" for="ReadableStream">pipeThrough()</a></code> is
-     otherwise agnostic about the values that it passes through.</p>
-  1. Let _promise_ be ? Invoke(*this*, `"pipeTo"`, « _writable_, _options_ »).
-  1. If Type(_promise_) is Object and _promise_ has a [[PromiseIsHandled]] internal slot, set
-     _promise_.[[PromiseIsHandled]] to *true*.
+  1. If ! IsReadableStream(*this*) is *false*, throw a *TypeError* exception.
+  1. If ! IsWritableStream(_writable_) is *false*, throw a *TypeError* exception.
+  1. If ! IsReadableStream(_readable_) is *false*, throw a *TypeError* exception.
+  1. Set _preventClose_ to ! ToBoolean(_preventClose_), set _preventAbort_ to ! ToBoolean(_preventAbort_), and set
+     _preventCancel_ to ! ToBoolean(_preventCancel_).
+  1. If _signal_ is not *undefined*, and _signal_ is not an instance of the `<a idl>AbortSignal</a>` interface, throw a
+     *TypeError* exception.
+  1. If ! IsReadableStreamLocked(*this*) is *true*, throw a *TypeError* exception.
+  1. If ! IsWritableStreamLocked(_writable_) is *true*, throw a *TypeError* exception.
+  1. Let _promise_ be ! ReadableStreamPipeTo(*this*, _writable_, _preventClose_, _preventAbort_, _preventCancel_,
+     _signal_).
+  1. Set _promise_.[[PromiseIsHandled]] to *true*.
   1. Return _readable_.
 </emu-alg>
 
@@ -701,8 +724,8 @@ option. If <code><a for="underlying source">type</a></code> is set to <code>unde
   </code></pre>
 </div>
 
-<h5 id="rs-pipe-to" method for="ReadableStream" lt="pipeTo(dest, options)">pipeTo(<var ignore>dest</var>, {
-<var ignore>preventClose</var>, <var ignore>preventAbort</var>, <var ignore>preventCancel</var> } = {})</h5>
+<h5 id="rs-pipe-to" method for="ReadableStream" lt="pipeTo(dest, options)">pipeTo(<var>dest</var>,
+{ <var>preventClose</var>, <var>preventAbort</var>, <var>preventCancel</var>, <var>signal</var> } = {})</h5>
 
 <div class="note">
   The <code>pipeTo</code> method <a lt="piping">pipes</a> this <a>readable stream</a> to a given <a>writable
@@ -733,6 +756,12 @@ option. If <code><a for="underlying source">type</a></code> is set to <code>unde
     promise will be rejected with an error indicating piping to a closed stream failed, or with any error that occurs
     during canceling the source.</p></li>
   </ul>
+
+  The <code>signal</code> option can be set to an {{AbortSignal}} to allow aborting an ongoing pipe operation via the
+  corresponding {{AbortController}}. In this case, the source <a>readable stream</a> will be <a lt="cancel a readable
+  stream">canceled</a>, and the destination <a>writable stream</a> <a lt="abort a writable stream">aborted</a>, unless
+  the respective options <code>preventCancel</code> or <code>preventAbort</code> are set.
+
 </div>
 
 <emu-alg>
@@ -740,93 +769,12 @@ option. If <code><a for="underlying source">type</a></code> is set to <code>unde
   1. If ! IsWritableStream(_dest_) is *false*, return <a>a promise rejected with</a> a *TypeError* exception.
   1. Set _preventClose_ to ! ToBoolean(_preventClose_), set _preventAbort_ to ! ToBoolean(_preventAbort_), and set
      _preventCancel_ to ! ToBoolean(_preventCancel_).
+  1. If _signal_ is not *undefined*, and _signal_ is not an instance of the `<a idl>AbortSignal</a>` interface, return
+     <a>a promise rejected with</a> a *TypeError* exception.
   1. If ! IsReadableStreamLocked(*this*) is *true*, return <a>a promise rejected with</a> a *TypeError* exception.
   1. If ! IsWritableStreamLocked(_dest_) is *true*, return <a>a promise rejected with</a> a *TypeError* exception.
-  1. If ! IsReadableByteStreamController(*this*.[[readableStreamController]]) is *true*, let _reader_ be either !
-     AcquireReadableStreamBYOBReader(*this*) or ! AcquireReadableStreamDefaultReader(*this*), at the user agent's
-     discretion.
-  1. Otherwise, let _reader_ be ! AcquireReadableStreamDefaultReader(*this*).
-  1. Let _writer_ be ! AcquireWritableStreamDefaultWriter(_dest_).
-  1. Let _shuttingDown_ be *false*.
-  1. Let _promise_ be <a>a new promise</a>.
-  1. <a>In parallel</a> <span class="XXX">but not really; see <a
-     href="https://github.com/whatwg/streams/issues/905">#905</a></span>, using _reader_ and _writer_, read all
-     <a>chunks</a> from *this* and write them to _dest_. Due to the locking provided by the reader and writer, the exact
-     manner in which this happens is not observable to author code, and so there is flexibility in how this is done. The
-     following constraints apply regardless of the exact algorithm used:
-     * <strong>Public API must not be used:</strong> while reading or writing, or performing any of the operations
-       below, the JavaScript-modifiable reader, writer, and stream APIs (i.e. methods on the appropriate prototypes)
-       must not be used. Instead, the streams must be manipulated directly.
-     * <strong>Backpressure must be enforced:</strong>
-       * While WritableStreamDefaultWriterGetDesiredSize(_writer_) is ≤ *0* or is *null*, the user agent must not read
-         from _reader_.
-       * If _reader_ is a <a>BYOB reader</a>, WritableStreamDefaultWriterGetDesiredSize(_writer_) should be used to
-         determine the size of the chunks read from _reader_.
-       * Reads or writes should not be delayed for reasons other than these backpressure signals.
-         <p class="example" id="example-bad-backpressure">An implementation that waits for each write to successfully
-         complete before proceeding to the next read/write operation violates this recommendation. In doing so, such an
-         implementation makes the <a>internal queue</a> of _dest_ useless, as it ensures _dest_ always contains at most
-         one queued <a>chunk</a>.</p>
-     * <strong>Shutdown must stop activity:</strong> if _shuttingDown_ becomes *true*, the user agent must not
-       initiate further reads from _reader_, and must only perform writes of already-read <a>chunks</a>, as described
-       below. In particular, the user agent must check the below conditions before performing any reads or writes,
-       since they might lead to immediate shutdown.
-     * <strong>Error and close states must be propagated:</strong> the following conditions must be applied in order.
-       1. <strong>Errors must be propagated forward:</strong> if *this*.[[state]] is or becomes `"errored"`, then
-         1. If _preventAbort_ is *false*, <a href="#rs-pipeTo-shutdown-with-action">shutdown with an action</a> of !
-            WritableStreamAbort(_dest_, *this*.[[storedError]]) and with *this*.[[storedError]].
-         1. Otherwise, <a href="#rs-pipeTo-shutdown">shutdown</a> with *this*.[[storedError]].
-       1. <strong>Errors must be propagated backward:</strong> if _dest_.[[state]] is or becomes `"errored"`, then
-         1. If _preventCancel_ is *false*, <a href="#rs-pipeTo-shutdown-with-action">shutdown with an action</a> of !
-            ReadableStreamCancel(*this*, _dest_.[[storedError]]) and with _dest_.[[storedError]].
-         1. Otherwise, <a href="#rs-pipeTo-shutdown">shutdown</a> with _dest_.[[storedError]].
-       1. <strong>Closing must be propagated forward:</strong> if *this*.[[state]] is or becomes `"closed"`, then
-         1. If _preventClose_ is *false*, <a href="#rs-pipeTo-shutdown-with-action">shutdown with an action</a> of !
-            WritableStreamDefaultWriterCloseWithErrorPropagation(_writer_).
-         1. Otherwise, <a href="#rs-pipeTo-shutdown">shutdown</a>.
-       1. <strong>Closing must be propagated backward:</strong> if ! WritableStreamCloseQueuedOrInFlight(_dest_) is *true*
-         or _dest_.[[state]] is `"closed"`, then
-         1. Assert: no <a>chunks</a> have been read or written.
-         1. Let _destClosed_ be a new *TypeError*.
-         1. If _preventCancel_ is *false*, <a href="#rs-pipeTo-shutdown-with-action">shutdown with an action</a> of !
-            ReadableStreamCancel(*this*, _destClosed_) and with _destClosed_.
-         1. Otherwise, <a href="#rs-pipeTo-shutdown">shutdown</a> with _destClosed_.
-     * <i id="rs-pipeTo-shutdown-with-action">Shutdown with an action</i>: if any of the above requirements ask to
-       shutdown with an action _action_, optionally with an error _originalError_, then:
-       1. If _shuttingDown_ is *true*, abort these substeps.
-       1. Set _shuttingDown_ to *true*.
-       1. If _dest_.[[state]] is `"writable"` and ! WritableStreamCloseQueuedOrInFlight(_dest_) is *false*,
-         1. If any <a>chunks</a> have been read but not yet written, write them to _dest_.
-         1. Wait until every <a>chunk</a> that has been read has been written (i.e. the corresponding promises have
-            settled).
-       1. Let _p_ be the result of performing _action_.
-       1. <a>Upon fulfillment</a> of _p_, <a href="#rs-pipeTo-finalize">finalize</a>, passing along _originalError_ if
-          it was given.
-       1. <a>Upon rejection</a> of _p_ with reason _newError_, <a href="#rs-pipeTo-finalize">finalize</a> with
-          _newError_.
-     * <i id="rs-pipeTo-shutdown">Shutdown</i>: if any of the above requirements or steps ask to shutdown, optionally
-       with an error _error_, then:
-       1. If _shuttingDown_ is *true*, abort these substeps.
-       1. Set _shuttingDown_ to *true*.
-       1. If _dest_.[[state]] is `"writable"` and ! WritableStreamCloseQueuedOrInFlight(_dest_) is *false*,
-         1. If any <a>chunks</a> have been read but not yet written, write them to _dest_.
-         1. Wait until every <a>chunk</a> that has been read has been written (i.e. the corresponding promises have
-            settled).
-       1. <a href="#rs-pipeTo-finalize">Finalize</a>, passing along _error_ if it was given.
-     * <i id="rs-pipeTo-finalize">Finalize</i>: both forms of shutdown will eventually ask to finalize, optionally with
-       an error _error_, which means to perform the following steps:
-       1. Perform ! WritableStreamDefaultWriterRelease(_writer_).
-       1. Perform ! ReadableStreamReaderGenericRelease(_reader_).
-       1. If _error_ was given, <a>reject</a> _promise_ with _error_.
-       1. Otherwise, <a>resolve</a> _promise_ with *undefined*.
-  1. Return _promise_.
+  1. Return ! ReadableStreamPipeTo(*this*, _dest_, _preventClose_, _preventAbort_, _preventCancel_, _signal_).
 </emu-alg>
-
-<p class="note">
-  Various abstract operations performed here include object creation (often of promises), which usually would require
-  specifying a realm for the created object. However, because of the locking, none of these objects can be observed by
-  author code. As such, the realm used to create them does not matter.
-</p>
 
 <h5 id="rs-tee" method for="ReadableStream">tee()</h5>
 
@@ -866,29 +814,116 @@ option. If <code><a for="underlying source">type</a></code> is set to <code>unde
   </code></pre>
 </div>
 
+<!-- Bikeshed doesn't let us mark this up correctly: https://github.com/tabatkins/bikeshed/issues/1344 -->
+<h5 id="rs-asynciterator" iterator for="ReadableStream">[@@asyncIterator]({ <var>preventCancel</var> } = {})</h5>
+
+<p class="note">
+  The <code>@@asyncIterator</code> method is an alias of {{ReadableStream/getIterator()}}.
+</p>
+
+The initial value of the <code>@@asyncIterator</code> method is the same function object as the initial value of the
+{{ReadableStream/getIterator()}} method.
+
+<h3 id="rs-asynciterator-prototype" interface
+lt="ReadableStreamAsyncIteratorPrototype">ReadableStreamAsyncIteratorPrototype</h3>
+
+{{ReadableStreamAsyncIteratorPrototype}} is an ordinary object that is used by {{ReadableStream/getIterator()}} to
+construct the objects it returns. Instances of {{ReadableStreamAsyncIteratorPrototype}} implement the {{AsyncIterator}}
+abstract interface from the JavaScript specification. [[!ECMASCRIPT]]
+
+The {{ReadableStreamAsyncIteratorPrototype}} object must have its \[[Prototype]] internal slot set to
+{{%AsyncIteratorPrototype%}}.
+
+<h4 id="default-reader-asynciterator-prototype-internal-slots">Internal slots</h4>
+
+Objects created by {{ReadableStream/getIterator()}}, using {{ReadableStreamAsyncIteratorPrototype}} as their
+prototype, are created with the internal slots described in the following table:
+
+<table>
+  <thead>
+    <tr>
+      <th>Internal Slot</th>
+      <th>Description (<em>non-normative</em>)</th>
+    </tr>
+  </thead>
+  <tr>
+    <td>\[[asyncIteratorReader]]
+    <td class="non-normative">A {{ReadableStreamDefaultReader}} instance
+  </tr>
+  <tr>
+    <td>\[[preventCancel]]
+    <td class="non-normative">A boolean value indicating if the stream will be <a lt="cancel a readable
+    stream">canceled</a> when the async iterator's {{ReadableStreamAsyncIteratorPrototype/return()}} method is called
+  </tr>
+</table>
+
+<h4 id="rs-asynciterator-prototype-next" method for="ReadableStreamAsyncIteratorPrototype">next()</h4>
+
+<emu-alg>
+  1. If ! IsReadableStreamAsyncIterator(*this*) is *false*, return <a>a promise rejected with</a> a *TypeError* exception.
+  1. Let _reader_ be *this*.[[asyncIteratorReader]].
+  1. If _reader_.[[ownerReadableStream]] is *undefined*, return <a>a promise rejected with</a> a *TypeError* exception.
+  1. Return the result of <a>transforming</a> ! ReadableStreamDefaultReaderRead(_reader_) with a fulfillment handler
+     which takes the argument _result_ and performs the following steps:
+    1. Assert: Type(_result_) is Object.
+    1. Let _done_ be ! Get(_result_, `"done"`).
+    1. Assert: Type(_done_) is Boolean.
+    1. If _done_ is *true*, perform ! ReadableStreamReaderGenericRelease(_reader_).
+    1. Let _value_ be ! Get(_result_, `"value"`).
+    1. Return ! ReadableStreamCreateReadResult(_value_, _done_, *true*).
+</emu-alg>
+
+<h4 id="rs-asynciterator-prototype-return" method
+for="ReadableStreamAsyncIteratorPrototype">return( <var>value</var> )</h4>
+
+<emu-alg>
+  1. If ! IsReadableStreamAsyncIterator(*this*) is *false*, return <a>a promise rejected with</a> a *TypeError* exception.
+  1. Let _reader_ be *this*.[[asyncIteratorReader]].
+  1. If _reader_.[[ownerReadableStream]] is *undefined*, return <a>a promise rejected with</a> a *TypeError* exception.
+  1. If _reader_.[[readRequests]] is not empty, return <a>a promise rejected with</a> a *TypeError* exception.
+  1. If *this*.[[preventCancel]] is *false*, then:
+    1. Let _result_ be ! ReadableStreamReaderGenericCancel(_reader_, _value_).
+    1. Perform ! ReadableStreamReaderGenericRelease(_reader_).
+    1. Return the result of <a>transforming</a> _result_ by a fulfillment handler that returns !
+    ReadableStreamCreateReadResult(_value_, *true*, *true*).
+  1. Perform ! ReadableStreamReaderGenericRelease(_reader_).
+  1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_value_, *true*, *true*).
+</emu-alg>
+
 <h3 id="rs-abstract-ops">General readable stream abstract operations</h3>
 
 The following abstract operations, unlike most in this specification, are meant to be generally useful by other
 specifications, instead of just being part of the implementation of this spec's classes.
 
 <h4 id="acquire-readable-stream-byob-reader" aoid="AcquireReadableStreamBYOBReader"
-throws>AcquireReadableStreamBYOBReader ( <var>stream</var> )</h4>
+throws>AcquireReadableStreamBYOBReader ( <var>stream</var>[, <var>forAuthorCode</var> ] )</h4>
 
 This abstract operation is meant to be called from other specifications that may wish to acquire a <a>BYOB reader</a>
 for a given stream.
 
 <emu-alg>
-  1. Return ? Construct(`<a idl>ReadableStreamBYOBReader</a>`, « _stream_ »).
+  1. If _forAuthorCode_ was not passed, set it to *false*.
+  1. Let _reader_ be ? Construct(`<a idl>ReadableStreamBYOBReader</a>`, « _stream_ »).
+  1. Set _reader_.[[forAuthorCode]] to _forAuthorCode_.
+  1. Return _reader_.
 </emu-alg>
 
 <h4 id="acquire-readable-stream-reader" aoid="AcquireReadableStreamDefaultReader" throws
-export>AcquireReadableStreamDefaultReader ( <var>stream</var> )</h4>
+export>AcquireReadableStreamDefaultReader ( <var>stream</var>[, <var>forAuthorCode</var> ] )</h4>
 
 This abstract operation is meant to be called from other specifications that may wish to acquire a <a>default
 reader</a> for a given stream.
 
+<p class="note">Other specifications ought to leave <var>forAuthorCode</var> as its default value of
+<emu-val>false</emu-val>, unless they are planning to directly expose the resulting <code>{ value, done }</code> object
+to authors. See <a href="#rs-read-result-for-author-code">the note regarding ReadableStreamCreateReadResult</a> for more
+information.</p>
+
 <emu-alg>
-  1. Return ? Construct(`<a idl>ReadableStreamDefaultReader</a>`, « _stream_ »).
+  1. If _forAuthorCode_ was not passed, set it to *false*.
+  1. Let _reader_ be ? Construct(`<a idl>ReadableStreamDefaultReader</a>`, « _stream_ »).
+  1. Set _reader_.[[forAuthorCode]] to _forAuthorCode_.
+  1. Return _reader_.
 </emu-alg>
 
 <h4 id="create-readable-stream" aoid="CreateReadableStream" throws export>CreateReadableStream (
@@ -984,6 +1019,15 @@ readable stream is <a>locked to a reader</a>.
   1. Return *true*.
 </emu-alg>
 
+<h4 id="is-readable-stream-asynciterator" aoid="IsReadableStreamAsyncIterator" nothrow
+export>IsReadableStreamAsyncIterator ( <var>x</var> )</h4>
+
+<emu-alg>
+  1. If Type(_x_) is not Object, return *false*.
+  1. If _x_ does not have a [[asyncIteratorReader]] internal slot, return *false*.
+  1. Return *true*.
+</emu-alg>
+
 <h4 id="readable-stream-tee" aoid="ReadableStreamTee" throws export>ReadableStreamTee ( <var>stream</var>,
 <var>cloneForBranch2</var> )</h4>
 
@@ -1003,7 +1047,7 @@ noticeable asymmetry between the two branches, and limits the possible <a>chunks
   1. Assert: ! IsReadableStream(_stream_) is *true*.
   1. Assert: Type(_cloneForBranch2_) is Boolean.
   1. Let _reader_ be ? AcquireReadableStreamDefaultReader(_stream_).
-  1. Let _closedOrErrored_ be *false*.
+  1. Let _reading_ be *false*.
   1. Let _canceled1_ be *false*.
   1. Let _canceled2_ be *false*.
   1. Let _reason1_ be *undefined*.
@@ -1012,19 +1056,21 @@ noticeable asymmetry between the two branches, and limits the possible <a>chunks
   1. Let _branch2_ be *undefined*.
   1. Let _cancelPromise_ be <a>a new promise</a>.
   1. Let _pullAlgorithm_ be the following steps:
-    1. Return the result of <a>transforming</a> ! ReadableStreamDefaultReaderRead(_reader_) with a fulfillment handler
-       which takes the argument _result_ and performs the following steps:
+    1. If _reading_ is *true*, return <a>a promise resolved with</a> *undefined*.
+    1. Set _reading_ to *true*.
+    1. Let _readPromise_ be the result of <a>transforming</a> ! ReadableStreamDefaultReaderRead(_reader_) with a
+       fulfillment handler which takes the argument _result_ and performs the following steps:
+      1. Set _reading_ to *false*.
       1. Assert: Type(_result_) is Object.
-      1. Let _value_ be ? Get(_result_, `"value"`).
-      1. Let _done_ be ? Get(_result_, `"done"`).
+      1. Let _done_ be ! Get(_result_, `"done"`).
       1. Assert: Type(_done_) is Boolean.
-      1. If _done_ is *true* and _closedOrErrored_ is *false*,
+      1. If _done_ is *true*,
         1. If _canceled1_ is *false*,
           1. Perform ! ReadableStreamDefaultControllerClose(_branch1_.[[readableStreamController]]).
         1. If _canceled2_ is *false*,
           1. Perform ! ReadableStreamDefaultControllerClose(_branch2_.[[readableStreamController]]).
-        1. Set _closedOrErrored_ to *true*.
-      1. If _closedOrErrored_ is *true*, return.
+        1. Return.
+      1. Let _value_ be ! Get(_result_, `"value"`).
       1. Let _value1_ and _value2_ be _value_.
       1. If _canceled2_ is *false* and _cloneForBranch2_ is *true*, set _value2_ to ? <a
          abstract-op>StructuredDeserialize</a>(? <a abstract-op>StructuredSerialize</a>(_value2_), the current Realm
@@ -1033,6 +1079,8 @@ noticeable asymmetry between the two branches, and limits the possible <a>chunks
          ReadableStreamDefaultControllerEnqueue(_branch1_.[[readableStreamController]], _value1_).
       1. If _canceled2_ is *false*, perform ?
          ReadableStreamDefaultControllerEnqueue(_branch2_.[[readableStreamController]], _value2_).
+    1. Set _readPromise_.[[PromiseIsHandled]] to *true*.
+    1. Return <a>a promise resolved with</a> *undefined*.
   1. Let _cancel1Algorithm_ be the following steps, taking a _reason_ argument:
     1. Set _canceled1_ to *true*.
     1. Set _reason1_ to _reason_.
@@ -1053,12 +1101,124 @@ noticeable asymmetry between the two branches, and limits the possible <a>chunks
   1. Set _branch1_ to ! CreateReadableStream(_startAlgorithm_, _pullAlgorithm_, _cancel1Algorithm_).
   1. Set _branch2_ to ! CreateReadableStream(_startAlgorithm_, _pullAlgorithm_, _cancel2Algorithm_).
   1. <a>Upon rejection</a> of _reader_.[[closedPromise]] with reason _r_,
-    1. If _closedOrErrored_ is *false*, then:
-      1. Perform ! ReadableStreamDefaultControllerError(_branch1_.[[readableStreamController]], _r_).
-      1. Perform ! ReadableStreamDefaultControllerError(_branch2_.[[readableStreamController]], _r_).
-      1. Set _closedOrErrored_ to *true*.
+    1. Perform ! ReadableStreamDefaultControllerError(_branch1_.[[readableStreamController]], _r_).
+    1. Perform ! ReadableStreamDefaultControllerError(_branch2_.[[readableStreamController]], _r_).
   1. Return « _branch1_, _branch2_ ».
 </emu-alg>
+
+<h4 id="readable-stream-pipe-to" aoid="ReadableStreamPipeTo" nothrow export>ReadableStreamPipeTo (
+<var ignore>source</var>, <var>dest</var>, <var>preventClose</var>, <var>preventAbort</var>, <var>preventCancel</var>,
+<var>signal</var> )</h4>
+
+<emu-alg>
+  1. Assert: ! IsReadableStream(_source_) is *true*.
+  1. Assert: ! IsWritableStream(_dest_) is *true*.
+  1. Assert: Type(_preventClose_) is Boolean, Type(_preventAbort_) is Boolean, and Type(_preventCancel_) is Boolean.
+  1. Assert: _signal_ is *undefined* or _signal_ is an instance of the `<a idl>AbortSignal</a>` interface.
+  1. Assert: ! IsReadableStreamLocked(_source_) is *false*.
+  1. Assert: ! IsWritableStreamLocked(_dest_) is *false*.
+  1. If ! IsReadableByteStreamController(_source_.[[readableStreamController]]) is *true*, let _reader_ be either !
+     AcquireReadableStreamBYOBReader(_source_) or ! AcquireReadableStreamDefaultReader(_source_), at the user agent's
+     discretion.
+  1. Otherwise, let _reader_ be ! AcquireReadableStreamDefaultReader(_source_).
+  1. Let _writer_ be ! AcquireWritableStreamDefaultWriter(_dest_).
+  1. Let _shuttingDown_ be *false*.
+  1. Let _promise_ be <a>a new promise</a>.
+  1. If _signal_ is not *undefined*,
+    1. Let _abortAlgorithm_ be the following steps:
+      1. Let _error_ be a new "`<a idl>AbortError</a>`" `<a idl>DOMException</a>`.
+      1. Let _actions_ be an empty <a>ordered set</a>.
+      1. If _preventAbort_ is *false*, <a for="set">append</a> the following action to _actions_:
+        1. If _dest_.[[_state_]] is `"writable"`, return ! WritableStreamAbort(_dest_, _error_).
+        1. Otherwise, return <a>a promise resolved with</a> *undefined*.
+      1. If _preventCancel_ is *false*, <a for="set">append</a> the following action action to _actions_:
+        1. If _source_.[[_state_]] is `"readable"`, return ! ReadableStreamCancel(_source_, _error_).
+        1. Otherwise, return <a>a promise resolved with</a> *undefined*.
+      1. <a href="#rs-pipeTo-shutdown-with-action">Shutdown with an action</a> consisting of <a>waiting for all</a>
+         of the actions in _actions_, and with _error_.
+    1. If _signal_'s <a for=AbortSignal>aborted flag</a> is set, perform _abortAlgorithm_ and return _promise_.
+    1. <a for="AbortSignal">Add</a> _abortAlgorithm_ to _signal_.
+  1. <a>In parallel</a> <span class="XXX">but not really; see <a
+     href="https://github.com/whatwg/streams/issues/905">#905</a></span>, using _reader_ and _writer_, read all
+     <a>chunks</a> from _source_ and write them to _dest_. Due to the locking provided by the reader and writer, the exact
+     manner in which this happens is not observable to author code, and so there is flexibility in how this is done. The
+     following constraints apply regardless of the exact algorithm used:
+     * <strong>Public API must not be used:</strong> while reading or writing, or performing any of the operations
+       below, the JavaScript-modifiable reader, writer, and stream APIs (i.e. methods on the appropriate prototypes)
+       must not be used. Instead, the streams must be manipulated directly.
+     * <strong>Backpressure must be enforced:</strong>
+       * While WritableStreamDefaultWriterGetDesiredSize(_writer_) is ≤ *0* or is *null*, the user agent must not read
+         from _reader_.
+       * If _reader_ is a <a>BYOB reader</a>, WritableStreamDefaultWriterGetDesiredSize(_writer_) should be used as a
+         basis to determine the size of the chunks read from _reader_.
+         <p class="note">It's frequently inefficient to read chunks that are too small or too large. Other information
+         might be factored in to determine the optimal chunk size.</p>
+       * Reads or writes should not be delayed for reasons other than these backpressure signals.
+         <p class="example" id="example-bad-backpressure">An implementation that waits for each write to successfully
+         complete before proceeding to the next read/write operation violates this recommendation. In doing so, such an
+         implementation makes the <a>internal queue</a> of _dest_ useless, as it ensures _dest_ always contains at most
+         one queued <a>chunk</a>.</p>
+     * <strong>Shutdown must stop activity:</strong> if _shuttingDown_ becomes *true*, the user agent must not
+       initiate further reads from _reader_, and must only perform writes of already-read <a>chunks</a>, as described
+       below. In particular, the user agent must check the below conditions before performing any reads or writes,
+       since they might lead to immediate shutdown.
+     * <strong>Error and close states must be propagated:</strong> the following conditions must be applied in order.
+       1. <strong>Errors must be propagated forward:</strong> if _source_.[[state]] is or becomes `"errored"`, then
+         1. If _preventAbort_ is *false*, <a href="#rs-pipeTo-shutdown-with-action">shutdown with an action</a> of !
+            WritableStreamAbort(_dest_, _source_.[[storedError]]) and with _source_.[[storedError]].
+         1. Otherwise, <a href="#rs-pipeTo-shutdown">shutdown</a> with _source_.[[storedError]].
+       1. <strong>Errors must be propagated backward:</strong> if _dest_.[[state]] is or becomes `"errored"`, then
+         1. If _preventCancel_ is *false*, <a href="#rs-pipeTo-shutdown-with-action">shutdown with an action</a> of !
+            ReadableStreamCancel(_source_, _dest_.[[storedError]]) and with _dest_.[[storedError]].
+         1. Otherwise, <a href="#rs-pipeTo-shutdown">shutdown</a> with _dest_.[[storedError]].
+       1. <strong>Closing must be propagated forward:</strong> if _source_.[[state]] is or becomes `"closed"`, then
+         1. If _preventClose_ is *false*, <a href="#rs-pipeTo-shutdown-with-action">shutdown with an action</a> of !
+            WritableStreamDefaultWriterCloseWithErrorPropagation(_writer_).
+         1. Otherwise, <a href="#rs-pipeTo-shutdown">shutdown</a>.
+       1. <strong>Closing must be propagated backward:</strong> if ! WritableStreamCloseQueuedOrInFlight(_dest_) is *true*
+         or _dest_.[[state]] is `"closed"`, then
+         1. Assert: no <a>chunks</a> have been read or written.
+         1. Let _destClosed_ be a new *TypeError*.
+         1. If _preventCancel_ is *false*, <a href="#rs-pipeTo-shutdown-with-action">shutdown with an action</a> of !
+            ReadableStreamCancel(_source_, _destClosed_) and with _destClosed_.
+         1. Otherwise, <a href="#rs-pipeTo-shutdown">shutdown</a> with _destClosed_.
+     * <i id="rs-pipeTo-shutdown-with-action">Shutdown with an action</i>: if any of the above requirements ask to
+       shutdown with an action _action_, optionally with an error _originalError_, then:
+       1. If _shuttingDown_ is *true*, abort these substeps.
+       1. Set _shuttingDown_ to *true*.
+       1. If _dest_.[[state]] is `"writable"` and ! WritableStreamCloseQueuedOrInFlight(_dest_) is *false*,
+         1. If any <a>chunks</a> have been read but not yet written, write them to _dest_.
+         1. Wait until every <a>chunk</a> that has been read has been written (i.e. the corresponding promises have
+            settled).
+       1. Let _p_ be the result of performing _action_.
+       1. <a>Upon fulfillment</a> of _p_, <a href="#rs-pipeTo-finalize">finalize</a>, passing along _originalError_ if
+          it was given.
+       1. <a>Upon rejection</a> of _p_ with reason _newError_, <a href="#rs-pipeTo-finalize">finalize</a> with
+          _newError_.
+     * <i id="rs-pipeTo-shutdown">Shutdown</i>: if any of the above requirements or steps ask to shutdown, optionally
+       with an error _error_, then:
+       1. If _shuttingDown_ is *true*, abort these substeps.
+       1. Set _shuttingDown_ to *true*.
+       1. If _dest_.[[state]] is `"writable"` and ! WritableStreamCloseQueuedOrInFlight(_dest_) is *false*,
+         1. If any <a>chunks</a> have been read but not yet written, write them to _dest_.
+         1. Wait until every <a>chunk</a> that has been read has been written (i.e. the corresponding promises have
+            settled).
+       1. <a href="#rs-pipeTo-finalize">Finalize</a>, passing along _error_ if it was given.
+     * <i id="rs-pipeTo-finalize">Finalize</i>: both forms of shutdown will eventually ask to finalize, optionally with
+       an error _error_, which means to perform the following steps:
+       1. Perform ! WritableStreamDefaultWriterRelease(_writer_).
+       1. Perform ! ReadableStreamReaderGenericRelease(_reader_).
+       1. If _signal_ is not *undefined*, <a for="AbortSignal">remove</a> _abortAlgorithm_ from _signal_.
+       1. If _error_ was given, <a>reject</a> _promise_ with _error_.
+       1. Otherwise, <a>resolve</a> _promise_ with *undefined*.
+  1. Return _promise_.
+</emu-alg>
+
+<p class="note">
+  Various abstract operations performed here include object creation (often of promises), which usually would require
+  specifying a realm for the created object. However, because of the locking, none of these objects can be observed by
+  author code. As such, the realm used to create them does not matter.
+</p>
 
 <h3 id="rs-abstract-ops-used-by-controllers">The interface between readable streams and controllers</h3>
 
@@ -1089,25 +1249,25 @@ implementations to affect their associated {{ReadableStream}} object. This trans
 controller into developer-facing results visible through the {{ReadableStream}}'s public API.
 
 <h4 id="readable-stream-add-read-into-request" aoid="ReadableStreamAddReadIntoRequest"
-nothrow>ReadableStreamAddReadIntoRequest ( <var>stream</var>, <var>forAuthorCode</var> )</h4>
+nothrow>ReadableStreamAddReadIntoRequest ( <var>stream</var> )</h4>
 
 <emu-alg>
   1. Assert: ! IsReadableStreamBYOBReader(_stream_.[[reader]]) is *true*.
   1. Assert: _stream_.[[state]] is `"readable"` or `"closed"`.
   1. Let _promise_ be <a>a new promise</a>.
-  1. Let _readIntoRequest_ be Record {[[promise]]: _promise_, [[forAuthorCode]]: _forAuthorCode_}.
+  1. Let _readIntoRequest_ be Record {[[promise]]: _promise_}.
   1. Append _readIntoRequest_ as the last element of _stream_.[[reader]].[[readIntoRequests]].
   1. Return _promise_.
 </emu-alg>
 
 <h4 id="readable-stream-add-read-request" aoid="ReadableStreamAddReadRequest" nothrow>ReadableStreamAddReadRequest (
-<var>stream</var>, <var>forAuthorCode</var> )</h4>
+<var>stream</var> )</h4>
 
 <emu-alg>
   1. Assert: ! IsReadableStreamDefaultReader(_stream_.[[reader]]) is *true*.
   1. Assert: _stream_.[[state]] is `"readable"`.
   1. Let _promise_ be <a>a new promise</a>.
-  1. Let _readRequest_ be Record {[[promise]]: _promise_, [[forAuthorCode]]: _forAuthorCode_}.
+  1. Let _readRequest_ be Record {[[promise]]: _promise_}.
   1. Append _readRequest_ as the last element of _stream_.[[reader]].[[readRequests]].
   1. Return _promise_.
 </emu-alg>
@@ -1134,7 +1294,7 @@ nothrow>ReadableStreamAddReadIntoRequest ( <var>stream</var>, <var>forAuthorCode
   1. If ! IsReadableStreamDefaultReader(_reader_) is *true*,
     1. Repeat for each _readRequest_ that is an element of _reader_.[[readRequests]],
       1. <a>Resolve</a> _readRequest_.[[promise]] with ! ReadableStreamCreateReadResult(*undefined*, *true*,
-         _readRequest_.[[forAuthorCode]]).
+         _reader_.[[forAuthorCode]]).
     1. Set _reader_.[[readRequests]] to an empty List.
   1. <a>Resolve</a> _reader_.[[closedPromise]] with *undefined*.
 </emu-alg>
@@ -1211,7 +1371,7 @@ nothrow>ReadableStreamFulfillReadIntoRequest ( <var>stream</var>, <var>chunk</va
   1. Remove _readIntoRequest_ from _reader_.[[readIntoRequests]], shifting all other elements downward (so that the
      second becomes the first, and so on).
   1. <a>Resolve</a> _readIntoRequest_.[[promise]] with ! ReadableStreamCreateReadResult(_chunk_, _done_,
-     _readIntoRequest_.[[forAuthorCode]]).
+     _reader_.[[forAuthorCode]]).
 </emu-alg>
 
 <h4 id="readable-stream-fulfill-read-request" aoid="ReadableStreamFulfillReadRequest"
@@ -1223,7 +1383,7 @@ nothrow>ReadableStreamFulfillReadRequest ( <var>stream</var>, <var>chunk</var>, 
   1. Remove _readRequest_ from _reader_.[[readRequests]], shifting all other elements downward (so that the second
      becomes the first, and so on).
   1. <a>Resolve</a> _readRequest_.[[promise]] with ! ReadableStreamCreateReadResult(_chunk_, _done_,
-     _readRequest_.[[forAuthorCode]]).
+     _reader_.[[forAuthorCode]]).
 </emu-alg>
 
 <h4 id="readable-stream-get-num-read-into-requests" aoid="ReadableStreamGetNumReadIntoRequests"
@@ -1305,6 +1465,10 @@ Instances of {{ReadableStreamDefaultReader}} are created with the internal slots
     <td class="non-normative">A promise returned by the reader's {{ReadableStreamDefaultReader/closed}} getter
   </tr>
   <tr>
+    <td>\[[forAuthorCode]]
+    <td class="non-normative">A boolean flag indicating whether this reader is visible to author code
+  </tr>
+  <tr>
     <td>\[[ownerReadableStream]]
     <td class="non-normative">A {{ReadableStream}} instance that owns this reader
   </tr>
@@ -1380,7 +1544,7 @@ lt="ReadableStreamDefaultReader(stream)">new ReadableStreamDefaultReader(<var>st
 <emu-alg>
   1. If ! IsReadableStreamDefaultReader(*this*) is *false*, return <a>a promise rejected with</a> a *TypeError* exception.
   1. If *this*.[[ownerReadableStream]] is *undefined*, return <a>a promise rejected with</a> a *TypeError* exception.
-  1. Return ! ReadableStreamDefaultReaderRead(*this*, *true*).
+  1. Return ! ReadableStreamDefaultReaderRead(*this*).
 </emu-alg>
 
 <h5 id="default-reader-release-lock" method for="ReadableStreamDefaultReader">releaseLock()</h5>
@@ -1445,6 +1609,10 @@ Instances of {{ReadableStreamBYOBReader}} are created with the internal slots de
   <tr>
     <td>\[[closedPromise]]
     <td class="non-normative">A promise returned by the reader's {{ReadableStreamBYOBReader/closed}} getter
+  </tr>
+  <tr>
+    <td>\[[forAuthorCode]]
+    <td class="non-normative">A boolean flag indicating whether this reader is visible to author code
   </tr>
   <tr>
     <td>\[[ownerReadableStream]]
@@ -1529,7 +1697,7 @@ ReadableStreamBYOBReader(<var>stream</var>)</h4>
   1. If ! IsDetachedBuffer(_view_.[[ViewedArrayBuffer]]) is *true*, return <a>a promise rejected with</a> a *TypeError*
      exception.
   1. If _view_.[[ByteLength]] is *0*, return <a>a promise rejected with</a> a *TypeError* exception.
-  1. Return ! ReadableStreamBYOBReaderRead(*this*, _view_, *true*).
+  1. Return ! ReadableStreamBYOBReaderRead(*this*, _view_).
 </emu-alg>
 
 <h5 id="byob-reader-release-lock" method for="ReadableStreamBYOBReader">releaseLock()</h5>
@@ -1585,6 +1753,7 @@ nothrow>ReadableStreamReaderGenericCancel ( <var>reader</var>, <var>reason</var>
 nothrow>ReadableStreamReaderGenericInitialize ( <var>reader</var>, <var>stream</var> )</h4>
 
 <emu-alg>
+  1. Set _reader_.[[forAuthorCode]] to *true*.
   1. Set _reader_.[[ownerReadableStream]] to _stream_.
   1. Set _stream_.[[reader]] to _reader_.
   1. If _stream_.[[state]] is `"readable"`,
@@ -1612,35 +1781,28 @@ nothrow>ReadableStreamReaderGenericRelease ( <var>reader</var> )</h4>
 </emu-alg>
 
 <h4 id="readable-stream-byob-reader-read" aoid="ReadableStreamBYOBReaderRead" nothrow>ReadableStreamBYOBReaderRead
-( <var>reader</var>, <var>view</var> [, <var>forAuthorCode</var> ] )</h4>
+( <var>reader</var>, <var>view</var> )</h4>
 
 <emu-alg>
-  1. If _forAuthorCode_ was not passed, set it to *false*.
   1. Let _stream_ be _reader_.[[ownerReadableStream]].
   1. Assert: _stream_ is not *undefined*.
   1. Set _stream_.[[disturbed]] to *true*.
   1. If _stream_.[[state]] is `"errored"`, return <a>a promise rejected with</a> _stream_.[[storedError]].
-  1. Return ! ReadableByteStreamControllerPullInto(_stream_.[[readableStreamController]], _view_, _forAuthorCode_).
+  1. Return ! ReadableByteStreamControllerPullInto(_stream_.[[readableStreamController]], _view_).
 </emu-alg>
 
 <h4 id="readable-stream-default-reader-read" aoid="ReadableStreamDefaultReaderRead" nothrow
-export>ReadableStreamDefaultReaderRead ( <var>reader</var> [, <var>forAuthorCode</var> ] )</h4>
-
-<p class="note">Other specifications ought to leave <var>forAuthorCode</var> as its default value of
-<emu-val>false</emu-val>, unless they are planning to directly expose the resulting <code>{ value, done }</code> object
-to authors. See <a href="#rs-read-result-for-author-code">the note regarding ReadableStreamCreateReadResult</a> for more
-information.</p>
+export>ReadableStreamDefaultReaderRead ( <var>reader</var> )</h4>
 
 <emu-alg>
-  1. If _forAuthorCode_ was not passed, set it to *false*.
   1. Let _stream_ be _reader_.[[ownerReadableStream]].
   1. Assert: _stream_ is not *undefined*.
   1. Set _stream_.[[disturbed]] to *true*.
   1. If _stream_.[[state]] is `"closed"`, return <a>a promise resolved with</a> !
-     ReadableStreamCreateReadResult(*undefined*, *true*, _forAuthorCode_).
+     ReadableStreamCreateReadResult(*undefined*, *true*, _reader_.[[forAuthorCode]]).
   1. If _stream_.[[state]] is `"errored"`, return <a>a promise rejected with</a> _stream_.[[storedError]].
   1. Assert: _stream_.[[state]] is `"readable"`.
-  1. Return ! _stream_.[[readableStreamController]].<a abstract-op>[[PullSteps]]</a>(_forAuthorCode_).
+  1. Return ! _stream_.[[readableStreamController]].<a abstract-op>[[PullSteps]]</a>().
 </emu-alg>
 
 <h3 id="rs-default-controller-class" interface lt="ReadableStreamDefaultController">Class
@@ -1816,7 +1978,7 @@ readable stream implementation will polymorphically call to either these or thei
   1. Return _result_.
 </emu-alg>
 
-<h5 id="rs-default-controller-private-pull"><a abstract-op>\[[PullSteps]]</a>( <var>forAuthorCode</var> )</h5>
+<h5 id="rs-default-controller-private-pull"><a abstract-op>\[[PullSteps]]</a>( )</h5>
 
 <emu-alg>
   1. Let _stream_ be *this*.[[controlledReadableStream]].
@@ -1826,8 +1988,9 @@ readable stream implementation will polymorphically call to either these or thei
       1. Perform ! ReadableStreamDefaultControllerClearAlgorithms(*this*).
       1. Perform ! ReadableStreamClose(_stream_).
     1. Otherwise, perform ! ReadableStreamDefaultControllerCallPullIfNeeded(*this*).
-    1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_chunk_, *false*, _forAuthorCode_).
-  1. Let _pendingPromise_ be ! ReadableStreamAddReadRequest(_stream_, _forAuthorCode_).
+    1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_chunk_, *false*,
+       _stream_.[[reader]].[[forAuthorCode]]).
+  1. Let _pendingPromise_ be ! ReadableStreamAddReadRequest(_stream_).
   1. Perform ! ReadableStreamDefaultControllerCallPullIfNeeded(*this*).
   1. Return _pendingPromise_.
 </emu-alg>
@@ -2088,7 +2251,8 @@ Instances of {{ReadableByteStreamController}} are created with the internal slot
   </tr>
   <tr>
     <td>\[[byobRequest]]
-    <td class="non-normative">A {{ReadableStreamBYOBRequest}} instance representing the current BYOB pull request
+    <td class="non-normative">A {{ReadableStreamBYOBRequest}} instance representing the current BYOB pull request,
+      or <emu-val>undefined</emu-val> if there are no pending requests
   </tr>
   <tr>
     <td>\[[cancelAlgorithm]]
@@ -2257,7 +2421,7 @@ readable stream implementation will polymorphically call to either these or thei
   1. Return _result_.
 </emu-alg>
 
-<h5 id="rbs-controller-private-pull"><a abstract-op>\[[PullSteps]]</a>( <var>forAuthorCode</var> )</h5>
+<h5 id="rbs-controller-private-pull"><a abstract-op>\[[PullSteps]]</a>( )</h5>
 
 <emu-alg>
   1. Let _stream_ be *this*.[[controlledReadableByteStream]].
@@ -2271,7 +2435,8 @@ readable stream implementation will polymorphically call to either these or thei
     1. Perform ! ReadableByteStreamControllerHandleQueueDrain(*this*).
     1. Let _view_ be ! Construct(<a idl>%Uint8Array%</a>, « _entry_.[[buffer]], _entry_.[[byteOffset]],
        _entry_.[[byteLength]] »).
-    1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_view_, *false*, _forAuthorCode_).
+    1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_view_, *false*,
+       _stream_.[[reader]].[[forAuthorCode]]).
   1. Let _autoAllocateChunkSize_ be *this*.[[autoAllocateChunkSize]].
   1. If _autoAllocateChunkSize_ is not *undefined*,
     1. Let _buffer_ be Construct(%ArrayBuffer%, « _autoAllocateChunkSize_ »).
@@ -2280,7 +2445,7 @@ readable stream implementation will polymorphically call to either these or thei
        _autoAllocateChunkSize_, [[bytesFilled]]: *0*, [[elementSize]]: *1*, [[ctor]]: <a idl>%Uint8Array%</a>,
        [[readerType]]: `"default"`}.
     1. Append _pullIntoDescriptor_ as the last element of *this*.[[pendingPullIntos]].
-  1. Let _promise_ be ! ReadableStreamAddReadRequest(_stream_, _forAuthorCode_).
+  1. Let _promise_ be ! ReadableStreamAddReadRequest(_stream_).
   1. Perform ! ReadableByteStreamControllerCallPullIfNeeded(*this*).
   1. Return _promise_.
 </emu-alg>
@@ -2647,7 +2812,7 @@ nothrow>ReadableByteStreamControllerProcessPullIntoDescriptorsUsingQueue ( <var>
 </emu-alg>
 
 <h4 id="readable-byte-stream-controller-pull-into" aoid="ReadableByteStreamControllerPullInto"
-nothrow>ReadableByteStreamControllerPullInto ( <var>controller</var>, <var>view</var>, <var>forAuthorCode</var> )</h4>
+nothrow>ReadableByteStreamControllerPullInto ( <var>controller</var>, <var>view</var> )</h4>
 
 <emu-alg>
   1. Let _stream_ be _controller_.[[controlledReadableByteStream]].
@@ -2666,21 +2831,23 @@ nothrow>ReadableByteStreamControllerPullInto ( <var>controller</var>, <var>view<
      [[ctor]]: _ctor_, [[readerType]]: `"byob"`}.
   1. If _controller_.[[pendingPullIntos]] is not empty,
     1. Append _pullIntoDescriptor_ as the last element of _controller_.[[pendingPullIntos]].
-    1. Return ! ReadableStreamAddReadIntoRequest(_stream_, _forAuthorCode_).
+    1. Return ! ReadableStreamAddReadIntoRequest(_stream_).
   1. If _stream_.[[state]] is `"closed"`,
     1. Let _emptyView_ be ! Construct(_ctor_, « _pullIntoDescriptor_.[[buffer]], _pullIntoDescriptor_.[[byteOffset]], *0* »).
-    1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_emptyView_, *true*, _forAuthorCode_).
+    1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_emptyView_, *true*,
+       _stream_.[[reader]].[[forAuthorCode]]).
   1. If _controller_.[[queueTotalSize]] > *0*,
     1. If ! ReadableByteStreamControllerFillPullIntoDescriptorFromQueue(_controller_, _pullIntoDescriptor_) is *true*,
       1. Let _filledView_ be ! ReadableByteStreamControllerConvertPullIntoDescriptor(_pullIntoDescriptor_).
       1. Perform ! ReadableByteStreamControllerHandleQueueDrain(_controller_).
-      1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_filledView_, *false*, _forAuthorCode_).
+      1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_filledView_, *false*,
+         _stream_.[[reader]].[[forAuthorCode]]).
     1. If _controller_.[[closeRequested]] is *true*,
       1. Let _e_ be a *TypeError* exception.
       1. Perform ! ReadableByteStreamControllerError(_controller_, _e_).
       1. Return <a>a promise rejected with</a> _e_.
   1. Append _pullIntoDescriptor_ as the last element of _controller_.[[pendingPullIntos]].
-  1. Let _promise_ be ! ReadableStreamAddReadIntoRequest(_stream_, _forAuthorCode_).
+  1. Let _promise_ be ! ReadableStreamAddReadIntoRequest(_stream_).
   1. Perform ! ReadableByteStreamControllerCallPullIfNeeded(_controller_).
   1. Return _promise_.
 </emu-alg>
@@ -2803,7 +2970,7 @@ throws>SetUpReadableByteStreamController ( <var>stream</var>, <var>controller</v
     1. Assert: _autoAllocateChunkSize_ is positive.
   1. Set _controller_.[[controlledReadableByteStream]] to _stream_.
   1. Set _controller_.[[pullAgain]] and _controller_.[[pulling]] to *false*.
-  1. Perform ! ReadableByteStreamControllerClearPendingPullIntos(_controller_).
+  1. Set _controller_.[[byobRequest]] to *undefined*.
   1. Perform ! ResetQueue(_controller_).
   1. Set _controller_.[[closeRequested]] and _controller_.[[started]] to *false*.
   1. Set _controller_.[[strategyHWM]] to ? ValidateAndNormalizeHighWaterMark(_highWaterMark_).
@@ -4137,7 +4304,7 @@ aoid="WritableStreamDefaultControllerAdvanceQueueIfNeeded" nothrow>WritableStrea
   1. If _controller_.[[started]] is *false*, return.
   1. If _stream_.[[inFlightWriteRequest]] is not *undefined*, return.
   1. Let _state_ be _stream_.[[state]].
-  1. If _state_ is `"closed"` or `"errored"`, return.
+  1. Assert: _state_ is not `"closed"` or `"errored"`.
   1. If _state_ is `"erroring"`,
     1. Perform ! WritableStreamFinishErroring(_stream_).
     1. Return.
@@ -4546,7 +4713,7 @@ algorithms do not need to check stream states when responding to an error condit
 nothrow>TransformStreamErrorWritableAndUnblockWrite ( <var>stream</var>, <var>e</var> )</h4>
 
 <emu-alg>
-  1. Perform ! TransformStreamDefaultControllerClearAlgorithms(_stream_.[[transformStreamController]]);
+  1. Perform ! TransformStreamDefaultControllerClearAlgorithms(_stream_.[[transformStreamController]]).
   1. Perform ! WritableStreamDefaultControllerErrorIfNeeded(_stream_.[[writable]].[[writableStreamController]], _e_).
   1. If _stream_.[[backpressure]] is *true*, perform ! TransformStreamSetBackpressure(_stream_, *false*).
 </emu-alg>
@@ -4887,7 +5054,7 @@ properties:
 <dl>
   <dt><dfn method for="queuing strategy">size(<var>chunk</var>)</dfn> (non-byte streams only)</dt>
   <dd>
-    <p>A function that computes and returns the size of the given <a>chunk</a> value.</p>
+    <p>A function that computes and returns the finite non-negative size of the given <a>chunk</a> value.</p>
 
     <p>The result is used to determine <a>backpressure</a>, manifesting via the appropriate <code>desiredSize</code>
     property: either
@@ -5733,7 +5900,7 @@ source abstractions.
       return this._closeWS(4000, reason && reason.message);
     }
 
-    _closeWS(code, reason) {
+    _closeWS(code, reasonString) {
       return new Promise((resolve, reject) => {
         this._ws.onclose = e => {
           if (e.wasClean) {
@@ -5945,13 +6112,16 @@ Dominic Tarr,
 Ed Hager,
 Forbes Lindesay,
 Forrest Norvell,
+Gary Blackwood,
 Gorgi Kosev,
+Gus Caplan,
 贺师俊 (hax),
 Isaac Schlueter,
 isonmad,
 Jake Archibald,
 Jake Verbaten,
 Janessa Det,
+Jason Orendorff,
 Jens Nockert,
 Lennart Grahl,
 Mangala Sadhu Sangeet Singh Khalsa,

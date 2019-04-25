@@ -53,14 +53,6 @@ url:https://tools.ietf.org/html/rfc7234#section-1.2.1;text:delta-seconds;type:df
     "WSP": {
         "aliasOf": "RFC6455"
     },
-    "CLIENT-HINTS": {
-        "authors": [
-            "Ilya Grigorik"
-        ],
-        "href": "https://tools.ietf.org/html/draft-ietf-httpbis-client-hints",
-        "publisher": "IETF",
-        "title": "HTTP Client Hints"
-    },
     "HTTPVERBSEC1": {
         "publisher": "US-CERT",
         "href": "https://www.kb.cert.org/vuls/id/867593",
@@ -89,6 +81,12 @@ url:https://tools.ietf.org/html/rfc7234#section-1.2.1;text:delta-seconds;type:df
     }
 }
 </pre>
+
+<pre class=link-defaults>
+spec:infra; type:dfn; text:string
+</pre>
+
+
 
 <h2 id=goals class="no-num short">Goals</h2>
 
@@ -152,7 +150,8 @@ Streams, and URL Standards.
 [[!STREAMS]]
 [[!URL]]
 
-<p><dfn>ABNF</dfn> means ABNF as modified by HTTP (in particular the addition <code>#</code>).
+<p><dfn>ABNF</dfn> means ABNF as augmented by HTTP (in particular the addition <code>#</code>) and
+RFC 7405. [[!RFC7405]]
 
 <hr>
 
@@ -202,7 +201,7 @@ number.
 <h3 id=url>URL</h3>
 
 <p>A <dfn export>local scheme</dfn> is a <a for=url>scheme</a> that is "<code>about</code>",
-"<code>blob</code>", "<code>data</code>", or "<code>filesystem</code>".
+"<code>blob</code>", or "<code>data</code>".
 
 <p>A <a for=/>URL</a> <dfn export>is local</dfn> if its <a for=url>scheme</a> is a
 <a>local scheme</a>.
@@ -216,8 +215,7 @@ number.
 <a>HTTP(S) scheme</a>.
 
 <p>A <dfn export>fetch scheme</dfn> is a <a for=url>scheme</a> that is "<code>about</code>",
-"<code>blob</code>", "<code>data</code>", "<code>file</code>", "<code>filesystem</code>", or a
-<a>network scheme</a>.
+"<code>blob</code>", "<code>data</code>", "<code>file</code>", or a <a>network scheme</a>.
 
 <p class="note no-backref"><a>HTTP(S) scheme</a>, <a>network scheme</a>, and <a>fetch scheme</a> are
 also used by <cite>HTML</cite>. [[HTML]]
@@ -238,6 +236,13 @@ means (e.g., <code>data</code> URLs).
 
 <p>An <dfn export>HTTP tab or space</dfn> is U+0009 TAB or U+0020 SPACE.
 
+<p><dfn export>HTTP whitespace</dfn> is U+000A LF, U+000D CR, or an <a>HTTP tab or space</a>.
+
+<p class="note no-backref"><a>HTTP whitespace</a> is only useful for specific constructs that are
+reused outside the context of HTTP headers (e.g., <a for=/>MIME types</a>). For HTTP header values,
+using <a>HTTP tab or space</a> is preferred, and outside that context <a>ASCII whitespace</a> is
+preferred. Unlike <a>ASCII whitespace</a> this excludes U+000C FF.
+
 <p>An <dfn export>HTTP newline byte</dfn> is 0x0A (LF) or 0x0D (CR).
 
 <p>An <dfn export>HTTP tab or space byte</dfn> is 0x09 (HT) or 0x20 (SP).
@@ -256,6 +261,68 @@ period. E.g., while removing support for a hash function, weak cipher suites, ce
 use "<code>deprecated</code>" is not defined by this specification. An
 <a>environment settings object</a> typically derives its
 <a for="environment settings object">HTTPS state</a> from a <a for=/>response</a>.
+
+<p>To
+<dfn export lt="collect an HTTP quoted string|collecting an HTTP quoted string">collect an HTTP quoted string</dfn>
+from a <a for=/>string</a> <var>input</var>, given a <a>position variable</a> <var>position</var>
+and optionally an <var>extract-value flag</var>, run these steps:
+
+<ol>
+ <li><p>Let <var>positionStart</var> be <var>position</var>.
+
+ <li><p>Let <var>value</var> be the empty string.
+
+ <li><p>Assert: the <a>code point</a> at <var>position</var> within <var>input</var> is U+0022 (").
+
+ <li><p>Advance <var>position</var> by 1.
+
+ <li>
+  <p>While true:
+
+  <ol>
+   <li><p>Append the result of <a>collecting a sequence of code points</a> that are not U+0022 (")
+   or U+005C (\) from <var>input</var>, given <var>position</var>, to <var>value</var>.
+
+   <li><p>If <var>position</var> is past the end of <var>input</var>, then
+   <a for=iteration>break</a>.
+
+   <li><p>Let <var>quoteOrBackslash</var> be the <a>code point</a> at <var>position</var> within
+   <var>input</var>.
+
+   <li><p>Advance <var>position</var> by 1.
+
+   <li>
+    <p>If <var>quoteOrBackslash</var> is U+005C (\), then:
+
+    <ol>
+     <li><p>If <var>position</var> is past the end of <var>input</var>, then append U+005C (\) to
+     <var>value</var> and <a for=iteration>break</a>.
+
+     <li><p>Append the <a>code point</a> at <var>position</var> within <var>input</var> to
+     <var>value</var>.
+
+     <li><p>Advance <var>position</var> by 1.
+    </ol>
+
+   <li>
+    <p>Otherwise:
+
+    <ol>
+     <li><p>Assert: <var>quoteOrBackslash</var> is U+0022 (").
+
+     <li><p><a for=iteration>Break</a>.
+    </ol>
+  </ol>
+
+ <li><p>If the <var>extract-value flag</var> is set, then return <var>value</var>.
+
+ <li><p>Return the <a for=/>code points</a> from <var>positionStart</var> to <var>position</var>,
+ inclusive, within <var>input</var>.
+</ol>
+
+<p class="note no-backref">The <var>extract-value flag</var> argument makes this algorithm suitable
+for <a for="header list">getting, decoding, and splitting</a> and <a>parse a MIME type</a>, as well
+as other header value parsers that might need this.
 
 
 <h4 id=methods>Methods</h4>
@@ -302,9 +369,9 @@ for consistency.
 <p class="note no-backref">A <a for=/>header list</a> is essentially a
 specialized multimap. An ordered list of key-value pairs with potentially duplicate keys.
 
-<p>A <a for=/>header list</a> (<var>list</var>)
+<p>A <a for=/>header list</a> <var>list</var>
 <dfn export for="header list" lt="contains|does not contain">contains</dfn> a <a for=header>name</a>
-(<var>name</var>) if <var>list</var> <a for=list>contains</a> a <a for=/>header</a> whose
+<var>name</var> if <var>list</var> <a for=list>contains</a> a <a for=/>header</a> whose
 <a for=header>name</a> is a <a>byte-case-insensitive</a> match for <var>name</var>.
 
 <p>To <dfn export for="header list" id=concept-header-list-get>get</dfn> a <a for=header>name</a>
@@ -314,12 +381,154 @@ specialized multimap. An ordered list of key-value pairs with potentially duplic
  <li><p>If <var>list</var> <a for="header list">does not contain</a> <var>name</var>, then return
  null.
 
- <li><p>Return the <a for="header">combined value</a> with <var>name</var> and <var>list</var>.
+ <li><p>Return the <a lt=value for=header>values</a> of all <a for=/>headers</a> in <var>list</var>
+ whose <a for=header>name</a> is a <a>byte-case-insensitive</a> match for <var>name</var>, separated
+ from each other by 0x2C 0x20, in order.
 </ol>
 
+<p>To
+<dfn export for="header list" lt="get, decode, and split|getting, decoding, and splitting" id=concept-header-list-get-decode-split>get, decode, and split</dfn>
+a <a for=header>name</a> <var>name</var> from <a for=/>header list</a> <var>list</var>, run these
+steps:
+
+<ol>
+ <li><p>Let <var>initialValue</var> be the result of <a for="header list">getting</a>
+ <var>name</var> from <var>list</var>.
+
+ <li><p>If <var>initialValue</var> is null, then return null.
+
+ <li><p>Let <var>input</var> be the result of <a>isomorphic decoding</a> <var>initialValue</var>.
+
+ <li><p>Let <var>position</var> be a <a for=string>position variable</a> for <var>input</var>,
+ initially pointing at the start of <var>input</var>.
+
+ <li><p>Let <var>values</var> be a <a for=/>list</a> of <a for=/>strings</a>, initially empty.
+
+ <li><p>Let <var>value</var> be the empty string.
+
+ <li>
+  <p>While <var>position</var> is not past the end of <var>input</var>:
+
+  <ol>
+   <li>
+    <p>Append the result of <a>collecting a sequence of code points</a> that are not U+0022 (") or
+    U+002C (,) from <var>input</var>, given <var>position</var>, to <var>value</var>.
+
+    <p class=note>The result might be the empty string.
+
+   <li>
+    <p>If <var>position</var> is not past the end of <var>input</var>, then:
+
+    <ol>
+     <li>
+      <p>If the <a for=/>code point</a> at <var>position</var> within <var>input</var> is
+      U+0022 ("), then:
+
+      <ol>
+       <li><p>Append the result of <a>collecting an HTTP quoted string</a> from <var>input</var>,
+       given <var>position</var>, to <var>value</var>.
+
+       <li>If <var>position</var> is not past the end of <var>input</var>, then
+       <a for=iteration>continue</a>.
+      </ol>
+
+     <li>
+      <p>Otherwise:
+
+      <ol>
+       <li><p>Assert: the <a for=/>code point</a> at <var>position</var> within <var>input</var> is
+       U+002C (,).
+
+       <li><p>Advance <var>position</var> by 1.
+      </ol>
+    </ol>
+
+   <li><p>Remove all <a>HTTP tab or space</a> from the start and end of <var>value</var>.
+
+   <li><p><a for=list>Append</a> <var>value</var> to <var>values</var>.
+
+   <li><p>Set <var>value</var> to the empty string.
+  </ol>
+
+ <li><p>Return <var>values</var>.
+</ol>
+
+<div class=example id=example-header-list-get-decode-split>
+ <p>This is how <a>get, decode, and split</a> functions in practice with `<code>A</code>` as the
+ <var>name</var> argument:
+
+ <table>
+  <tr>
+   <th>Headers (as on the network)
+   <th>Output
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+A: nosniff,
+</code></pre>
+   <td rowspan=2>« "<code>nosniff</code>", "" »
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+A: nosniff
+B: sniff
+A:
+</code></pre>
+  <tr>
+   <td>
+    <pre><code class=lang-http>A: text/html;", x/x</code></pre>
+   <td rowspan=2>« "<code>text/html;", x/x</code>" »
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+A: text/html;"
+A: x/x
+</code></pre>
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+A: x/x;test="hi",y/y
+</code></pre>
+   <td rowspan=2>« "<code>x/x;test="hi"</code>", "<code>y/y</code>" »
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+A: x/x;test="hi"
+C: **bingo**
+A: y/y
+</code></pre>
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+A: x / x,,,1
+</code></pre>
+   <td rowspan=2>« "<code>x / x</code>", "", "", "<code>1</code>" »
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+A: x / x
+A: ,
+A: 1
+</code></pre>
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+A: "1,2", 3
+</code></pre>
+   <td rowspan=2>« "<code>"1,2"</code>", "<code>3</code>" »
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+A: "1,2"
+D: 4
+A: 3
+</code></pre>
+ </table>
+</div>
+
 <p>To <dfn export for="header list" id=concept-header-list-append>append</dfn> a
-<a for=header>name</a>/<a for=header>value</a> (<var>name</var>/<var>value</var>) pair to a
-<a for=/>header list</a> (<var>list</var>), run these steps:
+<a for=header>name</a>/<a for=header>value</a> <var>name</var>/<var>value</var> pair to a
+<a for=/>header list</a> <var>list</var>, run these steps:
 
 <ol>
  <li>
@@ -335,13 +544,13 @@ specialized multimap. An ordered list of key-value pairs with potentially duplic
 </ol>
 
 <p>To <dfn export for="header list" id=concept-header-list-delete>delete</dfn> a
-<a for=header>name</a> (<var>name</var>) from a <a for=/>header list</a> (<var>list</var>),
+<a for=header>name</a> <var>name</var> from a <a for=/>header list</a> <var>list</var>,
 <a for=list>remove</a> all <a for=/>headers</a> whose <a for=header>name</a> is a
 <a>byte-case-insensitive</a> match for <var>name</var> from <var>list</var>.
 
 <p>To <dfn export for="header list" id=concept-header-list-set>set</dfn> a
-<a for=header>name</a>/<a for=header>value</a> (<var>name</var>/<var>value</var>) pair in a
-<a for=/>header list</a> (<var>list</var>), run these steps:
+<a for=header>name</a>/<a for=header>value</a> <var>name</var>/<var>value</var> pair in a
+<a for=/>header list</a> <var>list</var>, run these steps:
 
 <ol>
  <li><p>If <var>list</var> <a for="header list">contains</a> <var>name</var>, then set the
@@ -353,8 +562,8 @@ specialized multimap. An ordered list of key-value pairs with potentially duplic
 </ol>
 
 <p>To <dfn export for="header list" id=concept-header-list-combine>combine</dfn> a
-<a for=header>name</a>/<a for=header>value</a> (<var>name</var>/<var>value</var>) pair in a
-<a for=/>header list</a> (<var>list</var>), run these steps:
+<a for=header>name</a>/<a for=header>value</a> <var>name</var>/<var>value</var> pair in a
+<a for=/>header list</a> <var>list</var>, run these steps:
 
 <ol>
  <li><p>If <var>list</var> <a for="header list">contains</a> <var>name</var>, then set the
@@ -370,7 +579,7 @@ specialized multimap. An ordered list of key-value pairs with potentially duplic
 
 <p>To
 <dfn export for="header list" id=concept-header-list-sort-and-combine>sort and combine</dfn>
-a <a for=/>header list</a> (<var>list</var>), run these steps:
+a <a for=/>header list</a> <var>list</var>, run these steps:
 
 <ol>
  <li><p>Let <var>headers</var> be an empty <a for=/>list</a> of
@@ -385,8 +594,10 @@ a <a for=/>header list</a> (<var>list</var>), run these steps:
   <p><a for=list>For each</a> <var>name</var> in <var>names</var>:
 
   <ol>
-   <li><p>Let <var>value</var> be the <a for=header>combined value</a> with <var>name</var> and
-   <var>list</var>.
+   <li><p>Let <var>value</var> be the result of <a for="header list">getting</a> <var>name</var>
+   from <var>list</var>.
+
+   <li><p>Assert: <var>value</var> is not null.
 
    <li><p><a for=list>Append</a> <var>name</var>-<var>value</var> to <var>headers</var>.
   </ol>
@@ -418,12 +629,6 @@ production as
 <var>potentialValue</var>, remove any leading and trailing <a>HTTP whitespace bytes</a> from
 <var>potentialValue</var>.
 
-<p>A <dfn export for=header id=concept-header-value-combined>combined value</dfn>, given a
-<a for=header>name</a> (<var>name</var>) and <a for=/>header list</a> (<var>list</var>), is the
-<a lt=value for=header>values</a> of all <a for=/>headers</a> in <var>list</var> whose
-<a for=header>name</a> is a <a>byte-case-insensitive</a> match for <var>name</var>, separated from
-each other by 0x2C 0x20, in order.
-
 <hr>
 
 <p id=simple-header>To determine whether a <a for=/>header</a> <var>header</var> is a
@@ -438,18 +643,7 @@ each other by 0x2C 0x20, in order.
   <dl class=switch>
    <dt>`<code>accept</code>`
    <dd>
-    <p>If one of the following is true
-
-    <ul class=brief>
-     <li><p><var>value</var> contains a byte less than 0x20 that is not 0x09 HT
-     <li><p><var>value</var> contains 0x22 ("), 0x28 (left parenthesis), 0x29 (right parenthesis),
-     0x3A (:), 0x3C (&lt;), 0x3E (>), 0x3F (?), 0x40 (@), 0x5B ([), 0x5C (\), 0x5D (]), 0x7B ({),
-     0x7D (}), or 0x7F DEL
-    </ul>
-    <!-- Delimiters from https://tools.ietf.org/html/rfc7230#section-3.2.6 except for ,/;= and
-         including DEL -->
-
-    <p>then return false.
+    <p>If <var>value</var> contains a <a>CORS-unsafe request-header byte</a>, then return false.
 
    <dt>`<code>accept-language</code>`
    <dt>`<code>content-language</code>`
@@ -460,20 +654,40 @@ each other by 0x2C 0x20, in order.
    <!-- Maybe give Infra "byte-alphanumeric"? -->
 
    <dt>`<code>content-type</code>`
-   <dd><p>If <var>value</var>, <a lt="extract header values">once extracted</a>, does not have a
-   MIME type (ignoring parameters) that is <code>application/x-www-form-urlencoded</code>,
-   <code>multipart/form-data</code>, or <code>text/plain</code>, then return false.
-   <!-- XXX * needs better xref
-            * ignoring parameters has been the standard for a long time now
-            * interesting test: "Content-Type: text/plain;" -->
+   <dd>
+    <ol>
+     <li><p>If <var>value</var> contains a <a>CORS-unsafe request-header byte</a>, then return
+     false.
 
-   <dt>`<code><a href=http://httpwg.org/http-extensions/client-hints.html#dpr>DPR</a></code>`
-   <dt>`<code><a href=http://httpwg.org/http-extensions/client-hints.html#downlink>Downlink</a></code>`
-   <dt>`<code><a href=http://httpwg.org/http-extensions/client-hints.html#save-data>Save-Data</a></code>`
-   <dt>`<code><a href=http://httpwg.org/http-extensions/client-hints.html#viewport-width>Viewport-Width</a></code>`
-   <dt>`<code><a href=http://httpwg.org/http-extensions/client-hints.html#width>Width</a></code>`
-   <dd><p>If <var>value</var>, <a lt="extract header values">once extracted</a>, is failure, then
-   return false.
+     <li><p>Let <var>mimeType</var> be the result of <a lt="parse a MIME type">parsing</a>
+     <var>value</var>.
+
+     <li><p>If <var>mimeType</var> is failure, then return false.
+
+     <li><p>If <var>mimeType</var>'s <a for="MIME type">essence</a> is not
+     "<code>application/x-www-form-urlencoded</code>", "<code>multipart/form-data</code>", or
+     "<code>text/plain</code>", then return false.
+    </ol>
+
+    <p class=warning>This intentionally does not use <a>extract a MIME type</a> as that algorithm is
+    rather forgiving and servers are not expected to implement it.
+
+    <div class="example no-backref" id=example-cors-safelisted-request-header-content-type>
+     <p>If <a>extract a MIME type</a> were used the following request would not result in a CORS
+     preflight and a naïve parser on the server might treat the request body as JSON:
+
+     <pre><code class=lang-javascript>
+fetch("https://victim.example/naïve-endpoint", {
+  method: "POST",
+  headers: [
+    ["Content-Type", "application/json"],
+    ["Content-Type", "text/plain"]
+  ],
+  credentials: "include",
+  body: JSON.stringify(exerciseForTheReader)
+});
+</code></pre>
+    </div>
 
    <dt>Otherwise
    <dd><p>Return false.
@@ -487,6 +701,18 @@ each other by 0x2C 0x20, in order.
 
 <p class="note">There are limited exceptions to the `<code>Content-Type</code>` header safelist, as
 documented in <a href=#cors-protocol-exceptions>CORS protocol exceptions</a>.
+
+<p>A <dfn>CORS-unsafe request-header byte</dfn> is a byte <var>byte</var> for which one of the
+following is true:
+
+<ul class=brief>
+ <li><p><var>byte</var> is less than 0x20 and is not 0x09 HT
+ <li><p><var>byte</var> is 0x22 ("), 0x28 (left parenthesis), 0x29 (right parenthesis), 0x3A (:),
+ 0x3C (&lt;), 0x3E (>), 0x3F (?), 0x40 (@), 0x5B ([), 0x5C (\), 0x5D (]), 0x7B ({), 0x7D (}), or
+ 0x7F DEL.
+ <!-- Delimiters from https://tools.ietf.org/html/rfc7230#section-3.2.6 except for ,/;= and
+      including DEL -->
+</ul>
 
 <p>The <dfn noexport>CORS-unsafe request-header names</dfn>, given a <a for=/>header list</a>
 <var>headers</var>, are determined as follows:
@@ -521,7 +747,7 @@ documented in <a href=#cors-protocol-exceptions>CORS protocol exceptions</a>.
 <p>A <dfn export>CORS non-wildcard request-header name</dfn> is a <a>byte-case-insensitive</a> match
 for `<code>Authorization</code>`.
 
-<p>A <dfn export>privileged no-cors request-header name</dfn> is a <a for=/>header</a>
+<p>A <dfn export>privileged no-CORS request-header name</dfn> is a <a for=/>header</a>
 <a for=header>name</a> that is a <a>byte-case-insensitive</a> match for one of
 
 <ul class=brief>
@@ -555,22 +781,22 @@ for `<code>Authorization</code>`.
  <a>forbidden response-header name</a>.
 </ul>
 
+<p>A <dfn noexport>no-CORS-safelisted request-header name</dfn> is a <a for=/>header</a>
+<a for=header>name</a> that is a <a>byte-case-insensitive</a> match for one of
+
+<ul class=brief>
+ <li>`<code>Accept</code>`
+ <li>`<code>Accept-Language</code>`
+ <li>`<code>Content-Language</code>`
+ <li>`<code>Content-Type</code>`
+</ul>
+
 <p>To determine whether a <a for/>header</a> <var>header</var> is a
 <dfn noexport>no-CORS-safelisted request-header</dfn>, run these steps:
 
 <ol>
- <li>
-  <p>If <var>header</var>'s <a for=header>name</a> is not a <a>byte-case-insensitive</a> match for
-  one of
-
-  <ul class=brief>
-   <li>`<code>Accept</code>`
-   <li>`<code>Accept-Language</code>`
-   <li>`<code>Content-Language</code>`
-   <li>`<code>Content-Type</code>`
-  </ul>
-
-  <p>then return false.
+ <li><p>If <var>header</var>'s <a for=header>name</a> is not a
+ <a>no-CORS-safelisted request-header name</a>, then return false.
 
  <li><p>Return whether <var>header</var> is a <a>CORS-safelisted request-header</a>.
 </ol>
@@ -637,7 +863,7 @@ given a <a for=/>header</a> <var>header</var>, run these steps:
 
 <p>To
 <dfn export lt="extract header list values|extracting header list values">extract header list values</dfn>
-given a <a for=header>name</a> (<var>name</var>) and a <a for=/>header list</a> (<var>list</var>),
+given a <a for=header>name</a> <var>name</var> and a <a for=/>header list</a> <var>list</var>,
 run these steps:
 
 <ol>
@@ -667,19 +893,6 @@ run these steps:
   </ol>
 
  <li><p>Return <var>values</var>.
-</ol>
-
-<p>To
-<dfn export for="header list" lt="extract a MIME type|extracting a MIME type" id=concept-header-extract-mime-type>extract a MIME type</dfn>
-from a <a for=/>header list</a> (<var>headers</var>), run these steps:
-
-<ol>
- <li><p>Let <var>mimeType</var> be the result of <a>extracting header list values</a> given
- `<code>Content-Type</code>` and <var>headers</var>.
-
- <li><p>If <var>mimeType</var> is null or failure, then return the empty byte sequence.
-
- <li><p>Return <var>mimeType</var>, <a lt="byte-lowercase">byte-lowercased</a>.
 </ol>
 
 <hr>
@@ -782,10 +995,6 @@ field solely for the convenience of other standards hooking into Fetch.
 unset.
 
 <p>A <a for=/>request</a> has an associated
-<dfn export>sandboxed-storage-area-URLs flag</dfn>. Unless stated
-otherwise it is unset.
-
-<p>A <a for=/>request</a> has an associated
 <dfn export for=request id=concept-request-header-list>header list</dfn> (a
 <a for=/>header list</a>). Unless stated otherwise it is empty.
 
@@ -817,12 +1026,12 @@ outlawing <a>forbidden methods</a> and
 
 <p>A <a for=/>request</a> has an associated
 <dfn id=concept-request-reserved-client export for=request>reserved client</dfn>
-(null, an <a>environment</a>, or an
+(null, an <a for=/>environment</a>, or an
 <a>environment settings object</a>). Unless stated otherwise it is null.
 
 <p class="note no-backref">This is only used by <a>navigation requests</a> and worker
 requests, but not service worker requests. It references an
-<a>environment</a> for a <a>navigation request</a> and an
+<a for=/>environment</a> for a <a>navigation request</a> and an
 <a>environment settings object</a> for a worker request.
 
 <p>A <a for=/>request</a> has an associated
@@ -1085,16 +1294,6 @@ to not have to set <a for=/>request</a>'s <a for=request>referrer</a>.
 
 <p class="note no-backref">This can be used to override a referrer policy associated with an
 <a>environment settings object</a>.
-
-
-<p>A <a for=/>request</a> has an associated
-<dfn export for=request id=concept-request-client-hints-list>client hints list</dfn>,
-which is a <a lt="client hints list" for=client>client-hints list</a>. Unless stated
-otherwise, it is the empty list.
-
-<p class="note no-backref">This will be used to override a client hints list associated with
-an <a>environment settings object</a>.
-[[!CLIENT-HINTS]]
 
 <p>A <a for=/>request</a> has an associated
 <dfn id=synchronous-flag export for=request>synchronous flag</dfn>. Unless stated otherwise it is
@@ -1898,6 +2097,8 @@ run these steps:
  <li><p>Let <var>mimeType</var> be the result of <a for="header list">extracting a MIME type</a>
  from <var>response</var>'s <a for=response>header list</a>.
 
+ <li><p>If <var>mimeType</var> is failure, then return <b>allowed</b>.
+
  <li><p>Let <var>destination</var> be <var>request</var>'s <a for=request>destination</a>.
 
  <li>
@@ -1905,26 +2106,13 @@ run these steps:
   following is true, then return <b>blocked</b>:
 
   <ul class=brief>
-   <li><var>mimeType</var> starts with `<code>audio/</code>`, `<code>image/</code>`, or
-   `<code>video/</code>`.
-   <li><var>mimeType</var> is `<code>text/csv</code>`.
+   <li><var>mimeType</var>'s <a for="MIME type">essence</a> starts with "<code>audio/</code>",
+   "<code>image/</code>", or "<code>video/</code>".
+   <li><var>mimeType</var>'s <a for="MIME type">essence</a> is "<code>text/csv</code>".
   </ul>
 
  <li><p>Return <b>allowed</b>.
 </ol>
-
-
-<h3 id=client-hints-list>Client hints list</h3>
-
-<p class=note>This section will be integrated into HTTP Client Hints.
-[[!CLIENT-HINTS]]
-<!-- XXX -->
-
-<p>A <dfn export id=concept-client-hints-list for=client>client hints list</dfn> is a
-<a for=/>list</a> of
-<a href=http://httpwg.org/http-extensions/client-hints.html#accept-ch>Client hint tokens</a>, each
-of which is one of `<code>DPR</code>`, `<code>Save-Data</code>`, `<code>Viewport-Width</code>`, or
-`<code>Width</code>`.
 
 
 <h3 id=streams>Streams</h3>
@@ -2136,11 +2324,12 @@ compatibility constraints it is not included in all
 
 <p>Its <a for=header>value</a> <a>ABNF</a>:
 
-<pre>
+<pre><code class=lang-abnf>
 Origin                           = origin-or-null
 
-origin-or-null                   = origin / %x6E.75.6C.6C ; "null", case-sensitive
-origin                           = <a for=url>scheme</a> "://" <a for=url>host</a> [ ":" <a for=url>port</a> ]</pre>
+origin-or-null                   = origin / %s"null" ; case-sensitive
+origin                           = <a for=url>scheme</a> "://" <a for=url>host</a> [ ":" <a for=url>port</a> ]
+</code></pre>
 
 <p class="note no-backref">This supplants the `<code>Origin</code>`
 <a for=/>header</a>.
@@ -2270,17 +2459,18 @@ such HTTP responses.
 <p><a>ABNF</a> for the <a lt=value for=header>values</a> of the
 <a for=/>headers</a> used by the <a>CORS protocol</a>:
 
-<pre>
+<pre><code class=lang-abnf>
 Access-Control-Request-Method    = <a spec=http>method</a>
 Access-Control-Request-Headers   = 1#<a spec=http>field-name</a>
 
 wildcard                         = "*"
 Access-Control-Allow-Origin      = origin-or-null / wildcard
-Access-Control-Allow-Credentials = %x74.72.75.65 ; "true", case-sensitive
+Access-Control-Allow-Credentials = %s"true" ; case-sensitive
 Access-Control-Expose-Headers    = #<a spec=http>field-name</a>
 Access-Control-Max-Age           = <a spec=http-caching>delta-seconds</a>
 Access-Control-Allow-Methods     = #<a spec=http>method</a>
-Access-Control-Allow-Headers     = #<a spec=http>field-name</a></pre>
+Access-Control-Allow-Headers     = #<a spec=http>field-name</a>
+</code></pre>
 
 <p class=note>For `<code>Access-Control-Expose-Headers</code>`,
 `<code>Access-Control-Allow-Methods</code>`, and `<code>Access-Control-Allow-Headers</code>`
@@ -2304,11 +2494,12 @@ has an impact on the functioning of the <a>CORS protocol</a> other than includin
  <a for=/>request</a>'s
  <a for=request>credentials mode</a> to "<code>include</code>":
 
- <pre>
+ <pre><code class=lang-javascript>
 var client = new XMLHttpRequest()
 client.open("GET", "./")
 client.withCredentials = true
-/* … */</pre>
+/* … */
+</code></pre>
 
  <p>Nowadays, <code>fetch("./", { credentials:"include" }).then(/* … */)</code>
  suffices.
@@ -2403,16 +2594,18 @@ request to <code>https://rabbit.invalid/</code>:
  <code>https://bar.invalid/</code>. (Neither <a for=/>credentials</a> nor response header access is
  important.)
 
- <pre id=unicorn>
+ <pre id=unicorn><code class=lang-javascript>
 var url = "https://bar.invalid/api?key=730d67a37d7f3d802e96396d00280768773813fbe726d116944d814422fc1a45&amp;data=about:unicorn";
-fetch(url).then(success, failure)</pre>
+fetch(url).then(success, failure)
+</code></pre>
 
  <p>This will use the <a>CORS protocol</a>, though this is entirely transparent to the
  developer from <code>foo.invalid</code>. As part of the <a>CORS protocol</a>, the user agent
  will include the `<a http-header><code>Origin</code></a>` header in the request:
 
- <pre>
-Origin: https://foo.invalid</pre>
+ <pre><code class=lang-http>
+Origin: https://foo.invalid
+</code></pre>
 
  <p>Upon receiving a response from <code>bar.invalid</code>, the user agent will verify the
  `<a http-header><code>Access-Control-Allow-Origin</code></a>` response header. If its value is
@@ -2425,12 +2618,13 @@ Origin: https://foo.invalid</pre>
  <p>The developer of <code>foo.invalid</code> is back, and now wants to fetch some data from
  <code>bar.invalid</code> while also accessing a response header.
 
- <pre>
+ <pre><code class=lang-javascript>
 fetch(url).then(response => {
   var hsts = response.headers.get("strict-transport-security"),
       csp = response.headers.get("content-security-policy")
   log(hsts, csp)
-})</pre>
+})
+</code></pre>
 
  <p><code>bar.invalid</code> provides a correct
  `<a http-header><code>Access-Control-Allow-Origin</code></a>` response header per the earlier
@@ -2438,10 +2632,11 @@ fetch(url).then(response => {
  `<a http-header><code>Access-Control-Expose-Headers</code></a>` response header. For example, if
  the response included the following headers
 
- <pre>
+ <pre><code class=lang-http>
 Content-Security-Policy: default-src 'self'
 Strict-Transport-Security: max-age=31536000; includeSubdomains; preload
-Access-Control-Expose-Headers: Content-Security-Policy</pre>
+Access-Control-Expose-Headers: Content-Security-Policy
+</code></pre>
 
  <p>then <code>hsts</code> would be null and <code>csp</code> would be
  "<code>default-src 'self'</code>", even though the response did include both headers. This is
@@ -2461,8 +2656,9 @@ Access-Control-Expose-Headers: Content-Security-Policy</pre>
  <a>CORS protocol</a> is no longer transparent to the developer as <a for=/>credentials</a>
  require an explicit opt-in:
 
- <pre>
-fetch(url, { credentials:"include" }).then(success, failure)</pre>
+ <pre><code class=lang-javascript>
+fetch(url, { credentials:"include" }).then(success, failure)
+</code></pre>
 
  <p>This also makes any `<code>Set-Cookie</code>` response headers <code>bar.invalid</code>
  includes fully functional (they are ignored otherwise).
@@ -2474,14 +2670,16 @@ fetch(url, { credentials:"include" }).then(success, failure)</pre>
  allowed when <a for=/>credentials</a> are involved), the
  `<a http-header><code>Access-Control-Allow-Credentials</code></a>` header has to be present too:
 
- <pre>
+ <pre><code class=lang-http>
 Access-Control-Allow-Origin: https://foo.invalid
-Access-Control-Allow-Credentials: true</pre>
+Access-Control-Allow-Credentials: true
+</code></pre>
 
  <p>If the response does not include those two headers with those values, the <code>failure</code>
- callback will be invoked and any `<code>Set-Cookie</code>` response headers will end up being
- ignored.
+ callback will be invoked. However, any `<code>Set-Cookie</code>` response headers will be
+ respected.
 </div>
+
 
 <h4 id=cors-protocol-exceptions>CORS protocol exceptions</h4>
 
@@ -2504,6 +2702,127 @@ consideration for the security consequences. New exceptions can be proposed by
 <a href=https://github.com/whatwg/fetch/issues/new>filing an issue</a>.
 
 
+<h3 id=content-type-header>`<code>Content-Type</code>` header</h3>
+
+<p>The `<code>Content-Type</code>` header is largely defined in HTTP. Its processing model is
+defined here as the ABNF defined in HTTP is not compatible with web content. [[HTTP]]
+
+<p>To
+<dfn export for="header list" lt="extract a MIME type|extracting a MIME type" id=concept-header-extract-mime-type>extract a MIME type</dfn>
+from a <a for=/>header list</a> <var>headers</var>, run these steps:
+
+<ol>
+ <li><p>Let <var>charset</var> be null.
+
+ <li><p>Let <var>essence</var> be null.
+
+ <li><p>Let <var>mimeType</var> be null.
+
+ <li><p>Let <var>values</var> be the result of
+ <a for="header list">getting, decoding, and splitting</a> `<code>Content-Type</code>` from
+ <var>headers</var>.
+
+ <li><p>If <var>values</var> is null, then return failure.
+
+ <li>
+  <p><a for=list>For each</a> <var>value</var> of <var>values</var>:
+
+  <ol>
+   <li><p>Let <var>temporaryMimeType</var> be the result of <a lt="parse a MIME type">parsing</a>
+   <var>value</var>.
+
+   <li><p>If <var>temporaryMimeType</var> is failure or its <a for="MIME type">essence</a> is
+   "<code>*/*</code>", then <a for=iteration>continue</a>.
+
+   <li><p>Set <var>mimeType</var> to <var>temporaryMimeType</var>.
+
+   <li>
+    <p>If <var>mimeType</var>'s <a for="MIME type">essence</a> is not <var>essence</var>, then:
+
+    <ol>
+     <li><p>Set <var>charset</var> to null.
+
+     <li><p>If <var>mimeType</var>'s <a for="MIME type">parameters</a>["<code>charset</code>"]
+     <a for=map>exists</a>, then set <var>charset</var> to <var>mimeType</var>'s
+     <a for="MIME type">parameters</a>["<code>charset</code>"].
+
+     <li><p>Set <var>essence</var> to <var>mimeType</var>'s <a for="MIME type">essence</a>.
+    </ol>
+
+   <li><p>Otherwise, if <var>mimeType</var>'s
+   <a for="MIME type">parameters</a>["<code>charset</code>"] does not <a for=map>exist</a>, and
+   <var>charset</var> is non-null, set <var>mimeType</var>'s
+   <a for="MIME type">parameters</a>["<code>charset</code>"] to <var>charset</var>.
+  </ol>
+
+ <li><p>If <var>mimeType</var> is null, then return failure.
+
+ <li><p>Return <var>mimeType</var>.
+</ol>
+
+<p class=warning>When <a>extract a MIME type</a> returns failure or a <a for=/>MIME type</a> whose
+<a for="MIME type">essence</a> is incorrect for a given format, treat this as a fatal error.
+Existing web platform features have not always followed this pattern, which has been a major source
+of security vulnerabilities in those features over the years. In contrast, a
+<a for=/>MIME type</a>'s <a for="MIME type">parameters</a> can typically be safely ignored.
+
+<div class=example id=example-extract-a-mime-type>
+ <p>This is how <a>extract a MIME type</a> functions in practice:
+
+ <table>
+  <tr>
+   <th>Headers (as on the network)
+   <th>Output (<a lt="serialize a MIME type">serialized</a>)
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+Content-Type: text/plain;charset=gbk, text/html
+</code></pre>
+   <td><code>text/html</code>
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+Content-Type: text/html;charset=gbk;a=b, text/html;x=y
+</code></pre>
+   <td rowspan=2><code>text/html;x=y;charset=gbk</code>
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+Content-Type: text/html;charset=gbk;a=b
+Content-Type: text/html;x=y
+</code></pre>
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+Content-Type: text/html;charset=gbk
+Content-Type: x/x
+Content-Type: text/html;x=y
+</code></pre>
+   <td><code>text/html;x=y</code>
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+Content-Type: text/html
+Content-Type: cannot-parse
+</code></pre>
+   <td rowspan=3><code>text/html</code>
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+Content-Type: text/html
+Content-Type: */*
+</code></pre>
+  <tr>
+   <td>
+    <pre><code class=lang-http>
+Content-Type: text/html
+Content-Type:
+</code></pre>
+ </table>
+</div>
+
+
+
 <h3 id=x-content-type-options-header>`<code>X-Content-Type-Options</code>` header</h3>
 
 <p>The
@@ -2516,20 +2835,13 @@ response <a for=/>header</a> can be used to require checking of a <a for=/>respo
 steps:
 
 <ol>
- <li><p>Let <var>value</var> be the result of <a for="header list">getting</a>
+ <li><p>Let <var>values</var> be the result of
+ <a for="header list">getting, decoding, and splitting</a>
  `<a http-header><code>X-Content-Type-Options</code></a>` from <var>list</var>.
 
- <li><p>If <var>value</var> is null, then return false.
+ <li><p>If <var>values</var> is null, then return false.
 
- <li><p>Let <var>stringValue</var> be the <a>isomorphic decode</a> of <var>value</var>.
-
- <li><p>Let <var>tokens</var> be the result of
- <a lt="strictly split a string">strictly splitting</a> <var>stringValue</var> on U+002C (,).
-
- <li><p>Let <var>firstToken</var> be the result of removing all <a>HTTP tab or space</a> from the
- start and end of <var>tokens</var>[0].
-
- <li><p>If <var>firstToken</var> is an <a>ASCII case-insensitive</a> match for
+ <li><p>If <var>values</var>[0] is an <a>ASCII case-insensitive</a> match for
  "<code>nosniff</code>", then return true.
 
  <li><p>Return false.
@@ -2538,8 +2850,9 @@ steps:
 <p>Web developers and conformance checkers must use the following <a for=header>value</a>
 <a>ABNF</a> for `<a http-header><code>X-Content-Type-Options</code></a>`:
 
-<pre>
-X-Content-Type-Options           = "nosniff" ; case-insensitive</pre>
+<pre><code class=lang-abnf>
+X-Content-Type-Options           = "nosniff" ; case-insensitive
+</code></pre>
 
 
 <h4 lt="should response to request be blocked due to nosniff" dfn id=should-response-to-request-be-blocked-due-to-nosniff?>Should
@@ -2557,11 +2870,10 @@ X-Content-Type-Options           = "nosniff" ; case-insensitive</pre>
  <li><p>Let <var>destination</var> be <var>request</var>'s <a for=request>destination</a>.
 
  <li><p>If <var>destination</var> is <a for=request/destination>script-like</a> and
- <var>mimeType</var> (ignoring parameters) is not a <a>JavaScript MIME type</a>, then return
- <b>blocked</b>.
+ <var>mimeType</var> is failure or is not a <a>JavaScript MIME type</a>, then return <b>blocked</b>.
 
- <li><p>If <var>destination</var> is "<code>style</code>" and <var>mimeType</var>
- (ignoring parameters) is not `<code>text/css</code>`, then return <b>blocked</b>.
+ <li><p>If <var>destination</var> is "<code>style</code>" and <var>mimeType</var> is failure or its
+ <a for="MIME type">essence</a> is not "<code>text/css</code>", then return <b>blocked</b>.
 
  <li><p>Return <b>allowed</b>.
 </ol>
@@ -2604,19 +2916,20 @@ run these steps:</p>
  <li><p>Let <var>mimeType</var> be the result of <a for="header list">extracting a MIME type</a>
  from <var>response</var>'s <a for=response>header list</a>.
 
+ <li><p>If <var>mimeType</var> is failure, then return <b>allowed</b>.
+
  <li><p>If <var>response</var>'s <a for=response>status</a> is <code>206</code> and
- <var>mimeType</var> (ignoring parameters) is a <a>CORB-protected MIME type</a>, then return
- <b>blocked</b>.
+ <var>mimeType</var> is a <a>CORB-protected MIME type</a>, then return <b>blocked</b>.
 
  <li>
   <p>If <a>determine nosniff</a> with <var>response</var>'s <a for=response>header list</a> is true
-  and <var>mimeType</var> (ignoring parameters) is a <a>CORB-protected MIME type</a> or
-  <code>text/plain</code>, then return <b>blocked</b>.
+  and <var>mimeType</var> is a <a>CORB-protected MIME type</a> or its <a for="MIME type">essence</a>
+  is "<code>text/plain</code>", then return <b>blocked</b>.
 
   <p class="note no-backref">CORB only protects <code>text/plain</code> responses with a
   `<code>X-Content-Type-Options: nosniff</code>` header. Unfortunately, protecting such responses
   without that header when their <a for=response>status</a> is <code>206</code> would break too many
-  existing video responses that have a <code>text/plain</code> MIME type.
+  existing video responses that have a <code>text/plain</code> <a for=/>MIME type</a>.
 
  <!-- TODO: MIME type confirmation sniffing -->
  <!-- TODO: JSON security prefix sniffing -->
@@ -2636,8 +2949,9 @@ response <a for=/>header</a> can be used to require checking a <a for=/>request<
 
 <p>Its <a for=header>value</a> <a>ABNF</a>:
 
-<pre>
-Cross-Origin-Resource-Policy     = %x73.61.6D.65.2D.6F.72.69.67.69.6E / %x73.61.6D.65.2D.73.69.74.65 ; "same-origin" / "same-site", case-sensitive</pre>
+<pre><code class=lang-abnf>
+Cross-Origin-Resource-Policy     = %s"same-origin" / %s"same-site" ; case-sensitive
+</code></pre>
 
 <p>To perform a <dfn>cross-origin resource policy check</dfn>, given a <var>request</var> and
 <var>response</var>, run these steps:</p>
@@ -2657,8 +2971,8 @@ Cross-Origin-Resource-Policy     = %x73.61.6D.65.2D.6F.72.69.67.69.6E / %x73.61.
   <var>request</var>'s <a for=request>tainted origin flag</a> is not checked.
 
  <li>
-  <p>Let <var>policy</var> be the <a>combined value</a> with
-  `<a http-header><code>Cross-Origin-Resource-Policy</code></a>` and <var>response</var>'s
+  <p>Let <var>policy</var> be the result of <a for="header list">getting</a>
+  `<a http-header><code>Cross-Origin-Resource-Policy</code></a>` from <var>response</var>'s
   <a for=response>header list</a>.
 
   <p class=note>This means that `<code>Cross-Origin-Resource-Policy: same-site, same-origin</code>`
@@ -2793,56 +3107,9 @@ the request.
     HTTP/1 fetches.
 
    <li>
-    <p>If <var>request</var> is a <a>navigation request</a>, a user agent should, for each
-    <a for=/>header</a> <a for=header>name</a> (<var>hintName</var>) in the first column of the
-    following table, if <var>request</var>'s <a for=request>header list</a>
-    <a for="header list">does not contain</a> <var>hintName</var>, then
-    <a for="header list">append</a>
-    <var>hintName</var>/the value given in the same row on the second column, to
-    <var>request</var>'s <a for=request>header list</a>.
-
-    <table>
-     <tbody><tr>
-      <th><a for=header>Name</a>
-      <th><a for=header>Value</a>
-     <tr>
-      <td>`<code>DPR</code>`
-      <td>a suitable <a href=http://httpwg.org/http-extensions/client-hints.html#dpr>dpr value</a>
-     <tr>
-      <td>`<code>Save-Data</code>`
-      <td>a suitable <a href=http://httpwg.org/http-extensions/client-hints.html#save-data>save-data value</a>
-     <tr>
-      <td>`<code>Viewport-Width</code>`
-      <td>a suitable <a href=http://httpwg.org/http-extensions/client-hints.html#viewport-width>viewport-width value</a>
-    </table>
-
-   <li>
     <p>If <var>request</var> is a <a>subresource request</a>, then:
 
     <ol>
-     <li>
-      <p><a for=list>For each</a> <var>hintName</var> of <var>request</var>'s
-      <a for=client>client hints list</a>:
-
-      <ol>
-       <li>
-        <p>Let <var>value</var> be the first matching statement, switching on <var>hintName</var>:
-
-        <dl class=switch>
-         <dt>`<code>DPR</code>`
-         <dd>a suitable <a href=http://httpwg.org/http-extensions/client-hints.html#dpr>dpr value</a>
-         <dt>`<code>Save-Data</code>`
-         <dd>a suitable <a href=http://httpwg.org/http-extensions/client-hints.html#save-data>save-data value</a>
-         <dt>`<code>Viewport-Width</code>`
-         <dd>a suitable <a href=http://httpwg.org/http-extensions/client-hints.html#viewport-width>viewport-width value</a>
-         <dt>`<code>Width</code>`
-         <dd>a suitable <a href=http://httpwg.org/http-extensions/client-hints.html#width>width value</a>
-        </dl>
-
-       <li><p>A user agent should <a for="header list">append</a>
-       <var>hintName</var>/<var>value</var> to <var>request</var>'s <a for=request>header list</a>.
-      </ol>
-
      <li><p>Let <var>record</var> be a new
      <a for="fetch group">fetch record</a> consisting of
      <var>request</var> and this instance of the
@@ -2938,9 +3205,9 @@ with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
     <p>If <var>request</var>'s <a for=request>current URL</a>'s <a for=url>scheme</a> is
     "<code>ftp</code>", <var>request</var>'s <a for=request>client</a>'s
     <a for=environment>creation URL</a>'s <a for=url>scheme</a> is not "<code>ftp</code>", and
-    <var>request</var>'s <a for=request>reserved client</a> is either null or an <a>environment</a>
-    whose <a for=environment>target browsing context</a> is a <a>nested browsing context</a>, then
-    set <var>response</var> to a <a>network error</a>.
+    <var>request</var>'s <a for=request>reserved client</a> is either null or an
+    <a for=/>environment</a> whose <a for=environment>target browsing context</a> is a
+    <a>nested browsing context</a>, then set <var>response</var> to a <a>network error</a>.
 
    <li>
     <p>Set <var>request</var>'s <a for=request>current URL</a>'s <a for=url>scheme</a> to
@@ -2981,8 +3248,8 @@ with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
 
   <dl class=switch>
    <dt><var>request</var>'s <a for=request>current URL</a>'s <a for=url>origin</a> is
-   <a>same origin</a> with <var>request</var>'s <a for=request>origin</a> and <i>CORS flag</i> is
-   unset
+   <a>same origin</a> with <var>request</var>'s <a for=request>origin</a>, <var>request</var>'s
+   <a for=request>tainted origin flag</a> is unset, and the <i>CORS flag</i> is unset
    <dt><var>request</var>'s <a for=request>current URL</a>'s <a for=url>scheme</a> is
    "<code>data</code>"
    <dt><var>request</var>'s <a for=request>mode</a> is
@@ -3284,7 +3551,7 @@ with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
 
     <ol>
      <li><p>Let <var>blob</var> be <var>request</var>'s <a for=request>current URL</a>'s
-     <a for=url>object</a>.
+     <a for=url>blob URL entry</a>'s <a for="blob URL entry">object</a>.
 
      <li>
       <p>If <var>request</var>'s <a for=request>method</a> is not `<code>GET</code>` or
@@ -3354,19 +3621,34 @@ with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
   </ol>
 
  <dt>"<code>file</code>"
- <dt>"<code>ftp</code>"
  <dd>
-  <p>For now, unfortunate as it is, <code>file</code> and <code>ftp</code> <a for=/>URLs</a> are
-  left as an exercise for the reader.
+  <p>For now, unfortunate as it is, <code>file</code> <a for=/>URLs</a> are left as an exercise for
+  the reader.
 
   <p>When in doubt, return a <a>network error</a>.
 
- <dt>"<code>filesystem</code>" <!-- flag below also applies to "indexeddb" -->
+ <dt>"<code>ftp</code>"
  <dd>
-  <p>If <var>request</var>'s <a>sandboxed-storage-area-URLs flag</a> is set,
-  return a <a>network error</a>.
+  <p>For now, unfortunate as it is, <code>ftp</code> <a for=/>URLs</a> are mostly left as an
+  exercise for the reader.
 
-  <p class=XXX>Otherwise, … this scheme still needs to be defined.
+  <ol>
+   <li><p>Let <var>body</var> be the result of the user agent obtaining content from
+   <var>request</var>'s <a for=request>current URL</a> from the network via FTP. [[!RFC959]]
+
+   <li><p>Let </var>mime</var> be `<code>application/octet-stream</code>`.
+
+   <li><p>If <var>body</var> is the result of the user agent generating a directory listing page for
+   the result of FTP's LIST command, then set |mime| to `<code>text/ftp-dir</code>`.
+
+   <li><p>Return a <a for=/>response</a> whose <a for="response">status message</a> is
+   `<code>OK</code>`, <a for=response>header list</a> consists of a single <a for=/>header</a>
+   whose <a for=header>name</a> is `<code>Content-Type</code>` and whose <a for=header>value</a> is
+   <var>mime</var>, <a for=response>body</a> is <var>body</var>, and
+   <a for=response>HTTPS state</a> is "<code>none</code>".
+  </ol>
+
+  <p>When in doubt, return a <a>network error</a>.
 
  <dt><a>HTTP(S) scheme</a>
  <dd>
@@ -3479,15 +3761,12 @@ optional <i>CORS flag</i> and <i>CORS-preflight flag</i>, run these steps:
    <var>request</var> with <i>CORS flag</i> if set.
 
    <li>
-    <p>If <i>CORS flag</i> is set and a <a for=cors>CORS check</a> for
-    <var>request</var> and <var>response</var> returns failure, then return a
-    <a>network error</a>.
+    <p>If <i>CORS flag</i> is set and a <a>CORS check</a> for <var>request</var> and
+    <var>response</var> returns failure, then return a <a>network error</a>.
 
-    <p class="note no-backref">As the <a for=cors>CORS check</a> is not to be
-    applied to <a for=/>responses</a> whose
-    <a for=response>status</a> is <code>304</code> or <code>407</code>, or
-    <a for=/>responses</a> from a service worker for that matter, it is
-    applied here.
+    <p class="note no-backref">As the <a>CORS check</a> is not to be applied to
+    <a for=/>responses</a> whose <a for=response>status</a> is <code>304</code> or <code>407</code>,
+    or <a for=/>responses</a> from a service worker for that matter, it is applied here.
   </ol>
 
  <li>
@@ -4422,14 +4701,13 @@ run these steps:
  <a>HTTP-network-or-cache fetch</a> using <var>preflight</var> with the <i>CORS flag</i> set.
 
  <li>
-  <p>If a <a for=cors>CORS check</a> for <var>request</var> and <var>response</var> returns success
-  and <var>response</var>'s <a for=response>status</a> is an <a>ok status</a>, then:
+  <p>If a <a>CORS check</a> for <var>request</var> and <var>response</var> returns success and
+  <var>response</var>'s <a for=response>status</a> is an <a>ok status</a>, then:
   <!-- CORS said 200 here but nobody implemented that:
        https://lists.w3.org/Archives/Public/public-webappsec/2013Feb/0078.html -->
 
-  <p class="note no-backref">The <a for=cors>CORS check</a> is done
-  on <var>request</var> rather than <var>preflight</var> to ensure the correct
-  <a for=request>credentials mode</a> is used.
+  <p class="note no-backref">The <a>CORS check</a> is done on <var>request</var> rather than
+  <var>preflight</var> to ensure the correct <a for=request>credentials mode</a> is used.
 
   <ol>
    <li><p>Let <var>methods</var> be the result of <a>extracting header list values</a> given
@@ -4599,38 +4877,33 @@ agent's <a>CORS-preflight cache</a> for which there is a <a>cache entry match</a
 
 <h3 id=cors-check>CORS check</h3>
 
-<p>To perform a <dfn id=concept-cors-check for=cors>CORS check</dfn> for a
-<var>request</var> and <var>response</var>, run these steps:
+<p>To perform a <dfn id=concept-cors-check>CORS check</dfn> for a <var>request</var> and
+<var>response</var>, run these steps:
 
 <ol>
- <li>
-  <p>Let <var>origin</var> be the result of <a>extracting header list values</a> given
-  `<a http-header><code>Access-Control-Allow-Origin</code></a>` and <var>response</var>'s
-  <a for=response>header list</a>.
-
-  <p class=note>The above will fail for network errors, as they have no headers.
+ <li><p>Let <var>origin</var> be the result of <a for="header list">getting</a>
+ `<a http-header><code>Access-Control-Allow-Origin</code></a>` from <var>response</var>'s
+ <a for=response>header list</a>.
 
  <li>
-  <p>If <var>origin</var> is null or failure, return failure.
+  <p>If <var>origin</var> is null, then return failure.
 
   <p class=note>Null is not `<code>null</code>`.
 
- <li><p>If <var>request</var>'s
- <a for=request>credentials mode</a> is not
- "<code>include</code>" and <var>origin</var> is `<code>*</code>`, return success.
+ <li><p>If <var>request</var>'s <a for=request>credentials mode</a> is not "<code>include</code>"
+ and <var>origin</var> is `<code>*</code>`, then return success.
 
  <li><p>If the result of <a>serializing a request origin</a> with <var>request</var> is not
  <var>origin</var>, then return failure.
 
- <li><p>If <var>request</var>'s
- <a for=request>credentials mode</a> is not
- "<code>include</code>", return success.
+ <li><p>If <var>request</var>'s <a for=request>credentials mode</a> is not "<code>include</code>",
+ then return success.
 
- <li><p>Let <var>credentials</var> be the result of <a>extracting header list values</a> given
- `<a http-header><code>Access-Control-Allow-Credentials</code></a>` and <var>response</var>'s
+ <li><p>Let <var>credentials</var> be the result of <a for="header list">getting</a>
+ `<a http-header><code>Access-Control-Allow-Credentials</code></a>` from <var>response</var>'s
  <a for=response>header list</a>.
 
- <li><p>If <var>credentials</var> is `<code>true</code>`, return success.
+ <li><p>If <var>credentials</var> is `<code>true</code>`, then return success.
 
  <li><p>Return failure.
 </ol>
@@ -4649,20 +4922,22 @@ currently lacking when it comes to request progression (not response progression
  to <a for=/>fetch</a> a resource and extract its contents as a
  {{Blob}}:
 
- <pre>
+ <pre><code class=lang-javascript>
 fetch("/music/pk/altes-kamuffel.flac")
-  .then(res => res.blob()).then(playBlob)</pre>
+  .then(res => res.blob()).then(playBlob)
+</code></pre>
 
  <p>If you just care to log a particular response header:
 
- <pre>
+ <pre><code class=lang-javascript>
 fetch("/", {method:"HEAD"})
-  .then(res => log(res.headers.get("strict-transport-security")))</pre>
+  .then(res => log(res.headers.get("strict-transport-security")))
+</code></pre>
 
  <p>If you want to check a particular response header and then process the response of a
  cross-origin resources:
 
- <pre>
+ <pre><code class=lang-javascript>
 fetch("https://pk.example/berlin-calling.json", {mode:"cors"})
   .then(res => {
     if(res.headers.get("content-type") &amp;&amp;
@@ -4671,19 +4946,21 @@ fetch("https://pk.example/berlin-calling.json", {mode:"cors"})
     } else {
       throw new TypeError()
     }
-  }).then(processJSON)</pre>
+  }).then(processJSON)
+</code></pre>
 
  <p>If you want to work with URL query parameters:
 
- <pre>
+ <pre><code class=lang-javascript>
 var url = new URL("https://geo.example.org/api"),
     params = {lat:35.696233, long:139.570431}
 Object.keys(params).forEach(key => url.searchParams.append(key, params[key]))
-fetch(url).then(/* … */)</pre>
+fetch(url).then(/* … */)
+</code></pre>
 
  <p>If you want to receive the body data progressively:
 
- <pre>
+ <pre><code class=lang-javascript>
 function consume(reader) {
   var total = 0
   return pump()
@@ -4702,7 +4979,8 @@ function consume(reader) {
 fetch("/music/pk/altes-kamuffel.flac")
   .then(res => consume(res.body.getReader()))
   .then(() => log("consumed the entire body without keeping the whole thing in memory!"))
-  .catch(e => log("something went wrong: " + e))</pre>
+  .catch(e => log("something went wrong: " + e))
+</code></pre>
 </div>
 
 
@@ -4733,7 +5011,7 @@ Implementations could chose the more efficient {{Headers}} object representation
 <div class=example id=example-headers-class>
  <p>A {{Headers}} object can be initialized with various JavaScript data structures:
 
- <pre>
+ <pre><code class=lang-javascript>
 var meta = { "Content-Type": "text/xml", "Breaking-Bad": "&lt;3" }
 new Headers(meta)
 
@@ -4742,7 +5020,8 @@ var meta = [
   [ "Content-Type", "text/xml" ],
   [ "Breaking-Bad", "&lt;3" ]
 ]
-new Headers(meta)</pre>
+new Headers(meta)
+</code></pre>
 </div>
 
 <p>A {{Headers}} object has an associated
@@ -4762,7 +5041,7 @@ objects.</span>
 
 <p>To <dfn export for=Headers id=concept-headers-append>append</dfn> a
 <a for=header>name</a>/<a for=header>value</a>
-(<var>name</var>/<var>value</var>) pair to a
+<var>name</var>/<var>value</var> pair to a
 {{Headers}} object (<var>headers</var>), run these steps:
 
 <ol>
@@ -4777,9 +5056,22 @@ objects.</span>
  <li><p>Otherwise, if <var>headers</var>'s <a for=Headers>guard</a> is "<code>request</code>" and
  <var>name</var> is a <a>forbidden header name</a>, return.
 
- <li><p>Otherwise, if <var>headers</var>'s <a for=Headers>guard</a> is
- "<code>request-no-cors</code>" and <var>name</var>/<var>value</var> is not a
- <a>no-CORS-safelisted request-header</a>, return.
+ <li>
+  <p>Otherwise, if <var>headers</var>'s <a for=Headers>guard</a> is "<code>request-no-cors</code>":
+
+  <ol>
+   <li><p>Let <var>temporaryValue</var> be the result of <a for="header list">getting</a>
+   <var>name</var> from <var>headers</var>'s <a for=Headers>header list</a>.
+
+   <li><p>If <var>temporaryValue</var> is null, then set <var>temporaryValue</var> to
+   <var>value</var>.
+
+   <li><p>Otherwise, set <var>temporaryValue</var> to <var>temporaryValue</var>, followed by
+   0x2C 0x20, followed by <var>value</var>.
+
+   <li><p>If <var>name</var>/<var>temporaryValue</var> is not a
+   <a>no-CORS-safelisted request-header</a>, then return.
+  </ol>
 
  <li><p>Otherwise, if <var>headers</var>'s <a for=Headers>guard</a> is "<code>response</code>" and
  <var>name</var> is a <a>forbidden response-header name</a>, return.
@@ -4788,7 +5080,7 @@ objects.</span>
  <a for=Headers>header list</a>.
 
  <li><p>If <var>headers</var>'s <a for=Headers>guard</a> is "<code>request-no-cors</code>", then
- <a for=Headers>remove privileged no-cors request headers</a> from <var>headers</var>.
+ <a for=Headers>remove privileged no-CORS request headers</a> from <var>headers</var>.
 </ol>
 
 <p>To <dfn export for=Headers id=concept-headers-fill>fill</dfn> a
@@ -4814,12 +5106,12 @@ run these steps:
 </ol>
 
 <p>To
-<dfn for=Headers id=concept-headers-remove-privileged-no-cors-request-headers>remove privileged no-cors request headers</dfn>
+<dfn for=Headers id=concept-headers-remove-privileged-no-cors-request-headers>remove privileged no-CORS request headers</dfn>
 from a {{Headers}} object (<var>headers</var>), run these steps:
 
 <ol>
  <li><p><a for="list">For each</a> <var>headerName</var> of
- <a>privileged no-cors request-header names</a>:
+ <a>privileged no-CORS request-header names</a>:
 
  <ol>
   <li><p><a for="header list">Delete</a> <var>headerName</var> from <var>headers</var>'s
@@ -4859,16 +5151,10 @@ method, when invoked, must run these steps:
  <li><p>Otherwise, if the <a>context object</a>'s <a for=Headers>guard</a> is "<code>request</code>"
  and <var>name</var> is a <a>forbidden header name</a>, return.
 
- <li>
-  <p>Otherwise, if the <a>context object</a>'s <a for=Headers>guard</a> is
-  "<code>request-no-cors</code>", <var>name</var>/`<code>invalid</code>` is not a
-  <a>no-CORS-safelisted request-header</a>, and <var>name</var> is not a
-  <a>privileged no-cors request-header name</a>, return.
-
-  <p class=note>`<code>invalid</code>` is used because
-  <a method for=Headers><code>delete()</code></a> is not passed a value as argument.
- <!-- XXX This will always fail for Content-Type. Need to investigate under what scenarios you get a
-      Headers object guarded like this and figure out what the problems are... -->
+ <li><p>Otherwise, if the <a>context object</a>'s <a for=Headers>guard</a> is
+ "<code>request-no-cors</code>", <var>name</var> is not a
+ <a>no-CORS-safelisted request-header name</a>, and <var>name</var> is not a
+ <a>privileged no-CORS request-header name</a>, return.
 
  <li><p>Otherwise, if the <a>context object</a>'s <a for=Headers>guard</a> is
  "<code>response</code>" and <var>name</var> is a <a>forbidden response-header name</a>, return.
@@ -4880,7 +5166,7 @@ method, when invoked, must run these steps:
  <a for=Headers>header list</a>.
 
  <li><p>If the <a>context object</a>'s <a for=Headers>guard</a> is "<code>request-no-cors</code>",
- then <a for=Headers>remove privileged no-cors request headers</a> from the <a>context object</a>.
+ then <a for=Headers>remove privileged no-CORS request headers</a> from the <a>context object</a>.
 </ol>
 
 <p>The <dfn export for=Headers method><code>get(<var>name</var>)</code></dfn> method, when
@@ -4889,10 +5175,7 @@ invoked, must run these steps:
 <ol>
  <li><p>If <var>name</var> is not a <a for=header>name</a>, then <a>throw</a> a {{TypeError}}.
 
- <li><p>If the <a>context object</a>'s <a for=Headers>header list</a>
- <a for="header list">does not contain</a> <var>name</var>, then return null.
-
- <li><p>Return the <a for=header>combined value</a> with <var>name</var> and the
+ <li><p>Return the result of <a for="header list">getting</a> <var>name</var> from the
  <a>context object</a>'s <a for=Headers>header list</a>.
 </ol>
 
@@ -4933,7 +5216,7 @@ method, when invoked, must run these steps:
  <a for=Headers>header list</a>.
 
  <li><p>If the <a>context object</a>'s <a for=Headers>guard</a> is "<code>request-no-cors</code>",
- then <a for=Headers>remove privileged no-cors request headers</a> from the <a>context object</a>.
+ then <a for=Headers>remove privileged no-CORS request headers</a> from the <a>context object</a>.
 </ol>
 
 <p>The <a>value pairs to iterate over</a> are the return value of running
@@ -5087,7 +5370,7 @@ due course.
 
 <p>Objects implementing the {{Body}} mixin gain an associated
 <dfn id=concept-body-body for=Body>body</dfn> (null or a <a for=/>body</a>) and
-a <dfn id=concept-body-mime-type for=Body>MIME type</dfn> (initially the empty byte sequence).
+a <dfn id=concept-body-mime-type for=Body>MIME type</dfn> (failure or a <a for=/>MIME type</a>).
 
 <p>An object implementing the {{Body}} mixin is said to be
 <dfn export id=concept-body-disturbed for=Body>disturbed</dfn> if <a for=Body>body</a> is
@@ -5123,7 +5406,8 @@ runs the associated steps:
 
  <dt><i>FormData</i>
  <dd>
-  <p>If <var>mimeType</var> (ignoring parameters) is `<code>multipart/form-data</code>`, then:
+  <p>If <var>mimeType</var>'s <a for="MIME type">essence</a> is "<code>multipart/form-data</code>",
+  then:
 
   <ol>
    <li>
@@ -5160,8 +5444,8 @@ runs the associated steps:
   `<code>multipart/form-data</code>`, a more detailed parsing specification is to be
   written. Volunteers welcome.
 
-  <p>Otherwise, if <var>mimeType</var> (ignoring parameters) is
-  `<code>application/x-www-form-urlencoded</code>`, then:
+  <p>Otherwise, if <var>mimeType</var>'s <a for="MIME type">essence</a> is
+  "<code>application/x-www-form-urlencoded</code>", then:
 
   <ol>
    <li><p>Let <var>entries</var> be the result of
@@ -5911,7 +6195,7 @@ Response includes Body;
 
 dictionary ResponseInit {
   unsigned short status = 200;
-  ByteString statusText = "OK";
+  ByteString statusText = "";
   HeadersInit headers;
 };
 
@@ -6265,35 +6549,41 @@ with {{WebSocket}} and {{XMLHttpRequest}} objects.
 
 <div id=terminate-examples class="example no-backref">
  <p>The user agent can terminate the fetch because the termination cannot be observed.
- <pre>
-fetch("https://www.example.com/")</pre>
+ <pre><code class=lang-javascript>
+fetch("https://www.example.com/")
+</code></pre>
 
  <p>The user agent cannot terminate the fetch because the termination can be observed through
  the promise.
- <pre>
-window.promise = fetch("https://www.example.com/")</pre>
+ <pre><code class=lang-javascript>
+window.promise = fetch("https://www.example.com/")
+</code></pre>
 
  <p>The user agent can terminate the fetch because the associated body is not observable.
- <pre>
-window.promise = fetch("https://www.example.com/").then(res => res.headers)</pre>
+ <pre><code class=lang-javascript>
+window.promise = fetch("https://www.example.com/").then(res => res.headers)
+</code></pre>
 
  <p>The user agent can terminate the fetch because the termination cannot be observed.
- <pre>
-fetch("https://www.example.com/").then(res => res.body.getReader().closed)</pre>
+ <pre><code class=lang-javascript>
+fetch("https://www.example.com/").then(res => res.body.getReader().closed)
+</code></pre>
 
  <p>The user agent cannot terminate the fetch because one can observe the termination by registering
  a handler for the promise object.
- <pre>
+ <pre><code class=lang-javascript>
 window.promise = fetch("https://www.example.com/")
-  .then(res => res.body.getReader().closed)</pre>
+  .then(res => res.body.getReader().closed)
+</code></pre>
 
  <p>The user agent cannot terminate the fetch as termination would be observable via the registered
  handler.
- <pre>
+ <pre><code class=lang-javascript>
 fetch("https://www.example.com/")
   .then(res => {
     res.body.getReader().closed.then(() => console.log("stream closed!"))
-  })</pre>
+  })
+</code></pre>
 
   <p>(The above examples of non-observability assume that built-in properties and functions, such as
   {{ReadableStream/getReader()|body.getReader()}}, have not been overwritten.)
@@ -6385,12 +6675,12 @@ therefore not shareable, a WebSocket connection is very close to identical to an
 
  <li>
   <p>Let <var>keyValue</var> be a nonce consisting of a randomly selected 16-byte value that has
-  been base64-encoded (see <a href=https://tools.ietf.org/html/rfc4648#section-4>section 4</a> of
-  [[!RFC4648]]).
+  been <a lt="forgiving-base64 encode">forgiving-base64-encoded</a> and <a>isomorphic encoded</a>.
 
   <p id=example-random-value class=example>If the randomly selected value was the byte sequence 0x01 0x02 0x03 0x04 0x05
   0x06 0x07 0x08 0x09 0x0a 0x0b 0x0c 0x0d 0x0e 0x0f 0x10, <var>keyValue</var> would be
-  `<code>AQIDBAUGBwgJCgsMDQ4PEC==</code>`.
+  forgiving-base64-encoded to "<code>AQIDBAUGBwgJCgsMDQ4PEC==</code>" and isomorphic encoded
+  to `<code>AQIDBAUGBwgJCgsMDQ4PEC==</code>`.
 
  <li><p><a for="header list">Append</a>
  `<code>Sec-WebSocket-Key</code>`/<var>keyValue</var> to
@@ -6570,8 +6860,9 @@ invented.)
 <p>However, otherwise using the following <a for=/>header</a> is
 <strong>safe</strong>:
 
-<pre>
-Access-Control-Allow-Origin: *</pre>
+<pre><code class=lang-http>
+Access-Control-Allow-Origin: *
+</code></pre>
 
 <p>Even if a resource exposes additional information based on cookie or HTTP
 authentication, using the above <a for=/>header</a> will not reveal
@@ -6593,7 +6884,9 @@ however, it is perfectly fine to do so.
 [[!HTML]]
 [[!HTTP]] [[!HTTP-SEMANTICS]] [[!HTTP-COND]] [[!HTTP-CACHING]] [[!HTTP-AUTH]]
 
-<pre id=example-vary-origin class=example>Vary: Origin</pre>
+<pre id=example-vary-origin class=example><code class=lang-http>
+Vary: Origin
+</code></pre>
 
 <p>In particular, consider what happens if `<code>Vary</code>` is <em>not</em> used and a server is
 configured to send `<a http-header><code>Access-Control-Allow-Origin</code></a>` for a certain
@@ -6666,6 +6959,7 @@ Eric Lawrence,
 François Marier,
 Frank Ellerman,
 Frederick Hirsch,
+Gary Blackwood,
 Gavin Carothers,
 Glenn Maynard,
 Graham Klyne,
@@ -6735,6 +7029,7 @@ Michael™ Smith,
 Mike Pennisi,
 Mike West,
 Mohamed Zergaoui,
+Mohammed Zubair Ahmed<!-- M-ZubairAhmed; GitHub -->,
 Moritz Kneilmann,
 Ms2ger,
 Nico Schlömer,
@@ -6743,11 +7038,13 @@ Nikki Bee,
 Nikunj Mehta,
 Odin Hørthe Omdal,
 Ondřej Žára,
+O. Opsec,
 Philip Jägenstedt,
 R. Auburn,
 Raphael Kubo da Costa,
-Ryan Sleevi,
+Rondinelly,
 Rory Hewitt,
+Ryan Sleevi,
 Sébastien Cevey,
 Sendil Kumar N,
 Shao-xuan Kang,
@@ -6757,6 +7054,7 @@ Sigbjørn Finne,
 Simon Pieters,
 Simon Sapin,
 Srirama Chandra Sekhar Mogali,
+Stephan Paul,
 Steven Salat,
 Sunava Dutta,
 Surya Ismail,

@@ -30,7 +30,9 @@ type: interface
   text: WebGLContextEvent
 urlPrefix: https://tc39.github.io/ecma262/#; spec: ECMASCRIPT
  text: Construct; url: sec-construct; type: abstract-op
- text: Realm; url: realm; type: dfn
+ type: dfn
+  text: Realm; url: realm
+  text: surrounding agent; url: surrounding-agent
 urlPrefix: https://w3c.github.io/hr-time/#; spec: HR-TIME
  type:typedef; urlPrefix: dom-; text: DOMHighResTimeStamp
  type:dfn; text: time origin; url: dfn-time-origin
@@ -312,8 +314,8 @@ method, passing the same arguments.
 
 <a>Events</a> are objects too and implement the
 {{Event}} interface (or a derived interface). In the example above
-<var ignore>ev</var> is the <a>event</a>. It is
-passed as argument to
+<var ignore>ev</var> is the <a>event</a>. <var ignore>ev</var> is
+passed as an argument to the
 <a>event listener</a>'s <a for="event listener">callback</a>
 (typically a JavaScript Function as shown above).
 <a>Event listeners</a> key off the
@@ -326,9 +328,9 @@ object to which the <a>event</a> was
 <a>dispatched</a>
 (<var ignore>obj</var> above).
 
-<p id="synthetic-events">Now while typically <a>events</a> are <a>dispatched</a> by the user agent
+<p id="synthetic-events">Although <a>events</a> are typically <a>dispatched</a> by the user agent
 as the result of user interaction or the completion of some task, applications can <a>dispatch</a>
-<a>events</a> themselves, commonly known as synthetic events:
+<a>events</a> themselves by using what are commonly known as synthetic events:
 
 <pre class='lang-javascript'>
 // add an appropriate event listener
@@ -379,7 +381,7 @@ object's  <a>ancestor</a>
 <a>event listeners</a> are invoked again,
 but now in reverse <a>tree order</a>.
 
-Lets look at an example of how <a>events</a> work in a <a>tree</a>:
+Let's look at an example of how <a>events</a> work in a <a>tree</a>:
 
 <pre class='lang-markup'>
 &lt;!doctype html>
@@ -587,38 +589,101 @@ was initialized to. When an <a>event</a> is created the attribute must be initia
 steps:
 
 <ol>
- <li><p>Let <var>reversedComposedPath</var> be an empty <a for=/>list</a>.
+ <li><p>Let <var>composedPath</var> be an empty <a for=/>list</a>.
 
- <li><p>Let <var>hiddenSubtreeLevel</var> be 0.
+ <li><p>Let <var>path</var> be the <a>context object</a>'s <a for=Event>path</a>.
 
- <li><p>Let <var>hasSeenCurrentTarget</var> be false.
+ <li><p>If <var>path</var> <a for=list>is empty</a>, then return <var>composedPath</var>.
 
  <li><p>Let <var>currentTarget</var> be the <a>context object</a>'s {{Event/currentTarget}}
  attribute value.
 
- <li><p>Let <var>reversedPath</var> be the <a>context object</a>'s <a for=Event>path</a>, in reverse
- order.
+ <li><p><a for=list>Append</a> <var>currentTarget</var> to <var>composedPath</var>.
+
+ <li><p>Let <var>currentTargetIndex</var> be 0.
+
+ <li><p>Let <var>currentTargetHiddenSubtreeLevel</var> be 0.
+
+ <li><p>Let <var>index</var> be <var>path</var>'s <a for=list>size</a> &minus; 1.
 
  <li>
-  <p><a for=list>For each</a> <var>struct</var> in <var>reversedPath</var>:
+  <p>While <var>index</var> is greater than or equal to 0:
 
   <ol>
-   <li><p>If <var>struct</var>'s <a for=Event/path>item</a> is <var>currentTarget</var>, then set
-   <var>hasSeenCurrentTarget</var> to true.
+   <li><p>If <var>path</var>[<var>index</var>]'s <a for=Event/path>root-of-closed-tree</a> is true,
+   then increase <var>currentTargetHiddenSubtreeLevel</var> by 1.
 
-   <li><p>Otherwise, if <var>hasSeenCurrentTarget</var> is true and <var>struct</var>'s
-   <a for=Event/path>root-of-closed-tree</a> is true, then increase <var>hiddenSubtreeLevel</var> by
-   1.
+   <li><p>If <var>path</var>[<var>index</var>]'s <a for=Event/path>item</a> is
+   <var>currentTarget</var>, then set <var>currentTargetIndex</var> to <var>index</var> and
+   <a for=iteration>break</a>.
 
-   <li><p>If <var>hiddenSubtreeLevel</var> is 0, then <a for=list>append</a> <var>struct</var>'s
-   <a for=Event/path>item</a> to <var>reversedComposedPath</var>.
+   <li><p>If <var>path</var>[<var>index</var>]'s <a for=Event/path>slot-in-closed-tree</a> is true,
+   then decrease <var>currentTargetHiddenSubtreeLevel</var> by 1.
 
-   <li><p>If <var>struct</var>'s <a for=Event/path>slot-in-closed-tree</a> is true and
-   <var>hiddenSubtreeLevel</var> is greater than 0, then decrease <var>hiddenSubtreeLevel</var> by
-   1.
+   <li><p>Decrease <var>index</var> by 1.
   </ol>
 
- <li><p>Return <var>reversedComposedPath</var>, in reverse order.
+ <li><p>Let <var>currentHiddenLevel</var> and <var>maxHiddenLevel</var> be
+ <var>currentTargetHiddenSubtreeLevel</var>.
+
+ <li><p>Set <var>index</var> to <var>currentTargetIndex</var> &minus; 1.
+
+ <li>
+  <p>While <var>index</var> is greater than or equal to 0:
+
+  <ol>
+   <li><p>If <var>path</var>[<var>index</var>]'s <a for=Event/path>root-of-closed-tree</a> is true,
+   then increase <var>currentHiddenLevel</var> by 1.
+
+   <li><p>If <var>currentHiddenLevel</var> is less than or equal to <var>maxHiddenLevel</var>, then
+   <a for=list>prepend</a> <var>path</var>[<var>index</var>]'s <a for=Event/path>item</a> to
+   <var>composedPath</var>.
+
+   <li>
+    <p>If <var>path</var>[<var>index</var>]'s <a for=Event/path>slot-in-closed-tree</a> is true,
+    then:
+
+    <ol>
+     <li><p>Decrease <var>currentHiddenLevel</var> by 1.
+
+     <li><p>If <var>currentHiddenLevel</var> is less than <var>maxHiddenLevel</var>, then set
+     <var>maxHiddenLevel</var> to <var>currentHiddenLevel</var>.
+    </ol>
+
+   <li><p>Decrease <var>index</var> by 1.
+  </ol>
+
+ <li><p>Set <var>currentHiddenLevel</var> and <var>maxHiddenLevel</var> to
+ <var>currentTargetHiddenSubtreeLevel</var>.
+
+ <li><p>Set <var>index</var> to <var>currentTargetIndex</var> + 1.
+
+ <li>
+  <p>While <var>index</var> is less than <var>path</var>'s <a for=list>size</a>:
+
+  <ol>
+   <li><p>If <var>path</var>[<var>index</var>]'s <a for=Event/path>slot-in-closed-tree</a> is true,
+   then increase <var>currentHiddenLevel</var> by 1.
+
+   <li><p>If <var>currentHiddenLevel</var> is less than or equal to <var>maxHiddenLevel</var>, then
+   <a for=list>append</a> <var>path</var>[<var>index</var>]'s <a for=Event/path>item</a> to
+   <var>composedPath</var>.
+
+   <li>
+    <p>If <var>path</var>[<var>index</var>]'s <a for=Event/path>root-of-closed-tree</a> is true,
+    then:
+
+    <ol>
+     <li><p>Decrease <var>currentHiddenLevel</var> by 1.
+
+     <li><p>If <var>currentHiddenLevel</var> is less than <var>maxHiddenLevel</var>, then set
+     <var>maxHiddenLevel</var> to <var>currentHiddenLevel</var>.
+    </ol>
+
+   <li><p>Increase <var>index</var> by 1.
+  </ol>
+
+ <li><p>Return <var>composedPath</var>.
 </ol>
 
 <p>The <dfn attribute for=Event><code>eventPhase</code></dfn> attribute must return the value it was
@@ -1153,6 +1218,10 @@ method, when invoked, must run these steps:
  with the <a>context object</a> and that <a>event listener</a>.
 </ol>
 
+<p class=note>The event listener list will not contain multiple event listeners with equal
+<var>type</var>, <var>callback</var>, and <var>capture</var>, as <a>add an event listener</a>
+prevents that.
+
 <p>The <dfn method for=EventTarget><code>dispatchEvent(<var>event</var>)</code></dfn> method, when
 invoked, must run these steps:
 
@@ -1307,43 +1376,53 @@ for discussion).
      <li><p>Set <var>slot-in-closed-tree</var> to false.
     </ol>
 
-   <li><p>Let <var>clearTargetsTuple</var> be the last tuple in <var>event</var>'s
+   <li><p>Let <var>clearTargetsStruct</var> be the last struct in <var>event</var>'s
    <a for=Event>path</a> whose <a for=Event/path>target</a> is non-null.
 
-   <li><p>Let <var>clearTargets</var> be true if <var>clearTargetsTuple</var>'s
-   <a for=Event/path>target</a>, <var>clearTargetsTuple</var>'s <a for=Event/path>relatedTarget</a>,
-   or an {{EventTarget}} object in <var>clearTargetsTuple</var>'s
-   <a for=Event/path>touch target list</a> is a <a for=/>node</a> and its <a for=tree>root</a> is a
-   <a for=/>shadow root</a>, and false otherwise.
-
-   <li><p>Set <var>event</var>'s {{Event/eventPhase}} attribute to {{Event/CAPTURING_PHASE}}.
+   <li><p>Let <var>clearTargets</var> be true if <var>clearTargetsStruct</var>'s
+   <a for=Event/path>target</a>, <var>clearTargetsStruct</var>'s
+   <a for=Event/path>relatedTarget</a>, or an {{EventTarget}} object in
+   <var>clearTargetsStruct</var>'s <a for=Event/path>touch target list</a> is a <a for=/>node</a>
+   and its <a for=tree>root</a> is a <a for=/>shadow root</a>, and false otherwise.
 
    <li><p>If <var>activationTarget</var> is non-null and <var>activationTarget</var> has
    <a for=EventTarget>legacy-pre-activation behavior</a>, then run <var>activationTarget</var>'s
    <a for=EventTarget>legacy-pre-activation behavior</a>.
 
    <li>
-    <p>For each <var>tuple</var> in <var>event</var>'s <a for=Event>path</a>, in reverse order:
+    <p><a for=list>For each</a> <var>struct</var> in <var>event</var>'s <a for=Event>path</a>, in
+    reverse order:
 
     <ol>
-     <li><p>If <var>tuple</var>'s <a for=Event/path>target</a> is null, then <a>invoke</a> with
-     <var>tuple</var>, <var>event</var>, and <var>legacyOutputDidListenersThrowFlag</var> if given.
-    </ol>
-
-   <li>
-    <p>For each <var>tuple</var> in <var>event</var>'s <a for=Event>path</a>, in order:
-
-    <ol>
-     <li><p>If <var>tuple</var>'s <a for=Event/path>target</a> is non-null, then set
+     <li><p>If <var>struct</var>'s <a for=Event/path>target</a> is non-null, then set
      <var>event</var>'s {{Event/eventPhase}} attribute to {{Event/AT_TARGET}}.
 
      <li><p>Otherwise, set <var>event</var>'s {{Event/eventPhase}} attribute to
-     {{Event/BUBBLING_PHASE}}.
+     {{Event/CAPTURING_PHASE}}.
 
-     <li><p>If either <var>event</var>'s {{Event/eventPhase}} attribute is {{Event/BUBBLING_PHASE}}
-     and <var>event</var>'s {{Event/bubbles}} attribute is true or <var>event</var>'s
-     {{Event/eventPhase}} attribute is {{Event/AT_TARGET}}, then <a>invoke</a> with
-     <var>tuple</var>, <var>event</var>, and <var>legacyOutputDidListenersThrowFlag</var> if given.
+     <li><p><a>Invoke</a> with <var>struct</var>, <var>event</var>, "<code>capturing</code>", and
+     <var>legacyOutputDidListenersThrowFlag</var> if given.
+    </ol>
+
+   <li>
+    <p><a for=list>For each</a> <var>struct</var> in <var>event</var>'s <a for=Event>path</a>:
+
+    <ol>
+     <li><p>If <var>struct</var>'s <a for=Event/path>target</a> is non-null, then set
+     <var>event</var>'s {{Event/eventPhase}} attribute to {{Event/AT_TARGET}}.
+
+     <li>
+      <p>Otherwise:
+
+      <ol>
+       <li><p>If <var>event</var>'s {{Event/bubbles}} attribute is false, then
+       <a for=iteration>continue</a>.
+
+       <li><p>Set <var>event</var>'s {{Event/eventPhase}} attribute to {{Event/BUBBLING_PHASE}}.
+      </ol>
+
+     <li><p><a>Invoke</a> with <var>struct</var>, <var>event</var>, "<code>bubbling</code>", and
+     <var>legacyOutputDidListenersThrowFlag</var> if given.
     </ol>
   </ol>
 
@@ -1406,23 +1485,24 @@ for discussion).
  <a for=Event/path>slot-in-closed-tree</a> is <var>slot-in-closed-tree</var>.
 </ol>
 
-<p>To <dfn noexport id=concept-event-listener-invoke>invoke</dfn>, given a <var>tuple</var>,
-<var>event</var>, and an optional <var>legacyOutputDidListenersThrowFlag</var>, run these steps:
+<p>To <dfn noexport id=concept-event-listener-invoke>invoke</dfn>, given a <var>struct</var>,
+<var>event</var>, <var>phase</var>, and an optional <var>legacyOutputDidListenersThrowFlag</var>,
+run these steps:
 
 <ol>
  <li><p>Set <var>event</var>'s <a for=Event>target</a> to the <a for=Event/path>target</a> of the
- last tuple in <var>event</var>'s <a for=Event>path</a>, that is either <var>tuple</var> or
- preceding <var>tuple</var>, whose <a for=Event/path>target</a> is non-null.
+ last struct in <var>event</var>'s <a for=Event>path</a>, that is either <var>struct</var> or
+ preceding <var>struct</var>, whose <a for=Event/path>target</a> is non-null.
 
- <li><p>Set <var>event</var>'s <a for=Event>relatedTarget</a> to <var>tuple</var>'s
+ <li><p>Set <var>event</var>'s <a for=Event>relatedTarget</a> to <var>struct</var>'s
  <a for=Event/path>relatedTarget</a>.
 
- <li><p>Set <var>event</var>'s <a for=Event>touch target list</a> to <var>tuple</var>'s
+ <li><p>Set <var>event</var>'s <a for=Event>touch target list</a> to <var>struct</var>'s
  <a for=Event/path>touch target list</a>.
 
  <li><p>If <var>event</var>'s <a>stop propagation flag</a> is set, then return.
 
- <li><p>Initialize <var>event</var>'s {{Event/currentTarget}} attribute to <var>tuple</var>'s
+ <li><p>Initialize <var>event</var>'s {{Event/currentTarget}} attribute to <var>struct</var>'s
  <a for=Event/path>item</a>.
 
  <li>
@@ -1433,7 +1513,7 @@ for discussion).
   run. Note that removal still has an effect due to the <a for="event listener">removed</a> field.
 
  <li><p>Let <var>found</var> be the result of running <a>inner invoke</a> with <var>event</var>,
- <var>listeners</var>, and <var>legacyOutputDidListenersThrowFlag</var> if given.
+ <var>listeners</var>, <var>phase</var>, and <var>legacyOutputDidListenersThrowFlag</var> if given.
 
  <li>
   <p>If <var>found</var> is false and <var>event</var>'s {{Event/isTrusted}} attribute is true,
@@ -1457,7 +1537,7 @@ for discussion).
       <tr><td>"<code>transitionend</code>"<td>"<code>webkitTransitionEnd</code>"
     </table>
 
-   <li><p><a>Inner invoke</a> with <var>event</var>, <var>listeners</var>, and
+   <li><p><a>Inner invoke</a> with <var>event</var>, <var>listeners</var>, <var>phase</var>, and
    <var>legacyOutputDidListenersThrowFlag</var> if given.
 
    <li><p>Set <var>event</var>'s {{Event/type}} attribute value to <var>originalEventType</var>.
@@ -1465,7 +1545,7 @@ for discussion).
 </ol>
 
 <p>To <dfn noexport id=concept-event-listener-inner-invoke>inner invoke</dfn>, given an
-<var>event</var>, <var>listeners</var>, and an optional
+<var>event</var>, <var>listeners</var>, <var>phase</var>, and an optional
 <var>legacyOutputDidListenersThrowFlag</var>, run these steps:
 
 <ol>
@@ -1481,13 +1561,11 @@ for discussion).
 
    <li><p>Set <var>found</var> to true.
 
-   <li><p>If <var>event</var>'s {{Event/eventPhase}} attribute value is {{Event/CAPTURING_PHASE}}
-   and <var>listener</var>'s <a for="event listener">capture</a> is false, then
-   <a for=iteration>continue</a>.
+   <li><p>If <var>phase</var> is "<code>capturing</code>" and <var>listener</var>'s
+   <a for="event listener">capture</a> is false, then <a for=iteration>continue</a>.
 
-   <li><p>If <var>event</var>'s {{Event/eventPhase}} attribute value is {{Event/BUBBLING_PHASE}} and
-   <var>listener</var>'s <a for="event listener">capture</a> is true, then
-   <a for=iteration>continue</a>.
+   <li><p>If <var>phase</var> is "<code>bubbling</code>" and <var>listener</var>'s
+   <a for="event listener">capture</a> is true, then <a for=iteration>continue</a>.
 
    <li><p>If <var>listener</var>'s <a for="event listener">once</a> is true, then
    <a for=list>remove</a> <var>listener</var> from <var>event</var>'s {{Event/currentTarget}}
@@ -1506,7 +1584,7 @@ for discussion).
     <ol>
      <li><p>Set <var>currentEvent</var> to <var>global</var>'s <a for=Window>current event</a>.
 
-     <li><p>If <var>tuple</var>'s <a for=Event/path>item-in-shadow-tree</a> is false, then set
+     <li><p>If <var>struct</var>'s <a for=Event/path>item-in-shadow-tree</a> is false, then set
      <var>global</var>'s <a for=Window>current event</a> to <var>event</var>.
     </ol>
 
@@ -2206,18 +2284,16 @@ steps:
 
 <h5 id=signaling-slot-change>Signaling slot change</h5>
 
-<p>Each <a>unit of related similar-origin browsing contexts</a> has a
-<dfn export>signal slot list</dfn> (a list of <a>slots</a>). Unless stated otherwise it is empty.
-[[!HTML]]
+<p>Each <a>similar-origin window agent</a> has <dfn noexport id=signal-slot-list>signal slots</dfn>
+(a <a for=/>set</a> of <a>slots</a>), which is initially empty. [[!HTML]]
 
 <p>To <dfn noexport>signal a slot change</dfn>, for a <a>slot</a> <var>slot</var>, run these steps:
 
 <ol>
- <li><p>If <var>slot</var> is not in <a>unit of related similar-origin browsing contexts</a>'
- <a>signal slot list</a>, append <var>slot</var> to
- <a>unit of related similar-origin browsing contexts</a>' <a>signal slot list</a>.
+ <li><p><a for=set>Append</a> <var>slot</var> to <var>slot</var>'s <a>relevant agent</a>'s
+ <a>signal slots</a>.
 
- <li><p><a>Queue a mutation observer compound microtask</a>.
+ <li><p><a>Queue a mutation observer microtask</a>.
 </ol>
 
 
@@ -3189,42 +3265,42 @@ invoked, must run these steps:
 
 <h3 id=mutation-observers>Mutation observers</h3>
 
-<p>Each <a>unit of related similar-origin browsing contexts</a> has a
-<dfn noexport>mutation observer compound microtask queued flag</dfn>, which is initially unset.
-[[!HTML]]
+<p>Each <a>similar-origin window agent</a> has a
+<dfn noexport id=mutation-observer-compound-microtask-queued-flag>mutation observer microtask queued</dfn>
+(a boolean), which is initially false. [[!HTML]]
 
-<p>Each <a>unit of related similar-origin browsing contexts</a> also has a
-<dfn noexport>mutation observer list</dfn> (a <a for=/>list</a> of zero or more {{MutationObserver}}
-objects), which is initially empty.
+<p>Each <a>similar-origin window agent</a> also has
+<dfn noexport id=mutation-observer-list>mutation observers</dfn> (a <a for=/>set</a> of zero or more
+{{MutationObserver}} objects), which is initially empty.
 
-<p>To <dfn export>queue a mutation observer compound microtask</dfn>, run these steps:
+<p>To
+<dfn noexport id=queue-a-mutation-observer-compound-microtask>queue a mutation observer microtask</dfn>,
+run these steps:
 
 <ol>
- <li><p>If <a>mutation observer compound microtask queued flag</a> is set, then return.
+ <li><p>If the <a>surrounding agent</a>'s <a>mutation observer microtask queued</a> is true, then
+ return.
 
- <li><p>Set <a>mutation observer compound microtask queued flag</a>.
+ <li><p>Set the <a>surrounding agent</a>'s <a>mutation observer microtask queued</a> to true.
 
- <li><p><a lt="queue a microtask">Queue</a> a <a>compound microtask</a> to
- <a>notify mutation observers</a>.
+ <li><p><a lt="queue a microtask">Queue</a> a <a>microtask</a> to <a>notify mutation observers</a>.
 </ol>
 
 <p>To <dfn export>notify mutation observers</dfn>, run these steps:
 
 <ol>
- <li><p>Unset <a>mutation observer compound microtask queued flag</a>.
+ <li><p>Set the <a>surrounding agent</a>'s <a>mutation observer microtask queued</a> to false.
 
- <li><p>Let <var>notifyList</var> be a <a for=list>clone</a> of
- <a>unit of related similar-origin browsing contexts</a>' <a>mutation observer list</a>.
+ <li><p>Let <var>notifySet</var> be a <a for=set>clone</a> of the <a>surrounding agent</a>'s
+ <a>mutation observers</a>.
 
- <li><p>Let <var>signalList</var> be a <a for=list>clone</a> of
- <a>unit of related similar-origin browsing contexts</a>' <a>signal slot list</a>.
+ <li><p>Let <var>signalSet</var> be a <a for=set>clone</a> of the <a>surrounding agent</a>'s
+ <a>signal slots</a>.
 
- <li><p><a for=list>Empty</a> <a>unit of related similar-origin browsing contexts</a>'
- <a>signal slot list</a>.
+ <li><p><a for=set>Empty</a> the <a>surrounding agent</a>'s <a>signal slots</a>.
 
  <li>
-  <p><a for=list>For each</a> <var>mo</var> of <var>notifyList</var>,
-  <a>execute a compound microtask subtask</a> to run these steps: [[!HTML]]
+  <p><a for=set>For each</a> <var>mo</var> of <var>notifySet</var>:
 
   <ol>
    <li><p>Let <var>records</var> be a <a for=queue>clone</a> of <var>mo</var>'s
@@ -3242,7 +3318,7 @@ objects), which is initially empty.
    and <var>mo</var>. If this throws an exception, then <a>report the exception</a>.
   </ol>
 
- <li><p><a for=list>For each</a> <var>slot</var> of <var>signalList</var>, <a>fire an event</a>
+ <li><p><a for=set>For each</a> <var>slot</var> of <var>signalSet</var>, <a>fire an event</a>
  named <code>slotchange</code>, with its {{Event/bubbles}} attribute set to true, at
  <var>slot</var>.
 </ol>
@@ -3384,8 +3460,8 @@ constructor, when invoked, must run these steps:
  <li><p>Let <var>mo</var> be a new {{MutationObserver}} object whose
  <a for=MutationObserver>callback</a> is <var>callback</var>.
 
- <li><p><a for=list>Append</a> <var>mo</var> to
- <a>unit of related similar-origin browsing contexts</a>' <a>mutation observer list</a>.
+ <li><p><a for=set>Append</a> <var>mo</var> to <var>mo</var>'s <a>relevant agent</a>'s
+ <a>mutation observers</a>.
 
  <li><p>Return <var>mo</var>.
 </ol>
@@ -3551,7 +3627,7 @@ run these steps:
    <a for=MutationObserver>record queue</a>.
   </ol>
 
- <li><p><a>Queue a mutation observer compound microtask</a>.
+ <li><p><a>Queue a mutation observer microtask</a>.
 </ol>
 
 <p>To <dfn noexport>queue a tree mutation record</dfn> for <var>target</var> with
@@ -4044,11 +4120,7 @@ following, switching on <a>context object</a>:
 <dl class=switch>
  <dt>{{DocumentFragment}}
  <dt>{{Element}}
- <dd>The <a for=string>concatenation</a> of <a for=CharacterData>data</a> of all
- the {{Text}} <a>node</a>
- <a>descendants</a> of the
- <a>context object</a>, in
- <a>tree order</a>.
+ <dd>The <a>descendant text content</a> of the <a>context object</a>.
 
  <dt>{{Attr}}
  <dd><a>Context object</a>'s <a for=Attr>value</a>.
@@ -4062,22 +4134,26 @@ following, switching on <a>context object</a>:
  <dd>Null.
 </dl>
 
+<p>To <dfn export>string replace all</dfn> with a string <var>string</var> within a
+<a for=/>node</a> <var>parent</var>, run these steps:
+
+<ol>
+ <li><p>Let <var>node</var> be null.
+
+ <li><p>If <var>string</var> is not the empty string, then set <var>node</var> to a new {{Text}}
+ <a for=/>node</a> whose <a for=CharacterData>data</a> is <var>string</var> and
+ <a for=Node>node document</a> is <var>parent</var>'s <a for=Node>node document</a>.
+
+ <li><p><a for=Node>Replace all</a> with <var>node</var> within <var>parent</var>.
+</ol>
+
 <p>The {{Node/textContent}} attribute's setter must, if the given value is null, act as if it was
 the empty string instead, and then do as described below, switching on <a>context object</a>:
 
 <dl class=switch>
  <dt>{{DocumentFragment}}
  <dt>{{Element}}
- <dd>
-  <ol>
-   <li><p>Let <var>node</var> be null.
-
-   <li><p>If the given value is not the empty string, set <var>node</var> to a new {{Text}}
-   <a>node</a> whose <a for=CharacterData>data</a> is the given value and
-   <a for=Node>node document</a> is <a>context object</a>'s <a for=Node>node document</a>.
-
-   <li><p><a for=Node>Replace all</a> with <var>node</var> within the <a>context object</a>.
-  </ol>
+ <dd><p><a>String replace all</a> with the given value within the <a>context object</a>.
 
  <dt>{{Attr}}
  <dd><p><a>Set an existing attribute value</a> with <a>context object</a> and new value.
@@ -5685,8 +5761,9 @@ or "<code>closed</code>").</p>
 
 <p>A <a for=/>shadow root</a>'s <a>get the parent</a> algorithm, given an <var>event</var>, returns
 null if <var>event</var>'s <a>composed flag</a> is unset and <a for=/>shadow root</a> is the
-<a for=tree>root</a> of <var>event</var>'s <a for=Event>path</a>'s first tuple's <b>item</b>, and
-<a for=/>shadow root</a>'s <a for=DocumentFragment>host</a> otherwise.
+<a for=tree>root</a> of <var>event</var>'s <a for=Event>path</a>'s first struct's
+<a for=Event/path>item</a>, and <a for=/>shadow root</a>'s <a for=DocumentFragment>host</a>
+otherwise.
 
 <p>The <dfn attribute for=ShadowRoot><code>mode</code></dfn> attribute's getter must return the
 <a>context object</a>'s <a for=ShadowRoot>mode</a>.</p>
@@ -5964,20 +6041,14 @@ given a <var>document</var>, <var>localName</var>, <var>namespace</var>, and opt
      <li><p>Set <var>result</var> to the result of <a>constructing</a> <var>C</var>, with no
      arguments.
 
+     <li><p>Assert: <var>result</var>'s <a for=Element>custom element state</a> and
+     <a for=Element>custom element definition</a> are initialized.
+
      <li>
-      <p>If <var>result</var> does not implement the {{HTMLElement}} interface, then <a>throw</a> a
-      <code>TypeError</code>.
+      <p>Assert: <var>result</var>'s <a for=Element>namespace</a> is the <a>HTML namespace</a>.
 
-      <div class=note>
-       <p>This is meant to be a brand check to ensure that the object was allocated by the HTML
-       element constructor. See <a href="https://github.com/heycam/webidl/issues/97">webidl #97</a>
-       about making this more precise.
-
-       <p>If this check passes, then <var>result</var> will already have its
-       <a for=Element>custom element state</a> and <a for=Element>custom element definition</a>
-       initialized.
-      </div>
-     </li>
+      <p class=note>IDL enforces that <var>result</var> is an {{HTMLElement}} object, which all use
+      the <a>HTML namespace</a>.
 
      <li><p>If <var>result</var>'s <a for=Element>attribute list</a> <a for=list>is not empty</a>,
      then <a>throw</a> a "{{NotSupportedError!!exception}}" {{DOMException}}.
@@ -5990,17 +6061,6 @@ given a <var>document</var>, <var>localName</var>, <var>namespace</var>, and opt
 
      <li><p>If <var>result</var>'s <a for=Node>node document</a> is not <var>document</var>, then
      <a>throw</a> a "{{NotSupportedError!!exception}}" {{DOMException}}.
-
-     <li>
-      <p>If <var>result</var>'s <a for=Element>namespace</a> is not the <a>HTML namespace</a>,
-      then <a>throw</a> a "{{NotSupportedError!!exception}}" {{DOMException}}.
-
-      <p class="note">As of the time of this writing, every element that implements the
-      {{HTMLElement}} interface is also in the <a>HTML namespace</a>, so this check is currently
-      redundant with the above brand check. However, this is not guaranteed to be true forever in
-      the face of potential specification changes, such as converging certain SVG and HTML
-      interfaces.
-     </li>
 
      <li><p>If <var>result</var>'s <a for=Element>local name</a> is not equal to
      <var>localName</var>, then <a>throw</a> a "{{NotSupportedError!!exception}}" {{DOMException}}.
@@ -7277,12 +7337,18 @@ if any, and its <a>contiguous exclusive <code>Text</code> nodes</a>, and <var>no
 <a for=tree>next sibling</a> <a>exclusive <code>Text</code> node</a>, if any, and its
 <a>contiguous exclusive <code>Text</code> nodes</a>, avoiding any duplicates.
 
-<p>The <dfn export id=concept-child-text-content>child text content</dfn> of a <a>node</a>
+<p>The <dfn export id=concept-child-text-content>child text content</dfn> of a <a for=/>node</a>
 <var>node</var> is the <a for=string>concatenation</a> of the <a for=CharacterData>data</a> of all
-the {{Text}} node <a>children</a> of <var>node</var>, in <a>tree order</a>.
+the {{Text}} <a for=/>node</a> <a>children</a> of <var>node</var>, in <a>tree order</a>.
 
 <p>This and <a lt="other applicable specifications">other specifications</a> may define
-<dfn export id=concept-node-text-change-ext>child text content change steps</dfn> for <a for=/>nodes</a>.
+<dfn export id=concept-node-text-change-ext>child text content change steps</dfn> for
+<a for=/>nodes</a>.
+
+<p>The <dfn export id=concept-descendant-text-content>descendant text content</dfn> of a
+<a for=/>node</a> <var>node</var> is the <a for=string>concatenation</a> of the
+<a for=CharacterData>data</a> of all the {{Text}} <a for=/>node</a> <a>descendants</a> of
+<var>node</var>, in <a>tree order</a>.
 
 <hr>
 
@@ -9928,11 +9994,11 @@ Doug Schepers,
 Edgar Chen,
 Elisée Maurer,
 Elliott Sprehn,
+Emilio Cobos Álvarez,
 Eric Bidelman,
 Erik Arvidsson,
 Gary Kacmarcik,
 Gavin Nicol,
-Geoffrey Sneddon,
 Giorgio Liscio,
 Glen Huang,
 Glenn Adams,
@@ -9964,6 +10030,7 @@ Jonathan Kingston,
 Jonathan Robie,
 Joris van der Wel,
 Joshua Bell,
+J. S. Choi,
 Jungkee Song,
 Justin Summerlin,
 呂康豪 (Kang-Hao Lu),
@@ -9972,6 +10039,7 @@ Kirill Topolyan,
 Koji Ishii,
 Lachlan Hunt,
 Lauren Wood,
+Luke Zielinski,
 Magne Andersson,
 Majid Valipour,
 Malte Ubl,
@@ -9982,6 +10050,7 @@ Mark Miller,
 Martijn van der Ven,
 Mats Palmgren,
 Mounir Lamouri,
+Michael Stramel,
 Michael™ Smith,
 Mike Champion,
 Mike Taylor,
@@ -10008,6 +10077,7 @@ Russell Bicknell,
 Ruud Steltenpool,
 Ryosuke Niwa,
 Sam Dutton,
+Sam Sneddon,
 Samuel Giles,
 Sebastian Mayr,
 Seo Sanghyeon,

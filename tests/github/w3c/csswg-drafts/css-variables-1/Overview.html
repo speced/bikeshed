@@ -335,6 +335,7 @@ on screen, on paper, etc.
      <ol class="toc">
       <li><a href="#invalid-variables"><span class="secno">3.1</span> <span class="content"> Invalid Variables</span></a>
       <li><a href="#variables-in-shorthands"><span class="secno">3.2</span> <span class="content"> Variables in Shorthand Properties</span></a>
+      <li><a href="#long-variables"><span class="secno">3.3</span> <span class="content"> Safely Handling Overly-Long Variables</span></a>
      </ol>
     <li>
      <a href="#apis"><span class="secno">4</span> <span class="content"> APIs</span></a>
@@ -651,7 +652,7 @@ three { --foo: calc(var(--bar) + 10px); }
    <p>The value of a <a data-link-type="dfn" href="#custom-property" id="ref-for-custom-property①⑨">custom property</a> can be substituted into the value of another property
 	with the <a class="css" data-link-type="maybe" href="#funcdef-var" id="ref-for-funcdef-var①⑧">var()</a> function.
 	The syntax of <span class="css" id="ref-for-funcdef-var①⑨">var()</span> is:</p>
-<pre class="prod highlight"><dfn class="dfn-paneled" data-dfn-type="function" data-export id="funcdef-var">var()</dfn> = var( <a class="production" data-link-type="type" href="#typedef-custom-property-name" id="ref-for-typedef-custom-property-name">&lt;custom-property-name></a> [<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#comb-comma" id="ref-for-comb-comma">,</a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value" id="ref-for-typedef-declaration-value③">&lt;declaration-value></a> ]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt">?</a> )
+<pre class="prod highlight"><dfn class="dfn-paneled" data-dfn-type="function" data-export id="funcdef-var">var()</dfn> = var( <a class="production" data-link-type="type" href="#typedef-custom-property-name" id="ref-for-typedef-custom-property-name">&lt;custom-property-name></a> <a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#comb-comma" id="ref-for-comb-comma">,</a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-syntax-3/#typedef-declaration-value" id="ref-for-typedef-declaration-value③">&lt;declaration-value></a><a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt">?</a> )
 </pre>
    <p>The <a class="css" data-link-type="maybe" href="#funcdef-var" id="ref-for-funcdef-var②⓪">var()</a> function can be used in place of any part of a value in any property on an element.
 	The <span class="css" id="ref-for-funcdef-var②①">var()</span> function can not be used as
@@ -779,7 +780,7 @@ three { --foo: calc(var(--bar) + 10px); }
 	Attempting to do so
 	makes the declaration <a data-link-type="dfn" href="#invalid-at-computed-value-time" id="ref-for-invalid-at-computed-value-time③">invalid at computed-value time</a>,
 	unless a valid fallback is specified.</p>
-   <p>A declaration can be <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="invalid-at-computed-value-time">invalid at computed-value time</dfn> if it contains a <a class="css" data-link-type="maybe" href="#funcdef-var" id="ref-for-funcdef-var③⑤">var()</a> that references a <a data-link-type="dfn" href="#custom-property" id="ref-for-custom-property②⑧">custom property</a> with its initial value,
+   <p>A declaration can be <dfn class="dfn-paneled" data-dfn-type="dfn" data-export id="invalid-at-computed-value-time">invalid at computed-value time</dfn> if it contains a <a class="css" data-link-type="maybe" href="#funcdef-var" id="ref-for-funcdef-var③⑤">var()</a> that references a <a data-link-type="dfn" href="#custom-property" id="ref-for-custom-property②⑧">custom property</a> with its initial value,
 	as explained above,
 	or if it uses a valid <span id="ref-for-custom-property②⑨">custom property</span>,
 	but the property value,
@@ -838,6 +839,40 @@ three { --foo: calc(var(--bar) + 10px); }
 	must serialize to the original, <span class="css" id="ref-for-funcdef-var④③">var()</span>-containing value.
 	For other shorthands,
 	if any of the longhand subproperties for that shorthand have <a data-link-type="dfn" href="#pending-substitution-value" id="ref-for-pending-substitution-value①">pending-substitution values</a> then the serialized value of the shorthand must be the empty string.</p>
+   <h3 class="heading settled" data-level="3.3" id="long-variables"><span class="secno">3.3. </span><span class="content"> Safely Handling Overly-Long Variables</span><a class="self-link" href="#long-variables"></a></h3>
+   <p>Naively implemented, <a class="css" data-link-type="maybe" href="#funcdef-var" id="ref-for-funcdef-var④④">var()</a> functions can be used in a variation of the "billion laughs attack":</p>
+   <div class="example" id="example-9c9258de">
+    <a class="self-link" href="#example-9c9258de"></a> 
+<pre class="highlight" lang="css"><c- f>.foo </c-><c- p>{</c->
+  <c- k>--prop1</c-><c- p>:</c-> lol<c- p>;</c->
+  <c- k>--prop2</c-><c- p>:</c-> <c- nf>var</c-><c- p>(</c->--prop1<c- p>)</c-> <c- nf>var</c-><c- p>(</c->--prop1<c- p>);</c->
+  <c- k>--prop3</c-><c- p>:</c-> <c- nf>var</c-><c- p>(</c->--prop2<c- p>)</c-> <c- nf>var</c-><c- p>(</c->--prop2<c- p>);</c->
+  <c- k>--prop4</c-><c- p>:</c-> <c- nf>var</c-><c- p>(</c->--prop3<c- p>)</c-> <c- nf>var</c-><c- p>(</c->--prop3<c- p>);</c->
+  <c- c>/* etc */</c->
+<c- p>}</c->
+</pre>
+    <p>In this short example, <span class="css">--prop4</span>’s computed value is <span class="css">lol lol lol lol lol lol lol lol</span>,
+		containing 8 copies of the original <span class="css">lol</span>.
+		Every additional level added to this doubles the number of identifiers;
+		extending it to a mere 30 levels,
+		the work of a few minutes by hand,
+		would make <span class="css">--prop30</span> contain <em>nearly a billion instances</em> of the identifier.</p>
+   </div>
+   <p>To avoid this sort of attack,
+	UAs must impose a UA-defined limit on the allowed length of the token stream
+	that a <a class="css" data-link-type="maybe" href="#funcdef-var" id="ref-for-funcdef-var④⑤">var()</a> function expands into.
+	If a <span class="css" id="ref-for-funcdef-var④⑥">var()</span> would expand into a longer token stream than this limit,
+	it instead makes the property it’s expanding into <a data-link-type="dfn" href="#invalid-at-computed-value-time" id="ref-for-invalid-at-computed-value-time⑤">invalid at computed-value time</a>.</p>
+   <p>This specification does not define what size limit should be imposed.
+	However, since there are valid use-cases for custom properties that contain a kilobyte or more of text,
+	it’s recommended that the limit be set relatively high.</p>
+   <p class="note" role="note"><span>Note:</span> The general principle that UAs are allowed to violate standards due to resource constraints
+	is still generally true here;
+	a UA might, separately, have limits on how long of a custom property they can support,
+	or how large of an identifier they can support.
+	This section calls out this attack specifically
+	because of its long history,
+	and the fact that it can be done without any of the pieces <em>seeming</em> to be too large on first inspection.</p>
    <h2 class="heading settled" data-level="4" id="apis"><span class="secno">4. </span><span class="content"> APIs</span><a class="self-link" href="#apis"></a></h2>
    <p>All <a data-link-type="dfn" href="#custom-property" id="ref-for-custom-property③①">custom property</a> <a data-link-type="dfn" href="https://drafts.csswg.org/cssom-1/#cssstyledeclaration-declarations" id="ref-for-cssstyledeclaration-declarations">declarations</a> have the <a data-link-type="dfn" href="https://drafts.csswg.org/cssom-1/#css-declaration-case-sensitive-flag" id="ref-for-css-declaration-case-sensitive-flag">case-sensitive flag</a> set.</p>
    <p class="note" role="note"><span>Note:</span> Custom properties do not appear on a CSSStyleDeclaration object in camel-cased form,
@@ -859,7 +894,7 @@ three { --foo: calc(var(--bar) + 10px); }
     <li data-md>
      <p>Added example of using variables with <a class="css" data-link-type="maybe" href="https://drafts.csswg.org/selectors-4/#lang-pseudo" id="ref-for-lang-pseudo">:lang()</a> to do simple i18n.</p>
     <li data-md>
-     <p>Clarified that usage of <a class="css" data-link-type="maybe" href="#funcdef-var" id="ref-for-funcdef-var④④">var()</a> in a custom property must be valid per the <span class="css" id="ref-for-funcdef-var④⑤">var()</span> grammar.</p>
+     <p>Clarified that usage of <a class="css" data-link-type="maybe" href="#funcdef-var" id="ref-for-funcdef-var④⑦">var()</a> in a custom property must be valid per the <span class="css" id="ref-for-funcdef-var④⑧">var()</span> grammar.</p>
    </ul>
    <h2 class="heading settled" data-level="6" id="acks"><span class="secno">6. </span><span class="content"> Acknowledgments</span><a class="self-link" href="#acks"></a></h2>
    <p> Many thanks to several people in the CSS Working Group for keeping the dream of variables alive over the years,
@@ -872,8 +907,12 @@ three { --foo: calc(var(--bar) + 10px); }
 		Roland Steiner,
 		and Shane Stephens. </p>
    <h2 class="heading settled" data-level="7" id="priv-sec"><span class="secno">7. </span><span class="content">Privacy and Security Considerations</span><a class="self-link" href="#priv-sec"></a></h2>
-   <p>This specification defines a purely author-level mechanism for passing styling information around within a page they control.</p>
-   <p>As such, there are no new privacy or security considerations.</p>
+   <p>This specification defines a purely author-level mechanism for passing styling information around within a page they control.
+As such, there are no new privacy considerations.</p>
+   <p><a href="#long-variables">§3.3 Safely Handling Overly-Long Variables</a> calls out a long-standing Denial-of-Service attack
+that can be mounted against "macro-expansion"-like mechanisms,
+such as the <a class="css" data-link-type="maybe" href="#funcdef-var" id="ref-for-funcdef-var④⑨">var()</a> function,
+and mandates a defense against that attack.</p>
   </main>
   <h2 class="no-ref no-num heading settled" id="conformance"><span class="content"> Conformance</span><a class="self-link" href="#conformance"></a></h2>
   <h3 class="heading settled" id="document-conventions"><span class="content"> Document conventions</span><a class="self-link" href="#document-conventions"></a></h3>
@@ -1428,8 +1467,11 @@ Using Cascading Variables: the var() notation</a> <a href="#ref-for-funcdef-var�
 Invalid Variables</a> <a href="#ref-for-funcdef-var③⑤">(2)</a> <a href="#ref-for-funcdef-var③⑥">(3)</a> <a href="#ref-for-funcdef-var③⑦">(4)</a>
     <li><a href="#ref-for-funcdef-var③⑧">3.2. 
 Variables in Shorthand Properties</a> <a href="#ref-for-funcdef-var③⑨">(2)</a> <a href="#ref-for-funcdef-var④⓪">(3)</a> <a href="#ref-for-funcdef-var④①">(4)</a> <a href="#ref-for-funcdef-var④②">(5)</a> <a href="#ref-for-funcdef-var④③">(6)</a>
-    <li><a href="#ref-for-funcdef-var④④">5. 
-Changes since the May 6 2014 Last Call Working Draft</a> <a href="#ref-for-funcdef-var④⑤">(2)</a>
+    <li><a href="#ref-for-funcdef-var④④">3.3. 
+Safely Handling Overly-Long Variables</a> <a href="#ref-for-funcdef-var④⑤">(2)</a> <a href="#ref-for-funcdef-var④⑥">(3)</a>
+    <li><a href="#ref-for-funcdef-var④⑦">5. 
+Changes since the May 6 2014 Last Call Working Draft</a> <a href="#ref-for-funcdef-var④⑧">(2)</a>
+    <li><a href="#ref-for-funcdef-var④⑨">7. Privacy and Security Considerations</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="substitute-a-var">
@@ -1448,6 +1490,8 @@ Using Cascading Variables: the var() notation</a> <a href="#ref-for-substitute-a
 Using Cascading Variables: the var() notation</a> <a href="#ref-for-invalid-at-computed-value-time①">(2)</a> <a href="#ref-for-invalid-at-computed-value-time②">(3)</a>
     <li><a href="#ref-for-invalid-at-computed-value-time③">3.1. 
 Invalid Variables</a> <a href="#ref-for-invalid-at-computed-value-time④">(2)</a>
+    <li><a href="#ref-for-invalid-at-computed-value-time⑤">3.3. 
+Safely Handling Overly-Long Variables</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="pending-substitution-value">

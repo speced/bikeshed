@@ -10,9 +10,9 @@ Abstract: Defines an API and markup for creating animations that are either
           triggered by or tied to the scroll offset of a scroll container.
 Editor: Brian Birtles <bbirtles@mozilla.com>
 Editor: Botond Ballo <botond@mozilla.com>
-Editor: Mantaroh Yoshinaga <mantaroh@mozilla.com>
 Editor: Stephen McGruer <smcgruer@google.com>
 Editor: Antoine Quint <graouts@apple.com>
+Former editor: Mantaroh Yoshinaga
 !Issue Tracking: <a href="https://github.com/WICG/scroll-animations/issues">GitHub Issues</a>
 </pre>
 <pre class=anchors>
@@ -27,6 +27,8 @@ urlPrefix: https://w3c.github.io/web-animations/; type: dfn; spec: web-animation
     text: timeline
 urlPrefix: https://drafts.csswg.org/cssom-view/; type: dfn; spec: cssom-view-1
     text: CSS layout box
+urlPrefix: https://html.spec.whatwg.org/multipage/browsers.html; type: dfn; spec: html
+    text: document associated with a window; url: concept-document-window
 </pre>
 <pre class=link-defaults>
 spec:html; type:dfn; for:/; text:browsing context
@@ -117,12 +119,12 @@ alt="Use case: A navigation highlight effect.">
 </figure>
 
 Advisement: The proposal does not yet define CSS markup or programming
-            interfaces to express this use ase.
+            interfaces to express this use case.
 
 ## Scroll-triggered style changes ## {#scroll-triggered-style-changes-usecase}
 
 Advisement: The proposal does not yet define CSS markup or programming
-            interfaces to express this use ase.
+            interfaces to express this use case.
 
 
 ## Scroll-linked animations ## {#scroll-linked-animations-usecase}
@@ -155,53 +157,57 @@ alt="Use case: The picture-story show.">
 Using the CSS markup:
 
 <pre class='lang-css'>
-div.circle {
-  animation-duration: 1s;
-  animation-timing-function: linear;
-  animation-timeline: scroll(element(#container), vertical, "200px", "300px");
-}
-#left-circle {
-  animation-name: left-circle;
-}
-#right-circle {
-  animation-name: right-circle;
-}
-#union-circle {
-  animation-name: union-circle;
-  animation-timeline: scroll(element(#container), vertical, "250px", "300px");
-}
-@keyframes left-circle {
-  to { transform: translate(300px) }
-}
-@keyframes right-circle {
-  to { transform: translate(350px) }
-}
-@keyframes union-circle {
-  to { opacity: 1 }
+@media (prefers-reduced-motion: no-preference) {
+  div.circle {
+    animation-duration: 1s;
+    animation-timing-function: linear;
+    animation-timeline: scroll(element(#container), vertical, "200px", "300px");
+  }
+  #left-circle {
+    animation-name: left-circle;
+  }
+  #right-circle {
+    animation-name: right-circle;
+  }
+  #union-circle {
+    animation-name: union-circle;
+    animation-timeline: scroll(element(#container), vertical, "250px", "300px");
+  }
+  @keyframes left-circle {
+    to { transform: translate(300px) }
+  }
+  @keyframes right-circle {
+    to { transform: translate(350px) }
+  }
+  @keyframes union-circle {
+    to { opacity: 1 }
+  }
 }
 </pre>
 
 Using the programming interface, we might write this as:
 
 <pre class='lang-javascript'>
-var circleTimeline = new ScrollTimeline({
-  scrollSource: scrollableElement,
-  scrollOffset: '200px',
-  endScrollOffset: '300px'
-});
+if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+  var circleTimeline = new ScrollTimeline({
+    scrollSource: scrollableElement,
+    scrollOffset: '200px',
+    endScrollOffset: '300px'
+  });
 
-var left = leftCircle.animate({ transform: 'translate(300px)' }, 1000);
-left.timeline = circleTimeline;
+  var left = leftCircle.animate({ transform: 'translate(300px)' }, 1000);
+  left.timeline = circleTimeline;
 
-var right = leftCircle.animate({ transform: 'translate(350px)' }, 1000);
-right.timeline = circleTimeline;
+  var right = leftCircle.animate({ transform: 'translate(350px)' }, 1000);
+  right.timeline = circleTimeline;
 
-var union = unionCircle.animate({ opacity: 1 }, 1000);
-union.timeline = new ScrollTimeline({
-  scrollSource: scrollableElement,
-  startScrollOffset: '250px',
-  endScrollOffset: '300px'
-});
+  var union = unionCircle.animate({ opacity: 1 }, 1000);
+  union.timeline = new ScrollTimeline({
+    scrollSource: scrollableElement,
+    startScrollOffset: '250px',
+    endScrollOffset: '300px'
+  });
+}
 </pre>
 
 ### The content progress bar ### {#content-progress-bar-usecase}
@@ -229,25 +235,29 @@ Using the 'animation-timeline' property, this example could be written
 as follows:
 
 <pre class='lang-css'>
-@keyframes progress {
-  to { width: 100%; }
-}
-#progress {
-  width: 0px;
-  height: 30px;
-  background: red;
-  animation: progress 1s linear;
-  animation-timeline: scroll(element(#body));
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes progress {
+    to { width: 100%; }
+  }
+  #progress {
+    width: 0px;
+    height: 30px;
+    background: red;
+    animation: progress 1s linear;
+    animation-timeline: scroll(element(#body));
+  }
 }
 </pre>
 
 If we use this API for this case, the example code will be as follow:
 
 <pre class='lang-javascript'>
+if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
   var animation = div.animate({ width: '100%' }, 1000);
   animation.timeline = new ScrollTimeline(
     { startScrollOffset: '0px' }
   );
+}
 </pre>
 
 ## Combination scroll and time-base animations ## {#combination-scroll-and-time-base-animations-usecase}
@@ -274,8 +284,9 @@ alt="Use case 4: Scrollable slide show.">
 
 This content can't build the CSS only.
 <pre class='lang-javascript'>
+if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
   var animation = slideTarget.getAnimation()[0];
-  var scrollTimeline = new ScrollTimeline({ 
+  var scrollTimeline = new ScrollTimeline({
     scrollSource: scrollableElement,
     orientation: "vertical",
     scrollOffset: '0px',
@@ -291,6 +302,7 @@ This content can't build the CSS only.
       animation.timeline = scrollTimeline;
     }
   });
+}
 </pre>
 -->
 
@@ -304,7 +316,6 @@ This content can't build the CSS only.
 
 <pre class="idl">
 enum ScrollDirection {
-  "auto",
   "block",
   "inline",
   "horizontal",
@@ -314,11 +325,6 @@ enum ScrollDirection {
 
 The {{ScrollDirection}} enumeration specifies a direction of scroll of a
 scrollable element.
-
-:   <code>auto</code>
-::  If only one direction is scrollable, selects that direction.
-    Otherwise selects the direction along the [=block axis=], conforming to
-    writing mode and directionality.
 
 :   <code>block</code>
 ::  Selects the direction along the [=block axis=], conforming to writing mode
@@ -341,31 +347,22 @@ directions allows web developers to animate both logical (e.g.
 margin-inline-start) and physical (e.g. transform) properties with good
 behavior under different directionalities and writing modes.
 
-<div class="issue">
-
-What about a value that means, "the longest scroll direction"? That would be
-more reliable than "auto" for the case where layout differences could mean that,
-although normally you only expect the block direction to be scrollable, on
-some devices you end up with a small scrollable range in the inline direction
-too.
-
-</div>
-
 ### The {{ScrollTimeline}} interface ### {#scrolltimeline-interface}
 
 <pre class="idl">
 enum ScrollTimelineAutoKeyword { "auto" };
 
 dictionary ScrollTimelineOptions {
-  Element scrollSource;
-  ScrollDirection orientation = "auto";
+  Element? scrollSource = null;
+  ScrollDirection orientation = "block";
   DOMString startScrollOffset = "auto";
   DOMString endScrollOffset = "auto";
   (double or ScrollTimelineAutoKeyword) timeRange = "auto";
   FillMode fill = "none";
 };
 
-[Constructor(optional ScrollTimelineOptions options)]
+[Exposed=Window,
+ Constructor(optional ScrollTimelineOptions options)]
 interface ScrollTimeline : AnimationTimeline {
   readonly attribute Element scrollSource;
   readonly attribute ScrollDirection orientation;
@@ -384,8 +381,23 @@ not by wall-clock time, but by the progress of scrolling in a [=scroll container
 <div class="constructors">
 
 :   <dfn constructor for=ScrollTimeline lt="ScrollTimeline(options)">ScrollTimeline(options)</dfn>
-::  Creates a new {{ScrollTimeline}} object. The attributes of the {{ScrollTimeline}} are 
-    initialized with the respective members of the {{options}} dictionary.
+::  Creates a new {{ScrollTimeline}} object using the following procedure:
+
+    1. Let |timeline| be a new {{ScrollTimeline}} object.
+
+    1. Let |source| be the result corresponding to the first matching condition from below.
+
+        : If the |scrollSource| value of |options| is non-null,
+        :: Let |source| be |scrollSource|
+
+        : Otherwise (|scrollSource| is null):
+        :: Let |source| be the {{scrollingElement}} of the {{Document}} <a lt="document associated with a window">associated</a> with the {{Window}} that is the <a>current global object</a>.
+
+        Note: |source| may still be null after this step, e.g. if the {{Document}} has no {{scrollingElement}}.
+
+    1. Set the {{ScrollTimeline/scrollSource}} of |timeline| to |source|.
+
+    1. Assign the {{ScrollTimeline/orientation}}, {{ScrollTimeline/startScrollOffset}}, {{ScrollTimeline/endScrollOffset}}, {{ScrollTimeline/timeRange}}, and {{ScrollTimeline/fill}} properties of |timeline| to the corresponding value from |options|.
 
 </div>
 
@@ -394,14 +406,6 @@ not by wall-clock time, but by the progress of scrolling in a [=scroll container
 :   <dfn attribute for=ScrollTimeline>scrollSource</dfn>
 ::  The scrollable element whose scrolling triggers the activation and drives the
     progress of the timeline.
-
-    If this is not specified, the document element of the [=active document=] for the
-    current [=browsing context=], as determined at the time the {{ScrollTimeline}} is
-    constructed, is used.
-
-    Note that the {{scrollSource}}'s {{ownerDocument}} may change over the lifetime
-    of the scroll timeline. This does not affect the scroll timeline; the timeline
-    continues to be driven by the scroll progress of the {{scrollSource}}.
 
 :   <dfn attribute for=ScrollTimeline>orientation</dfn>
 ::  Determines the direction of scrolling which triggers the activation and drives
@@ -466,31 +470,31 @@ not by wall-clock time, but by the progress of scrolling in a [=scroll container
 
     :   none
     ::  The timeline is inactive when the scroll offset is less than {{startScrollOffset}} 
-        or greater than {{endScrollOffset}}.
+        or greater than or equal to {{endScrollOffset}}.
 
     :   forwards
     ::  When the scroll offset is less than {{startScrollOffset}}, the
-        timeline's [=current time=] is 0.
-        When the scroll offset is greater than {{endScrollOffset}}, the
         timeline is inactive.
+        When the scroll offset is greater than or equal to the
+        {{endScrollOffset}}, the timeline's [=current time=] is its
+        [=effective time range=].
 
     :   backwards
     ::  When the scroll offset is less than {{startScrollOffset}}, the
-        timeline is inactive.
-        When the scroll offset is greater than {{endScrollOffset}}, the
-        timeline's [=current time=] is its 
-        [=effective time range=].
+        timeline's [=current time=] is 0.
+        When the scroll offset is greater than or equal to the
+        {{endScrollOffset}}, the timeline is inactive.
 
     :   both
     ::  When the scroll offset is less than {{startScrollOffset}}, the
         timeline's [=current time=] is 0.
-        When the scroll offset is greater than {{endScrollOffset}}, the
-        timeline's [=current time=] is its 
+        When the scroll offset is greater than or equal to the
+        {{endScrollOffset}}, the timeline's [=current time=] is its
         [=effective time range=].
 
     :   auto
     ::  Behaves the same as <code>both</code>.
-        
+
 </div>
 
 ### The effective time range of a {{ScrollTimeline}} ### {#efffective-time-range-algorithm}
@@ -519,21 +523,33 @@ The <dfn>effective time range</dfn> of a {{ScrollTimeline}} is calculated as fol
 The [=current time=] of a {{ScrollTimeline}} is calculated
 as follows:
 
-1.  If {{scrollSource}} does not currently have a [=CSS layout box=], or if its layout box is not
-    a [=scroll container=], return an unresolved time value.
+1.  If {{scrollSource}} is null, does not currently have a [=CSS layout box=], or
+    if its layout box is not a [=scroll container=], return an unresolved time value.
 
-2.  Otherwise, let <var>current scroll offset</var> be the current scroll offset of {{scrollSource}}
+1.  Otherwise, let <var>current scroll offset</var> be the current scroll offset of {{scrollSource}}
     in the direction specified by {{orientation}}.
 
-3.  If <var>current scroll offset</var> is less than {{startScrollOffset}}, return an unresolved
-    time value if {{fill}} is <code>none</code> or <code>forwards</code>, 
-    or 0 otherwise.
+1.  If <var>current scroll offset</var> is less than {{startScrollOffset}}, return an unresolved
+    time value if {{fill}} is <code>none</code> or <code>forwards</code>, or 0 otherwise.
 
-4.  If <var>current scroll offset</var> is greater than or equal to {{endScrollOffset}}, 
-    return an unresolved time value if {{fill}} is <code>none</code> or
-    <code>backwards</code>, or the [=effective time range=] otherwise.
+1.  If <var>current scroll offset</var> is greater than or equal to {{endScrollOffset}} then:
+    <div class="switch">
 
-5.  Return the result of evaluating the following expression:
+    : If {{endScrollOffset}} is less than the maximum scroll offset of {{scrollSource}} in
+        {{orientation}} and {{fill}} is <code>none</code> or <code>backwards</code>,
+
+    :: return an unresolved time value.
+
+    : Otherwise,
+
+    :: return the [=effective time range=].
+
+    </div>
+
+    Note: Checking for {{endScrollOffset}} being the maximum scroll offset ensures that the common
+    case of a 'whole scroller' ScrollTimeline does not become inactive when you scroll to the end.
+
+1.  Return the result of evaluating the following expression:
 
     <blockquote>
       <code>(<var>current scroll offset</var> - {{startScrollOffset}}) / ({{endScrollOffset}} - {{startScrollOffset}}) &times; [=effective time range=]</code>
@@ -613,51 +629,55 @@ following effects:
     }
   </pre>
   <pre class="lang-javascript">
-    let progress = document.getElementById("progress");
-    let effect = new KeyframeEffect(
-      progress,
-      [
-        { width: "0vw" },
-        { width: "100vw" }
-      ],
-      {
-        duration: 1000,
-        easing: "linear"
+    if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+      let progress = document.getElementById("progress");
+      let effect = new KeyframeEffect(
+        progress,
+        [
+          { width: "0vw" },
+          { width: "100vw" }
+        ],
+        {
+          duration: 1000,
+          easing: "linear"
+        });
+      let timeline = new ScrollTimeline({
+        trigger: new ScrollTrigger({
+          scrollSource: document.documentElement,
+          orientation: "vertical",
+          kind: "range"
+        });
       });
-    let timeline = new ScrollTimeline({
-      trigger: new ScrollTrigger({
-        scrollSource: document.documentElement,
-        orientation: "vertical",
-        kind: "range"
-      })      
-    });
-    let animation = new Animation(effect, timeline);
-    animation.play();
+      let animation = new Animation(effect, timeline);
+      animation.play();
+    }
   </pre>
 </div>
 
 <div class="example">
   The same thing with CSS, using 'animation-timeline'
   <pre class="lang-css">
-    @keyframes progress {
-      from {
-        width: 0vw;
+    @media (prefers-reduced-motion: no-preference) {
+      @keyframes progress {
+        from {
+          width: 0vw;
+        }
+        to {
+          width: 100vw;
+        }
       }
-      to {
-        width: 100vw;
+      #progress {
+        position: fixed;
+        top: 0;
+        width: 0;
+        height: 2px;
+        background-color: red;
+        animation-name: progress;
+        animation-duration: 1s;
+        animation-timing-function: linear;
+        /* Assume the HTML element has id 'root' */
+        animation-timeline: scroll(element(#root), vertical);
       }
-    }
-    #progress {
-      position: fixed;
-      top: 0;
-      width: 0;
-      height: 2px;
-      background-color: red;
-      animation-name: progress;
-      animation-duration: 1s;
-      animation-timing-function: linear;
-      /* Assume the HTML element has id 'root' */
-      animation-timeline: scroll(element(#root), vertical);
     }
   </pre>
 </div>
@@ -723,3 +743,87 @@ it for transitions, so this feature was removed.
 
 The design space for triggering animations is still open. We welcome input
 on this subject.
+
+<h2 id="appendix-a-considerations-for-security-and-privacy">Appendix A. Considerations for Security and Privacy</h2>
+
+This appendix is <em>informative</em>.
+
+There are no known security or privacy impacts of this feature.
+
+The W3C TAG is developing a
+<a href="https://www.w3.org/TR/security-privacy-questionnaire/">Self-Review Questionnaire: Security and Privacy</a>
+for editors of specifications to informatively answer.
+
+Per the <a href="https://www.w3.org/TR/security-privacy-questionnaire/#questions">Questions to Consider</a>
+
+<ol>
+<li>Does this specification deal with personally-identifiable information?
+<p>No.</p>
+</li>
+
+<li>Does this specification deal with high-value data?
+<p>No.</p>
+</li>
+
+<li>Does this specification introduce new state for an origin that persists across browsing sessions?
+<p>No.</p>
+</li>
+
+<li>Does this specification expose persistent, cross-origin state to the web?
+<p>No.</p>
+</li>
+
+<li>Does this specification expose any other data to an origin that it doesn’t currently have access to?
+<p>No.</p>
+</li>
+
+<li>Does this specification enable new script execution/loading mechanisms?
+<p>No.</p>
+</li>
+
+<li>Does this specification allow an origin access to a user’s location?
+<p>No.</p>
+</li>
+
+<li>Does this specification allow an origin access to sensors on a user’s device?
+<p>No.</p>
+</li>
+
+<li>Does this specification allow an origin access to aspects of a user’s local computing environment?
+<p>No.</p>
+</li>
+
+<li>Does this specification allow an origin access to other devices?
+<p>No.</p>
+</li>
+
+<li>Does this specification allow an origin some measure of control over a user agent’s native UI?
+<p>No.</p>
+</li>
+
+<li>Does this specification expose temporary identifiers to the web?
+<p>No.</p>
+</li>
+
+<li>Does this specification distinguish between behavior in first-party and third-party contexts?
+<p>No.</p>
+</li>
+
+<li>How should this specification work in the context of a user agent’s "incognito" mode?
+<p>No differently. The website should not be able to determine that the user is
+in an "incognito" mode using scroll-linked animations.</p>
+</li>
+
+<li>Does this specification persist data to a user’s local device?
+<p>No.</p>
+</li>
+
+<li>Does this specification have a "Security Considerations" and "Privacy Considerations" section?
+<p>Yes.</p>
+</li>
+
+<li>Does this specification allow downgrading default security characteristics?
+<p>No.</p>
+</li>
+</ol>
+

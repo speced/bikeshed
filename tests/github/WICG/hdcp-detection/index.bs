@@ -1,0 +1,208 @@
+<pre class='metadata'>
+Title: Encrypted Media: HDCP Policy Check
+Repository: wicg/hdcp-detection
+Status: CG-DRAFT
+ED: https://wicg.github.io/hdcp-detection/
+Shortname: hdcp-detection
+Level: 1
+Group: wicg
+Editor: Mounir Lamouri, w3cid 45389, Google Inc. https://google.com/
+Editor: Joey Parrish, Google Inc. https://google.com/
+
+Abstract: This specification intends to provide an extension to the W3C
+Abstract: Encrypted Media Extension specification. The API will allow authors
+Abstract: to query the policies that the CDM is able to enforce before
+Abstract: requesting a key.
+
+!Participate: <a href='https://github.com/wicg/hdcp-detection'>Git Repository.</a>
+!Participate: <a href='https://github.com/wicg/hdcp-detection/issues/new'>File an issue.</a>
+!Version History: <a href='https://github.com/wicg/hdcp-detection/commits'>https://github.com/wicg/hdcp-detection/commits</a>
+</pre>
+
+<pre class='anchors'>
+spec: webidl; urlPrefix: https://heycam.github.io/webidl/
+    type: dfn
+        text: member; url: #dfn-dictionary-member
+        text: present; url: #dfn-present
+
+spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/
+    type: interface
+        text: TypeError; url: #sec-native-error-types-used-in-this-standard-typeerror
+
+spec: encrypted-media; for: EME; urlPrefix: https://www.w3.org/TR/encrypted-media/
+    type: interface
+        text: MediaKeys; url: #mediakeys-interface
+        text: MediaKeyStatus; url: #dom-mediakeystatus
+        text: output-restricted; url: #idl-def-MediaKeyStatus.output-restricted
+        text: usable; url: #idl-def-MediaKeyStatus.usable
+
+</pre>
+
+<!--
+<pre class='biblio'>
+</pre>
+-->
+
+<section>
+  <h2 id='mediakeys-policies'>
+    MediaKeys Policies
+  </h2>
+
+  <section>
+    <h3 id='mediakeyspolicy'>
+      MediaKeysPolicy Dictionary
+    </h3>
+
+    <pre class='idl'>
+      dictionary MediaKeysPolicy {
+        HDCPVersion minHdcpVersion;
+      };
+    </pre>
+
+    <p>
+      The {{MediaKeysPolicy}} dictionary is an object consisting of only
+      optional properties. Each property represents a <dfn>policy requirement</dfn>.
+    </p>
+
+    <p>
+      A <a>policy requirement</a> is said to be <dfn>fulfilled</dfn> if the
+      system matches the requirements. The exact requirements to match each
+      <a>policy requirement</a> are defined below.
+    </p>
+  </section>
+
+  <section>
+    <h3 id='hdcp-policy'>
+      HDCP Policy
+    </h3>
+
+    <p class='issue'>
+      Using an enum as a shorthand. The final result will be similar in
+      behaviour (TypeError) but may be based on a registry so the list can be
+      updated without updating this document.
+    </p>
+
+    <pre class='idl'>
+      enum HDCPVersion {
+        "1.0",
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "2.0",
+        "2.1",
+        "2.2",
+        "2.3",
+      };
+    </pre>
+
+    <p>
+      The HDCP Policy is represented by the {{minHdcpVersion}}. When set, the
+      <a>policy requirement</a> will be <a>fulfilled</a> if the system supports
+      {{minHdcpVersion}} on the current display.
+    </p>
+
+  </section>
+</section>
+
+<section>
+  <h2 id='mediakeys-extensions'>MediaKeys extension</h2>
+
+  <pre class='idl'>
+    [SecureContext, Exposed=Window]
+    partial interface MediaKeys {
+      [NewObject] Promise&lt;MediaKeyStatus&gt; getStatusForPolicy(optional MediaKeysPolicy policy);
+    };
+  </pre>
+
+  <p>
+    The {{getStatusForPolicy}} method MUST run the following steps:
+      <ol>
+        <li>
+          If <var>policy</var> has no <a>present</a> <a>member</a>, return a
+          Promise rejected with a newly created {{TypeError}}.
+        </li>
+        <li>
+          Let <var>p</var> be a new Promise.
+        </li>
+        <li>
+          For each <a>member</a> of <var>policy</var>, run the following steps:
+          <ol>
+            <li>
+              If the <a>policy requirement</a> associated with the <a>member</a>
+              is not <a>fulfilled</a>, resolve <var>p</var> with
+              {{output-restricted}} and abort these steps.
+            </li>
+          </ol>
+        </li>
+        <li>
+          Resolve <var>p</var> with {{usable}}.
+        </li>
+      </ol>
+  </p>
+</section>
+
+<section class='non-normative'>
+  <h2 id='security-privacy-considerations'>
+    Security and Privacy Considerations
+  </h2>
+
+  <section>
+    <p>
+      This specification does not introduce any security-sensitive information
+      or APIs but it provides an easier access to some information.
+    </p>
+
+    <section>
+      <h3 id='fingerprinting'>
+        Fingerprinting
+      </h3>
+
+      <p>
+        The API offers access to some information that can already be accessed
+        by the page through the CDM. This information does not increase the
+        fingerprint surface but can make it simpler for a website to fingerprint
+        its users as the information is easier to access and no longer requires
+        getting a key from the CDM.
+      </p>
+
+      <p>
+        The information added by this API, regardless of whether or not it is
+        accessible in other ways does not increase the entropy for
+        fingerprinting much as HDCP is widely available on most operating
+        systems and displays.
+      </p>
+    </section>
+
+    <section>
+      <h3 id='user-consent'>
+        User Consent
+      </h3>
+
+      <p>
+        The fingerprinting concerns are mitigated by the fact that the API is
+        only accessible after <code>requestMediaKeySystemAccess()</code> was
+        called which may require user consent. UAs that would require user
+        consent in order to access the CDM will therefore require user consent
+        to access this API.
+      </p>
+  </section>
+</section>
+
+<section>
+  <h2 id='examples'>Examples</h2>
+
+  <div class="example" highlight="javascript">
+    <pre>
+      video.mediaKeys.getStatusForPolicy({
+        minHdcpVersion: '1.0'
+      }).then(status => {
+        if (status === 'usable') {
+          // Pre-fetch HD content.
+        } else {  // such as 'output-restricted' or 'output-downscaled'
+          // Pre-fetch SD content.
+        }
+      });
+    </pre>
+  </div>
+</section>

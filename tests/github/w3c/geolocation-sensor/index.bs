@@ -4,10 +4,13 @@ Level: none
 Status: ED
 ED: https://w3c.github.io/geolocation-sensor/
 TR: https://www.w3.org/TR/geolocation-sensor/
+Previous Version: https://www.w3.org/TR/2018/WD-geolocation-sensor-20180821/
 Shortname: geolocation-sensor
 Editor: Anssi Kostiainen 41974, Intel Corporation, https://intel.com/
 Editor: Thomas Steiner 44965, Google Inc., https://google.com/
+Editor: Marijn Kruisselbrink, Google Inc., https://google.com/
 Group: dap
+Status Text: <p class="note" role="note"><span>Note:</span> The work on the Geolocation API [[GEOLOCATION-API]] has been concluded, and as such, any new feature development is happening in this Geolocation Sensor specification. The two specifications are expected to coexist.</p>
 Abstract:
   This specification defines the {{GeolocationSensor}} interface for obtaining
   the [=geolocation=] of the hosting device.
@@ -35,6 +38,9 @@ urlPrefix: https://w3c.github.io/sensors; spec: GENERIC-SENSOR
     text: security and privacy; url: security-and-privacy
     text: extensible; url: extensibility
     text: check sensor policy-controlled features; url: check-sensor-policy-controlled-features
+    text: automation
+    text: mock sensor type
+    text: mock sensor reading values
 urlPrefix: https://dom.spec.whatwg.org; spec: DOM
   type: dfn
     text: add the following abort steps; url: abortsignal-add
@@ -66,7 +72,7 @@ information about the [=geolocation=] of the hosting device.
 
 The feature set of the {{GeolocationSensor}} is similar to that of the Geolocation API
 [[GEOLOCATION-API]], but it is surfaced through a modern API that is consistent across
-<a href="https://www.w3.org/2009/dap/#sensors">contemporary sensor APIs</a>, improves
+<a href="https://www.w3.org/das/roadmap">contemporary sensor APIs</a>, improves
 <a>security and privacy</a>, and is <a>extensible</a>. The API aims to be
 <a href="https://github.com/kenchris/sensor-polyfills/blob/master/src/geolocation-sensor.js">polyfillable</a>
 (<a href="https://kenchris.github.io/sensor-polyfills/run-geolocation.html">example</a>)
@@ -137,7 +143,9 @@ The GeolocationSensor Interface {#geolocationsensor-interface}
 -------------------------------
 
 <pre class="idl">
-  [Constructor(optional GeolocationSensorOptions options), SecureContext, Exposed=Window]
+  [Constructor(optional GeolocationSensorOptions options),
+   SecureContext,
+   Exposed=(DedicatedWorker, Window)]
   interface GeolocationSensor : Sensor {
     static Promise&lt;GeolocationSensorReading&gt; read(optional ReadOptions readOptions);
     readonly attribute unrestricted double? latitude;
@@ -211,7 +219,7 @@ The {{GeolocationSensor/read()}} method, when called, must run the following alg
       1. Reject |p| with an "{{AbortError!!exception}}" {{DOMException}} and abort these steps.
     1. Run these steps <a>in parallel</a>:
       1. If <a>notify error</a> is invoked with |geo|, invoke |geo|.{{Sensor/stop()}}, and reject |p| with the {{DOMException}} passed as input to <a>notify error</a>.
-      1. If <a>notify new reading</a> is invoked with |geo|, then <a>resolve geolocation promise</a> with |geo| and |p|.
+      1. If <a>notify new reading</a> is invoked with |geo|, then <a>resolve a geolocation promise</a> with |geo| and |p|.
     1. Return |p|.
 </div>
 
@@ -300,6 +308,165 @@ Abstract Operations {#abstract-operations}
     1.  Invoke [=initialize a sensor object=] with |geo| and |options|.
     1.  Return |geo|.
 </div>
+
+Automation {#automation}
+==========
+This section extends the [=automation=] section defined in the Generic Sensor API [[GENERIC-SENSOR]]
+to provide mocking information about the [=geolocation=] of the hosting device for the purposes of
+testing a user agent's implementation of {{GeolocationSensor}} API.
+
+<h3 id="mock-geolocation-sensor-type">Mock Sensor Type</h3>
+
+The {{GeolocationSensor}} class has an associated [=mock sensor type=] which is
+<a for="MockSensorType" enum-value>"geolocation"</a>, its [=mock sensor reading values=]
+dictionary is defined as follows:
+
+<pre class="idl">
+  dictionary GeolocationReadingValues {
+    required double? latitude;
+    required double? longitude;
+    required double? altitude;
+    required double? accuracy;
+    required double? altitudeAccuracy;
+    required double? heading;
+    required double? speed;
+  };
+</pre>
+
+Use Cases {#use-cases}
+=========
+
+## Categorization of use cases ## {#use-cases-categorization}
+
+The mentioned use cases can roughly be grouped into four categories:
+
+* **Foreground** operations:
+  * Getting a **one-off geolocation update**.
+  * Getting **continuous geolocation updates** (*aka.* foreground geotracking).
+* **Background** operations:
+  * Getting **continuous geolocation updates** (*aka.* background geotracking).
+  * Getting a **one-off geolocation fence alert** (*aka.* background geofencing).
+
+Note: Only the **foreground operations** were possible with [[GEOLOCATION-API]],
+the **background operations** are completely novel.
+
+Core constraints when obtaining the gelocation are **accuracy** (*how close to the
+actual position of the user is the determined position*) and **latency**
+(*how long does the user want to wait for a result*). Both are tradeoffs:
+one can trade faster results for lower accuracy and vice versa.
+
+A common theme is to first obtain a rough estimation that then gets refined over time,
+for example based initially on surrounding WiFi signals (which is fast to obtain)
+and then eventually based on precise GPS data (which may take some time to find a signal).
+
+In the following, we list use cases based on the previously defined categories.
+
+Note: The categories are not mutually exclusive and overlaps exist.
+A task might start in the foreground, then continue in the background (for example,
+while the user quickly responds to an incoming email),
+and then eventually terminate in the foreground when the user multitasks back.
+
+## Foreground—One-off geolocation update ## {#use-cases-foreground-one-off}
+
+### Locate a user on a map ### {#use-case-locate-a-user-on-a-map}
+
+A mapping application can use the Geolocation Sensor API data of a user to locate them
+on the map, essentially responding to the question "Where am I right now?"
+
+### Find points of interest in the user's area ### {#use-case-find-points-of-interest-in-the-users-area}
+
+Someone visiting a foreign city could access a web application that allows users
+to search or browse through a database of tourist attractions. Using the Geolocation Sensor API,
+the web application has access to the user's approximate current position
+and is therefore able to rank the search results by proximity to the user's location.
+
+## Foreground—Continuous geolocation updates ## {#use-cases-foreground-continuous}
+
+### Up-to-date local information ### {#use-case-up-to-date-local-information}
+
+A widget-like web application that shows the weather or news that are relevant
+to the user's current area can use the Geolocation Sensor API to register for location updates.
+If the user's position changes, the widget can adapt the content accordingly.
+
+### Alerts when points of interest are in the user's vicinity ### {#use-case-alerts-when-points-of-interest-are-in-the-users-vicinity}
+
+A tour guide web application can use the Geolocation Sensor API to monitor the user's position
+and trigger visual or audio notifications when interesting places are in the vicinity.
+An online task management system can trigger reminders when the user is in the proximity
+of landmarks that are associated with certain tasks.
+This use case assumes active usage of the application in the foreground.
+
+### Show the user's position on a map ### {#use-case-show-the-users-position-on-a-map}
+
+A user finds themselves in an unfamiliar area. They want to check their position
+so they use their handheld device to navigate to a web-based mapping application
+that can pinpoint their exact location on the map using the Geolocation Sensor API.
+They then ask the web application to provide driving directions from their current position
+to their desired destination, essentially responding to the question "Where am I going?".
+
+## Background—Continuous geolocation updates ## {#use-cases-background-continuous}
+
+### Location-tagged status updates in social networking applications ### {#use-case-location-tagged-status-updates-in-social-networking-applications}
+
+A social networking application allows its users to automatically tag their status updates with
+location information. It does this by monitoring the user's position with the Geolocation Sensor API.
+Each user can control the granularity of the location information (e.g., city or neighborhood level)
+that is shared with the other users. Any user can also see their network of friends
+and get real-time updates about their current location,
+granted they have opted in to their location data being shared.
+This use case intentionally conflates foreground location tagging and background location sharing.
+
+### Turn-by-turn route navigation ### {#use-case-turn-by-turn-route-navigation}
+
+A mapping application can help the user navigate along a routeby providing detailed turn-by-turn directions.
+The application does this by registering with the Geolocation Sensor API to receive
+repeated location updates of the user's position. These updates are delivered as soon as the implementing
+user agent determines that the position of the user has changed, which allows the application
+to anticipate any changes of direction that the user might need to do.
+The application can be in the foreground, but likewise can be backgrounded, for example,
+when the user turns their device off to save battery on a long highway route section without side roads.
+
+### Tracking sports activity ### {#use-case-tracking-sports-activity}
+
+A web application can track a user's sports activity, for example, a marathon run or a bicycle race.
+Therefore, the application does not need to be on the screen, but would be backgrounded
+while the user performs their activity, maybe with their handheld device strapped to their arm.
+
+### Real estate search ### {#use-case-real-estate-search}
+
+A web application on a handheld device can notify a user of interesting available properties
+in a neighborhood they are passing by where the property fits the user's previously specified search criteria,
+for example, 3 bedroom apartments with balcony.
+This is based on the assumption that the number of possible matches is high,
+that is, impossible to realize with geofences as the amount of required geofences would be too high.
+
+## Background—One-off geolocation fence alert ## {#use-cases-background-geofence}
+
+### Reminder and to-do applications ### {#use-case-reminder-and-todo-applications}
+
+Reminder and to-do web applications can use a geofence to remind the user to do something when they cross it,
+for example, to buy milk when they are near the supermarket.
+
+### Travel applications ### {#use-case-travel-applications}
+
+Travel applications can show venue specific data like WiFi passwords,
+the user's booking confirmation etc. only within geofence boundaries.
+
+### Ticketing or booking confirmations ### {#use-case-ticketing-or-booking-confirmations}
+
+Ticketing or booking applications can bring up a ticket notification with a QR or bar code
+once the user is near the venue of a concert or sports event or when they reach their rental car counter or similar.
+
+### Ride share applications ### {#use-case-ride-share-applications}
+
+Users can be informed if their designated driver reaches a pre-defined pickup point.
+
+### Retail special offers ### {#use-case-retail-special-offers}
+
+Given their previous consent, a user with a retailer's web application installed on their handheld device
+can be alerted about special offers or location-based coupons when they are
+in vicinity of a physical presence of the retailer. Further, the in-store experience can be enriched,
+for example, the retailer can let the user know something they have looked at before is actually available for pick up nearby.
 
 Acknowledgements {#acknowledgements}
 ================

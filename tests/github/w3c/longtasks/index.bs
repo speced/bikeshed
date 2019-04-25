@@ -15,6 +15,12 @@ Status Text: If you wish to make comments regarding this document, please send t
 Default Highlight: js
 </pre>
 
+<style>
+dl {
+    margin-left: 2em;
+}
+</style>
+
 <pre class=anchors>
 urlPrefix: https://w3c.github.io/performance-timeline/; spec: PERFORMANCE-TIMELINE-2;
     type: interface; url: #the-performanceentry-interface; text: PerformanceEntry;
@@ -24,6 +30,7 @@ urlPrefix: https://w3c.github.io/performance-timeline/; spec: PERFORMANCE-TIMELI
         text: startTime; url: #dom-performanceentry-starttime
         text: duration; url: #dom-performanceentry-duration
     type: dfn; url: #dfn-queue-a-performanceentry; text: Queue the PerformanceEntry
+    type: dfn; url: #dfn-register-a-performance-entry-type; text: register a performance entry type
 urlPrefix: https://w3c.github.io/hr-time/; spec: HR-TIME-2;
     type: typedef; url: #idl-def-domhighrestimestamp; text: DOMHighResTimeStamp;
     type: interface; url: #dfn-performance; text: Performance;
@@ -33,13 +40,20 @@ urlPrefix: https://w3c.github.io/hr-time/; spec: HR-TIME-2;
 urlPrefix: https://html.spec.whatwg.org/multipage/; spec: HTML;
     type: dfn; url: #definitions-3; text: event loop definitions;
     type: dfn; url: #calling-scripts; text: calling scripts;
-    type: dfn; url: #list-of-the-descendant-browsing-contexts; text: list of the descendant browsing contexts
+    type: dfn; url: #list-of-the-descendant-browsing-contexts; text: list of the descendant browsing contexts;
     type: dfn; url: #ancestor-browsing-context; text: ancestor;
+    type: dfn; url: #unit-of-related-browsing-contexts; text: unit of related browsing contexts
+    type: dfn; url: #script-evaluation-environment-settings-object-set; text: script evaluation environment settings object set
+    type: dfn; url: #integration-with-the-javascript-agent-cluster-formalism; text: agent cluster
 urlPrefix: https://tc39.github.io/ecma262/; spec: ECMASCRIPT;
     type: dfn; url: #sec-code-realms; text: JavaScript Realms;
 urlPrefix: https://dom.spec.whatwg.org/; spec: DOM;
     type: attribute; for: Element;
         text: id; url: #dom-element-id;
+</pre>
+
+<pre class=link-defaults>
+spec:html; type:dfn; for:/; text:browsing context
 </pre>
 
 Introduction {#intro}
@@ -50,7 +64,7 @@ As the page is loading and while the user is interacting with the page afterward
 However, some task can take a long time (multiple frames), and if and when that happens, the UI thread is locked and all other tasks are blocked as well. To the user this is commonly visible as a "locked up" page where the browser is unable to respond to user input; this is a major source of bad user experience on the web today:
 
 : Delayed "time to Interactive":
-:: while the page is loading long tasks often tie up the main thread and prevent the user from interactive with the page even though the page is visually rendered. Poorly designed third-party content is a frequent culprit.
+:: while the page is loading long tasks often tie up the main thread and prevent the user from interacting with the page even though the page is visually rendered. Poorly designed third-party content is a frequent culprit.
 
 : High/variable input latency:
 :: critical user interaction events (tap, click, scroll, wheel, etc) are queued behind long tasks, which yields janky and unpredictable user experience.
@@ -63,7 +77,7 @@ However, some task can take a long time (multiple frames), and if and when that 
 
 Some applications (and RUM vendors) are already attempting to identify and track cases where "long tasks" happen. For example, one known pattern is to install a ~short periodic timer and inspect the elapsed time between the successive calls: if the elapsed time is greater than the timer period, then there is high likelihood that one or more long tasks have delayed execution of the timer. This mostly works, but it has several bad performance implications: the application is polling to detect long tasks, which prevents quiescence and long idle blocks (see requestIdleCallback); it’s bad for battery life; there is no way to know who caused the delay (e.g. first party vs third party code).
 
-RAIL performance model suggests that applications should respond in under 100ms to user input; for touch move and scrolling in under 16ms. Our goal with this API is to surface notifications about tasks that may prevent the application from hitting these targets.
+The RAIL performance model suggests that applications should respond in under 100ms to user input (for touch move and scrolling, in under 16ms). Our goal with this API is to surface notifications about tasks that may prevent the application from hitting these targets. We surface tasks that take 50ms or more. A website without these tasks should respond to user input in under 100ms: it will take less than 50ms to finish the task that is being executed when the user input is received and less than 50ms to execute the task to react to such user input.
 
 Usage Example {#example}
 ------------------------
@@ -94,11 +108,9 @@ Terminology {#sec-terminology}
 
 * A pause between the last step and the next first step of the <a>event loop processing model</a>. This captures any work that the user agent performs in its UI thread outside of the <a>event loop</a>.
 
-<dfn>Frame</dfn> or <dfn>frame context</dfn> refers to the browsing context, such as iframe (not animation frame), embed or object in which some work (such as script or layout) occurs.
+<dfn>Culprit browsing context container</dfn> refers to the <a>browsing context container</a> (<{iframe}>, <{object}>, etc.) that is being implicated, on the whole, for a <a>long task</a>.
 
-<dfn>Culprit frame</dfn> refers to the browsing context (iframe, embed or object etc) that is being implicated, on the whole, for a long task.
-
-<dfn>Attribution</dfn> refers to identifying the type of work (such as script, layout etc.) that contributed significantly to the long task AND which browsing context is responsible for that work.
+<dfn>Attribution</dfn> refers to identifying the type of work (such as script, layout etc.) that contributed significantly to the long task, as well as identifying which <a>culprit browsing context container</a> is responsible for that work.
 
 Long Task Timing {#sec-longtask-timing}
 =======================================
@@ -114,33 +126,36 @@ Long Task timing involves the following new interfaces:
     };
 </pre>
 
-{{PerformanceLongTaskTiming}} extends the following attributes of {{PerformanceEntry}} interface:
+The values of the attributes of a {{PerformanceLongTaskTiming}} are set in the processing model in [[#report-long-tasks]]. The following provides an informative summary of how they will be set.
 
-* The {{PerformanceEntry/name}} attribute must return {{DOMString}} that specifies the type of <a>long task</a> being reported. For long tasks obtained from event loop <a>tasks</a>, it also provides minimal frame attribution.
+The {{PerformanceEntry/name}} attribute's getter will return one of the following strings:
 
-    Possible values for tasks that are not originated from event loop <a>tasks</a> are:
+: "<code><dfn>unknown</dfn></code>"
+:: The long task did not originate from an event loop <a>task</a>.
+: "<code><dfn>self</dfn></code>"
+:: The long task originated from an event loop <a>task</a> within this <a>browsing context</a>.
+: "<code><dfn>same-origin-ancestor</dfn></code>"
+:: The long task originated from an event loop <a>task</a> within a <a lt="same origin">same-origin</a> <a>ancestor browsing context</a>.
+: "<code><dfn>same-origin-descendant</dfn></code>"
+:: The long task originated from an event loop <a>task</a> within a <a lt="same origin">same-origin</a> <a lt="list of the descendant browsing contexts">descendant browsing context</a>.
+: "<code><dfn>same-origin</dfn></code>"
+:: The long task originated from an event loop <a>task</a> within a <a lt="same origin">same-origin</a> <a>browsing context</a> that is not an ancestor or descendant.
+: "<code><dfn>cross-origin-ancestor</dfn></code>"
+:: The long task originated from an event loop <a>task</a> within a cross-origin <a>ancestor browsing context</a>.
+: "<code><dfn>cross-origin-descendant</dfn></code>"
+:: The long task originated from an event loop <a>task</a> within a cross-origin <a lt="list of the descendant browsing contexts">descendant browsing context</a>.
+: "<code><dfn>cross-origin-unreachable</dfn></code>"
+:: The long task originated from an event loop <a>task</a> within a cross-origin <a>browsing context</a> that is not an ancestor or descendant.
+: "<code><dfn>multiple-contexts</dfn></code>"
+:: Multiple <a>browsing contexts</a> were involved in the long task.
 
-    * <code>rendering</code>: long task comes from the <a>update the rendering</a> step.
-    * <code>browser</code>: long task comes from work outside of the <a>event loop</a>.
+The {{PerformanceEntry/entryType}} attribute's getter will return <code>"longtask"</code>.
 
-    The following values are only possible for long tasks originated from event loop <a>tasks</a>:
+The {{PerformanceEntry/startTime}} attribute's getter will return a {{DOMHighResTimeStamp}} of when the task started.
 
-    * <code>self</code>: long task is from within my own frame
-    * <code>same-origin-ancestor</code>: long task is from a same-origin ancestor frame
-    * <code>same-origin-descendant</code>: long task is from a same-origin descendant frame
-    * <code>same-origin</code>: long task is from an unreachable same-origin frame
-    * <code>cross-origin-ancestor</code>: long task is from a cross-origin ancestor frame
-    * <code>cross-origin-descendant</code>: long task is from a cross-origin descendant frame
-    * <code>cross-origin-unreachable</code>: long task is from a cross-origin unreachable frame
-    * <code>multiple-contexts</code>: multiple frame contexts were involved in the long task
-    * <code>unknown</code>: none of the above
-* The {{PerformanceEntry/entryType}} attribute must return <code>"longtask"</code>.
-* The {{PerformanceEntry/startTime}} attribute MUST return a {{DOMHighResTimeStamp}} of when the task started.
-* The {{PerformanceEntry/duration}} attribute MUST return a {{DOMHighResTimeStamp}} equal to the elapsed time between the start and end of task.
+The {{PerformanceEntry/duration}} attribute's getter will return a {{DOMHighResTimeStamp}} equal to the elapsed time between the start and end of task.
 
-{{PerformanceLongTaskTiming}} adds the following attributes:
-
-* The <dfn attribute for=PerformanceLongTaskTiming>attribution</dfn> field returns a sequence of {{TaskAttributionTiming}} entries.
+The <dfn attribute for=PerformanceLongTaskTiming>attribution</dfn> attribute's getter will return a frozen array of {{TaskAttributionTiming}} entries.
 
 {{TaskAttributionTiming}} interface {#sec-TaskAttributionTiming}
 ----------------------------------------------------------------
@@ -154,191 +169,166 @@ Long Task timing involves the following new interfaces:
     };
 </pre>
 
-{{TaskAttributionTiming}} extends the following attributes of {{PerformanceEntry}} interface:
+The values of the attributes of a {{TaskAttributionTiming}} are set in the processing model in [[#report-long-tasks]]. The following provides an informative summary of how they will be set.
 
-* The {{PerformanceEntry/name}} attribute must return {{DOMString}} indicating type of attribution. Currently this can only be <code>"script"</code>.
-* The {{PerformanceEntry/entryType}} attribute must return {{DOMString}} <code>"taskattribution"</code>.
-* The {{PerformanceEntry/startTime}} attribute MUST return 0.
-* The {{PerformanceEntry/duration}} attribute MUST return 0.
+The {{PerformanceEntry/name}} attribute's getter will always return "<code>unknown</code>".
 
-{{TaskAttributionTiming}} adds the following attributes:
+The {{PerformanceEntry/entryType}} attribute's getter will always return "<code>taskattribution</code>".
 
-<ul dfn-type=attribute dfn-for=TaskAttributionTiming>
-    * The <dfn>containerType</dfn> attribute must return {{DOMString}} with type of frame container, such as <code>"iframe"</code>, <code>"embed"</code>, <code>"object"</code>.
-    * The <dfn>containerName</dfn> attribute must return {{DOMString}} with container's <code>name</code> attribute.
-    * The <dfn>containerId</dfn> attribute must return {{DOMString}} with container's <code>id</code> attribute.
-    * The <dfn>containerSrc</dfn> attribute must return {{DOMString}} with container's <code>src</code> attribute.
-</ul>
+The {{PerformanceEntry/startTime}} attribute's getter will always return 0.
+
+The {{PerformanceEntry/duration}} attribute's getter will always return 0.
+
+The <dfn attribute for=TaskAttributionTiming>containerType</dfn> attribute's getter will return the type of the <a>culprit browsing context container</a>, such as "<code>iframe</code>", "<code>embed</code>", or "<code>object</code>".
+
+The <dfn attribute for=TaskAttributionTiming>containerName</dfn> attribute's getter will return the value of the <a lt="culprit browsing context container">container</a>'s <code>name</code> content attribute.
+
+The <dfn attribute for=TaskAttributionTiming>containerId</dfn> attribute's getter will return the value of the <a lt="culprit browsing context container">container</a>'s <code>id</code> content attribute.
+
+The <dfn attribute for=TaskAttributionTiming>containerSrc</dfn> attribute's getter will return the value of the <a lt="culprit browsing context container">container</a>'s <code>src</code> content attribute.
 
 Pointing to the culprit {#sec-PointingToCulprit}
 ------------------------------------------------
 
-A <a>long task</a> may involve different types of work (such as script, layout, style etc), and it could be executed within different frame contexts or it could be global in nature such as a long GC that is process or frame-tree wide.
+<div class=non-normative>
 
-Thus pointing to the culprit has a couple of facets:
+<em>This section is non-normative.</em>
 
-* Pointing to the origin of the long task and/or the overall frame to blame for the long task on the whole: this is referred to as "minimal frame attribution" and is captured in the {{PerformanceEntry/name}} field.
-* Pointing to the type of work involved in the <a>long task</a>, and its associated frame context: this is captured in {{TaskAttributionTiming}} objects in the {{PerformanceLongTaskTiming/attribution}} field of {{PerformanceLongTaskTiming}}.
+A <a>long task</a> can involve different types of work (such as script, layout, style etc), and it could be executed within different <a>browsing contexts</a>, or it could be global in nature such as a long garbage collection that spans the entire <a>agent cluster</a> or <a>unit of related browsing contexts</a>.
+
+Thus <a>attribution</a> has a couple of facets:
+
+* Pointing to the origin of the long task and/or the overall location of the <a lt="culprit browsing context container">culprit browsing context</a>: this is referred to as <dfn>minimal culprit attribution</dfn> and is captured in the {{PerformanceEntry/name}} field.
+
+* Pointing to the type of work involved in the <a>long task</a>, and its associated <a>culprit browsing context container</a>: this is captured in {{TaskAttributionTiming}} objects in the {{PerformanceLongTaskTiming/attribution}} field of {{PerformanceLongTaskTiming}}.
 
 Therefore, {{PerformanceEntry/name}} and {{PerformanceLongTaskTiming/attribution}} fields on {{PerformanceLongTaskTiming}} together paint the picture for where the blame rests for a long task.
-When delivering this information the web origin-policy must be adhered to.
+When delivering this information the Web's same-origin policy must be adhered to.
 
-As an illustration, the {{TaskAttributionTiming}} entry in {{PerformanceLongTaskTiming/attribution}} is populated with "script" work, and the container or frame implicated in attribution should match up with the {{PerformanceEntry/name}} as follows:
+These fields are not independent. The following gives an overview of how they are related:
 
 <table>
     <thead>
         <tr>
-            <th>value of {{PerformanceEntry/name}}</th>
-            <th>culprit frame implicated in {{PerformanceLongTaskTiming/attribution}}</th>
+            <th>{{PerformanceEntry/name}}</th>
+            <th><a>Culprit browsing context container</a> implicated by {{PerformanceLongTaskTiming/attribution}}</th>
     <tbody>
         <tr>
-            <td><code>self</code>
+            <td>"<code><a>self</a></code>"
             <td>empty
         <tr>
-            <td><code>same-origin-ancestor</code>
-            <td>same-origin culprit frame
+            <td>"<code><a>same-origin-ancestor</a></code>"
+            <td>same-origin culprit
         <tr>
-            <td><code>same-origin-descendant</code>
-            <td>same-origin culprit frame
+            <td>"<code><a>same-origin-descendant</a></code>"
+            <td>same-origin culprit
         <tr>
-            <td><code>same-origin</code>
-            <td>same-origin culprit frame
+            <td>"<code><a>same-origin</a></code>"
+            <td>same-origin culprit
         <tr>
-            <td><code>cross-origin-ancestor</code>
+            <td>"<code><a>cross-origin-ancestor</a></code>"
             <td>empty
         <tr>
-            <td><code>cross-origin-descendant</code>
+            <td>"<code><a>cross-origin-descendant</a></code>"
             <td>empty
         <tr>
-            <td><code>cross-origin-unreachable</code>
+            <td>"<code><a>cross-origin-unreachable</a></code>"
             <td>empty
         <tr>
-            <td><code>multiple-contexts</code>
+            <td>"<code><a>multiple-contexts</a></code>"
             <td>empty
         <tr>
-            <td><code>unknown</code>
+            <td>"<code><a>unknown</a></code>"
             <td>empty
 </table>
 
-Processing Model {#sec-processing-model}
+</div>
+
+Processing model {#sec-processing-model}
 ========================================
 
-Modifications to other specifications {#mod}
---------------------------------------------
+A user agent implementing the Long Tasks API must run the <a>register a performance entry type</a> algorithm with <code>"longtask"</code> as input.
 
-### HTML: <a>event loop definitions</a> ### {#html-event-loop-dfn}
-
-Each <a>task</a> gets an associated <dfn for="task">script evaluation environment settings object set</dfn>.
-
-Each <a>event loop</a> has two associated values: <dfn>event loop begin</dfn> and <dfn>event loop end</dfn>, which are initially unset.
-
-### HTML: <a>event loop processing model</a> ### {#html-event-loop-processing}
-
-Before Step #1:
-
-* Set <a>event loop begin</a> to the <a>current high resolution time</a>.
-* If <a>event loop end</a> is set, then let |top-level browsing contexts| be the set of all <a>top-level browsing contexts</a> of all <a>Document</a> objects associated with the <a>event loop</a> in question. Execute the [[#report-long-tasks]] algorithm, passing in <a>event loop begin</a>, <a>event loop end</a>, the string "browser", and |top-level browsing contexts|.
-
-After Step #6:
-
-* Let |task end time| be the <a>current high resolution time</a>.
-* Let |top-level browsing contexts| be an empty set.
-* For each <a>environment settings object</a> |settings| in |oldestTask|'s [=task/script evaluation environment settings object set=], add |settings|'s <a>responsible browsing context</a>'s <a>top-level browsing context</a> to |top-level browsing contexts|.
-* Execute the [[#report-long-tasks]] algorithm, passing in <a>event loop begin</a> (repurposed as meaning the beginning of the task), |task end time|, the string "event-loop-task", |top-level browsing contexts|, and |oldestTask|.
-
-In Step #7:
-
-* In substep #1, <var ignore=''>now</var> can be replaced with |task end time|. This saves a call to <a>current high resolution time</a>.
-
-After Step #7:
-
-* Let |rendering end time| be the <a>current high resolution time</a>.
-* Let |top-level browsing contexts| be the set of all <a>top-level browsing context</a> of all <a>fully active</a> <a>Document</a> in <var ignore=''>docs</var>.
-* Execute the [[#report-long-tasks]] algorithm, passing in |task end time| (repurposed as meaning the beginning of the update the rendering step), |rendering end time|, the string "rendering", and |top-level browsing contexts|.
-
-After Step #8 (at the very end):
-
-* Set <a>event loop end</a> to be the <a>current high resolution time</a>.
-
-### HTML: <a>calling scripts</a> ### {#html-calling-scripts}
-
-In <a>prepare to run script</a>, add a step at the end to add |settings| to the currently running task's [=task/script evaluation environment settings object set=].
-
-Additions to the Long Task Spec {#sec-additions-to-spec}
+Report long tasks {#report-long-tasks}
 --------------------------------------------------------
 
-<h4 dfn>Report Long Tasks</h4>
+<div algorithm="Report long tasks">
+    Given |start time|, |end time|, |top-level browsing contexts|, and optionally |task|, perform the following algorithm:
 
-Given |start time|, |end time|, |type|, |top-level browsing contexts|, and optionally |task|, perform the following algorithm:
+    1. If |end time| minus |start time| is less than the long tasks threshold of 50 ms, abort these steps.
 
-1. If |end time| minus |start time| is less than the long tasks threshold of 50 ms, abort these steps.
+    1. Let |destinationRealms| be an empty set.
 
-2. Let |destinationRealms| be an empty set.
+    1. Determine the set of <a>JavaScript Realms</a> to which reports will be delivered:
 
-3. Determine the set of <a>JavaScript Realms</a> to which reports will be delivered:
+        For each <a>top-level browsing context</a> |topmostBC| in |top-level browsing contexts|:
 
-    For each <a>top-level browsing context</a> |topmostBC| in |top-level browsing contexts|:
+        1. Add |topmostBC|'s Window's <a>relevant Realm</a> to |destinationRealms|.
+        1. Let |descendantBCs| be |topmostBC|'s <a>active document</a>'s <a>list of the descendant browsing contexts</a>.
+        1. For each |descendantBC| in |descendantBCs|, add |descendantBC|'s Window's <a>relevant Realm</a> to |destinationRealms|.
 
-    1. Add |topmostBC|'s Window's <a>relevant Realm</a> to |destinationRealms|.
-    2. Let |descendantBCs| be |topmostBC|'s <a>active document</a>'s <a>list of the descendant browsing contexts</a>.
-    3. For each |descendantBC| in |descendantBCs|, add |descendantBC|'s Window's <a>relevant Realm</a> to |destinationRealms|.
+    1. For each |destinationRealm| in |destinationRealms|:
 
-4. For each |destinationRealm| in |destinationRealms|:
+        1. Let |name| be the empty string. This will be used to report <a>minimal culprit attribution</a>, below.
+        1. Let |culpritSettings| be <code>null</code>.
+        1. If the |task| argument was not provided, set |name| to "<code><a>unknown</a></code>".
+        1. Otherwise: process |task|'s <a>script evaluation environment settings object set</a> to determine |name| and |culpritSettings| as follows:
 
-    1. Let |name| be the empty string. This will be used to report minimal frame attribution, below.
-    2. Let |culpritSettings| be <code>null</code>.
-    3. If the |task| argument was not provided, set |name| to |type|.
-    3. Otherwise: assert that |type| equals "event-loop-task" and process |task|'s [=task/script evaluation environment settings object set=] to determine |name| and |culpritSettings| as follows:
+            1. If |task|'s <a>script evaluation environment settings object set</a> is empty: set |name| to "<code><a>unknown</a></code>" and |culpritSettings| to <code>null</code>.
+            1. If |task|'s <a>script evaluation environment settings object set</a>'s length is greater than one: set |name| to "<code><a>multiple-contexts</a></code>" and |culpritSettings| to <code>null</code>.
+            1. If |task|'s <a>script evaluation environment settings object set</a>'s length is one:
+                1. Set |culpritSettings| to the single item in |task|'s <a>script evaluation environment settings object set</a>.
+                1. Let |destinationSettings| be |destinationRealm|'s <a>relevant settings object</a>.
+                1. Let |destinationOrigin| be |destinationSettings|'s [=environment settings object/origin=].
+                1. Let |destinationBC| be |destinationSettings|'s <a>responsible browsing context</a>.
+                1. If |culpritSettings| is the same as |destinationSettings|, set |name| to "<code><a>self</a></code>".
+                1. If |culpritSettings|'s [=environment settings object/origin=] and |destinationOrigin| are <a>same origin</a>:
+                    1. If |culpritSettings|'s <a>responsible browsing context</a> is an <a>ancestor</a> of |destinationBC|, set |name| to "<code><a>same-origin-ancestor</a></code>".
+                    1. Otherwise, if |culpritSettings|'s <a>responsible browsing context</a> is a <a lt="list of the descendant browsing contexts">descendant</a> of |destinationBC|, set |name| to "<code><a>same-origin-descendant</a></code>".
+                    1. Otherwise, set |name| to "<code><a>same-origin</a></code>".
+                1. Otherwise:
+                    1. If |culpritSettings|'s <a>responsible browsing context</a> is an <a>ancestor</a> of |destinationBC|, set |name| to "<code><a>cross-origin-ancestor</a></code>" and set |culpritSettings| to <code>null</code>.
 
-        1. If |task|'s [=task/script evaluation environment settings object set=] is empty: set |name| to <code>"unknown"</code> and |culpritSettings| to <code>null</code>.
-        2. If |task|'s [=task/script evaluation environment settings object set=]'s length is greater than one: set |name| to <code>"multiple-contexts"</code> and |culpritSettings| to <code>null</code>.
-        3. If |task|'s [=task/script evaluation environment settings object set=]'s length is one:
-            1. Set |culpritSettings| to the single item in task's [=task/script evaluation environment settings object set=].
-            2. Let |destinationOrigin| be |destinationRealm|'s <a>relevant settings object</a>'s [=environment settings object/origin=].
-            3. Let |destinationBC| be |destinationRealm|'s <a>relevant settings object</a>'s <a>responsible browsing context</a>.
-            4. If |culpritSettings|'s [=environment settings object/origin=] and |destinationOrigin| are <a>same origin</a>:
-                1. If |culpritSettings|'s <a>responsible browsing context</a> is an <a>ancestor</a> of |destinationBC|, set |name| to <code>"same-origin-ancestor"</code>.
-                2. If |culpritSettings|'s <a>responsible browsing context</a> is a descendant of |destinationBC|, set |name| to <code>"same-origin-descendant"</code>.
-            5. Otherwise:
-                1. If |culpritSettings|'s <a>responsible browsing context</a> is an <a>ancestor</a> of |destinationBC|, set |name| to <code>"cross-origin-ancestor"</code> and set |culpritSettings| to <code>null</code>.
+                        NOTE: this is not reported because of security. Developers should look this up themselves.
 
-                    NOTE: this is not reported because of security. Developers should look this up themselves.
+                    1. Otherwise, if |culpritSettings|'s <a>responsible browsing context</a> is a <a lt="list of the descendant browsing contexts">descendant</a> of |destinationBC|, set |name| to "<code><a>cross-origin-descendant</a></code>".
+                    1. Otherwise, set |name| to "<code><a>cross-origin-unreachable</a></code>".
 
-                2. If |culpritSettings|'s <a>responsible browsing context</a> is a descendant of |destinationBC|, set |name| to <code>"cross-origin-descendant"</code>.
+        1. If |task| was not provided, let |attribution| be <code>null</code>.
+        1. Otherwise, let |attribution| be a new {{TaskAttributionTiming}} object and set its attributes as follows:
+            1. Set |attribution|'s {{PerformanceEntry/name}} attribute to "<code><a>unknown</a></code>".
 
-    4. If |task| was not provided, let |attribution| be <code>null</code>.
-    5. Otherwise, let |attribution| be a new {{TaskAttributionTiming}} object |attribution| and set its attributes as follows:
-        1. Set |attribution|'s {{PerformanceEntry/name}} attribute to <code>"script"</code>.
+                NOTE: future iterations of this API will add more values to the {{PerformanceEntry/name}} attribute of a {{TaskAttributionTiming}} object, but for now it can only be a single value.
 
-            NOTE: future iterations of this API will add more values to the {{PerformanceEntry/name}} attribute of a {{TaskAttributionTiming}} object, but for now it can only be a single value.
+            1. Set |attribution|'s {{PerformanceEntry/entryType}} attribute to <code>"taskattribution"</code>.
+            1. Set |attribution|'s {{PerformanceEntry/startTime}} and {{PerformanceEntry/duration}} to 0.
+            1. If |culpritSettings| is not <code>null</code>, and |culpritSettings|'s <a>responsible browsing context</a> has a <a>browsing context container</a> that is an <{iframe}> element, then let |iframe| be that element, and perform the following steps:
+                1. Set |attribution|'s {{containerType}} attribute to "<code>iframe</code>".
+                1. Set |attribution|'s {{containerName}} attribute to the value of  |iframe|'s <{iframe/name}> content attribute, or <code>null</code> if the attribute is absent.
+                1. Set |attribution|'s {{containerSrc}} attribute to the value of |iframe|'s <{iframe/src}> content attribute, or <code>null</code> if the attribute is absent.
 
-        2. Set |attribution|'s {{PerformanceEntry/entryType}} attribute to <code>"taskattribution"</code>.
-        3. Set |attribution|'s {{PerformanceEntry/startTime}} and {{PerformanceEntry/duration}} to 0.
-        4. If |culpritSettings| is not <code>null</code>, and |culpritSettings|'s <a>responsible browsing context</a> has a <a>browsing context container</a> that is an <{iframe}> element, then let |iframe| be that element, and perform the following steps:
-            1. Set |attribution|'s {{containerName}} attribute to the value of  |iframe|'s <{iframe/name}> content attribute, or <code>null</code> if the attribute is absent.
-            2. Set |attribution|'s {{containerSrc}} attribute to the value of |iframe|'s <{iframe/src}> content attribute, or <code>null</code> if the attribute is absent.
+                    NOTE: it is intentional that we record the frame's <{iframe/src}> attribute here, and not its current URL, as this is meant primarily to help identify frames, and allowing discovery of the current URL of a cross-origin iframe is a security problem.
+                1. Set |attribution|'s {{containerId}} attribute to the value of |iframe|'s [=Element/ID=], or <code>null</code> if the ID is unset.
 
-                NOTE: it is intentional that we record the frame's src attribute here, and not its current URL, as this is meant primarily to help identify frames, and allowing discovery of the current URL of a cross-origin iframe is a security problem.
-            3. Set |attribution|'s {{containerId}} attribute to the value of |iframe|'s [=Element/id=] content attribute, or <code>null</code> if the attribute is absent.
+        1. Create a new {{PerformanceLongTaskTiming}} object |newEntry| and set its attributes as follows:
 
-    6. Create a new {{PerformanceLongTaskTiming}} object |newEntry| and set its attributes as follows:
+            1. Set |newEntry|'s {{PerformanceEntry/name}} attribute to |name|.
+            1. Set |newEntry|'s {{PerformanceEntry/entryType}} attribute to "<code>longtask</code>".
+            1. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |start time|.
+            1. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |end time| minus |start time|.
+            1. If |attribution| is not <code>null</code>, set |newEntry|'s {{PerformanceLongTaskTiming/attribution}} attribute to a new frozen array containing the single value |attribution|.
 
-        1. Set |newEntry|'s {{PerformanceEntry/name}} attribute to |name|.
-        2. Set |newEntry|'s {{PerformanceEntry/entryType}} attribute to <code>"longtask"</code>.
-        3. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |start time|.
-        4. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to |end time| minus |start time|.
-        5. If |attribution| is not <code>null</code>, set |newEntry|'s {{PerformanceLongTaskTiming/attribution}} attribute to a new frozen array containing the single value |attribution|.
+                NOTE: future iterations of this API will add more values to the {{PerformanceLongTaskTiming/attribution}} attribute, but for now it only contains a single value.
 
-            NOTE: future iterations of this API will add more values to the {{PerformanceLongTaskTiming/attribution}} attribute, but for now it only contains a single value.
+        1. <a>Queue the PerformanceEntry</a> |newEntry| on |destinationRealm|.
 
-    6. <a>Queue the PerformanceEntry</a> |newEntry| on |destinationRealm|.
+            NOTE: the "queue a PerformanceEntry" algorithm will end up doing nothing if no observers are registered. Implementations likely will want to bail out from this algorithm earlier in that case, instead of assembling all the above information only to find out nobody is listening for it.
+</div>
 
-        NOTE: the "queue a PerformanceEntry" algorithm will end up doing nothing if no observers are registered. Implementations likely will want to bail out from this algorithm earlier in that case, instead of assembling all the above information only to find out nobody is listening for it.
-
-Security & Privacy Considerations {#priv-sec}
+Security & privacy considerations {#priv-sec}
 ===============================================
 
-Long Tasks API adheres to cross-origin policy by including origin-safe attribution information about the source of the long task.
+Long Tasks API adheres to the same-origin policy by including origin-safe attribution information about the source of the long task.
 There is a 50ms threshold for long tasks. Together this provides adequate protection against security attacks against browser.
 
-However, privacy related attacks are possible, while the API doesn’t introduce any new privacy attacks, it could make existing privacy attacks faster. Mitigations for this are possible and discussed in the security review <a href="https://docs.google.com/document/d/1tIMI1gau_q6X5EBnjDNiFS5NWV9cpYJ5KKA7xPd3VB8/edit">in this document.</a>
+However, privacy related attacks are possible, while the API doesn’t introduce any new privacy attacks, it could make existing privacy attacks faster. Mitigations for this are possible and discussed in the security review <a href="https://docs.google.com/document/d/1tIMI1gau_q6X5EBnjDNiFS5NWV9cpYJ5KKA7xPd3VB8/edit">in this document</a>.

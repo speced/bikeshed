@@ -28,7 +28,7 @@ Abstract: This specification provides an API for representing file objects in we
 
   This API is designed to be used in conjunction with other APIs and elements on the web platform, notably:
   {{XMLHttpRequest}} (e.g. with an overloaded {{XMLHttpRequest/send()}} method for {{File}} or {{Blob}} arguments),
-  {{Worker/postMessage()}},
+  {{Worker/postMessage(message, options)|postMessage()}},
   {{DataTransfer}} (part of the drag and drop API defined in [[HTML]])
   and Web Workers.
   Additionally, it should be possible to programmatically obtain a list of files from the <{input}> element
@@ -56,6 +56,8 @@ spec: infra
     text: list
     text: string
 spec: streams
+  type:interface
+    text:ReadableStream
   type: dfn
     text: chunk
 spec: url
@@ -63,28 +65,25 @@ spec: url
     text: url; for:/
   type: interface
     text: URL
+spec: fetch
+  type:interface
+    text:ReadableStream
 </pre>
 
 <pre class="anchors">
-spec: xhr; urlPrefix: https://xhr.spec.whatwg.org/
-  type: method
-    for: XMLHttpRequest
-      text: getAllResponseHeaders(); url: #dom-xmlhttprequest-getallresponseheaders
-spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/
-  urlPrefix: semantics.html
-    type: element-attr; for: a; text: download; url: #attr-hyperlink-download
-  type:dfn; text:origin
 spec: mimesniff; urlPrefix: https://mimesniff.spec.whatwg.org/
   type: dfn
     text: parsable mime type
-    text: parse a MIME type
 spec: ecma-262; urlPrefix: http://tc39.github.io/ecma262/
   type: interface
     text: Array; url: sec-array-constructor
     text: Date; url: sec-date-constructor
+spec: media-source; urlPrefix: http://w3c.github.io/media-source/
+  type: interface
+    text: MediaSource; url: #mediasource
 </pre>
 
-<h2 id="intro">Introduction</h2>
+# Introduction # {#intro}
 
 *This section is informative.*
 
@@ -174,8 +173,7 @@ An example will be illustrative.
   </pre>
 </div>
 
-<h2 id="terminology">
-Terminology and Algorithms</h2>
+# Terminology and Algorithms # {#terminology}
 
 When this specification says to <dfn id="terminate-an-algorithm" lt="terminate an algorithm|terminate this algorithm">terminate an algorithm</dfn>
 the user agent must terminate the algorithm after finishing the step it is on.
@@ -208,8 +206,7 @@ this is the same time that is conceptually "<code>0</code>" in ECMA-262 [[ECMA-2
 ████████  ████████  ███████  ████████
 -->
 
-<h2 id="blob-section">
-The Blob Interface and Binary Data</h2>
+# The Blob Interface and Binary Data # {#blob-section}
 
 A {{Blob}} object refers to a <a>byte</a> sequence,
 and has a {{Blob/size}} attribute which is the total number of bytes in the byte sequence,
@@ -221,8 +218,8 @@ which must be initially set to the state of the underlying storage,
 if any such underlying storage exists.
 Further normative definition of <a>snapshot state</a> can be found for {{File}}s.
 
-<pre class="idl">
-[Constructor(optional sequence&lt;BlobPart> blobParts,
+<xmp class="idl">
+[Constructor(optional sequence<BlobPart> blobParts,
              optional BlobPropertyBag options),
  Exposed=(Window,Worker), Serializable]
 interface Blob {
@@ -231,9 +228,14 @@ interface Blob {
   readonly attribute DOMString type;
 
   // slice Blob into byte-ranged chunks
-  Blob slice([Clamp] optional long long start,
-            [Clamp] optional long long end,
+  Blob slice(optional [Clamp] long long start,
+            optional [Clamp] long long end,
             optional DOMString contentType);
+
+  // read from the Blob.
+  [NewObject] ReadableStream stream();
+  [NewObject] Promise<USVString> text();
+  [NewObject] Promise<ArrayBuffer> arrayBuffer();
 };
 
 enum EndingType { "transparent", "native" };
@@ -244,7 +246,7 @@ dictionary BlobPropertyBag {
 };
 
 typedef (BufferSource or Blob or USVString) BlobPart;
-</pre>
+</xmp>
 
 {{Blob}} objects are [=serializable objects=]. Their [=serialization steps=],
 given |value| and |serialized|, are:
@@ -259,8 +261,29 @@ Their [=deserialization step=], given |serialized| and |value|, are:
 
 2. Set |value|'s underlying byte sequence to |serialized|.\[[ByteSequence]].
 
-<h3 id="constructorBlob">
-Constructors</h3>
+<div algorithm="get stream">
+A {{Blob}} |blob| has an associated <dfn for=Blob>get stream</dfn> algorithm,
+which runs these steps:
+
+1. Let |stream| be the result of [=construct a ReadableStream object|constructing=] a
+   {{ReadableStream}} object.
+1. Run the following steps [=in parallel=]:
+  1. While not all bytes of |blob| have been read:
+    1. Let |bytes| be the [=byte sequence=] that results from reading a [=chunk=] from |blob|.
+    1. If a [=file read error=] occured while reading |bytes|, [$ReadableStream/error$]
+       |stream| with a [=failure reason=] and abort these steps.
+    1. [=ReadableStream/Enqueue=] a `Uint8Array` object wrapping an `ArrayBuffer`
+       containing |bytes| into |stream|.
+       If that threw an exception, [$ReadableStream/error$] |stream| with that exception
+       and abort these steps.
+
+    Issue: We need to specify more concretely what reading from a Blob actually does,
+    what possible errors can happen, perhaps something about chunk sizes, etc.
+1. Return |stream|.
+
+</div>
+
+## Constructors ## {#constructorBlob}
 
 <div algorithm="blob-constructor">
 The {{Blob()}} constructor can be invoked with zero or more parameters.
@@ -289,8 +312,7 @@ user agents must run the following steps:
 
 </div>
 
-<h4 id="constructorParams">
-Constructor Parameters</h4>
+### Constructor Parameters ### {#constructorParams}
 
 The {{Blob()}} constructor can be invoked with the parameters below:
 
@@ -425,8 +447,7 @@ run the following steps:
   </pre>
 </div>
 
-<h3 id="attributes-blob">
-Attributes</h3>
+## Attributes ## {#attributes-blob}
 
 <dl dfn-type="attribute" dfn-for="Blob">
   <dt><dfn id="dfn-size">size</dfn>
@@ -455,16 +476,13 @@ Attributes</h3>
     if performing the <a>parse a MIME type</a> algorithm to a byte sequence converted from
     the ASCII-encoded string representing the Blob object's type does not return failure.
 
-    Note: Use of the {{Blob/type}} attribute informs the <a>encoding determination</a>
+    Note: Use of the {{Blob/type}} attribute informs the [=package data=] algorithm
     and determines the `Content-Type` header when [=/fetching=] [=blob URLs=].
 </dl>
 
+## Methods and Parameters ## {#methodsandparams-blob}
 
-<h3 id="methodsandparams-blob">
-Methods and Parameters</h3>
-
-<h4 id="slice-method-algo">
-The slice method</h4>
+### The {{Blob/slice()}} method ### {#slice-method-algo}
 
 The <dfn id="dfn-slice" method for=Blob lt="slice(start, end, contentType), slice(start, end), slice(start), slice()">slice()</dfn> method
 returns a new {{Blob}} object with bytes ranging from
@@ -484,7 +502,7 @@ It must act as follows:
     <li>If the optional {{start}} parameter is not used as a parameter when making this call, let |relativeStart| be 0.
     <li>If {{start}} is negative, let |relativeStart| be <code>max(({{Blob/size}} + {{start}}), 0)</code>.
     <li>Else, let |relativeStart| be <code>min(start, size)</code>.
-    </ol>
+  </ol>
 
 3. The optional <dfn argument for="Blob/slice(start, end, contentType)" id="dfn-end">end</dfn> parameter
   is a value for the end point of a {{slice()}} call.
@@ -551,6 +569,38 @@ It must act as follows:
   </pre>
 </div>
 
+### The {{Blob/stream()}} method ### {#stream-method-algo}
+
+The <dfn method for=Blob>stream()</dfn> method, when invoked, must return
+the result of calling [=get stream=] on the [=context object=].
+
+### The {{Blob/text()}} method ### {#text-method-algo}
+
+The <dfn method for=Blob>text()</dfn> method, when invoked, must run these steps:
+
+1. Let |stream| be the result of calling [=get stream=] on the [=context object=].
+1. Let |reader| be the result of [=get a reader|getting a reader=] from |stream|.
+   If that threw an exception, return a new promise rejected with that exception.
+1. Let |promise| be the result of [=read all bytes|reading all bytes=] from |stream| with |reader|.
+1. Return the result of transforming |promise| by a fulfillment handler that returns the result of
+   running [=UTF-8 decode=] on its first argument.
+
+Note: This is different from the behavior of {{FileReader/readAsText()}} to align better
+with the behavior of {{Body/text()|Fetch's text()}}. Specifically this method will always
+use UTF-8 as encoding, while {{FileReader}} can use a different encoding depending on
+the blob's type and passed in encoding name.
+
+### The {{Blob/arrayBuffer()}} method ### {#arraybuffer-method-algo}
+
+The <dfn method for=Blob>arrayBuffer()</dfn> method, when invoked, must run these steps:
+
+1. Let |stream| be the result of calling [=get stream=] on the [=context object=].
+1. Let |reader| be the result of [=get a reader|getting a reader=] from |stream|.
+   If that threw an exception, return a new promise rejected with that exception.
+1. Let |promise| be the result of [=read all bytes|reading all bytes=] from |stream| with |reader|.
+1. Return the result of transforming |promise| by a fulfillment handler that returns
+   a new {{ArrayBuffer}} whose contents are its first argument.
+
 <!--
 ████████ ████ ██       ████████
 ██        ██  ██       ██
@@ -561,8 +611,7 @@ It must act as follows:
 ██       ████ ████████ ████████
 -->
 
-<h2 id="file-section">
-The File Interface</h2>
+# The File Interface # {#file-section}
 
 A {{File}} object is a {{Blob}} object with a {{File/name}} attribute, which is a string;
 it can be created within the web application via a constructor,
@@ -630,8 +679,7 @@ Their [=deserialization steps=], given |value| and |serialized|, are:
 4. Initialize the value of |value|'s {{File/lastModified}} attribute to
    |serialized|.\[[LastModified]].
 
-<h3 id="file-constructor">
-Constructor</h3>
+## Constructor ## {#file-constructor}
 
 <div algorithm="file-constructor">
 The {{File}} constructor is invoked with two or three parameters,
@@ -678,8 +726,7 @@ user agents must run the following steps:
 
 </div>
 
-<h4 id="file-constructor-params">
-Constructor Parameters</h4>
+### Constructor Parameters ### {#file-constructor-params}
 
 The {{File()}} constructor can be invoked with the parameters below:
 
@@ -702,8 +749,7 @@ The {{File()}} constructor can be invoked with the parameters below:
       normative conditions for this member are provided in [[#file-constructor]].
 </dl>
 
-<h3 id="file-attrs">
-Attributes</h3>
+## Attributes ## {#file-attrs}
 
 <dl dfn-type=attribute dfn-for=File>
   <dt><dfn id="dfn-name">name</dfn>
@@ -758,8 +804,7 @@ with the {{error!!attribute}} attribute returning a {{NotFoundError}}.
   </pre>
 </div>
 
-<h2 id="filelist-section">
-The FileList Interface</h2>
+# The FileList Interface # {#filelist-section}
 
 Note: The {{FileList}} interface should be considered "at risk"
 since the general trend on the Web Platform is to replace such interfaces
@@ -808,8 +853,7 @@ Their [=deserialization step=], given |serialized| and |value|, are:
   </pre>
 </div>
 
-<h3 id="attributes-filelist">
-Attributes</h3>
+## Attributes ## {#attributes-filelist}
 
   <dl>
     <dt><dfn attribute for=FileList id="dfn-length">length</dfn>
@@ -817,8 +861,7 @@ Attributes</h3>
       If there are no files, this attribute must return 0.
   </dl>
 
-<h3 id="filelist-methods-params">
-Methods and Parameters</h3>
+## Methods and Parameters ## {#filelist-methods-params}
 
 <dl>
   <dt><dfn method for=FileList id="dfn-item">item(index)</dfn>
@@ -840,112 +883,17 @@ which is what is being accessed in the above example.
 Other interfaces with a readonly attribute of type {{FileList}} include the {{DataTransfer}} interface.
 
 
-<h2 id="reading-data-section">
-Reading Data</h2>
+# Reading Data # {#reading-data-section}
 
-<h3 id="readOperationSection">
-The Read Operation</h3>
+## The File Reading Task Source ## {#blobreader-task-source}
 
-The algorithm below defines a <a>read operation</a>,
-which takes a {{Blob}} and a <a>synchronous flag</a> as input,
-and reads <a>byte</a>s into a byte stream
-which is returned as the |result| of the <a>read operation</a>,
-or else fails along with a <a>failure reason</a>.
-Methods in this specification invoke the <a>read operation</a>
-with the <a>synchronous flag</a> either set or unset.
-
-The <dfn id="synchronousFlag">synchronous flag</dfn> determines if a read operation is synchronous or asynchronous,
-and is *unset* by default.
-Methods may set it.
-If it is set,
-the <a>read operation</a> takes place synchronously.
-Otherwise, it takes place asynchronously.
-
-To perform a <dfn id="readOperation">read operation</dfn> on a {{Blob}} and the <a>synchronous flag</a>,
-run the following steps:
-
-1. Let |s| be a a new [=/body=],
-  |b| be the {{Blob}} to be read from,
-  and |bytes| initially set to an empty byte sequence.
-  Set the |length| on |s| to the {{Blob/size}} of |b|.
-  While there are still bytes to be read in |b|,
-  perform the following substeps:
-
-  1. If the <a>synchronous flag</a> is set, follow the steps below:
-    1. Let |bytes| be the byte sequence that results from reading a <a>chunk</a> from |b|.
-      If a <a>file read error</a> occurs reading a <a>chunk</a> from |b|,
-      return |s| with the error flag set,
-      along with a <a>failure reason</a>,
-      and <a>terminate this algorithm</a>.
-
-      Note: Along with returning failure,
-      the synchronous part of this algorithm must return the <a>failure reason</a> that occurred
-      for <a lt="throw">throwing an exception</a> by synchronous methods
-      that invoke this algorithm with the <a>synchronous flag</a> set.
-
-    2. If there are no errors,
-      push |bytes| to |s|,
-      and increment |s|'s |transmitted| [[Fetch]]
-      by the number of bytes in |bytes|.
-      Reset |bytes| to the empty byte sequence
-      and continue reading <a>chunk</a>s as above.
-
-    3. When all the bytes of |b| have been read into |s|,
-      return |s|
-      and <a>terminate this algorithm</a>.
-
-  2. Otherwise, the <a>synchronous flag</a> is unset.
-    Return |s| and process the rest of this algorithm asynchronously.
-
-  3. Let |bytes| be the byte sequence that results from reading a <a>chunk</a> from |b|.
-    If a <a>file read error</a> occurs reading a <a>chunk</a> from |b|,
-    set the error flag on |s|,
-    and <a>terminate this algorithm</a> with a <a>failure reason</a>.
-
-    Note: The asynchronous part of this algorithm must signal the <a>failure reason</a> that occurred
-    for asynchronous error reporting by methods expecting |s|
-    and which invoke this algorithm with the <a>synchronous flag</a> unset.
-
-  4. If no <a>file read error</a> occurs,
-    push |bytes| to |s|,
-    and increment |s|'s |transmitted| [[Fetch]]
-    by the number of bytes in |bytes|.
-    Reset |bytes| to the empty byte sequence
-    and continue reading <a>chunk</a>s as above.
-
-To perform an <dfn id="task-read-operation">annotated task read operation</dfn>
-on a {{Blob}} |b|,
-perform the steps below:
-
-1. Perform a <a>read operation</a> on |b| with the <a>synchronous flag</a> unset,
-  along with the additional steps below.
-2. If the <a>read operation</a> terminates with a <a>failure reason</a>,
-  <a>queue a task</a> to <dfn id="process-read-error">process read error</dfn> with the <a>failure reason</a>
-  and terminate this algorithm.
-3. When the first <a>chunk</a> is being pushed to the [=/body=] |s| during the <a>read operation</a>,
-  <a>queue a task</a> to <dfn id="process-read">process read</dfn>.
-4. Once the [=/body=] |s| from the <a>read operation</a> has at least one <a>chunk</a> read into it,
-  or there are no <a>chunk</a>s left to read from |b|,
-  <a>queue a task</a> to <dfn id="process-read-data">process read data</dfn>.
-  Keep <a lt="queue a task">queuing tasks</a> to <a>process read data</a>
-  for every <a>chunk</a> read or every 50ms,
-  whichever is *least frequent*.
-5. When all of the <a>chunk</a>s from |b| are read into the [=/body=] |s| from the <a>read operation</a>,
-  <a>queue a task</a> to <dfn id="process-read-EOF">process read EOF</dfn>.
-
-Use the <a>file reading task source</a> for all these tasks.
-
-
-<h3 id="blobreader-task-source">
-The File Reading Task Source</h3>
-
-This specification defines a new generic <a>task source</a> called the <dfn id="fileReadingTaskSource">file reading task source</dfn>,
-which is used for all <a lt="queue a task">tasks that are queued</a> in this specification
+This specification defines a new generic [=task source=] called the
+<dfn id="fileReadingTaskSource">file reading task source</dfn>,
+which is used for all [=queue a task|tasks that are queued=] in this specification
 to read byte sequences associated with {{Blob}} and {{File}} objects.
 It is to be used for features that trigger in response to asynchronously reading binary data.
 
-<h3 id="APIASynch">
-The FileReader API</h3>
+## The {{FileReader}} API ## {#APIASynch}
 
 <pre class="idl">
 [Constructor, Exposed=(Window,Worker)]
@@ -964,7 +912,6 @@ interface FileReader: EventTarget {
   const unsigned short LOADING = 1;
   const unsigned short DONE = 2;
 
-
   readonly attribute unsigned short readyState;
 
   // File or Blob data
@@ -979,21 +926,103 @@ interface FileReader: EventTarget {
   attribute EventHandler onabort;
   attribute EventHandler onerror;
   attribute EventHandler onloadend;
-
 };
 </pre>
 
-<h4 id="filereaderConstrctr">
-Constructor</h4>
+A {{FileReader}} has an associated <dfn for=FileReader>state</dfn>,
+that is `"empty"`, `"loading"`, or `"done"`. It is initially `"empty"`.
 
-When the {{FileReader()}} constructor is invoked,
-the user agent must return a new {{FileReader}} object.
+A {{FileReader}} has an associated <dfn for=FileReader>result</dfn>
+(`null`, a {{DOMString}} or an {{ArrayBuffer}}). It is initially `null`.
 
-In environments where the global object is represented by a {{Window}} or a {{WorkerGlobalScope}} object,
-the {{FileReader}} constructor must be available.
+A {{FileReader}} has an associated <dfn for=FileReader>error</dfn>
+(`null` or a {{DOMException}}). It is initially `null`.
 
-<h4 id="event-handler-attributes-section">
-Event Handler Content Attributes</h4>
+The <dfn constructor for=FileReader id=filereaderConstrctr>FileReader()</dfn> constructor,
+when invoked, must return a new {{FileReader}} object.
+
+The <dfn attribute for=FileReader>readyState</dfn> attribute's getter,
+when invoked, switches on the [=context object=]'s [=FileReader/state=]
+and runs the associated step:
+
+: `"empty"`
+:: Return {{EMPTY}}
+: `"loading"`
+:: Return {{LOADING}}
+: `"done"`
+:: Return {{DONE}}
+
+The <dfn attribute for=FileReader>result</dfn> attribute's getter,
+when invoked, must return the [=context object=]'s [=FileReader/result=].
+
+The <dfn attribute for=FileReader>error</dfn> attribute's getter,
+when invoked, must return the [=context object=]'s [=FileReader/error=].
+
+<div algorithm="read operation">
+A {{FileReader}} |fr| has an associated <dfn id=readOperation>read operation</dfn> algorithm,
+which given |blob|, a |type| and an optional |encodingName|,
+runs the following steps:
+
+1. If |fr|'s [=FileReader/state=] is `"loading"`,
+   throw an {{InvalidStateError}} {{DOMException}}.
+1. Set |fr|'s [=FileReader/state=] to `"loading"`.
+1. Set |fr|'s [=FileReader/result=] to `null`.
+1. Set |fr|'s [=FileReader/error=] to `null`.
+1. Let |stream| be the result of calling [=get stream=] on |blob|.
+1. Let |reader| be the result of [=get a reader|getting a reader=] from |stream|.
+1. Let |bytes| by an empty [=byte sequence=].
+1. Let |chunkPromise| be the result of [=read a chunk|reading a chunk=] from |stream| with |reader|.
+1. Let |isFirstChunk| be true.
+1. [=In parallel=], while true:
+  1. Wait for |chunkPromise| to be fulfilled or rejected.
+  1. If |chunkPromise| is fulfilled, and |isFirstChunk| is true,
+     [=queue a task=] to [=fire a progress event=] called {{loadstart}} at |fr|.
+
+     Issue(119): We might change {{loadstart}} to be dispatched synchronously,
+     to align with XMLHttpRequest behavior.
+
+  1. Set |isFirstChunk| to false.
+
+  1. If |chunkPromise| is fulfilled with an object whose `done` property is false and whose `value`
+     property is a `Uint8Array` object, run these steps:
+    1. Let |bs| be the [=byte sequence=] represented by the `Uint8Array` object.
+    1. Append |bs| to |bytes|.
+    1. If roughly 50ms have passed since these steps were last invoked,
+       [=queue a task=] to [=fire a progress event=] called {{progress}} at |fr|.
+    1. Set |chunkPromise| to the result of [=read a chunk|reading a chunk=] from |stream| with |reader|.
+
+  1. Otherwise, if |chunkPromise| is fulfilled with an object whose `done` property is true,
+     [=queue a task=] to run the following steps and abort this algorithm:
+    1. Set |fr|'s [=FileReader/state=] to `"done"`.
+    1. Let |result| be the result of
+       [=package data=] given |bytes|, |type|, |blob|'s {{Blob/type}}, and |encodingName|.
+    1. If [=package data=] threw an exception |error|:
+      1. Set |fr|'s [=FileReader/error=] to |error|.
+      1. [=Fire a progress event=] called {{error!!event}} at |fr|.
+    1. Else:
+      1. Set |fr|'s [=FileReader/result=] to |result|.
+      1. [=Fire a progress event=] called {{load}} at the |fr|.
+    1. If |fr|'s [=FileReader/state=] is not `"loading"`,
+       [=fire a progress event=] called {{loadend}} at the |fr|.
+
+       Note: Event handler for the {{load}} or {{error!!event}} events could have started another load,
+       if that happens the {{loadend}} event for this load is not fired.
+
+  1. Otherwise, if |chunkPromise| is rejected with an error |error|,
+     [=queue a task=] to run the following steps and abort this algorithm:
+    1. Set |fr|'s [=FileReader/state=] to `"done"`.
+    1. Set |fr|'s [=FileReader/error=] to |error|.
+    1. [=Fire a progress event=] called {{error!!event}} at |fr|.
+    1. If |fr|'s [=FileReader/state=] is not `"loading"`,
+       [=fire a progress event=] called {{loadend}} at |fr|.
+
+       Note: Event handler for the {{error!!event}} event could have started another load,
+       if that happens the {{loadend}} event for this load is not fired.
+
+Use the [=file reading task source=] for all these tasks.
+</div>
+
+### Event Handler Content Attributes ### {#event-handler-attributes-section}
 
 The following are the <a>event handler content attributes</a>
 (and their corresponding <a>event handler event types</a>)
@@ -1025,288 +1054,135 @@ that user agents must support on {{FileReader}} as DOM attributes:
       <td>{{loadend}}
 </table>
 
-<h4 id="blobreader-state">
-FileReader States</h4>
+### FileReader States ### {#blobreader-state}
 
+<div class="note domintro">
 The {{FileReader}} object can be in one of 3 states.
-The <dfn attribute for=FileReader id="dfn-readyState">readyState</dfn> attribute,
-on getting,
-must return the current state,
-which must be one of the following values:
+The {{FileReader/readyState}} attribute tells you in which state the object is:
 
-<dl dfn-type=const dfn-for=FileReader>
-  <dt><dfn id="dfn-empty">EMPTY</dfn> (numeric value 0)
-  <dd>The {{FileReader}} object has been constructed,
-    and there are no pending reads.
-    None of the <a>read methods</a> have been called.
-    This is the default state of a newly minted {{FileReader}} object,
-    until one of the <a>read methods</a> have been called on it.
-  <dt><dfn id="dfn-loading">LOADING</dfn> (numeric value 1)
-  <dd>A {{File}} or {{Blob}} is being read.
-    One of the <a>read methods</a> is being processed,
-    and no error has occurred during the read.
-  <dt><dfn id="dfn-done">DONE</dfn> (numeric value 2)
-  <dd>The entire {{File}} or {{Blob}} has been read into memory,
-    OR a <a>file read error</a> occurred,
-    OR the read was aborted using {{FileReader/abort()}}.
-    The {{FileReader}} is no longer reading a {{File}} or {{Blob}}.
-    If {{FileReader/readyState}} is set to {{FileReader/DONE}}
-    it means at least one of the <a>read methods</a> have been called on this {{FileReader}}.
-</dl>
+: {{EMPTY}} (numeric value 0)
+:: The {{FileReader}} object has been constructed,
+   and there are no pending reads.
+   None of the [=read methods=] have been called.
+   This is the default state of a newly minted {{FileReader}} object,
+   until one of the [=read methods=] have been called on it.
+: {{LOADING}} (numeric value 1)
+:: A {{File}} or {{Blob}} is being read.
+   One of the [=read methods=] is being processed,
+   and no error has occurred during the read.
+: {{DONE}} (numeric value 2)
+:: The entire {{File}} or {{Blob}} has been read into memory,
+   OR a [=file read error=] occurred,
+   OR the read was aborted using {{FileReader/abort()}}.
+   The {{FileReader}} is no longer reading a {{File}} or {{Blob}}.
+   If {{FileReader/readyState}} is set to {{FileReader/DONE}}
+   it means at least one of the [=read methods=] have been called on this {{FileReader}}.
 
-<h4 id="reading-a-file">
-Reading a File or Blob</h4>
+</div>
+
+### Reading a File or Blob ### {#reading-a-file}
 
 The {{FileReader}} interface makes available several <dfn id="asynchronous-read-methods" lt="asynchronous read method">asynchronous read methods</dfn>--
 {{FileReader/readAsArrayBuffer()}}, {{FileReader/readAsBinaryString()}}, {{FileReader/readAsText()}} and {{FileReader/readAsDataURL()}},
 which read files into memory.
-If multiple concurrent read methods are called on the same {{FileReader}} object,
-user agents must throw an {{InvalidStateError}} on any of the read methods that occur
+
+Note: If multiple concurrent read methods are called on the same {{FileReader}} object,
+user agents throw an {{InvalidStateError}} on any of the read methods that occur
 when {{FileReader/readyState}} = {{FileReader/LOADING}}.
 
-({{FileReaderSync}} makes available several <a>synchronous read methods</a>.
+({{FileReaderSync}} makes available several [=synchronous read methods=].
   Collectively, the sync and async read methods of {{FileReader}} and {{FileReaderSync}}
   are referred to as just <dfn lt="read method">read methods</dfn>.)
 
-<h5 id="filedata-attr">
-The {{FileReader/result}} attribute</h5>
+#### The {{FileReader/readAsDataURL()}} method #### {#readAsDataURL}
 
-On getting, the <dfn attribute for=FileReader id="dfn-result">result</dfn> attribute returns a {{Blob}}'s data
-as a {{DOMString}}, or as an {{ArrayBuffer}}, or <code>null</code>,
-depending on the <a>read method</a> that has been called on the {{FileReader}},
-and any errors that may have occurred.
+The <dfn method for=FileReader id="dfn-readAsDataURL">readAsDataURL(|blob|)</dfn> method,
+when invoked, must initiate a [=read operation=] for |blob| with *DataURL*.
 
-The list below is normative for the {{FileReader/result}} attribute
-and is the conformance criteria for this attribute:
+#### The {{FileReader/readAsText()}} method #### {#readAsDataText}
 
-* On getting,
-  if the {{FileReader/readyState}} is {{FileReader/EMPTY}}
-  (no read method has been called)
-  then the {{FileReader/result}} attribute must return <code>null</code>.
-* On getting,
-  if an error in reading the {{File}} or {{Blob}} has occurred
-  (using *any* <a>read method</a>)
-  then the {{FileReader/result}} attribute must return <code>null</code>.
-* On getting, if the {{FileReader/readAsDataURL()}} <a>read method</a> is used,
-  the {{FileReader/result}} attribute must return a {{DOMString}}
-  that is a Data URL [[!RFC2397]] encoding of the {{File}} or {{Blob}}'s data.
-* On getting, if the {{FileReader/readAsBinaryString()}} <a>read method</a> is called
-  and no error in reading the {{File}} or {{Blob}} has occurred,
-  then the {{FileReader/result}} attribute must return a {{DOMString}}
-  representing the {{File}} or {{Blob}}'s data as a <dfn>binary string</dfn>,
-  in which every byte is represented by a code unit of equal value [0...255].
-* On getting, if the {{FileReader/readAsText()}} <a>read method</a> is called
-  and no error in reading the {{File}} or {{Blob}} has occurred,
-  then the {{FileReader/result}} attribute must return a string
-  representing the {{File}} or {{Blob}}'s data as a text string,
-  and should decode the string into memory in the format specified by the <a>encoding determination</a> as a {{DOMString}}.
-* On getting, if the {{FileReader/readAsArrayBuffer()}} <a>read method</a> is called
-  and no error in reading the {{File}} or {{Blob}} has occurred,
-  then the {{FileReader/result}} attribute must return an {{ArrayBuffer}} object.
+The <dfn method for=FileReader id="dfn-readAsText">readAsText(|blob|, |encoding|)</dfn> method,
+when invoked, must initiate a [=read operation=] for |blob| with *Text* and |encoding|.
 
-<h5 id="readAsDataURL">
-The {{FileReader/readAsDataURL()}} method</h5>
+#### The {{FileReader/readAsArrayBuffer()}} #### {#readAsArrayBuffer}
 
-When the <dfn method for=FileReader id="dfn-readAsDataURL">readAsDataURL(blob)</dfn> method is called,
-the user agent must run the steps below.
+The <dfn method for=FileReader id="dfn-readAsArrayBuffer">readAsArrayBuffer(|blob|)</dfn> method,
+when invoked, must initiate a [=read operation=] for |blob| with *ArrayBuffer*.
 
-1. If {{FileReader/readyState}} = {{FileReader/LOADING}}
-  throw an {{InvalidStateError}} exception and <a>terminate this algorithm</a>.
-3. Otherwise set {{FileReader/readyState}} to {{FileReader/LOADING}}.
-4. Initiate an <a>annotated task read operation</a> using the <code>blob</code> argument as |input|
-  and handle <a lt="queue a task">tasks queued</a> on the <a>file reading task source</a> per below.
-5. To <a>process read error</a> with a <a>failure reason</a>,
-  proceed to [[#dfn-error-steps]].
-6. To <a>process read</a> <a>fire a progress event</a> called {{loadstart}} at the <a>context object</a>.
-7. To <a>process read data</a> <a>fire a progress event</a> called {{progress}} at the <a>context object</a>.
-8. To <a>process read EOF</a> run these substeps:
-  1. Set {{FileReader/readyState}} to {{FileReader/DONE}}.
-  2. Set the {{FileReader/result}} attribute to the [=/body=] returned by the <a>read operation</a> as a DataURL [[!RFC2397]];
-    on getting, the {{FileReader/result}} attribute returns the <code>blob</code> as a Data URL [[!RFC2397]].
+#### The {{FileReader/readAsBinaryString()}} method #### {#readAsBinaryString}
 
-    * Use the <code>blob</code>'s {{Blob/type}} attribute as part of the Data URL if it is available
-      in keeping with the Data URL specification [[!RFC2397]].
-    * If the {{Blob/type}} attribute is not available on the <code>blob</code> return a Data URL without a media-type. [[!RFC2397]].
-      Data URLs that do not have media-types [[RFC2046]] must be treated as plain text by conforming user agents. [[!RFC2397]].
-  3. <a>Fire a progress event</a> called {{load}} at the <a>context object</a>.
-  4. Unless {{FileReader/readyState}} is {{FileReader/LOADING}}
-    <a>fire a progress event</a> called {{loadend}} at the <a>context object</a>.
-    If {{FileReader/readyState}} is {{FileReader/LOADING}} do NOT fire {{loadend}} at the <a>context object</a>.
-9. <a>Terminate this algorithm</a>.
+The <dfn method for=FileReader id="dfn-readAsBinaryString">readAsBinaryString(|blob|)</dfn> method,
+when invoked, must initiate a [=read operation=] for |blob| with *BinaryString*.
 
-<h5 id="readAsDataText">
-The {{FileReader/readAsText()}} method</h5>
+Note: The use of {{FileReader/readAsArrayBuffer()}} is preferred over
+{{FileReader/readAsBinaryString()}}, which is provided for backwards
+compatibility.
 
-The {{FileReader/readAsText()}} method can be called with an optional parameter,
-<dfn argument for="FileReader/readAsText(blob, encoding), FileReader/readAsText(), FileReaderSync/readAsText(blob, encoding)" id="dfn-encoding" oldids="dfn-label">encoding</dfn>,
-which is a {{DOMString}} argument that represents the label of an encoding [[!Encoding]];
-if provided, it must be used as part of the <a>encoding determination</a> used when processing this method call.
-
-When the <dfn method for=FileReader id="dfn-readAsText">readAsText(blob, encoding)</dfn> method is called,
-the user agent must run the steps below.
-
-1. If {{FileReader/readyState}} = {{FileReader/LOADING}} throw an {{InvalidStateError}} and <a>terminate this algorithm</a>.
-3. Otherwise set {{FileReader/readyState}} to {{FileReader/LOADING}}.
-4. Initiate an <a>annotated task read operation</a> using the <code>blob</code> argument as |input|
-  and handle <a lt="queue a task">tasks queued</a> on the <a>file reading task source</a> per below.
-5. To <a>process read error</a> with a <a>failure reason</a>,
-  proceed to the [[#dfn-error-steps]].
-6. To <a>process read</a> <a>fire a progress event</a> called {{loadstart}} at the <a>context object</a>.
-7. To <a>process read data</a> <a>fire a progress event</a> called {{progress}} at the <a>context object</a>.
-8. To <a>process read EOF</a> run these substeps:
-  1. Set {{FileReader/readyState}} to {{FileReader/DONE}}
-  2. Set the {{FileReader/result}} attribute to the [=/body=] returned by the <a>read operation</a>,
-    represented as a string in a format determined by the <a>encoding determination</a>.
-  3. <a>Fire a progress event</a> called {{load}} at the <a>context object</a>.
-  4. Unless {{FileReader/readyState}} is {{FileReader/LOADING}}
-    <a>fire a progress event</a> called {{loadend}} at the <a>context object</a>.
-    If {{FileReader/readyState}} is {{FileReader/LOADING}}
-    do NOT fire {{loadend}} at the <a>context object</a>.
-9. <a>Terminate this algorithm</a>.
-
-<h5 id="readAsArrayBuffer">
-The {{FileReader/readAsArrayBuffer()}} method</h5>
-
-When the <dfn method for=FileReader id="dfn-readAsArrayBuffer">readAsArrayBuffer(blob)</dfn> method is called,
-the user agent must run the steps below.
-
-1. If {{FileReader/readyState}} = {{FileReader/LOADING}} throw an {{InvalidStateError}} exception and <a>terminate this algorithm</a>.
-3. Otherwise set {{FileReader/readyState}} to {{FileReader/LOADING}}.
-4. Initiate an <a>annotated task read operation</a> using the <code>blob</code> argument as |input|
-  and handle <a lt="queue a task">tasks queued</a> on the <a>file reading task source</a> per below.
-5. To <a>process read error</a> with a <a>failure reason</a>,
-  proceed to the [[#dfn-error-steps]].
-6. To <a>process read</a> <a>fire a progress event</a> called {{loadstart}} at the <a>context object</a>.
-7. To <a>process read data</a> <a>fire a progress event</a> called {{progress}} at the <a>context object</a>.
-8. To <a>process read EOF</a> run these substeps:
-  1. Set {{FileReader/readyState}} to {{FileReader/DONE}}
-  2. Set the {{FileReader/result}} attribute to the [=/body=] returned by the <a>read operation</a> as an {{ArrayBuffer}} object.
-  3. <a>Fire a progress event</a> called {{load}} at the <a>context object</a>.
-  4. Unless {{FileReader/readyState}} is {{FileReader/LOADING}}
-    <a>fire a progress event</a> called {{loadend}} at the <a>context object</a>.
-    If {{FileReader/readyState}} is {{FileReader/LOADING}}
-    do NOT fire {{loadend}} at the <a>context object</a>.
-9. <a>Terminate this algorithm</a>.
-
-<h5 id="readAsBinaryString">
-The {{FileReader/readAsBinaryString()}} method</h5>
-
-When the <dfn method for=FileReader id="dfn-readAsBinaryString">readAsBinaryString(blob)</dfn> method is called,
-the user agent must run the steps below.
-
-1. If {{FileReader/readyState}} = {{FileReader/LOADING}} throw an {{InvalidStateError}} exception and <a>terminate this algorithm</a>.
-3. Otherwise set {{FileReader/readyState}} to {{FileReader/LOADING}}.
-4. Initiate an <a>annotated task read operation</a> using the <code>blob</code> argument as |input|
-  and handle <a lt="queue a task">tasks queued</a> on the <a>file reading task source</a> per below.
-5. To <a>process read error</a> with a <a>failure reason</a>,
-  proceed to the [[#dfn-error-steps]].
-6. To <a>process read</a> <a>fire a progress event</a> called {{loadstart}} at the <a>context object</a>.
-7. To <a>process read data</a> <a>fire a progress event</a> called {{progress}} at the <a>context object</a>.
-8. To <a>process read EOF</a> run these substeps:
-  1. Set {{FileReader/readyState}} to {{FileReader/DONE}}
-  2. Set the {{FileReader/result}} attribute to the [=/body=] returned by the <a>read operation</a> as a <a>binary string</a>.
-  3. <a>Fire a progress event</a> called {{load}} at the <a>context object</a>.
-  4. Unless {{FileReader/readyState}} is {{FileReader/LOADING}}
-    <a>fire a progress event</a> called {{loadend}} at the <a>context object</a>.
-    If {{FileReader/readyState}} is {{FileReader/LOADING}}
-    do NOT fire {{loadend}} at the <a>context object</a>.
-9. <a>Terminate this algorithm</a>.
-
-<div class=note>
-  The use of {{FileReader/readAsArrayBuffer()}} is preferred over
-  {{FileReader/readAsBinaryString()}}, which is provided for backwards
-  compatibility.
-</div>
-
-<h5 id="dfn-error-steps">
-Error Steps</h5>
-
-These error steps are to <a>process read error</a> with a <a>failure reason</a>.
-
-1. Set the <a>context object</a>'s {{FileReader/readyState}} to {{FileReader/DONE}}
-  and {{FileReader/result}} to null if it is not already set to null.
-2. Set the {{error!!attribute}} attribute on the <a>context object</a>;
-  on getting, the {{error!!attribute}} attribute must be a a {{DOMException}} object
-  that corresponds to the <a>failure reason</a>.
-  <a>Fire a progress event</a> called {{error!!event}} at the <a>context object</a>.
-3. Unless {{FileReader/readyState}} is {{FileReader/LOADING}},
-  <a>fire a progress event</a> called {{loadend}} at the <a>context object</a>.
-  If {{FileReader/readyState}} is {{FileReader/LOADING}}
-  do NOT fire {{loadend}} at the <a>context object</a>.
-4. <a lt="terminate this algorithm">Terminate the algorithm</a> for any <a>read method</a>.
-
-<h5 id="abort">
-The abort() method</h5>
+#### The {{FileReader/abort()}} method #### {#abort}
 
 When the <dfn method for=FileReader id="dfn-abort">abort()</dfn> method is called,
 the user agent must run the steps below:
 
-1. If {{FileReader/readyState}} = {{FileReader/EMPTY}}
-  or if {{FileReader/readyState}} = {{FileReader/DONE}}
-  set {{FileReader/result}} to <code>null</code>
-  and <a>terminate this algorithm</a>.
-2. If {{FileReader/readyState}} = {{FileReader/LOADING}}
-  set {{FileReader/readyState}} to {{FileReader/DONE}}
-  and {{FileReader/result}} to <code>null</code>.
-3. If there are any <a>tasks</a> from the <a>context object</a>
-  on the <a>file reading task source</a> in an affiliated <a lt="queue a task">task queue</a>,
-  then remove those <a>tasks</a> from that task queue.
-4. <a lt="terminate an algorithm">Terminate the algorithm</a> for the <a>read method</a> being processed.
-5. <a>Fire a progress event</a> called {{abort}}.
-6. <a>Fire a progress event</a> called {{loadend}}.
+1. If [=context object=]'s [=FileReader/state=] is `"empty"`
+   or if [=context object=]'s [=FileReader/state=] is `"done"`
+   set [=context object=]'s [=FileReader/result=] to `null`
+   and [=terminate this algorithm=].
+1. If [=context object=]'s [=FileReader/state=] is `"loading"`
+   set [=context object=]'s [=FileReader/state=] to `"done"`
+   and set [=context object=]'s [=FileReader/result=] to `null`.
+1. If there are any [=tasks=] from the [=context object=]
+   on the [=file reading task source=] in an affiliated [=queue a task|task queue=],
+   then remove those [=tasks=] from that task queue.
+1. [=terminate an algorithm|Terminate the algorithm=] for the [=read method=] being processed.
+1. [=Fire a progress event=] called {{abort}} at the [=context object=].
+1. If [=context object=]'s [=FileReader/state=] is not `"loading"`,
+   [=fire a progress event=] called {{loadend}} at the [=context object=].
 
-<h5 id="blobAndFileParams">
-Blob Parameters</h5>
+## Packaging data ## {#packaging-data}
 
-The <a>asynchronous read methods</a>,
-the <a>synchronous read methods</a>, and
-<code>URL.{{URL/createObjectURL()}}</code>
-take a {{Blob}} parameter.
-This section defines this parameter.
+<div algorithm="package data">
+A {{Blob}} has an associated <dfn for=Blob>package data</dfn> algorithm,
+given |bytes|, a |type|, a optional |mimeType|, and a optional |encodingName|,
+which switches on |type| and runs the associated steps:
 
-<dl>
-  <dt><dfn id="dfn-fileBlob" argument for="FileReader/readAsArrayBuffer(blob), FileReader/readAsBinaryString(blob), FileReader/readAsText(blob, encoding), FileReader/readAsText(), FileReader/readAsDataURL(blob), URL/createObjectURL(blob), FileReaderSync/readAsArrayBuffer(blob), FileReaderSync/readAsBinaryString(blob), FileReaderSync/readAsText(blob, encoding), FileReaderSync/readAsDataURL(blob)">blob</dfn>
-  <dd>This is a {{Blob}} argument
-    and must be a reference to a single {{File}} in a {{FileList}}
-    or a {{Blob}} argument not obtained from the underlying OS file system.
-</dl>
+: DataURL
+:: Return |bytes| as a DataURL [[!RFC2397]] subject to the considerations below:
 
+  * Use |mimeType| as part of the Data URL if it is available
+    in keeping with the Data URL specification [[!RFC2397]].
+  * If |mimeType| is not available return a Data URL without a media-type. [[!RFC2397]].
 
-<h3 id="enctype">
-Determining Encoding</h3>
+  Issue(104): Better specify how the DataURL is generated.
 
-When reading {{Blob}} objects using the {{FileReader/readAsText()}} <a>read method</a>,
-the following <dfn id="encoding-determination">encoding determination</dfn> steps must be followed:
+: Text
+:: 1. Let |encoding| be failure.
+   1. If the |encodingName| is present, set |encoding| to the result of
+      [=getting an encoding=] from |encodingName|.
+   1. If |encoding| is failure, and |mimeType| is present:
+     1. Let |type| be the result of [=parse a MIME type=] given |mimeType|.
+     1. If |type| is not failure,
+        set |encoding| to the result of [=getting an encoding=]
+        from |type|'s [=MIME type/parameters=][`"charset"`].
 
-1. Let |encoding| be null.
-2. If the {{FileReader/readAsText()/encoding}} argument is present when calling the method,
-  set |encoding| to the result of the <a>getting an encoding</a> from {{FileReader/readAsText()/encoding}}.
-3. If the <a>getting an encoding</a> steps above return failure,
-  then set |encoding| to null.
-4. If |encoding| is null,
-  and the {{FileReader/readAsText()/blob}} argument's {{Blob/type}} attribute is present,
-  and it uses a Charset Parameter [[RFC2046]],
-  set |encoding| to the result of <a>getting an encoding</a>
-  for the portion of the Charset Parameter that is a <i>label</i> of an encoding.
+      <div class="example">
+        If `blob` has a {{Blob/type}} attribute of `text/plain;charset=utf-8`
+        then <a>getting an encoding</a> is run using `"utf-8"` as the label.
+        Note that user agents must parse and extract the portion of the Charset Parameter
+        that constitutes a *label* of an encoding.
+      </div>
+   1. If |encoding| is failure, then set |encoding| to [=UTF-8=].
+   1. [=Decode=] |bytes| using fallback encoding |encoding|, and return the result.
 
-  <div class="example">
-    If <code>blob</code> has a {{Blob/type}} attribute of <code>text/plain;charset=utf-8</code>
-    then <a>getting an encoding</a> is run using <code>"utf-8"</code> as the label.
-    Note that user agents must parse and extract the portion of the Charset Parameter that constitutes a <i>label</i> of an encoding.
-  </div>
-5. If the <a>getting an encoding</a> steps above return failure,
-  then set |encoding| to null.
-6. If |encoding| is null,
-  then set encoding to utf-8.
-7. <a>Decode</a> this <code>blob</code> using fallback encoding |encoding|,
-  and return the result.
-  On getting, the {{FileReader/result}} attribute of the {{FileReader}} object
-  returns a string in |encoding| format.
-  The synchronous {{FileReaderSync/readAsText()}} method of the {{FileReaderSync}} object
-  returns a string in |encoding| format.
+: ArrayBuffer
+:: Return a new `ArrayBuffer` whose contents are |bytes|.
 
-<h3 id="events">
-Events</h3>
+: BinaryString
+:: Return |bytes| as a binary string,
+   in which every byte is represented by a code unit of equal value [0..255].
+
+</div>
+
+## Events ## {#events}
 
 The {{FileReader}} object must be the event target for all events in this specification.
 
@@ -1318,8 +1194,7 @@ the following are normative:
 * The progress event <code>e</code> does not bubble.  <code>e.bubbles</code> must be false [[DOM]]
 * The progress event <code>e</code> is NOT cancelable. <code>e.cancelable</code> must be false [[DOM]]
 
-<h4 id="event-summary">
-Event Summary</h4>
+### Event Summary ### {#event-summary}
 
 The following are the events that are <a lt="fire an event">fired</a> at {{FileReader}} objects.
 
@@ -1357,8 +1232,7 @@ The following are the events that are <a lt="fire an event">fired</a> at {{FileR
       <td>When the request has completed (either in success or failure).
 </table>
 
-<h4 id="eventInvariants">
-Summary of Event Invariants</h4>
+### Summary of Event Invariants ### {#eventInvariants}
 
 *This section is informative.*
 
@@ -1402,8 +1276,7 @@ for a given asynchronous <a>read method</a> in this specification:
   At most one of {{abort}}, {{load}}, and {{error!!event}} fire for a given read.
 5. No {{abort}}, {{load}}, or {{error!!event}} event fires after {{loadend}}.
 
-<h3 id="readingOnThreads">
-Reading on Threads</h3>
+## Reading on Threads ## {#readingOnThreads}
 
 Web Workers allow for the use of synchronous {{File}} or {{Blob}} read APIs,
 since such reads on threads do not block the main thread.
@@ -1411,8 +1284,7 @@ This section defines a synchronous API, which can be used within Workers [[Web W
 Workers can avail of both the asynchronous API (the {{FileReader}} object)
 *and* the synchronous API (the {{FileReaderSync}} object).
 
-<h4 id="FileReaderSync">
-The {{FileReaderSync}} API</h4>
+### The {{FileReaderSync}} API ### {#FileReaderSync}
 
 This interface  provides methods to <dfn id="read-method-sync" lt="synchronous read method">synchronously read</dfn>
 {{File}} or {{Blob}} objects into memory.
@@ -1429,84 +1301,68 @@ interface FileReaderSync {
 };
 </pre>
 
-<h5 id="filereadersyncConstrctr">
-Constructors</h5>
+#### Constructors #### {#filereadersyncConstrctr}
 
 When the {{FileReaderSync()}} constructor is invoked,
 the user agent must return a new {{FileReaderSync}} object.
 
-In environments where the global object is represented by a {{WorkerGlobalScope}} object,
-the {{FileReaderSync}} constructor must be available.
+#### The {{FileReaderSync/readAsText()}} #### {#readAsTextSync}
 
-<h5 id="readAsTextSync">
-The {{FileReaderSync/readAsText()}} method</h5>
+The <dfn method for=FileReaderSync id="dfn-readAsTextSync">readAsText(|blob|, |encoding|)</dfn> method,
+when invoked, must run these steps:
 
-When the <dfn method for=FileReaderSync id="dfn-readAsTextSync">readAsText(blob, encoding)</dfn> method is called,
-the following steps must be followed:
+1. Let |stream| be the result of calling [=get stream=] on |blob|.
+1. Let |reader| be the result of [=get a reader|getting a reader=] from |stream|.
+1. Let |promise| be the result of [=read all bytes|reading all bytes=] from |stream| with |reader|.
+1. Wait for |promise| to be fulfilled or rejected.
+1. If |promise| fulfilled with a [=byte sequence=] |bytes|:
+  1. Return the result of [=package data=] given |bytes|, *Text*, |blob|'s {{Blob/type}}, and |encoding|.
+1. Throw |promise|'s rejection reason.
 
-1. Initiate a <a>read operation</a> using the <code>blob</code> argument,
-  and with the <a>synchronous flag</a> *set*.
-  If the read operation returns failure,
-  throw the appropriate exception as defined in [[#dfn-error-codes]].
-  <a>Terminate this algorithm</a>.
-1. If no error has occurred,
-  return the |result| of the <a>read operation</a> represented as a string
-  in a format determined through the <a>encoding determination</a> algorithm.
+#### The {{FileReaderSync/readAsDataURL()}} method #### {#readAsDataURLSync-section}
 
-<h5 id="readAsDataURLSync-section">
-The {{FileReaderSync/readAsDataURL()}} method</h5>
+The <dfn method for=FileReaderSync id="dfn-readAsDataURLSync">readAsDataURL(|blob|)</dfn> method,
+when invoked, must run these steps:
 
-When the <dfn method for=FileReaderSync id="dfn-readAsDataURLSync">readAsDataURL(blob)</dfn> method is called,
-the following steps must be followed:
+1. Let |stream| be the result of calling [=get stream=] on |blob|.
+1. Let |reader| be the result of [=get a reader|getting a reader=] from |stream|.
+1. Let |promise| be the result of [=read all bytes|reading all bytes=] from |stream| with |reader|.
+1. Wait for |promise| to be fulfilled or rejected.
+1. If |promise| fulfilled with a [=byte sequence=] |bytes|:
+  1. Return the result of [=package data=] given |bytes|, *DataURL*, and |blob|'s {{Blob/type}}.
+1. Throw |promise|'s rejection reason.
 
-1. Initiate a <a>read operation</a> using the <code>blob</code> argument,
-  and with the <a>synchronous flag</a> *set*.
-  If the <a>read operation</a> returns failure,
-  throw the appropriate exception as defined in [[#dfn-error-codes]].
-  <a>Terminate this algorithm</a>.
-1. If no error has occurred, return the |result| of the <a>read operation</a>
-  as a Data URL [[!RFC2397]] subject to the considerations below:
+#### The {{FileReaderSync/readAsArrayBuffer()}} method #### {#readAsArrayBufferSyncSection}
 
-  * Use the <code>blob</code>'s {{Blob/type}} attribute as part of the Data URL if it is available
-    in keeping with the Data URL specification [[!RFC2397]].
-  * If the {{Blob/type}} attribute is not available on the <code>blob</code> return a Data URL without a media-type. [[!RFC2397]].
-    Data URLs that do not have media-types [[RFC2046]] must be treated as plain text by conforming user agents. [[!RFC2397]].
+The <dfn method for=FileReaderSync id="dfn-readAsArrayBufferSync">readAsArrayBuffer(|blob|)</dfn> method,
+when invoked, must run these steps:
 
-<h5 id="readAsArrayBufferSyncSection">
-The {{FileReaderSync/readAsArrayBuffer()}} method</h5>
+1. Let |stream| be the result of calling [=get stream=] on |blob|.
+1. Let |reader| be the result of [=get a reader|getting a reader=] from |stream|.
+1. Let |promise| be the result of [=read all bytes|reading all bytes=] from |stream| with |reader|.
+1. Wait for |promise| to be fulfilled or rejected.
+1. If |promise| fulfilled with a [=byte sequence=] |bytes|:
+  1. Return the result of [=package data=] given |bytes|, *ArrayBuffer*, and |blob|'s {{Blob/type}}.
+1. Throw |promise|'s rejection reason.
 
-When the <dfn method for=FileReaderSync id="dfn-readAsArrayBufferSync">readAsArrayBuffer(blob)</dfn> method is called,
-the following steps must be followed:
+#### The {{FileReaderSync/readAsBinaryString()}} method #### {#readAsBinaryStringSyncSection}
 
-1. Initiate a <a>read operation</a> using the <code>blob</code> argument,
-  and with the <a>synchronous flag</a> *set*.
-  If the <a>read operation</a> returns failure,
-  throw the appropriate exception as defined in [[#dfn-error-codes]].
-  <a>Terminate this algorithm</a>.
-1. If no error has occurred, return the |result| of the <a>read operation</a> as an {{ArrayBuffer}}.
+The <dfn method for=FileReaderSync id="dfn-readAsBinaryStringSync">readAsBinaryString(|blob|)</dfn> method,
+when invoked, must run these steps:
 
-<h5 id="readAsBinaryStringSyncSection">
-The {{FileReaderSync/readAsBinaryString()}} method</h5>
+1. Let |stream| be the result of calling [=get stream=] on |blob|.
+1. Let |reader| be the result of [=get a reader|getting a reader=] from |stream|.
+1. Let |promise| be the result of [=read all bytes|reading all bytes=] from |stream| with |reader|.
+1. Wait for |promise| to be fulfilled or rejected.
+1. If |promise| fulfilled with a [=byte sequence=] |bytes|:
+  1. Return the result of [=package data=] given |bytes|, *BinaryString*, and |blob|'s {{Blob/type}}.
+1. Throw |promise|'s rejection reason.
 
-When the <dfn method for=FileReaderSync id="dfn-readAsBinaryStringSync">readAsBinaryString(blob)</dfn> method is called,
-the following steps must be followed:
+Note: The use of {{FileReaderSync/readAsArrayBuffer()}} is preferred over
+{{FileReaderSync/readAsBinaryString()}}, which is provided for
+backwards compatibility.
 
-1. Initiate a <a>read operation</a> using the <code>blob</code> argument,
-  and with the <a>synchronous flag</a> *set*.
-  If the <a>read operation</a> returns failure,
-  throw the appropriate exception as defined in [[#dfn-error-codes]].
-  <a>Terminate this algorithm</a>.
-1. If no error has occurred, return the |result| of the
-  <a>read operation</a> as an <a>binary string</a>.
-
-<div class=note>
-  The use of {{FileReaderSync/readAsArrayBuffer()}} is preferred over
-  {{FileReaderSync/readAsBinaryString()}}, which is provided for
-  backwards compatibility.
-</div>
-
-<h2 id="ErrorAndException">
-Errors and Exceptions</h2>
+# Errors and Exceptions # {#ErrorAndException}
 
 <dfn lt="file read error" id="file-error-read">File read errors</dfn> can occur when reading files from the underlying filesystem.
 The list below of potential error conditions is *informative*.
@@ -1528,22 +1384,21 @@ The list below of potential error conditions is *informative*.
   attempts to read from them may be considered a security violation.
   See [[#security-discussion]] and {{SecurityError}}.
 
-<h3 id="dfn-error-codes">
-Throwing an Exception or Returning an Error</h3>
+## Throwing an Exception or Returning an Error ## {#dfn-error-codes}
 
 *This section is normative.*
 
 Error conditions can arise when reading a {{File}} or a {{Blob}}.
 
 The <a>read operation</a> can terminate due to error conditions when reading a {{File}} or a {{Blob}};
-the particular error condition that causes a read operation to return failure
-or <a>queue a task</a> to <a>process read error</a>
-is called a <dfn id="failureReason">failure reason</dfn>.
+the particular error condition that causes the [=get stream=] algorithm to fail
+is called a <dfn id="failureReason">failure reason</dfn>. A <a>failure reason</a> is one of
+[=NotFound=], [=UnsafeFile=], [=TooManyReads=], [=SnapshotState=], or [=FileLock=].
 
 Synchronous read methods <a>throw</a> exceptions of the type in the table below
 if there has been an error owing to a particular <a>failure reason</a>.
 
-Asynchronous read methods use the <dfn attribute for=FileReader id="dfn-error">error</dfn> attribute of the {{FileReader}} object,
+Asynchronous read methods use the {{FileReader/error!!attribute}} attribute of the {{FileReader}} object,
 which must return a {{DOMException}} object of the most appropriate type from the table below
 if there has been an error owing to a particular <a>failure reason</a>,
 or otherwise return null.
@@ -1585,45 +1440,40 @@ or otherwise return null.
         and synchronous read methods must <a>throw</a> a {{NotReadableError}} exception.
 </table>
 
-<h2 id=url>
-A URL for Blob and File reference</h2>
+# A URL for Blob and MediaSource reference # {#url}
 
-This section defines a [=url/scheme=] for a [=/URL=] used to refer to {{Blob}} objects (and {{File}} objects).
+This section defines a [=url/scheme=] for a [=/URL=] used to refer to {{Blob}}
+and {{MediaSource}} objects.
 
-Note: other specifications, such as [[MEDIA-SOURCE]] extend this scheme to also refer to other types of objects.
-
-<h3 id="url-intro">
-Introduction</h3>
+## Introduction ## {#url-intro}
 
 *This section is informative.*
 
 [=Blob URL|Blob (or object) URLs=] are URLs like
 `blob:http://example.com/550e8400-e29b-41d4-a716-446655440000`.
-This enables integration of {{Blob}}s and {{File}}s with other Web Platform APIs
-that are only designed to be used with URLs, such as the <{img}> element.
-[=Blob URLs=] can also be used to navigate to as well as to trigger downloads of
-locally generated data.
+This enables integration of {{Blob}}s and {{MediaSource}}s with other
+APIs that are only designed to be used with URLs, such as the <{img}> element.
+[=Blob URLs=] can also be used to navigate to as well as to trigger downloads
+of locally generated data.
 
 For this purpose two static methods are exposed on the {{URL}} interface,
-{{URL/createObjectURL(blob)}} and {{URL/revokeObjectURL(url)}}.
+{{URL/createObjectURL(obj)}} and {{URL/revokeObjectURL(url)}}.
 The first method creates a mapping from a [=/URL=] to a {{Blob}},
 and the second method revokes said mapping.
 As long as the mapping exist the {{Blob}} can't be garbage collected,
 so some care must be taken to revoke the URL as soon as the reference is no longer needed.
 All URLs are revoked when the global that created the URL itself goes away.
 
-<h3 id="url-model">
-Model</h3>
+## Model ## {#url-model}
 
 Each user agent must maintain a <dfn id="BlobURLStore" export>blob URL store</dfn>.
 A [=blob URL store=] is a [=map=]
 where [=map/keys=] are [=valid URL strings=]
 and [=map/values=] are [=blob URL Entries=].
 
-A <dfn>blob URL entry</dfn> consists of
-an <dfn for="blob URL entry">object</dfn> (typically a {{Blob}},
-but other specs can extend this to refer to other types of objects),
-and an <dfn for="blob URL entry">environment</dfn> (an [=environment settings object=]).
+A <dfn export>blob URL entry</dfn> consists of
+an <dfn export for="blob URL entry">object</dfn> (of type {{Blob}} or {{MediaSource}}),
+and an <dfn export for="blob URL entry">environment</dfn> (an [=environment settings object=]).
 
 [=map/Keys=] in the [=blob URL store=] (also known as <dfn lt="blob URL|object URL" export>blob URLs</dfn>)
 are [=valid URL strings=] that when [=URL parser|parsed=]
@@ -1676,8 +1526,7 @@ run the following steps:
 
 </div>
 
-<h4 id="requestResponseModel">
-Dereferencing Model for blob URLs</h3>
+## Dereferencing Model for blob URLs ## {#requestResponseModel}
 
 <div algorithm="resolveURL">
 To <dfn export for="blob URL" lt="resolve">resolve a blob URL</dfn> given a |url| (a [=URL=]), run the following steps:
@@ -1689,36 +1538,23 @@ To <dfn export for="blob URL" lt="resolve">resolve a blob URL</dfn> given a |url
 
 </div>
 
-Futher requirements for the parsing an fetching model for [=blob URLs=] are defined in the [[!URL]] and [[!Fetch]] specifications.
+Futher requirements for the parsing and fetching model for [=blob URLs=] are defined in the [[!URL]] and [[!Fetch]] specifications.
 
-<h4 id="originOfBlobURL">
-Origin of blob URLs</h4>
+### Origin of blob URLs ### {#originOfBlobURL}
 
-<div algorithm="resolveURLOrigin">
-To <dfn export for="blob URL" lt="resolve the origin|resolving the origin">resolve the origin of a blob URL</dfn> given a |url| (a [=URL=]), run the following steps:
+*This section is informative.*
 
-1. [=Assert=]: |url|'s [=url/scheme=] is "`blob`".
-1. Let |entry| be the result of [=blob URL/resolve|resolving=] |url|.
-1. If |entry| is not failure, return |entry|'s [=blob URL entry/environment=]'s [=environment settings object/origin=].
-1. Let |nested url| be the result of [=URL parser|parsing=] |url|'s [=url/path=][0].
-1. Return a new [=opaque origin=], if |nested url| is failure, and |nested url|'s [=url/origin=] otherwise.
+The origin of a blob URL is always the same as that of the environment that created the URL,
+as long as the URL hasn't been revoked yet. This is achieved by the [[URL]] spec looking up
+the URL in the [=blob URL store=] when parsing a URL, and using that entry to return
+the correct origin.
 
-</div>
-
-Note: The effect of this algorithm is that the origin of a blob URL is always
-the same as that of the environment that created the URL,
-as long as the URL hasn't been revoked yet.
 If the URL was revoked the serialization of the origin will still remain the same
 as the serialization of the origin of the environment that created the blob URL,
-but for opaque origins the origin itself might be distinct.
-This difference isn't observable though, since a revoked blob URL can't be resolved/fetched anymore anyway.
+but for opaque origins the origin itself might be distinct. This difference isn't
+observable though, since a revoked blob URL can't be resolved/fetched anymore anyway.
 
-Issue: The [[URL]] spec should be updated to refer to this algorithm to resolve the origin of a blob URL when the URL is first parsed.
-This is tracked in <a href="https://github.com/w3c/FileAPI/issues/63">issue #63</a> and in
-<a href="https://github.com/whatwg/url/issues/127">whatwg/url#127</a>.
-
-<h4 id="lifeTime" dfn for="blob url" lt="lifetime|lifetime stipulation" export>
-Lifetime of blob URLs</h3>
+<h4 id="lifeTime" dfn for="blob url" lt="lifetime|lifetime stipulation" export>Lifetime of blob URLs</h4>
 
 This specification extends the [=unloading document cleanup steps=] with the following steps:
 
@@ -1728,8 +1564,7 @@ This specification extends the [=unloading document cleanup steps=] with the fol
 
 Issue: This needs a similar hook when a worker is unloaded.
 
-<h3 id="creating-revoking">
-Creating and Revoking a blob URL</h3>
+## Creating and Revoking a blob URL ## {#creating-revoking}
 
 <a>Blob URLs</a> are created and revoked using static methods exposed on the {{URL}} object.
 Revocation of a <a>blob URL</a> decouples the <a>blob URL</a> from the resource it refers to,
@@ -1741,14 +1576,14 @@ and presents methods for <a>blob URL</a> creation and revocation.
 <pre class="idl">
 [Exposed=(Window,DedicatedWorker,SharedWorker)]
 partial interface URL {
-  static DOMString createObjectURL(Blob blob);
+  static DOMString createObjectURL((Blob or MediaSource) obj);
   static void revokeObjectURL(DOMString url);
 };
 </pre>
 
 <div algorithm="createObjectURL">
-The <dfn method for=URL id="dfn-createObjectURL">createObjectURL(|blob|)</dfn> static method must
-return the result of [=adding an entry to the blob URL store=] for |blob|.
+The <dfn method for=URL id="dfn-createObjectURL">createObjectURL(|obj|)</dfn> static method must
+return the result of [=adding an entry to the blob URL store=] for |obj|.
 </div>
 
 <div algorithm="revokeObjectURL">
@@ -1756,7 +1591,7 @@ The <dfn method for=URL id="dfn-revokeObjectURL">revokeObjectURL(|url|)</dfn> st
 
 1. Let |url record| be the result of [=URL parser|parsing=] |url|.
 1. If |url record|'s [=url/scheme=] is not "`blob`", return.
-1. Let |origin| be the result of [=resolving the origin=] of |url record|.
+1. Let |origin| be the [=url/origin=] of |url record|.
 1. Let |settings| be the [=current settings object=].
 1. If |origin| is not [=same origin=] with |settings|'s [=environment settings object/origin=], return.
 1. [=Remove an entry from the Blob URL Store=] for |url|.
@@ -1786,8 +1621,7 @@ Requests that were started before the |url| was revoked should still succeed.
   results in a the user agent acting as if a <a>network error</a> has occurred.
 </div>
 
-<h4 id="examplesOfCreationRevocation">
-Examples of blob URL Creation and Revocation</h4>
+### Examples of blob URL Creation and Revocation ### {#examplesOfCreationRevocation}
 
 <a>Blob URL</a>s are strings that are used to [=/fetch=] {{Blob}} objects,
 and can persist for as long as the <code>document</code> from which they were minted
@@ -1837,8 +1671,7 @@ While not restricting number of uses of the <a>blob URL</a> offers more flexibil
 it increases the likelihood of leaks;
 developers should pair it with a corresponding call to <code>URL.{{revokeObjectURL()}}</code>.
 
-<h2 id="security-discussion">
-Security and Privacy Considerations</h2>
+# Security and Privacy Considerations # {#security-discussion}
 
 *This section is informative.*
 
@@ -1851,21 +1684,20 @@ Important security considerations include preventing malicious file selection at
 preventing access to system-sensitive files,
 and guarding against modifications of files on disk after a selection has taken place.
 
-* <dfn id="selection-looping">Preventing selection looping</dfn>.
-  During file selection, a user may be bombarded with the file picker associated with <code>&lt;input type="file"/></code>
-  (in a "must choose" loop that forces selection before the file picker is dismissed)
-  and a user agent may prevent file access to any selections by making the  {{FileList}} object returned be of size 0.
-* <dfn id="sensitive-files">System-sensitive files</dfn>
-  (e.g. files in /usr/bin, password files, and other native operating system executables)
-  typically should not be exposed to web content,
-  and should not be accessed via <a>blob URLs</a>.
-  User agents may <a>throw</a> a {{SecurityError}} exception for synchronous read methods,
-  or return a {{SecurityError}} exception for asynchronous reads.
+: Preventing selection looping
+:: During file selection, a user may be bombarded with the file picker associated with <code>&lt;input type="file"/></code>
+   (in a "must choose" loop that forces selection before the file picker is dismissed)
+   and a user agent may prevent file access to any selections by making the  {{FileList}} object returned be of size 0.
+: System-sensitive files
+:: (e.g. files in /usr/bin, password files, and other native operating system executables)
+   typically should not be exposed to web content,
+   and should not be accessed via <a>blob URLs</a>.
+   User agents may <a>throw</a> a {{SecurityError}} exception for synchronous read methods,
+   or return a {{SecurityError}} exception for asynchronous reads.
 
 Issue: This section is provisional; more security data may supplement this in subsequent drafts.
 
-<h2 id="requirements">
-Requirements and Use Cases</h2>
+# Requirements and Use Cases # {#requirements}
 
 This section covers what the requirements are for this API,
 as well as illustrates some use cases.

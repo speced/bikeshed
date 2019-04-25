@@ -3,17 +3,24 @@ Title: Constructable Stylesheet Objects
 Shortname: construct-stylesheets
 Level: 1
 Status: DREAM
-ED: https://wicg.github.io/construct-stylesheets/index.html
+ED: https://wicg.github.io/construct-stylesheets/
 Editor: Tab Atkins Jr., Google, http://xanthir.com/contact/
 Editor: Eric Willigers, Google, ericwilligers@google.com
 Editor: Rakina Zata Amni, Google, rakina@google.com
 Repository: https://github.com/WICG/construct-stylesheets/
-Abstract: This draft defines additions to CSSOM to make {{CSSStyleSheet}} objects directly constructable, along with a way to use them in {{DocumentOrShadowRoot}}s.
+Abstract: This draft defines additions to CSSOM to make {{/CSSStyleSheet}} objects directly constructable, along with a way to use them in {{DocumentOrShadowRoot}}s.
 Ignored Terms: create a medialist object, add a css style sheet, document css style sheets
+Markup Shorthands: markdown yes
 </pre>
 
 <pre class='link-defaults'>
 spec:dom; type:interface; text:Document
+spec:cssom-1; type:interface; for:/; text:CSSStyleSheet
+spec:cssom-1; type:method; for:CSSStyleSheet; text:insertRule(rule)
+spec:cssom-1; type:method; for:CSSStyleSheet; text:deleteRule(rule)
+spec:cssom-1; type:dfn; for:CSSStyleSheet; text:parent css style sheet
+spec:cssom-1; type:dfn; for:CSSStyleSheet; text:owner node
+spec:fetch; type:dfn; for:fetch; text:terminated
 </pre>
 
 Motivation {#motivation}
@@ -28,15 +35,34 @@ Some user agents might attempt to optimize by sharing internal style sheet repre
 Proposed Solution {#proposed-solution}
 ============================
 
-We are proposing to provide an API for creating stylesheet objects from script, without needing style elements, and also a way to reuse them in multiple places. Script can optionally add or remove rules from a stylesheet object. Each stylesheet object can be added directly to any number of shadow roots (and/or the top level document).
+We are proposing to provide an API for creating stylesheet objects from script, without needing style elements, and also a way to reuse them in multiple places. Script can optionally add, remove, or replace rules from a stylesheet object. Each stylesheet object can be added directly to any number of shadow roots (and/or the top level document).
+
+<pre class='lang-js'>
+const myElementSheet = new CSSStyleSheet();
+class MyElement extends HTMLElement {
+  constructor() {
+    super();
+    const shadowRoot = this.attachShadow({ mode: "open" });
+    shadowRoot.adoptedStyleSheets = [myElementSheet];
+  }
+  
+  connectedCallback() {
+    // Only actually parse the stylesheet when the first instance is connected.
+    if (myElementSheet.cssRules.length == 0) {
+       myElementSheet.replaceSync(styleText);
+    }
+  }
+}
+</pre>
 
 Constructing Stylesheets {#constructing-stylesheets}
 =================================
 
 <pre class='idl'>
-partial interface Document {
-	[NewObject] Promise&lt;CSSStyleSheet> createCSSStyleSheet(optional DOMString text = "", optional CSSStyleSheetInit options);
-	[NewObject] CSSStyleSheet createCSSStyleSheetSync(optional DOMString text = "", optional CSSStyleSheetInit options);
+[Constructor(optional CSSStyleSheetInit options)]
+partial interface CSSStyleSheet {
+	Promise&lt;CSSStyleSheet> replace(USVString text);
+	void replaceSync(USVString text);
 };
 
 dictionary CSSStyleSheetInit {
@@ -47,66 +73,119 @@ dictionary CSSStyleSheetInit {
 };
 </pre>
 
+<p class="note">
+Note that `[Constructor]` is defined in Web IDL to only be allowed on interfaces, not partial interfaces. 
+This is a known issue and we are going to move the definition to be on the {{/CSSStyleSheet}} interface when we [merge this spec to CSSOM](https://github.com/w3c/csswg-drafts/issues/3433).
+</p>
+
 <dl>
-	<dt><dfn method for=Document lt="createCSSStyleSheet(text)|createCSSStyleSheet(text, options)">createCSSStyleSheet(text, options)</dfn></dt>
+	<dt><dfn constructor for=CSSStyleSheet>CSSStyleSheet(|options|)</dfn></dt>
 	<dd>
 		When called, execute these steps:
 
-		1. Construct a new {{CSSStyleSheet}} object <var>sheet</var>,
-			with location set to the {{Document}}'s <a spec=html>base URL</a>,
-			no parent CSS style sheet,
-			no owner node,
-			no owner CSS rule,
-			associated document to <var>this</var>,
-			and a title set to the {{CSSStyleSheetInit/title}} attribute of <var>options</var>.
-			Set <var>sheet’s</var> origin-clean flag.
-		2. If the {{CSSStyleSheetInit/media}} attribute of <var>options</var> is a string,
+		1. Construct a new {{/CSSStyleSheet}} object |sheet| with the following properties:
+			* <a spec=cssom>location</a> set to the <a spec=html>base URL</a> of the [=associated Document=] for the [=current global object=]
+			* No <a spec=cssom>parent CSS style sheet</a>.
+			* No <a spec=cssom>owner node</a>.
+			* No <a spec=cssom>owner CSS rule</a>.
+			* <a spec=cssom>title</a> set to the {{CSSStyleSheetInit/title}} attribute of |options|.
+			* Set <a spec=cssom>alternate flag</a> if the {{CSSStyleSheetInit/alternate}} attribute of |options| is true, otherwise unset the <a spec=cssom>alternate flag</a>.
+			* Unset <a spec=cssom>origin-clean flag</a>.
+			* Set [=constructed flag=].
+			* [=Constructor document=] set to the [=associated Document=] for the [=current global object=].
+		2. If the {{CSSStyleSheetInit/media}} attribute of |options| is a string,
 			<a>create a MediaList object</a> from the string
-			and assign it as <var>sheet’s</var> media.
-			Otherwise, assign a copy of the value of the attribute as <var>sheet’s</var> media.
-		3. If the {{CSSStyleSheetInit/alternate}} attribute of <var>options</var> is true,
-			set <var>sheet’s</var> alternate flag.
-		4. If the {{CSSStyleSheetInit/disabled}} attribute of <var>options</var> is true,
-			set <var>sheet’s</var> disabled flag.
-		5. <a spec=css-syntax-3>Parse a stylesheet</a> from {{text}}.
-			If it returned a list of rules,
-			assign the list as <var>sheet’s</var> CSS rules;
-			otherwise,
-			set <var>sheet’s</var> CSS rules to an empty list.
-		6. Let <var>promise</var> be a promise.
-		7. In parallel, wait for loading of <a spec=css-cascade-4>@import</a> rules in <var>sheet</var> and any nested <a spec=css-cascade-4>@import</a>s from those rules.
-			* If any of them failed to load or resulted in a resource with a <a spec=html>Content-Type metadata</a> of anything other than <code>text/css</code>, reject <var>promise</var> with reason set to "{{NotAllowedError}}" {{DOMException}}.
-		    * Otherwise, resolve <var>promise</var> with <var>sheet</var> once all of them have finished loading.
-		8. Return <var>promise</var>.
+			and assign it as |sheet|'s <a spec=cssom>media</a>.
+			Otherwise, [=serialize a media query list=] from the attribute and then [=create a MediaList object=]
+			from the resulting string and set it as |sheet|'s <a spec=cssom>media</a>.
+		3. If the {{CSSStyleSheetInit/disabled}} attribute of |options| is true,
+			set |sheet|'s <a spec=cssom>disabled flag</a>.
+		4. Return |sheet|.
+	</dd>
+</dl>
+
+<a interface>CSSStyleSheet</a> instances have the following associated states:
+<dl>
+	<dt><dfn for=CSSStyleSheet lt="constructed flag">constructed flag</dfn></dt>
+	<dd>
+		Specified when created. Either set or unset. Unset by default.
+		Signifies whether this stylesheet was created by invoking the IDL-defined constructor.
+	</dd>
+	<dt><dfn for=CSSStyleSheet lt="disallow modification flag">disallow modification flag</dfn></dt>
+	<dd>
+		Either set or unset. Unset by default. If set, modification of the stylesheet's rules is not allowed.
+	</dd>
+	<dt><dfn for=CSSStyleSheet lt="constructor document">constructor document</dfn></dt>
+	<dd>
+		Specified when created. The {{Document}} a constructed stylesheet is associated with. Null by default.
+		Only non-null for stylesheets that have [=constructed flag=] set.
+	</dd>
+</dl>
+
+Modifying Constructed Stylesheets {#modifying-constructed-stylesheets}
+=============================
+
+After construction, constructed stylesheets can be modified using rule modification methods like {{CSSStyleSheet/insertRule()}} or {{CSSStyleSheet/deleteRule()}}, or {{replace(text)}} and {{replaceSync(text)}}. The behavior of those methods are affected by the [=disallow modification flag=] and [=constructed flag=] as described below.
+
+<p class="note">
+Note that we're explicitly monkeypatching CSSOM. We are working on [merging this spec into CSSOM](https://github.com/w3c/csswg-drafts/issues/3433) soon.
+</p>
+
+<dl>
+    <dt><dfn method for=CSSStyleSheet>insertRule(|rule|, |index|)</dfn></dt>
+    <dd>
+    	1. Let |sheet| be this {{/CSSStyleSheet}} object.
+		2. If |sheet|'s [=disallow modification flag=] is set, throw a "{{NotAllowedError}}" {{DOMException}}.
+        3. [=Parse a rule=] from |rule|. If the result is an <a>@import</a> rule and |sheet|'s [=constructed flag=] is set, or |sheet|'s [=parent CSS style sheet=]'s [=constructed flag=] is set, or that sheet's [=parent CSS style sheet=]'s [=constructed flag=] is set (and so on), throw a "{{NotAllowedError}}" {{DOMException}}.
+		4. (The rest of the algorithm remains as in CSSOM)
 	</dd>
 
-    <dt><dfn method for=Document lt="createCSSStyleSheetSync(text)|createCSSStyleSheetSync(text, options)">createCSSStyleSheetSync(text, options)</dfn></dt>
+    <dt><dfn method for=CSSStyleSheet>deleteRule(|index|)</dfn></dt>
+    <dd>
+    	1. Let |sheet| be this {{/CSSStyleSheet}} object.
+		2. If |sheet|'s [=disallow modification flag=] is set, throw a "{{NotAllowedError}}" {{DOMException}}.
+		3. (The rest of the algorithm remains as in CSSOM)
+	</dd>
+
+    <dt><dfn method for=CSSStyleSheet>replace(|text|)</dfn></dt>
+    <dd>
+    	1. Let |sheet| be this {{/CSSStyleSheet}} object.
+		2. If |sheet|'s [=constructed flag=] is not set, or |sheet|'s [=disallow modification flag=] is set, throw a "{{NotAllowedError}}" {{DOMException}}.
+		3. Set |sheet|'s [=CSS rules=] to an empty list, and set |sheet|'s [=disallow modification flag=].
+		4. Let |promise| be a promise.
+		5. [=In parallel=], do these steps:
+			1. Let |rules| be the result of running [=parse a list of rules=] from |text|. If |rules| is not a list of rules (i.e. an error occurred during parsing), set |rules| to an empty list.
+			2. Wait for loading of <a>@import</a> rules in |rules| and any nested <a>@import</a>s from those rules (and so on).
+				* If any of them failed to load, [=terminate=] fetching of the remaining <a>@import</a> rules,  and [=queue a task=] on the [=networking task source=] to perform the following steps:
+                    1. Unset |sheet|'s [=disallow modification flag=].
+                    2. Reject |promise| with a "{{NetworkError}}" {{DOMException}}.
+			    * Otherwise, once  all of them have finished loading, [=queue a task=] on the [=networking task source=] to perform the following steps:
+                    1. Unset |sheet|'s [=disallow modification flag=].
+                    2. Set |sheet|'s [=CSS rules=] to |rules|.
+                    3. Resolve |promise| with |sheet|.
+
+				<p class="note">
+                    Note: Loading  of <a>@import</a> rules should follow the rules used for fetching style sheets for <a>@import</a> rules of stylesheets from &lt;link> elements, in regard to what counts as success, CSP, and Content-Type header checking.
+				</p>
+				<p class="note">
+					Note: We will use the [=fetch group=] of |sheet|'s [=constructor document=]'s [=relevant settings object=] for <a>@import</a> rules and other (fonts, etc) loads.
+				</p>
+				<p class="note">
+					Note: The rules regarding loading mentioned above are currently not specified rigorously anywhere.
+				</p>
+		6. Return |promise|.
+	</dd>
+
+
+    <dt><dfn method for=CSSStyleSheet>replaceSync(|text|)</dfn></dt>
 	<dd>
 		When called, execute these steps:
-
-		1. Construct a new {{CSSStyleSheet}} object <var>sheet</var>,
-			with location set to the {{Document}}'s <a spec=html>base URL</a>,
-			no parent CSS style sheet,
-			no owner node,
-			no owner CSS rule,
-			associated document to <var>this</var>,
-			and a title set to the {{CSSStyleSheetInit/title}} attribute of <var>options</var>.
-			Set <var>sheet’s</var> origin-clean flag.
-		2. If the {{CSSStyleSheetInit/media}} attribute of <var>options</var> is a string,
-			<a>create a MediaList object</a> from the string
-			and assign it as <var>sheet’s</var> media.
-			Otherwise, assign a copy of the value of the attribute as <var>sheet’s</var> media.
-		3. If the {{CSSStyleSheetInit/alternate}} attribute of <var>options</var> is true,
-			set <var>sheet’s</var> alternate flag.
-		4. If the {{CSSStyleSheetInit/disabled}} attribute of <var>options</var> is true,
-			set <var>sheet’s</var> disabled flag.
-		5. <a spec=css-syntax-3>Parse a stylesheet</a> from {{text}}.
-			If it returned a list of rules,
-			assign the list as <var>sheet’s</var> CSS rules;
-			otherwise,
-			set <var>sheet’s</var> CSS rules to an empty list.
-		6. If <var>sheet</var> contains one or more <a spec=css-cascade-4>@import</a> rules, throw a "{{NotAllowedError}}" {{DOMException}}.
-		7. Return <var>sheet</var>.
+    	1. Let |sheet| be this {{/CSSStyleSheet}} object.
+		2. If |sheet|'s [=constructed flag=] is not set, or |sheet|'s [=disallow modification flag=] is set, throw a "{{NotAllowedError}}" {{DOMException}}.
+		3. Set |sheet|'s [=CSS rules=] to an empty list.
+		4. Let |rules| be the result of running [=parse a list of rules=] from |text|. If |rules| is not a list of rules (i.e. an error occurred during parsing), set |rules| to an empty list.
+		5. If |rules| contains one or more <a>@import</a> rules, throw a "{{NotAllowedError}}" {{DOMException}}.
+		6. Set |sheet|'s [=CSS rules=] to |rules|.
 	</dd>
 
 </dl>
@@ -120,7 +199,6 @@ partial interface DocumentOrShadowRoot {
 };
 </pre>
 
-
 <dl>
 	<dt><dfn attribute for=DocumentOrShadowRoot lt="adoptedStyleSheets">adoptedStyleSheets</dfn></dt>
 	<dd>
@@ -128,17 +206,22 @@ partial interface DocumentOrShadowRoot {
 
 		On setting, {{adoptedStyleSheets}} performs the following steps:
 
-		1. Let <var>adopted</var> be the result of converting the given value to a FrozenArray&lt;CSSStyleSheet>
-		2. If any entry of <var>adopted</var> has no associated document (e.g. it's not made by factory methods to construct stylesheets), throw a "{{NotAllowedError}}" {{DOMException}}. 
-		3. Set this {{DocumentOrShadowRoot}}'s [=adopted stylesheets=] to <var>adopted</var>.
+		1. Let |adopted| be the result of converting the given value to a FrozenArray&lt;CSSStyleSheet>
+
+		2. If any entry of |adopted| has its [=constructed flag=] not set, or its [=constructor document=] is not equal to this {{DocumentOrShadowRoot}}'s [=node document=], throw a "{{NotAllowedError}}" {{DOMException}}. 
+
+		3. Set this {{DocumentOrShadowRoot}}'s [=adopted stylesheets=] to |adopted|.
 	</dd>
 </dl>
 
 Every {{DocumentOrShadowRoot}} has <dfn>adopted stylesheets</dfn>.
 
 The user agent must include all style sheets in the {{DocumentOrShadowRoot}}'s
-[=adopted stylesheets=] inside its <a>document or shadow root CSS style sheets</a>. The [=adopted stylesheets=] are ordered after all the other style sheets (i.e. those derived from {{DocumentOrShadowRoot/styleSheets}}).
+[=adopted stylesheets=] inside its <a>document or shadow root CSS style sheets</a>.
 
+These [=adopted stylesheets=] are ordered after all the other style sheets (i.e. those derived from {{DocumentOrShadowRoot/styleSheets}}).
 
+This specification defines the following [=adopting steps=] for {{ShadowRoot}} nodes, given |node| and <var ignore>oldDocument</var>:
 
+1. Set |node|'s {{adoptedStyleSheets}} to the empty list.
 

@@ -2,7 +2,7 @@
 Title: Picture-in-Picture
 Shortname: picture-in-picture
 Level: 1
-Status: ED
+Status: CG-DRAFT
 ED: https://wicg.github.io/picture-in-picture
 Favicon: https://raw.githubusercontent.com/google/material-design-icons/master/action/2x_web/ic_picture_in_picture_alt_black_48dp.png
 Group: WICG
@@ -27,6 +27,7 @@ spec: HTML; urlPrefix: https://html.spec.whatwg.org/multipage/
     type: dfn
         urlPrefix: infrastructure.html
             text: in parallel
+            text: reflect
         urlPrefix: interaction.html
             text: triggered by user activation
         urlPrefix: media.html
@@ -53,23 +54,24 @@ spec:html; type:attribute; for:HTMLMediaElement; text:readyState
 Many users want to continue consuming media while they interact with other
 content, sites, or applications on their device. A common UI affordance for
 this type of activity is Picture-in-Picture (PiP), where the video is contained
-in a separate miniature window that is always on top of other windows.
+in a separate miniature window that is always on top of other windows. This
+window stays visible even when user agent is not visible.
 Picture-in-Picture is a common platform-level feature among desktop and mobile
 OSs.
 
 This specification aims to allow websites to initiate and control this behavior
 by exposing the following sets of properties to the API:
 
-* Notify the website when it enters and leave Picture-in-Picture mode.
-* Allow the website to trigger Picture-in-Picture via a user gesture on a video
-    element.
-* Allow the website to know the size of Picture-in-Picture window and notify
+* Notify the website when it enters and leaves Picture-in-Picture mode.
+* Allow the website to trigger Picture-in-Picture mode via a user gesture on a
+    video element.
+* Allow the website to know the size of the Picture-in-Picture window and notify
     the website when it changes.
-* Allow the website to exit Picture-in-Picture.
-* Allow the website to check if Picture-in-Picture can be triggered.
+* Allow the website to exit Picture-in-Picture mode.
+* Allow the website to check if Picture-in-Picture mode can be triggered.
 
 The proposed Picture-in-Picture API is very similar to [[Fullscreen]] as they
-have similar properties. The API only applies on
+have similar properties. The API only applies to
 {{HTMLVideoElement}} at the moment but is meant to be
 extensible.
 
@@ -83,8 +85,12 @@ extensible.
 <button id="togglePipButton"></button>
 
 <script>
+  const video = document.getElementById('video');
+  const togglePipButton = document.getElementById('togglePipButton');
+
   // Hide button if Picture-in-Picture is not supported or disabled.
-  togglePipButton.hidden = !document.pictureInPictureEnabled || video.disablePictureInPicture;
+  togglePipButton.hidden = !document.pictureInPictureEnabled ||
+    video.disablePictureInPicture;
 
   togglePipButton.addEventListener('click', function() {
     // If there is no element in Picture-in-Picture yet, let's request
@@ -110,6 +116,8 @@ extensible.
 <video id="video" src="https://example.com/file.mp4"></video>
 
 <script>
+  const video = document.getElementById('video');
+
   video.addEventListener('enterpictureinpicture', function(event) {
     // Video entered Picture-in-Picture mode.
     const pipWindow = event.pictureInPictureWindow;
@@ -132,6 +140,8 @@ extensible.
 
 <script>
   let pipWindow;
+  const video = document.getElementById('video');
+  const pipButton = document.getElementById('pipButton');
 
   pipButton.addEventListener('click', function() {
     video.requestPictureInPicture()
@@ -167,36 +177,40 @@ extensible.
 
 ## Request Picture-in-Picture ## {#request-pip}
 
-When the <dfn>request Picture-in-Picture algorithm</dfn> with |video| is
-invoked, the user agent MUST run the following steps:
+When the <dfn>request Picture-in-Picture algorithm</dfn> with |video|,
+|userActivationRequired| and |playingRequired| is invoked, the user agent MUST
+run the following steps:
 
 1. If <a>Picture-in-Picture support</a> is `false`, throw a
     {{NotSupportedError}} and abort these steps.
-2. If document is not allowed to use the <a>policy-controlled feature</a> named
-    `"picture-in-picture"`, throw a {{SecurityError}} and abort these steps.
+2. If the document is not allowed to use the <a>policy-controlled feature</a>
+    named `"picture-in-picture"`, throw a {{SecurityError}} and abort these
+    steps.
 3. If |video|'s {{readyState}} attribute is {{HAVE_NOTHING}}, throw a
     {{InvalidStateError}} and abort these steps.
 4. If |video| has no video track, throw a {{InvalidStateError}} and abort
     these steps.
 5. OPTIONALLY, if the {{disablePictureInPicture}} attribute is present on
-    |video|, throw a {{InvalidStateError}} and abort these steps.
-6. If the algorithm is not <a>triggered by user activation</a>, throw a
-    {{NotAllowedError}} and abort these steps.
+    |video|, throw an {{InvalidStateError}} and abort these steps.
+6. If |userActivationRequired| is `true` and the algorithm is not
+    <a>triggered by user activation</a>, throw a {{NotAllowedError}} and
+    abort these steps.
 7. If |video| is {{pictureInPictureElement}}, abort these steps.
-8. Set {{pictureInPictureElement}} to |video|.
-9. Let <dfn>Picture-in-Picture window</dfn> be a new instance of
+8. If |playingRequired| is `true` and |video| is {{paused}}, abort these steps.
+9. Set {{pictureInPictureElement}} to |video|.
+10. Let <dfn>Picture-in-Picture window</dfn> be a new instance of
     {{PictureInPictureWindow}} associated with {{pictureInPictureElement}}.
-10. <a>Queue a task</a> to <a>fire an event</a> with the name
+11. <a>Queue a task</a> to <a>fire an event</a> with the name
     {{enterpictureinpicture}} at the |video| with its {{bubbles}} attribute
     initialized to `true` and its {{pictureInPictureWindow}} attribute
     initialized to <a>Picture-in-Picture window</a>.
 
-It is RECOMMENDED that the video frames are not rendered in the page and in
-the Picture-in-Picture window at the same time but if they are, they MUST be
-kept in sync.
+It is RECOMMENDED that video frames are not rendered in the page and in the
+Picture-in-Picture window at the same time but if they are, they MUST be kept
+in sync.
 
-When a video is played in Picture-in-Picture, the states SHOULD transition as
-if it was played inline. That means that the events SHOULD fire at the same
+When a video is played in Picture-in-Picture mode, the states SHOULD transition
+as if it was played inline. That means that the events SHOULD fire at the same
 time, calling methods SHOULD have the same behaviour, etc. However, the user
 agent MAY transition out of Picture-in-Picture when the video element enters a
 state that is considered not compatible with Picture-in-Picture.
@@ -214,8 +228,8 @@ a half of one dimension of the screen.
 When the <dfn>exit Picture-in-Picture algorithm</dfn> is invoked,
 the user agent MUST run the following steps:
 
-1. If {{pictureInPictureElement}} is null, throw a {{InvalidStateError}} and abort
-    these steps.
+1. If {{pictureInPictureElement}} is `null`, throw a {{InvalidStateError}} and
+    abort these steps.
 2. Run the <a>close window algorithm</a> with the <a>Picture-in-Picture
     window</a> associated with {{pictureInPictureElement}}.
 3. Unset {{pictureInPictureElement}}.
@@ -223,22 +237,25 @@ the user agent MUST run the following steps:
     {{leavepictureinpicture}} at the |video| with its {{bubbles}} attribute
     initialized to `true`.
 
-It is NOT RECOMMENDED that video playback state changes when the <a>exit
+It is NOT RECOMMENDED that the video playback state changes when the <a>exit
 Picture-in-Picture algorithm</a> is invoked. The website SHOULD be in control
-of the experience if it is website initiated. However, user agent MAY expose
-Picture-in-Picture window controls that change video playback state (e.g.
+of the experience if it is website initiated. However, the user agent MAY expose
+Picture-in-Picture window controls that change video playback state (e.g.,
 pause).
+
+As one of the <a>unloading document cleanup steps</a>, run the <a>exit
+Picture-in-Picture algorithm</a>.
 
 ## Disable Picture-in-Picture ## {#disable-pip}
 
-Some pages may want to disable Picture-in-Picture for a video element. To
-support this, a new {{disablePictureInPicture}} attribute is added to the list
-of content attributes for video elements.
+Some pages may want to disable Picture-in-Picture mode for a video element; for
+example, they may want to prevent the user agent from suggesting a
+Picture-in-Picture context menu or to request Picture-in-Picture automatically
+in some cases. To support these use cases, a new {{disablePictureInPicture}}
+attribute is added to the list of content attributes for video elements.
 
-A corresponding {{disablePictureInPicture}} IDL attribute which reflects the
-value of element’s {{disablePictureInPicture}} content attribute is added to
-the {{HTMLVideoElement}} interface. The {{disablePictureInPicture}} IDL attribute
-MUST reflect the content attribute of the same name.
+The {{disablePictureInPicture}} IDL attribute MUST <a>reflect</a> the content
+attribute of the same name.
 
 If the {{disablePictureInPicture}} attribute is present on the video element,
 the user agent SHOULD NOT play the video element in Picture-in-Picture or
@@ -251,6 +268,43 @@ the user agent SHOULD run these steps:
     method with {{InvalidStateError}}.
 2. If |video| is {{pictureInPictureElement}}, run the <a>exit
     Picture-in-Picture algorithm</a>.
+
+## Auto Picture-in-Picture ## {#auto-pip}
+
+Some pages may want to automatically enter and leave Picture-in-Picture for
+a video element; for example, video meeting web apps would benefit from
+some automatic Picture-in-Picture behavior when the user switches back and forth
+between the web app and other applications/tabs.
+To support these use cases, a new {{autoPictureInPicture}} attribute is
+added to the list of content attributes for video elements.
+
+The {{autoPictureInPicture}} IDL attribute MUST <a>reflect</a> the content
+attribute of the same name.
+
+The <dfn>autoPictureInPictureElement</dfn> is the video element, among all
+video elements with the {{autoPictureInPicture}} attribute currently set,
+whose {{autoPictureInPicture}} attribute was set most recently. Note that the
+<a>autoPictureInPictureElement</a> can have the {{disablePictureInPicture}}
+attribute set. In that case, as expected, it won't be allowed to enter
+Picture-in-Picture mode in the <a>request Picture-in-Picture algorithm</a>.
+
+When the visibility state of a <a>top-level browsing context</a> value
+switches from "visible" to "hidden", the user agent MAY run these steps:
+
+1. If <a>autoPictureInPictureElement</a> is `null`, abort these steps.
+2. If {{pictureInPictureElement}} is set, abort these steps.
+3. Let |video| be <a>autoPictureInPictureElement</a>.
+4. Let |userActivationRequired| be `false`.
+5. Let |playingRequired| be `true`.
+6. Run the <a>request Picture-in-Picture algorithm</a> with |video|,
+    |userActivationRequired|, and |playingRequired|.
+
+When the visibility state of a <a>top-level browsing context</a> value
+switches from "hidden" to "visible", the user agent MAY run these steps:
+
+1. If <a>autoPictureInPictureElement</a> is `null`, abort these steps.
+2. If {{pictureInPictureElement}} is <a>autoPictureInPictureElement</a>, run
+    the <a>exit Picture-in-Picture algorithm</a>.
 
 ## Interaction with Remote Playback ## {#remote-playback}
 
@@ -266,25 +320,29 @@ available controls on the Picture-in-Picture window.
 
 ## Interaction with Page Visibility ## {#page-visibility}
 
+When {{pictureInPictureElement}} is set, the Picture-in-Picture window MUST
+be visible, even when the <a>Document</a> is not in focus or hidden. The user
+agent SHOULD provide a way for users to manually close the Picture-in-Picture
+window.
+
 The [[Page-Visibility]] specification defines a {{Document/visibilityState}}
-attribute used to determine the visibility state of a top level browsing
-context. For the purpose of Picture-in-Picture, the {{Document/visibilityState}}
-MUST always return "visible" when {{pictureInPictureElement}}
-is set and the Picture-in-Picture window is visible.
+attribute used to determine the visibility state of a <a>top-level browsing
+context</a>. The Picture-in-Picture window visibility MUST NOT be taken into
+account when determining the value returned by {{Document/visibilityState}}.
 
 ## One Picture-in-Picture window ## {#one-pip-window}
 
-Operating systems with a Picture-in-Picture API usually restricts
-Picture-in-Picture to only one window.  Whether only one window is allowed in
-Picture-in-Picture will be left to the implementation and the platform.
+Operating systems with a Picture-in-Picture API usually restrict
+Picture-in-Picture mode to only one window.  Whether only one window is allowed
+in Picture-in-Picture mode will be left to the implementation and the platform.
 However, because of the one Picture-in-Picture window limitation, the
 specification assumes that a given {{Document}} can only have one
 Picture-in-Picture window.
 
 What happens when there is a Picture-in-Picture request while a window is
-already in Picture-in-Picture will be left as an implementation details: the
+already in Picture-in-Picture will be left as an implementation detail: the
 current Picture-in-Picture window could be closed, the Picture-in-Picture
-request could be rejected or even two Picture-in-Picture windows can be
+request could be rejected or even two Picture-in-Picture windows could be
 created. Regardless, the User Agent will have to fire the appropriate events
 in order to notify the website of the Picture-in-Picture status changes.
 
@@ -299,6 +357,7 @@ partial interface HTMLVideoElement {
   attribute EventHandler onenterpictureinpicture;
   attribute EventHandler onleavepictureinpicture;
 
+  [CEReactions] attribute boolean autoPictureInPicture;
   [CEReactions] attribute boolean disablePictureInPicture;
 };
 </xmp>
@@ -307,11 +366,15 @@ The {{requestPictureInPicture()}} method, when invoked, MUST
 return <a>a new promise</a> |promise| and run the following steps <a>in
 parallel</a>:
 
-1. Let |video| be the requested video.
-2. Run the <a>request Picture-in-Picture algorithm</a> with |video|.
-3. If the previous step threw an exception, reject |promise| with that
+1. Let |video| be the video element on which the method was invoked.
+2. Let |userActivationRequired| be `true` if {{pictureInPictureElement}} is
+    `null`. It is `false` otherwise.
+3. Let |playingRequired| be `false`.
+4. Run the <a>request Picture-in-Picture algorithm</a> with |video|,
+    |userActivationRequired|, and |playingRequired|.
+5. If the previous step threw an exception, reject |promise| with that
     exception and abort these steps.
-4. Return |promise| with the <a>Picture-in-Picture window</a> associated with
+6. Return |promise| with the <a>Picture-in-Picture window</a> associated with
     {{pictureInPictureElement}}.
 
 ## Extensions to <code>Document</code> ## {#document-extensions}
@@ -329,9 +392,8 @@ The {{pictureInPictureEnabled}} attribute's getter must return `true` if
 <a>allowed to use</a> the feature indicated by attribute name
 `picture-in-picture`, and `false` otherwise.
 
-<dfn>Picture-in-Picture support</dfn> is `true` if there is no
-previously-established user preference, restrictions, or platform limitation,
-and `false` otherwise.
+<dfn>Picture-in-Picture support</dfn> is `false` if there's a user preference
+that disables it or a platform limitation. It is `true` otherwise.
 
 The {{exitPictureInPicture()}} method, when invoked, MUST
 return <a>a new promise</a> |promise| and run the following steps <a>in
@@ -345,20 +407,20 @@ parallel</a>:
 ## Extension to <code>DocumentOrShadowRoot</code> ## {#documentorshadowroot-extension}
 
 <xmp class="idl">
-partial interface DocumentOrShadowRoot {
+partial interface mixin DocumentOrShadowRoot {
   readonly attribute Element? pictureInPictureElement;
 };
 </xmp>
 
 The {{pictureInPictureElement}} attribute's getter must run these steps:
 
-1. If the <a>context object</a> is not <a>connected</a>, return null and abort
+1. If the <a>context object</a> is not <a>connected</a>, return `null` and abort
     these steps.
 2. Let |candidate| be the result of <a>retargeting</a> Picture-in-Picture
     element against the <a>context object</a>.
 3. If |candidate| and the <a>context object</a> are in the same <a>tree</a>,
     return |candidate| and abort these steps.
-4. Return null.
+4. Return `null`.
 
 ## Interface <code>PictureInPictureWindow</code> ## {#interface-picture-in-picture-window}
 
@@ -411,7 +473,7 @@ dictionary EnterPictureInPictureEventInit : EventInit {
 </xmp>
 
 : <dfn event for="HTMLVideoElement">`leavepictureinpicture`</dfn>
-:: Fired on a {{HTMLVideoElement}} when it leaves Picture-in-Picture.
+:: Fired on a {{HTMLVideoElement}} when it leaves Picture-in-Picture mode.
 : <dfn event for="PictureInPictureWindow">`resize`</dfn>
 :: Fired on a {{PictureInPictureWindow}} when it changes size.
 
@@ -419,6 +481,14 @@ dictionary EnterPictureInPictureEventInit : EventInit {
 
 The <a>task source</a> for all the tasks queued in this specification is the
 <a>media element event task source</a> of the video element in question.
+
+## CSS pseudo-class ## {#css-pseudo-class}
+
+The `:picture-in-picture` <a>pseudo-class</a> MUST match any <a>element</a>
+|element| for which one of the following conditions is true:
+- |element| is {{pictureInPictureElement}}.
+- |element| is a <a>shadow host</a> and the result of <a>retargeting</a> its
+    <a>node document</a>’s {{pictureInPictureElement}} against |element| is |element|.
 
 # Security considerations # {#security-considerations}
 
@@ -441,5 +511,5 @@ The <a>default allowlist</a> for this feature is `*`.
 # Acknowledgments # {#acknowledgments}
 
 Thanks to Jennifer Apacible, Zouhir Chahoud, Marcos Cáceres, Philip Jägenstedt,
-Jeremy Jones, Jer Noble, and Eckhart Wörner for their contributions to this
-document.
+Jeremy Jones, Chris Needham, Jer Noble, Justin Uberti, Yoav Weiss, and Eckhart
+Wörner for their contributions to this document.
