@@ -126,6 +126,6 @@ def rebase(Spec, files=None, md=None):
         doc.finish()
 
 def addTestMetadata(doc):
-    doc.mdBaseline.addData("Date", "1970-01-01")
     doc.mdBaseline.addData("Boilerplate", "omit feedback-header, omit generator, omit document-revision")
+    doc.mdCommandLine.addData("Date", "1970-01-01")
     doc.mdCommandLine.addData("Inline Github Issues", "no")
