@@ -30,7 +30,7 @@ def transformProductionPlaceholders(doc):
             elif match.group(3) in ("property", "descriptor"):
                 linkType = match.group(2)
             else:
-                die("Shorthand <<{0}>> gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3))
+                die("Shorthand <<{0}>> gives type as '{1}', but only 'property' and 'descriptor' are allowed.", match.group(0), match.group(3), el=el)
                 el.tag = "span"
                 el.text = "<‘" + text[1:-1] + "’>"
                 continue
@@ -78,7 +78,7 @@ def transformProductionPlaceholders(doc):
                 el.set("data-lt", "<{0}>".format(term))
             el.text = "<{0}>".format(interior)
             continue
-        die("Shorthand <<{0}>> does not match any recognized shorthand grammar.", text)
+        die("Shorthand <<{0}>> does not match any recognized shorthand grammar.", text, el=el)
         continue
 
 def formatValue(val):
@@ -135,7 +135,7 @@ def transformMaybePlaceholders(doc):
             elif match.group(3) in config.maybeTypes:
                 linkType = match.group(3)
             else:
-                die("Shorthand ''{0}'' gives type as '{1}', but only “maybe” types are allowed.", match.group(0), match.group(3))
+                die("Shorthand ''{0}'' gives type as '{1}', but only “maybe” types are allowed.", match.group(0), match.group(3), el=el)
                 el.tag = "css"
                 continue
             el.tag = "a"
