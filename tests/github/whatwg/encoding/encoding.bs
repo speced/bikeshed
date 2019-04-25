@@ -770,10 +770,9 @@ the return value of these steps:
  <li><p>If <var>pointer</var> is 7457, return code point U+E7C7.
  <!-- 7457 is 0x81 0x35 0xF4 0x37 -->
 
- <li><p>Let <var>offset</var> be the last pointer in
- <a>index gb18030 ranges</a> that is equal to or less than
- <var>pointer</var> and let <var>code point offset</var> be its
- corresponding code point.
+ <li><p>Let <var>offset</var> be the last pointer in <a>index gb18030 ranges</a> that is less than
+ or equal to <var>pointer</var> and let <var>code point offset</var> be its corresponding code
+ point.
 
  <li><p>Return a code point whose value is
  <var>code point offset</var> + <var>pointer</var> &minus; <var>offset</var>.
@@ -785,10 +784,9 @@ the return value of these steps:
 <ol>
  <li><p>If <var>code point</var> is U+E7C7, return pointer 7457.
 
- <li><p>Let <var>offset</var> be the last code point in
- <a>index gb18030 ranges</a> that is equal to or less than
- <var>code point</var> and let <var>pointer offset</var> be its
- corresponding pointer.
+ <li><p>Let <var>offset</var> be the last code point in <a>index gb18030 ranges</a> that is less
+ than or equal to <var>code point</var> and let <var>pointer offset</var> be its corresponding
+ pointer.
 
  <li><p>Return a pointer whose value is
  <var>pointer offset</var> + <var>code point</var> &minus; <var>offset</var>.
@@ -1294,15 +1292,19 @@ attribute's getter, when invoked, must return "<code>utf-8</code>".
 <h3 id=interface-textencoder>Interface {{TextEncoder}}</h3>
 
 <pre class=idl>
+dictionary TextEncoderEncodeIntoResult {
+  unsigned long long read;
+  unsigned long long written;
+};
+
 [Constructor,
  Exposed=(Window,Worker)]
 interface TextEncoder {
   [NewObject] Uint8Array encode(optional USVString input = "");
+  TextEncoderEncodeIntoResult encodeInto(USVString source, Uint8Array destination);
 };
 TextEncoder includes TextEncoderCommon;
 </pre>
-
-<p>A {{TextEncoder}} object has an associated <dfn for=TextEncoder>encoder</dfn>.
 
 <p class="note no-backref">A {{TextEncoder}} object offers no <var>label</var> argument as it only
 supports <a>UTF-8</a>. It also offers no <code>stream</code> option as no <a for=/>encoder</a>
@@ -1319,18 +1321,17 @@ requires buffering of scalar values.
 
  <dt><code><var>encoder</var> . <a method for=TextEncoder lt=encode()>encode([<var>input</var> = ""])</a></code>
  <dd><p>Returns the result of running <a>UTF-8</a>'s <a for=/>encoder</a>.
+
+ <dt><code><var>encoder</var> . <a method=for=TextEncoder lt="encodeInto(source, destination)">encodeInto(<var>source</var>, <var>destination</var>)</a></code>
+ <dd><p>Runs the <a>UTF-8 encoder</a> on <var>source</var>, stores the result of that operation into
+ <var>destination</var>, and returns the progress made as a dictionary whereby
+ {{TextEncoderEncodeIntoResult/read}} is the number of converted <a>code units</a> of
+ <var>source</var> and {{TextEncoderEncodeIntoResult/written}} is the number of bytes modified in
+ <var>destination</var>.
 </dl>
 
 <p>The <dfn constructor for=TextEncoder id=dom-textencoder><code>TextEncoder()</code></dfn>
-constructor, when invoked, must run these steps:
-
-<ol>
- <li><p>Let <var>enc</var> be a new {{TextEncoder}} object.
-
- <li><p>Set <var>enc</var>'s <a for=TextEncoder>encoder</a> to <a>UTF-8</a>'s <a for=/>encoder</a>.
-
- <li><p>Return <var>enc</var>.
-</ol>
+constructor, when invoked, must return a new {{TextEncoder}} object.
 
 <p>The <dfn method for=TextEncoder><code>encode(<var>input</var>)</code></dfn> method, when invoked,
 must run these steps:
@@ -1347,19 +1348,107 @@ must run these steps:
    <li><p>Let <var>token</var> be the result of
    <a>reading</a> from <var>input</var>.
 
-   <li><p>Let <var>result</var> be the result of
-   <a>processing</a> <var>token</var> for
-   <a for=TextEncoder>encoder</a>, <var>input</var>, <var>output</var>.
+   <li><p>Let <var>result</var> be the result of <a>processing</a> <var>token</var> for the
+   <a>UTF-8 encoder</a>, <var>input</var>, <var>output</var>.
 
    <li>
-    <p>If <var>result</var> is <a>finished</a>, convert <var>output</var> into a
-    byte sequence, and then return a {{Uint8Array}} object wrapping an
-    {{ArrayBuffer}} containing <var>output</var>.
-    <!-- XXX https://www.w3.org/Bugs/Public/show_bug.cgi?id=26966 -->
+    <p>Assert: <var>result</var> is not <a>error</a>.
 
-    <p class=note><a>UTF-8</a> cannot return <a>error</a>.
+    <p class=note>The <a>UTF-8 encoder</a> cannot return <a>error</a>.
+
+   <li><p>If <var>result</var> is <a>finished</a>, convert <var>output</var> into a byte sequence,
+   and then return a {{Uint8Array}} object wrapping an {{ArrayBuffer}} containing <var>output</var>.
+   <!-- XXX https://www.w3.org/Bugs/Public/show_bug.cgi?id=26966 -->
   </ol>
 </ol>
+
+<p>The
+<dfn method for=TextEncoder><code>encodeInto(<var>source</var>, <var>destination</var>)</code></dfn>
+method, when invoked, must run these steps:
+
+<ol>
+ <li><p>Let <var>read</var> be 0.
+
+ <li><p>Let <var>written</var> be 0.
+
+ <li><p>Let <var>destinationBytes</var> be the result of
+ <a lt="get a reference to the buffer source">getting a reference to the bytes held by</a>
+ <var>destination</var>.
+
+ <li>
+  <p>Let <var>unused</var> be a new <a for=/>stream</a>.
+
+  <p class=note>The <a>handler</a> algorithm invoked below requires this argument, but it is not
+  used by the <a>UTF-8 encoder</a>.
+
+ <li><p>Convert <var>source</var> to a <a for=/>stream</a>.
+
+ <li>
+  <p>While true:
+
+  <ol>
+   <li><p>Let <var>token</var> be the result of <a>reading</a> from <var>source</var>.
+
+   <li><p>Let <var>result</var> be the result of running the <a>UTF-8 encoder</a>'s <a>handler</a>
+   on <var>unused</var> and <var>token</var>.
+
+   <li><p>If <var>result</var> is <a>finished</a>, then <a for=iteration>break</a>.
+
+   <li>
+    <p>Otherwise:
+
+    <ol>
+     <li>
+      <p>If <var>destinationBytes</var>'s <a for="byte sequence">length</a> &minus;
+      <var>written</var> is greater than or equal to the number of bytes in <var>result</var>, then:
+
+      <ol>
+       <li><p>If <var>token</var> is greater than U+FFFF, then increment <var>read</var> by 2.
+
+       <li><p>Otherwise, increment <var>read</var> by 1.
+
+       <li><p>Write the bytes in <var>result</var> into <var>destinationBytes</var>, from byte
+       offset <var>written</var>.
+
+       <li><p>Increment <var>written</var> by the number of bytes in <var>result</var>.
+      </ol>
+
+     <li><p>Otherwise, <a for=iteration>break</a>.
+    </ol>
+  </ol>
+
+ <li><p>Return a new {{TextEncoderEncodeIntoResult}} dictionary whose
+ {{TextEncoderEncodeIntoResult/read}} member is <var>read</var> and
+ {{TextEncoderEncodeIntoResult/written}} member is <var>written</var>.
+</ol>
+
+<div class=example id=example-textencoder-encodeinto>
+ <p>The <a method=for=TextEncoder lt="encodeInto(source, destination)">encodeInto()</a> method can
+ be used to encode a string into an existing {{ArrayBuffer}} object. Various details below are left
+ as an exercise for the reader, but this demonstrates an approach one could take to use this method:
+
+ <pre><code class=lang-javascript>
+function convertString(buffer, input, callback) {
+  let bufferSize = 256,
+      bufferStart = malloc(buffer, bufferSize),
+      writeOffset = 0,
+      readOffset = 0;
+  while (true) {
+    const view = new Uint8Array(buffer, bufferStart + writeOffset, bufferSize - writeOffset),
+          {read, written} = cachedEncoder.encodeInto(input.substring(readOffset), view);
+    readOffset += read;
+    writeOffset += written;
+    if (readOffset === input.length) {
+      callback(bufferStart, writeOffset);
+      free(buffer, bufferStart);
+      return;
+    }
+    bufferSize *= 2;
+    bufferStart = realloc(buffer, bufferStart, bufferSize);
+  }
+}
+</code></pre>
+</div>
 
 
 <h3 id=interface-mixin-generictransformstream>Interface mixin {{GenericTransformStream}}</h3>
@@ -3186,7 +3275,6 @@ Dominique Hazaël-Massieux,
 Doug Ewell,
 Erik van der Poel,
 譚永鋒 (Frank Yung-Fong Tang),
-Geoffrey Sneddon,
 Glenn Maynard,
 Gordon P. Hemsley,
 Henri Sivonen,
@@ -3205,6 +3293,8 @@ Ken Whistler,
 Kenneth Russell,
 田村健人 (Kent Tamura),
 Leif Halvard Silli,
+Luke Wagner,
+Maciej Hirsz,
 Makoto Kato,
 Mark Callow,
 Mark Crispin,
@@ -3224,6 +3314,7 @@ Richard Ishida,
 Robbert Broersma,
 Robert Mustacchi,
 Ryan Dahl,
+Sam Sneddon,
 Shawn Steele,
 Simon Montagu,
 Simon Pieters,

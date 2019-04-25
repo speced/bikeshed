@@ -1,0 +1,246 @@
+<pre class=metadata>
+Title: Element Timing API
+Status: ED
+Shortname: element-timing
+Group: WICG
+Level: 1
+Editor: Nicolás Peña Moreno, Google https://google.com, npm@chromium.org
+        Tim Dresser, Google https://google.com, tdresser@chromium.org
+URL: https://wicg.github.io/element-timing
+Repository: https://github.com/WICG/element-timing
+Test Suite: https://github.com/web-platform-tests/wpt/tree/master/element-timing
+Abstract: This document defines an API that enables monitoring when large or developer-specified image elements are displayed on screen.
+Default Highlight: js
+</pre>
+
+<pre class=anchors>
+urlPrefix: https://w3c.github.io/performance-timeline/; spec: PERFORMANCE-TIMELINE-2;
+    type: interface; url: #the-performanceentry-interface; text: PerformanceEntry;
+    type: attribute; for: PerformanceEntry;
+        text: name; url: #dom-performanceentry-name;
+        text: entryType; url: #dom-performanceentry-entrytype;
+        text: startTime; url: #dom-performanceentry-starttime;
+        text: duration; url: #dom-performanceentry-duration;
+    type: dfn; url: #dfn-register-a-performance-entry-type; text: register a performance entry type;
+    type: dfn; url: #dfn-queue-a-performanceentry; text: queue the PerformanceEntry;
+urlPrefix: https://dom.spec.whatwg.org/; spec: DOM;
+    type: attribute; for: Element;
+        text: id; url: #dom-element-id;
+urlPrefix: https://w3c.github.io/IntersectionObserver; spec: INTERSECTION-OBSERVER;
+    type: interface; url: #intersectionobserver; text: IntersectionObserver;
+    type: dfn; url: #calculate-intersection-rect-algo; text: intersection rect algorithm;
+urlPrefix: https://w3c.github.io/paint-timing/; spec: PAINT-TIMING;
+    type: dfn; url: #first-paint; text: first paint;
+urlPrefix: https://html.spec.whatwg.org/multipage; spec: HTML;
+    type: dfn; url: #image-request; text: image request;
+    type: dfn; url: images.html/#img-all; text: completely available;
+    type: dfn; url: urls-and-fetching.html#resolve-a-url; text: resolved url;
+urlPrefix: https://w3c.github.io/resource-timing; spec: RESOURCE-TIMING;
+    type: dfn; url: #dfn-timing-allow-check; text: timing allow check;
+    type: attribute; for: PerformanceResourceTiming;
+        text: responseEnd; url: ##dom-performanceresourcetiming-responseend;
+urlPrefix: https://w3c.github.io/hr-time; spec: HR-TIME;
+    type: dfn; url: #dfn-current-high-resolution-time; text: current high resolution time;
+    type: interface; url: #dom-domhighrestimestamp; text: DOMHighResTimeStamp;
+urlPrefix: https://drafts.csswg.org/css-backgrounds-3; spec: CSS-BACKGROUNDS-3;
+    type: dfn; url: #propdef-background-image; text: background-image;
+</pre>
+
+Introduction {#sec-intro}
+=====================
+
+<em>This section is non-normative.</em>
+
+Knowing when critical elements are displayed on screen is key to understanding page load performance.
+While fast rendering of the essential components is not sufficient for a satisfactory loading experience, it's certainly necessary.
+Therefore, monitoring these rendering timestamps is important to improve and prevent regressions in page loads.
+
+This specification empowers developers and analytics providers by providing an API to measure rendering timestamps of critical elements.
+There is currently no good way to measure these timestamps for real users.
+Existing approaches would require either registering observers too early or significant DOM manipulation.
+These approaches are discussed on the [[#sec-security]] section.
+
+Web developers are the experts in critical user interactions for their sites, so they should be allowed to tell the user agent which are the elements they care about.
+Nonetheless, providing some information by default has some value. For example, for analytics providers to provide some information out of the box.
+Thus, this API exposes two ways to determine which are the critical elements of a web page: allowing web-developer-annotated elements and exposing elements that are large.
+
+Elements exposed {#sec-elements-exposed}
+------------------------
+
+The Element Timing API supports timing information about the following elements:
+* <{img}> elements.
+* <{image}> elements inside an <{svg}>.
+* Elements with a <a>background-image</a>.
+
+Future versions of this API will support measuring timing information about other types of elements.
+
+The following subset of elements are measured:
+* Elements that are annotated using the "elementtiming" attribute.
+* Elements that occupy a more than 15% of the viewport when they are displayed on the screen.
+
+Usage Example {#sec-example}
+------------------------
+
+The following example shows an image that is registered for observation via its attribute, and an observer gathering the timing information.
+
+<xmp class="example highlight" highlight=html>
+    <img... elementtiming="foobar"/>
+    ...
+    <script>
+    const observer = new PerformanceObserver((list) => {
+      let perfEntries = list.getEntries();
+      // Process the entries by iterating over them.
+    });
+    observer.observe({entryTypes: ['element']});
+    </script>
+</xmp>
+
+The following are sample elements whose rendering timestamps could be measured by using this API and which should be compared to page navigation:
+* The images in the image carousel of a shopping site.
+* The main photo in a story of a news site.
+
+The API could have use cases outside of page load by comparing the rendering timestamps with input timestamps.
+For example, developers could monitor the time it takes for a widget to show up after a click that triggers it.
+
+Element Timing {#sec-element-timing}
+=======================================
+
+Element Timing involves the following new interfaces:
+
+{{PerformanceElementTiming}} interface {#sec-performance-element-timing}
+------------------------------------------------------------------------
+
+<pre class="idl">
+interface PerformanceElementTiming : PerformanceEntry {
+    readonly attribute DOMRectReadOnly intersectionRect;
+    readonly attribute DOMHighResTimeStamp responseEnd;
+    readonly attribute DOMString identifier;
+};
+</pre>
+
+Each {{PerformanceElementTiming}} object reports timing information about one associated {{Element}}.
+The values of the attributes of {{PerformanceElementTiming}} are set in the processing model in [[#sec-report-element]].
+
+Processing model {#sec-processing-model}
+========================================
+
+A user agent implementing the Element Timing API must run the <a>register a performance entry type</a> algorithm  with <code>"element"</code> as input.
+
+Modifications to the DOM specification {#sec-modifications-DOM}
+--------------------------------------------------------
+
+<em>This section will be removed once the [[DOM]] specification has been modified.</em>
+
+We extend the {{Element}} interface as follows:
+
+<pre class="idl">
+partial interface Element {
+    readonly attribute DOMString elementtiming;
+};
+</pre>
+
+The {{Element/elementtiming}} attribute, when set to a {{DOMString}} of non-zero length, will indicate that the image must be registered for observation.
+Its value is read by the <a>report element timing</a> algorithm.
+
+Every image resource that is fetched from a URL has an <a>image request</a>. The request has an <dfn>associated element</dfn>, the {{Element}} causing this image resource.
+
+NOTE: we assume that there is one <a>image request</a> for each {{Element}} that a <a>background-image</a> property affects and for each URL that the <a>background-image</a> property specifies. So, for example, if there is a style with two URLs affecting all <{div}>s, and there are two <{div}>s, then there will be four <a>image requests</a>. This means that a single <a>background-image</a> property could produce multiple {{PerformanceElementTiming}} entries because it can affect multiple elements and because it can specify multiple URLs.
+
+Each {{Document}} has <dfn>imagesPendingRendering</dfn>, a list of <a>image requests</a> which are considered loaded and decoded but not yet rendered.
+When an <a>image request</a> has become <a>completely available</a> and decoded, run the following steps:
+
+<div algorithm="image element loaded">
+    1. Let |image request| be the input <a>image request</a>.
+    1. If |image request|'s <a>associated element</a> is not <{img}>, <{image}>, or <a>background-image</a>, abort these steps.
+    1. If the <a>timing allow check</a> passes for |image request|'s resource, then add |image request| to <a>imagesPendingRendering</a>.
+    1. Otherwise, run the <a>report element timing</a> algorithm, passing in |image request| and 0.
+</div>
+
+Modifications to the HTML specification {#sec-modifications-HTML}
+--------------------------------------------------------
+
+<em>This section will be removed once the [[HTML]] specification has been modified.</em>
+
+In the <a>update the rendering</a> step of the <a>event loop processing model</a>, add the following substep at the end:
+
+1. For each <a>fully active</a> {{Document}} in <em>docs</em>, run the <a>element timing processing</a> algorithm passing in the {{Document}} and <em>now</em>.
+
+Report Element Timing {#sec-report-element}
+--------------------------------------------------------
+
+<div algorithm="report element timing">
+    When asked to <dfn>report element timing</dfn> given an |image request| and a timestamp |renderTime|, perform the following steps:
+
+    1. Let |image| be |image request|'s <a>associated element</a>.
+    1. Let |intersectionRect| be the value returned by the <a>intersection rect algorithm</a> using |image| as the target and viewport as the root.
+    1. If the |image|'s {{Element/elementtiming}} attribute getter returns a {{DOMString}} of zero length and if |intersectionRect|'s size is smaller than 15% of the viewport size, then abort these steps.
+    1. Create a {{PerformanceElementTiming}} object |entry|.
+    1. Set |entry|'s {{PerformanceEntry/entryType}} to the {{DOMString}} <code>"element"</code>.
+    1. Set |entry|'s {{PerformanceEntry/name}} to |image request|'s resource <a>resolved URL</a>.
+    1. Set |entry|'s {{PerformanceEntry/startTime}} to |renderTime|.
+    1. Set |entry|'s {{PerformanceEntry/duration}} to 0.
+    1. Set |entry|'s {{intersectionRect}} to the value returned by the <a>intersection rect algorithm</a> using |image| as the target and viewport as the root.
+    1. Set |entry|'s {{responseEnd}} to |image request|'s resource {{PerformanceResourceTiming/responseEnd}}.
+    1. Set |entry|'s {{identifier}} to |image|'s {{elementtiming}} attribute value.
+    1. <a>Queue the PerformanceEntry</a> |entry|.
+</div>
+
+Element Timing Processing {#sec-element-processing}
+--------------------------------------------------------
+
+<div algorithm="process element timing">
+    The <dfn>element timing processing</dfn> algorithm receives a {{Document}} |doc| and a timestamp |now| and performs the following steps:
+
+    1. For each |image request| in |doc|'s <a>imagesPendingRendering</a> list:
+        1. Run the <a>report element timing</a> algorithm passing in |image request| and |now|.
+    1. Clear |doc|'s <a>imagesPendingRendering</a> list.
+</div>
+
+Security & privacy considerations {#sec-security}
+===============================================
+
+This API exposes some information about cross-origin images.
+In particular, images that do not pass the <a>timing allow check</a> still have their resource response end time exposed, which could be a source of privacy concerns.
+
+However, this is considered to not add new attacks to the web platform because the ResourceTiming API exposes this already.
+In addition, the onload handler exposes load timing when it is available, and the response end time is a close proxy to this.
+The <a>current high resolution time</a> computed at the beginning of the onload handler would provide the image load time.
+We choose to expose the {{responseEnd}} because it is very easy to obtain even without an onload handler.
+In addition, we believe any fix to remove the leak provided by image onload handlers or ResourceTiming could also fix the leak provided by this API.
+
+The {{PerformanceEntry/startTime}} (display timestamp) can also be polyfilled via the PaintTiming API.
+To do this, add an iframe that contains trivial content on the onload handler of the target image.
+Then, query the first paint of that iframe to obtain the rendering timestamp of the image element.
+This is quite inefficient and the polyfill itself might affect the timing obtained.
+Due to the difficulty in obtaining this information today, we choose not to expose the display timestamp for images that fail the <a>timing allow check</a>.
+For clarity, here is a code snippet using the PaintTiming API:
+
+<xmp class="example highlight" highlight=html>
+    // In the attacker frame.
+    <iframe src=attack.html></iframe>
+    <script>
+        window.onmessage = e => {
+            let timestamp = e.data;
+            // Acquired the display timestamp for 'victim.jpg'!
+        }
+    </script>
+
+    // In the attack.html iframe.
+    <img src='victim.jpg'/>
+    <script>
+        // Wait until onload or some time when the PaintTiming entries will be visible.
+        onload() => {
+            let entry = performance.getEntriesByType('paint')[0];
+            top.postMessage(entry.startTime, '*');
+        }
+    </script>
+</xmp>
+
+The other nontrivial parameter being exposed here is the {{intersectionRect}}.
+This can already be polyfilled, for example using {{IntersectionObserver}}.
+The polyfill process would be similar: add an {{IntersectionObserver}} on the onload handler of the target image.
+This solution is inefficient because it requires registering the observer once the image has loaded, but it should still provide the same level of accuracy.
+We compute the {{intersectionRect}} once the image has loaded if it does not pass the <a>timing allow check</a>.
+Computing it at this point in time allows exposing the entry at that time.
+If we were to compute the rect only until the image is fully displayed, we'd only be able to expose the entry after that time.
+This would unintentionally leak some of the display timing of the image.

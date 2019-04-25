@@ -1,0 +1,384 @@
+<pre class=metadata>
+Group: WHATWG
+Date: 2019-02-18
+H1: Storage
+Shortname: storage
+Text Macro: TWITTER storagestandard
+Abstract: The Storage Standard defines an API for persistent storage and quota estimates, as well as the platform storage architecture.
+Translation: ja https://triple-underscore.github.io/storage-ja.html
+</pre>
+
+
+
+<h2 id=introduction>Introduction</h2>
+
+Over the years the web has grown various APIs that can be used for storage, e.g., IndexedDB,
+<code>localStorage</code>, and <code>showNotification()</code>. The Storage Standard consolidates
+these APIs by defining:
+
+<ul class=brief>
+ <li>A bucket, the primitive these APIs store their data in
+ <li>A way of making that bucket persistent
+ <li>A way of getting usage and quota estimates for an <a for=/>origin</a>
+</ul>
+
+<p>Traditionally, as the user runs out of storage space on their device, the data stored with these
+APIs gets lost without the user being able to intervene. However, persistent buckets cannot be
+cleared without consent by the user. This thus brings data guarantees users have enjoyed on native
+platforms to the web.
+
+<div class="example" id=example-3a7051a8>
+ <p>A simple way to make storage persistent is through invoking the {{persist()}} method. It
+ simultaneously requests the end user for permission and changes the storage to be persistent once
+ granted:</p>
+
+ <pre><code class="lang-javascript">
+navigator.storage.persist().then(persisted => {
+  if(persisted) {
+    /* &hellip; */
+  }
+})
+</code></pre>
+
+ <p>To not show user-agent-driven dialogs to the end user unannounced slightly more involved code
+ can be written:</p>
+
+ <pre><code class="lang-javascript">
+Promise.all([
+  navigator.storage.persisted(),
+  navigator.permissions.query({name: "persistent-storage"})
+]).then(([persisted, permission]) => {
+  if(!persisted &amp;&amp; permission.status == "granted") {
+    navigator.storage.persist().then( /* &hellip; */ )
+  } else if(!persistent &amp;&amp; permission.status == "prompt") {
+    showPersistentStorageExplanation()
+  }
+})
+</code></pre>
+
+ <p>The {{estimate()}} method can be used to determine whether there is enough space left to
+ store content for an application:
+
+ <pre><code class="lang-javascript">
+ function retrieveNextChunk(nextChunkInfo) {
+   return navigator.storage.estimate().then(info => {
+     if(info.quota - info.usage > nextChunkInfo.size)
+       return fetch(nextChunkInfo.url)
+     else throw new Error("insufficient space to store next chunk")
+   }).then( /* &hellip; */ )
+ }
+</code></pre>
+
+</div>
+
+
+
+<h2 id=terminology>Terminology</h2>
+
+<p>This specification depends on the Infra Standard. [[!INFRA]]
+
+<p>This specification uses terminology from the DOM, HTML, IDL, Permissions API, and URL Standards.
+[[DOM]] [[HTML]] [[WEBIDL]] [[PERMISSIONS]] [[URL]]
+
+A <dfn>schemeless origin group</dfn> is a group of one of the following:
+
+<ul>
+ <li>Identical <a lt="opaque origin">opaque origins</a>.
+ <li><a lt="tuple origin">Tuple origins</a> whose <a for=origin>host</a> is identical and not a
+ <a for=/>domain</a>.
+ <li><a lt="tuple origin">Tuple origins</a> whose <a for=origin>host</a> is a <a for=/>domain</a> of
+ which the <a href="https://publicsuffix.org/list/">registrable domain</a> is identical.</li>
+</ul>
+
+<p class="note">This definition will move to a more suitable location eventually.
+
+
+
+<h2 id=infrastructure>Infrastructure</h2>
+
+A user agent has various kinds of storage:
+
+<dl>
+ <dt>Credentials
+ <dd><p>End-user credentials, such as username and passwords submitted through HTML forms
+ <dt>Permissions
+ <dd><p>Permissions for various features, such as geolocation
+ <dt>Network
+ <dd><p>HTTP cache, cookies, authentication entries, TLS client certificates
+ <dt>Site
+ <dd>Indexed DB, Cache API, service worker registrations, <code>localStorage</code>,
+ <code>history.pushState()</code>, application caches, notifications, etc.
+</dl>
+
+This specification primarily concerns itself with <dfn export id=site-storage>site storage</dfn>.
+
+<a>Site storage</a> consists of zero or more
+<dfn export id=site-storage-unit>site storage units</dfn>.
+
+Each <a for=/>origin</a> has an associated <a>site storage unit</a>. A <a>site storage unit</a>
+contains a single <dfn export id=bucket oldids=box>bucket</dfn>. [[HTML]]
+
+
+<h3 id=buckets oldids=boxes>Buckets</h3>
+
+A <a>bucket</a> has <dfn export for=bucket oldids=box-mode>mode</dfn> which is either
+"<code title>best-effort</code>" or "<code title>persistent</code>". A
+<dfn export oldids=persistent-box>persistent bucket</dfn> is a <a>bucket</a> whose
+<a for=bucket>mode</a> is "<code title>persistent</code>". A
+<dfn export oldids=non-persistent-box>non-persistent bucket</dfn> is a <a>bucket</a> whose
+<a for=bucket>mode</a> is <em>not</em> "<code title>persistent</code>".
+
+A bucket is considered to be an atomic unit. Whenever a <a>bucket</a> is cleared by the user agent,
+it must be cleared in its entirety.
+
+
+
+<h2 id=persistence>Persistence permission</h2>
+
+A <a>bucket</a> can only be turned into a <a>persistent bucket</a> if the user (or user agent
+on behalf of the user) has granted permission to use the {{"persistent-storage"}} feature.
+
+<p class="note">When granted to an <a for=/>origin</a>, the persistence permission can be used to
+protect storage from the user agent's clearing policies. The user agent cannot clear storage marked
+as persistent without involvement from the <a for=/>origin</a> or user. This makes it particularly
+useful for resources the user needs to have available while offline or resources the user creates
+locally.
+
+The <dfn for="PermissionName" enum-value>"<code>persistent-storage</code>"</dfn>
+<a>powerful feature</a>'s permission-related flags, algorithms, and types are defaulted, except for:
+
+<dl>
+ <dt><a>permission state</a></dt>
+ <dd>{{"persistent-storage"}}'s <a>permission state</a> must have the same value for all
+ <a>environment settings objects</a> with a given <a for=/>origin</a>.</dd>
+
+ <dt><a>permission revocation algorithm</a></dt>
+ <dd algorithm="permission-revocation">If {{"persistent-storage"}}'s <a>permission state</a> is not
+ {{"granted"}}, then set the current <a for=/>origin</a>’s <a>site storage unit</a>'s
+ <a>bucket</a>'s <a for=bucket>mode</a> to "<code>best-effort</code>".</dd>
+</dl>
+
+
+
+<h2 id=usage-and-quota>Usage and quota</h2>
+
+The <dfn export>site storage usage</dfn> of an <a for=/>origin</a> <var>origin</var> is a rough
+estimate of the amount of bytes used in <var>origin</var>'s <a>site storage unit</a>.
+
+<p class=note>This cannot be an exact amount as user agents might, and are encouraged to, use
+deduplication, compression, and other techniques that obscure exactly how much bytes an
+<a for=/>origin</a> uses.
+
+The <dfn export>site storage quota</dfn> of an <a for=/>origin</a> <var>origin</var> is a
+conservative estimate of the amount of bytes available to <var>origin</var>'s
+<a>site storage unit</a>. This amount should be less than the total available storage space on the
+device to give users some wiggle room.
+
+<p class=note>User agents are strongly encouraged to provide "popular" <a for=/>origins</a> with a
+larger <a>site storage quota</a>. Factors such as navigation frequency, recency of visits,
+bookmarking, and <a href="#persistence">permission</a> for {{"persistent-storage"}} can be used as
+indications of "popularity".
+
+
+
+<h2 id=ui-guidelines>User Interface Guidelines</h2>
+
+User agents should not distinguish between network storage and <a>site storage</a> in their user
+interface. Instead user agents should offer users the ability to remove all storage for a given
+<a>schemeless origin group</a>. This ensures to some extent that network storage cannot be used to
+revive <a>site storage</a>. This also reduces the amount users need to know about the different ways
+in which a <a>schemeless origin group</a> can store data.
+<!-- To some extent, since HTTP ETag... And also, permissions/credentials, maybe? -->
+
+Credentials storage should be separated as it might contain data the user might not be able to
+revive, such as an autogenerated password. Since permissions storage is mostly simple booleans it
+too can be separated to avoid inconveniencing the user. Credentials and permissions are also
+somewhat easier to understand and differentiate for users from network storage and
+<a>site storage</a>.
+
+
+<h3 id=storage-pressure>Storage Pressure</h3>
+
+When the user agent notices it comes under storage pressure and it cannot free up sufficient space
+by clearing network storage and <a>non-persistent buckets</a> within <a>site storage</a>, then the
+user agent should alert the user and offer a way to clear <a>persistent buckets</a>.
+
+
+
+<h2 id=api>API</h2>
+
+<pre class=idl>
+[SecureContext]
+interface mixin NavigatorStorage {
+  [SameObject] readonly attribute StorageManager storage;
+};
+Navigator includes NavigatorStorage;
+WorkerNavigator includes NavigatorStorage;
+</pre>
+
+Each <a>environment settings object</a> has an associated {{StorageManager}} object.
+[[HTML]]
+
+The <dfn attribute for=NavigatorStorage><code>storage</code></dfn> attribute's getter must return
+<a>context object</a>'s <a>relevant settings object</a>'s {{StorageManager}} object.
+
+<pre class=idl>
+[SecureContext,
+ Exposed=(Window,Worker)]
+interface StorageManager {
+  Promise&lt;boolean> persisted();
+  [Exposed=Window] Promise&lt;boolean> persist();
+
+  Promise&lt;StorageEstimate> estimate();
+};
+
+dictionary StorageEstimate {
+  unsigned long long usage;
+  unsigned long long quota;
+};
+</pre>
+
+The <dfn method for=StorageManager><code>persisted()</code></dfn> method, when invoked, must run
+these steps:
+
+<ol>
+ <li><p>Let <var>promise</var> be a new promise.
+
+ <li><p>Let <var>origin</var> be <a>context object</a>'s <a>relevant settings object</a>'s
+ <a for="environment settings object">origin</a>.
+
+ <li><p>If <var>origin</var> is an <a>opaque origin</a>, then reject <var>promise</var> with a
+ {{TypeError}}.
+
+ <li>
+  <p>Otherwise, run these steps <a>in parallel</a>:
+
+  <ol>
+   <li>
+    <p>Let <var>persisted</var> be true if <var>origin</var>'s <a>site storage unit</a>'s
+    <a>bucket</a> is a <a>persistent bucket</a>, and false otherwise.
+
+    <p class=note>It will be false when there's an internal error.
+
+   <li><p><a>Queue a task</a> to resolve <var>promise</var> with <var>persisted</var>.
+  </ol>
+
+ <li><p>Return <var>promise</var>.
+</ol>
+
+The <dfn method for=StorageManager><code>persist()</code></dfn> method, when invoked, must run these
+steps:
+
+<ol>
+ <li><p>Let <var>promise</var> be a new promise.
+
+ <li><p>Let <var>origin</var> be <a>context object</a>'s <a>relevant settings object</a>'s
+ <a for="environment settings object">origin</a>.
+
+ <li><p>If <var>origin</var> is an <a>opaque origin</a>, then reject <var>promise</var> with a
+ {{TypeError}}.
+
+ <li>
+  <p>Otherwise, run these steps <a>in parallel</a>:
+
+  <ol>
+   <li>
+    <p>Let <var>permission</var> be the result of <a>requesting permission to use</a>
+    {{"persistent-storage"}}.
+
+    <p class="note">User agents are encouraged to not let the user answer this question twice for
+    the same <a for=/>origin</a> around the same time and this algorithm is not equipped to handle
+    such a scenario.
+
+   <li>
+    <p>Let <var>persisted</var> be true, if <var>origin</var>'s <a>site storage unit</a>'s
+    <a>bucket</a> is a <a>persistent bucket</a>, and false otherwise.
+
+    <p class=note>It will be false when there's an internal error.
+
+   <li>
+    <p>If <var>persisted</var> is false and <var>permission</var> is {{"granted"}}, then:
+
+    <ol>
+     <li><p>Set <var>origin</var>'s <a>site storage unit</a>'s <a>bucket</a>'s <a>mode</a> to
+     "<code>persistent</code>".
+
+     <li><p>If there was no internal error, then set <var>persisted</var> to true.
+    </ol>
+
+   <li><p><a>Queue a task</a> to resolve <var>promise</var> with <var>persisted</var>.
+  </ol>
+
+ <li><p>Return <var>promise</var>.
+</ol>
+
+The <dfn method for=StorageManager><code>estimate()</code></dfn> method, when invoked,
+must run these steps:
+
+<ol>
+ <li><p>Let <var>promise</var> be a new promise.
+
+ <li><p>Let <var>origin</var> be <a>context object</a>'s <a>relevant settings object</a>'s
+ <a for="environment settings object">origin</a>.
+
+ <li><p>If <var>origin</var> is an <a>opaque origin</a>, then reject <var>promise</var> with a
+ {{TypeError}}.
+
+ <li>
+  <p>Otherwise, run these steps <a>in parallel</a>:
+
+  <ol>
+   <li><p>Let <var>usage</var> be <a>site storage usage</a> for <var>origin</var>.
+
+   <li><p>Let <var>quota</var> be <a>site storage quota</a> for <var>origin</var>.
+
+   <li><p>Let <var>dictionary</var> be a new {{StorageEstimate}} dictionary whose {{usage}} member
+   is <var>usage</var> and {{quota}} member is <var>quota</var>.
+
+   <li>
+    <p>If there was an internal error while obtaining <var>usage</var> and <var>quota</var>, then
+    <a>queue a task</a> to reject <var>promise</var> with a {{TypeError}}.
+
+    <p class=note>Internal errors are supposed to be extremely rare and indicate some kind of
+    low-level platform or hardware fault. However, at the scale of the web with the diversity of
+    implementation and platforms, the unexpected does occur.
+
+   <li><p>Otherwise, <a>queue a task</a> to resolve <var>promise</var> with <var>dictionary</var>.
+  </ol>
+
+ <li><p>Return <var>promise</var>.
+</ol>
+
+
+
+<h2 class=no-num id="acks">Acknowledgments</h2>
+
+With that, many thanks to
+Adrian Bateman,
+Alex Russell,
+Aislinn Grigas,
+Ali Alabbas,
+Ben Kelly,
+Ben Turner,
+Dale Harvey,
+David Grogan,
+fantasai,
+Jake Archibald<!-- technically B.J. Archibald -->,
+Jeffrey Yasskin,
+Jinho Bang,
+Jonas Sicking,
+Joshua Bell,
+Kenji Baheux,
+Kinuko Yasuda,
+Luke Wagner,
+Michael Nordman,
+Mounir Lamouri,
+Shachar Zohar,
+黃強 (Shawn Huang), and
+簡冠庭 (Timothy Guan-tin Chien)
+for being awesome!
+
+This standard is written by
+<a lang=nl href=https://annevankesteren.nl/>Anne van Kesteren</a>
+(<a href=https://www.mozilla.org/>Mozilla</a>,
+<a href=mailto:annevk@annevk.nl>annevk@annevk.nl</a>).

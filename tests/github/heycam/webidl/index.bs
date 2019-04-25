@@ -9,9 +9,9 @@ Mailing List Archives: https://lists.w3.org/Archives/Public/public-script-coord/
 Repository: heycam/webidl
 !Feedback: <a href="https://github.com/heycam/webidl">GitHub</a> (<a href="https://github.com/heycam/webidl/issues/new">new issue</a>, <a href="https://github.com/heycam/webidl/issues">open issues</a>, <a href="https://www.w3.org/Bugs/Public/buglist.cgi?product=WebAppsWG&amp;component=WebIDL&amp;resolution=---">legacy bug tracker</a>)
 ED: https://heycam.github.io/webidl/
-Editor: Cameron McCormack, Mozilla Corporation, http://mcc.id.au/, cam@mcc.id.au
+Former Editor: Cameron McCormack, Mozilla Corporation, http://mcc.id.au/, cam@mcc.id.au
 Editor: Boris Zbarsky, Mozilla Corporation, bzbarsky@mit.edu
-Editor: Tobie Langel, http://tobie.me, tobie@codespeaks.com
+Former Editor: Tobie Langel, https://tobie.me, tobie@unlockopen.com
 Abstract: This document defines an interface definition language, Web IDL,
 Abstract: that can be used to describe interfaces that are intended to be
 Abstract: implemented in web browsers. Web IDL is an IDL variant with a
@@ -102,6 +102,7 @@ urlPrefix: https://tc39.github.io/ecma262/; spec: ECMA-262
         text: %ObjProto_toString%; url: sec-object.prototype.tostring
         text: %Promise_reject%; url: sec-promise.reject
         text: %Promise_resolve%; url: sec-promise.resolve
+        text: %PromiseProto_then%; url: sec-promise.prototype.then
     type: const; for: ECMAScript
         url: sec-well-known-symbols
             text: @@iterator
@@ -120,10 +121,12 @@ urlPrefix: https://tc39.github.io/ecma262/; spec: ECMA-262
         text: CreateDataProperty; url: sec-createdataproperty
         text: CreateIterResultObject; url: sec-createiterresultobject
         text: CreateMapIterator; url: sec-createmapiterator
+        text: CreateMethodProperty; url: sec-createmethodproperty
         text: CreateSetIterator; url: sec-createsetiterator
         text: DefinePropertyOrThrow; url: sec-definepropertyorthrow
         text: DetachArrayBuffer; url: sec-detacharraybuffer
         text: Get; url: sec-get-o-p
+        text: GetFunctionRealm; url: sec-getfunctionrealm
         text: GetIterator; url: sec-getiterator
         text: GetMethod; url: sec-getmethod
         text: IsAccessorDescriptor; url: sec-isaccessordescriptor
@@ -141,6 +144,7 @@ urlPrefix: https://tc39.github.io/ecma262/; spec: ECMA-262
         text: OrdinaryGetOwnProperty; url: sec-ordinarygetownproperty
         text: OrdinaryPreventExtensions; url: sec-ordinarypreventextensions
         text: OrdinarySetWithOwnDescriptor; url: sec-ordinarysetwithowndescriptor
+        text: PerformPromiseThen; url: sec-performpromisethen
         text: Set; url: sec-set-o-p-v-throw
         text: SetFunctionLength; url: sec-setfunctionlength
         text: SetFunctionName; url: sec-setfunctionname
@@ -164,10 +168,10 @@ urlPrefix: https://tc39.github.io/ecma262/; spec: ECMA-262
         url: sec-returnifabrupt-shorthands
             text: !
             text: ?
-        text: ECMA-262 §5.2; url: sec-algorithm-conventions
-        text: ECMA-262 §9.1; url: sec-ordinary-object-internal-methods-and-internal-slots
-        text: ECMA-262 §9.3; url: sec-built-in-function-objects
-        text: ECMA-262 §9.4.7; url: sec-immutable-prototype-exotic-objects
+        text: ECMA-262 Algorithm Conventions; url: sec-algorithm-conventions
+        text: ECMA-262 Ordinary Object Internal Methods and Internal Slots; url: sec-ordinary-object-internal-methods-and-internal-slots
+        text: ECMA-262 Built-in Function Objects; url: sec-built-in-function-objects
+        text: ECMA-262 Immutable Prototype Exotic Objects; url: sec-immutable-prototype-exotic-objects
         text: abrupt completion; url: sec-completion-record-specification-type
         text: array index; url: array-index
         text: array iterator object; url: sec-array-iterator-objects
@@ -187,6 +191,7 @@ urlPrefix: https://tc39.github.io/ecma262/; spec: ECMA-262
             text: internal method
             text: internal slot
         text: Number type; url: sec-ecmascript-language-types-number-type
+        text: Object; for: ECMAScript; url: sec-object-type
         for: ordinary object; url: sec-ordinary-object-internal-methods-and-internal-slots
             text: internal method
             text: internal slot
@@ -439,6 +444,8 @@ The different kinds of <dfn id="dfn-definition">definitions</dfn> that can appea
 [=partial interface|partial interface definitions=],
 [=interface mixins=],
 [=partial interface mixin|partial mixin definitions=],
+[=callback functions=],
+[=callback interfaces=],
 [=namespaces=],
 [=partial namespace|partial namespace definitions=],
 [=dictionary|dictionaries=],
@@ -547,7 +554,8 @@ Every [=interface=],
 [=dictionary=],
 [=partial dictionary|partial dictionary definition=],
 [=enumeration=],
-[=callback function=] and
+[=callback function=],
+[=callback interface=] and
 [=typedef=] (together called <dfn id="dfn-named-definition" export lt="named definition">named definitions</dfn>)
 and every [=constant=],
 [=attribute=],
@@ -573,6 +581,7 @@ in the declaration:
         partial dictionary <mark>dictionary_identifier</mark> { /* dictionary_members... */ };
         enum <mark>enumeration_identifier</mark> { "enum", "values" /* , ... */ };
         callback <mark>callback_identifier</mark> = return_type (/* arguments... */);
+        callback interface <mark>callback_interface_identifier</mark> { /* interface_members... */ };
     </pre>
 *   For [=attributes=],
     [=typedefs=]
@@ -687,7 +696,8 @@ the [=identifier=] of every
 [=namespace=],
 [=dictionary=],
 [=enumeration=],
-[=callback function=] and
+[=callback function=],
+[=callback interface=] and
 [=typedef=]
 must not
 be the same as the identifier of any other
@@ -695,7 +705,8 @@ be the same as the identifier of any other
 [=namespace=],
 [=dictionary=],
 [=enumeration=],
-[=callback function=] or
+[=callback function=],
+[=callback interface=] or
 [=typedef=].
 
 Within an [=IDL fragment=], a reference
@@ -773,8 +784,7 @@ across [=IDL fragments=].
 describe object oriented systems.  In such systems, objects are entities
 that have identity and which are encapsulations of state and behavior.
 An <dfn id="dfn-interface" export>interface</dfn> is a definition (matching
-<emu-t>interface</emu-t> <emu-nt><a href="#prod-InterfaceRest">InterfaceRest</a></emu-nt> or
-<emu-t>callback</emu-t> <emu-t>interface</emu-t> <emu-nt><a href="#prod-InterfaceRest">InterfaceRest</a></emu-nt>) that declares some
+<emu-t>interface</emu-t> <emu-nt><a href="#prod-InterfaceRest">InterfaceRest</a></emu-nt>) that declares some
 state and behavior that an object implementing that interface will expose.
 
 <pre highlight="webidl" class="syntax">
@@ -868,6 +878,19 @@ its inheritance hierarchy has a cycle.  That is, an interface
 |A| cannot inherit from itself, nor can it inherit from another
 interface |B| that inherits from |A|, and so on.
 
+<div algorithm>
+  The [=list=] of <dfn for=interface>inclusive inherited interfaces</dfn> of an [=interface=] |I|
+  is defined as follows:
+
+    1.  Let |result| be « ».
+    1.  Let |interface| be |I|.
+    1.  While |interface| is not null:
+        1.  [=list/Append=] |interface| to |result|.
+        1.  Set |interface| to the [=interface=] that |I| [=interface/inherits=] from, if any, and
+            null otherwise.
+    1.  Return |result|.
+</div>
+
 Note that general multiple inheritance of interfaces is not supported, and
 objects also cannot implement arbitrary sets of interfaces.
 Objects can be defined to implement a single given interface |A|,
@@ -896,117 +919,10 @@ which can control how the interface member will be handled in language bindings.
     };
 </pre>
 
-A <dfn id="dfn-callback-interface" export>callback interface</dfn> is
-an [=interface=]
-that uses the <emu-t>callback</emu-t> keyword at the start of
-its definition.  Callback interfaces are ones that can be
-implemented by [=user objects=]
-and not by [=platform objects=],
-as described in [[#idl-objects]].
-
-<pre highlight="webidl" class="syntax">
-    callback interface identifier {
-      /* interface_members... */
-    };
-</pre>
-
-Note: See also the similarly named [=callback function=] definition.
-
-[=Callback interfaces=]
-must not [=interface/inherit=]
-from any non-callback interfaces, and non-callback interfaces must not
-inherit from any callback interfaces.
-Callback interfaces must not [=include=] any [=interface mixins=].
-
-[=Static attributes=] and
-[=static operations=] must not
-be defined on a [=callback interface=].
-
-<div class="advisement">
-
-    Specification authors should not define
-    [=callback interfaces=]
-    that have only a single [=operation=],
-    unless required to describe the requirements of existing APIs.
-    Instead, a [=callback function=] should be used.
-
-    The definition of <code class="idl">EventListener</code> as a
-    [=callback interface=]
-    is an example of an existing API that needs to allow
-    [=user objects=] with a
-    given property (in this case <code class="idl">handleEvent</code>) to be considered to implement the interface.
-    For new APIs, and those for which there are no compatibility concerns,
-    using a [=callback function=] will allow
-    only a [=function object=] (in the ECMAScript
-    language binding).
-
-</div>
-
-<p class="issue">
-    Perhaps this warning shouldn't apply if you are planning to extend the callback
-    interface in the future.  That's probably a good reason to start off with a single
-    operation callback interface.
-</p>
-
-<p class="issue">
-    I think we need to support operations not being implemented on a given
-    user object implementing a callback interface.  If specs extending an existing
-    callback interface, we probably want to be able to avoid calling the
-    operations that aren't implemented (and having some default behavior instead).
-    So we should perhaps define a term that means whether the operation is
-    implemented, which in the ECMAScript binding would correspond to checking
-    for the property's existence.
-</p>
-
-<div class="note">
-
-    Specification authors wanting to define APIs that take ECMAScript objects
-    as “property bag” like function arguments are suggested to use
-    [=dictionaries=] rather than
-    [=callback interfaces=].
-
-    For example, instead of this:
-
-    <pre highlight="webidl">
-        callback interface Options {
-          attribute DOMString? option1;
-          attribute DOMString? option2;
-          attribute long? option3;
-        };
-
-        [Exposed=Window]
-        interface A {
-          void doTask(DOMString type, Options options);
-        };
-    </pre>
-
-    to be used like this:
-
-    <pre highlight="js">
-        var a = getA();  // Get an instance of A.
-
-        a.doTask("something", { option1: "banana", option3: 100 });
-    </pre>
-
-    instead write the following:
-
-    <pre highlight="webidl">
-        dictionary Options {
-          DOMString? option1;
-          DOMString? option2;
-          long? option3;
-        };
-
-        [Exposed=Window]
-        interface A {
-          void doTask(DOMString type, optional Options options);
-        };
-    </pre>
-</div>
-
 The IDL for interfaces can be split into multiple parts by using
 <dfn id="dfn-partial-interface" export>partial interface</dfn> definitions
-(matching <emu-t>partial</emu-t> <emu-nt><a href="#prod-PartialInterfaceRest">PartialInterfaceRest</a></emu-nt>).
+(matching <emu-t>partial</emu-t> <emu-t>interface</emu-t>
+<emu-nt><a href="#prod-PartialInterfaceRest">PartialInterfaceRest</a></emu-nt>).
 The [=identifier=] of a partial
 interface definition must be the same
 as the identifier of an interface definition.  All of
@@ -1036,28 +952,6 @@ Note: A partial interface definition cannot specify that the interface
 Inheritance must be specified on the original [=interface=]
 definition.
 
-[=Extended attributes=] can be specified on
-[=partial interface=] definitions, with some
-limitations.  The following extended attributes must not
-be specified on partial interface definitions:
-[{{Constructor}}],
-[{{LegacyWindowAlias}}],
-[{{NamedConstructor}}],
-[{{NoInterfaceObject}}].
-
-Note: The above list of [=extended attributes=]
-is all of those defined in this document that are applicable to
-[=interfaces=] except for
-[{{Exposed}}],
-[{{Global}}],
-[{{OverrideBuiltins}}], and
-[{{SecureContext}}].
-
-Any [=extended attribute=] specified
-on a [=partial interface=] definition
-is considered to appear on the [=interface=]
-itself.
-
 The relevant language binding determines how interfaces correspond to constructs
 in the language.
 
@@ -1071,9 +965,13 @@ The following extended attributes are applicable to interfaces:
 [{{OverrideBuiltins}}], and
 [{{SecureContext}}].
 
-Non-callback [=interfaces=] which are not annotated
-with a [{{NoInterfaceObject}}] [=extended attribute=],
-and [=callback interfaces=] which declare [=constants=]
+The following extended attributes are applicable to [=partial interfaces=]:
+[{{Exposed}}],
+[{{OverrideBuiltins}}], and
+[{{SecureContext}}].
+
+[=Interfaces=] which are not annotated
+with a [{{NoInterfaceObject}}] [=extended attribute=]
 must be annotated with an [{{Exposed}}] [=extended attribute=].
 
 <div algorithm>
@@ -1094,12 +992,6 @@ The <dfn>qualified name</dfn> of an [=interface=] |interface| is defined as foll
     CallbackOrInterfaceOrMixin :
         "callback" CallbackRestOrInterface
         "interface" InterfaceOrMixin
-</pre>
-
-<pre class="grammar" id="prod-CallbackRestOrInterface">
-    CallbackRestOrInterface :
-        CallbackRest
-        "interface" InterfaceRest
 </pre>
 
 <pre class="grammar" id="prod-InterfaceOrMixin">
@@ -1190,8 +1082,8 @@ The <dfn>qualified name</dfn> of an [=interface=] |interface| is defined as foll
 <div class="example">
 
     The following [=IDL fragment=] defines
-    simplified versions of a few DOM [=interfaces=], one of which
-    is a [=callback interface=].
+    simplified versions of a DOM [=interfaces=]
+    and a [=callback interface=].
 
     <pre highlight="webidl">
         [Exposed=Window]
@@ -1207,9 +1099,8 @@ The <dfn>qualified name</dfn> of an [=interface=] |interface| is defined as foll
         };
     </pre>
 
-    Since the <code class="idl">EventListener</code> interface is annotated
-    callback interface, [=user objects=]
-    can implement it:
+    Plain objects can implement a [=callback interface=] like
+    <code class="idl">EventListener</code>:
 
     <pre highlight="js">
         var node = getNode();                                // Obtain an instance of Node.
@@ -1224,7 +1115,8 @@ The <dfn>qualified name</dfn> of an [=interface=] |interface| is defined as foll
         node.addEventListener("click", function() { ... });  // As does this.
     </pre>
 
-    It is not possible for a user object to implement <code class="idl">Node</code>, however:
+    It is not possible for such an object to implement an [=interface=] like
+    <code class="idl">Node</code>, however:
 
     <pre highlight="js">
         var node = getNode();  // Obtain an instance of Node.
@@ -1319,7 +1211,7 @@ must additionally include the [=interface mixin member|members=] of [=interface 
     interface_identifier includes mixin_indentifier;
 </pre>
 
-The first [=identifier=] must reference a [=callback interface|non-callback=] [=interface=] |I|.
+The first [=identifier=] must reference a [=interface=] |I|.
 The second identifier must reference an [=interface mixin=] |M|.
 
 Each [=interface mixin member|member=] of |M| is considered to be
@@ -1468,6 +1360,73 @@ you can extend the {{WindowOrWorkerGlobalScope}} [=interface mixin=] using a [=p
     };
 </pre>
 
+
+<h3 id="idl-callback-interfaces">Callback interfaces</h3>
+
+A <dfn id="dfn-callback-interface" export>callback interface</dfn> is a [=definition=] matching
+<emu-t>callback</emu-t> <emu-t>interface</emu-t> <emu-nt><a href="#prod-InterfaceRest">InterfaceRest</a></emu-nt>.
+It can be implemented by any object, as described in [[#idl-objects]].
+
+Note: A [=callback interface=] is not an [=interface=]. The name and syntax are left over from
+earlier versions of this standard, where these concepts had more in common.
+
+A [=callback interface=] is a specification of a set of
+<dfn export lt="callback interface member">callback interface members</dfn>
+(matching <emu-nt><a href="#prod-CallbackInterfaceMembers">CallbackInterfaceMembers</a></emu-nt>).
+These are the [=members=] that appear between the braces in the interface declaration.
+
+<pre highlight="webidl" class="syntax">
+    callback interface identifier {
+      /* interface_members... */
+    };
+</pre>
+
+Note: See also the similarly named [=callback function=] definition.
+
+[=Callback interfaces=] must define exactly one [=regular operation=].
+
+<div class="advisement">
+
+    Specification authors should not define
+    [=callback interfaces=]
+    unless required to describe the requirements of existing APIs.
+    Instead, a [=callback function=] should be used.
+
+    The definition of <code class="idl">EventListener</code> as a
+    [=callback interface=]
+    is an example of an existing API that needs to allow
+    objects with a
+    given property (in this case <code class="idl">handleEvent</code>) to be considered to implement the interface.
+    For new APIs, and those for which there are no compatibility concerns,
+    using a [=callback function=] will allow
+    only a [=function object=] (in the ECMAScript
+    language binding).
+
+</div>
+
+[=Callback interfaces=] which declare [=constants=]
+must be annotated with an [{{Exposed}}] [=extended attribute=].
+
+
+<pre class="grammar" id="prod-CallbackRestOrInterface">
+    CallbackRestOrInterface :
+        CallbackRest
+        "interface" identifier "{" CallbackInterfaceMembers "}" ";"
+</pre>
+
+<pre class="grammar" id="prod-CallbackInterfaceMembers">
+    CallbackInterfaceMembers :
+        ExtendedAttributeList CallbackInterfaceMember CallbackInterfaceMember
+        ε
+</pre>
+
+<pre class="grammar" id="prod-CallbackInterfaceMember">
+    CallbackInterfaceMember :
+        Const
+        RegularOperation
+</pre>
+
+
 <h3 id="idl-members">Members</h3>
 
 [=Interfaces=], [=interface mixins=], and [=namespaces=] are specifications of a set of
@@ -1483,8 +1442,27 @@ and [=operations=] describe the behaviors that can be invoked on the object.
 [=Constants=] declare named constant values
 that are exposed as a convenience to users of objects in the system.
 
-[=Interfaces=], [=interface mixins=], and [=namespaces=] each support a different set of [=members=],
-which are specified in [[#idl-interfaces]], [[#idl-interface-mixins]], and [[#idl-namespaces]],
+<div class="note">
+
+    When an [=interface=] [=includes=] an [=interface mixin=], each [=member=]
+    of the interface mixin is also considered a member of the interface. In contrast,
+    [=interface/inherit|inherited=] interface members are not considered members
+    of the interface.
+
+</div>
+
+The algorithm steps for every [=regular operation=], [=regular attribute=] getter, and
+[=regular attribute=] setter's defined on an [=interface=] or [=interface mixin=] have access to a
+<dfn export>this</dfn> value, which is an IDL value of the [=interface=] type that the member is
+declared on or that [=includes=] the [=interface mixin=] the member is declared on.
+
+[=Attribute=] setter's algorithm steps also have access to <dfn export>the given value</dfn>,
+which is an IDL value of the type the [=attribute=] is declared as.
+
+[=Interfaces=], [=interface mixins=], [=callback interfaces=] and [=namespaces=] each support a
+different set of [=members=],
+which are specified in [[#idl-interfaces]], [[#idl-interface-mixins]],
+[[#idl-callback-interfaces]], and [[#idl-namespaces]],
 and summarized in the following informative table:
 
 <table class="data complex non-normative">
@@ -1508,7 +1486,7 @@ and summarized in the following informative table:
         <tr>
             <th>[=Regular attributes=]</th>
             <td>●</td>
-            <td>●</td>
+            <td></td>
             <td>●</td>
             <td>Only [=read only=] attributes</td>
         </tr>
@@ -1568,7 +1546,7 @@ and summarized in the following informative table:
 
 A <dfn id="dfn-constant" export>constant</dfn> is a declaration (matching
 <emu-nt><a href="#prod-Const">Const</a></emu-nt>) used to bind a constant value to a name.
-Constants can appear on [=interfaces=].
+Constants can appear on [=interfaces=] and [=callback interfaces=].
 
 <p class="advisement">
     Constants have in the past primarily been used to define
@@ -1584,29 +1562,27 @@ Constants can appear on [=interfaces=].
 The [=identifier=] of a
 [=constant=]
 must not be the same as the identifier
-of another [=interface member=]
-defined on the same interface.
+of another [=interface member=] or [=callback interface member=]
+defined on the same [=interface=] or [=callback interface=].
 The identifier also must not
 be "<code>length</code>", "<code>name</code>" or "<code>prototype</code>".
 
-Note: These three names are the names of properties that may exist on
-[=function objects=] at the time the [=function object=] is created in the ECMAScript language binding.
+Note: These three names are the names of properties that are defined on the
+[=interface object=] in the ECMAScript language binding.
 
 The type of a constant (matching <emu-nt><a href="#prod-ConstType">ConstType</a></emu-nt>)
 must not be any type other than
-a [=primitive type=]
-or a [=nullable type|nullable=] primitive type.
+a [=primitive type=].
 If an [=identifier=] is used,
 it must reference a [=typedef=]
-whose type is a primitive type or a nullable primitive type.
+whose type is a primitive type.
 
 The <emu-nt><a href="#prod-ConstValue">ConstValue</a></emu-nt> part of a
 constant declaration gives the value of the constant, which can be
 one of the two boolean literal tokens (<emu-t>true</emu-t>
-and <emu-t>false</emu-t>),
-the <emu-t>null</emu-t> token, an
+and <emu-t>false</emu-t>), an
 <emu-t class="regex"><a href="#prod-integer">integer</a></emu-t> token,
-a <emu-t class="regex"><a href="#prod-float">float</a></emu-t> token,
+a <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t> token,
 or one of the three special floating point constant values
 (<emu-t>-Infinity</emu-t>, <emu-t>Infinity</emu-t> and <emu-t>NaN</emu-t>).
 
@@ -1647,23 +1623,23 @@ The value of the <emu-t class="regex"><a href="#prod-integer">integer</a></emu-t
 lie outside the valid range of values for its type, as given in
 [[#idl-types]].
 
-<div id="float-token-value" algorithm="value of float tokens">
-    The value of a <emu-t class="regex"><a href="#prod-float">float</a></emu-t> token is
+<div id="decimal-token-value" algorithm="value of decimal tokens">
+    The value of a <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t> token is
     either an IEEE 754 single-precision floating point number or an IEEE 754
     double-precision floating point number, depending on the type of the
     constant, dictionary member or optional argument it is being used as the value for, determined as follows:
 
     1.  Let |S| be the sequence of characters matched by the
-        <emu-t class="regex"><a href="#prod-float">float</a></emu-t> token.
+        <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t> token.
     1.  Let |result| be the Mathematical Value that would be obtained if
         |S| were parsed as an ECMAScript <emu-nt>[=NumericLiteral=]</emu-nt>.
-    1.  If the <emu-t class="regex"><a href="#prod-float">float</a></emu-t> token is being
+    1.  If the <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t> token is being
         used as the value for a {{float}} or {{unrestricted float}}, then
-        the value of the <emu-t class="regex"><a href="#prod-float">float</a></emu-t> token
+        the value of the <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t> token
         is the IEEE 754 single-precision floating point number closest to |result|.
-    1.  Otherwise, the <emu-t class="regex"><a href="#prod-float">float</a></emu-t> token is being
+    1.  Otherwise, the <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t> token is being
         used as the value for a {{double}} or {{unrestricted double}}, and
-        the value of the <emu-t class="regex"><a href="#prod-float">float</a></emu-t> token
+        the value of the <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t> token
         is the IEEE 754 double-precision floating point number closest to |result|. [[!IEEE-754]]
 </div>
 
@@ -1689,9 +1665,9 @@ value for:
      :: The value is the IEEE 754 double-precision NaN value with the bit pattern 0x7ff8000000000000.
 </dl>
 
-The type of a <emu-t class="regex"><a href="#prod-float">float</a></emu-t> token is the same
+The type of a <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t> token is the same
 as the type of the constant, dictionary member or optional argument it is being used as the value of.
-The value of the <emu-t class="regex"><a href="#prod-float">float</a></emu-t> token must not
+The value of the <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t> token must not
 lie outside the valid range of values for its type, as given in [[#idl-types]].
 Also, <emu-t>Infinity</emu-t>, <emu-t>-Infinity</emu-t> and <emu-t>NaN</emu-t> must not
 be used as the value of a {{float}} or {{double}}.
@@ -1709,7 +1685,7 @@ or |DT| is a [=nullable type=]
 whose [=nullable types/inner type=] is |VT|.
 
 [=Constants=] are not associated with
-particular instances of the [=interface=]
+particular instances of the [=interface=] or [=callback interface=]
 on which they appear.  It is language binding specific whether
 [=constants=] are exposed on instances.
 
@@ -1747,7 +1723,6 @@ The following extended attributes are applicable to constants:
         BooleanLiteral
         FloatLiteral
         integer
-        "null"
 </pre>
 
 <pre class="grammar" id="prod-BooleanLiteral">
@@ -1758,7 +1733,7 @@ The following extended attributes are applicable to constants:
 
 <pre class="grammar" id="prod-FloatLiteral">
     FloatLiteral :
-        float
+        decimal
         "-Infinity"
         "Infinity"
         "NaN"
@@ -1766,8 +1741,8 @@ The following extended attributes are applicable to constants:
 
 <pre class="grammar" id="prod-ConstType">
     ConstType :
-        PrimitiveType Null
-        identifier Null
+        PrimitiveType
+        identifier
 </pre>
 
 <div class="example">
@@ -1790,12 +1765,13 @@ The following extended attributes are applicable to constants:
 
 <h4 id="idl-attributes">Attributes</h4>
 
-An <dfn id="dfn-attribute" export>attribute</dfn> is an [=interface member=]
+An <dfn id="dfn-attribute" export>attribute</dfn> is an [=interface member=] or [=namespace member=]
 (matching
-<emu-t>inherit</emu-t> <emu-nt><a href="#prod-ReadOnly">ReadOnly</a></emu-nt> <emu-nt><a href="#prod-AttributeRest">AttributeRest</a></emu-nt>,
+<emu-t>inherit</emu-t> <emu-nt><a href="#prod-AttributeRest">AttributeRest</a></emu-nt>,
 <emu-t>static</emu-t> <emu-nt><a href="#prod-ReadOnly">ReadOnly</a></emu-nt> <emu-nt><a href="#prod-AttributeRest">AttributeRest</a></emu-nt>,
 <emu-t>stringifier</emu-t> <emu-nt><a href="#prod-ReadOnly">ReadOnly</a></emu-nt> <emu-nt><a href="#prod-AttributeRest">AttributeRest</a></emu-nt>,
-or <emu-nt><a href="#prod-ReadOnly">ReadOnly</a></emu-nt> <emu-nt><a href="#prod-AttributeRest">AttributeRest</a></emu-nt>)
+<emu-nt><a href="#prod-ReadOnly">ReadOnly</a></emu-nt> <emu-nt><a href="#prod-AttributeRest">AttributeRest</a></emu-nt>,
+or <emu-nt><a href="#prod-AttributeRest">AttributeRest</a></emu-nt>)
 that is used to declare data fields with a given type and
 [=identifier=] whose value can
 be retrieved and (in some cases) changed.  There are two kinds of attributes:
@@ -1826,7 +1802,7 @@ it declares a [=static attribute=]. Note that in addition to being [=interface m
     To <dfn export>get the underlying value</dfn> of an attribute |attr| given a value |target|,
     return the result of performing the actions listed in the description of |attr| that occur on getting,
     or those listed in the description of the inherited attribute,
-    if |attr| is declared to inherit its getter, on |target| if |target| is not null.
+    if |attr| is declared to inherit its getter, with |target| as <b>[=this=]</b> if it is not null.
 </div>
 
 The [=identifier=] of an
@@ -1842,8 +1818,8 @@ that appears after the <emu-t>attribute</emu-t> keyword.
 If the <emu-nt><a href="#prod-Type">Type</a></emu-nt> is an
 [=identifier=] or an identifier followed by <emu-t>?</emu-t>,
 then the identifier must
-identify an interface, [=enumeration=],
-[=callback function=] or [=typedef=].
+identify an [=interface=], [=enumeration=],
+[=callback function=], [=callback interface=] or [=typedef=].
 
 The type of the attribute, after resolving typedefs, must not be a
 [=nullable type|nullable=] or non-nullable version of any of the following types:
@@ -1884,9 +1860,10 @@ The read only attribute from which the attribute inherits its getter
 is the attribute with the same identifier on the closest ancestor interface
 of the one on which the inheriting attribute is defined.  The attribute
 whose getter is being inherited must be
-of the same type as the inheriting attribute, and <emu-t>inherit</emu-t>
-must not appear on a [=read only=]
-attribute or a [=static attribute=].
+of the same type as the inheriting attribute.
+
+Note: The grammar ensures that <emu-t>inherit</emu-t> does not appear on a [=read only=] attribute
+or a [=static attribute=].
 
 <pre highlight="webidl" class="syntax">
     [Exposed=Window]
@@ -1911,20 +1888,6 @@ interface will be stringified to the value of the attribute.  See
       stringifier attribute DOMString identifier;
     };
 </pre>
-
-<p id="callback-attribute-exceptions">
-    If an implementation attempts to get or set the value of an
-    [=attribute=] on a
-    [=user object=]
-    (for example, when a callback object has been supplied to the implementation),
-    and that attempt results in an exception being thrown, then, unless otherwise specified, that
-    exception will be propagated to the user code that caused the
-    implementation to access the attribute.  Similarly, if a value
-    returned from getting the attribute cannot be converted to
-    an IDL type, then any exception resulting from this will also
-    be propagated to the user code that resulted in the implementation
-    attempting to get the value of the attribute.
-</p>
 
 The following [=extended attributes=]
 are applicable to regular and static attributes:
@@ -1954,7 +1917,7 @@ are applicable only to regular attributes:
 
 <pre class="grammar" id="prod-ReadWriteAttribute">
     ReadWriteAttribute :
-        "inherit" ReadOnly AttributeRest
+        "inherit" AttributeRest
         AttributeRest
 </pre>
 
@@ -2010,7 +1973,8 @@ are applicable only to regular attributes:
 
 <h4 id="idl-operations">Operations</h4>
 
-An <dfn id="dfn-operation" export>operation</dfn> is an [=interface member=]
+An <dfn id="dfn-operation" export>operation</dfn> is an [=interface member=], [=callback interface
+member=] or [=namespace member=]
 (matching <emu-t>static</emu-t> <emu-nt><a href="#prod-RegularOperation">RegularOperation</a></emu-nt>,
 <emu-t>stringifier</emu-t> <emu-nt><a href="#prod-RegularOperation">RegularOperation</a></emu-nt>,
 <emu-nt><a href="#prod-RegularOperation">RegularOperation</a></emu-nt> or
@@ -2047,7 +2011,7 @@ There are three kinds of operation:
 
 If an operation has an identifier but no <emu-t>static</emu-t>
 keyword, then it declares a <dfn id="dfn-regular-operation" export>regular operation</dfn>.
-If the operation has a 
+If the operation has a
 [=special keyword=]
 used in its declaration (that is, any keyword matching
 <emu-nt><a href="#prod-Special">Special</a></emu-nt>, or
@@ -2056,7 +2020,7 @@ then it declares a special operation.  A single operation can declare
 both a regular operation and a special operation;
 see [[#idl-special-operations]] for details on special operations.
 Note that in addition to being [=interface members=],
-regular operations can also be [=namespace members=].
+regular operations can also be [=callback interface members=] and [=namespace members=].
 
 If an operation has no identifier,
 then it must be declared to be a special operation
@@ -2065,7 +2029,7 @@ using one of the special keywords.
 The identifier of a [=regular operation=] or [=static operation=]
 must not be the same as the identifier
 of a [=constant=] or [=attribute=]
-defined on the same [=interface=].
+defined on the same [=interface=], [=callback interface=] or [=namespace=].
 The identifier of a static operation must not be "<code>prototype</code>".
 
 Note: The identifier can be the same
@@ -2084,8 +2048,8 @@ A return type of <dfn id="idl-void" interface>void</dfn> indicates that the oper
 If the return type is an
 [=identifier=] followed by <emu-t>?</emu-t>,
 then the identifier must
-identify an interface, dictionary, [=enumeration=],
-[=callback function=] or [=typedef=].
+identify an [=interface=], [=dictionary=], [=enumeration=],
+[=callback function=], [=callback interface=] or [=typedef=].
 
 An operation’s arguments (matching <emu-nt><a href="#prod-ArgumentList">ArgumentList</a></emu-nt>)
 are given between the parentheses in the declaration.  Each individual argument is specified
@@ -2098,8 +2062,8 @@ symbol without needing to escape it.
 
 If the <emu-nt><a href="#prod-Type">Type</a></emu-nt> of an operation argument is an identifier
 followed by <emu-t>?</emu-t>,
-then the identifier must identify an interface,
-[=enumeration=], [=callback function=]
+then the identifier must identify an [=interface=],
+[=enumeration=], [=callback function=], [=callback interface=],
 or [=typedef=].
 If the operation argument type is an [=identifier=]
 not followed by <emu-t>?</emu-t>, then the identifier must
@@ -2272,7 +2236,7 @@ dictionary, unless otherwise specified.
 When a boolean literal token (<emu-t>true</emu-t> or <emu-t>false</emu-t>),
 the <emu-t>null</emu-t> token,
 an <emu-t class="regex"><a href="#prod-integer">integer</a></emu-t> token, a
-<emu-t class="regex"><a href="#prod-float">float</a></emu-t> token or one of
+<emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t> token or one of
 the three special floating point literal values (<emu-t>Infinity</emu-t>,
 <emu-t>-Infinity</emu-t> or <emu-t>NaN</emu-t>) is used as the
 [=optional argument/default value=],
@@ -2281,7 +2245,8 @@ it is interpreted in the same way as for a [=constant=].
 <div id="string-literal" algorithm="value of string literal tokens">
     Optional argument default values can also be specified using a
     <emu-t class="regex"><a href="#prod-string">string</a></emu-t>
-    token, whose value is a [=string type=] determined as follows:
+    token, whose <dfn lt="value of string literal tokens">value</dfn> is a
+    [=string type=] determined as follows:
 
     1.  Let |S| be the sequence of [=Unicode scalar values=] matched by
         the <emu-t class="regex"><a href="#prod-string">string</a></emu-t> token
@@ -2343,21 +2308,6 @@ that has a [=sequence type=] in its [=flattened member types=].
     </pre>
 </div>
 
-<p id="callback-operation-exceptions">
-    If an implementation attempts to invoke
-    an [=operation=] on a [=user object=]
-    (for example, when a callback object has been supplied to the implementation),
-    and that attempt results in an exception being thrown, then,
-    unless otherwise specified,
-    that exception will be propagated to
-    the user code that caused the implementation to invoke the operation.
-    Similarly, if a value returned from invoking the operation
-    cannot be converted to an IDL type,
-    then any exception resulting from this will also
-    be propagated to the user code
-    that resulted in the implementation attempting to invoke the operation.
-</p>
-
 The following extended attributes are applicable to operations:
 [{{Default}}],
 [{{Exposed}}],
@@ -2370,6 +2320,7 @@ The following extended attributes are applicable to operations:
         ConstValue
         string
         "[" "]"
+        "null"
 </pre>
 
 <pre class="grammar" id="prod-Operation">
@@ -2485,7 +2436,7 @@ which returns the [=JSON type=]
 converted into an ECMAScript value
 that can be turned into a JSON string
 by the {{JSON.stringify()}} function.
-Additionaly, in the ECMAScript language binding,
+Additionally, in the ECMAScript language binding,
 the <code>toJSON</code> operation can take a [{{Default}}] [=extended attribute=],
 in which case the [=default toJSON operation=] is exposed instead.
 
@@ -2526,7 +2477,7 @@ in which case the [=default toJSON operation=] is exposed instead.
         1.  [=list/For each=] attribute [=identifier=] |attr| in « "from", "to", "amount", "description" »:
             1.  Let |value| be result of [=get the underlying value|getting the underlying value=]
                 of the [=attribute=] identified by |attr|,
-                given this <code class="idl">Transaction</code> object.
+                given **this**.
             1.  Set |json|[|attr|] to |value|.
         1.  Return |json|.
     </div>
@@ -2687,9 +2638,6 @@ then it must also have a
 Special operations declared using operations must not
 be [=variadic=] nor have any
 [=optional arguments=].
-
-Special operations must not be declared on
-[=callback interfaces=].
 
 If an object implements more than one [=interface=]
 that defines a given special operation, then it is undefined which (if any)
@@ -3108,9 +3056,6 @@ It is language binding specific whether it is possible to invoke
 a static operation or get or set a static attribute through a reference
 to an instance of the interface.
 
-Static attributes and operations must not be
-declared on [=callback interfaces=].
-
 <pre class="grammar" id="prod-StaticMember">
     StaticMember :
         "static" StaticMemberRest
@@ -3229,7 +3174,7 @@ constructor (specified with [{{Constructor}}]
 or [{{NamedConstructor}}]), or
 [=callback function=].
 The algorithm to compute an [=effective overload set=]
-operates on one of the following six types of IDL constructs, and listed with them below are
+operates on one of the following four types of IDL constructs, and listed with them below are
 the inputs to the algorithm needed to compute the set.
 
  :  For regular operations
@@ -3244,9 +3189,6 @@ the inputs to the algorithm needed to compute the set.
  :: *   the [=interface=] on which the [{{NamedConstructor}}] [=extended attributes=] are to be found
     *   the [=identifier=] of the named constructors
     *   the number of arguments to be passed
- :  For callback functions
- :: *   the [=callback function=]
-    *   the number of arguments to be passed
 
 An effective overload set is used, among other things, to determine whether there are ambiguities in the
 overloaded operations and constructors specified on an interface.
@@ -3256,9 +3198,8 @@ The [=set/items=] of an [=effective overload set=] are [=tuples=] of the form
 whose [=tuple/items=] are described below:
 
 *   A <dfn for="effective overload set tuple">callable</dfn> is an [=operation=]
-    if the [=effective overload set=] is for [=regular operations=] or [=static operations=];
-    it is an [=extended attribute=] if the [=effective overload set=] is for constructors or [=named constructors=];
-    and it is the [=callback function=] itself if the [=effective overload set=] is for [=callback functions=].
+    if the [=effective overload set=] is for [=regular operations=] or [=static operations=]; and
+    it is an [=extended attribute=] if the [=effective overload set=] is for constructors or [=named constructors=].
 *   A <dfn>type list</dfn> is a [=list=] of IDL types.
 *   An <dfn>optionality list</dfn> is a [=list=] of
     three possible <dfn id="dfn-optionality-value" export>optionality values</dfn>
@@ -3281,7 +3222,6 @@ the same operation or constructor.
     *   the identifier of the operation or named constructor is |A|
     *   the argument count is |N|
     *   the interface is |I|
-    *   the callback function is |C|
 
     Whenever an argument of an extended attribute is mentioned,
     it is referring to an argument of the extended attribute’s
@@ -3307,8 +3247,6 @@ the same operation or constructor.
                 [=extended attributes=] on interface |I| whose
                 [=takes a named argument list|named argument lists’=]
                 identifiers are |A|.
-             :  For callback functions
-             :: The single element of |F| is the callback function itself, |C|.
         </dl>
 
     1.  Let |maxarg| be the maximum number of arguments the operations,
@@ -3318,7 +3256,7 @@ the same operation or constructor.
 
         Note: So <code>void f(long x, long... y);</code> is considered to be declared to take two arguments.
     1.  Let |max| be <a abstract-op>max</a>(|maxarg|, |N|).
-    1.  [=set/For each=] operation, extended attribute, or callback function |X| in |F|:
+    1.  [=set/For each=] operation or extended attribute |X| in |F|:
         1.  Let |arguments| be the [=list=] of arguments |X| is declared to take.
         1.  Let |n| be the [=list/size=] of |arguments|.
         1.  Let |types| be a [=type list=].
@@ -3453,14 +3391,14 @@ the following algorithm returns <i>true</i>.
     <dl>
         <dt>interface-like</dt>
         <dd>
-            * non-[=callback interfaces|callback=] [=interface types=]
+            * [=interface types=]
             * [=exception types=]
             * [=buffer source types=]
         <dt>dictionary-like</dt>
         <dd>
             * [=dictionary types=]
             * [=record types=]
-            * [=callback interfaces|callback=] [=interface types=]
+            * [=callback interface types=]
         <dt>sequence-like</dt>
         <dd>
             * [=sequence types=]
@@ -3629,7 +3567,7 @@ the following algorithm returns <i>true</i>.
 
         <pre highlight="idl">
             callback interface CBIface {
-                attribute DOMString attr1;
+                void handle();
             };
 
             [Exposed=Window]
@@ -3830,7 +3768,8 @@ determine what Web IDL language feature to use:
     to create separate operations with distinct names, but legacy APIs sometimes follow this
     pattern.
 
-    As an example, the {{CSS/supports()}} operations of the {{CSS}} interface is defined as the
+    As an example, the {{CSS/supports(property, value)}} and {{CSS/supports(conditionText)}}
+    operations of the {{CSS}} interface are defined as the
     following IDL fragment [[CSS3-CONDITIONAL]] [[CSSOM]].
 
     <pre highlight="webidl">
@@ -4221,8 +4160,9 @@ of a maplike interface must not
 also have a [=maplike declaration=].
 A maplike interface and its [=inherited interfaces=]
 must not have an
-[=iterable declaration=] or
-[=setlike declaration=].
+[=iterable declaration=],
+a [=setlike declaration=], or
+an [=indexed property getter=].
 
 <div data-fill-with="grammar-ReadOnlyMember"></div>
 
@@ -4313,8 +4253,9 @@ of a setlike interface must not
 also have a [=setlike declaration=].
 A setlike interface and its [=inherited interfaces=]
 must not have an
-[=iterable declaration=] or
-[=maplike declaration=].
+[=iterable declaration=],
+a [=maplike declaration=], or
+an [=indexed property getter=].
 
 <div data-fill-with="grammar-ReadOnlyMember"></div>
 
@@ -4408,7 +4349,7 @@ Of the extended attributes defined in this specification, only the [{{Exposed}}]
 
 <div class="example" id="example-namespace">
 
-    The following [=IDL fragment=] defines an
+    The following [=IDL fragment=] defines a
     [=namespace=].
 
     <pre highlight="webidl">
@@ -4483,8 +4424,10 @@ to the dictionary members defined on |D| and on any of |D|’s
 [=inherited dictionaries=].
 On a given dictionary value, the presence of each dictionary member
 is optional, unless that member is specified as required.
-When specified in the dictionary value, a dictionary member is said to be
-<dfn id="dfn-present" export lt="present|not present" for="dictionary member">present</dfn>, otherwise it is [=not present=].
+A dictionary member is said to be
+<dfn id="dfn-present" export lt="present|not present" for="dictionary member">present</dfn>
+in a dictionary value if the value [=map/exists|contains an entry with the key=]
+given by the member's [=identifier=], otherwise it is [=not present=].
 Dictionary members can also optionally have a <dfn id="dfn-dictionary-member-default-value" for="dictionary member" export>default value</dfn>, which is
 the value to use for the dictionary member when passing a value to a
 [=platform object=] that does
@@ -4521,8 +4464,8 @@ If the <emu-nt><a href="#prod-Type">Type</a></emu-nt>
 is an [=identifier=]
 followed by <emu-t>?</emu-t>, then the identifier
 must identify an
-interface, [=enumeration=],
-[=callback function=] or [=typedef=].
+[=interface=], [=enumeration=],
+[=callback function=], [=callback interface=] or [=typedef=].
 If the dictionary member type is an identifier
 not followed by <emu-t>?</emu-t>, then the identifier must
 identify any one of those definitions or a [=dictionary=].
@@ -4550,7 +4493,7 @@ then that gives the dictionary member its [=dictionary member/default value=].
 When a boolean literal token (<emu-t>true</emu-t> or <emu-t>false</emu-t>),
 the <emu-t>null</emu-t> token,
 an <emu-t class="regex"><a href="#prod-integer">integer</a></emu-t> token, a
-<emu-t class="regex"><a href="#prod-float">float</a></emu-t> token,
+<emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t> token,
 one of the three special floating point literal values (<emu-t>Infinity</emu-t>,
 <emu-t>-Infinity</emu-t> or <emu-t>NaN</emu-t>),
 a <emu-t class="regex"><a href="#prod-string">string</a></emu-t> token or
@@ -4567,8 +4510,7 @@ be one of the [=enumeration values|enumeration’s values=].
 If the type of the dictionary member is preceded by the
 <emu-t>required</emu-t> keyword, the member is considered a
 <dfn id="required-dictionary-member" export>required dictionary member</dfn>
-and must be present on the dictionary.  A
-[=required dictionary member=] must not have a default value.
+and must be present on the dictionary.
 
 <pre highlight="webidl" class="syntax">
     dictionary identifier {
@@ -4581,7 +4523,7 @@ the dictionary it appears on.  A type includes a dictionary |D|
 if at least one of the following is true:
 
 *   the type is |D|
-*   the type is a dictionary that [=interface/inherits=] from |D|
+*   the type is a dictionary that [=dictionary/inherits=] from |D|
 *   the type is a [=nullable type=]
     whose [=nullable types/inner type=] includes |D|
 *   the type is a [=sequence type=] or [=frozen array type|frozen array=]
@@ -4718,7 +4660,7 @@ No [=extended attributes=] are applicable to dictionaries.
 
 <pre class="grammar" id="prod-DictionaryMemberRest">
     DictionaryMemberRest :
-        "required" TypeWithExtendedAttributes identifier Default ";"
+        "required" TypeWithExtendedAttributes identifier ";"
         Type identifier Default ";"
 </pre>
 
@@ -5112,7 +5054,7 @@ whose type is the enumeration, is language binding specific.
 
 Note: In the ECMAScript binding, assignment of an invalid string value to an
 [=attribute=] is ignored, while
-passing such a value as an [=operation=] argument
+passing such a value in other contexts (for example as an [=operation=] argument)
 results in an exception being thrown.
 
 No [=extended attributes=]
@@ -5299,10 +5241,10 @@ defined in this specification are applicable to [=typedefs=].
 <h3 id="idl-objects">Objects implementing interfaces</h3>
 
 In a given implementation of a set of [=IDL fragments=],
-an object can be described as being a [=platform object=], a [=user object=], or neither.
+an object can be described as being a [=platform object=].
 
 <dfn id="dfn-platform-object" lt="platform object" export>Platform objects</dfn> are objects
-that implement a non-[=callback interface|callback=] [=interface=].
+that implement an [=interface=].
 
 <dfn id="dfn-legacy-platform-object" export>Legacy platform objects</dfn> are
 [=platform objects=] that implement an [=interface=] which
@@ -5313,9 +5255,9 @@ does not have a [{{Global}}] [=extended attribute=], and which
 In a browser, for example,
 the browser-implemented DOM objects (implementing interfaces such as <code class="idl">Node</code> and
 <code class="idl">Document</code>) that provide access to a web page’s contents
-to ECMAScript running in the page would be platform objects.  These objects might be exotic objects,
+to ECMAScript running in the page would be [=platform objects=].  These objects might be exotic objects,
 implemented in a language like C++, or they might be native ECMAScript objects.  Regardless,
-an implementation of a given set of IDL fragments needs to be able to recognize all platform objects
+an implementation of a given set of IDL fragments needs to be able to recognize all [=platform objects=]
 that are created by the implementation.  This might be done by having some internal state that records whether
 a given object is indeed a platform object for that implementation, or perhaps by observing
 that the object is implemented by a given internal C++ class.  How exactly platform objects
@@ -5327,16 +5269,10 @@ would be considered to be a different implementation from the browser provided i
 The objects created by the ECMAScript library that implement the <code class="idl">Node</code> interface
 will not be treated as platform objects that implement <code class="idl">Node</code> by the browser implementation.
 
-<dfn id="dfn-user-object" lt="user object" export>User objects</dfn> are those that authors would create,
-implementing [=callback interfaces=] that the Web APIs use to be able to invoke author-defined
-operations or to send and receive values to the author’s program through
-manipulating the object’s attributes.  In a web page, an ECMAScript object
-that implements the <code class="idl">EventListener</code> interface, which is
-used to register a callback that the DOM Events implementation invokes, would be considered
-to be a user object.
-
-Note that user objects can only implement [=callback interfaces=]
-and platform objects can only implement non-callback interfaces.
+[=Callback interfaces=], on the other hand, can be implemented by any ECMAScript object. This
+allows Web APIs to invoke author-defined operations. For example, the DOM Events implementation
+allows authors to register callbacks by providing objects that implement the
+<code class="idl">EventListener</code> interface.
 
 
 <h3 id="idl-types">Types</h3>
@@ -5389,7 +5325,8 @@ are {{ArrayBuffer}},
 and the [=typed array types=].
 
 The {{object}} type,
-all [=interface types=]
+all [=interface types=],
+all [=callback interface types=]
 and the [=exception types=]
 are known as <dfn id="dfn-object-type" export>object types</dfn>.
 
@@ -5671,7 +5608,7 @@ type that corresponds to the set of finite single-precision 32 bit
 IEEE 754 floating point numbers. [[!IEEE-754]]
 
 {{float}} constant values in IDL are
-represented with <emu-t class="regex"><a href="#prod-float">float</a></emu-t>
+represented with <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t>
 tokens.
 
 The [=type name=] of the
@@ -5693,7 +5630,7 @@ type that corresponds to the set of all possible single-precision 32 bit
 IEEE 754 floating point numbers, finite, non-finite, and special "not a number" values (NaNs). [[!IEEE-754]]
 
 {{unrestricted float}} constant values in IDL are
-represented with <emu-t class="regex"><a href="#prod-float">float</a></emu-t>
+represented with <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t>
 tokens.
 
 The [=type name=] of the
@@ -5707,7 +5644,7 @@ type that corresponds to the set of finite double-precision 64 bit
 IEEE 754 floating point numbers. [[!IEEE-754]]
 
 {{double}} constant values in IDL are
-represented with <emu-t class="regex"><a href="#prod-float">float</a></emu-t>
+represented with <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t>
 tokens.
 
 The [=type name=] of the
@@ -5721,7 +5658,7 @@ type that corresponds to the set of all possible double-precision 64 bit
 IEEE 754 floating point numbers, finite, non-finite, and special "not a number" values (NaNs). [[!IEEE-754]]
 
 {{unrestricted double}} constant values in IDL are
-represented with <emu-t class="regex"><a href="#prod-float">float</a></emu-t>
+represented with <emu-t class="regex"><a href="#prod-decimal">decimal</a></emu-t>
 tokens.
 
 The [=type name=] of the
@@ -5792,9 +5729,10 @@ of specifications using Web IDL might want to obtain a sequence of
 </div>
 
 There is no way to represent a constant {{DOMString}}
-value in IDL, although {{DOMString}} [=dictionary member=]
-and [=optional argument|operation optional argument=] default values
-can be specified using a <emu-t class="regex"><a href="#prod-string">string</a></emu-t> literal.
+value in IDL, although {{DOMString}} [=dictionary member=] [=dictionary member/default values=]
+and [=optional argument|operation optional argument=] [=optional argument/default values=]
+can be set to [=value of string literal tokens|the value=] of a
+<emu-t class="regex"><a href="#prod-string">string</a></emu-t> literal.
 
 The [=type name=] of the
 {{DOMString}} type is "<code>String</code>".
@@ -5808,9 +5746,10 @@ Such sequences might be interpreted as UTF-8 encoded strings [[!RFC3629]]
 or strings in some other 8-bit-per-code-unit encoding, although this is not required.
 
 There is no way to represent a constant {{ByteString}}
-value in IDL, although {{ByteString}} [=dictionary member=]
-and [=optional argument|operation optional argument=] default values
-can be specified using a <emu-t class="regex"><a href="#prod-string">string</a></emu-t> literal.
+value in IDL, although {{ByteString}} [=dictionary member=] [=dictionary member/default values=]
+and [=optional argument|operation optional argument=] [=optional argument/default values=]
+can be set to [=value of string literal tokens|the value=] of a
+<emu-t class="regex"><a href="#prod-string">string</a></emu-t> literal.
 
 The [=type name=] of the
 {{ByteString}} type is "<code>ByteString</code>".
@@ -5838,9 +5777,10 @@ which are all of the Unicode code points apart from the
 surrogate code points.
 
 There is no way to represent a constant {{USVString}}
-value in IDL, although {{USVString}} [=dictionary member=]
-and [=optional argument|operation optional argument=] default values
-can be specified using a <emu-t class="regex"><a href="#prod-string">string</a></emu-t> literal.
+value in IDL, although {{USVString}} [=dictionary member=] [=dictionary member/default values=]
+and [=optional argument|operation optional argument=] [=optional argument/default values=]
+can be set to [=value of string literal tokens|the value=] of a
+<emu-t class="regex"><a href="#prod-string">string</a></emu-t> literal.
 
 The [=type name=] of the
 {{USVString}} type is "<code>USVString</code>".
@@ -5888,15 +5828,8 @@ identifies an [=interface=] is used to refer to
 a type that corresponds to the set of all possible non-null references to objects that
 implement that interface.
 
-For non-callback interfaces, an IDL value of the interface type is represented just
-by an object reference.  For [=callback interfaces=], an IDL value of the interface type
-is represented by a tuple of an object reference and a <dfn id="dfn-callback-context" export>callback context</dfn>.
-The [=callback context=] is a language
-binding specific value, and is used to store information about the execution context at
-the time the language binding specific object reference is converted to an IDL value.
-
-Note: For ECMAScript objects, the [=callback context=] is used to hold a reference to the [=incumbent settings object=] at the time the Object value
-is converted to an IDL callback interface type value. See [[#es-interface]].
+An IDL value of the interface type is represented just
+by an object reference.
 
 There is no way to represent a constant object reference value for
 a particular interface type in IDL.
@@ -5907,6 +5840,31 @@ use a [=nullable type=].
 
 The [=type name=] of an interface type
 is the [=identifier=] of the interface.
+
+
+<h4 id="idl-callback-interface" dfn>Callback interface types</h4>
+
+An [=identifier=] that identifies a [=callback interface=] is used to refer to a type that
+corresponds to the set of all possible non-null references to objects.
+
+An IDL value of the interface type is represented by a tuple of an object reference and a
+<dfn id="dfn-callback-context" export>callback context</dfn>.
+The [=callback context=] is a language binding specific value, and is used to store information
+about the execution context at the time the language binding specific object reference is
+converted to an IDL value.
+
+Note: For ECMAScript objects, the [=callback context=] is used to hold a reference to the
+[=incumbent settings object=] at the time the Object value is converted to an IDL callback
+interface type value. See [[#es-callback-interface]].
+
+There is no way to represent a constant object reference value for a particular
+[=callback interface type=] in IDL.
+
+To denote a type that includes all possible references to objects plus the <emu-val>null</emu-val>
+value, use a [=nullable type=].
+
+The [=type name=] of a [=callback interface type=] is the [=identifier=] of the
+[=callback interface=].
 
 
 <h4 id="idl-dictionary" dfn>Dictionary types</h4>
@@ -5935,8 +5893,9 @@ refer to a type whose values are the set of strings (sequences of
 [=enumeration values|enumeration’s values=].
 
 Like {{DOMString}}, there is no way to represent a constant [=enumeration=]
-value in IDL, although enumeration-typed [=dictionary member=]
-[=dictionary member/default values=] can be specified using a
+value in IDL, although enumeration-typed [=dictionary member=] [=dictionary member/default values=]
+and [=optional argument|operation optional argument=] [=optional argument/default values=]
+can be set to [=value of string literal tokens|the value=] of a
 <emu-t class="regex"><a href="#prod-string">string</a></emu-t> literal.
 
 The [=type name=] of an enumeration type
@@ -5952,7 +5911,7 @@ a type whose values are references to objects that are functions with the given 
 An IDL value of the callback function type is represented by a tuple of an object
 reference and a [=callback context=].
 
-Note: As with [=interface type|callback interface types=], the [=callback context=] is used to hold a
+Note: As with [=callback interface types=], the [=callback context=] is used to hold a
 reference to the [=incumbent settings object=] at
 the time an ECMAScript Object value is converted to an IDL
 callback function type value.  See [[#es-callback-function]].
@@ -5977,7 +5936,7 @@ The [=nullable types/inner type=] must not be:
 *   {{any}},
 *   a [=Promise type=],
 *   another nullable type, or
-*   a [=union type=] that itself has [=includes a nullable type=]
+*   a [=union type=] that itself [=includes a nullable type=]
     or has a dictionary type as one of its [=flattened member types=].
 
 Note: Although dictionary types can in general be nullable,
@@ -6232,6 +6191,7 @@ annotate are called <dfn export for="annotated types" lt="inner type">inner type
 </div>
 
 The following extended attributes are <dfn for="extended attributes">applicable to types</dfn>:
+[{{AllowShared}}],
 [{{Clamp}}],
 [{{EnforceRange}}], and
 [{{TreatNullAs}}].
@@ -6417,7 +6377,7 @@ byte values using that reference.
 
 Attempting to [=get a reference to the buffer source|get a reference to=] or
 [=get a copy of the buffer source|get a copy of the bytes held by a buffer source=]
-when the {{ArrayBuffer}} has been [=detach|detached=]
+when the {{ArrayBuffer}} has been [=ArrayBuffer/detached=]
 will fail in a language binding-specific manner.
 
 Note: See [[#es-buffer-source-types]] below for
@@ -6468,6 +6428,7 @@ that can appear on
 types as [=annotated types=],
 [=interface members=],
 [=interface mixin members=],
+[=callback interface members=],
 [=namespace members=],
 [=dictionary members=],
 and [=operation=] arguments, and
@@ -6594,7 +6555,7 @@ five forms are allowed.
 <pre class="grammar" id="prod-Other">
     Other :
         integer
-        float
+        decimal
         identifier
         string
         other
@@ -6686,8 +6647,8 @@ in ECMAScript, as defined by the <cite>ECMAScript Language Specification</cite>
 [[!ECMA-262]].
 
 Unless otherwise specified, objects defined in this section are ordinary objects as described in
-[=ECMA-262 §9.1|ECMA-262 §9.1 Ordinary object internal methods and internal slots=], and if the
-object is a [=function object=], [=ECMA-262 §9.3|§9.3 Built-in function objects=].
+[=ECMA-262 Ordinary object internal methods and internal slots=], and if the
+object is a [=function object=], [=ECMA-262 Built-in function objects=].
 
 This section may redefine certain internal methods and/or internal slots of objects. Other
 specifications may also override the definitions of any internal method and/or internal slots of a
@@ -6723,7 +6684,7 @@ with PropertyDescriptor{\[[Writable]]: <emu-val>false</emu-val>,
 \[[Value]]: |classString|}.
 
 <p id="ecmascript-abstractop">
-    Algorithms in this section use the conventions described in [=ECMA-262 §5.2|ECMA-262 §5.2
+    Algorithms in this section use the conventions described in [=ECMA-262
     Algorithm conventions=], such as the use of steps and substeps, the use of mathematical
     operations, and so on.  This section may also reference abstract operations
     and notations defined in other parts of ECMA-262.
@@ -6782,24 +6743,24 @@ and comprise the following:
 *   <a href="#es-iterators">the function objects that correspond to iterators</a>
 *   [=map size getters=]
 
-Each [=Realm|ECMAScript global environment=]
+Each [=Realm=]
 must have its own unique set of each of
 the [=initial objects=], created
 before control enters any ECMAScript execution context associated with the
-environment, but after the global object for that environment is created.  The \[[Prototype]]s
-of all initial objects in a given global environment must come from
-that same global environment.
+Realm, but after the [=Realm/global object=] for that Realm is created.  The \[[Prototype]]s
+of all initial objects in a given [=Realm=] must come from
+that same [=Realm=].
 
 <div class="example">
 
-    In an HTML user agent, multiple global environments can exist when
+    In an HTML user agent, multiple [=Realms=] can exist when
     multiple frames or windows are created.  Each frame or window will have
     its own set of [=initial objects=],
     which the following HTML document demonstrates:
 
     <pre highlight="html">
         &lt;!DOCTYPE html&gt;
-        &lt;title&gt;Different global environments&lt;/title&gt;
+        &lt;title&gt;Different Realms&lt;/title&gt;
         &lt;iframe id=a&gt;&lt;/iframe&gt;
         &lt;script&gt;
         var iframe = document.getElementById("a");
@@ -6815,15 +6776,9 @@ that same global environment.
     </pre>
 </div>
 
-Unless otherwise specified, each ECMAScript global environment <dfn id="dfn-expose" for="ECMAScript global environment" export>exposes</dfn>
-all [=interfaces=]
-that the implementation supports.  If a given ECMAScript global environment does not
-expose an interface, then the requirements given in
-[[#es-interfaces]] are
-not followed for that interface.
-
-Note: This allows, for example, ECMAScript global environments for Web Workers to [=ECMAScript global environment/expose=]
-different sets of supported interfaces from those exposed in environments
+Note: All [=interfaces=] define which [=Realms=] they are [=exposed=] in.
+This allows, for example, [=Realms=] for Web Workers to [=expose=]
+different sets of supported interfaces from those exposed in Realms
 for Web pages.
 
 Although at the time of this writing the ECMAScript specification does not reflect this,
@@ -6933,7 +6888,7 @@ may return any value, which will be discarded.
 <h4 id="es-integer-types">Integer types</h4>
 
 Mathematical operations used in this section,
-including those defined in [=ECMA-262 §5.2|ECMA-262 §5.2 Algorithm conventions=],
+including those defined in [=ECMA-262 Algorithm conventions=],
 are to be understood as computing exact mathematical results
 on mathematical real numbers.
 
@@ -7012,7 +6967,7 @@ In effect, where <var ignore>x</var> is a Number value,
     to an IDL {{unsigned short}} value by running the following algorithm:
 
     1.  Let |x| be [=?=] <a abstract-op>ConvertToInt</a>(|V|, 16, "<code>unsigned</code>").
-    1.  Return the IDL {{short}} value that represents the same numeric value as |x|.
+    1.  Return the IDL {{unsigned short}} value that represents the same numeric value as |x|.
 </div>
 
 <p id="unsigned-short-to-es">
@@ -7054,7 +7009,7 @@ In effect, where <var ignore>x</var> is a Number value,
     to an IDL {{unsigned long}} value  by running the following algorithm:
 
     1.  Let |x| be [=?=] <a abstract-op>ConvertToInt</a>(|V|, 32, "<code>unsigned</code>").
-    1.  Return the IDL {{long}} value that represents the same numeric value as |x|.
+    1.  Return the IDL {{unsigned long}} value that represents the same numeric value as |x|.
 </div>
 
 <p id="unsigned-long-to-es">
@@ -7075,7 +7030,7 @@ In effect, where <var ignore>x</var> is a Number value,
     to an IDL {{long long}} value by running the following algorithm:
 
     1.  Let |x| be [=?=] <a abstract-op>ConvertToInt</a>(|V|, 64, "<code>signed</code>").
-    1.  Return the IDL {{long}} value that represents the same numeric value as |x|.
+    1.  Return the IDL {{long long}} value that represents the same numeric value as |x|.
 </div>
 
 <p id="long-long-to-es">
@@ -7100,7 +7055,7 @@ In effect, where <var ignore>x</var> is a Number value,
     to an IDL {{unsigned long long}} value by running the following algorithm:
 
     1.  Let |x| be [=?=] <a abstract-op>ConvertToInt</a>(|V|, 64, "<code>unsigned</code>").
-    1.  Return the IDL {{long}} value that represents the same numeric value as |x|.
+    1.  Return the IDL {{unsigned long long}} value that represents the same numeric value as |x|.
 </div>
 
 <p id="unsigned-long-long-to-es">
@@ -7426,11 +7381,7 @@ values are represented by ECMAScript Object values (including [=function objects
     An ECMAScript value |V| is [=converted to an IDL value|converted=]
     to an IDL [=interface type=] value by running the following algorithm (where |I| is the [=interface=]):
 
-    1.  If <a abstract-op>Type</a>(|V|) is not Object, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
-    1.  If |V| is a [=platform object=] that implements |I|, then return the IDL [=interface type=] value that represents a reference to that platform object.
-    1.  If |V| is a [=user object=]
-        that is considered to implement |I| according to the rules in [[#es-user-objects]], then return the IDL [=interface type=] value that represents a reference to that
-        user object, with the [=incumbent settings object=] as the [=callback context=].
+    1.  If |V| [=implements=] |I|, then return the IDL [=interface type=] value that represents a reference to that platform object.
     1.  [=ECMAScript/Throw=] a {{ECMAScript/TypeError}}.
 </div>
 
@@ -7440,6 +7391,30 @@ values are represented by ECMAScript Object values (including [=function objects
     value to an ECMAScript value is the Object
     value that represents a reference to the same object that the IDL
     [=interface type=] value represents.
+</p>
+
+
+<h4 id="es-callback-interface">Callback interface types</h4>
+
+IDL [=callback interface type=]
+values are represented by ECMAScript Object values (including [=function objects=]).
+
+<div id="es-to-callback-interface" algorithm="convert an ECMAScript value to callback interface">
+
+    An ECMAScript value |V| is [=converted to an IDL value|converted=]
+    to an IDL [=callback interface type=] value by running the following algorithm:
+
+    1.  If <a abstract-op>Type</a>(|V|) is not Object, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+    1.  Return the IDL [=callback interface type=] value that represents a reference to |V|, with
+        the [=incumbent settings object=] as the [=callback context=].
+</div>
+
+<p id="callback-interface-to-es">
+    The result of [=converted to an ECMAScript value|converting=]
+    an IDL [=callback interface type=]
+    value to an ECMAScript value is the Object
+    value that represents a reference to the same object that the IDL
+    [=callback interface type=] value represents.
 </p>
 
 
@@ -7897,9 +7872,7 @@ objects.
             return <emu-val>undefined</emu-val>.
         1.  Otherwise, return the result of performing any steps that were required to be run if the promise was rejected,
             with |reason| as the rejection reason.
-    1.  Let |then| be [=?=] <a abstract-op>GetMethod</a>(|promise|, "<code>then</code>").
-    1.  If |then| is <emu-val>undefined</emu-val>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
-    1.  Return <a abstract-op>Call</a>(|then|, |promise|, «|onFulfilled|, |onRejected|»).
+    1.  Return [=!=] [$PerformPromiseThen$](|promise|, |onFulfilled|, |onRejected|).
 </div>
 
 <p class="issue">
@@ -7926,9 +7899,9 @@ that correspond to the union’s [=member types=].
     1.  If |V| is <emu-val>null</emu-val> or <emu-val>undefined</emu-val>, then:
         1.  If |types| includes a [=dictionary type=], then return the
             result of [=converted to an IDL value|converting=] |V| to that dictionary type.
-    1.  If |V| is a [=platform object=], then:
+    1.  If |V| [=is a platform object=], then:
         1.  If |types| includes an [=interface type=] that |V|
-            implements, then return the IDL value that is a reference to the object |V|.
+            [=implements=], then return the IDL value that is a reference to the object |V|.
         1.  If |types| includes {{object}}, then return the IDL value
             that is a reference to the object |V|.
     1.  If |V| is a {{DOMException}} platform object, then:
@@ -7992,7 +7965,7 @@ that correspond to the union’s [=member types=].
         1.  If |types| includes a [=callback interface=]
             type, then return the result of
             [=converted to an IDL value|converting=]
-            |V| to that interface type.
+            |V| to that [=callback interface type=].
         1.  If |types| includes {{object}}, then return the IDL value
             that is a reference to the object |V|.
     1.  If <a abstract-op>Type</a>(|V|) is Boolean, then:
@@ -8166,13 +8139,11 @@ a reference to the same object that the IDL value represents.
     1.  Initialize |length| to 0.
     1.  If |O| has a \[[ViewedArrayBuffer]] [=internal slot=], then:
         1.  Set |arrayBuffer| to the value of |O|’s \[[ViewedArrayBuffer]] [=internal slot=].
-        1.  If |arrayBuffer| is <emu-val>undefined</emu-val>, then
-            [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
         1.  Set |offset| to the value of |O|’s \[[ByteOffset]] [=internal slot=].
         1.  Set |length| to the value of |O|’s \[[ByteLength]] [=internal slot=].
     1.  Otherwise, set |length| to the value of |O|’s \[[ArrayBufferByteLength]] [=internal slot=].
-    1.  If <a abstract-op>IsDetachedBuffer</a>(|O|), then
-        [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+    1.  If <a abstract-op>IsDetachedBuffer</a>(|arrayBuffer|) is <emu-val>true</emu-val>, then
+        return the empty byte sequence.
     1.  Let |data| be the value of |O|’s \[[ArrayBufferData]] [=internal slot=].
     1.  Return a reference to or copy of (as required) the |length| bytes in |data|
         starting at byte offset |offset|.
@@ -8352,20 +8323,15 @@ extended attribute must either
 The bare form, <code>[Constructor]</code>, has the same meaning as
 using an empty argument list, <code>[Constructor()]</code>.  For each
 [{{Constructor}}] extended attribute
-on the interface, there will be a way to construct an object that implements
+on the interface, there will be a way to construct an object that [=implements=]
 the interface by passing the specified arguments.
 
-The prose definition of a constructor must
-either return an IDL value of a type corresponding to the interface
-the [{{Constructor}}]
-extended attribute appears on, or throw an exception.
+The prose definition of a constructor must either initialize the value passed as <b>[=this=]</b>,
+or throw an exception.
 
 The [{{Constructor}}] and
 [{{NoInterfaceObject}}]
 extended attributes must not be specified on the same interface.
-
-The [{{Constructor}}] extended attribute
-must not be used on a [=callback interface=].
 
 See [[#interface-object]] for details on how a constructor
 for an interface is to be implemented.
@@ -8397,7 +8363,7 @@ for an interface is to be implemented.
     An ECMAScript implementation supporting these interfaces would
     have a \[[Construct]] property on the
     <code class="idl">Circle</code> interface object which would
-    return a new object that implements the interface.  It would take
+    return a new object that [=implements=] the interface.  It would take
     either zero or one argument.  The
     <code class="idl">NodeList</code> interface object would not
     have a \[[Construct]] property.
@@ -8559,6 +8525,7 @@ an [=interface=],
 [=partial interface=],
 [=interface mixin=],
 [=partial interface mixin=],
+[=callback interface=],
 [=namespace=],
 [=partial namespace=], or
 an individual [=interface member=],
@@ -8579,8 +8546,8 @@ This list of identifiers is known as the construct's
     To get the <dfn id="dfn-exposure-set" export>exposure set</dfn> of a construct |C|,
     run the following steps:
 
-    1.  Assert: |C| is an [=interface=], [=namespace=], [=interface member=], [=interface mixin member=],
-        or [=namespace member=].
+    1.  Assert: |C| is an [=interface=], [=callback interface=], [=namespace=],
+        [=interface member=], [=interface mixin member=], or [=namespace member=].
     1.  Let |H| be |C|'s [=host interface=] if |C| is an [=interface mixin member=], or null otherwise.
     1.  If |C| is an [=interface member=], [=interface mixin member=], or [=namespace member=], then:
         1.  If the [{{Exposed}}] [=extended attribute=] is specified on |C|, then:
@@ -8604,7 +8571,7 @@ This list of identifiers is known as the construct's
             then return the [=set/intersection=] of |C|'s [=own exposure set=]
             and |H|'s [=exposure set=].
         1.  Otherwise, set |C| to |H|.
-    1.  Assert: |C| is a [=interface=] or [=namespace=].
+    1.  Assert: |C| is an [=interface=], [=callback interface=] or [=namespace=].
     1.  Assert: The [{{Exposed}}] [=extended attribute=] is specified on |C|.
     1.  Return |C|'s [=own exposure set=].
 </div>
@@ -8613,7 +8580,7 @@ If [{{Exposed}}] appears on an [=overloaded=] [=operation=],
 then it must appear identically on all overloads.
 
 The [{{Exposed}}] extended attribute must not be specified both on
-an [=interface member|interface=], [=interface mixin member|mixin=], or [=namespace member=], and on
+an [=interface member=], [=interface mixin member=], or [=namespace member=], and on
 the [=partial interface=], [=partial interface mixin=], or [=partial namespace=] definition
 the [=member=] is declared on.
 
@@ -8653,8 +8620,9 @@ with the the [=host interface=]'s [=exposure set=].
 Otherwise, it is the [=host interface=]'s [=exposure set=].
 
 <div algorithm>
-    An [=interface=], [=namespace=], or [=member=] |construct| is <dfn id="dfn-exposed" export>exposed</dfn>
-    in a given [=Realm=] |realm| if the following steps return true:
+    An [=interface=], [=callback interface=], [=namespace=], or [=member=] |construct| is
+    <dfn id="dfn-exposed" export>exposed</dfn> in a given [=Realm=] |realm| if the following steps
+    return true:
 
     1.  If |realm|.\[[GlobalObject]] does not implement an [=interface=]
         that is in |construct|'s [=exposure set=], then return false.
@@ -8684,9 +8652,10 @@ for the specific requirements that the use of
 
 <div class="example">
 
-    [{{Exposed}}] is intended to be used to control whether [=interfaces=], [=namespaces=],
-    or individual [=interface member|interface=], [=interface mixin member|mixin=] or [=namespace members=]
-    are available for use in workers, {{Worklet}}, {{Window}}, or any combination of the above.
+    [{{Exposed}}] is intended to be used to control whether [=interfaces=],
+    [=callback interfaces=], [=namespaces=], or individual [=interface member|interface=],
+    [=interface mixin member|mixin=] or [=namespace members=] are available for use in workers,
+    {{Worklet}}, {{Window}}, or any combination of the above.
 
     The following IDL fragment shows how that might be achieved:
 
@@ -8759,7 +8728,7 @@ for the specific requirements that the use of
 
 If the [{{Global}}] [=extended attribute=] appears on an [=interface=],
 it indicates that objects implementing this interface can
-be used as the global object in an ECMAScript environment,
+be used as the global object in a [=Realm=],
 and that the structure of the prototype chain and how
 properties corresponding to [=interface members=]
 will be reflected on the prototype objects will be different from other
@@ -8821,7 +8790,7 @@ the [=named property getter=].
 
 The [{{Global}}] [=extended attribute=] must not
 be used on an [=interface=] that can have more
-than one object implementing it in the same ECMAScript global environment.
+than one object implementing it in the same [=Realm=].
 
 Note: This is because the [=named properties object=],
 which exposes the named properties, is in the prototype chain, and it would not make
@@ -8841,7 +8810,7 @@ or more than one [=iterable declaration=],
 across those interfaces.
 
 Note: This is because all of the [=members=] of the interface
-get flattened down on to the object that implements the interface.
+get flattened down on to the object that [=implements=] the interface.
 
 The [{{Global}}] extended attribute
 can also be used to give a name to one or more global interfaces,
@@ -8940,9 +8909,6 @@ This identifier must be the identifier of a namespace.
 
 The [{{LegacyNamespace}}] and [{{NoInterfaceObject}}]
 extended attributes must not be specified on the same interface.
-
-The [{{LegacyNamespace}}] extended attribute
-must not be used on a [=callback interface=].
 
 See [[#namespace-object]] for details on how an interface is exposed on a namespace.
 
@@ -9061,12 +9027,12 @@ and must not be one of the [=reserved identifiers=].
 The [{{LegacyWindowAlias}}] and [{{NoInterfaceObject}}]
 extended attributes must not be specified on the same interface.
 
+The [{{LegacyWindowAlias}}] and [{{LegacyNamespace}}]
+extended attributes must not be specified on the same interface.
+
 The [{{LegacyWindowAlias}}] extended attribute must not be specified
 on an interface that does not include the {{Window}} [=interface=]
 in its [=exposure set=].
-
-The [{{LegacyWindowAlias}}] extended attribute must not be specified
-on a [=callback interface=].
 
 An interface must not have more than one [{{LegacyWindowAlias}}] extended attributes specified.
 
@@ -9212,7 +9178,7 @@ If the [{{LenientThis}}]
 appears on a [=regular attribute=],
 it indicates that invocations of the attribute’s getter or setter
 with a <emu-val>this</emu-val> value that is not an
-object that implements the [=interface=]
+object that [=implements=] the [=interface=]
 on which the attribute appears will be ignored.
 
 The [{{LenientThis}}] extended attribute
@@ -9307,7 +9273,7 @@ has the same meaning as using an empty argument list,
 <code>[NamedConstructor=<emu-t class="regex"><a href="#prod-identifier">identifier</a></emu-t>()]</code>.
 For each [{{NamedConstructor}}] extended attribute on the interface,
 there will be a way to construct an object that
-implements the interface by passing the specified arguments to the [=constructor=]
+[=implements=] the interface by passing the specified arguments to the [=constructor=]
 that is the value of the aforementioned property.
 
 The [=NamedConstructor identifier|identifier=] used for the named constructor must not
@@ -9319,9 +9285,6 @@ must not be the same as an [=identifier=] of an interface
 that has an [=interface object=],
 and must not be one of the
 [=reserved identifiers=].
-
-The [{{NamedConstructor}}] extended attribute
-must not be used on a [=callback interface=].
 
 See [[#named-constructors]] for details on how named constructors
 are to be implemented.
@@ -9466,9 +9429,6 @@ The [{{NoInterfaceObject}}] extended attribute
 must not be specified on an interface that has any
 [=static operations=] defined on it.
 
-The [{{NoInterfaceObject}}] extended attribute
-must not be specified on a [=callback interface=].
-
 An interface that does not have the [{{NoInterfaceObject}}] extended
 attribute specified must not inherit
 from an interface that has the [{{NoInterfaceObject}}] extended
@@ -9563,6 +9523,10 @@ a [=partial interface=]
 definition, then that partial interface definition must
 be the part of the interface definition that defines
 the [=named property getter=].
+
+If the [{{OverrideBuiltins}}] extended attribute is specified on a
+[=partial interface=] definition, it is considered to appear on the
+[=interface=] itself.
 
 See [[#es-legacy-platform-objects]]
 and [[#legacy-platform-object-defineownproperty]]
@@ -9689,7 +9653,7 @@ must not be used on a
 
 The [{{PutForwards}}] extended attribute
 must not be used on an attribute declared on
-a [=callback interface=] or [=namespace=].
+a [=namespace=].
 
 See the <a href="#es-attributes">Attributes</a> section for how
 [{{PutForwards}}]
@@ -9765,7 +9729,7 @@ must not be used on a
 
 The [{{Replaceable}}] extended attribute
 must not be used on an attribute declared on
-a [=callback interface=].
+a [=namespace=].
 
 See [[#es-attributes]]
 for the specific requirements that the use of
@@ -9862,12 +9826,13 @@ If the [{{SecureContext}}] [=extended attribute=] appears on an
 [=partial interface=],
 [=interface mixin=],
 [=partial interface mixin=],
+[=callback interface=],
 [=namespace=],
 [=partial namespace=],
 [=interface member=],
 [=interface mixin member=], or
 [=namespace member=],
-it indicates that the construct is exposed
+it indicates that the construct is [=exposed=]
 only within a [=secure context=].
 The [{{SecureContext}}] extended attribute must not be used
 on any other construct.
@@ -9882,8 +9847,8 @@ By default, constructs are <dfn export>available in both secure and non-secure c
     <dfn id="dfn-available-only-in-secure-contexts" export>available only in secure contexts</dfn>,
     run the following steps:
 
-    1.  Assert: |C| is an [=interface=], [=namespace=], [=interface member=], [=interface mixin member=],
-        or [=namespace member=].
+    1.  Assert: |C| is an [=interface=], [=callback interface=], [=namespace=],
+        [=interface member=], [=interface mixin member=], or [=namespace member=].
     1.  Let |H| be |C|'s [=host interface=] if |C| is an [=interface mixin member=], or null otherwise.
     1.  If |C| is an [=interface member=], [=interface mixin member=], or [=namespace member=], then:
         1.  If the [{{SecureContext}}] [=extended attribute=] is specified on |C|,
@@ -9902,14 +9867,14 @@ By default, constructs are <dfn export>available in both secure and non-secure c
         1.  If the [{{SecureContext}}] [=extended attribute=] is specified on |C|,
             then return true.
         1.  Otherwise, set |C| to |H|.
-    1.  Assert: |C| is a [=interface=] or [=namespace=]
+    1.  Assert: |C| is an [=interface=], [=callback interface=] or [=namespace=].
     1.  If the [{{SecureContext}}] [=extended attribute=] is specified on |C|,
         then return true.
     1.  Otherwise, return false.
 </div>
 
 Note: Whether a construct is [=available only in secure contexts=]
-influences whether it is [=exposed=] in a given ECMAScript global environment.
+influences whether it is [=exposed=] in a given [=Realm=].
 
 If [{{SecureContext}}] appears on an [=overloaded=] [=operation=],
 then it must appear on all overloads.
@@ -10244,7 +10209,7 @@ If the [{{Unscopable}}]
 [=extended attribute=]
 appears on a [=regular attribute=]
 or [=regular operation=], it
-indicates that an object that implements an interface with the given
+indicates that an object that [=implements=] an interface with the given
 interface member will not include its property name in any object
 environment record with it as its base object.  The result of this is
 that bare identifiers matching the property name will not resolve to
@@ -10372,9 +10337,9 @@ Note: The HTML Standard defines how a security check is performed. [[!HTML]]
 
             then remove from |S| all other entries.
 
-        1.  Otherwise: if |V| is a [=platform object=], and
+        1.  Otherwise: if |V| [=is a platform object=], and
             there is an entry in |S| that has one of the following types at position |i| of its type list,
-            *   an [=interface type=] that |V| implements
+            *   an [=interface type=] that |V| [=implements=]
             *   {{object}}
             *   a [=nullable type|nullable=] version of any of the above types
             *   an [=annotated type=] whose [=annotated types/inner type=] is one of the above types
@@ -10470,7 +10435,7 @@ Note: The HTML Standard defines how a security check is performed. [[!HTML]]
 
         1.  Otherwise: if <a abstract-op>Type</a>(|V|) is Object and
             there is an entry in |S| that has one of the following types at position |i| of its type list,
-            *   a [=callback interface=] type
+            *   a [=callback interface type=]
             *   a [=dictionary type=]
             *   a [=record type=]
             *   {{object}}
@@ -10624,30 +10589,25 @@ Note: The HTML Standard defines how a security check is performed. [[!HTML]]
 
 <h3 id="es-interfaces">Interfaces</h3>
 
-For every non-callback [=interface=] that is [=exposed=] in
-a given ECMAScript global environment and that is not declared with
+For every [=interface=] that is [=exposed=] in
+a given [=Realm=] and that is not declared with
 the [{{NoInterfaceObject}}] or [{{LegacyNamespace}}] [=extended attributes=],
-a corresponding property must exist on the ECMAScript environment's global object.
+a corresponding property exists on the [=Realm=]'s [=Realm/global object=].
 The name of the property is the [=identifier=] of the interface,
 and its value is an object called the <dfn id="dfn-interface-object" export>interface object</dfn>.
-The property has the attributes { \[[Writable]]: <emu-val>true</emu-val>, \[[Enumerable]]: <emu-val>false</emu-val>, \[[Configurable]]: <emu-val>true</emu-val> }.
 The characteristics of an interface object are described in [[#interface-object]].
 
 If the [{{LegacyWindowAlias}}] extended attribute was specified on an [=exposed=] interface,
 then for each [=LegacyWindowAlias identifier|identifier=] in [{{LegacyWindowAlias}}]'s [=LegacyWindowAlias identifier|identifiers=]
-there must be a corresponding property on the {{Window}} [=interface=].
+there exists a corresponding property on the {{Window}} global object.
 The name of the property is the given [=LegacyWindowAlias identifier|identifier=],
 and its value is a reference to the [=interface object=] for the [=interface=].
-The property has the attributes
-{ \[[Writable]]: <emu-val>true</emu-val>, \[[Enumerable]]: <emu-val>false</emu-val>, \[[Configurable]]: <emu-val>true</emu-val> }.
 
 In addition, for every [{{NamedConstructor}}] extended attribute on an [=exposed=] interface,
-a corresponding property must exist on the ECMAScript global object.
+a corresponding property exists on the ECMAScript global object.
 The name of the property is the [{{NamedConstructor}}]'s [=NamedConstructor identifier|identifier=],
 and its value is an object called a <dfn id="dfn-named-constructor" export>named constructor</dfn>,
 which allows construction of objects that implement the interface.
-The property has the attributes
-{ \[[Writable]]: <emu-val>true</emu-val>, \[[Enumerable]]: <emu-val>false</emu-val>, \[[Configurable]]: <emu-val>true</emu-val> }.
 The characteristics of a named constructor are described in [[#named-constructors]].
 
 
@@ -10660,14 +10620,14 @@ as described in sections [[#es-constants]] and [[#es-operations]].
 
 If the [=interface=] is declared with a [{{Constructor}}] [=extended attribute=],
 then the [=interface object=] can be called as a [=constructor=]
-to create an object that implements that interface.
+to create an object that [=implements=] that interface.
 Calling that interface as a function will throw an exception.
 
 [=Interface objects=] whose [=interfaces=] are not declared
 with a [{{Constructor}}] [=extended attribute=] will throw when called,
 both as a function and as a [=constructor=].
 
-An [=interface object=] for a non-callback [=interface=]
+An [=interface object=] for an [=interface=]
 has an associated object called the [=interface prototype object=].
 This object has properties that correspond to
 the [=regular attributes=] and [=regular operations=] defined on the interface,
@@ -10678,7 +10638,7 @@ the <code>typeof</code> operator will return "function" when applied to an inter
 
 <div algorithm>
 
-    The [=interface object=] for a given non-callback [=interface=] |I|
+    The [=interface object=] for a given [=interface=] |I|
     with [=identifier=] |id| and in [=Realm=] |realm|
     is <dfn lt="create an interface object">created</dfn> as follows:
 
@@ -10696,19 +10656,30 @@ the <code>typeof</code> operator will return "function" when applied to an inter
         1.  Let &lt;|constructor|, |values|&gt; be the result
             of passing |S| and |args|.
             to the [=overload resolution algorithm=].
-        1.  Let |R| be the result of performing
-            the actions listed in the description of |constructor|
-            with |values| as the argument values.
-            Rethrow any exceptions.
-        1.  Let |O| be the result of [=converted to an ECMAScript value|converting=] |R|
-            to an ECMAScript [=interface type=] value |I|.
-        1.  Assert: |O| is an object that implements |I|.
-        1.  Assert: |O|.\[[Realm]] is equal to |realm|.
+        1.  Let |object| be the result of [=internally create a new object implementing the
+            interface|internally creating a new object implementing=] |I|, with |realm| and
+            {{NewTarget}}.
+        1.  Perform the actions listed in the description of |constructor|
+            with |values| as the argument values
+            and |object| as <b>[=this=]</b>.
+        1.  Let |O| be |object|, [=converted to an ECMAScript value=].
+        1.  Assert: |O| is an object that [=implements=] |I|.
+        1.  Assert: |O|.\[[Realm]] is |realm|.
         1.  Return |O|.
     1.  Let |constructorProto| be |realm|.\[[Intrinsics]].[[{{%FunctionPrototype%}}]].
     1.  If |I| inherits from some other interface |P|,
         then set |constructorProto| to the [=interface object=] of |P| in |realm|.
-    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|realm|, |steps|, |constructorProto|).
+    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|steps|, « \[[Unforgeables]] »,
+        |realm|, |constructorProto|).
+    1.  Let |unforgeables| be [$ObjectCreate$](<emu-val>null</emu-val>).
+    1.  [=Define the unforgeable regular operations=] of |I| on |unforgeables|, given |realm|.
+    1.  [=Define the unforgeable regular attributes=] of |I| on |unforgeables|, given |realm|.
+    1.  Set |F|.\[[Unforgeables]] to |unforgeables|.
+
+        Note: this object is never exposed to user code. It exists only to ensure all instances
+        of an interface with an unforgeable member use the same JavaScript function objects for
+        [=attribute getters=], [=attribute setters=] and [=creating an operation
+        function|operation functions=].
     1.  Perform [=!=] <a abstract-op>SetFunctionName</a>(|F|, |id|).
     1.  Let |length| be 0.
     1.  If |I| was declared with a [{{Constructor}}] [=extended attribute=], then
@@ -10718,11 +10689,13 @@ the <code>typeof</code> operator will return "function" when applied to an inter
         1.  Set |length| to the length of the
             shortest argument list of the entries in |S|.
     1.  Perform [=!=] <a abstract-op>SetFunctionLength</a>(|F|, |length|).
-    1.  Let |proto| be the [=interface prototype object=] of [=interface=] |I| in |realm|.
+    1.  Let |proto| be the result of [=create an interface prototype object|creating an interface
+        prototype object=] of [=interface=] |I| in |realm|.
     1.  Perform [=!=] <a abstract-op>DefinePropertyOrThrow</a>(|F|, "<code>prototype</code>",
         PropertyDescriptor{\[[Value]]: |proto|, \[[Writable]]: <emu-val>false</emu-val>, \[[Enumerable]]: <emu-val>false</emu-val>, \[[Configurable]]: <emu-val>false</emu-val>}).
     1.  [=Define the constants=] of [=interface=] |I| on |F| given |realm|.
     1.  [=Define the static attributes=] of [=interface=] |I| on |F| given |realm|.
+    1.  [=Define the static operations=] of [=interface=] |I| on |F| given |realm|.
     1.  Return |F|.
 
 </div>
@@ -10737,10 +10710,6 @@ It allows constructing objects that
 implement the interface on which the
 [{{NamedConstructor}}] extended attributes appear.
 
-If the actions listed in the description of the constructor return normally,
-then those steps must return an object that implements interface |I|.
-This object's relevant [=Realm=] must be the same as that of the [=named constructor=].
-
 <div algorithm>
 
     The [=named constructor=] with [=NamedConstructor identifier|identifier=] |id|
@@ -10753,19 +10722,24 @@ This object's relevant [=Realm=] must be the same as that of the [=named constru
         1.  Let |args| be the passed arguments.
         1.  Let |n| be the [=list/size=] of |args|.
         1.  Initialize |S| to the  [=effective overload set=]
-            for constructors with [=identifier=] |id| on [=interface=] |I|
+            for named constructors with [=identifier=] |id| on [=interface=] |I|
             and with argument count |n|.
         1.  Let &lt;|constructor|, |values|&gt; be the result of passing |S| and
             |args| to the [=overload resolution algorithm=].
-        1.  Let |R| be the result of performing the actions listed in the description of
-            |constructor| with |values| as the argument values.
-        1.  Return the result of [=converted to an ECMAScript value|converting=]
-            |R| to an ECMAScript [=interface type=] value |I|.
-    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|realm|, |steps|,
-        |realm|.\[[Intrinsics]].[[{{%FunctionPrototype%}}]]).
+        1.  Let |object| be the result of [=internally create a new object implementing the
+            interface|internally creating a new object implementing=] |I|, with |realm| and
+            {{NewTarget}}.
+        1.  Perform the actions listed in the description of |constructor|
+            with |values| as the argument values
+            and |object| as <b>[=this=]</b>.
+        1.  Let |O| be |object|, [=converted to an ECMAScript value=].
+        1.  Assert: |O| is an object that [=implements=] |I|.
+        1.  Assert: |O|.\[[Realm]] is |realm|.
+        1.  Return |O|.
+    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|steps|, « », |realm|).
     1.  Perform [=!=] <a abstract-op>SetFunctionName</a>(|F|, |id|).
     1.  Initialize |S| to the [=effective overload set=]
-        for constructors with identifier |id| on [=interface=] |I|
+        for named constructors with identifier |id| on [=interface=] |I|
         and with argument count 0.
     1.  Let |length| be the length of the shortest argument list of the entries in |S|.
     1.  Perform [=!=] <a abstract-op>SetFunctionLength</a>(|F|, |length|).
@@ -10778,8 +10752,8 @@ This object's relevant [=Realm=] must be the same as that of the [=named constru
 
 <h4 id="interface-prototype-object">Interface prototype object</h4>
 
-There must exist an <dfn id="dfn-interface-prototype-object" export>interface prototype object</dfn>
-for every non-callback [=interface=] defined,
+There will exist an <dfn id="dfn-interface-prototype-object" export>interface prototype object</dfn>
+for every [=interface=] defined,
 regardless of whether the interface was declared
 with the [{{NoInterfaceObject}}] [=extended attribute=].
 
@@ -10791,7 +10765,8 @@ with the [{{NoInterfaceObject}}] [=extended attribute=].
     1.  Let |proto| be null.
     1.  If |interface| is declared with the [{{Global}}] [=extended attribute=],
         and |interface| [=support named properties|supports named properties=],
-        then set |proto| to the [=named properties object=] in |realm| of |interface|.
+        then set |proto| to the result of [=create a named properties object|creating a named
+        properties object=] for |interface| and |realm|.
     1.  Otherwise, if |interface| is declared to inherit from another interface,
         then set |proto| to the [=interface prototype object=] in |realm|
         of that [=inherited interface=].
@@ -10823,7 +10798,7 @@ with the [{{NoInterfaceObject}}] [=extended attribute=].
         1.  Set the internal methods of |interfaceProtoObj|
             which are specific to [=immutable prototype exotic objects=]
             to the definitions specified in
-            [=ECMA-262 §9.4.7|ECMA-262 §9.4.7 Immutable prototype exotic objects=].
+            [=ECMA-262 Immutable prototype exotic objects=].
     1.  If |interface| is not declared with the [{{Global}}] [=extended attribute=], then:
         1.  [=Define the regular attributes=] of |interface| on |interfaceProtoObj| given |realm|.
         1.  [=Define the regular operations=] of |interface| on |interfaceProtoObj| given |realm|.
@@ -10881,47 +10856,11 @@ The [=class string=] of an [=interface prototype object=] is the concatenation o
 the [=interface=]’s [=qualified name=] and the string "<code>Prototype</code>".
 
 
-<h4 id="legacy-callback-interface-object">Legacy callback interface object</h4>
-
-For every callback [=interface=] that is [=exposed=] in
-a given ECMAScript global environment
-and on which [=constants=] are defined,
-a corresponding property must exist on the ECMAScript environment's global object.
-The name of the property is the [=identifier=] of the interface,
-and its value is an object called the
-<dfn id="dfn-legacy-callback-interface-object" export>legacy callback interface object</dfn>.
-The property has the attributes { \[[Writable]]: <emu-val>true</emu-val>, \[[Enumerable]]: <emu-val>false</emu-val>, \[[Configurable]]: <emu-val>true</emu-val> }.
-
-The [=legacy callback interface object=] for a given [=callback interface=]
-is a [=built-in function object=].
-It has properties that correspond to the [=constants=] defined on that interface,
-as described in sections [[#es-constants]].
-
-Note: Since a legacy callback interface object is a [=function object=]
-the <code>typeof</code> operator will return "function"
-when applied to a [=legacy callback interface object=].
-
-<div algorithm>
-
-    The [=legacy callback interface object=] for a given [=callback interface=] |interface|
-    with [=identifier=] |id| and in [=Realm=] |realm|
-    is <dfn lt="create a legacy callback interface object">created</dfn> as follows:
-
-    1.  Let |steps| be the following steps:
-        1.  [=ECMAScript/Throw=] a {{ECMAScript/TypeError}}.
-    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|realm|, |steps|, |realm|.\[[Intrinsics]].[[{{%FunctionPrototype%}}]]).
-    1.  Perform [=!=] <a abstract-op>SetFunctionName</a>(|F|, |id|).
-    1.  Perform [=!=] <a abstract-op>SetFunctionLength</a>(|F|, 0).
-    1.  [=Define the constants=] of |interface| on |F| given |realm|.
-    1.  Return |F|.
-</div>
-
-
 <h4 id="named-properties-object">Named properties object</h4>
 
 For every [=interface=] declared with the [{{Global}}] [=extended attribute=]
 that [=support named properties|supports named properties=],
-there must exist an object known as the <dfn id="dfn-named-properties-object" export>named properties object</dfn>
+there will exist an object known as the <dfn id="dfn-named-properties-object" export>named properties object</dfn>
 for that interface on which named properties are exposed.
 
 <div algorithm>
@@ -10934,7 +10873,7 @@ for that interface on which named properties are exposed.
     1.  Otherwise, set |proto| to |realm|.\[[Intrinsics]].[[{{%ObjectPrototype%}}]].
     1.  Let |obj| be a newly created object.
     1.  Set |obj|'s internal methods to the definitions specified in
-        [=ECMA-262 §9.1|ECMA-262 §9.1 Ordinary object internal methods and internal slots=],
+        [=ECMA-262 Ordinary object internal methods and internal slots=],
         unless they are specified in the the rest of [[#named-properties-object]].
     1.  Set |obj|'s remaining internal methods to the definitions specified below.
     1.  Set |obj|.\[[Prototype]] to |proto|.
@@ -10955,10 +10894,8 @@ is the concatenation of the [=interface=]’s
     is called with property key |P|, the following steps are taken:
 
     1.  Let |A| be the [=interface=] for the [=named properties object=] |O|.
-    1.  Let |object| be the sole object from |O|’s ECMAScript global environment that implements |A|.
-
-        Note: For example, if the [=interface=] is the {{Window}} interface,
-        then the sole object will be this global environment’s window object.
+    1.  Let |object| be |O|.\[[Realm]]'s [=Realm/global object=].
+    1.  Assert: |object| [=implements=] |A|.
     1.  If the result of running the [=named property visibility algorithm=] with
         property name |P| and object |object| is true, then:
         1.  Let |operation| be the operation used to declare the named property getter.
@@ -10972,7 +10909,7 @@ is the concatenation of the [=interface=]’s
         1.  Let |desc| be a newly created [=Property Descriptor=] with no fields.
         1.  Set |desc|.\[[Value]] to the result of [=converted to an ECMAScript value|converting=]
             |value| to an ECMAScript value.
-        1.  If |A| implements an interface with the
+        1.  If |A| [=implements=] an interface with the
             [{{LegacyUnenumerableNamedProperties}}]
             [=extended attribute=],
             then set |desc|.\[[Enumerable]] to <emu-val>false</emu-val>,
@@ -11036,14 +10973,14 @@ is the concatenation of the [=interface=]’s
 [=Constants=] are exposed on [=interface objects=],
 [=legacy callback interface objects=],
 [=interface prototype objects=], and
-on the single object that implements the interface,
+on the single object that [=implements=] the interface,
 when an interface is declared with the [{{Global}}] [=extended attribute=].
 
 <div algorithm>
-    To <dfn>define the constants</dfn> of [=interface=] |interface| on |target|,
-    given [=Realm=] |realm|, run the following steps:
+    To <dfn>define the constants</dfn> of [=interface=] or [=callback interface=] |definition| on
+    |target|, given [=Realm=] |realm|, run the following steps:
 
-    1.  [=list/For each=] [=constant=] |const| that is a [=member=] of |interface|:
+    1.  [=list/For each=] [=constant=] |const| that is a [=member=] of |definition|:
         1.  If |const| is not [=exposed=] in |realm|, then [=iteration/continue=].
         1.  Let |value| be the result of [=converted to an ECMAScript value|converting=]
             |const|’s IDL value to an ECMAScript value.
@@ -11061,7 +10998,7 @@ when an interface is declared with the [{{Global}}] [=extended attribute=].
 [=Regular attributes=] are exposed on the [=interface prototype object=],
 unless the attribute is [=unforgeable=] or
 if the interface was declared with the [{{Global}}] [=extended attribute=],
-in which case they are exposed on every object that implements the interface.
+in which case they are exposed on every object that [=implements=] the interface.
 
 <div algorithm>
     To <dfn>define the regular attributes</dfn> of [=interface=] or [=namespace=] |definition| on |target|,
@@ -11117,24 +11054,25 @@ in which case they are exposed on every object that implements the interface.
 
     1.  Let |steps| be the following series of steps:
         1.  Try running the following steps:
-            1.  Let |O| be <emu-val>null</emu-val>.
+            1.  Let |idlObject| be null.
             1.  If |target| is an [=interface=], and |attribute| is a [=regular attribute=]:
-                1.  If the <emu-val>this</emu-val> value is <emu-val>null</emu-val> or
-                    <emu-val>undefined</emu-val>, set |O| to |realm|'s [=Realm/global object=].
+                1.  Let |esValue| be the <emu-val>this</emu-val> value, if it is not
+                    <emu-val>null</emu-val> or <emu-val>undefined</emu-val>, or |realm|'s
+                    [=Realm/global object=] otherwise.
                     (This will subsequently cause a {{ECMAScript/TypeError}} in a few steps, if
                     the global object does not implement |target| and [{{LenientThis}}] is not
                     specified.)
                     <!-- https://www.w3.org/Bugs/Public/show_bug.cgi?id=18547#c9 -->
-                1.  Otherwise, set |O| to the <emu-val>this</emu-val> value.
-                1.  If |O| is a [=platform object=], then [=perform a security check=], passing |O|,
-                    |attribute|'s [=identifier=], and "getter".
-                1.  If |O| is not a [=platform object=] that implements the interface |target|,
-                    then:
+                1.  If |esValue| [=is a platform object=], then [=perform a security check=],
+                    passing |esValue|, |attribute|'s [=identifier=], and "getter".
+                1.  If |esValue| does not [=implement=] |target|, then:
                     1.  If |attribute| was specified with the [{{LenientThis}}]
                         [=extended attribute=], then return <emu-val>undefined</emu-val>.
-                    1. Otherwise, [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+                    1.  Otherwise, [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+                1.  Set |idlObject| to the IDL [=interface type=] value that represents a reference
+                    to |esValue|.
             1.  Let |R| be the result of [=get the underlying value|getting the underlying value=]
-                of |attribute| given |O|.
+                of |attribute| given |idlObject|.
             1.  Return the result of [=converted to an ECMAScript value|converting=] |R| to an
                 ECMAScript value of the type |attribute| is declared as.
 
@@ -11143,8 +11081,7 @@ in which case they are exposed on every object that implements the interface.
         1.  If |attribute|'s type is a [=promise type=], then return
             [=!=] <a abstract-op>Call</a>({{%Promise_reject%}}, {{%Promise%}}, «|E|»).
         1.  Otherwise, end these steps and allow the exception to propagate.
-    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|realm|,
-        |steps|, |realm|.\[[Intrinsics]].[[{{%FunctionPrototype%}}]]).
+    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|steps|, « », |realm|).
     1.  Let |name| be the string "<code>get </code>" prepended to |attribute|'s [=identifier=].
     1.  Perform [=!=] <a abstract-op>SetFunctionName</a>(|F|, |name|).
     1.  Perform [=!=] <a abstract-op>SetFunctionLength</a>(|F|, 0).
@@ -11155,8 +11092,11 @@ in which case they are exposed on every object that implements the interface.
 <div algorithm>
 
     The <dfn id="dfn-attribute-setter" export>attribute setter</dfn> is created as follows, given an
-    [=attribute=] |attribute|, an [=interface=] |target|, and a [=Realm=] |realm|:
+    [=attribute=] |attribute|, a [=namespace=] or [=interface=] |target|, and a [=Realm=] |realm|:
 
+    1.  If |target| is a [=namespace=]:
+        1. Assert: |attribute| is [=read only=].
+        1. Return <emu-val>undefined</emu-val>.
     1.  If |attribute| is [=read only=] and does not have a
         [{{LenientSetter}}], [{{PutForwards}}] or [{{Replaceable}}] [=extended attribute=], return
         <emu-val>undefined</emu-val>; there is no [=attribute setter=] function.
@@ -11165,35 +11105,36 @@ in which case they are exposed on every object that implements the interface.
         1.  If no arguments were passed, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
         1.  Let |V| be the value of the first argument passed.
         1.  Let |id| be |attribute|'s [=identifier=].
-        1.  Let |O| be <emu-val>null</emu-val>.
+        1.  Let |idlObject| be null.
         1.  If |attribute| is a [=regular attribute=]:
-            1.  If the <emu-val>this</emu-val> value is <emu-val>null</emu-val> or
-                <emu-val>undefined</emu-val>, set |O| to |realm|'s [=Realm/global object=].
+            1.  Let |esValue| be the <emu-val>this</emu-val> value, if it is not
+                <emu-val>null</emu-val> or <emu-val>undefined</emu-val>, or |realm|'s
+                [=Realm/global object=] otherwise.
                 (This will subsequently cause a {{ECMAScript/TypeError}} in a few steps, if
                 the global object does not implement |target| and [{{LenientThis}}] is not
                 specified.)
                 <!-- https://www.w3.org/Bugs/Public/show_bug.cgi?id=18547#c9 -->
-            1.  Otherwise, set |O| to the <emu-val>this</emu-val> value.
-            1.  If |O| is a [=platform object=], then [=perform a security check=], passing |O|,
-                |id|, and "setter".
-            1.  Let |validThis| be true if |O| is a [=platform object=] that implements the
-                interface |target|, or false otherwise.
+            1.  If |esValue| [=is a platform object=], then [=perform a security check=], passing
+                |esValue|, |id|, and "setter".
+            1.  Let |validThis| be true if |esValue| [=implements=] |target|, or false otherwise.
             1.  If |validThis| is false and |attribute| was not specified with the [{{LenientThis}}]
                 [=extended attribute=], then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
             1.  If |attribute| is declared with the [{{Replaceable}}] extended attribute, then:
-                1.  Perform [=?=] <a abstract-op>CreateDataProperty</a>(|O|, |id|, |V|).
+                1.  Perform [=?=] <a abstract-op>CreateDataProperty</a>(|esValue|, |id|, |V|).
                 1.  Return <emu-val>undefined</emu-val>.
             1.  If |validThis| is false, then return <emu-val>undefined</emu-val>.
             1.  If |attribute| is declared with a [{{LenientSetter}}] extended attribute, then
                 return <emu-val>undefined</emu-val>.
             1.  If |attribute| is declared with a [{{PutForwards}}] extended attribute, then:
-                1.  Let |Q| be [=?=] <a abstract-op>Get</a>(|O|, |id|).
+                1.  Let |Q| be [=?=] <a abstract-op>Get</a>(|esValue|, |id|).
                 1.  If <a abstract-op>Type</a>(|Q|) is not Object, then [=ECMAScript/throw=] a
                     {{ECMAScript/TypeError}}.
                 1.  Let |forwardId| be the identifier argument of the [{{PutForwards}}] extended
                     attribute.
                 1.  Perform [=?=] <a abstract-op>Set</a>(|Q|, |forwardId|, |V|, <emu-val>true</emu-val>).
                 1.  Return <emu-val>undefined</emu-val>.
+            1.  Set |idlObject| to the IDL [=interface type=] value that represents a reference
+                to |esValue|.
         1.  Let |idlValue| be determined as follows:
 
             <dl class="switch">
@@ -11212,11 +11153,11 @@ in which case they are exposed on every object that implements the interface.
                 </dd>
             </dl>
 
-        1.  Perform the actions listed in the description of |attribute| that occur on setting, on
-            |O| if |O| is not <emu-val>null</emu-val>.
+        1.  Perform the actions listed in the description of |attribute| that occur on setting,
+            with |idlValue| as <b>[=the given value=]</b> and
+            |idlObject| as <b>[=this=]</b> if it is not null.
         1.  Return <emu-val>undefined</emu-val>
-    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|realm|,
-        |steps|, |realm|.\[[Intrinsics]].[[{{%FunctionPrototype%}}]]).
+    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|steps|, « », |realm|).
     1.  Let |name| be the string "<code>set </code>" prepended to |id|.
     1.  Perform [=!=] <a abstract-op>SetFunctionName</a>(|F|, |name|).
     1.  Perform [=!=] <a abstract-op>SetFunctionLength</a>(|F|, 1).
@@ -11224,7 +11165,7 @@ in which case they are exposed on every object that implements the interface.
 </div>
 
 Note: Although there is only a single property for an IDL attribute, since
-accessor property getters and setters are passed a <emu-val>this</emu-val>
+accessor property getters and setters are passed a <b>[=this=]</b>
 value for the object on which property corresponding to the IDL attribute is
 accessed, they are able to expose instance-specific data.
 
@@ -11243,7 +11184,7 @@ there exist a corresponding property.
 [=Regular operations=] are exposed on the [=interface prototype object=],
 unless the operation is [=unforgeable=] or
 the interface was declared with the [{{Global}}] [=extended attribute=],
-in which case they are exposed on every object that implements the interface.
+in which case they are exposed on every object that [=implements=] the interface.
 
 <div algorithm>
     To <dfn>define the regular operations</dfn> of [=interface=] or [=namespace=] |definition| on |target|, given [=Realm=] |realm|,
@@ -11295,18 +11236,21 @@ in which case they are exposed on every object that implements the interface.
     1.  Let |steps| be the following series of steps, given function argument
         values |args|:
         1.  Try running the following steps:
-            1.  Let |O| be <emu-val>null</emu-val>.
+            1.  Let |idlObject| be null.
             1.  If |target| is an [=interface=], and |op| is not a [=static operation=]:
-                1.  If the <emu-val>this</emu-val> value is <emu-val>null</emu-val> or
-                    <emu-val>undefined</emu-val>, set |O| to |realm|'s [=Realm/global object=]. (This
-                    will subsequently cause a {{ECMAScript/TypeError}} in a few steps, if the global
-                    object does not implement |target|.)
+                1.  Let |esValue| be the <emu-val>this</emu-val> value, if it is not
+                    <emu-val>null</emu-val> or <emu-val>undefined</emu-val>, or |realm|'s
+                    [=Realm/global object=] otherwise.
+                    (This will subsequently cause a {{ECMAScript/TypeError}} in a few steps, if
+                    the global object does not implement |target| and [{{LenientThis}}] is not
+                    specified.)
                     <!-- https://www.w3.org/Bugs/Public/show_bug.cgi?id=18547#c9 -->
-                1.  Otherwise, set |O| to the <emu-val>this</emu-val> value.
-                1.  If |O| is a [=platform object=], then [=perform a security check=], passing |O|,
-                    |id|, and "method".
-                1.  If |O| is not a [=platform object=] that implements the interface |target|,
+                1.  If |esValue| [=is a platform object=], then [=perform a security check=],
+                    passing |esValue|, |id|, and "method".
+                1.  If |esValue| does not [=implement=] the interface |target|,
                     [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+                1.  Set |idlObject| to the IDL [=interface type=] value that represents a reference
+                    to |esValue|.
             1.  Let |n| be the [=list/size=] of |args|.
             1.  Let |S| be the [=effective overload set=] for [=regular operations=] (if |op| is a
                 regular operation) or for [=static operations=] (if |op| is a static operation) with
@@ -11317,14 +11261,17 @@ in which case they are exposed on every object that implements the interface.
             1.  If |operation| is declared with a [{{Default}}] [=extended attribute=],
                 then:
                 1.  Set |R| be the result of performing the actions listed in
-                    |operation|'s [=corresponding default operation=] on |O|,
-                    with |values| as the argument values.
+                    |operation|'s [=corresponding default operation=],
+                    with |values| as the argument values
+                    and |idlObject| as <b>[=this=]</b> if it is not null.
             1.  Otherwise:
                 1.  Set |R| be the result of performing the actions listed in the
-                    description of |operation|, on |O| if |O| is not <emu-val>null</emu-val>, with |values|
-                    as the argument values.
-                1.  Return the result of [=converted to an ECMAScript value|converting=] |R| to
-                    an ECMAScript value of the type |op| is declared to return.
+                    description of |operation|,
+                    with |values| as the argument values
+                    and |idlObject| as <b>[=this=]</b> if it is not null.
+            1.  Return |R|, [=converted to an ECMAScript value=].
+
+                Issue(heycam/webidl#674): |R| is assumed to be an IDL value of the type |op| is declared to return.
 
         And then, if <a lt="an exception was thrown">an exception |E| was thrown</a>:
 
@@ -11332,8 +11279,7 @@ in which case they are exposed on every object that implements the interface.
             that is a [=promise type=], then return
             [=!=] <a abstract-op>Call</a>({{%Promise_reject%}}, {{%Promise%}}, «|E|»).
         1.  Otherwise, end these steps and allow the exception to propagate.
-    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|realm|,
-        |steps|, |realm|.\[[Intrinsics]].[[{{%FunctionPrototype%}}]]).
+    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|steps|, « », |realm|).
     1.  Perform [=!=] <a abstract-op>SetFunctionName</a>(|F|, |id|).
     1.  Let |S| be the [=effective overload set=] for [=regular operations=] (if |op| is a regular
         operation) or for [=static operations=] (if |op| is a static operation) with [=identifier=] |id|
@@ -11358,13 +11304,13 @@ The [=return type=] of the [=default toJSON operation=] must be {{object}}.
 
 <div algorithm>
 
-    To invoke the <dfn export>default toJSON operation</dfn> of [=interface=] |I| on |O|,
+    To invoke the <dfn export>default toJSON operation</dfn> of [=interface=] |I|,
     run the the following steps:
 
     1.  Let |map| be a new [=ordered map=].
     1.  Let |stack| be the result of [=create an inheritance stack|creating an inheritance stack=]
         for [=interface=] |I|.
-    1.  Invoke [=collect attribute values of an inheritance stack=] on |O|,
+    1.  Invoke [=collect attribute values of an inheritance stack=] on **this**,
         passing it |stack| and |map| as arguments.
     1.  Let |result| be [=!=] <a abstract-op>ObjectCreate</a>({{%ObjectPrototype%}}).
     1.  [=map/For each=] |key| → |value| of |map|,
@@ -11376,21 +11322,21 @@ The [=return type=] of the [=default toJSON operation=] must be {{object}}.
 
 <div algorithm>
 
-    To invoke the <dfn>collect attribute values of an inheritance stack</dfn> abstract operation on |O|
+    To invoke the <dfn>collect attribute values of an inheritance stack</dfn> abstract operation
     with [=stack=] |stack| and [=ordered map=] |map| as arguments,
     run the the following steps:
 
     1.  Let |I| be the result of [=stack/pop|popping=] from |stack|.
-    1.  Invoke [=collect attribute values=] on |O|,
+    1.  Invoke [=collect attribute values=] on **this**,
         passing it |I| and |map| as arguments.
     1.  If |stack| [=stack/is not empty=],
-        then invoke [=collect attribute values of an inheritance stack=] on |O|,
+        then invoke [=collect attribute values of an inheritance stack=] on **this**,
         passing it |stack| and |map| as arguments.
 </div>
 
 <div algorithm>
 
-    To invoke the <dfn>collect attribute values</dfn> abstract operation on |O|
+    To invoke the <dfn>collect attribute values</dfn> abstract operation
     with [=interface=] |I| and [=ordered map=] |map| as arguments,
     run the the following steps:
 
@@ -11399,7 +11345,7 @@ The [=return type=] of the [=default toJSON operation=] must be {{object}}.
         that is an [=interface member=] of |I|, in order:
         1.  Let |id| be the [=identifier=] of |attr|.
         1.  Let |value| be the result of [=get the underlying value|getting the underlying value=]
-            of |attr| given |O|.
+            of |attr| given **this**.
         1.  If |value| is a [=JSON type=], then [=map/set=] |map|[|id|] to |value|.
 
 </div>
@@ -11509,7 +11455,7 @@ then there must exist a property with the following characteristics:
 *   The name of the property is "<code>toString</code>".
 *   If the [=stringifier=] is [=unforgeable=] on the interface
     or if the interface was declared with the [{{Global}}] [=extended attribute=],
-    then the property exists on every object that implements the interface.
+    then the property exists on every object that [=implements=] the interface.
     Otherwise, the property exists on the [=interface prototype object=].
 *   The property has attributes
     { \[[Writable]]: |B|, \[[Enumerable]]: <emu-val>true</emu-val>, \[[Configurable]]: |B| },
@@ -11520,12 +11466,12 @@ then there must exist a property with the following characteristics:
         The value of the property is a [=built-in function object=], which behaves as follows:
 
         1.  Let |O| be the result of calling <a abstract-op>ToObject</a> on the <emu-val>this</emu-val> value.
-        1.  If |O| is a [=platform object=],
+        1.  If |O| [=is a platform object=],
             then [=perform a security check=], passing:
             *   the platform object |O|,
             *   the [=identifier=] of the [=stringifier=], and
             *   the type "<code>method</code>".
-        1.  If |O| is not an object that implements the [=interface=]
+        1.  If |O| does not [=implement=] the [=interface=]
             on which the stringifier was declared, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
         1.  Let |V| be an uninitialized variable.
         1.  Depending on where <code>stringifier</code> was specified:
@@ -11559,8 +11505,7 @@ then there must exist a property with the following characteristics:
 If the [=interface=] has any of the following:
 
 *   an [=iterable declaration=]
-*   an [=indexed property getter=] and
-    an [=integer types|integer-typed=] <code class="idl">length</code> [=attribute=]
+*   an [=indexed property getter=]
 *   a [=maplike declaration=]
 *   a [=setlike declaration=]
 
@@ -11572,7 +11517,7 @@ and whose value is a [=function object=].
 The location of the property is determined as follows:
 
 *   If the interface was declared with the [{{Global}}] [=extended attribute=],
-    then the property exists on the single object that implements the interface.
+    then the property exists on the single object that [=implements=] the interface.
 *   Otherwise, the property exists solely on the interface’s [=interface prototype object=].
 
 If the interface defines an [=indexed property getter=],
@@ -11584,14 +11529,14 @@ then the [=function object=] is {{%ArrayProto_values%}}.
     when invoked, must behave as follows:
 
     1.  Let |object| be the result of calling <a abstract-op>ToObject</a> on the <emu-val>this</emu-val> value.
-    1.  If |object| is a [=platform object=],
+    1.  If |object| [=is a platform object=],
         then [=perform a security check=], passing:
         *   the platform object |object|,
         *   the identifier "<code>@@iterator</code>", and
         *   the type "<code>method</code>".
     1.  Let |interface| be the [=interface=]
         the [=iterable declaration=] is on.
-    1.  If |object| is not a [=platform object=] that implements |interface|,
+    1.  If |object| does not [=implement=] |interface|,
         then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
     1.  Let |iterator| be a newly created [=default iterator object=]
         for |interface| with |object| as its target and iterator kind "<code>key+value</code>".
@@ -11605,13 +11550,12 @@ then the [=function object=] is {{%ArrayProto_values%}}.
     when invoked, must behave as follows:
 
     1.  Let |object| be the result of calling <a abstract-op>ToObject</a> on the <emu-val>this</emu-val> value.
-    1.  If |object| is a [=platform object=],
+    1.  If |object| [=is a platform object=],
         then [=perform a security check=], passing:
         *   the platform object |object|,
         *   the identifier "<code>@@iterator</code>", and
         *   the type "<code>method</code>".
-    1.  If |object| is not a [=platform object=]
-        that implements the [=interface=]
+    1.  If |object| does not [=implement=] the [=interface=]
         on which the [=maplike declaration=]
         or [=setlike declaration=] is defined,
         then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
@@ -11648,7 +11592,7 @@ and whose value is a [=function object=].
 The location of the property is determined as follows:
 
 *   If the interface was declared with the [{{Global}}] [=extended attribute=],
-    then the property exists on the single object that implements the interface.
+    then the property exists on the single object that [=implements=] the interface.
 *   Otherwise, the property exists solely on the interface’s [=interface prototype object=].
 
 If the interface defines an [=indexed property getter=],
@@ -11692,7 +11636,7 @@ then the [=function object=] is {{%ArrayProto_forEach%}}.
     the method, when invoked, must behave as follows:
 
     1.  Let |object| be the result of calling <a abstract-op>ToObject</a> on the <emu-val>this</emu-val> value.
-    1.  If |object| is a [=platform object=],
+    1.  If |object| [=is a platform object=],
         then [=perform a security check=], passing:
         *   the platform object |object|,
         *   the identifier "<code>forEach</code>", and
@@ -11700,8 +11644,7 @@ then the [=function object=] is {{%ArrayProto_forEach%}}.
     1.  Let |interface| be the [=interface=]
         on which the [=maplike declaration=]
         or [=setlike declaration=] is declared.
-    1.  If |object| is not a [=platform object=]
-        that implements |interface|,
+    1.  If |object| does not [=implement=] |interface|,
         then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
     1.  Let |callbackFn| be the value of the first argument passed to the function, or <emu-val>undefined</emu-val> if the argument was not supplied.
     1.  If <a abstract-op>IsCallable</a>(|callbackFn|) is <emu-val>false</emu-val>, [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
@@ -11712,7 +11655,7 @@ then the [=function object=] is {{%ArrayProto_forEach%}}.
     1.  Let |callbackWrapper| be a [=built-in function object=] that, when invoked, behaves as follows:
         1.  Let |v| and |k| be the first two arguments passed to the function.
         1.  Let |thisArg| be the <emu-val>this</emu-val> value.
-        1.  <a abstract-op>Call</a>(|callbackFn|, |thisArg|, «|v|, |k|, |object|»).
+        1.  Perform [=?=] <a abstract-op>Call</a>(|callbackFn|, |thisArg|, «|v|, |k|, |object|»).
 
         Note: The |callbackWrapper| function simply calls the incoming |callbackFn|
         with |object| as the third argument rather than its internal \[[BackingMap]] or \[[BackingSet]] object.
@@ -11724,7 +11667,7 @@ then the [=function object=] is {{%ArrayProto_forEach%}}.
         </p>
     1.  Let |forEach| be [=?=] <a abstract-op>GetMethod</a>(|backing|, "<code>forEach</code>").
     1.  If |forEach| is <emu-val>undefined</emu-val>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
-    1.  <a abstract-op>Call</a>(|forEach|, |backing|, «|callbackWrapper|, |thisArg|»).
+    1.  Perform [=?=] <a abstract-op>Call</a>(|forEach|, |backing|, «|callbackWrapper|, |thisArg|»).
     1.  Return <emu-val>undefined</emu-val>.
 </div>
 
@@ -11748,7 +11691,7 @@ and whose value is a [=function object=].
 The location of the property is determined as follows:
 
 *   If the interface was declared with the [{{Global}}] [=extended attribute=],
-    then the property exists on the single object that implements the interface.
+    then the property exists on the single object that [=implements=] the interface.
 *   Otherwise, the property exists solely on the interface’s [=interface prototype object=].
 
 If the interface has a [=value iterator=],
@@ -11769,7 +11712,7 @@ and whose value is a [=function object=].
 The location of the property is determined as follows:
 
 *   If the interface was declared with the [{{Global}}] [=extended attribute=],
-    then the property exists on the single object that implements the interface.
+    then the property exists on the single object that [=implements=] the interface.
 *   Otherwise, the property exists solely on the interface’s [=interface prototype object=].
 
 If the interface has a [=value iterator=],
@@ -11781,15 +11724,14 @@ then the [=function object=] is {{%ArrayProto_keys%}}.
     then the method, when invoked, must behave as follows:
 
     1.  Let |object| be the result of calling <a abstract-op>ToObject</a> on the <emu-val>this</emu-val> value.
-    1.  If |object| is a [=platform object=],
+    1.  If |object| [=is a platform object=],
         then [=perform a security check=], passing:
         *   the platform object |object|,
         *   the identifier "<code>keys</code>", and
         *   the type "<code>method</code>".
     1.  Let |interface| be the [=interface=]
         on which the [=iterable declaration=] is declared on.
-    1.  If |object| is not a [=platform object=]
-        that implements |interface|,
+    1.  If |object| does not [=implement=] |interface|,
         then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
     1.  Let |iterator| be a newly created [=default iterator object=]
         for |interface| with |object| as its target and iterator kind "<code>key</code>".
@@ -11812,7 +11754,7 @@ and whose value is a [=function object=].
 The location of the property is determined as follows:
 
 *   If the interface was declared with the [{{Global}}] [=extended attribute=],
-    then the property exists on the single object that implements the interface.
+    then the property exists on the single object that [=implements=] the interface.
 *   Otherwise, the property exists solely on the interface’s [=interface prototype object=].
 
 If the interface has a [=value iterator=],
@@ -11825,15 +11767,14 @@ the value of the {{@@iterator}} property.
     then the method, when invoked, must behave as follows:
 
     1.  Let |object| be the result of calling <a abstract-op>ToObject</a> on the <emu-val>this</emu-val> value.
-    1.  If |object| is a [=platform object=],
+    1.  If |object| [=is a platform object=],
         then [=perform a security check=], passing:
         *   the platform object |object|,
         *   the identifier "<code>entries</code>", and
         *   the type "<code>method</code>".
     1.  Let |interface| be the [=interface=]
         on which the [=iterable declaration=] is declared on.
-    1.  If |object| is not a [=platform object=]
-        that implements |interface|,
+    1.  If |object| does not [=implement=] |interface|,
         then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
     1.  Let |iterator| be a newly created [=default iterator object=]
         for |interface| with |object| as its target and iterator kind "<code>value</code>".
@@ -11896,7 +11837,7 @@ must be {{%IteratorPrototype%}}.
     1.  Let |interface| be the [=interface=] for which the
         [=iterator prototype object=] exists.
     1.  Let |object| be the result of calling <a abstract-op>ToObject</a> on the <emu-val>this</emu-val> value.
-    1.  If |object| is a [=platform object=],
+    1.  If |object| [=is a platform object=],
         then [=perform a security check=], passing:
         *   the platform object |object|,
         *   the identifier "<code>next</code>", and
@@ -11941,7 +11882,7 @@ and the string "<code> Iterator</code>".
 
 <h4 id="es-maplike">Maplike declarations</h4>
 
-Any object that implements an [=interface=]
+Any object that [=implements=] an [=interface=]
 that has a [=maplike declaration=]
 must have a \[[BackingMap]] [=internal slot=], which is
 initially set to a newly created {{ECMAScript/Map}} object.
@@ -11963,16 +11904,16 @@ These additional properties are described in the sub-sections below.
     1.  Let |O| be the <emu-val>this</emu-val> value.
     1.  Let |arguments| be the list of arguments passed to this function.
     1.  Let |name| be the function name.
-    1.  If |O| is a [=platform object=],
+    1.  If |O| [=is a platform object=],
         then [=perform a security check=], passing:
         *   the platform object |O|,
         *   an identifier equal to |name|, and
         *   the type "<code>method</code>".
-    1.  If |O| is not an object that implements <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+    1.  If |O| does not [=implement=] <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
     1.  Let |map| be the {{ECMAScript/Map}} object that is the value of |O|’s \[[BackingMap]] [=internal slot=].
     1.  Let |function| be [=?=] <a abstract-op>GetMethod</a>(|map|, |name|).
     1.  If |function| is <emu-val>undefined</emu-val>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
-    1.  Return <a abstract-op>Call</a>(|function|, |map|, |arguments|).
+    1.  Return [=?=] <a abstract-op>Call</a>(|function|, |map|, |arguments|).
 </div>
 
 
@@ -11992,12 +11933,12 @@ with the following characteristics:
         whose behavior when invoked is as follows:
 
         1.  Let |O| be the <emu-val>this</emu-val> value.
-        1.  If |O| is a [=platform object=],
+        1.  If |O| [=is a platform object=],
             then [=perform a security check=], passing:
             *   the platform object |O|,
             *   the identifier "<code>size</code>", and
             *   the type "<code>getter</code>".
-        1.  If |O| is not an object that implements <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+        1.  If |O| does not [=implement=] <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
         1.  Let |map| be the {{ECMAScript/Map}} object that is the value of |O|’s \[[BackingMap]] [=internal slot=].
         1.  Return <a abstract-op>Get</a>(|map|, "<code>size</code>").
     </div>
@@ -12044,19 +11985,19 @@ For both of <code class="idl">get</code> and <code class="idl">has</code>, there
 
         1.  Let |O| be the <emu-val>this</emu-val> value.
         1.  Let |name| be the name of the property – "<code>get</code>" or "<code>has</code>".
-        1.  If |O| is a [=platform object=],
+        1.  If |O| [=is a platform object=],
             then [=perform a security check=], passing:
             *   the platform object |O|,
             *   an identifier equal to |name|, and
             *   the type "<code>method</code>".
-        1.  If |O| is not an object that implements <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+        1.  If |O| does not [=implement=] <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
         1.  Let |map| be the {{ECMAScript/Map}} object that is the value of |O|’s \[[BackingMap]] [=internal slot=].
         1.  Let |keyType| be the key type specified in the [=maplike declaration=].
         1.  Let |function| be [=!=] <a abstract-op>Get</a>(|map|, |name|).
         1.  Let |keyArg| be the first argument passed to this function, or <emu-val>undefined</emu-val> if not supplied.
         1.  Let |keyIDL| be the result of [=converted to an IDL value|converting=] |keyArg| to an IDL value of type |keyType|.
         1.  Let |key| be the result of [=converted to ECMAScript values|converting=] |keyIDL| to an ECMAScript value.
-        1.  Return <a abstract-op>Call</a>(|function|, |map|, «|key|»).
+        1.  Return [=?=] <a abstract-op>Call</a>(|function|, |map|, «|key|»).
     </div>
 
 The value of the [=function object=]’s <code class="idl">length</code> properties is the Number value <emu-val>1</emu-val>.
@@ -12096,19 +12037,19 @@ must exist on |A|’s
         The value of the property is a [=built-in function object=] that behaves as follows when invoked:
 
         1.  Let |O| be the <emu-val>this</emu-val> value.
-        1.  If |O| is a [=platform object=],
+        1.  If |O| [=is a platform object=],
             then [=perform a security check=], passing:
             *   the platform object |O|,
             *   the identifier "<code>delete</code>", and
             *   the type "<code>method</code>".
-        1.  If |O| is not an object that implements <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+        1.  If |O| does not [=implement=] <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
         1.  Let |map| be the {{ECMAScript/Map}} object that is the value of |O|’s \[[BackingMap]] [=internal slot=].
         1.  Let |keyType| be the key type specified in the [=maplike declaration=].
         1.  Let |function| be [=!=] <a abstract-op>Get</a>(|map|, "<code>delete</code>").
         1.  Let |keyArg| be the first argument passed to this function, or <emu-val>undefined</emu-val> if not supplied.
         1.  Let |keyIDL| be the result of [=converted to an IDL value|converting=] |keyArg| to an IDL value of type |keyType|.
         1.  Let |key| be the result of [=converted to ECMAScript values|converting=] |keyIDL| to an ECMAScript value.
-        1.  Return <a abstract-op>Call</a>(|function|, |map|, «|key|»).
+        1.  Return [=?=] <a abstract-op>Call</a>(|function|, |map|, «|key|»).
     </div>
 
 The value of the [=function object=]’s <code class="idl">length</code> property is the Number value <emu-val>1</emu-val>.
@@ -12130,12 +12071,12 @@ must exist on |A|’s [=interface prototype object=]:
         The value of the property is a [=built-in function object=] that behaves as follows when invoked:
 
         1.  Let |O| be the <emu-val>this</emu-val> value.
-        1.  If |O| is a [=platform object=],
+        1.  If |O| [=is a platform object=],
             then [=perform a security check=], passing:
             *   the platform object |O|,
             *   the identifier "<code>set</code>", and
             *   the type "<code>method</code>".
-        1.  If |O| is not an object that implements <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+        1.  If |O| does not [=implement=] <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
         1.  Let |map| be the {{ECMAScript/Map}} object that is the value of |O|’s \[[BackingMap]] [=internal slot=].
         1.  Let |keyType| and |valueType| be the key and value types specified in the [=maplike declaration=].
         1.  Let |function| be [=!=] <a abstract-op>Get</a>(|map|, "<code>set</code>").
@@ -12145,7 +12086,7 @@ must exist on |A|’s [=interface prototype object=]:
         1.  Let |valueIDL| be the result of [=converted to an IDL value|converting=] |valueArg| to an IDL value of type |valueType|.
         1.  Let |key| be the result of [=converted to ECMAScript values|converting=] |keyIDL| to an ECMAScript value.
         1.  Let |value| be the result of [=converted to ECMAScript values|converting=] |valueIDL| to an ECMAScript value.
-        1.  [=!=] <a abstract-op>Call</a>(|function|, |map|, «|key|, |value|»).
+        1.  Perform [=?=] <a abstract-op>Call</a>(|function|, |map|, «|key|, |value|»).
         1.  Return |O|.
     </div>
 
@@ -12156,7 +12097,7 @@ The value of the [=function object=]’s <code class="idl">name</code> property 
 
 <h4 id="es-setlike">Setlike declarations</h4>
 
-Any object that implements an [=interface=]
+Any object that [=implements=] an [=interface=]
 that has a [=setlike declaration=]
 must have a \[[BackingSet]] [=internal slot=], which is
 initially set to a newly created {{ECMAScript/Set}} object.
@@ -12177,19 +12118,19 @@ These additional properties are described in the sub-sections below.
     1.  Let |O| be the <emu-val>this</emu-val> value.
     1.  Let |arguments| be the list of arguments passed to this function.
     1.  Let |name| be the function name.
-    1.  If |O| is a [=platform object=],
+    1.  If |O| [=is a platform object=],
         then [=perform a security check=], passing:
         *   the platform object |O|,
         *   an identifier equal to |name|, and
         *   the type "<code>method</code>".
-    1.  If |O| is not an object that implements <var ignore>A</var>,
+    1.  If |O| does not [=implement=] <var ignore>A</var>,
         then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
     1.  Let |set| be the {{ECMAScript/Set}} object that is
         the value of |O|’s \[[BackingSet]] [=internal slot=].
     1.  Let |function| be [=?=] <a abstract-op>GetMethod</a>(|set|, |name|).
     1.  If |function| is <emu-val>undefined</emu-val>,
         then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
-    1.  Return <a abstract-op>Call</a>(|function|, |set|, |arguments|).
+    1.  Return [=?=] <a abstract-op>Call</a>(|function|, |set|, |arguments|).
 </div>
 
 
@@ -12207,12 +12148,12 @@ with the following characteristics:
         whose behavior when invoked is as follows:
 
         1.  Let |O| be the <emu-val>this</emu-val> value.
-        1.  If |O| is a [=platform object=],
+        1.  If |O| [=is a platform object=],
             then [=perform a security check=], passing:
             *   the platform object |O|,
             *   the identifier "<code>size</code>", and
             *   the type "<code>getter</code>".
-        1.  If |O| is not an object that implements <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+        1.  If |O| does not [=implement=] <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
         1.  Let |set| be the {{ECMAScript/Set}} object that is the value of |O|’s \[[BackingSet]] [=internal slot=].
         1.  Return the result of calling the \[[Get]] internal method of |set| passing "<code>size</code>" and |set| as arguments.
     </div>
@@ -12259,19 +12200,19 @@ with the following characteristics:
         The value of the property is a [=built-in function object=] that behaves as follows when invoked:
 
         1.  Let |O| be the <emu-val>this</emu-val> value.
-        1.  If |O| is a [=platform object=],
+        1.  If |O| [=is a platform object=],
             then [=perform a security check=], passing:
             *   the platform object |O|,
             *   the identifier "<code>has</code>", and
             *   the type "<code>method</code>".
-        1.  If |O| is not an object that implements <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+        1.  If |O| does not [=implement=] <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
         1.  Let |set| be the {{ECMAScript/Set}} object that is the value of |O|’s \[[BackingSet]] [=internal slot=].
         1.  Let |type| be the value type specified in the [=setlike declaration=].
         1.  Let |function| be [=!=] <a abstract-op>Get</a>(|set|, "<code>has</code>").
         1.  Let |arg| be the first argument passed to this function, or <emu-val>undefined</emu-val> if not supplied.
         1.  Let |idlValue| be the result of [=converted to an IDL value|converting=] |arg| to an IDL value of type |type|.
         1.  Let |value| be the result of [=converted to ECMAScript values|converting=] |idlValue| to an ECMAScript value.
-        1.  <a abstract-op>Call</a>(|function|, |set|, «|value|»).
+        1.  Return [=?=] <a abstract-op>Call</a>(|function|, |set|, «|value|»).
     </div>
 
 The value of the [=function object=]’s <code class="idl">length</code> property is a Number value <emu-val>1</emu-val>.
@@ -12296,19 +12237,19 @@ must exist on |A|’s [=interface prototype object=]:
 
         1.  Let |O| be the <emu-val>this</emu-val> value.
         1.  Let |name| be the name of the property – "<code>add</code>" or "<code>delete</code>".
-        1.  If |O| is a [=platform object=],
+        1.  If |O| [=is a platform object=],
             then [=perform a security check=], passing:
             *   the platform object |O|,
             *   an identifier equal to |name|, and
             *   the type "<code>method</code>".
-        1.  If |O| is not an object that implements <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
+        1.  If |O| does not [=implement=] <var ignore>A</var>, then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
         1.  Let |set| be the {{ECMAScript/Set}} object that is the value of |O|’s \[[BackingSet]] [=internal slot=].
         1.  Let |type| be the value type specified in the [=setlike declaration=].
-        1.  Let |function| be [=!=] <a abstract-op>Get</a>(|set|, |name|).
+        1.  Let |function| be [=?=] <a abstract-op>Get</a>(|set|, |name|).
         1.  Let |arg| be the first argument passed to this function, or <emu-val>undefined</emu-val> if not supplied.
         1.  Let |idlValue| be the result of [=converted to an IDL value|converting=] |arg| to an IDL value of type |type|.
         1.  Let |value| be the result of [=converted to ECMAScript values|converting=] |idlValue| to an ECMAScript value.
-        1.  Let |result| be [=!=] <a abstract-op>Call</a>(|function|, |set|, «|value|»).
+        1.  Let |result| be [=?=] <a abstract-op>Call</a>(|function|, |set|, «|value|»).
         1.  If |name| is "delete", then return |result|.
         1.  Otherwise, return |O|.
     </div>
@@ -12337,26 +12278,162 @@ The value of the [=function object=]’s <code class="idl">name</code> property 
 
 <h3 id="es-platform-objects">Platform objects implementing interfaces</h3>
 
-Every [=platform object=] is associated with a global environment, just
+<div algorithm>
+    An ECMAScript value |value| <dfn>is a platform object</dfn> if [$Type$](|value|) is Object and
+    if |value| has a \[[PrimaryInterface]] internal slot.
+</div>
+
+<div algorithm>
+    An ECMAScript value |value| <dfn export>implements</dfn> an [=interface=] |interface|
+    if |value| [=is a platform object=] and the [=inclusive inherited interfaces=] of
+    |value|.\[[PrimaryInterface]] [=list/contains=] |interface|.
+
+    Specifications may reference the concept "|object| implements |interface|"
+    in various ways, including "|object| is an |interface| object".
+</div>
+
+Every [=platform object=] is associated with a [=Realm=], just
 as the [=initial objects=] are.
+This Realm is stored in the [=platform object=]'s \[[Realm]] slot.
 It is the responsibility of specifications using Web IDL to state
-which global environment (or, by proxy, which global object) each platform
+which Realm (or, by proxy, which global object) each platform
 object is associated with.
+In particular, the algorithms below associate the new [=platform object=] with
+the Realm given as an argument.
 
-The <dfn id="dfn-primary-interface" export>primary interface</dfn> of a platform object
-that implements one or more interfaces is the most-derived [=interface=]
-that it implements.  The value of the \[[Prototype]] [=internal slot=]
-of the platform object is the [=interface prototype object=]
-of the [=primary interface=]
-from the [=platform object=]’s associated global environment.
+<div algorithm>
+  To <dfn export lt=new>create a new object implementing the interface</dfn> |interface|, with a
+  Realm |realm|, perform the following steps:
 
-The global environment that a given [=platform object=]
-is associated with can <dfn id="dfn-change-global-environment" for="global environment" export>change</dfn> after it has been created.  When
-the global environment associated with a platform object is changed, its
+    1.  Return the result of [=internally create a new object implementing the
+        interface|internally creating a new object implementing=] |interface|, with |realm| and
+        <emu-val>undefined</emu-val>.
+</div>
+
+<div algorithm>
+  To <dfn>internally create a new object implementing the interface</dfn> |interface|, with a
+  Realm |realm| and a JavaScript value |newTarget|, perform the following steps:
+
+    1.  Assert: |interface| is [=exposed=] in |realm|.
+    1.  If |newTarget| is <emu-val>undefined</emu-val>, then:
+        1.  Let |prototype| be the [=interface prototype object=] for |interface| in
+            |realm|.
+    1.  Otherwise:
+        1.  Assert: [$IsCallable$](|newTarget|) is true.
+        1.  Let |prototype| be [=?=] [$Get$](|newTarget|, "prototype").
+        1.  If [$Type$](|prototype|) is not Object, then:
+            1.  Let |targetRealm| be [$GetFunctionRealm$](|newTarget|).
+            1.  Set |prototype| to the [=interface prototype object=] for |interface| in
+                |targetRealm|.
+    1.  Let |slots| be « \[[Realm]], \[[PrimaryInterface]] ».
+    1.  Let |instance| be a newly created [=ECMAScript/object=] in |realm|
+        with an internal slot for each name in |slots|.
+    1.  Set |instance|.\[[Realm]] to |realm|.
+    1.  Set |instance|.\[[PrimaryInterface]] to |interface|.
+    1.  Set |instance|.\[[Prototype]] to |prototype|.
+    1.  Set |instance|'s essential internal methods to the definitions specified in
+        [=ECMA-262 Ordinary object internal methods and internal slots=].
+    1.  Let |interfaces| be the [=inclusive inherited interfaces=] of |interface|.
+    1.  [=list/iterate|For every=] [=interface=] |ancestor interface| in |interfaces|:
+        1.  Let |unforgeables| be the value of the \[[Unforgeables]] slot of the [=interface
+            object=] of |ancestor interface| in |realm|.
+        1.  Let |keys| be [=!=] |unforgeables|.\[[OwnPropertyKeys]]().
+        1.  [=list|For each=] element |key| of |keys|:
+            1.  Let |descriptor| be [=!=] |unforgeables|.\[[GetOwnProperty]](|key|).
+            1.  Perform [=!=] [$DefinePropertyOrThrow$](|instance|, |key|, |descriptor|).
+    1.  If |interface| is declared with the [{{Global}}] [=extended attribute=], then:
+        1.  [=Define the regular operations=] of |interface| on |instance|, given |realm|.
+        1.  [=Define the regular attributes=] of |interface| on |instance|, given |realm|.
+        1.  [=Define the global property references=] on |instance|, given |realm|.
+        1.  Set |instance|.\[[SetPrototypeOf]] as defined in [[#platform-object-setprototypeof]].
+    1.  Otherwise, if |interfaces| contains an [=interface=] which
+        [=support indexed properties|supports indexed properties=],
+        [=support named properties|named properties=], or both:
+        1.  Set |instance|.\[[GetOwnProperty]] as defined in
+            [[#legacy-platform-object-getownproperty]].
+        1.  Set |instance|.\[[Set]] as defined in
+            [[#legacy-platform-object-set]].
+        1.  Set |instance|.\[[DefineOwnProperty]] as defined in
+            [[#legacy-platform-object-defineownproperty]].
+        1.  Set |instance|.\[[Delete]] as defined in
+            [[#legacy-platform-object-delete]].
+        1.  Set |instance|.\[[PreventExtensions]] as defined in
+            [[#legacy-platform-object-preventextensions]].
+        1.  Set |instance|.\[[OwnPropertyKeys]] as defined in
+            [[#legacy-platform-object-ownpropertykeys]].
+    1.  Return |instance|.
+</div>
+
+<div algorithm>
+  To <dfn>define the global property references</dfn> on |target|, given [=Realm=] |realm|,
+  perform the following steps:
+
+    1.  Let |interfaces| be a [=list=] that contains every [=interface=] that is [=exposed=] in
+        |realm|.
+    1.  Sort |interfaces| in such a way that if |A| and |B| are [=list/items=] of |interfaces|,
+        and |A| [=interface/inherits=] from |B|, |A| has a higher index in |interfaces| than |B|.
+    1.  [=list/iterate|For every=] |interface| of |interfaces|:
+        1.  If |interface| is not declared with the [{{NoInterfaceObject}}] or
+            [{{LegacyNamespace}}] [=extended attributes=], then:
+            1.  Let |id| be |interface|'s [=identifier=].
+            1.  Let |interfaceObject| be the result of [=create an interface object|creating
+                an interface object=] for |interface| with |id| in |realm|.
+            1.  Perform [=!=] [$CreateMethodProperty$](|target|, |id|, |interfaceObject|).
+            1.  If the |interface| is declared with a [{{LegacyWindowAlias}}] [=extended attribute=],
+                and |target| implements the {{Window}} [=interface=], then:
+                1.  [=list/iterate|For every=] [=LegacyWindowAlias identifier|identifier=] |id| in
+                    [{{LegacyWindowAlias}}]'s [=LegacyWindowAlias identifier|identifiers=]:
+                    1.  Perform [=!=] [$CreateMethodProperty$](|target|, |id|, |interfaceObject|).
+        1.  If the |interface| is declared with a [{{NamedConstructor}}] [=extended attribute=],
+            then:
+            1.  [=list/iterate|For every=] [=NamedConstructor identifier|identifier=] |id| in
+                [{{NamedConstructor}}]'s [=NamedConstructor identifier|identifiers=]:
+                1.  Let |namedConstructor| be the result of [=create a named constructor|creating
+                    a named constructor=] with |id| for |interface| in |realm|.
+                1.  Perform [=!=] [$CreateMethodProperty$](|target|, |id|, |namedConstructor|).
+    1.  [=list/iterate|For every=] [=callback interface=] |interface| that is [=exposed=] in
+        |realm| and on which [=constants=] are defined:
+        1.  Let |id| be |interface|'s [=identifier=].
+        1.  Let |interfaceObject| be the result of [=create a legacy callback interface
+            object|creating a legacy callback interface object=] for |interface| with |id| in |realm|.
+        1.  Perform [=!=] [$CreateMethodProperty$](|target|, |id|, |interfaceObject|).
+    1.  [=list/iterate|For every=] [=namespace=] |namespace| that is [=exposed=] in
+        |realm|:
+        1.  Let |id| be |namespace|'s [=identifier=].
+        1.  Let |namespaceObject| be the result of [=create a namespace object|creating a namespace object=] for |namespace| in |realm|.
+        1.  Perform [=!=] [$CreateMethodProperty$](|target|, |id|, |namespaceObject|).
+</div>
+
+<div class="note">
+  The set of interfaces that a [=platform object=] [=implements=] does not change over
+  the lifetime of the object.
+
+  Multiple [=platform objects=] with different [=Realm/global objects=] will share
+  a reference to the same [=interface=] in their \[[PrimaryInterface]] internal
+  slots. For example, a page may contain a same-origin iframe, with the iframe's
+  method being called on the main page's element of the same kind, with no exception
+  thrown.
+
+  [=Interface mixins=] do not participate directly in the evaluation of the [=implements=]
+  algorithm. Instead, each [=interface=] that the [=interface mixin=] is [=included=] in
+  has its own "copy" of each [=member=] of the [=interface mixin=], and the corresponding
+  [=creating an operation function|operation function=] checks that the receiver [=implements=]
+  the particular [=interface=] which [=includes=] the [=interface mixin=].
+</div>
+
+<div algorithm>
+  The <dfn id="dfn-primary-interface" export>primary interface</dfn> of a [=platform object=] is
+  the value of the object's \[[PrimaryInterface]] internal slot, which is is the most-derived
+  [=interface=] that it [=implements=].
+</div>
+
+The [=Realm=] that a given [=platform object=]
+is associated with can <dfn id="dfn-change-global-environment" for="Realm" export>change</dfn> after it has been created.  When
+the [=Realm=] associated with a platform object is changed, its
 \[[Prototype]] [=internal slot=] must be immediately
 updated to be the [=interface prototype object=]
 of the [=primary interface=]
-from the [=platform object=]’s newly associated global environment.
+from the [=platform object=]’s newly associated [=Realm=].
 
 The [=class string=] of
 a platform object that implements one or more interfaces
@@ -12364,25 +12441,7 @@ must be the [=qualified name=] of
 the [=primary interface=]
 of the platform object.
 
-[=Platform objects=] have an internal \[[SetPrototypeOf]] method
-as defined in [[#platform-object-setprototypeof]].
-
-Within a [=Realm=] |realm|,
-for each [=interface=] |interface| implemented by a [=platform object=] |obj|,
-the following steps must be run as part of |obj|'s creation:
-
-1.  [=Define the unforgeable regular operations=] of |interface| on |obj|, given |realm|.
-1.  [=Define the unforgeable regular attributes=] of |interface| on |obj|, given |realm|.
-
-If within a [=Realm=] |realm| a [=platform object=] |obj| implements
-an interface which is declared with the [{{Global}}] [=extended attribute=], then
-for each [=interface=] |interface| implemented by |obj|,
-the following steps must be run as part of |obj|'s creation:
-
-1.  [=Define the regular operations=] of |interface| on |obj|, given |realm|.
-1.  [=Define the regular attributes=] of |interface| on |obj|, given |realm|.
-
-Additionaly, [=platform objects=] which implement an [=interface=]
+Additionally, [=platform objects=] which implement an [=interface=]
 which has a [{{Global}}] [=extended attribute=]
 get properties declaratively from:
 
@@ -12443,13 +12502,11 @@ Support for [=getters=] is handled in [[#legacy-platform-object-getownproperty]]
 and for [=setters=] in [[#legacy-platform-object-defineownproperty]]
 and [[#legacy-platform-object-set]].
 
-Additionaly, [=legacy platform objects=] must have internal methods as defined in:
+Additionally, [=legacy platform objects=] have internal methods as defined in:
 
 * [[#legacy-platform-object-delete]],
 * [[#legacy-platform-object-preventextensions]], and
 * [[#legacy-platform-object-ownpropertykeys]].
-
-Issue: Define those internal methods imperatively instead.
 
 
 <h4 id="legacy-platform-object-getownproperty" dfn oldids="getownproperty" lt=GetOwnProperty for="legacy platform object">\[[GetOwnProperty]]</h4>
@@ -12472,12 +12529,12 @@ Issue: Define those internal methods imperatively instead.
     property name |P|, value |V|, and ECMAScript language value |Receiver|:
 
     1.  If |O| and |Receiver| are the same object, then:
-        1.  If |O| [=support indexed properties|supports indexed properties=], |P| [=is an array index=], and |O| implements an interface with an [=indexed property setter=], then:
+        1.  If |O| [=implements=] an interface with an [=indexed property setter=]
+            and |P| [=is an array index=], then:
             1.  [=Invoke the indexed property setter=] with |P| and |V|.
             1.  Return <emu-val>true</emu-val>.
-        1.  If |O| [=support named properties|supports named properties=], <a abstract-op>Type</a>(|P|) is String,
-            |P| [=is not an array index=],
-            and |O| implements an interface with a [=named property setter=], then:
+        1.  If |O| [=implements=] an interface with a [=named property setter=]
+            and <a abstract-op>Type</a>(|P|) is String, then:
             1.  [=Invoke the named property setter=] with |P| and |V|.
             1.  Return <emu-val>true</emu-val>.
     1.  Let |ownDesc| be <a abstract-op>LegacyPlatformObjectGetOwnProperty</a>(|O|, |P|, <emu-val>true</emu-val>).
@@ -12508,12 +12565,12 @@ Issue: Define those internal methods imperatively instead.
         and |P| is not an [=unforgeable property name=]
         of |O|, then:
         1.  Let |creating| be true if |P| is not a [=supported property name=], and false otherwise.
-        1.  If |O| implements an interface with the [{{OverrideBuiltins}}]
+        1.  If |O| [=implements=] an interface with the [{{OverrideBuiltins}}]
             [=extended attribute=] or |O| does not have an own property
             named |P|, then:
             1.  If |creating| is false and |O| does not implement an
                 interface with a [=named property setter=], then return <emu-val>false</emu-val>.
-            1.  If |O| implements an interface with a
+            1.  If |O| [=implements=] an interface with a
                 [=named property setter=], then:
                 1.  If the result of calling <a abstract-op>IsDataDescriptor</a>(|Desc|) is
                     <emu-val>false</emu-val>, then return
@@ -12641,7 +12698,7 @@ internal method as follows.
           because in practice those are always set up before objects have any supported property names,
           and once set up will make the corresponding named properties invisible.
 
-    1.  If |O| implements an interface that has the [{{OverrideBuiltins}}]
+    1.  If |O| [=implements=] an interface that has the [{{OverrideBuiltins}}]
         [=extended attribute=], then return true.
     1.  Let |prototype| be |O|.\[[GetPrototypeOf]]().
     1.  While |prototype| is not null:
@@ -12728,78 +12785,59 @@ internal method as follows.
             1.  Let |desc| be a newly created [=Property Descriptor=] with no fields.
             1.  Set |desc|.\[[Value]] to the result of [=converted to an ECMAScript value|converting=]
                 |value| to an ECMAScript value.
-            1.  If |O| implements an interface with an [=indexed property setter=], then set
+            1.  If |O| [=implements=] an interface with an [=indexed property setter=], then set
                 |desc|.\[[Writable]] to <emu-val>true</emu-val>, otherwise set it to
                 <emu-val>false</emu-val>.
             1.  Set |desc|.\[[Enumerable]] and |desc|.\[[Configurable]] to <emu-val>true</emu-val>.
             1.  Return |desc|.
         1.  Set |ignoreNamedProps| to true.
-    1.  If |O| [=support named properties|supports named properties=],
-        the result of running the [=named property visibility algorithm=] with
-        property name |P| and object |O| is true, and |ignoreNamedProps| is false, then:
-        1.  Let |operation| be the operation used to declare the named property getter.
-        1.  Let |value| be an uninitialized variable.
-        1.  If |operation| was defined without an [=identifier=], then
-            set |value| to the result of performing the steps listed in the interface description to
-            [=determine the value of a named property=]
-            with |P| as the name.
-        1.  Otherwise, |operation| was defined with an identifier.  Set |value| to the result
-            of performing the steps listed in the description of |operation| with |P| as the only argument value.
-        1.  Let |desc| be a newly created [=Property Descriptor=] with no fields.
-        1.  Set |desc|.\[[Value]] to the result of [=converted to an ECMAScript value|converting=]
-            |value| to an ECMAScript value.
-        1.  If |O| implements an interface with a [=named property setter=], then set
-            |desc|.\[[Writable]] to <emu-val>true</emu-val>, otherwise set it to
-            <emu-val>false</emu-val>.
-        1.  If |O| implements an interface with the
-            [{{LegacyUnenumerableNamedProperties}}]
-            [=extended attribute=],
-            then set |desc|.\[[Enumerable]] to <emu-val>false</emu-val>,
-            otherwise set it to <emu-val>true</emu-val>.
-        1.  Set |desc|.\[[Configurable]] to <emu-val>true</emu-val>.
-        1.  Return |desc|.
+    1.  If |O| [=support named properties|supports named properties=] and
+        |ignoreNamedProps| is false, then:
+        1.  If the result of running the [=named property visibility algorithm=] with
+            property name |P| and object |O| is true, then:
+            1.  Let |operation| be the operation used to declare the named property getter.
+            1.  Let |value| be an uninitialized variable.
+            1.  If |operation| was defined without an [=identifier=], then
+                set |value| to the result of performing the steps listed in the interface description to
+                [=determine the value of a named property=]
+                with |P| as the name.
+            1.  Otherwise, |operation| was defined with an identifier.  Set |value| to the result
+                of performing the steps listed in the description of |operation| with |P| as the only argument value.
+            1.  Let |desc| be a newly created [=Property Descriptor=] with no fields.
+            1.  Set |desc|.\[[Value]] to the result of [=converted to an ECMAScript value|converting=]
+                |value| to an ECMAScript value.
+            1.  If |O| [=implements=] an interface with a [=named property setter=], then set
+                |desc|.\[[Writable]] to <emu-val>true</emu-val>, otherwise set it to
+                <emu-val>false</emu-val>.
+            1.  If |O| [=implements=] an interface with the
+                [{{LegacyUnenumerableNamedProperties}}]
+                [=extended attribute=],
+                then set |desc|.\[[Enumerable]] to <emu-val>false</emu-val>,
+                otherwise set it to <emu-val>true</emu-val>.
+            1.  Set |desc|.\[[Configurable]] to <emu-val>true</emu-val>.
+            1.  Return |desc|.
     1.  Return <a abstract-op>OrdinaryGetOwnProperty</a>(|O|, |P|).
 </div>
 
-<h3 id="es-user-objects">User objects implementing callback interfaces</h3>
+<h3 id="es-user-objects">Callback interfaces</h3>
 
 As described in [[#idl-objects]],
 [=callback interfaces=] can be
-implemented in script by an ECMAScript object.
-The following cases determine whether and how a given object
-is considered to be a user object implementing a callback interface:
+implemented in script by any ECMAScript object.
+The following cases explain how a [=callback interface=]'s [=operation=] is invoked on a given
+object:
 
-*   If the interface is a [=single operation callback interface=]
-    (defined below) then any object is considered to implement the interface.
-    The implementation of the operation (or set of overloaded operations) is
-    as follows:
-    *   If the object is [=ECMAScript/callable=],
-        then the implementation of the operation (or set of overloaded operations) is
-        the callable object itself.
-    *   Otherwise, the object is not [=ECMAScript/callable=].
-        The implementation of the operation (or set of overloaded operations) is
-        the result of invoking the internal \[[Get]] method
-        on the object with a property name that is the [=identifier=]
-        of the operation.
-*   Otherwise, the interface is not a [=single operation callback interface=].
-    Any object is considered to implement the interface.
-    For each operation declared on the interface with a given [=identifier=], the implementation
-    is the result of invoking \[[Get]] on the object with a
-    property name that is that identifier.
+*   If the object is [=ECMAScript/callable=], then the implementation of the operation is the
+    callable object itself.
+*   Otherwise, the implementation of the operation is calling the result of invoking the
+    internal \[[Get]] method on the object with a property name that is the [=identifier=] of
+    the operation.
 
 Note that ECMAScript objects need not have
 properties corresponding to [=constants=]
-on them to be considered as [=user objects=]
-implementing [=interfaces=] that happen
+on them to be considered as
+implementing [=callback interfaces=] that happen
 to have constants declared on them.
-
-A <dfn id="dfn-single-operation-callback-interface" export>single operation callback interface</dfn> is
-a [=callback interface=] that:
-
-*   is not declared to [=interface/inherit=] from another interface,
-*   has no [=attributes=], and
-*   has one or more [=regular operations=] that all have the same [=identifier=],
-    and no others.
 
 A <dfn>Web IDL arguments list</dfn> is a [=list=] of values each of which is either an IDL value or
 the special value “missing”, which represents a missing optional argument.
@@ -12828,8 +12866,8 @@ the special value “missing”, which represents a missing optional argument.
 <div algorithm="to call a user object's operation">
 
     To <dfn id="call-a-user-objects-operation" export>call a user object's operation</dfn>,
-    given a [=Interface types|callback interface type=] value |value|,
-    sometimes-optional operation name |opName|, [=Web IDL arguments list=] |args|, and optional
+    given a [=callback interface type=] value |value|,
+    operation name |opName|, [=Web IDL arguments list=] |args|, and optional
     <dfn id="dfn-callback-this-value" export>callback this value</dfn> |thisArg|,
     perform the following steps.
     These steps will either return an IDL value or throw an exception.
@@ -12842,22 +12880,17 @@ the special value “missing”, which represents a missing optional argument.
     1.  Let |stored settings| be |value|'s [=callback context=].
     1.  [=Prepare to run script=] with |relevant settings|.
     1.  [=Prepare to run a callback=] with |stored settings|.
-    1.  Determine the implementation of the operation, |X|:
-        1.  If |value|'s interface is a [=single operation callback interface=] and
-            [=!=] <a abstract-op>IsCallable</a>(|O|) is true,
-            then set |X| to |O|.
-        1.  Otherwise, |opName| must be supplied:
-            1.  Let |getResult| be <a abstract-op>Get</a>(|O|, |opName|).
-            1.  If |getResult| is an [=abrupt completion=], set |completion|
-                to |getResult| and jump to the step labeled <a href="#call-user-object-operation-return"><i>return</i></a>.
-            1.  Set |X| to |getResult|.\[[Value]].
-    1.  If [=!=] <a abstract-op>IsCallable</a>(|X|) is <emu-val>false</emu-val>,
-        then set |completion| to a new <a abstract-op>Completion</a>{\[[Type]]: throw, \[[Value]]: a
-        newly created {{ECMAScript/TypeError}} object, \[[Target]]: empty}, and jump
-        to the step labeled <a href="#call-user-object-operation-return"><i>return</i></a>.
-    1.  If |value|'s interface is not a [=single operation callback interface=],
-        or if [=!=] <a abstract-op>IsCallable</a>(|O|) is <emu-val>false</emu-val>,
-        set |thisArg| to |O| (overriding the provided value).
+    1.  Let |X| be |O|.
+    1.  If [=!=] <a abstract-op>IsCallable</a>(|O|) is false, then:
+        1.  Let |getResult| be <a abstract-op>Get</a>(|O|, |opName|).
+        1.  If |getResult| is an [=abrupt completion=], set |completion|
+            to |getResult| and jump to the step labeled <a href="#call-user-object-operation-return"><i>return</i></a>.
+        1.  Set |X| to |getResult|.\[[Value]].
+        1.  If [=!=] <a abstract-op>IsCallable</a>(|X|) is <emu-val>false</emu-val>,
+            then set |completion| to a new <a abstract-op>Completion</a>{\[[Type]]: throw, \[[Value]]: a
+            newly created {{ECMAScript/TypeError}} object, \[[Target]]: empty}, and jump
+            to the step labeled <a href="#call-user-object-operation-return"><i>return</i></a>.
+        1.  Set |thisArg| to |O| (overriding the provided value).
     1.  Let |esArgs| be the result of [=Web IDL arguments list/converting=] |args| to an ECMAScript
         arguments list. If this throws an exception, set |completion| to the completion value
         representing the thrown exception and jump to the step labeled
@@ -12881,68 +12914,39 @@ the special value “missing”, which represents a missing optional argument.
             |rejectedPromise| to the operation's return type.
 </div>
 
-<div algorithm>
 
-    To <dfn id="get-a-user-objects-attribute-value" export>get a user object's attribute value</dfn>,
-    given a [=Interface types|callback interface type=] value |object| and
-    attribute name |attributeName|, perform the following steps.
-    These steps will either return an IDL value or throw an exception.
+<h4 id="legacy-callback-interface-object">Legacy callback interface object</h4>
 
-    1.  Let |completion| be an uninitialized variable.
-    1.  Let |O| be the ECMAScript object corresponding to |object|.
-    1.  Let |realm| be |O|'s [=associated Realm=].
-    1.  Let |relevant settings| be |realm|'s [=Realm/settings object=].
-    1.  Let |stored settings| be |object|'s [=callback context=].
-    1.  [=Prepare to run script=] with |relevant settings|.
-    1.  [=Prepare to run a callback=] with |stored settings|.
-    1.  Let |getResult| be <a abstract-op>Get</a>(|O|, |attributeName|).
-    1.  If |getResult| is an [=abrupt completion=], set |completion| to
-        |getResult| and jump to the step labeled <a href="#get-user-object-attribute-return"><i>return</i></a>.
-    1.  Set |completion| to the result of
-        [=converted to an IDL value|converting=] |getResult|.\[[Value]] to
-        an IDL value of the same type as the attribute's type.
-    1.  <i id="get-user-object-attribute-return">Return:</i> at this
-        point |completion| will be set to an ECMAScript completion value.
-        1.  [=Clean up after running a callback=] with |stored settings|.
-        1.  [=Clean up after running script=] with |relevant settings|.
-        1.  If |completion| is a normal completion, return |completion|.
-        1.  If |completion| is an [=abrupt completion=] and the attribute's type is
-            <em>not</em> a [=promise type=], return |completion|.
-        1.  Let |rejectedPromise| be [=!=] <a abstract-op>Call</a>({{%Promise_reject%}},
-            {{%Promise%}}, «|completion|.\[[Value]]»).
-        1.  Return the result of [=converted to an IDL value|converting=]
-            |rejectedPromise| to the attribute's type.
-</div>
+For every [=callback interface=] that is [=exposed=] in
+a given [=Realm=]
+and on which [=constants=] are defined,
+a corresponding property exists on the [=Realm=]'s [=Realm/global object=].
+The name of the property is the [=identifier=] of the [=callback interface=],
+and its value is an object called the
+<dfn id="dfn-legacy-callback-interface-object" export>legacy callback interface object</dfn>.
+
+The [=legacy callback interface object=] for a given [=callback interface=]
+is a [=built-in function object=].
+It has properties that correspond to the [=constants=] defined on that interface,
+as described in sections [[#es-constants]].
+
+Note: Since a [=legacy callback interface object=] is a [=function object=]
+the <code>typeof</code> operator will return "function"
+when applied to a [=legacy callback interface object=].
 
 <div algorithm>
 
-    To <dfn id="set-a-user-objects-attribute-value" export>set a user object's attribute value</dfn>,
-    given a [=Interface types|callback interface type=] value |object|,
-    attribute name |attributeName|, and IDL value |value|,
-    perform the following steps.
-    These steps will not return anything, but could throw an exception.
+    The [=legacy callback interface object=] for a given [=callback interface=] |interface|
+    with [=identifier=] |id| and in [=Realm=] |realm|
+    is <dfn lt="create a legacy callback interface object">created</dfn> as follows:
 
-    1.  Let |completion| be an uninitialized variable.
-    1.  Let |O| be the ECMAScript object corresponding to |object|.
-    1.  Let |realm| be |O|'s [=associated Realm=].
-    1.  Let |relevant settings| be |realm|'s [=Realm/settings object=].
-    1.  Let |stored settings| be |object|'s [=callback context=].
-    1.  [=Prepare to run script=] with |relevant settings|.
-    1.  [=Prepare to run a callback=] with |stored settings|.
-    1.  Let |convertResult| be the result of
-        [=converted to an ECMAScript value|converting=] |value|
-        to an ECMAScript value.
-    1.  If |convertResult| is an [=abrupt completion=], set |completion| to
-        |convertResult| and jump to the step labeled <a href="#set-user-object-attribute-return"><i>return</i></a>.
-    1.  Set |completion| to <a abstract-op>Set</a>(|O|, |attributeName|,
-        |convertResult|.\[[Value]], <emu-val>true</emu-val>).
-    1.  <i id="set-user-object-attribute-return">Return:</i> at this
-        point |completion| will be set to an ECMAScript completion value, which is
-        either an [=abrupt completion=] or a normal completion for the value <emu-val>true</emu-val> (as returned by <a abstract-op>Set</a>).
-        1.  [=Clean up after running a callback=] with |stored settings|.
-        1.  [=Clean up after running script=] with |relevant settings|.
-        1.  If |completion| is an [=abrupt completion=], return |completion|.
-        1.  Return <a abstract-op>NormalCompletion</a>({{void}}).
+    1.  Let |steps| be the following steps:
+        1.  [=ECMAScript/Throw=] a {{ECMAScript/TypeError}}.
+    1.  Let |F| be [=!=] <a abstract-op>CreateBuiltinFunction</a>(|steps|, « », |realm|).
+    1.  Perform [=!=] <a abstract-op>SetFunctionName</a>(|F|, |id|).
+    1.  Perform [=!=] <a abstract-op>SetFunctionLength</a>(|F|, 0).
+    1.  [=Define the constants=] of |interface| on |F| given |realm|.
+    1.  Return |F|.
 </div>
 
 
@@ -12951,7 +12955,7 @@ the special value “missing”, which represents a missing optional argument.
 An ECMAScript [=ECMAScript/callable=] object that is being
 used as a [=callback function=] value is
 called in a manner similar to how [=operations=]
-on [=user objects=] are called (as
+on [=callback interface=] values are called (as
 described in the previous section).
 
 <div algorithm>
@@ -13040,33 +13044,32 @@ a return type that is a [=promise type=].
 
 <h3 id="es-namespaces">Namespaces</h3>
 
-For every [=namespace=] that is [=exposed=] in a given ECMAScript global environment,
-a corresponding property must exist on the ECMAScript
-environment's global object. The name of the property is the [=identifier=] of the namespace, and its value is an object
+For every [=namespace=] that is [=exposed=] in a given [=Realm=],
+a corresponding property exists on the [=Realm=]'s [=Realm/global object=].
+The name of the property is the [=identifier=] of the namespace, and its value is an object
 called the <dfn id="dfn-namespace-object" export>namespace object</dfn>.
 
-The property has the attributes
-{ \[[Writable]]: <emu-val>true</emu-val>, \[[Enumerable]]: <emu-val>false</emu-val>, \[[Configurable]]: <emu-val>true</emu-val> }.
 The characteristics of a namespace object are described in [[#namespace-object]].
 
 
 <h4 id="namespace-object">Namespace object</h4>
 
-<div algorithm="to create a namespace object">
+<div algorithm>
 
     The namespace object for a given [=namespace=] |namespace| and [=Realm=] |realm|
-    is created as follows:
+    is <dfn lt="create a namespace object">created</dfn> as follows:
 
     1.  Let |namespaceObject| be
         [=!=] <a abstract-op>ObjectCreate</a>(|realm|.\[[Intrinsics]].[[{{%ObjectPrototype%}}]]).
     1.  [=Define the regular attributes=] of |namespace| on |namespaceObject| given |realm|.
     1.  [=Define the regular operations=] of |namespace| on |namespaceObject| given |realm|.
     1.  For each [=exposed=] [=interface=] |interface| which has the [{{LegacyNamespace}}] extended
-        attribute with the identifier of this namespace as its argument,
-        1.  Let |I| be the [=interface object=] for |interface|.
-        1.  Let |newDesc| be the PropertyDescriptor{\[[Writable]]: <emu-val>true</emu-val>,
-            \[[Enumerable]]: <emu-val>false</emu-val>, \[[Configurable]]: <emu-val>true</emu-val>, \[[Value]]: |I|}.
-        1.  Perform [=!=] <a abstract-op>DefinePropertyOrThrow</a>(|namespaceObject|, |interface|'s [=identifier=], |newDesc|).
+        attribute with the identifier of |namespace| as its argument,
+        1.  Let |id| be |interface|'s [=identifier=].
+        1.  Let |interfaceObject| be the result of [=create an interface object|creating an
+            interface object=] for |interface| with |id| in |realm|.
+        1.  Perform [=!=] [$CreateMethodProperty$](|namespaceObject|, |id|, |interfaceObject|).
+    1.  Return |namespaceObject|.
 </div>
 
 
@@ -13078,7 +13081,7 @@ In the ECMAScript binding, the [=interface prototype object=] for {{DOMException
 has its \[[Prototype]] [=internal slot=] set to the intrinsic object {{%ErrorPrototype%}},
 as defined in the [=create an interface prototype object=] abstract operation.
 
-Additionaly, if an implementation gives native {{ECMAScript/Error}} objects special powers or
+Additionally, if an implementation gives native {{ECMAScript/Error}} objects special powers or
 nonstandard properties (such as a <code>stack</code> property),
 it should also expose those on {{DOMException}} instances.
 
@@ -13320,10 +13323,8 @@ Each {{DOMException}} object has an associated <dfn for="DOMException">name</dfn
 The <dfn constructor for="DOMException"><code>DOMException(|message|, |name|)</code></dfn>
 constructor, when invoked, must run these steps:
 
-1. Let |e| be a new {{DOMException}} object.
-1. Set |e|'s [=DOMException/name=] to |name|.
-1. Set |e|'s [=DOMException/message=] to |message|.
-1. Return |e|.
+1. Set **this**'s [=DOMException/name=] to |name|.
+1. Set **this**'s [=DOMException/message=] to |message|.
 
 The <dfn attribute for="DOMException"><code>name</code></dfn> attribute's getter must return this
 {{DOMException}} object's [=DOMException/name=].
@@ -13441,6 +13442,20 @@ agents in referencing specifications be linked to the
 </blockquote>
 
 
+<h2 id="priv-sec">Privacy and Security Considerations</h2>
+
+This specification defines a conversion layer between JavaScript and IDL values. An incorrect
+implementation of this layer can lead to security issues.
+
+This specification also provides the ability to use JavaScript values directly, through the
+{{any}} and {{object}} IDL types. These values need to be handled carefully to avoid security
+issues. In particular, user script can run in response to nearly any manipulation of these values,
+and invalidate the expectations of specifications or implementations using them.
+
+This specification makes it possible to interact with {{SharedArrayBuffer}} objects, which can be
+used to build timing attacks. Specifications that use these objects need to consider such attacks.
+
+
 <h2 id="acknowledgements">Acknowledgements</h2>
 
 <i>This section is informative.</i>
@@ -13460,6 +13475,7 @@ Giovanni Campagna,
 Domenic Denicola,
 Chris Dumez,
 Michael Dyck,
+Daniel Ehrenberg,
 Brendan Eich,
 João Eiras,
 Gorm Haug Eriksen,
@@ -13511,11 +13527,12 @@ Takashi Sakamoto,
 Doug Schepers,
 Jonas Sicking,
 Garrett Smith,
-Geoffrey Sneddon,
+Sam Sneddon,
 Jungkee Song,
 Josh Soref,
 Maciej Stachowiak,
 Anton Tayanovskyy,
+triple-underscore,
 Peter Van der Beken,
 Jeff Walden,
 Allen Wirfs-Brock,
@@ -13548,14 +13565,14 @@ expression syntax [[!PERLRE]]) as follows:
         <td><code class="regex"><span class="mute">/</span>-?([1-9][0-9]*|0[Xx][0-9A-Fa-f]+|0[0-7]*)<span class="mute">/</span></code></td>
     </tr>
     <tr>
-        <td id="prod-float"><emu-t class="regex">float</emu-t></td>
+        <td id="prod-decimal"><emu-t class="regex">decimal</emu-t></td>
         <td><code>=</code></td>
         <td><code class="regex"><span class="mute">/</span>-?(([0-9]+\.[0-9]*|[0-9]*\.[0-9]+)([Ee][+-]?[0-9]+)?|[0-9]+[Ee][+-]?[0-9]+)<span class="mute">/</span></code></td>
     </tr>
     <tr>
         <td id="prod-identifier"><emu-t class="regex">identifier</emu-t></td>
         <td><code>=</code></td>
-        <td><code class="regex"><span class="mute">/</span>_?[A-Za-z][0-9A-Z_a-z-]*<span class="mute">/</span></code></td>
+        <td><code class="regex"><span class="mute">/</span>[_-]?[A-Za-z][0-9A-Z_a-z-]*<span class="mute">/</span></code></td>
     </tr>
     <tr>
         <td id="prod-string"><emu-t class="regex">string</emu-t></td>
@@ -13766,7 +13783,7 @@ The following conformance classes are defined by this specification:
         [].forEach.call(document.querySelectorAll("pre.grammar"), pre => {
             var html = pre.textContent.replace(/("[^"]+")|([a-zA-Z]+)|(:)/g, m => {
                 if (/^"/.test(m)) { return "<emu-t>" + m.replace(/^"|"$/g, "") + "</emu-t>"; }
-                if (/^(integer|float|identifier|string|whitespace|comment|other)$/.test(m)) {
+                if (/^(integer|decimal|identifier|string|whitespace|comment|other)$/.test(m)) {
                   return "<emu-t class=\"regex\"><a href=\"#prod-" + m + "\">" + m + "</a></emu-t>";
                 }
                 if (m == ":") { return "::"; }

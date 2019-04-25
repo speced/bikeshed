@@ -13,7 +13,7 @@ Former Editor: Travis Leithead, w3cid 40117, Microsoft Corp., travis.leithead@mi
 Abstract: This document defines a recording API for use with {{MediaStream}}s.
 Previous Version: https://www.w3.org/TR/2017/WD-mediastream-recording-20170405/
 
-!Participate: <a href="https://lists.w3.org/Archives/Public/public-media-capture/">Mailing list</a>
+!Participate: <a href="https://lists.w3.org/Archives/Public/public-webrtc/">Mailing list</a>
 !Participate: <a href="https://github.com/w3c/mediacapture-record">GitHub repo</a> (<a href="https://github.com/w3c/mediacapture-record/issues/new">new issue</a>, <a href="https://github.com/w3c/mediacapture-record/issues">open issues</a>)
 
 !Implementation: <a href="http://caniuse.com/#feat=mediarecorder">Can I use Media Recording?</a>
@@ -70,7 +70,7 @@ interface MediaRecorder : EventTarget {
   readonly attribute unsigned long videoBitsPerSecond;
   readonly attribute unsigned long audioBitsPerSecond;
 
-  void start(optional long timeslice);
+  void start(optional unsigned long timeslice);
   void stop();
   void pause();
   void resume();
@@ -180,7 +180,11 @@ interface MediaRecorder : EventTarget {
 ## Methods ## {#mediarecorder-methods}
 
 <dl class="domintro">
-  <dt><dfn method for="MediaRecorder"><code>start(optional long timeslice)</code></dfn></dt>
+  <div class="note">
+    For historical reasons, the following methods alter {{state}} synchronously
+    and fire events asynchronously.
+  </div>
+  <dt><dfn method for="MediaRecorder"><code>start(optional unsigned long timeslice)</code></dfn></dt>
   <dd>
   When a {{MediaRecorder}} object&#8217;s {{start()}} method is invoked, the UA
   MUST run the following steps:
@@ -192,7 +196,7 @@ interface MediaRecorder : EventTarget {
     <li>If {{state}} is not {{inactive}}, throw an {{InvalidStateError}}
     {{DOMException}} and abort these steps.</li>
 
-    <li>If the {{MediaRecorder/stream}}'s isolation properties disallow access
+    <li>If the {{MediaRecorder/stream}}'s <a>isolation properties</a> disallow access
     from this {{MediaRecorder}}, throw a {{SecurityError}} {{DOMException}} and
     abort these steps.</li>
 
@@ -203,7 +207,7 @@ interface MediaRecorder : EventTarget {
       named <a>start</a> at <var>target</var>, then return <code>undefined</code>.
       </li>
 
-      <li>If at any point the {{MediaRecorder/stream}}'s isolation properties
+      <li>If at any point the {{MediaRecorder/stream}}'s <a>isolation properties</a>
       change so that {{MediaRecorder}} is no longer allowed access to it, the
       UA MUST immediately stop gathering data, discard any data that it has
       gathered, and queue a task, using the DOM manipulation task source, that
@@ -232,7 +236,7 @@ interface MediaRecorder : EventTarget {
       </li>
 
       <li>If the UA at any point is unable to continue gathering data for
-      reasons other than isolation properties or stream track set, it MUST stop gathering data, and
+      reasons other than <a>isolation properties</a> or stream track set, it MUST stop gathering data, and
       queue a task, using the DOM manipulation task source, that runs the
       following steps:
       <ol>
@@ -311,11 +315,12 @@ interface MediaRecorder : EventTarget {
   When a {{MediaRecorder}} object&#8217;s {{stop()}} method is invoked, the UA
   MUST run the following steps:
   <ol>
-    <li>If {{state}} is {{inactive}} throw an {{InvalidStateError}}
-    {{DOMException}} and terminate these steps. Otherwise the UA MUST queue a
+    <li>If {{state}} is {{inactive}}, abort these steps.</li>
+
+    <li>Set {{state}} to {{inactive}}, and queue a
     task, using the DOM manipulation task source, that runs the following steps:
     <ol>
-      <li>Set {{state}} to {{inactive}} and stop gathering data.</li>
+      <li>Stop gathering data.</li>
       <li>Let <var>blob</var> be the Blob of collected data so far and
       let <var>target</var> be the MediaRecorder context object, then
       <a href="#to-fire-a-blob-event">fire a blob event</a> named
@@ -332,11 +337,14 @@ interface MediaRecorder : EventTarget {
   When a {{MediaRecorder}} object&#8217;s {{pause()}} method is invoked, the UA
   MUST run the following steps:
   <ol>
-    <li>If {{state}} is {{inactive}} throw an {{InvalidStateError}}
-    {{DOMException}} and terminate these steps. Otherwise the UA MUST queue a
+    <li>If {{state}} is {{inactive}}, throw an {{InvalidStateError}}
+    {{DOMException}} and abort these steps.</li>
+
+    <li>If {{state}} is {{paused}}, abort these steps.</li>
+
+    <li>Set {{state}} to {{paused}}, and queue a
     task, using the DOM manipulation task source, that runs the following steps:
     <ol>
-      <li>Set {{state}} to {{paused}}.</li>
       <li>Stop gathering data into <var>blob</var> (but keep it
       available so that recording can be resumed in the future).</li>
       <li>Let <var>target</var> be the MediaRecorder context object.
@@ -352,11 +360,14 @@ interface MediaRecorder : EventTarget {
   When a {{MediaRecorder}} object&#8217;s {{resume()}} method is invoked, the
   UA MUST run the following steps:
   <ol>
-    <li>If {{state}} is {{inactive}} throw an {{InvalidStateError}}
-    {{DOMException}} and terminate these steps. Otherwise the UA MUST queue a
+    <li>If {{state}} is {{inactive}}, throw an {{InvalidStateError}}
+    {{DOMException}} and abort these steps.</li>
+
+    <li>If {{state}} is {{recording}}, abort these steps.</li>
+
+    <li>Set {{state}} to {{recording}}, and queue a
     task, using the DOM manipulation task source, that runs the following steps:
     <ol>
-      <li>Set {{state}} to {{recording}}.</li>
       <li>Resume (or continue) gathering data into the current <var>blob</var>.
       </li>
       <li>Let <var>target</var> be the MediaRecorder context object. <a>Fire
@@ -713,8 +724,13 @@ specific type.
     </tr>
     <tr>
       <td>{{SecurityError}}</td>
-      <td>The isolation properties of the {{MediaStream}} do not allow the
+      <td>The <a>isolation properties</a> of the {{MediaStream}} do not allow the
       MediaRecorder access to it.</td>
+    </tr>
+    <tr>
+      <td>{{InvalidModificationError}}</td>
+      <td>The set of {{MediaStreamTrack}}s of the recoded {{MediaStream}} has
+      changed, preventing any further recording.</td>
     </tr>
   </tbody>
 </table>
@@ -922,6 +938,8 @@ urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: attribute; text: 
 urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: enum-value; text: ended; url: idl-def-MediaStreamTrackState.ended
 
 urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: enum-value; text: live; url: idl-def-MediaStreamTrackState.live
+
+urlPrefix: https://www.w3.org/TR/webrtc-identity/#; type: dfn; text: isolation properties; url: isolated-media-streams
 </pre>
 
 <pre class="link-defaults">
@@ -931,4 +949,3 @@ spec: html
         text: in parallel
         text: incumbent settings object
 </pre>
-

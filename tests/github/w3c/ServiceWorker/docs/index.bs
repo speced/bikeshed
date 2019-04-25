@@ -163,13 +163,17 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
 
     A [=/service worker=] has an associated <dfn export id="dfn-script-resource-map">script resource map</dfn> which is an <a>ordered map</a> where the keys are [=/URLs=] and the values are [=/responses=].
 
+    A [=/service worker=] has an associated  <dfn export id="dfn-set-of-used-scripts">set of used scripts</dfn> (a [=ordered set|set=]) whose [=list/item=] is a [=/URL=]. It is initially a new [=ordered set|set=].
+
+    Note: The [=set of used scripts=] is only used to prune unused resources from a new worker's map after installation, that were populated based on the old worker's map during the update check.
+
     A [=/service worker=] has an associated <dfn export id="dfn-skip-waiting-flag">skip waiting flag</dfn>. Unless stated otherwise it is unset.
 
     A [=/service worker=] has an associated <dfn export id="dfn-classic-scripts-imported-flag">classic scripts imported flag</dfn>. It is initially unset.
 
-    A [=/service worker=] has an associated <dfn export id="dfn-set-of-event-types-to-handle">set of event types to handle</dfn> (a [=ordered set|set=]) whose [=list/item=] is an <a>event listener</a>'s event type. It is initially an empty set.
+    A [=/service worker=] has an associated <dfn export id="dfn-set-of-event-types-to-handle">set of event types to handle</dfn> (a [=ordered set|set=]) whose [=list/item=] is an <a>event listener</a>'s event type. It is initially a new [=ordered set|set=].
 
-    A [=/service worker=] has an associated <dfn export id="dfn-set-of-extended-events">set of extended events</dfn> (a [=ordered set|set=]) whose [=list/item=] is an {{ExtendableEvent}}. It is initially an empty set.
+    A [=/service worker=] has an associated <dfn export id="dfn-set-of-extended-events">set of extended events</dfn> (a [=ordered set|set=]) whose [=list/item=] is an {{ExtendableEvent}}. It is initially a new [=ordered set|set=].
 
     <section>
       <h4 id="service-worker-lifetime">Lifetime</h4>
@@ -310,7 +314,8 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
       interface ServiceWorker : EventTarget {
         readonly attribute USVString scriptURL;
         readonly attribute ServiceWorkerState state;
-        void postMessage(any message, optional sequence&lt;object&gt; transfer = []);
+        void postMessage(any message, sequence&lt;object&gt; transfer);
+        void postMessage(any message, optional PostMessageOptions options);
 
         // event
         attribute EventHandler onstatechange;
@@ -358,11 +363,20 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
 
       The <dfn method for="ServiceWorker"><code>postMessage(|message|, |transfer|)</code></dfn> method *must* run these steps:
 
+        1. Let |options| be «[ "transfer" → |transfer| ]».
+        1. Invoke {{ServiceWorker/postMessage(message, options)}} with |message| and |options| as the arguments.
+    </section>
+
+    <section algorithm="service-worker-postmessage-options">
+      <h4 id="service-worker-postmessage-options">{{ServiceWorker/postMessage(message, options)}}</h4>
+
+      The <dfn method for="ServiceWorker"><code>postMessage(|message|, |options|)</code></dfn> method *must* run these steps:
+
         1. If the {{ServiceWorker/state}} attribute value of the <a>context object</a> is {{"redundant"}}, [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
         1. Let |serviceWorker| be the [=/service worker=] represented by the <a>context object</a>.
         1. Invoke <a>Run Service Worker</a> algorithm with |serviceWorker| as the argument.
         1. Let |incumbentSettings| be the <a>incumbent settings object</a>, and |incumbentGlobal| its [=environment settings object/global object=].
-        1. Let |serializeWithTransferResult| be <a abstract-op>StructuredSerializeWithTransfer</a>(|message|, |transfer|). Rethrow any exceptions.
+        1. Let |serializeWithTransferResult| be <a abstract-op>StructuredSerializeWithTransfer</a>(|message|, |options|.transfer). Rethrow any exceptions.
         1. [=Queue a task=] on the [=DOM manipulation task source=] to run the following steps:
             1. Let |source| be determined by switching on the type of |incumbentGlobal|:
                 <dl class="switch">
@@ -978,7 +992,8 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
         readonly attribute FrameType frameType;
         readonly attribute DOMString id;
         readonly attribute ClientType type;
-        void postMessage(any message, optional sequence&lt;object&gt; transfer = []);
+        void postMessage(any message, sequence&lt;object&gt; transfer);
+        void postMessage(any message, optional PostMessageOptions options);
       };
 
       [Exposed=ServiceWorker]
@@ -1047,10 +1062,19 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
 
       The <dfn method for="Client"><code>postMessage(|message|, |transfer|)</code></dfn> method *must* run these steps:
 
+        1. Let |options| be «[ "transfer" → |transfer| ]».
+        1. Invoke {{Client/postMessage(message, options)}} with |message| and |options| as the arguments.
+    </section>
+
+    <section algorithm="client-postmessage-options">
+      <h4 id="client-postmessage-options">{{Client/postMessage(message, options)}}</h4>
+
+      The <dfn method for="Client"><code>postMessage(|message|, |options|)</code></dfn> method *must* run these steps:
+
         1. Let |sourceSettings| be the <a>context object</a>'s <a>relevant settings object</a>.
         1. Let |destination| be the {{ServiceWorkerContainer}} object whose [=ServiceWorkerContainer/service worker client=] is the <a>context object</a>'s [=Client/service worker client=], or null if no match is found.
         1. If |destination| is null, <a>throw</a> an "{{InvalidStateError}}" {{DOMException}}.
-        1. Let |serializeWithTransferResult| be <a abstract-op>StructuredSerializeWithTransfer</a>(|message|, |transfer|). Rethrow any exceptions.
+        1. Let |serializeWithTransferResult| be <a abstract-op>StructuredSerializeWithTransfer</a>(|message|, |options|.transfer). Rethrow any exceptions.
         1. Add a <a>task</a> that runs the following steps to |destination|'s [=ServiceWorkerContainer/client message queue=]:
             1. Let |origin| be the [=Unicode serialization of an origin|Unicode serialization=] of |sourceSettings|'s [=environment settings object/origin=].
             1. Let |source| be a {{ServiceWorker}} object, which represents the [=ServiceWorkerGlobalScope/service worker=] associated with |sourceSettings|'s [=environment settings object/global object=].
@@ -1643,7 +1667,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
     <h3 id="self-caches">{{WindowOrWorkerGlobalScope/caches|self.caches}}</h3>
 
     <pre class="idl">
-      partial interface WindowOrWorkerGlobalScope {
+      partial interface mixin WindowOrWorkerGlobalScope {
         [SecureContext, SameObject] readonly attribute CacheStorage caches;
       };
     </pre>
@@ -1811,40 +1835,43 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
 
       <dfn method for="Cache"><code>put(|request|, |response|)</code></dfn> method *must* run these steps:
 
-        1. Let |r| be null.
-        1. If |request| is a {{Request}} object, then:
-            1. Set |r| to |request|'s [=Request/request=].
-            1. If |r|'s [=request/url=]'s [=url/scheme=] is not one of "`http`" and "`https`", or |r|'s [=request/method=] is not \`<code>GET</code>\`, return [=a promise rejected with=] a `TypeError`.
-        1. Else if |request| is a string, then:
-            1. Set |r| to the associated [=Request/request=] of the result of invoking the initial value of {{Request}} as constructor with |request| as its argument. If this [=throws=] an exception, return [=a promise rejected with=] that exception.
-            1. If |r|'s [=request/url=]'s [=url/scheme=] is not one of "`http`" and "`https`", return [=a promise rejected with=] a `TypeError`.
-        1. If |response|'s associated [=Response/response=]'s [=response/status=] is `206`, return [=a promise rejected with=] a `TypeError`.
-        1. If |response|'s associated [=Response/response=]'s [=response/header list=] contains a <a>header</a> [=header/named=] \`<code>Vary</code>\`, then:
+        1. Let |innerRequest| be null.
+        1. If |request| is a {{Request}} object, then set |innerRequest| to |request|'s [=Request/request=].
+        1. Else:
+            1. Let |requestObj| be the result of invoking {{Request}}'s constructor with |request| as its argument. If this [=throws=] an |exception|, return [=a promise rejected with=] |exception|.
+            1. Set |innerRequest| to |requestObj|'s [=Request/request=].
+        1. If |innerRequest|'s [=request/url=]'s [=url/scheme=] is not one of "`http`" and "`https`", or |innerRequest|'s [=request/method=] is not \`<code>GET</code>\`, return [=a promise rejected with=] a `TypeError`.
+        1. Let |innerResponse| be |response|'s [=Response/response=].
+        1. If |innerResponse|'s [=response/status=] is `206`, return [=a promise rejected with=] a `TypeError`.
+        1. If |innerResponse|'s [=response/header list=] contains a [=header=] [=header/named=] \``Vary`\`, then:
             1. Let |fieldValues| be the [=list=] containing the [=list/items=] corresponding to the  [=Vary=] header's [=http/field-values=].
             1. [=list/For each=] |fieldValue| in |fieldValues|:
                 1. If |fieldValue| matches "`*`", return [=a promise rejected with=] a `TypeError`.
-        1. If |response| is [=Body/disturbed=] or [=Body/locked=], return [=a promise rejected with=] a `TypeError`.
-        1. Let |clonedResponse| be the result of [=response/clone|cloning=] |response|'s associated [=Response/response=].
-        1. If |response|'s body is non-null, run these substeps:
-            1. Let |dummyStream| be an [=empty=] {{ReadableStream}} object.
-            1. Set |response|'s [=response/body=] to a new [=/body=] whose [=stream=] is |dummyStream|.
-            1. Let |reader| be the result of [=get a reader|getting a reader=] from |dummyStream|.
-            1. [=Read all bytes=] from |dummyStream| with |reader|.
+        1. If |innerResponse|'s [=response/body=] is [=Body/disturbed=] or [=Body/locked=], return [=a promise rejected with=] a `TypeError`.
+        1. Let |clonedResponse| be a [=response/clone=] of |innerResponse|.
+        1. Let |bodyReadPromise| be [=a promise resolved with=] undefined.
+        1. If |innerResponse|'s [=response/body=] is non-null, run these substeps:
+            1. Let |stream| be |innerResponse|'s [=response/body=]'s [=body/stream=].
+            1. Let |reader| be the result of [=ReadableStream/get a reader|getting a reader=] for |stream|.
+            1. Set |bodyReadPromise| to the result of [=Read all bytes|reading all bytes=] from |stream| with |reader|.
+
+            Note: This ensures that |innerResponse|'s [=response/body=] is [=Body/locked=], and we have a full buffered copy of the body in |clonedResponse|. An implementation could optimize by streaming directly to disk rather than memory.
+
         1. Let |operations| be an empty [=list=].
         1. Let |operation| be a [=cache batch operation=].
         1. Set |operation|'s [=cache batch operation/type=] to "`put`".
-        1. Set |operation|'s [=cache batch operation/request=] to |r|.
+        1. Set |operation|'s [=cache batch operation/request=] to |innerRequest|.
         1. Set |operation|'s [=cache batch operation/response=] to |clonedResponse|.
         1. [=list/Append=] |operation| to |operations|.
         1. Let |realm| be the [=context object=]'s [=relevant realm=].
-        1. Let |cacheJobPromise| be [=a new promise=].
-        1. Run the following substeps [=in parallel=]:
-            1. Let |errorData| be null.
-            1. Invoke [=Batch Cache Operations=] with |operations|. If this [=throws=] an exception, set |errorData| to the exception.
-            1. [=Queue a task=], on |cacheJobPromise|'s [=relevant settings object=]'s [=responsible event loop=] using the [=DOM manipulation task source=], to perform the following substeps:
-                1. If |errorData| is null, resolve |cacheJobPromise| with undefined.
-                1. Else, reject |cacheJobPromise| with a [=exception/create|new=] [=exception=] with |errorData| and a user agent-defined [=exception/message=], in |realm|.
-        1. Return |cacheJobPromise|.
+        1. Return the result of the [=Upon fulfillment|fulfillment=] of |bodyReadPromise|:
+            1. Let |cacheJobPromise| be [=a new promise=].
+            1. Return |cacheJobPromise| and run these steps [=in parallel=]:
+                1. Let |errorData| be null.
+                1. Invoke [=Batch Cache Operations=] with |operations|. If this [=throws=] an exception, set |errorData| to the exception.
+                1. [=Queue a task=], on |cacheJobPromise|'s [=relevant settings object=]'s [=responsible event loop=] using the [=DOM manipulation task source=], to perform the following substeps:
+                    1. If |errorData| is null, resolve |cacheJobPromise| with undefined.
+                    1. Else, reject |cacheJobPromise| with a [=exception/create|new=] [=exception=] with |errorData| and a user agent-defined [=exception/message=], in |realm|.
     </section>
 
     <section algorithm="cache-delete">
@@ -2060,8 +2087,13 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
       When the <dfn method for="ServiceWorkerGlobalScope" id="importscripts-method"><code>importScripts(|urls|)</code></dfn> method is called on a {{ServiceWorkerGlobalScope}} object, the user agent *must* <a>import scripts into worker global scope</a>, given this {{ServiceWorkerGlobalScope}} object and |urls|, and with the following steps to [=fetching scripts/perform the fetch=] given the [=/request=] |request|:
 
         1. Let |serviceWorker| be |request|'s [=request/client=]'s [=environment settings object/global object=]'s [=ServiceWorkerGlobalScope/service worker=].
-        1. If |serviceWorker|'s [=script resource map=][|request|'s [=request/url=]] [=map/exists=], return the [=map/entry=]'s [=map/value=].
-        1. If |serviceWorker|'s [=state=] is not *parsed* or *installing*, return a [=network error=].
+        1. Let |map| be |serviceWorker|'s [=script resource map=].
+        1. Let |url| be |request|'s [=request/url=].
+        1. If |serviceWorker|'s [=state=] is not *parsed* or *installing*:
+            1. Return |map|[|url|] if it [=map/exists=] and a [=network error=] otherwise.
+        1. If |map|[|url|] [=map/exists=]:
+            1. [=set/Append=] |url| to |serviceWorker|'s [=set of used scripts=].
+            1. Return |map|[|url|].
         1. Let |registration| be |serviceWorker|'s [=containing service worker registration=].
         1. Set |request|'s [=service-workers mode=] to "`none`".
         1. Set |request|'s [=request/cache mode=] to "`no-cache`" if any of the following are true:
@@ -2069,12 +2101,11 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
             * The [=current global object=]'s [=force bypass cache for importscripts flag=] is set.
             * |registration|'s [=last update check time=] is not null and the time difference in seconds calculated by the current time minus |registration|’s [=last update check time=] is greater than 86400.
         1. Let |response| be the result of [=fetch|fetching=] |request|.
-        1. Set |response| to |response|'s [=unsafe response=].
         1. If |response|’s [=response/cache state=] is not "`local`", set |registration|’s [=service worker registration/last update check time=] to the current time.
-        1. [=Extract a MIME type=] from the |response|'s [=response/header list=]. If this MIME type (ignoring parameters) is not a [=JavaScript MIME type=], return a [=network error=].
-        1. If |response|'s [=response/type=] is not "`error`", and |response|'s [=response/status=] is an <a>ok status</a>, then:
-            1. [=map/Set=] |serviceWorker|'s [=script resource map=][|request|'s [=request/url=]] to |response|.
-            1. Set |serviceWorker|'s [=classic scripts imported flag=].
+        1. If |response|'s [=unsafe response=] is a [=bad import script response=], then return a [=network error=].
+        1. [=map/Set=] |map|[|url|] to |response|.
+        1. [=set/Append=] |url| to |serviceWorker|'s [=set of used scripts=].
+        1. Set |serviceWorker|'s [=classic scripts imported flag=].
         1. Return |response|.
     </section>
   </section>
@@ -2200,6 +2231,14 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
   A <dfn id="dfn-job-queue">job queue</dfn> is a thread safe [=queue=] used to synchronize the set of concurrent [=jobs=]. The [=job queue=] contains [=jobs=] as its [=queue/items=]. A [=job queue=] is initially empty.
 
   A <dfn id="dfn-scope-to-job-queue-map">scope to job queue map</dfn> is an <a>ordered map</a> where the keys are [=service worker registration/scope urls=], [=URL serializer|serialized=], and the values are [=job queues=].
+
+  A <dfn id="dfn-bad-import-script-response">bad import script response</dfn> is a [=/response=] for which any of the following conditions are met:
+
+    * |response|'s [=response/type=] is "`error`"
+    * |response|'s [=response/status=] is not an [=ok status=]
+    * The result of [=Extract a MIME type|extracting a MIME type=] from |response|'s [=response/header list=] is not a [=JavaScript MIME type=]
+
+        Note: Keep this definition in sync with [=fetch a classic worker-imported script=].
 
   <section algorithm>
     <h3 id="create-job-algorithm"><dfn>Create Job</dfn></h3>
@@ -2395,7 +2434,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
           1. Invoke [=Reject Job Promise=] with |job| and `TypeError`.
           1. Invoke <a>Finish Job</a> with |job| and abort these steps.
       1. Let |newestWorker| be the result of running <a>Get Newest Worker</a> algorithm passing |registration| as the argument.
-      1. If |job|'s <a>job type</a> is *update*, and |newestWorker|'s [=service worker/script url=] does not [=url/equal=] |job|'s [=job/script url=], then:
+      1. If |job|'s <a>job type</a> is *update*, and |newestWorker| is not null and its [=service worker/script url=] does not [=url/equal=] |job|'s [=job/script url=], then:
           1. Invoke [=Reject Job Promise=] with |job| and `TypeError`.
           1. Invoke <a>Finish Job</a> with |job| and abort these steps.
       1. Let |httpsState| be "<code>none</code>".
@@ -2449,26 +2488,34 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
           1. Else:
               1. Invoke [=Reject Job Promise=] with |job| and "{{SecurityError}}" {{DOMException}}.
               1. Asynchronously complete these steps with a <a>network error</a>.
-          1. Set |updatedResourceMap|[|request|'s [=request/url=]] to |response|.
+          1. Let |url| be |request|'s [=request/url=].
+          1. Set |updatedResourceMap|[|url|] to |response|.
           1. If |response|'s [=response/cache state=] is not "`local`", set |registration|'s [=last update check time=] to the current time.
-          1. If |newestWorker| is null, or |newestWorker|'s [=script resource map=][|request|'s [=request/url=]]'s [=response/body=] is not byte-for-byte identical with |response|'s [=response/body=], set |hasUpdatedResources| to true.
+          1. Let |map| be |newestWorker|'s [=script resource map=] if |newestWorker| is not null, and null otherwise.
+          1. If |map| is null or |map|[|url|]'s [=response/body=] is not byte-for-byte identical with |response|'s [=response/body=], set |hasUpdatedResources| to true.
           1. Else if |newestWorker|'s [=classic scripts imported flag=] is set, then:
-              1. [=map/For each=] |url| → |storedResponse| of |newestWorker|'s [=script resource map=]:
-                  1. Let |request| be a new [=/request=] whose [=request/url=] is |url|, [=request/client=] is |job|'s [=job/client=], [=request/destination=] is "`script`", [=request/parser metadata=] is "`not parser-inserted`", [=request/synchronous flag=] is set, and whose [=request/use-URL-credentials flag=] is set.
-                  1. Set |request|'s [=request/cache mode=] to "`no-cache`" if any of the following are true:
+
+              Note: The following checks to see if an imported script has been updated, since the main script has not changed.
+
+              1. [=map/For each=] |importUrl| → |storedResponse| of |newestWorker|'s [=script resource map=]:
+                  1. If |importUrl| is |request|'s [=request/url=], then continue.
+                  1. Let |importRequest| be a new [=/request=] whose [=request/url=] is |importUrl|, [=request/client=] is |job|'s [=job/client=], [=request/destination=] is "`script`", [=request/parser metadata=] is "`not parser-inserted`", [=request/synchronous flag=] is set, and whose [=request/use-URL-credentials flag=] is set.
+                  1. Set |importRequest|'s [=request/cache mode=] to "`no-cache`" if any of the following are true:
                       * |registration|'s [=service worker registration/update via cache mode=] is "`none`".
                       * |job|'s [=force bypass cache flag=] is set.
                       * |registration|'s [=last update check time=] is not null and the time difference in seconds calculated by the current time minus |registration|’s [=last update check time=] is greater than 86400.
-                  1. Let |fetchedResponse| be the result of [=fetch|fetching=] |request|.
+                  1. Let |fetchedResponse| be the result of [=fetch|fetching=] |importRequest|.
+                  1. Set |updatedResourceMap|[|importRequest|'s [=request/url=]] to |fetchedResponse|.
                   1. Set |fetchedResponse| to |fetchedResponse|'s [=unsafe response=].
-                  1. Set |updatedResourceMap|[|request|'s [=request/url=]] to |fetchedResponse|.
                   1. If |fetchedResponse|'s [=response/cache state=] is not "`local`", set |registration|’s [=last update check time=] to the current time.
-                  1. [=Extract a MIME type=] from the |fetchedResponse|'s [=response/header list=]. If this MIME type (ignoring parameters) is not a [=JavaScript MIME type=], asynchronously complete these steps with a [=network error=].
-                  1. If |fetchedResponse|'s [=response/type=] is "`error`", or |fetchedResponse|'s [=response/status=] is not an [=ok status=], asynchronously complete these steps with a [=network error=].
-                  1. If |fetchedResponse|'s [=response/body=] is not byte-for-byte identical with |storedResponse|'s [=response/body=], set |hasUpdatedResources| to true.
+                  1. If |fetchedResponse| is a [=bad import script response=], continue.
+
+                    Note: Bad responses for <a>importScripts()</a> are ignored for the purpose of the byte-to-byte check. Only good responses for the incumbent worker and good responses for the potential update worker are considered. See <a href="https://github.com/w3c/ServiceWorker/issues/1374">issue #1374</a> for some rationale.
+
+                  1. If |fetchedResponse|'s [=response/body=] is not byte-for-byte identical with |storedResponse|'s [=unsafe response=]'s [=response/body=], set |hasUpdatedResources| to true.
 
                       Note: The control does not break the loop in this step to continue with all the imported scripts to populate the cache.
-          1. Return true.
+          1. Asynchronously complete these steps with |response|.
 
           If the algorithm asynchronously completes with null, then:
 
@@ -2484,9 +2531,8 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
           1. Invoke [=Resolve Job Promise=] with |job| and |registration|.
           1. Invoke [=Finish Job=] with |job| and abort these steps.
       1. Let |worker| be a new [=/service worker=].
-      1. Set |worker|'s [=service worker/script url=] to |job|'s [=job/script url=], |worker|'s <a>script resource</a> to |script|, and |worker|'s [=service worker/type=] to |job|'s <a>worker type</a>.
-      1. [=map/For each=] |url| → |response| of |updatedResourceMap|:
-          1. Set |worker|'s [=script resource map=][|url|] to |response|.
+      1. Set |worker|'s [=service worker/script url=] to |job|'s [=job/script url=], |worker|'s [=script resource=] to |script|, |worker|'s [=service worker/type=] to |job|'s [=worker type=], and |worker|'s [=script resource map=] to |updatedResourceMap|.
+      1. Append |url| to |worker|'s [=set of used scripts=].
       1. Set |worker|'s <a>script resource</a>'s <a>HTTPS state</a> to |httpsState|.
       1. Set |worker|'s <a>script resource</a>'s [=script resource/referrer policy=] to |referrerPolicy|.
       1. Invoke [=Run Service Worker=] algorithm given |worker|, with the *force bypass cache for importscripts flag* set if |job|'s [=job/force bypass cache flag=] is set, and with the following callback steps given |evaluationStatus|:
@@ -2555,6 +2601,10 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
           1. Run the <a>Update Registration State</a> algorithm passing |registration|, "<code>installing</code>" and null as the arguments.
           1. If |newestWorker| is null, invoke <a>Clear Registration</a> algorithm passing |registration| as its argument.
           1. Invoke <a>Finish Job</a> with |job| and abort these steps.
+      1. Let |map| be |registration|'s [=installing worker=]'s [=script resource map=].
+      1. Let |usedSet| be |registration|'s [=installing worker=]'s [=set of used scripts=].
+      1. [=map/For each=] |url| of |map|:
+          1. If |usedSet| does not [=list/contain=] |url|, then [=map/remove=] |map|[|url|].
       1. If |registration|'s <a>waiting worker</a> is not null, then:
           1. [=Terminate Service Worker|Terminate=] |registration|'s [=waiting worker=].
           1. Run the [=Update Worker State=] algorithm passing |registration|'s [=waiting worker=] and *redundant* as the arguments.

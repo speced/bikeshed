@@ -382,13 +382,13 @@ obtain <var>host</var>'s <a for=host>registrable domain</a>, run these steps:
  </ul>
 </div>
 
-<p class=warning>Specifications should avoid depending on "<a for=host>public suffix</a>",
-"<a for=host>registrable domain</a>", and "<a>same site</a>". The public suffix list will diverge
-from client to client, and cannot be relied-upon to provide a hard security boundary. Specifications
-which ignore this advice are encouraged to carefully consider whether URLs' schemes ought to be
-incorporated into any decision made based upon whether or not two <a for=/>hosts</a> are
-<a>same site</a>. HTML's <a>same origin-domain</a> concept is a reasonable example of this
-consideration in practice.
+<p class=warning>Specifications should prefer the <a for=/>origin</a> concept for security
+decisions. The notion of "<a for=host>public suffix</a>", "<a for=host>registrable domain</a>",
+and "<a>same site</a>" cannot be relied-upon to provide a hard security boundary, as the public
+suffix list will diverge from client to client. Specifications which ignore this advice are
+encouraged to carefully consider whether URLs' schemes ought to be incorporated into any decision
+made based upon whether or not two <a for=/>hosts</a> are <a>same site</a>. HTML's <a>same
+origin-domain</a> concept is a reasonable example of this consideration in practice.
 
 
 <h3 id=idna>IDNA</h3>
@@ -450,7 +450,7 @@ consideration in practice.
 
 <p class=XXX>Ideally we define this in terms of a sequence of code points that make up a
 <a>valid domain</a> rather than through a whack-a-mole:
-<a href=https://www.w3.org/Bugs/Public/show_bug.cgi?id=25334>bug 25334</a>.
+<a href=https://github.com/whatwg/url/issues/245>issue 245</a>.
 
 <p>A <dfn export oldids=syntax-host-domain>valid domain string</dfn> must be a string that is a
 <a>valid domain</a>.
@@ -1120,14 +1120,14 @@ resource the <a for=/>URL</a>'s other components identify. It is initially null.
 <p id=non-relative-flag>A <a for=/>URL</a> also has an associated
 <dfn export for=url>cannot-be-a-base-URL flag</dfn>. It is initially unset.
 
-<p>A <a for=/>URL</a> also has an associated <dfn export for=url id=concept-url-object>object</dfn>
-that is null, a {{Blob}} object, or a {{MediaSource}} object. It is initially null.
-[[!FILEAPI]]
-[[!MEDIA-SOURCE]]
+<p>A <a for=/>URL</a> also has an associated
+<dfn export for=url id=concept-url-blob-entry>blob URL entry</dfn> that is either null or a
+<a for=/>blob URL entry</a>. It is initially null.
 
-<p class="note no-backref">At this point this is used primarily to support
-"<code>blob</code>" <a for=/>URLs</a>, but others can be added going forward, hence
-"object".
+<p class="note no-backref">This is used to support caching the object a "<code>blob</code>" URL
+refers to as well as its origin. It is important that these are cached as the <a for=/>URL</a> might
+be removed from the <a>blob URL store</a> between parsing and fetching, while fetching will still
+need to succeed.
 
 
 <h3 id=url-miscellaneous>URL miscellaneous</h3>
@@ -1429,12 +1429,9 @@ different document encoding. Using the <a>UTF-8</a> encoding everywhere solves t
  <li><p>If <var>url</var>'s <a for=url>scheme</a> is not
  "<code>blob</code>", return <var>url</var>.
 
- <li><p>If <var>url</var>'s <a for=url>path</a> <a for=list>is empty</a> or <var>url</var>'s
- <a for=url>path</a>[0] is not in the <a>Blob URL Store</a>, then return <var>url</var>.
- [[!FILEAPI]]
-
- <li><p>Set <var>url</var>'s <a for=url>object</a> to the entry in the <a>Blob URL Store</a>
- corresponding to <var>url</var>'s <a for=url>path</a>[0].
+ <li><p>Set <var>url</var>'s <a for=url>blob URL entry</a> to the result of
+ <a for="blob URL" lt="resolve">resolving the blob URL</a> <var>url</var>, if that did not return
+ failure, and null otherwise.
 
  <li><p>Return <var>url</var>.
 </ol>
@@ -2350,7 +2347,7 @@ string <var>input</var>, optionally with a <a>base URL</a> <var>base</var>, opti
 
 <p>The <dfn export id=concept-url-serializer lt="URL serializer">URL serializer</dfn> takes a
 <a for=/>URL</a> <var>url</var>, an optional <i title>exclude fragment flag</i>, and
-then runs these steps:
+then runs these steps, returning an <a>ASCII string</a>:
 
 <ol>
  <li><p>Let <var>output</var> be <var>url</var>'s <a for=url>scheme</a> and U+003A (:) concatenated.
@@ -2437,12 +2434,18 @@ background information. [[!HTML]]
 <dl class=switch>
  <dt>"<code>blob</code>"
  <dd>
-  <p>Let <var>url</var> be the result of <a lt="basic URL parser">parsing</a> <a for=/>URL</a>'s
-  <a for=url>path</a>[0].
+  <ol>
+   <li><p>If <a for=/>URL</a>'s <a for=url>blob URL entry</a> is non-null, then return
+   <a for=/>URL</a>'s <a for=url>blob URL entry</a>'s <a for="blob URL entry">environment</a>'s
+   <a for="environment settings object">origin</a>.
 
-  <p>Return a new <a>opaque origin</a>, if <var>url</var> is failure, and <var>url</var>'s
-  <a for=url>origin</a> otherwise.
-  <!-- Did you mean: recursion -->
+   <li><p>Let <var>url</var> be the result of <a lt="basic URL parser">parsing</a>
+   <a for=/>URL</a>'s <a for=url>path</a>[0].
+
+   <li><p>Return a new <a>opaque origin</a>, if <var>url</var> is failure, and <var>url</var>'s
+   <a for=url>origin</a> otherwise.
+   <!-- Did you mean: recursion -->
+  </ol>
 
   <p class="example no-backref" id=example-43b5cea5>The <a for=url>origin</a> of
   <code>blob:https://whatwg.org/d0360e2f-caee-469f-9a2f-87d5b0456f6f</code> is the tuple
@@ -2473,37 +2476,79 @@ background information. [[!HTML]]
 <h3 id=url-rendering>URL rendering</h3>
 <!-- See https://www.w3.org/Bugs/Public/show_bug.cgi?id=27641 for context -->
 
-<p>A <a for=/>URL</a> should be rendered in its <a lt="URL serializer">serialized</a>
-form, with these modifications:
+<p>A <a for=/>URL</a> should be rendered in its <a lt="URL serializer">serialized</a> form, with
+modifications described below, when the primary purpose of displaying a URL is to have the user make
+a security or trust decision. For example, users are expected to make trust decisions based on a URL
+rendered in the browser address bar.
 
-<ul class=brief>
- <li><p>A <a for=/>URL</a>'s <a for=url>username</a> and <a for=url>password</a> should
- not be rendered as they can be mistaken for a <a for=/>URL</a>'s <a for=url>host</a>.
- E.g., consider <code>https://examplecorp.com@attacker.example/</code>.
+<h4 id=url-rendering-simplification>Simplify non-human-readable or irrelevant components</h4>
 
- <li><p>A <a for=/>URL</a>'s <a for=url>host</a> should be rendered using
- <a>domain to Unicode</a>.
+<p>Remove components that can provide opportunities for spoofing or distract from security-relevant
+information:
 
- <li><p>Other parts of the <a for=/>URL</a> should have their sequences of
- <a>percent-encoded bytes</a> replaced with code points resulting from
- <a>percent decoding</a> those sequences converted to bytes, unless that renders those
- sequences invisible.
+<ul>
+ <li><p>Browsers may render only a URL's <a for=url>host</a> in places where it is important for
+ users to distinguish between the host and other parts of the URL such as the
+ <a for=url>path</a>. Browsers may consider simplifying the host further to draw attention to its
+ <a for=host>registrable domain</a>. For example, browsers may omit a leading <code>www</code> or
+ <code>m</code> domain label to simplify the host, or display its registrable domain only to remove
+ spoofing opportunities posted by subdomains (e.g., <code>https://examplecorp.attacker.com/</code>).
+
+ <li><p>Browsers should not render a <a for=/>URL</a>'s <a for=url>username</a> and <a
+ for=url>password</a>, as they can be mistaken for a <a for=/>URL</a>'s <a for=url>host</a> (e.g.,
+ <code>https://examplecorp.com@attacker.example/</code>).
+
+ <li><p>Browsers may render a URL without its <a for=url>scheme</a> if the display surface only ever
+ permits a single scheme (such as a browser feature that omits <code>https://</code> because it is
+ only enabled for secure origins). Otherwise, the scheme may be replaced or supplemented with a
+ human-readable string (e.g., "Not secure"), a security indicator icon, or both.
 </ul>
 
-<p>For the purposes of bidirectional text it should be rendered as if it were in a
-left-to-right embedding. [[!BIDI]]
+<h4 id=url-rendering-elision>Elision</h4>
 
-<p class="note no-backref">Unfortunately, as rendered <a for=/>URLs</a> are strings and can appear
-anywhere, a specific bidirectional algorithm for rendered <a for=/>URLs</a> would not see wide
-adoption. Bidirectional text interacts with the parts of a <a for=/>URL</a> in ways that can cause
-the rendering to be different from the model. Users of bidirectional languages are thus cautioned
-that this is to be expected, particularly in plain text environments.
+<p>In a space-constrained display, URLs should be elided carefully to avoid misleading the user when
+making a security decision:
 
-<p>Due to the confusion that can arise between a <a for=/>URL</a>'s <a for=url>host</a>
-and <a for=url>path</a> with bidirectional text, browsers are encouraged to only render a
-<a for=/>URL</a>'s <a for=url>host</a> in places where it is important for users to
-distinguish between the two. E.g., users are expected to make trust decisions based on a
-<a for=/>URL</a>'s <a for=url>host</a> rendered in the address bar.
+<ul>
+ <li><p>Browsers should ensure that at least the <a for=host>registrable domain</a> can be shown
+ when the URL is rendered (to avoid showing, e.g., <code>...examplecorp.com</code> when loading
+ <code>https://not-really-examplecorp.com/</code>).
+
+ <li><p>When the full <a for=url>host</a> cannot be rendered, browsers should elide domain labels
+ starting from the lowest-level domain label. For example, <code>examplecorp.com.evil.com</code>
+ should be elided as <code>...com.evil.com</code>, not <code>examplecorp.com...</code>. (Note that
+ bidirectional text means that the lowest-level label may not appear on the left.)
+</ul>
+
+<h4 id=url-rendering-i18n>Internationalization and special characters</h4>
+
+<p>Internationalized domain names (IDNs), special characters, and bidirectional text should be
+handled with care to prevent spoofing:
+
+<ul>
+ <li>
+  <p>Browsers should render a <a for=/>URL</a>'s <a for=url>host</a> using <a>domain to Unicode</a>.
+
+  <p class="note no-backref">Note that various characters can be used in homograph spoofing attacks.
+  Consider detecting confusable characters and warning when they are in use. [[IDNFAQ]] [[UTS39]]
+
+ <li><p>URLs are particularly prone to confusion between host and path when they contain
+ bidirectional text, so in this case it is particularly advisable to only render a URL's
+ <a for=url>host</a>. For readability, other parts of the <a for=/>URL</a>, if rendered, should have
+ their sequences of <a>percent-encoded bytes</a> replaced with code points resulting from
+ <a>percent decoding</a> those sequences converted to bytes, unless that renders those sequences
+ invisible. Browsers may choose to not decode certain sequences that present spoofing risks (e.g.,
+ U+1F512 (🔒)).
+
+ <li>
+  <p>Browsers should render bidirectional text as if it were in a left-to-right embedding. [[!BIDI]]
+
+  <p class="note no-backref">Unfortunately, as rendered <a for=/>URLs</a> are strings and can appear
+  anywhere, a specific bidirectional algorithm for rendered <a for=/>URLs</a> would not see wide
+  adoption. Bidirectional text interacts with the parts of a <a for=/>URL</a> in ways that can cause
+  the rendering to be different from the model. Users of bidirectional languages can come to expect
+  this, particularly in plain text environments.
+</ul>
 
 
 
@@ -3242,6 +3287,9 @@ David Sheets,
 David Singer,
 David Walp,
 Domenic Denicola,
+Emily Schechter,
+Emily Stark,
+Eric Lawrence,
 Erik Arvidsson,
 Gavin Carothers,
 Geoff Richards,
@@ -3267,6 +3315,7 @@ Larry Masinter,
 Leif Halvard Silli,
 Mark Davis,
 Marcos Cáceres,
+Marijn Kruisselbrink,
 Martin Dürst,
 Mathias Bynens,
 Michael Peick,

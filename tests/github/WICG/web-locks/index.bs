@@ -1,8 +1,8 @@
 <pre class=metadata>
 Title: Web Locks API
 Shortname: WebLocks
-Abstract: This document defines a web platform API that allows script to asynchronously acquire a lock over a resource, hold it while work is performed, then release it. While held, no other script in the origin can aquire a lock over the same resource. This allows contexts (windows, workers) within a web application to coordinate the usage of resources.
-Status: ED
+Abstract: This document defines a web platform API that allows script to asynchronously acquire a lock over a resource, hold it while work is performed, then release it. While held, no other script in the origin can acquire a lock over the same resource. This allows contexts (windows, workers) within a web application to coordinate the usage of resources.
+Status: CG-DRAFT
 ED: https://wicg.github.io/web-locks/
 Level: 1
 Editor: Joshua Bell, Google Inc. https://google.com, jsbell@google.com
@@ -132,6 +132,8 @@ For the purposes of this specification:
 
 A user agent has an associated <dfn>lock task queue</dfn> which is the result of [=starting a new parallel queue=].
 
+The [=task source=] for [=enqueue steps|steps enqueued=] below is the <dfn export>web locks tasks source</dfn>.
+
 
 <!-- ====================================================================== -->
 ## Resources Names ## {#resource-names}
@@ -233,7 +235,7 @@ The [=lock-concept/waiting promise=] is not named in the above code, but is stil
 Further note that if the callback is not `async` and returns a non-promise, the return value is wrapped in a promise that is immediately resolved; the lock will be released in an upcoming microtask, and the [=lock-concept/released promise=] will also resolve in a subsequent microtask.
 </aside>
 
-Each origin has an associated <dfn>held lock set</dfn> which is an [=/ordered set=] of [=lock-concept|locks=].
+Each origin has an associated <dfn>held lock set</dfn> which is a [=/set=] of [=lock-concept|locks=].
 
 When [=lock-concept|lock=] |lock|'s [=lock-concept/waiting promise=] settles (fulfills or rejects), [=enqueue the following steps=] on the [=lock task queue=]:
 
@@ -252,21 +254,24 @@ A <dfn>lock request</dfn> represents a pending request for a [=lock-concept|lock
 
 A [=lock request=] is a tuple of (<dfn>agent</dfn>, <dfn>clientId</dfn>, <dfn>origin</dfn>, <dfn>name</dfn>, <dfn>mode</dfn>, <dfn>promise</dfn>).
 
-Each origin has an associated <dfn>lock request queue</dfn>, which is a [=queue=] of [=lock requests=].
+A <dfn>lock request queue</dfn> is a [=queue=] of [=lock requests=].
+
+Each origin has an associated <dfn>lock request queue map</dfn>, which is a [=map=] of [=resource names=] to [=lock request queues=].
 
 A [=lock request=] |request| is said to be <dfn>grantable</dfn> if the following steps return true:
 
 1. Let |origin| be |request|'s [=lock request/origin=].
-1. Let |queue| be |origin|'s [=lock request queue=]
+1. Let |queueMap| be |origin|'s [=lock request queue map=].
+1. Let |name| be |request|'s associated [=lock request/name=].
+1. Let |queue| be |queueMap|[|name|].
 1. Let |held| be |origin|'s [=held lock set=]
 1. Let |mode| be |request|'s associated [=lock request/mode=]
-1. Let |name| be |request|'s associated [=lock request/name=]
 1. If |mode| is "{{exclusive}}", then return true if all of the following conditions are true, and false otherwise:
     * No [=lock-concept|lock=] in |held| has a [=lock-concept/name=] that equals |name|
-    * No [=lock request=] in |queue| earlier than |request| has a [=lock request/name=] that equals |name|.
+    * No [=lock request=] in |queue| earlier than |request| exists.
 1. Otherwise, mode is "{{shared}}"; return true if all of the following conditions are true, and false otherwise:
     * No [=lock-concept|lock=] in |held| has [=lock-concept/mode=] "{{exclusive}}" and has a [=lock-concept/name=] that equals |name|.
-    * No [=lock request=] in |queue| earlier than |request| has a [=lock request/mode=] "{{exclusive}}" and [=lock request/name=] that equals |name|.
+    * No [=lock request=] in |queue| earlier than |request| exists.
 
 </div>
 
@@ -587,21 +592,22 @@ To <dfn>request a lock</dfn> with |promise|, |agent|, |clientId|, |origin|, |cal
 
 1. Let |request| be a new [=lock request=] (|agent|, |clientId|, |origin|, |name|, |mode|, |promise|).
 1. [=Enqueue the following steps=] to the [=lock task queue=]:
-   1. Let |queue| be |origin|'s [=lock request queue=].
-   1. Let |held| be |origin|'s [=held lock set=].
-   1. If |steal| is true, then run these steps:
-      1. [=list/For each=] |lock| of |held|:
-         1. If |lock|'s [=lock-concept/name=] is |name|, then run these steps:
-            1. [=list/Remove=] [=lock-concept|lock=] from |held|.
-            1. Reject |lock|'s [=lock-concept/released promise=] with an "{{AbortError}}" {{DOMException}}.
-      1. [=list/Prepend=] |request| in |origin|'s [=lock request queue=].
-   1. Otherwise, run these steps:
-      1. If |ifAvailable| is true and |request| is not [=grantable=],
-          then [=enqueue the following steps=] on |callback|'s [=relevant settings object=]'s [=responsible event loop=]:
-         1. Let |r| be the result of [=invoking=] |callback| with `null` as the only argument.
-         1. Resolve |promise| with |r| and abort these steps.
-      1. [=queue/Enqueue=] |request| in |origin|'s [=lock request queue=].
-   1. [=Process the lock request queue=] for |origin|.
+    1. Let |queueMap| be |origin|'s [=lock request queue map=].
+    1. Let |queue| be |queueMap|[|name|].
+    1. Let |held| be |origin|'s [=held lock set=].
+    1. If |steal| is true, then run these steps:
+        1. [=list/For each=] |lock| of |held|:
+            1. If |lock|'s [=lock-concept/name=] is |name|, then run these steps:
+                1. [=list/Remove=] [=lock-concept|lock=] from |held|.
+                1. Reject |lock|'s [=lock-concept/released promise=] with an "{{AbortError}}" {{DOMException}}.
+        1. [=list/Prepend=] |request| in |queue|.
+    1. Otherwise, run these steps:
+        1. If |ifAvailable| is true and |request| is not [=grantable=],
+             then [=enqueue the following steps=] on |callback|'s [=relevant settings object=]'s [=responsible event loop=]:
+            1. Let |r| be the result of [=invoking=] |callback| with `null` as the only argument.
+            1. Resolve |promise| with |r| and abort these steps.
+        1. [=queue/Enqueue=] |request| in |queue|.
+    1. [=Process the lock request queue=] |queue|.
 1. Return |request|.
 
 </div>
@@ -615,8 +621,11 @@ To <dfn>release the lock</dfn> |lock|:
 
 1. [=Assert=]: these steps are running on the [=lock task queue=].
 1. Let |origin| be |lock|'s [=lock-concept/origin=].
+1. Let |queueMap| be |origin|'s [=lock request queue map=].
+1. Let |name| be |lock|'s associated [=resource name=].
+1. Let |queue| be |queueMap|[|name|].
 1. [=list/Remove=] [=lock-concept|lock=] from the |origin|'s [=held lock set=].
-1. [=Process the lock request queue=] for |origin|.
+1. [=Process the lock request queue=] |queue|.
 
 </div>
 
@@ -629,20 +638,22 @@ To <dfn>abort the request</dfn> |request|:
 
 1. [=Assert=]: these steps are running on the [=lock task queue=].
 1. Let |origin| be |request|'s [=lock request/origin=].
-1. [=list/Remove=] |request| from |origin|'s [=lock request queue=].
-1. [=Process the lock request queue=] for |origin|.
+1. Let |name| be |lock|'s associated [=resource name=].
+1. Let |queueMap| be |origin|'s [=lock request queue map=].
+1. Let |queue| be |queueMap|[|name|].
+1. [=list/Remove=] |request| from |queue|.
+1. [=Process the lock request queue=] |queue|.
 
 </div>
 
 <!-- ====================================================================== -->
-## Process a lock request queue ## {#algorithm-process-request}
+## Process a lock request queue for a given resource name ## {#algorithm-process-request}
 <!-- ====================================================================== -->
 
 <div class=algorithm>
-To <dfn>process the lock request queue</dfn> for |origin|:
+To <dfn>process the lock request queue</dfn> |queue|:
 
 1. [=Assert=]: these steps are running on the [=lock task queue=].
-1. Let |queue| be |origin|'s [=lock request queue=].
 1. [=list/For each=] |request| of |queue|:
     1. If |request| is [=grantable=], then run these steps:
         1. [=list/Remove=] |request| from |queue|.
@@ -669,12 +680,13 @@ To <dfn>snapshot the lock state</dfn> for |origin| with |promise|:
 
 1. [=Assert=]: these steps are running on the [=lock task queue=].
 1. Let |pending| be a new [=list=].
-1. [=list/For each=] |request| of |origin|'s [=lock request queue=]:
-    1. Let |info| be a new {{LockInfo}} dictionary.
-    1. Set |info|'s {{LockInfo/name}} dictionary member to |request|'s [=lock request/name=].
-    1. Set |info|'s {{LockInfo/mode}} dictionary member to |request|'s [=lock request/mode=].
-    1. Set |info|'s {{LockInfo/clientId}} dictionary member to |request|'s [=lock request/clientId=].
-    1. [=list/Append=] |info| to |pending|.
+1. [=map/For each=] |name| &rarr; |queue| of |origin|'s [=lock request queue map=]:
+    1. [=list/For each=] |request| of |queue|:
+        1. Let |info| be a new {{LockInfo}} dictionary.
+        1. Set |info|'s {{LockInfo/name}} dictionary member to |request|'s [=lock request/name=].
+        1. Set |info|'s {{LockInfo/mode}} dictionary member to |request|'s [=lock request/mode=].
+        1. Set |info|'s {{LockInfo/clientId}} dictionary member to |request|'s [=lock request/clientId=].
+        1. [=list/Append=] |info| to |pending|.
 1. Let |held| be a new [=list=].
 1. [=list/For each=] |lock| of |origin|'s [=held lock set=]:
     1. Let |info| be a new {{LockInfo}} dictionary.
@@ -688,6 +700,22 @@ To <dfn>snapshot the lock state</dfn> for |origin| with |promise|:
 1. Resolve |promise| with |snapshot|.
 
 </div>
+
+<aside class=note>
+<p>
+    For any given resource, the snapshot of the pending lock requests
+    will return the requests in the order in which they were made;
+    however, no guarantees are made with respect to the relative
+    ordering of requests across different resources. For example, if
+    pending lock requests A1 and A2 are made against resource A in
+    that order, and pending lock requests B1 and B2 are made against
+    resource B in that order, than both {A1, A2, B1, B2} and {A1, B1,
+    A2, B2} would be possible orderings for a snapshot's pending list.
+</p>
+<p>
+    No ordering guarantees exist for the snapshot of the held lock state.
+</p>
+</aside>
 
 <!-- ====================================================================== -->
 # Usage Considerations # {#usage-considerations}
@@ -755,7 +783,7 @@ async function requestMultiple(resources, callback) {
 }
 ```
 
-In practice, the use of multiple locks is rarely as straightforward &mdash; libraries and other utilities can often unintentionally obfuscate thier use.
+In practice, the use of multiple locks is rarely as straightforward &mdash; libraries and other utilities can often unintentionally obfuscate their use.
 </aside>
 
 
@@ -801,7 +829,7 @@ The W3C TAG has developed a [Self-Review Questionnaire: Security and Privacy](ht
     * Access to other devices.
     * Any measure of control over a user agent's native UI.
 * No temporary identifiers to the web are exposed to the web. All [=resource names=] are provided by the web application itself.
-* Behavior in first-party and third-party contexts is distguished in a user agent if storage is distinguished. See [[#security-scope]].
+* Behavior in first-party and third-party contexts is distinguished in a user agent if storage is distinguished. See [[#security-scope]].
 * Behavior in the context of a user agent's "incognito" mode is described in [[#private-browsing]].
 * No data is persisted to a user's local device by this API.
 * This API does not allow downgrading default security characteristics.
@@ -812,6 +840,7 @@ The W3C TAG has developed a [Self-Review Questionnaire: Security and Privacy](ht
 
 Many thanks to
 Alex Russell,
+Andreas Butler,
 Anne van Kesteren,
 Boris Zbarsky,
 Darin Fisher,

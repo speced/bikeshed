@@ -57,8 +57,49 @@ spec: mimesniff; urlPrefix: https://mimesniff.spec.whatwg.org/#
     type: dfn; text: valid mime type; url: valid-mime-type
 
 spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
-    type: dfn; text: present
+    type: dfn; text: present; url:dfn-present
+    type: dfn; text: SecurityError; url:securityerror
+    type: interface; text: DOMException; url:idl-DOMException
+    type: dfn; text: InvalidStateError; url:invalidstateerror
+
+spec: dom; urlPrefix: https://www.w3.org/TR/dom/#
+    type: dfn; text: Document; url:concept-document
+
+spec: html52; urlPrefix: https://www.w3.org/TR/html52/
+    type: dfn; 
+        text: origin; url:browsers.html#concept-cross-origin
+        text: global object; url:webappapis.html#global-object
+        text: relevant settings object; url:webappapis.html#relevant-settings-object
+
+spec: encrypted-media; for: EME; urlPrefix: https://www.w3.org/TR/encrypted-media/#
+    type: attribute
+        text: keySystem; url: dom-mediakeysystemaccess-keysystem
+        text: initDataTypes; url: dom-mediakeysystemconfiguration-initdatatypes
+        text: robustness; url: dom-mediakeysystemmediacapability-robustness
+        text: distinctiveIdentifier; url: dom-mediakeysystemconfiguration-distinctiveidentifier
+        text: persistentState; url: dom-mediakeysystemconfiguration-persistentstate
+        text: sessionTypes; url: dom-mediakeysystemconfiguration-sessiontypes
+    type: dfn
+        text: encrypted media
+        text: Key System; url: key-system
+        text: Get Supported Configuration; url: get-supported-configuration
+    type: interface
+        text: MediaKeySystemAccess; url: mediakeysystemaccess-interface
+        text: MediaKeys; url: mediakeys-interface
+        text: MediaKeySystemConfiguration; url: mediakeysystemconfiguration-dictionary
+        text: requestMediaKeySystemAccess(); url: navigator-extension:-requestmediakeysystemaccess()
+        text: MediaKeySystemMediaCapability; url: mediakeysystemmediacapability-dictionary
+        text: MediaKeysRequirement; url: dom-mediakeysrequirement
+        text: audioCapabilities; url: dom-mediakeysystemconfiguration-audiocapabilities
+        text: contentType; url: dom-mediakeysystemmediacapability-contenttype
+
+spec: secure-contexts; urlPrefix: https://www.w3.org/TR/secure-contexts/
+    type: dfn; text: Is the environment settings object settings a secure context?; url: #settings-object
+
+spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
+    type: interface; text: WorkerGlobalScope; url: the-workerglobalscope-common-interface
 </pre>
+
 <pre class='biblio'>
 {
     "media-playback-quality": {
@@ -134,6 +175,7 @@ spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
       <pre class='idl'>
         dictionary MediaDecodingConfiguration : MediaConfiguration {
           required MediaDecodingType type;
+          MediaCapabilitiesKeySystemConfiguration keySystemConfiguration;
         };
       </pre>
 
@@ -149,9 +191,48 @@ spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
         capabilities by a {{MediaEncodingConfiguration}} dictionary.
       </p>
       <p>
-        For a {{MediaConfiguration}} to be a <dfn>valid
-        MediaConfiguration</dfn>, <code>audio</code> or <code>video</code> MUST
-        be <a>present</a>.
+        For a {{MediaConfiguration}} to be a <dfn>valid 
+        MediaConfiguration</dfn>, all of the following conditions MUST be true:
+        <ol>
+          <li>
+            <code>audio</code> and/or <code>video</code> MUST be <a>present</a>.
+          </li>
+          <li>
+            <code>audio</code> MUST be a <a>valid audio configuration</a> if 
+            <a>present</a>.
+          </li>
+          <li>
+            <code>video</code> MUST be a <a>valid video configuration</a> if 
+            <a>present</a>.
+          </li>
+        </ol>
+      </p>
+      <p>
+        For a {{MediaDecodingConfiguration}} to be a <dfn>valid 
+        MediaDecodingConfiguration</dfn>, all of the following conditions MUST
+        be true:
+        <ol>
+          <li>
+            It MUST be a <a>valid MediaConfiguration</a>.
+          </li>
+          <li>
+            If <code>keySystemConfiguration</code> is <a>present</a>:
+            <ol>
+              <li>
+                If <code>keySystemConfiguration.audioRobustness</code> is 
+                <a>present</a>, <code>audio</code> MUST also be <a>present</a>.
+              </li>
+              <li>
+                If <code>keySystemConfiguration.videoRobustness</code> is 
+                <a>present</a>, <code>video</code> MUST also be <a>present</a>.
+              </li>
+            </ol>
+          </li>
+        </ol>
+      </p>
+      <p>
+        For a {{MediaDecodingConfiguration}} to describe [[!ENCRYPTED-MEDIA]], a
+        {{keySystemConfiguration}} MUST be <a>present</a>.
       </p>
     </section>
 
@@ -266,7 +347,7 @@ spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
               </li>
               <li>
                 <var>configuration</var>'s {{VideoConfiguration/framerate}}
-                contains one occurence of U+002F SLASH character (/) and the
+                contains one occurrence of U+002F SLASH character (/) and the
                 substrings before and after this character, when applying the
                 <a>rules for parsing floating-point number values</a> results in
                 a number that is finite and greater than 0.
@@ -372,6 +453,71 @@ spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
   </section>
 
   <section>
+      <h4 id='mediacapabilitieskeysystemconfiguration'>
+        MediaCapabilitiesKeySystemConfiguration
+      </h4>
+
+      <pre class='idl'>
+        <xmp>
+          dictionary MediaCapabilitiesKeySystemConfiguration {
+            required DOMString keySystem;
+            DOMString initDataType = "";
+            DOMString audioRobustness = "";
+            DOMString videoRobustness = "";
+            MediaKeysRequirement distinctiveIdentifier = "optional";
+            MediaKeysRequirement persistentState = "optional";
+            sequence<DOMString> sessionTypes;
+          };
+        </xmp>
+      </pre>
+
+      <p class='note'>
+        This dictionary refers to a number of types defined by
+        [[ENCRYPTED-MEDIA]] (EME). Sequences of EME types are
+        flattened to a single value whenever the intent of the sequence was to
+        have {{EME/requestMediaKeySystemAccess()}} choose a subset it supports.
+        With MediaCapabilities, callers provide the sequence across multiple
+        calls, ultimately letting the caller choose which configuration to use.
+      </p>
+
+      <p>
+        The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>keySystem</dfn>
+        member represents a {{EME/keySystem}} name as described in
+        [[!ENCRYPTED-MEDIA]].
+      </p>
+      <p>
+        The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>initDataType</dfn>
+        member represents a single value from the {{EME/initDataTypes}} sequence
+        described in [[!ENCRYPTED-MEDIA]].
+      </p>
+      <p>
+        The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>audioRobustness</dfn>
+        member represents an audio {{EME/robustness}} level as described in
+        [[!ENCRYPTED-MEDIA]].
+      </p>
+      <p>
+        The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>videoRobustness</dfn>
+        member represents a video {{EME/robustness}} level as described in
+        [[!ENCRYPTED-MEDIA]].
+      </p>
+      <p>
+        The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>distinctiveIdentifier</dfn>
+        member represents a {{EME/distinctiveIdentifier}} requirement as
+        described in [[!ENCRYPTED-MEDIA]].
+      </p>
+      <p>
+        The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>persistentState</dfn>
+        member represents a {{EME/persistentState}} requirement as described in
+        [[!ENCRYPTED-MEDIA]].
+      </p>
+      <p>
+        The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>sessionTypes</dfn>
+        member represents a sequence of required {{EME/sessionTypes}} as
+        described in [[!ENCRYPTED-MEDIA]].
+      </p>
+  </section>
+
+  <section>
     <h3 id='media-capabilities-info'>Media Capabilities Information</h3>
 
     <pre class='idl'>
@@ -379,6 +525,13 @@ spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
         required boolean supported;
         required boolean smooth;
         required boolean powerEfficient;
+        
+      };
+    </pre>
+
+    <pre class='idl'>
+      dictionary MediaCapabilitiesDecodingInfo : MediaCapabilitiesInfo {
+        required MediaKeySystemAccess keySystemAccess;
       };
     </pre>
 
@@ -396,100 +549,6 @@ spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
       booleans.
     </p>
 
-    <p>
-      When the <dfn>create a MediaCapabilitiesInfo algorithm</dfn> with a
-      <var>configuration</var> is invoked, the user agent MUST run the following
-      steps:
-      <ol>
-        <li>
-          Let <var>info</var> be a new {{MediaCapabilitiesInfo}} instance.
-          Unless stated otherwise, reading and writing apply to <var>info</var>
-          for the next steps.
-        </li>
-        <li>
-          Set <a for=MediaCapabilitiesInfo>configuration</a> to
-          <var>configuration</var>.
-        </li>
-        <li>
-          If <a for=MediaCapabilitiesInfo>configuration</a> is of type
-          {{MediaDecodingConfiguration}}, run the following substeps:
-          <ol>
-            <li>
-              If the user agent is able to decode the media represented by
-              <a for=MediaCapabilitiesInfo>configuration</a>, set
-              <a for=MediaCapabilitiesInfo>supported</a> to <code>true</code>.
-              Otherwise set it to <code>false</code>.
-            </li>
-            <li>
-              If the user agent is able to decode the media represented by
-              <a for=MediaCapabilitiesInfo>configuration</a> at a pace that
-              allows a smooth playback, set <a
-              for=MediaCapabilitiesInfo>smooth</a> to <code>true</code>.
-              Otherwise set it to <code>false</code>.
-            </li>
-            <li>
-              If the user agent is able to decode the media represented by
-              <a for=MediaCapabilitiesInfo>configuration</a> in a power efficient
-              manner, set <a for=MediaCapabilitiesInfo>powerEfficient</a> to
-              <code>true</code>. Otherwise set it to <code>false</code>. The
-              user agent SHOULD NOT take into consideration the current power
-              source in order to determine the decoding power efficiency unless
-              the device's power source has side effects such as enabling
-              different decoding modules.
-            </li>
-          </ol>
-        </li>
-        <li>
-          If <a for=MediaCapabilitiesInfo>configuration</a> is of type
-          {{MediaEncodingConfiguration}}, run the following substeps:
-          <ol>
-            <li>
-              If the user agent is able to encode the media represented by
-              <a for=MediaCapabilitiesInfo>configuration</a>, set
-              <a for=MediaCapabilitiesInfo>supported</a> to <code>true</code>.
-              Otherwise set it to <code>false</code>.
-            </li>
-            <li>
-              If the user agent is able to encode the media represented by
-              <a for=MediaCapabilitiesInfo>configuration</a> at a pace that
-              allows encoding frames at the same pace as they are sent to the
-              encoder, set <a for=MediaCapabilitiesInfo>smooth</a> to
-              <code>true</code>. Otherwise set it to <code>false</code>.
-            </li>
-            <li>
-              If the user agent is able to encode the media represented by
-              <a for=MediaCapabilitiesInfo>configuration</a> in a power
-              efficient manner, set <a
-              for=MediaCapabilitiesInfo>powerEfficient</a> to <code>true</code>.
-              Otherwise set it to <code>false</code>. The user agent SHOULD NOT
-              take into consideration the current power source in order to
-              determine the encoding power efficiency unless the device's power
-              source has side effects such as enabling different encoding
-              modules.
-            </li>
-          </ol>
-          <li>
-            Return <var>info</var>.
-          </li>
-        </li>
-      </ol>
-    </p>
-
-    <p>
-      The <dfn for='MediaCapabilitiesInfo' attribute>supported</dfn> attribute
-      MUST return <a for=MediaCapabilitiesInfo>supported</a>.
-    </p>
-
-    <p>
-      The <dfn for='MediaCapabilitiesInfo' attribute>smooth</dfn> attribute MUST
-      return <a for=MediaCapabilitiesInfo>smooth</a>.
-    </p>
-
-    <p>
-      The <dfn for='MediaCapabilitiesInfo' attribute>powerEfficient</dfn>
-      attribute MUST return <a for=MediaCapabilitiesInfo>powerEfficient</a>.
-    </p>
-
     <p class='note'>
       Authors can use {{MediaCapabilitiesInfo/powerEfficient}} in concordance
       with the Battery Status API [[battery-status]] in order to determine
@@ -498,6 +557,247 @@ spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
       constrained, high power usage has side effects such as increasing the
       temperature or the fans noise.
     </p>
+
+    <p>
+      A {{MediaCapabilitiesDecodingInfo}} has associated <dfn
+      for='MediaCapabilitiesDecodingInfo'>keySystemAccess</dfn> which is a
+      {{EME/MediaKeySystemAccess}} or <code>null</code> as appropriate.
+    </p>
+
+    <p class='note'>
+      If the encrypted decoding configuration is supported, the
+      resulting {{MediaCapabilitiesInfo}} will include a
+      {{EME/MediaKeySystemAccess}}. Authors may use this to create
+      {{EME/MediaKeys}} and setup encrypted playback.
+    </p>
+
+    <section>
+      <h3 id='info-algorithms'>Algorithms</h3>
+
+      <section>
+        <h4 id='create-media-capabilities-info'>
+          <dfn>Create a MediaCapabilitiesInfo</dfn>
+        </h4>
+        <p>
+          Given a {{MediaEncodingConfiguration}} <var>configuration</var>, this
+          algorithm returns a {{MediaCapabilitiesInfo}}. The following steps are
+          run:
+          <ol>
+            <li>
+              Let <var>info</var> be a new {{MediaCapabilitiesInfo}} instance.
+              Unless stated otherwise, reading and writing apply to
+              <var>info</var> for the next steps.
+            </li>
+            <li>
+              Set <a for=MediaCapabilitiesInfo>configuration</a> to
+              <var>configuration</var>.
+            </li>
+            <li>
+              If the user agent is able to encode the media represented by
+              <var>configuration</var>, set
+              <a for=MediaCapabilitiesInfo>supported</a> to 
+              <code>true</code>. Otherwise set it to <code>false</code>.
+            </li>
+            <li>
+              If the user agent is able to encode the media represented by
+              <var>configuration</var> at a pace that
+              allows encoding frames at the same pace as they are sent to 
+              the encoder, set <a for=MediaCapabilitiesInfo>smooth</a> to
+              <code>true</code>. Otherwise set it to <code>false</code>.
+            </li>
+            <li>
+              If the user agent is able to encode the media represented by
+              <var>configuration</var> in a power
+              efficient manner, set <a
+              for=MediaCapabilitiesInfo>powerEfficient</a> to 
+              <code>true</code>. Otherwise set it to <code>false</code>. 
+              The user agent SHOULD NOT take into consideration the current 
+              power source in order to determine the encoding power 
+              efficiency unless the device's power source has side effects 
+              such as enabling different encoding modules.
+            </li>
+            <li>
+              Return <var>info</var>.
+            </li>
+          </ol>
+        </p>
+      </section>
+
+      <section>
+        <h4 id='create-media-capabilities-decoding-info'>
+          <dfn>Create a MediaCapabilitiesDecodingInfo</dfn>
+        </h4>
+        <p>
+          Given a {{MediaDecodingConfiguration}} <var>configuration</var>, this
+          algorithm returns a {{MediaCapabilitiesDecodingInfo}}. The following 
+          steps are run:
+          <ol>
+            <li>
+              If <code>configuration.keySystemConfiguration</code> is
+              <a>present</a>:
+              <ol>
+                <li>
+                  Set <a for=MediaCapabilitiesDecodingInfo>keySystemAccess</a>
+                  to the result of running the <a>Check Encrypted Decoding 
+                  Support</a> algorithm with <var>configuration</var>.
+                </li>
+                <li>
+                  If <a for=MediaCapabilitiesDecodingInfo>keySystemAccess</a>
+                  is not <code>null</code> set 
+                  <a for=MediaCapabilitiesInfo>supported</a> to 
+                  <code>true</code>. Otherwise set it to <code>false</code>.
+                </li>
+              </ol>
+            </li>
+            <li>
+              Otherwise, run the following steps:
+              <ol>
+                <li>
+                  Set <a for=MediaCapabilitiesDecodingInfo>keySystemAccess</a>
+                  to <code>null</code>.
+                </li>
+                <li>
+                  If the user agent is able to decode the media represented
+                  by <var>configuration</var>, set
+                  <a for=MediaCapabilitiesInfo>supported</a> to
+                  <code>true</code>.
+                </li>
+                <li>Otherwise, set it to <code>false</code>.</li>
+              </ol>
+            </li>
+            <li>
+              If the user agent is able to decode the media represented by
+              <var>configuration</var> at a pace that allows a smooth
+              playback, set <a for=MediaCapabilitiesInfo>smooth</a> to 
+              <code>true</code>. Otherwise set it to <code>false</code>.
+            </li>
+            <li>
+              If the user agent is able to decode the media represented by
+              <var>configuration</var> in a power efficient
+              manner, set <a for=MediaCapabilitiesInfo>powerEfficient</a> to
+              <code>true</code>. Otherwise set it to <code>false</code>. The
+              user agent SHOULD NOT take into consideration the current 
+              power source in order to determine the decoding power 
+              efficiency unless the device's power source has side effects 
+              such as enabling different decoding modules.
+            </li>
+            <li>
+              Return <var>info</var>.
+            </li>
+          </ol>
+        </p>
+      </section>
+
+      <section>
+        <h4 id='is-encrypted-decode-supported'>
+          <dfn>Check Encrypted Decoding Support</dfn>
+        </h4>
+        <p>
+          Given a {{MediaDecodingConfiguration}} <var>config</var> with a
+          {{keySystemConfiguration}} <a>present</a>, this algorithm returns a
+          {{EME/MediaKeySystemAccess}} or <code>null</code> as appropriate. The
+          following steps are run:
+          <ol>
+            <li>
+              If the {{keySystem}} member of
+              <code>config.keySystemConfiguration</code> is not one of the
+              <a for='EME'>Key Systems</a> supported by the user agent, return
+              <code>null</code>. String comparison is case-sensitive.
+            </li>
+            <li>
+              Let <var>origin</var> be the <a>origin</a> of the calling 
+              context's <a>Document</a>.
+            </li>
+            <li>
+              Let <var>implementation</var> be the implementation of <code>config.keySystemConfiguration.keySystem</code>
+            </li>
+
+            <li>
+              Let <var>emeConfiguration</var> be a new 
+              {{EME/MediaKeySystemConfiguration}}, and initialize it as follows:
+            </li>
+            <ol>
+              <li>
+                Set the {{EME/initDataTypes}} attribute to a sequence containing
+                <code>config.keySystemConfiguration.initDataType</code>.
+              </li>
+              <li>
+                Set the {{EME/distinctiveIdentifier}} attribute to
+                <code>config.keySystemConfiguration.distinctiveIdentifier</code>.
+              </li>
+              <li>
+                Set the {{EME/persistentState}} attribute to
+                <code>config.keySystemConfiguration.peristentState</code>.
+              </li>
+              <li>
+                Set the {{EME/sessionTypes}} attribute to
+                <code>config.keySystemConfiguration.sessionTypes</code>.
+              </li>
+              <li>
+                If an {{audio}} is <a>present</a> in <var>config</var>, set the
+                {{EME/audioCapabilities}} attribute to a sequence containing a
+                single {{EME/MediaKeySystemMediaCapability}}, initialized as
+                follows:
+                <ol>
+                  <li>
+                    Set the {{EME/contentType}} attribute to
+                    <code>config.audio.contentType</code>.
+                  </li>
+                  <li>
+                    Set the {{EME/robustness}} attribute to
+                    <code>config.keySystemConfiguration.audioRobustness</code>.
+                  </li>
+                </ol>
+              </li>
+              <li>
+                If a {{video}} is <a>present</a> in <var>config</var>, set the
+                videoCapabilities attribute to a sequence containing a single
+                {{EME/MediaKeySystemMediaCapability}}, initialized as follows:
+                <ol>
+                  <li>
+                    Set the {{EME/contentType}} attribute to
+                    <code>config.video.contentType</code>.
+                  </li>
+                  <li>
+                    Set the {{EME/robustness}} attribute to
+                    <code>config.keySystemConfiguration.videoRobustness</code>.
+                  </li>
+                </ol>
+              </li>
+            </ol>
+            <li>
+              Let <var>supported configuration</var> be the result of
+              executing the <a for='EME'>Get Supported Configuration</a>
+              algorithm on <var>implementation</var>,
+              <var>emeConfiguration</var>, and <var>origin</var>.
+            </li>
+            <li>
+              If <var>supported configuration</var> is
+              <code>NotSupported</code>, return <code>null</code> and abort
+              these steps.
+            </li>
+            <li>
+              Let <var>access</var> be a new {{EME/MediaKeySystemAccess}}
+              object, and initialize it as follows:
+              <ol>
+                <li>
+                  Set the {{EME/keySystem}} attribute to
+                  <code>emeConfiguration.keySystem</code>.
+                </li>
+                <li>
+                  Let the <var>configuration</var> value be
+                  <var>supported configuration</var>.
+                </li>
+                <li>
+                  Let the <var ignore=''>cdm implementation</var> value be
+                  <var>implementation</var>.
+                </li>
+              </ol>
+            </li>
+            <li>Return <var>access</var></li>
+          </ol>
+        </p>
+      </section>
   </section>
 
   <section>
@@ -523,36 +823,71 @@ spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
     <pre class='idl'>
       [Exposed=(Window, Worker)]
       interface MediaCapabilities {
-        [NewObject] Promise&lt;MediaCapabilitiesInfo&gt; decodingInfo(MediaDecodingConfiguration configuration);
+        [NewObject] Promise&lt;MediaCapabilitiesDecodingInfo&gt; decodingInfo(MediaDecodingConfiguration configuration);
         [NewObject] Promise&lt;MediaCapabilitiesInfo&gt; encodingInfo(MediaEncodingConfiguration configuration);
       };
     </pre>
 
     <p>
-      The <dfn for='MediaCapabilities' method>decodingInfo()</dfn> method and
-      the <dfn for='MediaCapabilities' method>encodingInfo()</dfn> method MUST
-      run the following steps:
+      The {{decodingInfo()}} method method MUST run the following steps:
       <ol>
         <li>
-          If <var>configuration</var> is not a <a>valid MediaConfiguration</a>,
-          return a Promise rejected with a <code>TypeError</code>.
+          If <var>configuration</var> is not a <a>valid
+          MediaDecodingConfiguration</a>, return a Promise rejected with a 
+          newly created {{TypeError}}.
         </li>
         <li>
-          If <code>configuration.video</code> is <a>present</a> and is not a
-          <a>valid video configuration</a>, return a Promise rejected with a
-          <code>TypeError</code>.
-        </li>
-        <li>
-          If <code>configuration.audio</code> is <a>present</a> and is not a
-          <a>valid audio configuration</a>, return a Promise rejected with a
-          <code>TypeError</code>.
+          If <code>configuration.keySystemConfiguration</code> is 
+          <a>present</a>, run the following substeps:
+          <ol>
+            <li>
+              If the <a>global object</a> is of type {{WorkerGlobalScope}},
+              return a Promise rejected with a newly created {{DOMException}}
+              whose name is <a>InvalidStateError</a>.
+            </li>
+            <li>
+              If the result of running <a>Is the environment settings object 
+              settings a secure context?</a> [[!secure-contexts]] with the 
+              <a>global object's</a> <a>relevant settings object</a> is not
+              "Secure", return a Promise rejected with a newly created 
+              {{DOMException}} whose name is <a>SecurityError</a>.
+            </li>
+          </ol>
         </li>
         <li>
           Let <var>p</var> be a new promise.
         </li>
         <li>
-          <a>In parallel</a>, run the <a>create a MediaCapabilitiesInfo
-          algorithm</a> with <var>configuration</var> and resolve <var>p</var>
+          <a>In parallel</a>, run the <a>Create a 
+          MediaCapabilitiesDecodingInfo</a> algorithm with 
+          <var>configuration</var> and resolve <var>p</var> with its result.
+        </li>
+        <li>
+          Return <var>p</var>.
+        </li>
+      </ol>
+    </p>
+
+    <p class='note'>
+      Note, calling {{decodingInfo()}} with a {{keySystemConfiguration}} present
+      may have user-visible effects, including requests for user consent. Such
+      calls should only be made when the author intends to create and use a
+      {{EME/MediaKeys}} object with the provided configuration.
+    </p>
+
+    <p>
+      The {{encodingInfo()}} method MUST run the following steps:
+      <ol>
+        <li>
+          If <var>configuration</var> is not a <a>valid MediaConfiguration</a>,
+          return a Promise rejected with a newly created {{TypeError}}.
+        </li>
+        <li>
+          Let <var>p</var> be a new promise.
+        </li>
+        <li>
+          <a>In parallel</a>, run the <a>Create a MediaCapabilitiesInfo</a>
+          algorithm with <var>configuration</var> and resolve <var>p</var>
           with its result.
         </li>
         <li>
@@ -560,6 +895,7 @@ spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
         </li>
       </ol>
     </p>
+
   </section>
 </section>
 
@@ -739,8 +1075,8 @@ spec: webidl; urlPrefix: https://heycam.github.io/webidl/#
         If an implementation wishes to implement a fingerprint-proof version of
         this specification, it would be recommended to fake a given set of
         capabilities (ie. decode up to 1080p VP9, etc.) instead of returning
-        always yes or always no as the latter approach could considerably degrade
-        the user's experience.
+        always yes or always no as the latter approach could considerably 
+        degrade the user's experience.
       </p>
     </section>
 

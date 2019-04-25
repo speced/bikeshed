@@ -1,0 +1,778 @@
+<pre class='metadata'>
+Title: DeviceOrientation Event Specification
+Shortname: orientation-event
+Level: none
+Status: ED
+Group: dap
+TR: http://www.w3.org/TR/orientation-event/
+ED: https://w3c.github.io/deviceorientation/
+Previous Version: https://www.w3.org/TR/2017/NOTE-orientation-event-20170530/
+Repository: w3c/deviceorientation
+Editor: Devices and Sensors Working Group
+Former Editor: Rich Tibbett, Opera Software ASA
+Former Editor: Tim Volodine, Google Inc
+Former Editor: Steve Block, Google Inc until July 2012
+Former Editor: Andrei Popescu, Google Inc until July 2012
+Abstract: This specification defines several new DOM events that provide information about the physical orientation and motion of a hosting device.
+Boilerplate: omit issues-index, omit conformance, repository-issue-tracking off
+!Feedback: <a href="https://github.com/w3c/deviceorientation">GitHub w3c/deviceorientation</a>
+</pre>
+<pre class="anchors">
+urlPrefix: https://compat.spec.whatwg.org/; spec: COMPATIBILITY
+    type: interface
+        text: orientationchange; url: event-orientationchange
+urlPrefix: https://www.w3.org/TR/page-visibility-2/; spec: PAGE-VISIBILITY
+    type: dfn
+        text: visible; url: dom-visibilitystate-visible
+</pre>
+
+Conformance requirements {#conformance-requirements}
+====================================================
+
+All diagrams, examples, and notes in this specification are non-normative, as are all sections explicitly marked non-normative. Everything else in this specification is normative.
+
+The key words "MUST", "MUST NOT", "REQUIRED", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in the normative parts of this document are to be interpreted as described in RFC2119. For readability, these words do not appear in all uppercase letters in this specification. [[!RFC2119]]
+
+Requirements phrased in the imperative as part of algorithms (such as "strip any leading space characters" or "return false and abort these steps") are to be interpreted with the meaning of the key word ("must", "should", "may", etc) used in introducing the algorithm.
+
+Conformance requirements phrased as algorithms or specific steps may be implemented in any manner, so long as the end result is equivalent. (In particular, the algorithms defined in this specification are intended to be easy to follow, and not intended to be performant.)
+
+User agents may impose implementation-specific limits on otherwise unconstrained inputs, e.g. to prevent denial of service attacks, to guard against running out of memory, or to work around platform-specific limitations.
+
+Implementations that use ECMAScript to implement the APIs defined in this specification must implement them in a manner consistent with the ECMAScript Bindings defined in the Web IDL specification, as this specification uses that specification's terminology. [[!WEBIDL]]
+
+The events introduced by this specification implement the Event interface defined in the DOM4 Specification, [[!DOM4]]. Implementations must therefore support this specification.
+
+
+
+Introduction {#introduction}
+============================
+
+<em>This section is non-normative.</em>
+
+This specification provides several new DOM events for obtaining information about the physical orientation and movement of the hosting device. The information provided by the events is not raw sensor data, but rather high-level data which is agnostic to the underlying source of information. Common sources of information include gyroscopes, compasses and accelerometers.
+
+The first DOM event provided by the specification, [=deviceorientation=], supplies the physical orientation of the device, expressed as a series of rotations from a local coordinate frame.
+
+The second DOM event provided by this specification, [=devicemotion=], supplies the acceleration of the device, expressed in Cartesian coordinates in a coordinate frame defined in the device. It also supplies the rotation rate of the device about a local coordinate frame. Where practically possible, the event should provide the acceleration of the device's center of mass.
+
+Finally, the specification provides a [=compassneedscalibration=] DOM event, which is used to inform Web sites that a compass being used to provide data for one of the above events is in need of calibration.
+
+The following code extracts illustrate basic use of the events.
+
+<div class="example">
+Registering to receive [=deviceorientation=] events:
+<pre class="lang-js">
+window.addEventListener("deviceorientation", function(event) {
+    // process event.alpha, event.beta and event.gamma
+}, true);
+</pre>
+</div>
+
+<div class="example">
+A device lying flat on a horizontal surface with the top of the screen pointing West has the following orientation:
+<pre class="lang-json">
+{alpha: 90,
+ beta: 0,
+ gamma: 0};
+</pre>
+To get the compass heading, one would simply subtract {{DeviceOrientationEvent/alpha}} from 360 degrees. As the device is turned on the horizontal surface, the compass heading is (360 - alpha).
+</div>
+
+<div class="example">
+A user is holding the device in their hand, with the screen in a vertical plane and the top of the screen pointing upwards. The value of {{DeviceOrientationEvent/beta}} is 90, irrespective of what {{DeviceOrientationEvent/alpha}} and {{DeviceOrientationEvent/gamma}} are.
+</div>
+
+<div class="example">
+A user facing a compass heading of alpha degrees is holding the device in their hand, with the screen in a vertical plane and the top of the screen pointing to their right. The orientation of the device is:
+<pre class="lang-json">
+{alpha: 270 - alpha,
+ beta: 0,
+ gamma: 90};
+</pre>
+</div>
+
+<div class="example">
+Showing custom UI to instruct the user to calibrate the compass:
+<pre class="lang-js">
+window.addEventListener("compassneedscalibration", function(event) {
+    alert('Your compass needs calibrating! Wave your device in a figure-eight motion');
+    event.preventDefault();
+}, true);
+</pre>
+</div>
+
+<div class="example">
+Registering to receive [=devicemotion=] events:
+<pre class="lang-js">
+window.addEventListener("devicemotion", function(event) {
+    // Process event.acceleration, event.accelerationIncludingGravity,
+    // event.rotationRate and event.interval
+}, true);
+</pre>
+</div>
+
+<div class="example">
+A device lying flat on a horizontal surface with the screen upmost has an {{DeviceMotionEvent/acceleration}} of zero and the following value for {{DeviceMotionEvent/accelerationIncludingGravity}}:
+<pre class="lang-json">
+{x: 0,
+ y: 0,
+ z: 9.81};
+</pre>
+</div>
+
+<div class="example">
+A device in free-fall, with the screen horizontal and upmost, has an {{DeviceMotionEvent/accelerationIncludingGravity}} of zero and the following value for acceleration:
+<pre class="lang-json">
+{x: 0,
+ y: 0,
+ z: -9.81};
+</pre>
+</div>
+
+<div class="example">
+A device is mounted in a vehicle, with the screen in a vertical plane, the top uppermost and facing the rear of the vehicle. The vehicle is travelling at speed v around a right-hand bend of radius r. The device records a positive x component for both {{DeviceMotionEvent/acceleration}} and {{DeviceMotionEvent/accelerationIncludingGravity}}. The device also records a negative value for {{DeviceMotionEvent/rotationRate!!attribute}}.{{DeviceMotionEventRotationRate/gamma}}:
+<pre class="lang-json">
+{acceleration: {x: v^2/r, y: 0, z: 0},
+ accelerationIncludingGravity: {x: v^2/r, y: 0, z: 9.81},
+ rotationRate: {alpha: 0, beta: 0, gamma: -v/r*180/pi} };
+</pre>
+</div>
+
+Scope {#scope}
+==============
+
+<em>This section is non-normative.</em>
+
+This specification is limited to providing DOM events for retrieving information describing the physical orientation and motion of the hosting device. The intended purpose of this API is to enable simple use cases such as those in [[#use-cases|Use-Cases]] section. The scope of this specification does not include providing utilities to manipulate this data, such as transformation libraries. Nor does it include providing access to low sensor data, or direct control of these sensors.
+
+Description {#description}
+==========================
+
+<h3 id="deviceorientation">deviceorientation Event</h3>
+
+User agents implementing this specification must provide a new DOM event, named <dfn id="def-deviceorientation"><code>deviceorientation</code></dfn>. The corresponding event must be of type {{DeviceOrientationEvent}} and must fire on the {{window!!attribute}} object. Registration for, and firing of the [=deviceorientation=] event must follow the usual behavior of DOM4 Events, [[!DOM4]].
+
+User agents must also provide an event handler IDL attribute [[!HTML]] named {{Window/ondeviceorientation}} on the {{window!!attribute}} object. The type of the corresponding [=event handler event type=] must be [=deviceorientation=].
+
+<pre class="idl">
+partial interface Window {
+    [SecureContext] attribute EventHandler ondeviceorientation;
+};
+
+[Constructor(DOMString type, optional DeviceOrientationEventInit eventInitDict), Exposed=Window, SecureContext]
+interface DeviceOrientationEvent : Event {
+    readonly attribute double? alpha;
+    readonly attribute double? beta;
+    readonly attribute double? gamma;
+    readonly attribute boolean absolute;
+
+    static Promise&lt;PermissionState> requestPermission();
+};
+
+dictionary DeviceOrientationEventInit : EventInit {
+    double? alpha = null;
+    double? beta = null;
+    double? gamma = null;
+    boolean absolute = false;
+};
+
+enum PermissionState {
+    "granted",
+    "denied",
+};
+</pre>
+
+The {{DeviceOrientationEvent/alpha}} attribute must return the value it was initialized to. When the object is created, this attribute must be initialized to null.
+
+The {{DeviceOrientationEvent/beta}} attribute must return the value it was initialized to. When the object is created, this attribute must be initialized to null.
+
+The {{DeviceOrientationEvent/gamma}} attribute must return the value it was initialized to. When the object is created, this attribute must be initialized to null.
+
+The {{DeviceOrientationEvent/absolute}} attribute must return the value it was initialized to. When the object is created, this attribute must be initialized to false.
+
+The static {{DeviceOrientationEvent/requestPermission()}} operation, when invoked, must run these steps:
+<ol>
+ <li><p>Let <var>promise</var> be a new promise.
+
+ <li>
+  <p>Run these steps <a>in parallel</a>:
+
+  <ol>
+   <li><p>Let <var>permission</var> be <a>permission</a> for
+   <a>relevant settings object</a>'s <a for="environment settings object">origin</a>.
+
+   <li><p>If <var>permission</var> is "<code>default</code>" and the method call was not <a>triggered by user activation</a>, then reject <var>promise</var> with a
+   {{NotAllowedError!!exception}} {{DOMException}} and abort these steps.
+
+   <li><p>If <var>permission</var> is "<code>default</code>", ask the user whether sharing device orientation
+   for the <a>relevant settings object</a>'s
+   <a for="environment settings object">origin</a> is acceptable. If it is, set
+   <var>permission</var> to "<code>granted</code>", and "<code>denied</code>" otherwise.
+
+   <li>
+    <p><a>Queue a task</a> to run these steps:
+
+    <ol>
+     <li><p>Set <a>permission</a> for the <a>relevant settings object</a>'s
+     <a for="environment settings object">origin</a> to <var>permission</var>.
+
+     <li><p>Fulfill <var>promise</var> with <var>permission</var>.
+    </ol>
+  </ol>
+
+ <li><p>Return <var>promise</var>.
+</ol>
+
+The event should fire whenever a significant change in orientation occurs. The definition of a significant change in this context is left to the implementation, though a maximum threshold for change of one degree is recommended. Implementations may also fire the event if they have reason to believe that the page does not have sufficiently fresh data.
+
+The {{DeviceOrientationEvent/alpha}}, {{DeviceOrientationEvent/beta}} and {{DeviceOrientationEvent/gamma}} attributes of the event must specify the orientation of the device in terms of the transformation from a coordinate frame fixed on the Earth to a coordinate frame fixed in the device. The coordinate frames must be oriented as described below.
+
+The Earth coordinate frame is a 'East, North, Up' frame at the user's location. It has the following 3 axes, where the ground plane is tangent to the spheriod of the World Geodetic System 1984 [[WGS84]], at the user's location.
+
+* East (X) is in the ground plane, perpendicular to the North axis and positive towards the East.
+* North (Y) is in the ground plane and positive towards True North (towards the North Pole).
+* Up (Z) is perpendicular to the ground plane and positive upwards.
+
+For a mobile device such as a phone or tablet, the device coordinate frame is defined relative to the screen in its standard orientation, typically portrait. This means that slide-out elements such as keyboards are not deployed, and swiveling elements such as displays are folded to their default position. If the orientation of the screen changes when the device is rotated or a slide-out keyboard is deployed, this does not affect the orientation of the coordinate frame relative to the device. Users wishing to detect these changes in screen orientation may be able to do so with the existing {{orientationchange}} event. For a laptop computer, the device coordinate frame is defined relative to the integrated keyboard.
+
+* x is in the plane of the screen or keyboard and is positive towards the right hand side of the screen or keyboard.
+* y is in the plane of the screen or keyboard and is positive towards the top of the screen or keyboard.
+* z is perpendicular to the screen or keyboard, positive out of the screen or keyboard.
+
+The transformation from the Earth coordinate frame to the device coordinate frame must use the following system of rotations.
+
+Rotations must use the right-hand convention, such that positive rotation around an axis is clockwise when viewed along the positive direction of the axis. Starting with the two frames aligned, the rotations are applied in the following order:
+
+<ol id="rotations">
+<li>
+    <p>Rotate the device frame around its z axis by {{DeviceOrientationEvent/alpha}} degrees, with {{DeviceOrientationEvent/alpha}} in [0, 360).</p>
+    <div>
+    <img src="start.png" alt="start orientation">
+    <div>Device in the initial position, with Earth (XYZ) and body (xyz) frames aligned.</div>
+    </div>
+    <div>
+    <img src="c-rotation.png" alt="rotation about z axis">
+    <div>Device rotated through angle alpha about z axis, with previous locations of x and y axes shown as x<sub>0</sub> and y<sub>0</sub>.</div>
+    </div>
+</li>
+<li>
+    <p>Rotate the device frame around its x axis by {{DeviceOrientationEvent/beta}} degrees, with {{DeviceOrientationEvent/beta}} in [-180, 180).</p>
+    <div>
+    <img src="a-rotation.png" alt="rotation about x axis">
+    <div>Device rotated through angle beta about new x axis, with previous locations of y and z axes shown as y<sub>0</sub> and z<sub>0</sub>.</div>
+    </div>
+</li>
+<li>
+    <p>Rotate the device frame around its y axis by {{DeviceOrientationEvent/gamma}} degrees, with {{DeviceOrientationEvent/gamma}} in [-90, 90).</p>
+    <div>
+    <img src="b-rotation.png" alt="rotation about y axis">
+    <div>Device rotated through angle gamma about new y axis, with previous locations of x and z axes shown as x<sub>0</sub> and z<sub>0</sub>.</div>
+    </div>
+</li>
+</ol>
+
+Thus the angles {{DeviceOrientationEvent/alpha}}, {{DeviceOrientationEvent/beta}} and {{DeviceOrientationEvent/gamma}} form a set of intrinsic Tait-Bryan angles of type Z - X' - Y''. [[EULERANGLES]] Note that this choice of angles follows mathematical convention, but means that alpha is in the opposite sense to a compass heading. It also means that the angles do not match the roll-pitch-yaw convention used in vehicle dynamics.
+
+The [=deviceorientation=] event tries to provide relative values for the three angles (relative to some arbitrary orientation), based on just the accelerometer and the gyroscope. The implementation can still decide to provide absolute orientation if relative is not available or the resulting data is more accurate. In either case, the {{DeviceOrientationEvent/absolute}} property must be set accordingly to reflect the choice.
+
+Implementations that are unable to provide all three angles must set the values of the unknown angles to null. If any angles are provided, the {{DeviceOrientationEvent/absolute}} property must be set appropriately. If an implementation can never provide orientation information, the event should be fired with the {{DeviceOrientationEvent/alpha}}, {{DeviceOrientationEvent/beta}} and {{DeviceOrientationEvent/gamma}} attributes set to null.
+
+<h3 id="deviceorientationabsolute">deviceorientationabsolute Event</h3>
+
+<div class="issue">
+The [=deviceorientationabsolute=] event and its {{Window/ondeviceorientationabsolute}} event handler IDL attribute have <a href="https://wpt.fyi/results/orientation-event/ondeviceorientationabsolute.https.html">limited implementation experience</a>.
+</div>
+
+User agents implementing this specification must provide a new DOM event, named <dfn id="def-deviceorientationabsolute"><code>deviceorientationabsolute</code></dfn>. The corresponding event must be of type {{DeviceOrientationEvent}} and must fire on the {{window!!attribute}} object. Registration for, and firing of the [=deviceorientationabsolute=] event must follow the usual behavior of DOM4 Events, [[!DOM4]].
+
+User agents must also provide an event handler IDL attribute [[!HTML]] named {{Window/ondeviceorientationabsolute}} on the {{window!!attribute}} object. The type of the corresponding [=event handler event type=] must be [=deviceorientationabsolute=].
+
+<pre class="idl">
+partial interface Window {
+    [SecureContext] attribute EventHandler ondeviceorientationabsolute;
+};
+</pre>
+
+The [=deviceorientationabsolute=] event is completely analogous to the [=deviceorientation=] event, except additional sensors like the magnetometer can be used to provide an absolute orientation. The {{DeviceOrientationEvent/absolute}} property must be set to true. If an implementation can never provide absolute orientation information, the event should be fired with the {{DeviceOrientationEvent/alpha}}, {{DeviceOrientationEvent/beta}} and {{DeviceOrientationEvent/gamma}} attributes set to null.
+
+<h3 id="compassneedscalibration">compassneedscalibration Event</h3>
+
+<div class="issue">
+The [=compassneedscalibration=] event and its {{Window/oncompassneedscalibration}} event handler IDL attribute have <a href="https://github.com/w3c/deviceorientation/issues/38">limited implementation experience</a>.
+</div>
+
+User agents implementing this specification must provide a new DOM event, named <dfn id="def-compassneedscalibration"><code>compassneedscalibration</code></dfn> that uses the Event interface defined in the DOM4 Events specification [[!DOM4]]. This event must fire on the {{window!!attribute}} object. Registration for, and firing of the [=compassneedscalibration=] event must follow the usual behavior of DOM4 Events [[!DOM4]].
+
+User agents must also provide an event handler IDL attribute [[!HTML]] named {{Window/oncompassneedscalibration}} on the {{window!!attribute}} object. The type of the corresponding event must be [=compassneedscalibration=].
+
+<pre class="idl">
+partial interface Window {
+    attribute EventHandler oncompassneedscalibration;
+};
+</pre>
+
+This event must be fired when the user agent determines that a compass used to obtain orientation data is in need of calibration. Furthermore, user agents should only fire the event if calibrating the compass will increase the accuracy of the data provided by the [=deviceorientation=] event.
+
+The default action of this event should be for the user agent to present the user with details of how to calibrate the compass. The event must be cancelable, so that web sites can provide their own alternative calibration UI.
+
+<h3 id="devicemotion">devicemotion Event</h3>
+
+User agents implementing this specification must provide a new DOM event, named <dfn id="def-devicemotion"><code>devicemotion</code></dfn>. The corresponding event must be of type {{DeviceMotionEvent}} and must fire on the {{window!!attribute}} object. Registration for, and firing of the [=devicemotion=] event must follow the usual behavior of DOM4 Events, [[!DOM4]].
+
+User agents must also provide an event handler IDL attribute [[!HTML] named {{Window/ondevicemotion}} on the {{window!!attribute}} object. The type of the corresponding [=event handler event type=] must be [=devicemotion=].
+
+<pre class="idl">
+partial interface Window {
+    [SecureContext] attribute EventHandler ondevicemotion;
+};
+
+[SecureContext]
+interface DeviceMotionEventAcceleration {
+    readonly attribute double? x;
+    readonly attribute double? y;
+    readonly attribute double? z;
+};
+
+[SecureContext]
+interface DeviceMotionEventRotationRate {
+    readonly attribute double? alpha;
+    readonly attribute double? beta;
+    readonly attribute double? gamma;
+};
+
+[Constructor(DOMString type, optional DeviceMotionEventInit eventInitDict), Exposed=Window, SecureContext]
+interface DeviceMotionEvent : Event {
+    readonly attribute DeviceMotionEventAcceleration? acceleration;
+    readonly attribute DeviceMotionEventAcceleration? accelerationIncludingGravity;
+    readonly attribute DeviceMotionEventRotationRate? rotationRate;
+    readonly attribute double interval;
+
+    static Promise&lt;PermissionState> requestPermission();
+};
+
+dictionary DeviceMotionEventAccelerationInit {
+    double? x = null;
+    double? y = null;
+    double? z = null;
+};
+
+dictionary DeviceMotionEventRotationRateInit {
+    double? alpha = null;
+    double? beta = null;
+    double? gamma = null;
+};
+
+dictionary DeviceMotionEventInit : EventInit {
+    DeviceMotionEventAccelerationInit acceleration;
+    DeviceMotionEventAccelerationInit accelerationIncludingGravity;
+    DeviceMotionEventRotationRateInit rotationRate;
+    double interval = 0;
+};
+</pre>
+
+The {{DeviceMotionEvent/acceleration}} attribute must return the value it was initialized to. When the object is created, this attribute must be initialized to null.
+
+The {{DeviceMotionEvent/accelerationIncludingGravity}} attribute must return the value it was initialized to. When the object is created, this attribute must be initialized to null.
+
+The {{DeviceMotionEvent/rotationRate}} attribute must return the value it was initialized to. When the object is created, this attribute must be initialized to null.
+
+The {{DeviceMotionEvent/interval}} attribute must return the value it was initialized to. When the object is created, this attribute must be initialized to 0.
+
+The static {{DeviceMotionEvent/requestPermission()}} operation, when invoked, must run these steps:
+<ol>
+ <li><p>Let <var>promise</var> be a new promise.
+
+ <li>
+  <p>Run these steps <a>in parallel</a>:
+
+  <ol>
+   <li><p>Let <var>permission</var> be <a>permission</a> for
+   <a>relevant settings object</a>'s <a for="environment settings object">origin</a>.
+
+   <li><p>If <var>permission</var> is "<code>default</code>" and the method call was not <a>triggered by user activation</a>, then reject <var>promise</var> with a
+   {{NotAllowedError!!exception}} {{DOMException}} and abort these steps.
+
+   <li><p>If <var>permission</var> is "<code>default</code>", ask the user whether sharing device motion
+   for the <a>relevant settings object</a>'s
+   <a for="environment settings object">origin</a> is acceptable. If it is, set
+   <var>permission</var> to "<code>granted</code>", and "<code>denied</code>" otherwise.
+
+   <li>
+    <p><a>Queue a task</a> to run these steps:
+
+    <ol>
+     <li><p>Set <a>permission</a> for the <a>relevant settings object</a>'s
+     <a for="environment settings object">origin</a> to <var>permission</var>.
+
+     <li><p>Fulfill <var>promise</var> with <var>permission</var>.
+    </ol>
+  </ol>
+
+ <li><p>Return <var>promise</var>.
+</ol>
+
+In the {{DeviceMotionEvent}} events fired by the user agent, the following requirements must apply:
+
+The {{DeviceMotionEvent/acceleration}} attribute must be initialized with the acceleration of the hosting device relative to the Earth frame, expressed in the body frame, as defined in [[#deviceorientation|deviceorientation Event]] section. The acceleration must be expressed in meters per second squared (m/s2).
+
+Implementations that are unable to provide acceleration data without the effect of gravity (due, for example, to the lack of a gyroscope) may instead supply the acceleration including the effect of gravity. This is less useful in many applications but is provided as a means of providing best-effort support. In this case, the {{DeviceMotionEvent/accelerationIncludingGravity}} attribute must be initialized with the acceleration of the hosting device, plus an acceleration equal and opposite to the acceleration due to gravity. Again, the acceleration must be given in the body frame defined in [[#deviceorientation|deviceorientation Event]] section and must be expressed in meters per second squared (m/s2).
+
+The {{DeviceMotionEvent/rotationRate}} attribute must be initialized with the rate of rotation of the hosting device in space. It must be expressed as the rate of change of the angles defined as {{DeviceOrientationEvent/alpha}} (x axis), {{DeviceOrientationEvent/beta}} (y axis), {{DeviceOrientationEvent/gamma}} (z axis) and must be expressed in degrees per second (deg/s).
+
+The {{DeviceMotionEvent/interval}} attribute must be initialized with the interval at which data is obtained from the underlying hardware and must be expressed in milliseconds (ms). It must be a constant, to simplify filtering of the data by the Web application.
+
+Implementations that are unable to provide all attributes must initialize the values of the unknown attributes to null. If an implementation can never provide motion information, the event should be fired with the {{DeviceMotionEvent/acceleration}}, {{DeviceMotionEvent/accelerationIncludingGravity}} and {{DeviceMotionEvent/rotationRate}} attributes set to null.
+
+<h3 id="id=permission-model">Permission model</h3>
+
+<div class="issue">Further implementation experience is being gathered for the permission model and specification clarifications informed by this experience are being discussed in <a href="https://github.com/w3c/deviceorientation/issues/74">GitHub issue #74</a>.</div>
+
+<p>Implementations may choose to share device orientation &amp; motion only if the
+user (or user agent on behalf of the user) has granted <dfn>permission</dfn>.
+The <a>permission</a> to share device orientation &amp; motion
+for a given <a for=/>origin</a> is one of three strings:
+
+<dl>
+  <dt>"<code>default</code>"
+  <dd><p>This is equivalent to "<code>denied</code>", but the user has made no
+  explicit choice thus far.
+
+  <dt>"<code>denied</code>"
+  <dd><p>This means the user does not want
+  to share device orientation or motion.
+
+  <dt>"<code>granted</code>"
+  <dd><p>This means device orientation or motion may be shared.
+</dl>
+
+<p class=note>There is no equivalent to "<code>default</code>"
+meaning "<code>granted</code>". In that case
+"<code>granted</code>" is simply returned as there would be no reason
+for the application to ask for <a>permission</a>.
+
+Security and privacy considerations {#security-and-privacy}
+===========================================================
+
+The API defined in this specification can be used to obtain information from hardware sensors, such as accelerometer, gyroscope and magnetometer. Provided data may be considered as sensitive and could become a subject of attack from malicious web pages. The main attack vectors can be categorized into following categories:
+
+* Monitoring of a user input [[TOUCH]]
+* Location tracking [[INDOORPOS]]
+* User identification [[FINGERPRINT]]
+
+In light of that, implementations may consider permissions or visual indicators to signify the use of sensors by the web page. Furthermore, to minimize privacy risks, the chance of fingerprinting and other attacks the implementations must:
+
+* fire events only when [=active document=] is [=visible=],
+* fire events only on the [=top-level browsing context=] and same-origin [=nested browsing contexts=],
+* fire events only on secure browsing contexts [[!SECURE-CONTEXTS]]
+
+Additionally, implementing these items may also have a beneficial impact on the battery life of mobile devices.
+
+Use-Cases and Requirements {#use-cases-and-requirements}
+========================================================
+
+<h3 id="use-cases">Use-Cases</h3>
+
+<h4 class="no-toc" id="controlling-a-game">Controlling a game</h4>
+
+A gaming Web application monitors the device's orientation and interprets tilting in a certain direction as a means to control an on-screen sprite.
+
+<h4 class="no-toc" id="gesture-recognition">Gesture recognition</h4>
+
+A Web application monitors the device's acceleration and applies signal processing in order to recognize certain specific gestures. For example, using a shaking gesture to clear a web form.
+
+<h4 class="no-toc" id="mapping">Mapping</h4>
+
+A mapping Web application uses the device's orientation to correctly align the map with reality.
+
+<h3 id="requirements">Requirements</h3>
+
+* The specification must provide data that describes the physical orientation in space of the device.
+* The specification must provide data that describes the motion in space of the device.
+* The specification must allow Web applications to register for changes in the device's orientation.
+* The specification must be agnostic to the underlying sources of orientation and motion data.
+* The specification must use the existing DOM event framework.
+
+<h2 class="no-num" id="examples">A Examples</h2>
+
+<h3 id="worked-example">A.1 Calculating compass heading</h3>
+
+<em>This section is non-normative.</em>
+
+The following worked example is intended as an aid to users of the DeviceOrientation event.
+
+[[#introduction|Introduction]] section provided an example of using the DeviceOrientation event to obtain a compass heading when the device is held with the screen horizontal. This example shows how to determine the compass heading that the user is facing when holding the device with the screen approximately vertical in front of them. An application of this is an augmented-reality system.
+
+More precisely, we wish to determine the compass heading of the horizontal component of a vector which is orthogonal to the device's screen and pointing out of the back of the screen.
+
+If v represents this vector in the rotated device body frame xyz, then v is as follows.
+
+<object class="equation" data="equation1.xhtml" type="application/mathml+xml">
+    <p><img src="equation1.png" alt="v = [0; 0; -1]">
+</object>
+
+The transformation of v due to the rotation about the z axis can be represented by the following rotation matrix.
+
+<object class="equation" data="equation2.xhtml" type="application/mathml+xml">
+    <img src="equation2.png" alt="Z = [cos(alpha) -sin(alpha) 0; sin(alpha) cos(alpha) 0; 0 0 1]">
+</object>
+
+The transformation of v due to the rotation about the x axis can be represented by the following rotation matrix.
+
+<object class="equation" data="equation3.xhtml" type="application/mathml+xml">
+    <img src="equation3.png" alt="X = [1 0 0; 0 cos(beta) -sin(beta); 0 sin(beta) cos(beta)]">
+</object>
+
+The transformation of v due to the rotation about the y axis can be represented by the following rotation matrix.
+
+<object class="equation" data="equation4.xhtml" type="application/mathml+xml">
+    <img src="equation4.png" alt="Y = [cos(gamma) 0 sin(gamma); 0 1 0; -sin(gamma) 0 cos(gamma)]">
+</object>
+
+If R represents the full rotation matrix of the device in the earth frame XYZ, then since the initial body frame is aligned with the earth, R is as follows.
+
+<object class="equation" data="equation13a.xhtml" type="application/mathml+xml">
+    <img src="equation13a.png" alt="R = ZXY = [[cos(alpha) cos(gamma)-sin(alpha) sin(beta) sin(gamma), -cos(beta) sin(alpha), cos(gamma) sin(alpha) sin(beta)+cos(alpha) sin(gamma)], [cos(gamma) sin(alpha)+cos(alpha) sin(beta) sin(gamma), cos(alpha) cos(beta), sin(alpha) sin(gamma)-cos(alpha) cos(gamma) sin(beta)], [-cos(beta) sin(gamma), sin(beta), cos(beta) cos(gamma)]]">
+</object>
+
+If v' represents the vector v in the earth frame XYZ, then since the initial body frame is aligned with the earth, v' is as follows.
+
+<object class="equation" data="equation5a.xhtml" type="application/mathml+xml">
+    <img src="equation5a.png" alt="v' = Rv">
+</object>
+</object>
+    <object class="equation" data="equation5e.xhtml" type="application/mathml+xml">
+    <img src="equation5e.png" alt="v' = [-cos(alpha)sin(gamma)-sin(alpha)sin(beta)cos(gamma); -sin(alpha)sin(gamma)+cos(alpha)sin(beta)cos(gamma); -cos(beta)cos(gamma)]">
+</object>
+
+The compass heading &theta; is given by
+
+<object class="equation" data="equation6.xhtml" type="application/mathml+xml">
+    <img src="equation6.png" alt="theta = atan((v'_x)/(v'_y)) = atan((-cos(alpha)sin(gamma)-sin(alpha)sin(beta)cos(gamma))/(-sin(alpha)sin(gamma)+cos(alpha)sin(beta)cos(gamma)))">
+</object>
+
+provided that &beta; and &gamma; are not both zero.
+
+<div class="example">
+
+The compass heading calculation above can be represented in JavaScript as follows to return the correct compass heading when the provided parameters are defined, not null and represent {{DeviceOrientationEvent/absolute}} values.
+
+<pre class="lang-js">
+var degtorad = Math.PI / 180; // Degree-to-Radian conversion
+
+function compassHeading( alpha, beta, gamma ) {
+
+  var _x = beta  ? beta  * degtorad : 0; // beta value
+  var _y = gamma ? gamma * degtorad : 0; // gamma value
+  var _z = alpha ? alpha * degtorad : 0; // alpha value
+
+  var cX = Math.cos( _x );
+  var cY = Math.cos( _y );
+  var cZ = Math.cos( _z );
+  var sX = Math.sin( _x );
+  var sY = Math.sin( _y );
+  var sZ = Math.sin( _z );
+
+  // Calculate Vx and Vy components
+  var Vx = - cZ * sY - sZ * sX * cY;
+  var Vy = - sZ * sY + cZ * sX * cY;
+
+  // Calculate compass heading
+  var compassHeading = Math.atan( Vx / Vy );
+
+  // Convert compass heading to use whole unit circle
+  if( Vy < 0 ) {
+    compassHeading += Math.PI;
+  } else if( Vx < 0 ) {
+    compassHeading += 2 * Math.PI;
+  }
+
+  return compassHeading * ( 180 / Math.PI ); // Compass Heading (in degrees)
+
+}
+</pre>
+</div>
+
+As a consistency check, if we set &gamma; = 0, then
+
+<object class="equation" data="equation7.xhtml" type="application/mathml+xml">
+    <img src="equation7.png" alt="theta = atan(-sin(alpha)sin(beta)/cos(alpha)sin(beta)) = -alpha">
+</object>
+
+as expected.
+
+Alternatively, if we set &beta; = 90, then
+
+<object class="equation" data="equation8a.xhtml" type="application/mathml+xml">
+    <img src="equation8a.png" alt="theta = atan((-cos(alpha)sin(gamma)-sin(alpha)cos(gamma))/(-sin(alpha)sin(gamma)+cos(alpha)cos(gamma)))">
+</object>
+<object class="equation" data="equation8b.xhtml" type="application/mathml+xml">
+    <img src="equation8b.png" alt="theta = atan(-sin(alpha+gamma)/cos(alpha+gamma)) = -(alpha+gamma)">
+</object>
+
+as expected.
+
+<h3 id="worked-example-2">A.2 Alternate device orientation representations</h3>
+
+<em>This section is non-normative.</em>
+
+Describing orientation using Tait-Bryan angles can have some disadvantages such as introducing gimbal lock [[GIMBALLOCK]]. Depending on the intended application it can be useful to convert the Device Orientation values to other rotation representations.
+
+The first alternate orientation representation uses rotation matrices. By combining the component rotation matrices provided in the [[#worked-example|worked example]] above we can represent the orientation of the device body frame as a combined rotation matrix.
+
+If R represents the rotation matrix of the device in the earth frame XYZ, then since the initial body frame is aligned with the earth, R is as follows.
+
+<object class="equation" data="equation13a.xhtml" type="application/mathml+xml">
+    <img src="equation13a.png" alt="R = ZXY = [[cos(alpha) cos(gamma)-sin(alpha) sin(beta) sin(gamma), -cos(beta) sin(alpha), cos(gamma) sin(alpha) sin(beta)+cos(alpha) sin(gamma)], [cos(gamma) sin(alpha)+cos(alpha) sin(beta) sin(gamma), cos(alpha) cos(beta), sin(alpha) sin(gamma)-cos(alpha) cos(gamma) sin(beta)], [-cos(beta) sin(gamma), sin(beta), cos(beta) cos(gamma)]]">
+</object>
+
+<div class="example">
+The above combined rotation matrix can be represented in JavaScript as follows provided passed parameters are defined, not null and represent {{DeviceOrientationEvent/absolute}} values.
+<pre class="lang-js">
+var degtorad = Math.PI / 180; // Degree-to-Radian conversion
+
+function getRotationMatrix( alpha, beta, gamma ) {
+
+  var _x = beta  ? beta  * degtorad : 0; // beta value
+  var _y = gamma ? gamma * degtorad : 0; // gamma value
+  var _z = alpha ? alpha * degtorad : 0; // alpha value
+
+  var cX = Math.cos( _x );
+  var cY = Math.cos( _y );
+  var cZ = Math.cos( _z );
+  var sX = Math.sin( _x );
+  var sY = Math.sin( _y );
+  var sZ = Math.sin( _z );
+
+  //
+  // ZXY rotation matrix construction.
+  //
+
+  var m11 = cZ * cY - sZ * sX * sY;
+  var m12 = - cX * sZ;
+  var m13 = cY * sZ * sX + cZ * sY;
+
+  var m21 = cY * sZ + cZ * sX * sY;
+  var m22 = cZ * cX;
+  var m23 = sZ * sY - cZ * cY * sX;
+
+  var m31 = - cX * sY;
+  var m32 = sX;
+  var m33 = cX * cY;
+
+  return [
+    m11,    m12,    m13,
+    m21,    m22,    m23,
+    m31,    m32,    m33
+  ];
+
+};
+</pre>
+</div>
+
+Another alternate representation of device orientation data is as Quaternions. [[QUATERNIONS]]
+
+If q represents the unit quaternion of the device in the earth frame XYZ, then since the initial body frame is aligned with the earth, q is as follows.
+
+<object class="equation" data="equation14.xhtml" type="application/mathml+xml">
+    <img src="equation14.png" alt="q = [[q_w], [q_x], [q_y], [q_z]] = [[cos(beta)cos(gamma)cos(alpha) - sin(beta)sin(gamma)sin(alpha)], [sin(beta)cos(gamma)cos(alpha) - cos(beta)sin(gamma)sin(alpha)], [cos(beta)sin(gamma)cos(alpha) + sin(beta)cos(gamma)sin(alpha)], [cos(beta)cos(gamma)sin(alpha) + sin(beta)sin(gamma)cos(alpha)]]">
+</object>
+
+<div class="example">
+The above quaternion can be represented in JavaScript as follows provided the passed parameters are defined, are {{DeviceOrientationEvent/absolute}} values and those parameters are not null.
+<pre class="lang-js">
+var degtorad = Math.PI / 180; // Degree-to-Radian conversion
+
+function getQuaternion( alpha, beta, gamma ) {
+
+  var _x = beta  ? beta  * degtorad : 0; // beta value
+  var _y = gamma ? gamma * degtorad : 0; // gamma value
+  var _z = alpha ? alpha * degtorad : 0; // alpha value
+
+  var cX = Math.cos( _x/2 );
+  var cY = Math.cos( _y/2 );
+  var cZ = Math.cos( _z/2 );
+  var sX = Math.sin( _x/2 );
+  var sY = Math.sin( _y/2 );
+  var sZ = Math.sin( _z/2 );
+
+  //
+  // ZXY quaternion construction.
+  //
+
+  var w = cX * cY * cZ - sX * sY * sZ;
+  var x = sX * cY * cZ - cX * sY * sZ;
+  var y = cX * sY * cZ + sX * cY * sZ;
+  var z = cX * cY * sZ + sX * sY * cZ;
+
+  return [ w, x, y, z ];
+
+}
+</pre>
+</div>
+
+We can check that a Unit Quaternion has been constructed correctly using Lagrange's four-square theorem
+
+<object class="equation" data="equation18.xhtml" type="application/mathml+xml">
+    <img src="equation18.png" alt="q_w^2 * q_x^2 * q_y^2 * q_z^2 = 1">
+</object>
+
+as expected.
+
+<h2 class="no-num" id="acknowledgments">Acknowledgments</h2>
+
+Lars Erik Bolstad, Dean Jackson, Claes Nilsson, George Percivall, Doug Turner, Matt Womer, Chris Dumez
+
+<pre class="anchors">
+urlPrefix: https://html.spec.whatwg.org/multipage/
+    urlPrefix: webappapis.html; type: dfn
+        text: relevant settings object
+    urlPrefix: interaction.html; type: dfn
+        text: triggered by user activation
+</pre>
+
+<pre class="biblio">
+{
+    "WGS84": {
+        "authors": [
+            "National Imagery and Mapping Agency"
+        ],
+        "href": "http://earth-info.nga.mil/GandG/publications/tr8350.2/wgs84fin.pdf",
+        "title": "Department of Defence World Geodetic System 1984",
+        "status": "Technical Report 8350.2, Third Edition",
+        "publisher": "National Imagery and Mapping Agency",
+        "date": "3 January 2000"
+    },
+    "EULERANGLES": {
+        "href": "https://en.wikipedia.org/wiki/Euler_angles",
+        "title": "Euler Angles"
+    },
+    "TOUCH": {
+        "href": "http://arxiv.org/abs/1602.04115",
+        "title": "TouchSignatures: Identification of User Touch Actions and PINs Based on Mobile Sensor Data via JavaScript",
+        "date": "12 Feb 2016"
+    },
+    "INDOORPOS": {
+        "authors": [
+            "Shala, Ubejd",
+            "Angel Rodriguez"
+        ],
+        "href": "http://www.diva-portal.org/smash/record.jsf?pid=diva2%3A475619&dswid=9050",
+        "title": "Indoor positioning using sensor-fusion in android devices",
+        "date": "2011"
+    },
+    "FINGERPRINT": {
+        "href": "http://arxiv.org/abs/1408.1416",
+        "title": "Mobile Device Identification via Sensor Fingerprinting",
+        "date": "6 Aug 2014"
+    },
+    "GIMBALLOCK": {
+        "href": "https://en.wikipedia.org/wiki/Gimbal_Lock",
+        "title": "Gimbal Lock"
+    },
+    "QUATERNIONS": {
+        "href": "https://en.wikipedia.org/wiki/Quaternion",
+        "title": " Quaternions"
+    }
+}
+</pre>
