@@ -8,7 +8,17 @@ def transformProductionPlaceholders(doc):
     propdescRe = re.compile(r"^'(?:(\S*)/)?([\w*-]+)(?:!!([\w-]+))?'$")
     funcRe = re.compile(r"^(?:(\S*)/)?([\w*-]+\(\))$")
     atruleRe = re.compile(r"^(?:(\S*)/)?(@[\w*-]+)$")
-    typeRe = re.compile(r"^(?:(\S*)/)?(\S+)$")
+    typeRe = re.compile(r"""
+        ^(?:(\S*)/)?
+        (\S+)
+        (?:\s+
+            \[\s*
+            (-?(?:\d+|∞|Infinity))\s*
+            ,\s*
+            (-?(?:\d+|∞|Infinity))\s*
+            \]\s*
+        )?$
+        """, re.X)
     for el in findAll("fake-production-placeholder", doc):
         addLineNumber(el)
         text = textContent(el)
@@ -51,15 +61,57 @@ def transformProductionPlaceholders(doc):
             continue
         match = typeRe.match(text)
         if match:
+            for_, term, rangeStart, rangeEnd = match.groups()
             el.tag = "a"
             el.set("data-link-type", "type")
-            if match.group(1) is not None:
-                el.set("for", match.group(1))
-            el.text = "<" + match.group(2) + ">"
+            if for_ is not None:
+                el.set("for", for_)
+            interior = term
+            if rangeStart is not None:
+                rangeStart = formatValue(rangeStart)
+                rangeEnd = formatValue(rangeEnd)
+                if rangeStart is None or rangeEnd is None:
+                    die("Shorthand <<{0}>> has an invalid range.", text, el=el)
+                if not correctlyOrderedRange(rangeStart, rangeEnd):
+                    die("Shorthand <<{0}>> has a range whose start is not less than its end.", text, el=el)
+                interior += " [{0}, {1}]".format(rangeStart, rangeEnd)
+                el.set("data-lt", "<{0}>".format(term))
+            el.text = "<{0}>".format(interior)
             continue
         die("Shorthand <<{0}>> does not match any recognized shorthand grammar.", text)
         continue
 
+def formatValue(val):
+    negative = False
+    if val[0] in ["-", "−"]:
+        negative = True
+        val = val[1:]
+
+    if val == "Infinity":
+        val = "∞"
+    if val == "∞":
+        return ("−" if negative else "") + val
+
+    try:
+        val = int(val)
+    except ValueError:
+        return None
+
+    return ("−" if negative else "") + unicode(val)
+
+def correctlyOrderedRange(start, end):
+    start = numFromRangeVal(start)
+    end = numFromRangeVal(end)
+    return start < end
+
+def numFromRangeVal(val):
+    sign = 1
+    if val[0] == "−":
+        sign = -1
+        val = val[1:]
+    if val == "∞":
+        return sign * float("inf")
+    return sign * int(val)
 
 def transformMaybePlaceholders(doc):
     propRe = re.compile(r"^([\w-]+): .+")

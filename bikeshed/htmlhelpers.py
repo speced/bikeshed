@@ -688,7 +688,7 @@ def replaceAwkwardCSSShorthands(text):
         syntaxAttr = escapeAttr(match.group(0))
         text = match.group(1)
         return "<fake-production-placeholder class=production bs-autolink-syntax='{0}'>{1}</fake-production-placeholder>".format(syntaxAttr, text)
-    text = re.sub(r"<<([^>\s]+)>>", replaceProduction, text)
+    text = re.sub(r"<<([^>\n]+)>>", replaceProduction, text)
 
     # Replace the ''maybe link'' shortcuts.
     # They'll survive the HTML parser,
