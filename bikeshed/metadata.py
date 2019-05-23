@@ -28,6 +28,12 @@ class MetadataManager:
             return "{0}-{1}".format(self.shortname, self.level)
         return self.shortname
 
+    @property
+    def displayVshortname(self):
+        if self.level:
+            return "{0}-{1}".format(self.displayShortname, self.level)
+        return self.displayShortname
+
     def __init__(self):
         self.hasMetadata = False
 
@@ -235,7 +241,7 @@ class MetadataManager:
         else:
             macros["statustext"] = ""
         macros["level"] = str(self.level)
-        macros["vshortname"] = self.vshortname
+        macros["vshortname"] = self.displayVshortname
         if self.status == "FINDING" and self.group:
             macros["longstatus"] = "Finding of the {0}".format(self.group)
         elif self.status in config.shortToLongStatus:
