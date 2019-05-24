@@ -54,6 +54,7 @@ def main():
     echidnaParser.add_argument("--u", dest="un", metavar="USERNAME", required=False, help="W3C username.")
     echidnaParser.add_argument("--p", dest="pw", metavar="PASSWORD", required=False, help="W3C password.")
     echidnaParser.add_argument("--decision", dest="decision", metavar="DECISION_URL", required=False, help="URL recording the decision to publish.")
+    echidnaParser.add_argument("--cc", dest="cc", metavar="EMAIL", required=False, help="Comma-separated list of email addresses to ping with the publication status when complete.")
     echidnaParser.add_argument("--additional-directories", dest="additionalDirectories", required=False, nargs="*", help="Directories to bundle in the tar file. Defaults to examples/, diagrams/, and images/.")
     echidnaParser.add_argument("--self-contained", dest="selfContained", action="store_true", help="The spec is self-contained, do not bundle any extra directories in the tar file.")
     echidnaParser.add_argument("--just-tar", dest="justTar", action="store_true")
@@ -253,7 +254,7 @@ def handleEchidna(options, extras):
     if options.justTar:
         publish.prepareTar(doc, visibleTar=True, additionalDirectories=addDirs)
     else:
-        publish.publishEchidna(doc, username=options.un, password=options.pw, decision=options.decision, additionalDirectories=addDirs)
+        publish.publishEchidna(doc, username=options.un, password=options.pw, decision=options.decision, additionalDirectories=addDirs, cc=options.cc)
 
 
 def handleWatch(options, extras):
