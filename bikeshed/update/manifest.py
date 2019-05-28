@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 
-import datetime
 import hashlib
 import io
 import os
 import urllib2
 from contextlib import closing
+from datetime import datetime
 
 from ..messages import *
 
@@ -28,7 +28,7 @@ def createManifest(path, dryRun=False):
     if not dryRun:
         try:
             with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
-                fh.write(unicode(datetime.datetime.utcnow()) + "\n")
+                fh.write(unicode(datetime.utcnow()) + "\n")
                 for p,h in sorted(manifests, key=keyManifest):
                     fh.write("{0} {1}\n".format(h, p))
         except Exception as err:
@@ -96,14 +96,17 @@ def updateByManifest(path, dryRun=False):
         warn("Couldn't download remote manifest file.\n{0}", e)
         return False
 
-    # First manifest line is a datetime string,
-    # which luckily sorts lexicographically.
-    if oldManifest[0] == newManifest[0]:
-        say("Local data is already up-to-date ({0}). Done!", oldManifest[0].strip())
+    oldDt = datetime.strptime(oldManifest[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
+    newDt = datetime.strptime(newManifest[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
+
+    if (newDt - datetime.utcnow()).days >= 2:
+        warn("Remote data is more than two days old; the update process has probably fallen over. Please report this!")
+    if oldDt == newDt:
+        say("Local data is already up-to-date with remote ({0})", oldDt.strftime("%Y-%m-%d %H:%M:%S"))
         return True
-    elif oldManifest[0] > newManifest[0]:
+    elif oldDt > newDt:
         # No need to update, local data is more recent.
-        say("Local data is fresher ({0}) than remote ({1}), so nothing to update.", oldManifest[0].strip(), newManifest[0].strip())
+        say("Local data is fresher ({0}) than remote ({1}), so nothing to update.", oldDt.strftime("%Y-%m-%d %H:%M:%S"), newDt.strftime("%Y-%m-%d %H:%M:%S"))
         return True
 
     oldFiles = dictFromManifest(oldManifest)
