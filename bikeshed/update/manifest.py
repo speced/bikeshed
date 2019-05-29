@@ -85,45 +85,45 @@ def updateByManifest(path, dryRun=False):
     say("Updating via manifest...")
     try:
         with io.open(os.path.join(path, "manifest.txt"), 'r', encoding="utf-8") as fh:
-            oldManifest = fh.readlines()
+            localManifest = fh.readlines()
     except Exception as e:
         warn("Couldn't find local manifest file.\n{0}", e)
         return False
     try:
         with closing(urllib2.urlopen(ghPrefix + "manifest.txt")) as fh:
-            newManifest = [unicode(line, encoding="utf-8") for line in fh]
+            remoteManifest = [unicode(line, encoding="utf-8") for line in fh]
     except Exception as e:
         warn("Couldn't download remote manifest file.\n{0}", e)
         return False
 
-    oldDt = datetime.strptime(oldManifest[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
-    newDt = datetime.strptime(newManifest[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
+    localDt = datetime.strptime(localManifest[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
+    remoteDt = datetime.strptime(remoteManifest[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
 
-    if (newDt - datetime.utcnow()).days >= 2:
+    if (remoteDt - datetime.utcnow()).days >= 2:
         warn("Remote data is more than two days old; the update process has probably fallen over. Please report this!")
-    if oldDt == newDt:
-        say("Local data is already up-to-date with remote ({0})", oldDt.strftime("%Y-%m-%d %H:%M:%S"))
+    if localDt == remoteDt:
+        say("Local data is already up-to-date with remote ({0})", localDt.strftime("%Y-%m-%d %H:%M:%S"))
         return True
-    elif oldDt > newDt:
+    elif localDt > remoteDt:
         # No need to update, local data is more recent.
-        say("Local data is fresher ({0}) than remote ({1}), so nothing to update.", oldDt.strftime("%Y-%m-%d %H:%M:%S"), newDt.strftime("%Y-%m-%d %H:%M:%S"))
+        say("Local data is fresher ({0}) than remote ({1}), so nothing to update.", localDt.strftime("%Y-%m-%d %H:%M:%S"), remoteDt.strftime("%Y-%m-%d %H:%M:%S"))
         return True
 
-    oldFiles = dictFromManifest(oldManifest)
-    newFiles = dictFromManifest(newManifest)
+    localFiles = dictFromManifest(localManifest)
+    remoteFiles = dictFromManifest(remoteManifest)
     newPaths = []
-    for filePath,hash in newFiles.items():
-        if hash != oldFiles.get(filePath):
+    for filePath,hash in remoteFiles.items():
+        if hash != localFiles.get(filePath):
             newPaths.append(filePath)
 
     if not dryRun:
         deletedPaths = []
-        for filePath in oldFiles.keys():
-            if filePath not in newFiles and os.path.exists(localizePath(path, filePath)):
+        for filePath in localFiles.keys():
+            if filePath not in remoteFiles and os.path.exists(localizePath(path, filePath)):
                 os.remove(localizePath(path, filePath))
                 deletedPaths.append(filePath)
         if deletedPaths:
-            print "Deleted {0} old data files.".format(len(deletedPaths))
+            print "Deleted {0} old data file{1}.".format(len(deletedPaths), "s" if len(deletedPaths) > 1 else "")
 
     if not dryRun:
         import time
@@ -156,7 +156,7 @@ def updateByManifest(path, dryRun=False):
                 lastMsgTime = currFileTime
         try:
             with io.open(os.path.join(path, "manifest.txt"), 'w', encoding="utf-8") as fh:
-                fh.write("".join(newManifest))
+                fh.write("".join(remoteManifest))
         except Exception,e:
             warn("Couldn't save new manifest file.\n{0}", e)
             return False
