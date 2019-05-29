@@ -786,10 +786,8 @@ def processBiblioLinks(doc):
         el.set('href', '#biblio-' + id)
         storage[ref.linkText] = ref
 
-    verifyUsageOfAllLocalBiblios(doc, usedBiblioKeys)
 
-
-def verifyUsageOfAllLocalBiblios(doc, usedBiblioKeys):
+def verifyUsageOfAllLocalBiblios(doc):
     '''
     Verifies that all the locally-declared biblios
     (those written inline in a <pre class=biblio> block,
@@ -797,6 +795,7 @@ def verifyUsageOfAllLocalBiblios(doc, usedBiblioKeys):
     were used in the spec,
     so you can remove entries when they're no longer necessary.
     '''
+    usedBiblioKeys = set(doc.normativeRefs.keys() + doc.informativeRefs.keys())
     localBiblios = [b["linkText"] for bs in doc.refs.biblios.values() for b in bs if b['order'] == 1]
     unusedBiblioKeys = []
     for b in localBiblios:

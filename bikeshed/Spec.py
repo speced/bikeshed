@@ -196,6 +196,7 @@ class Spec(object):
         formatElementdefTables(self)
         processAutolinks(self)
         biblio.dedupBiblioReferences(self)
+        verifyUsageOfAllLocalBiblios(self)
         caniuse.addCanIUsePanels(self)
         boilerplate.addIndexSection(self)
         boilerplate.addExplicitIndexes(self)
