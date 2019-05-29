@@ -792,8 +792,8 @@ def verifyUsageOfAllLocalBiblios(doc):
     were used in the spec,
     so you can remove entries when they're no longer necessary.
     '''
-    usedBiblioKeys = set(doc.normativeRefs.keys() + doc.informativeRefs.keys())
-    localBiblios = [b["linkText"] for bs in doc.refs.biblios.values() for b in bs if b['order'] == 1]
+    usedBiblioKeys = set(x.lower() for x in doc.normativeRefs.keys() + doc.informativeRefs.keys())
+    localBiblios = [b["linkText"].lower() for bs in doc.refs.biblios.values() for b in bs if b['order'] == 1]
     unusedBiblioKeys = []
     for b in localBiblios:
         if b not in usedBiblioKeys:
