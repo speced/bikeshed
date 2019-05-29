@@ -735,7 +735,6 @@ def classifyLink(el):
 
 def processBiblioLinks(doc):
     biblioLinks = findAll("a[data-link-type='biblio']", doc)
-    usedBiblioKeys = set()
     for el in biblioLinks:
         biblioType = el.get('data-biblio-type')
         if biblioType == "normative":
@@ -755,8 +754,6 @@ def processBiblioLinks(doc):
         okayToFail = el.get('data-okay-to-fail') is not None
 
         ref = doc.refs.getBiblioRef(linkText, status=refStatus, generateFakeRef=okayToFail, quiet=okayToFail, el=el)
-        if ref:
-            usedBiblioKeys.add(linkText)
         if not ref:
             if not okayToFail:
                 closeBiblios = biblio.findCloseBiblios(doc.refs.biblioKeys, linkText)
