@@ -35,7 +35,9 @@ def update(path, dryRun=False):
                 die("Couldn't save biblio database to disk.\n{0}", e)
                 return
 
-        # Save the list of all names to a file
+        # biblio-keys is used to help correct typos,
+        # so remove all the useless purely-numbered name types,
+        # as they aren't useful for typo-correction
         reducedNames = []
         for name in allNames:
             if re.search(r"-\d{8}$", name):
@@ -52,11 +54,23 @@ def update(path, dryRun=False):
                 continue
             if re.match(r"n\d+$", name):
                 continue
-            if re.match(r"p\d+r\d+$", name):
+            if re.match(r"p\d+(r\d+)?$", name):
+                continue
+            if re.match(r"d\d+(r\d+)?$", name):
                 continue
             if re.match(r"rfc\d+$", name):
                 continue
             if re.match(r"wg21-", name):
+                continue
+            if re.match(r"edit\d+$", name):
+                continue
+            if re.match(r"etsi-", name):
+                continue
+            if re.match(r"iso-\d+", name):
+                continue
+            if re.match(r"iso\d+", name):
+                continue
+            if re.match(r"scte\d+", name):
                 continue
             reducedNames.append(name)
         try:
