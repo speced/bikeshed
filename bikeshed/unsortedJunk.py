@@ -368,7 +368,7 @@ def fixIntraDocumentReferences(doc):
                 continue
             text = textContent(content).strip()
             if target.get('data-level') is not None:
-                text = "§{1} {0}".format(text, target.get('data-level'))
+                text = "§\u202f{1} {0}".format(text, target.get('data-level'))
             appendChild(el, text)
 
 
