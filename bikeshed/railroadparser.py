@@ -71,7 +71,7 @@ def parse(string):
             if match.group(2):
                 prelude = match.group(2).strip()
             else:
-                prelude = ""
+                prelude = None
             text = match.group(3).strip()
             node = {"command": command, "prelude": prelude, "text":text, "children": [], "line": i}
         else:
