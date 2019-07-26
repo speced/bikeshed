@@ -303,7 +303,7 @@ Will be called for each StringType production within a Type, e.g. "ByteString", 
 
 **markupObjectType(text, construct)**
 
-Will be called for each ObjectType production within a Type, e.g. "object", "Date", "RegExp", "Error", or "DOMException".
+Will be called for each ObjectType production within a Type, e.g. "object" or "Error".
 
 **markupTypeName(text, construct)**
 

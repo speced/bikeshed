@@ -161,7 +161,6 @@ interface Simple{
     idl += u""" // this is a comment éß
 interface Multi : One  ,  Two   ,   Three     {
         attribute short one;
-        attribute DOMString id setraises(DOMException);
 };
 typedef sequence<Foo[]>? fooType;
 typedef (short or Foo) maybeFoo;
@@ -209,7 +208,6 @@ typedef foo [ ] [ ]  barTypes;
 typedef sequence<DOMString[]> sequins;
 typedef sequence<DOMString[]>? sequinses;
 typedef object obj;
-typedef Date? today;
 typedef (short or [Extended] double) union;
 typedef (short or sequence < DOMString [ ] ? [ ] > ? or DOMString[]?[] or unsigned long long or unrestricted double) craziness;
 typedef (short or (long or double)) nestedUnion;
@@ -218,7 +216,7 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
 
 [ Constructor , NamedConstructor = MyConstructor, Constructor (Foo one), NamedConstructor = MyOtherConstructor (Foo two , long long longest ) ] partial interface Foo: Bar {
     unsigned long long method(short x, unsigned long long y, optional double inf = Infinity, sequence<Foo>... fooArg) raises (hell);
-    unsigned long long method(DOMString string);
+    unsigned long long method(DOMString string, optional Foo foo = {});
     void abort();
     void anotherMethod(short round);
     [ha!] attribute short bar getraises (an, exception);

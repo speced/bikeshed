@@ -53,10 +53,10 @@ class Token(object):
 class Tokenizer(object):
     SymbolIdents = frozenset((
         'any', 'attribute', 'ArrayBuffer', 'boolean', 'byte', 'ByteString', 'callback', 'const', 'creator', 'DataView',
-        'Date', 'deleter', 'dictionary', 'DOMString', 'double', 'enum', 'Error', 'exception', 'false', 'float',
+        'deleter', 'dictionary', 'DOMString', 'double', 'enum', 'Error', 'exception', 'false', 'float',
         'Float32Array', 'Float64Array', 'FrozenArray', 'getter', 'implements', 'includes', 'Infinity', '-Infinity', 'inherit', 'Int8Array',
         'Int16Array', 'Int32Array', 'interface', 'iterable', 'legacycaller', 'legacyiterable', 'long', 'maplike', 'mixin',
-        'namespace', 'NaN', 'null', 'object', 'octet', 'optional', 'or', 'partial', 'Promise', 'readonly', 'record', 'RegExp', 'required',
+        'namespace', 'NaN', 'null', 'object', 'octet', 'optional', 'or', 'partial', 'Promise', 'readonly', 'record', 'required',
         'sequence', 'setlike', 'setter', 'short', 'static', 'stringifier', 'true', 'typedef',
         'Uint8Array', 'Uint16Array', 'Uint32Array', 'Uint8ClampedArray', 'unrestricted', 'unsigned', 'USVString',
         'void'))
