@@ -839,12 +839,15 @@ def getSpecRepository(doc):
             with open(os.devnull, "wb") as fnull:
                 remotes = subprocess.check_output(["git", "remote", "-v"], stderr=fnull)
             os.chdir(old_dir)
-            search = re.search(r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
-            if search:
-                return GithubRepository(*search.groups())
-            search = re.search(r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)\.git \(\w+\)", remotes)
-            if search:
-                return GithubRepository(*search.groups())
+            searches = [
+              r"origin\tgit@github\.([\w.-]+):([\w-]+)/([\w-]+)\.git \(\w+\)",
+              r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)\.git \(\w+\)",
+              r"origin\thttps://github\.([\w.-]+)/([\w-]+)/([\w-]+)/? \(\w+\)",
+            ]
+            for search_re in searches:
+                search = re.search(search_re, remotes)
+                if search:
+                    return GithubRepository(*search.groups())
             return config.Nil()
         except subprocess.CalledProcessError:
             # check_output will throw CalledProcessError when not in a git repo
