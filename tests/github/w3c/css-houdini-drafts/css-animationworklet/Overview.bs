@@ -3,12 +3,13 @@ Title:  CSS Animation Worklet API
 Status: ED
 Group: houdini
 ED: https://drafts.css-houdini.org/css-animationworklet-1/
+TR: https://www.w3.org/TR/css-animation-worklet-1/
 Shortname: css-animationworklet
 Level: 1
 Abstract:
-Editor: Majid Valipour, majidvp@google.com
-Editor: Robert Flack, flackr@chromium.org
-Editor: Stephen McGruer, smcgruer@chromium.org
+Editor: Majid Valipour, majidvp@google.com, w3cid 81464
+Editor: Robert Flack, flackr@chromium.org, w3cid 98451
+Editor: Stephen McGruer, smcgruer@chromium.org, w3cid 96463
 Ignored Terms: AnimationWorklet
 </pre>
 
@@ -127,49 +128,6 @@ interface from the Web Animations specification on the main javascript execution
 they can be controlled and inspected from main thread using the same Web Animation APIs.
 
 
-Threading Model {#threading-model}
-==================================
-<em>This section is not normative.</em>
-
-<a>Animation Worklet</a> is designed to be thread-agnostic. Rendering engines may create one or more
-parallel worklet execution contexts separate from the main javascript execution context, e.g., on
-their own dedicated threads. Rendering engines may then choose to assign Animation Worklet
-animations to run in such contexts. Doing so allows Animation Worklet animations to avoid being
-impacted by main thread jank.
-
-Rendering engines may wish to make a best-effort attempt to execute animate callbacks synchronously
-with visual frame production to ensure smooth animation. However it is legal for rendering engines
-to produce visual frames without blocking to receive animation updates from a worklet (i.e., letting
-the effects slip behind). For example, this could occur when the <a>animate function</a> callback is
-unable to complete before the frame deadline.
-
-We believe that scripted animations which are run in a parallel execution environment and which
-limit themselves to animating properties which do not require the user agent to consult main thread
-will have a much better chance of meeting the strict frame budgets required for smooth playback.
-
-If a Worklet Animation animation is executing in a parallel worklet execution context, the last
-known state of its animation effects should be periodically synced back to the main javascript
-execution context. The synchronization of <a>effect values</a> from the parallel worklet execution
-context to the main javascript execution context <em>must</em> occur before <a>running the animation
-frame callbacks</a> as part of the document lifecycle. Note that due to the asynchronous nature of
-this animation model a script running in the main javascript execution context may see a stale value
-when reading a <a>target property</a> that is being animated in a Worklet Animation, compared to the
-value currently being used to produce the visual frame that is visible to the user. This is similar
-to the effect of asynchronous scrolling when reading scroll offsets in the main javascript execution
-context.
-
-
-<figure>
-  <img src="img/AnimationWorklet-threading-model.svg" width="600"
-    alt="Overview of the animation worklet threading model.">
-  <figcaption>
-    Overview of the animation worklet threading model. <br>
-
-    A simplified visualization of how animators running in a parallel execution environment can sync
-    their update to main thread while remaining in sync with visual frame production.
-  </figcaption>
-</figure>
-
 Animation Worklet {#animation-worklet-desc}
 ==============================
 <dfn>Animation Worklet</dfn> is a {{Worklet}} responsible for all classes related to custom
@@ -198,32 +156,23 @@ and each one is associated with a {{WorkletAnimation}} instance. An animator can
 instantiated by construction of a {{WorkletAnimation}}.
 
 
-Two animators types are supported: {{StatelessAnimator}} and {{StatefulAnimator}} each
+Two animators types are supported: <a>Stateless Animator</a> and <a>Stateful Animator</a> each
 providing a different state management strategy.
 
 
-StatelessAnimator Interface {#stateless-animator-desc}
+Stateless Animator {#stateless-animator-desc}
 ---------------------------
 
-This interface represents a stateless animator. This type of animator does not depend on any local
-state either stored on the instance or global scope. Effectively, the animate function of an
-{{StatelessAnimator}} can be treated as a pure function with the expectation that given the same
-input, it produces the same output.
-
-
-
-<xmp class='idl'>
-[Exposed=AnimationWorklet, Global=AnimationWorklet, Constructor (optional any options)]
-interface StatelessAnimator {
-};
-</xmp>
-
+A <dfn>Stateless Animator</dfn> is a type of animator does not depend on any local state either
+stored on the instance or global scope. Effectively, the animate function of an <a>Stateless
+Animator</a> can be treated as a pure function with the expectation that given the same input, it
+produces the same output.
 
 
 <div class='note'>
-    This is how the class should look.
+    This is how an stateless animator class should look.
     <pre class='lang-javascript'>
-        class FooAnimator extends StatelessAnimator {
+        class FooAnimator {
             constructor(options) {
                 // Called when a new animator is instantiated.
             }
@@ -236,14 +185,14 @@ interface StatelessAnimator {
 
 Note: The statelessness allows an animation worklet to perform optimization such as producing
 multiple animation frames in parallel and performing very cheap teardown and setup. Using
-StatelessAnimator is highly recommended to enable such optimizations.
+<a>Stateless Animator</a> is highly recommended to enable such optimizations.
 
-StatefulAnimator Interface {#stateful-animator-desc}
+Stateful Animator {#stateful-animator-desc}
 ---------------------------
 
-This interface represents a stateful animator. This animator can have local state and animation
-worklet guarantees that it maintains this state as long as the stateful animator fulfills the
-contract required by this interface as described following.
+A <dfn>Stateful Animator</dfn> is a type of animator that can have local state and animation worklet
+guarantees that it maintains this state as long as the stateful animator fulfills the contract
+required by its interface as described following.
 
 
 <a>Animation worklet</a> maintains a set of {{WorkletGlobalScope}}s which may exist across different
@@ -253,29 +202,20 @@ effect is mutable only in a certain thread). Animation worklet guarantees that a
 instance's state is maintained even if the instance is respawned in a different global scope.
 
 The basic mechanism for maintaining the state is that the animation worklet snapshots the local
-state that is exposed via the {{StatefulAnimator/state}} function and then reifies it so that it can
-be passed into the constructor when the animator instance is respawned at a later time in a
-potentially different global scope. The <a>migrate an animator instance</a> algorithm specifies this
-process in details.
+state that is exposed via the <a>state function</a> and then reifies it so that it can be passed
+into the constructor when the animator instance is respawned at a later time in a potentially
+different global scope. The <a>migrate an animator instance</a> algorithm specifies this process in
+details.
 
 A user-defined stateful animator is expected to fulfill the required contract which is that its
 state function returns an object representing its state that can be serialized using structured
 serialized algorithm and that it can also recreate its state given that same object passed to
 its constructor.
 
-<xmp class='idl'>
-[Exposed=AnimationWorklet, Global=AnimationWorklet,
-Constructor (optional any options, optional any state)]
-interface StatefulAnimator {
-  any state();
-};
-</xmp>
-
-
 <div class='note'>
-    This is how the class should look.
+    This is how a stateful animator class should look.
     <pre class='lang-javascript'>
-        class BarAnimator extends StatefulAnimator {
+        class BarAnimator {
             constructor(options, state) {
               // Called when a new animator is instantiated (either first time or after being respawned).
               this.currentVelocity  = state ? state.velocity : 0;
@@ -307,8 +247,13 @@ animation as needed by {{AnimationWorkletGlobalScope}}. It consists of:
 
  - An <dfn>animate function</dfn> which is a <a>Function</a> <a>callback function</a> type.
 
- - A <dfn>stateful flag</dfn>
+ - A <dfn>state function</dfn> which is a <a>Function</a> <a>callback function</a> type.
 
+ - A <dfn>stateful flag</dfn>.
+
+
+A <dfn>stateful animator definition</dfn> is an <a>animator definition</a> whose <a>stateful
+flag</a> is <b>true</b>.
 
 
 Registering an Animator Definition {#registering-animator-definition}
@@ -319,7 +264,7 @@ The map gets populated when {{registerAnimator(name, animatorCtor)}} is called.
 
 <xmp class='idl'>
 
-[ Exposed=AnimationWorklet, Global=AnimationWorklet ]
+[ Global=(Worklet,AnimationWorklet), Exposed=AnimationWorklet ]
 interface AnimationWorkletGlobalScope : WorkletGlobalScope {
     void registerAnimator(DOMString name, AnimatorInstanceConstructor animatorCtor);
 };
@@ -327,6 +272,9 @@ interface AnimationWorkletGlobalScope : WorkletGlobalScope {
 callback AnimatorInstanceConstructor = any (any options, optional any state);
 
 </xmp>
+
+Note that to register a <a>stateful animator definition</a> it is simply enough for the registered
+class to have a state function.
 
 <div algorithm="register-animator">
 
@@ -347,24 +295,27 @@ following steps:
     4. Let |prototype| be the result of <a>Get</a>(|animatorCtor|, "prototype").
 
 
-    5. If <a>SameValue</a>(|prototype|, {{StatelessAnimator}}) is <b>true</b> set |stateful| to be
-        <b>false</b>, otherwise if <a>SameValue</a>(|prototype|, {{StatefulAnimator}}) is
-        <b>true</b> set |stateful| to be <b>true</b>, otherwise <a>throw</a> a <a>TypeError</a> and
-        abort all these steps.
+    5. Let |animateFuncValue| be the result of <a>Get</a>(|prototype|, "animate").
 
-    6. Let |animateValue| be the result of <a>Get</a>(|prototype|, "animate").
-
-    7. Let |animate| be the result of <a>converting</a> |animateValue| to the <a>Function</a>
+    6. Let |animateFunc| be the result of <a>converting</a> |animateFuncValue| to the <a>Function</a>
         <a>callback function</a> type. If an exception is thrown, rethrow the exception and abort
         all these steps.
 
-    8. Let |definition| be a new <a>animator definition</a> with:
+    7. Let |stateFuncValue| be the result of <a>Get</a>(|prototype|, "state").
+
+    8. Let |stateFunc| be the result of <a>converting</a> |stateFuncValue| to the <a>Function</a>
+        <a>callback function</a> type, If an exception is thrown, set |stateful| to be <b>false</b>,
+        otherwise set |stateful| to be <b>true</b> and |stateFunc| to be undefined.
+
+    9. Let |definition| be a new <a>animator definition</a> with:
 
         - <a>animator name</a> being |name|
 
         - <a>class constructor</a> being |animatorCtor|
 
-        - <a>animate function</a> being |animate|
+        - <a>animate function</a> being |animateFunc|
+
+        - <a>state function</a> being |stateFunc|
 
         - <a>stateful flag</a> being |stateful|
 
@@ -379,7 +330,7 @@ Animator Instance {#animator-instance-section}
 
 An <dfn>animator instance</dfn> is a <a>struct</a> which describes a fully realized custom animation
 instance in an {{AnimationWorkletGlobalScope}}. It has a reference to an <a>animator definition</a>
-and owns the instance specific state such as animation effect and timelines. It consists of:
+and owns the instance specific state such as animation effect and timeline. It consists of:
 
  - An <a>animator name</a>.
 
@@ -392,12 +343,11 @@ and owns the instance specific state such as animation effect and timelines. It 
 
  - An <dfn>animator timeline</dfn> which is a <a>timeline</a>.
 
- - An <dfn>animator attached timelines</dfn> which is <a>list</a> of attached <a>timelines</a>
-
  - An <dfn>animator serialized options</dfn> which is a serializable object.
 
 A <dfn>stateful animator instance</dfn> is an <a>animator instance</a> whose corresponding
-<a>animator definition</a>'s <a>stateful flag</a> is <b>true</b>.
+definition is a <a>stateful animator definition</a>.
+
 
 
 Creating an Animator Instance {#creating-animator-instance}
@@ -421,26 +371,23 @@ To <dfn>create a new animator instance</dfn> given a |name|, |timeline|, |effect
 
     2. Let |animatorCtor| be the <a>class constructor</a> of |definition|.
 
-    3. Let |timelineList| be a new <a>list</a> with |timeline| added to it.
+    3. Let |options| be <a>StructuredDeserialize</a>(|serializedOptions|).
 
-    4. Let |options| be <a>StructuredDeserialize</a>(|serializedOptions|).
+    4. Let |state| be <a>StructuredDeserialize</a>(|serializedState|).
 
-    5. Let |state| be <a>StructuredDeserialize</a>(|serializedState|).
-
-    6. Let |animatorInstance| be the result of <a>constructing</a> |animatorCtor| with
+    5. Let |animatorInstance| be the result of <a>constructing</a> |animatorCtor| with
         «|options|, |state|» as arguments. If an exception is thrown, rethrow the exception and
         abort all these steps.
 
-    7. Set the following on |animatorInstance| with:
+    6. Set the following on |animatorInstance| with:
         - <a>animator name</a> being |name|
         - <a>animation requested flag</a> being <a>frame-current</a>
         - <a>animator current time</a> being unresolved
         - <a>animator effect</a> being |effect|
         - <a>animator timeline</a> being |timeline|
-        - <a>animator attached timelines</a> being |timelineList|
         - <a>animator serialized options</a> being |options|
 
-    8. Add |animatorInstance| to |workletGlobalScope|'s <a>animator instance set</a>.
+    7. Add |animatorInstance| to |workletGlobalScope|'s <a>animator instance set</a>.
 
 </div>
 
@@ -534,6 +481,7 @@ To <dfn>migrate an animator instance</dfn> from one {{WorkletGlobalScope}} to an
 
      4. If |stateful| is <b>false</b> then abort the following steps.
 
+     4. |stateFunction|
      5. Let |state| be the result of <a>Invoke</a> |stateFunction| with |instance| as the
         <a>callback this value</a>.  If any exception is thrown, rethrow the exception and abort
         the following steps.
@@ -569,7 +517,7 @@ Each <a>animator instance</a> has an associated <dfn>animation requested flag</d
 either <dfn>frame-requested</dfn> or <dfn>frame-current</dfn>. It is initially set to
 <a>frame-current</a>. Different circumstances can cause the <a>animation requested flag</a> to be
 set to <a>frame-requested</a>. These include the following:
-  - Changes in the <a>current time</a> of any <a>timeline</a> in the animator's <a>animator attached timelines</a>
+  - Changes in the <a>current time</a> of the animator's <a>timeline</a>
   - Changes in the <a>current time</a> of the animator's corresponding <a>Worklet Animation</a>
 
 [[#running-animators]] resets the <a>animation requested flag</a> on animators to
@@ -689,6 +637,17 @@ Here are a few implications of the above semantics:
     may return stale information, in the case where the <a>animator instance</a> is running in a
     parallel execution context.
 
+If a Worklet Animation animation is executing in a parallel worklet execution context, the last
+known state of its animation effects should be periodically synced back to the main javascript
+execution context. The synchronization of <a>effect values</a> from the parallel worklet execution
+context to the main javascript execution context <em>must</em> occur before <a>running the animation
+frame callbacks</a> as part of the document lifecycle. Note that due to the asynchronous nature of
+this animation model a script running in the main javascript execution context may see a stale value
+when reading a <a>target property</a> that is being animated by a Worklet Animation, compared to the
+value currently being used to produce the visual frame that is visible to the user. This is similar
+to the effect of asynchronous scrolling when reading scroll offsets in the main javascript execution
+context.
+
 Issue(811): Come with appropriate mechanism's for <a>animator instance</a> to get notified when its
    animation currentTime is changing e.g., via reverse(), finish() or playbackRate change. So that
    it can react appropriately.
@@ -765,13 +724,12 @@ When the procedure to <a>set the timeline of an animation</a> for a given |workl
 is called, then <a>set animator instance of worklet animation</a> given |workletAnimation|.
 
 
-Timeline Attachment {#timeline-attachment}
--------------------
-
-Issue(810): Define semantics of attachment and detachment.
 
 ScrollTimeline {#scroll-timeline}
 ---------------------------------
+<em>This section is not normative.</em>
+
+
 {{ScrollTimeline}} is a new concept being proposed for addition to web animation API. It defines
 an animation timeline whose time value depends on the scroll position of a scroll container.
 <a>Worklet animations</a> can have a scroll timeline and thus drive their scripted effects based
@@ -848,96 +806,8 @@ There are no known privacy issues introduced by these features.
 Examples {#examples}
 ====================
 
-Example 1: Hidey Bar. {#example-1}
------------------------------------------
-An example of header effect where a header is moved with scroll and as soon as finger is lifted it
-animates fully to close or open position depending on its current position.
 
-<xmp class='lang-markup'>
-
-<div id='scrollingContainer'>
-  <div id='header'>Some header</div>
-  <div>content</div>
-</div>
-
-<script>
-await CSS.animationWorklet.addModule('hidey-bar-animator.js');
-const scrollTimeline = new ScrollTimeline({
-  scrollSource: $scrollingContainer,
-  orientation: 'block',
-  timeRange: 1000
-});
-const documentTimeline = document.timeline;
-
-// Note we pass in two timelines in the options bag which allows the animation to read their
-// currenTime values directly.
-const animation = new WorkletAnimation(
-    'hidey-bar',
-    new KeyframeEffect($header,
-                        [{transform: 'translateX(100px)'}, {transform: 'translateX(0px)'}],
-                        {duration: 1000, iterations: 1, fill: 'both' }]),
-    scrollTimeline,
-    {scrollTimeline, documentTimeline});
-
-animation.play();
-</script>
-</xmp>
-
-<xmp class='lang-javascript'>
-
-// Inside AnimationWorkletGlobalScope
-
-registerAnimator('hidey-bar', class HidybarAnimator extends StatefulAnimator {
-  constructor(options, state) {
-    this.scrollTimeline_ = options.scrollTimeline;
-    this.documentTimeline_ = options.documentTimeline;
-
-    if (state) {
-      this.startTime_ = state.startTime;
-      this.direction_ = state.direction;
-    }
-  }
-
-  animate(currentTime, effect) {
-    const scroll = this.scrollTimeline_.currentTime;  // [0, 100]
-    const time = this.documentTimeline_.currentTime;
-
-    const activelyScrolling = this.scrollTimeline_.phase == 'active';
-
-    let localTime;
-    if (activelyScrolling) {
-      this.startTime_ = undefined;
-      localTime = scroll;
-    } else {
-      this.startTime_ = this.startTime_ || time;
-      // Decide on close/open direction depending on how far we have scrolled the header
-      // This can even do more sophisticated animation curve by computing the scroll velocity and
-      // using it.
-      this.direction_ = scroll >= 50 ? +1 : -1;
-      localTime = this.direction_ * (time - this.startTime_);
-    }
-
-    // Drive the output effect by setting its local time.
-    effect.localTime = localTime;
-  }
-
-  getter state() {
-    return {
-      startTime: this.startTime_,
-      direction: this.direction_
-    }
-  }
-});
-
-</xmp>
-
-Issue: This example uses a hypothetical "phase" property on timeline as a way to detect when user
-is no longer actively scrolling. This is a reasonable thing to have on scroll timeline. A simple
-fallback can emulate this by detecting when timeline time (i.e. scroll offset) has not changed in
-the last few frames.
-
-
-Example 2: Twitter header. {#example-2}
+Example 1: Twitter header. {#example-1}
 --------------------------
 An example of twitter profile header effect where two elements (avatar, and header) are updated in
 sync with scroll offset.
@@ -977,7 +847,7 @@ animation.play();
 
 <xmp class='lang-javascript'>
 // Inside AnimationWorkletGlobalScope.
-registerAnimator('twitter-header', class HeaderAnimator extends StatelessAnimator {
+registerAnimator('twitter-header', class HeaderAnimator {
   constructor(options) {
     this.timing_ = new CubicBezier('ease-out');
   }
@@ -997,7 +867,7 @@ function clamp(value, min, max) {
 
 </xmp>
 
-Example 3: Parallax backgrounds. {#example-3}
+Example 2: Parallax backgrounds. {#example-2}
 -----------------------------------------
 A simple parallax background example.
 
@@ -1045,7 +915,7 @@ fastParallax.play();
 
 <xmp class='lang-javascript'>
 // Inside AnimationWorkletGlobalScope.
-registerAnimator('parallax', class ParallaxAnimator extends StatelessAnimator {
+registerAnimator('parallax', class ParallaxAnimator {
   constructor(options) {
     this.rate_ = options.rate;
   }

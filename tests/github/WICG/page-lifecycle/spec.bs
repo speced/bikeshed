@@ -1,16 +1,15 @@
 <pre class='metadata'>
 Title: Page Lifecycle
-Group: webperf
+Group: WICG
+Status: CG-DRAFT
 Shortname: page-lifecycle
 Level: 1
-ED:
-TR:
-Status: ED
+URL: https://wicg.github.io/page-lifecycle/
 Editor: Shubhie Panicker, Google https://google.com, panicker@google.com
 Editor: Domenic Denicola, Google https://google.com, d@domenic.me
 Repository: wicg/page-lifecycle
 Abstract: This document defines an API that supports browsers' ability to manage lifecycle of web pages.
-Default Highlight: js
+Default Biblio Status: current
 </pre>
 
 <pre class='link-defaults'>
@@ -23,7 +22,28 @@ spec: HTML; urlPrefix: https://html.spec.whatwg.org/multipage/;
     type: dfn; text: traverse the history; url: browsing-the-web.html#traverse-the-history
     type: dfn; text: list of the descendant browsing contexts; url: browsers.html#list-of-the-descendant-browsing-contexts
     type: dfn; text: browsing context; for: document; url: browsers.html#concept-document-bc
+    type: dfn; text: readiness; for: document; url: dom.html#current-document-readiness
+    type: dfn; text: iframe load in progress; url: iframe-embed-object.html#iframe-load-in-progress
+    type: dfn; text: iframe load event steps; url: iframe-embed-object.html#iframe-load-event-steps
+    type: dfn; text: Update the rendering; url: webappapis.html#update-the-rendering
+    type: dfn; text: being rendered; url: rendering.html#being-rendered
+    type: dfn; text: browsing context container; url: browsers.html#browsing-context-container
+    type: dfn; text: media elements; url: media.html#media-element
+    type: dfn; text: media pause; url: media.html#internal-pause-steps
+    type: dfn; text: media play; url: media.html#internal-play-steps
+    type: dfn; text: dedicated worker agent; url: webappapis.html#dedicated-worker-agent
+    type: dfn; text: worklet agent; url: webappapis.html#worklet-agent
+spec: CSS2; urlPrefix: https://www.w3.org/TR/CSS2/
+    type: dfn; text: viewport; url: visuren.html#viewport
+spec: IntersectionObserver; urlPrefix: https://w3c.github.io/IntersectionObserver/
+    type: dfn; text: compute the intersection of a target element and the root; url: #calculate-intersection-rect-algo
+spec: ECMA262; urlPrefix: https://tc39.github.io/ecma262/;
+    type: dfn; text: blocked; url: #sec-forward-progress
+    type: dfn; text: realm; url: #sec-code-realms
+spec: CSS-Houdini; urlPrefix: https://drafts.css-houdini.org/worklets;
+    type: dfn; text: owning document; for: worklet; url: #workletglobalscope-owner-document
 </pre>
+
 
 Introduction {#intro}
 =====================
@@ -45,8 +65,8 @@ This spec defines what the lifecycle of a web page is and adds extensions to ena
     * Tab discarding (for memory saving)
 
 This spec formalizes two new lifecycle states to support the above:
-    * <dfn for="Lifecycle">Frozen</dfn>: lifecycle state for CPU suspension. This means that the [[#change-frozenness-of-document]] algorithm was called on the {{Document}}'s [=document/browsing context=]. Normally HIDDEN pages will be [=/frozen=] to conserve resources.
-    * <dfn for="Lifecycle">Discarded</dfn>: means that the [=discard=] algorithm was called on the {{Document}}'s [=document/browsing context=]. Normally [=/frozen=] frames will be moved to [=Lifecycle/discarded=] state to conserve resources.
+    * Frozen: lifecycle state for CPU suspension. This means that the [=freeze steps=] algorithm was called on the {{Document}}'s [=document/browsing context=]. Normally HIDDEN pages will be [=/frozen=] to conserve resources.
+    * Discarded: means that the [=discard=] algorithm was called on the {{Document}}'s [=document/browsing context=]. Normally [=/frozen=] frames will be moved to the discarded state to conserve resources.
 
 TODO(panicker): Insert diagram
 
@@ -75,7 +95,7 @@ Usage example {#example}
 ------------------------
 
 Example of handling freeze and resume:
-<pre class="example highlight">
+<pre class="example highlight" highlight="js">
 const prepareForFreeze = () => {
   // Close any open IndexedDB connections.
   // Release any web locks.
@@ -94,7 +114,7 @@ document.addEventListener('resume', reInitializeApp);
 
 Example of restoring view state after discard:
 A user could have multiple tabs open for the same app & URL. If they are both in the background and are both discarded, then the app would need to distinguish between the two tabs to restore the correct state. clientId and lastClientId on the Window can be used for this purpose.
-<pre class="example highlight">
+<pre class="example highlight" highlight="js">
 // Persists state to IndexedDB, making sure to set the current value of
 // `self.clientId` on the record, so it can be retrieved later using
 // `getPersistedState()` (if the tab has to be reloaded after a discard).
@@ -116,73 +136,127 @@ if (document.wasDiscarded) {
 }
 </pre>
 
+Feature Policies {#feature-policies}
+=====================
+Controlling the execution state of [=nested browsing contexts=] is desirable from a [=document/browsing context=] in order to control
+the user experience. An application may desire that when a document is not [=being rendered=] or does not intersect the [=viewport=]
+that all execution stops in the [=nested browsing context=] (including currently playing video, audio). Stopping all execution
+can lead to an improvement in CPU utilization. To meet these needs, two feature policies are defined:
+ * "<dfn export><code>execution-while-not-rendered</code></dfn>", which has a [=default allowlist=] of <code>*</code>
+ * "<dfn export><code>execution-while-out-of-viewport</code></dfn>", which has a [=default allowlist=] of <code>*</code>
+
+The "<a><code>execution-while-not-rendered</code></a>" policy controls whether
+tasks should execute for [=nested browsing contexts=] whose [=browsing context container=] is not [=being rendered=].
+
+The "<a><code>execution-while-out-of-viewport</code></a>" policy controls whether
+tasks should execute for [=nested browsing contexts=] whose [=browsing context container=] does not intersect the [=viewport=] according
+to [=compute the intersection of a target element and the root=].
+
+[[#mod]] accomplishes this by placing the document (and its decendants) in a [=/frozen=] state when the following
+conditions have been met:
+ * the [=iframe load event steps=] have been run;
+ * the policy is disabled for the document; and
+ * the relevant policy condition applies (not rendered or scrolled out of view).
+
+If these conditions aren't met, the document will be in the [=/unfrozen=] state.
+
+<pre class="example highlight" highlight="html">
+&lt;!-- The iframe will be frozen immediately after it is loaded. --&gt;
+
+&lt;iframe allow="execution-while-not-rendered 'none'"
+  src="subframe.html" style="display:none"&gt;&lt;/iframe&gt;
+</pre>
+
+<div algorithm>
+    To run the <dfn export>update document frozenness steps</dfn> for a {{Document}} |document|:
+
+    1. If |document|'s [=document/browsing context=] is not a [=nested browsing context=], then return.
+    1. If |document|'s [=document/readiness=] is not "<code>complete</code>", then return.
+    1. Let |element| be |document|'s [=document/browsing context=]'s [=browsing context container=].
+    1. Let |frozenness| be false.
+    1. Let |auto resume media| be false.
+    1. If |document| is not [=allowed to use=] the "<a><code>execution-while-not-rendered</code></a>" feature, then:
+        1. If |element| is not [=being rendered=],  set |frozenness| to true.
+    1. Otherwise if |document| is not [=allowed to use=] the "<a><code>execution-while-out-of-viewport</code></a>" feature, then:
+        1. If |element| does not intersect the [=viewport=] according to [=compute the intersection of a target element and the root=], set |frozenness| to true and set |auto resume media| to true.
+    1. If |frozenness| does not equal |document|'s [=Document/frozenness=] state, [=change the frozenness of a document=] given |document|, |frozenness|, and |auto resume media|.
+</div>
+
 Processing model {#sec-processing-model}
 ========================================
+
+Modifications to worklet and worker behavior {#worklets-workers}
+----------------------------------------------------------------
+
+Any [=worklet agent=] whose single [=/realm=]'s [=Realm/global object=]'s [=worklet/owning document=] is [=/frozen=] must become [=blocked=].
+Any [=dedicated worker agent=] whose single [=/realm=]'s [=Realm/global object=]'s [=DedicatedWorkerGlobalScope/owning document=] is non-null and [=/frozen=] must become [=blocked=].
+
+<div algorithm>
+    To determine the <dfn for="DedicatedWorkerGlobalScope" export>owning document</dfn> for a {{DedicatedWorkerGlobalScope}} |workerGlobalScope|:
+
+    1. If |workerGlobalScope|'s [=owner set=] consists of a single {{Document}} |document|, then return |document|.
+    1. If |workerGlobalScope|'s [=owner set=] consists of a single {{DedicatedWorkerGlobalScope}} |parentWorkerGlobalScope|, then return |parentWorkerGlobalScope|'s [=owning document=].
+    1. Return null.
+
+    NOTE: A {{DedicatedWorkerGlobalScope}}'s [=owner set=] will always have exactly one item.
+</div>
+
 
 Modifications to the HTML Standard {#mod}
 --------------------------------------------
 
-### HTML: <a href="https://html.spec.whatwg.org/#task-source">task source</a> ### {#html-task-source-dfn}
+### <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#unloading-documents">Unloading documents</a> and <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#history-traversal">history traversal</a> ### {#html-bfcache-dfn}
 
-Each task source is classified as <dfn for="task source">freezable</dfn> or <dfn for="task source">unfreezable</dfn>.
+When documents move into and out of <a href="https://webkit.org/blog/427/webkit-page-cache-i-the-basics/">bfcache (back forward cache)</a> they will transition its [=Document/frozenness=] state to true and false respectively.
 
-All tasks queued on [=task source/freezable=] task source are automatically freezable.
+* In the [=unload a document=] algorithm, after Step #5, if the {{PageTransitionEvent/persisted}} attribute is true (i.e. we are moving to bfcache), [=change the frozenness of a document=], given |document| and true.
+* In the [=traverse the history=] algorithm, before Step #4.6.4, if the {{PageTransitionEvent/persisted}} attribute is true (i.e. we are moving out of bfcache), [=change the frozenness of a document=], given |document| and false.
 
-Examples of [=task source/freezable=] task sources are:
+### <a href="https://html.spec.whatwg.org/multipage/webappapis.html#definitions-3">Event loop: definitions</a> ### {#html-html-event-loop-definitions}
 
-* timers: callbacks generated by timers of a Document
-* networking: tasks queued due to loading of resources
-* DOM manipulation, user interaction, history traversal etc.
+Replace: A [=task=] is runnable if its [=document=] if either null or [=fully active=].
 
-NOTE: networking task source is freezable with an exception: when a pending fetch keep-alive request in inflight, then networking task source must not be frozen.
+With: A [=task=] is runnable if its [=document=] is either null or [=fully active=], and is also [=/unfrozen=].
 
-Examples of [=task source/unfreezable=] task sources are:
+### <a href="https://html.spec.whatwg.org/multipage/webappapis.html#event-loop-processing-model">Event loop: processing model</a> ### {#html-event-loop}
 
-* V8 task sources for garbage collection
-* IPC task sources needed to communicate with browser process
-* other task sources that are shared with the entire process 
+After Step #11 during the [=Update the rendering=] add the following step.
 
-TODO(domenic): classify all existing task sources in the HTML spec; find out if other specs have defined any relevant task sources.
+For each [=fully active=] {{Document}} |doc| in <var ignore>docs</var>, run the [=update document frozenness steps=] given |doc|.
 
-TODO(panicker): Add note about keeping everything within a site instance that are scriptable (eg. documents that can post-message with each other) in the same lifecycle state.
-
-
-### HTML: <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#unloading-documents">Unloading documents</a> and <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#history-traversal">History Traversal</a> ### {#html-bfcache-dfn}
-
-When documents move into and out of <a href="https://webkit.org/blog/427/webkit-page-cache-i-the-basics/">bfcache (back forward cache)</a> they will transition its [=Document/frozenness=] state to <code>true</code> and <code>false</code> respectively.
-
-* In the [=unload a document=] algorithm, after Step #5, if the {{PageTransitionEvent/persisted}} attribute is true (i.e. we are moving to bfcache), run the [[#change-frozenness-of-document]] algorithm, passing in |document| and <code>true</code>.
-* In the [=traverse the history=] algorithm, before Step #4.6.4, if the {{PageTransitionEvent/persisted}} attribute is true (i.e. we are moving out of bfcache), run the [[#change-frozenness-of-document]] algorithm, passing in |document| and <code>false</code>.
-
-
-### HTML: <a href="https://html.spec.whatwg.org/multipage/webappapis.html#event-loop-processing-model">HTML Event Loop Processing Model</a> ### {#html-event-loop}
-
-Step #1 currently ignores "tasks whose associated {{Document}}s are not [=fully active=]". Modify this clause to also ignore [=task/freezable=] tasks whose associated {{Document}} is in the [=/frozen=] state.
-
-### HTML: <a href="https://html.spec.whatwg.org/multipage/window-object.html#a-browsing-context-is-discarded">Discarding browsing context</a> ### {#html-discarding}
+### <a href="https://html.spec.whatwg.org/multipage/window-object.html#a-browsing-context-is-discarded">Discarding browsing contexts</a> ### {#html-discarding}
 
 Rename the "<a href="https://html.spec.whatwg.org/multipage/window-object.html#a-browsing-context-is-discarded">discard</a>" concept, for both browsing contexts and documents, to "destroy". This allows us to use the "discarded" terminology for the user-facing {{Document/wasDiscarded}} attribute.
 
-### HTML: Modifications to <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#initialise-the-document-object">Initialize the document</a> ### {#html-initialize-doc}
+### <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#initialise-the-document-object">Initialize the document</a> ### {#html-initialize-doc}
 
 Before Step #3 add following:
 
 If the browsing context was previously [=/discarded=], then set the {{Document}}'s [=Document/discarded=] boolean to true.
 
+### [=iframe load event steps=] ### {#html-iframe-load}
 
-Additions to Page Lifecycle spec {#page-lifecycle}
+After Step #5 add following:
+
+Run the [=update document frozenness steps=] given <var ignore>child document</var>.
+
+### {{HTMLMediaElement}} ### {#html-media-elements}
+
+Each {{HTMLMediaElement}} has a <dfn for="HTMLMediaElement">resume frozen flag</dfn>, which is initially set to false.
+
+Page lifecycle processing model {#page-lifecycle}
 --------------------------------------------
 
-<h4>FROZENNESS state</h4>
+<h4 id="frozenness-state">FROZENNESS state</h4>
 A document can be in one of the following <dfn for="Document">FROZENNESS</dfn> states:
 
-* true: the document is <dfn export lt="frozen">frozen</dfn>, any freezeable tasks associated with the document will not run
+* true: the document is <dfn export lt="frozen">frozen</dfn>, any tasks associated with the document will not run
 * false: the document is <dfn export lt="unfrozen">unfrozen</dfn>, tasks associated with the document will run as usual
 
-    NOTE: Per the [[#change-frozenness-of-a-top-level-document]] algorithm, when the Document of the top level browsing context changes its [=Document/frozenness=] state then all documents of descendant browsing contexts will also change [=Document/frozenness=] to the same value (and be consistent with the Document of the top level browsing context).
+    NOTE: Per the [=change the frozenness of a top-level document=] algorithm, when the Document of the top level browsing context changes its [=Document/frozenness=] state then all documents of descendant browsing contexts will also change [=Document/frozenness=] to the same value (and be consistent with the Document of the top level browsing context).
 
-The UA may choose to execute [[#change-frozenness-of-a-top-level-document]] with <code>true</code> in certain situations.
-For instance, if a browsing context is in the background or hidden, and a grace period has elapsed the UA could execute [[#change-frozenness-of-a-top-level-document]] with <code>true</code> to conserve resources and maintain the quality of the (foreground) user experience.
+The UA may choose to execute [=change the frozenness of a top-level document=] algorithm with true in certain situations.
+For instance, if a top level browsing context is in the background or hidden, and a grace period has elapsed the UA could execute [=change the frozenness of a top-level document=] with true to conserve resources and maintain the quality of the (foreground) user experience.
 Specific examples:
 
 * In mobile Chrome, tabs that have been in background for (at least) 5 minutes, may be [=/frozen=], to conserve battery and data.
@@ -190,33 +264,61 @@ Specific examples:
 
     NOTE: background tabs that are actively doing work on behalf of the user (eg. playing audio) are generally not [=/frozen=] or [=/discarded=].
 
-    NOTE: For a detailed list of heuristics & exclusions used by Chrome, see <a href=https://docs.google.com/document/d/1QJpuBTdllLVflMJSov0tlFX3e3yfSfd_-al2IBavbQM/edit>this doc</a>. 
-    
-The UA will typically execute [[#change-frozenness-of-a-top-level-document]] with <code>false</code> when the user revisits that browsing context. In addition, the UA may choose to periodically execute [[#change-frozenness-of-a-top-level-document]] with <code>false</code> in the background, if plentiful resources are available.
+    NOTE: For a detailed list of heuristics & exclusions used by Chrome, see <a href=https://docs.google.com/document/d/1QJpuBTdllLVflMJSov0tlFX3e3yfSfd_-al2IBavbQM/edit>this doc</a>.
 
-<h4 dfn>Reacting to FROZENNESS state changes</h4>
-<h5 dfn>Change frozenness of a top-level document</h5>
-To change the [=Document/frozenness=] of a top-level document passing in a document |doc| and [=Document/frozenness=] state |x| (one of <code>true</code>, <code>false</code>):
+The UA will typically execute [=change the frozenness of a top-level document=] with false when the user revisits that browsing context. In addition, the UA may choose to periodically execute [=change the frozenness of a top-level document=] with false in the background, if plentiful resources are available.
 
-1. Assert: |doc|'s [=Document/browsing context=] is a [=top-level browsing context=].
-1. Execute [[#change-frozenness-of-document]] passing in |doc| and |x|.
-1. Let |descendants| be the [=list of the descendant browsing contexts=] of |doc|.
-1. For each [=/browsing context=] |b| in |descendants|:
-    1. Let |d| be the [=active document=] of |b|.
-    1. Execute [[#change-frozenness-of-document]] passing in |d| and |x|.
+<h4 id="changing-frozenness">Changing the frozenness of documents</h4>
 
-<h5 dfn>Change frozenness of document</h5>
-To change the [=Document/frozenness=] of a document given a document |doc| and [=Document/frozenness=] state |x|:
-1. If |x| is <code>true</code>:
-    1. Set |doc|'s [=Document/frozenness=] state to <code>true</code>.
+<div algorithm>
+    To <dfn>change the frozenness of a top-level document</dfn>, given a {{Document}} |topLevelDoc| and boolean [=Document/frozenness=] state |frozenness|:
+
+    1. Assert: |doc|'s [=Document/browsing context=] is a [=top-level browsing context=].
+    1. [=Change the frozenness of a document=] given |topLevelDoc|, |frozenness|, and false.
+    1. Let |descendants| be the [=list of the descendant browsing contexts=] of |doc|.
+    1. For each [=/browsing context=] |b| in |descendants|:
+        1. Let |descendantDocument| be the [=active document=] of |b|.
+        1. [=Change the frozenness of a document=] given |descendantDocument|, |frozenness|, and false.
+</div>
+
+<div algorithm>
+    To <dfn>change the frozenness of a document</dfn>, given a {{Document}} |doc|, a boolean [=Document/frozenness=] state |frozenness|, and a boolean |auto resume frozen media|:
+
+    1. If |frozenness| is true, run the [=freeze steps=] for |doc| given |auto resume frozen media|.
+    1. Otherwise, run the [=resume steps=] given |doc|.
+</div>
+
+<div algorithm>
+    To run the <dfn>freeze steps</dfn> for a {{Document}} <var>doc</var>, given a boolean |auto resume frozen media|:
+
+    1. Set |doc|'s [=Document/frozenness=] state to true.
     1. [=Fire an event=] named <code>freeze</code> at |doc|.
-1. Otherwise:
+    1. Let |elements| be all [=media elements=] that are [=shadow-including descendants=] of |doc|, in [=shadow-including tree order=].
+    1. For each |element| in |elements|:
+        1. If |element|'s {{HTMLMediaElement/paused}} is false, then:
+            1. Set |element|'s [=HTMLMediaElement/resume frozen flag=] to |auto resume frozen media|.
+            1. Execute [=media pause=] on |element|.
+
+        NOTE: it is intentional that the ordering between the assignment of the of frozneness state
+        occurs first before event firing.
+</div>
+
+<div algorithm>
+    To run the <dfn export>resume steps</dfn> for a {{Document}} <var>doc</var>:
+
+    1. Let |elements| be all [=media elements=] that are [=shadow-including descendants=] of |doc|, in [=shadow-including tree order=].
+        1. For each |element| in |elements|:
+            1. If |elements|'s [=HTMLMediaElement/resume frozen flag=] is true.
+                1. Set |elements|'s [=HTMLMediaElement/resume frozen flag=] to false.
+                1. Execute [=media play=] on |element|.
     1. [=Fire an event=] named <code>resume</code> at |doc|.
-    1. Set |doc|'s [=Document/frozenness=] state to <code>false</code>.
+    1. Set |doc|'s [=Document/frozenness=] state to false.
 
-    NOTE: it is intentional that the ordering between event-firing and setting the state are different in the two cases above.
+        NOTE: it is intentional that the ordering between the assignment of the of frozneness state
+        comes last after event firing.
+</div>
 
-<h4>Discarding</h4>
+<h4 id="discarding">Discarding</h4>
 Each Document has a <dfn for="Document">discarded</dfn> boolean, which is initially false.
 
 To <dfn export lt="discarded|discard">discard</dfn> a browsing context, <a href="https://html.spec.whatwg.org/multipage/window-object.html#a-browsing-context-is-discarded">destroy the browsing context</a>, and make note of the fact that the reason it and any descendant browsing contents were destroyed was because of discarding.
@@ -229,7 +331,7 @@ Browsing contexts -- that are in the background and have their documents in <a h
 
     NOTE: background tabs that are actively doing work on behalf of the user (eg. playing audio) are generally not [=/discarded=].
 
-    NOTE: For a detailed list of heuristics & exclusions used by Chrome, see <a href=https://docs.google.com/document/d/1QJpuBTdllLVflMJSov0tlFX3e3yfSfd_-al2IBavbQM/edit>this doc</a>. 
+    NOTE: For a detailed list of heuristics & exclusions used by Chrome, see <a href=https://docs.google.com/document/d/1QJpuBTdllLVflMJSov0tlFX3e3yfSfd_-al2IBavbQM/edit>this doc</a>.
 
 When a [=top-level browsing context=] (tab in the browser) is [=/discarded=] due to resource pressure (or unexpected events eg. process crash), and later the user revisits the tab in the browser, then the {{Document}}'s [=Document/discarded=] boolean will be true due to [[#html-initialize-doc]].
 
@@ -238,4 +340,11 @@ When a [=top-level browsing context=] (tab in the browser) is [=/discarded=] due
 <h2 id=acknowledgements>Acknowledgements</h2>
 <!-- ============================================================ -->
 
-Special thanks to Ojan Vafai, Philip Walton, Fadi Meawad, Olli Pettay, Todd Reifsteck for their technical input and suggestions that led to improvements to this specification.
+Special thanks to
+Dave Tapuska,
+Fadi Meawad,
+Ojan Vafai,
+Olli Pettay,
+Philip Walton, and
+Todd Reifsteck
+for their technical input and suggestions that led to improvements to this specification.

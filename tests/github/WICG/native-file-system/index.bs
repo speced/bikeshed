@@ -65,23 +65,43 @@ directory on disk but doesn't have to map to any file on disk).
 ## The {{FileSystemHandle}} interface ## {#api-filesystemhandle}
 
 <xmp class=idl>
+dictionary FileSystemHandlePermissionDescriptor {
+  boolean writable = false;
+};
+
+[Exposed=(Window,Worker), SecureContext, Serializable]
 interface FileSystemHandle {
   readonly attribute boolean isFile;
   readonly attribute boolean isDirectory;
   readonly attribute USVString name;
 
-  Promise<FileSystemHandle> moveTo(USVString name);
-  Promise<FileSystemHandle> moveTo(
-      FileSystemDirectoryHandle parent, optional USVString name);
-  Promise<FileSystemHandle> copyTo(
-      FileSystemDirectoryHandle parent, optional USVString name);
-  Promise<void> remove();
+  Promise<PermissionState> queryPermission(optional FileSystemHandlePermissionDescriptor descriptor);
+  Promise<PermissionState> requestPermission(optional FileSystemHandlePermissionDescriptor descriptor);
 };
 </xmp>
 
 A {{FileSystemHandle}} object represents a [=/entry=]. Each {{FileSystemHandle}} object is assocaited
 with a <dfn for=FileSystemHandle>entry</dfn> (a [=/entry=]). Multiple separate objects implementing
 the {{FileSystemHandle}} interface can all be associated with the same [=/entry=] simultaneously.
+
+<div algorithm="serialization steps">
+{{FileSystemHandle}} objects are [=serializable objects=]. Their [=serialization steps=], given
+|value|, |serialized| and |forStorage| are:
+
+1. Set |serialized|.\[[Origin]] to |value|'s [=relevant settings object=]'s [=environment settings object/origin=].
+1. TODO
+
+</div>
+
+<div algorithm="deserialization steps">
+Their [=deserialization steps=], given |serialized| and |value| are:
+
+1. If |serialized|.\[[Origin]] is not [=same origin=] with
+   |value|'s [=relevant settings object=]'s [=environment settings object/origin=],
+   then throw a {{DataCloneError}}.
+1. TODO
+
+</div>
 
 <div class="note domintro">
   : |handle| . {{FileSystemHandle/isFile}}
@@ -103,68 +123,62 @@ associated [=FileSystemHandle/entry=] is a [=directory entry=], and false otherw
 The <dfn attribute for=FileSystemHandle>name</dfn> attribute must return the [=entry/name=] of the
 associated [=FileSystemHandle/entry=].
 
-### The {{FileSystemHandle/moveTo()}} method ### {#api-filesystemhandle-moveto}
+### The {{FileSystemHandle/queryPermission()}} method ### {#api-filesystemhandle-querypermission}
+
+Issue: the currently described API here assumes a model where it is not possible to have a
+    write-only handle. I.e. it is not possible to have or request write access without also having
+    read access. There definitely are use cases for write-only handles (i.e. directory downloads),
+    so we might have to reconsider this.
 
 <div class="note domintro">
-  : |newHandle| = await |handle| . {{FileSystemHandle/moveTo()|moveTo}}(|newName|)
-  :: Renames the entry represented by |handle| to |newName|.
+  : |status| = await |handle| . {{FileSystemHandle/queryPermission()|queryPermission}}({ {{FileSystemHandlePermissionDescriptor/writable}} = false })
+  : |status| = await |handle| . {{FileSystemHandle/queryPermission()}}
+  :: Queries the current state of the read permission of this handle. If this returns `"prompt"`
+     the website will have to call {{FileSystemHandle/requestPermission()}} before any
+     operations on the handle can be done. If this returns `"denied"` any operations will reject.
 
-  : |newHandle| = await |handle| . {{FileSystemHandle/moveTo()|moveTo}}(|otherDir|)
-  :: Moves the entry represented by |handle| to |otherDir|, while keeping its existing name.
+     Usually handles returned by {{chooseFileSystemEntries}} will initially return `"granted"` for
+     their read permission state, however other than through the user revoking permission, a handle
+     retrieved from IndexedDB is also likely to return `"prompt"`.
 
-  : |newHandle| = await |handle| . {{FileSystemHandle/moveTo()|moveTo}}(|otherDir|, |newName|)
-  :: Moves the entry represented by |handle| to |otherDir|, while renaming it to |newName|.
-
-     In all of these cases, |handle| will no longer represent a valid entry, and thus any further
-     operations on it will fail.
-
-     Attempting to move an entry to the directory it already exists in, without renaming it is
-     an error. In all other cases if the target entry already exists, it is overwritten.
+  : |status| = await |handle| . {{FileSystemHandle/queryPermission()|queryPermission}}({ {{FileSystemHandlePermissionDescriptor/writable}} = true })
+  :: Queries the current state of the write permission of this handle. If this returns `"prompt"`,
+     attempting to modify the file or directory this handle represents will require user activation
+     and will result in a confirmation prompt being shown to the user. However if the state of the
+     read permission of this handle is also `"prompt"` the website will need to call
+     {{FileSystemHandle/requestPermission()}}. There is no automatic prompting for read access when
+     attempting to read from a file or directory.
 </div>
 
 <div algorithm>
-The <dfn method for=FileSystemHandle>moveTo(|parent|, |name|)</dfn> method, when invoked, must run
-these steps:
+The <dfn method for=FileSystemHandle>queryPermission(|descriptor|)</dfn> method, when invoked, must run these steps:
 
 1. TODO
 
 </div>
 
-### The {{FileSystemHandle/copyTo()}} method ### {#api-filesystemhandle-copyto}
+### The {{FileSystemHandle/requestPermission()}} method ### {#api-filesystemhandle-requestpermission}
 
 <div class="note domintro">
-  : |newHandle| = await |handle| . {{FileSystemHandle/copyTo()|copyTo}}(|otherDir|)
-  :: Creates a copy of the entry represented by |handle| in |otherDir|, while keeping its existing
-     name.
+  : |status| = await |handle| . {{FileSystemHandle/requestPermission()|requestPermission}}({ {{FileSystemHandlePermissionDescriptor/writable}} = false })
+  : |status| = await |handle| . {{FileSystemHandle/requestPermission()}}
+  :: If the state of the read permission of this handle is anything other than `"prompt"`, this
+     will return that state directly. If it is `"prompt"` however, user activation is needed and
+     this will show a confirmation prompt to the user. The new read permission state is then
+     returned, depending on the user's response to the prompt.
 
-  : |newHandle| = await |handle| . {{FileSystemHandle/copyTo()|copyTo}}(|otherDir|, |newName|)
-  :: Creates a copy of the entry represented by |handle| in |otherDir|, using |newName| for the
-     name of the new entry.
+  : |status| = await |handle| . {{FileSystemHandle/requestPermission()|requestPermission}}({ {{FileSystemHandlePermissionDescriptor/writable}} = true })
+  :: If the state of the write permission of this handle is anything other than `"prompt"`, this
+     will return that state directly. If the status of the read permission of this handle is
+     `"denied"` this will return that.
 
-     In all of these cases, |handle| will no longer represent a valid entry, and thus any further
-     operations on it will fail.
-
-     Attempting to copy an entry on top of itself will fail. In all other cases if the target entry
-     already exists, it is overwritten.
+     Otherwise the state of the write permission is `"prompt"` and this will show a confirmation
+     prompt to the user. The new write permission state is then returned, depending on what the user
+     selected.
 </div>
 
 <div algorithm>
-The <dfn method for=FileSystemHandle>copyTo(|parent|, |name|)</dfn> method, when invoked, must run
-these steps:
-
-1. TODO
-
-</div>
-
-### The {{FileSystemHandle/remove()}} method ### {#api-filesystemhandle-remove}
-
-<div class="note domintro">
-  : await |handle| . {{FileSystemHandle/remove()}}
-  :: Attempts to remove the entry represented by |handle| from the underlying file system.
-</div>
-
-<div algorithm>
-The <dfn method for=FileSystemHandle>remove()</dfn> method, when invoked, must run these steps:
+The <dfn method for=FileSystemHandle>requestPermission(|descriptor|)</dfn> method, when invoked, must run these steps:
 
 1. TODO
 
@@ -173,18 +187,28 @@ The <dfn method for=FileSystemHandle>remove()</dfn> method, when invoked, must r
 ## The {{FileSystemFileHandle}} interface ## {#api-filesystemfilehandle}
 
 <xmp class=idl>
+dictionary FileSystemCreateWriterOptions {
+  boolean inPlace = false;
+  boolean keepExistingData = false;
+};
+
+[Exposed=(Window,Worker), SecureContext, Serializable]
 interface FileSystemFileHandle : FileSystemHandle {
   Promise<File> getFile();
-  Promise<FileSystemWriter> createWriter();
+  Promise<FileSystemWriter> createWriter(optional FileSystemCreateWriterOptions options);
 };
 </xmp>
 
+{{FileSystemFileHandle}} objects are [=serializable objects=]. Their [=serialization steps=] and
+[=deserialization steps=] are the same as those for {{FileSystemHandle}}.
 
 ### The {{FileSystemFileHandle/getFile()}} method ### {#api-filesystemfilehandle-getfile}
 
 <div class="note domintro">
   : |file| = await |fileHandle| . {{FileSystemFileHandle/getFile()}}
   :: Returns a {{File}} representing the state on disk of the entry represented by |handle|.
+     If the file on disk changes or is removed after this method is called, the returned
+     {{File}} object will likely be no longer readable.
 </div>
 
 <div algorithm>
@@ -198,11 +222,37 @@ The <dfn method for=FileSystemFileHandle>getFile()</dfn> method, when invoked, m
 
 <div class="note domintro">
   : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()}}
-  :: Returns a {{FileSystemWriter}} that can be used to write to the file.
+  : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/inPlace}}: false })
+  : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/keepExistingData}}: |keepExistingData|, {{FileSystemCreateWriterOptions/inPlace}}: false })
+  :: Returns a {{FileSystemWriter}} that can be used to write to the file. Any changes made through
+     |writer| won't be reflected in the file represented by |fileHandle| until its
+     {{FileSystemWriter/close()}} method is called.
+     User agents try to ensure that no partial writes happen, i.e. the file represented by
+     |fileHandle| will either contains its old contents or it will contain whatever data was written
+     through |writer| up until one of these methods was called.
+
+     This is typically implemented by writing data to a temporary file, and only replacing the file
+     represented by |fileHandle| with the temporary file when the writer is closed.
+
+     If |keepExistingData| is `false` or not specified, the temporary file starts out empty,
+     otherwise the existing file is first copied to this temporary file.
+
+   : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/inPlace}}: true })
+   : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/keepExistingData}}: |keepExistingData|, {{FileSystemCreateWriterOptions/inPlace}}: true })
+   :: Returns a {{FileSystemWriter}} that can be used to write to the file. Any changes made through
+      |writer| might not be reflected in the file represented by |fileHandle| until its
+      {{FileSystemWriter/close()}} method is called.
+      User agents are free to either flush changes to the file as they are made, or batch them
+      up (possibly by writing to some kind of change log) until {{FileSystemWriter/close()}}
+      is called. Specifically for less trusted websites, user agents
+      will want to batch up changes so that malware scanners or other security checks can be
+      performed before actually flushing changes to disk.
+
+      If |keepExistingData| is `false` or not specified, the file will start out empty.
 </div>
 
 <div algorithm>
-The <dfn method for=FileSystemFileHandle>createWriter()</dfn> method, when invoked, must run these steps:
+The <dfn method for=FileSystemFileHandle>createWriter(|options|)</dfn> method, when invoked, must run these steps:
 
 1. TODO
 
@@ -219,6 +269,11 @@ dictionary FileSystemGetDirectoryOptions {
   boolean create = false;
 };
 
+dictionary FileSystemRemoveOptions {
+  boolean recursive = false;
+};
+
+[Exposed=(Window,Worker), SecureContext, Serializable]
 interface FileSystemDirectoryHandle : FileSystemHandle {
   Promise<FileSystemFileHandle> getFile(USVString name, optional FileSystemGetFileOptions options);
   Promise<FileSystemDirectoryHandle> getDirectory(USVString name, optional FileSystemGetDirectoryOptions options);
@@ -228,9 +283,12 @@ interface FileSystemDirectoryHandle : FileSystemHandle {
 
   Promise<sequence<USVString>?> resolve(FileSystemHandle handle);
 
-  Promise<void> removeRecursively();
+  Promise<void> removeEntry(USVString name, optional FileSystemRemoveOptions options);
 };
 </xmp>
+
+{{FileSystemDirectoryHandle}} objects are [=serializable objects=]. Their [=serialization steps=] and
+[=deserialization steps=] are the same as those for {{FileSystemHandle}}.
 
 Issue: Should we have separate getFile and getDirectory methods, or just a single getChild/getEntry
 method?
@@ -246,6 +304,7 @@ iterable itself?
 
 <div class="note domintro">
   : |fileHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getFile()|getFile}}(|name|)
+  : |fileHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getFile()|getFile}}(|name|, { {{FileSystemGetFileOptions/create}}: false })
   :: Returns a handle for a file named |name| in the directory represented by |directoryHandle|. If
      no such file exists, this rejects.
 
@@ -256,7 +315,10 @@ iterable itself?
      name uses characters that aren't supported in file names on the underlying file system, or
      because the user agent for security reasons decided not to allow creation of the file.
 
-     See TODO section for possible security reasons.
+     This operation requires write permission, even if the file being returned already exists. If
+     this handle doesn't already have write permission, this could result in a prompt being shown to
+     the user. To get an existing file without needing write permission, call this method
+     with <code>{ {{FileSystemGetFileOptions/create}}: false }</code>.
 </div>
 
 <div algorithm>
@@ -271,6 +333,7 @@ must run these steps:
 
 <div class="note domintro">
   : |subdirHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getDirectory()|getDirectory}}(|name|)
+  : |subdirHandle| = await |directoryHandle| . {{FileSystemDirectoryHandle/getDirectory()|getDirectory}}(|name|, { {{FileSystemGetDirectoryOptions/create}}: false })
   :: Returns a handle for a directory named |name| in the directory represented by
     |directoryHandle|. If no such directory exists, this rejects.
 
@@ -280,6 +343,11 @@ must run these steps:
      directory failed, this rejects. Creation can fail because there already is a file with the same
      name, or because the name uses characters that aren't supported in file names on the underlying
      file system.
+
+     This operation requires write permission, even if the directory being returned already exists.
+     If this handle doesn't already have write permission, this could result in a prompt being shown
+     to the user. To get an existing directory without needing write permission, call this method
+     with <code>{ {{FileSystemGetDirectoryOptions/create}}: false }</code>.
 </div>
 
 <div algorithm>
@@ -331,17 +399,37 @@ these steps:
 
 </div>
 
-### The {{FileSystemDirectoryHandle/removeRecursively()}} method ### {#api-filesystemdirectoryhandle-removerecursively}
+### The {{FileSystemDirectoryHandle/removeEntry()}} method ### {#api-filesystemdirectoryhandle-removeentry}
 
 <div class="note domintro">
-  : await |directoryHandle| . {{FileSystemDirectoryHandle/removeRecursively()}}
-  :: Removes the entry represented by |directoryHandle|, and all entries contained within it,
+  : await |directoryHandle| . {{FileSystemDirectoryHandle/removeEntry()|removeEntry}}(|name|)
+  : await |directoryHandle| . {{FileSystemDirectoryHandle/removeEntry()|removeEntry}}(|name|, { {{FileSystemRemoveOptions/recursive}}: false })
+  :: If the directory represented by |directoryHandle| contains a file named |name|, or an empty
+     directory named |name|, this will attempt to delete that file or directory.
+
+     Attempting to delete a file or directory that does not exist is considered success,
+     while attempting to delete a non-empty directory will result in a promise rejection.
+
+  : await |directoryHandle| . {{FileSystemDirectoryHandle/removeEntry()|removeEntry}}(|name|, { {{FileSystemRemoveOptions/recursive}}: true })
+  :: Removes the entry named |name| in the directory represented by |directoryHandle|.
+     If that entry is a directory, its contents will also be deleted recursively.
      recursively.
+
+     Attempting to delete a file or directory that does not exist is considered success.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemDirectoryHandle>removeEntry(|name|, |options|)</dfn> method, when invoked, must run
+these steps:
+
+1. TODO
+
 </div>
 
 ## The {{FileSystemWriter}} interface ## {#api-filesystemwriter}
 
 <xmp class=idl>
+[Exposed=(Window,Worker), SecureContext]
 interface FileSystemWriter {
   Promise<void> write(unsigned long long position, (BufferSource or Blob or USVString) data);
   WritableStream asWritableStream();
@@ -350,12 +438,20 @@ interface FileSystemWriter {
 };
 </xmp>
 
+A {{FileSystemWriter}} has an associated <dfn for=FileSystemWriter>atomic flag</dfn>.
+
 ### The {{FileSystemWriter/write()}} method ### {#api-filesystemwriter-write}
 
 <div class="note domintro">
   : await |writer| . {{FileSystemWriter/write()|write}}(|position|, |data|)
   :: Writes the content of |data| into the file associated with |writer| at position |position|.
      If |position| is past the end of the file writing will fail and this method rejects.
+
+     There are no guarantees that the data written to the file using this method is actually
+     reflected in the file on disk until the {{FileSystemWriter/close()}}
+     method is called. Specifically when |writer|'s
+     [=atomic flag=] is set, the user agent will ensure that no changes are written to the actual
+     file until one of those methods is called.
 </div>
 
 <div algorithm>
@@ -368,10 +464,19 @@ these steps:
 
 ### The {{FileSystemWriter/asWritableStream()}} method ### {#api-filesystemwriter-aswritablestream}
 
+Issue(19): The functionality described by this method will likely stay, but the exact shape of
+the method is still in flux even more than the rest of this specification.
+
 <div class="note domintro">
   : let |stream| = |writer| . {{FileSystemWriter/asWritableStream()}}
   :: Returns a {{WritableStream}} that can be used to write data into the file, starting
      at the beginning of the file.
+
+     There are no guarantees that the data written to the file using this method is actually
+     reflected in the file on disk until the {{FileSystemWriter/close()}}
+     method is called. Specifically when |writer|'s
+     [=atomic flag=] is set, the user agent will ensure that no changes are written to the actual
+     file until one of those methods is called.
 </div>
 
 <div algorithm>
@@ -388,10 +493,40 @@ must run these steps:
   : await |writer| . {{FileSystemWriter/truncate()|truncate}}(|size|)
   :: Resizes the file associated with |writer| to be |size| bytes long. If |size| is larger than
      the current file size this pads the file with zero bytes, otherwise it truncates the file.
+
+     There are no guarantees that the changes made to the file using this method are actually
+     reflected in the file on disk until the {{FileSystemWriter/close()}}
+     method is called. Specifically when |writer|'s
+     [=atomic flag=] is set, the user agent will ensure that no changes are written to the actual
+     file until one of those methods is called.
 </div>
 
 <div algorithm>
 The <dfn method for=FileSystemWriter>truncate(|size|)</dfn> method, when invoked, must run these
+steps:
+
+1. TODO
+
+</div>
+
+### The {{FileSystemWriter/close()}} method ### {#api-filesystemwriter-close}
+
+<div class="note domintro">
+  : await |writer| . {{FileSystemWriter/close()}}
+  :: First flushes any data written so far to disk, and then closes the writer.
+     If |writer|'s [=atomic flag=] is set, no changes will
+     be visible in the file until this method is called.
+     Furthermore, if the file on disk changed between creating this |writer| and this invocation of
+     {{FileSystemWriter/close()}}, this will reject and all future operations on the writer will
+     fail.
+
+     This operation can take some time to complete (even if the |writer|'s [=atomic flag=] is not
+     set), as user agents might use this moment to run malware scanners or perform other security
+     checks if the website isn't sufficiently trusted.
+</div>
+
+<div algorithm>
+The <dfn method for=FileSystemWriter>close()</dfn> method, when invoked, must run these
 steps:
 
 1. TODO
@@ -418,8 +553,8 @@ dictionary ChooseFileSystemEntriesOptions {
     boolean excludeAcceptAllOption = false;
 };
 
+[SecureContext]
 partial interface Window {
-    [SecureContext]
     Promise<(FileSystemHandle or sequence<FileSystemHandle>)>
         chooseFileSystemEntries(optional ChooseFileSystemEntriesOptions options);
 };
@@ -484,6 +619,7 @@ dictionary GetSystemDirectoryOptions {
   required SystemDirectoryType type;
 };
 
+[SecureContext]
 partial interface FileSystemDirectoryHandle {
   static Promise<FileSystemDirectoryHandle> getSystemDirectory(GetSystemDirectoryOptions options);
 };
@@ -507,8 +643,86 @@ invoked, must run these steps:
 
 </div>
 
+# Privacy Considerations # {#privacy-considerations}
+
+*This section is non-normative.*
+
+This API does not give websites any more read access to data than the existing `<input type=file>`
+and `<input type=file webkitdirectory>` APIs already do. Furthermore similarly to those APIs, all
+access to files and directories is explicitly gated behind a file or directory picker.
+
+There are however several major privacy risks with this new API:
+
+## Users giving access to more, or more sensitive files than they intended. ## {#privacy-wide-access}
+
+This isn't a new risk with this API, but user agents should try to make sure that users are aware
+of what exactly they're giving websites access to. This is particularly important when giving
+access to a directory, where it might not be immediately clear to a user just how many files
+actually exist in that directory.
+
+A related risk is having a user give access to particularly sensitive data. This
+could include some of a user agent's configuration data, network cache or cookie store,
+or operating system configuration data such as password files. To protect against this, user agents
+are encouraged to restrict which directories a user is allowed to select in a directory picker,
+and potentially even restrict which files the user is allowed to select. This will make it much
+harder to accidentally give access to a directory that contains particularly sensitive data. Care
+must be taken to strike the right balance between restricting what the API can access while still
+having the API be useful. After all, this API intentionally lets the user use websites to interact
+with some of their most private personal data.
+
+## Websites trying to use this API for tracking. ## {#privacy-tracking}
+
+This API could be used by websites to track the user across clearing browsing
+data. This is because, in contrast with existing file access APIs, user agents are
+able to grant persistent access to files or directories and can re-prompt. In
+combination with the ability to write to files, websites will be able to persist an
+identifier on the users' disk. Clearing browsing data will not affect those files
+in any way, making these identifiers persist through those actions.
+
+This risk is somewhat mitigated by the fact that clearing browsing data will also clear IndexedDB,
+so websites won't have any handles to re-prompt for permission after browsing data was cleared.
+Furthermore user agents are encouraged to make it clear what files and directories a website has
+access to, and to automatically expire permission grants except for particularly well trusted
+origins (for example persistent permissions could be limited to "installed" web applications).
+
+User agents also are encouraged to provide a way for users to revoke permissions granted.
+Clearing browsing data is expected to revoke all permissions as well.
+
+## First-party vs third-party contexts. ## {#privacy-third-party}
+
+In third-party contexts (i.e. an iframe whose origin does not match that of the top-level frame)
+websites can't gain access to data they don't already have access to. This includes both getting
+access to new files or directories via the {{chooseFileSystemEntries}} API, as well as requesting
+more permissions to existing handles via the {{requestPermission}} API.
+
+Handles can also only be post-messaged to same-origin destinations. Attempts to send a handle to
+a cross-origin destination will result in a {{MessagePort/messageerror}} event.
+
 # Security Considerations # {#security-considerations}
 
-## Secure Context ## {#secure-context}
+*This section is non-normative.*
 
-## Limiting types of files that can be written to ## {#file-type-limitations}
+This API gives websites the ability to modify existing files on disk, as well as write to new
+files. This has a couple of important security considerations:
+
+## Malware ## {#security-malware}
+
+This API could be used by websites to try to store and/or execute malware on the users system.
+To mitigate this risk, this API does not provide any way to mark files as executable (on the other
+hand files that are already executable likely remain that way, even after the files are modified
+through this API). Furthermore user agents are encouraged to apply things like Mark-of-the-Web to
+files created or modified by this API.
+
+Finally, user agents are encouraged to verify the contents of files modified by this API via malware
+scans and safe browsing checks, unless some kind of external strong trust relation already exists.
+This of course has effects on the performance characteristics of this API.
+
+Issue(51): "Atomic writes" attempts to make it explicit what this API can and can't do, and how
+performance can be effected by safe browsing checks.
+
+## Ransomware attacks ## {#security-ransomware}
+
+Another risk factor is that of ransomware attacks. The limitations described above regarding
+blocking access to certain sensitive directories helps limit the damage such an attack can do.
+Additionally user agents can grant write access to files at whatever granularity they deem
+appropriate.

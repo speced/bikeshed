@@ -1,0 +1,163 @@
+<pre class='metadata'>
+Title: Private Click Measurement
+Shortname: ad-click-attribution
+Level: 1
+Status: CG-DRAFT
+Group: WICG
+Repository: WICG/ad-click-attribution
+URL: https://wicg.github.io/ad-click-attribution/index.html
+Editor: John Wilander, Apple Inc. https://apple.com/, wilander@apple.com
+Editor: Jason Novak, Apple Inc. https://apple.com/, jnovak@apple.com
+Abstract: This specification defines a privacy preserving way to attribute a conversion, such as a purchase or a sign-up, to a previous ad click.
+Markup Shorthands: idl yes
+Complain About: missing-example-ids yes
+Complain About: broken-links yes
+</pre>
+<pre class="biblio">
+{
+    "WELL-KNOWN": {
+        "aliasOf": "RFC5785"
+    }
+}
+</pre>
+
+# Introduction # {#introduction}
+
+<em>This section is non-normative.</em>
+
+A popular business model for the web is to get attribution and payment for conversions, for instance purchases or sign-ups, which result from the click on an ad. Traditionally, such attribution has been facilitated by user identifying cookies sent in third-party HTTP requests to the click source. However, the same technology can be and has been used for privacy invasive cross-site tracking of users.
+
+The technology described in this document is intended to allow for ad click attribution while disallowing arbitrary cross-site tracking.
+
+## Goals ## {#goals}
+
+* Support ad click attribution.
+
+* Preserve user privacy, specifically prevent cross-site tracking of users.
+
+## Terminology ## {#terminology}
+
+* <b>Ad click.</b> This document will use the term “ad click” for any kind of user gesture on an ad that invokes the navigation to a link destination, such as clicks, taps, and accessibility tools.
+
+* <b>Conversion.</b> A user activity that is notable such as a purchase, a sign-up to a service, or the submission of personal information such as an email address.
+
+The four parties involved in this technology are:
+
+* <b>The user.</b> They click on an ad, end up on a destination website, and perform what's deemed to be a conversion, such as a purchase.
+
+* <b>The user agent.</b> The web browser that acts on behalf of the user and facilitates ad click attribution.
+
+* <b>The ad click source.</b> The first-party website where the user clicks on the ad.
+
+* <b>The ad click destination.</b> The destination website where the conversion happens.
+
+The data consumed by the user agent to support ad click attribution is:
+
+* <b>Ad Campaign Id.</b> A 6-bit decimal identifier for an ad campaign associated with the ad click destination. This means support for 64 concurrent ad campaigns per ad click destination on the ad click source. Example: merchant.example can run up to 64 concurrent ad campaigns on search.example. The valid decimal values are 00 to 63.
+
+* <b>Ad Attribution Data.</b> A 6-bit decimal value encoding the details of the attribution. This data may contain things like specific steps in a sales funnel or the value of the sale in buckets, such as less than $10, between $10 and $50, between $51 and $200, above $200, and so on. The valid decimal values are 00 to 63.
+
+* <b>Ad Attribution Priority.</b> An optional 6-bit decimal value encoding the priority of the attribution. The priority is only intended for the user agent to be able to pick the most important attribution request if there are multiple. One such case may be after the user has taken step 1 through 3 in a sales funnel and the third step is the most important to get attribution for. The valid decimal values are 00 to 63.
+
+## A High Level Scenario ## {#scenario}
+
+A high level example of a scenario where the described technology is intended to come into play is this:
+
+1. The user makes an online search on search.example's website.
+2. The user is shown an ad for a product and clicks it.
+3. The ad click source informs the user agent:
+    - That it will want ad click attribution for this click.
+    - What the intended ad click destination is.
+    - What the attribution campaign id is.
+4. The user agent navigates the link and takes note that the user landed on the intended ad click destination.
+5. The user's activity on the ad click destination leads to a conversion.
+6. A third-party HTTP request is made on the ad click destination website to ​https://search.example/.well-known/ad-click-attribution
+7. The user agent checks for pending ad click attributions for the ad click source/destination pair and if there's a hit, makes or schedules an HTTP request to ​https://search.example/.well-known/ad-click-attribution with the ad click attribution data. One thing to consider here is whether there should be an option to send the attribution data to the ad click destination too.
+
+# Ad Click Source Link Format # {#linkformat}
+
+The ad click source needs to be an anchor tag with the following properties:
+<xmp class="highlight" highlight=html>
+<a adCampaignId="[6-bit ad campaign id]" adDestination="[ad click destination URL]">
+</xmp>
+
+Formally:
+
+<pre class="idl">
+partial interface HTMLAnchorElement {
+    [CEReactions=NotNeeded, Reflect] attribute DOMString adCampaignId;
+    [CEReactions=NotNeeded, Reflect] attribute DOMString adDestination;
+};
+</pre>
+
+Issue: These attributes should be on HTMLHyperlinkElementUtils instead.
+
+If an ad click on the above link triggers a top frame navigation that lands, possibly after HTTP redirects, on the <code>[ad click destination eTLD+1]</code>, the user agent stores the request for ad click attribution as the triple <code>{ [ad click source eTLD+1], [ad click destination eTLD+1], [6-bit ad campaign id] }</code>. If any of the conditions do not hold, such as the ad campaign id being larger than 6-bit, the request for ad click attribution is ignored.
+
+# Legacy Triggering of Ad Click Attribution # {#legacytriggering}
+
+Triggering of attribution is what happens when there is a conversion.
+
+Existing ad click attribution relies on third-party HTTP requests to the click source and these requests are typically the result of invisible image elements or "tracking pixels" placed in the DOM solely to fire HTTP GET requests. To allow for a smooth transition from these old pixel requests to the new Ad Click Attribution technology, we propose a server-side redirect to a well-known [[!WELL-KNOWN]] location as a legacy triggering mechanism.
+
+To make an existing pixel request an ad click attribution from the user agent, the top frame context of an ad click destination page needs to do the following:
+
+<div algorithm="legacy triggering of ad click attribution">
+    1. An HTTP GET request to the <code><var>ad click source eTLD+1</var></code>. This HTTP request may be the result of an HTTP redirect, such as searchUK.example HTTP 302 redirect to search.example. The use of HTTP GET is intentional in that existing “pixel requests” can be repurposed for this and in that the HTTP request should be idempotent.
+    2. A secure HTTP GET redirect to <code><var>ad click source eTLD+1</var>/.well-known/ad-click-attribution/<var>6-bit ad attribution data</var>/<var>optional 6-bit ad attribution priority</var></code>. This ensures that the <code><var>ad click source eTLD+1</var></code> is in control of who can trigger click attribution on its behalf and optionally what the priority of the attribution is. If the user agent gets such an HTTP request, it will check its stored requests for click attribution, and if there's a match for <code><var>ad click source eTLD+1</var>, <var>ad click destination eTLD+1</var></code>, it will make or schedule a secure HTTP POST request to <code><var>ad click source eTLD+1</var>/.well-known/ad-click-attribution/<var>6-bit ad attribution data</var>/<var>6-bit ad campaign id</var></code> with the referer header set to <code><var>ad click destination eTLD+1</var></code>. The use of HTTP POST is intentional in that it differs from the HTTP GET redirect used to trigger the attribution and in that it is not expected to be idempotent. If any of the conditions do not hold, such as the ad attribution data being larger than 6-bit, the request for ad click attribution is ignored. We may have to add a nonce to the HTTP POST request to prohibit double counting in cases where the user agent decides to retry the request.
+</div>
+
+If there are multiple ad click attribution requests for the same « [ad click source eTLD+1], [ad click destination eTLD+1] » pair, the one with the highest Ad Attribution Priority will be the one sent and the rest discarded.
+
+Issue: This needs to be reworked to monkeypatch HTML's "follows a hyperlink" algorithm.
+
+# Modern Triggering of Ad Click Attribution # {#moderntriggering}
+
+We envision a JavaScript API that is called on an ad click destination page as a modern means to trigger attribution at a conversion. This API call removes the necessity for third-party "pixels" which is great for ad click sources who do not want to be third party resources.
+
+# Privacy Considerations # {#privacy}
+
+The total entropy in ad click attribution HTTP requests is 12 bits (6+6), which means 4096 unique values can be managed for each pair of ad click source and ad click destination.
+
+With no other means of cross-site tracking, neither the ad click source nor the ad click destination will know whether the user has clicked an associated ad or not when a conversion happens. This restricts the entropy under control to 6 bits at any moment.
+
+Even if the ad click source and/or the ad click destination were to be in control of both pieces of 6-bit data, the total is 12 bits or 4096 unique values.
+
+We believe these restrictions avoid general cross-site tracking while still providing useful ad click attribution at web scale.
+
+In the interest of user privacy, user agents are encouraged to deploy the following restrictions to when and how they make secure HTTP POST requests to <code><var>[ad click source eTLD+1]</var>/.well-known/ad-click-attribution/<var>[6-bit ad attribution data]</var>/<var>[6-bit ad campaign id]</var></code>:
+
+* The user agent targets a delay of ad click attribution requests by 24-48 hours. However, the user agent might not be running or the user's device may be or disconnected from the Internet, in which case the request may be delayed further.
+* The user agent only holds on to the triple <code>{ <var>[ad click source eTLD+1]</var>, <var>[ad click destination eTLD+1]</var>, <var>[6-bit ad campaign id]</var> }</code> for 7 days, i.e. one week of potential ad click attribution.
+* The user agent doesn't guarantee any specific order in which multiple ad click attribution requests for the same ad click destination are sent, since the order itself could be abused to increase the entropy.
+* The user agent uses an ephemeral session (a.k.a. private or incognito mode) to make ad click attribution requests.
+* The user agent doesn't use or accept any credentials such as cookies, client certificates, or Basic Authentication in ad click attribution requests.
+* The user agent may use a central clearinghouse to further anonymize ad click attribution requests, should a trustworthy clearinghouse exist.
+* The user agent offers users a way to turn ad click attribution on and off. The default setting is on to encourage businesses to move to this technology and abandon general cross-site tracking.
+* The user agent doesn't support ad click attribution in private/incognito mode.
+
+# Performance Considerations # {#performance}
+
+The user agent may want to limit the amount of stored ad click attribution data. Limitations can be set per ad click source, per ad click destination, and on the total amount of ad click attribution data.
+
+# Related Work # {#relatedwork}
+
+The Web Advertising Business Group has related work that started in January 2019. It similarly uses a .well-known path with no cookies.<br>
+<a href="https://github.com/w3c/web-advertising/blob/master/admetrics.md">https://github.com/w3c/web-advertising/blob/master/admetrics.md</a>
+
+Brave publised a security and privacy model for ad confirmations in March 2019.<br>
+<a href="https://github.com/brave/brave-browser/wiki/Security-and-privacy-model-for-ad-confirmations">https://github.com/brave/brave-browser/wiki/Security-and-privacy-model-for-ad-confirmations</a>
+
+Google Chrome published an explainer document on May 22, 2019, for a very similar technology. They cross-reference this spec in its earlier form on the WebKit wiki.<br>
+<a href="https://github.com/csharrison/conversion-measurement-api">https://github.com/csharrison/conversion-measurement-api</a>
+
+# Acknowledgements # {#acknowledgements}
+
+Thanks to
+Maciej Stachowiak,
+Brent Fulgham,
+Erik Neuenschwander,
+Mark Xue,
+Steven Englehardt,
+and Ehsan Akghari,
+for their feedback on this proposal.

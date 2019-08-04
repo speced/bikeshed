@@ -31,6 +31,7 @@ url: https://w3c.github.io/IntersectionObserver/;
     type: dictionary; text: IntersectionObserverInit; url: #dictdef-intersectionobserverinit
 url: https://wicg.github.io/ResizeObserver/;
     type: interface; text: ResizeObserver; url: #resizeobserver
+url: https://dom.spec.whatwg.org/#ref-for-concept-getelementsbytagname; type: interface; text: getElementsByTagName; for: Document
 </pre>
 
 <style>
@@ -81,28 +82,40 @@ object property).
 
 <h3 id="js-gc">Do not expose garbage collection</h3>
 
-There must not be a way for author code to deduce when/if garbage collection of JavaScript objects
-has run.
+Web APIs should not expose a way for author code to deduce when/if garbage collection of JavaScript
+objects has run.
 
-The reason for this is somewhat subtle. If garbage collection timing were observable, then authors
-could easily write code relying on specific garbage collection timing. But this timing is almost
-certainly not the same across user agents, which means the resulting code will be
+Although some APIs may expose garbage collection, such as some implementations of
+{{Document/getElementsByTagName}}, and the JavaScript <a
+href="https://github.com/tc39/proposal-weakrefs">WeakRefs proposal</a> (which has multiple
+implementer support), API designers are strongly encouraged to avoid points in their own APIs that
+depend on this timing.
+
+The reason for this is somewhat subtle. The more that Web API semantics are affected by garbage
+collection timing (or whether objects are collected at all), the more programs will be affected by
+changes in this timing. But user agents differ significantly in both the timing of garbage
+collection and whether certain objects are collected at all, which means the resulting code will be
 non-interoperable. Worse, according to the usual rules of game theory as applied to browsers, this
 kind of scenario could force other user agents to copy the garbage collection timing of the
 original in order to create interoperability. This would cause current garbage collection
 strategies to ossify, preventing improvement in one of the most dynamic areas of JavaScript
 virtual machine technology.
 
-In particular, this means that you can't expose any API that acts as a weak reference, e.g. with a
-property that becomes <code highlight="js">null</code> once garbage collection runs. Such freeing of memory must
-be entirely deterministic.
+In particular, this means that you shouldn't expose any API that acts as a weak reference, e.g. with a
+property that becomes <code highlight="js">null</code> once garbage collection runs. Such freeing of
+memory should be entirely deterministic.
 
-<div class="note">
-There is some speculative discussion of exposing weak references such that their finalization is
-only observable between event loop turns in this <a
-href="https://github.com/tc39/proposal-weakrefs">stage 1 proposal under discussion at TC39</a>.
-However, this remains contentious and does not yet have consensus in TC39 or among implementers.
-</div>
+For example, currently, {{Document/getElementsByTagName}} permits reusing the {{HTMLCollection}}
+which it creates, when it's called with the same receiver and tag name. In practice, engines reuse
+the output if it has not been garbage collected. This creates behavior which differs based on the
+details of garbage collection, which is strongly discouraged. If {{Document/getElementsByTagName}}
+were designed today, the advice to the specification authors would be to either reliably reuse
+the output, or to produce a new {{HTMLCollection}} each time it's invoked.
+
+The case of {{Document/getElementsByTagName}} is particularly insidious because nothing about
+the API visibly relates to garbage collection details. By contrast, special APIs for this particular
+purpose such as `WeakRef` and `FinalizationGroup` have their GC interaction as a specific part of
+their contract with the developer.
 
 <h2 id="api-surface">API Surface Concerns</h2>
 
@@ -125,6 +138,11 @@ Boolean properties, options, or API parameters which are asking a question about
 their argument *should not* be prefixed with <code>is</code>, while methods
 that serve the same purpose, given that it has no side effects, *should* be
 prefixed with <code>is</code> to be consistent with the rest of the platform.
+
+The name should not be directly associated with a brand or specific revision of
+the underlying technology whenever possible; technology becomes obsolete, but
+since removing APIs from the web is difficult, naming should be generic and
+future-proof whenever possible.
 
 <h3 id="feature-detect">New features should be detectable</h3>
 

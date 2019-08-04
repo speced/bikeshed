@@ -43,7 +43,7 @@ Text Detection, despite being an interesting field, is not considered stable eno
 
 ## Shape detection use cases ## {#use-cases}
 
-Please see the <a href="https://github.com/WICG/shape-detection-api/blob/gh-pages/README.md">Readme/Explainer</a> in the repository.
+Please see the <a href="https://github.com/WICG/shape-detection-api/blob/master/README.md">Readme/Explainer</a> in the repository.
 
 # Shape Detection API # {#api}
 
@@ -87,6 +87,7 @@ Example implementations of face detection are e.g. <a href="https://developer.an
 
 <xmp class="idl">
 [Exposed=(Window,Worker),
+ SecureContext,
  Constructor(optional FaceDetectorOptions faceDetectorOptions)]
 interface FaceDetector {
   Promise<sequence<DetectedFace>> detect(ImageBitmapSource image);
@@ -123,7 +124,9 @@ dictionary FaceDetectorOptions {
 ### {{DetectedFace}} ### {#detectedface-section}
 
 <xmp class="idl">
-[Serializable]
+[Exposed=(Window,Worker),
+ SecureContext,
+ Serializable]
 interface DetectedFace {
   [SameObject] readonly attribute DOMRectReadOnly boundingBox;
   [SameObject] readonly attribute FrozenArray<Landmark>? landmarks;
@@ -186,6 +189,7 @@ Example implementations of Barcode/QR code detection are e.g. <a href="https://d
 
 <xmp class="idl">
 [Exposed=(Window,Worker),
+ SecureContext,
  Constructor(optional BarcodeDetectorOptions barcodeDetectorOptions)]
 interface BarcodeDetector {
   static Promise<sequence<BarcodeFormat>> getSupportedFormats();
@@ -196,24 +200,25 @@ interface BarcodeDetector {
 
 <dl class="domintro">
   <dt><dfn constructor for="BarcodeDetector"><code>BarcodeDetector(optional BarcodeDetectorOptions |barcodeDetectorOptions|)</code></dfn></dt>
-  <dd>Constructs a new {{BarcodeDetector}} with the optional |barcodeDetectorOptions|, if present.
-    * If |barcodeDetectorOptions| is passed, and its |formats| are empty, then throw a new {{TypeError}}.
-    * If |barcodeDetectorOptions| is passed, and its |formats| contain {{unknown}}, then throw a new {{TypeError}}.
-    <div class="note">
+  <dd>Constructs a new {{BarcodeDetector}} with |barcodeDetectorOptions|.
+    * If |barcodeDetectorOptions|.{{BarcodeDetectorOptions/formats}} is present and empty, then throw a new {{TypeError}}.
+    * If |barcodeDetectorOptions|.{{BarcodeDetectorOptions/formats}} is present and contains {{unknown}}, then throw a new {{TypeError}}.
+  <div class="note">
     Detectors may potentially allocate and hold significant resources. Where possible, reuse the same {{BarcodeDetector}} for several detections.
-    </div>
+  </div>
   </dd>
 
   <dt><dfn method for="BarcodeDetector">`getSupportedFormats()`</dfn></dt>
-  <dd> This method, when invoked, MUST return a new {{Promise}} `promise` and run the following steps <a>in parallel</a>:
+  <dd>This method, when invoked, MUST return a new {{Promise}} |promise| and run the following steps <a>in parallel</a>:
     <ol>
-     <li>If the UA does not support barcode detection, reject `promise` with a {{NotSupportedError}} and abort these steps.</li>
-     <li>Enumerate the {{BarcodeFormat}}s that the UA understands as potentially detectable in images. Let this be `supportedFormats`.
-     <div class="note">
-      The UA cannot give a definitive answer as to whether a given barcode format will <i>always</i> be recognized on an image due to e.g. positioning of the symbols or encoding errors. If a given barcode symbology is not in the `supportedFormats` array, however, it should not be detectable whatsoever.
-     </div>
-     </li>
-     <li>Resolve `promise` with `supportedFormats`.</li>
+      <li>Let |supportedFormats| be a new {{Array}}.</li>
+      <li>If the UA does not support barcode detection, resolve |promise| with |supportedFormats| and abort these steps.</li>
+      <li>Enumerate the {{BarcodeFormat}}s that the UA understands as potentially detectable in images. Add these to |supportedFormats|.
+      <div class="note">
+        The UA cannot give a definitive answer as to whether a given barcode format will <i>always</i> be recognized on an image due to e.g. positioning of the symbols or encoding errors. If a given barcode symbology is not in |supportedFormats| array, however, it should not be detectable whatsoever.
+      </div>
+      </li>
+      <li>Resolve |promise| with |supportedFormats|.</li>
    </ol>
   <div class="note">
     The list of supported {{BarcodeFormat}}s is platform dependent, some examples are the ones supported by <a href="https://developers.google.com/android/reference/com/google/android/gms/vision/barcode/BarcodeDetector.Builder.html#setBarcodeFormats(int)">Google Play Services</a> and <a href="https://developer.apple.com/documentation/coreimage/ciqrcodefeature?preferredLanguage=occ#overview">Apple's QICRCodeFeature</a>.
@@ -234,13 +239,19 @@ dictionary BarcodeDetectorOptions {
 
 <dl class="domintro">
   <dt><dfn dict-member for="BarcodeDetectorOptions">`formats`</dfn></dt>
-  <dd>A series of {{BarcodeFormat}}s to search for in the subsequent {{BarcodeDetector/detect()}} calls.</dd>
+  <dd>A series of {{BarcodeFormat}}s to search for in the subsequent {{BarcodeDetector/detect()}} calls. If not present then the UA SHOULD search for all supported formats.
+  <div class="note">
+    Limiting the search to a particular subset of supported formats is likely to provide better performance.
+  </div>
+  </dd>
 </dl>
 
 ### {{DetectedBarcode}} ### {#detectedbarcode-section}
 
 <xmp class="idl">
-[Serializable]
+[Exposed=(Window,Worker),
+ SecureContext,
+ Serializable]
 interface DetectedBarcode {
   [SameObject] readonly attribute DOMRectReadOnly boundingBox;
   [SameObject] readonly attribute DOMString rawValue;
