@@ -1,0 +1,249 @@
+<pre class=metadata>
+Title: Layout Instability API
+Status: CG-Draft
+Shortname: layout-instability
+Group: WICG
+Level: 1
+Editor: Steve Kobes, Google, https://google.com, skobes@chromium.org
+        Nicolás Peña Moreno, Google, https://google.com, npm@chromium.org
+        Emily Hanley, Google, https://google.com, eyaich@chromium.org
+URL: https://wicg.github.io/layout-instability
+Repository: https://github.com/WICG/layout-instability
+Abstract: This document defines an API that provides web page authors with insights into the stability of their pages based on movements of the elements on the page.
+Default Highlight: js
+Complain About: accidental-2119 yes
+</pre>
+
+<pre class=anchors>
+urlPrefix: https://dom.spec.whatwg.org/; spec: DOM;
+    type: dfn; url: #interface-element; text: element
+    type: dfn; url: #concept-shadow-including-descendant; text: shadow-including descendants;
+urlPrefix: https://www.w3.org/TR/css-writing-modes-4/; spec: CSS-WRITING-MODES-4;
+    type: dfn; url: #flow-relative; text: flow-relative offset;
+urlPrefix: https://w3c.github.io/performance-timeline/; spec: PERFORMANCE-TIMELINE-2;
+    type: interface; url: #the-performanceentry-interface; text: PerformanceEntry;
+    type: attribute; for: PerformanceEntry;
+        text: name; url: #dom-performanceentry-name;
+        text: entryType; url: #dom-performanceentry-entrytype;
+        text: startTime; url: #dom-performanceentry-starttime;
+        text: duration; url: #dom-performanceentry-duration;
+    type: dfn; url: #dfn-register-a-performance-entry-type; text: register a performance entry type;
+    type: dfn; url: #dfn-queue-a-performanceentry; text: Queue the PerformanceEntry;
+    type: dfn; url: #getentriesbytype-method-0; text: getEntriesByType;
+    type: dfn; url: #dom-performanceobserver; text: PerformanceObserver;
+    type: attribute; for: PerformanceObserver;
+        text: supportedEntryTypes; url: #supportedentrytypes-attribute;
+    type: dfn; url: #dom-performanceobserverinit-buffered; text: buffered;
+urlPrefix: https://w3c.github.io/resource-timing/; spec: RESOURCE-TIMING;
+    type: dfn; url: #sec-privacy-security; text: statistical fingerprinting;
+urlPrefix: https://w3c.github.io/hr-time/; spec: HR-TIME-2;
+    type: typedef; url: #idl-def-domhighrestimestamp; text: DOMHighResTimeStamp;
+    type: interface; url: #dfn-performance; text: Performance;
+    type: method; for:Performance;
+        text: now(); url: #dom-performance-now;
+    type: dfn; text: current high resolution time; url: #dfn-current-high-resolution-time;
+    type: attribute; for: WindowOrWorkerGlobalScope;
+        text: performance; url: #dom-windoworworkerglobalscope-performance;
+urlPrefix: https://www.w3.org/TR/CSS21/visuren.html; spec: CSS21;
+    type: dfn; url: #viewport; text: viewport;
+urlPrefix: https://w3c.github.io/paint-timing/; spec: PAINT-TIMING;
+    type: dfn; url: #mark-paint-timing; text: mark paint timing;
+urlPrefix: https://www.w3.org/TR/css-box-3/; spec: CSS-BOX-3;
+    type: dfn; url: #border-box; text: border box;
+urlPrefix: https://www.w3.org/TR/css-break-3/; spec: CSS-BREAK-3;
+    type: dfn; url: #box-fragment; text: box fragment;
+urlPrefix: https://www.w3.org/TR/cssom-view-1/; spec: CSSOM-VIEW-1;
+    type: dfn; url: #css-pixels; text: CSS pixels;
+urlPrefix: https://www.w3.org/TR/css-values-4/; spec: CSS-VALUES-4;
+    type: dfn; url: #pixel-unit; text: pixel units;
+urlPrefix: https://www.w3.org/TR/CSS2/visudet.html; spec: CSS2;
+    type: dfn; url: #containing-block-details; text: initial containing block;
+urlPrefix: https://wicg.github.io/visual-viewport/index.html; spec: VISUAL-VIEWPORT;
+    type: dfn; url: #dom-visualviewport-width; text: visual viewport width;
+    type: dfn; url: #dom-visualviewport-height; text: visual viewport height;
+</pre>
+
+Introduction {#sec-intro}
+=====================
+
+<div class="non-normative">
+
+<em>This section is non-normative.</em>
+
+The shifting of DOM elements on a webpage detracts from the user's experience, and occurs frequently on the web today.
+This shifting is often due to content loading asynchronously and displacing other elements on the page.
+The layout instability metric identifies these unstable pages by computing a value (the "layout shift") for each animation frame on the page, allowing the developer to compute an overall instability score for the page.
+
+</div>
+
+Usage example {#example}
+------------------------
+
+<pre class="example highlight">
+    var observer = new PerformanceObserver(function(list) {
+        var perfEntries = list.getEntries();
+        for (let i = 0; i < perfEntries.length; i++) {
+            // Process entries
+            // Report back for analytics and monitoring
+            // ...
+        }
+    });
+
+    // Register observer for layout shift notifications
+    observer.observe({type: "layout-shift", buffered: true});
+</pre>
+
+<div class="non-normative">
+
+<em>This section is non-normative.</em>
+
+<h4 dfn>End of session signal</h4>
+A "final" penalty for the user's session can be reported by listening to the <a href="https://developers.google.com/web/updates/2018/07/page-lifecycle-api#event-visibilitychange">visibilitychange event</a>, and factoring in that last value at that time.
+
+</div>
+
+Terminology {#sec-terminology}
+==============================
+An <a>element</a>’s <dfn export>starting point</dfn> refers to the <a>element</a>'s <a>flow-relative offset</a> in the coordinate space of the <a>initial containing block</a> of the current document measured in <a>pixel units</a>.
+
+The <dfn export>visual representation</dfn> of a <a href="https://www.w3.org/TR/html401/struct/global.html#h-7.5.3">block-level</a> <a>element</a> is its <a>border box</a>. The <a>visual representation</a> of an <a href="https://www.w3.org/TR/html401/struct/global.html#h-7.5.3">inline element</a> is the geometric union of its <a>box fragment</a>s.
+
+{{LayoutShift}} interface {#sec-layout-shift}
+=======================================
+
+<pre class="idl">
+    interface LayoutShift : PerformanceEntry {
+      readonly attribute long value;
+      readonly attribute boolean hadRecentInput;
+      readonly attribute DOMHighResTimeStamp lastInputTime;
+    };
+</pre>
+
+All attributes have the values assigned to them when the {{LayoutShift}} entry is constructed
+in <a>Compute the layout shift</a>.
+
+A user agent implementing the Layout Instability API must include <code>"layout-shift"</code> in {{PerformanceObserver/supportedEntryTypes}} for {{Window}} contexts. This allows developers to detect support for layout instability.
+
+Processing model {#sec-processing-model}
+========================================
+
+Modifications to the HTML specification {#sec-modifications-HTML-spec}
+--------------------------------------------------------
+
+<em>This section will be removed once the <a href=https://html.spec.whatwg.org/multipage>HTML specification</a> has been modified.</em>
+
+For each <a>element</a>, there is a:
+* <dfn>current frame starting point</dfn> which is initially set to <code>null</code>.
+* <dfn>previous frame starting point</dfn> which is initially set to <code>null</code>.
+* <dfn>current visual representation</dfn> which is initially set to <code>null</code>.
+* <dfn>previous visual representation</dfn> with is initially set to <code>null</code>.
+
+<div algorithm="additions to update rendering">
+    In the <a>update the rendering</a> step of the <a>event loop processing model</a>, add a step right after the step that calls <a>mark paint timing</a>:
+
+    1. For each fully active {{Document}} in <em>docs</em>, invoke the algorithm to <a>evaluate the layout instability</a> of that {{Document}}.
+</div>
+
+Evaluate layout instability {#sec-eval-layout-instability}
+--------------------------------------------------------
+
+<div algorithm="evaluate the layout instability">
+    When asked to <dfn export>evaluate the layout instability</dfn> given an active {{Document}} <var>doc</var>, run the following steps:
+
+    1. Let <var>elements</var> be the set of <a>shadow-including descendants</a> of the <var>doc</var>.
+    1. Let <var>unstableElements</var> be an empty list.
+    1. Let <var>totalWidth</var> be the current <a>visual viewport width</a>.
+    1. Let <var>totalHeight</var> be the current <a>visual viewport height</a>.
+    1. Let <var>viewportDistance</var> be max(<var>totalWidth</var>, <var>totalHeight</var>).
+    1. For each <var>element</var> of <var>elements</var>:
+        1. Set <var>element</var>'s <a>current frame starting point</a> to the <a>starting point</a> of <var>element</var>.
+        1. Set <var>element</var>'s <a>current visual representation</a> to the <a>visual representation</a> of <var>element</var>.
+        1. Let <var>unstable</var> be the boolean returned from calling <a>identify an unstable element</a> with <var>element</var>’s <a>current frame starting point</a> and <a>previous frame starting point</a>.
+        1. Set <var>element</var>'s <var>shiftFraction</var> to:
+            1. 0 if <a>previous frame starting point</a> is null.
+            1. The max distance the element has moved in any direction, which is computed as follows:
+                1. Let <var>verticalDistance</var> be abs(<a>previous frame starting point</a>'s y-value - <a>current frame starting point</a>'s y-value) / <var>viewportDistance</var>.
+                1. Let <var>horizontalDistance</var> be abs(<a>previous frame starting point</a>'s x-value - <a>current frame starting point</a>'s x-value) / <var>viewportDistance</var>.
+                1. Take the max(<var>verticalDistance</var>, <var>horizontalDistance</var>).
+        1. If <var>unstable</var> is true, add a tuple to <var>unstableElements</var> with:
+            1. <a>current visual representation</a> of <var>element</var>
+            1. <a>previous visual representation</a> of <var>element</var>
+            1. <var>shiftFraction</var> of <var>element</var>:
+        1. Set <var>element</var>'s <a>previous frame starting point</a> point to <a>current frame starting point</a>.
+        1. Set <var>element</var>'s <a>previous visual representation</a> to the <a>current visual representation</a>.
+    1. Call <a>compute the layout shift</a> with <var>unstableElements</var>.
+</div>
+
+Compute the layout shift {#sec-compute-layout-shift}
+-----------------------------------------------------
+
+<div algorithm="compute the layout shift">
+    When asked to <dfn export>compute the layout shift</dfn>, with <var>unstableElements</var>, a list of tuples, one for each impacted <a>element</a> on the page, as input, run the following steps:
+
+    1. Let <var>impactedRegion</var> be a two-dimensional geometric region which is initially empty (that is, it contains no points).
+    1. Let <var>maxShiftFraction</var> be initially set to 0.
+    1. For each tuple <var>tuple</var> in <var>unstableElements</var>:
+        1. If <a>previous visual representation</a> is not null, expand <var>impactedRegion</var> to additionally contain all points that lie within <var>tuple</var>'s <a>current visual representation</a>, <var>tuple</var>'s <a>previous visual representation</a>, or both.
+        1. Set <var>maxShiftFraction</var> to <var>shiftFraction</var> if <var>tuple</var>’s <var>shiftFraction</var> > <var>maxShiftFraction</var>.
+    1. Subtract from <var>impactedRegion</var> all points that lie outside of the <a>viewport</a>.
+    1. Let <var>impactedFraction</var> be the area of the <var>impactedRegion</var> divided by the area of the current <a>viewport</a>.
+    1. Set <var>layoutShift</var> to the <var>impactedFraction</var> multiplied by the <var>maxShiftFraction</var>.
+    1. If <var>layoutShift</var> is greater than 0:
+        1. Create a new {{LayoutShift}} object |newEntry|.
+        1. Set |newEntry|'s {{PerformanceEntry/name}} attribute to <code>"layout-shift"</code>.
+        1. Set |newEntry|'s {{PerformanceEntry/entryType}} attribute to <code>"layout-shift"</code>.
+        1. Set |newEntry|'s {{PerformanceEntry/startTime}} attribute to <a>current high resolution time</a>.
+        1. Set |newEntry|'s {{PerformanceEntry/duration}} attribute to 0.
+        1. Set |newEntry|'s <dfn attribute for=LayoutShift>value</dfn> attribute to <var>layoutShift</var>.
+        1. Set |newEntry|'s <dfn attribute for=LayoutShift>lastInputTime</dfn> attribute
+            to the time of the most recent <a>excluding input</a>, or 0 if no excluding input has occurred
+            during the browsing session.
+        1. Set |newEntry|'s <dfn attribute for=LayoutShift>hadRecentInput</dfn> attribute
+            to <code>true</code> if {{LayoutShift/lastInputTime}} is less than 500 milliseconds in the past,
+            and <code>false</code> otherwise.
+        1. <a href="https://w3c.github.io/performance-timeline/#dfn-queue-a-performanceentry">Queue the PerformanceEntry</a> |newEntry| object.
+</div>
+
+NOTE: This computation ensures that the layout shift takes into account both the fraction of the viewport that has been impacted by layout stability as well as the greatest impact to any given element in the viewport.  This is to recognize that a large element that moves only a small distance can have a small impact on the perceived stability of the page.
+
+Input Exclusion {#sec-input-exclusion}
+--------------------------------------
+
+An <dfn export>excluding input</dfn> is any event from an input device which signals a user's
+active interaction with the document, or any event which directly changes the size of the <a>viewport</a>.
+
+Excluding inputs generally include <a href="https://www.w3.org/TR/uievents/#event-type-mousedown">mousedown</a>,
+<a href="https://www.w3.org/TR/uievents/#keydown">keydown</a>, and
+<a href="https://www.w3.org/TR/pointerevents/#the-pointerdown-event">pointerdown</a>.
+However, an event whose only effect is to begin or update a fling or scroll gesture
+is not an excluding input.
+
+The user agent may delay the reporting of layout shifts after a
+<a href="https://www.w3.org/TR/pointerevents/#the-pointerdown-event">pointerdown</a> event
+until such time as it is known that the event does not begin a fling or scroll gesture.
+
+The <a href="https://www.w3.org/TR/uievents/#event-type-mousemove">mousemove</a> and
+<a href="https://www.w3.org/TR/pointerevents/#the-pointermove-event">pointermove</a>
+events are also not excluding inputs.
+
+Identify an unstable element {#sec-identify-unstable-element}
+--------------------------------------------------------------
+
+<div algorithm="identify an unstable element">
+    When asked to <dfn export>identify an unstable element</dfn>, given <var>element</var> as input, run the following steps:
+
+    1. If <var>element</var>’s <a>previous frame starting point</a> is null, return false.
+    1. If <var>element</var>’s <a>previous frame starting point</a> does not equal <var>element</var>’s <a>current frame starting point</a> and they differ by 3 or more pixel units in the horizontal or vertical direction, return true.
+    1. Return false.
+
+But (notwithstanding the above), no element should be treated as unstable
+solely due to a change in the <a href="https://www.w3.org/TR/css-transforms-1/#transform-property">transform</a> of that element or of any other element.
+
+</div>
+
+Security & privacy considerations {#priv-sec}
+===============================================
+
+Layout instability bears an indirect relationship to <a href="https://w3c.github.io/resource-timing/">resource timing</a>, as slow resources could cause intermediate layouts that would not otherwise be performed. Resource timing information can be used by malicious websites for <a>statistical fingerprinting</a>.
+The layout instability API only reports instability in the current browsing context. It does not directly provide any aggregation of instability scores across multiple browsing contexts. Developers can implement such aggregation manually, but browsing contexts with different <a href="https://html.spec.whatwg.org/multipage/origin.html#concept-origin">origins</a> would need to cooperate to share instability scores.
+

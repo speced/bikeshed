@@ -4,7 +4,7 @@ Shortname: import-maps
 Repository: WICG/import-maps
 Inline Github Issues: true
 Group: WICG
-Status: ED
+Status: CG-DRAFT
 Level: 1
 URL: https://wicg.github.io/import-maps/
 Boilerplate: omit conformance, omit feedback-header
@@ -22,6 +22,15 @@ spec: infra; type: dfn
   text: string
   text: list
 spec: url; type: dfn; for: /; text: url
+spec: html; type: element; text: script
+</pre>
+<pre class="anchors">
+spec: html; type: dfn; urlPrefix: https://html.spec.whatwg.org/multipage/
+  text: module map; for: /; url: webappapis.html#module-map
+  text: fetch an import() module script graph; url: webappapis.html#fetch-an-import()-module-script-graph
+  text: fetch a modulepreload module script graph; url: webappapis.html#fetch-a-modulepreload-module-script-graph
+  text: fetch an inline module script graph; url: webappapis.html#fetch-an-inline-module-script-graph
+  text: script; url: webappapis.html#concept-script
 </pre>
 
 <style>
@@ -46,37 +55,517 @@ summary {
 
 A <dfn>specifier map</dfn> is an [=ordered map=] from [=strings=] to [=lists=] of [=URLs=].
 
-<!-- TODO: unexport these; only doing that for now to un-break the build in our intermediate state. -->
-
 A <dfn>import map</dfn> is a [=struct=] with two [=struct/items=]:
 
-* <dfn for="import map" export>imports</dfn>, a [=specifier map=], and
-* <dfn for="import map" export>scopes</dfn>, an [=ordered map=] of [=URLs=] to [=specifier maps=].
+* <dfn for="import map">imports</dfn>, a [=specifier map=], and
+* <dfn for="import map">scopes</dfn>, an [=ordered map=] of [=URLs=] to [=specifier maps=].
+
+An <dfn>empty import map</dfn> is an [=/import map=] with its [=import map/imports=] and [=import map/scopes=] both being empty maps.
+
+<div algorithm>
+  To <dfn>update an import map</dfn> |importMap| with a second [=/import map=] |newImportMap|:
+
+  1. For each |specifier| → |addresses| of |newImportMap|'s [=import map/imports=], [=map/set=] |importMap|'s [=import map/imports=][|specifier|] to |addresses|.
+  1. For each |url| → |specifierMap| of |newImportMap|'s [=import map/scopes=], [=map/set=] |importMap|'s [=import map/scopes=][|url|] to |specifierMap|.
+  1. Set |importMap|'s [=import map/imports=] to the result of [=map/sorting=] |importMap|'s [=import map/imports=], with an entry |a| being less than an entry |b| if |a|'s [=map/key=] is [=longer or code unit less than=] |b|'s [=map/key=].
+  1. Set |importMap|'s [=import map/scopes=] to the result of [=map/sorting=] |importMap|'s [=import map/scopes=], with an entry |a| being less than an entry |b| if |a|'s [=map/key=] is [=longer or code unit less than=] |b|'s [=map/key=].
+</div>
+
+<div class="example" id="example-merging">
+  [=Update an import map=] merges the two import maps in a very simple way, not performing any deep merging beyond the top level of the "`imports`" and "`scopes`" keys. For example,
+
+  <xmp highlight="html">
+    <script type="importmap">
+    {
+      "imports": {
+        "a": "/a-1.mjs",
+        "b": "/b-1.mjs",
+        "std:kv-storage": ["std:kv-storage", "/kvs-1.mjs"]
+      },
+      "scopes": {
+        "/scope1/": {
+          "a": "/a-2.mjs"
+        }
+      }
+    }
+    </script>
+    <script type="importmap">
+    {
+      "imports": {
+        "b": null,
+        "std:kv-storage": "kvs-2.mjs"
+      },
+      "scopes": {
+        "/scope1/": {
+          "b": "/b-2.mjs"
+        }
+      }
+    }
+    </script>
+  </xmp>
+
+  is equivalent to
+
+  <xmp highlight="html">
+    <script type="importmap">
+    {
+      "imports": {
+        "a": "/a-1.mjs",
+        "b": null,
+        "std:kv-storage": "kvs-2.mjs"
+      },
+      "scopes": {
+        "/scope1/": {
+          "b": "/b-2.mjs"
+        }
+      }
+    }
+    </script>
+  </xmp>
+
+  Notice how the definition for "`/scope1/`" was completely overridden, so there is no longer a redirection for the "`a`" module specifier within that scope.
+</div>
 
 <h2 id="acquiring">Acquiring import maps</h2>
 
-<!--
-To <dfn lt="parse JSON into maps and lists|parsing JSON into maps and lists">parse JSON into maps and lists</dfn>, TODO. (This should move to Infra.)
--->
+<h3 id="integration-environment-settings-object">New members of environment settings objects</h3>
 
-<!-- TODO unexport -->
+Each [=environment settings object=] will get an <dfn for="environment settings object">import map</dfn> algorithm, which returns an [=/import map=] created by parsing and merging all `<script type="importmap">` elements that are encountered (before the cutoff).
 
-To <dfn export>parse an import map string</dfn>, given a [=string=] |input| and a [=URL=] |baseURL|:
+A {{Document}} has an [=/import map=] <dfn for="Document">import map</dfn>. It is initially a new [=/empty import map=].
 
-1. For now, see <a href="https://github.com/WICG/import-maps/blob/master/reference-implementation/lib/parser.js">the reference implementation</a>, carrying out the algorithm there given |input| and |baseURL|.
-1. This algorithm returns an [=/import map=]. The result will be highly normalized (e.g. all URL-like specifier keys will end up resolved against |baseURL| before being re-serialized as strings). See the <a href="https://github.com/WICG/import-maps/tree/master/reference-implementation/__tests__">parsing tests</a> for more details.
+In <a spec="html">set up a window environment settings object</a>, <var ignore>settings object</var>'s [=environment settings object/import map=] returns the [=Document/import map=] of <var ignore>window</var>'s <a>associated <code>Document</code></a>.
 
-... Other missing steps here. At some point, each [=environment settings object=] will get an <dfn for="environment settings object">import map</dfn> algorithm, which returns an [=/import map=] created by parsing and merging all `<script type="importmap">` elements that are encountered (before the cutoff).
+A {{WorkerGlobalScope}} has an [=/import map=] <dfn for="WorkerGlobalScope">import map</dfn>. It is initially a new [=/empty import map=].
+
+ISSUE: Specify a way to set {{WorkerGlobalScope}}'s [=WorkerGlobalScope/import map=]. We might want to inherit parent context's import maps, or provide APIs on {{WorkerGlobalScope}}, but we are not sure. Currently it is always an [=/empty import map=]. See <a href="https://github.com/WICG/import-maps/issues/2">#2</a>.</p>
+
+In <a spec="html">set up a worker environment settings object</a>, <var ignore>settings object</var>'s [=environment settings object/import map=] returns <var ignore>worker global scope</var>'s [=WorkerGlobalScope/import map=].
+
+<p class="note">
+  This infrastructure is very similar to the existing specification for module maps.
+</p>
+
+A {{Document}} has a <dfn for="Document">list of pending import map scripts</dfn>, which is a [=list=] of {{HTMLScriptElement}}s, initially empty.
+
+<p class="note">{{HTMLScriptElement}}s are added to this list by [[#integration-prepare-a-script]].</p>
+
+Each {{Document}} has an <dfn for="Document">acquiring import maps</dfn> boolean. It is initially true.
+
+<div class="note">
+  These two pieces of state are used to achieve the following behavior:
+
+  <ul>
+    <li>Import maps are accepted if and only if they are added (i.e., their corresponding <{script}> elements are added) before the first module load is started, even if the loading of the import map files don't finish before the first module load is started.
+    <li>Module loading waits for any import maps that have already started loading, if any.
+  </ul>
+</div>
+
+<h3 id="integration-script-type">Script type</h3>
+
+To process import maps in the <a spec="html">prepare a script</a> algorithm consistently with existing script types (i.e. classic or module), we make the following changes:
+
+- Introduce <dfn>import map parse result</dfn>, which is a [=struct=] with three [=struct/items=]:
+  - a <dfn for="import map parse result">settings object</dfn>, an [=environment settings object=];
+  - an <dfn for="import map parse result">import map</dfn>, an [=/import map=]; and
+  - an <dfn for="import map parse result">error to rethrow</dfn>, a JavaScript value representing a parse error when non-null.
+- <a spec="html">the script's type</a> should be either "`classic`", "`module`", or "`importmap`".
+- Rename <a spec="html">the script's script</a> to <dfn>the script's result</dfn>, which can be either a <a spec="html">script</a> or an [=import map parse result=].
+
+The following algorithms are updated accordingly:
+
+- <a spec="html">prepare a script</a>: see [[#integration-prepare-a-script]].
+- <a spec="html">execute a script block</a> Step 4: add the following case.
+  <dl>
+    <dt>"`importmap`"</dt>
+    <dd>
+      1. Assert: Never reached.
+         <p class="note">Import maps are processed by [=/register an import map=] instead of <a spec="html">execute a script block</a>.</p>
+    </dd>
+  </dl>
+
+<p class="note">Because we don't make [=import map parse result=] the new subclass of [=script=], other script execution-related specs are left unaffected.</p>
+
+<h3 id="integration-prepare-a-script">Prepare a script</h3>
+
+Inside the <a spec="html">prepare a script</a> algorithm, we make the following changes:
+
+- Insert the following step to [=prepare a script=] step 7, under "Determine the script's type as follows:":
+  - If the script block's type string is an [=ASCII case-insensitive=] match for the string "`importmap`", <a spec="html">the script's type</a> is "`importmap`".
+- Insert the following step before <a spec="html">prepare a script</a> step 24:
+  - If <a spec="html">the script's type</a> is "`importmap`" and the element's <a spec="html">node document</a>'s [=Document/acquiring import maps=] is false, then <a spec="html">queue a task</a> to <a spec="html">fire an event</a> named `error` at the element, and return.
+    <p class="note">Alternative considered: We can proceed to import map loading unless <a spec="html">the script is ready</a> for all {{HTMLScriptElement}} in [=Document/list of pending import map scripts=], even when [=Document/acquiring import maps=] is false, because at that time subsequent module loading is blocked and new import map loads could be still added. This would allow a few more opportinities for adding import maps, but this would highly depend on the timing of network loading. For example, if the preceding import map load finishes earlier than expected, then subsequent import maps depending on this behavior might fail. To avoid this kind of nondeterminism, we didn't choose this option, at least for now.</p>
+- Insert the following case to <a spec="html">prepare a script</a> step 24.6:
+  <dl>
+    <dt>"`importmap`"</dt>
+    <dd>
+      [=Fetch an import map=] given <var ignore>url</var>, |settings object|, and <var ignore>options</var>.
+    </dd>
+  </dl>
+- Insert the following case to <a spec="html">prepare a script</a> step 25.2:
+  <dl>
+    <dt>"`importmap`"</dt>
+    <dd>
+      1. Let |import map parse result| be the result of [=create an import map parse result=], given <var ignore>source text</var>, <var ignore>base URL</var> and |settings object|.
+      1. Set [=the script's result=] to |import map parse result|.
+      1. <a spec="html">The script is ready</a>.
+    </dd>
+  </dl>
+- Insert the following case to <a spec="html">prepare a script</a> step 26:
+  <dl>
+    <dt>If <a spec="html">the script's type</a> is "`importmap`"</dt>
+    <dd>
+      [=list/Append=] the element to the element's <a spec="html">node document</a>'s [=Document/list of pending import map scripts=].
+      When <a spec="html">the script is ready</a>, run the following steps:
+        1. Repeat while the [=Document/list of pending import map scripts=] is not empty and the first entry's <a spec="html">the script is ready</a>:
+          1. [=/Register an import map=] given the first element of [=Document/list of pending import map scripts=].
+          1. Remove the first element of [=Document/list of pending import map scripts=].
+             <p class="note">If this makes the [=Document/list of pending import map scripts=] empty, it will (asynchronously) unblock any [=wait for import maps=] algorithm instances.</p>
+    </dd>
+  </dl>
+
+<p class="issue">CSP is applied to import maps just like JavaScript scripts. Is this sufficient? <a href="https://github.com/WICG/import-maps/issues/105">#105</a>.</p>
+
+<p class="note">
+  This is specified similar to the <a spec="html">list of scripts that will execute in order as soon as possible</a>, to register import maps and fire `error` events in order (<a spec="html">list of scripts that will execute in order as soon as possible</a> is rarely used in the wild though).
+  There can be other alternatives, e.g. executing a similar loop inside [=/wait for import maps=].
+</p>
+
+</div>
+
+<div algorithm>
+  To <dfn export>fetch an import map</dfn> given |url|, |settings object|, and |options|, run the following steps. This algorithm asynchronously returns an [=/import map=] or null.
+  <p class="note">This algorithm is specified consistently with <a spec="html">fetch a single module script</a> steps 5, 7, 8, 9, 10, and 12.1. Particularly, we enforce CORS to avoid leaking the import map contents that shouldn't be accessed.</p>
+
+  1. Let |request| be a new [=/request=] whose [=request/url=] is |url|, [=request/destination=] is "`script`", [=request/mode=] is "`cors`", [=request/referrer=] is "`client`", and [=request/client=] is |settings object|.
+     <p class="note">Here we use "`script`" as the [=request/destination=], which means the `script-src-elem` CSP directive applies.</p>
+  1. <a spec="html">Set up the module script request</a> given |request| and |options|.
+  1. [=/Fetch=] |request|. Return from this algorithm, and run the remaining steps as part of the fetch's [=/process response=] for the [=/response=] |response|.
+     <p class="note">|response| is always [=CORS-same-origin=].</p>
+  1. If any of the following conditions are met, asynchronously complete this algorithm with null, and abort these steps:
+    - |response|'s [=response/type=] is "`error`"
+    - |response|'s [=response/status=] is not an [=ok status=]
+    - The result of [=extracting a MIME type=] from |response|'s [=response/header list=] is not `"application/importmap+json"`
+      <p class="note">For more context on MIME type checking, see <a href="https://github.com/WICG/import-maps/issues/105">#105</a> and <a href="https://github.com/WICG/import-maps/pull/119">#119</a>.</p>
+  1. Let |source text| be the result of [=UTF-8 decoding=] response's [=response/body=].
+  1. Asynchronously complete this algorithm with the result of [=create an import map parse result=], given |source text|, |response|'s [=response/url=], and |settings object|.
+
+</div>
+
+<h3 id="integration-wait-for-import-maps">Wait for import maps</h3>
+
+<div algorithm>
+  To <dfn export>wait for import maps</dfn> given |settings object|:
+
+  1. If |settings object|'s [=environment settings object/global object=] is a {{Window}} object:
+    1. Let |document| be |settings object|'s [=environment settings object/global object=]'s <a>associated <code>Document</code></a>.
+    1. Set |document|'s [=Document/acquiring import maps=] to false.
+    1. <a spec="html">Spin the event loop</a> until |document|'s [=Document/list of pending import map scripts=] is empty.
+  1. Asynchronously complete this algorithm.
+
+<p class="note">No actions are specified for {{WorkerGlobalScope}} because for now there are no mechanisms for adding import maps to {{WorkerGlobalScope}}.</p>
+
+</div>
+
+Insert a call to [=wait for import maps=] at the beginning of the following HTML spec concepts.
+
+- [=fetch an external module script graph=]
+- [=fetch an import() module script graph=]
+- [=fetch a modulepreload module script graph=]
+- [=fetch an inline module script graph=]
+- [=fetch a module worker script graph=] (using <var ignore>module map settings object</var>)
+
+<div class="advisement">
+  In this draft of the spec, which inserts itself into these HTML concepts, the settings object used here is the |module map settings object|, not |fetch client settings object|, because [=resolve a module specifier=] uses the import map of |module map settings object|. In a potential future version of the import maps infrastructure, which interjects itself at the layer of the Fetch spec in order to support `import:` URLs, we would instead use |fetch client settings object|.
+
+  This only affects [=fetch a module worker script graph=], where these two settings objects are different. And, given that the import maps for {{WorkerGlobalScope}}s are currently always empty, the only fetch that could be impacted is that of the initial module. But even that would not be impacted, because that fetch is done using URLs, not specifiers. So this is not a future compatibility hazard, just something to keep in mind as we develop import maps in module workers.
+</div>
+
+<div class="advisement">
+  Depending on the exact location of [=wait for import maps=], `import(unresolvableSpecifier)` might behave differently between a HTML-spec- and Fetch-spec-based import maps. In particular, in the current draft, [=acquiring import maps=] is set to false after an `import()`-initiated failure to [=resolve a module specifier=], thus causing any later-encountered import maps to cause an `error` event instead of being processed. Whereas, if [=wait for import maps=] was called as part of the Fetch spec, it's possible it would be natural to specify things such that [=acquiring import maps=] remains true (as it does for cases like `<script type="module" src="http://:invalidurl">`).
+
+  This should not be much of a compatibility hazard, as it only makes esoteric error cases into successes. And we can always preserve the behavior as specced here if necessary, with some potential additional complexity.
+</div>
+
+<h3 id="integration-register-an-import-map">Registering an import map</h3>
+
+<div algorithm>
+To <dfn>register an import map</dfn> given an {{HTMLScriptElement}} |element|:
+
+1. If |element|'s [=the script's result=] is null, then [=fire an event=] named `error` at |element|, and return.
+1. Let |import map parse result| be |element|'s [=the script's result=].
+1. Assert: |element|'s <a spec="html">the script's type</a> is "`importmap`".
+1. Assert: |import map parse result| is an [=import map parse result=].
+1. Let |settings object| be |import map parse result|'s [=import map parse result/settings object=].
+1. If |element|'s <a spec="html">node document</a>'s <a spec="html">relevant settings object</a> is not equal to |settings object|, then return.
+   <p class="note">This is spec'ed consistently with <a href="https://github.com/whatwg/html/pull/2673">whatwg/html#2673</a>.</p>
+   <p class="advisement">Currently we don't fire `error` events in this case. If we change the decision at <a href="https://github.com/whatwg/html/pull/2673">whatwg/html#2673</a> to fire `error` events, then we should change this step accordingly.</p>
+1. If |import map parse result|'s [=import map parse result/error to rethrow=] is not null, then:
+  1. <a spec="html">Report the exception</a> given |import map parse result|'s [=import map parse result/error to rethrow=].
+     <p class="issue">There are no relevant [=script=], because [=import map parse result=] isn't a [=script=]. This needs to wait for <a href="https://github.com/whatwg/html/issues/958">whatwg/html#958</a> before it is fixable.</p>
+  1. Return.
+1. [=update an import map|Update=] |element|'s [=node document=]'s [=Document/import map=] with |import map parse result|'s [=import map parse result/import map=].
+1. If |element| is <a spec="html">from an external file</a>, then [=fire an event=] named `load` at |element|.
+
+<p class="note">
+  The timing of [=/register an import map=] is observable by possible `error` and `load` events, or by the fact that after [=/register an import map=] an import map <{script}> can be moved to another {{Document}}. On the other hand, the updated [=Document/import map=] is not observable until [=/wait for import maps=] completes.
+</p>
+
+</div>
+
+<h2 id="parsing">Parsing import maps</h2>
+
+<div algorithm>
+  To <dfn lt="parse an import map string|parsing an import map string">parse an import map string</dfn>, given a [=string=] |input| and a [=URL=] |baseURL|:
+
+  1. Let |parsed| be the result of [=parse JSON into Infra values|parsing JSON into Infra values=] given |input|.
+  1. If |parsed| is not a [=map=], then throw a {{TypeError}} indicating that the top-level value must be a JSON object.
+  1. Let |sortedAndNormalizedImports| be an empty [=map=].
+  1. If |parsed|["`imports`"] [=map/exists=], then:
+    1. If |parsed|["`imports`"] is not a [=map=], then throw a {{TypeError}} indicating that the "`imports`" top-level key must be a JSON object.
+    1. Set |sortedAndNormalizedImports| to the result of [=sorting and normalizing a specifier map=] given |parsed|["`imports`"] and |baseURL|.
+  1. Let |sortedAndNormalizedScopes| be an empty [=map=].
+  1. If |parsed|["`scopes`"] [=map/exists=], then:
+    1. If |parsed|["`scopes`"] is not a [=map=], then throw a {{TypeError}} indicating that the "`scopes`" top-level key must be a JSON object.
+    1. Set |sortedAndNormalizedScopes| to the result of [=sorting and normalizing scopes=] given |parsed|["`scopes`"] and |baseURL|.
+  1. If |parsed|'s [=map/get the keys|keys=] [=set/contains=] any items besides "`imports`" or "`scopes`", [=report a warning to the console=] that an invalid top-level key was present in the import map.
+     <p class="note">This can help detect typos. It is not an error, because that would prevent any future extensions from being added backward-compatibly.</p>
+  1. Return the [=/import map=] whose [=import map/imports=] are |sortedAndNormalizedImports| and whose [=import map/scopes=] scopes are |sortedAndNormalizedScopes|.
+</div>
+
+<div algorithm>
+  To <dfn>create an import map parse result</dfn>, given a [=string=] |input|, a [=URL=] |baseURL|, and an [=environment settings object=] |settings object|:
+
+  1. Let |import map| be the result of [=parse an import map string=] given |input| and |baseURL|. If this throws an exception, let |error to rethrow| be the exception. Otherwise, let |error to rethrow| be null.
+  1. Return an [=import map parse result=] with [=import map parse result/settings object=] is |settings object|, [=import map parse result/import map=] is |import map|, and [=import map parse result/error to rethrow=] is |error to rethrow|.
+</div>
+
+
+<div class="example" id="parsing-example">
+  The [=/import map=] is a highly normalized structure. For example, given a base URL of `<https://example.com/base/page.html>`, the input
+
+  <xmp highlight="json">
+    {
+      "imports": {
+        "/app/helper": "node_modules/helper/index.mjs",
+        "std:kv-storage": [
+          "std:kv-storage",
+          "node_modules/kv-storage-polyfill/index.mjs",
+        ]
+      }
+    }
+  </xmp>
+
+  will generate an [=/import map=] with [=import map/imports=] of
+
+  <xmp>
+  «[
+    "https://example.com/app/helper" → «
+      <https://example.com/base/node_modules/helper/index.mjs>
+    »,
+    "std:kv-storage" → «
+      <std:kv-storage>,
+      <https://example.com/base/node_modules/kv-storage-polyfill/index.mjs>
+    »
+  ]»
+  </xmp>
+
+  and (despite nothing being present in the input) an empty [=map=] for its [=import map/scopes=].
+</div>
+
+<div algorithm>
+  To <dfn lt="sort and normalize a specifier map|sorting and normalizing a specifier map">sort and normalize a specifier map</dfn>, given a [=map=] |originalMap| and a [=URL=] |baseURL|:
+
+  1. Let |normalized| be an empty [=map=].
+  1. First, normalize all [=map/entries=] so that their [=map/values=] are [=lists=]. [=map/For each=] |specifierKey| → |value| of |originalMap|,
+    1. Let |normalizedSpecifierKey| be the result of [=normalizing a specifier key=] given |specifierKey| and |baseURL|.
+    1. If |normalizedSpecifierKey| is null, then [=continue=].
+    1. If |value| is a [=string=], then set |normalized|[|normalizedSpecifierKey|] to «|value|».
+    1. Otherwise, if |value| is null, then set |normalized|[|normalizedSpecifierKey|] to a new empty list.
+    1. Otherwise, if |value| is a [=list=], then set |normalized|[|normalizedSpecifierKey|] to |value|.
+    1. Otherwise, [=report a warning to the console=] that addresses must be strings, arrays, or null.
+  1. Next, normalize and validate each potential address in the value [=lists=]. [=map/For each=] |specifierKey| → |potentialAddresses| of |normalized|,
+    1. Assert: |potentialAddresses| is a [=list=], because of the previous normalization pass.
+    1. Let |validNormalizedAddresses| be an empty [=list=].
+    1. [=list/For each=] |potentialAddress| of |potentialAddresses|,
+      1. If |potentialAddress| is not a [=string=], then:
+        1. [=Report a warning to the console=] that the contents of address arrays must be strings.
+        1. [=Continue=].
+      1. Let |addressURL| be the result of [=parsing a URL-like import specifier=] given |potentialAddress| and |baseURL|.
+      1. If |addressURL| is null, then:
+        1. [=Report a warning to the console=] that the address was invalid.
+        1. [=Continue=].
+      1. If |specifierKey| ends with U+002F (/), and the [=URL serializer|serialization=] of |addressURL| does not end with U+002F (/), then:
+        1. [=Report a warning to the console=] that an invalid address was given for the specifier key |specifierKey|; since |specifierKey| ended in a slash, so must the address.
+        1. [=Continue=].
+      1. [=list/Append=] |addressURL| to |validNormalizedAddresses|.
+    1. Set |normalized|[|specifierKey|] to |validNormalizedAddresses|.
+  1. Return the result of [=map/sorting=] |normalized|, with an entry |a| being less than an entry |b| if |a|'s [=map/key=] is [=longer or code unit less than=] |b|'s [=map/key=].
+</div>
+
+<div algorithm>
+  To <dfn lt="sort and normalize scopes|sorting and normalizing scopes">sort and normalize scopes</dfn>, given a [=map=] |originalMap| and a [=URL=] |baseURL|:
+
+  1. Let |normalized| be an empty [=map=].
+  1. [=map/For each=] |scopePrefix| → |potentialSpecifierMap| of |originalMap|,
+    1. If |potentialSpecifierMap| is not a [=map=], then throw a {{TypeError}} indicating that the value of the scope with prefix |scopePrefix| must be a JSON object.
+    1. Let |scopePrefixURL| be the result of [=URL parser|parsing=] |scopePrefix| with |baseURL| as the base URL.
+    1. If |scopePrefixURL| is failure, then:
+      1. [=Report a warning to the console=] that the scope prefix URL was not parseable.
+      1. [=Continue=].
+    1. If |scopePrefixURL|'s [=url/scheme=] is not a [=fetch scheme=], then:
+      1. [=Report a warning to the console=] that scope prefix URLs must have a fetch scheme.
+      1. [=Continue=].
+    1. Let |normalizedScopePrefix| be the [=URL serializer|serialization=] of |scopePrefixURL|.
+    1. Set |normalized|[|normalizedScopePrefix|] to the result of [=sorting and normalizing a specifier map=] given |potentialSpecifierMap| and |baseURL|.
+  1. Return the result of [=map/sorting=] |normalized|, with an entry |a| being less than an entry |b| if |a|'s [=map/key=] is [=longer or code unit less than=] |b|'s [=map/key=].
+</div>
+
+<div algorithm>
+  To <dfn lt="normalize a specifier key|normalizing a specifier key">normalize a specifier key</dfn>, given a [=string=] |specifierKey| and a [=URL=] |baseURL|:
+
+  1. If |specifierKey| is the empty string, then:
+    1. [=Report a warning to the console=] that specifier keys cannot be the empty string.
+    1. Return null.
+  1. Let |url| be the result of [=parsing a URL-like import specifier=], given |specifierKey| and |baseURL|.
+  1. If |url| is not null, then return the [=URL serializer|serialization=] of |url|.
+  1. Return |specifierKey|.
+</div>
+
+<div algorithm>
+  To <dfn lt="parse a URL-like import specifier|parsing a URL-like import specifier">parse a URL-like import specifier</dfn>, given a [=string=] |specifier| and a [=URL=] |baseURL|:
+
+  1. If |specifier| [=/starts with=] "`/`", "`./`", or "`../`", then:
+    1. Let |url| be the result of [=URL parser|parsing=] |specifier| with |baseURL| as the base URL.
+    1. If |url| is failure, then return null.
+       <p class="example" id="example-bad-urllike-import-specifier">One way this could happen is if |specifier| is "`../foo`" and |baseURL| is a `data:` URL.</p>
+    1. Return |url|.
+  1. Let |url| be the result of [=URL parser|parsing=] |specifier| (with no base URL).
+  1. If |url| is failure, then return null.
+  1. If |url|'s [=url/scheme=] is either a [=fetch scheme=] or "`std`", then return |url|.
+  1. Return null.
+</div>
+
+<div algorithm>
+  A [=string=] |a| is <dfn>longer or code unit less than</dfn> |b| if |a|'s [=string/length=] is greater than |b|'s [=string/length=], or if |a| is [=code unit less than=] |b|.
+</div>
 
 <h2 id="resolving">Resolving module specifiers</h2>
 
-HTML already has a <a spec="html">resolve a module specifier</a> algorithm. We replace it with the following <dfn export>resolve a module specifier</dfn> algorithm, given a [=script=] |referringScript| and a [=JavaScript string=] |specifier|:
+<h3 id="new-resolve-algorithm">New "resolve a module specifier"</h3>
 
-1. Let |importMap| be |referringScript|'s [=script/settings object=]'s [=environment settings object/import map=].
-1. Let |baseURL| be |referringScript|'s [=script/base URL=].
-1. For now, see the <a href="https://github.com/WICG/import-maps/blob/master/reference-implementation/lib/resolver.js">reference implementation</a>, carrying out the algorithm there given |specifier|, |importMap|, and |baseURL|.
-1. As before, this algorithm returns a [=URL=] or failure.
+<div algorithm>
+  HTML already has a <a spec="html">resolve a module specifier</a> algorithm. We replace it with the following <dfn export>resolve a module specifier</dfn> algorithm, given a [=script=] |referringScript| and a [=JavaScript string=] |specifier|:
+
+  1. Let |settingsObject| be the [=current settings object=].
+  1. Let |baseURL| be |settingsObject|'s [=environment settings object/API base URL=].
+  1. If |referringScript| is not null, then:
+    1. Set |settingsObject| to |referringScript|'s [=script/settings object=].
+    1. Set |baseURL| to |referringScript|'s [=script/base URL=].
+  1. Let |importMap| be |settingsObject|'s [=environment settings object/import map=].
+  1. Let |moduleMap| be |settingsObject|'s [=environment settings object/module map=].
+  1. Let |baseURLString| be |baseURL|, [=URL serializer|serialized=].
+  1. Let |asURL| be the result of [=parsing a URL-like import specifier=] given |specifier| and |baseURL|.
+  1. Let |normalizedSpecifier| be the [=URL serializer|serialization=] of |asURL|, if |asURL| is non-null; otherwise, |specifier|.
+  1. [=map/For each=] |scopePrefix| → |scopeImports| of |importMap|'s [=import map/scopes=],
+    1. If |scopePrefix| is |baseURLString|, or if |scopePrefix| ends with U+002F (/) and |baseURLString| [=/starts with=] |scopePrefix|, then:
+      1. Let |scopeImportsMatch| be the result of [=resolving an imports match=] given |normalizedSpecifier|, |scopeImports|, and |moduleMap|.
+      1. If |scopeImportsMatch| is not null, then:
+        1. [=Validate the module script URL=] given |scopeImportsMatch|, |settingsObject|, and |baseURL|. <!-- TODO: when we simplify/centralize validation checks, remove this check. It can never fail. -->
+        1. Return |scopeImportsMatch|.
+  1. Let |topLevelImportsMatch| be the reuslt of [=resolving an imports match=] given |normalizedSpecifier|, |importMap|'s [=import map/imports=], and |moduleMap|.
+  1. If |topLevelImportsMatch| is not null, then:
+    1. [=Validate the module script URL=] given |topLevelImportsMatch|, |settingsObject|, and |baseURL|. <!-- TODO: when we simplify/centralize validation checks, remove this check. It can never fail. -->
+    1. Return |topLevelImportsMatch|.
+  1. <p class="note">At this point, the specifier was able to be turned in to a URL, but it wasn't remapped to anything by |importMap|.</p>
+    If |asURL| is not null, then:
+    1. [=Validate the module script URL=] given |asURL|, |settingsObject|, and |baseURL|.
+    1. Return |asURL|.
+  1. Throw a {{TypeError}} indicating that |specifier| was a bare specifier, but was not remapped to anything by |importMap|.
+</div>
 
 <p class="advisement">It seems possible that the return type could end up being a [=list=] of [=URLs=], not just a single URL, to support HTTPS → HTTPS fallback. But, we haven't gotten that far yet; for now let's assume it stays a single URL.</p>
 
-All call sites of HTML's existing <a spec="html">resolve a module specifier</a> will need to be updated to pass the appropriate [=script=], not just its [=script/base URL=].
+<div algorithm>
+  To <dfn lt="resolve an imports match|resolving an imports match">resolve an imports match</dfn>, given a [=string=] |normalizedSpecifier|, a [=specifier map=] |specifierMap|, and a [=module map=] |moduleMap|:
+
+  1. For each |specifierKey| → |addresses| of |specifierMap|,
+    1. If |specifierKey| is |normalizedSpecifier|, then:
+      1. If |addresses|'s [=list/size=] is 0, then throw a {{TypeError}} indicating that |normalizedSpecifier| was mapped to no addresses.
+      1. If |addresses|'s [=list/size=] is 1, then:
+        1. Let |singleAddress| be |addresses|[0].
+        1. If |singleAddress|'s [=url/scheme=] is "`std`", and |moduleMap|[|singleAddress|] does not [=map/exist=], then throw a {{TypeError}} indicating that the requested built-in module is not implemented.
+        1. Return |singleAddress|.
+      1. If |addresses|'s [=list/size=] is 2, and |addresses|[0]'s [=url/scheme=] is "`std`", and |addresses|[1]'s [=url/scheme=] is <em>not</em> "`std`", then:
+        1. Return |addresses|[0], if |moduleMap|[|addresses|[0]] [=map/exists=]; otherwise, return |addresses|[1].
+      1. Otherwise, <span class="advisement">we have no specification for more complicated fallbacks yet; throw a {{TypeError}} indicating this is not yet supported</span>.
+    1. If |specifierKey| ends with U+002F (/) and |normalizedSpecifier| [=/starts with=] |specifierKey|, then:
+      1. If |addresses|'s [=list/size=] is 0, then throw a {{TypeError}} indicating that |normalizedSpecifier| was mapped to no addresses.
+      1. If |addresses|'s [=list/size=] is 1, then:
+        1. Let |afterPrefix| be the portion of |normalizedSpecifier| after the initial |specifierKey| prefix.
+        1. Assert: |afterPrefix| ends with "`/`", as enforced during [=parse an import map string|parsing=].
+        1. Let |url| be the result of [=URL parser|parsing=] the concatenation of the [=URL serializer|serialization=] of |addresses|[0] with |afterPrefix|.
+           <p class="note">We [=URL parser|parse=] the concatenation, instead of parsing |afterPrefix| relative to |addresses|[0], due to cases such as an |afterPrefix| of "`switch`" and an |addresses|[0] of "`std:elements/`".
+        1. Assert: |url| is not failure, since |addresses|[0] was a URL, and appending after the trailing "`/`" will not make it unparseable.
+        1. Return |url|.
+      1. If |addresses|'s [=list/size=] is 2, and |addresses|[0]'s [=url/scheme=] is "`std`", and |addresses|[1]'s [=url/scheme=] is <em>not</em> "`std`", then:
+        1. Let |afterPrefix| be the portion of |normalizedSpecifier| after the initial |specifierKey| prefix.
+        1. Assert: |afterPrefix| ends with "`/`", as enforced during [=parse an import map string|parsing=].
+        1. Let |url0| be the result of [=URL parser|parsing=] the concatenation of the [=URL serializer|serialization=] of |addresses|[0] with |afterPrefix|; similarly, let |url1| be the result of [=URL parser|parsing=] the concatenation of the [=URL serializer|serialization=] of |addresses|[1] with |afterPrefix|.
+           <p class="note">As above, we parse the concatenation to deal with built-in module cases.
+        1. Assert: neither |url0| nor |url1| are failure, since |addresses|[0] and |addresses|[1] were URLs, and appending after their trailing "`/`" will not make them unparseable.
+        1. Return |url0|, if |moduleMap|[|url0|] [=map/exists=]; otherwise, return |url1|.
+      1. Otherwise, <span class="advisement">we have no specification for more complicated fallbacks yet; throw a {{TypeError}} indicating this is not yet supported</span>.
+  1. Return null.
+</div>
+
+<div algorithm>
+  To <dfn lt="validate the module script URL|validate a module script URL">validate a module script URL</dfn>, given a [=URL=] |url|, an [=environment settings object=] |settings object|, and a [=URL=] |base URL|:
+
+  1. If |url|'s [=url/scheme=] is "`std`", then:
+    1. Let |moduleMap| be |settings object|'s [=environment settings object/module map=].
+    1. If |moduleMap|[|url|] does not [=map/exist=], then throw a {{TypeError}} indicating that the requested built-in module is not implemented.
+       <p class="note">This condition is added to ensure that |moduleMap|[|url|] does not [=map/exist=] for unimplemented built-ins. Without this condition, <a spec="html">fetch a single module script</a> might be called and |moduleMap|[|url|] can be set to null, which might complicates the spec around built-ins.</p>
+    1. Return.
+  1. If |url|'s [=url/scheme=] is not a [=fetch scheme=], then throw a {{TypeError}} indicating that |url| is not a fetch scheme.
+
+  <div class="note">
+    This algorithm provides a convenient place for implementations to insert other useful behaviors, as long as they are not observable to web content. For example, Chromium might insert the following step at the beginning of the algorithm:
+
+    0. If |url|'s [=url/scheme=] is "`std-internal`" and |base URL|'s [=url/scheme=] is "`std-internal`", then return.
+
+    This introduces a type of internal built-in module that is only accessible to other internal built-in modules. Similar steps could be used to, for example, change how extension scripts access modules.
+
+    Since [=validate a module script URL=] is called before any module script fetches, such checks are reliable and can be used as a security mechanism.
+  </div>
+</div>
+
+<h3 id="resolving-updates">Updates to other algorithms</h3>
+
+All call sites of HTML's existing <a spec="html">resolve a module specifier</a> will need to be updated to pass the appropriate [=script=], not just its [=script/base URL=]. Some particular interesting cases:
+
+* <a spec="html">HostResolveImportedModule</a> and <a spec="html">HostImportModuleDynamically</a> no longer need to compute the base URL themselves, as [=resolve a module specifier=] now handles that.
+* [=Fetch an import() module script graph=] will also need to take a [=script=] instead of a base URL.
+
+Call sites will also need to be updated to account for [=resolve a module specifier=] now throwing exceptions, instead of returning failure. (Previously most call sites just turned failures into {{TypeError}}s manually, so this is straightforward.)
+
+<hr>
+
+In addition to the call sites for [=validate a module script URL=] explicitly added within this spec, insert the following at the beginning of <a spec="html">fetch a single module script</a>:
+
+<div algorithm="check-access-snippet">
+  1. [=Validate the module script URL=] given <var ignore>url</var>, |module map settings object|, and |module map settings object|'s [=environment settings object/API base URL=]. If this throws an error, then asynchronously complete this algorithm with null, and abort these steps.
+</div>
+
+<div class="note">
+This will call [=validate the module script URL=] twice for each non-toplevel script fetch, first in [=resolve a module specifier=], and then in <a spec="html">fetch a single module script</a>. The behavior of the two calls is identical.
+
+Alternatively, we can add the snippet at the beginning of the following HTML spec concepts (after [=wait for import maps=]), so that the validation is not done twice:
+
+- [=fetch an external module script graph=] (using <var ignore>settings object</var>)
+- [=fetch a modulepreload module script graph=] (using <var ignore>settings object</var>)
+- [=fetch a module worker script graph=]
+
+</div>
+
+<p class="note">[=Validate a module script URL=] is applied to all module URLs before they start loading, even in paths where [=resolve a module specifier=] and import maps are not applied (e.g. `<script src="..." type="module">`).</p>

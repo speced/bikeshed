@@ -31,6 +31,8 @@ urlPrefix: https://w3c.github.io/performance-timeline/; spec: PERFORMANCE-TIMELI
         text: duration; url: #dom-performanceentry-duration
     type: dfn; url: #dfn-queue-a-performanceentry; text: Queue the PerformanceEntry
     type: dfn; url: #dfn-register-a-performance-entry-type; text: register a performance entry type
+    type: attribute; for: PerformanceObserver;
+        text: supportedEntryTypes; url: #supportedentrytypes-attribute;
 urlPrefix: https://w3c.github.io/hr-time/; spec: HR-TIME-2;
     type: typedef; url: #idl-def-domhighrestimestamp; text: DOMHighResTimeStamp;
     type: interface; url: #dfn-performance; text: Performance;
@@ -59,25 +61,25 @@ spec:html; type:dfn; for:/; text:browsing context
 Introduction {#intro}
 =====================
 
-As the page is loading and while the user is interacting with the page afterwards, both the application and browser, queue various events that are then executed by the browser -- e.g. user agent schedules input events based on user’s activity, the application schedules callbacks for requestAnimationFrame and other callbacks etc. Once in the queue, these events are then dequeued one-by-one by the browser and executed.
+As the page is loading and while the user is interacting with the page afterwards, both the application and browser queue various events that are then executed by the browser -- e.g. user agent schedules input events based on user’s activity, the application schedules callbacks for requestAnimationFrame and other callbacks, etc. Once in the queue, the browser dequeues these events one-by-one and executes them.
 
-However, some task can take a long time (multiple frames), and if and when that happens, the UI thread is locked and all other tasks are blocked as well. To the user this is commonly visible as a "locked up" page where the browser is unable to respond to user input; this is a major source of bad user experience on the web today:
+However, some tasks can take a long time (multiple frames) and if/when that happens, the UI thread may become blocked and block all other tasks as well. To the user, this is commonly visible as a "locked up" page where the browser is unable to respond to user input; this is a major source of bad user experience on the web today:
 
 : Delayed "time to Interactive":
-:: while the page is loading long tasks often tie up the main thread and prevent the user from interacting with the page even though the page is visually rendered. Poorly designed third-party content is a frequent culprit.
+:: while the page is loading, or even completely visually rendered, long tasks often tie up the main thread and prevent the user from interacting with the page. Poorly designed third-party content is frequently the culprit.
 
 : High/variable input latency:
-:: critical user interaction events (tap, click, scroll, wheel, etc) are queued behind long tasks, which yields janky and unpredictable user experience.
+:: critical user-interaction events (e.g. tap, click, scroll, wheel, etc.) are queued behind long tasks which yields janky and unpredictable user experience.
 
 : High/variable event handling latency:
-:: similar to input, but for processing event callbacks (e.g. onload events, and so on), which delay application updates.
+:: like input, processing event callbacks (e.g. onload events, etc.) delay application updates.
 
 : Janky animations and scrolling:
-:: some animation and scrolling interactions require coordination between compositor and main threads; if the main thread is blocked due to a long task, it can affect responsiveness of animations and scrolling.
+:: some animation and scrolling interactions require coordination between compositor and main threads; if a long task is blocking the main thread it can affect responsiveness of animations and scrolling.
 
-Some applications (and RUM vendors) are already attempting to identify and track cases where "long tasks" happen. For example, one known pattern is to install a ~short periodic timer and inspect the elapsed time between the successive calls: if the elapsed time is greater than the timer period, then there is high likelihood that one or more long tasks have delayed execution of the timer. This mostly works, but it has several bad performance implications: the application is polling to detect long tasks, which prevents quiescence and long idle blocks (see requestIdleCallback); it’s bad for battery life; there is no way to know who caused the delay (e.g. first party vs third party code).
+Some applications (and <a href="https://en.wikipedia.org/wiki/Real_user_monitoring">RUM</a> vendors) are already attempting to identify and track cases where "long tasks" happen. For example, one known pattern is to install a ~short periodic timer and inspect the elapsed time between the successive expirations: if the elapsed time is greater than the timer period, then there is high likelihood that one or more long tasks have delayed execution of the event loop. This approach mostly works but has several bad performance implications: by polling to detect long tasks, the application prevents quiescence and long idle blocks (see requestIdleCallback); it’s bad for battery life; there is no way to know what is causing the delay (e.g. first party or third party code).
 
-The RAIL performance model suggests that applications should respond in under 100ms to user input (for touch move and scrolling, in under 16ms). Our goal with this API is to surface notifications about tasks that may prevent the application from hitting these targets. We surface tasks that take 50ms or more. A website without these tasks should respond to user input in under 100ms: it will take less than 50ms to finish the task that is being executed when the user input is received and less than 50ms to execute the task to react to such user input.
+The <a href="https://developers.google.com/web/fundamentals/performance/rail">RAIL</a> performance model suggests that applications should respond to user input in less than 100ms (for touch move and scrolling, the threshold is 16ms). The goal of this API is to surface notifications about tasks that may prevent the application from hitting these targets. This API surfaces tasks that take 50ms or more. A website without these tasks should respond to user input in under 100ms: it will take less than 50ms to finish the task that is being executed when the user input is received and less than 50ms to execute the task to react to such user input.
 
 Usage Example {#example}
 ------------------------
@@ -123,6 +125,7 @@ Long Task timing involves the following new interfaces:
 <pre class="idl">
     interface PerformanceLongTaskTiming : PerformanceEntry {
         readonly attribute FrozenArray&lt;TaskAttributionTiming> attribution;
+        [Default] object toJSON();
     };
 </pre>
 
@@ -131,7 +134,7 @@ The values of the attributes of a {{PerformanceLongTaskTiming}} are set in the p
 The {{PerformanceEntry/name}} attribute's getter will return one of the following strings:
 
 : "<code><dfn>unknown</dfn></code>"
-:: The long task did not originate from an event loop <a>task</a>.
+:: The long task originated from an <a>update the rendering</a> step within the <a>event loop processing model</a> or work the user agent performed outside of the <a>event loop</a>.
 : "<code><dfn>self</dfn></code>"
 :: The long task originated from an event loop <a>task</a> within this <a>browsing context</a>.
 : "<code><dfn>same-origin-ancestor</dfn></code>"
@@ -147,7 +150,7 @@ The {{PerformanceEntry/name}} attribute's getter will return one of the followin
 : "<code><dfn>cross-origin-unreachable</dfn></code>"
 :: The long task originated from an event loop <a>task</a> within a cross-origin <a>browsing context</a> that is not an ancestor or descendant.
 : "<code><dfn>multiple-contexts</dfn></code>"
-:: Multiple <a>browsing contexts</a> were involved in the long task.
+:: The long task originated from an event loop <a>task</a> involving multiple <a>browsing contexts</a>.
 
 The {{PerformanceEntry/entryType}} attribute's getter will return <code>"longtask"</code>.
 
@@ -166,6 +169,7 @@ The <dfn attribute for=PerformanceLongTaskTiming>attribution</dfn> attribute's g
         readonly attribute DOMString containerSrc;
         readonly attribute DOMString containerId;
         readonly attribute DOMString containerName;
+        [Default] object toJSON();
     };
 </pre>
 
@@ -247,7 +251,8 @@ These fields are not independent. The following gives an overview of how they ar
 Processing model {#sec-processing-model}
 ========================================
 
-A user agent implementing the Long Tasks API must run the <a>register a performance entry type</a> algorithm with <code>"longtask"</code> as input.
+Note: A user agent implementing the Long Tasks API would need to include <code>"longtask"</code> in {{PerformanceObserver/supportedEntryTypes}} for {{Window}} contexts.
+This allows developers to detect support for long tasks.
 
 Report long tasks {#report-long-tasks}
 --------------------------------------------------------

@@ -15,7 +15,7 @@ TR: https://www.w3.org/TR/IndexedDB-3/
 Level: 3
 Editor: Ali Alabbas, Microsoft Corp. https://microsoft.com, alia@microsoft.com
 Editor: Joshua Bell, Google Inc. https://google.com, jsbell@google.com
-Group: webplatform
+Group: webapps
 Test Suite: https://github.com/web-platform-tests/wpt/tree/master/IndexedDB
 Favicon: logo-db.png
 Complain About: accidental-2119 yes
@@ -371,7 +371,7 @@ from the database. Ideally the user will never see this.
 # Constructs # {#constructs}
 <!-- ============================================================ -->
 
-A <dfn>name</dfn> is a string equivalent to a {{DOMString}};
+A <dfn>name</dfn> is a [=string=] equivalent to a {{DOMString}};
 that is, an arbitrary sequence of 16-bit code units of any length,
 including the empty string. [=/Names=] are always compared as
 opaque sequences of 16-bit code units.
@@ -393,12 +393,12 @@ sorted in ascending order by 16-bit code unit.
 
 <details class=note>
     <summary>Details</summary>
-    <p>This matches the [=Array.prototype.sort=] on an [=Array=] of
+    This matches the [=Array.prototype.sort=] on an [=Array=] of
     [=Strings=]. This ordering compares the 16-bit code units in each
     string, producing a highly efficient, consistent, and deterministic
     sort order. The resulting list will not match any particular
     alphabet or lexicographical order, particularly for code points
-    represented by a surrogate pair.</p>
+    represented by a surrogate pair.
 </details>
 
 
@@ -464,7 +464,7 @@ the [=/connection=] is closed the
 [=connection/version=] does not change.
 
 Each connection has a <dfn>close pending flag</dfn> which is initially
-unset.
+false.
 
 When a [=/connection=] is initially created it is in an opened
 state. The connection can be <dfn>closed</dfn> through several means.
@@ -472,14 +472,14 @@ If the execution context where the [=/connection=] was created is
 destroyed (for example due to the user navigating away from that
 page), the connection is closed. The connection can also be closed
 explicitly using the steps to [=close a database connection=]. When
-the connection is closed the [=close pending flag=] is always set if
+the connection is closed its [=connection/close pending flag=] is always set to true if
 it hasn't already been.
 
 A [=/connection=] may be closed by a user agent in exceptional
 circumstances, for example due to loss of access to the file system, a
 permission change, or clearing of the origin's storage. If this occurs
-the user agent must run the steps to [=close a database
-connection=] with the [=/connection=] and with the |forced flag| set.
+the user agent must run [=close a database
+connection=] with the [=/connection=] and with the |forced flag| set to true.
 
 A [=/connection=] has an <dfn>object store set</dfn>, which is
 initialized to the set of [=/object stores=] in the associated
@@ -610,8 +610,8 @@ A [=/key=] also has an associated <dfn>value</dfn>, which will
 be either:
 an {{unrestricted double}} if type is *number* or *date*,
 a {{DOMString}} if type is *string*,
-a list of {{octet}}s if type is *binary*,
-or a list of other [=/keys=] if type is *array*.
+a [=byte sequence=] if type is *binary*,
+or a [=/list=] of other [=/keys=] if type is *array*.
 
 </div>
 
@@ -637,8 +637,8 @@ following the steps to [=convert a value to a key=].
 </aside>
 
 An <dfn>array key</dfn> is a [=/key=] with [=key/type=] *array*.
-The <dfn>subkeys</dfn> of an [=array key=] are the members of the
-[=array key=]'s [=key/value=] list.
+The <dfn>subkeys</dfn> of an [=array key=] are the [=list/items=] of the
+[=array key=]'s [=key/value=].
 
 <div class=algorithm>
 
@@ -648,28 +648,17 @@ To <dfn>compare two keys</dfn> |a| and |b|, run these steps:
 
 1. Let |tb| be the [=key/type=] of |b|.
 
-1. If |ta| is *array* and |tb| is *binary*, *string*,
-    *date* or *number*, return 1.
+1. If |ta| does not equal |tb|, then run these steps:
 
-1. If |tb| is *array* and |ta| is *binary*, *string*,
-    *date* or *number*, return -1.
-
-1. If |ta| is *binary* and |tb| is *string*, *date* or
-    *number*, return 1.
-
-1. If |tb| is *binary* and |ta| is *string*, *date* or
-    *number*, return -1.
-
-1. If |ta| is *string* and |tb| is *date* or *number*,
-    return 1.
-1. If |tb| is *string* and |ta| is *date* or *number*,
-    return -1.
-
-1. If |ta| is *date* and |tb| is *number*, return 1.
-
-1. If |tb| is *date* and |ta| is *number*, return -1.
-
-1. Assert: |ta| and |tb| are equal.
+    1. If |ta| is *array*, then return 1.
+    1. If |tb| is *array*, then return -1.
+    1. If |ta| is *binary*, then return 1.
+    1. If |tb| is *binary*, then return -1.
+    1. If |ta| is *string*, then return 1.
+    1. If |tb| is *string*, then return -1.
+    1. If |ta| is *date*, then return 1.
+    1. [=/Assert=]: |tb| is *date*.
+    1. Return -1.
 
 1. Let |va| be the [=key/value=] of |a|.
 
@@ -678,76 +667,53 @@ To <dfn>compare two keys</dfn> |a| and |b|, run these steps:
 1. Switch on |ta|:
 
     <dl class=switch>
-      <dt>*number*</dt>
-      <dt>*date*</dt>
-      <dd>
-        1. If |va| is greater than |vb|, then return 1.
-        1. If |va| is less than |vb|, then return -1.
-        1. Return 0.
-      </dd>
+      : *number*
+      : *date*
+      ::
+          1. If |va| is greater than |vb|, then return 1.
+          1. If |va| is less than |vb|, then return -1.
+          1. Return 0.
 
-      <dt>*string*</dt>
-      <dd>
-        1. Let |length| be the lesser of |va|'s length and |vb|'s length.
-        1. Let |i| be 0.
-        1. While |i| is less than |length|, then:
-            1. Let |u| be the code unit of |va| at index |i|.
-            1. Let |v| be the code unit of |vb| at index |i|.
-            1. If |u| is greater than |v| then return 1.
-            1. If |u| is less than |v| then return -1.
-            1. Increase |i| by 1.
-        1. If |va|'s length is greater than |vb|'s length, then return 1.
-        1. If |va|'s length is less than |vb|'s length, then return -1.
-        1. Return 0.
-      </dd>
+      : *string*
+      ::
+          1. If |va| is [=code unit less than=] |vb|, then return -1.
+          1. If |vb| is [=code unit less than=] |va|, then return 1.
+          1. Return 0.
 
-      <dt>*binary*</dt>
-      <dd>
-        1. Let |length| be the lesser of |va|'s length and |vb|'s length.
-        1. Let |i| be 0.
-        1. While |i| is less than |length|, then:
+      : *binary*
+      ::
+          1. If |va| is [=byte less than=] |vb|, then return -1.
+          1. If |vb| is [=byte less than=] |va|, then return 1.
+          1. Return 0.
 
-            1. Let |u| be the {{octet}} in |va| at index |i|.
-            1. Let |v| be the {{octet}} in |vb| at index |i|.
-            1. If |u| is greater than |v| then return 1.
-            1. If |u| is less than |v| then return -1.
-            1. Increase |i| by 1.
+      : *array*
+      ::
+          1. Let |length| be the lesser of |va|'s [=list/size=] and |vb|'s [=list/size=].
+          1. Let |i| be 0.
+          1. While |i| is less than |length|, then:
 
-        1. If |va|'s length is greater than |vb|'s length, then return 1.
-        1. If |va|'s length is less than |vb|'s length, then return -1.
-        1. Return 0.
-      </dd>
+              1. Let |c| be the result of recursively running [=compare two keys=] with |va|[|i|] and |vb|[|i|].
+              1. If |c| is not 0, return |c|.
+              1. Increase |i| by 1.
 
-      <dt>*array*</dt>
-      <dd>
-        1. Let |length| be the lesser of |va|'s length and |vb|'s length.
-        1. Let |i| be 0.
-        1. While |i| is less than |length|, then:
+          1. If |va|'s [=list/size=] is greater than |vb|'s [=list/size=], then return 1.
+          1. If |va|'s [=list/size=] is less than |vb|'s [=list/size=], then return -1.
+          1. Return 0.
 
-            1. Let |u| be the [=/key=] in |va| at index |i|.
-            1. Let |v| be the [=/key=] in |vb| at index |i|.
-            1. Let |c| be the result of recursively running the steps to [=compare two keys=] with |u| and |v|.
-            1. If |c| is not 0, return |c|.
-            1. Increase |i| by 1.
-
-        1. If |va|'s length is greater than |vb|'s length, then return 1.
-        1. If |va|'s length is less than |vb|'s length, then return -1.
-        1. Return 0.
-      </dd>
     </dl>
 
 </div>
 
 The [=/key=] |a| is <dfn lt="greater than|ascending">greater than</dfn> the [=/key=] |b| if the
-result of running the steps to [=compare two keys=] with |a| and |b|
+result of running [=compare two keys=] with |a| and |b|
 is 1.
 
 The [=/key=] |a| is <dfn>less than</dfn> the [=/key=] |b| if the
-result of running the steps to [=compare two keys=] with |a| and |b|
+result of running [=compare two keys=] with |a| and |b|
 is -1.
 
 The [=/key=] |a| is <dfn>equal to</dfn> the [=/key=] |b| if the result
-of running the steps to [=compare two keys=] with |a| and |b| is 0.
+of running [=compare two keys=] with |a| and |b| is 0.
 
 <aside class=note>
   As a result of the above rules, negative infinity is the lowest
@@ -762,9 +728,9 @@ of running the steps to [=compare two keys=] with |a| and |b| is 0.
 </aside>
 
 <aside class=note>
-  Members of *binary* keys are compared as unsigned {{octet}} values
-  (in the range [0, 255]) rather than signed {{byte}} values (in the range
-  [-128, 127]).
+  Members of *binary* keys are compared as unsigned [=byte=] values
+  (in the range 0 to 255 inclusive) rather than signed {{byte}} values (in the range
+  -128 to 127 inclusive).
 </aside>
 
 
@@ -871,8 +837,8 @@ An [=/index=] has a <dfn>name</dfn>, which is a [=/name=].
 At any one time, the name is
 unique within index's [=referenced=] [=/object store=].
 
-An [=/index=] has a <dfn>unique flag</dfn>. When this flag is
-set, the index enforces that no two [=object-store/records=] in the index has
+An [=/index=] has a <dfn>unique flag</dfn>. When
+true, the index enforces that no two [=object-store/records=] in the index has
 the same key. If a [=object-store/record=] in the index's referenced object
 store is attempted to be inserted or modified such that evaluating the
 index's key path on the records new value yields a result which
@@ -881,9 +847,9 @@ object store fails.
 
 An [=/index=] has a <dfn>multiEntry flag</dfn>. This flag affects how
 the index behaves when the result of evaluating the index's
-[=index/key path=] yields an [=array key=]. If the [=multiEntry flag=]
-is unset, then a single [=object-store/record=] whose [=/key=] is an [=array key=]
-is added to the index. If the [=multiEntry flag=] is true, then the
+[=index/key path=] yields an [=array key=]. If its [=index/multiEntry flag=]
+is false, then a single [=object-store/record=] whose [=/key=] is an [=array key=]
+is added to the index. If its [=index/multiEntry flag=] is true, then
 one [=object-store/record=] is added to the index for each of the [=subkeys=].
 
 </div>
@@ -943,19 +909,17 @@ is set when the transaction is created and remains fixed for the life
 of the transaction. A [=/transaction=]'s [=transaction/mode=] is one of the
 following:
 
-<dl>
-  <dt>{{"readonly"}}</dt>
-  <dd>
+: {{"readonly"}}
+::
     The transaction is only allowed to read data. No modifications can
     be done by this type of transaction. This has the advantage that
     several [=read-only transactions=] can run at the same time even
     if their [=transaction/scopes=] are overlapping, i.e. if they are using the
     same object stores. This type of transaction can be created any
     time once a database has been opened.
-  </dd>
 
-  <dt>{{"readwrite"}}</dt>
-  <dd>
+: {{"readwrite"}}
+::
     The transaction is allowed to read, modify and delete data from
     existing object stores. However object stores and indexes can't be
     added or removed. Multiple {{"readwrite"}} transactions
@@ -963,18 +927,15 @@ following:
     since that would mean that they can modify each other's data in
     the middle of the transaction. This type of transaction can be
     created any time once a database has been opened.
-  </dd>
 
-  <dt>{{"versionchange"}}</dt>
-  <dd>
+: {{"versionchange"}}
+::
     The transaction is allowed to read, modify and delete data from
     existing object stores, and can also create and remove object
     stores and indexes. It is the only type of transaction that can do
     so. This type of transaction can't be manually created, but
     instead is created automatically when an
     <a event>`upgradeneeded`</a> event is fired.
-  </dd>
-</dl>
 
 A [=/transaction=] optionally has a <dfn>cleanup event loop</dfn>
 which is an [=event loop=].
@@ -1001,34 +962,32 @@ is a [=/transaction=] with [=transaction/mode=] {{"readwrite"}}.
 A [=/transaction=] has a <dfn>state</dfn>, which is one
 of the following:
 
-<dl>
-  <dt><dfn>active</dfn>
-  <dd>
+: <dfn>active</dfn>
+::
     A transaction is in this state when it is first [=transaction/created=],
     and during dispatch of an event from a [=/request=] associated with the transaction.
 
     New [=/requests=] can be made against the transaction when it is in this state.
 
-  <dt><dfn>inactive</dfn>
-  <dd>
+: <dfn>inactive</dfn>
+::
     A transaction is in this state after control returns to the event
     loop after its creation, and when events are not being dispatched.
 
     No [=/requests=] can be made against the transaction when it is in this state.
 
-  <dt><dfn>committing</dfn>
-  <dd>
+: <dfn>committing</dfn>
+::
     Once all [=/requests=] associated with a transaction have completed,
     the transaction will enter this state as it attempts to [=commit=].
 
     No [=/requests=] can be made against the transaction when it is in this state.
 
-  <dt><dfn>finished</dfn>
-  <dd>
+: <dfn>finished</dfn>
+::
     Once a transaction has committed or aborted, it enters this state.
 
     No [=/requests=] can be made against the transaction when it is in this state.
-</dl>
 
 Transactions are expected to be short lived. This is encouraged by the
 [=transaction/commit|automatic committing=] functionality
@@ -1122,7 +1081,7 @@ the case even if the transaction has not yet been
 requests; however, the implementation must keep track of the
 [=/requests=] and their order.
 
-To <dfn id=cleanup-indexed-database-transactions export>cleanup Indexed Database transactions</dfn>, run these steps.
+To <dfn id=cleanup-indexed-database-transactions export>cleanup Indexed Database transactions</dfn>, run the following steps.
 They will return true if any transactions were cleaned up, or false otherwise.
 
 <div class=algorithm>
@@ -1279,18 +1238,18 @@ operation.
 
 <div dfn-for=request>
 
-A [=/request=] has a <dfn>processed flag</dfn> which is initially unset.
-This flag is set when the operation associated with the request has been executed.
+A [=/request=] has a <dfn>processed flag</dfn> which is initially false.
+This flag is set to true when the operation associated with the request has been executed.
 
-A [=/request=] is said to be <dfn>processed</dfn> when its [=request/processed flag=] is set.
+A [=/request=] is said to be <dfn>processed</dfn> when its [=request/processed flag=] is true.
 
-A [=/request=] has a <dfn>done flag</dfn> which is initially unset.
-This flag is set when the result of the operation associated with the request is available.
+A [=/request=] has a <dfn>done flag</dfn> which is initially false.
+This flag is set to true when the result of the operation associated with the request is available.
 
 A [=/request=] has a <dfn>source</dfn> object.
 
 A [=/request=] has a <dfn>result</dfn> and an <dfn>error</dfn>, neither
-of which are accessible until the [=request/done flag=] is set.
+of which are accessible until its [=request/done flag=] is true.
 
 A [=/request=] has a <dfn>transaction</dfn> which is initially null.
 This will be set when a request is <dfn>placed</dfn> against a
@@ -1298,13 +1257,13 @@ This will be set when a request is <dfn>placed</dfn> against a
 request=].
 
 When a request is made, a new [=/request=] is returned with its [=request/done
-flag=] unset. If a request completes successfully, the [=request/done flag=]
-is set, the [=request/result=] is set to the result of the request,
+flag=] set to false. If a request completes successfully, its [=request/done flag=]
+is set to true, its [=request/result=] is set to the result of the request,
 and an event with type <dfn event>`success`</dfn> is fired at the
 [=/request=].
 
-If an error occurs while performing the operation, the [=request/done flag=]
-is set, the [=request/error=] is set to the error, and an event with
+If an error occurs while performing the operation, the request's [=request/done flag=]
+is set to true, the request's [=request/error=] is set to the error, and an event with
 type <dfn event>`error`</dfn> is fired at the request.
 
 A [=/request=]'s [=get the parent=] algorithm returns the request's
@@ -1317,7 +1276,7 @@ A [=/request=]'s [=get the parent=] algorithm returns the request's
   an [=/upgrade transaction=] is necessary, the same [=open
   request=] is used for both the <a event>`upgradeneeded`</a>
   event and final result of the open operation itself. In some cases,
-  the request's [=request/done flag=] will be unset then set again, and the
+  the request's [=request/done flag=] will be set to false, then set to true again, and the
   [=request/result=] can change or [=request/error=] could be set instead.
 </aside>
 
@@ -1367,6 +1326,8 @@ Records can be retrieved from [=/object stores=] and [=/indexes=]
 using either [=/keys=] or [=key ranges=]. A <dfn>key range</dfn> is a
 continuous interval over some data type used for keys.
 
+<div dfn-for="key range">
+
 A [=key range=] has an associated <dfn>lower bound</dfn> (null or a
 [=/key=]).
 
@@ -1374,44 +1335,46 @@ A [=key range=] has an associated <dfn>upper bound</dfn> (null or a
 [=/key=]).
 
 A [=key range=] has an associated <dfn>lower open flag</dfn>.
-Unless otherwise stated it is unset.
+Unless otherwise stated it is false.
 
 A [=key range=] has an associated <dfn>upper open flag</dfn>.
-Unless otherwise stated it is unset.
+Unless otherwise stated it is false.
 
 A [=key range=] may have a [=lower bound=] [=equal to=] its
 [=upper bound=]. A [=key range=] must not have a [=lower
 bound=] [=greater than=] its [=upper bound=].
 
+</div>
+
 A [=key range=] <dfn>containing only</dfn> |key| has both
 [=lower bound=] and [=upper bound=] equal to |key|.
 
-A |key| is <dfn lt="in">in a key range</dfn> if both of the following
+A |key| is <dfn lt="in">in a key range</dfn> |range| if both of the following
 conditions are fulfilled:
 
-* The [=lower bound=] is null, or it is [=less than=]
+* The |range|'s [=key range/lower bound=] is null, or it is [=less than=]
     |key|, or it is both [=equal to=] |key| and
-    the [=lower open flag=] is unset.
+    the |range|'s [=key range/lower open flag=] is false.
 
-* The [=upper bound=] is null, or it is [=greater than=]
+* The |range|'s [=key range/upper bound=] is null, or it is [=greater than=]
     |key|, or it is both [=equal to=] |key| and
-    the [=upper open flag=] is unset.
+    the |range|'s [=key range/upper open flag=] is false.
 
 <aside class=note>
 
-  * If the [=lower open flag=] of a [=key range=] is unset, the
+  * If a [=key range=]'s [=key range/lower open flag=] is false, the
     [=lower bound=] [=/key=] of the [=key range=] is included
     in the range itself.
 
-  * If the [=lower open flag=] of a [=key range=] is set, the
+  * If a [=key range=]'s [=key range/lower open flag=] is true, the
     [=lower bound=] [=/key=] of the [=key range=] is excluded
     from the range itself.
 
-  * If the [=upper open flag=] of a [=key range=] is unset, the
+  * If a [=key range=]'s [=key range/upper open flag=] is false, the
     [=upper bound=] [=/key=] of the [=key range=] is included
     in the range itself.
 
-  * If the [=upper open flag=] of a [=key range=] is set, the
+  * If a [=key range=]'s [=key range/upper open flag=] is true, the
     [=upper bound=] [=/key=] of the [=key range=] is excluded
     from the range itself.
 
@@ -1424,17 +1387,16 @@ range=].
 
 <div class=algorithm>
 
-The steps to <dfn>convert a value to a key range</dfn> with
-|value| and optional |null disallowed flag| are as
-follows:
+To <dfn>convert a value to a key range</dfn> with
+|value| and optional |null disallowed flag|, run these steps:
 
 1. If |value| is a [=key range=], return |value|.
 
 1. If |value| is undefined or is null, then [=throw=] a
-    "{{DataError}}" {{DOMException}} if |null disallowed flag| is set, or return an
+    "{{DataError}}" {{DOMException}} if |null disallowed flag| is true, or return an
     [=unbounded key range=] otherwise.
 
-1. Let |key| be the result of running the steps to [=convert
+1. Let |key| be the result of running [=convert
     a value to a key=] with |value|. Rethrow any exceptions.
 
 1. If |key| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
@@ -1470,47 +1432,41 @@ the cursor initial position is at the start of its
 [=cursor/source=] or at its end. A cursor's
 [=cursor/direction=] is one of the following:
 
-<dl>
-  <dt>{{"next"}}</dt>
-  <dd>
+: {{"next"}}
+::
     This direction causes the cursor to be opened at the start of the
     [=cursor/source=]. When iterated, the [=cursor=] should yield all
     records, including duplicates, in monotonically increasing order
     of keys.
-  </dd>
 
-  <dt>{{"nextunique"}}</dt>
-  <dd>
+: {{"nextunique"}}
+::
     This direction causes the cursor to be opened at the start of the
     [=cursor/source=]. When iterated, the [=cursor=] should not yield
     records with the same key, but otherwise yield all records, in
     monotonically increasing order of keys. For every key with
     duplicate values, only the first record is yielded. When the
     [=cursor/source=] is an [=/object store=] or an [=/index=] with
-    the [=unique flag=] set, this direction has exactly the same
+    its [=unique flag=] set to true, this direction has exactly the same
     behavior as {{"next"}}.
-  </dd>
 
-  <dt>{{"prev"}}</dt>
-  <dd>
+: {{"prev"}}
+::
     This direction causes the cursor to be opened at the end of the
     [=cursor/source=]. When iterated, the [=cursor=] should yield all
     records, including duplicates, in monotonically decreasing order
     of keys.
-  </dd>
 
-  <dt>{{"prevunique"}}</dt>
-  <dd>
+: {{"prevunique"}}
+::
     This direction causes the cursor to be opened at the end of the
     [=cursor/source=]. When iterated, the [=cursor=] should not
     yield records with the same key, but otherwise yield all records,
     in monotonically decreasing order of keys. For every key with
     duplicate values, only the first record is yielded. When the
     [=cursor/source=] is an [=/object store=] or an
-    [=/index=] with the [=unique flag=] set, this direction
+    [=/index=] with its [=unique flag=] set to true, this direction
     has exactly the same behavior as {{"prev"}}.
-  </dd>
-</dl>
 
 A [=cursor=] has a <dfn>position</dfn> within its range. It is
 possible for the list of records which the cursor is iterating over to
@@ -1536,9 +1492,9 @@ A [=cursor=] has a <dfn>key</dfn> and a <dfn>value</dfn> which
 represent the [=/key=] and the [=/value=] of the last iterated
 [=object-store/record=].
 
-A [=cursor=] has a <dfn>got value flag</dfn>. When this flag unset,
+A [=cursor=] has a <dfn>got value flag</dfn>. When this flag is false,
 the cursor is either in the process of loading the next value or it
-has reached the end of its [=cursor/range=]. When it is set, it indicates
+has reached the end of its [=cursor/range=]. When it is true, it indicates
 that the cursor is currently holding a value and that it is ready to
 iterate to the next one.
 
@@ -1554,8 +1510,7 @@ A [=cursor=] has a <dfn>request</dfn>, which is the [=/request=] used
 to open the cursor.
 
 A [=cursor=] also has a <dfn>key only flag</dfn>, that indicates
-whether the cursor's [=cursor/value=] is exposed via the API. Unless
-stated otherwise it is unset.
+whether the cursor's [=cursor/value=] is exposed via the API.
 
 </div>
 
@@ -1984,7 +1939,7 @@ usage.
 
 <aside class=note>
   Given that multiple Indexed DB operations can throw the same type of
-  error, and that a even single operation can throw the same type of
+  error, and that even a single operation can throw the same type of
   error for multiple reasons, implementations are encouraged to
   provide more specific messages to enable developers to identify the
   cause of errors.
@@ -2051,55 +2006,48 @@ enum IDBRequestReadyState {
 };
 </xmp>
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>request</var> . {{IDBRequest/result}}</dt>
-    <dd>
+<dl class="domintro note">
+    : |request| . {{IDBRequest/result}}
+    ::
         When a request is completed, returns the [=request/result=],
         or `undefined` if the request failed. Throws a
         "{{InvalidStateError}}" {{DOMException}} if the request is still pending.
-    </dd>
 
-    <dt><var>request</var> . {{IDBRequest/error}}</dt>
-    <dd>
+    : |request| . {{IDBRequest/error}}
+    ::
         When a request is completed, returns the [=request/error=] (a
         {{DOMException}}), or null if the request succeeded. Throws
         a "{{InvalidStateError}}" {{DOMException}} if the request is still pending.
-    </dd>
 
-    <dt><var>request</var> . {{IDBRequest/source}}</dt>
-    <dd>
+    : |request| . {{IDBRequest/source}}
+    ::
         Returns the {{IDBObjectStore}}, {{IDBIndex}}, or {{IDBCursor}}
-        the request was made against, or null if is was an [=open
+        the request was made against, or null if it was an [=open
         request=].
-    </dd>
 
-    <dt><var>request</var> . {{IDBRequest/transaction}}</dt>
-    <dd>
+    : |request| . {{IDBRequest/transaction}}
+    ::
         Returns the {{IDBTransaction}} the request was made within.
         If this as an [=open request=], then it returns an
         [=/upgrade transaction=] while it is running, or null otherwise.
-    </dd>
 
-    <dt><var>request</var> . {{IDBRequest/readyState}}</dt>
-    <dd>
+    : |request| . {{IDBRequest/readyState}}
+    ::
         Returns {{"pending"}} until a request is complete,
         then returns {{"done"}}.
-    </dd>
-  </dl>
-</div>
+</dl>
 
 The <dfn attribute for=IDBRequest>result</dfn> attribute's getter must
-[=throw=] an "{{InvalidStateError}}" {{DOMException}} if the [=request/done flag=] is
-unset. Otherwise, the attribute's getter must return the
-[=request/result=] of the request, or undefined if the
+[=throw=] an "{{InvalidStateError}}" {{DOMException}} if the [=/request=]'s [=request/done flag=] is
+false. Otherwise, the attribute's getter must return the
+[=/request=]'s [=request/result=], or undefined if the
 request resulted in an error.
 
 
 The <dfn attribute for=IDBRequest>error</dfn> attribute's getter must
-[=throw=] an "{{InvalidStateError}}" {{DOMException}} if the [=request/done flag=] is unset.
-Otherwise, the attribute's getter must return the [=request/error=] of
-the request, or null if no error occurred.
+[=throw=] an "{{InvalidStateError}}" {{DOMException}} if the [=/request=]'s [=request/done flag=] is false.
+Otherwise, the attribute's getter must return the [=/request=]'s [=request/error=],
+or null if no error occurred.
 
 The <dfn attribute for=IDBRequest>source</dfn> attribute's getter must
 return the [=request/source=] of the [=/request=], or null if no
@@ -2111,7 +2059,7 @@ property can be null for certain requests, such as for [=/requests=]
 returned from {{IDBFactory/open()}}.
 
 The <dfn attribute for=IDBRequest>readyState</dfn> attribute's getter
-must return {{"pending"}} if the [=request/done flag=] is unset, and
+must return {{"pending"}} if the [=/request=]'s [=request/done flag=] is false, and
 {{"done"}} otherwise.
 
 
@@ -2185,7 +2133,7 @@ Events are constructed as defined in [[DOM#constructing-events]].
   1. Set |event|'s {{Event/bubbles}} and {{Event/cancelable}} attributes to false.
   1. Set |event|'s {{IDBVersionChangeEvent/oldVersion}} attribute to |oldVersion|.
   1. Set |event|'s {{IDBVersionChangeEvent/newVersion}} attribute to |newVersion|.
-  1. Let |legacyOutputDidListenersThrowFlag| be unset.
+  1. Let |legacyOutputDidListenersThrowFlag| be false.
   1. [=Dispatch=] |event| at |target| with |legacyOutputDidListenersThrowFlag|.
   1. Return |legacyOutputDidListenersThrowFlag|.
       <aside class=note>
@@ -2233,44 +2181,42 @@ dictionary IDBDatabaseInfo {
 </xmp>
 
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>request</var> = indexedDB .
-        {{IDBFactory/open()|open}}(<var>name</var>)</dt>
-    <dd>
+<dl class="domintro note">
+    : |request| = indexedDB .
+        {{IDBFactory/open()|open}}(|name|)
+    ::
         Attempts to open a [=/connection=] to the named [=/database=]
         with the current version, or 1 if it does not already exist.
         If the request is successful |request|'s
         {{IDBRequest/result}} will be the [=/connection=].
-    </dd>
-    <dt><var>request</var> = indexedDB .
-        {{IDBFactory/open()|open}}(<var>name</var>, <var>version</var>)</dt>
-    <dd>
+
+    : |request| = indexedDB .
+        {{IDBFactory/open()|open}}(|name|, |version|)
+    ::
         Attempts to open a [=/connection=] to the named [=/database=]
         with the specified version. If the database already exists
         with a lower version and there are open [=/connections=]
         that don't close in response to a
         <a event>`versionchange`</a> event, the request will be
-        blocked until all they close, then an upgrade
+        blocked until they all close, then an upgrade
         will occur. If the database already exists with a higher
         version the request will fail. If the request is
         successful |request|'s {{IDBRequest/result}} will
         be the [=/connection=].
-    </dd>
-    <dt><var>request</var> = indexedDB .
-        {{IDBFactory/deleteDatabase()|deleteDatabase}}(<var>name</var>)</dt>
-    <dd>
+
+    : |request| = indexedDB .
+        {{IDBFactory/deleteDatabase()|deleteDatabase}}(|name|)
+    ::
         Attempts to delete the named [=/database=]. If the
         database already exists and there are open
         [=/connections=] that don't close in response to a
         <a event>`versionchange`</a> event, the request will be
-        blocked until all they close. If the request
+        blocked until they all close. If the request
         is successful |request|'s {{IDBRequest/result}}
         will be null.
-    </dd>
-    <dt><var>result</var> = await indexedDB . {{IDBFactory/databases()|databases}}()</dt>
-    <dd>
-    <p>
+
+    : |result| = await indexedDB . {{IDBFactory/databases()|databases}}()
+    ::
         Returns a promise which resolves to a list of objects giving a snapshot
         of the names and versions of databases within the origin.
 
@@ -2279,9 +2225,7 @@ dictionary IDBDatabaseInfo {
         the result is a snapshot; there are no guarantees about the sequencing of the
         collection of the data or the delivery of the response with respect to requests
         to create, upgrade, or delete databases by this context or others.
-    </dd>
-  </dl>
-</div>
+</dl>
 
 <div class=algorithm>
 
@@ -2300,7 +2244,7 @@ when invoked, must run these steps:
 
 1. Run these steps [=in parallel=]:
 
-    1. Let |result| be the result of running the steps to
+    1. Let |result| be the result of running
         [=open a database=], with |origin|,
         |name|, |version| if given and undefined
         otherwise, and |request|.
@@ -2317,18 +2261,18 @@ when invoked, must run these steps:
 
     1. [=Queue a task=] to run these steps:
 
-        1. If |result| is an error, then run these steps:
+        1. If |result| is an error, then:
 
             1. Set |request|'s [=request/result=] to undefined.
             1. Set |request|'s [=request/error=] to |result|.
-            1. Set |request|'s [=request/done flag=].
+            1. Set |request|'s [=request/done flag=] to true.
             1. [=Fire an event=] named <a event>`error`</a> at |request| with its
                 {{Event/bubbles}} and {{Event/cancelable}} attributes initialized to true.
 
-        1. Otherwise, run these steps:
+        1. Otherwise:
 
             1. Set |request|'s [=request/result=] to |result|.
-            1. Set |request|'s [=request/done flag=].
+            1. Set |request|'s [=request/done flag=] to true.
             1. [=Fire an event=] named <a event>`success`</a> at |request|.
 
             <aside class=note>
@@ -2371,23 +2315,23 @@ when invoked, must run these steps:
 
 1. Run these steps [=in parallel=]:
 
-    1. Let |result| be the result of running the steps to
+    1. Let |result| be the result of running
         [=delete a database=], with |origin|,
         |name|, and |request|.
 
-    1. Set |request|'s [=request/processed flag=].
+    1. Set |request|'s [=request/processed flag=] to true.
 
     1. [=Queue a task=] to run these steps:
         1. If |result| is an error,
             set |request|'s [=request/error=] to |result|,
-            set |request|'s [=request/done flag=],
+            set |request|'s [=request/done flag=] to true,
             and [=fire an event=]
             named <a event>`error`</a> at |request| with
             its {{Event/bubbles}} and {{Event/cancelable}} attributes initialized to true.
 
         1. Otherwise,
             set |request|'s [=request/result=] to undefined,
-            set |request|'s [=request/done flag=],
+            set |request|'s [=request/done flag=] to true,
             and [=fire a version change event=] named
             <a event>`success`</a> at [=/request=] with |result| and
             null.
@@ -2453,37 +2397,34 @@ when invoked, must run these steps:
   &#x1F6A7;
 </aside>
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>result</var> = indexedDB .
-        {{IDBFactory/cmp()|cmp}}(<var>key1</var>, <var>key2</var>)</dt>
-    <dd>
+<dl class="domintro note">
+    : |result| = indexedDB .
+        {{IDBFactory/cmp()|cmp}}(|key1|, |key2|)
+    ::
         Compares two values as [=/keys=]. Returns -1 if
         |key1| precedes |key2|, 1 if
         |key2| precedes |key1|, and 0 if
         the keys are equal.
 
         Throws a "{{DataError}}" {{DOMException}} if either input is not a valid [=/key=].
-    </dd>
-  </dl>
-</div>
+</dl>
 
 <div class=algorithm>
 
 The <dfn method for=IDBFactory>cmp(|first|, |second|)</dfn> method,
 when invoked, must run these steps:
 
-1. Let |a| be the result of running the steps to [=convert a
+1. Let |a| be the result of running [=convert a
     value to a key=] with |first|. Rethrow any exceptions.
 
 1. If |a| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
 
-1. Let |b| be the result of running the steps to [=convert a
+1. Let |b| be the result of running [=convert a
     value to a key=] with |second|. Rethrow any exceptions.
 
 1. If |b| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
 
-1. Return the results of running the steps to [=compare two keys=]
+1. Return the results of running [=compare two keys=]
     with |a| and |b|.
 
 </div>
@@ -2496,7 +2437,7 @@ The {{IDBDatabase}}
 interface represents a [=/connection=] to a [=database=].
 
 An {{IDBDatabase}} object must not be garbage collected if its
-associated [=/connection=]'s [=close pending flag=] is unset and it
+associated [=/connection=]'s [=close pending flag=] is false and it
 has one or more event listeners registers whose type is one of
 <a event>`abort`</a>, <a event>`error`</a>, or <a event>`versionchange`</a>.
 If an {{IDBDatabase}} object is garbage collected, the associated
@@ -2530,23 +2471,18 @@ dictionary IDBObjectStoreParameters {
 };
 </xmp>
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>connection</var> . {{IDBDatabase/name}}</dt>
-    <dd>
-        Returns the [=database/name=] of the database.
-    </dd>
-    <dt><var>connection</var> . {{IDBDatabase/version}}</dt>
-    <dd>
-        Returns the [=database/version=] of the database.
-    </dd>
-  </dl>
-</div>
+<dl class="domintro note">
+    : |connection| . {{IDBDatabase/name}}
+    :: Returns the [=database/name=] of the database.
+
+    : |connection| . {{IDBDatabase/version}}
+    :: Returns the [=database/version=] of the database.
+</dl>
 
 The <dfn attribute for=IDBDatabase>name</dfn> attribute's getter must
 return the [=database/name=] of the [=connected=]
 [=database=]. The attribute must return this name even if the
-[=close pending flag=] is set on the [=/connection=]. In
+[=/connection=]'s [=close pending flag=] is true. In
 other words, the value of this attribute stays constant for the
 lifetime of the {{IDBDatabase}} instance.
 
@@ -2565,35 +2501,29 @@ must return this [=/connection=]'s
   reflect changes made with a later [=/upgrade transaction=].
 </details>
 
-<div class=note>
-  <dl class=domintro>
-
-    <dt><var>connection</var> . {{IDBDatabase/objectStoreNames}}</dt>
-    <dd>
+<dl class="domintro note">
+    : |connection| . {{IDBDatabase/objectStoreNames}}
+    ::
         Returns a list of the names of [=/object stores=] in the database.
-    </dd>
 
-    <dt><var>store</var> = <var>connection</var> .
-        {{IDBDatabase/createObjectStore()|createObjectStore}}(<var>name</var>
-            [, <var>options</var>])</dt>
-    <dd>
+    : |store| = |connection| .
+        {{IDBDatabase/createObjectStore()|createObjectStore}}(|name|
+            [, |options|])
+    ::
         Creates a new [=/object store=] with the given |name| and |options|
         and returns a new {{IDBObjectStore}}.
 
         Throws a "{{InvalidStateError}}" {{DOMException}} if not called within an
         [=/upgrade transaction=].
-    </dd>
 
-    <dt><var>connection</var> .
-        {{IDBDatabase/deleteObjectStore()|deleteObjectStore}}(<var>name</var>)</dt>
-    <dd>
+    : |connection| .
+        {{IDBDatabase/deleteObjectStore()|deleteObjectStore}}(|name|)
+    ::
         Deletes the [=/object store=] with the given |name|.
 
         Throws a "{{InvalidStateError}}" {{DOMException}} if not called within an
         [=/upgrade transaction=].
-    </dd>
-  </dl>
-</div>
+</dl>
 
 The <dfn attribute for=IDBDatabase>objectStoreNames</dfn> attribute's
 getter must return a {{DOMStringList}} associated with a [=sorted name list=] of the [=object-store/names=] of
@@ -2635,18 +2565,17 @@ The <dfn method for=IDBDatabase>createObjectStore(|name|,
 1. If an [=/object store=] [=object-store/named=] |name| already
     exists in |database| [=throw=] a "{{ConstraintError}}" {{DOMException}}.
 
-1. Let |autoIncrement| be set if |options|'s
-    {{IDBObjectStoreParameters/autoIncrement}} member is true, or
-    unset otherwise.
+1. Let |autoIncrement| be |options|'s
+    {{IDBObjectStoreParameters/autoIncrement}} member.
 
-1. If |autoIncrement| is set and |keyPath| is an empty string or any
+1. If |autoIncrement| is true and |keyPath| is an empty string or any
     sequence (empty or otherwise), [=throw=] an
     "{{InvalidAccessError}}" {{DOMException}}.
 
 1. Let |store| be a new [=/object store=] in
     |database|. Set the created [=/object store=]'s
     [=object-store/name=] to |name|. If
-    |autoIncrement| is set, then the created [=/object
+    |autoIncrement| is true, then the created [=/object
     store=] uses a [=key generator=]. If |keyPath| is
     not null, set the created [=/object store=]'s
     [=object-store/key path=] to |keyPath|.
@@ -2718,26 +2647,22 @@ This method synchronously modifies the
 instance on which it was called.
 
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>transaction</var> = <var>connection</var> .
-        {{IDBDatabase/transaction()|transaction}}(<var>scope</var>
-        [, <var>mode</var> = "readonly"])</dt>
-    <dd>
+<dl class="domintro note">
+    : |transaction| = |connection| .
+        {{IDBDatabase/transaction()|transaction}}(|scope|
+        [, |mode| = "readonly"])
+    ::
         Returns a new [=/transaction=] with the given |mode|
         ({{"readonly"}} or {{"readwrite"}})
         and |scope| which can be a single [=/object store=]
         [=object-store/name=] or an array of
         [=object-store/names=].
-    </dd>
 
-    <dt><var>connection</var> . {{IDBDatabase/close()|close}}()</dt>
-    <dd>
+    : |connection| . {{IDBDatabase/close()|close}}()
+    ::
         Closes the [=/connection=] once all running [=/transactions=]
         have finished.
-    </dd>
-  </dl>
-</div>
+</dl>
 
 <div class=algorithm>
 
@@ -2748,7 +2673,7 @@ The <dfn method for=IDBDatabase>transaction(|storeNames|,
     [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
 
 1. If the [=/connection=]'s
-    [=close pending flag=] is set, [=throw=] an
+    [=close pending flag=] is true, [=throw=] an
     "{{InvalidStateError}}" {{DOMException}}.
 
 1. Let |scope| be the set of unique strings in |storeNames| if it is a
@@ -2786,10 +2711,15 @@ The <dfn method for=IDBDatabase>transaction(|storeNames|,
 The <dfn method for=IDBDatabase>close()</dfn> method, when invoked,
 must run these steps:
 
-1. Run the steps to [=close a database connection=] with this
+1. Run [=close a database connection=] with this
     [=/connection=].
 
 </div>
+
+<aside class=note>
+The [=/connection=] will not actually [=connection/close=] until all outstanding [=/transactions=] have completed. Subsequent calls to {{IDBDatabase/close()}} will have no effect.
+</aside>
+
 
 The <dfn attribute for=IDBDatabase>onabort</dfn> attribute is the
 event handler for the <a event>`abort`</a> event.
@@ -2851,38 +2781,34 @@ dictionary IDBIndexParameters {
 };
 </xmp>
 
-
-<div class=note>
-  <dl class=domintro>
-    <dt><var>store</var> . {{IDBObjectStore/name}}</dt>
-    <dd>
+<dl class="domintro note">
+    : |store| . {{IDBObjectStore/name}}
+    ::
         Returns the [=object-store/name=] of the store.
-    </dd>
-    <dt><var>store</var> . {{IDBObjectStore/name}} = <var>newName</var></dt>
-    <dd>
+
+    : |store| . {{IDBObjectStore/name}} = |newName|
+    ::
         Updates the [=object-store/name=] of the store to |newName|.
 
         Throws "{{InvalidStateError}}" {{DOMException}} if not called within an [=/upgrade
         transaction=].
-    </dd>
-    <dt><var>store</var> . {{IDBObjectStore/keyPath}}</dt>
-    <dd>
+
+    : |store| . {{IDBObjectStore/keyPath}}
+    ::
         Returns the [=object-store/key path=] of the store, or null if none.
-    </dd>
-    <dt><var>list</var> . {{IDBObjectStore/indexNames}}</dt>
-    <dd>
+
+    : |list| . {{IDBObjectStore/indexNames}}
+    ::
         Returns a list of the names of indexes in the store.
-    </dd>
-    <dt><var>store</var> . {{IDBObjectStore/transaction}}</dt>
-    <dd>
+
+    : |store| . {{IDBObjectStore/transaction}}
+    ::
         Returns the associated [=/transaction=].
-    </dd>
-    <dt><var>store</var> . {{IDBObjectStore/autoIncrement}}</dt>
-    <dd>
+
+    : |store| . {{IDBObjectStore/autoIncrement}}
+    ::
         Returns true if the store has a [=key generator=], and false otherwise.
-    </dd>
-  </dl>
-</div>
+</dl>
 
 
 The <dfn attribute for=IDBObjectStore>name</dfn> attribute's getter
@@ -2986,64 +2912,64 @@ and false otherwise.
   called when the [=/transaction=] is not [=transaction/active=].
 
   <dl class=domintro>
-    <dt>
-      <var>request</var> = <var>store</var>
-          . {{IDBObjectStore/put()|put}}(<var>value</var> [, <var>key</var>])
-    </dt>
-    <dt>
-      <var>request</var> = <var>store</var>
-          . {{IDBObjectStore/add()|add}}(<var>value</var> [, <var>key</var>])
-    </dt>
-    <dd>
-       Adds or updates a [=object-store/record=] in |store| with the given |value|
-       and |key|.
+    : |request| = |store|
+          . {{IDBObjectStore/put()|put}}(|value| [, |key|])
 
-       If the store uses [=in-line keys=] and |key| is specified a
-       "{{DataError}}" {{DOMException}} will be thrown.
+    : |request| = |store|
+          . {{IDBObjectStore/add()|add}}(|value| [, |key|])
+    ::
+        Adds or updates a [=object-store/record=] in |store| with the given |value|
+        and |key|.
 
-       If {{IDBObjectStore/put()}} is used, any existing [=object-store/record=]
-       with the [=/key=] will be replaced. If {{IDBObjectStore/add()}}
-       is used, and if a [=object-store/record=] with the [=/key=] already exists
-       the |request| will fail, with |request|'s {{IDBRequest/error}}
-       set to a "{{ConstraintError}}" {{DOMException}}.
+        If the store uses [=in-line keys=] and |key| is specified a
+        "{{DataError}}" {{DOMException}} will be thrown.
 
-       If successful, |request|'s {{IDBRequest/result}} will be the
-       [=object-store/record=]'s [=/key=].
-    </dd>
+        If {{IDBObjectStore/put()}} is used, any existing [=object-store/record=]
+        with the [=/key=] will be replaced. If {{IDBObjectStore/add()}}
+        is used, and if a [=object-store/record=] with the [=/key=] already exists
+        the |request| will fail, with |request|'s {{IDBRequest/error}}
+        set to a "{{ConstraintError}}" {{DOMException}}.
 
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBObjectStore/delete()|delete}}(<var>query</var>)
-    </dt>
-    <dd>
-       Deletes [=object-store/records=] in |store| with the given
-       [=/key=] or in the given [=key range=] in |query|.
+        If successful, |request|'s {{IDBRequest/result}} will be the
+        [=object-store/record=]'s [=/key=].
 
-       If successful, |request|'s {{IDBRequest/result}} will
-       be `undefined`.
-    </dd>
+    : |request| = |store| .
+          {{IDBObjectStore/delete()|delete}}(|query|)
+    ::
+        Deletes [=object-store/records=] in |store| with the given
+        [=/key=] or in the given [=key range=] in |query|.
 
-    <dt>
-      <var>request</var> = <var>store</var> . {{IDBObjectStore/clear()|clear}}()
-    </dt>
-    <dd>
-       Deletes all [=object-store/records=] in |store|.
+        If successful, |request|'s {{IDBRequest/result}} will
+        be `undefined`.
 
-       If successful, |request|'s {{IDBRequest/result}} will
-       be `undefined`.
-    </dd>
+    : |request| = |store| . {{IDBObjectStore/clear()|clear}}()
+    ::
+        Deletes all [=object-store/records=] in |store|.
+
+        If successful, |request|'s {{IDBRequest/result}} will
+        be `undefined`.
   </dl>
 </div>
 
-<div class=algorithm>
 
 The <dfn method for=IDBObjectStore>put(|value|, |key|)</dfn> method,
-when invoked, must run these steps:
+when invoked, must return the result of running [=add or
+put=] with this [=/object store handle=], |value|, |key| and the
+|no-overwrite flag| false.
 
-1. Let |transaction| be this [=/object store handle=]'s
+The <dfn method for=IDBObjectStore>add(|value|, |key|)</dfn> method,
+when invoked, must return the result of running [=add or
+put=] with this [=/object store handle=], |value|, |key| and the
+|no-overwrite flag| true.
+
+<div class=algorithm>
+
+To <dfn>add or put</dfn> with |handle|, |value|, |key|, and |no-overwrite flag|, run these steps:
+
+1. Let |transaction| be |handle|'s
     [=object-store-handle/transaction=].
 
-1. Let |store| be this [=/object store handle=]'s
+1. Let |store| be this |handle|'s
     [=object-store-handle/object store=].
 
 1. If |store| has been deleted,
@@ -3064,86 +2990,7 @@ when invoked, must run these steps:
 
 1. If |key| was given, then:
 
-    1. Let |r| be the result of running the steps to [=convert a
-        value to a key=] with |key|. Rethrow any exceptions.
-
-    1. If |r| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
-
-    1. Let |key| be |r|.
-
-1. Let |targetRealm| be a user-agent defined [=Realm=].
-
-1. Let |clone| be a [=clone=] of |value| in |targetRealm|.
-    Rethrow any exceptions.
-
-    <details class=note>
-      <summary>Why create a copy of the value?</summary>
-      The value is be serialized when stored. Treating it as a copy
-      here allows other algorithms in this specification to treat it as
-      an ECMAScript value, but implementations can optimize this
-      if the difference in behavior is not observable.
-    </details>
-
-1. If |store| uses [=in-line keys=], then:
-
-    1. Let |kpk| be the result of running the steps to [=extract a
-        key from a value using a key path=] with |clone| and
-        |store|'s [=object-store/key path=]. Rethrow any
-        exceptions.
-
-    1. If |kpk| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
-
-    1. If |kpk| is not failure, let |key| be |kpk|.
-
-    1. Otherwise (|kpk| is failure):
-
-        1. If |store| does not have a [=key generator=], [=throw=]
-            a "{{DataError}}" {{DOMException}}.
-
-        1. Otherwise, if the steps to
-            [=check that a key could be injected into a value=] with
-            |clone| and  |store|'s [=object-store/key path=] return
-            false, [=throw=] a "{{DataError}}" {{DOMException}}.
-
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=/object store handle=] as |source| and the
-    steps to [=store a record into an object store=] as
-    |operation|, using |store|, the |clone| as |value|, |key|, and
-    with the |no-overwrite flag| unset.
-
-</div>
-
-<div class=algorithm>
-
-The <dfn method for=IDBObjectStore>add(|value|, |key|)</dfn> method,
-when invoked, must run these steps:
-
-1. Let |transaction| be this [=/object store handle=]'s
-    [=object-store-handle/transaction=].
-
-1. Let |store| be this [=/object store handle=]'s
-    [=object-store-handle/object store=].
-
-1. If |store| has been deleted, [=throw=] an
-    "{{InvalidStateError}}" {{DOMException}}.
-
-1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
-    then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
-
-1. If |transaction| is a [=read-only transaction=],
-    [=throw=] a "{{ReadOnlyError}}" {{DOMException}}.
-
-1. If |store| uses [=in-line keys=] and |key| was given,
-    [=throw=] a "{{DataError}}" {{DOMException}}.
-
-1. If |store| uses [=out-of-line keys=] and has no [=key
-    generator=] and |key| was not given, [=throw=] a
-    "{{DataError}}" {{DOMException}}.
-
-1. If |key| was given, then:
-
-    1. Let |r| be the result of running the steps to [=convert a
+    1. Let |r| be the result of running [=convert a
         value to a key=] with |key|. Rethrow any exceptions.
 
     1. If |r| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
@@ -3165,32 +3012,31 @@ when invoked, must run these steps:
 
 1. If |store| uses [=in-line keys=], then:
 
-    1. Let |kpk| be the result of running the steps to [=extract a
+    1. Let |kpk| be the result of running [=extract a
         key from a value using a key path=] with |clone| and
         |store|'s [=object-store/key path=]. Rethrow any
         exceptions.
 
     1. If |kpk| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
 
-    1. If |kpk| is not failure, let |key| be
-        |kpk|.
+    1. If |kpk| is not failure, let |key| be |kpk|.
 
     1. Otherwise (|kpk| is failure):
 
         1. If |store| does not have a [=key generator=], [=throw=]
             a "{{DataError}}" {{DOMException}}.
 
-        1. Otherwise, if the steps to
+        1. Otherwise, if
             [=check that a key could be injected into a value=] with
-            |clone| and  |store|'s [=object-store/key path=] return
+            |clone| and |store|'s [=object-store/key path=] return
             false, [=throw=] a "{{DataError}}" {{DOMException}}.
 
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=/object store handle=] as |source| and the
-    steps to [=store a record into an object store=] as
-    |operation|, using |store|, |clone| as |value|, |key|, and with
-    the |no-overwrite flag| set.
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with |handle| as |source| and
+    [=store a record into an object store=] as
+    |operation|, using |store|, the |clone| as |value|, |key|, and
+    |no-overwrite flag|.
 
 </div>
 
@@ -3214,14 +3060,14 @@ invoked, must run these steps:
 1. If |transaction| is a [=read-only transaction=],
     [=throw=] a "{{ReadOnlyError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query| and
-    |null disallowed flag| set. Rethrow any exceptions.
+    |null disallowed flag| true. Rethrow any exceptions.
 
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=/object store handle=] as |source| and
-    the steps to [=delete records from an object store=] as
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=/object store handle=] as |source| and
+    [=delete records from an object store=] as
     |operation|, using |store| and |range|.
 
 </div>
@@ -3232,7 +3078,7 @@ deleted.
 
 <aside class=note>
   Unlike other methods which take keys or key ranges, this method does
-  <strong>not</strong> allow null to be given as key. This is to
+  **not** allow null to be given as key. This is to
   reduce the risk that a small bug would clear a whole object store.
 </aside>
 
@@ -3257,10 +3103,10 @@ must run these steps:
 1. If |transaction| is a [=read-only transaction=],
     [=throw=] a "{{ReadOnlyError}}" {{DOMException}}.
 
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=/object store handle=] as |source| and
-    the steps to [=clear an object store=] as
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=/object store handle=] as |source| and
+    [=clear an object store=] as
     |operation|, using |store|.
 
 
@@ -3269,67 +3115,52 @@ must run these steps:
   when the [=/transaction=] is not [=transaction/active=].
 
   <dl class=domintro>
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBObjectStore/get()|get}}(<var>query</var>)
-    </dt>
-    <dd>
-       Retrieves the [=/value=] of the first [=object-store/record=] matching the
-       given [=/key=] or [=key range=] in |query|.
+    : |request| = |store| .
+          {{IDBObjectStore/get()|get}}(|query|)
+    ::
+        Retrieves the [=/value=] of the first [=object-store/record=] matching the
+        given [=/key=] or [=key range=] in |query|.
 
-       If successful, |request|'s {{IDBRequest/result}} will be the
-       [=/value=], or `undefined` if there was no matching
-       [=object-store/record=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be the
+        [=/value=], or `undefined` if there was no matching
+        [=object-store/record=].
 
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBObjectStore/getKey()|getKey}}(<var>query</var>)
-    </dt>
-    <dd>
-       Retrieves the [=/key=] of the first [=object-store/record=] matching the
-       given [=/key=] or [=key range=] in |query|.
+    : |request| = |store| .
+          {{IDBObjectStore/getKey()|getKey}}(|query|)
+    ::
+        Retrieves the [=/key=] of the first [=object-store/record=] matching the
+        given [=/key=] or [=key range=] in |query|.
 
-       If successful, |request|'s {{IDBRequest/result}} will be the
-       [=/key=], or `undefined` if there was no matching
-       [=object-store/record=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be the
+        [=/key=], or `undefined` if there was no matching
+        [=object-store/record=].
 
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBObjectStore/getAll()|getAll}}(<var>query</var> [, <var>count</var>])
-    </dt>
-    <dd>
-       Retrieves the [=/values=] of the [=object-store/records=] matching the
-       given [=/key=] or [=key range=] in |query| (up to |count| if given).
+    : |request| = |store| .
+          {{IDBObjectStore/getAll()|getAll}}(|query| [, |count|])
+    ::
+        Retrieves the [=/values=] of the [=object-store/records=] matching the
+        given [=/key=] or [=key range=] in |query| (up to |count| if given).
 
-       If successful, |request|'s {{IDBRequest/result}} will
-       be an [=Array=] of the [=/values=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will
+        be an [=Array=] of the [=/values=].
 
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBObjectStore/getAllKeys()|getAllKeys}}(<var>query</var> [,
-          <var>count</var>])
-    </dt>
-    <dd>
-       Retrieves the [=/keys=] of [=object-store/records=] matching the
-       given [=/key=] or [=key range=] in |query| (up to |count| if given).
+    : |request| = |store| .
+          {{IDBObjectStore/getAllKeys()|getAllKeys}}(|query| [,
+          |count|])
+    ::
+        Retrieves the [=/keys=] of [=object-store/records=] matching the
+        given [=/key=] or [=key range=] in |query| (up to |count| if given).
 
-       If successful, |request|'s {{IDBRequest/result}} will
-       be an [=Array=] of the [=/keys=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will
+        be an [=Array=] of the [=/keys=].
 
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBObjectStore/count()|count}}(<var>query</var>)
-    </dt>
-    <dd>
-       Retrieves the number of [=object-store/records=] matching the
-       given [=/key=] or [=key range=] in |query|.
+    : |request| = |store| .
+          {{IDBObjectStore/count()|count}}(|query|)
+    ::
+        Retrieves the number of [=object-store/records=] matching the
+        given [=/key=] or [=key range=] in |query|.
 
-       If successful, |request|'s {{IDBRequest/result}} will be the count.
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be the count.
   </dl>
 </div>
 
@@ -3348,17 +3179,17 @@ invoked, must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query| and
-    |null disallowed flag| set. Rethrow any exceptions.
+    |null disallowed flag| true. Rethrow any exceptions.
 
-1. Run the steps to [=asynchronously execute a request=] and
-      return the {{IDBRequest}} created by these steps. The steps
-      are run with this [=/object store handle=] as
-      |source| and the steps to [=retrieve a value from
-      an object store=] as |operation|, using the
-      [=current Realm=] as |targetRealm|,
-      |store| and |range|.
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=/object store handle=] as
+    |source| and [=retrieve a value from
+    an object store=] as |operation|, using the
+    [=current Realm=] as |targetRealm|,
+    |store| and |range|.
 
 </div>
 
@@ -3394,16 +3225,16 @@ invoked, must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query| and
-    |null disallowed flag| set. Rethrow any exceptions.
+    |null disallowed flag| true. Rethrow any exceptions.
 
-1. Run the steps to [=asynchronously execute a request=] and
-      return the {{IDBRequest}} created by these steps. The steps
-      are run with this [=/object store handle=] as
-      |source| and the steps to [=retrieve a key from an
-      object store=] as |operation|, using |store|
-      and |range|.
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=/object store handle=] as
+    |source| and [=retrieve a key from an
+    object store=] as |operation|, using |store|
+    and |range|.
 
 </div>
 
@@ -3430,14 +3261,14 @@ method, when invoked, must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query|.
     Rethrow any exceptions.
 
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=/object store handle=] as |source| and the
-    steps to [=retrieve multiple values from an object store=]
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=/object store handle=] as |source| and
+    [=retrieve multiple values from an object store=]
     as |operation|, using the [=current Realm=] as |targetRealm|,
     |store|, |range|, and |count| if given.
 
@@ -3467,14 +3298,14 @@ method, when invoked, must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query|.
     Rethrow any exceptions.
 
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=/object store handle=] as |source| and the
-    steps to [=retrieve multiple keys from an object store=] as
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=/object store handle=] as |source| and
+    [=retrieve multiple keys from an object store=] as
     |operation|, using |store|, |range|, and |count| if given.
 
 </div>
@@ -3503,14 +3334,14 @@ invoked, must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query|.
     Rethrow any exceptions.
 
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=/object store handle=] as |source| and the
-    steps to [=count the records in a range=] as |operation|, with
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=/object store handle=] as |source| and
+    [=count the records in a range=] as |operation|, using
     |source| and |range|.
 
 </div>
@@ -3524,35 +3355,29 @@ given, an [=unbounded key range=] is used.
   when the [=/transaction=] is not [=transaction/active=].
 
   <dl class=domintro>
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBObjectStore/openCursor()|openCursor}}([<var>query</var>
-              [, <var>direction</var> = "next"]])
-    </dt>
-    <dd>
-       Opens a [=cursor=] over the [=object-store/records=] matching |query|,
-       ordered by |direction|. If |query| is null, all [=object-store/records=] in
-       |store| are matched.
+    : |request| = |store| .
+          {{IDBObjectStore/openCursor()|openCursor}}([|query|
+              [, |direction| = "next"]])
+    ::
+        Opens a [=cursor=] over the [=object-store/records=] matching |query|,
+        ordered by |direction|. If |query| is null, all [=object-store/records=] in
+        |store| are matched.
 
-       If successful, |request|'s {{IDBRequest/result}} will be an
-       {{IDBCursorWithValue}} pointing at the first matching
-       [=object-store/record=], or null if there were no matching [=object-store/records=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be an
+        {{IDBCursorWithValue}} pointing at the first matching
+        [=object-store/record=], or null if there were no matching [=object-store/records=].
 
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBObjectStore/openKeyCursor()|openKeyCursor}}([<var>query</var>
-              [, <var>direction</var> = "next"]])
-    </dt>
-    <dd>
-       Opens a [=cursor=] with [=cursor/key only flag=] set over the
-       [=object-store/records=] matching |query|, ordered by |direction|. If
-       |query| is null, all [=object-store/records=] in |store| are matched.
+    : |request| = |store| .
+          {{IDBObjectStore/openKeyCursor()|openKeyCursor}}([|query|
+              [, |direction| = "next"]])
+    ::
+        Opens a [=cursor=] with [=cursor/key only flag=] set to true over the
+        [=object-store/records=] matching |query|, ordered by |direction|. If
+        |query| is null, all [=object-store/records=] in |store| are matched.
 
-       If successful, |request|'s {{IDBRequest/result}} will be an
-       {{IDBCursor}} pointing at the first matching [=object-store/record=], or
-       null if there were no matching [=object-store/records=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be an
+        {{IDBCursor}} pointing at the first matching [=object-store/record=], or
+        null if there were no matching [=object-store/records=].
   </dl>
 </div>
 
@@ -3573,20 +3398,23 @@ The <dfn method for=IDBObjectStore>openCursor(|query|,
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query|.
     Rethrow any exceptions.
 
-1. Let |cursor| be a new [=cursor=] with
-    [=cursor/transaction=] set to |transaction|, an undefined
-    [=cursor/position=], [=cursor/direction=] set to |direction|, [=got value
-    flag=] unset, and undefined [=cursor/key=] and
-    [=cursor/value=]. The [=cursor/source=] of |cursor| is
-    |store|. The [=cursor/range=] of |cursor| is |range|.
+1. Let |cursor| be a new [=cursor=] with its
+    [=cursor/transaction=] set to |transaction|,
+    undefined [=cursor/position=],
+    [=cursor/direction=] set to |direction|,
+    [=cursor/got value flag=] set to false,
+    undefined [=cursor/key=] and [=cursor/value=],
+    [=cursor/source=] set to |store|,
+    [=cursor/range=] set to |range|, and
+    [=cursor/key only flag=] set to false.
 
-1. Let |request| be the result of running the steps to
+1. Let |request| be the result of running
     [=asynchronously execute a request=] with this [=/object store
-    handle=] as |source| and the steps to [=iterate a cursor=] as
+    handle=] as |source| and [=iterate a cursor=] as
     |operation|, using the [=current Realm=] as |targetRealm|, and
     |cursor|.
 
@@ -3618,24 +3446,23 @@ The <dfn method for=IDBObjectStore>openKeyCursor(|query|,
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query|.
     Rethrow any exceptions.
 
-1. Let |cursor| be a new [=cursor=] with
-    [=cursor/transaction=] set to
-    |transaction|, an undefined [=cursor/position=],
-    [=cursor/direction=] set to |direction|, [=got value
-    flag=] unset, and undefined [=cursor/key=] and
-    [=cursor/value=]. The
-    [=cursor/source=] of |cursor| is
-    |store|. The [=cursor/range=] of |cursor| is
-    |range|. The [=key only flag=] of |cursor| is
-    set.
+1. Let |cursor| be a new [=cursor=] with its
+    [=cursor/transaction=] set to |transaction|,
+    undefined [=cursor/position=],
+    [=cursor/direction=] set to |direction|,
+    [=cursor/got value flag=] set to false,
+    undefined [=cursor/key=] and [=cursor/value=],
+    [=cursor/source=] set to |store|,
+    [=cursor/range=] set to |range|, and
+    [=cursor/key only flag=] set to true.
 
-1. Let |request| be the result of running the steps to
+1. Let |request| be the result of running
     [=asynchronously execute a request=] with this [=/object store
-    handle=] as |source| and the steps to [=iterate a cursor=] as
+    handle=] as |source| and [=iterate a cursor=] as
     |operation|, using the [=current Realm=] as |targetRealm|, and
     |cursor|.
 
@@ -3649,44 +3476,32 @@ The |query| parameter may be a [=/key=] or an
 {{IDBKeyRange}} to use as the [=cursor=]'s [=cursor/range=]. If null
 or not given, an [=unbounded key range=] is used.
 
-<div class=note>
-  <dl class=domintro>
-    <dt>
-      <var>index</var> = <var>store</var> . index(<var>name</var>)
-    </dt>
-    <dd>
-      Returns an {{IDBIndex}} for the [=/index=] named |name| in |store|.
-    </dd>
+<dl class="domintro note">
+    : |index| = |store| . index(|name|)
+    ::
+        Returns an {{IDBIndex}} for the [=/index=] named |name| in |store|.
 
-    <dt>
-      <var>index</var> = <var>store</var> .
-          {{IDBObjectStore/createIndex()|createIndex}}(<var>name</var>,
-              <var>keyPath</var> [, <var>options</var>])
-    </dt>
-    <dd>
-      Creates a new [=/index=] in |store| with the given |name|,
-      |keyPath| and |options| and returns a new {{IDBIndex}}. If the
-      |keyPath| and |options| define constraints that cannot be
-      satisfied with the data already in |store| the [=/upgrade
-      transaction=] will [=transaction/abort=] with
-      a "{{ConstraintError}}" {{DOMException}}.
+    : |index| = |store| .
+          {{IDBObjectStore/createIndex()|createIndex}}(|name|,
+              |keyPath| [, |options|])
+    ::
+        Creates a new [=/index=] in |store| with the given |name|,
+        |keyPath| and |options| and returns a new {{IDBIndex}}. If the
+        |keyPath| and |options| define constraints that cannot be
+        satisfied with the data already in |store| the [=/upgrade
+        transaction=] will [=transaction/abort=] with
+        a "{{ConstraintError}}" {{DOMException}}.
 
-      Throws an "{{InvalidStateError}}" {{DOMException}} if not called within an [=/upgrade
-      transaction=].
-    </dd>
+        Throws an "{{InvalidStateError}}" {{DOMException}} if not called within an [=/upgrade
+        transaction=].
 
-    <dt>
-      <var>store</var> . {{IDBObjectStore/deleteIndex()|deleteIndex}}(<var>name</var>)
-    </dt>
-    <dd>
-      Deletes the [=/index=] in |store| with the given |name|.
+    : |store| . {{IDBObjectStore/deleteIndex()|deleteIndex}}(|name|)
+    ::
+        Deletes the [=/index=] in |store| with the given |name|.
 
-      Throws an "{{InvalidStateError}}" {{DOMException}} if not called within an [=/upgrade
-      transaction=].
-    </dd>
-
-  </dl>
-</div>
+        Throws an "{{InvalidStateError}}" {{DOMException}} if not called within an [=/upgrade
+        transaction=].
+</dl>
 
 <div class=algorithm>
 
@@ -3715,21 +3530,20 @@ The <dfn method for=IDBObjectStore>createIndex(|name|, |keyPath|,
 1. If |keyPath| is not a [=valid key path=], [=throw=]
     a "{{SyntaxError}}" {{DOMException}}.
 
-1. Let |unique| be set if |options|'s
-    {{IDBIndexParameters/unique}} member is true, and unset otherwise.
+1. Let |unique| be |options|'s
+    {{IDBIndexParameters/unique}} member.
 
-1. Let |multiEntry| be set if |options|'s
-    {{IDBIndexParameters/multiEntry}} member is true, and unset otherwise.
+1. Let |multiEntry| be |options|'s
+    {{IDBIndexParameters/multiEntry}} member.
 
 1. If |keyPath| is a sequence and |multiEntry| is
-    set, [=throw=] an "{{InvalidAccessError}}" {{DOMException}}.
+    true, [=throw=] an "{{InvalidAccessError}}" {{DOMException}}.
 
 1. Let |index| be a new [=/index=] in |store|.
-    Set |index|'s [=index/name=] to
-    |name| and [=index/key path=] to
-    |keyPath|. If |unique| is set, set
-    |index|'s [=unique flag=]. If |multiEntry| is
-    set, set |index|'s [=multiEntry flag=].
+    Set |index|'s [=index/name=] to |name|, [=index/key path=] to
+    |keyPath|,
+    [=unique flag=] to |unique|, and
+    [=multiEntry flag=] to |multiEntry|.
 
 1. Add |index| to this [=/object store handle=]'s [=index
       set=].
@@ -3909,37 +3723,28 @@ interface IDBIndex {
 };
 </xmp>
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>index</var> . {{IDBIndex/name}}</dt>
-    <dd>
-      Returns the [=index/name=] of the index.
-    </dd>
-    <dt><var>index</var> . {{IDBIndex/name}} = <var>newName</var></dt>
-    <dd>
-      Updates the [=index/name=] of the store to |newName|.
+<dl class="domintro note">
+    : |index| . {{IDBIndex/name}}
+    :: Returns the [=index/name=] of the index.
 
-      Throws an "{{InvalidStateError}}" {{DOMException}} if not called within an [=/upgrade
-      transaction=].
-    </dd>
-    <dt><var>index</var> . {{IDBIndex/objectStore}}</dt>
-    <dd>
-      Returns the {{IDBObjectStore}} the index belongs to.
-    </dd>
-    <dt><var>index</var> . keyPath</dt>
-    <dd>
-      Returns the [=/key path=] of the index.
-    </dd>
-    <dt><var>index</var> . multiEntry</dt>
-    <dd>
-      Returns true if the index's [=index/multiEntry flag=] is set.
-    </dd>
-    <dt><var>index</var> . unique</dt>
-    <dd>
-      Returns true if the index's [=index/unique flag=] is set.
-    </dd>
-  </dl>
-</div>
+    : |index| . {{IDBIndex/name}} = |newName|
+    :: Updates the [=index/name=] of the store to |newName|.
+
+       Throws an "{{InvalidStateError}}" {{DOMException}} if not called within an [=/upgrade
+       transaction=].
+
+    : |index| . {{IDBIndex/objectStore}}
+    :: Returns the {{IDBObjectStore}} the index belongs to.
+
+    : |index| . keyPath
+    :: Returns the [=/key path=] of the index.
+
+    : |index| . multiEntry
+    :: Returns true if the index's [=index/multiEntry flag=] is true.
+
+    : |index| . unique
+    :: Returns true if the index's [=index/unique flag=] is true.
+</dl>
 
 The <dfn attribute for=IDBIndex>name</dfn> attribute's getter must
 return this [=index handle=]'s [=index/name=].
@@ -4010,14 +3815,12 @@ instance every time it is inspected. Changing the properties of the
 object has no effect on the [=/index=].
 
 The <dfn attribute for=IDBIndex>multiEntry</dfn> attribute's getter
-must return true if this [=index handle=]'s
-[=index-handle/index=]'s [=multiEntry flag=] is set, and false
-otherwise.
+must return this [=index handle=]'s
+[=index-handle/index=]'s [=multiEntry flag=].
 
 The <dfn attribute for=IDBIndex>unique</dfn> attribute's getter must
-return true if this [=index handle=]'s
-[=index-handle/index=]'s [=unique flag=] is set, and false
-otherwise.
+return this [=index handle=]'s
+[=index-handle/index=]'s [=unique flag=].
 
 
 <div class=note>
@@ -4025,68 +3828,53 @@ otherwise.
   when the [=/transaction=] is not [=transaction/active=].
 
   <dl class=domintro>
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBIndex/get()|get}}(<var>query</var>)
-    </dt>
-    <dd>
-       Retrieves the [=/value=] of the first [=object-store/record=] matching the
-       given [=/key=] or [=key range=] in |query|.
+    : |request| = |index| .
+          {{IDBIndex/get()|get}}(|query|)
+    ::
+        Retrieves the [=/value=] of the first [=object-store/record=] matching the
+        given [=/key=] or [=key range=] in |query|.
 
-       If successful, |request|'s {{IDBRequest/result}} will be the
-       [=/value=], or `undefined` if there was no matching
-       [=object-store/record=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be the
+        [=/value=], or `undefined` if there was no matching
+        [=object-store/record=].
 
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBIndex/getKey()|getKey}}(<var>query</var>)
-    </dt>
-    <dd>
-       Retrieves the [=/key=] of the first [=object-store/record=] matching the
-       given [=/key=] or [=key range=] in |query|.
+    : |request| = |index| .
+          {{IDBIndex/getKey()|getKey}}(|query|)
+    ::
+        Retrieves the [=/key=] of the first [=object-store/record=] matching the
+        given [=/key=] or [=key range=] in |query|.
 
-       If successful, |request|'s {{IDBRequest/result}} will be the
-       [=/key=], or `undefined` if there was no matching
-       [=object-store/record=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be the
+        [=/key=], or `undefined` if there was no matching
+        [=object-store/record=].
 
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBIndex/getAll()|getAll}}(<var>query</var> [, <var>count</var>])
-    </dt>
-    <dd>
-       Retrieves the [=/values=] of the [=object-store/records=] matching the given
-       [=/key=] or [=key range=] in |query| (up to |count| if given).
+    : |request| = |index| .
+          {{IDBIndex/getAll()|getAll}}(|query| [, |count|])
+    ::
+        Retrieves the [=/values=] of the [=object-store/records=] matching the given
+        [=/key=] or [=key range=] in |query| (up to |count| if given).
 
-       If successful, |request|'s {{IDBRequest/result}} will be an
-       [=Array=] of the [=/values=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be an
+        [=Array=] of the [=/values=].
 
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBIndex/getAllKeys()|getAllKeys}}(<var>query</var> [,
-          <var>count</var>])
-    </dt>
-    <dd>
-       Retrieves the [=/keys=] of [=object-store/records=] matching the given
-       [=/key=] or [=key range=] in |query| (up to |count| if given).
+    : |request| = |index| .
+          {{IDBIndex/getAllKeys()|getAllKeys}}(|query| [,
+          |count|])
+    ::
+        Retrieves the [=/keys=] of [=object-store/records=] matching the given
+        [=/key=] or [=key range=] in |query| (up to |count| if given).
 
-       If successful, |request|'s {{IDBRequest/result}} will be an
-       [=Array=] of the [=/keys=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be an
+        [=Array=] of the [=/keys=].
 
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBIndex/count()|count}}(<var>query</var>)
-    </dt>
-    <dd>
-       Retrieves the number of [=object-store/records=] matching the given [=/key=]
-       or [=key range=] in |query|.
+    : |request| = |index| .
+          {{IDBIndex/count()|count}}(|query|)
+    ::
+        Retrieves the number of [=object-store/records=] matching the given [=/key=]
+        or [=key range=] in |query|.
 
-       If successful, |request|'s {{IDBRequest/result}} will be the
-       count.
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be the
+        count.
   </dl>
 </div>
 
@@ -4107,16 +3895,16 @@ must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query| and
-    |null disallowed flag| set. Rethrow any exceptions.
+    |null disallowed flag| true. Rethrow any exceptions.
 
-1. Run the steps to [=asynchronously execute a request=] and
-      return the {{IDBRequest}} created by these steps. The steps
-      are run with this [=index handle=] as |source| and
-      the steps to [=retrieve a referenced value from an index=]
-      as |operation|, using the [=current Realm=] as |targetRealm|,
-      |index| and |range|.
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=index handle=] as |source| and
+    [=retrieve a referenced value from an index=]
+    as |operation|, using the [=current Realm=] as |targetRealm|,
+    |index| and |range|.
 
 </div>
 
@@ -4153,13 +3941,13 @@ invoked, must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to [=convert a
+1. Let |range| be the result of running [=convert a
     value to a key range=] with |query| and |null disallowed flag|
-    set. Rethrow any exceptions.
+    true. Rethrow any exceptions.
 
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=index handle=] as |source| and the steps to
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=index handle=] as |source| and
     [=retrieve a value from an index=] as |operation|, using |index|
     and |range|.
 
@@ -4188,13 +3976,13 @@ when invoked, must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query|.
     Rethrow any exceptions.
 
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=index handle=] as |source| and the steps to
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=index handle=] as |source| and
     [=retrieve multiple referenced values from an index=] as
     |operation|, using the [=current Realm=] as |targetRealm|,
     |index|, |range|, and |count| if given.
@@ -4225,13 +4013,13 @@ method, when invoked, must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query|.
     Rethrow any exceptions.
 
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=index handle=] as |source| and the steps to
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=index handle=] as |source| and
     [=retrieve multiple values from an index=] as |operation|, using
     |index|, |range|, and |count| if given.
 
@@ -4261,14 +4049,14 @@ invoked, must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query|.
     Rethrow any exceptions.
 
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=index handle=] as |source| and the steps to
-    [=count the records in a range=] as |operation|, with
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=index handle=] as |source| and
+    [=count the records in a range=] as |operation|, using
     [=/index=] as |source| and |range|.
 
 </div>
@@ -4282,34 +4070,28 @@ given, an [=unbounded key range=] is used.
   when the [=/transaction=] is not [=transaction/active=].
 
   <dl class=domintro>
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBIndex/openCursor()|openCursor}}([<var>query</var>
-              [, <var>direction</var> = "next"]])
-    </dt>
-    <dd>
-       Opens a [=cursor=] over the [=object-store/records=] matching |query|,
-       ordered by |direction|. If |query| is null, all [=object-store/records=] in
-       |index| are matched.
+    : |request| = |index| .
+          {{IDBIndex/openCursor()|openCursor}}([|query|
+              [, |direction| = "next"]])
+    ::
+        Opens a [=cursor=] over the [=object-store/records=] matching |query|,
+        ordered by |direction|. If |query| is null, all [=object-store/records=] in
+        |index| are matched.
 
-       If successful, |request|'s {{IDBRequest/result}} will be an
-       {{IDBCursorWithValue}}, or null if there were no matching
-       [=object-store/records=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be an
+        {{IDBCursorWithValue}}, or null if there were no matching
+        [=object-store/records=].
 
-    <dt>
-      <var>request</var> = <var>store</var> .
-          {{IDBIndex/openKeyCursor()|openKeyCursor}}([<var>query</var>
-              [, <var>direction</var> = "next"]])
-    </dt>
-    <dd>
-       Opens a [=cursor=] with [=cursor/key only flag=] set over the
-       [=object-store/records=] matching |query|, ordered by |direction|. If
-       |query| is null, all [=object-store/records=] in |index| are matched.
+    : |request| = |index| .
+          {{IDBIndex/openKeyCursor()|openKeyCursor}}([|query|
+              [, |direction| = "next"]])
+    ::
+        Opens a [=cursor=] with [=cursor/key only flag=] set to true over the
+        [=object-store/records=] matching |query|, ordered by |direction|. If
+        |query| is null, all [=object-store/records=] in |index| are matched.
 
-       If successful, |request|'s {{IDBRequest/result}} will be an
-       {{IDBCursor}}, or null if there were no matching [=object-store/records=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be an
+        {{IDBCursor}}, or null if there were no matching [=object-store/records=].
   </dl>
 </div>
 
@@ -4330,20 +4112,23 @@ method, when invoked, must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query|.
     Rethrow any exceptions.
 
-1. Let |cursor| be a new [=cursor=] with
-    [=cursor/transaction=] set to |transaction|, an undefined
-    [=cursor/position=], [=cursor/direction=] set to |direction|, [=got value
-    flag=] unset, and undefined [=cursor/key=] and
-    [=cursor/value=]. The [=cursor/source=] of |cursor| is
-    |index|. The [=cursor/range=] of |cursor| is |range|.
+1. Let |cursor| be a new [=cursor=] with its
+    [=cursor/transaction=] set to |transaction|,
+    undefined [=cursor/position=],
+    [=cursor/direction=] set to |direction|,
+    [=cursor/got value flag=] set to false,
+    undefined [=cursor/key=] and [=cursor/value=],
+    [=cursor/source=] set to |index|,
+    [=cursor/range=] set to |range|, and
+    [=cursor/key only flag=] set to false.
 
-1. Let |request| be the result of running the steps to
+1. Let |request| be the result of running
     [=asynchronously execute a request=] with this [=index handle=] as
-    |source| and the steps to [=iterate a cursor=] as |operation|,
+    |source| and [=iterate a cursor=] as |operation|,
     using the [=current Realm=] as |targetRealm|, and |cursor|.
 
 1. Set |cursor|'s [=cursor/request=] to |request|.
@@ -4374,21 +4159,23 @@ method, when invoked, must run these steps:
 1. If |transaction|'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] a "{{TransactionInactiveError}}" {{DOMException}}.
 
-1. Let |range| be the result of running the steps to
+1. Let |range| be the result of running
     [=convert a value to a key range=] with |query|.
     Rethrow any exceptions.
 
-1. Let |cursor| be a new [=cursor=] with
-    [=cursor/transaction=] set to |transaction|, an undefined
-    [=cursor/position=], [=cursor/direction=] set to |direction|, [=got value
-    flag=] unset, and undefined [=cursor/key=] and
-    [=cursor/value=]. The [=cursor/source=] of |cursor| is
-    |index|. The [=cursor/range=] of |cursor| is |range|. The [=key only
-    flag=] of |cursor| is set.
+1. Let |cursor| be a new [=cursor=] with its
+    [=cursor/transaction=] set to |transaction|,
+    undefined [=cursor/position=],
+    [=cursor/direction=] set to |direction|,
+    [=cursor/got value flag=] set to false,
+    undefined [=cursor/key=] and [=cursor/value=],
+    [=cursor/source=] set to |index|,
+    [=cursor/range=] set to |range|, and
+    [=cursor/key only flag=] set to true.
 
-1. Let |request| be the result of running the steps to
+1. Let |request| be the result of running
     [=asynchronously execute a request=] with this [=index handle=] as
-    |source| and the steps to [=iterate a cursor=] as |operation|,
+    |source| and [=iterate a cursor=] as |operation|,
     using the [=current Realm=] as |targetRealm|, and |cursor|.
 
 1. Set |cursor|'s [=cursor/request=] to |request|.
@@ -4430,83 +4217,74 @@ interface IDBKeyRange {
 };
 </xmp>
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>range</var> . {{IDBKeyRange/lower}}</dt>
-    <dd>
-      Returns [=lower bound=], or `undefined` if none.
-    </dd>
-    <dt><var>range</var> . {{IDBKeyRange/upper}}</dt>
-    <dd>
-      Returns [=upper bound=], or `undefined` if none.
-    </dd>
+<aside class=note>
+Note: When mapping the `_includes` identifier from [[WEBIDL]] to ECMAScript, the leading U+005F LOW LINE ("_") character is removed. A leading "_" is used to escape the identifier from looking like a reserved word (in this case, the `includes` keyword).
+</aside>
 
-    <dt><var>range</var> . {{IDBKeyRange/lowerOpen}}</dt>
-    <dd>
-      Returns true if the [=lower open flag=] is set, and false otherwise.
-    </dd>
-    <dt><var>range</var> . {{IDBKeyRange/upperOpen}}</dt>
-    <dd>
-      Returns true if the [=upper open flag=] is set, and false otherwise.
-    </dd>
-  </dl>
-</div>
+<dl class="domintro note">
+    : |range| . {{IDBKeyRange/lower}}
+    :: Returns the range's [=lower bound=], or `undefined` if none.
+
+    : |range| . {{IDBKeyRange/upper}}
+    :: Returns the range's [=upper bound=], or `undefined` if none.
+
+    : |range| . {{IDBKeyRange/lowerOpen}}
+    :: Returns the range's [=lower open flag=].
+
+    : |range| . {{IDBKeyRange/upperOpen}}
+    :: Returns the range's [=upper open flag=].
+</dl>
 
 The <dfn attribute for=IDBKeyRange>lower</dfn> attribute's getter must
-return result of running the steps to [=convert a key to a value=]
-with the [=lower bound=] if it is not null, or undefined otherwise.
+return result of running [=convert a key to a value=]
+with the [=/range=]'s [=lower bound=] if it is not null, or undefined otherwise.
 
 The <dfn attribute for=IDBKeyRange>upper</dfn> attribute's getter must
-return the result of running the steps to [=convert a key to a
-value=] with the [=upper bound=] if it is not null, or undefined
+return the result of running [=convert a key to a
+value=] with the [=/range=]'s [=upper bound=] if it is not null, or undefined
 otherwise.
 
 The <dfn attribute for=IDBKeyRange>lowerOpen</dfn> attribute's getter
-must return true if the [=lower open flag=] is set, and false
-otherwise.
+must return the [=/range=]'s [=lower open flag=].
 
 The <dfn attribute for=IDBKeyRange>upperOpen</dfn> attribute's getter
-must return true if the [=upper open flag=] is set, and false
-otherwise.
+must return the [=/range=]'s [=upper open flag=].
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>range</var> = {{IDBKeyRange}} .
-        {{IDBKeyRange/only()|only}}(<var>key</var>)</dt>
-    <dd>
-      Returns a new {{IDBKeyRange}} spanning only |key|.
-    </dd>
-    <dt><var>range</var> = {{IDBKeyRange}} .
-        {{IDBKeyRange/lowerBound()|lowerBound}}(<var>key</var> [, <var>open</var> = false])</dt>
-    <dd>
-      Returns a new {{IDBKeyRange}} starting at |key| with no
-      upper bound. If |open| is true, |key| is not included in the
-      range.
-    </dd>
-    <dt><var>range</var> = {{IDBKeyRange}} .
-        {{IDBKeyRange/upperBound()|upperBound}}(<var>key</var> [, <var>open</var> = false])</dt>
-    <dd>
-      Returns a new {{IDBKeyRange}} with no lower bound and ending at
-      |key|. If |open| is true, |key| is not included in the range.
-    </dd>
-    <dt><var>range</var> = {{IDBKeyRange}} .
-        {{IDBKeyRange/bound()|bound}}(<var>lower</var>, <var>upper</var>
-            [, <var>lowerOpen</var> = false
-            [, <var>upperOpen</var> = false]])</dt>
-    <dd>
-      Returns a new {{IDBKeyRange}} spanning from |lower| to |upper|.
-      If |lowerOpen| is true, |lower| is not included in the range.
-      If |upperOpen| is true, |upper| is not included in the range.
-    </dd>
-  </dl>
-</div>
+<dl class="domintro note">
+    : |range| = {{IDBKeyRange}} .
+        {{IDBKeyRange/only()|only}}(|key|)
+    ::
+        Returns a new {{IDBKeyRange}} spanning only |key|.
+
+    : |range| = {{IDBKeyRange}} .
+        {{IDBKeyRange/lowerBound()|lowerBound}}(|key| [, |open| = false])
+    ::
+        Returns a new {{IDBKeyRange}} starting at |key| with no
+        upper bound. If |open| is true, |key| is not included in the
+        range.
+
+    : |range| = {{IDBKeyRange}} .
+        {{IDBKeyRange/upperBound()|upperBound}}(|key| [, |open| = false])
+    ::
+        Returns a new {{IDBKeyRange}} with no lower bound and ending at
+        |key|. If |open| is true, |key| is not included in the range.
+
+    : |range| = {{IDBKeyRange}} .
+        {{IDBKeyRange/bound()|bound}}(|lower|, |upper|
+            [, |lowerOpen| = false
+            [, |upperOpen| = false]])
+    ::
+        Returns a new {{IDBKeyRange}} spanning from |lower| to |upper|.
+        If |lowerOpen| is true, |lower| is not included in the range.
+        If |upperOpen| is true, |upper| is not included in the range.
+</dl>
 
 <div class=algorithm>
 
 The <dfn method for=IDBKeyRange>only(|value|)</dfn> method, when
 invoked, must run these steps:
 
-1. Let |key| be the result of running the steps to [=convert
+1. Let |key| be the result of running [=convert
     a value to a key=] with |value|. Rethrow any exceptions.
 
 1. If |key| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
@@ -4518,34 +4296,34 @@ invoked, must run these steps:
 
 <div class=algorithm>
 
-The <dfn method for=IDBKeyRange>lowerBound(|lower|, |lowerOpen|)</dfn>
+The <dfn method for=IDBKeyRange>lowerBound(|lower|, |open|)</dfn>
 method, when invoked, must run these steps:
 
-1. Let |lowerKey| be the result of running the steps to [=convert a
+1. Let |lowerKey| be the result of running [=convert a
     value to a key=] with |lower|. Rethrow any exceptions.
 
 1. If |lowerKey| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
 
 1. Create and return a new [=key range=] with [=lower bound=]
-    set to |lowerKey|, [=lower open flag=] set if |lowerOpen| is
-    true, [=upper bound=] set to null and [=upper open flag=]
-    set.
+    set to |lowerKey|, [=lower open flag=] set to |open|,
+    [=upper bound=] set to null, and [=upper open flag=]
+    set to true.
 
 </div>
 
 <div class=algorithm>
 
-The <dfn method for=IDBKeyRange>upperBound(|upper|, |upperOpen|)</dfn>
+The <dfn method for=IDBKeyRange>upperBound(|upper|, |open|)</dfn>
 method, when invoked, must run these steps:
 
-1. Let |upperKey| be the result of running the steps to [=convert a
+1. Let |upperKey| be the result of running [=convert a
     value to a key=] with |upper|. Rethrow any exceptions.
 
 1. If |upperKey| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
 
 1. Create and return a new [=key range=] with [=lower bound=]
-    set to null, [=lower open flag=] set, [=upper bound=] set if
-    |upperKey|, and [=upper open flag=] set to |upperOpen|.
+    set to null, [=lower open flag=] set to true, [=upper bound=] set to
+    |upperKey|, and [=upper open flag=] set to |open|.
 
 </div>
 
@@ -4554,12 +4332,12 @@ method, when invoked, must run these steps:
 The <dfn method for=IDBKeyRange>bound(|lower|, |upper|, |lowerOpen|,
 |upperOpen|)</dfn> method, when invoked, must run these steps:
 
-1. Let |lowerKey| be the result of running the steps to [=convert a
+1. Let |lowerKey| be the result of running [=convert a
     value to a key=] with |lower|. Rethrow any exceptions.
 
 1. If |lowerKey| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
 
-1. Let |upperKey| be the result of running the steps to [=convert a
+1. Let |upperKey| be the result of running [=convert a
     value to a key=] with |upper|. Rethrow any exceptions.
 
 1. If |upperKey| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
@@ -4568,28 +4346,24 @@ The <dfn method for=IDBKeyRange>bound(|lower|, |upper|, |lowerOpen|,
     "{{DataError}}" {{DOMException}}.
 
 1. Create and return a new [=key range=] with [=lower bound=]
-    set to |lowerKey|, [=lower open flag=] set if |lowerOpen| is
-    true, [=upper bound=] set to |upperKey| and [=upper open
-    flag=] set if |upperOpen| is true.
+    set to |lowerKey|, [=lower open flag=] set to |lowerOpen|,
+    [=upper bound=] set to |upperKey| and [=upper open
+    flag=] set to |upperOpen|.
 
 </div>
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>range</var> .
-        {{IDBKeyRange/includes()|includes}}(<var>key</var>)</dt>
-    <dd>
-      Returns true if |key| is included in the range, and false otherwise.
-    </dd>
-  </dl>
-</div>
+<dl class="domintro note">
+    : |range| .
+        {{IDBKeyRange/includes()|includes}}(|key|)
+    :: Returns true if |key| is included in the range, and false otherwise.
+</dl>
 
 <div class=algorithm>
 
-The <dfn method for=IDBKeyRange>includes(|key|)</dfn> method, when
+The <dfn method for=IDBKeyRange lt="_includes(key)|includes(key)">includes(|key|)</dfn> method, when
 invoked, must run these steps:
 
-1. Let |k| be the result of running the steps to [=convert a
+1. Let |k| be the result of running [=convert a
     value to a key=] with |key|. Rethrow any exceptions.
 
 1. If |k| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
@@ -4617,7 +4391,7 @@ interface IDBCursor {
   readonly attribute IDBCursorDirection direction;
   readonly attribute any key;
   readonly attribute any primaryKey;
-  readonly attribute IDBRequest request;
+  [SameObject] readonly attribute IDBRequest request;
 
   void advance([EnforceRange] unsigned long count);
   void continue(optional any key);
@@ -4635,35 +4409,31 @@ enum IDBCursorDirection {
 };
 </xmp>
 
+<dl class="domintro note">
+    : |cursor| . {{IDBCursor/source}}
+    ::
+        Returns the {{IDBObjectStore}} or {{IDBIndex}} the cursor was opened from.
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>cursor</var> . {{IDBCursor/source}}</dt>
-    <dd>
-      Returns the {{IDBObjectStore}} or {{IDBIndex}} the cursor was opened from.
-    </dd>
-    <dt><var>range</var> . {{IDBCursor/direction}}</dt>
-    <dd>
-      Returns the [=cursor/direction=]
-      ({{"next"}}, {{"nextunique"}}, {{"prev"}} or {{"prevunique"}})
-      of the cursor.
-    </dd>
-    <dt><var>cursor</var> . {{IDBCursor/key}}
-    <dd>
-      Returns the [=cursor/key=] of the cursor.
-      Throws a "{{InvalidStateError}}" {{DOMException}} if the cursor is advancing or is finished.
-    </dd>
-    <dt><var>cursor</var> . {{IDBCursor/primaryKey}}
-    <dd>
-      Returns the [=cursor/effective key=] of the cursor.
-      Throws a "{{InvalidStateError}}" {{DOMException}} if the cursor is advancing or is finished.
-    </dd>
-    <dt><var>cursor</var> . {{IDBCursor/request}}
-    <dd>
-      Returns the [=cursor/request=] that was used to obtain this cursor.
-    </dd>
-  </dl>
-</div>
+    : |cursor| . {{IDBCursor/direction}}
+    ::
+        Returns the [=cursor/direction=]
+        ({{"next"}}, {{"nextunique"}}, {{"prev"}} or {{"prevunique"}})
+        of the cursor.
+
+    : |cursor| . {{IDBCursor/key}}
+    ::
+        Returns the [=cursor/key=] of the cursor.
+        Throws a "{{InvalidStateError}}" {{DOMException}} if the cursor is advancing or is finished.
+
+    : |cursor| . {{IDBCursor/primaryKey}}
+    ::
+        Returns the [=cursor/effective key=] of the cursor.
+        Throws a "{{InvalidStateError}}" {{DOMException}} if the cursor is advancing or is finished.
+
+    : |cursor| . {{IDBCursor/request}}
+    ::
+        Returns the [=cursor/request=] that was used to obtain this cursor.
+</dl>
 
 
 The <dfn attribute for=IDBCursor>source</dfn> attribute's getter must
@@ -4676,7 +4446,7 @@ The <dfn attribute for=IDBCursor>direction</dfn> attribute's getter
 must return the [=cursor/direction=] of the [=cursor=].
 
 The <dfn attribute for=IDBCursor>key</dfn> attribute's getter must
-return the result of running the steps to [=convert a key to a
+return the result of running [=convert a key to a
 value=] with the cursor's current [=cursor/key=]. Note that
 if this property returns an object (e.g. a [=Date=] or
 [=Array=]), it returns the same object instance every time it is
@@ -4686,7 +4456,7 @@ by anyone inspecting the value of the cursor. However modifying such
 an object does not modify the contents of the database.
 
 The <dfn attribute for=IDBCursor>primaryKey</dfn> attribute's getter
-must return the result of running the steps to [=convert a key to a
+must return the result of running [=convert a key to a
 value=] with the cursor's current [=effective key=]. Note that if
 this property returns an object (e.g. a [=Date=] or [=Array=]),
 it returns the same object instance every time it is inspected, until
@@ -4718,31 +4488,27 @@ return the [=cursor/request=] of the [=cursor=].
   when the [=/transaction=] is not [=transaction/active=].
 
   <dl class=domintro>
-    <dt><var>cursor</var> . {{IDBCursor/advance()|advance}}(<var>count</var>)</dt>
-    <dd>
-      Advances the cursor through the next |count| [=object-store/records=] in
-      range.
-    </dd>
+    : |cursor| . {{IDBCursor/advance()|advance}}(|count|)
+    ::
+        Advances the cursor through the next |count| [=object-store/records=] in
+        range.
 
-    <dt><var>cursor</var> . {{IDBCursor/continue()|continue}}()</dt>
-    <dd>
-      Advances the cursor to the next [=object-store/record=] in range.
-    </dd>
+    : |cursor| . {{IDBCursor/continue()|continue}}()
+    ::
+        Advances the cursor to the next [=object-store/record=] in range.
 
-    <dt><var>cursor</var> . {{IDBCursor/continue()|continue}}(<var>key</var>)</dt>
-    <dd>
-      Advances the cursor to the next [=object-store/record=] in range matching or
-      after |key|.
-    </dd>
+    : |cursor| . {{IDBCursor/continue()|continue}}(|key|)
+    ::
+        Advances the cursor to the next [=object-store/record=] in range matching or
+        after |key|.
 
-    <dt><var>cursor</var> .
-        {{IDBCursor/continuePrimaryKey()|continuePrimaryKey}}(<var>key</var>,
-        <var>primaryKey</var>)</dt>
-    <dd>
-      Advances the cursor to the next [=object-store/record=] in range matching
-      or after |key| and |primaryKey|. Throws an "{{InvalidAccessError}}" {{DOMException}}
-      if the [=cursor/source=] is not an [=/index=].
-    </dd>
+    : |cursor| .
+        {{IDBCursor/continuePrimaryKey()|continuePrimaryKey}}(|key|,
+        |primaryKey|)
+    ::
+        Advances the cursor to the next [=object-store/record=] in range matching
+        or after |key| and |primaryKey|. Throws an "{{InvalidAccessError}}" {{DOMException}}
+        if the [=cursor/source=] is not an [=/index=].
   </dl>
 </div>
 
@@ -4764,19 +4530,21 @@ invoked, must run these steps:
 1. If the cursor's [=cursor/source=] or [=effective object
     store=] has been deleted, [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
 
-1. If this cursor's [=cursor/got value flag=] is unset, indicating that
+1. If this cursor's [=cursor/got value flag=] is false, indicating that
     the cursor is being iterated or has iterated past its end,
     [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
 
-1. Unset this [=cursor=]'s [=cursor/got value flag=].
+1. Set this [=cursor=]'s [=cursor/got value flag=] to false.
 
 1. Let |request| be this [=cursor=]'s [=cursor/request=].
 
-1. Unset |request|'s [=request/processed flag=] and [=request/done flag=].
+1. Set |request|'s [=request/processed flag=] to false.
 
-1. Run the steps to [=asynchronously execute a request=] with
-    the cursor's [=cursor/source=] as |source|, the steps
-    to [=iterate a cursor=] as |operation| and |request|, using
+1. Set |request|'s [=request/done flag=] to false.
+
+1. Run [=asynchronously execute a request=] with
+    the cursor's [=cursor/source=] as |source|,
+    [=iterate a cursor=] as |operation| and |request|, using
     the [=current Realm=] as |targetRealm|, this [=cursor=] and |count|.
 
 </div>
@@ -4786,7 +4554,7 @@ invoked, must run these steps:
   loaded - for example, calling {{advance()}} twice from the
   same onsuccess handler - results in an "{{InvalidStateError}}" {{DOMException}}
   being thrown on the second call because the cursor's
-  [=cursor/got value flag=] has been unset.
+  [=cursor/got value flag=] has been set to false.
 </aside>
 
 
@@ -4805,13 +4573,13 @@ invoked, must run these steps:
     [=effective object store=] has been deleted, [=throw=] an
     "{{InvalidStateError}}" {{DOMException}}.
 
-1. If this cursor's [=cursor/got value flag=] is unset, indicating that
+1. If this cursor's [=cursor/got value flag=] is false, indicating that
     the cursor is being iterated or has iterated past its end,
     [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
 
 1. If |key| is given, then:
 
-    1. Let |r| be the result of running the steps to [=convert a
+    1. Let |r| be the result of running [=convert a
         value to a key=] with |key|. Rethrow any exceptions.
 
     1. If |r| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
@@ -4826,15 +4594,17 @@ invoked, must run these steps:
         cursor's [=cursor/position=] and this cursor's [=cursor/direction=] is
         {{"prev"}} or {{"prevunique"}}, [=throw=] a "{{DataError}}" {{DOMException}}.
 
-1. Unset this [=cursor=]'s [=cursor/got value flag=].
+1. Set this [=cursor=]'s [=cursor/got value flag=] to false.
 
 1. Let |request| be this [=cursor=]'s [=cursor/request=].
 
-1. Unset |request|'s [=request/processed flag=] and [=request/done flag=].
+1. Set |request|'s [=request/processed flag=] to false.
 
-1. Run the steps to [=asynchronously execute a request=] with
-    the cursor's [=cursor/source=] as |source|, the steps
-    to [=iterate a cursor=] as |operation| and |request|,
+1. Set |request|'s [=request/done flag=] to false.
+
+1. Run [=asynchronously execute a request=] with
+    the cursor's [=cursor/source=] as |source|,
+    [=iterate a cursor=] as |operation| and |request|,
     using the [=current Realm=] as |targetRealm|,
     this [=cursor=] and |key| (if given).
 
@@ -4845,7 +4615,7 @@ invoked, must run these steps:
   loaded - for example, calling {{continue()}} twice from the
   same onsuccess handler - results in an "{{InvalidStateError}}" {{DOMException}}
   being thrown on the second call because the cursor's
-  [=cursor/got value flag=] has been unset.
+  [=cursor/got value flag=] has been set to false.
 </aside>
 
 
@@ -4869,18 +4639,18 @@ The <dfn method for=IDBCursor>continuePrimaryKey(|key|,
 1. If this cursor's [=cursor/direction=] is not {{"next"}} or {{"prev"}},
     [=throw=] an "{{InvalidAccessError}}" {{DOMException}}.
 
-1. If this cursor's [=cursor/got value flag=] is unset, indicating that
+1. If this cursor's [=cursor/got value flag=] is false, indicating that
     the cursor is being iterated or has iterated past its end,
     [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
 
-1. Let |r| be the result of running the steps to [=convert a value to
+1. Let |r| be the result of running [=convert a value to
     a key=] with |key|. Rethrow any exceptions.
 
 1. If |r| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
 
 1. Let |key| be |r|.
 
-1. Let |r| be the result of running the steps to [=convert a value
+1. Let |r| be the result of running [=convert a value
      to a key=] with |primaryKey|. Rethrow any exceptions.
 
 1. If |r| is invalid, [=throw=] a "{{DataError}}" {{DOMException}}.
@@ -4906,15 +4676,17 @@ The <dfn method for=IDBCursor>continuePrimaryKey(|key|,
     [=cursor/direction=] is {{"prev"}}, [=throw=] a
     "{{DataError}}" {{DOMException}}.
 
-1. Unset this [=cursor=]'s [=cursor/got value flag=].
+1. Set this [=cursor=]'s [=cursor/got value flag=] to false.
 
 1. Let |request| be this [=cursor=]'s [=cursor/request=].
 
-1. Unset |request|'s [=request/processed flag=] and [=request/done flag=].
+1. Set |request|'s [=request/processed flag=] to false.
 
-1. Run the steps to [=asynchronously execute a request=] with
-    the cursor's [=cursor/source=] as |source|, the steps
-    to [=iterate a cursor=] as |operation| and |request|,
+1. Set |request|'s [=request/done flag=] to false.
+
+1. Run [=asynchronously execute a request=] with
+    the cursor's [=cursor/source=] as |source|,
+    [=iterate a cursor=] as |operation| and |request|,
     using the [=current Realm=] as |targetRealm|,
     this [=cursor=], |key| and |primaryKey|.
 
@@ -4925,7 +4697,7 @@ The <dfn method for=IDBCursor>continuePrimaryKey(|key|,
   loaded - for example, calling {{continuePrimaryKey()}} twice from
   the same onsuccess handler - results in an "{{InvalidStateError}}" {{DOMException}}
   being thrown on the second call because the cursor's [=got value
-  flag=] has been unset.
+  flag=] has been set to false.
 </aside>
 
 
@@ -4936,26 +4708,25 @@ The <dfn method for=IDBCursor>continuePrimaryKey(|key|,
   called when the [=/transaction=] is not [=transaction/active=].
 
   <dl class=domintro>
-    <dt><var>request</var> = <var>cursor</var> .
-        {{IDBCursor/update()|update}}(<var>value</var>)</dt>
-    <dd>
-      Updated the [=object-store/record=] pointed at by the cursor with a new value.
+    : |request| = |cursor| .
+        {{IDBCursor/update()|update}}(|value|)
+    ::
+        Updated the [=object-store/record=] pointed at by the cursor with a new value.
 
-      Throws a "{{DataError}}" {{DOMException}} if the [=cursor/effective object store=]
-      uses [=in-line keys=] and the [=/key=] would have changed.
+        Throws a "{{DataError}}" {{DOMException}} if the [=cursor/effective object store=]
+        uses [=in-line keys=] and the [=/key=] would have changed.
 
-      If successful, |request|'s {{IDBRequest/result}} will be the
-      [=object-store/record=]'s [=/key=].
-    </dd>
+        If successful, |request|'s {{IDBRequest/result}} will be the
+        [=object-store/record=]'s [=/key=].
 
-    <dt><var>request</var> = <var>cursor</var> .
-        {{IDBCursor/delete()|delete}}()</dt>
-    <dd>
-      Delete the [=object-store/record=] pointed at by the cursor with a new value.
 
-      If successful, |request|'s {{IDBRequest/result}} will be
-      `undefined`.
-    </dd>
+    : |request| = |cursor| .
+        {{IDBCursor/delete()|delete}}()
+    ::
+        Delete the [=object-store/record=] pointed at by the cursor with a new value.
+
+        If successful, |request|'s {{IDBRequest/result}} will be
+        `undefined`.
   </dl>
 </div>
 
@@ -4976,11 +4747,11 @@ invoked, must run these steps:
 1. If the cursor's [=cursor/source=] or [=effective object
     store=] has been deleted, [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
 
-1. If this cursor's [=cursor/got value flag=] is unset, indicating that
+1. If this cursor's [=cursor/got value flag=] is false, indicating that
     the cursor is being iterated or has iterated past its end,
     [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
 
-1. If this cursor's [=key only flag=] is set, [=throw=] an
+1. If this cursor's [=cursor/key only flag=] is true, [=throw=] an
     "{{InvalidStateError}}" {{DOMException}}.
 
 1. Let |targetRealm| be a user-agent defined [=Realm=].
@@ -4999,7 +4770,7 @@ invoked, must run these steps:
 1. If the [=effective object store=] of this cursor uses [=in-line
     keys=], then:
 
-    1. Let |kpk| be the result of running the steps to
+    1. Let |kpk| be the result of running
         [=extract a key from a value using a key path=] with
         |clone| and the [=object-store/key
         path=] of the [=effective object store=].
@@ -5009,13 +4780,13 @@ invoked, must run these steps:
         the cursor's [=effective key=], [=throw=] a
         "{{DataError}}" {{DOMException}}.
 
-1. Run the steps to [=asynchronously execute a request=] and return
-    the {{IDBRequest}} created by these steps. The steps are run with
-    this [=cursor=] as |source| and the steps to [=store a
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=cursor=] as |source| and [=store a
     record into an object store=] as |operation|, using this
     cursor's [=effective object store=] as |store|, the |clone| as
     |value|, this cursor's [=effective key=] as |key|, and with the
-    |no-overwrite flag| unset.
+    |no-overwrite flag| false.
 
 </div>
 
@@ -5043,23 +4814,23 @@ must run these steps:
 1. If the cursor's [=cursor/source=] or [=effective object
     store=] has been deleted, [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
 
-1. If this cursor's [=cursor/got value flag=] is unset, indicating that
+1. If this cursor's [=cursor/got value flag=] is false, indicating that
     the cursor is being iterated or has iterated past its end,
     [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
 
-1. If this cursor's [=key only flag=] is set, [=throw=] an
+1. If this cursor's [=cursor/key only flag=] is true, [=throw=] an
     "{{InvalidStateError}}" {{DOMException}}.
 
-1. Run the steps to [=asynchronously execute a request=] and
-    return the {{IDBRequest}} created by these steps. The steps are
-    run with this [=cursor=] as |source| and the steps to
+1. Return the result (an {{IDBRequest}}) of running
+    [=asynchronously execute a request=]
+    with this [=cursor=] as |source| and
     [=delete records from an object store=] as |operation|, using
     this cursor's [=effective object store=] and [=effective
     key=] as |store| and |key| respectively.
 
 </div>
 
-A [=cursor=] that has the [=key only flag=] unset implements the
+A [=cursor=] that has its [=cursor/key only flag=] set to false implements the
 {{IDBCursorWithValue}} interface as well.
 
 
@@ -5070,14 +4841,10 @@ interface IDBCursorWithValue : IDBCursor {
 };
 </xmp>
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>cursor</var> . {{IDBCursorWithValue/value}}</dt>
-    <dd>
-      Returns the [=cursor=]'s current [=cursor/value=].
-    </dd>
-  </dl>
-</div>
+<dl class="domintro note">
+    : |cursor| . {{IDBCursorWithValue/value}}
+    :: Returns the [=cursor=]'s current [=cursor/value=].
+</dl>
 
 
 The <dfn attribute for=IDBCursorWithValue>value</dfn> attribute's
@@ -5121,31 +4888,28 @@ enum IDBTransactionMode {
 };
 </xmp>
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>transaction</var> . {{IDBTransaction/objectStoreNames}}</dt>
-    <dd>
-      Returns a list of the names of [=/object stores=] in the
-      transaction's [=transaction/scope=]. For an [=/upgrade transaction=]
-      this is all object stores in the [=database=].
-    </dd>
-    <dt><var>transaction</var> . {{IDBTransaction/mode}}</dt>
-    <dd>
-      Returns the [=transaction/mode=] the transaction was created with
-      ({{"readonly"}} or {{"readwrite"}}), or {{"versionchange"}} for
-      an [=/upgrade transaction=].
-    </dd>
-    <dt><var>transaction</var> . {{IDBTransaction/db}}</dt>
-    <dd>
-      Returns the transaction's [=transaction/connection=].
-    </dd>
-    <dt><var>transaction</var> . {{IDBTransaction/error}}</dt>
-    <dd>
-      If the transaction was [=transaction/aborted=], returns the
-      error (a {{DOMException}}) providing the reason.
-    </dd>
-  </dl>
-</div>
+<dl class="domintro note">
+    : |transaction| . {{IDBTransaction/objectStoreNames}}
+    ::
+        Returns a list of the names of [=/object stores=] in the
+        transaction's [=transaction/scope=]. For an [=/upgrade transaction=]
+        this is all object stores in the [=database=].
+
+    : |transaction| . {{IDBTransaction/mode}}
+    ::
+        Returns the [=transaction/mode=] the transaction was created with
+        ({{"readonly"}} or {{"readwrite"}}), or {{"versionchange"}} for
+        an [=/upgrade transaction=].
+
+    : |transaction| . {{IDBTransaction/db}}
+    ::
+        Returns the transaction's [=transaction/connection=].
+
+    : |transaction| . {{IDBTransaction/error}}
+    ::
+        If the transaction was [=transaction/aborted=], returns the
+        error (a {{DOMException}}) providing the reason.
+</dl>
 
 
 <div class=algorithm>
@@ -5194,37 +4958,32 @@ none.
   "{{UnknownError}}" {{DOMException}}).
 </aside>
 
-<div class=note>
-  <dl class=domintro>
-    <dt><var>transaction</var> .
-        {{IDBTransaction/objectStore()|objectStore}}(<var>name</var>)</dt>
-    <dd>
-      Returns an {{IDBObjectStore}} in the [=/transaction=]'s [=transaction/scope=].
-    </dd>
+<dl class="domintro note">
+    : |transaction| .
+        {{IDBTransaction/objectStore()|objectStore}}(|name|)
+    ::
+        Returns an {{IDBObjectStore}} in the [=/transaction=]'s [=transaction/scope=].
 
-    <dt><var>transaction</var> . {{IDBTransaction/abort()}}</dt>
-    <dd>
-      Aborts the transaction. All pending [=/requests=] will fail with
-      a "{{AbortError}}" {{DOMException}} and all changes made to the database will be
-      reverted.
-    </dd>
+    : |transaction| . {{IDBTransaction/abort()}}
+    ::
+        Aborts the transaction. All pending [=/requests=] will fail with
+        a "{{AbortError}}" {{DOMException}} and all changes made to the database will be
+        reverted.
 
-    <dt><var>transaction</var> . {{IDBTransaction/commit()}}</dt>
-    <dd>
-      Attempts to commit the transaction. All pending [=/requests=] will be allowed
-      to complete, but no new requests will be accepted. This can be used to force a
-      transaction to quickly finish, without waiting for pending requests to fire
-      <a event>`success`</a> events before attempting to commit normally.
+    : |transaction| . {{IDBTransaction/commit()}}
+    ::
+        Attempts to commit the transaction. All pending [=/requests=] will be allowed
+        to complete, but no new requests will be accepted. This can be used to force a
+        transaction to quickly finish, without waiting for pending requests to fire
+        <a event>`success`</a> events before attempting to commit normally.
 
-      The transaction will abort if a pending request fails, for example due to a
-      constraint error. The <a event>`success`</a> events for successful requests
-      will still fire, but throwing an exception in an event handler will not abort
-      the transaction. Similarly, <a event>`error`</a> events for failed requests
-      will still fire, but calling `preventDefault()` will not prevent the
-      transaction from aborting.
-    </dd>
-  </dl>
-</div>
+        The transaction will abort if a pending request fails, for example due to a
+        constraint error. The <a event>`success`</a> events for successful requests
+        will still fire, but throwing an exception in an event handler will not abort
+        the transaction. Similarly, <a event>`error`</a> events for failed requests
+        will still fire, but calling `preventDefault()` will not prevent the
+        transaction from aborting.
+</dl>
 
 <div class=algorithm>
 
@@ -5266,8 +5025,8 @@ must run these steps:
     or [=transaction/finished=],
     then [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
 
-1. Set the [=/transaction=]'s [=transaction/state=] to [=transaction/inactive=] and run the
-    steps to [=abort a transaction=] with null as |error|.
+1. Set the [=/transaction=]'s [=transaction/state=] to [=transaction/inactive=] and run
+    [=abort a transaction=] with null as |error|.
 
 </div>
 
@@ -5279,7 +5038,7 @@ must run these steps:
 1. If this [=/transaction=]'s [=transaction/state=] is not [=transaction/active=],
     then [=throw=] an "{{InvalidStateError}}" {{DOMException}}.
 
-1. Run the steps to [=commit a transaction=] with this [=/transaction=].
+1. Run [=commit a transaction=] with this [=/transaction=].
 
 </div>
 
@@ -5327,10 +5086,7 @@ event handler for the <a event>`error`</a> event.
 
 <div class=algorithm>
 
-The steps to <dfn>open a database</dfn> are as follows.
-The algorithm in these steps takes four arguments:
-the |origin| which requested the [=database=] to be opened, a
-database |name|, a database |version|, and a |request|.
+To <dfn>open a database</dfn> with |origin| which requested the [=database=] to be opened, a database |name|, a database |version|, and a |request|, run these steps:
 
 1. Let |queue| be the [=connection queue=] for |origin| and |name|.
 
@@ -5364,7 +5120,7 @@ database |name|, a database |version|, and a |request|.
         except |connection|, associated with |db|.
 
     1. [=set/For each=] |entry| of |openConnections| that does not have its
-        [=close pending flag=] set, [=queue a task=] to [=fire a
+        [=close pending flag=] set to true, [=queue a task=] to [=fire a
         version change event=] named <a event>`versionchange`</a> at
         |entry| with |db|'s [=database/version=] and |version|.
 
@@ -5386,7 +5142,7 @@ database |name|, a database |version|, and a |request|.
         [=/connections=] in |openConnections| are
         [=connection/closed=].
 
-    1. Run the steps to [=run an upgrade transaction=]
+    1. Run [=run an upgrade transaction=]
         using |connection|, |version| and |request|.
 
     1. If |connection| was [=connection/closed=],
@@ -5408,21 +5164,20 @@ database |name|, a database |version|, and a |request|.
 
 <div class=algorithm>
 
-The steps to <dfn>close a database connection</dfn> are as follows.
-These steps take two arguments, a |connection| object, and an
-optional |forced flag|.
+To <dfn>close a database connection</dfn> with a |connection| object, and an
+optional |forced flag|, run these steps:
 
-1. Set |connection|'s [=close pending flag=].
+1. Set |connection|'s [=close pending flag=] to true.
 
-1. If the |forced flag| is set, then for each |transaction|
-    [=transaction/created=] using |connection| run the steps to [=abort a
+1. If the |forced flag| is true, then for each |transaction|
+    [=transaction/created=] using |connection| run [=abort a
     transaction=] with |transaction| and newly <a for=exception>created</a>
     "{{AbortError}}" {{DOMException}}.
 
 1. Wait for all transactions [=transaction/created=] using |connection| to complete.
     Once they are complete, |connection| is [=connection/closed=].
 
-1. If the |forced flag| is set, then [=fire an event=] named
+1. If the |forced flag| is true, then [=fire an event=] named
     <a event>`close`</a> at |connection|.
 
     <aside class=note>
@@ -5435,10 +5190,10 @@ optional |forced flag|.
 </div>
 
 <aside class=note>
-  Once the [=close pending flag=] has been set no new transactions
-  can be [=transaction/created=] using |connection|. All methods that
-  [=transaction/create=] transactions first check the [=close pending flag=]
-  first and throw an exception if it is set.
+  Once a [=/connection=]'s [=close pending flag=] has been set to true, no new transactions
+  can be [=transaction/created=] using the [=/connection=]. All methods that
+  [=transaction/create=] transactions first check the [=/connection=]'s [=close pending flag=]
+  first and throw an exception if it is true.
 </aside>
 
 <aside class=note>
@@ -5456,10 +5211,9 @@ optional |forced flag|.
 
 <div class=algorithm>
 
-The steps to <dfn>delete a database</dfn> are as follows. The
-algorithm in these steps takes three arguments: the |origin| that
+To <dfn>delete a database</dfn> with the |origin| that
 requested the [=database=] to be deleted, a database |name|, and a
-|request|.
+|request|, run these steps:
 
 1. Let |queue| be the [=connection queue=] for |origin| and |name|.
 
@@ -5474,7 +5228,7 @@ requested the [=database=] to be deleted, a database |name|, and a
     associated with |db|.
 
 1. [=set/For each=] |entry| of |openConnections| that does not have its
-    [=close pending flag=] set, [=queue a task=] to [=fire a version
+    [=close pending flag=] set to true, [=queue a task=] to [=fire a version
     change event=] named <a event>`versionchange`</a> at |entry| with
     |db|'s [=database/version=] and null.
 
@@ -5512,8 +5266,7 @@ requested the [=database=] to be deleted, a database |name|, and a
 
 <div class=algorithm>
 
-The steps to <dfn>commit a transaction</dfn> are as follows.
-This algorithm takes one argument, the |transaction| to commit.
+To <dfn>commit a transaction</dfn> with the |transaction| to commit, run these steps:
 
 1. Set |transaction|'s [=transaction/state=] to [=transaction/committing=].
 
@@ -5528,8 +5281,7 @@ This algorithm takes one argument, the |transaction| to commit.
     1. Attempt to write any outstanding changes made by |transaction| to the [=database=].
 
     1. If an error occurs while writing the changes to the [=database=],
-        then run the steps
-        to [=abort a transaction=] with |transaction| and an
+        then run [=abort a transaction=] with |transaction| and an
         appropriate type for the error, for example "{{QuotaExceededError}}" or
         "{{UnknownError}}" {{DOMException}}, and terminate these steps.
 
@@ -5563,9 +5315,7 @@ This algorithm takes one argument, the |transaction| to commit.
 
 <div class=algorithm>
 
-The steps to <dfn>abort a transaction</dfn> are as follows.
-This algorithm
-takes two arguments: the |transaction| to abort, and |error|.
+To <dfn>abort a transaction</dfn> with the |transaction| to abort, and |error|, run these steps:
 
 1. All the changes made to the [=database=] by the [=/transaction=]
     are reverted. For [=/upgrade transactions=] this includes changes
@@ -5590,10 +5340,10 @@ takes two arguments: the |transaction| to abort, and |error|.
 
 1. [=list/For each=] |request| of |transaction|'s [=request list=],
     abort the steps to [=asynchronously execute a request=] for |request|,
-    set |request|'s [=request/processed flag=] if not already set,
+    set |request|'s [=request/processed flag=] to true,
     and [=queue a task=] to run these steps:
 
-    1. Set |request|'s [=request/done flag=].
+    1. Set |request|'s [=request/done flag=] to true.
     1. Set |request|'s [=request/result=] to undefined.
     1. Set |request|'s [=request/error=] to a newly
         <a for=exception>created</a> "{{AbortError}}" {{DOMException}}.
@@ -5621,7 +5371,8 @@ takes two arguments: the |transaction| to abort, and |error|.
         1. Let |request| be the [=request/open request=] associated with |transaction|.
         1. Set |request|'s [=request/transaction=] to null.
         1. Set |request|'s [=request/result=] to undefined.
-        1. Unset |request|'s [=request/processed flag=] and [=request/done flag=].
+        1. Set |request|'s [=request/processed flag=] to false.
+        1. Set |request|'s [=request/done flag=] to false.
 
 </div>
 
@@ -5632,10 +5383,7 @@ takes two arguments: the |transaction| to abort, and |error|.
 
 <div class=algorithm>
 
-The steps to <dfn>asynchronously execute a request</dfn> are as follows.
-The
-algorithm takes a |source| object and an |operation| to perform on a
-database, and an optional |request|.
+To <dfn>asynchronously execute a request</dfn> with the |source| object and an |operation| to perform on a database, and an optional |request|, run these steps:
 
 These steps can be aborted at any point if the [=/transaction=] the
 created [=/request=] belongs to is [=transaction/aborted=] using the steps to
@@ -5644,7 +5392,7 @@ created [=/request=] belongs to is [=transaction/aborted=] using the steps to
 1. Let |transaction| be the [=/transaction=] associated with
     |source|.
 
-1. Assert: |transaction|'s [=transaction/state=] is [=transaction/active=].
+1. [=/Assert=]: |transaction|'s [=transaction/state=] is [=transaction/active=].
 
 1. If |request| was not given, let |request| be a new |request| with
     [=request/source=] as |source|.
@@ -5659,7 +5407,7 @@ created [=/request=] belongs to is [=transaction/aborted=] using the steps to
     1. Let |result| be the result of performing |operation|.
 
     1. If |result| is an error and |transaction|'s [=transaction/state=] is [=committing=],
-        then run the steps to [=abort a transaction=] with |transaction| and |error|,
+        then run [=abort a transaction=] with |transaction| and |error|,
         and terminate these steps.
 
     1. If |result| is an error,
@@ -5670,13 +5418,13 @@ created [=/request=] belongs to is [=transaction/aborted=] using the steps to
           other changes made by the transaction.
         </aside>
 
-    1. Set |request|'s [=request/processed flag=].
+    1. Set |request|'s [=request/processed flag=] to true.
 
     1. [=Queue a task=] to run these steps:
 
         1. Remove |request| from |transaction|'s [=transaction/request list=].
 
-        1. Set |request|'s [=request/done flag=].
+        1. Set |request|'s [=request/done flag=] to true.
 
         1. If |result| is an error, then:
 
@@ -5701,10 +5449,9 @@ created [=/request=] belongs to is [=transaction/aborted=] using the steps to
 
 <div class=algorithm>
 
-The steps to <dfn>run an upgrade transaction</dfn> are as
-follows. This algorithm takes three arguments: a |connection| object
+To <dfn>run an upgrade transaction</dfn> with a |connection| object
 which is used to update the [=database=], a new |version| to be set
-for the [=database=], and a |request|.
+for the [=database=], and a |request|, run these steps:
 
 1. Let |db| be |connection|'s [=database=].
 
@@ -5731,20 +5478,20 @@ for the [=database=], and a |request|.
     considered part of the [=/transaction=], and so if the
     transaction is [=transaction/aborted=], this change is reverted.
 
-1. Set |request|'s [=request/processed flag=].
+1. Set |request|'s [=request/processed flag=] to true.
 
 1. [=Queue a task=] to run these steps:
 
     1. Set |request|'s [=request/result=] to |connection|.
     1. Set |request|'s [=request/transaction=] to |transaction|.
-    1. Set |request|'s [=request/done flag=].
+    1. Set |request|'s [=request/done flag=] to true.
     1. Set |transaction|'s [=transaction/state=] to [=transaction/active=].
-    1. Let |didThrow| be the result of running the steps to
+    1. Let |didThrow| be the result of running
         [=fire a version change event=] named
         <a event>`upgradeneeded`</a> at |request| with |old
         version| and |version|.
     1. Set |transaction|'s [=transaction/state=] to [=transaction/inactive=].
-    1. If |didThrow| is set, run the steps to [=abort a
+    1. If |didThrow| is true, run [=abort a
         transaction=] with the |error| property set to a newly
         <a for=exception>created</a> "{{AbortError}}" {{DOMException}}.
 
@@ -5766,8 +5513,7 @@ for the [=database=], and a |request|.
 
 <div class=algorithm>
 
-The steps to <dfn>abort an upgrade transaction</dfn> with |transaction|
-are as follows.
+To <dfn>abort an upgrade transaction</dfn> with |transaction|, run these steps:
 
 <aside class=note>
   These steps are run as needed by the steps to [=abort a
@@ -5873,7 +5619,7 @@ the implementation must run these steps:
 
 1. Let |transaction| be |request|'s [=/transaction=].
 
-1. Let |legacyOutputDidListenersThrowFlag| be initially unset.
+1. Let |legacyOutputDidListenersThrowFlag| be initially false.
 
 1. If |transaction|'s [=transaction/state=] is [=transaction/inactive=],
     then set |transaction|'s [=transaction/state=] to [=transaction/active=].
@@ -5881,17 +5627,17 @@ the implementation must run these steps:
 1. [=Dispatch=] |event| at |request| with |legacyOutputDidListenersThrowFlag|.
 
 1. If |transaction|'s [=transaction/state=] is [=transaction/active=],
-    then run these steps:
+    then:
 
     1. Set |transaction|'s [=transaction/state=] to [=transaction/inactive=].
 
-    1. If |legacyOutputDidListenersThrowFlag| is set,
-        then run the steps to [=abort a transaction=] with
+    1. If |legacyOutputDidListenersThrowFlag| is true,
+        then run [=abort a transaction=] with
         |transaction| and a newly <a for=exception>created</a>
         "{{AbortError}}" {{DOMException}}.
 
     1. If |transaction|'s [=transaction/request list=] is empty,
-        then run the steps to [=commit a transaction=] with |transaction|.
+        then run [=commit a transaction=] with |transaction|.
 
 </div>
 
@@ -5913,7 +5659,7 @@ the implementation must run these steps:
 
 1. Let |transaction| be |request|'s [=/transaction=].
 
-1. Let |legacyOutputDidListenersThrowFlag| be initially unset.
+1. Let |legacyOutputDidListenersThrowFlag| be initially false.
 
 1. If |transaction|'s [=transaction/state=] is [=transaction/inactive=],
     then set |transaction|'s [=transaction/state=] to [=transaction/active=].
@@ -5921,15 +5667,15 @@ the implementation must run these steps:
 1. [=Dispatch=] |event| at [=/request=] with |legacyOutputDidListenersThrowFlag|.
 
 1. If |transaction|'s [=transaction/state=] is [=transaction/active=],
-    then run these steps:
+    then:
 
     1. Set |transaction|'s [=transaction/state=] to [=transaction/inactive=].
 
-    1. If |legacyOutputDidListenersThrowFlag| is set,
-        then run the steps to [=abort a transaction=] with
+    1. If |legacyOutputDidListenersThrowFlag| is true,
+        then run [=abort a transaction=] with
         |transaction| and a newly <a for=exception>created</a>
         "{{AbortError}}" {{DOMException}} and terminate these steps.
-        This is done even if the event's [=canceled flag=] is not set.
+        This is done even if the event's [=canceled flag=] is false.
 
         <aside class=note>
           This means that if an error event is fired and any of the event
@@ -5939,13 +5685,13 @@ the implementation must run these steps:
           {{Event/preventDefault()}} is never called.
         </aside>
 
-    1. If the event's [=canceled flag=] is not set,
-        then run the steps to [=abort a transaction=] using
+    1. If the event's [=canceled flag=] is false,
+        then run [=abort a transaction=] using
         |transaction| and [=/request=]'s [=request/error=], and
         terminate these steps.
 
     1. If |transaction|'s [=transaction/request list=] is empty,
-        then run the steps to [=commit a transaction=] with |transaction|.
+        then run [=commit a transaction=] with |transaction|.
 
 </div>
 
@@ -5989,37 +5735,36 @@ a request=].
 
 <div class=algorithm>
 
-The steps to <dfn>store a record into an object store</dfn> with
-|store|, |value|, an optional |key|, and a |no-overwrite flag| are as
-follows.
+To <dfn>store a record into an object store</dfn> with
+|store|, |value|, an optional |key|, and a |no-overwrite flag|, run these steps:
 
 1. If |store| uses a [=key generator=], then:
 
     1. If |key| is undefined, then:
 
-        1. Let |key| be the result of running the steps to
+        1. Let |key| be the result of running
             [=generate a key=] for |store|.
 
         1. If |key| is failure, then this operation failed with a
             "{{ConstraintError}}" {{DOMException}}. Abort this
             algorithm without taking any further steps.
 
-        1. If |store| also uses [=in-line keys=], then run the
-            steps to [=inject a key into a value using a key path=]
+        1. If |store| also uses [=in-line keys=], then run
+            [=inject a key into a value using a key path=]
             with |value|, |key| and |store|'s [=object-store/key
             path=].
 
-    1. Otherwise, run the steps to [=possibly update the key generator=]
+    1. Otherwise, run [=possibly update the key generator=]
         for |store| with |key|.
 
-1. If the |no-overwrite flag| was given to these steps and is set, and
+1. If the |no-overwrite flag| was given to these steps and is true, and
     a [=object-store/record=] already exists in |store| with its key [=equal to=]
     |key|, then this operation failed with a "{{ConstraintError}}" {{DOMException}}.
     Abort this algorithm without taking any further steps.
 
 1. If a [=object-store/record=] already exists in |store| with its key [=equal
-    to=] |key|, then remove the [=object-store/record=] from |store| using the
-    steps to [=delete records from an object store=].
+    to=] |key|, then remove the [=object-store/record=] from |store| using
+    [=delete records from an object store=].
 
 1. Store a record in |store| containing |key| as its key and
     [=!=] <a abstract-op>StructuredSerializeForStorage</a>(|value|)
@@ -6029,7 +5774,7 @@ follows.
 
 1. For each |index| which [=references=] |store|:
 
-    1. Let |index key| be the result of running the steps to
+    1. Let |index key| be the result of running
         [=extract a key from a value using a key path=] with
         |value|, |index|'s [=index/key path=], and |index|'s
         [=multiEntry flag=].
@@ -6042,29 +5787,29 @@ follows.
           An exception thrown in this step is not rethrown.
         </aside>
 
-    1. If |index|'s [=multiEntry flag=] is unset, or if |index key|
+    1. If |index|'s [=multiEntry flag=] is false, or if |index key|
         is not an [=array key=], and if |index| already contains a
         [=object-store/record=] with [=/key=] [=equal to=] |index
-        key|, and |index| has its [=unique flag=] set, then this
+        key|, and |index|'s [=unique flag=] is true, then this
         operation failed with a "{{ConstraintError}}" {{DOMException}}. Abort this
         algorithm without taking any further steps.
 
-    1. If |index|'s [=multiEntry flag=] is set and |index key| is
+    1. If |index|'s [=multiEntry flag=] is true and |index key| is
         an [=array key=], and if |index| already contains a
         [=object-store/record=] with [=/key=] [=equal to=] any of the
-        [=subkeys=] of |index key|, and |index| has its [=unique
-        flag=] set, then this operation failed with a
+        [=subkeys=] of |index key|, and |index|'s [=unique
+        flag=] is true, then this operation failed with a
         "{{ConstraintError}}" {{DOMException}}. Abort this algorithm without taking any
         further steps.
 
-    1. If |index|'s [=multiEntry flag=] is unset, or if |index key|
+    1. If |index|'s [=multiEntry flag=] is false, or if |index key|
         is not an [=array key=] then store a record in |index|
         containing |index key| as its key and |key| as its value. The
         record is stored in |index|'s [=index/list of records=]
         such that the list is sorted primarily on the records keys,
         and secondarily on the records values, in [=ascending=] order.
 
-    1. If |index|'s [=multiEntry flag=] is set and |index key| is
+    1. If |index|'s [=multiEntry flag=] is true and |index key| is
         an [=array key=], then for each |subkey| of the
         [=subkeys=] of |index key| store a record in |index|
         containing |subkey| as its key and |key| as its value. The
@@ -6096,8 +5841,8 @@ follows.
 
 <div class=algorithm>
 
-The steps to <dfn>retrieve a value from an object store</dfn> with
-|targetRealm|, |store| and |range| are as follows:
+To <dfn>retrieve a value from an object store</dfn> with
+|targetRealm|, |store| and |range|, run these steps:
 
 1. Let |record| be the first [=object-store/record=] in |store|'s
     [=object-store/list of records=] whose [=/key=] is [=in=] |range|, if
@@ -6114,8 +5859,8 @@ The steps to <dfn>retrieve a value from an object store</dfn> with
 
 <div class=algorithm>
 
-The steps to <dfn>retrieve multiple values from an object
-store</dfn> with |targetRealm|, |store|, |range| and optional |count| are as follows:
+To <dfn>retrieve multiple values from an object
+store</dfn> with |targetRealm|, |store|, |range| and optional |count|, run these steps:
 
 1. If |count| is not given or is 0 (zero), let |count| be infinity.
 
@@ -6138,8 +5883,8 @@ store</dfn> with |targetRealm|, |store|, |range| and optional |count| are as fol
 
 <div class=algorithm>
 
-The steps to <dfn>retrieve a key from an object store</dfn> with
-|store| and |range| are as follows:
+To <dfn>retrieve a key from an object store</dfn>
+with |store| and |range|, run these steps:
 
 1. Let |record| be the first [=object-store/record=] in |store|'s
     [=object-store/list of records=] whose [=/key=] is [=in=] |range|, if
@@ -6147,7 +5892,7 @@ The steps to <dfn>retrieve a key from an object store</dfn> with
 
 1. If |record| was not found, return undefined.
 
-1. Return the result of running the steps to [=convert a
+1. Return the result of running [=convert a
     key to a value=] with |record|'s key.
 
 </div>
@@ -6155,8 +5900,8 @@ The steps to <dfn>retrieve a key from an object store</dfn> with
 
 <div class=algorithm>
 
-The steps to <dfn>retrieve multiple keys from an object store</dfn>
-with |store|, |range| and optional |count| are as follows:
+To <dfn>retrieve multiple keys from an object store</dfn>
+with |store|, |range| and optional |count|, run these steps:
 
 1. If |count| is not given or is 0 (zero), let |count| be infinity.
 
@@ -6168,7 +5913,7 @@ with |store|, |range| and optional |count| are as follows:
 
 1. [=list/For each=] |record| of |records|:
 
-    1. Let |entry| be the result of running the steps to [=convert a
+    1. Let |entry| be the result of running [=convert a
         key to a value=] with |record|'s key.
     1. Append |entry| to |list|.
 
@@ -6183,8 +5928,8 @@ with |store|, |range| and optional |count| are as follows:
 
 <div class=algorithm>
 
-The steps to <dfn>retrieve a referenced value from an index</dfn>
-with |targetRealm|, |index| and |range| are as follows.
+To <dfn>retrieve a referenced value from an index</dfn>
+with |targetRealm|, |index| and |range|, run these steps:
 
 1. Let |record| be the first [=object-store/record=] in |index|'s [=index/list of
     records=] whose [=index/key=] is [=in=] |range|, if any.
@@ -6200,8 +5945,8 @@ with |targetRealm|, |index| and |range| are as follows.
 
 <div class=algorithm>
 
-The steps to <dfn>retrieve multiple referenced values from an
-index</dfn> with |targetRealm|, |index|, |range| and optional |count| are as follows:
+To <dfn>retrieve multiple referenced values from an
+index</dfn> with |targetRealm|, |index|, |range| and optional |count|, run these steps:
 
 1. If |count| is not given or is 0 (zero), let |count| be infinity.
 
@@ -6227,15 +5972,15 @@ index</dfn> with |targetRealm|, |index|, |range| and optional |count| are as fol
 
 <div class=algorithm>
 
-The steps to <dfn>retrieve a value from an index</dfn> with
-|index| and |range| are as follows.
+To <dfn>retrieve a value from an index</dfn> with
+|index| and |range|, run these steps:
 
 1. Let |record| be the first [=index/record=] in |index|'s [=index/list of
     records=] whose [=index/key=] is [=in=] |range|, if any.
 
 1. If |record| was not found, return undefined.
 
-1. Return the of running the steps to [=convert a
+1. Return the result of running [=convert a
         key to a value=] with |record|'s [=/value=].
 
 </div>
@@ -6243,8 +5988,8 @@ The steps to <dfn>retrieve a value from an index</dfn> with
 
 <div class=algorithm>
 
-The steps to <dfn>retrieve multiple values from an index</dfn> with
-|index|, |range| and optional |count| are as follows:
+To <dfn>retrieve multiple values from an index</dfn> with
+|index|, |range| and optional |count|, run these steps:
 
 1. If |count| is not given or is 0 (zero), let |count| be infinity.
 
@@ -6255,7 +6000,7 @@ The steps to <dfn>retrieve multiple values from an index</dfn> with
 
 1. [=list/For each=] |record| of |records|:
 
-    1. Let |entry| be the result of running the steps to [=convert a
+    1. Let |entry| be the result of running [=convert a
         key to a value=] with |record|'s value.
     1. Append |entry| to |list|.
 
@@ -6270,8 +6015,8 @@ The steps to <dfn>retrieve multiple values from an index</dfn> with
 
 <div class=algorithm>
 
-The steps to <dfn>delete records from an object store</dfn>
-with |store| and |range| are as follows.
+To <dfn>delete records from an object store</dfn>
+with |store| and |range|, run these steps:
 
 1. Remove all records, if any, from |store|'s [=object-store/list
     of records=] with key [=in=]
@@ -6292,8 +6037,8 @@ with |store| and |range| are as follows.
 
 <div class=algorithm>
 
-The steps to <dfn>count the records in a range</dfn> with |source| and
-|range| are as follows:
+To <dfn>count the records in a range</dfn> with |source| and
+|range|, run these steps:
 
 1. Let |count| be the number of records, if any, in |source|'s list of
     records with key [=in=] |range|.
@@ -6309,7 +6054,7 @@ The steps to <dfn>count the records in a range</dfn> with |source| and
 
 <div class=algorithm>
 
-The steps to <dfn>clear an object store</dfn> with |store| are as follows.
+To <dfn>clear an object store</dfn> with |store|, run these steps:
 
 1. Remove all records from |store|.
 
@@ -6327,15 +6072,14 @@ The steps to <dfn>clear an object store</dfn> with |store| are as follows.
 
 <div class=algorithm>
 
-The steps to <dfn>iterate a cursor</dfn> with |targetRealm|, |cursor|, an optional
-|key| and |primaryKey| to iterate to, and an optional |count| are as
-follows.
+To <dfn>iterate a cursor</dfn> with |targetRealm|, |cursor|, an optional
+|key| and |primaryKey| to iterate to, and an optional |count|, run these steps:
 
 1. Let |source| be |cursor|'s [=cursor/source=].
 
 1. Let |direction| be |cursor|'s [=cursor/direction=].
 
-1. Assert: if |primaryKey| is given, |source| is an [=/index=]
+1. [=/Assert=]: if |primaryKey| is given, |source| is an [=/index=]
     and |direction| is {{"next"}} or {{"prev"}}.
 
 1. Let |records| be the list of [=object-store/records=] in |source|.
@@ -6362,101 +6106,94 @@ follows.
     1. Switch on |direction|:
 
         <dl class=switch>
-          <dt>{{"next"}}</dt>
-          <dd>
-            Let |found record| be the first record in |records| which
-            satisfy all of the following requirements:
+          : {{"next"}}
+          ::
+              Let |found record| be the first record in |records| which
+              satisfy all of the following requirements:
 
-            * If |key| is defined, the record's key is [=greater
-                than=] or [=equal to=] |key|.
+              * If |key| is defined, the record's key is [=greater
+                  than=] or [=equal to=] |key|.
 
-            * If |primaryKey| is defined, the record's key is [=equal
-                to=] |key| and the record's value is [=greater
-                than=] or [=equal to=] |primaryKey|, or the
-                record's key is [=greater than=] |key|.
+              * If |primaryKey| is defined, the record's key is [=equal
+                  to=] |key| and the record's value is [=greater
+                  than=] or [=equal to=] |primaryKey|, or the
+                  record's key is [=greater than=] |key|.
 
-            * If |position| is defined, and |source| is an
-                [=/object store=], the record's key is [=greater than=]
-                |position|.
+              * If |position| is defined, and |source| is an
+                  [=/object store=], the record's key is [=greater than=]
+                  |position|.
 
-            * If |position| is defined, and |source| is an
-                [=/index=], the record's key is [=equal to=]
-                |position| and the record's value is [=greater
-                than=] |object store position| or the record's key is
-                [=greater than=] |position|.
+              * If |position| is defined, and |source| is an
+                  [=/index=], the record's key is [=equal to=]
+                  |position| and the record's value is [=greater
+                  than=] |object store position| or the record's key is
+                  [=greater than=] |position|.
 
-            * The record's key is [=in=]
-                |range|.
+              * The record's key is [=in=]
+                  |range|.
 
-          </dd>
+          : {{"nextunique"}}
+          ::
+              Let |found record| be the first record in |records| which
+              satisfy all of the following requirements:
 
-          <dt>{{"nextunique"}}</dt>
-          <dd>
-            Let |found record| be the first record in |records| which
-            satisfy all of the following requirements:
+              * If |key| is defined, the record's key is [=greater
+                  than=] or [=equal to=] |key|.
 
-            * If |key| is defined, the record's key is [=greater
-                than=] or [=equal to=] |key|.
+              * If |position| is defined, the record's key is [=greater
+                  than=] |position|.
 
-            * If |position| is defined, the record's key is [=greater
-                than=] |position|.
+              * The record's key is [=in=]
+                  |range|.
 
-            * The record's key is [=in=]
-                |range|.
+          : {{"prev"}}
+          ::
+              Let |found record| be the last record in |records| which
+              satisfy all of the following requirements:
 
-          </dd>
+              * If |key| is defined, the record's key is [=less
+                  than=] or [=equal to=] |key|.
 
-          <dt>{{"prev"}}</dt>
-          <dd>
-            Let |found record| be the last record in |records| which
-            satisfy all of the following requirements:
+              * If |primaryKey| is defined, the record's key is [=equal
+                  to=] |key| and the record's value is [=less than=]
+                  or [=equal to=] |primaryKey|, or the record's key is
+                  [=less than=] |key|.
 
-            * If |key| is defined, the record's key is [=less
-                than=] or [=equal to=] |key|.
+              * If |position| is defined, and |source| is an
+                  [=/object store=], the record's key is [=less
+                  than=] |position|.
 
-            * If |primaryKey| is defined, the record's key is [=equal
-                to=] |key| and the record's value is [=less than=]
-                or [=equal to=] |primaryKey|, or the record's key is
-                [=less than=] |key|.
+              * If |position| is defined, and |source| is an
+                  [=/index=], the record's key is [=equal to=]
+                  |position| and the record's value is [=less than=]
+                  |object store position| or the record's key is
+                  [=less than=] |position|.
 
-            * If |position| is defined, and |source| is an
-                [=/object store=], the record's key is [=less
-                than=] |position|.
+              * The record's key is [=in=] |range|.
 
-            * If |position| is defined, and |source| is an
-                [=/index=], the record's key is [=equal to=]
-                |position| and the record's value is [=less than=]
-                |object store position| or the record's key is
-                [=less than=] |position|.
+          : {{"prevunique"}}
+          ::
+              Let |temp record| be the last record in
+              |records| which satisfy all of the following requirements:
 
-            * The record's key is [=in=] |range|.
+              * If |key| is defined, the record's key is [=less
+                  than=] or [=equal to=] |key|.
 
-          </dd>
+              * If |position| is defined, the record's key is [=less
+                  than=] |position|.
 
-          <dt>{{"prevunique"}}</dt>
-          <dd>
-            Let |temp record| be the last record in
-            |records| which satisfy all of the following requirements:
+              * The record's key is [=in=]
+                  |range|.
 
-            * If |key| is defined, the record's key is [=less
-                than=] or [=equal to=] |key|.
+              If |temp record| is defined, let |found record| be the
+              first record in |records| whose [=/key=] is [=equal to=]
+              |temp record|'s [=/key=].
 
-            * If |position| is defined, the record's key is [=less
-                than=] |position|.
+              <aside class=note>
+                Iterating with {{"prevunique"}} visits the same records that
+                {{"nextunique"}} visits, but in reverse order.
+              </aside>
 
-            * The record's key is [=in=]
-                |range|.
-
-            If |temp record| is defined, let |found record| be the
-            first record in |records| whose [=/key=] is [=equal to=]
-            |temp record|'s [=/key=].
-
-            <aside class=note>
-              Iterating with {{"prevunique"}} visits the same records that
-              {{"nextunique"}} visits, but in reverse order.
-            </aside>
-
-          </dd>
         </dl>
 
     1. If |found record| is not defined, then:
@@ -6466,7 +6203,7 @@ follows.
         1. If |source| is an [=/index=], set |cursor|'s
             [=object store position=] to undefined.
 
-        1. If |cursor|'s [=key only flag=] is unset, set |cursor|'s
+        1. If |cursor|'s [=cursor/key only flag=] is false, set |cursor|'s
             [=cursor/value=] to undefined.
 
         1. Return null.
@@ -6485,13 +6222,13 @@ follows.
 
 1. Set |cursor|'s [=cursor/key=] to |found record|'s key.
 
-1. If |cursor|'s [=key only flag=] is unset, then:
+1. If |cursor|'s [=cursor/key only flag=] is false, then:
 
     1. Let |serialized| be |found record|'s [=referenced value=].
     1. Set |cursor|'s [=cursor/value=] to
         [=!=] <a abstract-op>StructuredDeserialize</a>(|serialized|, |targetRealm|)
 
-1. Set |cursor|'s [=cursor/got value flag=].
+1. Set |cursor|'s [=cursor/got value flag=] to true.
 
 1. Return |cursor|.
 
@@ -6516,20 +6253,20 @@ algorithm conventions from the ECMAScript Language Specification.
 
 <div class=algorithm>
 
-The steps to <dfn>extract a key from a value using a key path</dfn>
-with |value|, |keyPath| and an optional |multiEntry flag| are as
-follows. The result of these steps is a [=/key=], invalid, or
+To <dfn>extract a key from a value using a key path</dfn>
+with |value|, |keyPath| and an optional |multiEntry flag|, run the
+following steps. The result of these steps is a [=/key=], invalid, or
 failure, or the steps may throw an exception.
 
-1. Let |r| be the result of running the steps to [=evaluate a key
+1. Let |r| be the result of running [=evaluate a key
     path on a value=] with |value| and |keyPath|. Rethrow any
     exceptions.
 
 1. If |r| is failure, return failure.
 
-1. Let |key| be the result of running the steps to [=convert a value
-    to a key=] with |r| if the |multiEntry flag| is unset, and the
-    result of running the steps to [=convert a value to a multiEntry
+1. Let |key| be the result of running [=convert a value
+    to a key=] with |r| if the |multiEntry flag| is false, and the
+    result of running [=convert a value to a multiEntry
     key=] with |r| otherwise. Rethrow any exceptions.
 
 1. If |key| is invalid, return invalid.
@@ -6541,8 +6278,8 @@ failure, or the steps may throw an exception.
 
 <div class=algorithm>
 
-The steps to <dfn>evaluate a key path on a value</dfn> with |value|
-and |keyPath| are as follows. The result of these steps is an
+To <dfn>evaluate a key path on a value</dfn> with |value|
+and |keyPath|, run the following steps. The result of these steps is an
 ECMAScript value or failure, or the steps may throw an exception.
 
 1. If |keyPath| is a [=/list=] of strings, then:
@@ -6554,11 +6291,11 @@ ECMAScript value or failure, or the steps may throw an exception.
 
     1. [=list/For each=] |item| of |keyPath|:
 
-        1. Let |key| be the result of recursively running the steps to
+        1. Let |key| be the result of recursively running
             [=evaluate a key path on a value=] using
             |item| as |keyPath| and |value| as |value|.
 
-        1. Assert: |key| is not an [=abrupt completion=].
+        1. [=/Assert=]: |key| is not an [=abrupt completion=].
 
         1. If |key| is failure, abort the overall algorithm and return
             failure.
@@ -6567,7 +6304,7 @@ ECMAScript value or failure, or the steps may throw an exception.
 
         1. Let |status| be [=CreateDataProperty=](|result|, |p|, |key|).
 
-        1. Assert: |status| is true.
+        1. [=/Assert=]: |status| is true.
 
         1. Increase |i| by 1.
 
@@ -6588,45 +6325,43 @@ ECMAScript value or failure, or the steps may throw an exception.
 1. [=list/For each=] |identifier| of |identifiers|, jump to the appropriate step below:
 
     <dl class=switch>
-      <dt>If [=/Type=](|value|) is String, and |identifier| is "`length`"</dt>
-      <dd>Let |value| be a Number equal to the number of elements in |value|.</dd>
+      : If [=/Type=](|value|) is String, and |identifier| is "`length`"
+      :: Let |value| be a Number equal to the number of elements in |value|.
 
-      <dt>If |value| is an [=Array=] and |identifier| is "`length`"</dt>
+      : If |value| is an [=Array=] and |identifier| is "`length`"
+      :: Let |value| be [=!=] [=ToLength=]([=!=] [=Get=](|value|, "`length`")).
 
-      <dd>Let |value| be [=!=] [=ToLength=]([=!=] [=Get=](|value|, "`length`")).</dd>
+      : If |value| is a {{Blob}} and |identifier| is "`size`"
+      :: Let |value| be a Number equal to |value|'s {{Blob/size}}.
 
-      <dt>If |value| is a {{Blob}} and |identifier| is "`size`"</dt>
-      <dd>Let |value| be a Number equal to |value|'s {{Blob/size}}.</dd>
+      : If |value| is a {{Blob}} and |identifier| is "`type`"
+      :: Let |value| be a String equal to |value|'s {{Blob/type}}.
 
-      <dt>If |value| is a {{Blob}} and |identifier| is "`type`"</dt>
-      <dd>Let |value| be a String equal to |value|'s {{Blob/type}}.</dd>
+      : If |value| is a {{File}} and |identifier| is "`name`"
+      :: Let |value| be a String equal to |value|'s {{File/name}}.
 
-      <dt>If |value| is a {{File}} and |identifier| is "`name`"</dt>
-      <dd>Let |value| be a String equal to |value|'s {{File/name}}.</dd>
+      : If |value| is a {{File}} and |identifier| is "`lastModified`"
+      :: Let |value| be a Number equal to |value|'s {{File/lastModified}}.
 
-      <dt>If |value| is a {{File}} and |identifier| is "`lastModified`"</dt>
-      <dd>Let |value| be a Number equal to |value|'s {{File/lastModified}}.</dd>
+      : If |value| is a {{File}} and |identifier| is "`lastModifiedDate`"
+      :: Let |value| be a new [=Date=] object with \[[DateValue]] internal slot
+          equal to |value|'s {{File/lastModified}}.
 
-      <dt>If |value| is a {{File}} and |identifier| is "`lastModifiedDate`"</dt>
-      <dd>Let |value| be a new [=Date=] object with \[[DateValue]] internal slot
-        equal to |value|'s {{File/lastModified}}.</dd>
+      : Otherwise
+      ::
+          1. If [=/Type=](|value|) is not Object, return failure.
 
-      <dt>Otherwise</dt>
-      <dd>
-        1. If [=/Type=](|value|) is not Object, return failure.
+          1. Let |hop| be [=!=] [=HasOwnProperty=](|value|, |identifier|).
 
-        1. Let |hop| be [=!=] [=HasOwnProperty=](|value|, |identifier|).
+          1. If |hop| is false, return failure.
 
-        1. If |hop| is false, return failure.
+          1. Let |value| be [=!=] [=Get=](|value|, |identifier|).
 
-        1. Let |value| be [=!=] [=Get=](|value|, |identifier|).
-
-        1. If |value| is undefined, return failure.
-      </dd>
+          1. If |value| is undefined, return failure.
 
     </dl>
 
-1. Assert: |value| is not an [=abrupt completion=].
+1. [=/Assert=]: |value| is not an [=abrupt completion=].
 
 1. Return |value|.
 
@@ -6652,18 +6387,17 @@ ECMAScript value or failure, or the steps may throw an exception.
 
 <div class=algorithm>
 
-The steps to <dfn>check that a key could be injected into a value</dfn> are
-as follows. The algorithm takes a |value| and a |keyPath|, and outputs
-true or false.
+To <dfn>check that a key could be injected into a value</dfn> with |value| and a |keyPath|, run the following steps.
+The result of these steps is either true or false.
 
 <div class=algorithm>
 
 1. Let |identifiers| be the result of <a lt="strictly split a string">strictly splitting</a>
     |keyPath| on U+002E FULL STOP characters (.).
 
-1. Assert: |identifiers| is not empty.
+1. [=/Assert=]: |identifiers| is not empty.
 
-1. Remove the last member of |identifiers|.
+1. Remove the last [=list/item=] of |identifiers|.
 
 1. [=list/For each=] remaining |identifier| of |identifiers|, if any:
 
@@ -6686,20 +6420,19 @@ true or false.
 
 <div class=algorithm>
 
-The steps to <dfn>inject a key into a value using a key path</dfn> are
-as follows. The algorithm takes a |value|, a |key| and a |keyPath|.
+To <dfn>inject a key into a value using a key path</dfn> with |value|, a |key| and a |keyPath|, run these steps:
 
 1. Let |identifiers| be the result of <a lt="strictly split a string">strictly splitting</a>
     |keyPath| on U+002E FULL STOP characters (.).
 
-1. Assert: |identifiers| is not empty.
+1. [=/Assert=]: |identifiers| is not empty.
 
-1. Let |last| be the last member of |identifiers| and remove it from
+1. Let |last| be the last [=list/item=] of |identifiers| and remove it from
     the list.
 
 1. [=list/For each=] remaining |identifier| of |identifiers|:
 
-    1. Assert: |value| is an [=Object=] or an [=Array=].
+    1. [=/Assert=]: |value| is an [=Object=] or an [=Array=].
 
     1. Let |hop| be [=!=] [=HasOwnProperty=](|value|, |identifier|).
 
@@ -6711,18 +6444,18 @@ as follows. The algorithm takes a |value|, a |key| and a |keyPath|.
          1. Let |status| be [=CreateDataProperty=](|value|, |identifier|,
             |o|).
 
-         1. Assert: |status| is true.
+         1. [=/Assert=]: |status| is true.
 
     1. Let |value| be [=!=] [=Get=](|value|, |identifier|).
 
-1. Assert: |value| is an [=Object=] or an [=Array=].
+1. [=/Assert=]: |value| is an [=Object=] or an [=Array=].
 
-1. Let |keyValue| be the result of running the steps to [=convert a
+1. Let |keyValue| be the result of running [=convert a
     key to a value=] with |key|.
 
 1. Let |status| be [=CreateDataProperty=](|value|, |last|, |keyValue|).
 
-1. Assert: |status| is true.
+1. [=/Assert=]: |status| is true.
 
 </div>
 
@@ -6740,8 +6473,8 @@ as follows. The algorithm takes a |value|, a |key| and a |keyPath|.
 
 <div class=algorithm>
 
-The steps to <dfn>convert a key to a value</dfn> are as follows. These
-steps take one argument, |key|, and return an ECMAScript value.
+To <dfn>convert a key to a value</dfn> with |key|, run the following steps.
+The steps return an ECMAScript value.
 
 1. Let |type| be |key|'s [=key/type=].
 
@@ -6750,54 +6483,48 @@ steps take one argument, |key|, and return an ECMAScript value.
 1. Switch on |type|:
 
     <dl class=switch>
-      <dt>*number*</dt>
-      <dd>Return an ECMAScript Number value equal to |value|</dd>
+      : *number*
+      :: Return an ECMAScript Number value equal to |value|
 
-      <dt>*string*</dt>
-      <dd>Return an ECMAScript String value equal to |value|</dd>
+      : *string*
+      :: Return an ECMAScript String value equal to |value|
 
-      <dt>*date*</dt>
-      <dd>
-        1. Let |date| be the result of executing the ECMAScript Date
-            constructor with the single argument |value|.
-        1. Assert: |date| is not an [=abrupt completion=].
-        1. Return |date|.
+      : *date*
+      ::
+          1. Let |date| be the result of executing the ECMAScript Date
+              constructor with the single argument |value|.
+          1. [=/Assert=]: |date| is not an [=abrupt completion=].
+          1. Return |date|.
 
-      </dd>
+      : *binary*
+      ::
+          1. Let |len| be |value|'s [=byte sequence/length=].
+          1. Let |buffer| be the result of executing the ECMAScript
+              ArrayBuffer constructor with |len|.
+          1. [=/Assert=]: |buffer| is not an [=abrupt completion=].
+          1. Set the entries in |buffer|'s
+              \[[ArrayBufferData]] internal slot to the entries
+              in |value|.
+          1. Return |buffer|.
 
-      <dt>*binary*</dt>
-      <dd>
-        1. Let |len| be the length of |value|.
-        1. Let |buffer| be the result of executing the ECMAScript
-            ArrayBuffer constructor with |len|.
-        1. Assert: |buffer| is not an [=abrupt completion=].
-        1. Set the entries in |buffer|'s
-            \[[ArrayBufferData]] internal slot to the entries
-            in |value|.
-        1. Return |buffer|.
+      : *array*
+      ::
+          1. Let |array| be the result of executing the ECMAScript Array
+              constructor with no arguments.
+          1. [=/Assert=]: |array| is not an [=abrupt completion=].
+          1. Let |len| be |value|'s [=list/size=].
+          1. Let |index| be 0.
+          1. While |index| is less than |len|:
 
-      </dd>
+              1. Let |entry| be the result of running
+                  [=convert a key to a value=] with |value|[|index|].
+              1. Let |status| be [=CreateDataProperty=](|array|, |index|,
+                  |entry|).
+              1. [=/Assert=]: |status| is true.
+              1. Increase |index| by 1.
 
-      <dt>*array*</dt>
-      <dd>
-        1. Let |array| be the result of executing the ECMAScript Array
-            constructor with no arguments.
-        1. Assert: |array| is not an [=abrupt completion=].
-        1. Let |len| be the length of |value|.
-        1. Let |index| be 0.
-        1. While |index| is less than |len|:
+          1. Return |array|.
 
-            1. Let |entry| be the result of running the steps to
-                [=convert a key to a value=] with the |index|th
-                entry of |value| as input.
-            1. Let |status| be [=CreateDataProperty=](|array|, |index|,
-                |entry|).
-            1. Assert: |status| is true.
-            1. Increase |index| by 1.
-
-        1. Return |array|.
-
-      </dd>
     </dl>
 
 </div>
@@ -6809,102 +6536,91 @@ steps take one argument, |key|, and return an ECMAScript value.
 
 <div class=algorithm>
 
-The steps to <dfn>convert a value to a key</dfn> are as follows. These
-steps take two arguments, an ECMAScript value |input|, and an optional
-set |seen|. The result of these steps is a [=/key=] or invalid, or the
+To <dfn>convert a value to a key</dfn> with an ECMAScript value |input|, and an optional
+[=/set=] |seen|, run the following steps.
+The result of these steps is a [=/key=] or invalid, or the
 steps may throw an exception.
 
-1. If |seen| was not given, let |seen| be a new empty set.
+1. If |seen| was not given, then let |seen| be a new empty [=/set=].
 
-1. If |input| is in |seen| return invalid.
+1. If |seen| [=set/contains=] |input|, then return invalid.
 
 1. Jump to the appropriate step below:
 
     <dl class=switch>
 
       <!-- Number -->
-      <dt>If [=/Type=](|input|) is Number</dt>
-      <dd>
-        1. If |input| is NaN then return invalid.
-        1. Otherwise, return a new [=/key=] with
-            [=key/type=] *number* and [=key/value=]
-            |input|.
-
-      </dd>
+      : If [=/Type=](|input|) is Number
+      ::
+          1. If |input| is NaN then return invalid.
+          1. Otherwise, return a new [=/key=] with
+              [=key/type=] *number* and [=key/value=]
+              |input|.
 
       <!-- Date -->
-      <dt>If |input| is a [=Date=] (has a \[[DateValue]] internal slot)</dt>
-      <dd>
-        1. Let |ms| be the value of |input|'s
-            \[[DateValue]] internal slot.
+      : If |input| is a [=Date=] (has a \[[DateValue]] internal slot)
+      ::
+          1. Let |ms| be the value of |input|'s
+              \[[DateValue]] internal slot.
 
-        1. If |ms| is NaN then return invalid.
+          1. If |ms| is NaN then return invalid.
 
-        1. Otherwise, return a new [=/key=] with [=key/type=]
-            *date* and [=key/value=] |ms|.
-
-      </dd>
+          1. Otherwise, return a new [=/key=] with [=key/type=]
+              *date* and [=key/value=] |ms|.
 
       <!-- String -->
-      <dt>If [=/Type=](|input|) is String</dt>
-      <dd>
+      : If [=/Type=](|input|) is String
+      ::
+          1. Return a new [=/key=] with [=key/type=] *string* and
+              [=key/value=] |input|.
 
-        1. Return a new [=/key=] with [=key/type=] *string* and
-            [=key/value=] |input|.
-
-      </dd>
 
       <!-- Binary -->
-      <dt>
-        If |input| is a [=buffer source type=]</dt>
-      <dd>
+      : If |input| is a [=buffer source type=]
+      ::
+          1. Let |bytes| be the result of running
+              <a lt="get a copy of the buffer source">get a copy of the bytes held by the buffer source</a>
+              |input|. Rethrow any exceptions.
 
-        1. Let |octets| be the result of running the steps to
-            <a lt="get a copy of the buffer source">get a copy of the bytes held by the buffer source</a>
-            |input|. Rethrow any exceptions.
-
-        1. Return a new [=/key=] with [=key/type=]
-            *binary* and [=key/value=] |octets|.
-
-      </dd>
+          1. Return a new [=/key=] with [=key/type=]
+              *binary* and [=key/value=] |bytes|.
 
       <!-- Array -->
-      <dt>If [=IsArray=](|input|)</dt>
-      <dd>
+      : If [=IsArray=](|input|)
+      ::
+          1. Let |len| be [=?=] [=ToLength=]( [=?=] [=Get=](|input|,
+              "`length`")).
+          1. [=set/Append=] |input| to |seen|.
+          1. Let |keys| be a new empty list.
+          1. Let |index| be 0.
+          1. While |index| is less than |len|:
 
-        1. Let |len| be [=?=] [=ToLength=]( [=?=] [=Get=](|input|,
-            "`length`")).
-        1. Add |input| to |seen|.
-        1. Let |keys| be a new empty list.
-        1. Let |index| be 0.
-        1. While |index| is less than |len|:
+              1. Let |hop| be [=?=] [=HasOwnProperty=](|input|, |index|).
 
-            1. Let |hop| be [=?=] [=HasOwnProperty=](|input|, |index|).
+              1. If |hop| is false, return invalid.
 
-            1. If |hop| is false, return invalid.
+              1. Let |entry| be [=?=] [=Get=](|input|, |index|).
 
-            1. Let |entry| be [=?=] [=Get=](|input|, |index|).
+              1. Let |key| be the result of running
+                  [=convert a value to a key=] with arguments |entry|
+                  and |seen|.
 
-            1. Let |key| be the result of running the steps to
-                [=convert a value to a key=] with arguments |entry|
-                and |seen|.
+              1. [=ReturnIfAbrupt=](|key|).
 
-            1. [=ReturnIfAbrupt=](|key|).
+              1. If |key| is invalid abort these steps and return
+                  invalid.
 
-            1. If |key| is invalid abort these steps and return
-                invalid.
+              1. [=list/Append=] |key| to |keys|.
 
-            1. Append |key| to |keys|.
+              1. Increase |index| by 1.
 
-            1. Increase |index| by 1.
+          1. Return a new [=array key=] with [=key/value=]
+              |keys|.
 
-        1. Return a new [=array key=] with [=key/value=]
-            |keys|.
 
-      </dd>
+      : Otherwise
+      :: Return invalid.
 
-      <dt>Otherwise</dt>
-      <dd>Return invalid.</dd>
     </dl>
 
 </div>
@@ -6912,8 +6628,7 @@ steps may throw an exception.
 
 <div class=algorithm>
 
-The steps to <dfn>convert a value to a multiEntry key</dfn> are as
-follows. These steps take one argument, an ECMAScript value |input|.
+To <dfn>convert a value to a multiEntry key</dfn> with an ECMAScript value |input|, run the following steps.
 The result of these steps is a [=/key=] or invalid, or the
 steps may throw an exception.
 
@@ -6921,9 +6636,9 @@ steps may throw an exception.
 
     1. Let |len| be [=?=] ToLength( [=?=] [=Get=](|input|, "`length`")).
 
-    1. Let |seen| be a new set containing only |input|.
+    1. Let |seen| be a new [=/set=] containing only |input|.
 
-    1. Let |keys| be a new empty set.
+    1. Let |keys| be a new empty [=/list=].
 
     1. Let |index| be 0.
 
@@ -6933,20 +6648,19 @@ steps may throw an exception.
 
         1. If |entry| is not an [=abrupt completion=], then:
 
-             1. Let |key| be the result of running the steps to
+             1. Let |key| be the result of running
                  [=convert a value to a key=] with arguments
                  |entry| and |seen|.
 
              1. If |key| is not invalid or an [=abrupt completion=],
-                 add |key| to |keys| if there are no other members of
-                 |keys| [=equal to=] |key|.
+                 and there is no [=list/item=] in |keys| [=equal to=] |key|,
+                 then [=list/append=] |key| to |keys|.
 
         1. Increase |index| by 1.
 
-    1. Return a new [=array key=] with [=key/value=] set to
-        a list of the members of |keys|.
+    1. Return a new [=array key=] with [=key/value=] set to |keys|.
 
-1. Otherwise, return the result of running the steps to [=convert a
+1. Otherwise, return the result of running [=convert a
     value to a key=] with argument |input|.
     Rethrow any exceptions.
 
@@ -6983,74 +6697,57 @@ There are a number of techniques that can be used to mitigate the risk
 of user tracking:
 
 
-<dl>
-<dt>Blocking third-party storage</dt>
-<dd>
-User agents may restrict access to the database objects
-to scripts originating at the domain of the top-level document of
-the <span>browsing context</span>, for instance denying access to
-the API for pages from other domains running in `iframe`s.
-</dd>
+: Blocking third-party storage
+::
+    User agents may restrict access to the database objects
+    to scripts originating at the domain of the top-level document of
+    the <span>browsing context</span>, for instance denying access to
+    the API for pages from other domains running in `iframe`s.
 
-<dt>Expiring stored data</dt>
-<dd>
+: Expiring stored data
+::
+    User agents may automatically delete stored data after a period of
+    time.
 
-User agents may automatically delete stored data after a period of
-time.
+    This can restrict the ability of a site to track a user, as the site
+    would then only be able to track the user across multiple sessions
+    when she authenticates with the site itself (e.g. by making a purchase
+    or logging in to a service).
 
-This can restrict the ability of a site to track a user, as the site
-would then only be able to track the user across multiple sessions
-when she authenticates with the site itself (e.g. by making a purchase
-or logging in to a service).
+    However, this also puts the user's data at risk.
 
-However, this also puts the user's data at risk.
-</dd>
+: Treating persistent storage as cookies
+::
+    User agents should present the database feature to the user in a way
+    that associates them strongly with HTTP session cookies. [[COOKIES]]
 
-<dt>Treating persistent storage as cookies</dt>
-<dd>
+    This might encourage users to view such storage with healthy
+    suspicion.
 
-User agents should present the database feature to the user in a way
-that associates them strongly with HTTP session cookies. [[COOKIES]]
+: Site-specific safe-listing of access to databases
+::
+    User agents may require the user to authorize access to databases
+    before a site can use the feature.
 
-This might encourage users to view such storage with healthy
-suspicion.
+: Origin-tracking of stored data
+::
+    User agents may record the [=/origins=] of sites that contained content
+    from third-party origins that caused data to be stored.
 
-</dd>
+    If this information is then used to present the view of data
+    currently in persistent storage, it would allow the user to make
+    informed decisions about which parts of the persistent storage to
+    prune. Combined with a blocklist ("delete this data and prevent
+    this domain from ever storing data again"), the user can restrict
+    the use of persistent storage to sites that she trusts.
 
-<dt>Site-specific safe-listing of access to databases</dt>
-<dd>
+: Shared blocklists
+::
+    User agents may allow users to share their persistent storage
+    domain blocklists.
 
-User agents may require the user to authorize access to databases
-before a site can use the feature.
-
-</dd>
-
-<dt>Origin-tracking of stored data</dt>
-<dd>
-
-User agents may record the [=/origins=] of sites that contained content
-from third-party origins that caused data to be stored.
-
-If this information is then used to present the view of data
-currently in persistent storage, it would allow the user to make
-informed decisions about which parts of the persistent storage to
-prune. Combined with a blocklist ("delete this data and prevent
-this domain from ever storing data again"), the user can restrict
-the use of persistent storage to sites that she trusts.
-
-</dd>
-
-<dt>Shared blocklists</dt>
-<dd>
-
-User agents may allow users to share their persistent storage
-domain blocklists.
-
-This would allow communities to act together to protect their
-privacy.
-
-</dd>
-</dl>
+    This would allow communities to act together to protect their
+    privacy.
 
 While these suggestions prevent trivial use of this API for user
 tracking, they do not block it altogether. Within a single domain, a
@@ -7220,6 +6917,7 @@ for his general authoring advice.
 Special thanks to
 Chris Anderson,
 Jake Archibald,
+Yannic Bonenberger,
 Andreas Butler,
 Pablo Castro,
 Victor Costan,
@@ -7238,10 +6936,12 @@ Philip Jägenstedt,
 Laxminarayan G Kamath A,
 Anne van Kesteren,
 Adam Klein,
+Marijn Kruisselbrink,
 Tobie Langel,
 Kang-Hao Lu,
 Andrea Marchesini,
 Glenn Maynard,
+Isiah Meadows,
 Ms2ger,
 Odin Omdal,
 Danillo Paiva,
@@ -7255,6 +6955,7 @@ Kagami Sascha Rosylight,
 Margo Seltzer,
 Maciej Stachowiak,
 Andrew Sutherland,
+Yaron Tausky,
 Bevis Tseng,
 Ben Turner,
 Kyaw Tun,

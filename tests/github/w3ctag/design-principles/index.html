@@ -1601,22 +1601,31 @@ modify state <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipag
 developers. Instead, they should <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#queue-a-task" id="ref-for-queue-a-task">queue a task</a> to modify author-observable state (such as an
 object property).</p>
    <h3 class="heading settled" data-level="1.3" id="js-gc"><span class="secno">1.3. </span><span class="content">Do not expose garbage collection</span><a class="self-link" href="#js-gc"></a></h3>
-   <p>There must not be a way for author code to deduce when/if garbage collection of JavaScript objects
-has run.</p>
-   <p>The reason for this is somewhat subtle. If garbage collection timing were observable, then authors
-could easily write code relying on specific garbage collection timing. But this timing is almost
-certainly not the same across user agents, which means the resulting code will be
+   <p>Web APIs should not expose a way for author code to deduce when/if garbage collection of JavaScript
+objects has run.</p>
+   <p>Although some APIs may expose garbage collection, such as some implementations of <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#ref-for-concept-getelementsbytagname" id="ref-for-ref-for-concept-getelementsbytagname">getElementsByTagName</a></code>, and the JavaScript <a href="https://github.com/tc39/proposal-weakrefs">WeakRefs proposal</a> (which has multiple
+implementer support), API designers are strongly encouraged to avoid points in their own APIs that
+depend on this timing.</p>
+   <p>The reason for this is somewhat subtle. The more that Web API semantics are affected by garbage
+collection timing (or whether objects are collected at all), the more programs will be affected by
+changes in this timing. But user agents differ significantly in both the timing of garbage
+collection and whether certain objects are collected at all, which means the resulting code will be
 non-interoperable. Worse, according to the usual rules of game theory as applied to browsers, this
 kind of scenario could force other user agents to copy the garbage collection timing of the
 original in order to create interoperability. This would cause current garbage collection
 strategies to ossify, preventing improvement in one of the most dynamic areas of JavaScript
 virtual machine technology.</p>
-   <p>In particular, this means that you can’t expose any API that acts as a weak reference, e.g. with a
-property that becomes <code class="highlight"><c- kc>null</c-></code> once garbage collection runs. Such freeing of memory must
-be entirely deterministic.</p>
-   <div class="note" role="note"> There is some speculative discussion of exposing weak references such that their finalization is
-only observable between event loop turns in this <a href="https://github.com/tc39/proposal-weakrefs">stage 1 proposal under discussion at TC39</a>.
-However, this remains contentious and does not yet have consensus in TC39 or among implementers. </div>
+   <p>In particular, this means that you shouldn’t expose any API that acts as a weak reference, e.g. with a
+property that becomes <code class="highlight"><c- kc>null</c-></code> once garbage collection runs. Such freeing of
+memory should be entirely deterministic.</p>
+   <p>For example, currently, <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#ref-for-concept-getelementsbytagname" id="ref-for-ref-for-concept-getelementsbytagname①">getElementsByTagName</a></code> permits reusing the <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#htmlcollection" id="ref-for-htmlcollection">HTMLCollection</a></code> which it creates, when it’s called with the same receiver and tag name. In practice, engines reuse
+the output if it has not been garbage collected. This creates behavior which differs based on the
+details of garbage collection, which is strongly discouraged. If <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#ref-for-concept-getelementsbytagname" id="ref-for-ref-for-concept-getelementsbytagname②">getElementsByTagName</a></code> were designed today, the advice to the specification authors would be to either reliably reuse
+the output, or to produce a new <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#htmlcollection" id="ref-for-htmlcollection①">HTMLCollection</a></code> each time it’s invoked.</p>
+   <p>The case of <code class="idl"><a data-link-type="idl" href="https://dom.spec.whatwg.org/#ref-for-concept-getelementsbytagname" id="ref-for-ref-for-concept-getelementsbytagname③">getElementsByTagName</a></code> is particularly insidious because nothing about
+the API visibly relates to garbage collection details. By contrast, special APIs for this particular
+purpose such as <code>WeakRef</code> and <code>FinalizationGroup</code> have their GC interaction as a specific part of
+their contract with the developer.</p>
    <h2 class="heading settled" data-level="2" id="api-surface"><span class="secno">2. </span><span class="content">API Surface Concerns</span><a class="self-link" href="#api-surface"></a></h2>
    <h3 class="heading settled" data-level="2.1" id="naming-is-hard"><span class="secno">2.1. </span><span class="content">Naming things</span><a class="self-link" href="#naming-is-hard"></a></h3>
    <p>Naming is hard! We would all like a silver-bullet for naming APIs...</p>
@@ -1636,6 +1645,10 @@ and by name association.</p>
 their argument <em>should not</em> be prefixed with <code>is</code>, while methods
 that serve the same purpose, given that it has no side effects, <em>should</em> be
 prefixed with <code>is</code> to be consistent with the rest of the platform.</p>
+   <p>The name should not be directly associated with a brand or specific revision of
+the underlying technology whenever possible; technology becomes obsolete, but
+since removing APIs from the web is difficult, naming should be generic and
+future-proof whenever possible.</p>
    <h3 class="heading settled" data-level="2.2" id="feature-detect"><span class="secno">2.2. </span><span class="content">New features should be detectable</span><a class="self-link" href="#feature-detect"></a></h3>
    <p>The existence of new features should generally be detectable,
 so that web content can act appropriately whether the feature is present or not.
@@ -2621,6 +2634,12 @@ so that readers can quickly decide whether they need to read the steps in detail
     <li><a href="#ref-for-eventtarget③">3.8. How to decide between Events and Observers</a> <a href="#ref-for-eventtarget④">(2)</a> <a href="#ref-for-eventtarget⑤">(3)</a> <a href="#ref-for-eventtarget⑥">(4)</a> <a href="#ref-for-eventtarget⑦">(5)</a> <a href="#ref-for-eventtarget⑧">(6)</a> <a href="#ref-for-eventtarget⑨">(7)</a> <a href="#ref-for-eventtarget①⓪">(8)</a> <a href="#ref-for-eventtarget①①">(9)</a>
    </ul>
   </aside>
+  <aside class="dfn-panel" data-for="term-for-htmlcollection">
+   <a href="https://dom.spec.whatwg.org/#htmlcollection">https://dom.spec.whatwg.org/#htmlcollection</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-htmlcollection">1.3. Do not expose garbage collection</a> <a href="#ref-for-htmlcollection①">(2)</a>
+   </ul>
+  </aside>
   <aside class="dfn-panel" data-for="term-for-mutationobserver">
    <a href="https://dom.spec.whatwg.org/#mutationobserver">https://dom.spec.whatwg.org/#mutationobserver</a><b>Referenced in:</b>
    <ul>
@@ -2920,6 +2939,7 @@ so that readers can quickly decide whether they need to read the steps in detail
      <li><span class="dfn-paneled" id="term-for-element" style="color:initial">Element</span>
      <li><span class="dfn-paneled" id="term-for-event" style="color:initial">Event</span>
      <li><span class="dfn-paneled" id="term-for-eventtarget" style="color:initial">EventTarget</span>
+     <li><span class="dfn-paneled" id="term-for-htmlcollection" style="color:initial">HTMLCollection</span>
      <li><span class="dfn-paneled" id="term-for-mutationobserver" style="color:initial">MutationObserver</span>
      <li><span class="dfn-paneled" id="term-for-dictdef-mutationobserverinit" style="color:initial">MutationObserverInit</span>
      <li><span class="dfn-paneled" id="term-for-mutationrecord" style="color:initial">MutationRecord</span>

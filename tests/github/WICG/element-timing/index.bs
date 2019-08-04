@@ -9,7 +9,7 @@ Editor: Nicolás Peña Moreno, Google https://google.com, npm@chromium.org
 URL: https://wicg.github.io/element-timing
 Repository: https://github.com/WICG/element-timing
 Test Suite: https://github.com/web-platform-tests/wpt/tree/master/element-timing
-Abstract: This document defines an API that enables monitoring when large or developer-specified image elements are displayed on screen.
+Abstract: This document defines an API that enables monitoring when large or developer-specified image elements and text nodes are displayed on screen.
 Default Highlight: js
 </pre>
 
@@ -23,9 +23,13 @@ urlPrefix: https://w3c.github.io/performance-timeline/; spec: PERFORMANCE-TIMELI
         text: duration; url: #dom-performanceentry-duration;
     type: dfn; url: #dfn-register-a-performance-entry-type; text: register a performance entry type;
     type: dfn; url: #dfn-queue-a-performanceentry; text: queue the PerformanceEntry;
+    type: interface; url: #the-performanceobserver-interface; text: PerformanceObserver;
+    type: attribute; for: PerformanceObserver;
+        text: supportedEntryTypes; url: #supportedentrytypes-attribute;
 urlPrefix: https://dom.spec.whatwg.org/; spec: DOM;
     type: attribute; for: Element;
-        text: id; url: #dom-element-id;
+        text: element id; url: #dom-element-id;
+    type: dfn; url: #connected; text: connected;
 urlPrefix: https://w3c.github.io/IntersectionObserver; spec: INTERSECTION-OBSERVER;
     type: interface; url: #intersectionobserver; text: IntersectionObserver;
     type: dfn; url: #calculate-intersection-rect-algo; text: intersection rect algorithm;
@@ -33,17 +37,27 @@ urlPrefix: https://w3c.github.io/paint-timing/; spec: PAINT-TIMING;
     type: dfn; url: #first-paint; text: first paint;
 urlPrefix: https://html.spec.whatwg.org/multipage; spec: HTML;
     type: dfn; url: #image-request; text: image request;
-    type: dfn; url: images.html/#img-all; text: completely available;
-    type: dfn; url: urls-and-fetching.html#resolve-a-url; text: resolved url;
+    type: dfn; url: /images.html#img-all; text: completely available;
+    type: dfn; url: /urls-and-fetching.html#resolve-a-url; text: resolved url;
+    type: dfn; url: images.html#list-of-available-images; text: list of available images;
+    type: attribute; for: img;
+        text:naturalWidth; url: #dom-img-naturalwidth;
+        text:naturalHeight; url: #dom-img-naturalheight;
 urlPrefix: https://w3c.github.io/resource-timing; spec: RESOURCE-TIMING;
     type: dfn; url: #dfn-timing-allow-check; text: timing allow check;
-    type: attribute; for: PerformanceResourceTiming;
-        text: responseEnd; url: ##dom-performanceresourcetiming-responseend;
+    type: interface; url: #sec-performanceresourcetiming; text: PerformanceResourceTiming;
 urlPrefix: https://w3c.github.io/hr-time; spec: HR-TIME;
     type: dfn; url: #dfn-current-high-resolution-time; text: current high resolution time;
     type: interface; url: #dom-domhighrestimestamp; text: DOMHighResTimeStamp;
 urlPrefix: https://drafts.csswg.org/css-backgrounds-3; spec: CSS-BACKGROUNDS-3;
     type: dfn; url: #propdef-background-image; text: background-image;
+urlPrefix: https://fetch.spec.whatwg.org; spec: FETCH;
+    type: dfn; url: #concept-request; text: fetch request;
+    type: dfn; url: #concept-request-url; text: request URL;
+urlPrefix: https://drafts.csswg.org/css2/zindex.html; spec: CSS;
+    type: dfn; url:#painting-order; text: painting order;
+urlPrefix: https://wicg.github.io/largest-contentful-paint/; spec: LARGEST-CONTENTFUL-PAINT;
+    type: dfn; url:#potentially-add-a-largestcontentfulpaint-entry; text: potentially add a LargestContentfulPaint entry;
 </pre>
 
 Introduction {#sec-intro}
@@ -61,8 +75,7 @@ Existing approaches would require either registering observers too early or sign
 These approaches are discussed on the [[#sec-security]] section.
 
 Web developers are the experts in critical user interactions for their sites, so they should be allowed to tell the user agent which are the elements they care about.
-Nonetheless, providing some information by default has some value. For example, for analytics providers to provide some information out of the box.
-Thus, this API exposes two ways to determine which are the critical elements of a web page: allowing web-developer-annotated elements and exposing elements that are large.
+Thus, this API exposes rendering timing information about web-developer-annotated elements.
 
 Elements exposed {#sec-elements-exposed}
 ------------------------
@@ -71,33 +84,33 @@ The Element Timing API supports timing information about the following elements:
 * <{img}> elements.
 * <{image}> elements inside an <{svg}>.
 * Elements with a <a>background-image</a>.
+* Groups of text nodes, which are aggregated as described in [[#sec-modifications-CSS]].
 
-Future versions of this API will support measuring timing information about other types of elements.
+Elements that have a "<code>elementtiming</code>" content attribute are reported in the <a>report image element timing</a> and the <a>report text element timing</a> algorithms.
 
-The following subset of elements are measured:
-* Elements that are annotated using the "elementtiming" attribute.
-* Elements that occupy a more than 15% of the viewport when they are displayed on the screen.
-
-Usage Example {#sec-example}
+Usage example {#sec-example}
 ------------------------
 
 The following example shows an image that is registered for observation via its attribute, and an observer gathering the timing information.
 
 <xmp class="example highlight" highlight=html>
-    <img... elementtiming="foobar"/>
+    <img... elementtiming='foobar'/>
+    <p elementtiming='important-paragraph'>This is text I care about.</p>
     ...
     <script>
     const observer = new PerformanceObserver((list) => {
       let perfEntries = list.getEntries();
       // Process the entries by iterating over them.
     });
-    observer.observe({entryTypes: ['element']});
+    observer.observe({type: 'element', buffered: true});
     </script>
 </xmp>
 
 The following are sample elements whose rendering timestamps could be measured by using this API and which should be compared to page navigation:
 * The images in the image carousel of a shopping site.
 * The main photo in a story of a news site.
+* The title of a blog post.
+* The first paragraph in an entry of an encyclopedia site.
 
 The API could have use cases outside of page load by comparing the rendering timestamps with input timestamps.
 For example, developers could monitor the time it takes for a widget to show up after a click that triggers it.
@@ -112,19 +125,66 @@ Element Timing involves the following new interfaces:
 
 <pre class="idl">
 interface PerformanceElementTiming : PerformanceEntry {
+    readonly attribute DOMHighResTimeStamp renderTime;
+    readonly attribute DOMHighResTimeStamp loadTime;
     readonly attribute DOMRectReadOnly intersectionRect;
-    readonly attribute DOMHighResTimeStamp responseEnd;
     readonly attribute DOMString identifier;
+    readonly attribute unsigned long naturalWidth;
+    readonly attribute unsigned long naturalHeight;
+    readonly attribute DOMString id;
+    readonly attribute Element? element;
+    readonly attribute DOMString url;
 };
 </pre>
 
-Each {{PerformanceElementTiming}} object reports timing information about one associated {{Element}}.
-The values of the attributes of {{PerformanceElementTiming}} are set in the processing model in [[#sec-report-element]].
+A {{PerformanceElementTiming}} object reports timing information about one associated image.
+
+Each {{PerformanceElementTiming}} object has these associated concepts, all of which are initially set to <code>null</code>:
+* A <dfn>request</dfn> containing the image request (if the entry is for image content).
+* An <dfn>element</dfn> containing the associated {{Element}}.
+
+The associated concepts and some attributes for {{PerformanceElementTiming}} are specified in the processing model in [[#sec-report-image-element]] and [[#sec-report-text]].
+
+The {{PerformanceEntry/entryType}} attribute's getter must return the {{DOMString}} <code>"element"</code>.
+
+The {{PerformanceEntry/name}} attribute's getter must return the value it was initialized to.
+
+The {{PerformanceEntry/startTime}} attribute's getter must return the value of the <a>context object</a>'s {{renderTime}} if it is not 0, and the value of the <a>context object</a>'s {{loadTime}} otherwise.
+
+The {{PerformanceEntry/duration}} attribute's getter must return 0.
+
+The {{PerformanceElementTiming/renderTime}} attribute must return the value it was initialized to.
+
+The {{PerformanceElementTiming/loadTime}} attribute's getter must return the the value it was initialized to.
+
+The {{PerformanceElementTiming/intersectionRect}} attribute must return the value it was initialized to.
+
+The {{PerformanceElementTiming/identifier}} attribute's getter must return the value it was initialized to.
+
+The {{PerformanceElementTiming/naturalWidth}} attribute must return the value it was initialized to.
+
+The {{PerformanceElementTiming/naturalHeight}} attribute must return the value it was initialized to.
+
+The {{PerformanceElementTiming/id}} attribute's getter must return the value it was initialized to.
+
+The {{PerformanceElementTiming/element}} attribute's getter must run the [=get an element=] algorithm with <a>context object</a>'s <a>element</a> and null as inputs.
+
+Note: This means that an element that is no longer <a>descendant</a> of the {{Document}} will no longer be returned by {{PerformanceElementTiming/element}}'s attribute getter.
+
+The {{PerformanceElementTiming/url}} attribute's getter must perform the following steps:
+<div algorithm="PerformanceElementTiming url">
+    1. Let <var>url</var> be <a>request</a>'s <a>resolved URL</a>
+    1. If <var>url</var>'s <a spec=url>scheme</a> is "data:", trim <var>url</var> to its first 100 characters.
+    1. Return <var>url</var>.
+</div>
+
+Note: The URL is trimmed for data URLs to avoid excessive memory in the entry.
 
 Processing model {#sec-processing-model}
 ========================================
 
-A user agent implementing the Element Timing API must run the <a>register a performance entry type</a> algorithm  with <code>"element"</code> as input.
+Note: A user agent implementing the Element Timing API would need to include <code>"element"</code> in {{PerformanceObserver/supportedEntryTypes}} for {{Window}} contexts.
+This allows developers to detect support for element timing.
 
 Modifications to the DOM specification {#sec-modifications-DOM}
 --------------------------------------------------------
@@ -135,26 +195,48 @@ We extend the {{Element}} interface as follows:
 
 <pre class="idl">
 partial interface Element {
-    readonly attribute DOMString elementtiming;
+    [CEReactions] attribute DOMString elementTiming;
 };
 </pre>
 
-The {{Element/elementtiming}} attribute, when set to a {{DOMString}} of non-zero length, will indicate that the image must be registered for observation.
-Its value is read by the <a>report element timing</a> algorithm.
+The {{Element/elementTiming}} attribute must <a>reflect</a> the "<code>elementtiming</code>" content attribute.
 
-Every image resource that is fetched from a URL has an <a>image request</a>. The request has an <dfn>associated element</dfn>, the {{Element}} causing this image resource.
+Every {{Element}} has an <dfn>associated image request</dfn> which is initially null.
+When either of {{HTMLImageElement}}, {{SVGImageElement}}, or {{HTMLVideoElement}} require a new image resource (to be displayed as an image or poster image), its <a>associated image request</a> is set to a new <a>image request</a> caused by the new resource.
 
-NOTE: we assume that there is one <a>image request</a> for each {{Element}} that a <a>background-image</a> property affects and for each URL that the <a>background-image</a> property specifies. So, for example, if there is a style with two URLs affecting all <{div}>s, and there are two <{div}>s, then there will be four <a>image requests</a>. This means that a single <a>background-image</a> property could produce multiple {{PerformanceElementTiming}} entries because it can affect multiple elements and because it can specify multiple URLs.
+Note: Every image resource that is obtained from a URL whose <a spec=url>scheme</a> is equal to "data" has an associated <a>image request</a> which is not fetched but still needs to be loaded.
+This request can be the <a>associated image request</a> of an {{Element}}.
 
-Each {{Document}} has <dfn>imagesPendingRendering</dfn>, a list of <a>image requests</a> which are considered loaded and decoded but not yet rendered.
-When an <a>image request</a> has become <a>completely available</a> and decoded, run the following steps:
+Note: The current language is vague since it does not point to specific algorithms.
+This can be made more rigorous when the corresponding processing models have a more unified processing model.
+For instance, the only {{HTMLImageElement}} uses the [=list of available images=].
 
-<div algorithm="image element loaded">
-    1. Let |image request| be the input <a>image request</a>.
-    1. If |image request|'s <a>associated element</a> is not <{img}>, <{image}>, or <a>background-image</a>, abort these steps.
-    1. If the <a>timing allow check</a> passes for |image request|'s resource, then add |image request| to <a>imagesPendingRendering</a>.
-    1. Otherwise, run the <a>report element timing</a> algorithm, passing in |image request| and 0.
+Each {{Document}} has <dfn>images pending rendering</dfn>, a list of triples ({{Element}}, <a>image request</a>, DOMHighResTimeStamp) which are considered loaded but not yet rendered.
+When an {{Element}}'s <a>associated image request</a> has become <a>completely available</a>, run the algorithm to <a>process an image that finished loading</a> passing in the {{Element}} and its <a>associated image request</a> as inputs.
+
+Each {{Document}} also has a <dfn>set of elements with rendered text</dfn>, which is initially an empty <a>ordered set</a>.
+
+Each {{Element}} has a <dfn>set of owned text nodes</dfn>, which is initially an empty <a>ordered set</a>.
+
+Modifications to the CSS specification {#sec-modifications-CSS}
+--------------------------------------------------------
+
+When the user agent is executing the <a>painting order</a>, it must populate the <a>set of owned text nodes</a> of the painted {{Element|Elements}} so that the following is true:
+
+<div algorithm="text aggregation">
+    * If a {{Text}} object |text| will not be painted due to the font face being in its <a>font block period</a>, then it is not <a for="set">appended</a> to the <a>set of owned text nodes</a> of any {{Element}}.
+    * Otherwise, |text| is <a for="set">appended</a> to the <a>set of owned text nodes</a> of the {{Element}} which determines the <a>containing block</a> of |text|.
 </div>
+
+NOTE: A user agent might want to use a stack to efficiently compute the <a>set of owned text nodes</a> while implementing the <a>painting order</a>.
+
+Every {{Element}} has a list of <dfn>associated background image requests</dfn> which is initially an empty array.
+When the {{Element}}'s style requires a new image resource (to be displayed as background image), a new <a>image request</a> caused by the new resource is appended to the {{Element}}'s <a>associated background image requests</a>.
+Whenever an <a>image request</a> in an {{Element}}'s <a>associated background image requests</a> has become <a>completely available</a>, run the algorithm to <a>process an image that finished loading</a> with the {{Element}} and <a>image request</a> as inputs.
+
+NOTE: we assume that there is one <a>image request</a> for each {{Element}} that a <a>background-image</a> property affects and for each URL that the <a>background-image</a> property specifies.
+So, for example, if there is a style with two URLs affecting all <{div}>s, and there are two <{div}>s, then there will be four <a>image requests</a>.
+This means that a single <a>background-image</a> property could produce multiple {{PerformanceElementTiming}} entries because it can affect multiple elements and because it can specify multiple URLs.
 
 Modifications to the HTML specification {#sec-modifications-HTML}
 --------------------------------------------------------
@@ -165,52 +247,111 @@ In the <a>update the rendering</a> step of the <a>event loop processing model</a
 
 1. For each <a>fully active</a> {{Document}} in <em>docs</em>, run the <a>element timing processing</a> algorithm passing in the {{Document}} and <em>now</em>.
 
-Report Element Timing {#sec-report-element}
+Process image that finished loading {#sec-process-loaded-image}
 --------------------------------------------------------
 
-<div algorithm="report element timing">
-    When asked to <dfn>report element timing</dfn> given an |image request| and a timestamp |renderTime|, perform the following steps:
+<div algorithm="image element loaded">
+To <dfn>process an image that finished loading</dfn> given |element| and |imageRequest| as inputs:
+    1. Let |element| be the input {{Element}}.
+    1. Let |imageRequest| be |element|'s <a>associated image request</a>.
+    1. Let |root| be |element|'s <a for="tree">root</a>.
+    1. If |root| is not a {{Document}}, return.
+    1. Let |now| be the <a>current high resolution time</a>.
+    1. If |imageRequest| is not a data URL [[RFC2397]] and if the <a>timing allow check</a> fails for |imageRequest|'s resource, run the <a>report image element timing</a> algorithm, passing in the triple (|element|, |imageRequest|, |now|), 0, and |root| as inputs.
+    1. Otherwise, add the triple (|element|, |imageRequest|, |now|) to |root|'s <a>images pending rendering</a>.
+</div>
 
-    1. Let |image| be |image request|'s <a>associated element</a>.
-    1. Let |intersectionRect| be the value returned by the <a>intersection rect algorithm</a> using |image| as the target and viewport as the root.
-    1. If the |image|'s {{Element/elementtiming}} attribute getter returns a {{DOMString}} of zero length and if |intersectionRect|'s size is smaller than 15% of the viewport size, then abort these steps.
+Report image Element Timing {#sec-report-image-element}
+--------------------------------------------------------
+
+<div algorithm="report image element timing">
+    When asked to <dfn>report image element timing</dfn> given a triple (|element|, |imageRequest|, |loadTime|), a DOMHighResTimestamp |renderTime| and a {{Document}} |document|, perform the following steps:
+
+    1. Let |intersectionRect| be the value returned by the <a>intersection rect algorithm</a> using |element| as the target and viewport as the root.
+    1. Let |exposedElement| be the result of running [=get an element=] with |element| and |document| as input.
+    1. If |exposedElement| is not null, call the <a>potentially add a LargestContentfulPaint entry</a> algorithm with |intersectionRect|, |imageRequest|, |renderTime|, |loadTime|, |element|, and |document|.
+    1. If |element|'s "<code>elementtiming</code>" content attribute is absent or if its value is the empty string, then abort these steps.
     1. Create a {{PerformanceElementTiming}} object |entry|.
-    1. Set |entry|'s {{PerformanceEntry/entryType}} to the {{DOMString}} <code>"element"</code>.
-    1. Set |entry|'s {{PerformanceEntry/name}} to |image request|'s resource <a>resolved URL</a>.
-    1. Set |entry|'s {{PerformanceEntry/startTime}} to |renderTime|.
-    1. Set |entry|'s {{PerformanceEntry/duration}} to 0.
-    1. Set |entry|'s {{intersectionRect}} to the value returned by the <a>intersection rect algorithm</a> using |image| as the target and viewport as the root.
-    1. Set |entry|'s {{responseEnd}} to |image request|'s resource {{PerformanceResourceTiming/responseEnd}}.
-    1. Set |entry|'s {{identifier}} to |image|'s {{elementtiming}} attribute value.
+    1. Set |entry|'s <a>request</a> to |imageRequest|.
+    1. Set |entry|'s <a>element</a> to |element|.
+    1. Set |entry|'s {{PerformanceEntry/name}} to the {{DOMString}} "image-paint".
+    1. Set |entry|'s {{renderTime}} to |renderTime|.
+    1. Set |entry|'s {{loadTime}} to |loadTime|.
+    1. Set |entry|'s {{intersectionRect}} to |intersectionRect|.
+    1. Set |entry|'s {{identifier}} to |element|'s "<code>elementtiming</code>" content attribute.
+    1. Set |entry|'s {{PerformanceElementTiming/naturalWidth}} and {{PerformanceElementTiming/naturalHeight}} by running the same steps for an <{img}>'s {{img/naturalWidth}} and {{img/naturalHeight}} attribute getters, but using |imageRequest| as the image.
+    1. Set |entry|'s {{id}} to |element|'s "<code>id</code>" content attribute.
     1. <a>Queue the PerformanceEntry</a> |entry|.
 </div>
 
-Element Timing Processing {#sec-element-processing}
+Report text Element Timing {#sec-report-text}
+--------------------------------------------------------
+
+<div algorithm="report text element timing">
+    When asked to <dfn>report text element timing</dfn> given an {{Element}} |element|, a DOMHighResTimestamp |renderTime| and a {{Document}} |document|, perform the following steps:
+
+    1. Let |intersectionRect| be an empty rectangle.
+    1. For each {{Text}} <a>node</a> |text| in |element|'s <a>set of owned text nodes</a>:
+        1. Augment |intersectionRect| to be smallest rectangle containing the border box of |text| and |intersectionRect|.
+    1. Intersect |intersectionRect| with the visual viewport.
+    1. Let |exposedElement| be the result of running [=get an element=] with |element| and |document| as input.
+    1. If |exposedElement| is not null, call the <a>potentially add a LargestContentfulPaint entry</a> algorithm with |intersectionRect|, null, |renderTime|, 0, |exposedElement|, and |document|.
+    1. If |element|'s "<code>elementtiming</code>" content attribute is absent or if its value is the empty string, then abort these steps.
+    1. Create a {{PerformanceElementTiming}} object |entry|.
+    1. Set |entry|'s <a>element</a> to |element|.
+    1. Set |entry|'s {{PerformanceEntry/name}} to the {{DOMString}} "text-paint".
+    1. Set |entry|'s {{renderTime}} to |renderTime|.
+    1. Set |entry|'s {{loadTime}} to 0.
+    1. Set |entry|'s {{intersectionRect}} to |intersectionRect|.
+    1. Set |entry|'s {{identifier}} to |element|'s "<code>elementtiming</code>" content attribute.
+    1. Set |entry|'s {{PerformanceElementTiming/naturalWidth}} and {{PerformanceElementTiming/naturalHeight}} to 0.
+    1. Set |entry|'s {{id}} to |element|'s "<code>id</code>" content attribute.
+    1. <a>Queue the PerformanceEntry</a> |entry|.
+</div>
+
+Element Timing processing {#sec-element-processing}
 --------------------------------------------------------
 
 <div algorithm="process element timing">
     The <dfn>element timing processing</dfn> algorithm receives a {{Document}} |doc| and a timestamp |now| and performs the following steps:
 
-    1. For each |image request| in |doc|'s <a>imagesPendingRendering</a> list:
-        1. Run the <a>report element timing</a> algorithm passing in |image request| and |now|.
-    1. Clear |doc|'s <a>imagesPendingRendering</a> list.
+    1. For each |imagePendingRenderingTriple| in |doc|'s <a>images pending rendering</a> list:
+        1. Run the <a>report image element timing</a> algorithm passing in |imagePendingRenderingTriple|, |now|, and |doc|.
+    1. Clear |doc|'s <a>images pending rendering</a> list.
+    1. For each {{Element}} |element| in |doc|'s <a>descendants</a>:
+        1. If |element| is contained in |doc|'s <a>set of elements with rendered text</a>, continue.
+        1. If |element|'s <a>set of owned text nodes</a> is empty, continue.
+        1. <a for="set">Append</a> |element| to |doc|'s <a>set of elements with rendered text</a>.
+        1. Run the <a>report text element timing</a> given |element|, |now|, and |doc|.
+</div>
+
+Get an element algorithm {#sec-get-an-element}
+---------------------------------
+
+<div algorithm="PerformanceElementTiming element">
+When asked to run the <dfn>get an element</dfn> algorithm with {{Element}} |element| and {{Document}} |document| as inputs, run these steps:
+    1. If |element| is not <a>connected</a>, return <code>null</code>.
+    1. Let |settings| be the <a>context object</a>'s <a>relevant settings object</a>.
+    1. if |document| is null, let |document| be |settings|'s <a>responsible document</a>.
+    1. If |element|'s <a for="tree">root</a> is not equal to |document| or if |document| is not [=fully active=], return <code>null</code>.
+    1. Return |element|.
 </div>
 
 Security & privacy considerations {#sec-security}
 ===============================================
 
 This API exposes some information about cross-origin images.
-In particular, images that do not pass the <a>timing allow check</a> still have their resource response end time exposed, which could be a source of privacy concerns.
+In particular, images that do not pass the <a>timing allow check</a> still have their resource load time exposed, which could be a source of privacy concerns.
 
-However, this is considered to not add new attacks to the web platform because the ResourceTiming API exposes this already.
-In addition, the onload handler exposes load timing when it is available, and the response end time is a close proxy to this.
+However, this is considered to not add new attacks to the web platform because the ResourceTiming API exposes a similar timestamp already.
+In addition, the onload handler exposes load timing when it is available, and the resource load time is a close proxy to this.
 The <a>current high resolution time</a> computed at the beginning of the onload handler would provide the image load time.
-We choose to expose the {{responseEnd}} because it is very easy to obtain even without an onload handler.
+We choose to expose the {{loadTime}} because it is very easy to obtain even without an onload handler.
 In addition, we believe any fix to remove the leak provided by image onload handlers or ResourceTiming could also fix the leak provided by this API.
 
-The {{PerformanceEntry/startTime}} (display timestamp) can also be polyfilled via the PaintTiming API.
-To do this, add an iframe that contains trivial content on the onload handler of the target image.
-Then, query the first paint of that iframe to obtain the rendering timestamp of the image element.
+The {{renderTime}} (display timestamp) can also be polyfilled via the PaintTiming API.
+To do this, add an iframe that contains trivial content on the onload handler of the target image or text content.
+Then, query the first paint of that iframe to obtain the rendering timestamp of the content.
 This is quite inefficient and the polyfill itself might affect the timing obtained.
 Due to the difficulty in obtaining this information today, we choose not to expose the display timestamp for images that fail the <a>timing allow check</a>.
 For clarity, here is a code snippet using the PaintTiming API:
@@ -238,9 +379,16 @@ For clarity, here is a code snippet using the PaintTiming API:
 
 The other nontrivial parameter being exposed here is the {{intersectionRect}}.
 This can already be polyfilled, for example using {{IntersectionObserver}}.
-The polyfill process would be similar: add an {{IntersectionObserver}} on the onload handler of the target image.
-This solution is inefficient because it requires registering the observer once the image has loaded, but it should still provide the same level of accuracy.
-We compute the {{intersectionRect}} once the image has loaded if it does not pass the <a>timing allow check</a>.
+The polyfill process would be similar: add an {{IntersectionObserver}} on the onload handler of the target image or text content.
+This solution is inefficient because it requires registering the observer once the content has loaded, but it should still provide the same level of accuracy.
+For images, we compute the {{intersectionRect}} once the image has loaded if it does not pass the <a>timing allow check</a>.
 Computing it at this point in time allows exposing the entry at that time.
 If we were to compute the rect only until the image is fully displayed, we'd only be able to expose the entry after that time.
+
+If we do not want to expose the rendering timetamp of an image, it's preferable to dispatch the entry to the {{PerformanceObserver}} right away.
+Suppose we waited and exposed all the entries during the <a>element timing processing</a> algorithm.
+An attacker could infer nontrivial information about the rendering timestamp of an image.
+It would do so by only observing the timing for that image.
+Even though the timestamp is not exposed as a member of the {{PerformanceElementTiming}} entry received,
+the fact that we wait until the next <a>update the rendering</a> step means that the attacker can distinguish between a very slow rendering time and a very fast rendering time by measuring the time at which it received the entry.
 This would unintentionally leak some of the display timing of the image.

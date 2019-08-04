@@ -1,0 +1,772 @@
+<pre class='metadata'>
+Title: Deprecating <code>volatile</code>
+Shortname: P1152
+Revision: 4
+Audience: CWG
+Status: P
+Group: WG21
+URL: http://wg21.link/P1152R4
+!Source: <a href="https://github.com/jfbastien/papers/blob/master/source/P1152R4.bs">github.com/jfbastien/papers/blob/master/source/P1152R4.bs</a>
+Editor: JF Bastien, Apple, jfbastien@apple.com
+No abstract: true
+Date: 2019-07-19
+Markup Shorthands: markdown yes
+</pre>
+
+<style>
+th { vertical-align: middle; }
+</style>
+
+Abstract {#abstract}
+========
+
+We propose deprecating most of `volatile`. See [[#word]] for the details.
+
+The proposed deprecation preserves the useful parts of `volatile`, and removes
+the dubious / already broken ones. This paper aims at breaking at compile-time
+code which is today subtly broken at runtime or through a compiler update. The
+paper might also break another type of code: that which doesn't exist. This
+removes a significant foot-gun and removes unintuitive corner cases from the
+languages.
+
+The first version of this paper, [[P1152R0]], has extensive background
+information which is not repeated here:
+
+  * <a href="wg21.link/P1152R0#over">Overview</a>
+  * <a href="wg21.link/P1152R0#where">How we got here</a>
+  * <a href="wg21.link/P1152R0#why">Why the proposed changes?</a>
+  * <a href="wg21.link/P1152R0#examples">Examples</a>
+
+See [[P1382R0]] for the follow-up paper on `volatile_load<T>` /
+`volatile_store<T>` requested by SG1.
+
+In Cologne, CWG was able to review this paper but LWG was not. The library parts
+of this paper have therefore moved to [[P1831R0]] so that the language changes
+can make C++20, and the library changes can be added to C++20 later.
+
+
+Edit History {#edit}
+============
+
+r3 → r4 {#r3r4}
+-------
+
+Edit wording of the following sections as suggested by Jens Maurer:
+[**expr.post.incr**], [**expr.pre.incr**], [**expr.ass**], [**dcl.fct**],
+[**over.load**], [**over.built**].
+
+Drop one word from [**tuple**] as suggested by Arthur O'Dwyer.
+
+Add [**dcl.struct.bind**].
+
+Add Annex D.
+
+Move library parts to [[P1831R0]].
+
+
+r2 → r3 {#r2r3}
+-------
+
+[[P1152R2]] was reviewed offline by Alisdair Meredith.
+
+  * `is_volatile<T>` should have been `is_volatile_v<T>`.
+  * Use *Mandates* instead of *Constraints* to allow marking a function as deleted or employing a `static_assert` instead of using `enable_if` or `requires`. This likely provides better error messages.
+  * "`is_volatile_v<T>` is `false`" was erroneously used instead of testing whether the `this` pointer itself was `volatile`. Wording of the *Mandates* clause was updated to only apply to the `volatile` overloads of methods instead.
+
+
+r1 → r2 {#r1r2}
+-------
+
+[[P1152R1]] was seen by SG1 and EWG in Kona. This update does the following:
+
+  * Also edit sections [**expr.post.incr**], [**expr.pre.incr**], [**expr.ass**], which are redundant with other sections already modified by this paper.
+  * Change *Remarks* to *Constraints* per [[P1369R0]].
+  * Change language wording to explicitly call out deprecation.
+
+<table>
+    <thead>
+        <tr>
+            <th>Poll</th>
+            <th>Group</th>
+            <th>SF</th>
+            <th>F</th>
+            <th>N</th>
+            <th>A</th>
+            <th>SA</th>
+            <th>Outcome</th>
+        </tr>
+    </thead>
+    <tr>
+        <th>Forward this paper—with edits as discussed—to EWG for C++20.</th>
+        <th>SG1</th><th>3</th><th>12</th><th>1</th><th>1</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>Proposal as presented for C++20.</th>
+        <th>EWG</th><th>6</th><th>27</th><th>1</th><th>0</th><th>0</th><th>✅</th>
+    </tr>
+</table>
+
+r0 → r1 {#r0r1}
+-------
+
+[[P1152R0]] was seen by SG1 and EWG in San Diego. This update does the
+following:
+
+  * Remove background information from the paper.
+  * Follow the guidance from SG1 and EWG, based on the polls below.
+
+<table>
+    <thead>
+        <tr>
+            <th>Poll</th>
+            <th>Group</th>
+            <th>SF</th>
+            <th>F</th>
+            <th>N</th>
+            <th>A</th>
+            <th>SA</th>
+            <th>Outcome</th>
+        </tr>
+    </thead>
+    <tr>
+        <th>Deprecate `volatile` compound operations (including `++` and `--`) on scalar types (arithmetic, pointer, enumeration).</th>
+        <th>SG1</th><th>4</th><th>19</th><th>3</th><th>0</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>Deprecate `volatile` compound operations (including `++` and `--`) on scalar types (arithmetic, pointer, enumeration).</th>
+        <th>EWG</th><th>4</th><th>9</th><th>4</th><th>0</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>Deprecate usage of `volatile` assignment chaining on scalar types (arithmetic, pointer, enumeration, pointer to members, `nullptr_t`).</th>
+        <th>SG1</th><th>6</th><th>15</th><th>3</th><th>0</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>Deprecate usage of `volatile` assignment chaining on scalar types (arithmetic, pointer, enumeration, pointer to members, `nullptr_t`).</th>
+        <th>EWG</th><th>6</th><th>9</th><th>3</th><th>0</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>SG1 would be OK if we deprecated `volatile`-qualified member functions (pending separate decision on what we do with `volatile` atomic).</th>
+        <th>SG1</th><th>1</th><th>5</th><th>10</th><th>4</th><th>3</th><th>❌</th>
+    </tr>
+    <tr>
+        <th>EWG would be OK if we deprecated `volatile`-qualified member functions (pending separate decision on what we do with `volatile` atomic).</th>
+        <th>EWG</th><th>2</th><th>7</th><th>7</th><th>1</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>SG1 would be OK if we deprecated `volatile` partial template specializations, overloads, or qualified member functions in the STL for all but the atomic, `numeric_limits`, and type traits (`remove_volatile`, `add_volatile`, etc) parts of the Library.</th>
+        <th>SG1</th><th>1</th><th>9</th><th>6</th><th>2</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>EWG would be OK if we deprecated `volatile` partial template specializations, overloads, or qualified member functions in the STL for all but the atomic, `numeric_limits`, and type traits (`remove_volatile`, `add_volatile`, etc) parts of the Library.</th>
+        <th>EWG</th><th>1</th><th>11</th><th>9</th><th>0</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>Deprecate `volatile` member functions of atomic in favor of new template partial specializations which will only declare load, store, and only exist when `is_always_lock_free` is true.</th>
+        <th>SG1</th><th>2</th><th>1</th><th>1</th><th>11</th><th>2</th><th>❌</th>
+    </tr>
+    <tr>
+        <th>Deprecate `volatile` member functions of atomic in favor of new template partial specializations which will only declare load, store, RMW, and only exist when `is_always_lock_free` is true.</th>
+        <th>SG1</th><th>4</th><th>7</th><th>3</th><th>3</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>Deprecate `volatile` member functions of atomic in favor of new template partial specializations which will only declare load, store, RMW, and only exist when `is_always_lock_free` is true.</th>
+        <th>EWG</th><th>2</th><th>9</th><th>3</th><th>0</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>Deprecate `volatile` member functions of atomic in favor of new template partial specializations which will only declare load, store, RMW.</th>
+        <th>SG1</th><th>0</th><th>0</th><th>0</th><th>10</th><th>7</th><th>❌</th>
+    </tr>
+    <tr>
+        <th>SG1 would be OK if we deprecated top-level `volatile` parameters.</th>
+        <th>SG1</th><th>6</th><th>9</th><th>6</th><th>2</th><th>1</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>EWG would be OK if we deprecated top-level `volatile` parameters.</th>
+        <th>EWG</th><th>6</th><th>9</th><th>6</th><th>0</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>EWG would be OK if we deprecated top-level const parameters.</th>
+        <th>EWG</th><th>0</th><th>2</th><th>5</th><th>8</th><th>8</th><th>❌</th>
+    </tr>
+    <tr>
+        <th>SG1 would be OK if we deprecated top-level `volatile` return values.</th>
+        <th>SG1</th><th>6</th><th>9</th><th>4</th><th>2</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>EWG would be OK if we deprecated top-level `volatile` return values.</th>
+        <th>EWG</th><th>6</th><th>6</th><th>5</th><th>0</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>EWG would be OK if we deprecated top-level const return values.</th>
+        <th>EWG</th><th>2</th><th>3</th><th>3</th><th>5</th><th>5</th><th>❌</th>
+    </tr>
+    <tr>
+        <th>SG1 interested is interested in hearing about `volatile_load<T>` / `volatile_store<T>` free functions in a separate paper, given that time is limited and we could be doing something else.</th>
+        <th>SG1</th><th>0</th><th>17</th><th>4</th><th>3</th><th>0</th><th>✅</th>
+    </tr>
+    <tr>
+        <th>EWG interested is interested in hearing about `volatile_load<T>` / `volatile_store<T>` free functions in a separate paper, given that time is limited and we could be doing something else.</th>
+        <th>EWG</th><th>2</th><th>11</th><th>4</th><th>1</th><th>0</th><th>✅</th>
+    </tr>
+</table>
+
+
+Wording {#word}
+=======
+
+The proposed wording follows the language and library approach to deprecation:
+
+
+  * Language deprecation is called out in the Standard text itself, and repeated
+    in Annex D.
+  * Library deprecation presents the library without the deprecated feature, and
+    only mentions said feature in Annex D.
+
+Program execution [**intro.execution**] {#intro.execution}
+---------------------------------------
+
+No changes.
+  
+<blockquote>
+
+  Accesses through `volatile` glvalues are evaluated strictly according to the
+  rules of the abstract machine.
+  
+  Reading an object designated by a `volatile` glvalue, modifying an object,
+  calling a library I/O function, or calling a function that does any of those
+  operations are all *side effects*, which are changes in the state of the
+  execution environment. *Evaluation* of an expression (or a subexpression) in
+  general includes both value computations (including determining the identity
+  of an object for glvalue evaluation and fetching a value previously assigned
+  to an object for prvalue evaluation) and initiation of side effects. When a
+  call to a library I/O function returns or an access through a `volatile`
+  glvalue is evaluated the side effect is considered complete, even though some
+  external actions implied by the call (such as the I/O itself) or by the
+  `volatile` access may not have completed yet.
+
+</blockquote>
+
+Data races [**intro.races**] {#data.races}
+----------------------------
+  
+No changes.
+
+<blockquote>
+
+  Two accesses to the same object of type `volatile` `std::sig_atomic_t` do not
+  result in a data race if both occur in the same thread, even if one or more
+  occurs in a signal handler. For each signal handler invocation, evaluations
+  performed by the thread invoking a signal handler can be divided into two
+  groups A and B, such that no evaluations in B happen before evaluations in A,
+  and the evaluations of such `volatile` `std::sig_atomic_t` objects take values
+  as though all evaluations in A happened before the execution of the signal
+  handler and the execution of the signal handler happened before all
+  evaluations in B.
+  
+</blockquote>
+
+Forward progress [**intro.progress**] {#intro.progress}
+-------------------------------------
+  
+No changes.
+
+<blockquote>
+
+  The implementation may assume that any thread will eventually do one of the
+  following:
+
+  * terminate,
+  * make a call to a library I/O function,
+  * perform an access through a `volatile` glvalue, or
+  * perform a synchronization operation or an atomic operation
+
+  During the execution of a thread of execution, each of the following is termed
+  an execution step:
+  
+  * termination of the thread of execution,
+  * performing an access through a `volatile` glvalue, or
+  * completion of a call to a library I/O function, a synchronization
+    operation, or an atomic operation.
+
+</blockquote>
+
+Increment and decrement [**expr.post.incr**] {#expr.post.incr}
+--------------------------------------------
+
+Modify as follows.
+
+<blockquote>
+
+  The value of a postfix `++` expression is the value of its operand. [ *Note:*
+  The value obtained is a copy of the original value —*end note* ] The operand
+  shall be a modifiable lvalue. The type of the operand shall be an
+  arithmetic type other than *cv* `bool`, or a
+  pointer to a complete object type. <ins>An operand with `volatile`-qualified
+  type is deprecated; see [**depr.volatile.type**].</ins> The value of the operand object is
+  modified by adding `1` to it. The value computation of the `++` expression is
+  sequenced before the modification of the operand object. With respect to an
+  indeterminately-sequenced function call, the operation of postfix `++` is a
+  single evaluation. [ *Note:* Therefore, a function call shall not intervene
+  between the lvalue-to-rvalue conversion and the side effect associated with
+  any single postfix `++` operator. —*end note* ] The result is a prvalue. The
+  type of the result is the *cv*-unqualified version of the type of the operand.
+  If the operand is a bit-field that cannot represent the incremented value, the
+  resulting value of the bit-field is implementation-defined. See also
+  [**expr.add**] and [**expr.ass**].
+
+  The operand of postfix `--` is decremented analogously to the postfix `++`
+  operator. [ *Note:* For prefix increment and decrement, see
+  [**expr.pre.incr**]. —*end note* ]
+
+</blockquote>
+
+Class member access [**expr.ref**] {#expr.ref}
+----------------------------------
+
+No changes.
+  
+<blockquote>
+
+  Abbreviating *postfix-expression.id-expression* as `E1.E2`, `E1` is called the
+  *object expression*. If `E2` is a bit-field, `E1.E2` is a bit-field. The type
+  and value category of `E1.E2` are determined as follows. In the remainder of
+  [**expr.ref**], *cq* represents either `const` or the absence of `const` and
+  *vq* represents either `volatile` or the absence of `volatile`. *cv*
+  represents an arbitrary set of cv-qualifiers.
+  
+  * If `E2` is a non-static data member and the type of `E1` is “*cq1 vq1 X*”,
+    and the type of `E2` is “*cq2 vq2 T*”, the expression designates the named
+    member of the object designated by the first expression. If `E1` is an
+    lvalue, then `E1.E2` is an lvalue; otherwise `E1.E2` is an xvalue. Let the
+    notation *vq12* stand for the “union” of *vq1* and *vq2*; that is, if *vq1*
+    or *vq2* is `volatile`, then *vq12* is `volatile`. Similarly, let the
+    notation *cq12* stand for the “union” of *cq1* and *cq2*; that is, if *cq1*
+    or *cq2* is `const`, then *cq12* is `const`. If `E2` is declared to be a
+    `mutable` member, then the type of `E1.E2` is “*vq12 T*”. If `E2` is not
+    declared to be a `mutable` member, then the type of `E1.E2` is
+    “*cq12 vq12 T*”.
+
+</blockquote>
+
+Increment and decrement [**expr.pre.incr**] {#expr.pre.incr}
+-------------------------------------------
+
+Modify as follows.
+
+<blockquote>
+
+  The operand of prefix `++` is modified by adding `1`. The operand shall be a
+  modifiable lvalue. The type of the operand shall be an arithmetic type
+  other than *cv* `bool`, or a pointer to a
+  completely-defined object type. <ins>An operand with `volatile`-qualified type
+  is deprecated; see [**depr.volatile.type**].</ins> The result is the updated operand; it is an
+  lvalue, and it is a bit-field if the operand is a bit-field. The expression
+  `++x` is equivalent to `x+=1`. [ *Note:* See the discussions of [**expr.add**]
+  and assignment operators [**expr.ass**] for information on conversions. —*end
+  note* ]
+
+  The operand of prefix `--` is modified by subtracting `1`. The requirements on
+  the operand of prefix `--` and the properties of its result are otherwise the
+  same as those of prefix `++`. [ *Note:* For postfix increment and decrement,
+  see [**expr.post.incr**]. —*end note* ]
+
+</blockquote>
+
+Assignment and compound assignment operators [**expr.ass**] {#expr.ass}
+-----------------------------------------------------------
+
+Modify as follows.
+
+<blockquote>
+
+  <ol>
+  
+  <li>
+  The assignment operator (`=`) and the compound assignment operators all group
+  right-to-left.
+  </li>
+
+  <li>
+  All require a modifiable lvalue as their left operand; their result is an
+  lvalue referring to the left operand. The result in all cases is a bit-field
+  if the left operand is a bit-field. In all cases, the assignment is sequenced
+  after the value computation of the right and left operands, and before the
+  value computation of the assignment expression. The right operand is sequenced
+  before the left operand. With respect to an indeterminately-sequenced function
+  call, the operation of a compound assignment is a single evaluation. [ *Note:*
+  Therefore, a function call shall not intervene between the lvalue-to-rvalue
+  conversion and the side effect associated with any single compound assignment
+  operator. —*end note* ]
+  
+  <pre>
+  <em>assignment-expression</em>
+      <em>conditional-expression</em>
+      <em>logical-or-expression assignment-operator initializer-clause</em>
+      <em>throw-expression</em>
+  
+  <em>assignment-operator</em>: one of
+      <code>=  *=  /=  %=   +=  -=  >>=  <<=  &=  ^=  |=</code>
+  </pre>
+  </li>
+
+  <li>
+  In simple assignment (`=`), the object referred to by the left operand is
+  modified by replacing its value with the result of the right operand.
+  </li>
+
+  <li>
+  If the left operand is not of class type, the expression is implicitly
+  converted to the cv-unqualified type of the left operand.
+  </li>
+  
+  <li>
+  If the left operand is of class type, the class shall be complete. Assignment
+  to objects of a class is defined by the copy/move assignment.
+  </li>
+
+  <li>
+  [ *Note:* For class objects, assignment is not in general the same as
+  initialization. —*end note* ]
+  </li>
+
+  <li>
+  When the left operand of an assignment operator is a bit-field that cannot
+  represent the value of the expression, the resulting value of the bit-field is
+  implementation-defined.
+  </li>
+  
+  <li><ins>
+  Simple assignments where the left operand is a `volatile`-qualified type that
+  is not of class type are deprecated (see [**depr.volatile.type**]) unless they are
+  either a discarded-value expression or appear in an unevaluated context.
+  </ins></li>
+
+  <li>
+  The behavior of an expression of the form
+  <code>E1 <em>op</em>= E2</code> is equivalent to
+  <code>E1 = E1 <em>op</em> E2</code>
+  except that `E1` is evaluated only once. <ins>Such expressions are deprecated
+  if `E1` has `volatile`-qualified type;
+  see [**depr.volatile.type**].</ins> In `+=` and `-=`, `E1` shall either
+  have arithmetic type or be a pointer to a possibly cv-qualified
+  completely-defined object type. In all other cases, `E1` shall have arithmetic
+  type.
+  </li>
+
+  <li>
+  If the value being stored in an object is read via another object that
+  overlaps in any way the storage of the first object, then the overlap shall be
+  exact and the two objects shall have the same type, otherwise the behavior is
+  undefined. [ *Note:* This restriction applies to the relationship between the
+  left and right sides of the assignment operation; it is not a statement about
+  how the target of the assignment may be aliased in general.
+  See [**basic.lval**]. —*end note* ]
+  </li>
+
+  <li>
+  A *braced-init-list* may appear on the right-hand side of
+
+    <ol>
+      <li>an assignment to a scalar, in which case the initializer list shall have at most a single element. The meaning of `x = {v}`, where `T` is the scalar type of the expression `x`, is that of `x = T{v}`. The meaning of `x = {}` is `x = T{}`.
+      <li>an assignment to an object of class type, in which case the initializer list is passed as the argument to the assignment operator function selected by overload resolution.
+    </ol>
+  </li>
+  
+  </ol>
+
+</blockquote>
+
+The cv-qualifiers [**dcl.type.cv**] {#dcl.type.cv}
+-----------------------------------
+
+No changes.
+  
+<blockquote>
+
+  The semantics of an access through a `volatile` glvalue are
+  implementation-defined. If an attempt is made to access an object defined with
+  a `volatile`-qualified type through the use of a non-`volatile` glvalue, the
+  behavior is undefined.
+
+  [ *Note:* `volatile` is a hint to the implementation to avoid aggressive
+  optimization involving the object because the value of the object might be
+  changed by means undetectable by an implementation. Furthermore, for some
+  implementations, `volatile` might indicate that special hardware instructions
+  are required to access the object. See [**intro.execution**] for detailed
+  semantics. In general, the semantics of `volatile` are intended to be the same
+  in C++ as they are in C. —*end note* ]
+
+</blockquote>
+
+Functions [**dcl.fct**] {#dcl.fct}
+-----------------------
+
+Modify as follows.
+
+<blockquote>
+
+  The *parameter-declaration-clause* determines the arguments that can be
+  specified, and their processing, when the function is called. [ *Note:* The
+  *parameter-declaration-clause* is used to convert the arguments specified on
+  the function call; see [**expr.call**] —*end note* ] If the
+  *parameter-declaration-clause* is empty, the function takes no arguments. A
+  parameter list consisting of a single unnamed parameter of non-dependent type
+  `void` is equivalent to an empty parameter list. Except for this special case,
+  a parameter shall not have type *cv* `void`. <ins>A parameter with
+  `volatile`-qualified type is deprecated; see [**depr.volatile.type**].</ins>
+  If the *parameter-declaration-clause* terminates with an ellipsis or a
+  function parameter pack, the number of arguments shall be equal to or greater
+  than the number of parameters that do not have a default argument and are not
+  function parameter packs. Where syntactically correct and where "`...`" is not
+  part of an *abstract-declarator*, "`, ...`" is synonymous with "`...`".
+  
+  [...]
+  
+  The type of a function is determined using the following rules. The type of
+  each parameter (including function parameter packs) is determined from its own
+  *decl-specifier-seq* and *declarator*. After determining the type of each
+  parameter, any parameter of type "array of `T`" or of function type `T` is
+  adjusted to be "pointer to `T`". After producing the list of parameter types,
+  any top-level *cv-qualifier*s modifying a parameter type are deleted when
+  forming the function type. The resulting list of transformed parameter types
+  and the presence or absence of the ellipsis or a function parameter pack is
+  the function's *parameter-type-list*.
+  
+  [...]
+  
+  Functions shall not have a return type of type array or function, although
+  they may have a return type of type pointer or reference to such things. There
+  shall be no arrays of functions, although there can be arrays of pointers to
+  functions.
+  
+  <ins>A `volatile`-qualified return type is
+  deprecated; see [**depr.volatile.type**].</ins>
+
+</blockquote>
+
+Structured binding declarations [**dcl.struct.bind**] {#dcl.struct.bind}
+-----------------------------------------------------
+
+Modify as follows:
+
+<blockquote>
+
+A structured binding declaration introduces the *identifier*s
+<code>v<sub>0</sub></code>, <code>v<sub>1</sub></code>,
+<code>v<sub>2</sub></code>, ... of the *identifier-list* as names of *structured
+binding*s. Let *cv* denote the *cv-qualifier*s in the *decl-specifier-seq* and
+*S* consist of the *storage-class-specifier*s of the *decl-specifier-seq* (if
+any). <ins>A *cv* that includes `volatile` is deprecated; see
+[**depr.volatile.type**].</ins> First, a variable with a unique name `e` is
+introduced. If the *assignment-expression* in the *initializer* has array type
+`A` and no *ref-qualifier* is present, `e` is defined by
+
+*attribute-specifier-seq*<sub>*opt*</sub> *S* *cv* `A` `e` `;`
+
+</blockquote>
+
+Non-static member functions [**class.mfct.non-static**] {#class.mfct.non-static}
+-------------------------------------------------------
+
+No changes.
+
+<blockquote>
+
+  A non-static member function may be declared `const`, `volatile`, or
+  `const volatile`. These cv-qualifiers affect the type of the `this` pointer.
+  They also affect the function type of the member function; a member
+  function declared `const` is a `const` member function, a member function declared
+  `volatile` is a `volatile` member function and a member function declared
+  `const volatile` is a `const volatile` member function.
+
+</blockquote>
+
+The this pointer [**class.this**] {#class.this}
+---------------------------------
+
+No changes.
+
+<blockquote>
+
+   In the body of a non-static member function, the keyword `this` is a prvalue
+   expression whose value is the address of the object for which the function is
+   called. The type of `this` in a member function of a class `X` is `X*`. If
+   the member function is declared `const`, the type of `this` is `const X*`, if
+   the member function is declared `volatile`, the type of `this` is
+   `volatile X*`, and if the member function is declared `const volatile`, the type of
+   `this` is `const volatile X*`.
+   
+   `volatile` semantics apply in `volatile` member functions when accessing the
+   object and its non-static data members.
+
+</blockquote>
+
+Constructors [**class.ctor**] {#class.ctor}
+-----------------------------
+
+No changes.
+
+<blockquote>
+
+  A constructor can be invoked for a `const`, `volatile` or `const volatile`
+  object. `const` and `volatile` semantics are not applied on an object under
+  construction. They come into effect when the constructor for the most derived
+  object ends.
+
+</blockquote>
+
+Destructors [**class.dtor**] {#class.dtor}
+----------------------------
+
+No changes.
+
+<blockquote>
+
+  A destructor is used to destroy objects of its class type. The address of a
+  destructor shall not be taken. A destructor can be invoked for a `const`,
+  `volatile` or `const volatile` object. `const` and `volatile` semantics are
+  not applied on an object under destruction. They stop being in effect when the
+  destructor for the most derived object starts.
+
+</blockquote>
+
+Overloadable declarations [**over.load**] {#over.load}
+-----------------------------------------
+
+No changes since [**dcl.fct**] already handles deprecation.
+
+<blockquote>
+
+  Parameter declarations that differ only in the presence or absence of
+  `const` and/or `volatile` are equivalent. That is, the
+  `const` and `volatile` type-specifiers for each parameter type are
+  ignored when determining which function is being declared, defined, or called.
+
+</blockquote>
+
+Built-in operators [**over.built**] {#over.built}
+-----------------------------------
+
+No changes since [**expr.post.incr**], [**expr.pre.incr**], and [**expr.ass**]
+already handle deprecation.
+
+<blockquote>
+
+  In the remainder of this section, *vq* represents either `volatile` or no
+  cv-qualifier.
+  
+  For every pair (*T*, *vq*), where *T* is an arithmetic type other than `bool`,
+  there exist candidate operator functions of the form
+
+  <pre><code>
+  vq T &amp; operator++(vq T &amp;);
+  T operator++(vq T &amp;, int);
+  </code></pre>
+
+  For every pair (*T*, *vq*), where *T* is an arithmetic type other than `bool`,
+  there exist candidate operator functions of the form
+
+  <pre><code>
+  vq T &amp; operator--(vq T &amp;);
+  T operator--(vq T &amp;, int);
+  </code></pre>
+
+  For every pair (*T*, *vq*), where *T* is a cv-qualified or cv-unqualified
+  object type, there exist candidate operator functions of the form
+
+  <pre><code>
+  T*vq&amp; operator++(T*vq&amp;);
+  T*vq&amp; operator--(T*vq&amp;);
+  T* operator++(T*vq&amp;, int);
+  T* operator--(T*vq&amp;, int);
+  </code></pre>
+  
+  For every quintuple (*C1*, *C2*, *T*, *cv1*, *cv2*), where *C2* is a class
+  type, *C1* is the same type as *C2* or is a derived class of *C2*, and *T* is an
+  object type or a function type, there exist candidate operator functions of
+  the form
+
+  <pre><code>
+  <em>cv12</em> T&amp; operator->*(<em>cv1</em> C1*, <em>cv2</em> T C2::*);
+  </code></pre>
+  
+  For every triple (*L*, *vq*, *R*), where *L* is an arithmetic type, and *R* is
+  a promoted arithmetic type, there exist candidate operator functions of the
+  form
+
+  <pre><code>
+  vq L&amp; operator=(vq L&amp;, R);
+  vq L&amp; operator*=(vq L&amp;, R);
+  vq L&amp; operator/=(vq L&amp;, R);
+  vq L&amp; operator+=(vq L&amp;, R);
+  vq L&amp; operator-=(vq L&amp;, R);
+  </code></pre>
+    
+  For every pair (*T*, *vq*), where *T* is any type, there exist candidate
+  operator functions of the form
+  
+  <pre><code>
+  T*vq&amp; operator=(T*vq&amp;, T*);
+  </code></pre>
+
+  For every pair (*T*, *vq*), where *T* is an enumeration or pointer to member
+  type, there exist candidate operator functions of the form
+
+  <pre><code>
+  vq T&amp; operator=(vq T&amp;, T );
+  </code></pre>
+
+  For every pair (*T*, *vq*), where *T* is a cv-qualified or cv-unqualified
+  object type, there exist candidate operator functions of the form
+
+  <pre><code>
+  T*vq&amp; operator+=(T*vq&amp;, std::ptrdiff_t);
+  T*vq&amp; operator-=(T*vq&amp;, std::ptrdiff_t);
+  </code></pre>
+
+  For every triple (*L*, *vq*, *R*), where *L* is an integral type, and *R* is a
+  promoted integral type, there exist candidate operator functions of the form
+
+  <pre><code>
+  vq L&amp; operator%=(vq L&amp;, R);
+  vq L&amp; operator<<=(vq L&amp;, R);
+  vq L&amp; operator>>=(vq L&amp;, R);
+  vq L&amp; operator&amp;=(vq L&amp;, R);
+  vq L&amp; operator^=(vq L&amp;, R);
+  vq L&amp; operator|=(vq L&amp;, R);
+  </code></pre>
+
+</blockquote>
+
+
+Annex D {#annexD}
+-------
+
+Add the following wording to Annex D:
+
+### Deprecated `volatile` types [**depr.volatile.type**] ### {#depr.volatile.type}
+
+Postfix `++` and `--` expressions ([**expr.post.incr**]) and prefix `++` and
+`--` expressions ([**expr.pre.incr**]) of `volatile`-qualified arithmetic and
+pointer types are deprecated.
+
+Certain assignments where the left operand is a `volatile`-qualified non-class
+type are deprecated; see [**expr.ass**].
+
+A function type ([**dcl.fct**]) with a parameter with `volatile`-qualified type
+or with a `volatile`-qualified return type is deprecated.
+
+A structured binding ([**dcl.struct.bind**]) of a `volatile`-qualified type is
+deprecated.
+
+
+<pre class=biblio>
+{
+    "P1831R0": {
+        "href": "https://wg21.link/P1831R0",
+        "title": "Deprecating volatile: library",
+        "authors": ["JF Bastien"],
+        "date": "19 July 2019"
+    }
+}
+</pre>

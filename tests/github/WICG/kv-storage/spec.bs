@@ -20,18 +20,27 @@ Default Biblio Status: current
 <pre class="anchors">
 url: https://html.spec.whatwg.org/multipage/webstorage.html#dom-localstorage; type: attribute; text: localStorage; for: Window; spec: HTML
 
+url: https://pr-preview.s3.amazonaws.com/heycam/webidl/pull/720.html#dfn-get-the-next-iteration-result; type: dfn; text: get the next iteration result; spec: WEBIDL
+
+url: https://pr-preview.s3.amazonaws.com/heycam/webidl/pull/718.html#SameRealmBrandCheck; type: extended-attribute; text: [SameRealmBrandCheck]; spec: WEBIDL
+
+urlPrefix: https://pr-preview.s3.amazonaws.com/littledan/webidl/pull/675.html#; type: dfn; spec: WEBIDL
+  text: evaluation steps; for: module; url: module-evaluation-steps
+  text: set the module attribute; url: set-a-module-attribute
+
 urlPrefix: https://tc39.github.io/ecma262/#; spec: ECMASCRIPT
   text: Map; url: sec-map-objects; type: interface
   text: WeakMap; url: sec-weakmap-objects; type: interface
   text: Date; url: sec-date-objects; type: interface
   text: ToString; url: sec-tostring; type: abstract-op
-  text: %IteratorPrototype%; url: sec-%iteratorprototype%-object; type: interface
+  text: %AsyncIteratorPrototype%; url: sec-asynciteratorprototype; type: interface
   text: %ObjectPrototype%; url: sec-properties-of-the-object-prototype-object; type: interface
   text: CreateDataProperty; url: sec-createdataproperty; type: abstract-op
   text: CreateBuiltinFunction; url: sec-createbuiltinfunction; type: abstract-op
   text: CreateMethodProperty; url: sec-createmethodproperty; type: abstract-op
   text: CreateArrayFromList; url: sec-createarrayfromlist; type: abstract-op
   text: CreateIterResultObject; url: sec-createiterresultobject; type: abstract-op
+  text: HostHasSourceTextAvailable; url: sec-hosthassourcetextavailable; type: abstract-op
   text: NormalCompletion; url: sec-normalcompletion; type: abstract-op
   text: ObjectCreate; url: sec-objectcreate; type: abstract-op
   text: ThrowCompletion; url: sec-throwcompletion; type: abstract-op
@@ -43,9 +52,6 @@ urlPrefix: https://tc39.github.io/ecma262/#; spec: ECMASCRIPT
   text: typed array; url: sec-typedarray-objects; type: dfn
   text: Completion Record; url: sec-completion-record-specification-type; type: dfn
   text: @@asyncIterator; url: table-1; type: dfn
-
-urlPrefix: https://tc39.github.io/Function-prototype-toString-revision/#; spec: FN-TOSTRING
-  text: HostHasSourceTextAvailable; url: proposal-sec-hosthassourcetextavailable; type: abstract-op
 
 urlPrefix: https://w3c.github.io/IndexedDB/; spec: INDEXEDDB-2; type: dfn
   text: convert a value to a key
@@ -73,6 +79,7 @@ urlPrefix: https://w3c.github.io/IndexedDB/; spec: INDEXEDDB-2; type: dfn
 <pre class="link-defaults">
   spec: promises-guide; type: dfn; text: resolve
   spec: infra; type: dfn; text: list
+  spec: webidl; type: dfn; text: new
 </pre>
 
 <pre class="biblio">
@@ -108,7 +115,7 @@ summary {
 }
 
 /* domintro from https://resources.whatwg.org/standard.css */
-dl.domintro {
+.domintro {
   position: relative;
   color: green;
   background: #DDFFDD;
@@ -116,17 +123,17 @@ dl.domintro {
   padding: 1.5em 1em 0.5em 2em;
 }
 
-dl.domintro dt, dl.domintro dt * {
+.domintro dt, .domintro dt * {
   color: black;
   font-size: inherit;
 }
-dl.domintro dd {
+.domintro dd {
   margin: 0.5em 0 1em 2em; padding: 0;
 }
-dl.domintro dd p {
+.domintro dd p {
   margin: 0.5em 0;
 }
-dl.domintro::before {
+.domintro::before {
   content: 'For web developers (non-normative)';
   background: green;
   color: white;
@@ -169,7 +176,7 @@ This specification proposes a new API, called KV storage, which is intended to p
       time(s).
     </p>
     <script type="module">
-      import { storage } from "std:kv-storage";
+      import storage from "std:kv-storage";
 
       (async () => {
         let pageLoadCount = await storage.get("pageLoadCount") || 0;
@@ -192,96 +199,69 @@ This specification proposes a new API, called KV storage, which is intended to p
 
 <h2 id="module">The <code>std:kv-storage</code> built-in module</h2>
 
-<dl class="domintro non-normative" id="module-domintro">
-  <dt><code>import * as |kvs| from "std:kv-storage"</code>
-  <dd>
-    <p>Imports the KV storage API's namespace object as the variable |kvs|.
+<div class="advisement">
+  The below is not yet valid Web IDL. It depends on the following outstanding Web IDL pull requests:
 
-    <p>If the module is not imported in a [=secure context=], the <code>import</code> statement will cause a "{{SecurityError}}" {{DOMException}}, as persistent storage is a powerful feature.
-  </dd>
+  * <a href="https://github.com/heycam/webidl/pull/675"><code>module { }</code></a>
+  * <a href="https://github.com/heycam/webidl/pull/720"><code>async_iterable&lt;K, V></code></a>
+  * <a href="https://github.com/heycam/webidl/pull/718"><code>[SameRealmBrandCheck]</code></a>
 
-  <dt><code>|kvs|.[=std:kv-storage/storage=]</code>
-  <dd>
-    <p>Returns the default storage area. It is a pre-constructed instance of the {{StorageArea}} class, meant to be a convenience similar to {{Window/localStorage}}.
-  </dd>
+  Note that until at least the first two of these are merged and the associated tooling is updated, syntax highlighting and cross-linking will not work for the below IDL block. Sorry about that.
+</div>
 
-  <dt><code>|kvs|.[=std:kv-storage/StorageArea=]</code>
-  <dd>
-    <p>Returns the constructor for the {{StorageArea}} class, to allow the creation of isolated storage areas.
-  </dd>
-</dl>
+<!-- TODO: add highlight="idl" when tooling catches up -->
+<xmp>
+[SecureContext,Exposed=(Window,Worker)]
+module kv-storage {
+  [Constructor(DOMString name), SameRealmBrandCheck]
+  interface StorageArea {
+    Promise<void> set(any key, any value);
+    Promise<any> get(any key);
+    Promise<void> delete(any key);
+    Promise<void> clear();
 
-This specification defines a new built-in module. Tentatively, depending on further discussions, we use the specifier "<dfn><code>std:kv-storage</code></dfn>" to denote it for now. This is not final and is subject to change depending on the details of how built-in modules end up working. [[JSSTDLIB]]
+    async_iterable<any, any>;
 
-Its exports are the following:
+    [SameObject] readonly attribute object backingStore;
+  };
 
-: <dfn for="std:kv-storage"><code>storage</code></dfn>
-:: An instance of the {{StorageArea}} class, created as if by [$Construct$]({{StorageArea}}, « "<code>default</code>" »).
+  readonly attribute kv-storage.StorageArea default;
+};
+</xmp>
+
+<div class="domintro non-normative" id="module-domintro">
+  <dl>
+    <dt><code>import [=std:kv-storage/default|storage=] from "std:kv-storage"</code>
+    <dd>
+      <p>Returns the default storage area. It is a pre-constructed instance of the {{StorageArea}} class, meant to be a convenience similar to {{Window/localStorage}}.
+    </dd>
+
+    <dt><code>import { [=std:kv-storage/StorageArea=] } from "std:kv-storage"</code>
+    <dd>
+      <p>Returns the constructor for the {{StorageArea}} class, to allow the creation of isolated storage areas.
+    </dd>
+  </dl>
+
+  <p>If the module is not imported in a [=secure context=], the <code>import</code> statements will fail, as persistent storage is a powerful feature.
+</div>
+
+This specification defines a new built-in module, "<dfn export><code>std:kv-storage</code></dfn>". Its exports are:
+
+: <dfn for="std:kv-storage"><code>default</code></dfn>
+:: An instance of the {{StorageArea}} class, backed by a database named "<code>kv-storage:default</code>".
 : <dfn for="std:kv-storage"><code>StorageArea</code></dfn>
 :: The {{StorageArea}} class
 
-<div class="example" id="example-importing">
-  To get access to these exports, one could use the syntax shown <a href="#module-domintro">above</a>, or import them directly without the intermediate |kvs| variable:
+The [=module/evaluation steps=] for the <code>[=std:kv-storage=]</code> module in |realm| are:
 
-  <xmp highlight="js">
-    import { storage, StorageArea } from "std:kv-storage";
-  </xmp>
-</div>
-
-In addition to establishing its exports, evaluating the module must perform the following steps:
-
-1. If the [=current settings object=] is not [$Is an environment settings object contextually secure?|contextually secure$], throw a "{{SecurityError}}" {{DOMException}}.
+1. Let |defaultStorageArea| be a [=new=] {{StorageArea}} in |realm|.
+1. Set |defaultStorageArea|.[=[[DatabaseName]]=] to "<code>kv-storage:default</code>".
+1. Set |defaultStorageArea|.[=[[DatabasePromise]]=] to null.
+1. Set |defaultStorageArea|.[=[[BackingStoreObject]]=] to null.
+1. [=Set the module attribute=] <code>[=std:kv-storage/default=]</code> of this module to |defaultStorageArea|.
 
 
 <h2 id="storagearea" interface lt="StorageArea">The <code>StorageArea</code> class</h2>
-
-Upon evaluating the <a><code>std:kv-storage</code></a> module, the {{StorageArea}} class must be created in the [=current realm=]. The result must be equivalent to evaluating the following JavaScript code, with the following two exceptions:
-
-<ul>
-  <li><p>The constructor, method, and getter bodies must behave as specified below instead of being the no-ops shown in this code block.</p></li>
-  <li id="fn-tostring-censorship"><p>[$HostHasSourceTextAvailable$] must return false for all function objects (i.e. the constructor, methods, and getter) created.</p></li>
-</ul>
-
-<pre highlight="js">
-  class StorageArea {
-    constructor(name)  { /* <a href="#storagearea-constructor">see below</a> */ }
-
-    set(key, value)    { /* <a href="#storagearea-set">see below</a> */ }
-    get(key)           { /* <a href="#storagearea-get">see below</a> */ }
-    delete(key)        { /* <a href="#storagearea-delete">see below</a> */ }
-    clear()            { /* <a href="#storagearea-clear">see below</a> */ }
-
-    keys()             { /* <a href="#storagearea-keys">see below</a> */ }
-    values()           { /* <a href="#storagearea-values">see below</a> */ }
-    entries()          { /* <a href="#storagearea-entries">see below</a> */ }
-
-    get backingStore() { /* <a href="#storagearea-backingstore">see below</a> */ }
-  }
-</pre>
-
-The <code>prototype</code> property of {{StorageArea}} must additionally have a [=@@asyncIterator=] property, whose value is equal to the same function object as the original value of <code>StorageArea.prototype.entries()</code>.
-
-<div class="note" id="class-definition-explanation">
-  <p>The intention of defining the {{StorageArea}} class in this way, using a skeleton JavaScript class definition, is to automatically establish the various properties of the class, its methods, and its getter, which otherwise need to be specified in tedious detail. For example, this automatically establishes the <code>length</code> and <code>name</code> properties of all these functions, their property descriptors, their <code>prototype</code> and <code>constructor</code> properties, etc. And it does so in a way that is consistent with what a JavaScript developer would expect.
-
-  <details>
-    <summary>Why not use Web IDL?</summary>
-
-    Apart from the above novel technique, there are two commonly-seen alternatives for defining JavaScript classes. The JavaScript specification, as well as the Streams Standard, defer to the "<a href="https://tc39.github.io/ecma262/#sec-ecmascript-standard-built-in-objects">ECMAScript Standard Built-in Objects</a>" section of the JavaScript specification, which defines many defaults. The more popular alternative, however, is to use Web IDL. Why aren't we using that?
-
-    Web IDL has a few minor mismatches with our goals for built-in modules:
-
-    * Its automatically-generated brand checks are both unforgeable and cross-realm, which is not accomplishable in JavaScript. [=StorageArea/brand check|Our brand checks=] are same-realm-only, as we would like built-in modules to not have special privileges in this regard over non-built-in ones.
-
-    * It does not have a mechanism for exposing classes inside modules; instead they are always exposed on some set of global objects.
-
-    * It produces methods and accessors that are enumerable, which does not match the natural JavaScript implementation. This would make it more difficult to implement a Web IDL-specified built-in module in JavaScript. (But not impossible.)
-
-    * The generic nature of Web IDL means that it is best implemented using code generation. However, most implementers currently do not have a Web IDL bindings generator that wraps JavaScript; using Web IDL would virtually require them to either implement the built-in modules in C++, or create such a bindings generator. Furthermore, the wrappers end up being quite large; see <a href="https://gist.github.com/domenic/b5c395e036781173e123">an example</a>. <!-- TODO: maybe make an actual generated StorageArea example -->
-
-    None of these mismatches are fatal. We could switch this specification to Web IDL, with appropriate extensions for solving the first two problems, if that ends up being desired. We recognize that the goals for built-in modules are still under active discussion, and the above might not end up being important in the end. But for now, we're experimenting with this different—and more aligned-with-JavaScript-modules—mechanism of specifying a class definition.
-  </details>
-</div>
 
 Each {{StorageArea}} instance must also contain the <dfn>\[[DatabaseName]]</dfn>, <dfn>\[[DatabasePromise]]</dfn>, and <dfn>\[[BackingStoreObject]]</dfn> internal slots. The following is a non-normative summary of their meaning:
 
@@ -294,9 +274,7 @@ Each {{StorageArea}} instance must also contain the <dfn>\[[DatabaseName]]</dfn>
   <dd>The object returned by the {{StorageArea/backingStore}} getter, cached to ensure identity across gets.</dd>
 </dl>
 
-A JavaScript value |val| <dfn for="StorageArea">brand checks</dfn> as a {{StorageArea}} if [$Type$](|val|) is Object, |val| has a [=[[DatabaseName]]=] internal slot, and |val|'s [=relevant realm=] is equal to the [=current realm=].
-
-<p class="note">The realm check here gives us semantics identical to using JavaScript's {{WeakMap}} or the proposed private class fields. This ensures {{StorageArea}} does not use any magic, like the platform's usual cross-realm brand checks, which go beyond what can be implemented in JavaScript. [[ECMA-262]] [[CLASS-FIELDS]]
+<p class="note">The {{[SameRealmBrandCheck]}} [=extended attribute=] used in the IDL gives us semantics identical to using JavaScript's {{WeakMap}} or the proposed private class fields. This ensures {{StorageArea}} does not use any magic, like the platform's usual cross-realm brand checks, which go beyond what can be implemented in JavaScript. [[ECMA-262]] [[CLASS-FIELDS]]
 
 <h3 id="storagearea-constructor" constructor for="StorageArea" lt="constructor(name)">constructor(|name|)</h3>
 
@@ -308,12 +286,13 @@ A JavaScript value |val| <dfn for="StorageArea">brand checks</dfn> as a {{Storag
     <p>This does not actually open or create the database yet; that is done lazily when other methods are called. This means that all other methods can reject with database-related exceptions in failure cases.
 </dl>
 
-<div class="algorithm">
-  1. Let |area| be this {{StorageArea}} object.
-  1. Let |nameString| be [$ToString$](|name|).
-  1. Set |area|.[=[[DatabaseName]]=] to the concatenation of "<code>kv-storage:</code>" and |nameString|.
-  1. Set |area|.[=[[DatabasePromise]]=] to null.
-  1. Set |area|.[=[[BackingStoreObject]]=] to null.
+<div algorithm>
+The <dfn constructor for=StorageArea><code>StorageArea(|name|)</code></dfn> constructor, when
+invoked, must run these steps:
+
+  1. Set <b>this</b>.[=[[DatabaseName]]=] to the concatenation of "<code>kv-storage:</code>" and |name|.
+  1. Set <b>this</b>.[=[[DatabasePromise]]=] to null.
+  1. Set <b>this</b>.[=[[BackingStoreObject]]=] to null.
 </div>
 
 <h3 id="storagearea-set" method for="StorageArea">set(|key|, |value|)</h3>
@@ -398,12 +377,10 @@ A JavaScript value |val| <dfn for="StorageArea">brand checks</dfn> as a {{Storag
 </dl>
 
 <div class="algorithm">
-  1. Let |area| be this object.
-  1. If |area| does not [=StorageArea/brand check=], return [=a promise rejected with=] a {{TypeError}} exception.
-  1. If |area|.[=[[DatabasePromise]]=] is not null, return the result of [=transforming=] |area|.[=[[DatabasePromise]]=] by fulfillment and rejection handlers that both perform the following steps:
-    1. Set |area|.[=[[DatabasePromise]]=] to null.
-    1. Return the result of [=deleting the database=] given by |area|.[=[[DatabaseName]]=].
-  1. Otherwise, return the result of [=deleting the database=] given by |area|.[=[[DatabaseName]]=].
+  1. If <b>this</b>.[=[[DatabasePromise]]=] is not null, return the result of [=transforming=] <b>this</b>.[=[[DatabasePromise]]=] by fulfillment and rejection handlers that both perform the following steps:
+    1. Set <b>this</b>.[=[[DatabasePromise]]=] to null.
+    1. Return the result of [=deleting the database=] given by <b>this</b>.[=[[DatabaseName]]=].
+  1. Otherwise, return the result of [=deleting the database=] given by <b>this</b>.[=[[DatabaseName]]=].
 </div>
 
 To <dfn lt="deleting the database|delete the database">delete the database</dfn> given a string |name|:
@@ -453,26 +430,60 @@ To <dfn lt="deleting the database|delete the database">delete the database</dfn>
   </xmp>
 </div>
 
-<h3 id="storagearea-keys" method for="StorageArea">keys()</h3>
+<h3 id="storagearea-iteration">Iteration</h3>
 
-<dl class="domintro non-normative">
-  <dt><code>for await (const |key| of |storage|.{{StorageArea/keys()|keys}}()) { ... }</code>
-  <dd>
-    <p>Retrieves an async iterator containing the keys of all entries in this storage area.
+The {{StorageArea}} interface supports asynchronous iteration.
 
-    <p>Keys will be yielded in [=key/ascending=] order; roughly, segregated by type, and then sorted within each type. They will be [=key round-tripped=] from their original form.
+<div class="domintro non-normative">
+  <dl>
+    <dt><code>for await (const |key| of |storage|.<dfn method for="StorageArea">keys()</dfn>) { ... }</code>
+    <dd>
+      <p>Retrieves an async iterator containing the keys of all entries in this storage area.
 
-    <p>The iterator provides a live view onto the storage area: modifications made to entries sorted after the last-returned one will be reflected in the iteration.
-</dl>
+      <p>Keys will be yielded in [=key/ascending=] order; roughly, segregated by type, and then sorted within each type. They will be [=key round-tripped=] from their original form.
 
-<div class="algorithm">
-  1. Let |area| be this object.
-  1. If |area| does not [=StorageArea/brand check=], throw a {{TypeError}} exception.
-  1. Return the result of [=creating a storage area async iterator=] given |area| and "<code>keys</code>".
+    <dt><code>for await (const |value| of |storage|.<dfn method for="StorageArea">values()</dfn>) { ... }</code>
+    <dd>
+      <p>Asynchronously retrieves an array containing the values of all entries in this storage area.
+
+      <p>Values will be ordered as corresponding to their keys. They will be [$StructuredDeserialize|structured-deserialized$] from their original form.
+
+    <dt><code>for await (const [|key|, |value|] of |storage|.<dfn method for="StorageArea">entries()</dfn>) { ... }</code>
+    <dt><code>for await (const [|key|, |value|] of |storage|) { ... }</code>
+    <dd>
+      <p>Asynchronously retrieves an array of two-element <code>[key, value]</code> arrays, each of which corresponds to an entry in this storage area.
+
+      <p>Entries will be ordered as corresponding to their keys. Each key and value will be [=key round-tripped=] and [$StructuredDeserialize|structured-deserialized$] from its original form, respectively.
+  </dl>
+  <p>All of these iterators provide live views onto the storage area: modifications made to entries sorted after the last-returned one will be reflected in the iteration.
 </div>
 
+To [=get the next iteration result=]:
+
+1. If <b>this</b>'s [=relevant realm=] is not equal to the [=current realm=], then return [=a promise rejected with=] a {{TypeError}} exception.
+
+    Issue: This should be handled by WebIDL once the various features involved land.
+1. Return the result of [=performing a database operation=] given <b>this</b>, "<code>readonly</code>", and the following steps operating on |transaction| and |store|:
+  1. Let |lastKey| be <b>current state</b>.
+  1. Let |range| be the result of [=getting the range for=] |lastKey|.
+  1. Let |keyRequest| be the result of performing the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/getKey()}} method on |store|, given the argument |range|.
+  1. Let |valueRequest| be the result of performing the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/get()}} method on |store|, given the argument |range|.
+
+      Note: The iterator returned from {{StorageArea/keys()}} discards the value. Implementations could avoid constructing |valueRequest| in that case.
+  1. Let |promise| be [=a new promise=].
+  1. [=Add a simple event listener=] to |valueRequest| for "<code>success</code>" that performs the following steps:
+    1. Let |key| be |keyRequest|'s [=request/result=].
+    1. If |key| is undefined, then:
+      1. [=Resolve=] |promise| with undefined.
+    1. Otherwise:
+      1. Let |value| be |valueRequest|'s [=request/result=].
+      1. [=Resolve=] |promise| with (|key|, |value|, |key|).
+  1. [=Add a simple event listener=] to |keyRequest| for "<code>error</code>" that [=rejects=] |promise| with |keyRequest|'s [=request/error=].
+  1. [=Add a simple event listener=] to |valueRequest| for "<code>error</code>" that [=rejects=] |promise| with |valueRequest|'s [=request/error=].
+  1. Return |promise|.
+
 <div class="example" id="example-live-async-iterator">
-  To illustrate the live nature of the async iterator, consider the following:
+  To illustrate the live nature of the async iterators, consider the following:
 
   <xmp highlight="js">
     await storage.set(10, "value 10");
@@ -495,45 +506,8 @@ To <dfn lt="deleting the database|delete the database">delete the database</dfn>
   That is, calling {{StorageArea/keys()}} does not create a snapshot as of the time it was called; it returns a live asynchronous iterator, that lazily retrieves the next key after the last-seen one.
 </div>
 
-<h3 id="storagearea-values" method for="StorageArea">values()</h3>
-
-<dl class="domintro non-normative">
-  <dt><code>for await (const |value| of |storage|.{{StorageArea/values()|values}}()) { ... }</code>
-  <dd>
-    <p>Asynchronously retrieves an array containing the values of all entries in this storage area.
-
-    <p>Values will be ordered as corresponding to their keys; see {{StorageArea/keys()}}. They will be [$StructuredDeserialize|structured-deserialized$] from their original form.
-
-    <p>The iterator provides a live view onto the storage area: modifications made to entries sorted after the last-returned one will be reflected in the iteration.
-</dl>
-
-<div class="algorithm">
-  1. Let |area| be this object.
-  1. If |area| does not [=StorageArea/brand check=], throw a {{TypeError}} exception.
-  1. Return the result of [=creating a storage area async iterator=] given |area| and "<code>values</code>".
-</div>
-
-<h3 id="storagearea-entries" method for="StorageArea">entries()</h3>
-
-<dl class="domintro non-normative">
-  <dt><code>for await (const [|key|, |value|] of |storage|.{{StorageArea/entries()|entries}}()) { ... }</code>
-  <dt><code>for await (const [|key|, |value|] of |storage|) { ... }</code>
-  <dd>
-    <p>Asynchronously retrieves an array of two-element <code>[key, value]</code> arrays, each of which corresponds to an entry in this storage area.
-
-    <p>Entries will be ordered as corresponding to their keys; see {{StorageArea/keys()}}. Each key and value will be [=key round-tripped=] and [$StructuredDeserialize|structured-deserialized$] from its original form, respectively.
-
-    <p>The iterator provides a live view onto the storage area: modifications made to entries sorted after the last-returned one will be reflected in the iteration.
-</dl>
-
-<div class="algorithm">
-  1. Let |area| be this object.
-  1. If |area| does not [=StorageArea/brand check=], throw a {{TypeError}} exception.
-  1. Return the result of [=creating a storage area async iterator=] given |area| and "<code>entries</code>".
-</div>
-
 <div class="example" id="example-entries-to-server">
-  Assuming you knew that that you only stored JSON-compatible types in <code>[=storage=]</code>, you could use the following code to send all locally-stored entries to a server:
+  Assuming you knew that that you only stored JSON-compatible types in the {{StorageArea}} |storage|, you could use the following code to send all locally-stored entries to a server:
 
   <xmp highlight="js">
     const entries = [];
@@ -551,12 +525,12 @@ To <dfn lt="deleting the database|delete the database">delete the database</dfn>
   </xmp>
 </div>
 
-<h3 id="storagearea-backingstore" attribute for="StorageArea" lt="backingStore">get backingStore()</h3>
+<h3 id="storagearea-backingstore" attribute for="StorageArea" lt="backingStore">backingStore</h3>
 
 <dl class="domintro non-normative">
   <dt><code>{ |database|, |store|, |version| } = |storage|.{{StorageArea/backingStore}}</code>
   <dd>
-    <p>Asynchronously retrieves an an object containing all of the information necessary to manually interface with the IndexedDB backing store that underlies this storage area:
+    <p>Returns an object containing all of the information necessary to manually interface with the IndexedDB backing store that underlies this storage area:
 
     * |database| will be a string equal to "<code>kv-storage:</code>" concatenated with the database name passed to the constructor. (For the default storage area, it will be "<code>kv-storage:default</code>".)
     * |store| will be the string "<code>store</code>".
@@ -566,20 +540,18 @@ To <dfn lt="deleting the database|delete the database">delete the database</dfn>
 </dl>
 
 <div class="algorithm">
-  1. Let |area| be this object.
-  1. If |area| does not [=StorageArea/brand check=], throw a {{TypeError}} exception.
-  1. If |area|.[=[[BackingStoreObject]]=] is null, then:
+  1. If <b>this</b>.[=[[BackingStoreObject]]=] is null, then:
     1. Let |backingStoreObject| be [$ObjectCreate$]({{%ObjectPrototype%}}).
-    1. Perform [$CreateDataProperty$](|backingStoreObject|, "<code>database</code>", |area|.[=[[DatabaseName]]=]).
+    1. Perform [$CreateDataProperty$](|backingStoreObject|, "<code>database</code>", <b>this</b>.[=[[DatabaseName]]=]).
     1. Perform [$CreateDataProperty$](|backingStoreObject|, "<code>store</code>", "<code>store</code>").
     1. Perform [$CreateDataProperty$](|backingStoreObject|, "<code>version</code>", 1).
     1. Perform [$SetIntegrityLevel$](|backingStoreObject|, "<code>frozen</code>").
-    1. Set |area|.[=[[BackingStoreObject]]=] to |backingStoreObject|.
-  1. Return |area|.[=[[BackingStoreObject]]=].
+    1. Set <b>this</b>.[=[[BackingStoreObject]]=] to |backingStoreObject|.
+  1. Return <b>this</b>.[=[[BackingStoreObject]]=].
 </div>
 
 <div class="example" id="example-backingstore">
-  Consider a checklist application, which tracks the Pokémon a user has collected. It might use <code>[=std:kv-storage/storage=]</code> like so:
+  Consider a checklist application, which tracks the Pokémon a user has collected. It might use a {{StorageArea}} |storage| like so:
 
   <xmp highlight="js">
     bulbasaur.onchange = () => storage.set("bulbasaur", bulbasaur.checked);
@@ -624,106 +596,6 @@ To <dfn lt="deleting the database|delete the database">delete the database</dfn>
   Satisfied with their web app's Pokémon integrity, our developer is now happy and fulfilled. (At least, until they realize that none of their code has error handling.)
 </div>
 
-<h2 id="async-iterator">The storage area async iterator</h2>
-
-<p class="note">Much of this section is amenable to being generalized into a reusable primitive, probably via Web IDL. See <a href="https://github.com/heycam/webidl/issues/580">heycam/webidl#580</a>.</p>
-
-Upon evaluating the <a><code>std:kv-storage</code></a> module, let <dfn>the storage area async iterator prototype object</dfn> be object obtained via the following steps executed in the [=current realm=]:
-
-1. Let |proto| be [$ObjectCreate$]({{%IteratorPrototype%}}).
-1. Let |next| be [$CreateBuiltinFunction$](the steps of [[#storageareaasynciterator-next]]).
-1. Perform [$CreateMethodProperty$](|proto|, "<code>next</code>", |next|).
-1. Return |proto|.
-
-<h3 id="async-iterator-create">Creation</h3>
-
-To <dfn lt="create a storage area async iterator|creating a storage area async iterator">create a storage area async iterator</dfn>, given a {{StorageArea}} |area| and a string |mode| which is one of either "<code>keys</code>", "<code>values</code>", or "<code>entries</code>":
-
-1. Let |iter| be [$ObjectCreate$]([=the storage area async iterator prototype object=], « <dfn>\[[Area]]</dfn>, <dfn>\[[Mode]]</dfn>, <dfn>\[[LastKey]]</dfn>, <dfn>\[[OngoingPromise]]</dfn> »).
-1. Set |iter|.[=[[Area]]=] to |area|.
-1. Set |iter|.[=[[Mode]]=] to |mode|.
-1. Set |iter|.[=[[LastKey]]=] to [=not yet started=].
-1. Set |iter|.[=[[OngoingPromise]]=] to undefined.
-1. Return |iter|.
-
-The following is a non-normative summary of the internal slots that get added to objects created in such a way:
-
-<dl class="non-normative">
-  <dt>[=[[Area]]=]
-  <dd>A pointer back to the originating {{StorageArea}}, used so that the async iterator can [=perform a database operation|perform database operations=].
-
-  <dt>[=[[Mode]]=]
-  <dd>One of "<code>keys</code>", "<code>values</code>", or "<code>entries</code>", indicating the types of values that iteration will retrieve from the storage area.
-
-  <dt>[=[[LastKey]]=]
-  <dd>The key of the entry that was most recently iterated over, used to perform the next iteration. Or, if {{the storage area async iterator prototype object/next()}} has not yet been called, it will be set to [=not yet started=].
-
-  <dt>[=[[OngoingPromise]]=]
-  <dd>A reference to the promise that was returned by the most recent call to {{the storage area async iterator prototype object/next()}}, if that promise has not yet settled, or undefined if it has. Used to prevent concurrent executions of the main [=get the next IterResult=] algorithm, which would be bad because that algorithm needs to complete in order for [=[[LastKey]]=] to be set correctly.
-</dl>
-
-<h3 id="storageareaasynciterator-next" method for="the storage area async iterator prototype object" lt="next()">next()</h3>
-
-1. Let |iter| be this object.
-1. If [$Type$](|iter|) is not Object, or |iter|'s [=relevant realm=] is not equal to the [=current realm=], or |iter| does not have a \[[Area]] internal slot, then return [=a promise rejected with=] a {{TypeError}} exception.
-1. Let |currentOngoingPromise| be |iter|.[=[[OngoingPromise]]=].
-1. Let |resultPromise| be undefined.
-1. If |currentOngoingPromise| is not undefined, then set |resultPromise| to the result of [=transforming=] |currentOngoingPromise| by the result of [=getting the next IterResult=] given |iter|.
-1. Otherwise, set |resultPromise| to the result of [=getting the next IterResult=] given |iter|.
-1. Set |iter|.[=[[OngoingPromise]]=] to |resultPromise|.
-1. Return |resultPromise|.
-
-To <dfn lt="get the next IterResult|getting the next IterResult">get the next IterResult</dfn> given |iter|:
-
-1. Return the result of [=performing a database operation=] given |iter|.[=[[Area]]=], "<code>read</code>", and the following steps operating on |transaction| and |store|:
-  1. Let |lastKey| be |iter|.[=[[LastKey]]=].
-  1. If |lastKey| is undefined, then return [$CreateIterResultObject$](undefined, true).
-  1. Let |range| be the result of [=getting the range for=] |lastKey|.
-  1. Let |key| and |iterResultValue| be null.
-  1. Let |promise| be [=a new promise=].
-  1. Switch on |iter|.[=[[Mode]]=]:
-    <dl class="switch">
-      <dt>"<code>keys</code>"</dt>
-      <dd>
-        1. Let |request| be the result of performing the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/getKey()}} method on |store|, given the argument |range|.
-        1. [=Add a simple event listener=] to |request| for "<code>success</code>" that performs the following steps:
-          1. Set |key| to |request|'s [=request/result=].
-          1. Set |iterResultValue| to |key|.
-          1. [=Finish up=].
-        1. [=Add a simple event listener=] to |request| for "<code>error</code>" that [=rejects=] |promise| with |request|'s [=request/error=].
-      </dd>
-      <dt>"<code>values</code>"</dt>
-      <dd>
-        1. Let |keyRequest| be the result of performing the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/getKey()}} method on |store|, given the argument |range|.
-        1. Let |valueRequest| be the result of performing the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/get()}} method on |store|, given the argument |range|.
-        1. [=Add a simple event listener=] to |valueRequest| for "<code>success</code>" that performs the following steps:
-          1. Set |key| to |keyRequest|'s [=request/result=].
-          1. Set |iterResultValue| to |valueRequest|'s [=request/result=].
-          1. [=Finish up=].
-        1. [=Add a simple event listener=] to |keyRequest| for "<code>error</code>" that [=rejects=] |promise| with |keyRequest|'s [=request/error=].
-        1. [=Add a simple event listener=] to |valueRequest| for "<code>error</code>" that [=rejects=] |promise| with |valueRequest|'s [=request/error=].
-      </dd>
-      <dt>"<code>entries</code>"</dt>
-      <dd>
-        1. Let |keyRequest| be the result of performing the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/getKey()}} method on |store|, given the argument |range|.
-        1. Let |valueRequest| be the result of performing the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/get()}} method on |store|, given the argument |range|.
-        1. [=Add a simple event listener=] to |valueRequest| for "<code>success</code>" that performs the following steps:
-          1. Set |key| to |keyRequest|'s [=request/result=].
-          1. Let |value| be |valueRequest|'s [=request/result=].
-          1. Set |iterResultValue| to [$CreateArrayFromList$](« |key|, |value| »).
-          1. [=Finish up=].
-        1. [=Add a simple event listener=] to |keyRequest| for "<code>error</code>" that [=rejects=] |promise| with |keyRequest|'s [=request/error=].
-        1. [=Add a simple event listener=] to |valueRequest| for "<code>error</code>" that [=rejects=] |promise| with |valueRequest|'s [=request/error=].
-      </dd>
-    </dl>
-
-    When the above steps say to <dfn>finish up</dfn>, which they will do after having set |key| and |iterResultValue| appropriately, perform the following steps:
-      1. Set |iter|.[=[[LastKey]]=] to |key|.
-      1. Set |iter|.[=[[OngoingPromise]]=] to undefined.
-      1. Let |done| be true if |key| is undefined, and false otherwise.
-      1. [=Resolve=] |promise| with [$CreateIterResultObject$](|iterResultValue|, |done|).
-  1. Return |promise|.
-
 <h2 id="supporting">Supporting operations and concepts</h3>
 
 To <dfn>add a simple event listener</dfn>, given an {{EventTarget}} |target|, an event type string |type|, and a set of steps |steps|:
@@ -744,7 +616,6 @@ The <dfn>current <code>IDBFactory</code></dfn> is the {{IDBFactory}} instance re
 To <dfn lt="performing a database operation|perform a database operation">perform a database operation</dfn> given a {{StorageArea}} |area|, a mode string |mode|, and a set of steps |steps| that operate on an {{IDBTransaction}} |transaction| and an {{IDBObjectStore}} |store|:
 
 <div class="algorithm">
-  1. If |area| does not [=StorageArea/brand check=], return [=a promise rejected with=] a {{TypeError}} exception.
   1. Assert: |area|.[=[[DatabaseName]]=] is a string (and in particular is not null).
   1. If |area|.[=[[DatabasePromise]]=] is null, [=initialize the database promise=] for |area|.
   1. Return the result of [=transforming=] |area|.[=[[DatabasePromise]]=] by a fulfillment handler that performs the following steps, given |database|:
@@ -817,7 +688,7 @@ To <dfn lt="get the range for a key|getting the range for|getting the range for 
 
 1. If |key| is [=not yet started=], then return the result of performing the steps listed in the description of the {{IDBKeyRange/lowerBound(lower)|IDBKeyRange.lowerBound()}} static method, given the argument &minus;Infinity.
    <p class="note">The intent here is to get an [=unbounded key range=], but this is the closest thing we can get that is representable as an {{IDBKeyRange}} object. It works equivalently for our purposes, but will behave incorrectly if Indexed DB ever adds keys that sort below &minus;Infinity. See <a href="https://github.com/WICG/kv-storage/issues/6#issuecomment-452054944">some discussion on potential future improvements</a>.</p>
-1. Otherwise, return the result of performing the steps listed listed in the description of the {{IDBKeyRange/lowerBound(lower, lowerOpen)|IDBKeyRange.lowerBound()}} static method, given the arguments |lastKey| and true.
+1. Otherwise, return the result of performing the steps listed listed in the description of the {{IDBKeyRange/lowerBound(lower, open)|IDBKeyRange.lowerBound()}} static method, given the arguments |lastKey| and true.
 
 The special value <dfn>not yet started</dfn> can be taken to be any JavaScript value that is not equal to any other program-accessible JavaScript value (but is equal to itself). It is used exclusively as an argument to the [=get the range for a key=] algorithm.
 
@@ -825,9 +696,9 @@ The special value <dfn>not yet started</dfn> can be taken to be any JavaScript v
 
 <h2 id="perfect-polyfill">Appendix: is this API perfectly layered?</h2>
 
-The APIs in this specification, being layered on top of Indexed DB as they are, are almost entirely well-layered, in the sense of building on low-level features in the way promoted by the <cite>Extensible Web Manifesto</cite>. (Indeed, the <a href="#class-definition-explanation">unusual class definition pattern</a> was motivated by a desire to further improve this layering.) However, it fails in two ways, both around ensuring the encapsulation of the implementation: [[EXTENSIBLE]]
+The APIs in this specification, being layered on top of Indexed DB as they are, are almost entirely well-layered, in the sense of building on low-level features in the way promoted by the <cite>Extensible Web Manifesto</cite>. However, it fails in two ways, both around ensuring the encapsulation of the implementation: [[EXTENSIBLE]]
 
-* By <a href="#fn-tostring-censorship">requiring censorship</a> of the output of <code>Function.prototype.toString()</code> for the functions produced. See <a href="https://github.com/drufball/layered-apis/issues/7">drufball/layered-apis#7</a>.
+* The output of <code>Function.prototype.toString()</code> for the functions produced is censored. See <a href="https://github.com/drufball/layered-apis/issues/7">drufball/layered-apis#7</a>.
 
 * By directly invoking the algorithms of various IDL operations and attributes, instead of going through the global, potentially-overridable JavaScript APIs. (E.g., in various algorithm steps that say "performing the steps listed in the description of", or the [=allowed as a key=] algorithm which uses [$IsArray$] directly instead of going through <code>Array.isArray()</code>.) See <a href="https://github.com/drufball/layered-apis/issues/6">drufball/layered-apis#6</a>.
 
@@ -838,9 +709,12 @@ Eventually we hope to introduce the ability for web authors to write code that g
 The editor would like to thank
 Andrew Sutherland,
 Kenneth Rohde Christiansen,
+Jacob Rask,
 Jake Archibald,
 Jan Varga,
-Joshua Bell, and
+Joshua Bell,
+Ms2ger,
+and
 Victor Costan
 for their contributions to this specification.
 

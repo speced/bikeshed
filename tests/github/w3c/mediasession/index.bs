@@ -1,24 +1,25 @@
 <pre class="metadata">
 Title: Media Session Standard
-Status: CG-DRAFT
-ED: https://wicg.github.io/mediasession
+Repository: w3c/mediasession
+Status: ED
+ED: https://w3c.github.io/mediasession
 Shortname: mediasession
 Level: 1
 Editor: Mounir Lamouri, Google Inc., mlamouri@google.com
 Former Editor: Zhiqiang Zhang, Google Inc., zqzhang@google.com
 Former Editor: Rich Tibbett, Opera, richt@opera.com
 
-Group: wicg
+Group: mediawg
 Logo: https://resources.whatwg.org/logo-mediasession.svg
 Abstract: This specification enables web developers to show customized media
 Abstract: metadata on platform UI, customize available platform media
 Abstract: controls, and access platform media keys such as hardware keys found
 Abstract: on keyboards, headsets, remote controls, and software keys found in
 Abstract: notification areas and on lock screens of mobile devices.
-!Participate: <a href="https://github.com/WICG/mediasession/">We are on GitHub</a>
-!Participate: <a href="https://github.com/WICG/mediasession/issues/new">File an issue</a>
-!Participate: <a href="https://github.com/WICG/mediasession/issues?state=open">Open issues</a>
-!Version History: <a href="https://github.com/WICG/mediasession/commits">https://github.com/WICG/mediasession/commits</a>
+!Participate: <a href="https://github.com/w3c/mediasession/">We are on GitHub</a>
+!Participate: <a href="https://github.com/w3c/mediasession/issues/new">File an issue</a>
+!Participate: <a href="https://github.com/w3c/mediasession/issues?state=open">Open issues</a>
+!Version History: <a href="https://github.com/w3c/mediasession/commits">https://github.com/w3c/mediasession/commits</a>
 Ignored Vars: context, media, session
 Boilerplate: omit conformance, omit feedback-header
 </pre>
@@ -452,12 +453,16 @@ conforming IDL fragments, as described in the Web IDL specification. [[!WEBIDL]]
           playback has a notion of playlist.
         </li>
         <li>
-          <dfn enum-value for=MediaSessionAction>skipad</dfn>: the action
-          intent is to skip the advertisement that is currently playing.
+          <dfn enum-value for=MediaSessionAction>skipad</dfn>: the action intent
+          is to skip the advertisement that is currently playing.
         </li>
         <li>
-          <dfn enum-value for=MediaSessionAction>stop</dfn>: the action intent is
-          to stop the playback and clear the state if appropriate.
+          <dfn enum-value for=MediaSessionAction>stop</dfn>: the action intent
+          is to stop the playback and clear the state if appropriate.
+        </li>
+        <li>
+          <dfn enum-value for=MediaSessionAction>seekto</dfn>: the action intent
+          is to move the playback time to a specific time.
         </li>
       </ul>
     </p>
@@ -517,7 +522,21 @@ conforming IDL fragments, as described in the Web IDL specification. [[!WEBIDL]]
           with the key <var>action</var> in <var>actions</var>.
         </li>
         <li>
-          Run <var>handler</var>.
+          Run <var>handler</var> with the <var>details</var> parameter set to:
+          <ul>
+            <li>
+              {{MediaSessionSeekActionDetails}} if <var>action</var> is
+              <a enum-value for=MediaSessionAction>seekbackward</a> or
+              <a enum-value for=MediaSessionAction>seekforward</a>.
+            </li>
+            <li>
+              {{MediaSessionSeekToActionDetails}} if <var>action</var> is
+              <a enum-value for=MediaSessionAction>seekto</a>.
+            </li>
+            <li>
+              Otherwise, with {{MediaSessionActionDetails}}.
+            </li>
+          </ul>
         </li>
       </ol>
     </p>
@@ -618,6 +637,88 @@ conforming IDL fragments, as described in the Web IDL specification. [[!WEBIDL]]
       </ol>
     </p>
   </section>
+
+  <section>
+    <h3 id='position-state'>Position State</h3>
+
+    <p>
+      A user agent MAY display the <a>current playback position</a> and
+      <a>duration</a>
+      of a media session in the platform UI depending on platform conventions.
+      The
+      <dfn>position state</dfn> is the combination of the following:
+      <ul>
+        <li>
+          The <dfn>duration</dfn> of the media in seconds.
+        </li>
+        <li>
+          The <dfn>playback rate</dfn> of the media. It is a coefficient.
+        </li>
+        <li>
+          The <dfn>last reported playback position</dfn> of the media. This is
+          the playback position of the media in seconds when the <a>position
+          state</a>
+          was created.
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      The <a>position state</a> is represented by a {{MediaPositionState}} which
+      MUST always be stored with the <dfn>last position updated time</dfn>. This
+      is the time the <a>position state</a> was last updated in seconds.
+    </p>
+
+    <p>
+      The RECOMMENDED way to determine the <a>position state</a> is to monitor
+      the media elements whose node document's browsing context is the
+      <a>browsing context</a>.
+    </p>
+
+    <p>
+      The <dfn>actual playback rate</dfn> is a coefficient computed in the
+      following way:
+      <ul>
+        <li>
+          If the <a>actual playback state</a> is <a enum-value
+          for="MediaSessionPlaybackState">paused</a>, then return zero.
+        </li>
+        <li>
+          Return <a>playback rate</a>.
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      The <dfn>current playback position</dfn> in seconds is computed in the
+      following way:
+      <ul>
+        <li>
+          Set <var>time elapsed</var> to the system time in seconds minus the
+          <a>last position updated time</a>.
+        </li>
+        <li>
+          Mutliply <var>time elapsed</var> with <a>actual playback rate</a>.
+        </li>
+        <li>
+          Set <var>position</var> to <var>time elapsed</var> added to
+          <a>last reported playback position</a>.
+        </li>
+        <li>
+          If <var>position</var> is less than zero, return zero.
+        </li>
+        <li>
+          If <var>position</var> is greater than <a>duration</a>, return
+          <a>duration</a>.
+        </li>
+        <li>
+          Return <var>position</var>.
+        </li>
+      </ul>
+    </p>
+
+  </section>
+
 </section>
 
 <h2 id="the-mediasession-interface">The {{MediaSession}} interface</h2>
@@ -643,9 +744,10 @@ enum MediaSessionAction {
   "nexttrack",
   "skipad",
   "stop",
+  "seekto"
 };
 
-callback MediaSessionActionHandler = void();
+callback MediaSessionActionHandler = void(MediaSessionActionDetails details);
 
 [Exposed=Window]
 interface MediaSession {
@@ -654,6 +756,8 @@ interface MediaSession {
   attribute MediaSessionPlaybackState playbackState;
 
   void setActionHandler(MediaSessionAction action, MediaSessionActionHandler? handler);
+
+  void setPositionState(MediaPositionState? state);
 };
 </pre>
 
@@ -746,6 +850,33 @@ interface MediaSession {
   The <dfn method for=MediaSession>setActionHandler()</dfn> method, when
   invoked, MUST run the <a>update action handler algorithm</a> with
   <var>action</var> and <var>handler</var> on the {{MediaSession}}.
+</p>
+
+<p>
+  The <dfn method for=MediaSession>setPositionState()</dfn> method, when invoked
+  MUST perform the following steps:
+
+  <ul>
+    <li>
+      If the <var>state</var> is null then clear the <a>position state</a>.
+    </li>
+    <li>
+      If the <a dict-member for="MediaPositionState">duration</a> is negative,
+      throw a <a exception>TypeError</a>.
+    </li>
+    <li>
+      If the <a dict-member for="MediaPositionState">position</a> is negative or
+      greater than <a dict-member for="MediaPositionState">duration</a>, throw a
+      <a exception>TypeError</a>.
+    </li>
+    <li>
+      If the <a dict-member for="MediaPositionState">playbackRate</a> is zero
+      throw a <a exception>TypeError</a>.
+    </li>
+    <li>
+      Update the <a>position state</a> and <a>last position updated time</a>.
+    </li>
+  </ul>
 </p>
 
 <h2 id="the-mediametadata-interface">The {{MediaMetadata}} interface</h2>
@@ -1016,6 +1147,83 @@ used to specify the {{MediaImage}} object's <a>MIME type</a>. It is a hint as to
 the media type of the image. The purpose of this attribute is to allow a user
 agent to ignore images of media types it does not support.
 
+<h2 id="the-mediapositionstate-dictionary">The {{MediaPositionState}}
+dictionary</h2>
+
+<pre class="idl">
+
+dictionary MediaPositionState {
+  required double duration;
+  double playbackRate = 1.0;
+  double position = 0.0;
+};
+</pre>
+
+The {{MediaPositionState}} dictionary is a representation of the current
+playback position associated with a {{MediaSession}} that can be used by user
+agents to provide a user interface that displays the current playback position
+and duration.
+
+The <dfn dict-member for="MediaPositionState">duration</dfn> <a>dictionary
+member</a>
+is used to specify the <a>duration</a> in seconds. It should always be positive
+and positive infinity can be used to indicate media without a defined end such
+as live playback.
+
+The <dfn dict-member for="MediaPositionState">playbackRate</dfn> <a>dictionary
+member</a>
+is used to specify the <a>playback rate</a>. It can be positive to represent
+forward playback or negative to represent backwards playback. It should not be
+zero.
+
+The <dfn dict-member for="MediaPositionState">position</dfn> <a>dictionary
+member</a>
+is used to specify the <a>last reported playback position</a> in seconds. It
+should always be positive.
+
+<h2 id="the-mediasessionactiondetails-dictionary">The
+{{MediaSessionActionDetails}} dictionary</h2>
+
+<pre class="idl">
+
+dictionary MediaSessionActionDetails {
+  required MediaSessionAction action;
+};
+
+dictionary MediaSessionSeekActionDetails : MediaSessionActionDetails {
+  double? seekOffset;
+};
+
+dictionary MediaSessionSeekToActionDetails : MediaSessionActionDetails {
+  required double seekTime;
+  bool? fastSeek;
+};
+</pre>
+
+The {{MediaSessionActionHandler}} MUST be run with the <var>details</var>
+parameter which is represented by a dictionary inherited from
+{{MediaSessionActionDetails}}.
+
+The <dfn dict-member for="MediaSessionActionDetails">action</dfn> <a>dictionary
+member</a>
+is used to specify the <a>action</a> that the {{MediaSessionActionHandler}} is
+associated with.
+
+The <dfn dict-member for="MediaSessionSeekActionDetails">seekOffset</dfn>
+<a>dictionary member</a> MAY be provided and is the time in seconds to move the
+playback time by. If it is not provided then the site should choose a sensible
+time (e.g. a few seconds).
+
+The <dfn dict-member for="MediaSessionSeekToActionDetails">seekTime</dfn>
+<a>dictionary member</a> MUST be provided and is the time in seconds to move the
+playback time to.
+
+The <dfn dict-member for="MediaSessionSeekToActionDetails">fastSeek</dfn>
+<a>dictionary member</a> MAY be provided and will be true if the
+<a enum-value for=MediaSessionAction>seekto</a> <a>action</a> is being called
+multiple times as part of a sequence and this is not the last call in that
+sequence.
+
 <h2 id="examples">Examples</h2>
 
 <em>This section is non-normative.</em>
@@ -1122,6 +1330,10 @@ agent to ignore images of media types it does not support.
       trackId = (trackId + 1) % tracks.length;
       updatePlayingMedia();
     });
+
+    navigator.mediaSession.setActionHandler("seekto", function(details) {
+      audio.currentTime = details.seekTime;
+    });
   </pre>
 </div>
 
@@ -1183,6 +1395,32 @@ agent to ignore images of media types it does not support.
     function removeAdFrame() {
       adFrame.remove();
     }
+  </pre>
+</div>
+
+<div class="example" id="example-media-position-state">
+  Setting <a>position state</a>:
+  <pre class="lang-javascript">
+    // Media is loaded, set the duration.
+    navigator.mediaSession.setPositionState({
+      duration: 60
+    });
+
+    // Media starts playing at the beginning.
+    navigator.mediaSession.playbackState = "playing";
+
+    // Media starts playing at 2x 10 seconds in.
+    navigator.mediaSession.setPositionState({
+      duration: 60,
+      playbackRate: 2,
+      position: 10
+    });
+
+    // Media is paused.
+    navigator.mediaSession.playbackState = "paused";
+
+    // Media is reset.
+    navigator.mediaSession.setPositionState(null);
   </pre>
 </div>
 

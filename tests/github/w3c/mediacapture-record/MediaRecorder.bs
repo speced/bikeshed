@@ -111,14 +111,51 @@ interface MediaRecorder : EventTarget {
         "False">&#10008;</span></td>
         <td class="prmOptTrue"><span role="img" aria-label=
         "True">&#10004;</span></td>
-        <td class="prmDesc">A dictionary of options to for the UA instructing
-        how the recording will take part.
-        {{MediaRecorderOptions/mimeType|options.mimeType}}, if present, will
-        become the value of {{MediaRecorder/mimeType}} attribute.</td>
+        <td class="prmDesc">A dictionary of recording options.</td>
       </tr>
     </tbody>
   </table>
   </dd>
+  <dd>When the {{MediaRecorder()}}
+  constructor is invoked, the User Agent MUST run the following steps:
+  <ol>
+    <li>Let |stream| be the constructor's first argument.</li>
+    <li>Let |options| be the constructor's second argument.</li>
+    <li>If {{MediaRecorderOptions/mimeType}} is present in |options|, and
+    invoking [$is type supported$] with |options|'
+    {{MediaRecorderOptions/mimeType}} member as its argument returns false,
+    throw a {{NotSupportedError}} {{DOMException}} and abort these steps.</li>
+    <li>Let |recorder| be a newly constructed {{MediaRecorder}} object.</li>
+    <li>Let |recorder| have a <dfn>\[[ConstrainedMimeType]]</dfn> internal slot,
+    initialized to the empty string.</li>
+    <li>Let |recorder| have a <dfn>\[[ConstrainedBitsPerSecond]]</dfn> internal
+    slot, initialized to the value of |options|'
+    {{MediaRecorderOptions/bitsPerSecond}} member, if it is present, otherwise
+    <code>undefined</code>.</li>
+    <li>Set |recorder|'s [=[[ConstrainedMimeType]]=] slot to the value of
+    |options|' {{MediaRecorderOptions/mimeType}} member, if it is present.</li>
+    <li>Initialize |recorder|'s {{MediaRecorder/stream}} attribute to
+    |stream|.</li>
+    <li>Initialize |recorder|'s {{MediaRecorder/mimeType}} attribute to the
+    value of |recorder|'s [=[[ConstrainedMimeType]]=] slot.</li>
+    <li>Initialize |recorder|'s {{MediaRecorder/state}} attribute to
+    {{inactive}}.</li>
+    <li>Initialize |recorder|'s {{videoBitsPerSecond}} attribute to the value of
+    |options|' {{MediaRecorderOptions/videoBitsPerSecond}} member, if it is
+    present. Otherwise, choose a target value the User Agent deems reasonable
+    for video.</li>
+    <li>Initialize |recorder|'s {{audioBitsPerSecond}} attribute to the value of
+    |options|' {{MediaRecorderOptions/audioBitsPerSecond}} member, if it is
+    present. Otherwise, choose a target value the User Agent deems reasonable
+    for audio.</li>
+    <li>If |recorder|'s [=[[ConstrainedBitsPerSecond]]=] slot is not
+    <code>undefined</code>, set |recorder|'s {{videoBitsPerSecond}} and
+    {{audioBitsPerSecond}} attributes to values the User Agent deems reasonable
+    for the respective media types, such that the sum of {{videoBitsPerSecond}}
+    and {{audioBitsPerSecond}} is close to the value of |recorder|'s
+    [=[[ConstrainedBitsPerSecond]]=] slot.</li>
+    <li>Return |recorder|.</li>
+  </ol></dd>
 </dl>
 
 ## Attributes ## {#mediarecorder-attributes}
@@ -128,12 +165,10 @@ interface MediaRecorder : EventTarget {
   <dd>The {{MediaStream}} [[!GETUSERMEDIA]] to be recorded.</dd>
 
   <dt><dfn attribute for="MediaRecorder"><code>mimeType</code></dfn></dt>
-  <dd>The MIME type [[!RFC2046]] that has been selected as the container
-  for recording. This entry includes all the parameters to the base
-  <code>mimeType</code>. The UA should be able to play back any of the
-  MIME types it supports for recording. For example, it should be able
-  to display a video recording in the HTML &lt;video&gt; tag. The
-  default value for this property is platform-specific.
+  <dd>The MIME type [[!RFC2046]] used by the {{MediaRecorder}} object.
+  The User Agent SHOULD be able to play back any of the MIME types it supports
+  for recording. For example, it should be able to display a video recording in
+  the HTML &lt;video&gt; tag.
 
   <div class="note"> {{MediaRecorder/mimeType}} specifies the media type and
   container format for the recording via a type/subtype combination, with the
@@ -142,8 +177,7 @@ interface MediaRecorder : EventTarget {
   </div></dd>
 
   <dt><dfn attribute for="MediaRecorder"><code>state</code></dfn></dt>
-  <dd>The current state of the {{MediaRecorder}} object. When the
-  {{MediaRecorder}} is created, the UA MUST set this attribute to {{inactive}}.
+  <dd>The current state of the {{MediaRecorder}} object.
   </dd>
 
   <dt><dfn attribute for="MediaRecorder"><code>onstart</code></dfn></dt>
@@ -167,14 +201,10 @@ interface MediaRecorder : EventTarget {
   <dd>Called to handle a {{MediaRecorderErrorEvent}}.</dd>
 
   <dt><dfn attribute for="MediaRecorder"><code>videoBitsPerSecond</code></dfn></dt>
-  <dd>The value of the Video encoding target bit rate that was passed to
-  the Platform (potentially truncated, rounded, etc), or the calculated
-  one if the user has specified {{bitsPerSecond}}.</dd>
+  <dd>The target bitrate used to encode video tracks.</dd>
 
   <dt><dfn attribute for="MediaRecorder"><code>audioBitsPerSecond</code></dfn></dt>
-  <dd>The value of the Audio encoding target bit rate that was passed to
-  the Platform (potentially truncated, rounded, etc), or the calculated
-  one if the user has specified {{bitsPerSecond}}.</dd>
+  <dd>The target bitrate used to encode audio tracks.</dd>
 </dl>
 
 ## Methods ## {#mediarecorder-methods}
@@ -189,63 +219,119 @@ interface MediaRecorder : EventTarget {
   When a {{MediaRecorder}} object&#8217;s {{start()}} method is invoked, the UA
   MUST run the following steps:
   <ol>
-    <li>Let <var>target</var> be the MediaRecorder context object.</li>
+    <li>Let |recorder| be the {{MediaRecorder}} object on which the method was
+    invoked.</li>
+
     <li>Let <var>timeslice</var> be the method's first argument, if provided,
     or <code>undefined</code>. </li>
 
-    <li>If {{state}} is not {{inactive}}, throw an {{InvalidStateError}}
+    <li>Let |stream| be the value of |recorder|'s {{stream}} attribute.</li>
+
+    <li>Let |tracks| be the set of {{live}} tracks in |stream|'s
+    [=track set=].</li>
+
+    <li>If the value of |recorder|'s {{state}} attribute is not {{inactive}},
+    throw an {{InvalidStateError}} {{DOMException}} and abort these steps.</li>
+
+    <li>If the <a>isolation properties</a> of |stream| disallow access from
+    |recorder|, throw a {{SecurityError}} {{DOMException}} and abort these
+    steps.</li>
+
+    <li>If |stream| is {{inactive}}, throw a {{NotSupportedError}}
     {{DOMException}} and abort these steps.</li>
 
-    <li>If the {{MediaRecorder/stream}}'s <a>isolation properties</a> disallow access
-    from this {{MediaRecorder}}, throw a {{SecurityError}} {{DOMException}} and
-    abort these steps.</li>
-
-    <li>Set {{state}} to {{recording}}, and run the following steps in parallel:
+    <li>If the [=[[ConstrainedMimeType]]=] slot specifies a media type,
+    container, or codec, then run the following sub steps:
     <ol>
-      <li>Start gathering the data into a {{Blob}} <var>blob</var> and queue a
-      task, using the DOM manipulation task source, to <a>fire an event</a>
-      named <a>start</a> at <var>target</var>, then return <code>undefined</code>.
-      </li>
+      <li>Constrain the configuration of |recorder| to the media type,
+      container, and codec specified in the [=[[ConstrainedMimeType]]=]
+      slot.</li>
+      <li>For each track in |tracks|, if the User Agent cannot record the track
+      using the current configuration, then throw a {{NotSupportedError}}
+      {{DOMException}} and abort all steps.</li>
+    </ol>
+    </li>
 
-      <li>If at any point the {{MediaRecorder/stream}}'s <a>isolation properties</a>
-      change so that {{MediaRecorder}} is no longer allowed access to it, the
-      UA MUST immediately stop gathering data, discard any data that it has
-      gathered, and queue a task, using the DOM manipulation task source, that
-      runs the following steps:
+    <li>Let |extendedMimeType| be the value of |recorder|'s
+    [=[[ConstrainedMimeType]]=] slot.</li>
+
+    <li>Modify |extendedMimeType| by adding media type, subtype and codecs
+    parameter reflecting the configuration used by the MediaRecorder to record
+    all tracks in |tracks|, if not already present. This MAY include the
+    profiles parameter [[RFC6381]] or further codec-specific parameters.</li>
+
+    <li>Set |recorder|'s {{mimeType}} attribute to |extendedMimeType|.</li>
+
+    <li>If |recorder|'s [=[[ConstrainedBitsPerSecond]]=] slot is not
+    <code>undefined</code>, set |recorder|'s {{videoBitsPerSecond}} and
+    {{audioBitsPerSecond}} attributes to values the User Agent deems reasonable
+    for the respective media types, for recording all tracks in |tracks|, such
+    that the sum of {{videoBitsPerSecond}} and {{audioBitsPerSecond}} is close
+    to the value of |recorder|'s [=[[ConstrainedBitsPerSecond]]=] slot.</li>
+
+    <li>Let |videoBitrate| be the value of |recorder|'s {{videoBitsPerSecond}}
+    attribute, and constrain the configuration of |recorder| to target an
+    aggregate bitrate of |videoBitrate| bits per second for all video tracks
+    |recorder| will be recording. |videoBitrate| is a hint for the encoder and
+    the value might be surpassed, not achieved, or only be achieved over a long
+    period of time.</li>
+
+    <li>Let |audioBitrate| be the value of |recorder|'s {{audioBitsPerSecond}}
+    attribute, and constrain the configuration of |recorder| to target an
+    aggregate bitrate of |audioBitrate| bits per second for all audio tracks
+    |recorder| will be recording. |audioBitrate| is a hint for the encoder and
+    the value might be surpassed, not achieved, or only be achieved over a long
+    period of time.</li>
+
+    <li>Set |recorder|'s {{state}} to {{recording}}, and run the following steps
+    in parallel:
+    <ol>
+      <li>Start recording all tracks in |tracks| using the {{MediaRecorder}}'s
+      current configuration, and gather the data into a {{Blob}} <var>blob</var>
+      and queue a task, using the DOM manipulation task source, to
+      <a>fire an event</a> named <a>start</a> at <var>recorder</var>, then return
+      <code>undefined</code>.</li>
+
+      <li>If at any point |stream|'s <a>isolation properties</a> change so
+      that {{MediaRecorder}} is no longer allowed access to it, the UA MUST
+      immediately stop gathering data, discard any data that it has gathered,
+      and queue a task, using the DOM manipulation task source, that runs the
+      following steps:
       <ol>
-        <li>Set {{state}} to {{inactive}}.</li>
+        <li>[$Inactivate the recorder$] with |recorder|.</li>
         <li><a>Fire an error event</a> named {{SecurityError}} at
-        <var>target</var>.</li>
+        <var>recorder</var>.</li>
         <li><a href="#to-fire-a-blob-event">Fire a blob event</a> named
-        <a>dataavailable</a> at <var>target</var> with <var>blob</var>.</li>
-        <li><a>Fire an event</a> named <a>stop</a> at <var>target</var>.</li>
+        <a>dataavailable</a> at <var>recorder</var> with <var>blob</var>.</li>
+        <li><a>Fire an event</a> named <a>stop</a> at <var>recorder</var>.</li>
       </ol>
       </li>
 
-      <li>If at any point, a track is added to or removed from the {{MediaRecorder/stream}}'s
-      track set, the UA MUST immediately stop gathering data, discard any data that it has gathered,
-      and queue a task, using the DOM manipulation task source, that runs the following steps:
+      <li>If at any point, a track is added to or removed from |stream|'s
+      [=track set=], the UA MUST immediately stop gathering data, discard any
+      data that it has gathered, and queue a task, using the DOM manipulation
+      task source, that runs the following steps:
       <ol>
-        <li>Set {{state}} to {{inactive}}.</li>
+        <li>[$Inactivate the recorder$] with |recorder|.</li>
         <li><a>Fire an error event</a> named {{InvalidModificationError}} at
-        <var>target</var>.</li>
+        <var>recorder</var>.</li>
         <li><a href="#to-fire-a-blob-event">Fire a blob event</a> named
-        <a>dataavailable</a> at <var>target</var> with <var>blob</var>.</li>
-        <li><a>Fire an event</a> named <a>stop</a> at <var>target</var>.</li>
+        <a>dataavailable</a> at <var>recorder</var> with <var>blob</var>.</li>
+        <li><a>Fire an event</a> named <a>stop</a> at <var>recorder</var>.</li>
       </ol>
       </li>
 
       <li>If the UA at any point is unable to continue gathering data for
-      reasons other than <a>isolation properties</a> or stream track set, it MUST stop gathering data, and
-      queue a task, using the DOM manipulation task source, that runs the
-      following steps:
+      reasons other than <a>isolation properties</a> or |stream|'s
+      [=track set=], it MUST stop gathering data, and queue a task, using the
+      DOM manipulation task source, that runs the following steps:
       <ol>
-        <li>Set {{state}} to {{inactive}}.</li>
+        <li>[$Inactivate the recorder$] with |recorder|.</li>
         <li><a>Fire an error event</a> named {{UnknownError}} at
-        <var>target</var>.</li>
+        <var>recorder</var>.</li>
         <li><a href="#to-fire-a-blob-event">Fire a blob event</a> named
-        <a>dataavailable</a> at <var>target</var> with <var>blob</var>.</li>
-        <li><a>Fire an event</a> named <a>stop</a> at <var>target</var>.</li>
+        <a>dataavailable</a> at <var>recorder</var> with <var>blob</var>.</li>
+        <li><a>Fire an event</a> named <a>stop</a> at <var>recorder</var>.</li>
       </ol>
       </li>
 
@@ -255,7 +341,7 @@ interface MediaRecorder : EventTarget {
       gathering data into a new {{Blob}} <var>blob</var>, and queue a task,
       using the DOM manipulation task source, that
       <a href="#to-fire-a-blob-event">fires a blob event</a> named
-      <a>dataavailable</a> at <var>target</var> with <var>blob</var>.
+      <a>dataavailable</a> at <var>recorder</var> with <var>blob</var>.
 
       Note that an <code>undefined</code> value of <var>timeslice</var> will
       be understood as the largest <code>long</code> value.</li>
@@ -264,11 +350,11 @@ interface MediaRecorder : EventTarget {
       queue a task, using the DOM manipulation task source, that runs the
       following steps:
       <ol>
-        <li>Set {{state}} to {{inactive}}.</li>
+        <li>[$Inactivate the recorder$] with |recorder|.</li>
         <li><a href="#to-fire-a-blob-event">Fire a blob event</a> named
-        <a>dataavailable</a> at <var>target</var> with <var>blob</var>.</li>
+        <a>dataavailable</a> at <var>recorder</var> with <var>blob</var>.</li>
         <li><a>Fire an event</a> named <a>stop</a> at
-        <var>target</var>.</li>
+        <var>recorder</var>.</li>
       </ol>
       </li>
 
@@ -288,6 +374,20 @@ interface MediaRecorder : EventTarget {
   <p> If any Track within the {{MediaStream}} is {{muted}} or not {{enabled}} at
   any time, the UA will only record black frames or silence since that is the
   content produced by the Track.</p>
+
+  <p>The <dfn abstract-op>Inactivate the recorder</dfn> algorithm given a
+  |recorder|, is as follows:</p>
+  <ol>
+    <li>Set |recorder|'s {{mimeType}} attribute to the value of the
+    [=[[ConstrainedMimeType]]=] slot.</li>
+    <li>Set |recorder|'s {{state}} attribute to {{inactive}}.</li>
+    <li>If |recorder|'s [=[[ConstrainedBitsPerSecond]]=] slot is not
+    <code>undefined</code>, set |recorder|'s {{videoBitsPerSecond}} and
+    {{audioBitsPerSecond}} attributes to values the User Agent deems reasonable
+    for the respective media types, such that the sum of {{videoBitsPerSecond}}
+    and {{audioBitsPerSecond}} is close to the value of |recorder|'s
+    [=[[ConstrainedBitsPerSecond]]=] slot.</li>
+  </ol>
 
   <table class="parameters">
     <tbody>
@@ -315,17 +415,19 @@ interface MediaRecorder : EventTarget {
   When a {{MediaRecorder}} object&#8217;s {{stop()}} method is invoked, the UA
   MUST run the following steps:
   <ol>
-    <li>If {{state}} is {{inactive}}, abort these steps.</li>
-
-    <li>Set {{state}} to {{inactive}}, and queue a
-    task, using the DOM manipulation task source, that runs the following steps:
+    <li>Let |recorder| be the {{MediaRecorder}} object on which the method was
+    invoked.</li>
+    <li>If |recorder|'s {{state}} attribute is {{inactive}}, abort these
+    steps.</li>
+    <li>[$Inactivate the recorder$] with |recorder|.</li>
+    <li>Queue a task, using the DOM manipulation task source, that runs the
+    following steps:
     <ol>
       <li>Stop gathering data.</li>
-      <li>Let <var>blob</var> be the Blob of collected data so far and
-      let <var>target</var> be the MediaRecorder context object, then
+      <li>Let <var>blob</var> be the Blob of collected data so far, then
       <a href="#to-fire-a-blob-event">fire a blob event</a> named
-      <a>dataavailable</a> at <var>target</var> with <var>blob</var>.</li>
-      <li><a>Fire an event</a> named <a>stop</a> at <var>target</var>.</li>
+      <a>dataavailable</a> at <var>recorder</var> with <var>blob</var>.</li>
+      <li><a>Fire an event</a> named <a>stop</a> at <var>recorder</var>.</li>
     </ol>
     </li>
     <li>return <code>undefined</code>.</li>
@@ -409,24 +511,8 @@ interface MediaRecorder : EventTarget {
   {{MediaRecorder}} implementation is capable of recording {{Blob}} objects for
   the specified MIME type. Recording may still fail if sufficient resources are
   not available to support the concrete media encoding. When this method is
-  invoked, the User Agent must run the following steps:
-  <ol class="method-algorithm">
-    <li>If <code>type</code> is an empty string, then return true
-    (note that this case is essentially equivalent to leaving up to
-    the UA the choice of container and codecs on constructor).</li>
-    <li>If <code>type</code> does not contain a valid MIME type
-    string, then return false.</li>
-    <li>If <code>type</code> contains a media type or media subtype
-    that the MediaRecorder does not support, then return false.</li>
-    <li>If <code>type</code> contains a media container that the
-    MediaRecorder does not support, then return false.</li>
-    <li>If <code>type</code> contains a codec that the MediaRecorder
-    does not support, then return false.</li>
-    <li>If the MediaRecorder does not support the specified
-    combination of media type/subtype, codecs and container then
-    return false.</li>
-    <li>Return true.</li>
-  </ol>
+  invoked, the User Agent must return the result of [$is type supported$],
+  given the method's first argument.
   <table class="parameters">
     <tbody>
       <tr>
@@ -449,6 +535,28 @@ interface MediaRecorder : EventTarget {
       </tr>
     </tbody>
   </table>
+  </dd>
+  <dd algorithm="is type supported">The <dfn abstract-op>is type supported</dfn>
+  algorithm consists of the following steps.
+  <ol>
+    <li>Let |type| be the algorithm's argument.</li>
+    <li>If |type| is an empty string, then return true (note that this case is
+    essentially equivalent to leaving up to the UA the choice of both container
+    and codecs).</li>
+    <li>If |type| does not contain a valid MIME type string, then return false.
+    </li>
+    <li>If |type| contains a media type or media subtype that the MediaRecorder
+    does not support, then return false.</li>
+    <li>If |type| contains a media container that the MediaRecorder does not
+    support, then return false.</li>
+    <li>If |type| contains more than one audio codec, or more than one video
+    codec, then return false.</li>
+    <li>If |type| contains a codec that the MediaRecorder does not support, then
+    return false.</li>
+    <li>If the MediaRecorder does not support the specified combination of media
+    type/subtype, codecs and container then return false.</li>
+    <li>Return true.</li>
+  </ol>
   </dd>
 </dl>
 
@@ -480,12 +588,7 @@ dictionary MediaRecorderOptions {
 <dl class="domintro">
   <dt><dfn dict-member for="MediaRecorderOptions"><code>mimeType</code></dfn></dt>
   <dd>The container and codec format(s) [[!RFC2046]] for the recording, which
-  may include any parameters that are defined for the format. If the UA does not
-  support the format or any of the parameters specified, it MUST throw a
-  {{NotSupportedError}} {{DOMException}}. If this paramater is not specified,
-  the UA will use a platform-specific default format. The container format,
-  whether passed in to the constructor or defaulted, will be used as the value
-  of the {{MediaRecorder/mimeType}} attribute.
+  may include any parameters that are defined for the format.
 
   <div class="note"> {{MediaRecorderOptions/mimeType}} specifies the media
   type and container format for the recording via a type/subtype
@@ -495,23 +598,18 @@ dictionary MediaRecorderOptions {
 
   <dt><dfn dict-member for="MediaRecorderOptions"><code>audioBitsPerSecond</code></dfn></dt>
   <dd>Aggregate target bits per second for encoding of the Audio track(s), if
-  any. This is a hint for the encoder and the value might be surpassed, not
-  achieved, or only be achieved over a long period of time.</dd>
+  any.</dd>
 
   <dt><dfn dict-member for="MediaRecorderOptions"><code>videoBitsPerSecond</code></dfn></dt>
   <dd>Aggregate target bits per second for encoding of the Video track(s), if
-  any. This is a hint for the encoder and the value might be surpassed, not
-  achieved, or only be achieved over a long period of time.</dd>
+  any.</dd>
 
   <dt><dfn dict-member for="MediaRecorderOptions"><code>bitsPerSecond</code></dfn></dt>
   <dd> Aggregate target bits per second for encoding of all Video and Audio
-  Track(s) present. This parameter overrides either
+  Track(s) present. This member overrides either
   {{MediaRecorderOptions/audioBitsPerSecond}} or
   {{MediaRecorderOptions/videoBitsPerSecond}} if present, and might be
-  distributed among the present track encoders as the UA sees fit. This
-  parameter is a hint for the encoder(s) and the total value might be surpassed,
-  not achieved, or only be achieved over a long period of time.
-  </dd>
+  distributed among the present track encoders as the UA sees fit.</dd>
 </dl>
 
 
@@ -716,11 +814,10 @@ specific type.
     </tr>
     <tr>
       <td>{{NotSupportedError}}</td>
-      <td>
-        A {{MediaRecorder}} could not be created due to unsupported options
-        (e.g. MIME type) specification. User agents should provide as much
-        additional information as possible in the <code>message</code> attribute.
-      </td>
+      <td>An operation could not be performed because the MIME type was not
+      supported or the set of tracks could not be recorded by the MIME type.
+      User agents should provide as much additional information as possible in
+      the <code>message</code> attribute.</td>
     </tr>
     <tr>
       <td>{{SecurityError}}</td>
@@ -925,15 +1022,19 @@ type: interface; text: DOMHighResTimeStamp; url: https://www.w3.org/TR/hr-time/#
 <pre class="anchors">
 urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: interface; text: MediaStream; url: mediastream
 
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: dfn; text: track set; url: track-set
+
 urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: interface; text: MediaStreamTrack; url: mediastreamtrack
 
-urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: method; text: onmute; url: widl-MediaStreamTrack-onmute
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: method; text: onmute; url: dom-mediastreamtrack-onmute
 
 urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: method; text: getUserMedia(); url: dom-mediadevices-getusermedia
 
-urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: attribute; text: muted; url: widl-MediaStreamTrack-muted
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: attribute; text: muted; url: dom-mediastreamtrack-muted
 
-urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: attribute; text: enabled; url: widl-MediaStreamTrack-enabled
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: attribute; text: enabled; url: dom-mediastreamtrack-enabled
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: attribute; text: kind; url: dom-mediastreamtrack-kind
 
 urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: enum-value; text: ended; url: idl-def-MediaStreamTrackState.ended
 
