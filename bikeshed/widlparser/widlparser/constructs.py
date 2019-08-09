@@ -336,15 +336,16 @@ class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut]
         return output + ((' [default: ' + repr(self.default) + ']]') if (self.default) else ']')
 
 
-class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | SpecialOperation | Stringifier | StaticMember | Iterable | Attribute | Maplike | Setlike
+class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | SpecialOperation | Stringifier | StaticMember | AsyncIterable | Iterable | Attribute | Maplike | Setlike
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
         return tokens.popPosition(Const.peek(tokens) or
                                   Stringifier.peek(tokens) or StaticMember.peek(tokens) or
-                                  Iterable.peek(tokens) or Maplike.peek(tokens) or
-                                  Setlike.peek(tokens) or Attribute.peek(tokens) or
+                                  AsyncIterable.peek(tokens) or Iterable.peek(tokens) or
+                                  Maplike.peek(tokens) or Setlike.peek(tokens) or
+                                  Attribute.peek(tokens) or
                                   SpecialOperation.peek(tokens) or Operation.peek(tokens))
 
     def __init__(self, tokens, parent):
@@ -355,6 +356,8 @@ class InterfaceMember(Construct): # [ExtendedAttributes] Const | Operation | Spe
             self.member = Stringifier(tokens, parent)
         elif (StaticMember.peek(tokens)):
             self.member = StaticMember(tokens, parent)
+        elif (AsyncIterable.peek(tokens)):
+            self.member = AsyncIterable(tokens, parent)
         elif (Iterable.peek(tokens)):
             self.member = Iterable(tokens, parent)
         elif (Maplike.peek(tokens)):

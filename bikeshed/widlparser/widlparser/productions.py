@@ -1531,6 +1531,65 @@ class Iterable(ChildProduction):     # "iterable" "<" TypeWithExtendedAttributes
         return output + ']'
 
 
+class AsyncIterable(ChildProduction):     # "async iterable" "<" TypeWithExtendedAttributes "," TypeWithExtendedAttributes ">" ";"
+    @classmethod
+    def peek(cls, tokens):
+        tokens.pushPosition(False)
+        if (Symbol.peek(tokens, 'async')):
+            if (Symbol.peek(tokens, 'iterable')):
+                if (Symbol.peek(tokens, '<')):
+                    if (TypeWithExtendedAttributes.peek(tokens)):
+                        if (Symbol.peek(tokens, ',')):
+                            if (TypeWithExtendedAttributes.peek(tokens)):
+                                token = tokens.peek()
+                                return tokens.popPosition(token and token.isSymbol('>'))
+        return tokens.popPosition(False)
+
+    def __init__(self, tokens, parent):
+        ChildProduction.__init__(self, tokens, parent)
+        self._async = Symbol(tokens)
+        self._iterable = Symbol(tokens)
+        self._openType = Symbol(tokens, '<')
+        self.keyType = TypeWithExtendedAttributes(tokens)
+        self._comma = Symbol(tokens)
+        self.valueType = TypeWithExtendedAttributes(tokens)
+        self._closeType = Symbol(tokens, '>')
+        self._consumeSemicolon(tokens)
+        self._didParse(tokens)
+
+    @property
+    def idlType(self):
+        return 'async-iterable'
+
+    @property
+    def name(self):
+        return '__async_iterable__'
+
+    @property
+    def arguments(self):
+        return None
+
+    def _unicode(self):
+        output = unicode(self._async) + unicode(self._iterable) + unicode(self._openType)
+        output += unicode(self.keyType) + unicode(self._comma) + unicode(self.valueType)
+        return output + unicode(self._closeType)
+
+    def _markup(self, generator):
+        self._async.markup(generator)
+        self._iterable.markup(generator)
+        generator.addText(self._openType)
+        generator.addType(self.keyType)
+        generator.addText(self._comma)
+        generator.addType(self.valueType)
+        generator.addText(self._closeType)
+        return self
+
+    def __repr__(self):
+        output = '[AsyncIterable: '
+        output += repr(self.keyType) + ' ' + repr(self.valueType)
+        return output + ']'
+
+
 class Maplike(ChildProduction):      # ["readonly"] "maplike" "<" TypeWithExtendedAttributes "," TypeWithExtendedAttributes ">" ";"
     @classmethod
     def peek(cls, tokens):

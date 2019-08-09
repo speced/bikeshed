@@ -151,6 +151,7 @@ interface Simple{
     serializer cereal(short one);
     iterable<Foo>;
     iterable<Foo, Bar>;
+    async iterable<Foo, Bar>;
     readonly maplike<Foo, Bar>;
     setlike<Uint8ClampedArray>;
     attribute boolean required;
