@@ -1059,7 +1059,7 @@ class Default(Production):   # "=" ConstValue | "=" string | "=" "[" "]" | "=" "
 
 
 class ArgumentName(Production):   # identifier | ArgumentNameKeyword
-    ArgumentNameKeywords = frozenset(['attribute', 'callback', 'const', 'creator', 'deleter', 'dictionary', 'enum',
+    ArgumentNameKeywords = frozenset(['async', 'attribute', 'callback', 'const', 'creator', 'deleter', 'dictionary', 'enum',
                                       'getter', 'implements', 'inherit', 'interface', 'iterable', 'legacycaller',
                                       'legacyiterable', 'maplike', 'namespace', 'partial', 'required', 'setlike',
                                       'setter', 'static', 'stringifier', 'typedef', 'unrestricted'])
