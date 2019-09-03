@@ -11,9 +11,10 @@
 #  [1] http://www.w3.org/Consortium/Legal/2002/copyright-software-20021231
 #
 
-import sys
-import itertools
 import cgi
+import codecs
+import itertools
+import sys
 
 from widlparser import parser
 
@@ -131,6 +132,7 @@ def test_difference(input, output):
 
 if __name__ == "__main__":      # called from the command line
     sys.excepthook = debugHook
+    sys.stdout = codecs.getwriter('utf8')(sys.stdout)
     parser = parser.Parser(ui=ui())
 
     if (1 < len(sys.argv)):
@@ -222,13 +224,18 @@ typedef (short or sequence<(DOMString[]?[] or short)>? or DOMString[]?[]) sequen
     void anotherMethod(short round);
     [ha!] attribute short bar getraises (an, exception);
     const short fortyTwo = 42;
-    long foo(long x, long y);
+    attribute long async;
+    long foo(long x, long y, long async);
+    void bar(any constructor);
+    long includes();
 }
 [ NoInterfaceObject , MapClass (short, Foo )] interface LinkStyle {
+    constructor();
+    constructor(int x);
     stringifier attribute DOMString mediaText;
-    readonly attribute [Extended] short bar;
+    readonly attribute [Extended] short bar ;
     getter object (DOMString name);
-    getter setter object bob(DOMString name);
+    getter setter object bob (DOMString name);
     stringifier foo me(int x);
     stringifier foo ();
     stringifier;
@@ -372,5 +379,5 @@ interface mixin MixinCanNotIncludeSetlike {
     print(', '.join(parser.normalizedMethodNames('method()', 'Foo')))
     print(', '.join(parser.normalizedMethodNames('method(x)', 'Foo')))
     print(', '.join(parser.normalizedMethodNames('method(x, y)', 'Foo')))
-    print(', '.join(parser.normalizedMethodNames('method(x, y, bar)', 'Foo')))
+    print(', '.join(parser.normalizedMethodNames('method (x, y, bar)', 'Foo')))
     print(', '.join(parser.normalizedMethodNames('abort()', 'Foo')))
