@@ -66,15 +66,14 @@ class RefSource(object):
             return self._refs.items()
 
         path = config.scriptPath("spec-data", "anchors")
-        for root, dirs, files in os.walk(path):
-            for file in files:
-                group = re.match("anchors-(.{2})", file).group(1)
-                if group in self._loadedAnchorGroups:
-                    # Already loaded
-                    continue
-                with self.dataFile.fetch("anchors", file) as fh:
-                    self._refs.update(decodeAnchors(fh))
-                    self._loadedAnchorGroups.add(group)
+        for file in self.dataFile.walkFiles("anchors"):
+            group = re.match("anchors-(.{2})", file).group(1)
+            if group in self._loadedAnchorGroups:
+                # Already loaded
+                continue
+            with self.dataFile.fetch("anchors", file) as fh:
+                self._refs.update(decodeAnchors(fh))
+                self._loadedAnchorGroups.add(group)
         return self._refs.items()
 
     def queryRefs(self, **kwargs):

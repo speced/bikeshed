@@ -34,6 +34,11 @@ class DataFileRequester(object):
                     return self._fail(location, str, okayToFail)
             return self._fail(location, str, okayToFail)
 
+    def walkFiles(self, *segs):
+        for root, dirs, files in os.walk(self._buildPath(*segs)):
+            for file in files:
+                yield file
+
     def _buildPath(self, *segs):
         if self.type == "readonly":
             return scriptPath("spec-data", "readonly", *segs)
