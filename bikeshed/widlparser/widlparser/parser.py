@@ -216,8 +216,8 @@ class Parser(object):
             tokens = tokenizer.Tokenizer(match.group(2))
             if (ArgumentList.peek(tokens)):
                 arguments = ArgumentList(tokens, None)
-                return match.group(1) + '(' + arguments.argumentNames[0] + ')'
-            name = match.group(1) + match.group(3)
+                return match.group(1).strip() + '(' + arguments.argumentNames[0] + ')'
+            name = match.group(1).strip() + match.group(3)
             argumentNames = [argument.strip() for argument in match.group(2).split(',')]
         else:
             name = methodText
@@ -247,8 +247,8 @@ class Parser(object):
             tokens = tokenizer.Tokenizer(match.group(2))
             if (ArgumentList.peek(tokens)):
                 arguments = ArgumentList(tokens, None)
-                return [match.group(1) + '(' + argumentName + ')' for argumentName in arguments.argumentNames]
-            name = match.group(1) + match.group(3)
+                return [match.group(1).strip() + '(' + argumentName + ')' for argumentName in arguments.argumentNames]
+            name = match.group(1).strip() + match.group(3)
             argumentNames = [argument.strip() for argument in match.group(2).split(',')]
         else:
             name = methodText
