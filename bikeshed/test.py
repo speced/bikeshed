@@ -22,6 +22,9 @@ def findTestFiles(manualOnly=False):
             filePath = testNameForPath(os.path.join(root, filename))
             if manualOnly and re.match("github/", filePath):
                 continue
+            if re.match("[^/]*\d{3}-files/", filePath):
+                # support files for a manual test
+                continue
             if filename.endswith(".bs"):
                 yield os.path.join(root, filename)
 
