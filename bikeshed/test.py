@@ -5,6 +5,7 @@ import difflib
 import io
 import os
 import pipes
+import re
 import subprocess
 from itertools import *
 from . import config
@@ -15,9 +16,12 @@ from .messages import *
 TEST_DIR = os.path.abspath(os.path.join(config.scriptPath(), "..", "tests"))
 
 
-def findTestFiles():
+def findTestFiles(manualOnly=False):
     for root, dirnames, filenames in os.walk(TEST_DIR):
         for filename in filenames:
+            filePath = testNameForPath(os.path.join(root, filename))
+            if manualOnly and re.match("github/", filePath):
+                continue
             if filename.endswith(".bs"):
                 yield os.path.join(root, filename)
 
@@ -34,10 +38,10 @@ def sortTests(tests):
     return sorted(tests, key=lambda x:("/" in testNameForPath(x), x))
 
 
-def runAllTests(Spec, testFiles=None, md=None):
+def runAllTests(Spec, testFiles=None, manualOnly=False, md=None):
     fileRequester = config.DataFileRequester(type="readonly")
     if not testFiles:
-        testFiles = list(sortTests(findTestFiles()))
+        testFiles = list(sortTests(findTestFiles(manualOnly=manualOnly)))
         if len(testFiles) == 0:
             p("No tests were found")
             return True

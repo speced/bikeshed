@@ -156,6 +156,11 @@ def main():
                             default=False,
                             action="store_true",
                             help="Rebase the specified files.")
+    testParser.add_argument("--manual-only",
+                            dest="manualOnly",
+                            default=False,
+                            action="store_true",
+                            help="Skip testing the real-world files in the repo, and only run the manually-written ones.")
     testParser.add_argument('testFiles',
                             default=[],
                             metavar="FILE",
@@ -366,9 +371,9 @@ def handleTest(options, extras):
     config.setErrorLevel("nothing")
     config.quiet = 100
     if options.rebase:
-        test.rebase(Spec, options.testFiles, md=md)
+        test.rebase(Spec, options.testFiles, manualOnly=options.manualOnly, md=md)
     else:
-        result = test.runAllTests(Spec, options.testFiles, md=md)
+        result = test.runAllTests(Spec, options.testFiles, manualOnly=options.manualOnly, md=md)
         sys.exit(0 if result else 1)
 
 
