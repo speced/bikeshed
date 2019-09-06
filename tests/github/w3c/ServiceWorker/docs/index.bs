@@ -193,7 +193,10 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
     <section>
       <h4 id="service-worker-events">Events</h4>
 
-      Service Workers specification defines <dfn export id="dfn-lifecycle-events">lifecycle events</dfn> (each of which is an [=event=]), {{install!!event}} and {{activate!!event}}. Service Workers and other specifications that <a href="#extensibility">extend</a> Service Workers define set of events called <dfn export id="dfn-functional-events">functional events</dfn> (each of which is an [=event=]) including {{fetch!!event}}. (See the <a href="#execution-context-events">list</a> of [=lifecycle events=] and [=functional events=].)
+      The Service Workers specification defines <dfn export id="dfn-service-worker-events">service worker events</dfn> (each of which is an [=event=]) that include (see the <a href="#execution-context-events">list</a>):
+          * <dfn export id="dfn-lifecycle-events">Lifecycle events</dfn>: {{install!!event}} and {{activate!!event}}.
+          * <dfn export id="dfn-functional-events">Functional events</dfn>: {{fetch!!event}} and the [=events=] defined by other specifications that <a href="#extensibility">extend</a> the Service Workers specification. (See the <a href="#execution-context-events">list</a>.)
+          * {{message!!event}} and {{messageerror!!event}}.
     </section>
   </section>
 
@@ -257,15 +260,49 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
   </section>
 
   <section>
-    <h3 id="selection">Selection and Use</h3>
+    <h3 id="control-and-use">Control and Use</h3>
 
-    A [=/service worker client=] independently <a lt="selection">selects</a> and <a>uses</a> a [=/service worker registration=] for its own loading and its subresources. The <dfn id="dfn-service-worker-registration-selection">selection</dfn> of a [=/service worker registration=], upon a <a>non-subresource request</a>, is a process of either <a lt="Match Service Worker Registration">matching</a> a [=/service worker registration=] from <a>scope to registration map</a> or inheriting an existing [=/service worker registration=] from its parent or owner context depending on the request's [=request/url=].
+    A [=/service worker client=] has an [=active service worker=] that serves its own loading and its subresources. When a [=/service worker client=] has a non-null [=active service worker=], it is said to be <dfn id="dfn-control" lt="controlling|controls|controlled">controlled</dfn> by that [=active service worker=]. When a [=/service worker client=] is [=controlled=] by a [=/service worker=], it is said that the [=/service worker client=] is <dfn id="dfn-use" lt="using|uses|used">using</dfn> the [=/service worker=]’s [=containing service worker registration=].
+    A [=/service worker client=]'s [=active service worker=] is determined as explained in the following subsections.
 
-    When the request's [=request/url=] is not <a lt="is local">local</a>, a [=/service worker client=] <a lt="Match Service Worker Registration">matches</a> a [=/service worker registration=] from <a>scope to registration map</a>. That is, the [=/service worker client=] attempts to consult a [=/service worker registration=] whose [=service worker registration/scope url=] <a lt="Match Service Worker Registration">matches</a> its <a>creation URL</a>.
+    *The rest of the section is non-normative.*
 
-    When the request's [=request/url=] <a>is local</a>, if the [=/service worker client=]'s <a>responsible browsing context</a> is a <a>nested browsing context</a> or the [=/service worker client=] is a <a>worker client</a>, the [=/service worker client=] inherits the [=/service worker registration=] from its <a>parent browsing context</a>'s environment or from the environment of a {{Document}} in the [=/service worker client=]'s [=environment settings object/global object=]'s [=owner set=], respectively, if it exists.
+    Issue: The behavior in this section is not fully specified yet and will be specified in [HTML Standard](https://html.spec.whatwg.org). The work is tracked by the [issue](https://github.com/w3c/ServiceWorker/issues/765) and the [pull request](https://github.com/whatwg/html/pull/2809).
 
-    If the <a>selection</a> was successful, the <a lt="selection">selected</a> [=/service worker registration=]'s <a>active worker</a> starts to <dfn id="dfn-control">control</dfn> the [=/service worker client=]. Otherwise, the flow returns to [=/fetch=] where it falls back to the default behavior. When a [=/service worker client=] is <a>controlled</a> by an <a>active worker</a>, it is considered that the [=/service worker client=] is <dfn id="dfn-use" lt="using|uses|used">using</dfn> the <a>active worker</a>'s <a>containing service worker registration</a>.
+    <section>
+      <h4 id="control-and-use-window-client">The window client case</h4>
+
+      A [=window client=] is [created](https://html.spec.whatwg.org/#set-up-a-window-environment-settings-object) when a [=/browsing context=] is [created](https://html.spec.whatwg.org/#creating-a-new-browsing-context) and when it [=navigates=].
+
+      When a [=window client=] is [created](https://html.spec.whatwg.org/#set-up-a-window-environment-settings-object) in the process of a [=/browsing context=] [creation](https://html.spec.whatwg.org/#creating-a-new-browsing-context):
+
+      If the [=/browsing context=]'s initial [=active document=]'s [=/origin=] is an [=opaque origin=], the [=window client=]'s [=active service worker=] is set to null.
+      Otherwise, it is set to the creator [=document=]'s [=/service worker client=]'s [=active service worker=].
+
+      When a [=window client=] is [created](https://html.spec.whatwg.org/#set-up-a-window-environment-settings-object) in the process of the [=/browsing context=]'s [=navigate|navigation=]:
+
+      If the [=fetch=] is routed through [=/HTTP fetch=], the [=window client=]'s [=active service worker=] is set to the result of the <a lt="Match Service Worker Registration">service worker registration matching</a>.
+      Otherwise, if the created [=document=]'s [=/origin=] is an [=opaque origin=] or not the [=same origin|same=] as its creator [=document=]'s [=/origin=], the [=window client=]'s [=active service worker=] is set to null.
+      Otherwise, it is set to the creator [=document=]'s [=/service worker client=]'s [=active service worker=].
+
+      Note: For an initial [=navigate|navigation=] with [=replacement enabled=], the initial [=window client=] that was [created](https://html.spec.whatwg.org/#set-up-a-window-environment-settings-object) when the [=/browsing context=] was [created](https://html.spec.whatwg.org/#creating-a-new-browsing-context) is reused, but the [=active service worker=] is determined by the same behavior as above.
+
+      Note: <a element-attr for=iframe lt=sandbox>Sandboxed</a> <{iframe}>s without the sandboxing directives, `allow-same-origin` and `allow-scripts`, result in having the [=active service worker=] value of null as their [=/origin=] is an [=opaque origin=].
+    </section>
+
+    <section>
+      <h4 id="control-and-use-worker-client">The worker client case</h4>
+
+      A [=worker client=] is <a href="https://html.spec.whatwg.org/#set-up-a-worker-environment-settings-object">created</a> when the user agent [=run a worker|runs a worker=].
+
+      When the [=worker client=] is created:
+
+      When the [=fetch=] is routed through [=/HTTP fetch=], the [=worker client=]'s [=active service worker=] is set to the result of the <a lt="Match Service Worker Registration">service worker registration matching</a>.
+      Otherwise, if the [=worker client=]'s [=service worker client/origin=] is an [=opaque origin=], or the [=/request=]'s [=request/URL=] is a [=blob URL=] and the [=worker client=]'s [=service worker client/origin=] is not the [=same origin|same=] as the [=/origin=] of the last [=set/item=] in the [=worker client=]'s [=/global object=]'s [=owner set=], the [=worker client=]'s [=active service worker=] is set to null.
+      Otherwise, it is set to the [=active service worker=] of the [=environment settings object=] of the last [=set/item=] in the [=worker client=]'s [=/global object=]'s [=owner set=].
+    </section>
+
+    Note: [=Window clients=] and [=worker clients=] with a [data: URL](https://tools.ietf.org/html/rfc2397#section-2) result in having the [=active service worker=] value of null as their [=/origin=] is an [=opaque origin=]. [=Window clients=] and [=worker clients=] with a [=blob URL=] can inherit the [=active service worker=] of their creator [=document=] or owner, but if the [=/request=]'s [=request/origin=] is not the [=same origin|same=] as the [=/origin=] of their creator [=document=] or owner, the [=active service worker=] is set to null.
   </section>
 
   <section>
@@ -321,7 +358,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
         readonly attribute USVString scriptURL;
         readonly attribute ServiceWorkerState state;
         void postMessage(any message, sequence&lt;object&gt; transfer);
-        void postMessage(any message, optional PostMessageOptions options);
+        void postMessage(any message, optional PostMessageOptions options = {});
 
         // event
         attribute EventHandler onstatechange;
@@ -624,7 +661,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
         readonly attribute ServiceWorker? controller;
         readonly attribute Promise&lt;ServiceWorkerRegistration&gt; ready;
 
-        [NewObject] Promise&lt;ServiceWorkerRegistration&gt; register(USVString scriptURL, optional RegistrationOptions options);
+        [NewObject] Promise&lt;ServiceWorkerRegistration&gt; register(USVString scriptURL, optional RegistrationOptions options = {});
 
         [NewObject] Promise&lt;any&gt; getRegistration(optional USVString clientURL = "");
         [NewObject] Promise&lt;FrozenArray&lt;ServiceWorkerRegistration&gt;&gt; getRegistrations();
@@ -1049,7 +1086,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
         readonly attribute DOMString id;
         readonly attribute ClientType type;
         void postMessage(any message, sequence&lt;object&gt; transfer);
-        void postMessage(any message, optional PostMessageOptions options);
+        void postMessage(any message, optional PostMessageOptions options = {});
       };
 
       [Exposed=ServiceWorker]
@@ -1222,7 +1259,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
       interface Clients {
         // The objects returned will be new instances every time
         [NewObject] Promise&lt;any&gt; get(DOMString id);
-        [NewObject] Promise&lt;FrozenArray&lt;Client&gt;&gt; matchAll(optional ClientQueryOptions options);
+        [NewObject] Promise&lt;FrozenArray&lt;Client&gt;&gt; matchAll(optional ClientQueryOptions options = {});
         [NewObject] Promise&lt;WindowClient?&gt; openWindow(USVString url);
         [NewObject] Promise&lt;void&gt; claim();
       };
@@ -1282,7 +1319,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
                     1. If |client| is an [=environment settings object=], set |browsingContext| to |client|'s [=environment settings object/global object=]'s [=/browsing context=].
                     1. Else, set |browsingContext| to |client|’s [=environment/target browsing context=].
                     1. [=Queue a task=] |task| to run the following substeps on |browsingContext|'s [=event loop=] using the [=user interaction task source=]:
-                        1. If |browsingContext| has been [=a browsing context is discarded|discarded=], then set |isClientEnumerable| to false and abort these steps.
+                        1. If |browsingContext| has been [=discard|discarded=], then set |isClientEnumerable| to false and abort these steps.
                         1. If |client| is a window client and |client|'s [=responsible document=] is not |browsingContext|'s [=active document=], then set |isClientEnumerable| to false and abort these steps.
                         1. Set |windowData|["`frameType`"] to the result of running [=Get Frame Type=] with |browsingContext|.
                         1. Set |windowData|["`visibilityState`"] to |browsingContext|'s [=active document=]'s {{Document/visibilityState}} attribute value.
@@ -1370,7 +1407,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
     <h3 id="extendableevent-interface">{{ExtendableEvent}}</h3>
 
     <pre class="idl">
-      [Constructor(DOMString type, optional ExtendableEventInit eventInitDict), Exposed=ServiceWorker]
+      [Constructor(DOMString type, optional ExtendableEventInit eventInitDict = {}), Exposed=ServiceWorker]
       interface ExtendableEvent : Event {
         void waitUntil(Promise&lt;any&gt; f);
       };
@@ -1558,7 +1595,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
     <h3 id="extendablemessageevent-interface">{{ExtendableMessageEvent}}</h3>
 
     <pre class="idl">
-      [Constructor(DOMString type, optional ExtendableMessageEventInit eventInitDict), Exposed=ServiceWorker]
+      [Constructor(DOMString type, optional ExtendableMessageEventInit eventInitDict = {}), Exposed=ServiceWorker]
       interface ExtendableMessageEvent : ExtendableEvent {
         readonly attribute any data;
         readonly attribute USVString origin;
@@ -1613,7 +1650,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
   <section>
     <h3 id="execution-context-events">Events</h3>
 
-    The following events are dispatched on {{ServiceWorkerGlobalScope}} object:
+    The following events, called [=service worker events=], are dispatched on {{ServiceWorkerGlobalScope}} object:
 
     <table class="data" dfn-for="ServiceWorkerGlobalScope">
       <thead>
@@ -1743,13 +1780,13 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
     <pre class="idl">
       [SecureContext, Exposed=(Window,Worker)]
       interface Cache {
-        [NewObject] Promise&lt;any&gt; match(RequestInfo request, optional CacheQueryOptions options);
-        [NewObject] Promise&lt;FrozenArray&lt;Response&gt;&gt; matchAll(optional RequestInfo request, optional CacheQueryOptions options);
+        [NewObject] Promise&lt;any&gt; match(RequestInfo request, optional CacheQueryOptions options = {});
+        [NewObject] Promise&lt;FrozenArray&lt;Response&gt;&gt; matchAll(optional RequestInfo request, optional CacheQueryOptions options = {});
         [NewObject] Promise&lt;void&gt; add(RequestInfo request);
         [NewObject] Promise&lt;void&gt; addAll(sequence&lt;RequestInfo&gt; requests);
         [NewObject] Promise&lt;void&gt; put(RequestInfo request, Response response);
-        [NewObject] Promise&lt;boolean&gt; delete(RequestInfo request, optional CacheQueryOptions options);
-        [NewObject] Promise&lt;FrozenArray&lt;Request&gt;&gt; keys(optional RequestInfo request, optional CacheQueryOptions options);
+        [NewObject] Promise&lt;boolean&gt; delete(RequestInfo request, optional CacheQueryOptions options = {});
+        [NewObject] Promise&lt;FrozenArray&lt;Request&gt;&gt; keys(optional RequestInfo request, optional CacheQueryOptions options = {});
       };
     </pre>
     <pre class="idl" id="cache-query-options-dictionary">
@@ -1825,7 +1862,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
 
         1. Let |requests| be an array containing only |request|.
         1. Let |responseArrayPromise| be the result of running the algorithm specified in {{Cache/addAll(requests)}} passing |requests| as the argument.
-        1. Return the result of [=transforming=] |responseArrayPromise| with a fulfillment handler that returns undefined.
+        1. Return the result of [=promise/reacting=] to |responseArrayPromise| with a fulfillment handler that returns undefined.
     </section>
 
     <section algorithm="cache-addAll">
@@ -1866,8 +1903,8 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
                     Note: The cache commit is allowed when the response's body is fully received.
 
             1. Add |responsePromise| to |responsePromises|.
-        1. Let |p| be [=waiting for all=] of |responsePromises|.
-        1. Return the result of [=transforming=] |p| with a fulfillment handler that, when called with argument |responses|, performs the following substeps:
+        1. Let |p| be the result of [=getting a promise to wait for all=] of |responsePromises|.
+        1. Return the result of [=promise/reacting=] to |p| with a fulfillment handler that, when called with argument |responses|, performs the following substeps:
             1. Let |operations| be an empty [=list=].
             1. Let |index| be zero.
             1. For each |response| in |responses|:
@@ -2000,7 +2037,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
     <pre class="idl">
       [SecureContext, Exposed=(Window,Worker)]
       interface CacheStorage {
-        [NewObject] Promise&lt;any&gt; match(RequestInfo request, optional MultiCacheQueryOptions options);
+        [NewObject] Promise&lt;any&gt; match(RequestInfo request, optional MultiCacheQueryOptions options = {});
         [NewObject] Promise&lt;boolean&gt; has(DOMString cacheName);
         [NewObject] Promise&lt;Cache&gt; open(DOMString cacheName);
         [NewObject] Promise&lt;boolean&gt; delete(DOMString cacheName);
@@ -2034,7 +2071,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
         1. Else:
             1. Let |promise| be [=a promise resolved with=] undefined.
             1. [=map/For each=] <var ignore>cacheName</var> → |cache| of the [=relevant name to cache map=]:
-                1. Set |promise| to the result of [=transforming=] itself with a fulfillment handler that, when called with argument |response|, performs the following substeps:
+                1. Set |promise| to the result of [=promise/reacting=] to itself with a fulfillment handler that, when called with argument |response|, performs the following substeps:
                     1. If |response| is not undefined, return |response|.
                     1. Return the result of running the algorithm specified in {{Cache/match(request, options)}} method of {{Cache}} interface with |request| and |options| as the arguments (providing |cache| as thisArgument to the `[[Call]]` internal method of {{Cache/match(request, options)}}.)
             1. Return |promise|.
@@ -2076,7 +2113,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
       <dfn method for="CacheStorage"><code>delete(|cacheName|)</code></dfn> method *must* run these steps:
 
         1. Let |promise| be the result of running the algorithm specified in {{CacheStorage/has(cacheName)}} method with |cacheName|.
-        1. Return the result of [=transforming=] |promise| with a fulfillment handler that, when called with argument |cacheExists|, performs the following substeps:
+        1. Return the result of [=promise/reacting=] to |promise| with a fulfillment handler that, when called with argument |cacheExists|, performs the following substeps:
             1. If |cacheExists| is false, then:
                 1. Return false.
             1. Let |cacheJobPromise| be [=a new promise=].
@@ -2688,7 +2725,9 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
                   1. <a>Dispatch</a> |e| at |installingWorker|'s [=service worker/global object=].
                   1. *WaitForAsynchronousExtensions*: Run the following substeps <a>in parallel</a>:
                       1. <span id="install-settle-step">Wait until |e| is not [=ExtendableEvent/active=].</span>
-                      1. If |e|'s [=ExtendableEvent/timed out flag=] is set, or the result of [=waiting for all=] of |e|'s [=extend lifetime promises=] rejected, set |installFailed| to true.
+                      1. If |e|'s [=ExtendableEvent/timed out flag=] is set, set |installFailed| to true.
+                      1. Let |p| be the result of [=getting a promise to wait for all=] of |e|'s [=extend lifetime promises=].
+                      1. [=Upon rejection=] of |p|, set |installFailed| to true.
 
                   If |task| is discarded, set |installFailed| to true.
 
@@ -3421,7 +3460,7 @@ spec: webappsec-referrer-policy; urlPrefix: https://w3c.github.io/webappsec-refe
       1. If |response| is null, |options|.{{CacheQueryOptions/ignoreVary}} is true, or |response|'s [=response/header list=] does not [=header list/contain=] \``Vary`\`, then return true.
       1. Let |fieldValues| be the [=list=] containing the elements corresponding to the [=http/field-values=] of the [=Vary=] header for the [=header/value=] of the [=header=] with [=header/name=] \``Vary`\`.
       1. For each |fieldValue| in |fieldValues|:
-          1. If |fieldValue| matches "`*`", or the [=combined value=] given |fieldValue| and |request|'s [=request/header list=] does not match the [=combined value=] given |fieldValue| and |requestQuery|'s [=request/header list=], then return false.
+          1. If |fieldValue| matches "`*`", or the [=header list/combine|combined value=] given |fieldValue| and |request|'s [=request/header list=] does not match the [=header list/combine|combined value=] given |fieldValue| and |requestQuery|'s [=request/header list=], then return false.
       1. Return true.
   </section>
 

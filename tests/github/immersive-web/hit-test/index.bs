@@ -1,0 +1,212 @@
+<pre class="metadata">
+Shortname: webxr-hit-test
+Title: WebXR Hit Test Module - Level 1
+Group: immersivewebwg
+Status: ED
+ED: https://immersive-web.github.io/hit-test/
+Repository: immersive-web/hit-test
+Level: 1
+Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web/
+
+!Participate: <a href="https://github.com/immersive-web/hit-test/issues/new">File an issue</a> (<a href="https://github.com/immersive-web/hit-test/issues">open issues</a>)
+!Participate: <a href="https://lists.w3.org/Archives/Public/public-immersive-web/">Mailing list archive</a>
+!Participate: <a href="irc://irc.w3.org:6665/">W3C's #immersive-web IRC</a>
+
+Editor: Brandon Jones 87824, Google http://google.com/, bajones@google.com
+Editor: Nell Waliczek 93109, Amazon [Microsoft until 2018] https://amazon.com/, nhw@amazon.com
+
+Abstract: Describes a method for performing hit tests against real world geometry to be used with the WebXR Device API.
+
+Warning: custom
+Custom Warning Title: Unstable API
+Custom Warning Text:
+  <b>The API represented in this document is under development and may change at any time.</b>
+  <p>For additional context on the use of this API please reference the <a href="https://github.com/immersive-web/webxr-ar-module/blob/master/ar-module-explainer.md">WebXR Augmented Reality Module Explainer</a>.</p>
+</pre>
+
+<pre class="link-defaults">
+spec:infra;
+    type:dfn; text:string
+</pre>
+
+<pre class="anchors">
+spec: WebXR Device API - Level 1; urlPrefix: https://www.w3.org/TR/webxr/#
+    type: interface; text: XRSession; url: xrsession-interface
+    type: interface; text: XRRigidTransform; url: xrrigidtransform-interface
+    type: attribute; text: matrix; for: XRRigidTransform; url: dom-xrrigidtransform-matrix
+    type: dfn; text: matrix; url: matrix
+    type: dfn; text: normalize; url: normalize
+spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/#
+    type: method; text: IsDetachedBuffer; url: sec-isdetachedbuffer
+</pre>
+
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+
+<style>
+  .unstable::before {
+    content: "This section is not stable";
+    display: block;
+    font-weight: bold;
+    text-align: right;
+    color: red;
+  }
+  .unstable {
+    border: thin solid pink;
+    border-radius: .5em;
+    padding: .5em;
+    margin: .5em calc(-0.5em - 1px);
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+    background-repeat: repeat;
+    background-color: #FFF4F4;
+  }
+  .unstable h3:first-of-type {
+    margin-top: 0.5rem;
+  }
+
+  .unstable.example:not(.no-marker)::before {
+    content: "Example " counter(example) " (Unstable)";
+    float: none;
+  }
+
+  .non-normative::before {
+    content: "This section is non-normative.";
+    font-style: italic;
+  }
+  .tg {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+  .tg th {
+    border-style: solid;
+    border-width: 1px;
+    background: #90b8de;
+    color: #fff;
+    font-family: sans-serif;
+    font-weight: bold;
+    border-color: grey;
+  }
+  .tg td {
+    padding: 4px 5px;
+    background-color: rgb(221, 238, 255);
+    font-family: monospace;
+    border-style: solid;
+    border-width: 1px;
+    border-color: grey;
+    overflow: hidden;
+    word-break: normal;
+  }
+</style>
+
+Introduction {#intro}
+============
+
+<section class="non-normative">
+
+This potential module describes a mechanism for allowing WebXR applications to cast rays into the users real world environment and report back, to the best of the XR device's knowledge, the point at which the ray intersected with a physical object and the orientation of the intersected surface. This allows for virtual objects to be placed in alignment with those surfaces, such as placing objects realistically on the floor or attaching them to a wall.
+
+</section>
+
+WebXR Device API Integration {#webxr-device-api-integration}
+============================
+This module expands the definition of {{XRSession}}.
+
+Geometric Primitives {#geometric-primitives}
+====================
+
+XRRay {#xrray-interface}
+-----
+
+ISSUE: Find the correct spec home for this type
+
+An {{XRRay}} is a geometric ray described by an {{XRRay/origin}} point and {{XRRay/direction}} vector.
+
+An {{XRRay}} contains an <dfn for=XRRay>internal matrix</dfn> which is a [=/matrix=].
+
+<pre class="idl">
+[SecureContext, Exposed=Window,
+ Constructor(optional DOMPointInit origin, optional DOMPointInit direction),
+ Constructor(XRRigidTransform transform)]
+interface XRRay {
+  [SameObject] readonly attribute DOMPointReadOnly origin;
+  [SameObject] readonly attribute DOMPointReadOnly direction;
+  [SameObject] readonly attribute Float32Array matrix;
+};
+</pre>
+
+<div class="algorithm" data-algorithm="construct-ray-origin-direction">
+
+The <dfn constructor for="XRRay">XRRay(|origin|, |direction|)</dfn> constructor MUST perform the following steps when invoked:
+
+  1. Let |ray| be a new {{XRRay}}.
+  1. Initialize |ray|'s {{XRRay/origin}} based on the following:
+    <dl class="switch">
+      <dt> If |origin| is not a {{DOMPointInit}}
+      <dd> Initialize |ray|'s {{XRRay/origin}} to <code>{ x: 0.0, y: 0.0, z: 0.0, w: 1.0 }</code>.
+      <dt> Else
+      <dd> Initialize |ray|'s {{XRRay/origin}}’s {{DOMPointReadOnly/x}} value to |origin|'s x dictionary member, {{DOMPointReadOnly/y}} value to |origin|'s y dictionary member, {{DOMPointReadOnly/z}} value to |origin|'s z dictionary member and {{DOMPointReadOnly/w}} to <code>1.0</code>.
+    </dl>
+  1. Initialize |ray|'s {{XRRay/direction}} based on the following:
+    <dl class="switch">
+      <dt> If |direction| is not a {{DOMPointInit}}
+      <dd> Initialize |ray|'s {{XRRay/direction}} to <code>{ x: 0.0, y: 0.0, z: -1.0, w: 0.0 }</code>.
+      <dt> Else
+      <dd> Initialize |ray|'s {{XRRay/direction}}’s {{DOMPointReadOnly/x}} value to |direction|'s x dictionary member, {{DOMPointReadOnly/y}} value to |direction|'s y dictionary member, {{DOMPointReadOnly/z}} value to |direction|'s z dictionary member and {{DOMPointReadOnly/w}} value to to <code>0.0</code>.
+    </dl>
+  1. [=Normalize=] the {{DOMPointReadOnly/x}}, {{DOMPointReadOnly/y}}, and {{DOMPointReadOnly/z}} components of |ray|'s {{XRRay/direction}}.
+  1. Initialize |ray|'s [=XRRay/internal matrix=] to <code>null</code>.
+  1. Return |ray|.
+
+</div>
+
+<div class="algorithm" data-algorithm="construct-ray-transform">
+
+The <dfn constructor for="XRRay">XRRay(|transform|)</dfn> constructor MUST perform the following steps when invoked:
+
+  1. Let |ray| be a new {{XRRay}}.
+  1. Initialize |ray|'s {{XRRay/origin}} to <code>{ x: 0.0, y: 0.0, z: 0.0, w: 1.0 }</code>.
+  1. Initialize |ray|'s {{XRRay/direction}} to <code>{ x: 0.0, y: 0.0, z: -1.0, w: 0.0 }</code>.
+  1. Transform |ray|'s {{XRRay/origin}} by premultiplying the |transform|'s {{XRRigidTransform/matrix}} and set |ray| to the result.
+  1. Transform |ray|'s {{XRRay/direction}} by premultiplying the |transform|'s {{XRRigidTransform/matrix}} and set |ray| to the result.
+  1. [=Normalize=] the {{DOMPointReadOnly/x}}, {{DOMPointReadOnly/y}}, and {{DOMPointReadOnly/z}} components of |ray|'s {{XRRay/direction}}
+  1. Return |ray|.
+
+</div>
+
+The <dfn attribute for="XRRay">origin</dfn> attribute defines the 3-dimensional point in space that the ray originates from, given in meters. The {{XRRay/origin}}'s {{DOMPointReadOnly/w}} attribute MUST be <code>1.0</code>.
+
+The <dfn attribute for="XRRay">direction</dfn> attribute defines the ray's 3-dimensional directional vector. The {{XRRay/direction}}'s {{DOMPointReadOnly/w}} attribute MUST be <code>0.0</code> and the vector MUST be normalized to have a length of <code>1.0</code>.
+
+The <dfn attribute for="XRRay">matrix</dfn> attribute is a [=matrix=] which represents a transform that can be used to position objects along the {{XRRay}}. It is a transform from a ray originating at <code>[0, 0, 0]</code> and extending down the negative Z axis to the ray described by the {{XRRay}}'s {{XRRay/origin}} and {{XRRay/direction}}. Such a matrix MUST be one that has a rotation component which leaves any vector perpendicular to {{XRRay/direction}} and the <code>Z</code> axis unchanged. This attribute MUST be computed by [=XRRay/obtain the matrix|obtaining the matrix=] for the {{XRRay}}. This attribute SHOULD be lazily evaluated.
+
+Note: The {{XRRay}}'s {{XRRay/matrix}} can be used to easily position graphical representations of the ray when rendering.
+
+<div class=algorithm data-algorithm="obtain-ray-matrix">
+
+To <dfn for=XRRay>obtain the matrix</dfn> for a given {{XRRay}} |ray|
+
+  1. If |ray|'s [=XRRay/internal matrix=] is not <code>null</code>, perform the following steps:
+    1. If the operation {{IsDetachedBuffer}} on [=XRRay/internal matrix=] is <code>false</code>, return |ray|'s [=XRRay/internal matrix=].
+  1. Let |z| be the vector <code>[0, 0, -1]</code>
+  1. Let |axis| be the vector cross product of |z| and |ray|'s {{XRRay/direction}}, <code>z × direction</code>
+  1. Let |cos_angle| be the scalar dot product of |z| and |ray|'s {{XRRay/direction}}, <code>z · direction</code>
+  1. Set |rotation| based on the following:
+    <dl class="switch">
+      <dt> If |cos_angle| is greater than -1 and less than 1
+      <dd> Set |rotation| to the rotation matrix representing a right handed planar rotation around |axis| by <code>arccos(cos_angle)</code>.
+      <dt> Else, if |cos_angle| is -1
+      <dd> Set |rotation| to the rotation matrix representing a right handed planar rotation around vector <code>[1, 0, 0]</code> by <code>arccos(cos_angle)</code>.
+      <dt> Else
+      <dd> Set |rotation| to an identity matrix.
+    </dl>
+  1. Let |translation| be the translation matrix with components corresponding to |ray|'s {{XRRay/origin}}
+  1. Let |matrix| be the result of premultiplying |rotation| from the left onto |translation| (i.e. <code>translation * rotation</code>) in column-vector notation.
+  1. Set |ray|'s [=XRRay/internal matrix=] to |matrix|
+  1. Return |matrix|
+
+</div>
+
+Acknowledgements {#ack}
+================
+
+The following individuals have contributed to the design of the WebXR Hit Test specification:

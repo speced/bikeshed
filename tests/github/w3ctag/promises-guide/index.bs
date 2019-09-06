@@ -5,37 +5,39 @@ Shortname: promises-guide
 Status: FINDING
 Editor: Domenic Denicola, Google https://www.google.com/, https://domenic.me/, d@domenic.me
 Abstract: This document gives guidance on how to write specifications that create, accept, or manipulate promises.
-Abstract: It also includes a series of prose shorthands you can use in your specification to work with promises.
+Boilerplate: omit conformance
 Default Biblio Status: current
 !Participate: <a href="https://github.com/w3ctag/promises-guide">GitHub w3ctag/promises-guide</a> (<a href="https://github.com/w3ctag/promises-guide/issues/new">file an issue</a>; <a href="https://github.com/w3ctag/promises-guide/issues?state=open">open issues</a>)
-
-Ignored Vars: O, f, args, x, cb
-</pre>
-
-<pre class="link-defaults">
-spec:infra; type:dfn; text:list
 </pre>
 
 <pre class="anchors">
-urlPrefix: https://tc39.github.io/ecma262/; spec: ECMASCRIPT
-    text: PerformPromiseThen; url: #sec-performpromisethen; type: abstract-op
-    text: all(); for: Promise; url: #sec-promise.all; type: method
+urlPrefix: https://tc39.es/ecma262/#; spec: ECMASCRIPT
+    text: Error; url: sec-error-objects; type: interface
+urlPrefix: https://notifications.spec.whatwg.org/#; spec: NOTIFICATIONS
+    text: requestPermission(deprecatedCallback); url: dom-notification-requestpermission; type: method; for: Notification
+</pre>
+
+<pre class="link-defaults">
+spec:streams; type:interface; text:ReadableStream
+spec:webidl; type:dfn; text:resolve
 </pre>
 
 <h2 id="intro">Introduction</h2>
 
 A <em>promise</em> is an object that represents the eventual result of a single asynchronous operation. They can be returned from asynchronous functions, thus allowing consumers to not only queue up callbacks to be called when the operation succeeds or fails, but also to manipulate the returned promise object, opening up a variety of possibilities.
 
-Promises have been battle-tested in many JavaScript libraries, including as part of popular frameworks like Dojo, jQuery, YUI, Ember, Angular, WinJS, Q, and others. This culminated in the <a href="https://promisesaplus.com/">Promises/A+ community specification</a> which most libraries conformed to. Now, a standard <code>Promise</code> class is included <a href="https://tc39.github.io/ecma262/#sec-promise-objects">in the ECMAScript Language Specification</a> [[!ECMASCRIPT]], allowing web platform APIs to return promises for their asynchronous operations.
+Promises have been battle-tested in many JavaScript libraries, including as part of popular frameworks like Dojo, jQuery, YUI, Ember, Angular, WinJS, Q, and others. This culminated in the <a href="https://promisesaplus.com/">Promises/A+ community specification</a> which most libraries conformed to. Now, a standard <a href="https://tc39.github.io/ecma262/#sec-promise-objects"><code>Promise</code></a> class is included in the JavaScript specification, allowing web platform APIs to return promises for their asynchronous operations. [[!ECMASCRIPT]]
 
 Promises are now the web platform's paradigm for all "one and done" asynchronous operations. Previously, specifications used a variety of mismatched mechanisms for such operations. Going forward, all asynchronous operations of this type should be specified to instead return promises, giving our platform a unified primitive for asynchronicity.
 
-<div class="note">Although the primary audience of this document is specification writers, it is also useful for JavaScript developers who want to write libraries or applications using promises. We will call out sections that are spec-writer specific so developers can skip them more easily.</div>
+<p class="note" oldids="shorthand-phrases a-new-promise a-promise-resolved-with resolved-as-a-promise a-promise-rejected-with resolve-promise reject-promise upon-fulfillment upon-rejection transforming-by waiting-for-all waiting-for-all-promise promise-calling examples example-delay example-validated-delay example-add-delay example-resource-open example-environment-ready example-add-bookmark example-batch-request shorthand-note-on-realms webidl-examples webidl">This document previously defined a number of terms for manipulating promises, and gave examples for using them. Those have since moved to <cite>Web IDL</cite>. [[!WEBIDL]]</p>
+
+<p class="note" oldids="async-algorithms explicit-async-steps queue-tasks">Similarly, this document used to give advice on some of the general subtleties around asynchronous algorithms, i.e. running steps [=in parallel=] and [=queue a task|queuing tasks=]. Those are now in <cite>HTML</cite>'s "<a href="https://html.spec.whatwg.org/multipage/webappapis.html#event-loop-for-spec-authors">Dealing with the event loop from other specifications</a>" section.</p>
 
 
-<h2 id="when-to-use">When to Use Promises</h2>
+<h2 id="when-to-use">When to use promises</h2>
 
-<h3 id="one-and-done">One-and-Done Operations</h3>
+<h3 id="one-and-done">One-and-done operations</h3>
 
 The primary use case for promises is returning them from a method that kicks off a single asynchronous operation. One should think of promise-returning functions as asynchronous functions, in contrast to normal synchronous functions; there is a very strong analogy here, and keeping it in mind makes such functions easier to write and reason about.
 
@@ -48,52 +50,54 @@ Examples of such asynchronous operations abound throughout web specifications:
 - Long-running computations: methods that take a while to compute something could do the work on another thread, returning a promise for the result.
 - User interface prompts: methods that ask the user for an answer could return a promise.
 
-Previously, web specifications used a large variety of differing patterns for asynchronous operations. We've documented these in an appendix below, so you can get an idea of what is now considered legacy. Now that we have promises as a platform primitive, such approaches are no longer necessary.
+Previously, web specifications used a large variety of differing patterns for asynchronous operations. We've documented these in [[#legacy]], so you can get an idea of what to avoid. Now that we have promises as a platform primitive, such approaches are no longer necessary.
 
-<h3 id="one-time-events">One-Time "Events"</h3>
+<h3 id="one-time-events">One-time "events"</h3>
 
 Because promises can be subscribed to even after they've already been fulfilled or rejected, they can be very useful for a certain class of "event." When something only happens once, and authors often want to observe the status of it after it's already occurred, providing a promise that becomes fulfilled when that eventuality comes to pass gives a very convenient API.
 
-The prototypical example of such an "event" is a loaded indicator: a resource such as an image, font, or even document, could provide a <code>loaded</code> property that is a promise that becomes fulfilled only when the resource has fully loaded (or becomes rejected if there's an error loading the resource). Then, authors can always queue up actions to be executed once the resource is ready by doing <code>resource.loaded.then(onLoaded, onFailure)</code>. This will work even if the resource was loaded already, queueing a microtask to execute <code>onLoaded</code>. This is in contrast to an event model, where if the author is not subscribed at the time the event fires, that information is lost.
+The prototypical example of such an "event" is a loaded indicator: a resource such as an image, font, or even document, could provide a <code>loaded</code> property that is a promise that becomes fulfilled only when the resource has fully loaded (or becomes rejected if there's an error loading the resource). Then, authors can always queue up actions to be executed once the resource is ready by doing <code>resource.loaded.then(onLoaded, onFailure)</code>. This will work even if the resource was loaded already, [=queue a microtask|queueing a microtask=] to execute <code>onLoaded</code>. This is in contrast to a traditional event model, such as that of {{EventTarget}}, where if the author is not subscribed at the time the event fires, that information is lost.
 
-<h3 id="state-transitions">More General State Transitions</h3>
+<h3 id="state-transitions">More general state transitions</h3>
 
 In certain cases, promises can be useful as a general mechanism for signaling state transitions. This usage is subtle, but can provide a very nice API for consumers when done correctly.
 
-One can think of this pattern as a generalization of the one-time "events" use case. For example, take <code>&lt;img&gt;</code> elements. By resetting their <code>src</code> property, they can be re-loaded; that is, they can transition back from a loaded state to an unloaded state. Thus becoming loaded is not a one-time occasion: instead, the image actually consists of a state machine that moves back and forth between loaded and unloaded states. In such a scenario, it is still useful to give images a promise-returning <code>loaded</code> property, which will signal the next state transition to a loaded state (or be already fulfilled if the image is already in a loaded state). This property should return the same promise every time it is retrieved, until the image moves backward from the loaded state into the unloaded state. Once that occurs, a new promise is created, representing the <em>next</em> transition to loaded.
+One can think of this pattern as a generalization of the one-time "events" use case. For example, take <{img}> elements. By resetting their <{img/src}> attribute, they can be re-loaded; that is, they can transition back from a loaded state to an unloaded state. Thus becoming loaded is not a one-time occasion: instead, the image actually consists of a state machine that moves back and forth between loaded and unloaded states.
 
-There are many places in the platform where this can be useful, not only for resources which can transition to loaded, but e.g. for animations that can transition to finished, or expensive resources that can transition to disposed, or caches that can become unloaded.
+In such a scenario, it is still useful to give images a promise-returning <code>loaded</code> property, which will signal the next state transition to a loaded state (or be already fulfilled if the image is already in a loaded state). This property should return the same promise every time it is retrieved, until the image moves backward from the loaded state into the unloaded state. Once that occurs, a new promise is created, representing the <em>next</em> transition to loaded.
 
-A slight variant of this pattern occurs when your class contains a method that causes a state transition, and you want to indicate when that state transition completes. In that case you can return a promise from the method, instead of keeping it as a property on your object. The <a href="https://github.com/whatwg/streams/">streams API</a> uses this variant for its <code>wait()</code> and <code>close()</code> methods. In general, methods should be used for actions, and properties for informational state transitions.
+There are many places in the platform where this can be useful, not only for resources which can transition to loaded, but e.g. for animations that can transition to finished, or expensive resources that can transition to disposed, or caches that can become invalidated.
+
+A slight variant of this pattern occurs when your class contains a method that causes a state transition, and you want to indicate when that state transition completes. In that case you can return a promise from the method, instead of keeping it as a property on your object. <cite>Streams</cite> uses this variant in several places, e.g. the {{WritableStreamDefaultWriter/close()|writer.close()}} method. In general, methods should be used for actions, and properties for informational state transitions.
 
 To close, we must caution against over-using this pattern. Not every state transition needs a corresponding promise-property. Indicators that it might be useful include:
 
-- Authors are almost always interested in the <em>next</em> instance of that state transition, and rarely need recurring notification every time it occurs. For example, rarely do authors care to know every time an image element is reloaded; usually they simply care about the initial load of the image, or possibly the next one that occurs after resetting its <code>src</code>.
+- Authors are almost always interested in the <em>next</em> instance of that state transition, and rarely need recurring notification every time it occurs. For example, rarely do authors care to know every time an <{img}> is reloaded; usually they simply care about the initial load of the image, or possibly the next one that occurs after resetting its <{img/src}>.
 - Authors are often interested in reacting to transitions that have already occurred. For example, authors often want to run some code once an image is loaded; if the image is already loaded, they want to run the code as soon as possible.
 
-<h2 id="when-not-to-use">When Not to Use Promises</h2>
+<h2 id="when-not-to-use">When not to use promises</h2>
 
 Although promises are widely applicable to asynchronous operations of many sorts, there are still situations where they are not appropriate, even for asynchronicity.
 
-<h3 id="recurring-events">Recurring Events</h3>
+<h3 id="recurring-events">Recurring events</h3>
 
-Any event that can occur more than once is not a good candidate for the "one and done" model of promises. There is no single asynchronous operation for the promise to represent, but instead a series of events. Conventional <code>EventTarget</code> usage is just fine here.
+Any event that can occur more than once is not a good candidate for the "one and done" model of promises. There is no single asynchronous operation for the promise to represent, but instead a series of events. Conventional {{EventTarget}} usage is just fine here.
 
-<h3 id="streaming-data">Streaming Data</h3>
+<h3 id="streaming-data">Streaming data</h3>
 
-If the amount of data involved is potentially large, and could be produced incrementally, promises are probably not the right solution. Instead, you'll want to use the under-development <a href="https://github.com/whatwg/streams">streams API</a>, which allows authors to process and compose data streams incrementally, without buffering the entire contents of the stream into memory.
+If the amount of data involved is potentially large, and could be produced incrementally, promises are probably not the right solution. Instead, you'll want to use the {{ReadableStream}} class, which allows authors to process and compose data streams incrementally, without buffering the entire contents of the stream into memory.
 
 Note that in some cases, you could provide a promise API alongside a streaming API, as a convenience for those cases when buffering all the data into memory is not a concern. But this would be a supporting, not primary, role.
 
-<h2 id="api-design-guidance">API Design Guidance</h2>
+<h2 id="api-design-guidance">API design guidance</h2>
 
 There are a few subtle aspects of using or accepting promises in your API. Here we attempt to address commonly-encountered questions and situations.
 
 <h3 id="errors">Errors</h3>
 
-<h4 id="always-return-promises">Promise-Returning Functions Should Always Return Promises</h4>
+<h4 id="always-return-promises" oldids="webidl-promise-return-values">Promise-returning functions must always return promises</h4>
 
-Promise-returning functions should always return a promise, under all circumstances. Even if the result is available synchronously, or the inputs can be detected as invalid synchronously, this information needs to be communicated through a uniform channel so that a developer can be sure that by doing
+Promise-returning functions must always return a promise, under all circumstances. Even if the result is available synchronously, or the inputs can be detected as invalid synchronously, this information needs to be communicated through a uniform channel so that a developer can be sure that by doing
 
 <pre><code class="lang-javascript">
 promiseFunction()
@@ -103,17 +107,15 @@ promiseFunction()
 
 they are handling all successes and all errors.
 
-In particular, promise-returning functions should never synchronously throw errors, since that would force duplicate error-handling logic on the consumer: once in a <code>catch (e) { ... }</code> block, and once in a <code>.catch(e => { ... })</code> block. Even argument validation errors are not OK. Instead, all errors should be signaled by returning rejected promises.
+In particular, promise-returning functions should never synchronously throw errors, since that would force duplicate error-handling logic on the consumer: once in a <code class="lang-javascript">catch (e) { ... }</code> block, and once in a <code class="lang-javascript">p.catch(e => { ... })</code> block. Even argument validation errors are not OK. Instead, all errors should be signaled by returning rejected promises.
 
-For WebIDL-based specs, this is taken care of automatically <a href="https://heycam.github.io/webidl/#es-operations">by the WebIDL specification</a>: any exceptions thrown by WebIDL operations, or by the WebIDL overload resolution algorithm itself, are automatically converted into rejections. For an example of how to do manual validation, see the <code>validatedDelay</code> example below.
+For Web IDL-based specs, this is taken care of automatically if you declare your [=operations=] to return a [=promise type=]. Any exceptions thrown by such operations, or by the Web IDL-level type conversions and overload resolution, are automatically converted into rejections. [[!WEBIDL]]
 
-<h4 id="reasons-should-be-errors">Rejection Reasons Should Be <code>Error</code>s</h4>
+<h4 id="reasons-should-be-errors">Rejection reasons must be {{Error}} instances</h4>
 
-Promise rejection reasons should always be instances of the ECMAScript <code>Error</code> type, just like synchronously-thrown exceptions should always be instances of <code>Error</code> as well.
+Promise rejection reasons should always be instances of the JavaScript {{Error}} type, just like synchronously-thrown exceptions should always be instances of {{Error}}. This generally means using either one of the <a href="https://tc39.github.io/ecma262/#sec-error-objects">built-in JavaScript error types</a>, or using {{DOMException}}.
 
-In particular, for DOM or other web platform specs, this means you should never use <code>DOMError</code>, but instead use <code>DOMException</code>, which <a href="https://heycam.github.io/webidl/#es-exceptions">per WebIDL</a> extends <code>Error</code>. You can of course also use one of the <a href="https://tc39.github.io/ecma262/#sec-error-objects">built-in ECMAScript error types</a>.
-
-<h4 id="rejections-should-be-exceptional">Rejections Should Be Used for Exceptional Situations</h4>
+<h4 id="rejections-should-be-exceptional">Rejections must be used for exceptional situations</h4>
 
 What exactly you consider "exceptional" is up for debate, as always. But, you should always ask, before rejecting a promise: if this function was synchronous, would I expect a thrown exception under this circumstance? Or perhaps a failure value (like <code>null</code>, <code>false</code>, or <code>undefined</code>)? You should think about which behavior is more useful for consumers of your API. If you're not sure, pretend your API is synchronous and then think if your developers would expect a thrown exception.
 
@@ -132,50 +134,15 @@ Cases where a judgement call will be necessary include:
 
 - APIs that are more ambiguous about being a question versus a demand: for example <code>requestUsersContacts()</code> could return a promise fulfilled with <code>null</code> if the user denies permission, or it could return a promise rejected with an error stating that the user denied permission.
 
-<h3 id="async-algorithms">Asynchronous Algorithms</h3>
+<h3 id="accepting-promises">Accepting promises</h3>
 
-<div class="note">This section is primarily for spec writers, dealing with the vagaries of clearly manifesting asynchronous algorithm flow in prose. For more background on this subject, see <a href="https://annevankesteren.nl/2014/08/asynchronicity">Anne's blog post on asynchronicity</a>.</div>
-
-<h4 id="simply-resolve-or-reject">Simply Resolve or Reject the Promise</h4>
-
-Unlike in the old world of callbacks, there's no need to create separate callback types (e.g. in WebIDL) for your success and error cases. Instead, just resolve or reject your promise.
-
-<h4 id="explicit-async-steps">Note Parallel Steps Explicitly</h4>
-
-It is important to note which steps in your algorithms will be run in parallel with the author's JavaScript code, i.e. without blocking script execution. This instructs implementers as to which operations will need to use e.g. a background thread or asychronous I/O calls. And it helps authors to know the expected sequencing of <em>their</em> operations with respect to those of your algorithm. To do this, use the phrase <a>in parallel</a> from [[!HTML]].
-
-As an example, the following steps will give a promise that is resolved after <var>ms</var> milliseconds:
-
-1. Let <var>p</var> be <a>a new promise</a>.
-1. Run the following steps <a>in parallel</a>:
-    1. Wait <var>ms</var> milliseconds.
-    1. <a>Resolve</a> <var>p</var> with <b>undefined</b>.
-1. Return <var>p</var>.
-
-If we had omitted the "Run the following steps in parallel" heading, then the algorithm would have instructed implementers to block the main thread for <var>ms</var> milliseconds, which is very bad! Whereas as written, this algorithm correctly describes a non-blocking wait.
-
-<h4 id="queue-tasks">Queue Tasks to Invoke Developer Code</h4>
-
-Promises abstract away many of the details regarding notifying the developer about async operations. For example, you can say "<a>resolve</a> <var>p</var> with <var>x</var>" instead of e.g. "<a>queue a task</a> to call the callback <var>cb</var> with <var>x</var>," and it's understood that this will use the normal promise mechanisms. (Namely, the developer can wait for fulfillment or rejection by passing callbacks to the promise's <code>then</code> method, which will call those callbacks in the next microtask.) So in most cases, you will not need to explicitly queue tasks inside your promise-based asynchronous algorithms.
-
-However, in cases where you need to interface with developer code in more ways than can be mediated via the promise, you'll still need to queue a task. For example, you may want to fire an event, which can call into developer event handlers. Or you may need to perform a structured clone operation, which <a href="http://lists.w3.org/Archives/Public/public-webcrypto/2014Mar/0141.html">can trigger getters</a>. If these things must be done inside the asynchronous portion of your algorithm, you need to specify that they are done via a queued task, and with a specific task queue. This nails down the exact time such developer-observable operations happen both in relation to other queued tasks, and to the microtask queue used by promises.
-
-As an example, the following steps will return a promise resolved after <var>ms</var> milliseconds, but also fire an event named <code>timerfinished</code> on an object |object|:
-
-1. Let <var>p</var> be <a>a new promise</a>.
-1. Run the following steps <a>in parallel</a>:
-    1. Wait <var>ms</var> milliseconds.
-    1. <a>Resolve</a> <var>p</var> with <b>undefined</b>.
-    1. <a>Queue a task</a> to <a href="https://html.spec.whatwg.org/multipage/webappapis.html#fire-a-simple-event">fire a simple event</a> named <code>timerfinished</code> at the |object|.
-1. Return <var>p</var>.
-
-<h3 id="accepting-promises">Accepting Promises</h3>
-
-<h4 id="resolve-arguments">Promise Arguments Should Be Resolved</h4>
+<h4 id="resolve-arguments" oldids="webidl-promise-parameters">Promise arguments should be resolved</h4>
 
 In general, when an argument is expected to be a promise, you should also allow thenables and non-promise values by <em>resolving</em> the argument to a promise before using it. You should <em>never</em> do a type-detection on the incoming value, or overload between promises and other values, or put promises in a union type.
 
-In WebIDL-using specs, this is automatically taken care of by the <a href="https://heycam.github.io/webidl/#es-promise">WebIDL promise type</a>. To see what it means in JavaScript, consider the following function, which adds a delay of <var>ms</var> milliseconds to a promise:
+In Web IDL-using specs, this is automatically taken care of by the <code><a interface>Promise</a>&lt;<var ignore>T</var>&gt;</code> type.
+
+To see what it means in JavaScript code, consider the following function, which adds a delay of <var ignore>ms</var> milliseconds to a promise:
 
 <div class="example">
     <pre><code class="lang-javascript">
@@ -194,446 +161,25 @@ In WebIDL-using specs, this is automatically taken care of by the <a href="https
 
 In this example, <code>p1</code> will be fulfilled 500 ms after the promise returned by <code>doAsyncOperation()</code> fulfills, with that operation's value. (Or <code>p1</code> will reject as soon as that promise rejects.) And, since we resolve the incoming argument to a promise, the function can also work when you pass it the string <code>"value"</code>: <code>p2</code> will be fulfilled with <code>"value"</code> after 1000 ms. In this way, we essentially treat it as an immediately-fulfilled promise for that value.
 
-<h4 id="should-promise-call">Developer-Supplied Promise-Returning Functions Should Be "Promise-Called"</h4>
+<h4 id="should-promise-call" oldids="webidl-developer-functions-returning-promises">Developer-supplied promise-returning functions should be "promise-called"</h4>
 
-If the developer supplies you with a function that you expect to return a promise, you should also allow it to return a thenable or non-promise value, or even throw an exception, and treat all these cases as if they had returned an analogous promise. We can encapsulate this process in an operation called <a href="#promise-calling">promise-calling</a> the supplied function. This allows us to have the same reaction to synchronous forms of success and failure that we would to asynchronous forms.
+If the developer supplies you with a function that you expect to return a promise, you should also allow it to return a thenable or non-promise value, or even throw an exception, and treat all these cases as if they had returned an analogous promise. This should be done by converting the returned value to a promise, as if by using <code>Promise.resolve()</code>, and catching thrown exceptions and converting those into a promise as if by using <code>Promise.reject()</code>. We call this "promise-calling" the function.
 
-See the <a href="#example-resource-open"><code>resource.open</code> example</a> below for further discussion of how and why this should be used.
+The purpose of this is to allow us to have the same reaction to synchronous forms of success and failure that we would to asynchronous forms.
 
-<h2 id="shorthand-phrases">Shorthand Phrases</h2>
+In Web IDL-using specifications, this is automatically taken care of if you declare the developer function as a [=callback function=] and then [=invoke=] it.
 
-<div class="note">This section is primarily for spec writers, dealing with ways of performing common promise operations in prose.</div>
+<h2 id="legacy" class="no-num">Appendix: legacy APIs for asynchronicity</h2>
 
-<div class="note">This section should eventually move to WebIDL, where it belongs. See <a href="https://github.com/w3ctag/promises-guide/issues/27">#27</a>.</div>
-
-When writing such specifications, it's convenient to be able to refer to common promise operations concisely. We define here a set of shorthands that allow you to do so.
-
-<h3 id="shorthand-creating">Creating Promises</h3>
-
-"<dfn id="a-new-promise" export>A new promise</dfn>" gives a new, initialized-but-unresolved promise object to manipulate further. It is equivalent to calling <code>new Promise((resolve, reject) => { ... })</code>, using the initial value of <a href="https://tc39.github.io/ecma262/#sec-promise-constructor">the <code>Promise</code> constructor</a>. Here <code>...</code> stands in for code that saves the value of <code>resolve</code> and <code>reject</code> for later use by the shorthands under [[#shorthand-manipulating]].
-
-"<dfn id="a-promise-resolved-with" export>A promise resolved with</dfn> <var>x</var>" or "<var>x</var> <dfn id="resolved-as-a-promise" export>resolved as a promise</dfn>" is shorthand for the result of <code>Promise.resolve(x)</code>, using the initial value of <a href="https://tc39.github.io/ecma262/#sec-promise.resolve"><code>Promise.resolve</code></a>.
-
-"<dfn id="a-promise-rejected-with" export>A promise rejected with</dfn> <var>r</var>" is shorthand for the result of <code>Promise.reject(r)</code>, using the initial value of <a href="https://tc39.github.io/ecma262/#sec-promise.reject"><code>Promise.reject</code></a>.
-
-<h3 id="shorthand-manipulating">Manipulating Promises</h3>
-
-"<dfn id="resolve-promise" export>Resolve</dfn> <var>p</var> with <var>x</var>" is shorthand for calling a previously-stored <a href="https://tc39.github.io/ecma262/#sec-promise-resolve-functions"><code>resolve</code> function</a> from creating <code>p</code>, with argument <code>x</code>.
-
-"<dfn id="reject-promise" export>Reject</dfn> <var>p</var> with <var>r</var>" is shorthand for calling a previously-stored <a href="https://tc39.github.io/ecma262/#sec-promise-reject-functions"><code>reject</code> function</a> from creating <code>p</code>, with argument <code>r</code>.
-
-If the algorithm using these shorthands is running <a>in parallel</a>, the shorthands <a>queue a task</a> on <var>p</var>'s <a>relevant settings object</a>'s <a>responsible event loop</a> to call the stored function.
-
-<h3 id="shorthand-reacting">Reacting to Promises</h3>
-
-"<dfn id="upon-fulfillment" export>Upon fulfillment</dfn> of <var>p</var> with value <var>v</var>" is shorthand for calling <code>p.then(onFulfilled)</code>, with the successive nested steps comprising the <code>onFulfilled</code> function, and using the initial value of <a href="https://tc39.github.io/ecma262/#sec-promise.prototype.then"><code>Promise.prototype.then</code></a>. The steps then have access to <code>onFulfilled</code>'s argument as <var>v</var>.
-
-"<dfn id="upon-rejection" export>Upon rejection</dfn> of <var>p</var> with reason <var>r</var>" is shorthand for calling <code>p.then(undefined, onRejected)</code>, with the successive nested steps comprising the <code>onRejected</code> function, and using the initial value of <a href="https://tc39.github.io/ecma262/#sec-promise.prototype.then"><code>Promise.prototype.then</code></a>. The steps then have access to <code>onRejected</code>'s argument as <var>r</var>.
-
-"<dfn id="transforming-by" export>Transforming</dfn> <var>p</var> with a fulfillment and/or rejection handler" is shorthand for calling <code>p.then(fulfillmentHandler, rejectionHandler)</code>, using the initial value of <a href="https://tc39.github.io/ecma262/#sec-promise.prototype.then"><code>Promise.prototype.then</code></a>.
-
-<div class="example">
-    Some examples of the latter phrase would be
-
-    1. Return the result of <a>transforming</a> <var>p</var> with a fulfillment handler that returns <b>undefined</b>.
-
-    or
-
-    1. Return the result of <a>transforming</a> <var>p</var> with a fulfillment handler that returns twice its first argument.
-
-    These correspond to
-
-    <pre><code class="lang-javascript">
-    return p.then(() => undefined);
-    </code></pre>
-
-    and
-
-    <pre><code class="lang-javascript">
-    return p.then(x => 2 * x);
-    </code></pre>
-
-    respectively. (More complicated transforms are of course possible as well, as shown in the <a href="#example-resource-open"><code>resource.open</code> example</a> below.)
-</div>
-
-<h3 id="aggregating-promises">Aggregating Promises</h3>
-
-To <dfn id="waiting-for-all" export lt="wait for all|waiting for all">wait for all</dfn> of a <a>list</a> of promises |promises|, with success steps |successSteps| that take a <a>list</a> of JavaScript values and failure steps |failureSteps| that take a rejection reason JavaScript value, perform the following steps:
-
-1. Let |fullfilledCount| be 0.
-1. Let |rejected| be false.
-1. Let |rejectionHandler| be a built-in function that takes an argument |arg| and performs the following steps:
-    1. If |rejected| is true, abort these steps.
-    1. Set |rejected| to true.
-    1. Perform |failureSteps| given |arg|.
-1. Let |index| be 0.
-1. Let |total| be |promises|'s [=list/size=].
-1. Let |result| be a <a>list</a> containing |total| null values.
-1. If |total| is 0, then:
-    1. <a>Queue a microtask</a> to perform |successSteps| given |result|.
-    1. Return.
-1. [=list/For each=] |promise| of |promises|:
-    1. Let |promiseIndex| be |index|.
-    1. Let |fulfillmentHandler| be a built-in function that takes an argument |arg| performs the following steps:
-        1. Set |result|[|promiseIndex|] to |arg|.
-        1. Set |fullfilledCount| to |fullfilledCount| + 1.
-        1. If |fullfilledCount| equals |total|, then perform |successSteps| given |result|.
-    1. Perform <a abstract-op>PerformPromiseThen</a>(|promise|, |fulfillmentHandler|, |rejectionHandler|).
-    1. Set |index| to |index| + 1.
-
-This phrase is useful when you wish to aggregate the result of multiple promises, and react to them all together, in the same way that {{Promise/all()|Promise.all()}} functions for JavaScript code.
-
-To <dfn id="waiting-for-all-promise" export lt="get a promise to wait for all|getting a promise to wait for all">get a promise for waiting for all</dfn> of a <a>list</a> of promises |promises|, with success steps |successSteps| that take a <a>list</a> of JavaScript values and optional failure steps |failureSteps| that take a rejection reason JavaScript value, perform the following steps:
-
-1. Let |promise| be <a>a new promise</a>.
-1. If |failureSteps| were not given, let them be steps taking an argument |arg| that throw |arg|.
-1. Let |successStepsWrapper| be the following steps, given |results|:
-    1. Let |stepsResult| be the result of performing |successSteps| given |results|. If these steps threw an exception, <a>reject</a> |promise| with that exception.
-    1. <a>Resolve</a> |promise| with |stepsResult|.
-1. Let |failureStepsWrapper| be the following steps, given |reason|:
-    1. Let |stepsResult| be the result of performing |failureSteps| given |reason|. If these steps threw an exception, <a>reject</a> |promise| with that exception.
-    1. <a>Resolve</a> |promise| with |stepsResult|.
-1. <a>Wait for all</a> of |promises|, given |successStepsWrapper| and |failureStepsWrapper|.
-1. Return |promise|.
-
-This phrase is useful when you wish to aggregate the results of multiple promises, and then produce another promise from them.
-
-An example usage of this phrase is found in [[#example-batch-request]].
-
-<h3 id="shorthand-promise-calling">Promise-Calling</h3>
-
-The result of <dfn id="promise-calling" export>promise-calling</dfn> <var>f</var>(...<var>args</var>) is:
-
-- If the call returns a value <var>v</var>, the result of <a href="#resolved-as-a-promise">resolving</a> <var>v</var> as a promise.
-- If the call throws an exception <var>e</var>, a promise <a href="#a-promise-rejected-with">rejected with</a> <var>e</var>.
-
-<div class="note" id="promise-call-in-js">
-    In JavaScript, you might express promise-calling this way:
-
-    <pre><code class="lang-javascript">
-    function promiseCall(f, ...args) {
-        try {
-            return Promise.resolve(f(...args));
-        } catch (e) {
-            return Promise.reject(e);
-        }
-    }
-    </code></pre>
-</div>
-
-<h3 id="shorthand-note-onrealms">A Note on Realms</h3>
-
-In all cases, when we use phrases like "the initial value of <code>Promise.resolve</code>," we mean the initial value within the <a href="https://tc39.github.io/ecma262/#sec-code-realms">realm</a> associated to the function being specified. So for example, if <code>window.f()</code> is specified to return "<a>a promise resolved with</a> <b>1</b>," then:
-
-<pre><code class="lang-javascript">
-assert(windowA.f().constructor === windowA.Promise);
-assert(windowB.f().constructor === windowB.Promise);
-
-// The realm of the object the function is being invoked on has no effect;
-// the function's realm is all that matters.
-assert(windowA.f.call(windowB).constructor === windowA.Promise);
-
-// This means mutations to the Promise constructor also propagate.
-windowA.Promise.prototype.foo = "bar";
-assert(windowA.f().foo === "bar");
-assert(windowB.f().foo === undefined);
-
-// But since the algorithm for Promise.resolve uses the un-modifiable %Promise%
-// intrinsic, instead of consulting the global, modifying the global property named
-// "Promise" does not impact the return value.
-const oldPromise = windowA.Promise;
-windowA.Promise = () => throw new Error("I break developer code, but not platform code!");
-assert(windowA.f().constructor !== windowA.Promise);
-assert(windowA.f().constructor === oldPromise);
-</code></pre>
-
-For more information, see <a href="http://lists.w3.org/Archives/Public/www-tag/2014Jan/0108.html">this www-tag thread</a>, especially the replies.
-
-<h2 id="examples">Examples</h2>
-
-<div class="note">This section is mostly for spec writers, although it does give examples of the spec prose translated into JavaScript.</div>
-
-<h3 id="example-delay">delay(<var>ms</var>)</h3>
-
-<code>delay</code> is a function that returns a promise that will be fulfilled in <var>ms</var> milliseconds. It illustrates how simply you can resolve a promise, with one line of prose.
-
-1. Let <var>ms</var> be ToNumber(<var>ms</var>).
-1. If <var>ms</var> is <b>NaN</b>, let <var>ms</var> be <b>+0</b>; otherwise let <var>ms</var> be the maximum of <var>ms</var> and <b>+0</b>.
-1. Let <var>p</var> be <a>a new promise</a>.
-1. Run the following steps <a>in parallel</a>:
-    1. Wait <var>ms</var> milliseconds.
-    1. <a>Resolve</a> <var>p</var> with <b>undefined</b>.
-1. Return <var>p</var>.
-
-The equivalent function in JavaScript would be
-
-<pre><code class="lang-javascript">
-function delay(ms) {
-    ms = Number(ms);
-    ms = Number.isNaN(ms) ? +0 : Math.max(ms, +0);
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-</code></pre>
-
-or, in a more one-to-one correspondence with the specified steps,
-
-<pre><code class="lang-javascript">
-function delay(ms) {
-    // Steps 1, 2
-    ms = Number(ms);
-    ms = Number.isNaN(ms) ? +0 : Math.max(ms, +0);
-
-    // Step 3
-    let resolve;
-    const p = new Promise(r => { resolve = r; });
-
-    // Step 4
-    setTimeout(() => resolve(undefined), ms);
-
-    // Step 5
-    return p;
-}
-</code></pre>
-
-<h3 id="example-validated-delay">validatedDelay(<var>ms</var>)</h3>
-
-The <code>validatedDelay</code> function is much like <a href="#example-delay">the <code>delay</code> function</a>, except it will validate its arguments. This shows how to use rejected promises to signal immediate failure before even starting any asynchronous operations.
-
-1. Let <var>ms</var> be ToNumber(<var>ms</var>).
-1. If <var>ms</var> is <b>NaN</b>, return <a>a promise rejected with</a> a <b>TypeError</b>.
-1. If <var>ms</var> is less than zero, return <a>a promise rejected with</a> a <b>RangeError</b>.
-1. Let <var>p</var> be <a>a new promise</a>.
-1. Run the following steps <a>in parallel</a>:
-    1. Wait <var>ms</var> milliseconds.
-    1. <a>Resolve</a> <var>p</var> with <b>undefined</b>.
-1. Return <var>p</var>.
-
-The equivalent function in JavaScript would be
-
-<pre><code class="lang-javascript">
-function delay(ms) {
-    ms = Number(ms);
-
-    if (Number.isNaN(ms)) {
-        return Promise.reject(new TypeError("Not a number."));
-    }
-    if (ms < 0) {
-        return Promise.reject(new RangeError("ms must be at least zero."));
-    }
-
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-</code></pre>
-
-<h3 id="example-add-delay">addDelay(<var>promise</var>, <var>ms</var>)</h3>
-
-<code>addDelay</code> is a function that adds an extra <var>ms</var> milliseconds of delay between <var>promise</var> settling and the returned promise settling. Notice how it resolves the incoming argument to a promise, so that you could pass it a non-promise value or a thenable.
-
-1. Let <var>ms</var> be ToNumber(<var>ms</var>).
-1. If <var>ms</var> is <b>NaN</b>, let <var>ms</var> be <b>+0</b>; otherwise let <var>ms</var> be the maximum of <var>ms</var> and <b>+0</b>.
-1. Let <var>p</var> be <a>a new promise</a>.
-1. Let <var>resolvedToPromise</var> be the result of resolving <var>promise</var> to a promise.
-1. <a>Upon fulfillment</a> of <var>resolvedToPromise</var> with value <var>v</var>, perform the following steps <a>in parallel</a>:
-    1. Wait <var>ms</var> milliseconds.
-    1. <a>Resolve</a> <var>p</var> with <var>v</var>.
-1. <a>Upon rejection</a> of <var>resolvedToPromise</var> with reason <var>r</var>, perform the following steps <a>in parallel</a>:
-    1. Wait <var>ms</var> milliseconds.
-    1. <a>Reject</a> <var>p</var> with <var>r</var>.
-1. Return <var>p</var>.
-
-The equivalent function in JavaScript would be
-
-<pre><code class="lang-javascript">
-function addDelay(promise, ms) {
-    ms = Number(ms);
-    ms = Number.isNaN(ms) ? +0 : Math.max(ms, +0);
-
-    let resolve, reject;
-    const p = new Promise((r, rr) => { resolve = r; reject = rr; });
-
-    const resolvedToPromise = Promise.resolve(promise);
-    resolvedToPromise.then(
-        v => setTimeout(() => resolve(v), ms),
-        r => setTimeout(() => reject(r), ms)
-    );
-
-    return p;
-}
-</code></pre>
-
-<h3 id="example-resource-open">resource.open(<var>resourcePath</var>, <var>openingOperation</var>)</h3>
-
-<code>resource.open</code> is a method that executes the passed function <var>openingOperation</var> to do most of its work, but then updates the <code>resource</code>'s properties to reflect the result of this operation. It is a simplified version of some of the techniques used in the streams specification. The method is meant to illustrate how and why you might <a href="#promise-calling">promise-call</a> another function.
-
-1. Let <var>resourcePath</var> be ToString(<var>resourcePath</var>).
-1. Let <var>openingPromise</var> be the result of <a href="#promise-calling">promise-calling</a> <var>openingOperation</var>(<var>resourcePath</var>).
-1. Return the result of <a>transforming</a> <var>openingPromise</var> with:
-    1. A fulfillment handler that sets <code>this.status</code> to <code>"opened"</code>.
-    1. A rejection handler that, when called with argument <var>r</var>, set <code>this.status</code> to <cod>"errored"</code> and <code>this.error</code> to <var>r</var>.
-
-The equivalent function in JavaScript would be
-
-<pre><code class="lang-javascript">
-resource.open = function (resourcePath, openingOperation) {
-    resourcePath = String(resourcePath);
-
-    return promiseCall(openingOperation, resourcePath).then(
-        v => {
-            this.status = "opened";
-        },
-        r => {
-            this.status = "errored";
-            this.error = r;
-        }
-    );
-};
-</code></pre>
-
-using <a href="#promise-call-in-js">the <code>promiseCall</code> function defined above</a>.
-
-<div class="note">
-    Note how if we had instead just called <code>openingOperation</code>, i.e. done <code>openingOperation(resourcePath)</code> directly, then code like
-
-    <pre><code class="lang-javascript">
-    resource.open(synchronouslyOpenTheResource).then(doSomethingElse);
-    </code></pre>
-
-    would fail. It would not return a promise, so calling <code>then</code> on the return value would fail. Even if we accounted for that, what if <code>synchronouslyOpenTheResource</code> threw an error? We would want that to result in an <code>"errored"</code> status, but without promise-calling, that would not be the case: the error would simply cause <code>resource.open</code> to exit. So you can see that promise-calling is quite helpful here.
-</div>
-
-<h3 id="example-environment-ready">environment.ready</h3>
-
-<code>environment.ready</code> is a property that signals when some part of some environment becomes "ready," e.g. a DOM document. It illustrates how to encode environmental asynchronicity.
-
-Let every <code>Environment</code> object have a \[[ready]] internal slot, initialized with <a>a new promise</a>. When the getter for <code>environment.ready</code> is called, return the value of this <code>Environment</code> object's \[[ready]] internal slot.
-
-The following steps might be inserted toward the end of some algorithm for readying <code>Environment</code> objects:
-
-1. If the environment becomes ready successfully, <a>resolve</a> this <code>Environment</code> object's \[[ready]] promise with <b>undefined</b>.
-1. If the environment fails to become ready, <a>reject</a> this <code>Environment</code> object's \[[ready]] promise with an <b>Error</b> instance explaining the load failure.
-
-<h3 id="example-add-bookmark">addBookmark()</h3>
-
-<code>addBookmark</code> is a function that requests that the user add the current web page as a bookmark. It's drawn from <a href="https://github.com/domenic/promises-unwrapping/issues/85">some iterative design work</a> and illustrates a more real-world scenario of appealing to environmental asynchrony, as well as immediate rejections.
-
-1. If this method was not invoked as a result of explicit user action, return <a>a promise rejected with</a> a new <code>DOMException</code> whose name is <code>"SecurityError"</code>.
-1. If the document's mode of operation is standalone, return <a>a promise rejected with</a> a new <code>DOMException</code> whose name is <code>"NotSupported"</code>.
-1. Let <var>promise</var> be <a>a new promise</a>.
-1. Let <var>info</var> be the result of getting a web application's metadata.
-1. Run the following steps <a>in parallel</a>:
-    1. Using <var>info</var>, and in a manner that is user-agent specific, allow the end user to make a choice as to whether they want to add the bookmark.
-        1. If the end-user aborts the request to add the bookmark (e.g., they hit escape, or press a "cancel" button), <a>reject</a> <var>promise</var> with a new <code>DOMException</code> whose name is <code>"AbortError"</code>.
-        1. Otherwise, <a>resolve</a> <var>promise</var> with <b>undefined</b>.
-1. Return <var>promise</var>.
-
-<h3 id="example-batch-request">batchRequest(<var>urls</var>)</h3>
-
-Several places in [[SERVICE-WORKERS]] use <a>get a promise to wait for all</a>. <code>batchRequest</code> illustrates a simplified version of one of their uses. It takes as input a <a>list</a> of URLs, and returns a promise for an array of {{Response}} objects created by fetching the corresponding URL. If any of the fetches fail, it will return <a>a promise rejected with</a> that failure.
-
-1. Let <var>responsePromises</var> be a new empty <a>list</a>.
-1. For each value <var>url</var> of <var>urls</var>,
-    1. Let <var>url</var> be the result of converting <var>url</var> to a {{USVString}}.
-    1. Let <var>req</var> be the result of creating a new {{Request}} passing <var>url</var> to the constructor.
-    1. Let <var>p</var> be the result of calling {{WindowOrWorkerGlobalScope/fetch()}} with <var>req</var>.
-    1. Add <var>p</var> to <var>responsePromises</var>.
-1. Return the result of <a>getting a promise to wait for all</a> of <var>responsePromises</var>, given success steps that take |results| and returns the result of converting that <a>list</a> into a JavaScript Array.
-
-<h2 id="webidl">WebIDL and Promises</h2>
-
-<div class="note">This section is primarily for spec writers, dealing with how promises integrate with an interface definition language often used in web specs.</div>
-
-[[!WEBIDL]] provides a <a href="https://heycam.github.io/webidl/#es-promise"><code>Promise&lt;T&gt;</code></a> type which can be used when writing specifications that expose their API through WebIDL. We summarize the impact of <code>Promise&lt;T&gt;</code> here for easy reference.
-
-<h3 id="webidl-promise-return-values"><code>Promise&lt;T&gt;</code> Return Values</h3>
-
-Like all WebIDL return values, declaring a return value of type <code>Promise&lt;T&gt;</code> has no impact on the algorithm's actual return steps. It is simply a form of documentation, and if you return something that is not a promise or is a promise with a fulfillment value that is not of WebIDL-type <code>T</code>, then you have written incorrect documentation into your spec.
-
-However, declaring that your method or accessor returns a promise does have one important impact: it ensures that any exceptions that it would otherwise throw, e.g. as a result of failed type conversions, are caught and turned into rejected promises. (See the <a href="https://heycam.github.io/webidl/#es-operations">"Operations" section</a>, "If <var>O</var> has a return type that is a promise type …", and similar phrases scattered throughout the document.) This automatically takes care of the advice in [[#always-return-promises]], at least for exceptions.
-
-<h3 id="webidl-promise-parameters"><code>Promise&lt;T&gt;</code> Parameters</h3>
-
-When a parameter of a WebIDL method is declared as <code>Promise&lt;T&gt;</code>, it will automatically resolve any arguments passed in that position. This will take care of the "Promise Arguments Should Be Resolved" advice above.
-
-If you have a WebIDL <code>Promise&lt;T&gt;</code> argument, you can use the WebIDL <a href="https://heycam.github.io/webidl/#dfn-perform-steps-once-promise-is-settled">perform some steps once a promise is settled</a> algorithm. This is much like our <a href="#upon-fulfillment">upon fulfillment …</a> and <a href="#upon-rejection">upon rejection …</a> shorthand phrases above, but it will add an additional step of converting the promise's fulfillment value to the WebIDL type <code>T</code> before running any upon-fulfillment steps. Additionally it causes your algorithm to return a promise derived from running those steps. If the type conversion fails, your algorithm will return <a>a promise rejected with</a> the error causing that failure.
-
-Note that the <code>T</code> here refers to a WebIDL type <em>for the fulfillment value</em>. Furthermore, it only has impact if you use the WebIDL "perform some steps …" algorithm, and not if you use the promise in other ways (such as passing it along to another function). If that is not relevant, we advise using <code>Promise&lt;any&gt;</code> for parameters.
-
-<div class="note">
-    As a consequence of the resolution behavior, <code>Promise&lt;T&gt;</code> parameters cannot be overloaded with any other parameters. For example, you cannot do:
-
-    <pre>
-    // INVALID WEBIDL
-    void f(Promise&lt;DOMString&gt; x);
-    void f(DOMString y);
-    </pre>
-</div>
-
-<span id="webidl-user-functions-returning-promises"></span> <!-- so as to not break links -->
-<h3 id="webidl-developer-functions-returning-promises">Developer Functions Returning Promises</h3>
-
-In WebIDL, you consume JavaScript functions by declaring them as WebIDL <a href="https://heycam.github.io/webidl/#dfn-callback-function">callback functions</a> (or, in rare cases, via <a href="https://heycam.github.io/webidl/#dfn-callback-interface">callback interfaces</a>) and later <a href="https://heycam.github.io/webidl/#es-invoking-callback-functions">invoking them</a> with a list of WebIDL values.
-
-If you use WebIDL's mechanisms for calling JavaScript functions, the invocation algorithm will automatically resolve return values and convert thrown exceptions into rejected promises. This automatically takes care of the advice in [[#should-promise-call]].
-
-<h3 id="webidl-examples">Examples</h3>
-
-<div class="example">
-    Promise-returning methods:
-
-    <pre>
-    interface ProtectedResource {
-      Promise&lt;void&gt; requestAccess();
-      // ...
-    };
-
-    interface Quoter {
-      Promise&lt;DOMString&gt; getInterestingQuote();
-    };
-    </pre>
-</div>
-
-<div class="example">
-    Promise-returning properties
-
-    <pre>
-    interface StateMachine {
-      readonly attribute Promise&lt;void&gt; loaded;
-
-      Promise&lt;void&gt; load();
-    };
-    </pre>
-</div>
-
-<div class="example">
-    Promise-accepting methods
-
-    <pre>
-    interface Waiter {
-      void waitUntil(Promise&lt;any&gt; promise);
-    };
-    </pre>
-</div>
-
-<div class="example">
-    Promise-returning developer functions
-
-    <pre>
-    callback Promise&lt;DOMString&gt; ResourceLoader();
-
-    interface ResourceConsumer {
-      void loadAndConsumeResource(ResourceLoader loader);
-    };
-    </pre>
-</div>
-
-<h2 id="legacy" class="no-num">Appendix: Legacy APIs for Asynchronicity</h2>
+<div class="non-normative">
 
 Many web platform APIs were written before the advent of promises, and thus came up with their own ad-hoc ways of signaling asynchronous operation completion or failure. These include:
 
-- IndexedDB returning <a href="http://www.w3.org/TR/IndexedDB/#request-api"><code>IDBRequest</code></a> objects, with their <code>onsuccess</code> and <code>onerror</code> events
-- The File API's <a href="http://www.w3.org/TR/file-system-api/#methods"><code>methods</code></a> taking various <code>successCallback</code> and <code>errorCallback</code> parameters
-- The Notifications API's <a href="https://notifications.spec.whatwg.org/#dom-notification-requestpermission"><code>requestPermission</code></a> method, which calls its callback with <code>"granted"</code> or <code>"denied"</code>
-- The Fullscreen API's <a href="https://fullscreen.spec.whatwg.org/#dom-element-requestfullscreen"><code>requestFullscreen</code></a> method, which triggers <code>onfullscreenchange</code> or <code>onfullscreenerror</code> events on the nearby <code>document</code> object that must be listened to in order to detect success or failure
-- XMLHttpRequest's <a href="https://xhr.spec.whatwg.org/#the-send%28%29-method"><code>send</code></a> method, which triggers <code>onreadystatechange</code> multiple times and updates properties of the object with status information which must be consulted in order to accurately detect success or failure of the ultimate state transition
+- <cite>IndexedDB</cite> returning {{IDBRequest}} objects, with their {{IDBRequest/onsuccess}} and {{IDBRequest/onerror}} event handler attributes. [[INDEXEDDB]]
+- <cite>File API: Directories and System</cite>'s methods taking various <code>successCallback</code> and <code>errorCallback</code> parameters. [[FILE-SYSTEM-API]]
+- <cite>Notifications</cite>'s {{Notification/requestPermission(deprecatedCallback)}} operation, which calls its callback with <code>"granted"</code> or <code>"denied"</code>. (This has since been updated to also return a promise, making the callback optional.) [[NOTIFICATIONS]]
+- <cite>XMLHttpRequest</cite>'s {{XMLHttpRequest/send()}} method, which triggers {{XMLHttpRequest/onreadystatechange}}  multiple times and updates properties of the object with status information which must be consulted in order to accurately detect success or failure of the ultimate state transition. [[XHR]]
 
 If you find yourself doing something even remotely similar to these, stop, and instead use promises.
+
+</div>
