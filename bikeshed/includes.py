@@ -26,6 +26,8 @@ def processInclusions(doc):
             handleBikeshedInclude(el, doc)
     for el in findAll("pre.include-code", doc):
         handleCodeInclude(el, doc)
+    for el in findAll("pre.include-raw", doc):
+        handleRawInclude(el, doc)
 
 def handleBikeshedInclude(el, doc):
     macros = {}
@@ -108,6 +110,23 @@ def handleCodeInclude(el, doc):
                     # but otherwise DWIM.
                     el.set("line-start", unicode(start))
     appendChild(el, *lines)
+
+
+def handleRawInclude(el, doc):
+    if not el.get("path"):
+        die("Whoops, an include-raw block didn't get parsed correctly, so I can't include anything.", el=el)
+        removeNode(el)
+        return
+    path = el.get("path")
+    try:
+        with io.open(config.docPath(doc, path), 'r', encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception as err:
+        die("Couldn't find include-raw file '{0}'. Error was:\n{1}", path, err, el=el)
+        removeNode(el)
+        return
+    subtree = parseHTML(''.join(lines))
+    replaceNode(el, *subtree)
 
 def parseRangeString(rangeStr):
     rangeStr = re.sub(r"\s*", "", rangeStr)

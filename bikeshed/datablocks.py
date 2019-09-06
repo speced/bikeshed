@@ -45,6 +45,7 @@ def transformDataBlocks(doc, lines):
         'info': transformInfo,
         'include': transformInclude,
         'include-code': transformIncludeCode,
+        'include-raw': transformIncludeRaw,
         'pre': transformPre
     }
     blockType = ""
@@ -742,6 +743,34 @@ def transformIncludeCode(lines, doc, firstLine, lineNum=None, **kwargs):
         if lineNumbers:
             attrs += " line-numbers"
         el = "<pre class=include-code{0}></pre>".format(attrs)
+        indent = getWsPrefix(firstLine)
+        return [indent+el]
+    else:
+        return []
+
+
+def transformIncludeRaw(lines, doc, firstLine, lineNum=None, **kwargs):
+    lineNumAttr = ""
+    if lineNum is not None:
+        lineNumAttr = " line-number={0}".format(lineNum)
+    infos = parseInfoTree(lines, doc.md.indent, lineNum)
+    path = None
+    highlight = None
+    lineStart = None
+    show = []
+    lineHighlight = []
+    lineNumbers = False
+    for info in infos:
+        if "path" in info:
+            if path is None:
+                path = info['path'][0]
+            else:
+                die("Include-raw blocks must only contain a single 'path'.", lineNum=lineNum)
+
+    if path:
+        attrs = lineNumAttr
+        attrs += " path='{0}'".format(escapeAttr(path))
+        el = "<pre class=include-raw{0}></pre>".format(attrs)
         indent = getWsPrefix(firstLine)
         return [indent+el]
     else:
