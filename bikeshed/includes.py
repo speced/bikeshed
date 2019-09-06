@@ -53,14 +53,14 @@ def handleBikeshedInclude(el, doc):
             # This came from another included file, check if it's a loop-include
             if hash in el.get('hash'):
                 # WHOOPS
-                die("Include loop detected - “{0}” is included in itself.", path)
+                die("Include loop detected - “{0}” is included in itself.", path, el=el)
                 removeNode(el)
                 return
             hash += " " + el.get('hash')
         depth = int(el.get('depth')) if el.get('depth') is not None else 0
         if depth > 100:
             # Just in case you slip past the nesting restriction
-            die("Nesting depth > 100, literally wtf are you doing.")
+            die("Nesting depth > 100, literally wtf are you doing.", el=el)
             removeNode(el)
             return
         lines = datablocks.transformDataBlocks(doc, lines)
@@ -73,13 +73,13 @@ def handleBikeshedInclude(el, doc):
             childInclude.set("depth", str(depth + 1))
         replaceNode(el, *subtree)
     else:
-        die("Whoops, an include block didn't get parsed correctly, so I can't include anything.")
+        die("Whoops, an include block didn't get parsed correctly, so I can't include anything.", el=el)
         removeNode(el)
         return
 
 def handleCodeInclude(el, doc):
     if not el.get("path"):
-        die("Whoops, an include-code block didn't get parsed correctly, so I can't include anything.")
+        die("Whoops, an include-code block didn't get parsed correctly, so I can't include anything.", el=el)
         removeNode(el)
         return
     path = el.get("path")
