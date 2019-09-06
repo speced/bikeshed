@@ -223,32 +223,41 @@ The <dfn method for=FileSystemFileHandle>getFile()</dfn> method, when invoked, m
 <div class="note domintro">
   : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()}}
   : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/inPlace}}: false })
-  : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/keepExistingData}}: |keepExistingData|, {{FileSystemCreateWriterOptions/inPlace}}: false })
+  : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/inPlace}}: false, {{FileSystemCreateWriterOptions/keepExistingData}}: true/false })
   :: Returns a {{FileSystemWriter}} that can be used to write to the file. Any changes made through
      |writer| won't be reflected in the file represented by |fileHandle| until its
      {{FileSystemWriter/close()}} method is called.
      User agents try to ensure that no partial writes happen, i.e. the file represented by
      |fileHandle| will either contains its old contents or it will contain whatever data was written
-     through |writer| up until one of these methods was called.
+     through |writer| up until {{FileSystemWriter/close()}} was called.
 
      This is typically implemented by writing data to a temporary file, and only replacing the file
      represented by |fileHandle| with the temporary file when the writer is closed.
 
-     If |keepExistingData| is `false` or not specified, the temporary file starts out empty,
+     If {{FileSystemCreateWriterOptions/keepExistingData}} is `false` or not specified,
+     the temporary file starts out empty,
      otherwise the existing file is first copied to this temporary file.
 
    : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/inPlace}}: true })
-   : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/keepExistingData}}: |keepExistingData|, {{FileSystemCreateWriterOptions/inPlace}}: true })
+   : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/inPlace}}: true, {{FileSystemCreateWriterOptions/keepExistingData}}: true/false })
    :: Returns a {{FileSystemWriter}} that can be used to write to the file. Any changes made through
       |writer| might not be reflected in the file represented by |fileHandle| until its
-      {{FileSystemWriter/close()}} method is called.
+      {{FileSystemWriter/close()}} method is called, but there are no guarantees that such changes
+      aren't immediately visible either.
+
       User agents are free to either flush changes to the file as they are made, or batch them
       up (possibly by writing to some kind of change log) until {{FileSystemWriter/close()}}
       is called. Specifically for less trusted websites, user agents
-      will want to batch up changes so that malware scanners or other security checks can be
+      might want to batch up changes so that malware scanners or other security checks can be
       performed before actually flushing changes to disk.
 
-      If |keepExistingData| is `false` or not specified, the file will start out empty.
+      If {{FileSystemCreateWriterOptions/keepExistingData}} is `false` or not specified,
+      the file will start out empty.
+
+      Advisement: The {{FileSystemCreateWriterOptions/inPlace}} option (and thus this functionality)
+      is not currently implemented in Chrome. Implementing this is currently blocked on figuring out
+      how to combine the desire to run malware checks with the desire to let websites make fast
+      in-place modifications to existing large files.
 </div>
 
 <div algorithm>
@@ -568,11 +577,14 @@ partial interface Window {
      The |options| argument sets options that influence the behavior of the shown file picker.
 
      |options|.{{ChooseFileSystemEntriesOptions/type}} specifies the type of the entry the website
-     wants the user to pick. When set to {{ChooseFileSystemEntriesType/"openFile"}} (the default),
-     the user can select only existing files. When set to {{ChooseFileSystemEntriesType/"saveFile"}}
-     the dialog will additionally let the user select files that don't yet exist. Finally when set
-     to {{ChooseFileSystemEntriesType/"openDirectory"}}, the dialog will let the user select
-     directories instead of files.
+     wants the user to pick.
+     When set to {{ChooseFileSystemEntriesType/"openFile"}} (the default), the user can select only
+     existing files.
+     When set to {{ChooseFileSystemEntriesType/"saveFile"}} the dialog will additionally let the
+     user select files that don't yet exist, and if the user selects a file that does exist already,
+     its contents will be cleared before the handle is returned to the website.
+     Finally when set to {{ChooseFileSystemEntriesType/"openDirectory"}}, the dialog will let the
+     user select directories instead of files.
 
      If |options|.{{ChooseFileSystemEntriesOptions/multiple}} is false (or absent) the user can
      only select a single file, and the |result| will be a single {{FileSystemHandle}}. If on the

@@ -1,0 +1,276 @@
+<pre class="metadata">
+Shortname: webxrmeshing-1
+Title: WebXR Meshing API Level 1
+Group: immersivewebwg
+Status: DREAM
+TR:
+ED:
+Previous Version:
+Repository: immersive-web/real-world-geometry
+Level: 1
+Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web/
+
+Editor: Rik Cabanier, Magic Leap https://magicleap.com, rcabanier@magicleap.com
+
+Abstract: This specification describes support for accessing the geometry of real world objects during a WebXR session.
+</pre>
+
+<pre class="link-defaults">
+spec:infra;
+    type:dfn; text:string
+</pre>
+
+<pre class="anchors">
+</pre>
+
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+
+<style>
+  .unstable::before {
+    content: "This section is not stable";
+    display: block;
+    font-weight: bold;
+    text-align: right;
+    color: red;
+  }
+  .unstable {
+    border: thin solid pink;
+    border-radius: .5em;
+    padding: .5em;
+    margin: .5em calc(-0.5em - 1px);
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+    background-repeat: repeat;
+    background-color: #FFF4F4;
+  }
+  .unstable h3:first-of-type {
+    margin-top: 0.5rem;
+  }
+
+  .unstable.example:not(.no-marker)::before {
+    content: "Example " counter(example) " (Unstable)";
+    float: none;
+  }
+
+  .non-normative::before {
+    content: "This section is non-normative.";
+    font-style: italic;
+  }
+  .tg {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+  .tg th {
+    border-style: solid;
+    border-width: 1px;
+    background: #90b8de;
+    color: #fff;
+    font-family: sans-serif;
+    font-weight: bold;
+    border-color: grey;
+  }
+  .tg td {
+    padding: 4px 5px;
+    background-color: rgb(221, 238, 255);
+    font-family: monospace;
+    border-style: solid;
+    border-width: 1px;
+    border-color: grey;
+    overflow: hidden;
+    word-break: normal;
+  }
+</style>
+
+Introduction {#intro}
+============
+
+<section class="non-normative">
+
+Meshing is a technique that uses a device's sensors to build a 3 dimensional representation of the world.
+
+The mesh consists of a large collection of geometry of medium complexity that changes slowly over time (aka the world mesh) and a very small collection of complex quickly changing content that represents the geometry close to the user (aka the near mesh).
+
+A user agent can have support for no, one or both types of geometry and the website author can request one or both types of geometry data. Requesting the geometry data is an expensive process so an author should only request it if they will do something with the information.
+
+Typically mesh data is not used to determine things like hand gestures or the recognition of real world objects. (However a UA could choose to infer this through postprocessing.)
+
+The most common use cases for the world mesh are:
+  1. physics: interaction of virtual objects with the real world
+  1. occlusion: blocking part or the whole virtual object by a real world one
+
+The most common use cases for the near mesh are:
+  1. a visual representation of objects near the viewer.
+  1. occlusion
+
+</section>
+
+Terminology {#terminology}
+-----------
+
+Application flow {#applicationflow}
+----------------
+
+<section class="non-normative">
+
+Most applications using the WebXR Meshing API will follow a similar usage pattern:
+
+* During the creation of a WebXR session, pass a XRFeatureInit object with parameters for world and near mesh.
+* For each XRFrame, get the requested mesh data and apply it to the scene.
+
+</section>
+
+Initialization {#initialization}
+==============
+
+XRMeshQuality {#xr--mesh-quality}
+-------------
+
+<pre class="idl">
+enum XRMeshQuality {
+   "low",
+   "medium",
+   "high"
+};
+</pre>
+
+{{XRMeshQuality}} defines the quality of the mesh. A higher quality means that the mesh will be finer but also more resource intensive. It is up to the UA to define the quality level.
+
+XRWorldMeshFeature {#xr-world-mesh-feature}
+------------------
+
+The "worldmesh" feature is used to request world meshing.
+
+<pre class="idl">
+dictionary XRWorldMeshFeature: XRFeatureInit {
+    XRMeshQuality quality = "medium";
+    double width = 10.0;
+    double height = 10.0;
+    double breadth = 10.0;
+};
+</pre>
+
+The <dfn attribute for="XRWorldMeshFeature/width">width</dfn>, <dfn attribute for="XRWorldMeshFeature/height">height</dfn> and <dfn attribute for="XRWorldMeshFeature/breadth">breadth</dfn> attributes define the distance, in meters, of the width, height and breadth of the area around the observer that should be meshed.
+The <dfn attribute for="XRWorldMeshFeature/quality">quality</dfn> attribute defines the UA dependent quality of the mesh.
+
+<div class="example">
+The following code attempts to create an {{immersive-ar}} {{XRSession}} with world meshing.
+
+<pre highlight="js">
+let xrSession;
+
+navigator.xr.requestSession("immersive-ar", {
+                            requiredFeature: {
+                                name: "XRWorldMeshFeature",
+                                quality: "medium"}}).then((session) => {
+    xrSession = session;
+});
+</pre>
+</div>
+
+ISSUE: should the world mesh follow the observer or should it stay relative to the original position or should it be configurable?
+
+ISSUE: should the world mesh have an XRSpace?
+
+
+XRNearMeshFeature {#xr-near-mesh-feature}
+-----------------
+
+The "nearmesh" feature is used to request meshing near the observer. It is UA dependent what the scanned area for the near mesh is but it MUST not overlap with the world mesh.
+
+<pre class="idl">
+dictionary XRNearMeshFeature: XRFeatureInit {
+    XRMeshQuality quality = "medium";
+};
+</pre>
+
+The <dfn attribute for="XRNearMeshFeature/quality">quality</dfn> attribute defines the UA dependent quality of the mesh.
+
+<div class="example">
+The following code attempts to create an {{immersive-ar}} {{XRSession}} with near meshing.
+
+<pre highlight="js">
+let xrSession;
+
+navigator.xr.requestSession("immersive-vr", {
+                            requiredFeature: {
+                                name: "XRNearMeshFeature",
+                                quality: "low"}}).then((session) => {
+    xrSession = session;
+});
+</pre>
+</div>
+
+ISSUE: should the near mesh have an XRSpace?
+
+Frame Loop {#frame}
+==========
+
+XRMesh structures {#xrframe-structures}
+-----------------
+
+<pre class="idl">
+dictionary XRMeshBlock {
+    required Float32Array vertices;
+    required Uint16Array indices;
+    Float32Array normals;
+};
+</pre>
+
+A {{XRMeshBlock}} contains the geometry data of a single mesh instance.
+
+{{XRMeshBlock/vertices}} contains a buffer with points in 3D space. Each point consists of 3 floats.
+
+Each value in {{XRMeshBlock/indices}} points to an offset into a point inside {{XRMeshBlock/vertices}} and defines the corner of a triangle. The set of triangles creates a polygon mesh.
+NOTE: the offset of each point is found by taking the index value and multiplying by 3.
+
+{{XRMeshBlock}} can contain an optional {{XRMeshBlock/normals}} which defines a buffer with the normal of each vertex. The size of {{XRMeshBlock/normals}} must be the same as {{XRMeshBlock/vertices}}.
+
+Issue: is 'normals' needed? If so, should it be requested during initialisation?
+
+<pre class="idl">
+interface XRNearMesh {
+    readonly setlike&lt;XRMeshBlock&gt;;
+};
+
+interface XRWorldMesh {
+    readonly maplike&lt;DOMString, XRMeshBlock&gt;;
+};
+
+dictionary XRMetadata {
+    XRWorldMesh worldMesh;
+    XRNearMesh nearMesh;
+};
+</pre>
+
+The <dfn dict-member for="XRMetadata">worldMesh</dfn> attribute contains updates to the world mesh. If any key in the dictionary was a previously provided provided [=XRWorldMesh=] this new value must replace the previous [=XRMeshBlock=]. If the value of a new world XRMeshBlock contains no vertices, the existing XRMeshBlock must be deleted.
+
+The <dfn dict-member for="XRMetadata">nearMesh</dfn> attribute contains a new near mesh which will replace the previous near mesh (if any). If nearMesh contains no new XRMeshBlock object, there is no near mesh.
+
+
+XRFrame {#xrframe-interface}
+-------
+
+<pre class="idl">
+partial interface XRFrame {
+    readonly attribute XRMetadata metaData;
+};
+</pre>
+
+Each XRFrame contains a <dfn dict-member for="XRFrame">metaData</dfn> attribute with new or updated world or near mesh data.
+
+Issue: should the mesh data persist per browser session or per xr session?
+
+Security and Privacy Considerations {#security}
+=============================================
+
+The WebXR Meshing API is a powerful feature with that carries significant privacy risks.
+A UA MUST ask permission from the user during session creation before meshing data is returned to the page.
+
+An 'inline' session must NOT have access to mesh data.
+
+Additionally, mesh data MUST be constructed from the geometry of the real world. It MUST not reveal writing, colors, pictures or other visual content.
+
+ISSUE: clarify this section
+
+
+

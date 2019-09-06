@@ -39,8 +39,13 @@ urlPrefix: https://wicg.github.io/event-timing; spec: EVENT-TIMING;
     type: dfn; url: #has-dispatched-input-event; text: has dispatched input event;
 urlPrefix: https://fetch.spec.whatwg.org/; spec: FETCH;
     type: dfn; url: #dom-request-url; text: request URL
-urlPrefix: https://html.spec.whatwg.org/multipage/webappapis.html; type: dfn; spec: html
-    text: relevant global object; url: concept-relevant-global
+urlPrefix: https://html.spec.whatwg.org/multipage/webappapis.html; spec: html;
+    type: dfn; text: relevant global object; url: concept-relevant-global;
+    type: attribute; for: img;
+        text: naturalWidth; url: #dom-img-naturalwidth;
+        text: naturalHeight; url: #dom-img-naturalheight;
+        text: width; url: #dom-img-width;
+        text: height; url: #dom-img-height;
 </pre>
 
 Introduction {#sec-intro}
@@ -94,6 +99,7 @@ Largest Contentful Paint involves the following new interface:
 ------------------------------------------------------------------------
 
 <pre class="idl">
+[Exposed=Window]
 interface LargestContentfulPaint : PerformanceEntry {
     readonly attribute DOMHighResTimeStamp renderTime;
     readonly attribute DOMHighResTimeStamp loadTime;
@@ -101,6 +107,7 @@ interface LargestContentfulPaint : PerformanceEntry {
     readonly attribute DOMString id;
     readonly attribute DOMString url;
     readonly attribute Element? element;
+    [Default] object toJSON();
 };
 </pre>
 
@@ -146,7 +153,7 @@ In order to <dfn export>potentially add a {{LargestContentfulPaint}} entry</dfn>
 <div algorithm="LargestContentfulPaint add-image-entry">
     : Input
     ::  |intersectionRect|, a {{DOMRectReadOnly}}
-    ::  |request|, a {{Request}}
+    ::  |imageRequest|, a {{Request}}
     ::  |renderTime|, a DOMHighResTimestamp
     ::  |loadTime|, a DOMHighResTimestamp
     ::  |element|, an <a>Element</a>
@@ -158,11 +165,18 @@ In order to <dfn export>potentially add a {{LargestContentfulPaint}} entry</dfn>
 
         1. Let |largest| be |document|'s [=largestContentfulPaintSize=].
         1. Let |url| be the empty string.
-        1. If |request| is not null, set |url| to be |request|'s [=request URL=].
+        1. If |imageRequest| is not null, set |url| to be |imageRequest|'s [=request URL=].
         1. Let |id| be |element|'s <a attribute for=Element>element id</a>.
         1. Let |width| be |intersectionRect|'s {{DOMRectReadOnly/width}}.
         1. Let |height| be |intersectionRect|'s {{DOMRectReadOnly/height}}.
-        1. Let |size| be |width|*|height|.
+        1. Let |size| be <code>|width| * |height|</code>.
+        1. If |imageRequest| is not null, run the following steps:
+            1. Let |naturalWidth| and |naturalHeight| be the outputs of running the same steps for an <{img}>'s {{img/naturalWidth}} and {{img/naturalHeight}} attribute getters, but using |imageRequest| as the image.
+            1. Let |naturalSize| be <code>|naturalWidth| * |naturalHeight|</code>.
+            1. Let |displayWidth| and |displayHeight| be the outputs of running the same steps for an <{img}>'s {{img/width}} and {{img/height}} attribute getters, but using |imageRequest| as the image.
+            1. Let |displaySize| be <code>|displayWidth| * |displayHeight|</code>.
+            1. Let |penaltyFactor| be <code>min(|displaySize|, |naturalSize|) / |displaySize|</code>.
+            1. Multiply |size| by |penaltyFactor|.
         1. If |size| is smaller or equals |largest|, return.
         1. Set |document|'s [=largestContentfulPaintSize=] to |size|.
         1. Let |entry| be a new {{LargestContentfulPaint}} entry, with it's

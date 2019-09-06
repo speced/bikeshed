@@ -1,0 +1,128 @@
+<pre class='metadata'>
+Status: CG-DRAFT
+Title: Scroll To Text Fragment
+ED: wicg.github.io/ScrollToTextFragment/draftspec.html
+Shortname: scroll-to-text
+Level: 1
+Editor: Nick Burris, Google https://www.google.com, nburris@chromium.org
+Editor: David Bokan, Google https://www.google.com, bokan@chromium.org
+Abstract: Scroll To Text adds support for specifying a text snippet in the URL fragment. When navigating to a URL with such a fragment, the browser will find the first instance of the text snippet and scroll it into view.
+Group: wicg
+Repository: wicg/ScrollToTextFragment
+</pre>
+
+# Introduction # {#introduction}
+TODO
+
+## Use cases ## {#use-cases}
+
+### Web text references ### {#web-text-references}
+The core use case for scroll to text is to allow URLs to serve as an exact text reference across the web. For example, Wikipedia references could link to the exact text they are quoting from a page. Similarly, search engines can serve URLs that direct the user to the answer they are looking for in the page rather than linking to the top of the page.
+
+### User sharing ### {#user-sharing}
+With scroll to text, browsers may implement an option to 'Copy URL to here' when the user highlights and opens the context menu on some text. The browser can then generate a URL with the target text appropriately specified, and the recipient of the URL will have the text scrolled into view and highlighted. Without scroll to text, if a user wants to share a passage of text from a page, they would likely just copy and paste the passage, in which case the receiver loses the context of the page.
+
+# Description # {#description}
+
+## Syntax ## {#syntax}
+A text fragment is specified in the fragment directive (see [[#fragment-directive]]) with the following format:
+<pre>
+##targetText=[prefix-,]textStart[,textEnd][,-suffix]
+              context  |-------match-----|  context
+</pre>
+<em>(Square brackets indicate an optional parameter)</em>
+
+The text parameters are percent-decoded before matching. Dash (-), ampersand (&), and comma (,) characters in text parameters must be percent-encoded to avoid being interpreted as part of the targetText syntax.
+
+The only required parameter is textStart. If only textStart is specified, the first instance of this exact text string is the target text.
+
+<div class="example">
+<code>##targetText=an%20example%20text%20fragment</code> indicates that the exact text "an example text fragment" is the target text.
+</div>
+
+If the textEnd parameter is also specified, then the target text refers to a range of text in the page. The target text range is the text range starting at the first instance of startText, until the first instance of endText that appears after startText. This is equivalent to specifying the entire text range in the startText parameter, but allows the URL to avoid being bloated with a long target text.
+
+<div class="example">
+<code>##targetText=an%20example,text%20fragment</code> indicates that the first instance of "an example" until the following first instance of "text fragment" is the target text.
+</div>
+
+### Context Terms ### {#context-terms}
+
+The other two optional parameters are context terms. They are specified by the dash (-) character succeeding the prefix and preceding the suffix, to differentiate them from the textStart and textEnd parameters, as any combination of optional parameters may be specified.
+
+Context terms are used to disambiguate the target text fragment. The context terms can specify the text immediately before (prefix) and immediately after (suffix) the text fragment, allowing for whitespace.
+
+<div class="note">
+While the context terms must be the immediate text surrounding the target text fragment, any amount of whitespace is allowed between context terms and the text fragment. This helps allow context terms to be across element boundaries, for example if the target text fragment is at the beginning of a paragraph and it must be disambiguated by the previous element's text as a prefix.
+</div>
+
+The context terms are not part of the target text fragment and should not be highlighted or affect the scroll position.
+
+<div class="example">
+<code>##targetText=this%20is-,an%20example,-text%20fragment</code> would match to "an example" in "this is an example text fragment", but not match to "an example" in "here is an example text".
+</div>
+
+## The Fragment Directive ## {#fragment-directive}
+To avoid compatibility issues with usage of the existing URL fragment, scroll to text uses the <em>fragment directive</em> which is a proposed part of the URL fragment delimited by the double-hash "##". The fragment directive is reserved for UA instructions such as targetText, and is stripped from the URL during loading.
+
+See <a href="https://github.com/whatwg/url/issues/445">whatwg/url#445</a> for the full URL spec proposal.
+
+## Navigating to a Text Fragment ## {#navigating-to-text-fragment}
+<div class="note">
+The scroll to text specification proposes an amendment to [[html#scroll-to-fragid]]. In summary, if a targetText fragment directive is present and a match is found in the page, the text fragment takes precedent over the element fragment as the indicated part of the document.
+</div>
+
+Add the following steps to the beginning of the processing model for <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#the-indicated-part-of-the-document">The indicated part of the document</a>.
+
+1. Let <em>fragment directive</em> be the document URL's <a href="#fragment-directive">fragment directive</a>.
+2. If [[#find-a-target-text]] with <em>fragment directive</em> returns non-null, then the return value is the indicated part of the document; return.
+
+### Find a target text ### {#find-a-target-text}
+
+To find the target text for a given string <em>fragment directive</em>, the user agent must run these steps:
+1. If <em>fragment directive</em> does not begin with the string "targetText=", then return null.
+2. Let <em>raw target text</em> be the substring of <em>fragment directive</em> starting at index 11.
+    <div class="note">
+    This is the remainder of the fragment directive following, but not including, the "targetText=" prefix.
+    </div>
+3. If <em>raw target text</em> is the empty string, return null.
+4. Let <em>tokens</em> be a list of strings that is the result of splitting the string <em>raw target text</em> on commas.
+5. If <em>tokens</em> has size 1, then:
+    1. Let <em>target text</em> be <em>tokens[0]</em>.
+    2. Let <em>text match</em> be the range of text that is the first instance of <em>target text</em> in the DOM tree.
+    3. Return <em>text match</em>
+6. Let <em>prefix</em> and <em>suffix</em> and <em>textEnd</em> be the empty string.
+    <div class="note">
+    prefix, suffix, and textEnd are the optional parameters of targetText.
+    </div>
+7. Let <em>potential prefix</em> be the first item of <em>tokens</em>.
+8. If the last character of <em>potential prefix</em> is U+002D (-), then:
+    1. Let <em>prefix</em> be the result of removing any U+002D (-) from <em>potential prefix</em>.
+    2. Remove the first item of the list <em>tokens</em>.
+9. Let <em>potential suffix</em> be the last item of <em>tokens</em>.
+10. If the first character of <em>potential suffix</em> is U+002D (-), then:
+    1. Let <em>suffix</em> be the result of removing any U+002D (-) from <em>potential suffix</em>.
+    2. Remove the last item of the list <em>tokens</em>.
+11. Assert: <em>tokens</em> has size 1 or <em>tokens</em> has size 2.
+    <div class="note">
+    Once the prefix and suffix are removed from tokens, tokens may either contain one item (textStart) or two items (textStart and textEnd).
+    </div>
+12. Let <em>textStart</em> be the first item of <em>tokens</em>.
+13. If <em>tokens</em> has size 2, then let <em>textEnd</em> be the last item of <em>tokens</em>.
+    <div class="note">
+    The strings prefix, textStart, textEnd, and suffix now contain the targetText parameters as defined in [[#syntax]].
+    </div>
+14. If textEnd is the empty string, then:
+    1. For each instance of <em>textStart</em> in the DOM tree:
+        1. If <em>prefix</em> is not the empty string and <em>prefix</em> is not the text immediately preceding this instance of <em>textStart</em> in the DOM tree, then continue.
+        2. If <em>suffix</em> is not the empty string and <em>suffix</em> is not the text immediately following this instance of <em>textStart</em> in the DOM tree, then continue.
+        3. Return this instance of <em>textStart</em> as the indicated part of the document.
+    2. Return null.
+15. For each instance of <em>textStart</em> in the DOM tree:
+    1. If <em>prefix</em> is not the empty string and <em>prefix</em> is not the text immediately preceding this instance of <em>textStart</em> in the DOM tree, then continue.
+    2. For each instance of <em>textEnd</em> in the DOM tree, starting from this instance of <em>textStart</em>:
+        1. If <em>suffix</em> is not the empty string and <em>suffix</em> is not the text immediately following this instance of <em>textEnd</em> in the DOM tree, then continue.
+        2. Let <em>match</em> be the range of text from this instance of <em>textStart</em> to this instance of <em>textEnd</em>.
+        3. Return match.
+    3. Return null.
+16. Return null.

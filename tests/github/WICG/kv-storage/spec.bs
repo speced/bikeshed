@@ -52,6 +52,7 @@ urlPrefix: https://tc39.github.io/ecma262/#; spec: ECMASCRIPT
   text: typed array; url: sec-typedarray-objects; type: dfn
   text: Completion Record; url: sec-completion-record-specification-type; type: dfn
   text: @@asyncIterator; url: table-1; type: dfn
+  text: Realm; url: realm-record; type: dfn
 
 urlPrefix: https://w3c.github.io/IndexedDB/; spec: INDEXEDDB-2; type: dfn
   text: convert a value to a key
@@ -77,7 +78,7 @@ urlPrefix: https://w3c.github.io/IndexedDB/; spec: INDEXEDDB-2; type: dfn
 </pre>
 
 <pre class="link-defaults">
-  spec: promises-guide; type: dfn; text: resolve
+  spec: webidl; type: dfn; text: resolve
   spec: infra; type: dfn; text: list
   spec: webidl; type: dfn; text: new
 </pre>
@@ -316,7 +317,7 @@ invoked, must run these steps:
       1. Perform the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/delete()}} method on |store|, given the argument |key|.
     1. Otherwise,
       1. Perform the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/put()}} method on |store|, given the arguments |value| and |key|.
-    1. Let |promise| be [=a new promise=].
+    1. Let |promise| be [=a new promise=] in the [=relevant Realm=] of <b>this</b>.
     1. [=Add a simple event listener=] to |transaction| for "<code>complete</code>" that [=resolves=] |promise| with undefined.
     1. [=Add a simple event listener=] to |transaction| for "<code>error</code>" that [=rejects=] |promise| with |transaction|'s [=transaction/error=].
     1. [=Add a simple event listener=] to |transaction| for "<code>abort</code>" that [=rejects=] |promise| with |transaction|'s [=transaction/error=].
@@ -337,7 +338,7 @@ invoked, must run these steps:
   1. If |key| is not [=allowed as a key=], return [=a promise rejected with=] a "{{DataError}}" {{DOMException}}.
   1. Return the result of [=performing a database operation=] given this object, "<code>readonly</code>", and the following steps operating on |transaction| and |store|:
     1. Let |request| be the result of performing the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/get()}} method on |store|, given the argument |key|.
-    1. Let |promise| be [=a new promise=].
+    1. Let |promise| be [=a new promise=] in the [=relevant Realm=] of <b>this</b>.
     1. [=Add a simple event listener=] to |request| for "<code>success</code>" that [=resolves=] |promise| with |request|'s [=request/result=].
     1. [=Add a simple event listener=] to |request| for "<code>error</code>" that [=rejects=] |promise| with |request|'s [=request/error=].
     1. Return |promise|.
@@ -357,7 +358,7 @@ invoked, must run these steps:
   1. If |key| is not [=allowed as a key=], return [=a promise rejected with=] a "{{DataError}}" {{DOMException}}.
   1. Return the result of [=performing a database operation=] given this object, "<code>readwrite</code>", and the following steps operating on |transaction| and |store|:
     1. Perform the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/delete()}} method on |store|, given the argument |key|.
-    1. Let |promise| be [=a new promise=].
+    1. Let |promise| be [=a new promise=] in the [=relevant Realm=] of <b>this</b>.
     1. [=Add a simple event listener=] to |transaction| for "<code>complete</code>" that [=resolves=] |promise| with undefined.
     1. [=Add a simple event listener=] to |transaction| for "<code>error</code>" that [=rejects=] |promise| with |transaction|'s [=transaction/error=].
     1. [=Add a simple event listener=] to |transaction| for "<code>abort</code>" that [=rejects=] |promise| with |transaction|'s [=transaction/error=].
@@ -377,16 +378,17 @@ invoked, must run these steps:
 </dl>
 
 <div class="algorithm">
-  1. If <b>this</b>.[=[[DatabasePromise]]=] is not null, return the result of [=transforming=] <b>this</b>.[=[[DatabasePromise]]=] by fulfillment and rejection handlers that both perform the following steps:
+  1. Let |realm| be the [=relevant Realm=] of <b>this</b>.
+  1. If <b>this</b>.[=[[DatabasePromise]]=] is not null, return the result of [=promise/reacting=] to <b>this</b>.[=[[DatabasePromise]]=] with fulfillment and rejection handlers that both perform the following steps:
     1. Set <b>this</b>.[=[[DatabasePromise]]=] to null.
-    1. Return the result of [=deleting the database=] given by <b>this</b>.[=[[DatabaseName]]=].
-  1. Otherwise, return the result of [=deleting the database=] given by <b>this</b>.[=[[DatabaseName]]=].
+    1. Return the result of [=deleting the database=] given <b>this</b>.[=[[DatabaseName]]=] and |realm|.
+  1. Otherwise, return the result of [=deleting the database=] given <b>this</b>.[=[[DatabaseName]]=] and |realm|.
 </div>
 
-To <dfn lt="deleting the database|delete the database">delete the database</dfn> given a string |name|:
-
 <div class="algorithm">
-  1. Let |promise| be [=a new promise=].
+  To <dfn lt="deleting the database|delete the database">delete the database</dfn> given a string |name| and a [=Realm=] |realm|:
+
+  1. Let |promise| be [=a new promise=] in |realm|.
   1. Let |request| be the result of performing the steps listed in the description of {{IDBFactory}}'s {{IDBFactory/deleteDatabase()}} method on the <a>current <code>IDBFactory</code></a>, given the argument |name|.
   1. If those steps threw an exception, catch the exception and [=reject=] |promise| with it.
   1. Otherwise:
@@ -460,7 +462,7 @@ The {{StorageArea}} interface supports asynchronous iteration.
 
 To [=get the next iteration result=]:
 
-1. If <b>this</b>'s [=relevant realm=] is not equal to the [=current realm=], then return [=a promise rejected with=] a {{TypeError}} exception.
+1. If <b>this</b>'s [=relevant Realm=] is not equal to the [=current Realm=], then return [=a promise rejected with=] a {{TypeError}} exception.
 
     Issue: This should be handled by WebIDL once the various features involved land.
 1. Return the result of [=performing a database operation=] given <b>this</b>, "<code>readonly</code>", and the following steps operating on |transaction| and |store|:
@@ -470,7 +472,7 @@ To [=get the next iteration result=]:
   1. Let |valueRequest| be the result of performing the steps listed in the description of {{IDBObjectStore}}'s {{IDBObjectStore/get()}} method on |store|, given the argument |range|.
 
       Note: The iterator returned from {{StorageArea/keys()}} discards the value. Implementations could avoid constructing |valueRequest| in that case.
-  1. Let |promise| be [=a new promise=].
+  1. Let |promise| be [=a new promise=] in the [=relevant Realm=] of <b>this</b>.
   1. [=Add a simple event listener=] to |valueRequest| for "<code>success</code>" that performs the following steps:
     1. Let |key| be |keyRequest|'s [=request/result=].
     1. If |key| is undefined, then:
@@ -618,7 +620,7 @@ To <dfn lt="performing a database operation|perform a database operation">perfor
 <div class="algorithm">
   1. Assert: |area|.[=[[DatabaseName]]=] is a string (and in particular is not null).
   1. If |area|.[=[[DatabasePromise]]=] is null, [=initialize the database promise=] for |area|.
-  1. Return the result of [=transforming=] |area|.[=[[DatabasePromise]]=] by a fulfillment handler that performs the following steps, given |database|:
+  1. Return the result of [=promise/reacting=] to |area|.[=[[DatabasePromise]]=] with a fulfillment handler that performs the following steps, given |database|:
     1. Let |transaction| be the result of performing the steps listed in the description of {{IDBDatabase}}'s {{IDBDatabase/transaction()}} method on |database|, given the arguments "<code>store</code>" and |mode|.
     1. Let |store| be the result of performing the steps listed in the description of {{IDBTransaction}}'s {{IDBTransaction/objectStore()}} method on |transaction|, given the argument "<code>store</code>".
     1. Return the result of performing |steps|, passing along |transaction| and |store|.
@@ -627,7 +629,7 @@ To <dfn lt="performing a database operation|perform a database operation">perfor
 To <dfn>initialize the database promise</dfn> for a {{StorageArea}} |area|:
 
 <div class="algorithm">
-  1. Set |area|.[=[[DatabasePromise]]=] to [=a new promise=].
+  1. Set |area|.[=[[DatabasePromise]]=] to [=a new promise=] in the [=relevant Realm=] of |area|.
   1. If the [=current global object=] does not [=include=] {{WindowOrWorkerGlobalScope}}, [=reject=] |area|.[=[[DatabasePromise]]=] with a {{TypeError}}, and return.
   1. Let |request| be the result of performing the steps listed in the description of {{IDBFactory}}'s {{IDBFactory/open()}} method on the <a>current <code>IDBFactory</code></a>, given the arguments |area|.[=[[DatabaseName]]=] and 1.
   1. If those steps threw an exception, catch the exception, [=reject=] |area|.[=[[DatabasePromise]]=] with it, and return.
