@@ -118,14 +118,13 @@ class Construct(ChildProduction):
 
 
 
-class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
+class Const(Construct):    # "const" ConstType Identifier "=" ConstValue ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         if (Symbol.peek(tokens, 'const')):
             if (ConstType.peek(tokens)):
-                token = tokens.peek()
-                if (token and token.isIdentifier()):
+                if (Identifier.peek(tokens)):
                     if (Symbol.peek(tokens, '=')):
                         return tokens.popPosition(ConstValue.peek(tokens))
         return tokens.popPosition(False)
@@ -134,7 +133,7 @@ class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
         Construct.__init__(self, tokens, parent, False, parser = parser)
         self._const = Symbol(tokens, 'const')
         self.type = ConstType(tokens)
-        self.name = tokens.next().text
+        self._name = Identifier(tokens)
         self._equals = Symbol(tokens, '=')
         self.value = ConstValue(tokens)
         self._consumeSemicolon(tokens)
@@ -143,6 +142,10 @@ class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
     @property
     def idlType(self):
         return 'const'
+
+    @property
+    def name(self):
+        return self._name.name
 
     @property
     def methodName(self):
@@ -157,30 +160,29 @@ class Const(Construct):    # "const" ConstType identifier "=" ConstValue ";"
         return 0
 
     def _unicode(self):
-        return unicode(self._const) + unicode(self.type) + self.name + unicode(self._equals) + unicode(self.value)
+        return unicode(self._const) + unicode(self.type) + unicode(self._name) + unicode(self._equals) + unicode(self.value)
 
     def _markup(self, generator):
         self._const.markup(generator)
         generator.addType(self.type)
-        generator.addName(self.name)
+        self._name.markup(generator)
         generator.addText(self._equals)
         self.value.markup(generator)
         return self
 
     def __repr__(self):
         return ('[const: ' + repr(self.type) +
-                '[name: ' + self.name + '] = [value: ' + unicode(self.value) + ']]')
+                '[name: ' + repr(self._name) + '] = [value: ' + unicode(self.value) + ']]')
 
 
-class Enum(Construct):    # [ExtendedAttributes] "enum" identifier "{" EnumValueList "}" ";"
+class Enum(Construct):    # [ExtendedAttributes] "enum" Identifier "{" EnumValueList "}" ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
         token = tokens.peek()
         if (token and token.isSymbol('enum')):
-            token = tokens.peek()
-            if (token and token.isIdentifier()):
+            if (Identifier.peek(tokens)):
                 token = tokens.peek()
                 if (token and token.isSymbol('{')):
                     if (EnumValueList.peek(tokens)):
@@ -191,7 +193,7 @@ class Enum(Construct):    # [ExtendedAttributes] "enum" identifier "{" EnumValue
     def __init__(self, tokens, parent = None, parser = None):
         Construct.__init__(self, tokens, parent, parser = parser)
         self._enum = Symbol(tokens, 'enum')
-        self.name = tokens.next().text
+        self._name = Identifier(tokens)
         self._openBrace = Symbol(tokens, '{')
         self.values = EnumValueList(tokens)
         self._closeBrace = Symbol(tokens, '}')
@@ -203,38 +205,41 @@ class Enum(Construct):    # [ExtendedAttributes] "enum" identifier "{" EnumValue
     def idlType(self):
         return 'enum'
 
+    @property
+    def name(self):
+        return self._name.name
+
     def _unicode(self):
-        return Construct._unicode(self) + unicode(self._enum) + self.name + unicode(self._openBrace) + unicode(self.values) + unicode(self._closeBrace)
+        return Construct._unicode(self) + unicode(self._enum) + unicode(self._name) + unicode(self._openBrace) + unicode(self.values) + unicode(self._closeBrace)
 
     def _markup(self, generator):
         self._enum.markup(generator)
-        generator.addName(self.name)
+        self._name.markup(generator)
         generator.addText(self._openBrace)
         self.values.markup(generator)
         generator.addText(self._closeBrace)
         return self
 
     def __repr__(self):
-        return ('[enum: ' + Construct.__repr__(self) + '[name: ' + self.name + '] ' +
+        return ('[enum: ' + Construct.__repr__(self) + '[name: ' + repr(self._name) + '] ' +
                 '[values: ' + repr(self.values) + ']]')
 
 
-class Typedef(Construct):    # [ExtendedAttributes] "typedef" TypeWithExtendedAttributes identifier ";"
+class Typedef(Construct):    # [ExtendedAttributes] "typedef" TypeWithExtendedAttributes Identifier ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
         if (Symbol.peek(tokens, 'typedef')):
             if (TypeWithExtendedAttributes.peek(tokens)):
-                token = tokens.peek()
-                return tokens.popPosition(token and token.isIdentifier())
+                return tokens.popPosition(Identifier.peek(tokens))
         return tokens.popPosition(False)
 
     def __init__(self, tokens, parent = None, parser = None):
         Construct.__init__(self, tokens, parent, parser = parser)
         self._typedef = Symbol(tokens, 'typedef')
         self.type = TypeWithExtendedAttributes(tokens)
-        self.name = tokens.next().text
+        self._name = Identifier(tokens)
         self._consumeSemicolon(tokens)
         self._didParse(tokens)
         self.parser.addType(self)
@@ -243,14 +248,18 @@ class Typedef(Construct):    # [ExtendedAttributes] "typedef" TypeWithExtendedAt
     def idlType(self):
         return 'typedef'
 
+    @property
+    def name(self):
+        return self._name.name
+
     def _unicode(self):
         output = Construct._unicode(self) + unicode(self._typedef)
-        return output + unicode(self.type) + unicode(self.name)
+        return output + unicode(self.type) + unicode(self._name)
 
     def _markup(self, generator):
         self._typedef.markup(generator)
         generator.addType(self.type)
-        generator.addName(self.name)
+        self._name.markup(generator)
         return self
 
     def __repr__(self):
@@ -332,7 +341,7 @@ class Argument(Construct):    # [ExtendedAttributeList] "optional" [IgnoreInOut]
         output += '[optional] ' if (self.optional) else ''
         output += '[type: ' + unicode(self.type) + ']'
         output += '[...] ' if (self.variadic) else ' '
-        output += '[name: ' + unicode(self.name) + ']'
+        output += '[name: ' + repr(self._name) + ']'
         return output + ((' [default: ' + repr(self.default) + ']]') if (self.default) else ']')
 
 
@@ -527,7 +536,7 @@ class SyntaxError(Construct):   # ... ";" | ... "}"
         return output + ''.join([repr(token) for token in self.tokens]) + ']'
 
 
-class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" identifier [Inheritance] "{" [InterfaceMember]... "}" ";"
+class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" Identifier [Inheritance] "{" [InterfaceMember]... "}" ";"
     @classmethod
     def peek(cls, tokens, acceptExtendedAttributes = True):
         tokens.pushPosition(False)
@@ -535,8 +544,7 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
             Construct.peek(tokens)
         Symbol.peek(tokens, 'partial')
         if (Symbol.peek(tokens, 'interface')):
-            token = tokens.peek()
-            if (token and token.isIdentifier()):
+            if (Identifier.peek(tokens)):
                 Inheritance.peek(tokens)
                 return tokens.popPosition(Symbol.peek(tokens, '{'))
         return tokens.popPosition(False)
@@ -545,7 +553,7 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
         Construct.__init__(self, tokens, parent, (not parent), parser = parser)
         self.partial = Symbol(tokens, 'partial') if (Symbol.peek(tokens, 'partial')) else None
         self._interface = Symbol(tokens, 'interface')
-        self.name = tokens.next().text
+        self._name = Identifier(tokens)
         self.inheritance = Inheritance(tokens) if (Inheritance.peek(tokens)) else None
         self._openBrace = Symbol(tokens, '{')
         self.members = self.constructors
@@ -567,6 +575,10 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
         return 'interface'
 
     @property
+    def name(self):
+        return self._name.name
+
+    @property
     def complexityFactor(self):
         return len(self.members) + 1
 
@@ -633,7 +645,7 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
     def _unicode(self):
         output = Construct._unicode(self)
         output += unicode(self.partial) if (self.partial) else ''
-        output += unicode(self._interface) + self.name
+        output += unicode(self._interface) + unicode(self._name)
         output += unicode(self.inheritance) if (self.inheritance) else ''
         output += unicode(self._openBrace)
         for member in self.members:
@@ -645,7 +657,7 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
         if (self.partial):
             self.partial.markup(generator)
         self._interface.markup(generator)
-        generator.addName(self.name)
+        self._name.markup(generator)
         if (self.inheritance):
             self.inheritance.markup(generator)
         generator.addText(self._openBrace)
@@ -658,7 +670,7 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
     def __repr__(self):
         output = '[interface: ' + Construct.__repr__(self)
         output += '[partial] ' if (self.partial) else ''
-        output += '[name: ' + self.name.encode('ascii', 'replace') + '] '
+        output += '[name: ' + repr(self._name) + '] '
         output += repr(self.inheritance) if (self.inheritance) else ''
         output += '[members: \n'
         for member in self.members:
@@ -666,7 +678,7 @@ class Interface(Construct):    # [ExtendedAttributes] ["partial"] "interface" id
         return output + ']]'
 
 
-class Mixin(Construct):    # [ExtendedAttributes] ["partial"] "interface" "mixin" identifier [Inheritance] "{" [MixinMember]... "}" ";"
+class Mixin(Construct):    # [ExtendedAttributes] ["partial"] "interface" "mixin" Identifier [Inheritance] "{" [MixinMember]... "}" ";"
     @classmethod
     def peek(cls, tokens, acceptExtendedAttributes = True):
         tokens.pushPosition(False)
@@ -674,8 +686,7 @@ class Mixin(Construct):    # [ExtendedAttributes] ["partial"] "interface" "mixin
             Construct.peek(tokens)
         Symbol.peek(tokens, 'partial')
         if (Symbol.peek(tokens, 'interface') and Symbol.peek(tokens, 'mixin')):
-            token = tokens.peek()
-            if (token and token.isIdentifier()):
+            if (Identifier.peek(tokens)):
                 Inheritance.peek(tokens)
                 return tokens.popPosition(Symbol.peek(tokens, '{'))
         return tokens.popPosition(False)
@@ -685,7 +696,7 @@ class Mixin(Construct):    # [ExtendedAttributes] ["partial"] "interface" "mixin
         self.partial = Symbol(tokens, 'partial') if (Symbol.peek(tokens, 'partial')) else None
         self._interface = Symbol(tokens, 'interface')
         self._mixin = Symbol(tokens, 'mixin')
-        self.name = tokens.next().text
+        self._name = Identifier(tokens)
         self.inheritance = Inheritance(tokens) if (Inheritance.peek(tokens)) else None
         self._openBrace = Symbol(tokens, '{')
         self.members = self.constructors
@@ -707,6 +718,10 @@ class Mixin(Construct):    # [ExtendedAttributes] ["partial"] "interface" "mixin
         return 'interface'
 
     @property
+    def name(self):
+        return self._name.name
+
+    @property
     def complexityFactor(self):
         return len(self.members) + 1
 
@@ -773,7 +788,7 @@ class Mixin(Construct):    # [ExtendedAttributes] ["partial"] "interface" "mixin
     def _unicode(self):
         output = Construct._unicode(self)
         output += unicode(self.partial) if (self.partial) else ''
-        output += unicode(self._interface) + unicode(self._mixin) + self.name
+        output += unicode(self._interface) + unicode(self._mixin) + unicode(self._name)
         output += unicode(self.inheritance) if (self.inheritance) else ''
         output += unicode(self._openBrace)
         for member in self.members:
@@ -786,7 +801,7 @@ class Mixin(Construct):    # [ExtendedAttributes] ["partial"] "interface" "mixin
             self.partial.markup(generator)
         self._interface.markup(generator)
         self._mixin.markup(generator)
-        generator.addName(self.name)
+        self._name.markup(generator)
         if (self.inheritance):
             self.inheritance.markup(generator)
         generator.addText(self._openBrace)
@@ -800,7 +815,7 @@ class Mixin(Construct):    # [ExtendedAttributes] ["partial"] "interface" "mixin
         output = '[interface: ' + Construct.__repr__(self)
         output += '[partial] ' if (self.partial) else ''
         output += '[mixin] '
-        output += '[name: ' + self.name.encode('ascii', 'replace') + '] '
+        output += '[name: ' + repr(self._name) + '] '
         output += repr(self.inheritance) if (self.inheritance) else ''
         output += '[members: \n'
         for member in self.members:
@@ -879,7 +894,7 @@ class NamespaceMember(Construct): # [ExtendedAttributes] Operation | "readonly" 
 
 
 
-class Namespace(Construct):    # [ExtendedAttributes] ["partial"] "namespace" identifier "{" [NamespaceMember]... "}" ";"
+class Namespace(Construct):    # [ExtendedAttributes] ["partial"] "namespace" Identifier "{" [NamespaceMember]... "}" ";"
     @classmethod
     def peek(cls, tokens, acceptExtendedAttributes = True):
         tokens.pushPosition(False)
@@ -887,8 +902,7 @@ class Namespace(Construct):    # [ExtendedAttributes] ["partial"] "namespace" id
             Construct.peek(tokens)
         Symbol.peek(tokens, 'partial')
         if (Symbol.peek(tokens, 'namespace')):
-            token = tokens.peek()
-            if (token and token.isIdentifier()):
+            if (Identifier.peek(tokens)):
                 return tokens.popPosition(Symbol.peek(tokens, '{'))
         return tokens.popPosition(False)
 
@@ -896,7 +910,7 @@ class Namespace(Construct):    # [ExtendedAttributes] ["partial"] "namespace" id
         Construct.__init__(self, tokens, parent, (not parent), parser = parser)
         self.partial = Symbol(tokens, 'partial') if (Symbol.peek(tokens, 'partial')) else None
         self._namespace = Symbol(tokens, 'namespace')
-        self.name = tokens.next().text
+        self._name = Identifier(tokens)
         self._openBrace = Symbol(tokens, '{')
         self.members = []
         self._closeBrace = None
@@ -915,6 +929,10 @@ class Namespace(Construct):    # [ExtendedAttributes] ["partial"] "namespace" id
     @property
     def idlType(self):
         return 'namespace'
+
+    @property
+    def name(self):
+        return self._name.name
 
     @property
     def complexityFactor(self):
@@ -983,7 +1001,7 @@ class Namespace(Construct):    # [ExtendedAttributes] ["partial"] "namespace" id
     def _unicode(self):
         output = Construct._unicode(self)
         output += unicode(self.partial) if (self.partial) else ''
-        output += unicode(self._namespace) + self.name
+        output += unicode(self._namespace) + unicode(self._name)
         output += unicode(self._openBrace)
         for member in self.members:
             output += unicode(member)
@@ -993,7 +1011,7 @@ class Namespace(Construct):    # [ExtendedAttributes] ["partial"] "namespace" id
         if (self.partial):
             self.partial.markup(generator)
         self._namespace.markup(generator)
-        generator.addName(self.name)
+        self._name.markup(generator)
         generator.addText(self._openBrace)
         for member in self.members:
             member.markup(generator)
@@ -1003,22 +1021,21 @@ class Namespace(Construct):    # [ExtendedAttributes] ["partial"] "namespace" id
     def __repr__(self):
         output = '[namespace: ' + Construct.__repr__(self)
         output += '[partial] ' if (self.partial) else ''
-        output += '[name: ' + self.name.encode('ascii', 'replace') + '] '
+        output += '[name: ' + repr(self._name) + '] '
         output += '[members: \n'
         for member in self.members:
             output += '  ' + repr(member) + '\n'
         return output + ']]'
 
 
-class DictionaryMember(Construct): # [ExtendedAttributes] ["required"] TypeWithExtendedAttributes identifier [Default] ";"
+class DictionaryMember(Construct): # [ExtendedAttributes] ["required"] TypeWithExtendedAttributes Identifier [Default] ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
         Symbol.peek(tokens, 'required')
         if (TypeWithExtendedAttributes.peek(tokens)):
-            token = tokens.peek()
-            if (token and token.isIdentifier()):
+            if (Identifier.peek(tokens)):
                 Default.peek(tokens)
                 return tokens.popPosition(True)
         tokens.popPosition(False)
@@ -1027,7 +1044,7 @@ class DictionaryMember(Construct): # [ExtendedAttributes] ["required"] TypeWithE
         Construct.__init__(self, tokens, parent)
         self.required = Symbol(tokens, 'required') if (Symbol.peek(tokens, 'required')) else None
         self.type = TypeWithExtendedAttributes(tokens)
-        self.name = tokens.next().text
+        self._name = Identifier(tokens)
         self.default = Default(tokens) if (Default.peek(tokens)) else None
         self._consumeSemicolon(tokens)
         self._didParse(tokens)
@@ -1036,17 +1053,21 @@ class DictionaryMember(Construct): # [ExtendedAttributes] ["required"] TypeWithE
     def idlType(self):
         return 'dict-member'
 
+    @property
+    def name(self):
+        return self._name.name
+
     def _unicode(self):
         output = Construct._unicode(self)
         output += unicode(self.required) if (self.required) else ''
-        output += unicode(self.type) + unicode(self.name)
+        output += unicode(self.type) + unicode(self._name)
         return output + (unicode(self.default) if (self.default) else '')
 
     def _markup(self, generator):
         if (self.required):
             self.required.markup(generator)
         generator.addType(self.type)
-        generator.addName(self.name)
+        self._name.markup(generator)
         if (self.default):
             self.default.markup(generator)
         return self
@@ -1055,22 +1076,21 @@ class DictionaryMember(Construct): # [ExtendedAttributes] ["required"] TypeWithE
         output = '[dict-member: ' + Construct.__repr__(self)
         output += '[required] ' if (self.required) else ''
         output += repr(self.type)
-        output += ' [name: ' + self.name.encode('ascii', 'replace') + ']'
+        output += ' [name: ' + repr(self._name) + ']'
         if (self.default):
             output += ' = [default: ' + repr(self.default) + ']'
         output += ']'
         return output
 
 
-class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" identifier [Inheritance] "{" [DictionaryMember]... "}" ";"
+class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" Identifier [Inheritance] "{" [DictionaryMember]... "}" ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
         Symbol.peek(tokens, 'partial')
         if (Symbol.peek(tokens, 'dictionary')):
-            token = tokens.peek()
-            if (token and token.isIdentifier()):
+            if (Identifier.peek(tokens)):
                 Inheritance.peek(tokens)
                 return tokens.popPosition(Symbol.peek(tokens, '{'))
         return tokens.popPosition(False)
@@ -1079,7 +1099,7 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
         Construct.__init__(self, tokens, parent, parser = parser)
         self.partial = Symbol(tokens, 'partial') if (Symbol.peek(tokens, 'partial')) else None
         self._dictionary = Symbol(tokens, 'dictionary')
-        self.name = tokens.next().text
+        self._name = Identifier(tokens)
         self.inheritance = Inheritance(tokens) if (Inheritance.peek(tokens)) else None
         self._openBrace = Symbol(tokens, '{')
         self.members = []
@@ -1099,6 +1119,10 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
     @property
     def idlType(self):
         return 'dictionary'
+
+    @property
+    def name(self):
+        return self._name.name
 
     @property
     def complexityFactor(self):
@@ -1148,7 +1172,7 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
     def _unicode(self):
         output = Construct._unicode(self)
         output += unicode(self.partial) if (self.partial) else ''
-        output += unicode(self._dictionary) + self.name
+        output += unicode(self._dictionary) + unicode(self._name)
         output += unicode(self.inheritance) if (self.inheritance) else ''
         output += unicode(self._openBrace)
         for member in self.members:
@@ -1159,7 +1183,7 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
         if (self.partial):
             self.partial.markup(generator)
         self._dictionary.markup(generator)
-        generator.addName(self.name)
+        self._name.markup(generator)
         if (self.inheritance):
             self.inheritance.markup(generator)
         generator.addText(self._openBrace)
@@ -1171,7 +1195,7 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
     def __repr__(self):
         output = '[dictionary: ' + Construct.__repr__(self)
         output += '[partial] ' if (self.partial) else ''
-        output += '[name: ' + self.name.encode('ascii', 'replace') + '] '
+        output += '[name: ' + repr(self._name) + '] '
         output += repr(self.inheritance) if (self.inheritance) else ''
         output += '[members: \n'
         for member in self.members:
@@ -1179,7 +1203,7 @@ class Dictionary(Construct):  # [ExtendedAttributes] ["partial"] "dictionary" id
         return output + ']]'
 
 
-class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" ReturnType "(" [ArgumentList] ")" ";" |
+class Callback(Construct):    # [ExtendedAttributes] "callback" Identifier "=" ReturnType "(" [ArgumentList] ")" ";" |
                               # [ExtendedAttributes] "callback" Interface
                               # [ExtendedAttributes] "callback" Mixin
     @classmethod
@@ -1191,8 +1215,7 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
                 return tokens.popPosition(True)
             if (Interface.peek(tokens, False)):
                 return tokens.popPosition(True)
-            token = tokens.peek()
-            if (token and token.isIdentifier()):
+            if (Identifier.peek(tokens)):
                 if (Symbol.peek(tokens, '=')):
                     if (ReturnType.peek(tokens)):
                         if (Symbol.peek(tokens, '(')):
@@ -1206,7 +1229,7 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
         self._callback = Symbol(tokens, 'callback')
         token = tokens.sneakPeek()
         if (token.isIdentifier()):
-            self.name = tokens.next().text
+            self._name = Identifier(tokens)
             self._equals = Symbol(tokens, '=')
             self.returnType = ReturnType(tokens)
             self._openParen = Symbol(tokens, '(')
@@ -1224,13 +1247,17 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
                 self.interface = Mixin(tokens, self)
             else:
                 self.interface = Interface(tokens, self)
-            self.name = self.interface.name
+            self._name = self.interface._name
         self._didParse(tokens)
         self.parser.addType(self)
 
     @property
     def idlType(self):
         return 'callback'
+
+    @property
+    def name(self):
+        return self._name.name
 
     @property
     def complexityFactor(self):
@@ -1304,14 +1331,14 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
         output = Construct._unicode(self) + unicode(self._callback)
         if (self.interface):
             return output + unicode(self.interface)
-        output += self.name + unicode(self._equals) + unicode(self.returnType)
+        output += unicode(self._name) + unicode(self._equals) + unicode(self.returnType)
         return output + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
 
     def _markup(self, generator):
         self._callback.markup(generator)
         if (self.interface):
             return self.interface._markup(generator)
-        generator.addName(self.name)
+        self._name.markup(generator)
         generator.addText(self._equals)
         self.returnType.markup(generator)
         generator.addText(self._openParen)
@@ -1328,23 +1355,21 @@ class Callback(Construct):    # [ExtendedAttributes] "callback" identifier "=" R
         return output + '[argumentlist: ' + (repr(self.arguments) if (self.arguments) else '') + ']]'
 
 
-class ImplementsStatement(Construct):  # [ExtendedAttributes] identifier "implements" identifier ";"
+class ImplementsStatement(Construct):  # [ExtendedAttributes] Identifier "implements" Identifier ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
         Construct.peek(tokens)
-        token = tokens.peek()
-        if (token and token.isIdentifier()):
+        if (TypeIdentifier.peek(tokens)):
             if (Symbol.peek(tokens, 'implements')):
-                token = tokens.peek()
-                return tokens.popPosition(token and token.isIdentifier())
+                return tokens.popPosition(TypeIdentifier.peek(tokens))
         return tokens.popPosition(False)
 
     def __init__(self, tokens, parent = None, parser = None):
         Construct.__init__(self, tokens, parent, parser = parser)
-        self.name = tokens.next().text
-        self._implements = Symbol(tokens, 'implements')
-        self.implements = tokens.next().text
+        self._name = TypeIdentifier(tokens)
+        self._implementsSymbol = Symbol(tokens, 'implements')
+        self._implements = TypeIdentifier(tokens)
         self._consumeSemicolon(tokens)
         self._didParse(tokens)
 
@@ -1352,35 +1377,41 @@ class ImplementsStatement(Construct):  # [ExtendedAttributes] identifier "implem
     def idlType(self):
         return 'implements'
 
+    @property
+    def name(self):
+        return self._name.name
+
+    @property
+    def implements(self):
+        return self._implements.name
+
     def _unicode(self):
-        return Construct._unicode(self) + self.name + unicode(self._implements) + self.implements
+        return Construct._unicode(self) + unicode(self._name) + unicode(self._implementsSymbol) + unicode(self._implements)
 
     def _markup(self, generator):
-        generator.addTypeName(self.name)
+        self._name.markup(generator)
+        self._implementsSymbol.markup(generator)
         self._implements.markup(generator)
-        generator.addTypeName(self.implements)
         return self
 
     def __repr__(self):
-        return '[implements: ' + Construct.__repr__(self) + '[name: ' + self.name.encode('ascii', 'replace') + '] [implements: ' + self.implements + ']]'
+        return '[implements: ' + Construct.__repr__(self) + '[name: ' + repr(self._name) + '] [implements: ' + repr(self._implements) + ']]'
 
 
-class IncludesStatement(Construct):  # identifier "includes" identifier ";"
+class IncludesStatement(Construct):  # Identifier "includes" Identifier ";"
     @classmethod
     def peek(cls, tokens):
         tokens.pushPosition(False)
-        token = tokens.peek()
-        if (token and token.isIdentifier()):
+        if (TypeIdentifier.peek(tokens)):
             if (Symbol.peek(tokens, 'includes')):
-                token = tokens.peek()
-                return tokens.popPosition(token and token.isIdentifier())
+                return tokens.popPosition(TypeIdentifier.peek(tokens))
         return tokens.popPosition(False)
 
     def __init__(self, tokens, parent = None, parser = None):
         Construct.__init__(self, tokens, parent, parser = parser)
-        self.name = tokens.next().text
-        self._includes = Symbol(tokens, 'includes')
-        self.includes = tokens.next().text
+        self._name = TypeIdentifier(tokens)
+        self._includesSymbol = Symbol(tokens, 'includes')
+        self._includes = TypeIdentifier(tokens)
         self._consumeSemicolon(tokens)
         self._didParse(tokens)
 
@@ -1388,17 +1419,25 @@ class IncludesStatement(Construct):  # identifier "includes" identifier ";"
     def idlType(self):
         return 'includes'
 
+    @property
+    def name(self):
+        return self._name.name
+
+    @property
+    def includes(self):
+        return self._includes.name
+
     def _unicode(self):
-        return Construct._unicode(self) + self.name + unicode(self._includes) + self.includes
+        return Construct._unicode(self) + unicode(self._name) + unicode(self._includesSymbol) + unicode(self._includes)
 
     def _markup(self, generator):
-        generator.addTypeName(self.name)
+        self._name.markup(generator)
+        self._includesSymbol.markup(generator)
         self._includes.markup(generator)
-        generator.addTypeName(self.includes)
         return self
 
     def __repr__(self):
-        return '[includes: ' + Construct.__repr__(self) + '[name: ' + self.name.encode('ascii', 'replace') + '] [includes: ' + self.includes + ']]'
+        return '[includes: ' + Construct.__repr__(self) + '[name: ' + repr(self._name) + '] [includes: ' + repr(self._includes) + ']]'
 
 
 class ExtendedAttributeUnknown(Construct): # list of tokens
@@ -1424,23 +1463,27 @@ class ExtendedAttributeUnknown(Construct): # list of tokens
         return '[ExtendedAttribute: ' + ''.join([repr(token) for token in self.tokens]) + ']'
 
 
-class ExtendedAttributeNoArgs(Construct):   # identifier
+class ExtendedAttributeNoArgs(Construct):   # Identifier
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isIdentifier()):
+        tokens.pushPosition(False)
+        if (Identifier.peek(tokens)):
             token = tokens.sneakPeek()
             return tokens.popPosition((not token) or token.isSymbol((',', ']')))
         return tokens.popPosition(False)
 
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent, False)
-        self.attribute = tokens.next().text
+        self._attribute = Identifier(tokens)
         self._didParse(tokens)
 
     @property
     def idlType(self):
         return 'constructor' if ('Constructor' == self.attribute) else 'extended-attribute'
+
+    @property
+    def attribute(self):
+        return self._attribute.name
 
     @property
     def name(self):
@@ -1451,21 +1494,21 @@ class ExtendedAttributeNoArgs(Construct):   # identifier
         return (self.parent.name + '()') if ('constructor' == self.idlType) else self.attribute
 
     def _unicode(self):
-        return self.attribute
+        return unicode(self._attribute)
 
     def _markup(self, generator):
-        generator.addName(self.attribute)
+        self._attribute.markup(generator)
         return self
 
     def __repr__(self):
-        return '[ExtendedAttributeNoArgs: ' + self.attribute.encode('ascii', 'replace') + ']'
+        return '[ExtendedAttributeNoArgs: ' + repr(self._attribute) + ']'
 
 
-class ExtendedAttributeArgList(Construct):  # identifier "(" [ArgumentList] ")"
+class ExtendedAttributeArgList(Construct):  # Identifier "(" [ArgumentList] ")"
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isIdentifier()):
+        tokens.pushPosition(False)
+        if (Identifier.peek(tokens)):
             if (Symbol.peek(tokens, '(')):
                 ArgumentList.peek(tokens)
                 if (Symbol.peek(tokens, ')')):
@@ -1475,7 +1518,7 @@ class ExtendedAttributeArgList(Construct):  # identifier "(" [ArgumentList] ")"
 
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent, False)
-        self.attribute = tokens.next().text
+        self._attribute = Identifier(tokens)
         self._openParen = Symbol(tokens, '(')
         self.arguments = ArgumentList(tokens, self) if (ArgumentList.peek(tokens)) else None
         self._closeParen = Symbol(tokens, ')')
@@ -1484,6 +1527,10 @@ class ExtendedAttributeArgList(Construct):  # identifier "(" [ArgumentList] ")"
     @property
     def idlType(self):
         return 'constructor' if ('Constructor' == self.attribute) else 'extended-attribute'
+
+    @property
+    def attribute(self):
+        return self._attribute.name
 
     @property
     def name(self):
@@ -1496,10 +1543,10 @@ class ExtendedAttributeArgList(Construct):  # identifier "(" [ArgumentList] ")"
         return self.attribute
 
     def _unicode(self):
-        return self.attribute + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
+        return unicode(self._attribute) + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
 
     def _markup(self, generator):
-        generator.addName(self.attribute)
+        self._attribute.markup(generator)
         generator.addText(self._openParen)
         if (self.arguments):
             self.arguments.markup(generator)
@@ -1507,32 +1554,39 @@ class ExtendedAttributeArgList(Construct):  # identifier "(" [ArgumentList] ")"
         return self
 
     def __repr__(self):
-        return ('[ExtendedAttributeArgList: ' + self.attribute.encode('ascii', 'replace') +
+        return ('[ExtendedAttributeArgList: ' + repr(self._attribute) +
                 ' [arguments: ' + (repr(self.arguments) if (self.arguments) else '') + ']]')
 
 
-class ExtendedAttributeIdent(Construct):    # identifier "=" identifier
+class ExtendedAttributeIdent(Construct):    # Identifier "=" Identifier
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isIdentifier()):
+        tokens.pushPosition(False)
+        if (Identifier.peek(tokens)):
             if (Symbol.peek(tokens, '=')):
-                token = tokens.peek()
-                if (token and token.isIdentifier()):
+                if (Identifier.peek(tokens)):
                     token = tokens.sneakPeek()
                     return tokens.popPosition((not token) or token.isSymbol((',', ']')))
         return tokens.popPosition(False)
 
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent, False)
-        self.attribute = tokens.next().text
+        self._attribute = Identifier(tokens)
         self._equals = Symbol(tokens, '=')
-        self.value = tokens.next().text
+        self._value = TypeIdentifier(tokens)
         self._didParse(tokens)
 
     @property
     def idlType(self):
         return 'constructor' if ('NamedConstructor' == self.attribute) else 'extended-attribute'
+
+    @property
+    def attribute(self):
+        return self._attribute.name
+
+    @property
+    def value(self):
+        return self._value.name
 
     @property
     def name(self):
@@ -1543,28 +1597,27 @@ class ExtendedAttributeIdent(Construct):    # identifier "=" identifier
         return (self.value + '()') if ('constructor' == self.idlType) else self.attribute
 
     def _unicode(self):
-        return self.attribute + unicode(self._equals) + self.value
+        return unicode(self._attribute) + unicode(self._equals) + unicode(self._value)
 
     def _markup(self, generator):
-        generator.addName(self.attribute)
+        self._attribute.markup(generator)
         generator.addText(self._equals)
-        generator.addTypeName(self.value)
+        self._value.markup(generator)
         return self
 
     def __repr__(self):
-        return ('[ExtendedAttributeIdent: ' + self.attribute.encode('ascii', 'replace') + ' [value: ' + self.value + ']]')
+        return ('[ExtendedAttributeIdent: ' + self.attribute.encode('ascii', 'replace') + ' [value: ' + repr(self._value) + ']]')
 
 
-class ExtendedAttributeIdentList(Construct):    # identifier "=" "(" identifier [Identifiers] ")"
+class ExtendedAttributeIdentList(Construct):    # Identifier "=" "(" Identifier [Identifiers] ")"
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isIdentifier()):
+        tokens.pushPosition(False)
+        if (Identifier.peek(tokens)):
             if (Symbol.peek(tokens, '=')):
                 if (Symbol.peek(tokens, '(')):
-                    token = tokens.peek()
-                    if (token and token.isIdentifier()):
-                        Identifiers.peek(tokens)
+                    if (TypeIdentifier.peek(tokens)):
+                        TypeIdentifiers.peek(tokens)
                         if (Symbol.peek(tokens, ')')):
                             token = tokens.sneakPeek()
                             return tokens.popPosition((not token) or token.isSymbol((',', ']')))
@@ -1572,11 +1625,11 @@ class ExtendedAttributeIdentList(Construct):    # identifier "=" "(" identifier 
 
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent, False)
-        self.attribute = tokens.next().text
+        self._attribute = Identifier(tokens)
         self._equals = Symbol(tokens, '=')
         self._openParen = Symbol(tokens, '(')
-        self.value = tokens.next().text
-        self.next = Identifiers(tokens) if (Identifiers.peek(tokens)) else None
+        self._value = TypeIdentifier(tokens)
+        self.next = TypeIdentifiers(tokens) if (TypeIdentifiers.peek(tokens)) else None
         self._closeParen = Symbol(tokens, ')')
         self._didParse(tokens)
 
@@ -1585,6 +1638,14 @@ class ExtendedAttributeIdentList(Construct):    # identifier "=" "(" identifier 
         return 'constructor' if ('NamedConstructor' == self.attribute) else 'extended-attribute'
 
     @property
+    def attribute(self):
+        return self._attribute.name
+
+    @property
+    def value(self):
+        return self._value.name
+
+    @property
     def name(self):
         return self.value if ('constructor' == self.idlType) else self.attribute
 
@@ -1593,35 +1654,34 @@ class ExtendedAttributeIdentList(Construct):    # identifier "=" "(" identifier 
         return (self.value + '()') if ('constructor' == self.idlType) else self.attribute
 
     def _unicode(self):
-        return (self.attribute + unicode(self._equals) + unicode(self._openParen) + self.value +
+        return (unicode(self._attribute) + unicode(self._equals) + unicode(self._openParen) + unicode(self._value) +
                 (unicode(self.next) if (self.next) else '') + unicode(self._closeParen))
 
     def _markup(self, generator):
-        generator.addName(self.attribute)
+        self._attribute.markup(generator)
         generator.addText(self._equals)
         generator.addText(self._openParen)
-        generator.addTypeName(self.value)
+        self._value.markup(generator)
         next = self.next
         while (next):
             generator.addText(next._comma)
-            generator.addTypeName(next.name)
+            next._name.markup(generator)
             next = next.next
         generator.addText(self._closeParen)
         return self
 
     def __repr__(self):
-        return ('[ExtendedAttributeIdentList: ' + self.attribute.encode('ascii', 'replace') + ' [value: ' + self.value + ']' +
+        return ('[ExtendedAttributeIdentList: ' + self.attribute.encode('ascii', 'replace') + ' [value: ' + repr(self._value) + ']' +
                 (repr(self.next) if (self.next) else '') + ']')
 
 
-class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" [ArgumentList] ")"
+class ExtendedAttributeNamedArgList(Construct): # Identifier "=" Identifier "(" [ArgumentList] ")"
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isIdentifier()):
+        tokens.pushPosition(False)
+        if (Identifier.peek(tokens)):
             if (Symbol.peek(tokens, '=')):
-                token = tokens.peek()
-                if (token and token.isIdentifier()):
+                if (TypeIdentifier.peek(tokens)):
                     if (Symbol.peek(tokens, '(')):
                         ArgumentList.peek(tokens)
                         if (Symbol.peek(tokens, ')')):
@@ -1631,9 +1691,9 @@ class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" 
 
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent, False)
-        self.attribute = tokens.next().text
+        self._attribute = Identifier(tokens)
         self._equals = Symbol(tokens, '=')
-        self.value = tokens.next().text
+        self._value = TypeIdentifier(tokens)
         self._openParen = Symbol(tokens, '(')
         self.arguments = ArgumentList(tokens, self) if (ArgumentList.peek(tokens)) else None
         self._closeParen = Symbol(tokens, ')')
@@ -1642,6 +1702,14 @@ class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" 
     @property
     def idlType(self):
         return 'constructor' if ('NamedConstructor' == self.attribute) else 'extended-attribute'
+
+    @property
+    def attribute(self):
+        return self._attribute.name
+
+    @property
+    def value(self):
+        return self._value.name
 
     @property
     def name(self):
@@ -1654,13 +1722,13 @@ class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" 
         return self.attribute
 
     def _unicode(self):
-        output = self.attribute + unicode(self._equals) + self.value
+        output = unicode(self._attribute) + unicode(self._equals) + unicode(self._value)
         return output + unicode(self._openParen) + (unicode(self.arguments) if (self.arguments) else '') + unicode(self._closeParen)
 
     def _markup(self, generator):
-        generator.addName(self.attribute)
+        self._attribute.markup(generator)
         generator.addText(self._equals)
-        generator.addTypeName(self.value)
+        self._value.markup(generator)
         generator.addText(self._openParen)
         if (self.arguments):
             self.arguments.markup(generator)
@@ -1668,15 +1736,15 @@ class ExtendedAttributeNamedArgList(Construct): # identifier "=" identifier "(" 
         return self
 
     def __repr__(self):
-        return ('[ExtendedAttributeNamedArgList: ' + self.attribute.encode('ascii', 'replace') + ' [value: ' + self.value + ']' +
+        return ('[ExtendedAttributeNamedArgList: ' + repr(self._attribute) + ' [value: ' + repr(self._value) + ']' +
                 ' [arguments: ' + (repr(self.arguments) if (self.arguments) else '') + ']]')
 
 
-class ExtendedAttributeTypePair(Construct): # identifier "(" Type "," Type ")"
+class ExtendedAttributeTypePair(Construct): # Identifier "(" Type "," Type ")"
     @classmethod
     def peek(cls, tokens):
-        token = tokens.pushPosition()
-        if (token and token.isIdentifier()):
+        tokens.pushPosition(False)
+        if (Identifier.peek(tokens)):
             if (Symbol.peek(tokens, '(')):
                 if (Type.peek(tokens)):
                     if (Symbol.peek(tokens, ',')):
@@ -1688,7 +1756,7 @@ class ExtendedAttributeTypePair(Construct): # identifier "(" Type "," Type ")"
 
     def __init__(self, tokens, parent):
         Construct.__init__(self, tokens, parent, False)
-        self.attribute = tokens.next().text
+        self._attribute = Identifier(tokens)
         self._openParen = Symbol(tokens, '(')
         self.keyType = Type(tokens)
         self._comma = Symbol(tokens, ',')
@@ -1701,15 +1769,19 @@ class ExtendedAttributeTypePair(Construct): # identifier "(" Type "," Type ")"
         return 'extended-attribute'
 
     @property
+    def attribute(self):
+        return self._attribute.name
+
+    @property
     def name(self):
         return self.attribute
 
     def _unicode(self):
-        output = self.attribute + unicode(self._openParen) + unicode(self.keyType) + unicode(self._comma)
+        output = unicode(self._attribute) + unicode(self._openParen) + unicode(self.keyType) + unicode(self._comma)
         return output + unicode(self.valueType) + unicode(self._closeParen)
 
     def _markup(self, generator):
-        generator.addName(self.attribute)
+        self._attribute.markup(generator)
         generator.addText(self._openParen)
         self.keyType.markup(generator)
         generator.addText(self._comma)
@@ -1718,7 +1790,7 @@ class ExtendedAttributeTypePair(Construct): # identifier "(" Type "," Type ")"
         return self
 
     def __repr__(self):
-        return ('[ExtendedAttributeTypePair: ' + self.attribute.encode('ascii', 'replace') + ' ' +
+        return ('[ExtendedAttributeTypePair: ' + repr(self._attribute) + ' ' +
                 repr(self.keyType) + ' ' + repr(self.valueType) + ']')
 
 

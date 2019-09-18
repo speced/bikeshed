@@ -263,7 +263,7 @@ callback interface mixin callMeMixin {
     any [] value = null;
 };
 
-[] interface Int {
+[] interface _interface {
     readonly attribute long? service;
     readonly attribute ArrayBuffer? value;
     readonly attribute ArrayBuffer value2;
@@ -329,6 +329,11 @@ interface mixin MixinCanNotIncludeMaplike {
 
 interface mixin MixinCanNotIncludeSetlike {
   readonly setlike<DOMString>;
+};
+
+interface Underscores {
+  attribute DOMString _or;
+  boolean _includes(DOMString value);
 };
 
 """
