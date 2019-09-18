@@ -190,7 +190,7 @@ class IDLMarker(object):
         So, if both were optional,
         "foo(bar)" and "foo()" would both also be valid linking texts.
         '''
-        for i,arg in enumerate(getattr(method,'arguments',[])):
+        for i,arg in enumerate(method.arguments or []):
             if arg.optional or arg.variadic:
                 optStart = i
                 break
