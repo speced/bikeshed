@@ -121,6 +121,8 @@ class IDLMarker(object):
             else:
                 # Otherwise, you *can* point to/dfn stringification behavior if you want.
                 return ("<idl data-export data-idl-type=dfn data-idl-for='{0}' data-lt='stringification behavior' id='{0}-stringification-behavior'>".format(construct.parent.fullName), "</idl>")
+        if text == "constructor":
+            return ("<idl data-idl-type=constructor data-idl-for='{0}' data-lt='{1}'>".format(construct.parent.fullName, '|'.join(self.methodLinkingTexts(construct))), "</idl>")
         return (None, None)
 
     def markupName(self, text, construct):
@@ -188,21 +190,27 @@ class IDLMarker(object):
         So, if both were optional,
         "foo(bar)" and "foo()" would both also be valid linking texts.
         '''
-        if getattr(method, "arguments", None) is None:
-            return [method.normalName]
-        for i,arg in enumerate(method.arguments):
+        for i,arg in enumerate(getattr(method,'arguments',[])):
             if arg.optional or arg.variadic:
                 optStart = i
                 break
         else:
-            # No optionals, so no work to be done
-            return [method.normalName]
-        prefix = method.name + "("
+            optStart = None
+
         texts = []
-        for i in range(optStart, len(method.arguments)):
-            argText = ', '.join(arg.name for arg in method.arguments[:i])
-            texts.append(prefix + argText + ")")
+        
+        if optStart is not None:
+            prefixes = [method.name]
+            if method.name == "constructor":
+                prefixes.append(method.parent.name)
+            for i in range(optStart, len(method.arguments)):
+                argText = ', '.join(arg.name for arg in method.arguments[:i])
+                for prefix in prefixes:
+                    texts.append(prefix + "(" + argText + ")")
+
         texts.append(method.normalName)
+        if method.name == "constructor":
+            texts.append(method.parent.name + method.normalName[11:])
         return reversed(texts)
 
 
