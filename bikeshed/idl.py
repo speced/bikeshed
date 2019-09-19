@@ -128,9 +128,12 @@ class IDLMarker(object):
         if construct.idlType not in config.idlTypes:
             return (None, None)
 
-        idlType = construct.idlType
-        extraParameters = ''
         idlTitle = construct.normalName
+        if idlTitle.startswith("constructor("):
+            idlType = "constructor"
+        else:
+            idlType = construct.idlType
+        extraParameters = ''
         refType = "idl"
         if idlType in config.functionishTypes:
             idlTitle = '|'.join(self.methodLinkingTexts(construct))
