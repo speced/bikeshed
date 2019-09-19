@@ -15,7 +15,7 @@ Indent: 2
 <pre class="link-defaults">
 spec:infra; type:dfn; text:list
 spec:fetch; type:interface; text:ReadableStream
-spec:promises-guide-1; type:dfn; text:resolve
+spec:webidl; type:dfn; text:resolve
 </pre>
 
 <pre class="anchors">
@@ -39,6 +39,9 @@ spec: webdriver; urlPrefix: https://w3c.github.io/webdriver/webdriver-spec.html#
     text: WebDriver error code; url: dfn-error-code
     text: no such window; url: dfn-no-such-window
     text: url variable; url: dfn-url-variables
+
+spec: appmanifest; urlPrefix: https://www.w3.org/TR/appmanifest/
+  type: dictionary; text: ImageResource; url: dom-imageresource
 </pre>
 
 <style>
@@ -139,9 +142,9 @@ A <dfn>background fetch</dfn> consists of:
     * If the |bgFetch|'s [=background fetch/paused flag=] is unset, and |bgFetch|'s [=background fetch/result=] is not the empty string, then the UI must indicate that bandwidth is being used.
     * The UI cannot be dismissed without aborting (e.g. swiped away) until |bgFetch|'s [=background fetch/result=] is not the empty string.
     * The UI may display |bgFetch|'s [=background fetch/title=].
-    * The UI may [=select an icon=] for display from |bgFetch|'s [=background fetch/icons=], and [=/fetch=] it using a new [=/request=] with the following properties:
+    * The UI may select an icon for display from |bgFetch|'s [=background fetch/icons=], and [=/fetch=] it using a new [=/request=] with the following properties:
       : [=request/URL=]
-      :: The {{ImageResource}}'s [=ImageResource/src=].
+      :: The {{ImageResource}}'s {{ImageResource/src}}.
       : [=request/Client=]
       :: |environment|.
       : [=request/Keepalive flag=]
@@ -250,7 +253,7 @@ Note: This is the algorithm that manages the 'background' parts of a background 
 
       Then run these steps with |dispatchedEvent| [=in parallel=]:
 
-      1. Wait until |dispatchedEvent| is not {{ExtendableEvent/active}}.
+      1. Wait until |dispatchedEvent| is not [=ExtendableEvent/active=].
 
         Issue: [ServiceWorker/1348](https://github.com/w3c/ServiceWorker/pull/1348).
 
@@ -420,7 +423,7 @@ Note: This algorithm checks if a partial response reasonably matches what was re
   1. If |responseFirstBytePos| does not equal |expectedRangeStart|, then return invalid.
   1. If |previousResponse| is not null, then:
     1. For |headerName| of « \``ETag`\`, \``Last-Modified`\` »:
-      1. If |previousResponse|'s [=response/header list=] [=header list/contains=] |headerName| and the [=combined value=] of |headerName| in |previousResponse|'s [=response/header list=] does not equal the [=combined value=] of |headerName| in |partialResponse|'s [=response/header list=], then return invalid.
+      1. If |previousResponse|'s [=response/header list=] [=header list/contains=] |headerName| and the [=header list/combined=] value of |headerName| in |previousResponse|'s [=response/header list=] does not equal the [=header list/combined=] value of |headerName| in |partialResponse|'s [=response/header list=], then return invalid.
     1. If |previousResponse|'s [=response/status=] is `206`, then:
       1. Let <var ignore>previousResponseFirstBytePos</var>, <var ignore>previousResponseLastBytePos</var>, and |previousResponseCompleteLength| be the result of [=extracting content-range values=] from |previousResponse|. If this fails, then return invalid.
       1. If |previousResponseCompleteLength| is not null, and |responseCompleteLength| does not equal |previousResponseCompleteLength|, then return invalid.
@@ -635,7 +638,7 @@ partial interface ServiceWorkerRegistration {
 <script type="idl">
 [Exposed=(Window,Worker)]
 interface BackgroundFetchManager {
-  Promise<BackgroundFetchRegistration> fetch(DOMString id, (RequestInfo or sequence<RequestInfo>) requests, optional BackgroundFetchOptions options);
+  Promise<BackgroundFetchRegistration> fetch(DOMString id, (RequestInfo or sequence<RequestInfo>) requests, optional BackgroundFetchOptions options = {});
   Promise<BackgroundFetchRegistration?> get(DOMString id);
   Promise<sequence<DOMString>> getIds();
 };
@@ -767,8 +770,8 @@ interface BackgroundFetchRegistration : EventTarget {
   attribute EventHandler onprogress;
 
   Promise<boolean> abort();
-  Promise<BackgroundFetchRecord> match(RequestInfo request, optional CacheQueryOptions options);
-  Promise<sequence<BackgroundFetchRecord>> matchAll(optional RequestInfo request, optional CacheQueryOptions options);
+  Promise<BackgroundFetchRecord> match(RequestInfo request, optional CacheQueryOptions options = {});
+  Promise<sequence<BackgroundFetchRecord>> matchAll(optional RequestInfo request, optional CacheQueryOptions options = {});
 };
 
 enum BackgroundFetchResult { "", "success", "failure" };
@@ -850,7 +853,7 @@ enum BackgroundFetchFailureReason {
     The <dfn method>match(|request|, |options|)</dfn> method, when invoked, must run these steps:
 
     1. Let |promise| be the result of calling the algorithm {{BackgroundFetchRegistration/matchAll()}} passing |request| and |options|.
-    1. Return the result of [=transforming=] |promise| with a fulfilment handler that, when called with argument |matches|, returns |matches|[0].
+    1. Return the result of [=promise/reacting=] to |promise| with a fulfilment handler that, when called with argument |matches|, returns |matches|[0].
 
     Note: User agents are encouraged to optimise the above so it's faster than calling {{BackgroundFetchRegistration/matchAll()}}.
   </div>
@@ -895,8 +898,9 @@ interface BackgroundFetchRecord {
 ## {{BackgroundFetchEvent}} ## {#background-fetch-event}
 
 <script type="idl">
-[Constructor(DOMString type, BackgroundFetchEventInit init), Exposed=ServiceWorker]
+[Exposed=ServiceWorker]
 interface BackgroundFetchEvent : ExtendableEvent {
+  constructor(DOMString type, BackgroundFetchEventInit init);
   readonly attribute BackgroundFetchRegistration registration;
 };
 
@@ -914,9 +918,10 @@ dictionary BackgroundFetchEventInit : ExtendableEventInit {
 ## {{BackgroundFetchUpdateUIEvent}} ## {#background-fetch-update-ui-event}
 
 <script type="idl">
-[Constructor(DOMString type, BackgroundFetchEventInit init), Exposed=ServiceWorker]
+[Exposed=ServiceWorker]
 interface BackgroundFetchUpdateUIEvent : BackgroundFetchEvent {
-  Promise<void> updateUI(optional BackgroundFetchUIOptions options);
+  constructor(DOMString type, BackgroundFetchEventInit init);
+  Promise<void> updateUI(optional BackgroundFetchUIOptions options = {});
 };
 </script>
 

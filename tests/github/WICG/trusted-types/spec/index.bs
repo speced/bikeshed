@@ -884,6 +884,11 @@ a string |value| and a list |arguments|, execute the following steps:
     |value| as a first argument, items of |arguments| as subsequent arguments,
     and [[ECMASCRIPT#sec-method|callback **this** value]] set to `null`.
 1.  If |policyValue| is an error, return |policyValue| and abort the following steps.
+1.  If |policy|'s [=TrustedTypePolicy/name=] is `"default"` and the |policyValue|
+    is null or undefined, return |policyValue|.
+
+    Note: This is used in a [$Get Trusted Type compliant string$] algorithm to signal that
+    a value was rejected.
 1.  Let |dataString| be the result of stringifying |policyValue|.
 1.  Let |trustedObject| be a new instance of an interface with a type
     name |trustedTypeName|, with its `[[Data]]` internal slot value
@@ -908,24 +913,36 @@ Given a {{TrustedType}} type (|expectedType|), a [=Realm/global object=] (|globa
     return stringified |input| and abort these steps.
 1.  If |input| has type |expectedType|, return stringified
     |input| and abort these steps.
-1.  Otherwise, execute the following steps:
-    1.  Let |defaultPolicy| be the result of executing
-        [$Get default policy$] algorithm on |global|'s [=Window/trusted type policy factory=].
-    1.  If |defaultPolicy| is `null`, abort these steps and resume below.
-    1.  Let |convertedInput| be the result of executing [$Create a
-        Trusted Type$] algorithm, with the following arguments:
-        *  |defaultPolicy| as |policy|
-        *  |input| as |value|
-        *  |expectedType|’s type name as |trustedTypeName|
-        *  &laquo; |sink| &raquo; as |arguments|
-    1.  If |convertedInput| is an error, abort the following steps.
-    1.  If |convertedInput| has type |expectedType|, then return
-        stringified |convertedInput| and abort the following steps.
-    1.  Set |input| to |convertedInput|’s value.
-1.  Let |disposition| be the result of executing [$Should sink type mismatch violation be blocked by Content Security Policy?$] algorithm,
-    passing |global|, |input| as |source|, and |sink|.
-1.  If |disposition| is `“Allowed”`, then return stringified |input| and abort these steps.
-1.  Throw a {{TypeError}}.
+1.  Let |convertedInput| be the result of executing [$Process value with a default policy$] with the same arguments as this algorithm.
+1.  If the algorithm threw an error, rethrow the error and abort the following steps.
+1.  If |convertedInput| is `null` or `undefined`, execute the following steps:
+    1.  Let |disposition| be the result of executing [$Should sink type mismatch violation be blocked by Content Security Policy?$] algorithm,
+        passing |global|, |input| as |source|, and |sink|.
+    1.  If |disposition| is `“Allowed”`, return stringified |input| and abort futher steps.
+
+        Note: This step assures that the default policy rejection will be reported, but ignored in a report-only mode.
+    1. Throw a {{TypeError}} and abort further steps.
+1. Assert: |convertedInput| has type |expectedType|.
+1. Return stringified |convertedInput|.
+
+## <dfn abstract-op>Process value with a default policy</dfn> ## {#process-value-with-a-default-policy-algorithm}
+
+This algorithm routes a value to be assigned to an [=injection sink=]  through a default policy, should one exist.
+
+Given a {{TrustedType}} type (|expectedType|), a [=Realm/global object=] (|global|),
+{{TrustedType}} or a string (|input|), and a string (|sink|), run these steps:
+
+1.  Let |defaultPolicy| be the result of executing
+    [$Get default policy$] algorithm on |global|'s [=Window/trusted type policy factory=].
+1.  If |defaultPolicy| is `null`, return `null`.
+1.  Let |convertedInput| be the result of executing [$Create a
+    Trusted Type$] algorithm, with the following arguments:
+    *  |defaultPolicy| as |policy|
+    *  |input| as |value|
+    *  |expectedType|’s type name as |trustedTypeName|
+    *  &laquo; |sink| &raquo; as |arguments|
+1. If the algorithm threw an error, rethrow it. Otherwise, return |convertedInput|.
+
 
 # Integrations # {#integrations}
 
@@ -1226,8 +1243,7 @@ Content-Security-Policy: trusted-types one two default
 
 #### `trusted-types` Pre-Navigation check #### {#trusted-types-pre-navigation-check}
 
-Given a [[Fetch#concept-request|request]] (|request|), a string |navigation type|, two [=browsing contexts=]
-(|source| and |target|), and a [[CSP3#content-security-policy-object|policy]] (|policy|), this algorithm returns `"Blocked"`
+Given a [[Fetch#concept-request|request]] (|request|), a string |navigation type| and a [[CSP3#content-security-policy-object|policy]] (|policy|), this algorithm returns `"Blocked"`
 if a navigation violates the {{#trusted-types-directive|trusted-types}} directive's constraints and `"Allowed"`
 otherwise. This constitutes the {{#trusted-types-directive|trusted-types}} directive's [=pre-navigation check=]:
 
@@ -1237,7 +1253,7 @@ Note: This algorithm assures that the code to be executed by a navigation to a `
 1. If |request|'s [=request/url=]'s [=url/scheme=] is not `"javascript"`, return `"Allowed"` and abort further steps.
 1. Let |urlString| be the result of running the [=URL serializer=] on |request|'s [=request/url=].
 1. Let |encodedScriptSource| be the result of removing the leading `"javascript:"` from |urlString|.
-1. Let |defaultPolicy| be the result of executing [$Get default policy$] algorithm on |source|'s {{WindowProxy}}'s [=trusted type policy factory=].
+1. Let |defaultPolicy| be the result of executing [$Get default policy$] algorithm on |request|'s [=request/clients=]'s [=environment settings object/global object=]'s [=trusted type policy factory=].
 1. If |defaultPolicy| is `null`, return `"Blocked"` and abort further steps.
 1. Let |convertedScriptSource| be the result of executing [$Create a Trusted Type$] algorithm, with the following arguments:
 
@@ -1383,11 +1399,12 @@ throws an "`EvalError`" if not:
             Otherwise if |policy| contains a [=directive=] whose [=directive/name=] is
             "`default-src`", then set |source-list| to that directive's [=directive/value=].
 
-        3.  If |source-list| is not `null`, and does not contain a [=source expression=] which is
-            an [=ASCII case-insensitive=] match for the string "<a grammar>`'unsafe-eval'`</a>", <ins>and
-            it is the case that (|isExempt| is not true or |source-list| does not contain a
+        3. <ins>If |isExempt| is true and |source-list| contains a
             [=source expression=] which is an [=ASCII case-insensitive=] match for the
-            string "<a grammar>`'trusted-script'`</a>")</ins> then:
+            string "<a grammar>`'trusted-script'`</a>"), [=continue=].</ins>
+
+        4.  If |source-list| is not `null`, and does not contain a [=source expression=] which is
+            an [=ASCII case-insensitive=] match for the string "<a grammar>`'unsafe-eval'`</a>" then:
 
             1.  Let |violation| be the result of executing [[CSP3#create-violation-for-global]] on
                 |global|, |policy|, and "`script-src`".

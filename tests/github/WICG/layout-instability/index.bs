@@ -83,25 +83,6 @@ The layout Instability API identifies these unstable pages by reporting a value
 (the "layout shift") for each animation frame in the user's session, allowing
 the developer to compute a cumulative layout shift score for the page.
 
-Usage example {#example}
-------------------------
-
-<em>This section is non-normative.</em>
-
-<pre class="example highlight">
-    var observer = new PerformanceObserver(function(list) {
-        var perfEntries = list.getEntries();
-        for (let i = 0; i < perfEntries.length; i++) {
-            // Process entries
-            // Report back for analytics and monitoring
-            // ...
-        }
-    });
-
-    // Register observer for layout shift notifications
-    observer.observe({type: "layout-shift", buffered: true});
-</pre>
-
 End of session signal {#end-of-session}
 ---------------------------------------
 
@@ -113,6 +94,51 @@ shift values as they are reported to the observer.
 A "final" score for the user's session can be reported by listening to the
 <a href="https://developers.google.com/web/updates/2018/07/page-lifecycle-api#event-visibilitychange">visibilitychange event</a>,
 and taking the value of the cumulative layout shift score at that time.
+
+This strategy is illustrated in the usage example.
+
+Usage example {#example}
+------------------------
+
+<em>This section is non-normative.</em>
+
+<pre class="example highlight">
+    // Stores the current layout shift score for the page.
+    let cumulativeLayoutShiftScore = 0;
+
+    // Detects new layout shift occurrences and updates the
+    // `cumulativeLayoutShiftScore` variable.
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        // Only count layout shifts without recent user input.
+        if (!entry.hadRecentInput) {
+          cumulativeLayoutShiftScore += entry.value;
+        }
+      }
+    });
+
+    observer.observe({type: 'layout-shift', buffered: true});
+
+    // Sends the final score to your analytics back end once
+    // the page's lifecycle state becomes hidden.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        // Force any pending records to be dispatched.
+        observer.takeRecords();
+
+        // Send the final score to your analytics back end
+        // (assumes `sendToAnalytics` is defined elsewhere).
+        sendToAnalytics({cumulativeLayoutShiftScore});
+      }
+    });
+</pre>
+
+The layout shift score is only one signal, which correlates in an approximate
+manner with the user experience of "jumpiness".
+
+Developers should avoid relying on the precise value of the layout shift score,
+as the metric might evolve over time, and user agents might compromise precision
+in the interest of calculation efficiency.
 
 </div>
 

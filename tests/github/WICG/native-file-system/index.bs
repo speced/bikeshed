@@ -75,8 +75,8 @@ interface FileSystemHandle {
   readonly attribute boolean isDirectory;
   readonly attribute USVString name;
 
-  Promise<PermissionState> queryPermission(optional FileSystemHandlePermissionDescriptor descriptor);
-  Promise<PermissionState> requestPermission(optional FileSystemHandlePermissionDescriptor descriptor);
+  Promise<PermissionState> queryPermission(optional FileSystemHandlePermissionDescriptor descriptor = {});
+  Promise<PermissionState> requestPermission(optional FileSystemHandlePermissionDescriptor descriptor = {});
 };
 </xmp>
 
@@ -85,8 +85,11 @@ with a <dfn for=FileSystemHandle>entry</dfn> (a [=/entry=]). Multiple separate o
 the {{FileSystemHandle}} interface can all be associated with the same [=/entry=] simultaneously.
 
 <div algorithm="serialization steps">
-{{FileSystemHandle}} objects are [=serializable objects=]. Their [=serialization steps=], given
-|value|, |serialized| and |forStorage| are:
+{{FileSystemHandle}} objects are [=serializable objects=].
+
+Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable.
+
+Their [=serialization steps=], given |value|, |serialized| and |forStorage| are:
 
 1. Set |serialized|.\[[Origin]] to |value|'s [=relevant settings object=]'s [=environment settings object/origin=].
 1. TODO
@@ -188,19 +191,20 @@ The <dfn method for=FileSystemHandle>requestPermission(|descriptor|)</dfn> metho
 
 <xmp class=idl>
 dictionary FileSystemCreateWriterOptions {
-  boolean inPlace = false;
   boolean keepExistingData = false;
 };
 
 [Exposed=(Window,Worker), SecureContext, Serializable]
 interface FileSystemFileHandle : FileSystemHandle {
   Promise<File> getFile();
-  Promise<FileSystemWriter> createWriter(optional FileSystemCreateWriterOptions options);
+  Promise<FileSystemWriter> createWriter(optional FileSystemCreateWriterOptions options = {});
 };
 </xmp>
 
 {{FileSystemFileHandle}} objects are [=serializable objects=]. Their [=serialization steps=] and
 [=deserialization steps=] are the same as those for {{FileSystemHandle}}.
+
+Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable.
 
 ### The {{FileSystemFileHandle/getFile()}} method ### {#api-filesystemfilehandle-getfile}
 
@@ -222,8 +226,7 @@ The <dfn method for=FileSystemFileHandle>getFile()</dfn> method, when invoked, m
 
 <div class="note domintro">
   : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()}}
-  : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/inPlace}}: false })
-  : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/inPlace}}: false, {{FileSystemCreateWriterOptions/keepExistingData}}: true/false })
+  : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/keepExistingData}}: true/false })
   :: Returns a {{FileSystemWriter}} that can be used to write to the file. Any changes made through
      |writer| won't be reflected in the file represented by |fileHandle| until its
      {{FileSystemWriter/close()}} method is called.
@@ -237,28 +240,14 @@ The <dfn method for=FileSystemFileHandle>getFile()</dfn> method, when invoked, m
      If {{FileSystemCreateWriterOptions/keepExistingData}} is `false` or not specified,
      the temporary file starts out empty,
      otherwise the existing file is first copied to this temporary file.
-
-   : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/inPlace}}: true })
-   : |writer| = await |fileHandle| . {{FileSystemFileHandle/createWriter()|createWriter}}({ {{FileSystemCreateWriterOptions/inPlace}}: true, {{FileSystemCreateWriterOptions/keepExistingData}}: true/false })
-   :: Returns a {{FileSystemWriter}} that can be used to write to the file. Any changes made through
-      |writer| might not be reflected in the file represented by |fileHandle| until its
-      {{FileSystemWriter/close()}} method is called, but there are no guarantees that such changes
-      aren't immediately visible either.
-
-      User agents are free to either flush changes to the file as they are made, or batch them
-      up (possibly by writing to some kind of change log) until {{FileSystemWriter/close()}}
-      is called. Specifically for less trusted websites, user agents
-      might want to batch up changes so that malware scanners or other security checks can be
-      performed before actually flushing changes to disk.
-
-      If {{FileSystemCreateWriterOptions/keepExistingData}} is `false` or not specified,
-      the file will start out empty.
-
-      Advisement: The {{FileSystemCreateWriterOptions/inPlace}} option (and thus this functionality)
-      is not currently implemented in Chrome. Implementing this is currently blocked on figuring out
-      how to combine the desire to run malware checks with the desire to let websites make fast
-      in-place modifications to existing large files.
 </div>
+
+Issue: There has been some discussion around and desire for a "inPlace" mode for createWriter (where
+changes will be written to the actual underlying file as they are written to the writer, for example
+to support in-place modification of large files or things like databases). This is not currently
+implemented in Chrome. Implementing this is currently blocked on figuring out how to combine the
+desire to run malware checks with the desire to let websites make fast in-place modifications to
+existing large files.
 
 <div algorithm>
 The <dfn method for=FileSystemFileHandle>createWriter(|options|)</dfn> method, when invoked, must run these steps:
@@ -284,20 +273,20 @@ dictionary FileSystemRemoveOptions {
 
 [Exposed=(Window,Worker), SecureContext, Serializable]
 interface FileSystemDirectoryHandle : FileSystemHandle {
-  Promise<FileSystemFileHandle> getFile(USVString name, optional FileSystemGetFileOptions options);
-  Promise<FileSystemDirectoryHandle> getDirectory(USVString name, optional FileSystemGetDirectoryOptions options);
+  Promise<FileSystemFileHandle> getFile(USVString name, optional FileSystemGetFileOptions options = {});
+  Promise<FileSystemDirectoryHandle> getDirectory(USVString name, optional FileSystemGetDirectoryOptions options = {});
 
   // This really returns an async iterable, but that is not yet expressable in WebIDL.
   object getEntries();
 
-  Promise<sequence<USVString>?> resolve(FileSystemHandle handle);
-
-  Promise<void> removeEntry(USVString name, optional FileSystemRemoveOptions options);
+  Promise<void> removeEntry(USVString name, optional FileSystemRemoveOptions options = {});
 };
 </xmp>
 
 {{FileSystemDirectoryHandle}} objects are [=serializable objects=]. Their [=serialization steps=] and
 [=deserialization steps=] are the same as those for {{FileSystemHandle}}.
+
+Advisement: In the Origin Trial as available in Chrome 78, these objects are not yet serializable.
 
 Issue: Should we have separate getFile and getDirectory methods, or just a single getChild/getEntry
 method?
@@ -308,6 +297,12 @@ previous issue).
 
 Issue: Should getEntries be its own method, or should FileSystemDirectoryHandle just be an async
 iterable itself?
+
+Issue: We will probably want some method to make it possible to compare two handles, and/or determine
+if one handle represents a descendant of another handle. Such a method will enable for example an IDE
+to detect that the user tries to open a file (through the file picker), where that file actually is
+part of the "project" the IDE has open, allowing the IDE to highlight the selected file in a directory
+tree.
 
 ### The {{FileSystemDirectoryHandle/getFile()}} method ### {#api-filesystemdirectoryhandle-getfile}
 
@@ -382,32 +377,6 @@ these steps:
 
 </div>
 
-### The {{FileSystemDirectoryHandle/resolve()}} method ### {#api-filesystemdirectoryhandle-resolve}
-
-<div class="note domintro">
-  : |relativePath| = await |directoryHandle| . {{FileSystemDirectoryHandle/resolve()|resolve}}(|otherHandle|)
-  :: If |otherHandle| is a descendant of |directoryHandle|, returns an array representing the path
-     you can take to get from |directoryHandle| to |otherHandle|.
-
-     For example if |otherHandle| is a direct child of |directoryHandle|,
-     |relativePath| will be equal to an array containing just |otherHandle|.name.
-
-     If |otherHandle| isn't a descendant of |directoryHandle|, resolves with `null`.
-
-     If |otherHandle| represents the same entry as |directoryHandle|, resolves with an empty array.
-
-     If for whatever reason |directoryHandle| or |otherHandle| isn't readable, rejects with some
-     exception.
-</div>
-
-<div algorithm>
-The <dfn method for=FileSystemDirectoryHandle>resolve(|handle|)</dfn> method, when invoked, must run
-these steps:
-
-1. TODO
-
-</div>
-
 ### The {{FileSystemDirectoryHandle/removeEntry()}} method ### {#api-filesystemdirectoryhandle-removeentry}
 
 <div class="note domintro">
@@ -441,13 +410,13 @@ these steps:
 [Exposed=(Window,Worker), SecureContext]
 interface FileSystemWriter {
   Promise<void> write(unsigned long long position, (BufferSource or Blob or USVString) data);
-  WritableStream asWritableStream();
   Promise<void> truncate(unsigned long long size);
   Promise<void> close();
 };
 </xmp>
 
-A {{FileSystemWriter}} has an associated <dfn for=FileSystemWriter>atomic flag</dfn>.
+Issue(19): We want some kind of integration with writable streams. One possible option is to make
+FileStreamWriter inherit from WritableStream, but other options should be considered as well.
 
 ### The {{FileSystemWriter/write()}} method ### {#api-filesystemwriter-write}
 
@@ -456,41 +425,13 @@ A {{FileSystemWriter}} has an associated <dfn for=FileSystemWriter>atomic flag</
   :: Writes the content of |data| into the file associated with |writer| at position |position|.
      If |position| is past the end of the file writing will fail and this method rejects.
 
-     There are no guarantees that the data written to the file using this method is actually
-     reflected in the file on disk until the {{FileSystemWriter/close()}}
-     method is called. Specifically when |writer|'s
-     [=atomic flag=] is set, the user agent will ensure that no changes are written to the actual
-     file until one of those methods is called.
+     No changes are written to the actual file until on disk until {{FileSystemWriter/close()}}
+     is called. Changes are typically written to a temporary file instead.
 </div>
 
 <div algorithm>
 The <dfn method for=FileSystemWriter>write(|position|, |data|)</dfn> method, when invoked, must run
 these steps:
-
-1. TODO
-
-</div>
-
-### The {{FileSystemWriter/asWritableStream()}} method ### {#api-filesystemwriter-aswritablestream}
-
-Issue(19): The functionality described by this method will likely stay, but the exact shape of
-the method is still in flux even more than the rest of this specification.
-
-<div class="note domintro">
-  : let |stream| = |writer| . {{FileSystemWriter/asWritableStream()}}
-  :: Returns a {{WritableStream}} that can be used to write data into the file, starting
-     at the beginning of the file.
-
-     There are no guarantees that the data written to the file using this method is actually
-     reflected in the file on disk until the {{FileSystemWriter/close()}}
-     method is called. Specifically when |writer|'s
-     [=atomic flag=] is set, the user agent will ensure that no changes are written to the actual
-     file until one of those methods is called.
-</div>
-
-<div algorithm>
-The <dfn method for=FileSystemWriter>asWritableStream()</dfn> method, when invoked,
-must run these steps:
 
 1. TODO
 
@@ -503,11 +444,8 @@ must run these steps:
   :: Resizes the file associated with |writer| to be |size| bytes long. If |size| is larger than
      the current file size this pads the file with zero bytes, otherwise it truncates the file.
 
-     There are no guarantees that the changes made to the file using this method are actually
-     reflected in the file on disk until the {{FileSystemWriter/close()}}
-     method is called. Specifically when |writer|'s
-     [=atomic flag=] is set, the user agent will ensure that no changes are written to the actual
-     file until one of those methods is called.
+     No changes are written to the actual file until on disk until {{FileSystemWriter/close()}}
+     is called. Changes are typically written to a temporary file instead.
 </div>
 
 <div algorithm>
@@ -523,15 +461,13 @@ steps:
 <div class="note domintro">
   : await |writer| . {{FileSystemWriter/close()}}
   :: First flushes any data written so far to disk, and then closes the writer.
-     If |writer|'s [=atomic flag=] is set, no changes will
-     be visible in the file until this method is called.
+     No changes will be visible in the destination file until this method is called.
      Furthermore, if the file on disk changed between creating this |writer| and this invocation of
      {{FileSystemWriter/close()}}, this will reject and all future operations on the writer will
      fail.
 
-     This operation can take some time to complete (even if the |writer|'s [=atomic flag=] is not
-     set), as user agents might use this moment to run malware scanners or perform other security
-     checks if the website isn't sufficiently trusted.
+     This operation can take some time to complete, as user agents might use this moment to run
+     malware scanners or perform other security checks if the website isn't sufficiently trusted.
 </div>
 
 <div algorithm>
@@ -565,7 +501,7 @@ dictionary ChooseFileSystemEntriesOptions {
 [SecureContext]
 partial interface Window {
     Promise<(FileSystemHandle or sequence<FileSystemHandle>)>
-        chooseFileSystemEntries(optional ChooseFileSystemEntriesOptions options);
+        chooseFileSystemEntries(optional ChooseFileSystemEntriesOptions options = {});
 };
 </xmp>
 

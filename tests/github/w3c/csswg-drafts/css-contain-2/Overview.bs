@@ -1,27 +1,27 @@
 <pre class=metadata>
-Title: CSS Containment Module Level 1
-Level: 1
+Title: CSS Containment Module Level 2
+Level: 2
 Shortname: css-contain
 Status: ED
-Work Status: completed
+Work Status: stable
 Group: csswg
-ED: https://drafts.csswg.org/css-contain-1/
-TR: https://www.w3.org/TR/css-contain-1/
-Previous Version: https://www.w3.org/TR/2019/CR-css-contain-1-20190430/
-Previous Version: https://www.w3.org/TR/2018/CR-css-contain-1-20181108/
-Previous Version: https://www.w3.org/TR/2018/CR-css-contain-1-20180524/
-Previous Version: https://www.w3.org/TR/2017/CR-css-contain-1-20170808/
-Previous Version: https://www.w3.org/TR/2017/WD-css-contain-1-20170419/
-Previous Version: https://www.w3.org/TR/2017/WD-css-contain-1-20170221/
+ED: https://drafts.csswg.org/css-contain-2/
+TR: https://www.w3.org/TR/css-contain-2/
 Editor: Tab Atkins, Google, http://xanthir.com/contact/, w3cid 42199
 Editor: Florian Rivoal, On behalf of Bloomberg, https://florian.rivoal.net/, w3cid 43241
 Abstract: This CSS module describes the 'contain' property, which indicates that the element's subtree is independent of the rest of the page. This enables heavy optimizations by user agents when used well.
-Status Text: A <a href="https://drafts.csswg.org/css-contain-1/issues-2019-cr.html">Disposition of Comments</a> and an <a href="https://drafts.csswg.org/css-contain-1/implementation-report-2019-09">Implementation Report</a> are available.
+Test Suite: https://test.csswg.org/harness/results/css-contain-1_dev/
 WPT Path Prefix: css/css-contain/
+At risk: [=style containment=] and the ''contain: style'' value
 </pre>
 <pre class="anchors">
 spec: css2; urlPrefix: https://www.w3.org/TR/CSS2/
+	type: property; url: generate.html#propdef-content; text: content
 	type: property; url: visudet.html#propdef-vertical-align; text: vertical-align
+	type: value; for: content; url: generate.html#value-def-open-quote; text: open-quote
+	type: value; for: content; url: generate.html#value-def-close-quote; text: close-quote
+	type: value; for: content; url: generate.html#value-def-no-open-quote; text: no-open-quote
+	type: value; for: content; url: generate.html#value-def-no-close-quote; text: no-close-quote
 	type: dfn; url: box.html#padding-edge; text: padding edge
 
 spec: css-backgrounds-3;
@@ -29,7 +29,9 @@ spec: css-backgrounds-3;
 </pre>
 <pre class=link-defaults>
 spec:css2; type:dfn; text:stacking context
+spec:css2; type:property; text:content
 spec:css-display-3; type:property; text:display
+spec:css2; type:property; text:counter-increment
 spec:css-ui-3; type:property; text:text-overflow
 spec:css-grid-1; type:property; text:grid
 spec:css-break-3; type:dfn; text:forced break
@@ -55,12 +57,32 @@ Introduction</h2>
 	and allow strong, predictable isolation of a subtree from the rest of the page,
 	this specification defines a 'contain' property.
 
+<h3 id="interaction">
+Module Interactions</h3>
+
+	This document defines new features not present in earlier specifications.
+	In addition, it aims to replace and supersede [[!CSS-CONTAIN-1]]
+	once stable.
+
+<h3 id="values">
+Values</h3>
+
+	This specification follows
+	the <a href="https://www.w3.org/TR/CSS2/about.html#property-defs">CSS property definition conventions</a> from [[!CSS2]].
+	Value types not defined in this specification are defined in CSS Values & Units [[!CSS-VALUES-3]].
+	Other CSS modules may expand the definitions of these value types.
+
+	In addition to the property-specific values listed in their definitions,
+	all properties defined in this specification
+	also accept the <a>CSS-wide keywords</a> keywords as their property value.
+	For readability they have not been repeated explicitly.
+
 <h2 id='contain-property'>
 Strong Containment: the 'contain' property</h2>
 
 	<pre class='propdef'>
 		Name: contain
-		Value: none | strict | content | [ size || layout || paint ]
+		Value: none | strict | content | [ size || layout || style || paint ]
 		Initial: none
 		Inherited: no
 		Applies to: See <a href="#contain-applies">below</a>
@@ -101,18 +123,19 @@ Strong Containment: the 'contain' property</h2>
 
 		<dt><dfn>strict</dfn>
 		<dd>
-			This value turns on all forms of <a>containment</a> for the element.
+			This value turns on all forms of <a>containment</a> <em>except</em> <a>style containment</a> for the element.
 			In other words, it behaves the same as ''contain: size layout paint;''.
 
 			<wpt>
 				contain-strict-001.html
 				contain-strict-002.html
 				contain-strict-003.html
+				contain-strict-011.html
 			</wpt>
 
 		<dt><dfn>content</dfn>
 		<dd>
-			This value turns on all forms of <a>containment</a> <em>except</em> <a>size containment</a> for the element.
+			This value turns on all forms of <a>containment</a> <em>except</em> <a>size containment</a> and <a>style containment</a> for the element.
 			In other words, it behaves the same as ''contain: layout paint;''.
 
 			<wpt>
@@ -120,6 +143,8 @@ Strong Containment: the 'contain' property</h2>
 				contain-content-002.html
 				contain-content-003.html
 				contain-content-004.html
+				contain-content-011.html
+
 			</wpt>
 
 			Note: ''contain: content'' is reasonably "safe" to apply widely;
@@ -128,7 +153,7 @@ Strong Containment: the 'contain' property</h2>
 			However, because it doesn't apply <a>size containment</a>,
 			the element can still respond to the size of its contents,
 			which can cause layout-invalidation to percolate further up the tree than desired.
-			Use ''contain: strict'' when possible,
+			Use ''contain: strict'' or ''contain: strict style'' when possible,
 			to gain as much containment as you can.
 
 		<dt><dfn>size</dfn>
@@ -247,6 +272,35 @@ Strong Containment: the 'contain' property</h2>
 				contain-layout-size-003.html
 				contain-subgrid-001.html
 			</wpt>
+
+		<dt><dfn>style</dfn>
+		<dd>
+			This value turns on <a>style containment</a> for the element.
+			This ensures that,
+			for properties which can have effects on more than just an element and its descendants,
+			those effects don't escape the element.
+
+			<wpt>
+				contain-style-baseline-001.html
+				contain-style-breaks-001.html
+				contain-style-breaks-002.html
+				contain-style-breaks-003.html
+				contain-style-breaks-004.html
+				contain-style-breaks-005.html
+				contain-style-counters-001.html
+				contain-style-counters-002.html
+				contain-style-counters-003.html
+				contain-style-counters-004.html
+				counter-scoping-001.html
+				counter-scoping-002.html
+				counter-scoping-003.html
+				quote-scoping-001.html
+				quote-scoping-002.html
+				quote-scoping-003.html
+				quote-scoping-004.html
+			</wpt>
+
+			Note: This value is at-risk.
 
 		<dt><dfn>paint</dfn>
 		<dd>
@@ -675,6 +729,107 @@ Layout Containment</h3>
 		(When paired with <a>size containment</a>,
 		this optimization can be applied more liberally.)
 
+<h3 id='containment-style'>
+Style Containment</h3>
+
+	Note: Style Containment is at-risk.
+
+	Giving an element <dfn export>style containment</dfn>
+	and has the following effects:
+
+	1. The 'counter-increment' and 'counter-set' properties
+	    must be <a for=property>scoped to the element's sub-tree</a>
+	    and create a new counter.
+
+	    <wpt>
+	    contain-style-counters-001.html
+	    contain-style-counters-002.html
+	    contain-style-counters-003.html
+	    contain-style-counters-004.html
+	    </wpt>
+
+	2. The effects of the 'content' property's
+	    ''content/open-quote'', ''content/close-quote'', ''content/no-open-quote'' and ''content/no-close-quote''
+	    must be <a for=property>scoped to the element's sub-tree</a>.
+
+	    Note: This implies that the depth of quote nesting in the subtree
+	    is unchanged and starts at the value that its context normally implies,
+	    but that changes to the depth of quote nesting by these values inside the subtree
+	    do not affect the depth of quote nesting outside the subtree.
+
+	    <wpt>
+	    quote-scoping-001.html
+	    quote-scoping-002.html
+	    quote-scoping-003.html
+	    quote-scoping-004.html
+	    </wpt>
+
+	<wpt>
+	contain-style-baseline-001.html
+	contain-style-breaks-001.html
+	contain-style-breaks-002.html
+	contain-style-breaks-003.html
+	contain-style-breaks-004.html
+	contain-style-breaks-005.html
+	</wpt>
+
+	Note: [[CSS-REGIONS-1]] has normative requirements on how <a>style containment</a> affects regions.
+
+	A <dfn export for=property lt="scoped | scoped property | scoped properties">scoped property</dfn> has its effects scoped to a particular element or subtree.
+
+	* If <dfn export for=property lt="scoped to an element | scoped to the element">scoped to an element</dfn>,
+	    it must act as if the scoping element was the root of the document
+	    for the purpose of evaluating the property's effects:
+	    any uses of the property outside the scoping element must have no effect on the uses of the property on or in the scoping element,
+	    and vice versa.
+
+	    Note: “Scoping to an element” is currently unused.
+	    It is defined as an extension point for future specifications to use.
+
+	* If <dfn export for=property lt="scoped to a sub-tree | scoped to the sub-tree | scoped to the element's sub-tree | scoped to an element's sub-tree">scoped to a sub-tree</dfn>, it's the same,
+	    except the scoping element itself is counted as "outside" the tree,
+	    like the rest of the document,
+	    and the effects of the property on that element are unaffected by scoping.
+	    When considering the effects of the scoped property on elements <em>inside</em> the subtree,
+	    the element at the base of the subtree is treated as if it was the root of the document.
+
+	    <wpt>
+	    counter-scoping-001.html
+	    counter-scoping-002.html
+	    counter-scoping-003.html
+	    </wpt>
+
+	<div class=example>
+	As 'counter-increment' is scoped to an element's subtree,
+	the first use of it within the subtree acts as if the named counter were set to 0 at the scoping element,
+	regardless of whether the counter had been used outside the scoping element.
+	Any increments made within the subtree have no effect on counters of the same name outside the scoping element.
+	However, the ''content/counter()'' and ''content/counters()'' value of the 'content' property is not itself scoped,
+	and can refer to counters established outside of the subtree.
+	Therefore, the following code results in <q><samp>1 1.2</samp></q> being displayed:
+	<pre><code highlight=markup>
+	&lt;div>&lt;/div>
+	</code></pre>
+	<pre><code highlight=css>
+	div {
+		contain: style;
+		counter-increment: n;
+	}
+	div::before, div::after {
+		content: counters(n, '.') " ";
+	}
+	div::after {
+		counter-increment: n 2;
+	}
+	</code></pre>
+	</div>
+
+	Possible optimizations that can be enabled by <a>style containment</a> include (but are not limited to):
+
+	1. Whenever a property is changed on a descendant of an element with [=style containment=],
+		calculating what part of the DOM tree is "dirtied" and might need to have its style recalculated
+		can stop at the containing box.
+
 <h3 id='containment-paint'>
 Paint Containment</h3>
 
@@ -853,102 +1008,9 @@ Answers are provided below.
 
 This appendix is <em>informative</em>.
 
-<h3 id="2019-04-30-changes">Changes from the
-<a href="https://www.w3.org/TR/2019/CR-css-contain-1-20190430/">Candidate Recommendation of 30 April 2019</a></h3>
+<h3 id="l1-changes">
+Changes from <a href="https://www.w3.org/TR/css-contain-1/">CSS Containment Level 1</a>
+</h3>
 
-<ul>
-	<li>
-		Editorial tweaks
+* Restored [=style containment=], which had been dropped from Level 1
 
-	<li>
-		<span id=valdef-contain-style></span>
-		<span id=containment-style></span>
-		<span id=style-containment></span>
-		<span id=property-scoped></span>
-		<span id=property-scoped-to-an-element></span>
-		<span id=property-scoped-to-a-sub-tree></span>
-		Drop the at-risk “style containment” feature from this specification, move it <a href="https://drafts.csswg.org/css-contain-2/">Level 2</a>
-
-		<wpt>
-		contain-strict-011.html
-		contain-content-011.html
-		contain-style-baseline-001.html
-		contain-style-breaks-001.html
-		contain-style-breaks-002.html
-		contain-style-breaks-003.html
-		contain-style-breaks-004.html
-		contain-style-breaks-005.html
-		contain-style-counters-001.html
-		contain-style-counters-002.html
-		contain-style-counters-003.html
-		contain-style-counters-004.html
-		counter-scoping-001.html
-		counter-scoping-002.html
-		counter-scoping-003.html
-		quote-scoping-001.html
-		quote-scoping-002.html
-		quote-scoping-003.html
-		quote-scoping-004.html
-		</wpt>
-
-<h3 id="2018-11-08-changes">Changes from the
-<a href="https://www.w3.org/TR/2018/CR-css-contain-1-20181108/">Candidate Recommendation of 08 November 2018</a></h3>
-
-<p>A full <a href="https://drafts.csswg.org/css-contain-1/issues-2018-11-cr.html">Disposition of Comments</a> is available.
-
-* Exclude [=style containment=] from ''contain: strict'' and ''contain: content'', and mark it at risk.
-
-<h3 id="2018-05-24-changes">Changes from the
-<a href="https://www.w3.org/TR/2018/CR-css-contain-1-20180524/">Candidate Recommendation of 24 May 2018</a></h3>
-
-<p>A full <a href="https://drafts.csswg.org/css-contain-1/issues-2018-cr.html">Disposition of Comments</a> is available.
-
-* Clarify that layout containment causes overflow to be treated as ink overflow only when visible (or clip)
-* Layout containment suppresses baseline alignment, but size containment does not
-* Layout containment causes the element to establish a new stacking context
-* Size containment does not apply to tables
-* Clarify that the columns and grid properties affect the size of size-contained elements
-* Change the animation type of the contain property from discrete to not animatable
-* Define the effect of containment on SVG elements
-* Editorial improvements
-* A comprehensive test suite for the full specification was developed, see <a href="http://test.csswg.org/harness/review/css-contain-1_dev">http://test.csswg.org/harness/review/css-contain-1_dev</a>
-
-<h3 id="2017-08-08-changes">Changes from the
-<a href="https://www.w3.org/TR/2017/CR-css-contain-1-20170808/">Candidate Recommendation of 8 August 2017</a></h3>
-
-<p>A full <a href="https://drafts.csswg.org/css-contain-1/issues-2017-cr.html">Disposition of Comments</a> is available.
-
-<ul>
-	<li>Clarify to which box paint containment clips (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/5b92ee3c170e3be239937a3ae069f37655ff6671">see tests</a>).
-	<li>Move the interaction between containment and the <code>bookmark-*</code> and <code>string-set</code> properties to  [[CSS-CONTENT-3]] (additional tests not needed, no change in behavior).
-	<li>Remove the effects of style containment on the "break-*" properties (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/d6a4f606a0501fe6ca526483a7a379ba2e9eaa1c">see tests</a>).
-	<li>Move the description of the effects of containment on regions from this specification to [[CSS-REGIONS-1]] (additional tests not needed, no change in behavior).
-	<li>Clarify the effects of style scoping on counter-set and counter-increment (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/d7fbc4794403dfeb55f13310d4c1cb51813e2d6e">see tests</a>)
-	<li>Size layout and paint containment don't apply to internal ruby elements (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/ba5a04e3d65f9f39c2d6431a9ece5eb15d22116b">see tests</a>)
-	<li>Layout, Paint, and size containments do not apply to non-atomic inlines (see <a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/402a19bde8981a402d9dba73083f84d96e4aeeb9">tests here</a> and <a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/69b5681ee7aa5a028eb694b2c93bfd48c1ef08e4">one more test here</a>)
-	<li>Align paint containment's behavior with overflow:clip (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/e2f844700a4a165f7ab6a0f021bbe1bf4d921cc0">see test</a>)
-	<li>Elements with size containment are monolithic (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/536f74e4137196b34d63752f5a9217e23c4fb899#diff-bd8852c889db6d2b471bae58105f9374">see test</a>)
-	<li>Forced breaks area allowed in elements with layout containments, but do not propagate (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/536f74e4137196b34d63752f5a9217e23c4fb899">see tests</a>)
-	<li>Clarify the effects of scoping to a subtree (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/7aad64ade18bce9db257c34d72c6dad126a9e9cd">see test</a>)
-	<li>Clarify the effects of scoping on open/close quotes (<a href="https://github.com/web-platform-tests/wpt/pull/10549/commits/f6efd2ff775bea39e34b1b260959de618908046b">see tests</a>)
-	<li>Editorial clarification: replace "Becoming a formatting context" (aka "Becoming a formatting context root") with "Establish a FC" (additional tests not needed, no change in behavior)
-</ul>
-
-<h3 id="2017-04-19-changes">Changes from the
-<a href="https://www.w3.org/TR/2017/WD-css-contain-1-20170419/">Working Draft of 19 April 2017</a></h3>
-
-<p>A <a href="https://drafts.csswg.org/css-contain-1/issues-2017.html">Disposition of Comments</a> covering this draft and the previous one together is available.
-
-<ul>
-	<li>Clarify the interaction with display: contents
-	<li>Clarify how containment works on table parts
-	<li>Move the interaction between containment and fragmentation of overflow from this specification to CSS-OVERFLOW-4
-</ul>
-
-<h3 id="fpwd-changes">Changes from the
-<a href="https://www.w3.org/TR/2017/WD-css-contain-1-20170221/">First Public Working Draft of 21 February 2017</a></h3>
-
-<ul>
-	<li>Specify handling of replaced elements for size containment
-	<li>Layout containment makes element act as a containing block for absolutely positioned and fixed positioned descendants.
-</ul>

@@ -1509,8 +1509,8 @@ A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/
     <li>
      <a href="#sec-intro"><span class="secno">1</span> <span class="content">Introduction</span></a>
      <ol class="toc">
-      <li><a href="#example"><span class="secno">1.1</span> <span class="content">Usage example</span></a>
-      <li><a href="#end-of-session"><span class="secno">1.2</span> <span class="content">End of session signal</span></a>
+      <li><a href="#end-of-session"><span class="secno">1.1</span> <span class="content">End of session signal</span></a>
+      <li><a href="#example"><span class="secno">1.2</span> <span class="content">Usage example</span></a>
      </ol>
     <li>
      <a href="#sec-terminology"><span class="secno">2</span> <span class="content">Terminology</span></a>
@@ -1552,26 +1552,49 @@ loading asynchronously and displacing other elements on the page.</p>
     <p>The layout Instability API identifies these unstable pages by reporting a value
 (the "layout shift") for each animation frame in the user’s session, allowing
 the developer to compute a cumulative layout shift score for the page.</p>
-    <h3 class="heading settled" data-level="1.1" id="example"><span class="secno">1.1. </span><span class="content">Usage example</span><a class="self-link" href="#example"></a></h3>
-    <p><em>This section is non-normative.</em></p>
-<pre class="example highlight" id="example-a018f1d4"><a class="self-link" href="#example-a018f1d4"></a><c- a>var</c-> observer <c- o>=</c-> <c- k>new</c-> PerformanceObserver<c- p>(</c-><c- a>function</c-><c- p>(</c->list<c- p>)</c-> <c- p>{</c->
-    <c- a>var</c-> perfEntries <c- o>=</c-> list<c- p>.</c->getEntries<c- p>();</c->
-    <c- k>for</c-> <c- p>(</c-><c- a>let</c-> i <c- o>=</c-> <c- mi>0</c-><c- p>;</c-> i <c- o>&lt;</c-> perfEntries<c- p>.</c->length<c- p>;</c-> i<c- o>++</c-><c- p>)</c-> <c- p>{</c->
-        <c- c1>// Process entries</c->
-        <c- c1>// Report back for analytics and monitoring</c->
-        <c- c1>// ...</c->
-    <c- p>}</c->
-<c- p>});</c->
-
-<c- c1>// Register observer for layout shift notifications</c->
-observer<c- p>.</c->observe<c- p>({</c->type<c- o>:</c-> <c- u>"layout-shift"</c-><c- p>,</c-> buffered<c- o>:</c-> <c- kc>true</c-><c- p>});</c->
-</pre>
-    <h3 class="heading settled" data-level="1.2" id="end-of-session"><span class="secno">1.2. </span><span class="content">End of session signal</span><a class="self-link" href="#end-of-session"></a></h3>
+    <h3 class="heading settled" data-level="1.1" id="end-of-session"><span class="secno">1.1. </span><span class="content">End of session signal</span><a class="self-link" href="#end-of-session"></a></h3>
     <p><em>This section is non-normative.</em></p>
     <p>The developer can compute a cumulative layout shift score by summing the layout
 shift values as they are reported to the observer.</p>
     <p>A "final" score for the user’s session can be reported by listening to the <a href="https://developers.google.com/web/updates/2018/07/page-lifecycle-api#event-visibilitychange">visibilitychange event</a>,
 and taking the value of the cumulative layout shift score at that time.</p>
+    <p>This strategy is illustrated in the usage example.</p>
+    <h3 class="heading settled" data-level="1.2" id="example"><span class="secno">1.2. </span><span class="content">Usage example</span><a class="self-link" href="#example"></a></h3>
+    <p><em>This section is non-normative.</em></p>
+<pre class="example highlight" id="example-7ea3aa6b"><a class="self-link" href="#example-7ea3aa6b"></a><c- c1>// Stores the current layout shift score for the page.</c->
+<c- a>let</c-> cumulativeLayoutShiftScore <c- o>=</c-> <c- mi>0</c-><c- p>;</c->
+
+<c- c1>// Detects new layout shift occurrences and updates the</c->
+<c- c1>// `cumulativeLayoutShiftScore` variable.</c->
+<c- kr>const</c-> observer <c- o>=</c-> <c- k>new</c-> PerformanceObserver<c- p>((</c->list<c- p>)</c-> <c- p>=></c-> <c- p>{</c->
+  <c- k>for</c-> <c- p>(</c-><c- kr>const</c-> entry <c- k>of</c-> list<c- p>.</c->getEntries<c- p>())</c-> <c- p>{</c->
+    <c- c1>// Only count layout shifts without recent user input.</c->
+    <c- k>if</c-> <c- p>(</c-><c- o>!</c->entry<c- p>.</c->hadRecentInput<c- p>)</c-> <c- p>{</c->
+      cumulativeLayoutShiftScore <c- o>+=</c-> entry<c- p>.</c->value<c- p>;</c->
+    <c- p>}</c->
+  <c- p>}</c->
+<c- p>});</c->
+
+observer<c- p>.</c->observe<c- p>({</c->type<c- o>:</c-> <c- t>'layout-shift'</c-><c- p>,</c-> buffered<c- o>:</c-> <c- kc>true</c-><c- p>});</c->
+
+<c- c1>// Sends the final score to your analytics back end once</c->
+<c- c1>// the page’s lifecycle state becomes hidden.</c->
+document<c- p>.</c->addEventListener<c- p>(</c-><c- t>'visibilitychange'</c-><c- p>,</c-> <c- p>()</c-> <c- p>=></c-> <c- p>{</c->
+  <c- k>if</c-> <c- p>(</c->document<c- p>.</c->visibilityState <c- o>===</c-> <c- t>'hidden'</c-><c- p>)</c-> <c- p>{</c->
+    <c- c1>// Force any pending records to be dispatched.</c->
+    observer<c- p>.</c->takeRecords<c- p>();</c->
+
+    <c- c1>// Send the final score to your analytics back end</c->
+    <c- c1>// (assumes `sendToAnalytics` is defined elsewhere).</c->
+    sendToAnalytics<c- p>({</c->cumulativeLayoutShiftScore<c- p>});</c->
+  <c- p>}</c->
+<c- p>});</c->
+</pre>
+    <p>The layout shift score is only one signal, which correlates in an approximate
+manner with the user experience of "jumpiness".</p>
+    <p>Developers should avoid relying on the precise value of the layout shift score,
+as the metric might evolve over time, and user agents might compromise precision
+in the interest of calculation efficiency.</p>
    </div>
    <h2 class="heading settled" data-level="2" id="sec-terminology"><span class="secno">2. </span><span class="content">Terminology</span><a class="self-link" href="#sec-terminology"></a></h2>
    <h3 class="heading settled" data-level="2.1" id="sec-basic-concepts"><span class="secno">2.1. </span><span class="content">Basic Concepts</span><a class="self-link" href="#sec-basic-concepts"></a></h3>

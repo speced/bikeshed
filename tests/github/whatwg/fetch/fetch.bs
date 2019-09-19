@@ -12,10 +12,12 @@ Translate IDs: typedefdef-bodyinit bodyinit,dictdef-requestinit requestinit,type
 <pre class=anchors>
 url:https://tools.ietf.org/html/rfc7230#section-3.1.1;text:method;type:dfn;spec:http
 url:https://tools.ietf.org/html/rfc7230#section-3.2;text:field-name;type:dfn;spec:http
-url:https://tools.ietf.org/html/rfc7230#section-3.2;text:field-content; type:dfn;spec:http
-url:https://tools.ietf.org/html/rfc7230#section-3.2;text:field-value; type:dfn;spec:http
+url:https://tools.ietf.org/html/rfc7230#section-3.2;text:field-content;type:dfn;spec:http
+url:https://tools.ietf.org/html/rfc7230#section-3.2;text:field-value;type:dfn;spec:http
 url:https://tools.ietf.org/html/rfc7230#section-3.1.2;text:reason-phrase;type:dfn;spec:http
 url:https://tools.ietf.org/html/rfc7234#section-1.2.1;text:delta-seconds;type:dfn;spec:http-caching
+url:https://tools.ietf.org/html/draft-ietf-httpbis-header-structure#section-2;text:structured header value;type:dfn;spec:header-structure
+url:https://tools.ietf.org/html/draft-ietf-httpbis-header-structure#section-4.1;text:serializing structured headers;type:dfn;spec:header-structure
 </pre>
 
 <pre class=biblio>
@@ -81,6 +83,12 @@ url:https://tools.ietf.org/html/rfc7234#section-1.2.1;text:delta-seconds;type:df
     },
     "OCSP": {
         "aliasOf": "RFC2560"
+    },
+    "HEADER-STRUCTURE": {
+        "authors": ["Mark Nottingham","Paul-Henning Kamp"],
+        "href": "https://tools.ietf.org/html/draft-ietf-httpbis-header-structure",
+        "publisher": "IETF",
+        "title": "Structured Headers for HTTP"
     }
 }
 </pre>
@@ -563,6 +571,23 @@ A: 3
  <li><p>Otherwise, <a for=list>append</a> a new <a for=/>header</a> whose <a for=header>name</a> is
  <var>name</var> and <a for=header>value</a> is <var>value</var> to <var>list</var>.
 </ol>
+
+<p>To
+<dfn export for="header list" id=concept-header-list-set-structured-header>set a structured header</dfn>
+<a for=header>name</a>/<a>structured header value</a> <var>name</var>/<var>structuredValue</var>
+pair in a <a for=/>header list</a> <var>list</var>, run these steps:
+
+<ol>
+ <li><p>Let <var>serializedValue</var> be the result of executing the
+ <a>serializing structured headers</a> algorithm on <var>structuredValue</var>.
+
+ <li><p><a for="header list">Set</a> <var>name</var>/<var>serializedValue</var> in <var>list</var>.
+</ol>
+
+<p class="note"><a>Structured header values</a> are defined as objects which HTTP can (eventually)
+serialize in interesting and efficient ways. For the moment, Fetch only supports setting these
+objects in <a for=/>header lists</a> by serializing them. In the future the fact that they are
+objects might be preserved end-to-end. [[!HEADER-STRUCTURE]]
 
 <p>To <dfn export for="header list" id=concept-header-list-combine>combine</dfn> a
 <a for=header>name</a>/<a for=header>value</a> <var>name</var>/<var>value</var> pair in a
@@ -2203,19 +2228,31 @@ parameter, please update it.
 <ol>
  <li><p>Let <var>startAlgorithm</var> be an algorithm that returns undefined.
 
- <li><p>If <var>pull</var> is absent, then set it to an action that returns undefined.
+ <li><p>If <var>pull</var> is not given, then set it to an action that does nothing.
 
- <li><p>Let <var>pullAlgorithm</var> be an algorithm that returns the result of [=promise-calling=]
- <var>pull</var>().
+ <li>
+  <p>Let <var>pullAlgorithm</var> be an algorithm that runs these steps:
 
- <li><p>If <var>cancel</var> is absent, then set it to an action that returns undefined.
+  <ol>
+   <li><p>Run <var>pull</var>.
 
- <li><p>Let <var>cancelAlgorithm</var> be an algorithm that takes a <var>reason</var> and returns
- the result of [=promise-calling=] <var>cancel</var>(<var>reason</var>).
+   <li><p>Return <a>a promise resolved with</a> undefined.
+  </ol>
 
- <li><p>If <var>highWaterMark</var> is absent, then set it to 1.
+ <li><p>If <var>cancel</var> is not given, then set it to an action that does nothing.
 
- <li><p>If <var>sizeAlgorithm</var> is absent, then set it to an algorithm that returns 1.
+ <li>
+  <p>Let <var>cancelAlgorithm</var> be an algorithm that runs these steps:
+
+  <ol>
+   <li><p>Run <var>cancel</var>.
+
+   <li><p>Return <a>a promise resolved with</a> undefined.
+  </ol>
+
+ <li><p>If <var>highWaterMark</var> is not given, then set it to 1.
+
+ <li><p>If <var>sizeAlgorithm</var> is not given, then set it to an algorithm that returns 1.
 
  <li><p>Return [$CreateReadableStream$](<var>startAlgorithm</var>, <var>pullAlgorithm</var>,
  <var>cancelAlgorithm</var>, <var>highWaterMark</var>, <var>sizeAlgorithm</var>).
@@ -2921,8 +2958,8 @@ response <a for=/>header</a> can be used to require checking of a <a for=/>respo
 `<code>Content-Type</code>` <a for=/>header</a> against the <a for=request>destination</a> of a
 <a for=/>request</a>.
 
-<p>To <dfn>determine nosniff</dfn>, given a <a for=/>header list</a> <var>list</var>, run these
-steps:
+<p>To <dfn export>determine nosniff</dfn>, given a <a for=/>header list</a> <var>list</var>, run
+these steps:
 
 <ol>
  <li><p>Let <var>values</var> be the result of
