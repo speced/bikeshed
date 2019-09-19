@@ -371,7 +371,7 @@ def handleTest(options, extras):
     config.setErrorLevel("nothing")
     config.quiet = 100
     if options.rebase:
-        test.rebase(Spec, options.testFiles, manualOnly=options.manualOnly, md=md)
+        test.rebase(Spec, options.testFiles, md=md)
     else:
         result = test.runAllTests(Spec, options.testFiles, manualOnly=options.manualOnly, md=md)
         sys.exit(0 if result else 1)
