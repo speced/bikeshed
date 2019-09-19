@@ -151,7 +151,7 @@ Terminology {#terminology}
 
 This document uses the acronym <b>XR</b> throughout to refer to the spectrum of hardware, applications, and techniques used for Virtual Reality, Augmented Reality, and other related technologies. Examples include, but are not limited to:
 
- * Head mounted displays, whether they are opaque, transparent, or utilize video passthrough
+ * Head-mounted displays, whether they are opaque, transparent, or utilize video passthrough
  * Mobile devices with positional tracking
  * Fixed displays with head tracking capabilities
 
@@ -215,7 +215,7 @@ XR {#xr-interface}
 [SecureContext, Exposed=Window] interface XR : EventTarget {
   // Methods
   Promise&lt;void&gt; supportsSession(XRSessionMode mode);
-  Promise&lt;XRSession&gt; requestSession(XRSessionMode mode, optional XRSessionInit options = {});
+  [NewObject] Promise&lt;XRSession&gt; requestSession(XRSessionMode mode, optional XRSessionInit options = {});
 
   // Events
   attribute EventHandler ondevicechange;
@@ -306,12 +306,17 @@ When this method is invoked, the user agent MUST run the following steps:
 
   1. Let |promise| be [=a new Promise=].
   1. Let |immersive| be <code>true</code> if |mode| is {{XRSessionMode/"immersive-vr"}}, and <code>false</code> otherwise.
-  1. If |immersive| is <code>true</code>:
-    1. Check if an [=immersive session request is allowed=], and if not [=reject=] |promise| with a "{{SecurityError}}" {{DOMException}} and return |promise|.
-    1. If [=pending immersive session=] is <code>true</code> or [=active immersive session=] is not <code>null</code>, [=reject=] |promise| with an "{{InvalidStateError}}" {{DOMException}} and return |promise|.
-    1. Set [=pending immersive session=] to <code>true</code>.
-  1. If |immersive| is <code>false</code>:
-    1. Check if an [=inline session request is allowed=], and if not [=reject=] |promise| with a "{{SecurityError}}" {{DOMException}} and return |promise|.
+  1. Check whether the session request is allowed based on the following:
+      <dl class="switch">
+        <dt>If |immersive| is <code>true</code></dt>
+        <dd>
+          1. Check if an [=immersive session request is allowed=], and if not [=reject=] |promise| with a "{{SecurityError}}" {{DOMException}} and return |promise|.
+          1. If [=pending immersive session=] is <code>true</code> or [=active immersive session=] is not <code>null</code>, [=reject=] |promise| with an "{{InvalidStateError}}" {{DOMException}} and return |promise|.
+          1. Set [=pending immersive session=] to <code>true</code>.
+              </dd>
+            <dt>Otherwise</dt>
+            <dd>Check if an [=inline session request is allowed=], and if not [=reject=] |promise| with a "{{SecurityError}}" {{DOMException}} and return |promise|.</dd>
+      </dl>
   1. Run the following steps [=in parallel=]:
     1. Choose |device| based on the following:
         <dl class="switch">
@@ -371,7 +376,7 @@ enum XRSessionMode {
 };
 </pre>
 
-  - A session mode of <dfn enum-value for="XRSessionMode">inline</dfn> indicates that the session's output will be shown as an element in the HTML document. {{inline}} session content MAY be displayed in mono or stereo and MAY allow for [=viewer=] tracking. User agents MUST allow {{inline}} sessions to be created.
+  - A session mode of <dfn enum-value for="XRSessionMode">inline</dfn> indicates that the session's output will be shown as an element in the HTML document. {{inline}} session content MUST be displayed in mono (i.e., with a single [=view=]). It MAY allow for [=viewer=] tracking. User agents MUST allow {{inline}} sessions to be created.
   - A session mode of <dfn enum-value for="XRSessionMode">immersive-vr</dfn> indicates that the session's output will be given [=exclusive access=] to the [=XR/immersive XR device=] display and that content <b>is not</b> intended to be integrated with the user's environment.
 
 In this document, the term <dfn>inline session</dfn> is synonymous with an {{inline}} session and the term <dfn>immersive session</dfn> is synonymous with an {{immersive-vr}} session.
@@ -466,6 +471,10 @@ Some [=feature descriptors=], when present in the [=requested features=] list, r
 
 Note: {{XRReferenceSpaceType/"local"}} is always included in the [=requested features=] of [=immersive sessions=] as a [=default feature=], and as such [=immersive sessions=] always need to obtain [=explicit consent=] or [=implicit consent=].
 
+[=Requested features=] can only be enabled for a session if the [=XRSession/XR Device=] is <dfn>capable of supporting</dfn> the feature, which means that the feature is known to be supported by the [=XRSession/XR Device=] in some configurations, even if the current configuration has not yet been verified as supporting the feature. The user agent MAY apply more rigorous constraints if desired in order to yield a more consistent user experience.
+
+Note: For example, several VR devices support either configuring a safe boundary for the user to move around within or skipping boundary configuration and operating in a mode where the user is expected to stand in place. Such a device can be considered to be [=capable of supporting=] {{"bounded-floor"}} {{XRReferenceSpace}}s even if they are currently not configured with safety boundaries, because it's expected that the user could configure the device appropriately if the experience required it. This is to allow user agents to avoid fully initializing the [=XRSession/XR Device=] or waiting for the user's environment to be recognized prior to [=resolve the requested features|resolving the requested features=] if desired. If, however, the user agent knows that the boundary state at the time the session is requested without additional initialization it may choose to reject the {{"bounded-floor"}} feature if the safety boundary not already configured.
+
 <div class="algorithm" data-algorithm="resolve-features">
 
 To <dfn>resolve the requested features</dfn> given |requiredFeatures| and |optionalFeatures| for an {{XRSession}} |session|, the user agent MUST run the following steps:
@@ -474,17 +483,17 @@ To <dfn>resolve the requested features</dfn> given |requiredFeatures| and |optio
   1. Let |consentOptional| be an empty [=/list=] of {{DOMString}}.
   1. For each |feature| in |requiredFeatures| perform the following steps:
     1. If |feature| is not a valid [=feature descriptor=], return <code>false</code>.
-    1. If the functionality described by |feature| is not supported by |session|'s [=XRSession/XR Device=] or the user agent has otherwise determined to reject the feature, return <code>false</code>.
+    1. If |session|'s [=XRSession/XR Device=] is not [=capable of supporting=] the functionality described by |feature| or the user agent has otherwise determined to reject the feature, return <code>false</code>.
     1. If the functionality described by |feature| requires [=explicit consent=], append it to |consentRequired|.
     1. Else append |feature| to |session|'s [=list of enabled features=].
   1. For each |feature| in |optionalFeatures| perform the following steps:
     1. If |feature| is not a valid [=feature descriptor=], continue to the next entry.
-    1. If the functionality described by |feature| is not supported by |session|'s [=XRSession/XR Device=] or the user agent has otherwise determined to reject the feature, continue to the next entry.
+    1. If |session|'s [=XRSession/XR Device=] is not [=capable of supporting=] the functionality described by |feature| or the user agent has otherwise determined to reject the feature, continue to the next entry.
     1. If the functionality described by |feature| requires [=explicit consent=], append it to |consentOptional|.
     1. Else append |feature| to |session|'s [=list of enabled features=].
   1. For each |feature| in the [=default features=] table perform the following steps:
     1. If |session|'s [=XRSession/mode=] is not one of the modes associated with |feature| in the [=default features=], continue to the next entry.
-    1. If the functionality described by |feature| is not supported by |session|'s [=XRSession/XR Device=] or the user agent has otherwise determined to reject the feature, continue to the next entry.
+    1. If |session|'s [=XRSession/XR Device=] is not [=capable of supporting=] the functionality described by |feature| or the user agent has otherwise determined to reject the feature, continue to the next entry.
     1. Else append |feature| to |session|'s [=list of enabled features=].
   1. If |consentRequired| or |consentOptional| are not empty, request [=explicit consent=] to use the functionality described by those features.
   1. For each |feature| in |consentRequired| perform the following steps:
@@ -503,7 +512,7 @@ Session {#session}
 XRSession {#xrsession-interface}
 ---------
 
-Any interaction with XR hardware is done via an {{XRSession}} object, which can only be retrieved by calling {{requestSession()}} on the {{XR}} object. Once a session has been successfully acquired it can be used to {{XRFrame/getViewerPose()|poll the viewer pose}}, query information about the user's environment and, present imagery to the user.
+Any interaction with XR hardware is done via an {{XRSession}} object, which can only be retrieved by calling {{requestSession()}} on the {{XR}} object. Once a session has been successfully acquired, it can be used to {{XRFrame/getViewerPose()|poll the viewer pose}}, query information about the user's environment, and present imagery to the user.
 
 The user agent, when possible, <dfn>SHOULD NOT initialize device tracking</dfn> or rendering capabilities until an {{XRSession}} has been acquired. This is to prevent unwanted side effects of engaging the XR systems when they're not actively being used, such as increased battery usage or related utility applications from appearing when first navigating to a page that only wants to test for the presence of XR hardware in order to advertise XR features. Not all XR platforms offer ways to detect the hardware's presence without initializing tracking, however, so this is only a strong recommendation.
 
@@ -522,7 +531,7 @@ enum XRVisibilityState {
 
   // Methods
   void updateRenderState(optional XRRenderStateInit state = {});
-  Promise&lt;XRReferenceSpace&gt; requestReferenceSpace(XRReferenceSpaceType type);
+  [NewObject] Promise&lt;XRReferenceSpace&gt; requestReferenceSpace(XRReferenceSpaceType type);
 
   long requestAnimationFrame(XRFrameRequestCallback callback);
   void cancelAnimationFrame(long handle);
@@ -549,7 +558,7 @@ To <dfn>initialize the session</dfn>, given |session|, |mode|, and |device|, the
   1. [=Initialize the render state=].
   1. If no other features of the user agent have done so already, perform the necessary platform-specific steps to initialize the device's tracking and rendering capabilities, including showing any necessary instructions to the user.
 
-Note: Some devices require additional user instructions for activation, for example going into immersive mode on a phone-based headset device requires inserting the phone into the headset, and doing so on a desktop browser connected to an external headset requires wearing the headset. It is the responsibility of the user agent &mdash; not the author &mdash; to ensure any such instructions are shown.
+Note: Some devices require additional user instructions for activation. For example, going into immersive mode on a phone-based headset device requires inserting the phone into the headset, and doing so on a desktop browser connected to an external headset requires wearing the headset. It is the responsibility of the user agent &mdash; not the author &mdash; to ensure any such instructions are shown.
 
 </div>
 
@@ -770,10 +779,10 @@ When an {{XRRenderState}} object is created for an {{XRSession}} |session|, the 
   1. Initialize |state|'s {{XRRenderState/depthFar}} to <code>1000.0</code>.
   1. Initialize |state|'s {{XRRenderState/inlineVerticalFieldOfView}} based on the following:
     <dl class="switch">
-      <dt> If |session| is an [=immersive session=]
-      <dd> Initialize |state|'s {{XRRenderState/inlineVerticalFieldOfView}} to <code>null</code>.
-      <dt> Else
+      <dt> If |session| is an [=inline session=]
       <dd> Initialize |state|'s {{XRRenderState/inlineVerticalFieldOfView}} to <code>PI * 0.5</code>.
+      <dt> Else
+      <dd> Initialize |state|'s {{XRRenderState/inlineVerticalFieldOfView}} to <code>null</code>.
     </dl>
   1. Initialize |state|'s {{XRRenderState/baseLayer}} to <code>null</code>.
 
@@ -990,7 +999,7 @@ To <dfn>populate the pose</dfn> of an {{XRSpace}} |space| in an {{XRSpace}} |bas
   1. If |space|'s [=XRSpace/session=] does not equal |session|, throw an {{InvalidStateError}} and abort these steps.
   1. If |baseSpace|'s [=XRSpace/session=] does not equal |session|, throw an {{InvalidStateError}} and abort these steps.
   1. Check if [=poses may be reported=] and, if not, throw a {{SecurityError}} and abort these steps.
-  1. Let |limit| be whether [=poses must be limited=] between |space| and |baseSpace|.
+  1. Let |limit| be the result of whether [=poses must be limited=] between |space| and |baseSpace|.
   1. Let |transform| be |pose|'s {{XRPose/transform}}.
   1. Query the [=/XR device=]'s tracking system for |space|'s pose relative to |baseSpace| at the time represented by |frame|, then perform the following steps:
     <dl class="switch">
@@ -1035,7 +1044,7 @@ enum XRReferenceSpaceType {
 
 [SecureContext, Exposed=Window]
 interface XRReferenceSpace : XRSpace {
-  XRReferenceSpace getOffsetReferenceSpace(XRRigidTransform originOffset);
+  [NewObject] XRReferenceSpace getOffsetReferenceSpace(XRRigidTransform originOffset);
 
   attribute EventHandler onreset;
 };
@@ -1047,7 +1056,7 @@ An {{XRReferenceSpace}} is most frequently obtained by calling {{XRSession/reque
 
   - Passing a type of <dfn enum-value for="XRReferenceSpaceType">viewer</dfn> creates an {{XRReferenceSpace}} instance. It represents a tracking space with a [=native origin=] which tracks the position and orientation of the [=viewer=]. Every {{XRSession}} MUST support {{XRReferenceSpaceType/"viewer"}} {{XRReferenceSpace}}s.
 
-  - Passing a type of <dfn enum-value for="XRReferenceSpaceType">local</dfn> creates an {{XRReferenceSpace}} instance. It represents a tracking space with a [=native origin=] near the user's head at the time of creation. The exact position and orientation will be initialized based on the conventions of the underlying platform. When using this reference space the user is not expected to move beyond their initial position much, if at all, and tracking is optimized for that purpose. For devices with [=6DoF=] tracking, {{local}} reference spaces should emphasize keeping the origin stable relative to the user's environment.
+  - Passing a type of <dfn enum-value for="XRReferenceSpaceType">local</dfn> creates an {{XRReferenceSpace}} instance. It represents a tracking space with a [=native origin=] near the viewer at the time of creation. The exact position and orientation will be initialized based on the conventions of the underlying platform. When using this reference space the user is not expected to move beyond their initial position much, if at all, and tracking is optimized for that purpose. For devices with [=6DoF=] tracking, {{local}} reference spaces should emphasize keeping the origin stable relative to the user's environment.
 
   - Passing a type of <dfn enum-value for="XRReferenceSpaceType">local-floor</dfn> creates an {{XRReferenceSpace}} instance. It represents a tracking space with a [=native origin=] at the floor in a safe position for the user to stand. The <code>y</code> axis equals <code>0</code> at floor level, with the <code>x</code> and <code>z</code> position and orientation initialized based on the conventions of the underlying platform. If the floor level isn't known it MUST be estimated. If the estimated floor level is determined with a non-default value, it MUST be [=rounding|rounded=] sufficiently to prevent fingerprinting. When using this reference space the user is not expected to move beyond their initial position much, if at all, and tracking is optimized for that purpose. For devices with [=6DoF=] tracking, {{local-floor}} reference spaces should emphasize keeping the origin stable relative to the user's environment.
 
@@ -1089,7 +1098,7 @@ To check if a <dfn>reference space is supported</dfn> for a given reference spac
   1. If |type| is {{viewer}}, return <code>true</code>.
   1. If |type| is {{local}} or {{local-floor}}, and |session| is an [=immersive session=], return <code>true</code>.
   1. If |type| is {{local}} or {{local-floor}}, and the [=XRSession/XR device=] supports reporting orientation data, return <code>true</code>.
-  1. If |type| is {{bounded-floor}} and |session| is an [=immersive session=], return if [=bounded reference spaces are supported=] by the [=XRSession/XR device=].
+  1. If |type| is {{bounded-floor}} and |session| is an [=immersive session=], return the result of whether [=bounded reference spaces are supported=] by the [=XRSession/XR device=].
   1. If |type| is {{unbounded}}, |session| is an [=immersive session=], and the [=XRSession/XR device=] supports stable tracking near the user over an unlimited distance, return <code>true</code>.
   1. Return <code>false</code>.
 
@@ -1447,7 +1456,7 @@ The <dfn attribute for="XRInputSource">handedness</dfn> attribute describes whic
 
 The <dfn attribute for="XRInputSource">targetRayMode</dfn> attribute describes the method used to produce the target ray, and indicates how the application should present the target ray to the user if desired.
 
-  - <dfn enum-value for="XRTargetRayMode">gaze</dfn> indicates the target ray will originate at the user's head and follow the direction they are looking (this is commonly referred to as a "gaze input" device).
+  - <dfn enum-value for="XRTargetRayMode">gaze</dfn> indicates the target ray will originate at the viewer and follow the direction it is facing. (This is commonly referred to as a "gaze input" device in the context of head-mounted displays.)
   - <dfn enum-value for="XRTargetRayMode">tracked-pointer</dfn> indicates that the target ray originates from either a handheld device or other hand-tracking mechanism and represents that the user is using their hands or the held device for pointing. The orientation of the target ray relative to the tracked object MUST follow platform-specific ergonomics guidelines when available. In the absence of platform-specific guidance, the target ray SHOULD point in the same direction as the user's index finger if it was outstretched.
   - <dfn enum-value for="XRTargetRayMode">screen</dfn> indicates that the input source was an interaction with the canvas element associated with an inline session's output context, such as a mouse click or touch event.
 
@@ -1638,10 +1647,10 @@ The <dfn constructor for="XRWebGLLayer">XRWebGLLayer(|session|, |context|, |laye
     </dl>
   1. Initialize |layer|'s [=XRWebGLLayer/composition disabled=] boolean as follows:
     <dl class="switch">
-      <dt> If |session| is an [=immersive session=]
-      <dd> Initialize |layer|'s [=XRWebGLLayer/composition disabled=] boolean to <code>false</code>
-      <dt> Otherwise
+      <dt> If |session| is an [=inline session=]
       <dd> Initialize |layer|'s [=XRWebGLLayer/composition disabled=] to <code>true</code>
+      <dt> Otherwise
+      <dd> Initialize |layer|'s [=XRWebGLLayer/composition disabled=] boolean to <code>false</code>
     </dl>
   1. <dl class="switch">
       <dt> If |layer|'s [=XRWebGLLayer/composition disabled=] boolean is <code>false</code>:
@@ -1958,7 +1967,7 @@ dictionary XRReferenceSpaceEventInit : EventInit {
 
 The <dfn attribute for="XRReferenceSpaceEvent">referenceSpace</dfn> attribute indicates the {{XRReferenceSpace}} that generated this event.
 
-The <dfn attribute for="XRReferenceSpaceEvent">transform</dfn> attribute describes the transform the {{XRReferenceSpaceEvent/referenceSpace}} underwent during this event, if applicable.
+The <dfn attribute for="XRReferenceSpaceEvent">transform</dfn> attribute describes the post-event position and orientation of the {{XRReferenceSpaceEvent/referenceSpace}}'s [=native origin=] in the pre-event coordinate system.
 
 Event Types {#event-types}
 -----------
