@@ -408,7 +408,11 @@ def idlReplacer(match):
         die("Shorthand {0} gives type as '{1}', but only IDL types are allowed.", match.group(0), linkType)
         return E.span(match.group(0))
     if linkText is None:
-        linkText = lt
+        if lt.startswith("constructor(") and linkFor and linkFor != "/":
+            # make {{Foo/constructor()}} output as "Foo()" so you know what it's linking to.
+            linkText = linkFor + lt[11:]
+        else:
+            linkText = lt
     return E.code({"class":"idl", "nohighlight":""},
                   E.a({"data-link-type":linkType, "for": linkFor, "lt":lt, "bs-autolink-syntax":match.group(0)}, linkText))
 
