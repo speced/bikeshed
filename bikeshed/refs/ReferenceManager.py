@@ -194,14 +194,16 @@ class ReferenceManager(object):
                 dfnFor = treeAttr(el, 'data-dfn-for')
                 if dfnFor is None:
                     dfnFor = set()
-                    if self.localRefs.queryRefs(linkType=linkType, text=linkText, linkFor="/", exact=True)[0]:
+                    existingRefs = self.localRefs.queryRefs(linkType=linkType, text=linkText, linkFor="/", exact=True)[0]
+                    if existingRefs and existingRefs[0].el is not el:
                         die("Multiple local '{1}' <dfn>s have the same linking text '{0}'.", linkText, linkType, el=el)
                         continue
                 else:
                     dfnFor = set(config.splitForValues(dfnFor))
                     encounteredError = False
                     for singleFor in dfnFor:
-                        if self.localRefs.queryRefs(linkType=linkType, text=linkText, linkFor=singleFor, exact=True)[0]:
+                        existingRefs = self.localRefs.queryRefs(linkType=linkType, text=linkText, linkFor=singleFor, exact=True)[0]
+                        if existingRefs and existingRefs[0].el is not el:
                             encounteredError = True
                             die("Multiple local '{1}' <dfn>s for '{2}' have the same linking text '{0}'.", linkText, linkType, singleFor, el=el)
                             break
@@ -223,7 +225,8 @@ class ReferenceManager(object):
                     "level":self.specLevel,
                     "url":"#" + el.get('id'),
                     "export":True,
-                    "for": dfnFor
+                    "for": dfnFor,
+                    "el": el
                 }
                 self.localRefs._refs[linkText].append(ref)
                 for for_ in dfnFor:

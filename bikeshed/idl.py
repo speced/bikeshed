@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, unicode_literals
 
+import re
+
 from .widlparser.widlparser import parser
 from .htmlhelpers import *
 from .unsortedJunk import classifyDfns
@@ -199,7 +201,7 @@ class IDLMarker(object):
             optStart = None
 
         texts = []
-        
+
         if optStart is not None:
             prefixes = [method.name]
             if method.name == "constructor":
@@ -254,6 +256,7 @@ def markupIDL(doc):
 
 
 def processIDL(doc):
+    localDfns = set()
     for pre in findAll("pre.idl, xmp.idl", doc):
         if pre.get("data-no-idl") is not None:
             continue
@@ -292,6 +295,13 @@ def processIDL(doc):
                     el.set('data-dfn-for', el.get('data-idl-for'))
                     del el.attrib['data-idl-for']
             else:
+                # Copy over the auto-generated linking text to the manual dfn.
+                dfn = find(url, doc)
+                lts = combineIdlLinkingTexts(el.get("data-lt"), dfn.get("data-lt"))
+                dfn.set("data-lt", lts)
+                localDfns.add(dfn)
+
+                # Reset the <idl> element to be a link to the manual dfn.
                 el.tag = "a"
                 el.set('data-link-type', idlType)
                 el.set('data-lt', idlText)
@@ -302,10 +312,28 @@ def processIDL(doc):
                 if el.get('id'):
                     # ID was defensively added by the Marker.
                     del el.attrib['id']
-    dfns = findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc)
+
+    dfns = findAll("pre.idl:not([data-no-idl]) dfn, xmp.idl:not([data-no-idl]) dfn", doc) + list(localDfns)
     classifyDfns(doc, dfns)
     fixupIDs(doc, dfns)
     doc.refs.addLocalDfns(dfn for dfn in dfns if dfn.get('id') is not None)
+
+def combineIdlLinkingTexts(t1, t2):
+    t1s = [normalizeIdlWhitespace(x) for x in (t1 or "").split("|")]
+    t2s = [normalizeIdlWhitespace(x) for x in (t2 or "").split("|")]
+    for lt in t2s:
+        if lt not in t1s:
+            t1s.append(lt)
+    return "|".join(t1s)
+
+def normalizeIdlWhitespace(text):
+    # Remove all whitespace...
+    text = re.sub(r"\s+", "", text)
+    # Then add whitespace after commas
+    text = re.sub(r",", ", ", text)
+    return text
+
+
 
 
 def getParser():
