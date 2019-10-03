@@ -282,7 +282,9 @@ def transformProductionGrammars(doc):
             if isinstance(el, basestring):
                 newChildren.extend(transformText(el))
             elif isElement(el):
-                transformElement(el)
+                if el.tag != "a":
+                    # Transforms all add links, which aren't allowed in <a>...
+                    transformElement(el)
                 newChildren.append(el)
         appendChild(parentEl, *newChildren)
 
