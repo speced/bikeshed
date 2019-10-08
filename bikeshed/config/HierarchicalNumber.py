@@ -51,3 +51,7 @@ class HierarchicalNumber(object):
 
     def __hash__(self):
         return hash(self.originalVal)
+
+    def strip(self):
+        # Act kinda like a string!
+        return self
