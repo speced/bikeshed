@@ -325,7 +325,10 @@ def parseDate(key, val, lineNum):
 
 
 def parseLevel(key, val, lineNum):
-    return config.HierarchicalNumber(val)
+    val = val.strip().lower()
+    if val == "none":
+        return None
+    return val
 
 
 def parseInteger(key, val, lineNum):

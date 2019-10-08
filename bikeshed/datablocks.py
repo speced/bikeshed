@@ -535,7 +535,7 @@ def processAnchors(anchors, doc, lineNum=None):
         level = None
         if "shortname" in anchor and "level" in anchor:
             shortname = anchor['shortname'][0]
-            level = config.HierarchicalNumber(anchor['level'][0])
+            level = anchor['level'][0]
         spec = anchor["spec"][0] if "spec" in anchor else None
         if shortname and not spec:
             if level:
@@ -546,10 +546,10 @@ def processAnchors(anchors, doc, lineNum=None):
             match = re.match("(.*)-(\d+)$", spec)
             if match:
                 shortname = match.group(1)
-                level = config.HierarchicalNumber(match.group(2))
+                level = match.group(2)
             else:
                 shortname = spec
-                level = config.HierarchicalNumber("")
+                level = ""
         if "status" in anchor:
             status = anchor["status"][0]
             if status in config.linkStatuses:

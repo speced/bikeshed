@@ -27,6 +27,8 @@ class RefWrapper(object):
         return self._ref['shortname'].strip()
     @property
     def level(self):
+        if self._ref['level'] is None:
+            return ""
         return self._ref['level'].strip()
     @property
     def status(self):
