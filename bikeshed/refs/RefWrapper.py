@@ -14,7 +14,6 @@ class RefWrapper(object):
 
     text = attr.ib()
     _ref = attr.ib()
-    el   = attr.ib(default=None)
 
     @property
     def type(self):
@@ -45,6 +44,10 @@ class RefWrapper(object):
     @property
     def for_(self):
         return [x.strip() for x in self._ref['for']]
+    @property
+    def el(self):
+        return self._ref.get('el', None)
+
     '''
         "type": linesIter.next(),
         "spec": linesIter.next(),
