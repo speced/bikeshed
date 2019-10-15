@@ -18,24 +18,24 @@ class RefWrapper(object):
 
     @property
     def type(self):
-        return self._ref['type'].strip()
+        return decode(self._ref['type'].strip())
     @property
     def spec(self):
-        return self._ref['spec'].strip()
+        return decode(self._ref['spec'].strip())
     @property
     def shortname(self):
-        return self._ref['shortname'].strip()
+        return decode(self._ref['shortname'].strip())
     @property
     def level(self):
         if self._ref['level'] is None:
             return ""
-        return self._ref['level'].strip()
+        return decode(self._ref['level'].strip())
     @property
     def status(self):
-        return self._ref['status'].strip()
+        return decode(self._ref['status'].strip())
     @property
     def url(self):
-        return self._ref['url'].strip()
+        return decode(self._ref['url'].strip())
     @property
     def export(self):
         return self._ref['export']
