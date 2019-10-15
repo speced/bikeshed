@@ -15,21 +15,51 @@ class RefWrapper(object):
     text = attr.ib()
     _ref = attr.ib()
 
-    def __getattr__(self, name):
-        '''
-        Indirect all attr accesses into the self._ref dict.
-        Also, strip whitespace from the values (they'll have \n at the end) on access.
-        '''
-        if name == "for_":
-            refKey = "for"
-        else:
-            refKey = name
-        val = self._ref[refKey]
-        if isinstance(val, basestring):
-            val = decode(val.strip())
-        elif isinstance(val, list):
-            val = [decode(x.strip()) for x in val]
-        return val
+    @property
+    def type(self):
+        return decode(self._ref['type'].strip())
+    @property
+    def spec(self):
+        return decode(self._ref['spec'].strip())
+    @property
+    def shortname(self):
+        return decode(self._ref['shortname'].strip())
+    @property
+    def level(self):
+        if self._ref['level'] is None:
+            return ""
+        return decode(self._ref['level'].strip())
+    @property
+    def status(self):
+        return decode(self._ref['status'].strip())
+    @property
+    def url(self):
+        return decode(self._ref['url'].strip())
+    @property
+    def export(self):
+        return self._ref['export']
+    @property
+    def normative(self):
+        return self._ref['normative']
+    @property
+    def for_(self):
+        return [x.strip() for x in self._ref['for']]
+    @property
+    def el(self):
+        return self._ref.get('el', None)
+
+    '''
+        "type": linesIter.next(),
+        "spec": linesIter.next(),
+        "shortname": linesIter.next(),
+        "level": linesIter.next(),
+        "status": linesIter.next(),
+        "url": linesIter.next(),
+        "export": linesIter.next() != "\n",
+        "normative": linesIter.next() != "\n",
+        "for": [],
+        (optionall) "el": manuallyProvided,
+    '''
 
     def __json__(self):
         refCopy = copy.copy(self._ref)
