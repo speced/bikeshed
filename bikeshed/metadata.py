@@ -327,7 +327,7 @@ def parseDate(key, val, lineNum):
 def parseLevel(key, val, lineNum):
     val = val.lower().strip()
     if val == "none":
-        return None
+        return ""
     return val.strip()
 
 
