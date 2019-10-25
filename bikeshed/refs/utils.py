@@ -135,6 +135,12 @@ def linkTextVariations(str, linkType):
         else:
             yield str + "ly"
 
+        # Special irregular case: throw <-> thrown
+        if str == "throw":
+            yield "thrown"
+        if str == "thrown":
+            yield "throw"
+
     if config.linkTypeIn(linkType, "idl"):
         # Let people refer to escaped IDL names with their "real" names (without the underscore)
         if str[:1] != "_":
