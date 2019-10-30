@@ -980,6 +980,11 @@ def addSelfLinks(doc):
             continue
         if el.get("data-no-self-link") is not None:
             continue
+        if el.tag == "details":
+            summary = find("summary", el)
+            if summary is not None:
+                insertAfter(summary, makeSelfLink(el))
+                continue
         prependChild(el, makeSelfLink(el))
     if doc.md.useDfnPanels:
         dfnpanels.addDfnPanels(doc, dfnElements)
