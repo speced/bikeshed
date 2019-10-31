@@ -67,6 +67,9 @@ class MetadataManager:
         self.editors = []
         self.editorTerm = {"singular": "Editor", "plural": "Editors"}
         self.favicon = None
+        self.fingerprintClass = "tracking-vector"
+        self.fingerprintImage = None
+        self.fingerprintTitle = "There is a potential fingerprinting vector here."
         self.forceCrossorigin = False
         self.group = None
         self.h1 = None
@@ -933,6 +936,12 @@ def parseLiteral(key, val, lineNum):
     return val
 
 
+def parseLiteralOrNone(key, val, lineNum):
+    if val.lower() == "none":
+        return None
+    return val
+
+
 def parseLiteralCaseless(key, val, lineNum):
     return val.lower()
 
@@ -964,6 +973,9 @@ knownKeys = {
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),
     "Favicon": Metadata("Favicon", "favicon", joinValue, parseLiteral),
+    "Fingerprint Class": Metadata("Fingerprint Class", "fingerprintClass", joinValue, parseLiteralOrNone),
+    "Fingerprint Image": Metadata("Fingerprint Image", "fingerprintImage", joinValue, parseLiteralOrNone),
+    "Fingerprint Title": Metadata("Fingerprint Title", "fingerprintTitle", joinValue, parseLiteral),
     "Force Crossorigin": Metadata("Force Crossorigin", "forceCrossorigin", joinValue, parseBoolean),
     "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),
     "Group": Metadata("Group", "group", joinValue, parseLiteral),

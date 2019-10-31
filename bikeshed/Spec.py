@@ -14,6 +14,7 @@ from . import caniuse
 from . import config
 from . import datablocks
 from . import extensions
+from . import fingerprinting
 from . import headings
 from . import highlight
 from . import HTMLSerializer
@@ -215,6 +216,7 @@ class Spec(object):
         boilerplate.removeUnwantedBoilerplate(self)
         highlight.addSyntaxHighlighting(self)
         boilerplate.addBikeshedBoilerplate(self)
+        fingerprinting.addFingerprinting(self)
         fixIntraDocumentReferences(self)
         fixInterDocumentReferences(self)
         removeMultipleLinks(self)
