@@ -574,7 +574,7 @@ def classifyDfns(doc, dfns):
         if primaryDfnText is None:
             die("Dfn has no linking text:\n{0}", outerHTML(el), el=el)
             continue
-        if len(primaryDfnText) > 100:
+        if len(primaryDfnText) > 300:
             # Almost certainly accidentally missed the end tag
             warn("Dfn has extremely long text - did you forget the </dfn> tag?\n{0}", outerHTML(el), el=el)
         # Check for invalid fors, as it's usually some misnesting.
