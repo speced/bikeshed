@@ -3,9 +3,9 @@ from __future__ import division, unicode_literals
 import re
 from itertools import *
 
-from .. import Line
-from ..htmlhelpers import escapeAttr
-from ..messages import *
+from . import Line
+from .htmlhelpers import escapeAttr
+from .messages import *
 
 
 def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
@@ -52,7 +52,7 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
     tokens = []
     rawStack = []
     if opaqueElements is None:
-	opaqueElements = []
+        opaqueElements = []
     opaqueElements += ["pre", "xmp", "script", "style"]
     rawElements = "|".join(re.escape(x) for x in opaqueElements)
 
