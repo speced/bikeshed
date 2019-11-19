@@ -3,9 +3,9 @@ from __future__ import division, unicode_literals
 import re
 from itertools import *
 
-from . import Line
-from .htmlhelpers import escapeAttr
-from .messages import *
+from .. import Line
+from ..htmlhelpers import escapeAttr
+from ..messages import *
 
 
 def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
