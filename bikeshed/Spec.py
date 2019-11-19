@@ -23,7 +23,6 @@ from . import includes
 from . import inlineTags
 from . import lint
 from . import markdown
-from . import markdown
 from . import metadata
 from . import shorthands
 from . import wpt
