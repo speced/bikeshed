@@ -305,6 +305,8 @@ class MetadataManager:
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-NOTE"
         elif self.status == "w3c/CG-DRAFT":
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/cg-draft"
+        elif self.status == "w3c/CG-FINAL":
+            macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/cg-final"
         else:
             shortStatus = self.rawStatus.partition("/")[2] if (self.rawStatus and "/" in self.rawStatus) else self.rawStatus
             macros["w3c-stylesheet-url"] = "https://www.w3.org/StyleSheets/TR/2016/W3C-{0}".format(shortStatus)
