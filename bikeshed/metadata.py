@@ -75,6 +75,7 @@ class MetadataManager:
         self.ignoredTerms = []
         self.ignoredVars = []
         self.includeCanIUsePanels = False
+        self.includeMdnPanels = False
         self.indent = 4
         self.inferCSSDfns = False
         self.informativeClasses = []
@@ -987,6 +988,7 @@ knownKeys = {
     "Ignored Terms": Metadata("Ignored Terms", "ignoredTerms", joinList, parseCommaSeparated),
     "Ignored Vars": Metadata("Ignored Vars", "ignoredVars", joinList, parseCommaSeparated),
     "Include Can I Use Panels": Metadata("Include Can I Use Panels", "includeCanIUsePanels", joinValue, parseBoolean),
+    "Include Mdn Panels": Metadata("Include Mdn Panels", "includeMdnPanels", joinValue, parseBoolean),
     "Indent": Metadata("Indent", "indent", joinValue, parseInteger),
     "Infer Css Dfns": Metadata("Infer Css Dfns", "inferCSSDfns", joinValue, parseBoolean),
     "Informative Classes": Metadata("Informative Classes", "informativeClasses", joinList, parseCommaSeparated),

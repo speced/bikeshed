@@ -7,6 +7,7 @@ from . import updateBackRefs
 from . import updateCrossRefs
 from . import updateBiblio
 from . import updateCanIUse
+from . import updateMdnSpecLinks
 from . import updateLinkDefaults
 from . import updateTestSuites
 from . import updateLanguages
@@ -16,7 +17,7 @@ from .. import config
 from ..messages import *
 
 
-def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefaults=False, testSuites=False, languages=False, wpt=False, path=None, dryRun=False, force=False):
+def update(anchors=False, backrefs=False, biblio=False, caniuse=False, mdn=False, linkDefaults=False, testSuites=False, languages=False, wpt=False, path=None, dryRun=False, force=False):
     if path is None:
         path = config.scriptPath("spec-data")
 
@@ -28,14 +29,15 @@ def update(anchors=False, backrefs=False, biblio=False, caniuse=False, linkDefau
             force = True
     if force:
         # If all are False, update everything
-        if  anchors == backrefs == biblio == caniuse == linkDefaults == testSuites == languages == wpt == False:
-            anchors  = backrefs  = biblio  = caniuse  = linkDefaults  = testSuites  = languages  = wpt  = True
+        if  anchors == backrefs == biblio == caniuse == mdn == linkDefaults == testSuites == languages == wpt == False:
+            anchors  = backrefs  = biblio  = caniuse  = mdn = linkDefaults  = testSuites  = languages  = wpt  = True
 
         touchedPaths = {
             "anchors": updateCrossRefs.update(path=path, dryRun=dryRun) if anchors else None,
             "backrefs": updateBackRefs.update(path=path, dryRun=dryRun) if backrefs else None,
             "biblio": updateBiblio.update(path=path, dryRun=dryRun) if biblio else None,
             "caniuse": updateCanIUse.update(path=path, dryRun=dryRun) if caniuse else None,
+            "mdnspeclinks": updateMdnSpecLinks.update(path=path, dryRun=dryRun) if mdn else None,
             "linkDefaults": updateLinkDefaults.update(path=path, dryRun=dryRun) if linkDefaults else None,
             "testSuites": updateTestSuites.update(path=path, dryRun=dryRun) if testSuites else None,
             "languages": updateLanguages.update(path=path, dryRun=dryRun) if languages else None,
@@ -113,6 +115,9 @@ def cleanupFiles(root, touchedPaths, dryRun=False):
         deletableFiles.extend(["caniuse.json"])
         deletableFolders.extend(["caniuse"])
         paths.update(touchedPaths["caniuse"])
+    if touchedPaths["mdnspeclinks"] is not None:
+        deletableFolders.extend(["mdnspeclinks"])
+        paths.update(touchedPaths["mdnspeclinks"])
 
     say("Cleaning up old data files...")
     oldPaths = []
