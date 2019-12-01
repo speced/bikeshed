@@ -196,7 +196,7 @@ def main():
     config.setErrorLevel(options.errorLevel)
     config.dryRun = options.dryRun
     if options.printMode is None:
-        if "NO_COLOR" in os.environ or os.environ["TERM"] == "dumb":
+        if "NO_COLOR" in os.environ or os.environ.get("TERM") == "dumb":
             config.printMode = "plain"
         else:
             config.printMode = "console"
