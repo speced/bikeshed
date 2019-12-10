@@ -65,8 +65,12 @@ def addMdnPanels(doc):
             }
         });
         document.body.addEventListener("click", function(e) {
-            if(e.target.parentNode.classList.contains("mdn-anno-btn")) {
-                e.target.parentNode.parentNode.classList.toggle("wrapped");
+            parentnode = e.target.parentNode;
+            if (!parentnode) {
+                return;
+            }
+            if(parentnode.classList.contains("mdn-anno-btn")) {
+                parentnode.parentNode.classList.toggle("wrapped");
             }
         });'''  # noqa
 
