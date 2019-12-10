@@ -77,7 +77,8 @@ def addMdnPanels(doc):
             if (!parentnode) {
                 return;
             }
-            if(parentnode.classList.contains("mdn-anno-btn")) {
+            if (e.composedPath().some(el =>
+                    (el.classList && el.classList.contains("mdn-anno-btn")))) {
                 parentnode.parentNode.classList.toggle("wrapped");
             }
         });'''  # noqa
