@@ -65,20 +65,16 @@ def addMdnPanels(doc):
             }
         }
         window.addEventListener("load", positionAnnos())
-        document.body.addEventListener("click", function(e) {
-            if (e.composedPath().some(el => (el.id === "toc-toggle"))) {
-                /* If this is a document styled for W3C publication with a ToC
-                 * sidebar, and the ToC "Collapse Sidebar" button is pushed,
-                 * some MDN annos seem to end up getting wildly out of place
-                 * unless we reposition them where they belong. */
-                positionAnnos()
-            }
-            var mdnAnno = e.composedPath().filter(el =>
-                (el.classList && el.classList.contains("mdn-anno")))[0];
-            if (mdnAnno) {
-                mdnAnno.classList.toggle("wrapped");
-            }
-        });'''  # noqa
+        /* If this is a document styled for W3C publication with a ToC
+         * sidebar, and the ToC "Collapse Sidebar" button is pushed, some
+         * MDN annos seem to end up getting wildly out of place unless we
+         * reposition them where they belong. */
+        document.querySelector("#toc-toggle").addEventListener("click",
+            () => positionAnnos());
+        Array.from(document.querySelectorAll(".mdn-anno"),
+            el => el.addEventListener('click',
+            () => el.classList.toggle("wrapped")));
+        '''  # noqa
 
     # FIXME: Update the Edge logo URL when we get
     #       https://github.com/whatwg/whatwg.org/pull/267 resolved
