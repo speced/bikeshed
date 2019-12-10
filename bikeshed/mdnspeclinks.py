@@ -92,7 +92,7 @@ def addMdnPanels(doc):
         .mdn-anno > .feature > .less-than-two-engines-text { color: red }
         .mdn-anno > .feature > .all-engines-text { color: green }
         .mdn-anno > .feature > p { font-size: .75em; margin-top: 6px; margin-bottom: 0; }
-        .mdn-anno > .feature > p + p { margin-top: 0; }
+        .mdn-anno > .feature > p + p { margin-top: 3px; }
         .mdn-anno > .feature > .support { display: block; font-size: 0.6em; margin: 0; padding: 0; margin-top: 2px }
         .mdn-anno > .feature > .support + div { padding-top: 0.5em; }
         .mdn-anno > .feature > .support > hr { display: block; border-top: 1px dotted #999; padding: 3px 0px 0px 0px; margin: 2px 3px 0px 3px; }
