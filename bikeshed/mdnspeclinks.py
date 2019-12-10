@@ -73,13 +73,10 @@ def addMdnPanels(doc):
                  * unless we reposition them where they belong. */
                 positionAnnos()
             }
-            parentnode = e.target.parentNode;
-            if (!parentnode) {
-                return;
-            }
-            if (e.composedPath().some(el =>
-                    (el.classList && el.classList.contains("mdn-anno-btn")))) {
-                parentnode.parentNode.classList.toggle("wrapped");
+            var mdnAnno = e.composedPath().filter(el =>
+                (el.classList && el.classList.contains("mdn-anno")))[0];
+            if (mdnAnno) {
+                mdnAnno.classList.toggle("wrapped");
             }
         });'''  # noqa
 
