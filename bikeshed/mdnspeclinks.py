@@ -41,7 +41,7 @@ def addMdnPanels(doc):
     }
 
     doc.extraScripts["script-mdn-anno"] = '''
-        window.addEventListener("load", function(){
+        function positionAnnos() {
             var annos = [].slice.call(document.querySelectorAll(".mdn-anno"));
             for(var i = 0; i < annos.length; i++) {
                 var anno = annos[i];
@@ -63,8 +63,16 @@ def addMdnPanels(doc):
                     console.error('MDN anno references non-existent element ID "%s".%o', id, anno);
                 }
             }
-        });
+        }
+        window.addEventListener("load", positionAnnos())
         document.body.addEventListener("click", function(e) {
+            if (e.composedPath().some(el => (el.id === "toc-toggle"))) {
+                /* If this is a document styled for W3C publication with a ToC
+                 * sidebar, and the ToC "Collapse Sidebar" button is pushed,
+                 * some MDN annos seem to end up getting wildly out of place
+                 * unless we reposition them where they belong. */
+                positionAnnos()
+            }
             parentnode = e.target.parentNode;
             if (!parentnode) {
                 return;
