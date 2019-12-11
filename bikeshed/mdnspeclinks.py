@@ -65,15 +65,17 @@ def addMdnPanels(doc):
             }
         }
         window.addEventListener("load", positionAnnos())
+        document.body.addEventListener("click", (e) => {
+            if(e.target.closest(".mdn-anno-btn")) {
+                e.target.closest(".mdn-anno").classList.toggle("wrapped");
+            }
+        });
         /* If this is a document styled for W3C publication with a ToC
          * sidebar, and the ToC "Collapse Sidebar" button is pushed, some
          * MDN annos seem to end up getting wildly out of place unless we
          * reposition them where they belong. */
         document.querySelector("#toc-toggle").addEventListener("click",
             () => positionAnnos());
-        Array.from(document.querySelectorAll(".mdn-anno"),
-            el => el.addEventListener('click',
-            () => el.classList.toggle("wrapped")));
         '''  # noqa
 
     # FIXME: Update the Edge logo URL when we get
