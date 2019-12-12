@@ -30,7 +30,10 @@ def update(path, dryRun=False):
     writtenPaths = set()
     if not dryRun:
         try:
-            p = os.path.join(path, "mdnspeclinks", "SPECMAP.json")
+            mdnSpecLinksDir = os.path.join(path, "mdnspeclinks")
+            if not os.path.exists(mdnSpecLinksDir):
+                os.makedirs(mdnSpecLinksDir)
+            p = os.path.join(mdnSpecLinksDir, "SPECMAP.json")
             writtenPaths.add(p)
             with io.open(p, 'w', encoding="utf-8") as fh:
                 fh.write(unicode(json.dumps(data, indent=1, ensure_ascii=False,
@@ -43,7 +46,7 @@ def update(path, dryRun=False):
             #     ...
             # }
             for specFilename in data.values():
-                p = os.path.join(path, "mdnspeclinks", specFilename)
+                p = os.path.join(mdnSpecLinksDir, specFilename)
                 writtenPaths.add(p)
                 mdnSpecLinksBaseURL = "https://w3c.github.io/mdn-spec-links/"
                 try:
