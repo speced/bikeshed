@@ -45,7 +45,7 @@ def addMdnPanels(doc):
             var annos = [].slice.call(document.querySelectorAll(".mdn-anno"));
             for(var i = 0; i < annos.length; i++) {
                 var anno = annos[i];
-                id = anno.getAttribute("data-dfn-id");
+                id = anno.getAttribute("data-mdn-for");
                 var dfn = document.querySelector("#" + id);
                 if (dfn !== null) {
                     var rect = dfn.getBoundingClientRect(id);
@@ -160,7 +160,7 @@ def addMdnPanels(doc):
                 mdnButton = E.button({"class": "mdn-anno-btn"})
                 mdnLogo = E.span("MDN")
                 appendChild(anno, mdnButton)
-                anno.set("data-dfn-id", escapedElementID)
+                anno.set("data-mdn-for", escapedElementID)
                 appendChild(doc.body, anno)
                 lessThanTwoEngines = 0
                 onlyTwoEngines = 0
