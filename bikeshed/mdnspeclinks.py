@@ -99,7 +99,7 @@ def addMdnPanels(doc):
         .mdn-anno > .feature > p + p { margin-top: 3px; }
         .mdn-anno > .feature > .support { display: block; font-size: 0.6em; margin: 0; padding: 0; margin-top: 2px }
         .mdn-anno > .feature > .support + div { padding-top: 0.5em; }
-        .mdn-anno > .feature > .support > hr { display: block; border-top: 1px dotted #999; padding: 3px 0px 0px 0px; margin: 2px 3px 0px 3px; }
+        .mdn-anno > .feature > .support > hr { display: block; border: none; border-top: 1px dotted #999; padding: 3px 0px 0px 0px; margin: 2px 3px 0px 3px; }
         .mdn-anno > .feature > .support > hr::before { content: ""; }
         .mdn-anno > .feature > .support > span { padding: 0.2em 0; display: block; display: table; }
         .mdn-anno > .feature > .support > span.no { color: #CCCCCC; filter: grayscale(100%); }
