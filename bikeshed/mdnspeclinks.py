@@ -174,7 +174,7 @@ def addMdnPanels(doc):
                         warn("No \"{0}\" ID found." + mdnSuggest, elementID)
                         continue
                     if "engines" in feature:
-                        engines = feature["engines"]
+                        engines = len(feature["engines"])
                         if engines < 2:
                             lessThanTwoEngines = lessThanTwoEngines + 1
                         elif engines == 2:
@@ -283,7 +283,7 @@ def mdnPanelFor(feature, mdnBaseUrl, bcdBaseUrl, nameFromCodeName,
         slugPara = E.p(slugLink)
         appendChild(featureDiv, slugPara)
     if "engines" in feature:
-        engines = feature["engines"]
+        engines = len(feature["engines"])
         enginesPara = None
         if engines == 0:
             enginesPara = E.p({"class": "less-than-two-engines-text"},
