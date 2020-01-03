@@ -52,7 +52,7 @@ def update(path, dryRun=False):
                 try:
                     with closing(urllib2.urlopen(mdnSpecLinksBaseURL +
                                                  specFilename)) as fh:
-                        fileContents = fh.read()
+                        fileContents = fh.read().decode('utf-8')
                 except Exception as e:
                     die("Couldn't download the MDN Spec Links " + specFilename +
                         " file.\n{0}", e)
