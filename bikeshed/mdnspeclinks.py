@@ -74,8 +74,10 @@ def addMdnPanels(doc):
          * sidebar, and the ToC "Collapse Sidebar" button is pushed, some
          * MDN annos seem to end up getting wildly out of place unless we
          * reposition them where they belong. */
-        document.querySelector("#toc-toggle").addEventListener("click",
-            () => positionAnnos());
+        const tocToggle = document.querySelector("#toc-toggle");
+        if (tocToggle) {
+            tocToggle.addEventListener("click", () => positionAnnos());
+        }
         '''  # noqa
 
     # FIXME: Update the Edge logo URL when we get
