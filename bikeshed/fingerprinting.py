@@ -29,14 +29,13 @@ def addTrackingVector(doc):
 
 	for el in els:
 		prependChild(el,
-			trackingVectorImage(doc.md.trackingVectorImage, doc.md.trackingVectorTitle, doc.md.trackingVectorClass))
+			trackingVectorImage(doc.md.trackingVectorImage, doc.md.trackingVectorText, doc.md.trackingVectorTitle, doc.md.trackingVectorClass))
 		removeAttr(el, "tracking-vector")
 
-
-def trackingVectorImage(url, title, cls):
+def trackingVectorImage(url, text, title, cls):
 	if url is None:
-		return E.svg({"width":"46", "height":"64", "role":"img", "class": cls},
+		return E.svg({"width":"46", "height":"64", "role":"img", "aria-label":text, "class":cls},
 			E.title({}, title),
 			E.use({"href":"#"+trackingVectorId}))
 	else:
-		return E.img({"title":title, "alt":title, "src":url, "class": cls})
+		return E.img({"title":title, "alt":text, "src":url, "class":cls})
