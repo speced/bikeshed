@@ -69,7 +69,8 @@ class MetadataManager:
         self.favicon = None
         self.trackingVectorClass = "tracking-vector"
         self.trackingVectorImage = None
-        self.trackingVectorTitle = "There is a potential tracking vector here."
+        self.trackingVectorAltText = "(This is a tracking vector.) " # The space is to separate from the following text.
+        self.trackingVectorTitle = "There is a tracking vector here."
         self.forceCrossorigin = False
         self.group = None
         self.h1 = None
@@ -1022,6 +1023,7 @@ knownKeys = {
     "TR": Metadata("TR", "TR", joinValue, parseLiteral),
     "Tracking Vector Class": Metadata("Tracking Vector Class", "trackingVectorClass", joinValue, parseLiteralOrNone),
     "Tracking Vector Image": Metadata("Tracking Vector Image", "trackingVectorImage", joinValue, parseLiteralOrNone),
+    "Tracking Vector Alt Text": Metadata("Tracking Vector Alt Text", "trackingVectorAltText", joinValue, parseLiteral),
     "Tracking Vector Title": Metadata("Tracking Vector Title", "trackingVectorTitle", joinValue, parseLiteral),
     "Translate Ids": Metadata("Translate Ids", "translateIDs", joinDdList, parseTranslateIDs),
     "Translation": Metadata("Translation", "translations", joinList, parseTranslation),
