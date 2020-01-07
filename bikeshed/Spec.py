@@ -216,7 +216,7 @@ class Spec(object):
         boilerplate.removeUnwantedBoilerplate(self)
         highlight.addSyntaxHighlighting(self)
         boilerplate.addBikeshedBoilerplate(self)
-        fingerprinting.addFingerprinting(self)
+        fingerprinting.addTrackingVector(self)
         fixIntraDocumentReferences(self)
         fixInterDocumentReferences(self)
         removeMultipleLinks(self)

@@ -67,9 +67,9 @@ class MetadataManager:
         self.editors = []
         self.editorTerm = {"singular": "Editor", "plural": "Editors"}
         self.favicon = None
-        self.fingerprintClass = "tracking-vector"
-        self.fingerprintImage = None
-        self.fingerprintTitle = "There is a potential fingerprinting vector here."
+        self.trackingVectorClass = "tracking-vector"
+        self.trackingVectorImage = None
+        self.trackingVectorTitle = "There is a potential tracking vector here."
         self.forceCrossorigin = False
         self.group = None
         self.h1 = None
@@ -975,9 +975,6 @@ knownKeys = {
     "Editor": Metadata("Editor", "editors", joinList, parseEditor),
     "Editor Term": Metadata("Editor Term", "editorTerm", joinValue, parseEditorTerm),
     "Favicon": Metadata("Favicon", "favicon", joinValue, parseLiteral),
-    "Fingerprint Class": Metadata("Fingerprint Class", "fingerprintClass", joinValue, parseLiteralOrNone),
-    "Fingerprint Image": Metadata("Fingerprint Image", "fingerprintImage", joinValue, parseLiteralOrNone),
-    "Fingerprint Title": Metadata("Fingerprint Title", "fingerprintTitle", joinValue, parseLiteral),
     "Force Crossorigin": Metadata("Force Crossorigin", "forceCrossorigin", joinValue, parseBoolean),
     "Former Editor": Metadata("Former Editor", "previousEditors", joinList, parseEditor),
     "Group": Metadata("Group", "group", joinValue, parseLiteral),
@@ -1023,6 +1020,9 @@ knownKeys = {
     "Title": Metadata("Title", "title", joinValue, parseLiteral),
     "Toggle Diffs": Metadata("Toggle Diffs", "toggleDiffs", joinValue, parseBoolean),
     "TR": Metadata("TR", "TR", joinValue, parseLiteral),
+    "Tracking Vector Class": Metadata("Tracking Vector Class", "trackingVectorClass", joinValue, parseLiteralOrNone),
+    "Tracking Vector Image": Metadata("Tracking Vector Image", "trackingVectorImage", joinValue, parseLiteralOrNone),
+    "Tracking Vector Title": Metadata("Tracking Vector Title", "trackingVectorTitle", joinValue, parseLiteral),
     "Translate Ids": Metadata("Translate Ids", "translateIDs", joinDdList, parseTranslateIDs),
     "Translation": Metadata("Translation", "translations", joinList, parseTranslation),
     "URL": Metadata("URL", "ED", joinValue, parseLiteral),  # URL is a synonym for ED

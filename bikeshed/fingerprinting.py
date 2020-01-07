@@ -3,23 +3,23 @@ from __future__ import division, unicode_literals
 
 from .htmlhelpers import *
 
-fingerprintId = "b732b3fe" # hashlib.md5("tracking-vector").hexdigest()[0:8], to minimize chance of collision
+trackingVectorId = "b732b3fe" # hashlib.md5("tracking-vector").hexdigest()[0:8], to minimize chance of collision
 
-def addFingerprinting(doc):
-	if doc.md.fingerprintClass is None:
+def addTrackingVector(doc):
+	if doc.md.trackingVectorClass is None:
 		return
 
-	els = findAll(".{0}".format(doc.md.fingerprintClass), doc)
+	els = findAll("[tracking-vector]", doc)
 
 	if len(els) == 0:
 		return
 
-	if doc.md.fingerprintImage is None:
+	if doc.md.trackingVectorImage is None:
 		# Generate an SVG and <use> it in all the individual spots
 		appendChild(doc.body,
 			E.svg({"viewBox":"0 0 46 64", "style":"display:none"},
 				E.defs({},
-					E.path({"id":fingerprintId,
+					E.path({"id":trackingVectorId,
 					        "stroke":"black",
 					        "stroke-linecap":"round",
 					        "stroke-linejoin":"round",
@@ -29,13 +29,14 @@ def addFingerprinting(doc):
 
 	for el in els:
 		prependChild(el,
-			fingerprintImage(doc.md.fingerprintImage, doc.md.fingerprintTitle))
+			trackingVectorImage(doc.md.trackingVectorImage, doc.md.trackingVectorTitle, doc.md.trackingVectorClass))
+		removeAttr(el, "tracking-vector")
 
 
-def fingerprintImage(url, title):
+def trackingVectorImage(url, title, cls):
 	if url is None:
-		return E.svg({"width":"46", "height":"64", "role":"img"},
+		return E.svg({"width":"46", "height":"64", "role":"img", "class": cls},
 			E.title({}, title),
-			E.use({"href":"#"+fingerprintId}))
+			E.use({"href":"#"+trackingVectorId}))
 	else:
-		return E.img({"title":title, "alt":title, "src":url})
+		return E.img({"title":title, "alt":title, "src":url, "class": cls})
