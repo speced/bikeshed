@@ -384,50 +384,72 @@ def fixInterDocumentReferences(doc):
             continue
         if spec in doc.refs.specs:
             # Bikeshed recognizes the spec
-            specData = doc.refs.fetchHeadings(spec)
-            if section in specData:
-                heading = specData[section]
-            else:
-                die("Couldn't find section '{0}' in spec '{1}':\n{2}", section, spec, outerHTML(el), el=el)
-                continue
-            if isinstance(heading, list):
-                # Multipage spec
-                if len(heading) == 1:
-                    # only one heading of this name, no worries
-                    heading = specData[heading[0]]
-                else:
-                    # multiple headings of this id, user needs to disambiguate
-                    die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  [[{0}]]".format(spec + x) for x in heading), el=el)
-                    continue
-            if doc.md.status == "current":
-                if "current" in heading:
-                    heading = heading["current"]
-                else:
-                    heading = heading["snapshot"]
-            else:
-                if "snapshot" in heading:
-                    heading = heading["snapshot"]
-                else:
-                    heading = heading["current"]
-            el.tag = "a"
-            el.set("href", heading['url'])
-            if isEmpty(el):
-                el.text = "{spec} §{number} {text}".format(**heading)
-        elif doc.refs.getBiblioRef(spec):
-            # Bikeshed doesn't know the spec, but it's in biblio
-            bib = doc.refs.getBiblioRef(spec)
-            if isinstance(bib, biblio.StringBiblioEntry):
-                die("Can't generate a cross-spec section ref for '{0}', because the biblio entry has no url.", spec, el=el)
-                continue
-            el.tag = "a"
-            el.set("href", bib.url + section)
-            if isEmpty(el):
-                el.text = bib.title + " §" + section[1:]
-        else:
-            # Unknown spec
-            die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el), el=el)
+            fillInterDocumentReferenceFromShepherd(doc, el, spec, section)
             continue
-        removeAttr(el, 'data-link-spec', 'spec-section')
+        if not re.search(r"\d$", spec):
+            # Unnumbered, check if there's a numbered variant in Shepherd
+            vNames = doc.refs.vNamesFromSpecNames(spec)
+            if len(vNames):
+                fillInterDocumentReferenceFromShepherd(doc, el, vNames[0], section)
+                if len(vNames) > 1:
+                    die("Section autolink {2} attempts to link to unversioned spec name '{0}', "+
+                         "but that spec is versioned as {1}. "+
+                         "Please choose a versioned spec name.",
+                        spec,
+                        config.englishFromList("'{0}'".format(x) for x in vNames),
+                        outerHTML(el),
+                        el=el)
+                continue
+        if doc.refs.getBiblioRef(spec):
+            # Bikeshed doesn't know the spec, but it's in biblio
+            fillInterDocumentReferenceFromSpecref(doc, el, spec, section)
+            continue
+        # Unknown spec
+        die("Spec-section autolink tried to link to non-existent '{0}' spec:\n{1}", spec, outerHTML(el), el=el)
+
+
+def fillInterDocumentReferenceFromShepherd(doc, el, spec, section):
+    specData = doc.refs.fetchHeadings(spec)
+    if section in specData:
+        heading = specData[section]
+    else:
+        die("Couldn't find section '{0}' in spec '{1}':\n{2}", section, spec, outerHTML(el), el=el)
+        return
+    if isinstance(heading, list):
+        # Multipage spec
+        if len(heading) == 1:
+            # only one heading of this name, no worries
+            heading = specData[heading[0]]
+        else:
+            # multiple headings of this id, user needs to disambiguate
+            die("Multiple headings with id '{0}' for spec '{1}'. Please specify:\n{2}", section, spec, "\n".join("  [[{0}]]".format(spec + x) for x in heading), el=el)
+            return
+    if doc.md.status == "current":
+        if "current" in heading:
+            heading = heading["current"]
+        else:
+            heading = heading["snapshot"]
+    else:
+        if "snapshot" in heading:
+            heading = heading["snapshot"]
+        else:
+            heading = heading["current"]
+    el.tag = "a"
+    el.set("href", heading['url'])
+    if isEmpty(el):
+        el.text = "{spec} §{number} {text}".format(**heading)
+    removeAttr(el, 'data-link-spec', 'spec-section')
+
+def fillInterDocumentReferenceFromSpecref(doc, el, spec, section):
+    bib = doc.refs.getBiblioRef(spec)
+    if isinstance(bib, biblio.StringBiblioEntry):
+        die("Can't generate a cross-spec section ref for '{0}', because the biblio entry has no url.", spec, el=el)
+        return
+    el.tag = "a"
+    el.set("href", bib.url + section)
+    if isEmpty(el):
+        el.text = bib.title + " §" + section[1:]
+    removeAttr(el, 'data-link-spec', 'spec-section')
 
 
 def fillAttributeInfoSpans(doc):
