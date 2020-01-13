@@ -522,9 +522,8 @@ class ReferenceManager(object):
         return bib
 
     def vNamesFromSpecNames(self, specName):
-        # If given an unversioned spec name recogized by Shepherd/SpecRef,
-        # finds the most recent *versioned* name for the spec,
-        # guessing that the names are in simple increasing order of numeric suffix.
+        # Takes an unversioned specName,
+        # returns the versioned names that Shepherd knows about.
 
         chosenVNames = []
         for vSpecName in self.specs.keys():
