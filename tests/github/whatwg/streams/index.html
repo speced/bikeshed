@@ -347,7 +347,8 @@ WritableStream(<var>underlyingSink</var> = {}, <var>strategy</var> = {})</span><
          <ol class="toc">
           <li><a href="#ws-locked"><span class="secno">4.2.5.1</span> <span class="content">get locked</span></a>
           <li><a href="#ws-abort"><span class="secno">4.2.5.2</span> <span class="content">abort(<var>reason</var>)</span></a>
-          <li><a href="#ws-get-writer"><span class="secno">4.2.5.3</span> <span class="content">getWriter()</span></a>
+          <li><a href="#ws-close"><span class="secno">4.2.5.3</span> <span class="content">close()</span></a>
+          <li><a href="#ws-get-writer"><span class="secno">4.2.5.4</span> <span class="content">getWriter()</span></a>
          </ol>
        </ol>
       <li>
@@ -359,6 +360,7 @@ WritableStream(<var>underlyingSink</var> = {}, <var>strategy</var> = {})</span><
         <li><a href="#is-writable-stream"><span class="secno">4.3.4</span> <span class="content">IsWritableStream ( <var>x</var> )</span></a>
         <li><a href="#is-writable-stream-locked"><span class="secno">4.3.5</span> <span class="content">IsWritableStreamLocked ( <var>stream</var> )</span></a>
         <li><a href="#writable-stream-abort"><span class="secno">4.3.6</span> <span class="content">WritableStreamAbort ( <var>stream</var>, <var>reason</var> )</span></a>
+        <li><a href="#writable-stream-close"><span class="secno">4.3.7</span> <span class="content">WritableStreamClose ( <var>stream</var> )</span></a>
        </ol>
       <li>
        <a href="#ws-abstract-ops-used-by-controllers"><span class="secno">4.4</span> <span class="content">Writable stream abstract operations used by controllers</span></a>
@@ -676,7 +678,8 @@ reading from the readable side.</p>
 transform stream. However, the standard <code class="idl"><a data-link-type="idl" href="#ts-class" id="ref-for-ts-class">TransformStream</a></code> class makes it much easier to create such a pair that is
 properly entangled. It wraps a <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="transformer">transformer</dfn>, which defines algorithms for the specific transformation to be
 performed. For web developer–created streams, the implementation details of a transformer are provided by <a href="#transformer-api">an object with certain methods and properties</a> that is passed to the <code class="idl"><a data-link-type="idl" href="#ts-constructor" id="ref-for-ts-constructor">TransformStream()</a></code> constructor.</p>
-   <p>An <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="identity-transform-stream">identity transform stream</dfn> is a type of transform stream which forwards all <a data-link-type="dfn" href="#chunk" id="ref-for-chunk③">chunks</a> written to its <a data-link-type="dfn" href="#writable-side" id="ref-for-writable-side">writable side</a> to its <a data-link-type="dfn" href="#readable-side" id="ref-for-readable-side">readable side</a>, without any changes. This can be useful in <a href="#example-transform-identity">a variety of scenarios</a>. By default, the <code class="idl"><a data-link-type="idl" href="#ts-class" id="ref-for-ts-class①">TransformStream</a></code> constructor will
+   <p>An <dfn class="dfn-paneled" data-dfn-type="dfn" data-export id="identity-transform-stream">identity transform stream</dfn> is a type of transform stream which forwards all <a data-link-type="dfn" href="#chunk" id="ref-for-chunk③">chunks</a> written
+to its <a data-link-type="dfn" href="#writable-side" id="ref-for-writable-side">writable side</a> to its <a data-link-type="dfn" href="#readable-side" id="ref-for-readable-side">readable side</a>, without any changes. This can be useful in <a href="#example-transform-identity">a variety of scenarios</a>. By default, the <code class="idl"><a data-link-type="idl" href="#ts-class" id="ref-for-ts-class①">TransformStream</a></code> constructor will
 create an identity transform stream, when no <code class="idl"><a data-link-type="idl" href="#dom-transformer-transform" id="ref-for-dom-transformer-transform">transform()</a></code> method is present on the <a data-link-type="dfn" href="#transformer" id="ref-for-transformer">transformer</a> object.</p>
    <p>Some examples of potential transform streams include:</p>
    <ul>
@@ -1150,8 +1153,8 @@ prototype, are created with the internal slots described in the following table:
   1. If ! IsReadableStreamAsyncIterator(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑦">a promise rejected with</a> a *TypeError* exception.
   1. Let _reader_ be *this*.[[asyncIteratorReader]].
   1. If _reader_.[[ownerReadableStream]] is *undefined*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑧">a promise rejected with</a> a *TypeError* exception.
-  1. Return the result of <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#transforming-by" id="ref-for-transforming-by">transforming</a> ! ReadableStreamDefaultReaderRead(_reader_) with a fulfillment handler
-     which takes the argument _result_ and performs the following steps:
+  1. Return the result of <a data-link-type="dfn">reacting</a> to ! ReadableStreamDefaultReaderRead(_reader_) with the following fulfillment
+     steps given the argument _result_:
     1. Assert: Type(_result_) is Object.
     1. Let _done_ be ! Get(_result_, `"done"`).
     1. Assert: Type(_done_) is Boolean.
@@ -1168,7 +1171,7 @@ prototype, are created with the internal slots described in the following table:
   1. If *this*.[[preventCancel]] is *false*, then:
     1. Let _result_ be ! ReadableStreamReaderGenericCancel(_reader_, _value_).
     1. Perform ! ReadableStreamReaderGenericRelease(_reader_).
-    1. Return the result of <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#transforming-by" id="ref-for-transforming-by①">transforming</a> _result_ by a fulfillment handler that returns !
+    1. Return the result of <a data-link-type="dfn">reacting</a> to _result_ with a fulfillment step that returns !
     ReadableStreamCreateReadResult(_value_, *true*, *true*).
   1. Perform ! ReadableStreamReaderGenericRelease(_reader_).
   1. Return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-resolved-with" id="ref-for-a-promise-resolved-with">a promise resolved with</a> ! ReadableStreamCreateReadResult(_value_, *true*, *true*).
@@ -1288,8 +1291,8 @@ noticeable asymmetry between the two branches, and limits the possible <a data-l
   1. Let _pullAlgorithm_ be the following steps:
     1. If _reading_ is *true*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-resolved-with" id="ref-for-a-promise-resolved-with①">a promise resolved with</a> *undefined*.
     1. Set _reading_ to *true*.
-    1. Let _readPromise_ be the result of <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#transforming-by" id="ref-for-transforming-by②">transforming</a> ! ReadableStreamDefaultReaderRead(_reader_) with a
-       fulfillment handler which takes the argument _result_ and performs the following steps:
+    1. Let _readPromise_ be the result of <a data-link-type="dfn">reacting</a> to ! ReadableStreamDefaultReaderRead(_reader_) with the
+       following fulfillment steps given the argument _result_:
       1. Set _reading_ to *false*.
       1. Assert: Type(_result_) is Object.
       1. Let _done_ be ! Get(_result_, `"done"`).
@@ -1316,7 +1319,7 @@ noticeable asymmetry between the two branches, and limits the possible <a data-l
     1. If _canceled2_ is *true*,
       1. Let _compositeReason_ be ! CreateArrayFromList(« _reason1_, _reason2_ »).
       1. Let _cancelResult_ be ! ReadableStreamCancel(_stream_, _compositeReason_).
-      1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise">Resolve</a> _cancelPromise_ with _cancelResult_.
+      1. <a data-link-type="dfn">Resolve</a> _cancelPromise_ with _cancelResult_.
     1. Return _cancelPromise_.
   1. Let _cancel2Algorithm_ be the following steps, taking a _reason_ argument:
     1. Set _canceled2_ to *true*.
@@ -1324,7 +1327,7 @@ noticeable asymmetry between the two branches, and limits the possible <a data-l
     1. If _canceled1_ is *true*,
       1. Let _compositeReason_ be ! CreateArrayFromList(« _reason1_, _reason2_ »).
       1. Let _cancelResult_ be ! ReadableStreamCancel(_stream_, _compositeReason_).
-      1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise①">Resolve</a> _cancelPromise_ with _cancelResult_.
+      1. <a data-link-type="dfn">Resolve</a> _cancelPromise_ with _cancelResult_.
     1. Return _cancelPromise_.
   1. Let _startAlgorithm_ be an algorithm that returns *undefined*.
   1. Set _branch1_ to ! CreateReadableStream(_startAlgorithm_, _pullAlgorithm_, _cancel1Algorithm_).
@@ -1347,6 +1350,7 @@ noticeable asymmetry between the two branches, and limits the possible <a data-l
      discretion.
   1. Otherwise, let _reader_ be ! AcquireReadableStreamDefaultReader(_source_).
   1. Let _writer_ be ! AcquireWritableStreamDefaultWriter(_dest_).
+  1. Set _source_.[[disturbed]] to *true*.
   1. Let _shuttingDown_ be *false*.
   1. Let _promise_ be <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise①">a new promise</a>.
   1. If _signal_ is not *undefined*,
@@ -1354,13 +1358,13 @@ noticeable asymmetry between the two branches, and limits the possible <a data-l
       1. Let _error_ be a new "`<a data-link-type="idl" href="https://heycam.github.io/webidl/#aborterror" id="ref-for-aborterror">AbortError</a>`" `<a data-link-type="idl" href="https://heycam.github.io/webidl/#idl-DOMException" id="ref-for-idl-DOMException">DOMException</a>`.
       1. Let _actions_ be an empty <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#ordered-set" id="ref-for-ordered-set">ordered set</a>.
       1. If _preventAbort_ is *false*, <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#set-append" id="ref-for-set-append">append</a> the following action to _actions_:
-        1. If _dest_.[[_state_]] is `"writable"`, return ! WritableStreamAbort(_dest_, _error_).
+        1. If _dest_.[[state]] is `"writable"`, return ! WritableStreamAbort(_dest_, _error_).
         1. Otherwise, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-resolved-with" id="ref-for-a-promise-resolved-with③">a promise resolved with</a> *undefined*.
       1. If _preventCancel_ is *false*, <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#set-append" id="ref-for-set-append①">append</a> the following action action to _actions_:
-        1. If _source_.[[_state_]] is `"readable"`, return ! ReadableStreamCancel(_source_, _error_).
+        1. If _source_.[[state]] is `"readable"`, return ! ReadableStreamCancel(_source_, _error_).
         1. Otherwise, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-resolved-with" id="ref-for-a-promise-resolved-with④">a promise resolved with</a> *undefined*.
-      1. <a href="#rs-pipeTo-shutdown-with-action">Shutdown with an action</a> consisting of <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#waiting-for-all" id="ref-for-waiting-for-all">waiting for all</a>
-         of the actions in _actions_, and with _error_.
+      1. <a href="#rs-pipeTo-shutdown-with-action">Shutdown with an action</a> consisting of
+         <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#waiting-for-all-promise" id="ref-for-waiting-for-all-promise">getting a promise to wait for all</a> of the actions in _actions_, and with _error_.
     1. If _signal_’s <a data-link-type="dfn" href="https://dom.spec.whatwg.org/#abortsignal-aborted-flag" id="ref-for-abortsignal-aborted-flag">aborted flag</a> is set, perform _abortAlgorithm_ and return _promise_.
     1. <a data-link-type="dfn" href="https://dom.spec.whatwg.org/#abortsignal-add" id="ref-for-abortsignal-add">Add</a> _abortAlgorithm_ to _signal_.
   1. <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/infrastructure.html#in-parallel" id="ref-for-in-parallel">In parallel</a> <span class="XXX">but not really; see <a href="https://github.com/whatwg/streams/issues/905">#905</a></span>, using _reader_ and _writer_, read all
@@ -1434,7 +1438,7 @@ noticeable asymmetry between the two branches, and limits the possible <a data-l
        1. Perform ! ReadableStreamReaderGenericRelease(_reader_).
        1. If _signal_ is not *undefined*, <a data-link-type="dfn" href="https://dom.spec.whatwg.org/#abortsignal-remove" id="ref-for-abortsignal-remove">remove</a> _abortAlgorithm_ from _signal_.
        1. If _error_ was given, <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#reject-promise" id="ref-for-reject-promise">reject</a> _promise_ with _error_.
-       1. Otherwise, <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise②">resolve</a> _promise_ with *undefined*.
+       1. Otherwise, <a data-link-type="dfn">resolve</a> _promise_ with *undefined*.
   1. Return _promise_.
 </emu-alg> 
    <p class="note" role="note"> Various abstract operations performed here include object creation (often of promises), which usually would require
@@ -1484,7 +1488,7 @@ controller into developer-facing results visible through the <code class="idl"><
   1. If _stream_.[[state]] is `"errored"`, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with①②">a promise rejected with</a> _stream_.[[storedError]].
   1. Perform ! ReadableStreamClose(_stream_).
   1. Let _sourceCancelPromise_ be ! _stream_.[[readableStreamController]].<a data-link-type="abstract-op" href="#abstract-opdef-cancelsteps" id="ref-for-abstract-opdef-cancelsteps">[[CancelSteps]]</a>(_reason_).
-  1. Return the result of <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#transforming-by" id="ref-for-transforming-by③">transforming</a> _sourceCancelPromise_ with a fulfillment handler that returns *undefined*.
+  1. Return the result of <a data-link-type="dfn">reacting</a> to _sourceCancelPromise_ with a fulfillment step that returns *undefined*.
 </emu-alg> 
    <h4 aoid="ReadableStreamClose" class="heading settled" data-level="3.5.4" id="readable-stream-close" nothrow><span class="secno">3.5.4. </span><span class="content">ReadableStreamClose ( <var>stream</var> )</span><a class="self-link" href="#readable-stream-close"></a></h4>
     <emu-alg>
@@ -1494,10 +1498,10 @@ controller into developer-facing results visible through the <code class="idl"><
   1. If _reader_ is *undefined*, return.
   1. If ! IsReadableStreamDefaultReader(_reader_) is *true*,
     1. Repeat for each _readRequest_ that is an element of _reader_.[[readRequests]],
-      1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise③">Resolve</a> _readRequest_.[[promise]] with ! ReadableStreamCreateReadResult(*undefined*, *true*,
+      1. <a data-link-type="dfn">Resolve</a> _readRequest_.[[promise]] with ! ReadableStreamCreateReadResult(*undefined*, *true*,
          _reader_.[[forAuthorCode]]).
     1. Set _reader_.[[readRequests]] to an empty List.
-  1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise④">Resolve</a> _reader_.[[closedPromise]] with *undefined*.
+  1. <a data-link-type="dfn">Resolve</a> _reader_.[[closedPromise]] with *undefined*.
 </emu-alg> 
    <div class="note" role="note"> The case where <var>stream</var>.[[state]] is <code>"closed"</code>, but <var>stream</var>.[[closeRequested]] is <emu-val>false</emu-val>, will happen if the stream was closed without its controller’s close method ever being
   called: i.e., if the stream was closed by a call to <code class="idl"><a data-link-type="idl" href="#rs-cancel" id="ref-for-rs-cancel②">cancel(reason)</a></code>. In this case we allow the
@@ -1552,7 +1556,7 @@ controller into developer-facing results visible through the <code class="idl"><
   1. Let _readIntoRequest_ be the first element of _reader_.[[readIntoRequests]].
   1. Remove _readIntoRequest_ from _reader_.[[readIntoRequests]], shifting all other elements downward (so that the
      second becomes the first, and so on).
-  1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise⑤">Resolve</a> _readIntoRequest_.[[promise]] with ! ReadableStreamCreateReadResult(_chunk_, _done_,
+  1. <a data-link-type="dfn">Resolve</a> _readIntoRequest_.[[promise]] with ! ReadableStreamCreateReadResult(_chunk_, _done_,
      _reader_.[[forAuthorCode]]).
 </emu-alg> 
    <h4 aoid="ReadableStreamFulfillReadRequest" class="heading settled" data-level="3.5.8" id="readable-stream-fulfill-read-request" nothrow><span class="secno">3.5.8. </span><span class="content">ReadableStreamFulfillReadRequest ( <var>stream</var>, <var>chunk</var>, <var>done</var> )</span><a class="self-link" href="#readable-stream-fulfill-read-request"></a></h4>
@@ -1561,7 +1565,7 @@ controller into developer-facing results visible through the <code class="idl"><
   1. Let _readRequest_ be the first element of _reader_.[[readRequests]].
   1. Remove _readRequest_ from _reader_.[[readRequests]], shifting all other elements downward (so that the second
      becomes the first, and so on).
-  1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise⑥">Resolve</a> _readRequest_.[[promise]] with ! ReadableStreamCreateReadResult(_chunk_, _done_,
+  1. <a data-link-type="dfn">Resolve</a> _readRequest_.[[promise]] with ! ReadableStreamCreateReadResult(_chunk_, _done_,
      _reader_.[[forAuthorCode]]).
 </emu-alg> 
    <h4 aoid="ReadableStreamGetNumReadIntoRequests" class="heading settled" data-level="3.5.9" id="readable-stream-get-num-read-into-requests" nothrow><span class="secno">3.5.9. </span><span class="content">ReadableStreamGetNumReadIntoRequests ( <var>stream</var> )</span><a class="self-link" href="#readable-stream-get-num-read-into-requests"></a></h4>
@@ -2861,6 +2865,7 @@ like</p>
   get <a href="#ws-locked" id="ref-for-ws-locked①">locked</a><c- p>()</c->
 
   <a href="#ws-abort" id="ref-for-ws-abort②">abort</a><c- p>(</c->reason<c- p>)</c->
+  <a href="#ws-close" id="ref-for-ws-close">close</a><c- p>()</c->
   <a href="#ws-get-writer" id="ref-for-ws-get-writer">getWriter</a><c- p>()</c->
 <c- p>}</c->
 </code></pre>
@@ -2999,7 +3004,22 @@ bridging the gap with non-promise-based APIs, as seen for example in <a href="#e
   1. If ! IsWritableStreamLocked(*this*) is *true*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③④">a promise rejected with</a> a *TypeError* exception.
   1. Return ! WritableStreamAbort(*this*, _reason_).
 </emu-alg> 
-   <h5 class="heading settled dfn-paneled idl-code" data-dfn-for="WritableStream" data-dfn-type="method" data-export data-level="4.2.5.3" data-lt="getWriter()" id="ws-get-writer"><span class="secno">4.2.5.3. </span><span class="content">getWriter()</span></h5>
+   <h5 class="heading settled dfn-paneled idl-code" data-dfn-for="WritableStream" data-dfn-type="method" data-export data-level="4.2.5.3" data-lt="close()" id="ws-close"><span class="secno">4.2.5.3. </span><span class="content">close()</span></h5>
+   <div class="note" role="note">
+     The <code>close</code> method closes the stream. The <a data-link-type="dfn" href="#underlying-sink" id="ref-for-underlying-sink①⑦">underlying sink</a> will finish processing any
+  previously-written <a data-link-type="dfn" href="#chunk" id="ref-for-chunk④⑦">chunks</a>, before invoking its close behavior. During this time any further attempts to write
+  will fail (without erroring the stream). 
+    <p>The method returns a promise that is fulfilled with <emu-val>undefined</emu-val> if all remaining <a data-link-type="dfn" href="#chunk" id="ref-for-chunk④⑧">chunks</a> are
+  successfully written and the stream successfully closes, or rejects if an error is encountered during this process.</p>
+   </div>
+    <emu-alg>
+  1. If ! IsWritableStream(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③⑤">a promise rejected with</a> a *TypeError* exception.
+  1. If ! IsWritableStreamLocked(*this*) is *true*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③⑥">a promise rejected with</a> a *TypeError* exception.
+  1. If ! WritableStreamCloseQueuedOrInFlight(*this*) is *true*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③⑦">a promise rejected with</a> a *TypeError*
+  exception.
+  1. Return ! WritableStreamClose(*this*).
+</emu-alg> 
+   <h5 class="heading settled dfn-paneled idl-code" data-dfn-for="WritableStream" data-dfn-type="method" data-export data-level="4.2.5.4" data-lt="getWriter()" id="ws-get-writer"><span class="secno">4.2.5.4. </span><span class="content">getWriter()</span></h5>
    <div class="note" role="note">
      The <code>getWriter</code> method creates a <a data-link-type="dfn" href="#writer" id="ref-for-writer③">writer</a> (an instance of <code class="idl"><a data-link-type="idl" href="#default-writer-class" id="ref-for-default-writer-class③">WritableStreamDefaultWriter</a></code>) and <a data-link-type="dfn" href="#lock" id="ref-for-lock①①">locks</a> the stream to the new writer. While the stream is locked, no other writer can be
   acquired until this one is <a data-link-type="dfn" href="#release-a-lock" id="ref-for-release-a-lock⑤">released</a>. 
@@ -3020,7 +3040,7 @@ specifications, instead of just being part of the implementation of this spec’
 </emu-alg> 
    <h4 aoid="CreateWritableStream" class="heading settled" data-level="4.3.2" id="create-writable-stream" throws><span class="secno">4.3.2. </span><span class="content">CreateWritableStream ( <var>startAlgorithm</var>, <var>writeAlgorithm</var>, <var>closeAlgorithm</var>, <var>abortAlgorithm</var> [, <var>highWaterMark</var> [, <var>sizeAlgorithm</var> ] ] )</span><a class="self-link" href="#create-writable-stream"></a></h4>
    <p>This abstract operation is meant to be called from other specifications that wish to create <code class="idl"><a data-link-type="idl" href="#ws-class" id="ref-for-ws-class⑤">WritableStream</a></code> instances. The <var>writeAlgorithm</var>, <var>closeAlgorithm</var> and <var>abortAlgorithm</var> algorithms must return
-promises; if supplied, <var>sizeAlgorithm</var> must be an algorithm accepting <a data-link-type="dfn" href="#chunk" id="ref-for-chunk④⑦">chunk</a> objects and returning a
+promises; if supplied, <var>sizeAlgorithm</var> must be an algorithm accepting <a data-link-type="dfn" href="#chunk" id="ref-for-chunk④⑨">chunk</a> objects and returning a
 number; and if supplied, <var>highWaterMark</var> must be a non-negative, non-NaN number.</p>
    <p class="note" role="note">CreateWritableStream throws an exception if and only if the supplied <var>startAlgorithm</var> throws.</p>
     <emu-alg>
@@ -3074,6 +3094,20 @@ writable stream is <a data-link-type="dfn" href="#lock" id="ref-for-lock①②">
   1. If _wasAlreadyErroring_ is *false*, perform ! WritableStreamStartErroring(_stream_, _reason_).
   1. Return _promise_.
 </emu-alg> 
+   <h4 aoid="WritableStreamClose" class="heading settled" data-level="4.3.7" id="writable-stream-close" nothrow><span class="secno">4.3.7. </span><span class="content">WritableStreamClose ( <var>stream</var> )</span><a class="self-link" href="#writable-stream-close"></a></h4>
+    <emu-alg>
+  1. Let _state_ be _stream_.[[state]].
+  1. If _state_ is `"closed"` or `"errored"`, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③⑧">a promise rejected with</a> a *TypeError* exception.
+  1. Assert: _state_ is `"writable"` or `"erroring"`.
+  1. Assert: ! WritableStreamCloseQueuedOrInFlight(_stream_) is *false*.
+  1. Let _promise_ be <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise⑥">a new promise</a>.
+  1. Set _stream_.[[closeRequest]] to _promise_.
+  1. Let _writer_ be _stream_.[[writer]].
+  1. If _writer_ is not *undefined*, and _stream_.[[backpressure]] is *true*, and _state_ is `"writable"`,
+     <a data-link-type="dfn">resolve</a> _writer_.[[readyPromise]] with *undefined*.
+  1. Perform ! WritableStreamDefaultControllerClose(_stream_.[[writableStreamController]]).
+  1. Return _promise_.
+</emu-alg> 
    <h3 class="heading settled" data-level="4.4" id="ws-abstract-ops-used-by-controllers"><span class="secno">4.4. </span><span class="content">Writable stream abstract operations used by controllers</span><a class="self-link" href="#ws-abstract-ops-used-by-controllers"></a></h3>
    <p>To allow future flexibility to add different writable stream behaviors (similar to the distinction between default
 readable streams and <a data-link-type="dfn" href="#readable-byte-stream" id="ref-for-readable-byte-stream⑥">readable byte streams</a>), much of the internal state of a <a data-link-type="dfn" href="#writable-stream" id="ref-for-writable-stream①①">writable stream</a> is
@@ -3085,7 +3119,7 @@ visible through the <code class="idl"><a data-link-type="idl" href="#ws-class" i
     <emu-alg>
   1. Assert: ! IsWritableStreamLocked(_stream_) is *true*.
   1. Assert: _stream_.[[state]] is `"writable"`.
-  1. Let _promise_ be <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise⑥">a new promise</a>.
+  1. Let _promise_ be <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise⑦">a new promise</a>.
   1. Append _promise_ as the last element of _stream_.[[writeRequests]].
   1. Return _promise_.
 </emu-alg> 
@@ -3134,7 +3168,7 @@ visible through the <code class="idl"><a data-link-type="idl" href="#ws-class" i
     1. Return.
   1. Let _promise_ be ! stream.[[writableStreamController]].[[AbortSteps]](_abortRequest_.[[reason]]).
   1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#upon-fulfillment" id="ref-for-upon-fulfillment⑤">Upon fulfillment</a> of _promise_,
-    1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise⑦">Resolve</a> _abortRequest_.[[promise]] with *undefined*.
+    1. <a data-link-type="dfn">Resolve</a> _abortRequest_.[[promise]] with *undefined*.
     1. Perform ! WritableStreamRejectCloseAndClosedPromiseIfNeeded(_stream_).
   1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#upon-rejection" id="ref-for-upon-rejection⑥">Upon rejection</a> of _promise_ with reason _reason_,
     1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#reject-promise" id="ref-for-reject-promise⑦">Reject</a> _abortRequest_.[[promise]] with _reason_.
@@ -3143,7 +3177,7 @@ visible through the <code class="idl"><a data-link-type="idl" href="#ws-class" i
    <h4 aoid="WritableStreamFinishInFlightWrite" class="heading settled" data-level="4.4.5" id="writable-stream-finish-in-flight-write" nothrow><span class="secno">4.4.5. </span><span class="content">WritableStreamFinishInFlightWrite ( <var>stream</var> )</span><a class="self-link" href="#writable-stream-finish-in-flight-write"></a></h4>
     <emu-alg>
   1. Assert: _stream_.[[inFlightWriteRequest]] is not *undefined*.
-  1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise⑧">Resolve</a> _stream_.[[inFlightWriteRequest]] with *undefined*.
+  1. <a data-link-type="dfn">Resolve</a> _stream_.[[inFlightWriteRequest]] with *undefined*.
   1. Set _stream_.[[inFlightWriteRequest]] to *undefined*.
 </emu-alg> 
    <h4 aoid="WritableStreamFinishInFlightWriteWithError" class="heading settled" data-level="4.4.6" id="writable-stream-finish-in-flight-write-with-error" nothrow><span class="secno">4.4.6. </span><span class="content">WritableStreamFinishInFlightWriteWithError ( <var>stream</var>, <var>error</var> )</span><a class="self-link" href="#writable-stream-finish-in-flight-write-with-error"></a></h4>
@@ -3157,18 +3191,18 @@ visible through the <code class="idl"><a data-link-type="idl" href="#ws-class" i
    <h4 aoid="WritableStreamFinishInFlightClose" class="heading settled" data-level="4.4.7" id="writable-stream-finish-in-flight-close" nothrow><span class="secno">4.4.7. </span><span class="content">WritableStreamFinishInFlightClose ( <var>stream</var> )</span><a class="self-link" href="#writable-stream-finish-in-flight-close"></a></h4>
     <emu-alg>
   1. Assert: _stream_.[[inFlightCloseRequest]] is not *undefined*.
-  1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise⑨">Resolve</a> _stream_.[[inFlightCloseRequest]] with *undefined*.
+  1. <a data-link-type="dfn">Resolve</a> _stream_.[[inFlightCloseRequest]] with *undefined*.
   1. Set _stream_.[[inFlightCloseRequest]] to *undefined*.
   1. Let _state_ be _stream_.[[state]].
   1. Assert: _stream_.[[state]] is `"writable"` or `"erroring"`.
   1. If _state_ is `"erroring"`,
     1. Set _stream_.[[storedError]] to *undefined*.
     1. If _stream_.[[pendingAbortRequest]] is not *undefined*,
-      1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise①⓪">Resolve</a> _stream_.[[pendingAbortRequest]].[[promise]] with *undefined*.
+      1. <a data-link-type="dfn">Resolve</a> _stream_.[[pendingAbortRequest]].[[promise]] with *undefined*.
       1. Set _stream_.[[pendingAbortRequest]] to *undefined*.
   1. Set _stream_.[[state]] to `"closed"`.
   1. Let _writer_ be _stream_.[[writer]].
-  1. If _writer_ is not *undefined*, <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise①①">resolve</a> _writer_.[[closedPromise]] with *undefined*.
+  1. If _writer_ is not *undefined*, <a data-link-type="dfn">resolve</a> _writer_.[[closedPromise]] with *undefined*.
   1. Assert: _stream_.[[pendingAbortRequest]] is *undefined*.
   1. Assert: _stream_.[[storedError]] is *undefined*.
 </emu-alg> 
@@ -3227,10 +3261,10 @@ visible through the <code class="idl"><a data-link-type="idl" href="#ws-class" i
   1. Assert: ! WritableStreamCloseQueuedOrInFlight(_stream_) is *false*.
   1. Let _writer_ be _stream_.[[writer]].
   1. If _writer_ is not *undefined* and _backpressure_ is not _stream_.[[backpressure]],
-    1. If _backpressure_ is *true*, set _writer_.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise⑦">a new promise</a>.
+    1. If _backpressure_ is *true*, set _writer_.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise⑧">a new promise</a>.
     1. Otherwise,
       1. Assert: _backpressure_ is *false*.
-      1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise①②">Resolve</a> _writer_.[[readyPromise]] with *undefined*.
+      1. <a data-link-type="dfn">Resolve</a> _writer_.[[readyPromise]] with *undefined*.
   1. Set _stream_.[[backpressure]] to _backpressure_.
 </emu-alg> 
    <h3 class="heading settled dfn-paneled idl-code" data-dfn-type="interface" data-export data-level="4.5" data-lt="WritableStreamDefaultWriter" id="default-writer-class"><span class="secno">4.5. </span><span class="content">Class <code>WritableStreamDefaultWriter</code></span></h3>
@@ -3283,22 +3317,22 @@ would look like</p>
   1. Let _state_ be _stream_.[[state]].
   1. If _state_ is `"writable"`,
     1. If ! WritableStreamCloseQueuedOrInFlight(_stream_) is *false* and _stream_.[[backpressure]] is *true*,
-       set *this*.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise⑧">a new promise</a>.
+       set *this*.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise⑨">a new promise</a>.
     1. Otherwise, set *this*.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-resolved-with" id="ref-for-a-promise-resolved-with①⑥">a promise resolved with</a> *undefined*.
-    1. Set *this*.[[closedPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise⑨">a new promise</a>.
+    1. Set *this*.[[closedPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise①⓪">a new promise</a>.
   1. Otherwise, if _state_ is `"erroring"`,
-      1. Set *this*.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③⑤">a promise rejected with</a> _stream_.[[storedError]].
+      1. Set *this*.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③⑨">a promise rejected with</a> _stream_.[[storedError]].
       1. Set *this*.[[readyPromise]].[[PromiseIsHandled]] to *true*.
-      1. Set *this*.[[closedPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise①⓪">a new promise</a>.
+      1. Set *this*.[[closedPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise①①">a new promise</a>.
   1. Otherwise, if _state_ is `"closed"`,
     1. Set *this*.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-resolved-with" id="ref-for-a-promise-resolved-with①⑦">a promise resolved with</a> *undefined*.
     1. Set *this*.[[closedPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-resolved-with" id="ref-for-a-promise-resolved-with①⑧">a promise resolved with</a> *undefined*.
   1. Otherwise,
     1. Assert: _state_ is `"errored"`.
     1. Let _storedError_ be _stream_.[[storedError]].
-    1. Set *this*.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③⑥">a promise rejected with</a> _storedError_.
+    1. Set *this*.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⓪">a promise rejected with</a> _storedError_.
     1. Set *this*.[[readyPromise]].[[PromiseIsHandled]] to *true*.
-    1. Set *this*.[[closedPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③⑦">a promise rejected with</a> _storedError_.
+    1. Set *this*.[[closedPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④①">a promise rejected with</a> _storedError_.
     1. Set *this*.[[closedPromise]].[[PromiseIsHandled]] to *true*.
 </emu-alg> 
    <h4 class="heading settled" data-level="4.5.4" id="default-writer-prototype"><span class="secno">4.5.4. </span><span class="content">Properties of the <code class="idl"><a data-link-type="idl" href="#default-writer-class" id="ref-for-default-writer-class⑧">WritableStreamDefaultWriter</a></code> prototype</span><a class="self-link" href="#default-writer-prototype"></a></h4>
@@ -3307,7 +3341,7 @@ would look like</p>
   the stream ever errors or the writer’s lock is <a data-link-type="dfn" href="#release-a-lock" id="ref-for-release-a-lock⑥">released</a> before the stream finishes
   closing. </div>
     <emu-alg>
-  1. If ! IsWritableStreamDefaultWriter(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③⑧">a promise rejected with</a> a *TypeError* exception.
+  1. If ! IsWritableStreamDefaultWriter(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④②">a promise rejected with</a> a *TypeError* exception.
   1. Return *this*.[[closedPromise]].
 </emu-alg> 
    <h5 class="heading settled dfn-paneled idl-code" data-dfn-for="WritableStreamDefaultWriter" data-dfn-type="attribute" data-export data-level="4.5.4.2" data-lt="desiredSize" id="default-writer-desired-size"><span class="secno">4.5.4.2. </span><span class="content">get desiredSize</span></h5>
@@ -3333,37 +3367,32 @@ would look like</p>
   returned promise will become rejected.</p>
    </div>
     <emu-alg>
-  1. If ! IsWritableStreamDefaultWriter(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with③⑨">a promise rejected with</a> a *TypeError* exception.
+  1. If ! IsWritableStreamDefaultWriter(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④③">a promise rejected with</a> a *TypeError* exception.
   1. Return *this*.[[readyPromise]].
 </emu-alg> 
    <h5 class="heading settled dfn-paneled idl-code" data-dfn-for="WritableStreamDefaultWriter" data-dfn-type="method" data-export data-level="4.5.4.4" data-lt="abort(reason)" id="default-writer-abort"><span class="secno">4.5.4.4. </span><span class="content">abort(<var>reason</var>)</span></h5>
    <div class="note" role="note"> If the writer is <a data-link-type="dfn" href="#active" id="ref-for-active④">active</a>, the <code>abort</code> method behaves the same as that for the
   associated stream. (Otherwise, it returns a rejected promise.) </div>
     <emu-alg>
-  1. If ! IsWritableStreamDefaultWriter(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⓪">a promise rejected with</a> a *TypeError* exception.
-  1. If *this*.[[ownerWritableStream]] is *undefined*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④①">a promise rejected with</a> a *TypeError* exception.
+  1. If ! IsWritableStreamDefaultWriter(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④④">a promise rejected with</a> a *TypeError* exception.
+  1. If *this*.[[ownerWritableStream]] is *undefined*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⑤">a promise rejected with</a> a *TypeError* exception.
   1. Return ! WritableStreamDefaultWriterAbort(*this*, _reason_).
 </emu-alg> 
    <h5 class="heading settled dfn-paneled idl-code" data-dfn-for="WritableStreamDefaultWriter" data-dfn-type="method" data-export data-level="4.5.4.5" data-lt="close()" id="default-writer-close"><span class="secno">4.5.4.5. </span><span class="content">close()</span></h5>
-   <div class="note" role="note">
-     The <code>close</code> method will close the associated writable stream. The <a data-link-type="dfn" href="#underlying-sink" id="ref-for-underlying-sink①⑦">underlying sink</a> will finish
-  processing any previously-written <a data-link-type="dfn" href="#chunk" id="ref-for-chunk④⑧">chunks</a>, before invoking its close behavior. During this time any further
-  attempts to write will fail (without erroring the stream). 
-    <p>The method returns a promise that is fulfilled with <emu-val>undefined</emu-val> if all remaining <a data-link-type="dfn" href="#chunk" id="ref-for-chunk④⑨">chunks</a> are
-  successfully written and the stream successfully closes, or rejects if an error is encountered during this process.</p>
-   </div>
+   <div class="note" role="note"> If the writer is <a data-link-type="dfn" href="#active" id="ref-for-active⑤">active</a>, the <code>close</code> method behaves the same as that for the
+  associated stream. (Otherwise, it returns a rejected promise.) </div>
     <emu-alg>
-  1. If ! IsWritableStreamDefaultWriter(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④②">a promise rejected with</a> a *TypeError* exception.
+  1. If ! IsWritableStreamDefaultWriter(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⑥">a promise rejected with</a> a *TypeError* exception.
   1. Let _stream_ be *this*.[[ownerWritableStream]].
-  1. If _stream_ is *undefined*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④③">a promise rejected with</a> a *TypeError* exception.
-  1. If ! WritableStreamCloseQueuedOrInFlight(_stream_) is *true*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④④">a promise rejected with</a> a *TypeError*
+  1. If _stream_ is *undefined*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⑦">a promise rejected with</a> a *TypeError* exception.
+  1. If ! WritableStreamCloseQueuedOrInFlight(_stream_) is *true*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⑧">a promise rejected with</a> a *TypeError*
      exception.
   1. Return ! WritableStreamDefaultWriterClose(*this*).
 </emu-alg> 
    <h5 class="heading settled dfn-paneled idl-code" data-dfn-for="WritableStreamDefaultWriter" data-dfn-type="method" data-export data-level="4.5.4.6" data-lt="releaseLock()" id="default-writer-release-lock"><span class="secno">4.5.4.6. </span><span class="content">releaseLock()</span></h5>
    <div class="note" role="note">
      The <code>releaseLock</code> method <a data-link-type="dfn" href="#release-a-lock" id="ref-for-release-a-lock⑨">releases the writer’s lock</a> on the corresponding
-  stream. After the lock is released, the writer is no longer <a data-link-type="dfn" href="#active" id="ref-for-active⑤">active</a>. If the associated
+  stream. After the lock is released, the writer is no longer <a data-link-type="dfn" href="#active" id="ref-for-active⑥">active</a>. If the associated
   stream is errored when the lock is released, the writer will appear errored in the same way from now on; otherwise,
   the writer will appear closed. 
     <p>Note that the lock can still be released even if some ongoing writes have not yet finished (i.e. even if the promises
@@ -3386,8 +3415,8 @@ would look like</p>
   been accepted, and not necessarily that it is safely saved to its ultimate destination.</p>
    </div>
     <emu-alg>
-  1. If ! IsWritableStreamDefaultWriter(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⑤">a promise rejected with</a> a *TypeError* exception.
-  1. If *this*.[[ownerWritableStream]] is *undefined*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⑥">a promise rejected with</a> a *TypeError* exception.
+  1. If ! IsWritableStreamDefaultWriter(*this*) is *false*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⑨">a promise rejected with</a> a *TypeError* exception.
+  1. If *this*.[[ownerWritableStream]] is *undefined*, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤⓪">a promise rejected with</a> a *TypeError* exception.
   1. Return ! WritableStreamDefaultWriterWrite(*this*, _chunk_).
 </emu-alg> 
    <h3 class="heading settled" data-level="4.6" id="rs-writer-abstract-ops"><span class="secno">4.6. </span><span class="content">Writable stream writer abstract operations</span><a class="self-link" href="#rs-writer-abstract-ops"></a></h3>
@@ -3407,16 +3436,7 @@ would look like</p>
     <emu-alg>
   1. Let _stream_ be _writer_.[[ownerWritableStream]].
   1. Assert: _stream_ is not *undefined*.
-  1. Let _state_ be _stream_.[[state]].
-  1. If _state_ is `"closed"` or `"errored"`, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⑦">a promise rejected with</a> a *TypeError* exception.
-  1. Assert: _state_ is `"writable"` or `"erroring"`.
-  1. Assert: ! WritableStreamCloseQueuedOrInFlight(_stream_) is *false*.
-  1. Let _promise_ be <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise①①">a new promise</a>.
-  1. Set _stream_.[[closeRequest]] to _promise_.
-  1. If _stream_.[[backpressure]] is *true* and _state_ is `"writable"`, <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise①③">resolve</a> _writer_.[[readyPromise]] with
-     *undefined*.
-  1. Perform ! WritableStreamDefaultControllerClose(_stream_.[[writableStreamController]]).
-  1. Return _promise_.
+  1. Return ! WritableStreamClose(_stream_).
 </emu-alg> 
    <h4 aoid="WritableStreamDefaultWriterCloseWithErrorPropagation" class="heading settled" data-level="4.6.4" id="writable-stream-default-writer-close-with-error-propagation" nothrow><span class="secno">4.6.4. </span><span class="content">WritableStreamDefaultWriterCloseWithErrorPropagation ( <var>writer</var> )</span><a class="self-link" href="#writable-stream-default-writer-close-with-error-propagation"></a></h4>
    <p class="note" role="note">This abstract operation helps implement the error propagation semantics of <code class="idl"><a data-link-type="idl" href="#rs-pipe-to" id="ref-for-rs-pipe-to⑤">pipeTo()</a></code>.</p>
@@ -3426,7 +3446,7 @@ would look like</p>
   1. Let _state_ be _stream_.[[state]].
   1. If ! WritableStreamCloseQueuedOrInFlight(_stream_) is *true* or _state_ is `"closed"`, return
      <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-resolved-with" id="ref-for-a-promise-resolved-with①⑨">a promise resolved with</a> *undefined*.
-  1. If _state_ is `"errored"`, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⑧">a promise rejected with</a> _stream_.[[storedError]].
+  1. If _state_ is `"errored"`, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤①">a promise rejected with</a> _stream_.[[storedError]].
   1. Assert: _state_ is `"writable"` or `"erroring"`.
   1. Return ! WritableStreamDefaultWriterClose(_writer_).
 </emu-alg> 
@@ -3434,13 +3454,13 @@ would look like</p>
     <emu-alg>
   1. If _writer_.[[closedPromise]].[[PromiseState]] is `"pending"`, <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#reject-promise" id="ref-for-reject-promise①③">reject</a> _writer_.[[closedPromise]] with
      _error_.
-  1. Otherwise, set _writer_.[[closedPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with④⑨">a promise rejected with</a> _error_.
+  1. Otherwise, set _writer_.[[closedPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤②">a promise rejected with</a> _error_.
   1. Set _writer_.[[closedPromise]].[[PromiseIsHandled]] to *true*.
 </emu-alg> 
    <h4 aoid="WritableStreamDefaultWriterEnsureReadyPromiseRejected" class="heading settled" data-level="4.6.6" id="writable-stream-default-writer-ensure-ready-promise-rejected" nothrow><span class="secno">4.6.6. </span><span class="content">WritableStreamDefaultWriterEnsureReadyPromiseRejected( <var>writer</var>, <var>error</var> )</span><a class="self-link" href="#writable-stream-default-writer-ensure-ready-promise-rejected"></a></h4>
     <emu-alg>
   1. If _writer_.[[readyPromise]].[[PromiseState]] is `"pending"`, <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#reject-promise" id="ref-for-reject-promise①④">reject</a> _writer_.[[readyPromise]] with _error_.
-  1. Otherwise, set _writer_.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤⓪">a promise rejected with</a> _error_.
+  1. Otherwise, set _writer_.[[readyPromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤③">a promise rejected with</a> _error_.
   1. Set _writer_.[[readyPromise]].[[PromiseIsHandled]] to *true*.
 </emu-alg> 
    <h4 aoid="WritableStreamDefaultWriterGetDesiredSize" class="heading settled" data-level="4.6.7" id="writable-stream-default-writer-get-desired-size" nothrow><span class="secno">4.6.7. </span><span class="content">WritableStreamDefaultWriterGetDesiredSize ( <var>writer</var> )</span><a class="self-link" href="#writable-stream-default-writer-get-desired-size"></a></h4>
@@ -3468,13 +3488,13 @@ would look like</p>
   1. Assert: _stream_ is not *undefined*.
   1. Let _controller_ be _stream_.[[writableStreamController]].
   1. Let _chunkSize_ be ! WritableStreamDefaultControllerGetChunkSize(_controller_, _chunk_).
-  1. If _stream_ is not equal to _writer_.[[ownerWritableStream]], return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤①">a promise rejected with</a> a *TypeError*
+  1. If _stream_ is not equal to _writer_.[[ownerWritableStream]], return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤④">a promise rejected with</a> a *TypeError*
      exception.
   1. Let _state_ be _stream_.[[state]].
-  1. If _state_ is `"errored"`, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤②">a promise rejected with</a> _stream_.[[storedError]].
+  1. If _state_ is `"errored"`, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤⑤">a promise rejected with</a> _stream_.[[storedError]].
   1. If ! WritableStreamCloseQueuedOrInFlight(_stream_) is *true* or _state_ is `"closed"`, return
-     <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤③">a promise rejected with</a> a *TypeError* exception indicating that the stream is closing or closed.
-  1. If _state_ is `"erroring"`, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤④">a promise rejected with</a> _stream_.[[storedError]].
+     <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤⑥">a promise rejected with</a> a *TypeError* exception indicating that the stream is closing or closed.
+  1. If _state_ is `"erroring"`, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤⑦">a promise rejected with</a> _stream_.[[storedError]].
   1. Assert: _state_ is `"writable"`.
   1. Let _promise_ be ! WritableStreamAddWriteRequest(_stream_).
   1. Perform ! WritableStreamDefaultControllerWrite(_controller_, _chunk_, _chunkSize_).
@@ -3841,7 +3861,7 @@ readableStrategy)" id="ts-constructor"><span class="secno">5.2.3. </span><span c
      _readableHighWaterMark_, _readableSizeAlgorithm_).
   1. Perform ? SetUpTransformStreamDefaultControllerFromTransformer(*this*, _transformer_).
   1. Let _startResult_ be ? InvokeOrNoop(_transformer_, `"start"`, « *this*.[[transformStreamController]] »).
-  1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise①④">Resolve</a> _startPromise_ with _startResult_.
+  1. <a data-link-type="dfn">Resolve</a> _startPromise_ with _startResult_.
 </emu-alg> 
    <h4 class="heading settled" data-level="5.2.4" id="transformer-api"><span class="secno">5.2.4. </span><span class="content">Transformer API</span><a class="self-link" href="#transformer-api"></a></h4>
    <div class="non-normative">
@@ -3918,7 +3938,7 @@ supplied, <var>writableSizeAlgorithm</var> and <var>readableSizeAlgorithm</var> 
      property).
   1. Perform ! SetUpTransformStreamDefaultController(_stream_, _controller_, _transformAlgorithm_, _flushAlgorithm_).
   1. Let _startResult_ be the result of performing _startAlgorithm_. (This may throw an exception.)
-  1. <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise①⑤">Resolve</a> _startPromise_ with _startResult_.
+  1. <a data-link-type="dfn">Resolve</a> _startPromise_ with _startResult_.
   1. Return _stream_.
 </emu-alg> 
    <h4 aoid="InitializeTransformStream" class="heading settled" data-level="5.3.2" id="initialize-transform-stream" nothrow><span class="secno">5.3.2. </span><span class="content">InitializeTransformStream ( <var>stream</var>, <var>startPromise</var>, <var>writableHighWaterMark</var>, <var>writableSizeAlgorithm</var>, <var>readableHighWaterMark</var>, <var>readableSizeAlgorithm</var> )</span><a class="self-link" href="#initialize-transform-stream"></a></h4>
@@ -3973,7 +3993,7 @@ the promise always resolves.</p>
 ( <var>stream</var>, <var>backpressure</var> )</span><a class="self-link" href="#transform-stream-set-backpressure"></a></h4>
     <emu-alg>
   1. Assert: _stream_.[[backpressure]] is not _backpressure_.
-  1. If _stream_.[[backpressureChangePromise]] is not *undefined*, <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise" id="ref-for-resolve-promise①⑥">resolve</a>
+  1. If _stream_.[[backpressureChangePromise]] is not *undefined*, <a data-link-type="dfn">resolve</a>
      stream.[[backpressureChangePromise]] with *undefined*.
   1. Set _stream_.[[backpressureChangePromise]] to <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-new-promise" id="ref-for-a-new-promise①④">a new promise</a>.
   1. Set _stream_.[[backpressure]] to _backpressure_.
@@ -4073,7 +4093,7 @@ desiredSize</span></h5>
      property).
   1. Let _transformAlgorithm_ be the following steps, taking a _chunk_ argument:
     1. Let _result_ be TransformStreamDefaultControllerEnqueue(_controller_, _chunk_).
-    1. If _result_ is an abrupt completion, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤⑤">a promise rejected with</a> _result_.[[Value]].
+    1. If _result_ is an abrupt completion, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤⑧">a promise rejected with</a> _result_.[[Value]].
     1. Otherwise, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-resolved-with" id="ref-for-a-promise-resolved-with②②">a promise resolved with</a> *undefined*.
   1. Let _transformMethod_ be ? GetV(_transformer_, `"transform"`).
   1. If _transformMethod_ is not *undefined*,
@@ -4120,8 +4140,8 @@ in the same way a developer would error a stream using its associated controller
    <h4 aoid="TransformStreamDefaultControllerPerformTransform" class="heading settled" data-level="5.5.7" id="transform-stream-default-controller-perform-transform" nothrow><span class="secno">5.5.7. </span><span class="content">TransformStreamDefaultControllerPerformTransform ( <var>controller</var>, <var>chunk</var> )</span><a class="self-link" href="#transform-stream-default-controller-perform-transform"></a></h4>
     <emu-alg>
   1. Let _transformPromise_ be the result of performing _controller_.[[transformAlgorithm]], passing _chunk_.
-  1. Return the result of <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#transforming-by" id="ref-for-transforming-by④">transforming</a> _transformPromise_ with a rejection handler that, when called with
-     argument _r_, performs the following steps:
+  1. Return the result of <a data-link-type="dfn">reacting</a> to _transformPromise_ with the following rejection steps given the
+     argument _r_:
     1. Perform ! TransformStreamError(_controller_.[[controlledTransformStream]], _r_).
     1. Throw _r_.
 </emu-alg> 
@@ -4145,8 +4165,7 @@ this to streams they did not create.</p>
   1. If _stream_.[[backpressure]] is *true*,
     1. Let _backpressureChangePromise_ be _stream_.[[backpressureChangePromise]].
     1. Assert: _backpressureChangePromise_ is not *undefined*.
-    1. Return the result of <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#transforming-by" id="ref-for-transforming-by⑤">transforming</a> _backpressureChangePromise_ with a fulfillment handler which performs
-       the following steps:
+    1. Return the result of <a data-link-type="dfn">reacting</a> to _backpressureChangePromise_ with the following fulfillment steps:
       1. Let _writable_ be _stream_.[[writable]].
       1. Let _state_ be _writable_.[[state]].
       1. If _state_ is `"erroring"`, throw _writable_.[[storedError]].
@@ -4165,13 +4184,13 @@ this to streams they did not create.</p>
   1. Let _controller_ be _stream_.[[transformStreamController]].
   1. Let _flushPromise_ be the result of performing _controller_.[[flushAlgorithm]].
   1. Perform ! TransformStreamDefaultControllerClearAlgorithms(_controller_).
-  1. Return the result of <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#transforming-by" id="ref-for-transforming-by⑥">transforming</a> _flushPromise_ with:
-    1. A fulfillment handler that performs the following steps:
+  1. Return the result of <a data-link-type="dfn">reacting</a> to _flushPromise_:
+    1. If _flushPromise_ was fulfilled, then:
       1. If _readable_.[[state]] is `"errored"`, throw _readable_.[[storedError]].
       1. Let _readableController_ be _readable_.[[readableStreamController]].
       1. If ! ReadableStreamDefaultControllerCanCloseOrEnqueue(_readableController_) is *true*, perform !
          ReadableStreamDefaultControllerClose(_readableController_).
-    1. A rejection handler that, when called with argument _r_, performs the following steps:
+    1. If _flushPromise_ was rejected with reason _r_, then:
       1. Perform ! TransformStreamError(_stream_, _r_).
       1. Throw _readable_.[[storedError]].
 </emu-alg> 
@@ -4392,13 +4411,14 @@ chunks, or when trillions of chunks are enqueued.)</p>
   1. Return *true*.
 </emu-alg> 
    <h4 aoid="PromiseCall" class="heading settled" data-level="6.3.5" id="promise-call" nothrow><span class="secno">6.3.5. </span><span class="content">PromiseCall ( <var>F</var>, <var>V</var>, <var>args</var> )</span><a class="self-link" href="#promise-call"></a></h4>
-   <div class="note" role="note"> PromiseCall is a variant of <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#promise-calling" id="ref-for-promise-calling">promise-calling</a> that works on methods. </div>
+   <div class="note" role="note"> This encapsulates the relevant promise-related parts of the Web IDL <a data-link-type="dfn" href="https://heycam.github.io/webidl/#call-a-user-objects-operation" id="ref-for-call-a-user-objects-operation">call a user object’s operation</a> algorithm
+  for use while we work on <a href="https://github.com/whatwg/streams/issues/963">moving to Web IDL</a>. </div>
     <emu-alg>
   1. Assert: ! IsCallable(_F_) is *true*.
   1. Assert: _V_ is not *undefined*.
   1. Assert: _args_ is a List.
   1. Let _returnValue_ be Call(_F_, _V_, _args_).
-  1. If _returnValue_ is an abrupt completion, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤⑥">a promise rejected with</a> _returnValue_.[[Value]].
+  1. If _returnValue_ is an abrupt completion, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-rejected-with" id="ref-for-a-promise-rejected-with⑤⑨">a promise rejected with</a> _returnValue_.[[Value]].
   1. Otherwise, return <a data-link-type="dfn" href="https://www.w3.org/2001/tag/doc/promises-guide/#a-promise-resolved-with" id="ref-for-a-promise-resolved-with②⑤">a promise resolved with</a> _returnValue_.[[Value]].
 </emu-alg> 
    <h4 aoid="TransferArrayBuffer" class="heading settled" data-level="6.3.6" id="transfer-array-buffer" nothrow><span class="secno">6.3.6. </span><span class="content">TransferArrayBuffer ( <var>O</var> )</span><a class="self-link" href="#transfer-array-buffer"></a></h4>
@@ -4986,8 +5006,6 @@ planned) that the conventions of ECMAScript itself will evolve in these ways.</p
     be destructured, if combined with the below destructuring convention.) 
     <li> We use destructuring notation in function and method declarations, and assume that <a data-link-type="abstract-op" href="https://tc39.github.io/ecma262/#sec-runtime-semantics-destructuringassignmentevaluation" id="ref-for-sec-runtime-semantics-destructuringassignmentevaluation">DestructuringAssignmentEvaluation</a> was performed appropriately before the algorithm starts. 
     <li> We use "<emu-val>this</emu-val>" instead of "<emu-val>this</emu-val> value". 
-    <li> We use the shorthand phrases from the <a data-link-type="biblio" href="#biblio-promises-guide">[PROMISES-GUIDE]</a> to operate on promises at a higher level than the
-    ECMAScript spec does. 
    </ul>
    <p>It’s also worth noting that, as in <a data-link-type="biblio" href="#biblio-ecmascript">[ECMASCRIPT]</a>, all numbers are represented as double-precision floating point
 values, and all arithmetic operations performed on them must be done in the standard way for such values.</p>
@@ -5088,6 +5106,7 @@ if ("serviceWorker" in navigator) {
     <ul>
      <li><a href="#rbs-controller-close">method for ReadableByteStreamController</a><span>, in §3.11.4.2</span>
      <li><a href="#rs-default-controller-close">method for ReadableStreamDefaultController</a><span>, in §3.9.4.1</span>
+     <li><a href="#ws-close">method for WritableStream</a><span>, in §4.2.5.2</span>
      <li><a href="#default-writer-close">method for WritableStreamDefaultWriter</a><span>, in §4.5.4.4</span>
      <li><a href="#dom-underlying-sink-close">method for underlying sink</a><span>, in §4.2.4</span>
     </ul>
@@ -5129,7 +5148,7 @@ if ("serviceWorker" in navigator) {
    <li><a href="#dom-transformer-flush">flush(controller)</a><span>, in §5.2.4</span>
    <li><a href="#rs-get-iterator">getIterator({ preventCancel } = {})</a><span>, in §3.2.5.2</span>
    <li><a href="#rs-get-reader">getReader({ mode } = {})</a><span>, in §3.2.5.3</span>
-   <li><a href="#ws-get-writer">getWriter()</a><span>, in §4.2.5.2</span>
+   <li><a href="#ws-get-writer">getWriter()</a><span>, in §4.2.5.3</span>
    <li><a href="#high-water-mark">high water mark</a><span>, in §2.5</span>
    <li><a href="#queuing-strategy-highwatermark">highWaterMark</a><span>, in §6.1.1</span>
    <li><a href="#identity-transform-stream">identity transform stream</a><span>, in §2.3</span>
@@ -5490,11 +5509,11 @@ stream )</a>
     <li><a href="#ref-for-a-new-promise④">3.8.4. ReadableStreamReaderGenericInitialize ( reader, stream )</a>
     <li><a href="#ref-for-a-new-promise⑤">4.3.6. WritableStreamAbort ( stream,
 reason )</a>
-    <li><a href="#ref-for-a-new-promise⑥">4.4.1. WritableStreamAddWriteRequest (
+    <li><a href="#ref-for-a-new-promise⑥">4.3.7. WritableStreamClose ( stream )</a>
+    <li><a href="#ref-for-a-new-promise⑦">4.4.1. WritableStreamAddWriteRequest (
 stream )</a>
-    <li><a href="#ref-for-a-new-promise⑦">4.4.14. WritableStreamUpdateBackpressure ( stream, backpressure )</a>
-    <li><a href="#ref-for-a-new-promise⑧">4.5.3. new WritableStreamDefaultWriter(stream)</a> <a href="#ref-for-a-new-promise⑨">(2)</a> <a href="#ref-for-a-new-promise①⓪">(3)</a>
-    <li><a href="#ref-for-a-new-promise①①">4.6.3. WritableStreamDefaultWriterClose ( writer )</a>
+    <li><a href="#ref-for-a-new-promise⑧">4.4.14. WritableStreamUpdateBackpressure ( stream, backpressure )</a>
+    <li><a href="#ref-for-a-new-promise⑨">4.5.3. new WritableStreamDefaultWriter(stream)</a> <a href="#ref-for-a-new-promise①⓪">(2)</a> <a href="#ref-for-a-new-promise①①">(3)</a>
     <li><a href="#ref-for-a-new-promise①②">5.2.3. new TransformStream(transformer = {}, writableStrategy = {},
 readableStrategy = {})</a>
     <li><a href="#ref-for-a-new-promise①③">5.3.1. CreateTransformStream (
@@ -5529,19 +5548,20 @@ reason )</a>
     <li><a href="#ref-for-a-promise-rejected-with③①">3.11.5.2. [[PullSteps]]( )</a>
     <li><a href="#ref-for-a-promise-rejected-with③②">3.13.18. ReadableByteStreamControllerPullInto ( controller, view )</a>
     <li><a href="#ref-for-a-promise-rejected-with③③">4.2.5.2. abort(reason)</a> <a href="#ref-for-a-promise-rejected-with③④">(2)</a>
-    <li><a href="#ref-for-a-promise-rejected-with③⑤">4.5.3. new WritableStreamDefaultWriter(stream)</a> <a href="#ref-for-a-promise-rejected-with③⑥">(2)</a> <a href="#ref-for-a-promise-rejected-with③⑦">(3)</a>
-    <li><a href="#ref-for-a-promise-rejected-with③⑧">4.5.4.1. get closed</a>
-    <li><a href="#ref-for-a-promise-rejected-with③⑨">4.5.4.3. get ready</a>
-    <li><a href="#ref-for-a-promise-rejected-with④⓪">4.5.4.4. abort(reason)</a> <a href="#ref-for-a-promise-rejected-with④①">(2)</a>
-    <li><a href="#ref-for-a-promise-rejected-with④②">4.5.4.5. close()</a> <a href="#ref-for-a-promise-rejected-with④③">(2)</a> <a href="#ref-for-a-promise-rejected-with④④">(3)</a>
-    <li><a href="#ref-for-a-promise-rejected-with④⑤">4.5.4.7. write(chunk)</a> <a href="#ref-for-a-promise-rejected-with④⑥">(2)</a>
-    <li><a href="#ref-for-a-promise-rejected-with④⑦">4.6.3. WritableStreamDefaultWriterClose ( writer )</a>
-    <li><a href="#ref-for-a-promise-rejected-with④⑧">4.6.4. WritableStreamDefaultWriterCloseWithErrorPropagation ( writer )</a>
-    <li><a href="#ref-for-a-promise-rejected-with④⑨">4.6.5. WritableStreamDefaultWriterEnsureClosedPromiseRejected( writer, error )</a>
-    <li><a href="#ref-for-a-promise-rejected-with⑤⓪">4.6.6. WritableStreamDefaultWriterEnsureReadyPromiseRejected( writer, error )</a>
-    <li><a href="#ref-for-a-promise-rejected-with⑤①">4.6.9. WritableStreamDefaultWriterWrite ( writer, chunk )</a> <a href="#ref-for-a-promise-rejected-with⑤②">(2)</a> <a href="#ref-for-a-promise-rejected-with⑤③">(3)</a> <a href="#ref-for-a-promise-rejected-with⑤④">(4)</a>
-    <li><a href="#ref-for-a-promise-rejected-with⑤⑤">5.5.3. SetUpTransformStreamDefaultControllerFromTransformer ( stream, transformer )</a>
-    <li><a href="#ref-for-a-promise-rejected-with⑤⑥">6.3.5. PromiseCall ( F, V,
+    <li><a href="#ref-for-a-promise-rejected-with③⑤">4.2.5.3. close()</a> <a href="#ref-for-a-promise-rejected-with③⑥">(2)</a> <a href="#ref-for-a-promise-rejected-with③⑦">(3)</a>
+    <li><a href="#ref-for-a-promise-rejected-with③⑧">4.3.7. WritableStreamClose ( stream )</a>
+    <li><a href="#ref-for-a-promise-rejected-with③⑨">4.5.3. new WritableStreamDefaultWriter(stream)</a> <a href="#ref-for-a-promise-rejected-with④⓪">(2)</a> <a href="#ref-for-a-promise-rejected-with④①">(3)</a>
+    <li><a href="#ref-for-a-promise-rejected-with④②">4.5.4.1. get closed</a>
+    <li><a href="#ref-for-a-promise-rejected-with④③">4.5.4.3. get ready</a>
+    <li><a href="#ref-for-a-promise-rejected-with④④">4.5.4.4. abort(reason)</a> <a href="#ref-for-a-promise-rejected-with④⑤">(2)</a>
+    <li><a href="#ref-for-a-promise-rejected-with④⑥">4.5.4.5. close()</a> <a href="#ref-for-a-promise-rejected-with④⑦">(2)</a> <a href="#ref-for-a-promise-rejected-with④⑧">(3)</a>
+    <li><a href="#ref-for-a-promise-rejected-with④⑨">4.5.4.7. write(chunk)</a> <a href="#ref-for-a-promise-rejected-with⑤⓪">(2)</a>
+    <li><a href="#ref-for-a-promise-rejected-with⑤①">4.6.4. WritableStreamDefaultWriterCloseWithErrorPropagation ( writer )</a>
+    <li><a href="#ref-for-a-promise-rejected-with⑤②">4.6.5. WritableStreamDefaultWriterEnsureClosedPromiseRejected( writer, error )</a>
+    <li><a href="#ref-for-a-promise-rejected-with⑤③">4.6.6. WritableStreamDefaultWriterEnsureReadyPromiseRejected( writer, error )</a>
+    <li><a href="#ref-for-a-promise-rejected-with⑤④">4.6.9. WritableStreamDefaultWriterWrite ( writer, chunk )</a> <a href="#ref-for-a-promise-rejected-with⑤⑤">(2)</a> <a href="#ref-for-a-promise-rejected-with⑤⑥">(3)</a> <a href="#ref-for-a-promise-rejected-with⑤⑦">(4)</a>
+    <li><a href="#ref-for-a-promise-rejected-with⑤⑧">5.5.3. SetUpTransformStreamDefaultControllerFromTransformer ( stream, transformer )</a>
+    <li><a href="#ref-for-a-promise-rejected-with⑤⑨">6.3.5. PromiseCall ( F, V,
 args )</a>
    </ul>
   </aside>
@@ -5583,11 +5603,12 @@ algoArgCount, extraArgs )</a>
 args )</a>
    </ul>
   </aside>
-  <aside class="dfn-panel" data-for="term-for-promise-calling">
-   <a href="https://www.w3.org/2001/tag/doc/promises-guide/#promise-calling">https://www.w3.org/2001/tag/doc/promises-guide/#promise-calling</a><b>Referenced in:</b>
+  <aside class="dfn-panel" data-for="term-for-waiting-for-all-promise">
+   <a href="https://www.w3.org/2001/tag/doc/promises-guide/#waiting-for-all-promise">https://www.w3.org/2001/tag/doc/promises-guide/#waiting-for-all-promise</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-promise-calling">6.3.5. PromiseCall ( F, V,
-args )</a>
+    <li><a href="#ref-for-waiting-for-all-promise">3.4.11. ReadableStreamPipeTo (
+source, dest, preventClose, preventAbort, preventCancel,
+signal )</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-reject-promise">
@@ -5607,47 +5628,6 @@ signal )</a>
 stream )</a> <a href="#ref-for-reject-promise①②">(2)</a>
     <li><a href="#ref-for-reject-promise①③">4.6.5. WritableStreamDefaultWriterEnsureClosedPromiseRejected( writer, error )</a>
     <li><a href="#ref-for-reject-promise①④">4.6.6. WritableStreamDefaultWriterEnsureReadyPromiseRejected( writer, error )</a>
-   </ul>
-  </aside>
-  <aside class="dfn-panel" data-for="term-for-resolve-promise">
-   <a href="https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise">https://www.w3.org/2001/tag/doc/promises-guide/#resolve-promise</a><b>Referenced in:</b>
-   <ul>
-    <li><a href="#ref-for-resolve-promise">3.4.10. ReadableStreamTee ( stream,
-cloneForBranch2 )</a> <a href="#ref-for-resolve-promise①">(2)</a>
-    <li><a href="#ref-for-resolve-promise②">3.4.11. ReadableStreamPipeTo (
-source, dest, preventClose, preventAbort, preventCancel,
-signal )</a>
-    <li><a href="#ref-for-resolve-promise③">3.5.4. ReadableStreamClose ( stream )</a> <a href="#ref-for-resolve-promise④">(2)</a>
-    <li><a href="#ref-for-resolve-promise⑤">3.5.7. ReadableStreamFulfillReadIntoRequest ( stream, chunk, done )</a>
-    <li><a href="#ref-for-resolve-promise⑥">3.5.8. ReadableStreamFulfillReadRequest ( stream, chunk, done )</a>
-    <li><a href="#ref-for-resolve-promise⑦">4.4.4. WritableStreamFinishErroring
-( stream )</a>
-    <li><a href="#ref-for-resolve-promise⑧">4.4.5. WritableStreamFinishInFlightWrite ( stream )</a>
-    <li><a href="#ref-for-resolve-promise⑨">4.4.7. WritableStreamFinishInFlightClose ( stream )</a> <a href="#ref-for-resolve-promise①⓪">(2)</a> <a href="#ref-for-resolve-promise①①">(3)</a>
-    <li><a href="#ref-for-resolve-promise①②">4.4.14. WritableStreamUpdateBackpressure ( stream, backpressure )</a>
-    <li><a href="#ref-for-resolve-promise①③">4.6.3. WritableStreamDefaultWriterClose ( writer )</a>
-    <li><a href="#ref-for-resolve-promise①④">5.2.3. new TransformStream(transformer = {}, writableStrategy = {},
-readableStrategy = {})</a>
-    <li><a href="#ref-for-resolve-promise①⑤">5.3.1. CreateTransformStream (
-startAlgorithm, transformAlgorithm, flushAlgorithm
-[, writableHighWaterMark [, writableSizeAlgorithm [, readableHighWaterMark [,
-readableSizeAlgorithm ] ] ] ] )</a>
-    <li><a href="#ref-for-resolve-promise①⑥">5.3.6. TransformStreamSetBackpressure
-( stream, backpressure )</a>
-   </ul>
-  </aside>
-  <aside class="dfn-panel" data-for="term-for-transforming-by">
-   <a href="https://www.w3.org/2001/tag/doc/promises-guide/#transforming-by">https://www.w3.org/2001/tag/doc/promises-guide/#transforming-by</a><b>Referenced in:</b>
-   <ul>
-    <li><a href="#ref-for-transforming-by">3.3.2. next()</a>
-    <li><a href="#ref-for-transforming-by①">3.3.3. return( value )</a>
-    <li><a href="#ref-for-transforming-by②">3.4.10. ReadableStreamTee ( stream,
-cloneForBranch2 )</a>
-    <li><a href="#ref-for-transforming-by③">3.5.3. ReadableStreamCancel ( stream,
-reason )</a>
-    <li><a href="#ref-for-transforming-by④">5.5.7. TransformStreamDefaultControllerPerformTransform ( controller, chunk )</a>
-    <li><a href="#ref-for-transforming-by⑤">5.6.1. TransformStreamDefaultSinkWriteAlgorithm ( stream, chunk )</a>
-    <li><a href="#ref-for-transforming-by⑥">5.6.3. TransformStreamDefaultSinkCloseAlgorithm( stream )</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-upon-fulfillment">
@@ -5692,14 +5672,6 @@ writeAlgorithm, closeAlgorithm, abortAlgorithm, highWaterMark, sizeAlgorithm )</
     <li><a href="#ref-for-upon-rejection⑨">4.8.12. WritableStreamDefaultControllerProcessWrite ( controller, chunk )</a>
    </ul>
   </aside>
-  <aside class="dfn-panel" data-for="term-for-waiting-for-all">
-   <a href="https://www.w3.org/2001/tag/doc/promises-guide/#waiting-for-all">https://www.w3.org/2001/tag/doc/promises-guide/#waiting-for-all</a><b>Referenced in:</b>
-   <ul>
-    <li><a href="#ref-for-waiting-for-all">3.4.11. ReadableStreamPipeTo (
-source, dest, preventClose, preventAbort, preventCancel,
-signal )</a>
-   </ul>
-  </aside>
   <aside class="dfn-panel" data-for="term-for-service-worker-global-scope-fetch-event">
    <a href="https://w3c.github.io/ServiceWorker/#service-worker-global-scope-fetch-event">https://w3c.github.io/ServiceWorker/#service-worker-global-scope-fetch-event</a><b>Referenced in:</b>
    <ul>
@@ -5720,6 +5692,13 @@ signal )</a>
     <li><a href="#ref-for-idl-DOMException">3.4.11. ReadableStreamPipeTo (
 source, dest, preventClose, preventAbort, preventCancel,
 signal )</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-call-a-user-objects-operation">
+   <a href="https://heycam.github.io/webidl/#call-a-user-objects-operation">https://heycam.github.io/webidl/#call-a-user-objects-operation</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-call-a-user-objects-operation">6.3.5. PromiseCall ( F, V,
+args )</a>
    </ul>
   </aside>
   <h3 class="no-num no-ref heading settled" id="index-defined-elsewhere"><span class="content">Terms defined by reference</span><a class="self-link" href="#index-defined-elsewhere"></a></h3>
@@ -5778,18 +5757,15 @@ signal )</a>
      <li><span class="dfn-paneled" id="term-for-ordered-set" style="color:initial">ordered set</span>
     </ul>
    <li>
-    <a data-link-type="biblio">[PROMISES-GUIDE]</a> defines the following terms:
+    <a data-link-type="biblio">[promises-guide]</a> defines the following terms:
     <ul>
      <li><span class="dfn-paneled" id="term-for-a-new-promise" style="color:initial">a new promise</span>
      <li><span class="dfn-paneled" id="term-for-a-promise-rejected-with" style="color:initial">a promise rejected with</span>
      <li><span class="dfn-paneled" id="term-for-a-promise-resolved-with" style="color:initial">a promise resolved with</span>
-     <li><span class="dfn-paneled" id="term-for-promise-calling" style="color:initial">promise-calling</span>
+     <li><span class="dfn-paneled" id="term-for-waiting-for-all-promise" style="color:initial">getting a promise to wait for all</span>
      <li><span class="dfn-paneled" id="term-for-reject-promise" style="color:initial">reject</span>
-     <li><span class="dfn-paneled" id="term-for-resolve-promise" style="color:initial">resolve</span>
-     <li><span class="dfn-paneled" id="term-for-transforming-by" style="color:initial">transforming</span>
      <li><span class="dfn-paneled" id="term-for-upon-fulfillment" style="color:initial">upon fulfillment</span>
      <li><span class="dfn-paneled" id="term-for-upon-rejection" style="color:initial">upon rejection</span>
-     <li><span class="dfn-paneled" id="term-for-waiting-for-all" style="color:initial">waiting for all</span>
     </ul>
    <li>
     <a data-link-type="biblio">[SERVICE-WORKERS]</a> defines the following terms:
@@ -5801,6 +5777,7 @@ signal )</a>
     <ul>
      <li><span class="dfn-paneled" id="term-for-aborterror" style="color:initial">AbortError</span>
      <li><span class="dfn-paneled" id="term-for-idl-DOMException" style="color:initial">DOMException</span>
+     <li><span class="dfn-paneled" id="term-for-call-a-user-objects-operation" style="color:initial">call a user object's operation</span>
     </ul>
   </ul>
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
@@ -5861,10 +5838,10 @@ signal )</a> <a href="#ref-for-chunk②③">(2)</a> <a href="#ref-for-chunk②�
     <li><a href="#ref-for-chunk④③">3.11.4.4. enqueue(chunk)</a>
     <li><a href="#ref-for-chunk④④">4.1. Using writable streams</a>
     <li><a href="#ref-for-chunk④⑤">4.2.4. Underlying sink API</a> <a href="#ref-for-chunk④⑥">(2)</a>
-    <li><a href="#ref-for-chunk④⑦">4.3.2. CreateWritableStream ( startAlgorithm,
+    <li><a href="#ref-for-chunk④⑦">4.2.5.3. close()</a> <a href="#ref-for-chunk④⑧">(2)</a>
+    <li><a href="#ref-for-chunk④⑨">4.3.2. CreateWritableStream ( startAlgorithm,
 writeAlgorithm, closeAlgorithm, abortAlgorithm [, highWaterMark [,
 sizeAlgorithm ] ] )</a>
-    <li><a href="#ref-for-chunk④⑧">4.5.4.5. close()</a> <a href="#ref-for-chunk④⑨">(2)</a>
     <li><a href="#ref-for-chunk⑤⓪">4.5.4.7. write(chunk)</a> <a href="#ref-for-chunk⑤①">(2)</a> <a href="#ref-for-chunk⑤②">(3)</a>
     <li><a href="#ref-for-chunk⑤③">4.7.2. Internal slots</a> <a href="#ref-for-chunk⑤④">(2)</a> <a href="#ref-for-chunk⑤⑤">(3)</a>
     <li><a href="#ref-for-chunk⑤⑥">5.1. Using transform streams</a>
@@ -6052,7 +6029,7 @@ ReadableStreamDefaultController</a>
 WritableStream(underlyingSink = {}, strategy = {})</a>
     <li><a href="#ref-for-underlying-sink①①">4.2.4. Underlying sink API</a> <a href="#ref-for-underlying-sink①②">(2)</a> <a href="#ref-for-underlying-sink①③">(3)</a> <a href="#ref-for-underlying-sink①④">(4)</a> <a href="#ref-for-underlying-sink①⑤">(5)</a>
     <li><a href="#ref-for-underlying-sink①⑥">4.2.5.2. abort(reason)</a>
-    <li><a href="#ref-for-underlying-sink①⑦">4.5.4.5. close()</a>
+    <li><a href="#ref-for-underlying-sink①⑦">4.2.5.3. close()</a>
     <li><a href="#ref-for-underlying-sink①⑧">4.5.4.7. write(chunk)</a> <a href="#ref-for-underlying-sink①⑨">(2)</a>
     <li><a href="#ref-for-underlying-sink②⓪">4.7. Class
 WritableStreamDefaultController</a>
@@ -6319,7 +6296,7 @@ signal )</a>
    <ul>
     <li><a href="#ref-for-writer">1. Introduction</a>
     <li><a href="#ref-for-writer①">4.1. Using writable streams</a> <a href="#ref-for-writer②">(2)</a>
-    <li><a href="#ref-for-writer③">4.2.5.3. getWriter()</a>
+    <li><a href="#ref-for-writer③">4.2.5.4. getWriter()</a>
     <li><a href="#ref-for-writer④">4.5. Class
 WritableStreamDefaultWriter</a>
     <li><a href="#ref-for-writer⑤">5.1. Using transform streams</a>
@@ -6344,7 +6321,7 @@ preventCancel, signal } = {})</a>
 stream )</a>
     <li><a href="#ref-for-lock⑨">4.2.2. Internal slots</a>
     <li><a href="#ref-for-lock①⓪">4.2.5.1. get locked</a>
-    <li><a href="#ref-for-lock①①">4.2.5.3. getWriter()</a>
+    <li><a href="#ref-for-lock①①">4.2.5.4. getWriter()</a>
     <li><a href="#ref-for-lock①②">4.3.5. IsWritableStreamLocked ( stream
 )</a>
    </ul>
@@ -6357,7 +6334,8 @@ stream )</a>
     <li><a href="#ref-for-active②">3.7.4.2. cancel(reason)</a>
     <li><a href="#ref-for-active③">3.7.4.4. releaseLock()</a>
     <li><a href="#ref-for-active④">4.5.4.4. abort(reason)</a>
-    <li><a href="#ref-for-active⑤">4.5.4.6. releaseLock()</a>
+    <li><a href="#ref-for-active⑤">4.5.4.5. close()</a>
+    <li><a href="#ref-for-active⑥">4.5.4.6. releaseLock()</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="release-a-lock">
@@ -6368,7 +6346,7 @@ stream )</a>
     <li><a href="#ref-for-release-a-lock②">3.6.4.4. releaseLock()</a>
     <li><a href="#ref-for-release-a-lock③">3.7.4.1. get closed</a>
     <li><a href="#ref-for-release-a-lock④">3.7.4.4. releaseLock()</a>
-    <li><a href="#ref-for-release-a-lock⑤">4.2.5.3. getWriter()</a>
+    <li><a href="#ref-for-release-a-lock⑤">4.2.5.4. getWriter()</a>
     <li><a href="#ref-for-release-a-lock⑥">4.5.4.1. get closed</a>
     <li><a href="#ref-for-release-a-lock⑦">4.5.4.2. get desiredSize</a>
     <li><a href="#ref-for-release-a-lock⑧">4.5.4.3. get ready</a>
@@ -6913,6 +6891,12 @@ TransformStreamDefaultController</a>
     <li><a href="#ref-for-ws-abort①">4.2.4. Underlying sink API</a>
    </ul>
   </aside>
+  <aside class="dfn-panel" data-for="ws-close">
+   <b><a href="#ws-close">#ws-close</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-ws-close">4.2.1. Class definition</a>
+   </ul>
+  </aside>
   <aside class="dfn-panel" data-for="ws-get-writer">
    <b><a href="#ws-get-writer">#ws-get-writer</a></b><b>Referenced in:</b>
    <ul>
@@ -6926,7 +6910,7 @@ TransformStreamDefaultController</a>
     <li><a href="#ref-for-default-writer-class">2.6. Locking</a>
     <li><a href="#ref-for-default-writer-class①">4.1. Using writable streams</a>
     <li><a href="#ref-for-default-writer-class②">4.2.2. Internal slots</a>
-    <li><a href="#ref-for-default-writer-class③">4.2.5.3. getWriter()</a>
+    <li><a href="#ref-for-default-writer-class③">4.2.5.4. getWriter()</a>
     <li><a href="#ref-for-default-writer-class④">4.3.1. AcquireWritableStreamDefaultWriter ( stream )</a>
     <li><a href="#ref-for-default-writer-class⑤">4.5. Class
 WritableStreamDefaultWriter</a>

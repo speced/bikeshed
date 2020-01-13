@@ -1,0 +1,396 @@
+<pre class='metadata'>
+Title: Client Hints Infrastructure
+Shortname: ClientHintsInfra
+Level: 1
+Status: CG-Draft
+Group: WICG
+URL: https://wicg.github.io/client-hints-infrastructure
+Editor: Yoav Weiss, Google, yoav@yoav.ws, https://blog.yoav.ws 
+Abstract: Specification of the Client Hints infrastructure and its integration with Fetch and HTML
+Markup Shorthands: markdown yes
+</pre>
+
+<pre class="link-defaults">
+spec:infra; type:dfn; for:/; text:list
+spec:infra; type:dfn; for:list; text:append
+spec:infra; type:dfn; for:set; text:append
+spec:html; type:dfn; for:/; text:origin
+spec:fetch; type:dfn; for:/; text:fetch
+spec:fetch; type:dfn; for:Request; text:request
+spec:fetch; type:dfn; text:client
+</pre>
+
+<pre class=biblio>
+{
+    "FEATURE-POLICY": {
+        "authors": [
+            "Ian Clelland"
+        ],
+        "href": "https://wicg.github.io/feature-policy/",
+        "publisher": "WICG",
+        "title": "Feature Policy"
+    },
+    "CLIENT-HINTS": {
+        "authors": [
+            "Ilya Grigorik",
+            "Yoav Weiss"
+          ],
+          "href": "https://httpwg.org/http-extensions/client-hints.html",
+          "publisher": "IETF HTTP-WG",
+          "title": "Client Hints"
+    }
+}
+
+</pre>
+
+<style>
+table, th, td { border: 1px black solid; }
+thead {background-color: yellow; }
+</style>
+
+Introduction {#intro}
+=====================
+
+Client Hints is collection of HTTP and user-agent features that enables
+privacy-preserving, proactive content negotiation with an explicit third-party
+delegation mechanism:
+
+* Proactive content negotiation at the HTTP layer enables servers to request
+    delivery of specific hints, in order to enable optimized and automated
+    selection of resources based on a user's device, conditions and preferences,
+    and lets clients decide which hint requests they want to grant, with
+    per-hint and per-origin granularity.
+* Integration of said mechanism with web concepts, defined in this document,
+    enables browsers to benefit from content adaptation, and have it play nicely with
+    current web restrictions (e.g. same-origin policy).
+* The opt-in nature of the mechanism enables browsers to advertise requested
+    hint data (e.g. user agent and device characteristics) selectively to
+    secure-transport origins, instead of appending such data on every outgoing
+    request.
+* Origin opt-in applies to same-origin assets only and delivery to third-party
+    origins is subject to explicit first party delegation via Feature Policy,
+    enabling tight control over which third party origins can access requested
+    hint data.
+
+The goal of Client Hints is to **reduce passive fingerprinting** on the web
+while **enabling scalable and privacy preserving content adaptation** between
+client and server, via a standardized set of content negotiation primitives at
+the HTTP and user agent levels.
+
+Infrastructure definition {#definition}
+=========================
+
+The specification of the Client Hints **infrastructure** is divided between the
+following specifications and proposals:
+
+* IETF [[!CLIENT-HINTS]]
+     - Provides the motivation for Client Hints.
+     - Defines the fundamental Client Hints infrastructure:
+        - The `Accept-CH` response header, which servers may use to advertise
+            support for certain Client Hints.
+     - Provides both general guidelines, and formal requirements, about Client
+         Hints’ impact on caching, security, and privacy.
+     - Does *not* define any actual, particular hints – or say anything about how
+         Client Hints works in web contexts.
+* Client Hints infrastructure - this document
+     - Defines how web clients should process the `Accept-CH` headers sent by servers.
+     - Defines the environment settings object state related to `Accept-CH`,
+         which stores information about which servers should get which hints.
+     - Defines how, and when, web clients should actually go about sending hints,
+         based on the state of their environment settings object.
+        - More specifically, it integrates the HTML web concepts with Fetch's
+            algorithms to make sure that opted-in hints are added to requests for
+            same-origin or delegated-to cross-origin requests. It also makes sure
+            hints are removed from not delegated-to cross-origin requests after
+            redirections.
+     - Integrates those concepts with the [[!HTML]] and [[!FETCH]] specifications, 
+          by patching various concepts there.
+* W3C Feature Policy specification (<a href="https://w3c.github.io/webappsec-feature-policy/#should-request-be-allowed-to-use-feature">relevant section</a>)
+     - In order to perform third party Client Hint delegation, Feature Policy has
+         been extended to control features within fetch requests (rather than just Documents).
+
+Environment settings object processing {#environment-settings-object-processing}
+==============
+
+<h3 id=concept-client-hints-set>Client hints set</h3>
+
+<p>A <dfn>client hints set</dfn> is a
+<a for=/>set</a> of [=client hints token=]s.
+
+Accept-CH cache {#accept-ch-cache-definition}
+----------------
+
+An <dfn>Accept-CH cache</dfn> is owned by the user agent and is an [=ordered map=],
+  [=keyed=] on <dfn for="accept-ch-cache">origin</dfn> (an [=/origin=]), 
+  with a value of <dfn for="accept-ch-cache">client hints set</dfn> (a [=/client hints set=]).
+
+The Accept-CH cache can effectively act as an alternative cookie store,
+since sites can use each of the hints as a bit set on the client, and that information will be
+communicated to them on every request. As such, a user agent MUST evict that
+cache whenever the user clears their cookies or when session cookies expire.
+
+To <dfn>add a new Accept-CH cache entry</dfn> to the [=Accept-CH cache=],
+given an [=accept-ch-cache/origin=] |origin| and a [=/client hints set=] |client hints set|, [=map/set=] [=Accept-CH cache=][|origin|] to |client hints set|.
+
+To <dfn>retrieve the client hints set</dfn> given an |origin|:
+
+1. Let |clientHintsSet| be an empty [=ordered set=].
+2. Let |originMatchingEntries| be the entries in the [=Accept-CH cache=] whose [=accept-ch-cache/origin=] is [=same origin=] with |origin|.
+3. For each entry in |originMatchingEntries|, for each token in its [=accept-ch-cache/client hints set=], [=set/append=] the token to |clientHintsSet|.
+4. Return |clientHintsSet|.
+
+Initialize Client Hints set {#initialize-ch-set}
+-----------------------
+When asked to <dfn abstract-op>initialize the Client Hints set</dfn> with |settingsObject| and |response| as inputs, run the following steps:
+
+1. Let |clientHintsSet| be the result of running [=retrieve the client hints set=] with |settingsObject|'s [=environment settings object/origin=].
+2. For each |hint| in |clientHintsSet|, [=set/append=] |hint| to |settingsObject|'s [=environment settings object/client hints set=].
+3. If the result of executing [$Is an environment settings object contextually secure?$] on |settingsObject| is `"Not Secure"`, abort these steps.
+4. Let |browsingContext| be |settingsObject|'s [=responsible browsing context=].
+5. If the [=top-level browsing context=] does not equal |browsingContext|, abort these steps.
+6. If |response|'s `Accept-CH` header is present, parse the header field value according to the
+    `Accept-CH` header parsing rules, as a [=field-name=]. Add each parsed [=client hints token=] to |settingsObject|'s [=environment settings object/client hints set=].
+7. [=Add a new Accept-CH cache entry=] with |response|'s [=/origin=] and |settingsObject|'s [=environment settings object/client hints set=] as inputs.
+
+<div class=note>
+Note, the above algorithm:
+
+* Initializes client hints set on the environment settings object based on its origin. 
+* If we are in a secure context and the navigation is a top-level navigation,
+    it parses `Accept-CH` and adds the results to the environment setting object's client hints set as well as the Accept-CH cache.
+    </div>
+
+<dfn>Accept-CH state</dfn> (`http-equiv="accept-ch"`) {#accept-ch-state-algo}
+--------
+
+Note: This pragma appends [=client hints token=]s to the [=environment settings object=]'s [=environment settings object/client hints set=].
+
+1. If the <{meta}> element is not a child of a <{head}> element, then return.
+2. If the <{meta}> element has no <{meta/content}> attribute, or if that attribute's value is the empty string, then return.
+3. Let |settingsObject| be the <{meta}> element's [=relevant settings object=].
+4. If the result of executing [$Is an environment settings object contextually secure?$] on |settingsObject| is `"Not Secure"`, then return.
+5. Let |browsingContext| be |settingsObject|'s [=responsible browsing context=].
+6. If the [=top-level browsing context=] does not equal |browsingContext|, abort these steps.
+7. Let |acceptCHValue| be the <{meta}> element's <{meta/content}> attribute's value.
+8. Parse |acceptCHValue| according to the [=Accept-CH=] header parsing rules, as a [=field-name=].
+     [=set/Append=] each parsed [=client hints token=] to |settingsObject|'s [=environment settings object/client hints set=].
+9. [=Add a new Accept-CH cache entry=] with |settingsObject|'s [=/origin=], and |settingsObject|'s [=environment settings object/client hints set=].
+
+
+Integration with HTML {#html}
+===========
+
+This specification integrates with the [[!HTML]] specification by patching the algorithms below:
+
+Document object initialization {#document-init}
+----------
+
+At <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#initialise-the-document-object">Create and initialize a Document object</a>,
+after step 11, starting with "Initialize a Document's CSP list", 
+call [$initialize the Client Hints set$] with <var ignore>document</var>'s [=relevant settings object=] and |response| as inputs.
+
+Worker initialization {#worker-init}
+-----------
+At <a href="https://html.spec.whatwg.org/multipage/workers.html#set-up-a-worker-environment-settings-object">set up a worker environment settings object</a>,
+after step 6, add the following step:
+1. Set |settingsObject|'s [=environment settings object/client hints set=] to be a [=set/clone=] of <var ignore>outside settings</var>' [=environment settings object/client hints set=].
+
+http-equiv attributes {#http-equiv-attributes}
+-------------
+
+<div class=non-normative>
+*This section is non-normative.*
+
+In the table on <a href="https://html.spec.whatwg.org/multipage/#attributes-3">attributes</a>, add "accept-ch" in the line which attribute is "http-equiv".
+</div>
+
+Pragma directives {#pragma-directives}
+------------
+For the table in <a href="https://html.spec.whatwg.org/multipage/#pragma-directives">pragma directives</a>,
+add a line with a "State" value of [=Accept-CH state|Accept-CH=] and a "Keyword" value of <dfn>accept-ch</dfn>.
+
+Extending environment settings object {#extending-environment-settings-object}
+-------------
+
+An [=environment settings object=] has a <dfn for="environment settings object">client hints set</dfn>: a [=/client hints set=], initially the empty set, used for [=fetches=] performed using the [=environment settings object=] as a [=request=] [=client=].
+
+
+Request processing {#request-processing}
+===========
+
+
+When asked to <dfn abstract-op>append client hints to request</dfn> with |request| as input, run the following steps:
+
+<p>If <var>request</var> is a <a>navigation request</a>, a user agent should, for each
+<a for=/>header</a> <a for=header>name</a> (<var>hintName</var>) in the registry's [=low entropy hint table=],
+if <var>request</var>'s <a for=request>header list</a>
+<a for="header list">does not contain</a> <var>hintName</var>, then
+<a for="header list">append</a>
+<var>hintName</var>/the corresponding value to
+<var>request</var>'s <a for=request>header list</a>.
+
+Issue: Define registry's low entropy table
+
+<p>If <var>request</var>'s <a for="request">client</a> is not null,
+  then <a for=list>for each</a> [=client hints token=] <var>hintName</var>
+  of <var>request</var>'s <a for="request">client</a>'s
+  <a for="environment settings object">client hints set</a>:
+
+<ol>
+  <li>
+   <p>Let <var>value</var> be the return value of running <a>find client hint value</a>, given <var>hintName</var> as input.
+
+
+  <li><p>If <var>request</var> is a <a>subresource request</a> and the result of running
+   <a href="https://w3c.github.io/webappsec-feature-policy/#algo-should-request-be-allowed-to-use-feature">Should request be allowed to use feature?</a>,
+   given <var>request</var> and <var>hintName</var>’s
+   <a href="http://httpwg.org/http-extensions/client-hints.html#opt-in-via-feature-policy">associated
+   policy-controlled feature</a>, returns <code>false</code>, then skip the next steps and
+   continue to the next <var>hintName</var>.
+   [[!FEATURE-POLICY]] [[!CLIENT-HINTS]]
+
+  <li><p>Set <var>hintName</var> to "Sec-" concatenated with <var>hintName</var>.
+  <div class=issue>We need to figure out if we really want a `Sec-` prefix, and if so also exempt it from CORS.</div>
+
+  <li><p>If <var>request</var>'s <a for=request>header list</a> <a for="header list">does not
+  contain</a> <var>hintName</var>, a user agent should <a for="header list">append</a>
+  <var>hintName</var>/<var>value</var> to <var>request</var>'s <a for=request>header list</a>.
+</ol>
+
+When asked to <dfn abstract-op>remove client hints from redirect if needed</dfn> with |request| as input, run the following steps:
+
+<ol>
+ <li>If |request|'s [=client=] is null, then abort these steps.
+
+ <li>Let |clientHintsSet| be |request|'s <var ignore>client</var>'s [=environment settings object/client hints set=].
+ <li><p><a for=list>For each</a> <var>hintName</var> of |clientHintsSet|:
+ <ol>
+  <li><p>Set <var>hintName</var> to "Sec-" concatenated with <var>hintName</var>.
+  <li><p>If <var>request</var>'s <a for=request>header list</a> <a for="header list">contains</a>
+  <var>hintName</var> and if the result of running <a
+  href="https://wicg.github.io/feature-policy/#should-request-be-allowed-to-use-feature">Should
+  request be allowed to use feature?</a>, given <var>request</var> and <var>hintName</var>’s
+  <a href="http://httpwg.org/http-extensions/client-hints.html#opt-in-via-feature-policy">associated
+  policy-controlled feature</a>, returns <code>false</code>, then remove <var>hintName</var> from
+  <a for=request>header list</a>.
+  [[!FEATURE-POLICY]] [[!CLIENT-HINTS]]
+ </ol>
+</ol>
+
+Integration with Fetch {#fetch}
+==============
+
+This specification integrates with the [[!FETCH]] specification by patching the algorithms below:
+
+In [=Fetching=], after step 1.6, run [$append client hints to request$] with |request| as input.
+
+In [=HTTP-redirect fetch=], after step 7, run [$remove client hints from redirect if needed$] with |request| as input.
+
+Feature Registry {#registry}
+==========
+
+Note: This section contains feature-specific definitions.
+  New features that rely on the Client Hints infrastructure need to add their respective definitions to this registry.
+  User Agents can implement some of those features without implementing others.
+
+Client hints token {#client-hints-token-definition}
+----------
+
+A <dfn>client hints token</dfn> is a [=byte-lowercase=] representation of one of
+  `Save-Data`,
+  `DPR`,
+  `Width`,
+  `Viewport-Width`,
+  `Device-Memory`,
+  `RTT`,
+  `Downlink`,
+  `ECT`,
+  `Arch`,
+  `Model`,
+  `Platform`,
+  `UA` or
+  `Mobile`.
+
+Policy-controlled features {#policy-controlled-features}
+-------------
+
+This document defines the following [=policy-controlled features=]:
+
+- <code><dfn export>ch-save-data</dfn></code> which has a [=default allowlist=] of `'*'`
+- <code><dfn export>ch-dpr</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-width</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-viewport-width</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-device-memory</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-rtt</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-downlink</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-ect</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-arch</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-model</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-platform</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-ua</dfn></code> which has a [=default allowlist=] of `'self'`
+- <code><dfn export>ch-mobile</dfn></code> which has a [=default allowlist=] of `'self'`
+
+Issue: Should Save-data really have an allowlist of '*'? If so, is it because it's somehow "low entropy" and should we tie low-entropy-ness to allowlists, generally?
+
+
+Low entropy hint table {#low-entropy-table}
+-------
+The <dfn>low entropy hint table</dfn> below defines hints that are only exposing low amounts of entropy.
+
+<table>
+ <thead>
+ <tr>
+  <th><a for=header>Name</a>
+  <th><a for=header>Value</a>
+ <tbody>
+ <tr>
+  <td>`Save-Data`
+  <td>a suitable <a href=https://wicg.github.io/savedata/#save-data-request-header-field>Save-Data value</a>
+</table>
+
+Find client hint value {#find-client-hint-value-section}
+------------
+
+When asked to <dfn>find client hint value</dfn>, given |hint| as input, switch on |hint| and return the result:
+ <dl class=switch>
+  <dt>`Save-Data`
+  <dd>a suitable <a href=https://wicg.github.io/savedata/#save-data-request-header-field>Save-Data value</a>
+  <dt>`DPR`
+  <dd>a suitable <a href>DPR value</a>
+  <dt>`Viewport-Width`
+  <dd>a suitable <a href>Viewport-Width value</a>
+  <dt>`Width`
+  <dd>a suitable <a href>Width value</a>
+  <dt>`Device-Memory`
+  <dd>a suitable <a href=https://w3c.github.io/device-memory/#sec-device-memory-client-hint-header>Device-Memory value</a>
+  <dt>`RTT`
+  <dd>a suitable <a href=https://wicg.github.io/netinfo/#rtt-request-header-field>RTT value</a>
+  <dt>`Downlink`
+  <dd>a suitable <a href=https://wicg.github.io/netinfo/#downlink-request-header-field>Downlink value</a>
+  <dt>`ECT`
+  <dd>a suitable <a href=https://wicg.github.io/netinfo/#ect-request-header-field>ECT value</a>
+  <dt>`Arch`
+  <dd>a suitable <a href=https://wicg.github.io/ua-client-hints/#sec-ch-arch>Arch value</a>
+  <dt>`Model`
+  <dd>a suitable <a href=https://wicg.github.io/ua-client-hints/#sec-ch-model>Model value</a>
+  <dt>`Platform`
+  <dd>a suitable <a href=https://wicg.github.io/ua-client-hints/#sec-ch-platform>Platform value</a>
+  <dt>`UA`
+  <dd>a suitable <a href=https://wicg.github.io/ua-client-hints/#sec-ch-ua>UA value</a>
+  <dt>`Mobile`
+  <dd>a suitable <a href=https://wicg.github.io/ua-client-hints/#sec-ch-mobile>Mobile value</a>
+ </dl>
+
+Issue: Links for image features are broken, need to actually define that and link to them.
+
+Security and Privacy considerations {#privacy}
+===========
+See [[!CLIENT-HINTS]].
+
+Terms {#terms}
+====
+
+The following terms are defined in the HTTP specifications:
+<dfn href="https://tools.ietf.org/html/rfc7230#section-3.2">field-name</dfn>
+
+

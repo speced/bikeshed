@@ -121,19 +121,17 @@ interface MediaRecorder : EventTarget {
   <ol>
     <li>Let |stream| be the constructor's first argument.</li>
     <li>Let |options| be the constructor's second argument.</li>
-    <li>If {{MediaRecorderOptions/mimeType}} is present in |options|, and
-    invoking [$is type supported$] with |options|'
+    <li>If invoking [$is type supported$] with |options|'
     {{MediaRecorderOptions/mimeType}} member as its argument returns false,
     throw a {{NotSupportedError}} {{DOMException}} and abort these steps.</li>
     <li>Let |recorder| be a newly constructed {{MediaRecorder}} object.</li>
     <li>Let |recorder| have a <dfn>\[[ConstrainedMimeType]]</dfn> internal slot,
-    initialized to the empty string.</li>
+    initialized to the value of |options|' {{MediaRecorderOptions/mimeType}}
+    member.</li>
     <li>Let |recorder| have a <dfn>\[[ConstrainedBitsPerSecond]]</dfn> internal
     slot, initialized to the value of |options|'
     {{MediaRecorderOptions/bitsPerSecond}} member, if it is present, otherwise
     <code>undefined</code>.</li>
-    <li>Set |recorder|'s [=[[ConstrainedMimeType]]=] slot to the value of
-    |options|' {{MediaRecorderOptions/mimeType}} member, if it is present.</li>
     <li>Initialize |recorder|'s {{MediaRecorder/stream}} attribute to
     |stream|.</li>
     <li>Initialize |recorder|'s {{MediaRecorder/mimeType}} attribute to the
@@ -237,7 +235,7 @@ interface MediaRecorder : EventTarget {
     |recorder|, throw a {{SecurityError}} {{DOMException}} and abort these
     steps.</li>
 
-    <li>If |stream| is {{inactive}}, throw a {{NotSupportedError}}
+    <li>If |stream| is [=inactive=], throw a {{NotSupportedError}}
     {{DOMException}} and abort these steps.</li>
 
     <li>If the [=[[ConstrainedMimeType]]=] slot specifies a media type,
@@ -251,16 +249,6 @@ interface MediaRecorder : EventTarget {
       {{DOMException}} and abort all steps.</li>
     </ol>
     </li>
-
-    <li>Let |extendedMimeType| be the value of |recorder|'s
-    [=[[ConstrainedMimeType]]=] slot.</li>
-
-    <li>Modify |extendedMimeType| by adding media type, subtype and codecs
-    parameter reflecting the configuration used by the MediaRecorder to record
-    all tracks in |tracks|, if not already present. This MAY include the
-    profiles parameter [[RFC6381]] or further codec-specific parameters.</li>
-
-    <li>Set |recorder|'s {{mimeType}} attribute to |extendedMimeType|.</li>
 
     <li>If |recorder|'s [=[[ConstrainedBitsPerSecond]]=] slot is not
     <code>undefined</code>, set |recorder|'s {{videoBitsPerSecond}} and
@@ -286,11 +274,37 @@ interface MediaRecorder : EventTarget {
     <li>Set |recorder|'s {{state}} to {{recording}}, and run the following steps
     in parallel:
     <ol>
-      <li>Start recording all tracks in |tracks| using the {{MediaRecorder}}'s
-      current configuration, and gather the data into a {{Blob}} <var>blob</var>
-      and queue a task, using the DOM manipulation task source, to
-      <a>fire an event</a> named <a>start</a> at <var>recorder</var>, then return
-      <code>undefined</code>.</li>
+      <li>If the container and codecs to use for the recording have not yet been
+      fully specified, the User Agent specifies them in |recorder|'s current
+      configuration. The User Agent MAY take the sources of the tracks in
+      |tracks| into account when deciding which container and codecs to
+      use.
+      <div class="note">
+        By looking at the sources of the tracks in |tracks| when recording
+        starts, the User Agent could choose a configuration that avoids
+        re-encoding track content. For example, if the MediaStreamTrack is a
+        remote track sourced from an RTCPeerConnection, the User Agent could
+        pick the same codec as is used for the MediaStreamTrack's RTP stream,
+        should it be known. However, if the codec of the RTP stream changes
+        while recording, the User Agent has to be prepared to re-encode it to
+        avoid interruptions.
+      </div>
+      </li>
+      <li>Start recording all tracks in |tracks| using the |recorder|'s current
+      configuration and gather the data into a {{Blob}} <var>blob</var>. Queue a
+      task, using the DOM manipulation task source, to run the following steps:
+      <ol>
+        <li>Let |extendedMimeType| be the value of |recorder|'s
+        [=[[ConstrainedMimeType]]=] slot.</li>
+        <li>Modify |extendedMimeType| by adding media type, subtype and codecs
+        parameter reflecting the configuration used by the MediaRecorder to
+        record all tracks in |tracks|, if not already present. This MAY include
+        the profiles parameter [[RFC6381]] or further codec-specific
+        parameters.</li>
+        <li>Set |recorder|'s {{mimeType}} attribute to |extendedMimeType|.</li>
+        <li><a>Fire an event</a> named <a>start</a> at |recorder|.</li>
+      </ol>
+      </li>
 
       <li>If at any point |stream|'s <a>isolation properties</a> change so
       that {{MediaRecorder}} is no longer allowed access to it, the UA MUST
@@ -344,7 +358,7 @@ interface MediaRecorder : EventTarget {
       <a>dataavailable</a> at <var>recorder</var> with <var>blob</var>.
 
       Note that an <code>undefined</code> value of <var>timeslice</var> will
-      be understood as the largest <code>long</code> value.</li>
+      be understood as the largest <code>unsigned long</code> value.</li>
 
       <li>If all recorded tracks become {{ended}}, then stop gathering data, and
       queue a task, using the DOM manipulation task source, that runs the
@@ -400,7 +414,7 @@ interface MediaRecorder : EventTarget {
       </tr>
       <tr>
         <td class="prmName">timeslice</td>
-        <td class="prmType"><code>long</code></td>
+        <td class="prmType"><code>unsigned long</code></td>
         <td class="prmNullFalse"><span role="img" aria-label="False">&#10008;</span></td>
         <td class="prmOptTrue"><span role="img" aria-label="True">&#10004;</span></td>
         <td class="prmDesc">The minimum number of milliseconds of data
@@ -576,7 +590,7 @@ its {{BlobEvent/data}} attribute initialized to <var>blob</var>.
 
 <pre class="idl">
 dictionary MediaRecorderOptions {
-  DOMString mimeType;
+  DOMString mimeType = "";
   unsigned long audioBitsPerSecond;
   unsigned long videoBitsPerSecond;
   unsigned long bitsPerSecond;
@@ -1023,6 +1037,8 @@ type: interface; text: DOMHighResTimeStamp; url: https://www.w3.org/TR/hr-time/#
 urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: interface; text: MediaStream; url: mediastream
 
 urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: dfn; text: track set; url: track-set
+
+urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: dfn; text: inactive; url: stream-inactive
 
 urlPrefix: https://www.w3.org/TR/mediacapture-streams/#; type: interface; text: MediaStreamTrack; url: mediastreamtrack
 

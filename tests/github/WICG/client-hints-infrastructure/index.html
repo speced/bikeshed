@@ -1,0 +1,2437 @@
+<!doctype html><html lang="en">
+ <head>
+  <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+  <title>Client Hints Infrastructure</title>
+  <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
+<style data-fill-with="stylesheet">/******************************************************************************
+ *                   Style sheet for the W3C specifications                   *
+ *
+ * Special classes handled by this style sheet include:
+ *
+ * Indices
+ *   - .toc for the Table of Contents (<ol class="toc">)
+ *     + <span class="secno"> for the section numbers
+ *   - #toc for the Table of Contents (<nav id="toc">)
+ *   - ul.index for Indices (<a href="#ref">term</a><span>, in §N.M</span>)
+ *   - table.index for Index Tables (e.g. for properties or elements)
+ *
+ * Structural Markup
+ *   - table.data for general data tables
+ *     -> use 'scope' attribute, <colgroup>, <thead>, and <tbody> for best results !
+ *     -> use <table class='complex data'> for extra-complex tables
+ *     -> use <td class='long'> for paragraph-length cell content
+ *     -> use <td class='pre'> when manual line breaks/indentation would help readability
+ *   - dl.switch for switch statements
+ *   - ol.algorithm for algorithms (helps to visualize nesting)
+ *   - .figure and .caption (HTML4) and figure and figcaption (HTML5)
+ *     -> .sidefigure for right-floated figures
+ *   - ins/del
+ *
+ * Code
+ *   - pre and code
+ *
+ * Special Sections
+ *   - .note       for informative notes             (div, p, span, aside, details)
+ *   - .example    for informative examples          (div, p, pre, span)
+ *   - .issue      for issues                        (div, p, span)
+ *   - .assertion  for assertions                    (div, p, span)
+ *   - .advisement for loud normative statements     (div, p, strong)
+ *   - .annoying-warning for spec obsoletion notices (div, aside, details)
+ *
+ * Definition Boxes
+ *   - pre.def   for WebIDL definitions
+ *   - table.def for tables that define other entities (e.g. CSS properties)
+ *   - dl.def    for definition lists that define other entitles (e.g. HTML elements)
+ *
+ * Numbering
+ *   - .secno for section numbers in .toc and headings (<span class='secno'>3.2</span>)
+ *   - .marker for source-inserted example/figure/issue numbers (<span class='marker'>Issue 4</span>)
+ *   - ::before styled for CSS-generated issue/example/figure numbers:
+ *     -> Documents wishing to use this only need to add
+ *        figcaption::before,
+ *        .caption::before { content: "Figure "  counter(figure) " ";  }
+ *        .example::before { content: "Example " counter(example) " "; }
+ *        .issue::before   { content: "Issue "   counter(issue) " ";   }
+ *
+ * Header Stuff (ignore, just don't conflict with these classes)
+ *   - .head for the header
+ *   - .copyright for the copyright
+ *
+ * Miscellaneous
+ *   - .overlarge for things that should be as wide as possible, even if
+ *     that overflows the body text area. This can be used on an item or
+ *     on its container, depending on the effect desired.
+ *     Note that this styling basically doesn't help at all when printing,
+ *     since A4 paper isn't much wider than the max-width here.
+ *     It's better to design things to fit into a narrower measure if possible.
+ *   - js-added ToC jump links (see fixup.js)
+ *
+ ******************************************************************************/
+
+/******************************************************************************/
+/*                                   Body                                     */
+/******************************************************************************/
+
+	body {
+		counter-reset: example figure issue;
+
+		/* Layout */
+		max-width: 50em;               /* limit line length to 50em for readability   */
+		margin: 0 auto;                /* center text within page                     */
+		padding: 1.6em 1.5em 2em 50px; /* assume 16px font size for downlevel clients */
+		padding: 1.6em 1.5em 2em calc(26px + 1.5em); /* leave space for status flag     */
+
+		/* Typography */
+		line-height: 1.5;
+		font-family: sans-serif;
+		widows: 2;
+		orphans: 2;
+		word-wrap: break-word;
+		overflow-wrap: break-word;
+		hyphens: auto;
+
+		/* Colors */
+		color: black;
+		background: white top left fixed no-repeat;
+		background-size: 25px auto;
+	}
+
+
+/******************************************************************************/
+/*                         Front Matter & Navigation                          */
+/******************************************************************************/
+
+/** Header ********************************************************************/
+
+	div.head { margin-bottom: 1em }
+	div.head hr { border-style: solid; }
+
+	div.head h1 {
+		font-weight: bold;
+		margin: 0 0 .1em;
+		font-size: 220%;
+	}
+
+	div.head h2 { margin-bottom: 1.5em;}
+
+/** W3C Logo ******************************************************************/
+
+	.head .logo {
+		float: right;
+		margin: 0.4rem 0 0.2rem .4rem;
+	}
+
+	.head img[src*="logos/W3C"] {
+		display: block;
+		border: solid #1a5e9a;
+		border-width: .65rem .7rem .6rem;
+		border-radius: .4rem;
+		background: #1a5e9a;
+		color: white;
+		font-weight: bold;
+	}
+
+	.head a:hover > img[src*="logos/W3C"],
+	.head a:focus > img[src*="logos/W3C"] {
+		opacity: .8;
+	}
+
+	.head a:active > img[src*="logos/W3C"] {
+		background: #c00;
+		border-color: #c00;
+	}
+
+	/* see also additional rules in Link Styling section */
+
+/** Copyright *****************************************************************/
+
+	p.copyright,
+	p.copyright small { font-size: small }
+
+/** Back to Top / ToC Toggle **************************************************/
+
+	@media print {
+		#toc-nav {
+			display: none;
+		}
+	}
+	@media not print {
+		#toc-nav {
+			position: fixed;
+			z-index: 2;
+			bottom: 0; left: 0;
+			margin: 0;
+			min-width: 1.33em;
+			border-top-right-radius: 2rem;
+			box-shadow: 0 0 2px;
+			font-size: 1.5em;
+			color: black;
+		}
+		#toc-nav > a {
+			display: block;
+			white-space: nowrap;
+
+			height: 1.33em;
+			padding: .1em 0.3em;
+			margin: 0;
+
+			background: white;
+			box-shadow: 0 0 2px;
+			border: none;
+			border-top-right-radius: 1.33em;
+			background: white;
+		}
+		#toc-nav > #toc-jump {
+			padding-bottom: 2em;
+			margin-bottom: -1.9em;
+		}
+
+		#toc-nav > a:hover,
+		#toc-nav > a:focus {
+			background: #f8f8f8;
+		}
+		#toc-nav > a:not(:hover):not(:focus) {
+			color: #707070;
+		}
+
+		/* statusbar gets in the way on keyboard focus; remove once browsers fix */
+		#toc-nav > a[href="#toc"]:not(:hover):focus:last-child {
+			padding-bottom: 1.5rem;
+		}
+
+		#toc-nav:not(:hover) > a:not(:focus) > span + span {
+			/* Ideally this uses :focus-within on #toc-nav */
+			display: none;
+		}
+		#toc-nav > a > span + span {
+			padding-right: 0.2em;
+		}
+
+		#toc-toggle-inline {
+			vertical-align: 0.05em;
+			font-size: 80%;
+			color: gray;
+			color: hsla(203,20%,40%,.7);
+			border-style: none;
+			background: transparent;
+			position: relative;
+		}
+		#toc-toggle-inline:hover:not(:active),
+		#toc-toggle-inline:focus:not(:active) {
+			text-shadow: 1px 1px silver;
+			top: -1px;
+			left: -1px;
+		}
+
+		#toc-nav :active {
+			color: #C00;
+		}
+	}
+
+/** ToC Sidebar ***************************************************************/
+
+	/* Floating sidebar */
+	@media screen {
+		body.toc-sidebar #toc {
+			position: fixed;
+			top: 0; bottom: 0;
+			left: 0;
+			width: 23.5em;
+			max-width: 80%;
+			max-width: calc(100% - 2em - 26px);
+			overflow: auto;
+			padding: 0 1em;
+			padding-left: 42px;
+			padding-left: calc(1em + 26px);
+			background: inherit;
+			background-color: #f7f8f9;
+			z-index: 1;
+			box-shadow: -.1em 0 .25em rgba(0,0,0,.1) inset;
+		}
+		body.toc-sidebar #toc h2 {
+			margin-top: .8rem;
+			font-variant: small-caps;
+			font-variant: all-small-caps;
+			text-transform: lowercase;
+			font-weight: bold;
+			color: gray;
+			color: hsla(203,20%,40%,.7);
+		}
+		body.toc-sidebar #toc-jump:not(:focus) {
+			width: 0;
+			height: 0;
+			padding: 0;
+			position: absolute;
+			overflow: hidden;
+		}
+	}
+	/* Hide main scroller when only the ToC is visible anyway */
+	@media screen and (max-width: 28em) {
+		body.toc-sidebar {
+			overflow: hidden;
+		}
+	}
+
+	/* Sidebar with its own space */
+	@media screen and (min-width: 78em) {
+		body:not(.toc-inline) #toc {
+			position: fixed;
+			top: 0; bottom: 0;
+			left: 0;
+			width: 23.5em;
+			overflow: auto;
+			padding: 0 1em;
+			padding-left: 42px;
+			padding-left: calc(1em + 26px);
+			background: inherit;
+			background-color: #f7f8f9;
+			z-index: 1;
+			box-shadow: -.1em 0 .25em rgba(0,0,0,.1) inset;
+		}
+		body:not(.toc-inline) #toc h2 {
+			margin-top: .8rem;
+			font-variant: small-caps;
+			font-variant: all-small-caps;
+			text-transform: lowercase;
+			font-weight: bold;
+			color: gray;
+			color: hsla(203,20%,40%,.7);
+		}
+
+		body:not(.toc-inline) {
+			padding-left: 29em;
+		}
+		/* See also Overflow section at the bottom */
+
+		body:not(.toc-inline) #toc-jump:not(:focus) {
+			width: 0;
+			height: 0;
+			padding: 0;
+			position: absolute;
+			overflow: hidden;
+		}
+	}
+	@media screen and (min-width: 90em) {
+		body:not(.toc-inline) {
+			margin: 0 4em;
+		}
+	}
+
+/******************************************************************************/
+/*                                Sectioning                                  */
+/******************************************************************************/
+
+/** Headings ******************************************************************/
+
+	h1, h2, h3, h4, h5, h6, dt {
+		page-break-after: avoid;
+		page-break-inside: avoid;
+		font: 100% sans-serif;   /* Reset all font styling to clear out UA styles */
+		font-family: inherit;    /* Inherit the font family. */
+		line-height: 1.2;        /* Keep wrapped headings compact */
+		hyphens: manual;         /* Hyphenated headings look weird */
+	}
+
+	h2, h3, h4, h5, h6 {
+		margin-top: 3rem;
+	}
+
+	h1, h2, h3 {
+		color: #005A9C;
+		background: transparent;
+	}
+
+	h1 { font-size: 170%; }
+	h2 { font-size: 140%; }
+	h3 { font-size: 120%; }
+	h4 { font-weight: bold; }
+	h5 { font-style: italic; }
+	h6 { font-variant: small-caps; }
+	dt { font-weight: bold; }
+
+/** Subheadings ***************************************************************/
+
+	h1 + h2,
+	#subtitle {
+		/* #subtitle is a subtitle in an H2 under the H1 */
+		margin-top: 0;
+	}
+	h2 + h3,
+	h3 + h4,
+	h4 + h5,
+	h5 + h6 {
+		margin-top: 1.2em; /* = 1 x line-height */
+	}
+
+/** Section divider ***********************************************************/
+
+	:not(.head) > hr {
+		font-size: 1.5em;
+		text-align: center;
+		margin: 1em auto;
+		height: auto;
+		border: transparent solid 0;
+		background: transparent;
+	}
+	:not(.head) > hr::before {
+		content: "\2727\2003\2003\2727\2003\2003\2727";
+	}
+
+/******************************************************************************/
+/*                            Paragraphs and Lists                            */
+/******************************************************************************/
+
+	p {
+		margin: 1em 0;
+	}
+
+	dd > p:first-child,
+	li > p:first-child {
+		margin-top: 0;
+	}
+
+	ul, ol {
+		margin-left: 0;
+		padding-left: 2em;
+	}
+
+	li {
+		margin: 0.25em 0 0.5em;
+		padding: 0;
+	}
+
+	dl dd {
+		margin: 0 0 .5em 2em;
+	}
+
+	.head dd + dd { /* compact for header */
+		margin-top: -.5em;
+	}
+
+	/* Style for algorithms */
+	ol.algorithm ol:not(.algorithm),
+	.algorithm > ol ol:not(.algorithm) {
+	 border-left: 0.5em solid #DEF;
+	}
+
+	/* Put nice boxes around each algorithm. */
+	[data-algorithm]:not(.heading) {
+	  padding: .5em;
+	  border: thin solid #ddd; border-radius: .5em;
+	  margin: .5em calc(-0.5em - 1px);
+	}
+	[data-algorithm]:not(.heading) > :first-child {
+	  margin-top: 0;
+	}
+	[data-algorithm]:not(.heading) > :last-child {
+	  margin-bottom: 0;
+	}
+
+	/* Style for switch/case <dl>s */
+	dl.switch > dd > ol.only,
+	dl.switch > dd > .only > ol {
+	 margin-left: 0;
+	}
+	dl.switch > dd > ol.algorithm,
+	dl.switch > dd > .algorithm > ol {
+	 margin-left: -2em;
+	}
+	dl.switch {
+	 padding-left: 2em;
+	}
+	dl.switch > dt {
+	 text-indent: -1.5em;
+	 margin-top: 1em;
+	}
+	dl.switch > dt + dt {
+	 margin-top: 0;
+	}
+	dl.switch > dt::before {
+	 content: '\21AA';
+	 padding: 0 0.5em 0 0;
+	 display: inline-block;
+	 width: 1em;
+	 text-align: right;
+	 line-height: 0.5em;
+	}
+
+/** Terminology Markup ********************************************************/
+
+
+/******************************************************************************/
+/*                                 Inline Markup                              */
+/******************************************************************************/
+
+/** Terminology Markup ********************************************************/
+	dfn   { /* Defining instance */
+		font-weight: bolder;
+	}
+	a > i { /* Instance of term */
+		font-style: normal;
+	}
+	dt dfn code, code.idl {
+		font-size: medium;
+	}
+	dfn var {
+		font-style: normal;
+	}
+
+/** Change Marking ************************************************************/
+
+	del { color: red;  text-decoration: line-through; }
+	ins { color: #080; text-decoration: underline;    }
+
+/** Miscellaneous improvements to inline formatting ***************************/
+
+	sup {
+		vertical-align: super;
+		font-size: 80%
+	}
+
+/******************************************************************************/
+/*                                    Code                                    */
+/******************************************************************************/
+
+/** General monospace/pre rules ***********************************************/
+
+	pre, code, samp {
+		font-family: Menlo, Consolas, "DejaVu Sans Mono", Monaco, monospace;
+		font-size: .9em;
+		page-break-inside: avoid;
+		hyphens: none;
+		text-transform: none;
+	}
+	pre code,
+	code code {
+		font-size: 100%;
+	}
+
+	pre {
+		margin-top: 1em;
+		margin-bottom: 1em;
+		overflow: auto;
+	}
+
+/** Inline Code fragments *****************************************************/
+
+  /* Do something nice. */
+
+/******************************************************************************/
+/*                                    Links                                   */
+/******************************************************************************/
+
+/** General Hyperlinks ********************************************************/
+
+	/* We hyperlink a lot, so make it less intrusive */
+	a[href] {
+		color: #034575;
+		text-decoration: none;
+		border-bottom: 1px solid #707070;
+		/* Need a bit of extending for it to look okay */
+		padding: 0 1px 0;
+		margin: 0 -1px 0;
+	}
+	a:visited {
+		border-bottom-color: #BBB;
+	}
+
+	/* Use distinguishing colors when user is interacting with the link */
+	a[href]:focus,
+	a[href]:hover {
+		background: #f8f8f8;
+		background: rgba(75%, 75%, 75%, .25);
+		border-bottom-width: 3px;
+		margin-bottom: -2px;
+	}
+	a[href]:active {
+		color: #C00;
+		border-color: #C00;
+	}
+
+	/* Backout above styling for W3C logo */
+	.head .logo,
+	.head .logo a {
+		border: none;
+		text-decoration: none;
+		background: transparent;
+	}
+
+/******************************************************************************/
+/*                                    Images                                  */
+/******************************************************************************/
+
+	img {
+		border-style: none;
+	}
+
+	/* For autogen numbers, add
+	   .caption::before, figcaption::before { content: "Figure " counter(figure) ". "; }
+	*/
+
+	figure, .figure, .sidefigure {
+		page-break-inside: avoid;
+		text-align: center;
+		margin: 2.5em 0;
+	}
+	.figure img,    .sidefigure img,    figure img,
+	.figure object, .sidefigure object, figure object {
+		max-width: 100%;
+		margin: auto;
+	}
+	.figure pre, .sidefigure pre, figure pre {
+		text-align: left;
+		display: table;
+		margin: 1em auto;
+	}
+	.figure table, figure table {
+		margin: auto;
+	}
+	@media screen and (min-width: 20em) {
+		.sidefigure {
+			float: right;
+			width: 50%;
+			margin: 0 0 0.5em 0.5em
+		}
+	}
+	.caption, figcaption, caption {
+		font-style: italic;
+		font-size: 90%;
+	}
+	.caption::before, figcaption::before, figcaption > .marker {
+		font-weight: bold;
+	}
+	.caption, figcaption {
+		counter-increment: figure;
+	}
+
+	/* DL list is indented 2em, but figure inside it is not */
+	dd > .figure, dd > figure { margin-left: -2em }
+
+/******************************************************************************/
+/*                             Colored Boxes                                  */
+/******************************************************************************/
+
+	.issue, .note, .example, .assertion, .advisement, blockquote {
+		padding: .5em;
+		border: .5em;
+		border-left-style: solid;
+		page-break-inside: avoid;
+	}
+	span.issue, span.note {
+		padding: .1em .5em .15em;
+		border-right-style: solid;
+	}
+
+	.issue,
+	.note,
+	.example,
+	.advisement,
+	.assertion,
+	blockquote {
+		margin: 1em auto;
+	}
+	.note  > p:first-child,
+	.issue > p:first-child,
+	blockquote > :first-child {
+		margin-top: 0;
+	}
+	blockquote > :last-child {
+		margin-bottom: 0;
+	}
+
+/** Blockquotes ***************************************************************/
+
+	blockquote {
+		border-color: silver;
+	}
+
+/** Open issue ****************************************************************/
+
+	.issue {
+		border-color: #E05252;
+		background: #FBE9E9;
+		counter-increment: issue;
+		overflow: auto;
+	}
+	.issue::before, .issue > .marker {
+		text-transform: uppercase;
+		color: #AE1E1E;
+		padding-right: 1em;
+		text-transform: uppercase;
+	}
+	/* Add .issue::before { content: "Issue " counter(issue) " "; } for autogen numbers,
+	   or use class="marker" to mark up the issue number in source. */
+
+/** Example *******************************************************************/
+
+	.example {
+		border-color: #E0CB52;
+		background: #FCFAEE;
+		counter-increment: example;
+		overflow: auto;
+		clear: both;
+	}
+	.example::before, .example > .marker {
+		text-transform: uppercase;
+		color: #827017;
+		min-width: 7.5em;
+		display: block;
+	}
+	/* Add .example::before { content: "Example " counter(example) " "; } for autogen numbers,
+	   or use class="marker" to mark up the example number in source. */
+
+/** Non-normative Note ********************************************************/
+
+	.note {
+		border-color: #52E052;
+		background: #E9FBE9;
+		overflow: auto;
+	}
+
+	.note::before, .note > .marker,
+	details.note > summary::before,
+	details.note > summary > .marker {
+		text-transform: uppercase;
+		display: block;
+		color: hsl(120, 70%, 30%);
+	}
+	/* Add .note::before { content: "Note"; } for autogen label,
+	   or use class="marker" to mark up the label in source. */
+
+	details.note > summary {
+		display: block;
+		color: hsl(120, 70%, 30%);
+	}
+	details.note[open] > summary {
+		border-bottom: 1px silver solid;
+	}
+
+/** Assertion Box *************************************************************/
+	/*  for assertions in algorithms */
+
+	.assertion {
+		border-color: #AAA;
+		background: #EEE;
+	}
+
+/** Advisement Box ************************************************************/
+	/*  for attention-grabbing normative statements */
+
+	.advisement {
+		border-color: orange;
+		border-style: none solid;
+		background: #FFEECC;
+	}
+	strong.advisement {
+		display: block;
+		text-align: center;
+	}
+	.advisement > .marker {
+		color: #B35F00;
+	}
+
+/** Spec Obsoletion Notice ****************************************************/
+	/* obnoxious obsoletion notice for older/abandoned specs. */
+
+	details {
+		display: block;
+	}
+	summary {
+		font-weight: bolder;
+	}
+
+	.annoying-warning:not(details),
+	details.annoying-warning:not([open]) > summary,
+	details.annoying-warning[open] {
+		background: #fdd;
+		color: red;
+		font-weight: bold;
+		padding: .75em 1em;
+		border: thick red;
+		border-style: solid;
+		border-radius: 1em;
+	}
+	.annoying-warning :last-child {
+		margin-bottom: 0;
+	}
+
+@media not print {
+	details.annoying-warning[open] {
+		position: fixed;
+		left: 1em;
+		right: 1em;
+		bottom: 1em;
+		z-index: 1000;
+	}
+}
+
+	details.annoying-warning:not([open]) > summary {
+		text-align: center;
+	}
+
+/** Entity Definition Boxes ***************************************************/
+
+	.def {
+		padding: .5em 1em;
+		background: #DEF;
+		margin: 1.2em 0;
+		border-left: 0.5em solid #8CCBF2;
+	}
+
+/******************************************************************************/
+/*                                    Tables                                  */
+/******************************************************************************/
+
+	th, td {
+		text-align: left;
+		text-align: start;
+	}
+
+/** Property/Descriptor Definition Tables *************************************/
+
+	table.def {
+		/* inherits .def box styling, see above */
+		width: 100%;
+		border-spacing: 0;
+	}
+
+	table.def td,
+	table.def th {
+		padding: 0.5em;
+		vertical-align: baseline;
+		border-bottom: 1px solid #bbd7e9;
+	}
+
+	table.def > tbody > tr:last-child th,
+	table.def > tbody > tr:last-child td {
+		border-bottom: 0;
+	}
+
+	table.def th {
+		font-style: italic;
+		font-weight: normal;
+		padding-left: 1em;
+		width: 3em;
+	}
+
+	/* For when values are extra-complex and need formatting for readability */
+	table td.pre {
+		white-space: pre-wrap;
+	}
+
+	/* A footnote at the bottom of a def table */
+	table.def           td.footnote {
+		padding-top: 0.6em;
+	}
+	table.def           td.footnote::before {
+		content: " ";
+		display: block;
+		height: 0.6em;
+		width: 4em;
+		border-top: thin solid;
+	}
+
+/** Data tables (and properly marked-up index tables) *************************/
+	/*
+		 <table class="data"> highlights structural relationships in a table
+		 when correct markup is used (e.g. thead/tbody, th vs. td, scope attribute)
+
+		 Use class="complex data" for particularly complicated tables --
+		 (This will draw more lines: busier, but clearer.)
+
+		 Use class="long" on table cells with paragraph-like contents
+		 (This will adjust text alignment accordingly.)
+		 Alternately use class="longlastcol" on tables, to have the last column assume "long".
+	*/
+
+	table {
+		word-wrap: normal;
+		overflow-wrap: normal;
+		hyphens: manual;
+	}
+
+	table.data,
+	table.index {
+		margin: 1em auto;
+		border-collapse: collapse;
+		border: hidden;
+		width: 100%;
+	}
+	table.data caption,
+	table.index caption {
+		max-width: 50em;
+		margin: 0 auto 1em;
+	}
+
+	table.data td,  table.data th,
+	table.index td, table.index th {
+		padding: 0.5em 1em;
+		border-width: 1px;
+		border-color: silver;
+		border-top-style: solid;
+	}
+
+	table.data thead td:empty {
+		padding: 0;
+		border: 0;
+	}
+
+	table.data  thead,
+	table.index thead,
+	table.data  tbody,
+	table.index tbody {
+		border-bottom: 2px solid;
+	}
+
+	table.data colgroup,
+	table.index colgroup {
+		border-left: 2px solid;
+	}
+
+	table.data  tbody th:first-child,
+	table.index tbody th:first-child  {
+		border-right: 2px solid;
+		border-top: 1px solid silver;
+		padding-right: 1em;
+	}
+
+	table.data th[colspan],
+	table.data td[colspan] {
+		text-align: center;
+	}
+
+	table.complex.data th,
+	table.complex.data td {
+		border: 1px solid silver;
+		text-align: center;
+	}
+
+	table.data.longlastcol td:last-child,
+	table.data td.long {
+	 vertical-align: baseline;
+	 text-align: left;
+	}
+
+	table.data img {
+		vertical-align: middle;
+	}
+
+
+/*
+Alternate table alignment rules
+
+	table.data,
+	table.index {
+		text-align: center;
+	}
+
+	table.data  thead th[scope="row"],
+	table.index thead th[scope="row"] {
+		text-align: right;
+	}
+
+	table.data  tbody th:first-child,
+	table.index tbody th:first-child  {
+		text-align: right;
+	}
+
+Possible extra rowspan handling
+
+	table.data  tbody th[rowspan]:not([rowspan='1']),
+	table.index tbody th[rowspan]:not([rowspan='1']),
+	table.data  tbody td[rowspan]:not([rowspan='1']),
+	table.index tbody td[rowspan]:not([rowspan='1']) {
+		border-left: 1px solid silver;
+	}
+
+	table.data  tbody th[rowspan]:first-child,
+	table.index tbody th[rowspan]:first-child,
+	table.data  tbody td[rowspan]:first-child,
+	table.index tbody td[rowspan]:first-child{
+		border-left: 0;
+		border-right: 1px solid silver;
+	}
+*/
+
+/******************************************************************************/
+/*                                  Indices                                   */
+/******************************************************************************/
+
+
+/** Table of Contents *********************************************************/
+
+	.toc a {
+		/* More spacing; use padding to make it part of the click target. */
+		padding-top: 0.1rem;
+		/* Larger, more consistently-sized click target */
+		display: block;
+		/* Reverse color scheme */
+		color: black;
+		border-color: #3980B5;
+		border-bottom-width: 3px !important;
+		margin-bottom: 0px !important;
+	}
+	.toc a:visited {
+		border-color: #054572;
+	}
+	.toc a:not(:focus):not(:hover) {
+		/* Allow colors to cascade through from link styling */
+		border-bottom-color: transparent;
+	}
+
+	.toc, .toc ol, .toc ul, .toc li {
+		list-style: none; /* Numbers must be inlined into source */
+		/* because generated content isn't search/selectable and markers can't do multilevel yet */
+		margin:  0;
+		padding: 0;
+		line-height: 1.1rem; /* consistent spacing */
+	}
+
+	/* ToC not indented until third level, but font style & margins show hierarchy */
+	.toc > li             { font-weight: bold;   }
+	.toc > li li          { font-weight: normal; }
+	.toc > li li li       { font-size:   95%;    }
+	.toc > li li li li    { font-size:   90%;    }
+	.toc > li li li li .secno { font-size: 85%; }
+	.toc > li li li li li { font-size:   85%;    }
+	.toc > li li li li li .secno { font-size: 100%; }
+
+	/* @supports not (display:grid) { */
+		.toc > li             { margin: 1.5rem 0;    }
+		.toc > li li          { margin: 0.3rem 0;    }
+		.toc > li li li       { margin-left: 2rem;   }
+
+		/* Section numbers in a column of their own */
+		.toc .secno {
+			float: left;
+			width: 4rem;
+			white-space: nowrap;
+		}
+
+		.toc li {
+			clear: both;
+		}
+
+		:not(li) > .toc              { margin-left:  5rem; }
+		.toc .secno                  { margin-left: -5rem; }
+		.toc > li li li .secno       { margin-left: -7rem; }
+		.toc > li li li li .secno    { margin-left: -9rem; }
+		.toc > li li li li li .secno { margin-left: -11rem; }
+
+		/* Tighten up indentation in narrow ToCs */
+		@media (max-width: 30em) {
+			:not(li) > .toc              { margin-left:  4rem; }
+			.toc .secno                  { margin-left: -4rem; }
+			.toc > li li li              { margin-left:  1rem; }
+			.toc > li li li .secno       { margin-left: -5rem; }
+			.toc > li li li li .secno    { margin-left: -6rem; }
+			.toc > li li li li li .secno { margin-left: -7rem; }
+		}
+	/* } */
+
+	@supports (display:grid) and (display:contents) {
+		/* Use #toc over .toc to override non-@supports rules. */
+		#toc {
+			display: grid;
+			align-content: start;
+			grid-template-columns: auto 1fr;
+			grid-column-gap: 1rem;
+			column-gap: 1rem;
+			grid-row-gap: .6rem;
+			row-gap: .6rem;
+		}
+		#toc h2 {
+			grid-column: 1 / -1;
+			margin-bottom: 0;
+		}
+		#toc ol,
+		#toc li,
+		#toc a {
+			display: contents;
+			/* Switch <a> to subgrid when supported */
+		}
+		#toc span {
+			margin: 0;
+		}
+		#toc > .toc > li > a > span {
+			/* The spans of the top-level list,
+			   comprising the first items of each top-level section. */
+			margin-top: 1.1rem;
+		}
+		#toc#toc .secno { /* Ugh, need more specificity to override base.css */
+			grid-column: 1;
+			width: auto;
+			margin-left: 0;
+		}
+		#toc .content {
+			grid-column: 2;
+			width: auto;
+			margin-right: 1rem;
+		}
+		#toc .content:hover {
+			background: rgba(75%, 75%, 75%, .25);
+			border-bottom: 3px solid #054572;
+			margin-bottom: -3px;
+		}
+		#toc li li li .content {
+			margin-left: 1rem;
+		}
+		#toc li li li li .content {
+			margin-left: 2rem;
+		}
+	}
+
+
+/** Index *********************************************************************/
+
+	/* Index Lists: Layout */
+	ul.index       { margin-left: 0; columns: 15em; text-indent: 1em hanging; }
+	ul.index li    { margin-left: 0; list-style: none; break-inside: avoid; }
+	ul.index li li { margin-left: 1em }
+	ul.index dl    { margin-top: 0; }
+	ul.index dt    { margin: .2em 0 .2em 20px;}
+	ul.index dd    { margin: .2em 0 .2em 40px;}
+	/* Index Lists: Typography */
+	ul.index ul,
+	ul.index dl { font-size: smaller; }
+	@media not print {
+		ul.index li span {
+			white-space: nowrap;
+			color: transparent; }
+		ul.index li a:hover + span,
+		ul.index li a:focus + span {
+			color: #707070;
+		}
+	}
+
+/** Index Tables *****************************************************/
+	/* See also the data table styling section, which this effectively subclasses */
+
+	table.index {
+		font-size: small;
+		border-collapse: collapse;
+		border-spacing: 0;
+		text-align: left;
+		margin: 1em 0;
+	}
+
+	table.index td,
+	table.index th {
+		padding: 0.4em;
+	}
+
+	table.index tr:hover td:not([rowspan]),
+	table.index tr:hover th:not([rowspan]) {
+		background: #f7f8f9;
+	}
+
+	/* The link in the first column in the property table (formerly a TD) */
+	table.index th:first-child a {
+		font-weight: bold;
+	}
+
+/******************************************************************************/
+/*                                    Print                                   */
+/******************************************************************************/
+
+	@media print {
+		/* Pages have their own margins. */
+		html {
+			margin: 0;
+		}
+		/* Serif for print. */
+		body {
+			font-family: serif;
+		}
+	}
+	@page {
+		margin: 1.5cm 1.1cm;
+	}
+
+/******************************************************************************/
+/*                                    Legacy                                  */
+/******************************************************************************/
+
+	/* This rule is inherited from past style sheets. No idea what it's for. */
+	.hide { display: none }
+
+
+
+/******************************************************************************/
+/*                             Overflow Control                               */
+/******************************************************************************/
+
+	.figure .caption, .sidefigure .caption, figcaption {
+		/* in case figure is overlarge, limit caption to 50em */
+		max-width: 50rem;
+		margin-left: auto;
+		margin-right: auto;
+	}
+	.overlarge {
+		/* Magic to create good table positioning:
+		   "content column" is 50ems wide at max; less on smaller screens.
+		   Extra space (after ToC + content) is empty on the right.
+
+		   1. When table < content column, centers table in column.
+		   2. When content < table < available, left-aligns.
+		   3. When table > available, fills available + scroll bar.
+		*/ 
+		display: grid;
+		grid-template-columns: minmax(0, 50em);
+	}
+	.overlarge > table {
+		/* limit preferred width of table */
+		max-width: 50em;
+		margin-left: auto;
+		margin-right: auto;
+	}
+
+	@media (min-width: 55em) {
+		.overlarge {
+			margin-right: calc(13px + 26.5rem - 50vw);
+			max-width: none;
+		}
+	}
+	@media screen and (min-width: 78em) {
+		body:not(.toc-inline) .overlarge {
+			/* 30.5em body padding 50em content area */
+			margin-right: calc(40em - 50vw) !important;
+		}
+	}
+	@media screen and (min-width: 90em) {
+		body:not(.toc-inline) .overlarge {
+			/* 4em html margin 30.5em body padding 50em content area */
+			margin-right: calc(84.5em - 100vw) !important;
+		}
+	}
+
+	@media not print {
+		.overlarge {
+			overflow-x: auto;
+			/* See Lea Verou's explanation background-attachment:
+			 * http://lea.verou.me/2012/04/background-attachment-local/
+			 *
+			background: top left  / 4em 100% linear-gradient(to right,  #ffffff, rgba(255, 255, 255, 0)) local,
+			            top right / 4em 100% linear-gradient(to left, #ffffff, rgba(255, 255, 255, 0)) local,
+			            top left  / 1em 100% linear-gradient(to right,  #c3c3c5, rgba(195, 195, 197, 0)) scroll,
+			            top right / 1em 100% linear-gradient(to left, #c3c3c5, rgba(195, 195, 197, 0)) scroll,
+			            white;
+			background-repeat: no-repeat;
+			*/
+		}
+	}
+</style>
+  <link href="https://www.w3.org/StyleSheets/TR/2016/cg-draft" rel="stylesheet">
+  <link href="https://wicg.github.io/client-hints-infrastructure" rel="canonical">
+<style>
+table, th, td { border: 1px black solid; }
+thead {background-color: yellow; }
+</style>
+<style>/* style-md-lists */
+
+/* This is a weird hack for me not yet following the commonmark spec
+   regarding paragraph and lists. */
+[data-md] > :first-child {
+    margin-top: 0;
+}
+[data-md] > :last-child {
+    margin-bottom: 0;
+}</style>
+<style>/* style-counters */
+
+body {
+    counter-reset: example figure issue;
+}
+.issue {
+    counter-increment: issue;
+}
+.issue:not(.no-marker)::before {
+    content: "Issue " counter(issue);
+}
+
+.example {
+    counter-increment: example;
+}
+.example:not(.no-marker)::before {
+    content: "Example " counter(example);
+}
+.invalid.example:not(.no-marker)::before,
+.illegal.example:not(.no-marker)::before {
+    content: "Invalid Example" counter(example);
+}
+
+figcaption {
+    counter-increment: figure;
+}
+figcaption:not(.no-marker)::before {
+    content: "Figure " counter(figure) " ";
+}</style>
+<style>/* style-dfn-panel */
+
+.dfn-panel {
+    position: absolute;
+    z-index: 35;
+    height: auto;
+    width: -webkit-fit-content;
+    width: fit-content;
+    max-width: 300px;
+    max-height: 500px;
+    overflow: auto;
+    padding: 0.5em 0.75em;
+    font: small Helvetica Neue, sans-serif, Droid Sans Fallback;
+    background: #DDDDDD;
+    color: black;
+    border: outset 0.2em;
+}
+.dfn-panel:not(.on) { display: none; }
+.dfn-panel * { margin: 0; padding: 0; text-indent: 0; }
+.dfn-panel > b { display: block; }
+.dfn-panel a { color: black; }
+.dfn-panel a:not(:hover) { text-decoration: none !important; border-bottom: none !important; }
+.dfn-panel > b + b { margin-top: 0.25em; }
+.dfn-panel ul { padding: 0; }
+.dfn-panel li { list-style: inside; }
+.dfn-panel.activated {
+    display: inline-block;
+    position: fixed;
+    left: .5em;
+    bottom: 2em;
+    margin: 0 auto;
+    max-width: calc(100vw - 1.5em - .4em - .5em);
+    max-height: 30vh;
+}
+
+.dfn-paneled { cursor: pointer; }
+</style>
+<style>/* style-selflinks */
+
+.heading, .issue, .note, .example, li, dt {
+    position: relative;
+}
+a.self-link {
+    position: absolute;
+    top: 0;
+    left: calc(-1 * (3.5rem - 26px));
+    width: calc(3.5rem - 26px);
+    height: 2em;
+    text-align: center;
+    border: none;
+    transition: opacity .2s;
+    opacity: .5;
+}
+a.self-link:hover {
+    opacity: 1;
+}
+.heading > a.self-link {
+    font-size: 83%;
+}
+li > a.self-link {
+    left: calc(-1 * (3.5rem - 26px) - 2em);
+}
+dfn > a.self-link {
+    top: auto;
+    left: auto;
+    opacity: 0;
+    width: 1.5em;
+    height: 1.5em;
+    background: gray;
+    color: white;
+    font-style: normal;
+    transition: opacity .2s, background-color .2s, color .2s;
+}
+dfn:hover > a.self-link {
+    opacity: 1;
+}
+dfn > a.self-link:hover {
+    color: black;
+}
+
+a.self-link::before            { content: "¶"; }
+.heading > a.self-link::before { content: "§"; }
+dfn > a.self-link::before      { content: "#"; }</style>
+<style>/* style-autolinks */
+
+.css.css, .property.property, .descriptor.descriptor {
+    color: #005a9c;
+    font-size: inherit;
+    font-family: inherit;
+}
+.css::before, .property::before, .descriptor::before {
+    content: "‘";
+}
+.css::after, .property::after, .descriptor::after {
+    content: "’";
+}
+.property, .descriptor {
+    /* Don't wrap property and descriptor names */
+    white-space: nowrap;
+}
+.type { /* CSS value <type> */
+    font-style: italic;
+}
+pre .property::before, pre .property::after {
+    content: "";
+}
+[data-link-type="property"]::before,
+[data-link-type="propdesc"]::before,
+[data-link-type="descriptor"]::before,
+[data-link-type="value"]::before,
+[data-link-type="function"]::before,
+[data-link-type="at-rule"]::before,
+[data-link-type="selector"]::before,
+[data-link-type="maybe"]::before {
+    content: "‘";
+}
+[data-link-type="property"]::after,
+[data-link-type="propdesc"]::after,
+[data-link-type="descriptor"]::after,
+[data-link-type="value"]::after,
+[data-link-type="function"]::after,
+[data-link-type="at-rule"]::after,
+[data-link-type="selector"]::after,
+[data-link-type="maybe"]::after {
+    content: "’";
+}
+
+[data-link-type].production::before,
+[data-link-type].production::after,
+.prod [data-link-type]::before,
+.prod [data-link-type]::after {
+    content: "";
+}
+
+[data-link-type=element],
+[data-link-type=element-attr] {
+    font-family: Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    font-size: .9em;
+}
+[data-link-type=element]::before { content: "<" }
+[data-link-type=element]::after  { content: ">" }
+
+[data-link-type=biblio] {
+    white-space: pre;
+}</style>
+ <body class="h-entry">
+  <div class="head">
+   <p data-fill-with="logo"></p>
+   <h1 class="p-name no-ref" id="title">Client Hints Infrastructure</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Community Group Report, <time class="dt-updated" datetime="1970-01-01">1 January 1970</time></span></h2>
+   <div data-fill-with="spec-metadata">
+    <dl>
+     <dt>This version:
+     <dd><a class="u-url" href="https://wicg.github.io/client-hints-infrastructure">https://wicg.github.io/client-hints-infrastructure</a>
+     <dt class="editor">Editor:
+     <dd class="editor p-author h-card vcard"><a class="p-name fn u-url url" href="https://blog.yoav.ws">Yoav Weiss</a> (<span class="p-org org">Google</span>) <a class="u-email email" href="mailto:yoav@yoav.ws">yoav@yoav.ws</a>
+    </dl>
+   </div>
+   <div data-fill-with="warning"></div>
+   <p class="copyright" data-fill-with="copyright"><a href="http://www.w3.org/Consortium/Legal/ipr-notice#Copyright">Copyright</a> © 1970 the Contributors to the Client Hints Infrastructure Specification, published by the <a href="https://www.w3.org/community/wicg/">Web Platform Incubator Community Group</a> under the <a href="https://www.w3.org/community/about/agreements/cla/">W3C Community Contributor License Agreement (CLA)</a>.
+A human-readable <a href="http://www.w3.org/community/about/agreements/cla-deed/">summary</a> is available. </p>
+   <hr title="Separator for header">
+  </div>
+  <div class="p-summary" data-fill-with="abstract">
+   <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
+   <p>Specification of the Client Hints infrastructure and its integration with Fetch and HTML</p>
+  </div>
+  <div data-fill-with="at-risk"></div>
+  <h2 class="no-num no-toc no-ref heading settled" id="status"><span class="content">Status of this document</span></h2>
+  <div data-fill-with="status">
+   <p> This specification was published by the <a href="https://www.w3.org/community/wicg/">Web Platform Incubator Community Group</a>.
+  It is not a W3C Standard nor is it on the W3C Standards Track.
+
+  Please note that under the <a href="https://www.w3.org/community/about/agreements/cla/">W3C Community Contributor License Agreement (CLA)</a> there is a limited opt-out and other conditions apply.
+
+  Learn more about <a href="http://www.w3.org/community/">W3C Community and Business Groups</a>. </p>
+   <p></p>
+  </div>
+  <div data-fill-with="at-risk"></div>
+  <nav data-fill-with="table-of-contents" id="toc">
+   <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
+   <ol class="toc" role="directory">
+    <li><a href="#intro"><span class="secno">1</span> <span class="content">Introduction</span></a>
+    <li><a href="#definition"><span class="secno">2</span> <span class="content">Infrastructure definition</span></a>
+    <li>
+     <a href="#environment-settings-object-processing"><span class="secno">3</span> <span class="content">Environment settings object processing</span></a>
+     <ol class="toc">
+      <li><a href="#concept-client-hints-set"><span class="secno">3.1</span> <span class="content">Client hints set</span></a>
+      <li><a href="#accept-ch-cache-definition"><span class="secno">3.2</span> <span class="content">Accept-CH cache</span></a>
+      <li><a href="#initialize-ch-set"><span class="secno">3.3</span> <span class="content">Initialize Client Hints set</span></a>
+      <li><a href="#accept-ch-state-algo"><span class="secno">3.4</span> <span class="content"><span>Accept-CH state</span> (<code>http-equiv="accept-ch"</code>)</span></a>
+     </ol>
+    <li>
+     <a href="#html"><span class="secno">4</span> <span class="content">Integration with HTML</span></a>
+     <ol class="toc">
+      <li><a href="#document-init"><span class="secno">4.1</span> <span class="content">Document object initialization</span></a>
+      <li><a href="#worker-init"><span class="secno">4.2</span> <span class="content">Worker initialization</span></a>
+      <li><a href="#http-equiv-attributes"><span class="secno">4.3</span> <span class="content">http-equiv attributes</span></a>
+      <li><a href="#pragma-directives"><span class="secno">4.4</span> <span class="content">Pragma directives</span></a>
+      <li><a href="#extending-environment-settings-object"><span class="secno">4.5</span> <span class="content">Extending environment settings object</span></a>
+     </ol>
+    <li><a href="#request-processing"><span class="secno">5</span> <span class="content">Request processing</span></a>
+    <li><a href="#fetch"><span class="secno">6</span> <span class="content">Integration with Fetch</span></a>
+    <li>
+     <a href="#registry"><span class="secno">7</span> <span class="content">Feature Registry</span></a>
+     <ol class="toc">
+      <li><a href="#client-hints-token-definition"><span class="secno">7.1</span> <span class="content">Client hints token</span></a>
+      <li><a href="#policy-controlled-features"><span class="secno">7.2</span> <span class="content">Policy-controlled features</span></a>
+      <li><a href="#low-entropy-table"><span class="secno">7.3</span> <span class="content">Low entropy hint table</span></a>
+      <li><a href="#find-client-hint-value-section"><span class="secno">7.4</span> <span class="content">Find client hint value</span></a>
+     </ol>
+    <li><a href="#privacy"><span class="secno">8</span> <span class="content">Security and Privacy considerations</span></a>
+    <li><a href="#terms"><span class="secno">9</span> <span class="content">Terms</span></a>
+    <li><a href="#conformance"><span class="secno"></span> <span class="content"> Conformance</span></a>
+    <li>
+     <a href="#index"><span class="secno"></span> <span class="content">Index</span></a>
+     <ol class="toc">
+      <li><a href="#index-defined-here"><span class="secno"></span> <span class="content">Terms defined by this specification</span></a>
+      <li><a href="#index-defined-elsewhere"><span class="secno"></span> <span class="content">Terms defined by reference</span></a>
+     </ol>
+    <li>
+     <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
+     <ol class="toc">
+      <li><a href="#normative"><span class="secno"></span> <span class="content">Normative References</span></a>
+     </ol>
+    <li><a href="#issues-index"><span class="secno"></span> <span class="content">Issues Index</span></a>
+   </ol>
+  </nav>
+  <main>
+   <h2 class="heading settled" data-level="1" id="intro"><span class="secno">1. </span><span class="content">Introduction</span><a class="self-link" href="#intro"></a></h2>
+   <p>Client Hints is collection of HTTP and user-agent features that enables
+privacy-preserving, proactive content negotiation with an explicit third-party
+delegation mechanism:</p>
+   <ul>
+    <li data-md>
+     <p>Proactive content negotiation at the HTTP layer enables servers to request
+delivery of specific hints, in order to enable optimized and automated
+selection of resources based on a user’s device, conditions and preferences,
+and lets clients decide which hint requests they want to grant, with
+per-hint and per-origin granularity.</p>
+    <li data-md>
+     <p>Integration of said mechanism with web concepts, defined in this document,
+enables browsers to benefit from content adaptation, and have it play nicely with
+current web restrictions (e.g. same-origin policy).</p>
+    <li data-md>
+     <p>The opt-in nature of the mechanism enables browsers to advertise requested
+hint data (e.g. user agent and device characteristics) selectively to
+secure-transport origins, instead of appending such data on every outgoing
+request.</p>
+    <li data-md>
+     <p>Origin opt-in applies to same-origin assets only and delivery to third-party
+origins is subject to explicit first party delegation via Feature Policy,
+enabling tight control over which third party origins can access requested
+hint data.</p>
+   </ul>
+   <p>The goal of Client Hints is to <strong>reduce passive fingerprinting</strong> on the web
+while <strong>enabling scalable and privacy preserving content adaptation</strong> between
+client and server, via a standardized set of content negotiation primitives at
+the HTTP and user agent levels.</p>
+   <h2 class="heading settled" data-level="2" id="definition"><span class="secno">2. </span><span class="content">Infrastructure definition</span><a class="self-link" href="#definition"></a></h2>
+   <p>The specification of the Client Hints <strong>infrastructure</strong> is divided between the
+following specifications and proposals:</p>
+   <ul>
+    <li data-md>
+     <p>IETF <a data-link-type="biblio" href="#biblio-client-hints">[CLIENT-HINTS]</a></p>
+     <ul>
+      <li data-md>
+       <p>Provides the motivation for Client Hints.</p>
+      <li data-md>
+       <p>Defines the fundamental Client Hints infrastructure:</p>
+       <ul>
+        <li data-md>
+         <p>The <code>Accept-CH</code> response header, which servers may use to advertise
+support for certain Client Hints.</p>
+       </ul>
+      <li data-md>
+       <p>Provides both general guidelines, and formal requirements, about Client
+ Hints’ impact on caching, security, and privacy.</p>
+      <li data-md>
+       <p>Does <em>not</em> define any actual, particular hints – or say anything about how
+ Client Hints works in web contexts.</p>
+     </ul>
+    <li data-md>
+     <p>Client Hints infrastructure - this document</p>
+     <ul>
+      <li data-md>
+       <p>Defines how web clients should process the <code>Accept-CH</code> headers sent by servers.</p>
+      <li data-md>
+       <p>Defines the environment settings object state related to <code>Accept-CH</code>,
+ which stores information about which servers should get which hints.</p>
+      <li data-md>
+       <p>Defines how, and when, web clients should actually go about sending hints,
+ based on the state of their environment settings object.</p>
+       <ul>
+        <li data-md>
+         <p>More specifically, it integrates the HTML web concepts with Fetch’s
+algorithms to make sure that opted-in hints are added to requests for
+same-origin or delegated-to cross-origin requests. It also makes sure
+hints are removed from not delegated-to cross-origin requests after
+redirections.</p>
+       </ul>
+      <li data-md>
+       <p>Integrates those concepts with the <a data-link-type="biblio" href="#biblio-html">[HTML]</a> and <a data-link-type="biblio" href="#biblio-fetch">[FETCH]</a> specifications,
+  by patching various concepts there.</p>
+     </ul>
+    <li data-md>
+     <p>W3C Feature Policy specification (<a href="https://w3c.github.io/webappsec-feature-policy/#should-request-be-allowed-to-use-feature">relevant section</a>)</p>
+     <ul>
+      <li data-md>
+       <p>In order to perform third party Client Hint delegation, Feature Policy has
+ been extended to control features within fetch requests (rather than just Documents).</p>
+     </ul>
+   </ul>
+   <h2 class="heading settled" data-level="3" id="environment-settings-object-processing"><span class="secno">3. </span><span class="content">Environment settings object processing</span><a class="self-link" href="#environment-settings-object-processing"></a></h2>
+   <h3 class="heading settled" data-level="3.1" id="concept-client-hints-set"><span class="secno">3.1. </span><span class="content">Client hints set</span><a class="self-link" href="#concept-client-hints-set"></a></h3>
+   <p>A <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="client-hints-set">client hints set</dfn> is a <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#ordered-set" id="ref-for-ordered-set">set</a> of <a data-link-type="dfn" href="#client-hints-token" id="ref-for-client-hints-token">client hints token</a>s. </p>
+   <h3 class="heading settled" data-level="3.2" id="accept-ch-cache-definition"><span class="secno">3.2. </span><span class="content">Accept-CH cache</span><a class="self-link" href="#accept-ch-cache-definition"></a></h3>
+   <p>An <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="accept-ch-cache">Accept-CH cache</dfn> is owned by the user agent and is an <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#ordered-map" id="ref-for-ordered-map">ordered map</a>, <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#map-key" id="ref-for-map-key">keyed</a> on <dfn class="dfn-paneled" data-dfn-for="accept-ch-cache" data-dfn-type="dfn" data-noexport id="accept-ch-cache-origin">origin</dfn> (an <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/origin.html#concept-origin" id="ref-for-concept-origin">origin</a>), 
+  with a value of <dfn class="dfn-paneled" data-dfn-for="accept-ch-cache" data-dfn-type="dfn" data-noexport id="accept-ch-cache-client-hints-set">client hints set</dfn> (a <a data-link-type="dfn" href="#client-hints-set" id="ref-for-client-hints-set">client hints set</a>).</p>
+   <p>The Accept-CH cache can effectively act as an alternative cookie store,
+since sites can use each of the hints as a bit set on the client, and that information will be
+communicated to them on every request. As such, a user agent MUST evict that
+cache whenever the user clears their cookies or when session cookies expire.</p>
+   <p>To <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="add-a-new-accept-ch-cache-entry">add a new Accept-CH cache entry</dfn> to the <a data-link-type="dfn" href="#accept-ch-cache" id="ref-for-accept-ch-cache">Accept-CH cache</a>,
+given an <a data-link-type="dfn" href="#accept-ch-cache-origin" id="ref-for-accept-ch-cache-origin">origin</a> <var>origin</var> and a <a data-link-type="dfn" href="#client-hints-set" id="ref-for-client-hints-set①">client hints set</a> <var>client hints set</var>, <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#map-set" id="ref-for-map-set">set</a> <a data-link-type="dfn" href="#accept-ch-cache" id="ref-for-accept-ch-cache①">Accept-CH cache</a>[<var>origin</var>] to <var>client hints set</var>.</p>
+   <p>To <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="retrieve-the-client-hints-set">retrieve the client hints set</dfn> given an <var>origin</var>:</p>
+   <ol>
+    <li data-md>
+     <p>Let <var>clientHintsSet</var> be an empty <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#ordered-set" id="ref-for-ordered-set①">ordered set</a>.</p>
+    <li data-md>
+     <p>Let <var>originMatchingEntries</var> be the entries in the <a data-link-type="dfn" href="#accept-ch-cache" id="ref-for-accept-ch-cache②">Accept-CH cache</a> whose <a data-link-type="dfn" href="#accept-ch-cache-origin" id="ref-for-accept-ch-cache-origin①">origin</a> is <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/origin.html#same-origin" id="ref-for-same-origin">same origin</a> with <var>origin</var>.</p>
+    <li data-md>
+     <p>For each entry in <var>originMatchingEntries</var>, for each token in its <a data-link-type="dfn" href="#accept-ch-cache-client-hints-set" id="ref-for-accept-ch-cache-client-hints-set">client hints set</a>, <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#set-append" id="ref-for-set-append">append</a> the token to <var>clientHintsSet</var>.</p>
+    <li data-md>
+     <p>Return <var>clientHintsSet</var>.</p>
+   </ol>
+   <h3 class="heading settled" data-level="3.3" id="initialize-ch-set"><span class="secno">3.3. </span><span class="content">Initialize Client Hints set</span><a class="self-link" href="#initialize-ch-set"></a></h3>
+    When asked to <dfn class="dfn-paneled" data-dfn-type="abstract-op" data-export id="abstract-opdef-initialize-the-client-hints-set">initialize the Client Hints set</dfn> with <var>settingsObject</var> and <var>response</var> as inputs, run the following steps: 
+   <ol>
+    <li data-md>
+     <p>Let <var>clientHintsSet</var> be the result of running <a data-link-type="dfn" href="#retrieve-the-client-hints-set" id="ref-for-retrieve-the-client-hints-set">retrieve the client hints set</a> with <var>settingsObject</var>’s <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin" id="ref-for-concept-settings-object-origin">origin</a>.</p>
+    <li data-md>
+     <p>For each <var>hint</var> in <var>clientHintsSet</var>, <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#set-append" id="ref-for-set-append①">append</a> <var>hint</var> to <var>settingsObject</var>’s <a data-link-type="dfn" href="#environment-settings-object-client-hints-set" id="ref-for-environment-settings-object-client-hints-set">client hints set</a>.</p>
+    <li data-md>
+     <p>If the result of executing <a data-link-type="abstract-op" href="https://w3c.github.io/webappsec-secure-contexts/#settings-object" id="ref-for-settings-object">Is an environment settings object contextually secure?</a> on <var>settingsObject</var> is <code>"Not Secure"</code>, abort these steps.</p>
+    <li data-md>
+     <p>Let <var>browsingContext</var> be <var>settingsObject</var>’s <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context" id="ref-for-responsible-browsing-context">responsible browsing context</a>.</p>
+    <li data-md>
+     <p>If the <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/browsers.html#top-level-browsing-context" id="ref-for-top-level-browsing-context">top-level browsing context</a> does not equal <var>browsingContext</var>, abort these steps.</p>
+    <li data-md>
+     <p>If <var>response</var>’s <code>Accept-CH</code> header is present, parse the header field value according to the <code>Accept-CH</code> header parsing rules, as a <a data-link-type="dfn" href="#field-name" id="ref-for-field-name">field-name</a>. Add each parsed <a data-link-type="dfn" href="#client-hints-token" id="ref-for-client-hints-token①">client hints token</a> to <var>settingsObject</var>’s <a data-link-type="dfn" href="#environment-settings-object-client-hints-set" id="ref-for-environment-settings-object-client-hints-set①">client hints set</a>.</p>
+    <li data-md>
+     <p><a data-link-type="dfn" href="#add-a-new-accept-ch-cache-entry" id="ref-for-add-a-new-accept-ch-cache-entry">Add a new Accept-CH cache entry</a> with <var>response</var>’s <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/origin.html#concept-origin" id="ref-for-concept-origin①">origin</a> and <var>settingsObject</var>’s <a data-link-type="dfn" href="#environment-settings-object-client-hints-set" id="ref-for-environment-settings-object-client-hints-set②">client hints set</a> as inputs.</p>
+   </ol>
+   <div class="note" role="note">
+     Note, the above algorithm: 
+    <ul>
+     <li data-md>
+      <p>Initializes client hints set on the environment settings object based on its origin.</p>
+     <li data-md>
+      <p>If we are in a secure context and the navigation is a top-level navigation,
+it parses <code>Accept-CH</code> and adds the results to the environment setting object’s client hints set as well as the Accept-CH cache.</p>
+    </ul>
+   </div>
+   <h3 class="heading settled" data-level="3.4" id="accept-ch-state-algo"><span class="secno">3.4. </span><span class="content"><dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="accept-ch-state">Accept-CH state</dfn> (<code>http-equiv="accept-ch"</code>)</span><a class="self-link" href="#accept-ch-state-algo"></a></h3>
+   <p class="note" role="note"><span>Note:</span> This pragma appends <a data-link-type="dfn" href="#client-hints-token" id="ref-for-client-hints-token②">client hints token</a>s to the <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object" id="ref-for-environment-settings-object">environment settings object</a>'s <a data-link-type="dfn" href="#environment-settings-object-client-hints-set" id="ref-for-environment-settings-object-client-hints-set③">client hints set</a>.</p>
+   <ol>
+    <li data-md>
+     <p>If the <code><a data-link-type="element" href="https://html.spec.whatwg.org/multipage/semantics.html#meta" id="ref-for-meta">meta</a></code> element is not a child of a <code><a data-link-type="element" href="https://html.spec.whatwg.org/multipage/semantics.html#the-head-element" id="ref-for-the-head-element">head</a></code> element, then return.</p>
+    <li data-md>
+     <p>If the <code><a data-link-type="element" href="https://html.spec.whatwg.org/multipage/semantics.html#meta" id="ref-for-meta①">meta</a></code> element has no <code><a data-link-type="element-sub" href="https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-content" id="ref-for-attr-meta-content">content</a></code> attribute, or if that attribute’s value is the empty string, then return.</p>
+    <li data-md>
+     <p>Let <var>settingsObject</var> be the <code><a data-link-type="element" href="https://html.spec.whatwg.org/multipage/semantics.html#meta" id="ref-for-meta②">meta</a></code> element’s <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object" id="ref-for-relevant-settings-object">relevant settings object</a>.</p>
+    <li data-md>
+     <p>If the result of executing <a data-link-type="abstract-op" href="https://w3c.github.io/webappsec-secure-contexts/#settings-object" id="ref-for-settings-object①">Is an environment settings object contextually secure?</a> on <var>settingsObject</var> is <code>"Not Secure"</code>, then return.</p>
+    <li data-md>
+     <p>Let <var>browsingContext</var> be <var>settingsObject</var>’s <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context" id="ref-for-responsible-browsing-context①">responsible browsing context</a>.</p>
+    <li data-md>
+     <p>If the <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/browsers.html#top-level-browsing-context" id="ref-for-top-level-browsing-context①">top-level browsing context</a> does not equal <var>browsingContext</var>, abort these steps.</p>
+    <li data-md>
+     <p>Let <var>acceptCHValue</var> be the <code><a data-link-type="element" href="https://html.spec.whatwg.org/multipage/semantics.html#meta" id="ref-for-meta③">meta</a></code> element’s <code><a data-link-type="element-sub" href="https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-content" id="ref-for-attr-meta-content①">content</a></code> attribute’s value.</p>
+    <li data-md>
+     <p>Parse <var>acceptCHValue</var> according to the <a data-link-type="dfn" href="#accept-ch" id="ref-for-accept-ch">Accept-CH</a> header parsing rules, as a <a data-link-type="dfn" href="#field-name" id="ref-for-field-name①">field-name</a>. <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#set-append" id="ref-for-set-append②">Append</a> each parsed <a data-link-type="dfn" href="#client-hints-token" id="ref-for-client-hints-token③">client hints token</a> to <var>settingsObject</var>’s <a data-link-type="dfn" href="#environment-settings-object-client-hints-set" id="ref-for-environment-settings-object-client-hints-set④">client hints set</a>.</p>
+    <li data-md>
+     <p><a data-link-type="dfn" href="#add-a-new-accept-ch-cache-entry" id="ref-for-add-a-new-accept-ch-cache-entry①">Add a new Accept-CH cache entry</a> with <var>settingsObject</var>’s <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/origin.html#concept-origin" id="ref-for-concept-origin②">origin</a>, and <var>settingsObject</var>’s <a data-link-type="dfn" href="#environment-settings-object-client-hints-set" id="ref-for-environment-settings-object-client-hints-set⑤">client hints set</a>.</p>
+   </ol>
+   <h2 class="heading settled" data-level="4" id="html"><span class="secno">4. </span><span class="content">Integration with HTML</span><a class="self-link" href="#html"></a></h2>
+   <p>This specification integrates with the <a data-link-type="biblio" href="#biblio-html">[HTML]</a> specification by patching the algorithms below:</p>
+   <h3 class="heading settled" data-level="4.1" id="document-init"><span class="secno">4.1. </span><span class="content">Document object initialization</span><a class="self-link" href="#document-init"></a></h3>
+   <p>At <a href="https://html.spec.whatwg.org/multipage/browsing-the-web.html#initialise-the-document-object">Create and initialize a Document object</a>,
+after step 11, starting with "Initialize a Document’s CSP list", 
+call <a data-link-type="abstract-op" href="#abstract-opdef-initialize-the-client-hints-set" id="ref-for-abstract-opdef-initialize-the-client-hints-set">initialize the Client Hints set</a> with <var>document</var>’s <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object" id="ref-for-relevant-settings-object①">relevant settings object</a> and <var>response</var> as inputs.</p>
+   <h3 class="heading settled" data-level="4.2" id="worker-init"><span class="secno">4.2. </span><span class="content">Worker initialization</span><a class="self-link" href="#worker-init"></a></h3>
+    At <a href="https://html.spec.whatwg.org/multipage/workers.html#set-up-a-worker-environment-settings-object">set up a worker environment settings object</a>,
+after step 6, add the following step: 
+   <ol>
+    <li data-md>
+     <p>Set <var>settingsObject</var>’s <a data-link-type="dfn" href="#environment-settings-object-client-hints-set" id="ref-for-environment-settings-object-client-hints-set⑥">client hints set</a> to be a <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list-clone" id="ref-for-list-clone">clone</a> of <var>outside settings</var>’ <a data-link-type="dfn" href="#environment-settings-object-client-hints-set" id="ref-for-environment-settings-object-client-hints-set⑦">client hints set</a>.</p>
+   </ol>
+   <h3 class="heading settled" data-level="4.3" id="http-equiv-attributes"><span class="secno">4.3. </span><span class="content">http-equiv attributes</span><a class="self-link" href="#http-equiv-attributes"></a></h3>
+   <div class="non-normative">
+     <em>This section is non-normative.</em> 
+    <p>In the table on <a href="https://html.spec.whatwg.org/multipage/#attributes-3">attributes</a>, add "accept-ch" in the line which attribute is "http-equiv".</p>
+   </div>
+   <h3 class="heading settled" data-level="4.4" id="pragma-directives"><span class="secno">4.4. </span><span class="content">Pragma directives</span><a class="self-link" href="#pragma-directives"></a></h3>
+    For the table in <a href="https://html.spec.whatwg.org/multipage/#pragma-directives">pragma directives</a>,
+add a line with a "State" value of <a data-link-type="dfn" href="#accept-ch-state" id="ref-for-accept-ch-state">Accept-CH</a> and a "Keyword" value of <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="accept-ch">accept-ch</dfn>. 
+   <h3 class="heading settled" data-level="4.5" id="extending-environment-settings-object"><span class="secno">4.5. </span><span class="content">Extending environment settings object</span><a class="self-link" href="#extending-environment-settings-object"></a></h3>
+   <p>An <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object" id="ref-for-environment-settings-object①">environment settings object</a> has a <dfn class="dfn-paneled" data-dfn-for="environment settings object" data-dfn-type="dfn" data-noexport id="environment-settings-object-client-hints-set">client hints set</dfn>: a <a data-link-type="dfn" href="#client-hints-set" id="ref-for-client-hints-set②">client hints set</a>, initially the empty set, used for <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-fetch" id="ref-for-concept-fetch">fetches</a> performed using the <a data-link-type="dfn" href="https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object" id="ref-for-environment-settings-object②">environment settings object</a> as a <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-request-request" id="ref-for-concept-request-request">request</a> <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-request-client" id="ref-for-concept-request-client">client</a>.</p>
+   <h2 class="heading settled" data-level="5" id="request-processing"><span class="secno">5. </span><span class="content">Request processing</span><a class="self-link" href="#request-processing"></a></h2>
+   <p>When asked to <dfn class="dfn-paneled" data-dfn-type="abstract-op" data-export id="abstract-opdef-append-client-hints-to-request">append client hints to request</dfn> with <var>request</var> as input, run the following steps:</p>
+   <p>If <var>request</var> is a <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#navigation-request" id="ref-for-navigation-request">navigation request</a>, a user agent should, for each <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-header" id="ref-for-concept-header">header</a> <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-header-name" id="ref-for-concept-header-name">name</a> (<var>hintName</var>) in the registry’s <a data-link-type="dfn" href="#low-entropy-hint-table" id="ref-for-low-entropy-hint-table">low entropy hint table</a>,
+if <var>request</var>’s <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-request-header-list" id="ref-for-concept-request-header-list">header list</a> <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#header-list-contains" id="ref-for-header-list-contains">does not contain</a> <var>hintName</var>, then <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-header-list-append" id="ref-for-concept-header-list-append">append</a> <var>hintName</var>/the corresponding value to <var>request</var>’s <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-request-header-list" id="ref-for-concept-request-header-list①">header list</a>. </p>
+   <p class="issue" id="issue-f40790e6"><a class="self-link" href="#issue-f40790e6"></a> Define registry’s low entropy table</p>
+   <p>If <var>request</var>’s <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-request-client" id="ref-for-concept-request-client①">client</a> is not null,
+  then <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list-iterate" id="ref-for-list-iterate">for each</a> <a data-link-type="dfn" href="#client-hints-token" id="ref-for-client-hints-token④">client hints token</a> <var>hintName</var> of <var>request</var>’s <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-request-client" id="ref-for-concept-request-client②">client</a>’s <a data-link-type="dfn" href="#environment-settings-object-client-hints-set" id="ref-for-environment-settings-object-client-hints-set⑧">client hints set</a>: </p>
+   <ol>
+    <li>
+     <p>Let <var>value</var> be the return value of running <a data-link-type="dfn" href="#find-client-hint-value" id="ref-for-find-client-hint-value">find client hint value</a>, given <var>hintName</var> as input. </p>
+    <li>
+     <p>If <var>request</var> is a <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#subresource-request" id="ref-for-subresource-request">subresource request</a> and the result of running <a href="https://w3c.github.io/webappsec-feature-policy/#algo-should-request-be-allowed-to-use-feature">Should request be allowed to use feature?</a>,
+   given <var>request</var> and <var>hintName</var>’s <a href="http://httpwg.org/http-extensions/client-hints.html#opt-in-via-feature-policy">associated
+   policy-controlled feature</a>, returns <code>false</code>, then skip the next steps and
+   continue to the next <var>hintName</var>. <a data-link-type="biblio" href="#biblio-feature-policy">[FEATURE-POLICY]</a> <a data-link-type="biblio" href="#biblio-client-hints">[CLIENT-HINTS]</a> </p>
+    <li>
+     <p>Set <var>hintName</var> to "Sec-" concatenated with <var>hintName</var>. </p>
+     <div class="issue" id="issue-48a63eb6"><a class="self-link" href="#issue-48a63eb6"></a>We need to figure out if we really want a <code>Sec-</code> prefix, and if so also exempt it from CORS.</div>
+    <li>
+     <p>If <var>request</var>’s <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-request-header-list" id="ref-for-concept-request-header-list②">header list</a> <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#header-list-contains" id="ref-for-header-list-contains①">does not
+  contain</a> <var>hintName</var>, a user agent should <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-header-list-append" id="ref-for-concept-header-list-append①">append</a> <var>hintName</var>/<var>value</var> to <var>request</var>’s <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-request-header-list" id="ref-for-concept-request-header-list③">header list</a>. </p>
+   </ol>
+   <p>When asked to <dfn class="dfn-paneled" data-dfn-type="abstract-op" data-export id="abstract-opdef-remove-client-hints-from-redirect-if-needed">remove client hints from redirect if needed</dfn> with <var>request</var> as input, run the following steps:</p>
+   <ol>
+    <li>If <var>request</var>’s <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-request-client" id="ref-for-concept-request-client③">client</a> is null, then abort these steps. 
+    <li>Let <var>clientHintsSet</var> be <var>request</var>’s <var>client</var>’s <a data-link-type="dfn" href="#environment-settings-object-client-hints-set" id="ref-for-environment-settings-object-client-hints-set⑨">client hints set</a>. 
+    <li>
+     <p><a data-link-type="dfn" href="https://infra.spec.whatwg.org/#list-iterate" id="ref-for-list-iterate①">For each</a> <var>hintName</var> of <var>clientHintsSet</var>: </p>
+     <ol>
+      <li>
+       <p>Set <var>hintName</var> to "Sec-" concatenated with <var>hintName</var>. </p>
+      <li>
+       <p>If <var>request</var>’s <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-request-header-list" id="ref-for-concept-request-header-list④">header list</a> <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#header-list-contains" id="ref-for-header-list-contains②">contains</a> <var>hintName</var> and if the result of running <a href="https://wicg.github.io/feature-policy/#should-request-be-allowed-to-use-feature">Should
+  request be allowed to use feature?</a>, given <var>request</var> and <var>hintName</var>’s <a href="http://httpwg.org/http-extensions/client-hints.html#opt-in-via-feature-policy">associated
+  policy-controlled feature</a>, returns <code>false</code>, then remove <var>hintName</var> from <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-request-header-list" id="ref-for-concept-request-header-list⑤">header list</a>. <a data-link-type="biblio" href="#biblio-feature-policy">[FEATURE-POLICY]</a> <a data-link-type="biblio" href="#biblio-client-hints">[CLIENT-HINTS]</a> </p>
+     </ol>
+   </ol>
+   <h2 class="heading settled" data-level="6" id="fetch"><span class="secno">6. </span><span class="content">Integration with Fetch</span><a class="self-link" href="#fetch"></a></h2>
+   <p>This specification integrates with the <a data-link-type="biblio" href="#biblio-fetch">[FETCH]</a> specification by patching the algorithms below:</p>
+   <p>In <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-fetch" id="ref-for-concept-fetch①">Fetching</a>, after step 1.6, run <a data-link-type="abstract-op" href="#abstract-opdef-append-client-hints-to-request" id="ref-for-abstract-opdef-append-client-hints-to-request">append client hints to request</a> with <var>request</var> as input.</p>
+   <p>In <a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-http-redirect-fetch" id="ref-for-concept-http-redirect-fetch">HTTP-redirect fetch</a>, after step 7, run <a data-link-type="abstract-op" href="#abstract-opdef-remove-client-hints-from-redirect-if-needed" id="ref-for-abstract-opdef-remove-client-hints-from-redirect-if-needed">remove client hints from redirect if needed</a> with <var>request</var> as input.</p>
+   <h2 class="heading settled" data-level="7" id="registry"><span class="secno">7. </span><span class="content">Feature Registry</span><a class="self-link" href="#registry"></a></h2>
+   <p class="note" role="note"><span>Note:</span> This section contains feature-specific definitions.
+  New features that rely on the Client Hints infrastructure need to add their respective definitions to this registry.
+  User Agents can implement some of those features without implementing others.</p>
+   <h3 class="heading settled" data-level="7.1" id="client-hints-token-definition"><span class="secno">7.1. </span><span class="content">Client hints token</span><a class="self-link" href="#client-hints-token-definition"></a></h3>
+   <p>A <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="client-hints-token">client hints token</dfn> is a <a data-link-type="dfn" href="https://infra.spec.whatwg.org/#byte-lowercase" id="ref-for-byte-lowercase">byte-lowercase</a> representation of one of <code>Save-Data</code>, <code>DPR</code>, <code>Width</code>, <code>Viewport-Width</code>, <code>Device-Memory</code>, <code>RTT</code>, <code>Downlink</code>, <code>ECT</code>, <code>Arch</code>, <code>Model</code>, <code>Platform</code>, <code>UA</code> or <code>Mobile</code>.</p>
+   <h3 class="heading settled" data-level="7.2" id="policy-controlled-features"><span class="secno">7.2. </span><span class="content">Policy-controlled features</span><a class="self-link" href="#policy-controlled-features"></a></h3>
+   <p>This document defines the following <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#policy-controlled-feature" id="ref-for-policy-controlled-feature">policy-controlled features</a>:</p>
+   <ul>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-save-data">ch-save-data<a class="self-link" href="#ch-save-data"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist">default allowlist</a> of <code>'*'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-dpr">ch-dpr<a class="self-link" href="#ch-dpr"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist①">default allowlist</a> of <code>'self'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-width">ch-width<a class="self-link" href="#ch-width"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist②">default allowlist</a> of <code>'self'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-viewport-width">ch-viewport-width<a class="self-link" href="#ch-viewport-width"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist③">default allowlist</a> of <code>'self'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-device-memory">ch-device-memory<a class="self-link" href="#ch-device-memory"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist④">default allowlist</a> of <code>'self'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-rtt">ch-rtt<a class="self-link" href="#ch-rtt"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist⑤">default allowlist</a> of <code>'self'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-downlink">ch-downlink<a class="self-link" href="#ch-downlink"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist⑥">default allowlist</a> of <code>'self'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-ect">ch-ect<a class="self-link" href="#ch-ect"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist⑦">default allowlist</a> of <code>'self'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-arch">ch-arch<a class="self-link" href="#ch-arch"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist⑧">default allowlist</a> of <code>'self'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-model">ch-model<a class="self-link" href="#ch-model"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist⑨">default allowlist</a> of <code>'self'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-platform">ch-platform<a class="self-link" href="#ch-platform"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist①⓪">default allowlist</a> of <code>'self'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-ua">ch-ua<a class="self-link" href="#ch-ua"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist①①">default allowlist</a> of <code>'self'</code></p>
+    <li data-md>
+     <p><code><dfn data-dfn-type="dfn" data-export id="ch-mobile">ch-mobile<a class="self-link" href="#ch-mobile"></a></dfn></code> which has a <a data-link-type="dfn" href="https://wicg.github.io/feature-policy/#default-allowlist" id="ref-for-default-allowlist①②">default allowlist</a> of <code>'self'</code></p>
+   </ul>
+   <p class="issue" id="issue-ef477b6d"><a class="self-link" href="#issue-ef477b6d"></a> Should Save-data really have an allowlist of <a class="property" data-link-type="propdesc">*</a>? If so, is it because it’s somehow "low entropy" and should we tie low-entropy-ness to allowlists, generally?</p>
+   <h3 class="heading settled" data-level="7.3" id="low-entropy-table"><span class="secno">7.3. </span><span class="content">Low entropy hint table</span><a class="self-link" href="#low-entropy-table"></a></h3>
+    The <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="low-entropy-hint-table">low entropy hint table</dfn> below defines hints that are only exposing low amounts of entropy. 
+   <table>
+    <thead>
+     <tr>
+      <th><a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-header-name" id="ref-for-concept-header-name①">Name</a> 
+      <th><a data-link-type="dfn" href="https://fetch.spec.whatwg.org/#concept-header-value" id="ref-for-concept-header-value">Value</a> 
+    <tbody>
+     <tr>
+      <td><code>Save-Data</code> 
+      <td>a suitable <a href="https://wicg.github.io/savedata/#save-data-request-header-field">Save-Data value</a> 
+   </table>
+   <h3 class="heading settled" data-level="7.4" id="find-client-hint-value-section"><span class="secno">7.4. </span><span class="content">Find client hint value</span><a class="self-link" href="#find-client-hint-value-section"></a></h3>
+   <p>When asked to <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport id="find-client-hint-value">find client hint value</dfn>, given <var>hint</var> as input, switch on <var>hint</var> and return the result:</p>
+   <dl class="switch">
+    <dt><code>Save-Data</code> 
+    <dd>a suitable <a href="https://wicg.github.io/savedata/#save-data-request-header-field">Save-Data value</a> 
+    <dt><code>DPR</code> 
+    <dd>a suitable <a href>DPR value</a> 
+    <dt><code>Viewport-Width</code> 
+    <dd>a suitable <a href>Viewport-Width value</a> 
+    <dt><code>Width</code> 
+    <dd>a suitable <a href>Width value</a> 
+    <dt><code>Device-Memory</code> 
+    <dd>a suitable <a href="https://w3c.github.io/device-memory/#sec-device-memory-client-hint-header">Device-Memory value</a> 
+    <dt><code>RTT</code> 
+    <dd>a suitable <a href="https://wicg.github.io/netinfo/#rtt-request-header-field">RTT value</a> 
+    <dt><code>Downlink</code> 
+    <dd>a suitable <a href="https://wicg.github.io/netinfo/#downlink-request-header-field">Downlink value</a> 
+    <dt><code>ECT</code> 
+    <dd>a suitable <a href="https://wicg.github.io/netinfo/#ect-request-header-field">ECT value</a> 
+    <dt><code>Arch</code> 
+    <dd>a suitable <a href="https://wicg.github.io/ua-client-hints/#sec-ch-arch">Arch value</a> 
+    <dt><code>Model</code> 
+    <dd>a suitable <a href="https://wicg.github.io/ua-client-hints/#sec-ch-model">Model value</a> 
+    <dt><code>Platform</code> 
+    <dd>a suitable <a href="https://wicg.github.io/ua-client-hints/#sec-ch-platform">Platform value</a> 
+    <dt><code>UA</code> 
+    <dd>a suitable <a href="https://wicg.github.io/ua-client-hints/#sec-ch-ua">UA value</a> 
+    <dt><code>Mobile</code> 
+    <dd>a suitable <a href="https://wicg.github.io/ua-client-hints/#sec-ch-mobile">Mobile value</a> 
+   </dl>
+   <p class="issue" id="issue-707decdc"><a class="self-link" href="#issue-707decdc"></a> Links for image features are broken, need to actually define that and link to them.</p>
+   <h2 class="heading settled" data-level="8" id="privacy"><span class="secno">8. </span><span class="content">Security and Privacy considerations</span><a class="self-link" href="#privacy"></a></h2>
+    See <a data-link-type="biblio" href="#biblio-client-hints">[CLIENT-HINTS]</a>. 
+   <h2 class="heading settled" data-level="9" id="terms"><span class="secno">9. </span><span class="content">Terms</span><a class="self-link" href="#terms"></a></h2>
+   <p>The following terms are defined in the HTTP specifications: <dfn class="dfn-paneled" data-dfn-type="dfn" data-noexport href="https://tools.ietf.org/html/rfc7230#section-3.2" id="field-name">field-name</dfn></p>
+  </main>
+  <div data-fill-with="conformance">
+   <h2 class="no-ref no-num heading settled" id="conformance"><span class="content"> Conformance</span><a class="self-link" href="#conformance"></a></h2>
+   <p> Conformance requirements are expressed with a combination of descriptive assertions and RFC 2119 terminology.
+            The key words “MUST”, “MUST NOT”, “REQUIRED”, “SHALL”, “SHALL NOT”, “SHOULD”, “SHOULD NOT”, “RECOMMENDED”, “MAY”, and “OPTIONAL”
+            in the normative parts of this document
+            are to be interpreted as described in RFC 2119.
+            However, for readability,
+            these words do not appear in all uppercase letters in this specification. </p>
+   <p> All of the text of this specification is normative
+            except sections explicitly marked as non-normative, examples, and notes. <a data-link-type="biblio" href="#biblio-rfc2119">[RFC2119]</a> </p>
+   <p> Examples in this specification are introduced with the words “for example”
+            or are set apart from the normative text with <code>class="example"</code>, like this: </p>
+   <div class="example" id="example-example"><a class="self-link" href="#example-example"></a> This is an example of an informative example. </div>
+   <p> Informative notes begin with the word “Note”
+            and are set apart from the normative text with <code>class="note"</code>, like this: </p>
+   <p class="note" role="note"> Note, this is an informative note. </p>
+  </div>
+<script>
+(function() {
+  "use strict";
+  var collapseSidebarText = '<span aria-hidden="true">←</span> '
+                          + '<span>Collapse Sidebar</span>';
+  var expandSidebarText   = '<span aria-hidden="true">→</span> '
+                          + '<span>Pop Out Sidebar</span>';
+  var tocJumpText         = '<span aria-hidden="true">↑</span> '
+                          + '<span>Jump to Table of Contents</span>';
+
+  var sidebarMedia = window.matchMedia('screen and (min-width: 78em)');
+  var autoToggle   = function(e){ toggleSidebar(e.matches) };
+  if(sidebarMedia.addListener) {
+    sidebarMedia.addListener(autoToggle);
+  }
+
+  function toggleSidebar(on) {
+    if (on == undefined) {
+      on = !document.body.classList.contains('toc-sidebar');
+    }
+
+    /* Don’t scroll to compensate for the ToC if we’re above it already. */
+    var headY = 0;
+    var head = document.querySelector('.head');
+    if (head) {
+      // terrible approx of "top of ToC"
+      headY += head.offsetTop + head.offsetHeight;
+    }
+    var skipScroll = window.scrollY < headY;
+
+    var toggle = document.getElementById('toc-toggle');
+    var tocNav = document.getElementById('toc');
+    if (on) {
+      var tocHeight = tocNav.offsetHeight;
+      document.body.classList.add('toc-sidebar');
+      document.body.classList.remove('toc-inline');
+      toggle.innerHTML = collapseSidebarText;
+      if (!skipScroll) {
+        window.scrollBy(0, 0 - tocHeight);
+      }
+      tocNav.focus();
+      sidebarMedia.addListener(autoToggle); // auto-collapse when out of room
+    }
+    else {
+      document.body.classList.add('toc-inline');
+      document.body.classList.remove('toc-sidebar');
+      toggle.innerHTML = expandSidebarText;
+      if (!skipScroll) {
+        window.scrollBy(0, tocNav.offsetHeight);
+      }
+      if (toggle.matches(':hover')) {
+        /* Unfocus button when not using keyboard navigation,
+           because I don’t know where else to send the focus. */
+        toggle.blur();
+      }
+    }
+  }
+
+  function createSidebarToggle() {
+    /* Create the sidebar toggle in JS; it shouldn’t exist when JS is off. */
+    var toggle = document.createElement('a');
+      /* This should probably be a button, but appearance isn’t standards-track.*/
+    toggle.id = 'toc-toggle';
+    toggle.class = 'toc-toggle';
+    toggle.href = '#toc';
+    toggle.innerHTML = collapseSidebarText;
+
+    sidebarMedia.addListener(autoToggle);
+    var toggler = function(e) {
+      e.preventDefault();
+      sidebarMedia.removeListener(autoToggle); // persist explicit off states
+      toggleSidebar();
+      return false;
+    }
+    toggle.addEventListener('click', toggler, false);
+
+
+    /* Get <nav id=toc-nav>, or make it if we don’t have one. */
+    var tocNav = document.getElementById('toc-nav');
+    if (!tocNav) {
+      tocNav = document.createElement('p');
+      tocNav.id = 'toc-nav';
+      /* Prepend for better keyboard navigation */
+      document.body.insertBefore(tocNav, document.body.firstChild);
+    }
+    /* While we’re at it, make sure we have a Jump to Toc link. */
+    var tocJump = document.getElementById('toc-jump');
+    if (!tocJump) {
+      tocJump = document.createElement('a');
+      tocJump.id = 'toc-jump';
+      tocJump.href = '#toc';
+      tocJump.innerHTML = tocJumpText;
+      tocNav.appendChild(tocJump);
+    }
+
+    tocNav.appendChild(toggle);
+  }
+
+  var toc = document.getElementById('toc');
+  if (toc) {
+    createSidebarToggle();
+    toggleSidebar(sidebarMedia.matches);
+
+    /* If the sidebar has been manually opened and is currently overlaying the text
+       (window too small for the MQ to add the margin to body),
+       then auto-close the sidebar once you click on something in there. */
+    toc.addEventListener('click', function(e) {
+      if(e.target.tagName.toLowerCase() == "a" && document.body.classList.contains('toc-sidebar') && !sidebarMedia.matches) {
+        toggleSidebar(false);
+      }
+    }, false);
+  }
+  else {
+    console.warn("Can’t find Table of Contents. Please use <nav id='toc'> around the ToC.");
+  }
+
+  /* Wrap tables in case they overflow */
+  var tables = document.querySelectorAll(':not(.overlarge) > table.data, :not(.overlarge) > table.index');
+  var numTables = tables.length;
+  for (var i = 0; i < numTables; i++) {
+    var table = tables[i];
+    var wrapper = document.createElement('div');
+    wrapper.className = 'overlarge';
+    table.parentNode.insertBefore(wrapper, table);
+    wrapper.appendChild(table);
+  }
+
+})();
+</script>
+  <h2 class="no-num no-ref heading settled" id="index"><span class="content">Index</span><a class="self-link" href="#index"></a></h2>
+  <h3 class="no-num no-ref heading settled" id="index-defined-here"><span class="content">Terms defined by this specification</span><a class="self-link" href="#index-defined-here"></a></h3>
+  <ul class="index">
+   <li><a href="#accept-ch">accept-ch</a><span>, in §4.4</span>
+   <li><a href="#accept-ch-cache">Accept-CH cache</a><span>, in §3.2</span>
+   <li><a href="#accept-ch-state">Accept-CH state</a><span>, in §3.4</span>
+   <li><a href="#add-a-new-accept-ch-cache-entry">add a new Accept-CH cache entry</a><span>, in §3.2</span>
+   <li><a href="#abstract-opdef-append-client-hints-to-request">append client hints to request</a><span>, in §5</span>
+   <li><a href="#ch-arch">ch-arch</a><span>, in §7.2</span>
+   <li><a href="#ch-device-memory">ch-device-memory</a><span>, in §7.2</span>
+   <li><a href="#ch-downlink">ch-downlink</a><span>, in §7.2</span>
+   <li><a href="#ch-dpr">ch-dpr</a><span>, in §7.2</span>
+   <li><a href="#ch-ect">ch-ect</a><span>, in §7.2</span>
+   <li><a href="#ch-mobile">ch-mobile</a><span>, in §7.2</span>
+   <li><a href="#ch-model">ch-model</a><span>, in §7.2</span>
+   <li><a href="#ch-platform">ch-platform</a><span>, in §7.2</span>
+   <li><a href="#ch-rtt">ch-rtt</a><span>, in §7.2</span>
+   <li><a href="#ch-save-data">ch-save-data</a><span>, in §7.2</span>
+   <li><a href="#ch-ua">ch-ua</a><span>, in §7.2</span>
+   <li><a href="#ch-viewport-width">ch-viewport-width</a><span>, in §7.2</span>
+   <li><a href="#ch-width">ch-width</a><span>, in §7.2</span>
+   <li>
+    client hints set
+    <ul>
+     <li><a href="#client-hints-set">definition of</a><span>, in §3.1</span>
+     <li><a href="#accept-ch-cache-client-hints-set">dfn for accept-ch-cache</a><span>, in §3.2</span>
+     <li><a href="#environment-settings-object-client-hints-set">dfn for environment settings object</a><span>, in §4.5</span>
+    </ul>
+   <li><a href="#client-hints-token">client hints token</a><span>, in §7.1</span>
+   <li><a href="#field-name">field-name</a><span>, in §9</span>
+   <li><a href="#find-client-hint-value">find client hint value</a><span>, in §7.4</span>
+   <li><a href="#abstract-opdef-initialize-the-client-hints-set">initialize the Client Hints set</a><span>, in §3.3</span>
+   <li><a href="#low-entropy-hint-table">low entropy hint table</a><span>, in §7.3</span>
+   <li><a href="#accept-ch-cache-origin">origin</a><span>, in §3.2</span>
+   <li><a href="#abstract-opdef-remove-client-hints-from-redirect-if-needed">remove client hints from redirect if needed</a><span>, in §5</span>
+   <li><a href="#retrieve-the-client-hints-set">retrieve the client hints set</a><span>, in §3.2</span>
+  </ul>
+  <aside class="dfn-panel" data-for="term-for-default-allowlist">
+   <a href="https://wicg.github.io/feature-policy/#default-allowlist">https://wicg.github.io/feature-policy/#default-allowlist</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-default-allowlist">7.2. Policy-controlled features</a> <a href="#ref-for-default-allowlist①">(2)</a> <a href="#ref-for-default-allowlist②">(3)</a> <a href="#ref-for-default-allowlist③">(4)</a> <a href="#ref-for-default-allowlist④">(5)</a> <a href="#ref-for-default-allowlist⑤">(6)</a> <a href="#ref-for-default-allowlist⑥">(7)</a> <a href="#ref-for-default-allowlist⑦">(8)</a> <a href="#ref-for-default-allowlist⑧">(9)</a> <a href="#ref-for-default-allowlist⑨">(10)</a> <a href="#ref-for-default-allowlist①⓪">(11)</a> <a href="#ref-for-default-allowlist①①">(12)</a> <a href="#ref-for-default-allowlist①②">(13)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-policy-controlled-feature">
+   <a href="https://wicg.github.io/feature-policy/#policy-controlled-feature">https://wicg.github.io/feature-policy/#policy-controlled-feature</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-policy-controlled-feature">7.2. Policy-controlled features</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-concept-header-list-append">
+   <a href="https://fetch.spec.whatwg.org/#concept-header-list-append">https://fetch.spec.whatwg.org/#concept-header-list-append</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-concept-header-list-append">5. Request processing</a> <a href="#ref-for-concept-header-list-append①">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-concept-request-client">
+   <a href="https://fetch.spec.whatwg.org/#concept-request-client">https://fetch.spec.whatwg.org/#concept-request-client</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-concept-request-client">4.5. Extending environment settings object</a>
+    <li><a href="#ref-for-concept-request-client①">5. Request processing</a> <a href="#ref-for-concept-request-client②">(2)</a> <a href="#ref-for-concept-request-client③">(3)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-header-list-contains">
+   <a href="https://fetch.spec.whatwg.org/#header-list-contains">https://fetch.spec.whatwg.org/#header-list-contains</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-header-list-contains">5. Request processing</a> <a href="#ref-for-header-list-contains①">(2)</a> <a href="#ref-for-header-list-contains②">(3)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-header-list-contains">
+   <a href="https://fetch.spec.whatwg.org/#header-list-contains">https://fetch.spec.whatwg.org/#header-list-contains</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-header-list-contains">5. Request processing</a> <a href="#ref-for-header-list-contains①">(2)</a> <a href="#ref-for-header-list-contains②">(3)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-concept-fetch">
+   <a href="https://fetch.spec.whatwg.org/#concept-fetch">https://fetch.spec.whatwg.org/#concept-fetch</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-concept-fetch">4.5. Extending environment settings object</a>
+    <li><a href="#ref-for-concept-fetch①">6. Integration with Fetch</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-concept-header">
+   <a href="https://fetch.spec.whatwg.org/#concept-header">https://fetch.spec.whatwg.org/#concept-header</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-concept-header">5. Request processing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-concept-request-header-list">
+   <a href="https://fetch.spec.whatwg.org/#concept-request-header-list">https://fetch.spec.whatwg.org/#concept-request-header-list</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-concept-request-header-list">5. Request processing</a> <a href="#ref-for-concept-request-header-list①">(2)</a> <a href="#ref-for-concept-request-header-list②">(3)</a> <a href="#ref-for-concept-request-header-list③">(4)</a> <a href="#ref-for-concept-request-header-list④">(5)</a> <a href="#ref-for-concept-request-header-list⑤">(6)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-concept-http-redirect-fetch">
+   <a href="https://fetch.spec.whatwg.org/#concept-http-redirect-fetch">https://fetch.spec.whatwg.org/#concept-http-redirect-fetch</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-concept-http-redirect-fetch">6. Integration with Fetch</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-concept-header-name">
+   <a href="https://fetch.spec.whatwg.org/#concept-header-name">https://fetch.spec.whatwg.org/#concept-header-name</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-concept-header-name">5. Request processing</a>
+    <li><a href="#ref-for-concept-header-name①">7.3. Low entropy hint table</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-navigation-request">
+   <a href="https://fetch.spec.whatwg.org/#navigation-request">https://fetch.spec.whatwg.org/#navigation-request</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-navigation-request">5. Request processing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-concept-request-request">
+   <a href="https://fetch.spec.whatwg.org/#concept-request-request">https://fetch.spec.whatwg.org/#concept-request-request</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-concept-request-request">4.5. Extending environment settings object</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-subresource-request">
+   <a href="https://fetch.spec.whatwg.org/#subresource-request">https://fetch.spec.whatwg.org/#subresource-request</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-subresource-request">5. Request processing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-concept-header-value">
+   <a href="https://fetch.spec.whatwg.org/#concept-header-value">https://fetch.spec.whatwg.org/#concept-header-value</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-concept-header-value">7.3. Low entropy hint table</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-attr-meta-content">
+   <a href="https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-content">https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-content</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-attr-meta-content">3.4. Accept-CH state (http-equiv="accept-ch")</a> <a href="#ref-for-attr-meta-content①">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-environment-settings-object">
+   <a href="https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object">https://html.spec.whatwg.org/multipage/webappapis.html#environment-settings-object</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-environment-settings-object">3.4. Accept-CH state (http-equiv="accept-ch")</a>
+    <li><a href="#ref-for-environment-settings-object①">4.5. Extending environment settings object</a> <a href="#ref-for-environment-settings-object②">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-the-head-element">
+   <a href="https://html.spec.whatwg.org/multipage/semantics.html#the-head-element">https://html.spec.whatwg.org/multipage/semantics.html#the-head-element</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-the-head-element">3.4. Accept-CH state (http-equiv="accept-ch")</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-meta">
+   <a href="https://html.spec.whatwg.org/multipage/semantics.html#meta">https://html.spec.whatwg.org/multipage/semantics.html#meta</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-meta">3.4. Accept-CH state (http-equiv="accept-ch")</a> <a href="#ref-for-meta①">(2)</a> <a href="#ref-for-meta②">(3)</a> <a href="#ref-for-meta③">(4)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-concept-settings-object-origin">
+   <a href="https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin">https://html.spec.whatwg.org/multipage/webappapis.html#concept-settings-object-origin</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-concept-settings-object-origin">3.3. Initialize Client Hints set</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-relevant-settings-object">
+   <a href="https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object">https://html.spec.whatwg.org/multipage/webappapis.html#relevant-settings-object</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-relevant-settings-object">3.4. Accept-CH state (http-equiv="accept-ch")</a>
+    <li><a href="#ref-for-relevant-settings-object①">4.1. Document object initialization</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-responsible-browsing-context">
+   <a href="https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context">https://html.spec.whatwg.org/multipage/webappapis.html#responsible-browsing-context</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-responsible-browsing-context">3.3. Initialize Client Hints set</a>
+    <li><a href="#ref-for-responsible-browsing-context①">3.4. Accept-CH state (http-equiv="accept-ch")</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-same-origin">
+   <a href="https://html.spec.whatwg.org/multipage/origin.html#same-origin">https://html.spec.whatwg.org/multipage/origin.html#same-origin</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-same-origin">3.2. Accept-CH cache</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-top-level-browsing-context">
+   <a href="https://html.spec.whatwg.org/multipage/browsers.html#top-level-browsing-context">https://html.spec.whatwg.org/multipage/browsers.html#top-level-browsing-context</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-top-level-browsing-context">3.3. Initialize Client Hints set</a>
+    <li><a href="#ref-for-top-level-browsing-context①">3.4. Accept-CH state (http-equiv="accept-ch")</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-set-append">
+   <a href="https://infra.spec.whatwg.org/#set-append">https://infra.spec.whatwg.org/#set-append</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-set-append">3.2. Accept-CH cache</a>
+    <li><a href="#ref-for-set-append①">3.3. Initialize Client Hints set</a>
+    <li><a href="#ref-for-set-append②">3.4. Accept-CH state (http-equiv="accept-ch")</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-byte-lowercase">
+   <a href="https://infra.spec.whatwg.org/#byte-lowercase">https://infra.spec.whatwg.org/#byte-lowercase</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-byte-lowercase">7.1. Client hints token</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-list-clone">
+   <a href="https://infra.spec.whatwg.org/#list-clone">https://infra.spec.whatwg.org/#list-clone</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-list-clone">4.2. Worker initialization</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-list-iterate">
+   <a href="https://infra.spec.whatwg.org/#list-iterate">https://infra.spec.whatwg.org/#list-iterate</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-list-iterate">5. Request processing</a> <a href="#ref-for-list-iterate①">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-map-key">
+   <a href="https://infra.spec.whatwg.org/#map-key">https://infra.spec.whatwg.org/#map-key</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-map-key">3.2. Accept-CH cache</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-ordered-map">
+   <a href="https://infra.spec.whatwg.org/#ordered-map">https://infra.spec.whatwg.org/#ordered-map</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-ordered-map">3.2. Accept-CH cache</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-ordered-set">
+   <a href="https://infra.spec.whatwg.org/#ordered-set">https://infra.spec.whatwg.org/#ordered-set</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-ordered-set">3.1. Client hints set</a>
+    <li><a href="#ref-for-ordered-set①">3.2. Accept-CH cache</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-map-set">
+   <a href="https://infra.spec.whatwg.org/#map-set">https://infra.spec.whatwg.org/#map-set</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-map-set">3.2. Accept-CH cache</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-settings-object">
+   <a href="https://w3c.github.io/webappsec-secure-contexts/#settings-object">https://w3c.github.io/webappsec-secure-contexts/#settings-object</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-settings-object">3.3. Initialize Client Hints set</a>
+    <li><a href="#ref-for-settings-object①">3.4. Accept-CH state (http-equiv="accept-ch")</a>
+   </ul>
+  </aside>
+  <h3 class="no-num no-ref heading settled" id="index-defined-elsewhere"><span class="content">Terms defined by reference</span><a class="self-link" href="#index-defined-elsewhere"></a></h3>
+  <ul class="index">
+   <li>
+    <a data-link-type="biblio">[FEATURE-POLICY]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-default-allowlist" style="color:initial">default allowlist</span>
+     <li><span class="dfn-paneled" id="term-for-policy-controlled-feature" style="color:initial">policy-controlled feature</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[FETCH]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-concept-header-list-append" style="color:initial">append</span>
+     <li><span class="dfn-paneled" id="term-for-concept-request-client" style="color:initial">client</span>
+     <li><span class="dfn-paneled" id="term-for-header-list-contains" style="color:initial">contains</span>
+     <li><span class="dfn-paneled" id="term-for-header-list-contains①" style="color:initial">does not contain</span>
+     <li><span class="dfn-paneled" id="term-for-concept-fetch" style="color:initial">fetch</span>
+     <li><span class="dfn-paneled" id="term-for-concept-header" style="color:initial">header</span>
+     <li><span class="dfn-paneled" id="term-for-concept-request-header-list" style="color:initial">header list</span>
+     <li><span class="dfn-paneled" id="term-for-concept-http-redirect-fetch" style="color:initial">http-redirect fetch</span>
+     <li><span class="dfn-paneled" id="term-for-concept-header-name" style="color:initial">name</span>
+     <li><span class="dfn-paneled" id="term-for-navigation-request" style="color:initial">navigation request</span>
+     <li><span class="dfn-paneled" id="term-for-concept-request-request" style="color:initial">request</span>
+     <li><span class="dfn-paneled" id="term-for-subresource-request" style="color:initial">subresource request</span>
+     <li><span class="dfn-paneled" id="term-for-concept-header-value" style="color:initial">value</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[HTML]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-attr-meta-content" style="color:initial">content</span>
+     <li><span class="dfn-paneled" id="term-for-environment-settings-object" style="color:initial">environment settings object</span>
+     <li><span class="dfn-paneled" id="term-for-the-head-element" style="color:initial">head</span>
+     <li><span class="dfn-paneled" id="term-for-meta" style="color:initial">meta</span>
+     <li><span class="dfn-paneled" id="term-for-concept-settings-object-origin" style="color:initial">origin <small>(for environment settings object)</small></span>
+     <li><span class="dfn-paneled" id="term-for-relevant-settings-object" style="color:initial">relevant settings object</span>
+     <li><span class="dfn-paneled" id="term-for-responsible-browsing-context" style="color:initial">responsible browsing context</span>
+     <li><span class="dfn-paneled" id="term-for-same-origin" style="color:initial">same origin</span>
+     <li><span class="dfn-paneled" id="term-for-top-level-browsing-context" style="color:initial">top-level browsing context</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[INFRA]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-set-append" style="color:initial">append</span>
+     <li><span class="dfn-paneled" id="term-for-byte-lowercase" style="color:initial">byte-lowercase</span>
+     <li><span class="dfn-paneled" id="term-for-list-clone" style="color:initial">clone</span>
+     <li><span class="dfn-paneled" id="term-for-list-iterate" style="color:initial">for each</span>
+     <li><span class="dfn-paneled" id="term-for-map-key" style="color:initial">key</span>
+     <li><span class="dfn-paneled" id="term-for-ordered-map" style="color:initial">ordered map</span>
+     <li><span class="dfn-paneled" id="term-for-ordered-set" style="color:initial">ordered set</span>
+     <li><span class="dfn-paneled" id="term-for-map-set" style="color:initial">set <small>(for map)</small></span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[secure-contexts]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-settings-object" style="color:initial">Is an environment settings object contextually secure?</span>
+    </ul>
+  </ul>
+  <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
+  <h3 class="no-num no-ref heading settled" id="normative"><span class="content">Normative References</span><a class="self-link" href="#normative"></a></h3>
+  <dl>
+   <dt id="biblio-client-hints">[CLIENT-HINTS]
+   <dd>Ilya Grigorik; Yoav Weiss. <a href="https://httpwg.org/http-extensions/client-hints.html">Client Hints</a>. URL: <a href="https://httpwg.org/http-extensions/client-hints.html">https://httpwg.org/http-extensions/client-hints.html</a>
+   <dt id="biblio-feature-policy">[FEATURE-POLICY]
+   <dd>Ian Clelland. <a href="https://wicg.github.io/feature-policy/">Feature Policy</a>. URL: <a href="https://wicg.github.io/feature-policy/">https://wicg.github.io/feature-policy/</a>
+   <dt id="biblio-fetch">[FETCH]
+   <dd>Anne van Kesteren. <a href="https://fetch.spec.whatwg.org/">Fetch Standard</a>. Living Standard. URL: <a href="https://fetch.spec.whatwg.org/">https://fetch.spec.whatwg.org/</a>
+   <dt id="biblio-html">[HTML]
+   <dd>Anne van Kesteren; et al. <a href="https://html.spec.whatwg.org/multipage/">HTML Standard</a>. Living Standard. URL: <a href="https://html.spec.whatwg.org/multipage/">https://html.spec.whatwg.org/multipage/</a>
+   <dt id="biblio-infra">[INFRA]
+   <dd>Anne van Kesteren; Domenic Denicola. <a href="https://infra.spec.whatwg.org/">Infra Standard</a>. Living Standard. URL: <a href="https://infra.spec.whatwg.org/">https://infra.spec.whatwg.org/</a>
+   <dt id="biblio-rfc2119">[RFC2119]
+   <dd>S. Bradner. <a href="https://tools.ietf.org/html/rfc2119">Key words for use in RFCs to Indicate Requirement Levels</a>. March 1997. Best Current Practice. URL: <a href="https://tools.ietf.org/html/rfc2119">https://tools.ietf.org/html/rfc2119</a>
+   <dt id="biblio-secure-contexts">[SECURE-CONTEXTS]
+   <dd>Mike West. <a href="https://www.w3.org/TR/secure-contexts/">Secure Contexts</a>. 15 September 2016. CR. URL: <a href="https://www.w3.org/TR/secure-contexts/">https://www.w3.org/TR/secure-contexts/</a>
+  </dl>
+  <h2 class="no-num no-ref heading settled" id="issues-index"><span class="content">Issues Index</span><a class="self-link" href="#issues-index"></a></h2>
+  <div style="counter-reset:issue">
+   <div class="issue"> Define registry’s low entropy table<a href="#issue-f40790e6"> ↵ </a></div>
+   <div class="issue">We need to figure out if we really want a <code>Sec-</code> prefix, and if so also exempt it from CORS.<a href="#issue-48a63eb6"> ↵ </a></div>
+   <div class="issue"> Should Save-data really have an allowlist of <a class="property" data-link-type="propdesc">*</a>? If so, is it because it’s somehow "low entropy" and should we tie low-entropy-ness to allowlists, generally?<a href="#issue-ef477b6d"> ↵ </a></div>
+   <div class="issue"> Links for image features are broken, need to actually define that and link to them.<a href="#issue-707decdc"> ↵ </a></div>
+  </div>
+  <aside class="dfn-panel" data-for="client-hints-set">
+   <b><a href="#client-hints-set">#client-hints-set</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-client-hints-set">3.2. Accept-CH cache</a> <a href="#ref-for-client-hints-set①">(2)</a>
+    <li><a href="#ref-for-client-hints-set②">4.5. Extending environment settings object</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="accept-ch-cache">
+   <b><a href="#accept-ch-cache">#accept-ch-cache</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-accept-ch-cache">3.2. Accept-CH cache</a> <a href="#ref-for-accept-ch-cache①">(2)</a> <a href="#ref-for-accept-ch-cache②">(3)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="accept-ch-cache-origin">
+   <b><a href="#accept-ch-cache-origin">#accept-ch-cache-origin</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-accept-ch-cache-origin">3.2. Accept-CH cache</a> <a href="#ref-for-accept-ch-cache-origin①">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="accept-ch-cache-client-hints-set">
+   <b><a href="#accept-ch-cache-client-hints-set">#accept-ch-cache-client-hints-set</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-accept-ch-cache-client-hints-set">3.2. Accept-CH cache</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="add-a-new-accept-ch-cache-entry">
+   <b><a href="#add-a-new-accept-ch-cache-entry">#add-a-new-accept-ch-cache-entry</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-add-a-new-accept-ch-cache-entry">3.3. Initialize Client Hints set</a>
+    <li><a href="#ref-for-add-a-new-accept-ch-cache-entry①">3.4. Accept-CH state (http-equiv="accept-ch")</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="retrieve-the-client-hints-set">
+   <b><a href="#retrieve-the-client-hints-set">#retrieve-the-client-hints-set</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-retrieve-the-client-hints-set">3.3. Initialize Client Hints set</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="abstract-opdef-initialize-the-client-hints-set">
+   <b><a href="#abstract-opdef-initialize-the-client-hints-set">#abstract-opdef-initialize-the-client-hints-set</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-abstract-opdef-initialize-the-client-hints-set">4.1. Document object initialization</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="accept-ch-state">
+   <b><a href="#accept-ch-state">#accept-ch-state</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-accept-ch-state">4.4. Pragma directives</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="accept-ch">
+   <b><a href="#accept-ch">#accept-ch</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-accept-ch">3.4. Accept-CH state (http-equiv="accept-ch")</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="environment-settings-object-client-hints-set">
+   <b><a href="#environment-settings-object-client-hints-set">#environment-settings-object-client-hints-set</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-environment-settings-object-client-hints-set">3.3. Initialize Client Hints set</a> <a href="#ref-for-environment-settings-object-client-hints-set①">(2)</a> <a href="#ref-for-environment-settings-object-client-hints-set②">(3)</a>
+    <li><a href="#ref-for-environment-settings-object-client-hints-set③">3.4. Accept-CH state (http-equiv="accept-ch")</a> <a href="#ref-for-environment-settings-object-client-hints-set④">(2)</a> <a href="#ref-for-environment-settings-object-client-hints-set⑤">(3)</a>
+    <li><a href="#ref-for-environment-settings-object-client-hints-set⑥">4.2. Worker initialization</a> <a href="#ref-for-environment-settings-object-client-hints-set⑦">(2)</a>
+    <li><a href="#ref-for-environment-settings-object-client-hints-set⑧">5. Request processing</a> <a href="#ref-for-environment-settings-object-client-hints-set⑨">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="abstract-opdef-append-client-hints-to-request">
+   <b><a href="#abstract-opdef-append-client-hints-to-request">#abstract-opdef-append-client-hints-to-request</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-abstract-opdef-append-client-hints-to-request">6. Integration with Fetch</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="abstract-opdef-remove-client-hints-from-redirect-if-needed">
+   <b><a href="#abstract-opdef-remove-client-hints-from-redirect-if-needed">#abstract-opdef-remove-client-hints-from-redirect-if-needed</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-abstract-opdef-remove-client-hints-from-redirect-if-needed">6. Integration with Fetch</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="client-hints-token">
+   <b><a href="#client-hints-token">#client-hints-token</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-client-hints-token">3.1. Client hints set</a>
+    <li><a href="#ref-for-client-hints-token①">3.3. Initialize Client Hints set</a>
+    <li><a href="#ref-for-client-hints-token②">3.4. Accept-CH state (http-equiv="accept-ch")</a> <a href="#ref-for-client-hints-token③">(2)</a>
+    <li><a href="#ref-for-client-hints-token④">5. Request processing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="low-entropy-hint-table">
+   <b><a href="#low-entropy-hint-table">#low-entropy-hint-table</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-low-entropy-hint-table">5. Request processing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="find-client-hint-value">
+   <b><a href="#find-client-hint-value">#find-client-hint-value</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-find-client-hint-value">5. Request processing</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="field-name">
+   <b><a href="#field-name">#field-name</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-field-name">3.3. Initialize Client Hints set</a>
+    <li><a href="#ref-for-field-name①">3.4. Accept-CH state (http-equiv="accept-ch")</a>
+   </ul>
+  </aside>
+<script>/* script-dfn-panel */
+
+document.body.addEventListener("click", function(e) {
+    var queryAll = function(sel) { return [].slice.call(document.querySelectorAll(sel)); }
+    // Find the dfn element or panel, if any, that was clicked on.
+    var el = e.target;
+    var target;
+    var hitALink = false;
+    while(el.parentElement) {
+        if(el.tagName == "A") {
+            // Clicking on a link in a <dfn> shouldn't summon the panel
+            hitALink = true;
+        }
+        if(el.classList.contains("dfn-paneled")) {
+            target = "dfn";
+            break;
+        }
+        if(el.classList.contains("dfn-panel")) {
+            target = "dfn-panel";
+            break;
+        }
+        el = el.parentElement;
+    }
+    if(target != "dfn-panel") {
+        // Turn off any currently "on" or "activated" panels.
+        queryAll(".dfn-panel.on, .dfn-panel.activated").forEach(function(el){
+            el.classList.remove("on");
+            el.classList.remove("activated");
+        });
+    }
+    if(target == "dfn" && !hitALink) {
+        // open the panel
+        var dfnPanel = document.querySelector(".dfn-panel[data-for='" + el.id + "']");
+        if(dfnPanel) {
+            dfnPanel.classList.add("on");
+            var rect = el.getBoundingClientRect();
+            dfnPanel.style.left = window.scrollX + rect.right + 5 + "px";
+            dfnPanel.style.top = window.scrollY + rect.top + "px";
+            var panelRect = dfnPanel.getBoundingClientRect();
+            var panelWidth = panelRect.right - panelRect.left;
+            if(panelRect.right > document.body.scrollWidth && (rect.left - (panelWidth + 5)) > 0) {
+                // Reposition, because the panel is overflowing
+                dfnPanel.style.left = window.scrollX + rect.left - (panelWidth + 5) + "px";
+            }
+        } else {
+            console.log("Couldn't find .dfn-panel[data-for='" + el.id + "']");
+        }
+    } else if(target == "dfn-panel") {
+        // Switch it to "activated" state, which pins it.
+        el.classList.add("activated");
+        el.style.left = null;
+        el.style.top = null;
+    }
+
+});
+</script>

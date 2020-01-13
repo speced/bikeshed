@@ -1,0 +1,534 @@
+<pre class="metadata">
+Shortname: webxr-test
+Title: WebXR Test API
+Group: immersivewebwg
+Status: ED
+ED: https://immersive-web.github.io/webxr-test-api/
+Repository: immersive-web/webxr-test-api
+Level: 1
+
+Editor: Manish Goregaokar 109489, Mozilla http://mozilla.org/, manish@mozilla.com
+Editor: Alex Cooper 114716, Google http://google.com/, alcooper@google.com
+
+Abstract: The WebXR Test API module provides a mocking interface for <a href="https://github.com/web-platform-tests/">Web Platform Tests</a> to be able to test the <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a>.
+
+Warning: custom
+Custom Warning Title: Testing-only API
+Custom Warning Text:
+  <b>The API represented in this document is for testing only and should not be exposed to users.</b>
+
+</pre>
+<pre class="link-defaults">
+spec:infra;
+    type:dfn; text:string
+    type:dfn; text:list
+    type:dfn; for:list; text:extend
+spec:webxr-1;
+    type:event; text:reset
+    type:dfn; text:xr device
+    type:dfn; for: XRBoundedReferenceSpace; text:native bounds geometry
+    type:dfn; text:native origin
+    type:dfn; text:viewer
+    type:dfn; text:view
+    type:dfn; text:view offset
+    type:dfn; for:view; text:eye
+    type:dfn; for:view; text:projection matrix
+    type:dfn; text:xr animation frame
+    type:dfn; text:capable of supporting
+    type:dfn; text:list of supported modes
+    type:dfn; text:list of animation frame callbacks
+    type:dfn; text:inline xr device
+    type:dfn; text:list of immersive xr devices
+</pre>
+
+<pre class="anchors">
+</pre>
+
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+
+<style>
+<style>
+  .unstable::before {
+    content: "This section is not stable";
+    display: block;
+    font-weight: bold;
+    text-align: right;
+    color: red;
+  }
+  .unstable {
+    border: thin solid pink;
+    border-radius: .5em;
+    padding: .5em;
+    margin: .5em calc(-0.5em - 1px);
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+    background-repeat: repeat;
+    background-color: #FFF4F4;
+  }
+  .unstable h3:first-of-type {
+    margin-top: 0.5rem;
+  }
+
+  .unstable.example:not(.no-marker)::before {
+    content: "Example " counter(example) " (Unstable)";
+    float: none;
+  }
+
+  .non-normative::before {
+    content: "This section is non-normative.";
+    font-style: italic;
+  }
+  .tg {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+  .tg th {
+    border-style: solid;
+    border-width: 1px;
+    background: #90b8de;
+    color: #fff;
+    font-family: sans-serif;
+    font-weight: bold;
+    border-color: grey;
+  }
+  .tg td {
+    padding: 4px 5px;
+    background-color: rgb(221, 238, 255);
+    font-family: monospace;
+    border-style: solid;
+    border-width: 1px;
+    border-color: grey;
+    overflow: hidden;
+    word-break: normal;
+  }
+</style>
+
+
+Introduction {#intro}
+============
+
+<section class="non-normative">
+
+In order to allow <a href="https://web-platform-tests.org/">Web Platform Tests</a> for WebXR there are some basic functions which are common across all tests, such as adding a fake test device and specifying poses. Below is an API which attempts to capture the necessary functions, based off what was defined in the spec. Different browser vendors can implement this API in whatever way is most compatible with their browser. For example, some browsers may back the interface with a WebDriver API while others may use HTTP or IPC mechanisms to communicate with an out of process fake backend. 
+
+
+These initialization object and control interfaces do not represent a complete set of WebXR functionality, and are expected to be expanded on as the WebXR spec grows.
+
+</section>
+
+
+Conformance {#conformance}
+============
+
+Interfaces and functionality exposed by this specification SHOULD NOT be exposed to typical browsing experiences, and instead SHOULD only be used when running <a href="https://web-platform-tests.org/">Web Platform Tests</a>.
+
+
+
+Simulated devices {#simulated-devices}
+============
+
+This API gives tests the ability to spin up a <dfn>simulated XR device</dfn> which is an [=/XR device=] which from the point of view of the WebXR API behaves like a normal [=/XR device=]. These [=simulated XR device|simulated XR devices=] can be controlled by the associated {{FakeXRDevice}} object.
+
+Every [=simulated XR device=] may have an <dfn for="simulated XR device">native bounds geometry</dfn> which is an array of {{DOMPointReadOnly}}s, used to initialize the [=XRBoundedReferenceSpace/native bounds geometry=] of any {{XRBoundedReferenceSpace}}s created for the device. If <code>null</code>, the device is treated as if it is not currently tracking a bounded reference space.
+
+Every [=simulated XR device=] may have a <dfn for="simulated XR device">floor origin</dfn> which is an {{XRRigidTransform}} used to note the position of the physical floor. If <code>null</code>, the device is treated as if it is unable to identify the physical floor.
+
+Every [=simulated XR device=] may have an <dfn for="simulated XR device">viewer origin</dfn> which is an {{XRRigidTransform}} used to set the position and orientation of the [=viewer=]. If <code>null</code>, the device is treated as if it has lost tracking.
+
+Every [=simulated XR device=] has an <dfn for="simulated XR device">emulated position boolean</dfn> which is a boolean used to set the {{XRPose/emulatedPosition}} of any {{XRPose}}s produced involving the [=viewer=]. This is initially <code>false</code>.
+
+Every [=simulated XR device=] has an <dfn for="simulated XR device">visibility state</dfn> which is an {{XRVisibilityState}} used to set the {{XRSession/visibilityState}} of any {{XRSession}}s associated with the [=simulated XR device=] . This is initially {{XRVisibilityState/"visible"}}. When it is changed, the associated changes must be reflected on the {{XRSession}}, including triggering {{XRSession/onvisibilitychange}} events if necessary.
+
+Every [=view=] for a [=simulated XR device=] has an associated <dfn for=view>device resolution</dfn>, which is an instance of {{FakeXRDeviceResolution}}. This resolution must be used when constructing {{XRViewport}} values for the [=view=], based on the canvas size.
+
+Every [=view=] for a [=simulated XR device=] may have an associated <dfn for=view>field of view</dfn>, which is an instance of {{FakeXRFieldOfViewInit}} used to calculate projection matrices using depth values. If the [=field of view=] is set, projection matrix values are calculated using the [=field of view=] and {{XRRenderState/depthNear}} and {{XRRenderState/depthFar}} values.
+
+The WebXR API never exposes native origins directly, instead exposing transforms between them, so we need to specify a base reference space for {{FakeXRRigidTransformInit}}s so that we can have consistent numerical values across implementations. When used as an origin, {{FakeXRRigidTransformInit}}s are in the base reference space where the [=viewer=]'s [=native origin=] is identity at initialization, unless otherwise specified. In this space, the {{XRReferenceSpaceType/"local"}} reference space has a [=native origin=] of identity. This is an arbitrary choice: changing this reference space doesn't affect the data returned by the WebXR API, but we must make such a choice so that the tests produce the same results across different UAs. When used as an origin it is logically a transform <i>from</i> the origin's space <i>to</i> the underlying base reference space described above.
+
+
+Initialization {#initialization}
+==============
+
+navigator.xr.test {#xr-test-attribute}
+------------
+
+
+<script type="idl">
+partial interface XR {
+    [SameObject] readonly attribute XRTest test;
+};
+</script>
+
+The <dfn attribute for="XR">test</dfn> attribute's getter MUST return the {{XRTest}} object that is associated with it. This object MAY be lazily created.
+
+
+XRTest {#xrtest-interface}
+------------
+
+The {{XRTest}} object is the entry point for all testing.
+
+<script type="idl">
+interface XRTest {
+  Promise<FakeXRDevice> simulateDeviceConnection(FakeXRDeviceInit init);
+  void simulateUserActivation(Function f);
+  Promise<void> disconnectAllDevices();
+};
+</script>
+
+<div class="algorithm" data-algorithm="simulate-device-connection">
+The <dfn method for="XRTest">simulateDeviceConnection(|init|)</dfn> method creates a new [=simulated XR device=].
+
+When this method is invoked, the user agent MUST run the following steps:
+
+  1. Let |promise| be [=a new Promise=].
+  1. Run the following steps [=in parallel=]:
+    1. Let |device| be a new [=simulated XR device=].
+    1. For each |view| in |init|'s {{FakeXRDeviceInit/views}}:
+        1. Let |v| be the result of running [=parse a view=] on |view|.
+        1. If running [=parse a view=] threw an error, reject |promise| with this error and abort these steps.
+        1. [=list/Append=] |v| to |device|'s list of views.
+    1. If |init|'s {{FakeXRDeviceInit/supportedFeatures}} is set, set |device|'s [=capable of supporting|list of features it is capable of supporting=] to |init|'s {{FakeXRDeviceInit/supportedFeatures}}.
+    1. If |init|'s {{FakeXRDeviceInit/boundsCoordinates}} is set, perform the following steps:
+        1. If |init|'s {{FakeXRDeviceInit/boundsCoordinates}} has less than 3 elements, reject |promise| with {{TypeError}} and abort these steps.
+        1. Set |device|'s [=simulated XR device/native bounds geometry=] to |init|'s {{FakeXRDeviceInit/boundsCoordinates}}.
+    1. If |init|'s {{FakeXRDeviceInit/floorOrigin}} is set, set |device|'s [=simulated XR device/floor origin=] to |init|'s {{FakeXRDeviceInit/floorOrigin}}.
+    1. If |init|'s {{FakeXRDeviceInit/viewerOrigin}} is set, set |device|'s [=simulated XR device/viewer origin=] to |init|'s {{FakeXRDeviceInit/viewerOrigin}}.
+    1. Let |supportedModes| be an empty list of {{XRSessionMode}}s.
+    1. Modify |supportedModes| as follows:
+        <dl class="switch">
+        <dt>If |init|'s {{FakeXRDeviceInit/supportedModes}} is present:</dt>
+        <dd>
+            1. Append the contents of |init|'s {{FakeXRDeviceInit/supportedModes}} to |supportedModes|.
+            1. If |supportedModes| is empty, append <code>"inline"</code> to it.
+        </dd>
+        <dt>Else</dt>
+        <dd>
+            1. Append <code>"inline"</code> to |supportedModes|.
+            1. If |init|'s {{FakeXRDeviceInit/supportsImmersive}} is <code>true</code>, append <code>"immersive-vr"</code> to |supportedModes|.
+        </dd>
+        </dl>
+    1. Set |device|'s [=list of supported modes=] to |supportedModes|.
+    1. Register |device| based on the following:
+        1. If |supportedModes| contains <code>"immersive-vr"</code> or <code>"immersive-ar"</code>, append |device| to the {{Navigator/xr}}'s [=list of immersive XR devices=].
+        1. If |supportedModes| contains <code>"inline"</code>, set the [=inline XR device=] to |device|.
+    1. Let |d| be a new {{FakeXRDevice}} object with [=FakeXRDevice/device=] as |device|.
+    1. [=/Resolve=] |promise| with |d|.
+  1. Return |promise|.
+
+</div>
+
+When <dfn method for=XRTest>simulateUserActivation(f)</dfn> is called, invoke <code>f</code> as if it was [=triggered by user activation=].
+
+
+When <dfn method for=XRTest>disconnectAllDevices()</dfn> is called, remove all [=simulated XR devices=] from the [=context object=]'s {{XR}} object's [=list of immersive XR devices=] as if they were disconnected. If the [=inline XR device=] is a [=simulated XR device=], reset it to the default [=inline XR device=].
+
+
+FakeXRDeviceInit {#fakexrdeviceinit-dict}
+------------
+
+<script type="idl">
+
+dictionary FakeXRDeviceInit {
+    required boolean supportsImmersive;
+    sequence<XRSessionMode> supportedModes;
+    required sequence<FakeXRViewInit> views;
+
+    sequence<any> supportedFeatures;
+    sequence<FakeXRBoundsPoint> boundsCoordinates;
+    FakeXRRigidTransformInit floorOrigin;
+    FakeXRRigidTransformInit viewerOrigin;
+
+    // Hit test extensions:
+    FakeXRWorldInit world;
+};
+
+dictionary FakeXRViewInit {
+  required XREye eye;
+  required sequence<float> projectionMatrix;
+  required FakeXRDeviceResolution resolution;
+  required FakeXRRigidTransformInit viewOffset;
+  FakeXRFieldOfViewInit fieldOfView;
+};
+
+dictionary FakeXRFieldOfViewInit {
+  required float upDegrees;
+  required float downDegrees;
+  required float leftDegrees;
+  required float rightDegrees;
+};
+
+dictionary FakeXRDeviceResolution {
+    required long width;
+    required long height;
+};
+
+dictionary FakeXRBoundsPoint {
+  double x; double z;
+};
+
+dictionary FakeXRRigidTransformInit {
+  required sequence<float> position;
+  required sequence<float> orientation;
+};
+
+</script>
+
+<p class="advisement">
+The {{FakeXRDeviceInit/supportsImmersive}} is deprecated in favor of {{FakeXRDeviceInit/supportedModes}} and will be removed in future revisions of the specification.
+</p>
+
+<div class="algorithm" data-algorithm="parse-rigid-transform">
+To <dfn>parse a rigid transform</dfn> given a {{FakeXRRigidTransformInit}} |init|, perform the following steps:
+
+  1. Let |p| be |init|'s {{FakeXRRigidTransformInit/position}}.
+  1. If |p| does not have three elements, throw a {{TypeError}}.
+  1. Let |o| be |init|'s {{FakeXRRigidTransformInit/orientation}}.
+  1. If |o| does not have four elements, throw a {{TypeError}}.
+  1. Let |position| be a {{DOMPointInit}} with {{DOMPointInit/x}}, {{DOMPointInit/y}} and {{DOMPointInit/z}} equal to the three elements of |p| in order, and {{DOMPointInit/w}} equal to <code>1</code>.
+  1. Let |orientation| be a {{DOMPointInit}} with {{DOMPointInit/x}}, {{DOMPointInit/y}}, {{DOMPointInit/z}}, and {{DOMPointInit/w}} equal to the four elements of |o| in order.
+  1. {{XRRigidTransform/constructor|Construct an XRRigidTransform}} |transform| with {{XRRigidTransform/position}} |position| and {{XRRigidTransform/orientation}} |orientation|.
+  1. Return |transform|.
+
+</div>
+
+<div class="algorithm" data-algorithm="parse-view">
+To <dfn>parse a view</dfn> given a {{FakeXRViewInit}} |init|, perform the following steps:
+
+  1. Let |view| be a new [=view=].
+  1. Set |view|'s [=view/eye=] to |init|'s {{FakeXRViewInit/eye}}.
+  1. If |init|'s {{FakeXRViewInit/projectionMatrix}} does not have 16 elements, throw a {{TypeError}}.
+  1. Set |view|'s [=view/projection matrix=] to |init|'s {{FakeXRViewInit/projectionMatrix}}.
+  1. Set |view|'s [=view offset=] to the result of running [=parse a rigid transform=] |init|'s {{FakeXRViewInit/viewOffset}}.
+  1. Set |view|'s [=view/device resolution=] to |init|'s {{FakeXRViewInit/resolution}}.
+  1. If |init|'s {{FakeXRViewInit/fieldOfView}} is set, perform the following steps:
+    1. Set |view|'s [=view/field of view=] to |init|'s {{FakeXRViewInit/fieldOfView}}.
+    1. Set |view|'s [=view/projection matrix=] to the projection matrix corresponding to this field of view, and depth values equal to {{XRRenderState/depthNear}} and {{XRRenderState/depthFar}} of any {{XRSession}} associated with the device. If there currently is none, use the default values of <code>near=0.1, far=1000.0</code>.
+  1. Set |view|'s [=view/projection matrix=] to |init|'s {{FakeXRViewInit/projectionMatrix}}.
+  1. Return |view|.
+
+</div>
+
+Mocking {#mocking}
+==============
+
+FakeXRDevice {#fakexrdevice-interface}
+------------
+
+<script type="idl">
+interface FakeXRDevice {
+  void setViews(sequence<FakeXRViewInit> views);
+
+  Promise<void> disconnect();
+
+  void setViewerOrigin(FakeXRRigidTransformInit origin, optional boolean emulatedPosition = false);
+  void clearViewerOrigin();
+  void setFloorOrigin(FakeXRRigidTransformInit origin);
+  void clearFloorOrigin();
+  void setBoundsGeometry(sequence<FakeXRBoundsPoint> boundsCoordinates);
+  void simulateResetPose();
+
+  void simulateVisibilityChange(XRVisibilityState state);
+
+  FakeXRInputController simulateInputSourceConnection(FakeXRInputSourceInit init);
+
+  // Hit test extensions:
+  void setWorld(FakeXRWorldInit world);
+  void clearWorld();
+};
+
+</script>
+
+
+Each {{FakeXRDevice}} object has an associated <dfn for=FakeXRDevice>device</dfn>, which is a [=simulated XR device=] that it is able to control.
+
+<div class="algorithm" data-algorithm="next-animation-frame">
+
+Operations on the {{FakeXRDevice}}'s [=FakeXRDevice/device=] typically take place on the <dfn for=XRSession>next animation frame</dfn>, i.e. they are not immediately observable until a future {{XRSession/requestAnimationFrame()}} callback.
+
+To determine when this frame is, for a given operation, choose a frame based on the following:
+
+    <dl class=switch>
+    <dt>If such an operation is triggered within an [=XR animation frame=]:</dt>
+    <dd>Choose the next [=XR animation frame=], whenever it may occur</dd>
+    <dt>If such an operation is triggered outside of an [=XR animation frame=]:</dt>
+    <dd>Choose a frame based on the following:
+        <dl class=switch>
+            <dt>If there are no callbacks in the [=list of animation frame callbacks=]:</dt>
+            <dd>Choose the next [=XR animation frame=], whenever it may occur</dd>
+            <dt>Otherwise:</dt>
+            <dd>Choose the next-to-next [=XR animation frame=], whenever it may occur</dd>
+        </dl>
+    </dd>
+    </dl>
+
+NOTE: The reason we defer an extra frame when there are pending animation frame callbacks is to avoid having to deal with potential race conditions when the device is ready to trigger an animation frame callback, but has not yet. In practice, this means that tests should be written so that they wait until they have performed all such operations <i>before</i> calling the next {{XRSession/requestAnimationFrame()}}
+</div>
+
+<div class="algorithm" data-algorithm="set-views">
+The <dfn method for=FakeXRDevice>setViews(|views|)</dfn> method performs the following steps:
+
+    1. On the [=next animation frame=], run the following steps:
+        1. Let |l| be an empty [=list=].
+        1. For each |view| in |views|:
+            1. Let |v| be the result of running [=parse a view=] on |view|.
+            1. [=list/Append=] |v| to |l|.
+        1. Set [=FakeXRDevice/device=]'s list of views to |l|.
+
+</div>
+
+
+<div class="algorithm" data-algorithm="disconnect">
+
+When <dfn method for=FakeXRDevice>disconnect()</dfn> method is called, perform the following steps:
+
+
+    1. Remove [=FakeXRDevice/device=] from the [=context object=]'s {{XR}} object's [=list of immersive XR devices=] as if it were disconnected. 
+    1. If the [=inline XR device=] is equal to the {{FakeXRDevice}}, reset it to the default [=inline XR device=].
+
+</div>
+
+<div class="algorithm" data-algorithm="set-viewer-origin">
+The <dfn method for=FakeXRDevice>setViewerOrigin(|origin|, |emulatedPosition|)</dfn> performs the following steps:
+
+    1. Let |o| be the result of running [=parse a rigid transform=] on |origin|.
+    1. On the [=next animation frame=], perform the following steps:
+        1. Set [=FakeXRDevice/device=]'s [=simulated XR device/viewer origin=] to |o|.
+        1. Set [=FakeXRDevice/device=]'s [=simulated XR device/emulated position boolean=] to |emulatedPosition|.
+
+</div>
+
+The <dfn method for=FakeXRDevice>clearViewerOrigin()</dfn> method will, on the [=next animation frame=], set [=FakeXRDevice/device=]'s [=simulated XR device/viewer origin=] to <code>null</code>.
+
+The <dfn method for=FakeXRDevice>simulateVisibilityChange(|state|)</dfn> method will, as soon as possible, set [=FakeXRDevice/device=]'s [=simulated XR device/visibility state=] to |state|.
+
+
+
+
+<div class="algorithm" data-algorithm="set-floor-origin">
+The <dfn method for=FakeXRDevice>setFloorOrigin(|origin|)</dfn> performs the following steps:
+
+    1. Let |o| be the result of running [=parse a rigid transform=] on |origin|.
+    1. On the [=next animation frame=], set [=FakeXRDevice/device=]'s [=simulated XR device/floor origin=] to |o|.
+
+</div>
+
+The <dfn method for=FakeXRDevice>clearFloorOrigin()</dfn> method will, on the [=next animation frame=], set [=FakeXRDevice/device=]'s [=simulated XR device/floor origin=] to <code>null</code>.
+
+
+<div class="algorithm" data-algorithm="set-bounds-geometry">
+The <dfn method for=FakeXRDevice>setBoundsGeometry(|boundsCoordinates|)</dfn> performs the following steps:
+
+    1. If |boundsCoordinates| has fewer than 3 elements, throw a {{TypeError}}.
+    1. On the [=next animation frame=], set [=FakeXRDevice/device=]'s [=simulated XR device/native bounds geometry=] to |boundsCoordinates|.
+
+</div>
+
+The <dfn method for=FakeXRDevice>simulateResetPose()</dfn> method will, as soon as possible, behave as if the [=FakeXRDevice/device=]'s [=viewer=]'s [=native origin=] had a discontinuity, triggering appropriate {{reset}} events.
+
+FakeXRInputController {#fakexrinputcontroller-init}
+------------
+
+<script type="idl">
+dictionary FakeXRInputSourceInit {
+  required XRHandedness handedness;
+  required XRTargetRayMode targetRayMode;
+  required FakeXRRigidTransformInit pointerOrigin;
+  required sequence<DOMString> profiles;
+  boolean selectionStarted = false;
+  boolean selectionClicked = false;
+  sequence<FakeXRButtonStateInit> supportedButtons;
+  FakeXRRigidTransformInit gripOrigin;
+};
+
+interface FakeXRInputController {
+  void setHandedness(XRHandedness handedness);
+  void setTargetRayMode(XRTargetRayMode targetRayMode);
+  void setProfiles(sequence<DOMString> profiles);
+  void setGripOrigin(FakeXRRigidTransformInit gripOrigin, optional boolean emulatedPosition = false);
+  void clearGripOrigin();
+  void setPointerOrigin(FakeXRRigidTransformInit pointerOrigin, optional boolean emulatedPosition = false);
+
+  void disconnect();
+  void reconnect();
+
+  void startSelection();
+  void endSelection();
+  void simulateSelect();
+
+  void setSupportedButtons(sequence<FakeXRButtonStateInit> supportedButtons);
+  void updateButtonState(FakeXRButtonStateInit buttonState);
+};
+
+enum FakeXRButtonType {
+  "grip",
+  "touchpad",
+  "thumbstick",
+  "optional-button",
+  "optional-thumbstick"
+};
+
+dictionary FakeXRButtonStateInit {
+  required FakeXRButtonType buttonType;
+  required boolean pressed;
+  required boolean touched;
+  required float pressedValue;
+  float xValue = 0.0;
+  float yValue = 0.0;
+};
+</script>
+
+Hit test extensions {#hit-test-extensions}
+===================
+
+The hit test extensions for test API SHOULD be implemented by all user agents that implement <a href="https://immersive-web.github.io/hit-test/">WebXR Hit Test Module</a>.
+
+<script type="idl">
+
+dictionary FakeXRWorldInit {
+  required sequence<FakeXRRegionInit> hitTestRegions;
+};
+
+</script>
+
+{{FakeXRWorldInit}} dictionary describes the state of the world that will be used when computing hit test results on a {{FakeXRDevice}}.
+
+{{FakeXRWorldInit/hitTestRegions}} contains a collection of {{FakeXRRegionInit}}s that are used to describe specific regions of the fake world. The order of the regions does not matter.
+
+<script type="idl">
+
+dictionary FakeXRRegionInit {
+  required sequence<FakeXRTriangleInit> faces;
+  required FakeXRRegionType type;
+};
+
+</script>
+
+{{FakeXRRegionInit}} dictionary describes the contents of a specific region of the world.
+
+{{FakeXRRegionInit/faces}} contains a collection of {{FakeXRTriangleInit}}s that enumerate all the faces contained by the region. The order of the faces does not matter.
+
+{{FakeXRRegionInit/type}} contains a type of the region that will be used during computation of hit test results.
+
+<script type="idl">
+
+dictionary FakeXRTriangleInit {
+  required sequence<DOMPointInit> vertices;  // size = 3
+};
+
+</script>
+
+{{FakeXRTriangleInit}} dictionary describes a single face of a region.
+
+{{FakeXRTriangleInit/vertices}} contains a collection of {{DOMPointInit}}s that comprise the face. The face will be considered as solid when computing hit test results and as such, the winding order of the vertices does not matter.
+
+<script type="idl">
+
+enum FakeXRRegionType {
+  "point",
+  "plane",
+  "mesh"
+};
+
+</script>
+
+{{FakeXRRegionType}} enum is used to describe a type of the world region.

@@ -105,6 +105,10 @@ spec: fingerprinting-guidance; urlPrefix: https://w3c.github.io/fingerprinting-g
     type: dfn
         text: fingerprinting surface; url: dfn-fingerprinting-surface
 
+spec: html; urlPrefix: https://html.spec.whatwg.org/#
+    type: dfn
+        text: initializing the Document object; url: initialise-the-document-object
+
 spec: WebIDL; urlPrefix: https://heycam.github.io/webidl/#
     type: dfn
         text: a copy of the bytes held; url: dfn-get-buffer-source-copy
@@ -121,7 +125,7 @@ spec: html
     type: dfn
         text: browsing context; for: /
         text: global object; for: /
-spec: promises-guide-1
+spec: webidl
     type: dfn
         text: resolve
 </pre>
@@ -221,19 +225,14 @@ spec: promises-guide-1
             services: ['heart_rate'],
           }]
         }).then(device => device.gatt.<a for="BluetoothRemoteGATTServer">connect()</a>)
-        .then(server => server.<a idl for="BluetoothRemoteGATTServer" lt="getPrimaryService()">
-                              getPrimaryService</a>(<a idl lt="org.bluetooth.service.heart_rate">
-            'heart_rate'</a>))
+        .then(server => server.<a idl for="BluetoothRemoteGATTServer" lt="getPrimaryService()"
+          >getPrimaryService</a>(<a idl lt="org.bluetooth.service.heart_rate">'heart_rate'</a>))
         .then(service => {
           chosenHeartRateService = service;
           return Promise.all([
-            service.<a idl for="BluetoothRemoteGATTService" lt="getCharacteristic()">
-                       getCharacteristic</a>(<a idl lt="org.bluetooth.characteristic.body_sensor_location">
-            'body_sensor_location'</a>)
+            service.<a idl for="BluetoothRemoteGATTService" lt="getCharacteristic()">getCharacteristic</a>(<a idl lt="org.bluetooth.characteristic.body_sensor_location">'body_sensor_location'</a>)
               .then(handleBodySensorLocationCharacteristic),
-            service.<a idl for="BluetoothRemoteGATTService" lt="getCharacteristic()">
-                       getCharacteristic</a>(<a idl lt="org.bluetooth.characteristic.heart_rate_measurement">
-            'heart_rate_measurement'</a>)
+            service.<a idl for="BluetoothRemoteGATTService" lt="getCharacteristic()">getCharacteristic</a>(<a idl lt="org.bluetooth.characteristic.heart_rate_measurement">'heart_rate_measurement'</a>)
               .then(handleHeartRateMeasurementCharacteristic),
           ]);
         });
@@ -245,7 +244,7 @@ spec: promises-guide-1
           }
           return characteristic.<a for="BluetoothRemoteGATTCharacteristic">readValue()</a>
           .then(sensorLocationData => {
-            let sensorLocation = sensorLocationData.getUint8(0);
+            const sensorLocation = sensorLocationData.getUint8(0);
             switch (sensorLocation) {
               case 0: return 'Other';
               case 1: return 'Chest';
@@ -268,7 +267,7 @@ spec: promises-guide-1
         }
 
         function onHeartRateChanged(event) {
-          let characteristic = event.target;
+          const characteristic = event.target;
           console.log(parseHeartRate(characteristic.<a attribute for="BluetoothRemoteGATTCharacteristic">value</a>));
         }
       </pre>
@@ -284,9 +283,9 @@ spec: promises-guide-1
 
       <pre highlight="js">
         function parseHeartRate(data) {
-          let flags = data.getUint8(0);
-          let rate16Bits = flags & 0x1;
-          let result = {};
+          const flags = data.getUint8(0);
+          const rate16Bits = flags & 0x1;
+          const result = {};
           let index = 1;
           if (rate16Bits) {
             result.heartRate = data.getUint16(index, /*littleEndian=*/true);
@@ -295,19 +294,19 @@ spec: promises-guide-1
             result.heartRate = data.getUint8(index);
             index += 1;
           }
-          let contactDetected = flags & 0x2;
-          let contactSensorPresent = flags & 0x4;
+          const contactDetected = flags & 0x2;
+          const contactSensorPresent = flags & 0x4;
           if (contactSensorPresent) {
             result.contactDetected = !!contactDetected;
           }
-          let energyPresent = flags & 0x8;
+          const energyPresent = flags & 0x8;
           if (energyPresent) {
             result.energyExpended = data.getUint16(index, /*littleEndian=*/true);
             index += 2;
           }
-          let rrIntervalPresent = flags & 0x10;
+          const rrIntervalPresent = flags & 0x10;
           if (rrIntervalPresent) {
-            let rrIntervals = [];
+            const rrIntervals = [];
             for (; index + 1 < data.byteLength; index += 2) {
               rrIntervals.push(data.getUint16(index, /*littleEndian=*/true));
             }
@@ -341,11 +340,9 @@ spec: promises-guide-1
           if (!chosenHeartRateService) {
             return Promise.reject(new Error('No heart rate sensor selected yet.'));
           }
-          return chosenHeartRateService.<a idl for="BluetoothRemoteGATTService" lt="getCharacteristic()">
-                                         getCharacteristic</a>(<a idl lt="org.bluetooth.characteristic.heart_rate_control_point">
-            'heart_rate_control_point'</a>)
+          return chosenHeartRateService.<a idl for="BluetoothRemoteGATTService" lt="getCharacteristic()">getCharacteristic</a>(<a idl lt="org.bluetooth.characteristic.heart_rate_control_point">'heart_rate_control_point'</a>)
           .then(controlPoint => {
-            let resetEnergyExpended = new Uint8Array([1]);
+            const resetEnergyExpended = new Uint8Array([1]);
             return controlPoint.<a idl for="BluetoothRemoteGATTCharacteristic" lt="writeValue()">writeValue</a>(resetEnergyExpended);
           });
         }
@@ -554,7 +551,8 @@ spec: promises-guide-1
     <p>
       <code>navigator.bluetooth.{{getAvailability()}}</code>
       exposes whether a Bluetooth radio is available on the user's system,
-      regardless of whether it is powered on or not.
+      regardless of whether it is powered on or not. The availability is also
+      affected if the user has configured the UA to block Web Bluetooth.
       Some users might consider this private,
       although it's hard to imagine the damage that would result from revealing it.
       This information also increases the UA's <a>fingerprinting surface</a> by a bit.
@@ -1073,7 +1071,7 @@ spec: promises-guide-1
         `null`
       </td>
       <td>
-        Set to a {{BluetoothDevice}} while <a>initializing a new `Document` object</a>
+        Set to a {{BluetoothDevice}} while <a>initializing the `Document` object</a>
         if the `Document` was opened from the device.
       </td>
     </tr>
@@ -1096,7 +1094,7 @@ spec: promises-guide-1
         advertises a URL,
         the UA may allow the user to navigate to this URL.
       </span>
-      If this happens, then as part of <a>initializing a new `Document` object</a>,
+      If this happens, then as part of <a>initializing the `Document` object</a>,
       the UA MUST run the following steps:
     </p>
     <ol>
@@ -2036,7 +2034,7 @@ spec: promises-guide-1
     </dl>
   </section>
 
-  <section class="unstable">
+  <section>
     <h3 id="availability">Overall Bluetooth availability</h3>
 
     <p>
@@ -2051,7 +2049,7 @@ spec: promises-guide-1
         To show Bluetooth UI only to users who have a Bluetooth adapter:
       </p>
       <pre highlight="js">
-      let bluetoothUI = document.querySelector('#bluetoothUI');
+      const bluetoothUI = document.querySelector('#bluetoothUI');
       navigator.bluetooth.<a idl>getAvailability()</a>.then(isAvailable => {
         bluetoothUI.hidden = !isAvailable;
       });
@@ -2073,6 +2071,9 @@ spec: promises-guide-1
           return a particular answer from this function for the current origin,
           <a>queue a task</a> to <a>resolve</a> |promise| with the configured answer,
           and abort these steps.
+
+          Note: If the Web Bluetooth permission has been blocked by the user,
+          the UA may <a>resolve</a> |promise| with  `false`.
         </li>
         <li>
           If the UA is running on a system that has a Bluetooth radio
@@ -2084,12 +2085,36 @@ spec: promises-guide-1
         </li>
       </ol>
 
-      Note: the promise is resolved <a>in parallel</a>
+      Note: The promise is resolved <a>in parallel</a>
       to let the UA call out to other systems
       to determine whether Bluetooth is available.
     </div>
 
-    <div algorithm="availabilitychanged" id="availability-changed-algorithm">
+    <div class="example" id="example-getAvailability-PermissionStatus-onchange">
+      <p>If the user has blocked the permission and the UA resolves the
+      <code><a idl>getAvailability</a></code> promise with false, the following can be used to detect
+      when Bluetooth is available again to show Bluetooth UI:</p>
+      <pre highlight="js">
+      function checkAvailability() {
+        const bluetoothUI = document.querySelector('#bluetoothUI');
+        navigator.bluetooth.<a idl>getAvailability()</a>.then(isAvailable => {
+          bluetoothUI.hidden = !isAvailable;
+        });
+      }
+
+      navigator.permission.query({name: "bluetooth"}).then(status => {
+        if (status.state !== 'denied') checkAvailability();
+
+        // Bluetooth is blocked, listen for change in PermissionStatus.
+        status.onchange = () => {
+          if (this.state !== 'denied') checkAvailability();
+        };
+      });
+      </pre>
+    </div>
+
+    <div algorithm="availabilitychanged" id="availability-changed-algorithm"
+        class="unstable">
       <p>
         If the UA becomes able or unable to use Bluetooth,
         for example because a radio was physically attached or detached,
@@ -2122,10 +2147,10 @@ spec: promises-guide-1
     <pre class="idl">
       [
         Exposed=Window,
-        Constructor(DOMString type, optional ValueEventInit initDict = {}),
         SecureContext
       ]
       interface ValueEvent : Event {
+        constructor(DOMString type, optional ValueEventInit initDict = {});
         readonly attribute any value;
       };
 
@@ -2495,10 +2520,10 @@ spec: promises-guide-1
         };
         [
           Exposed=Window,
-          Constructor(DOMString type, BluetoothAdvertisingEventInit init),
           SecureContext
         ]
         interface BluetoothAdvertisingEvent : Event {
+          constructor(DOMString type, BluetoothAdvertisingEventInit init);
           [SameObject]
           readonly attribute BluetoothDevice device;
           readonly attribute FrozenArray&lt;UUID> uuids;
@@ -3114,15 +3139,15 @@ spec: promises-guide-1
             Let <var>promise</var> be the result.
           </li>
           <li>
-            Return the result of
-            <a>transforming</a> <var>promise</var> with a fulfillment handler that:
+            <a>Upon fulfillment</a> of <var>promise</var> with |result|, run the
+            following steps:
             <ul>
-              <li>If its argument is empty, throws a {{NotFoundError}},</li>
+              <li>If |result| is empty, throw a {{NotFoundError}},</li>
               <li>
                 Otherwise, if the <var>single</var> flag is set,
-                returns the first (only) element of its argument.
+                returns the first (only) element of |result|.
               </li>
-              <li>Otherwise, returns its argument.</li>
+              <li>Otherwise, return |result|.</li>
             </ul>
           </li>
         </ol>
@@ -3430,16 +3455,14 @@ spec: promises-guide-1
           <code><var>gattServer</var>.{{BluetoothRemoteGATTServer/[[activeAlgorithms]]}}</code>.
         </li>
         <li>
-          Return the result of <a>transforming</a> <var>promise</var>
-          with fulfillment and rejection handlers that perform the following steps:
-          <dl>
-            <dt>fulfillment handler</dt>
-            <dd>
+          <a>React</a> to <var>promise</var>:
+          <ul>
+            <li>If |promise| was fulfilled with value |result|, then:
               <ol>
                 <li>
                   If <var>promise</var> is in
                   <code><var>gattServer</var>.{{BluetoothRemoteGATTServer/[[activeAlgorithms]]}}</code>,
-                  remove it and return the first argument.
+                  remove it and return |result|.
                 </li>
                 <li>
                   Otherwise, throw a {{NetworkError}}.
@@ -3449,14 +3472,13 @@ spec: promises-guide-1
                   </span>
                 </li>
               </ol>
-            </dd>
-            <dt>rejection handler</dt>
-            <dd>
+            </li>
+            <li>If |promise| was rejected with reason |error|, then:
               <ol>
                 <li>
                   If <var>promise</var> is in
                   <code><var>gattServer</var>.{{BluetoothRemoteGATTServer/[[activeAlgorithms]]}}</code>,
-                  remove it and throw the first argument.
+                  remove it and throw |error|.
                 </li>
                 <li>
                   Otherwise, throw a {{NetworkError}}.
@@ -3466,8 +3488,8 @@ spec: promises-guide-1
                   </span>
                 </li>
               </ol>
-            </dd>
-          </dl>
+            </li>
+          </ul>
         </li>
       </ol>
     </div>

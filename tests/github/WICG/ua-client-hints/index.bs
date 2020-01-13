@@ -1,0 +1,613 @@
+<pre class="metadata">
+Title: User-Agent Client Hints
+Status: CG-DRAFT
+Group: WICG
+ED: https://wicg.github.io/ua-client-hints/
+Repository: wicg/ua-client-hints
+Shortname: ua-client-hints
+Level: None
+Editor: Mike West 56384, Google Inc., mkwst@google.com
+Abstract:
+    This document defines a set of Client Hints that aim to provide developers with the ability to
+    perform agent-based content negotiation when necessary, while avoiding the historical baggage and
+    passive fingerprinting surface exposed by the venerable `User-Agent` header.
+Indent: 4
+Default Biblio Status: current
+Markup Shorthands: css off, markdown on
+Boilerplate: omit conformance, omit feedback-header
+!Participate: <a href="https://github.com/WICG/ua-client-hints/issues/new">File an issue</a> (<a href="https://github.com/WICG/ua-client-hints/issues">open issues</a>)
+</pre>
+<pre class="link-defaults">
+spec:fetch; type:dfn; for:/; text:request
+spec:webidl; type:dfn; text:resolve
+</pre>
+<pre class="anchors">
+urlPrefix: https://tools.ietf.org/html/draft-ietf-httpbis-header-structure; spec: I-D.ietf-httpbis-header-structure
+    type: dfn
+        text: structured header; url: #
+    for: structured header
+        type: dfn
+            text: token; url: #section-3.3.6
+            text: boolean; url: #section-3.3.4
+            text: string; url: #section-3.3.3
+            text: list; url: #section-3.1
+    type: abstract-op
+        text: serialize Structured Header; url: #section-4.1
+</pre>
+<pre class="biblio">
+{
+  "FacebookYearClass": {
+    "href": "https://code.fb.com/android/year-class-a-classifiation-system-for-android/",
+    "title": "Year class: A classification system for Android",
+    "authors": [ "Chris Marra", "Daniel Weaver" ]
+  },
+  "I-D.ietf-httpbis-client-hints": {
+    "href": "https://tools.ietf.org/html/draft-ietf-httpbis-client-hints",
+    "title": "HTTP Client Hints",
+    "authors": [ "Ilya Grigorik" ],
+    "status": "ID",
+    "publisher": "IETF"
+  },
+  "I-D.ietf-httpbis-header-structure": {
+    "authors": [ "Mark Nottingham", "Poul-Henning Kamp" ],
+    "href": "https://tools.ietf.org/html/draft-ietf-httpbis-header-structure",
+    "title": "Structured Headers for HTTP",
+    "status": "ID",
+    "publisher": "IETF"
+  },
+  "I-D.ietf-tls-grease": {
+    "href": "https://tools.ietf.org/html/draft-ietf-tls-grease",
+    "title": "Applying GREASE to TLS Extensibility",
+    "authors": [ "David Benjamin" ],
+    "status": "ID",
+    "publisher": "IETF"
+  },
+  "Janc2014": {
+    "href": "https://dev.chromium.org/Home/chromium-security/client-identification-mechanisms#TOC-Browser-level-fingerprints",
+    "title": "Technical analysis of client identification mechanisms",
+    "authors": [ "Artur Janc", "Michal Zalweski" ]
+  },
+  "Rossi2015": {
+    "href": "https://channel9.msdn.com/Events/WebPlatformSummit/2015/The-Microsoft-Edge-Rendering-Engine-that-makes-the-Web-just-work#time=9m45s",
+    "title": "The Microsoft Edge Rendering Engine that makes the Web just work",
+    "author": [ "Jacob Rossi" ]
+  }
+}
+</pre>
+
+Introduction {#intro}
+============
+
+Today, user agents generally identify themselves to servers by sending a `User-Agent` HTTP request
+header field along with each request (defined in Section 5.5.3 of [[RFC7231]]). Ideally, this header
+would give servers the ability to perform content negotiation, sending down exactly those bits that
+best represent the requested resource in a given user agent, optimizing both bandwidth and user
+experience. In practice, however, this header's value exposes far more information about the user's
+device than seems appropriate as a default, on the one hand, and intentionally obscures the true
+user agent in order to bypass misguided server-side heuristics, on the other.
+
+For example, a recent version of Chrome on iOS identifies itself as:
+
+``` http
+  User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 12_0 like Mac OS X)
+              AppleWebKit/605.1.15 (KHTML, like Gecko)
+              CriOS/69.0.3497.105 Mobile/15E148 Safari/605.1
+```
+
+While a recent version of Edge identifies itself as:
+
+``` http
+  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+              AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.2704.79
+              Safari/537.36 Edge/18.014
+```
+
+There's quite a bit of information packed into those strings (along with a fair number of lies).
+Version numbers, platform details, model information, etc. are all broadcast along with every
+request, and form the basis for fingerprinting schemes of all sorts. Individual vendors have taken
+stabs at altering their user agent strings, and have run into a few categories of feedback from
+developers that have stymied historical approaches:
+
+1.  Brand and version information (e.g. "Chrome 69") allows websites to work around known bugs in
+    specific releases that aren't otherwise detectable. For example, implementations of Content
+    Security Policy have varied wildly between vendors, and it's difficult to know what policy to
+    send in an HTTP response without knowing what browser is responsible for its parsing and
+    execution.
+
+2.  Developers will often negotiate what content to send based on the user agent and platform. Some
+    application frameworks, for instance, will style an application on iOS differently from the same
+    application on Android in order to match each platform's aesthetic and design patterns.
+
+3.  Similarly to #1, OS revisions and architecture can be responsible for specific bugs which can
+    be worked around in website's code, and narrowly useful for things like selecting appropriate
+    executables for download (32 vs 64 bit, ARM vs Intel, etc).
+
+4.  Sophisticated developers use model/make to tailor their sites to the capabilities of the
+    device (e.g. [[FacebookYearClass]]) and to pinpoint performance bugs and regressions which
+    sometimes are specific to model/make.
+
+This document proposes a mechanism which might allow user agents to be a bit more aggressive about
+removing entropy from the `User-Agent` string generally by giving servers that really need some
+specific details about the client the ability to opt-into receiving them. It introduces four new
+Client Hints ([[I-D.ietf-httpbis-client-hints]]) that can provide the client's branding and version
+information, the underlying operating system's branding and major version, as well as details about
+the underlying device. Rather than broadcasting this data to everyone, all the time, user agents can
+make reasonable decisions about how to respond to given sites' requests for more granular data,
+reducing the passive fingerprinting surface area exposed to the network.
+
+Examples {#examples}
+--------
+
+A user navigates to `https://example.com/` for the first time. Their user agent sends the following
+header along with the HTTP request:
+
+``` http
+  Sec-CH-UA: "Examplary Browser 73"
+```
+
+The server is interested in rendering content consistent with the user's underlying platform, and
+asks for a little more information by sending an `Accept-CH` header (Section 2.2.1 of
+[[I-D.ietf-httpbis-client-hints]]) along with the initial response:
+
+``` http
+  Accept-CH: UA, Platform
+```
+
+In response, the user agent includes more detailed version information, as well as information about
+the underlying platform in the next request:
+
+``` http
+  Sec-CH-UA: "Examplary Browser 73.3R8.2H.1"
+  Sec-CH-Platform: "Windows 10"
+```
+
+
+User Agent Hints {#http-ua-hints}
+================
+
+The following sections define a number of HTTP request header fields that expose detail about a
+given user agent, which servers can opt-into receiving via the Client Hints infrastructure defined
+in [[I-D.ietf-httpbis-client-hints]]. The definitions below assume that each user agent has defined
+a number of properties for itself:
+
+*   <dfn for="user agent" export>brand</dfn> (for example: "cURL", "Edge", "The World's Best Web Browser")
+*   <dfn for="user agent" export>major version</dfn> (for example: "72", "3", or "28")
+*   <dfn for="user agent" export>full version</dfn> (for example: "72.0.3245.12", "3.14159", or "297.70E04154A")
+*   <dfn for="user agent" export>platform brand and version</dfn> (for example: "Windows NT 6.0", "iOS 15", or "AmazingOS 17G")
+*   <dfn for="user agent" export>platform architecture</dfn> (for example: "ARM64", or "ia32")
+*   <dfn for="user agent" export>model</dfn> (for example: "", or "Pixel 2 XL")
+*   <dfn for="user agent" export>mobileness</dfn> (for example: ?0 or ?1)
+
+User agents SHOULD keep these strings short and to the point, but servers MUST accept arbitrary
+values for each, as they are all values constructed at the user agent's whim.
+
+
+The 'Sec-CH-Arch' Header Field {#sec-ch-arch}
+------------------------------
+
+The <dfn http-header>`Sec-CH-Arch`</dfn> request header field gives a server information about
+the architecture of the platform on which a given user agent is executing. It is a
+[=Structured Header=] whose value MUST be a [=structured header/string=]
+[[I-D.ietf-httpbis-header-structure]].
+
+The header's ABNF is:
+
+~~~ abnf
+  Sec-CH-Arch = sh-string
+~~~
+
+To <dfn abstract-op local-lt="set-arch">set the `Sec-CH-Arch` header for a request</dfn>, given a [=request=] (|r|),
+user agents MUST:
+
+1.  If |r|'s [=request/client-hints set=] [=list/contains=] `Arch`, then:
+
+    1.  Let `value` be a [=Structured Header=] object whose value is the user agent's
+        [=user agent/platform architecture=].
+
+    2.  [=header list/Set a structured header=] in |r|'s [=request/header list=] whose name is
+        `Sec-CH-Arch`, and whose value is `value`.
+
+
+The 'Sec-CH-Model' Header Field {#sec-ch-model}
+-------------------------------
+
+The <dfn http-header>`Sec-CH-Model`</dfn> request header field gives a server information about
+the device on which a given user agent is executing. It is a [=Structured Header=] whose value MUST
+be a [=structured header/string=] [[I-D.ietf-httpbis-header-structure]].
+
+The header's ABNF is:
+
+``` abnf
+  Sec-CH-Model = sh-string
+```
+
+To <dfn abstract-op local-lt="set-model">set the `Sec-CH-Model` header for a request</dfn>, given a [=request=] (|r|),
+user agents MUST:
+
+1.  If |r|'s [=request/client-hints set=] [=list/contains=] `Model`, then:
+
+    1.  Let `value` be a [=Structured Header=] object whose value is the user agent's
+        [=user agent/model=].
+
+    2.  [=header list/Set a structured header=] in |r|'s [=request/header list=] whose name is
+        `Sec-CH-Model`, and whose value is `value`.
+
+ISSUE(wicg/ua-client-hints): Perhaps `Sec-CH-Mobile` is enough, and we don't need to expose the model?
+
+
+The 'Sec-CH-Platform' Header Field {#sec-ch-platform}
+----------------------------------
+
+The <dfn http-header>`Sec-CH-Platform`</dfn> request header field gives a server information about
+the platform on which a given user agent is executing. It is a [=Structured Header=] whose value
+MUST be a [=structured header/string=] [[I-D.ietf-httpbis-header-structure]].
+
+The header's ABNF is:
+
+``` abnf
+  Sec-CH-Platform = sh-string
+```
+
+To <dfn abstract-op local-lt="set-platform">set the `Sec-CH-Platform` header for a request</dfn>, given a [=request=] (|r|),
+user agents MUST:
+
+1.  If |r|'s [=request/client-hints set=] [=list/contains=] `Platform`, then:
+
+    1.  Let `value` be a [=Structured Header=] object whose value is the user agent's
+        [=user agent/platform brand and version=].
+
+    2.  [=header list/Set a structured header=] in |r|'s [=request/header list=] whose name is
+        `Sec-CH-Platform`, and whose value is `value`.
+
+The 'Sec-CH-UA' Header Field {#sec-ch-ua}
+----------------------------
+
+The <dfn http-header>`Sec-CH-UA`</dfn> request header field gives a server information about a
+user agent's branding and version. It is a [=Structured Header=] whose value MUST be a
+[=structured header/list=] [[I-D.ietf-httpbis-header-structure]].
+
+The header's ABNF is:
+
+``` abnf
+  Sec-CH-UA = sh-list
+```
+
+Unlike most Client Hints, the `Sec-CH-UA` header will be sent with all requests, whether or not the
+server opted-into receiving the header via an `Accept-CH` header. Prior to an opt-in, however, it
+will include only the user agent's branding information, and the major version number (both of which
+are fairly clearly sniffable by "examining the structure of other headers and by testing for the
+availability and semantics of the features introduced or modified between releases of a particular
+browser" [[Janc2014]]).
+
+To <dfn abstract-op local-lt="set-ua">set the `Sec-CH-UA` header for a request</dfn>, given a [=request=] (|r|),
+user agents MUST:
+
+1.  Let |value| be a [=Structured Header=] object whose value is a [=structured header/list=].
+
+2.  Let |version| be the user agent's [=user agent/full version=] if |r|'s
+    [=request/client-hints set=] [=list/contains=] `UA`, and the user agent's
+    [=user agent/major version=] otherwise.
+
+3.  Let |ua| be a string whose value is the [=string/concatenation=] of the user agent's
+    [=user agent/brand=], a U+0020 SPACE character, and |version|.
+
+    ISSUE(wicg/ua-client-hints#7): Should we split the version out into a separate
+    `Sec-CH-UA-Version` header? Or keep it here?
+
+4.  [=list/Append=] |ua| to |value|.
+
+5.  The user agent MAY execute the following steps:
+
+    1.  [=list/Append=] additional items to |value| containing arbitrary brand and version
+        combinations.
+
+    2.  Randomize the order of the items in |value|.
+
+    Note: See [[#grease]] for more details on why these steps might be appropriate.
+
+6.  [=header list/Set a structured header=] in |r|'s [=request/header list=] whose name is
+    `Sec-CH-UA`, and whose value is |value|.
+
+The 'Sec-CH-Mobile' Header Field {#sec-ch-mobile}
+--------------------------------
+
+The <dfn http-header>`Sec-CH-Mobile`</dfn> request header field gives a server information about
+whether or not a user agent prefers a "mobile" user experience. It is a [=Structured Header=]
+whose value MUST be a [=structured header/boolean=] [[I-D.ietf-httpbis-header-structure]].
+
+The header's ABNF is:
+
+``` abnf
+  Sec-CH-Mobile = sh-boolean
+```
+
+To <dfn abstract-op local-lt="set-mobile">set the `Sec-CH-Mobile` header for a request</dfn>, given a [=request=] (|r|),
+user agents MUST:
+
+1.  If the |r|'s [=request/client-hints set=] [=list/contains=] `Mobile`, then:
+
+    1.  Let `value` be a [=Structured Header=] whose value is the user agent's
+        [=user agent/mobileness=].
+
+    2.  [=header list/Set a structured header=] in |r|'s [=request/header list=] whose name is
+        `Sec-CH-Mobile`, and whose value is `value`.
+
+
+Integration with Fetch {#fetch-integration}
+----------------------
+
+The Fetch specification should call into the following algorithm in place of the current Step 5.11
+in its HTTP-network-or-cache fetch algorithm.
+
+To <dfn abstract-op export>set the user agent metadata for a request</dfn> (|r|), the user agent MUST
+execute the following steps:
+
+1.  If |r|'s [=request/header list=] does not [=header list/contain=] `User-Agent`, then the user
+    agent MAY append `User-Agent`/[=default `User-Agent` value=] to |r|'s [=request/header list=].
+
+2.  <a abstract-op lt="set-arch">Set the `Sec-CH-Arch` header for a request</a>, given |r|.
+
+3.  <a abstract-op lt="set-mobile">Set the `Sec-CH-Mobile` header for a request</a>, given |r|.
+
+3.  <a abstract-op lt="set-model">Set the `Sec-CH-Model` header for a request</a>, given |r|.
+
+4.  <a abstract-op lt="set-platform">Set the `Sec-CH-Platform` header for a request</a>, given |r|.
+
+5.  <a abstract-op lt="set-ua">Set the `Sec-CH-UA` header for a request</a>, given |r|.
+
+
+Interface {#interface} 
+=================
+
+<pre class="idl">
+[Exposed=Window]
+interface NavigatorUAData {
+  readonly attribute DOMString brand;
+  readonly attribute DOMString version;
+  readonly attribute DOMString platform;
+  readonly attribute DOMString architecture;
+  readonly attribute DOMString model;
+  readonly attribute boolean mobile;
+};
+interface mixin NavigatorUA {
+  [SecureContext] Promise&lt;NavigatorUAData&gt; getUserAgent();
+};
+Navigator includes NavigatorUA;
+
+</pre>
+
+Processing model {#processing}
+--------------
+<dfn method for="NavigatorUA"><code>getUserAgent()</code></dfn> method MUST run these steps:
+
+1. Let |p| be a [=a new promise=].
+
+2.  Run the following steps [=in parallel=]:
+
+    1.  Let |UAData| be a new {{NavigatorUAData}} object whose values are initialized as follows:
+
+        :   {{NavigatorUAData/brand}}
+        ::  The user agent's [=user agent/brand=].
+        :   {{NavigatorUAData/platform}}
+        ::  The user agent's [=user agent/platform brand and version=].
+        :   {{NavigatorUAData/architecture}}
+        ::  The user agent's [=user agent/platform architecture=].
+        :   {{NavigatorUAData/model}}
+        ::  The user agent's [=user agent/model=].
+        :   {{NavigatorUAData/mobile}}
+        ::  The user agent's [=user agent/mobileness=].
+        :   {{NavigatorUAData/version}}
+        ::  The user agent's [=user agent/full version=].
+
+    2.  [=Resolve=] |p| with |UAData|.
+
+3.  Return |p|.
+
+ISSUE: Provide a method to only access the UA's major version.
+
+Security and Privacy Considerations {#security-privacy}
+===================================
+
+Secure Transport {#secure-transport}
+----------------
+
+Client Hints will not be delivered to non-secure endpoints (see the secure transport requirements in
+Section 2.2.1 of [[I-D.ietf-httpbis-client-hints]]). This means that user agent information will not
+be leaked over plaintext channels, reducing the opportunity for network attackers to build a profile
+of a given agent's behavior over time.
+
+Delegation {#delegation}
+----------
+
+Client Hints will be delegated from top-level pages via Feature Policy (once a few patches against
+Fetch and Client Hints and Feature Policy land. This reduces the likelihood that user agent
+information will be delivered along with subresource requests, which reduces the potential for
+passive fingerprinting. The following issues cover the dependencies:
+
+ISSUE(whatwg/fetch#773): Fetch integration of Accept-CH opt-in, and the definition of a
+[=request=]'s <dfn for="request">client-hints set</dfn>.
+
+ISSUE(whatwg/html#3774): HTML integration of Accept-CH-Lifetime and the ACHL cache.
+
+ISSUE(whatwg/fetch#725): Adding new CH features to the CH list in Fetch
+
+ISSUE(whatwg/fetch#811): 3rd-party opt-in
+
+ISSUE(wicg/feature-policy#220): 3rd-party opt-in
+
+ISSUE: These are all out of date. Yoav will fix them.
+
+Access Restrictions {#access}
+-------------------
+
+The information in the Client Hints defined above reveals quite a bit of information about the user
+agent and the platform/device upon which it runs. User agents ought to exercise judgement before
+granting access to this information, and MAY impose restrictions above and beyond the secure
+transport and delegation requirements noted above. For instance, user agents could choose to reveal
+[=user agent/platform architecture=] only on requests it intends to download, giving the server the
+opportunity to serve the right binary. Likewise, they could offer users control over the values
+revealed to servers, or gate access on explicit user interaction via a permission prompt or via a
+settings interface.
+
+Implementation Considerations {#impl-considerations}
+=============================
+
+The 'User-Agent' Header {#user-agent}
+-----------------------
+
+User agents SHOULD deprecate the `User-Agent` header in favor of the Client Hints model described in
+this document. The header, however, is likely to be impossible to remove entirely in the near-term,
+as existing sites' content negotiation code will continue to require its presence (see
+[[Rossi2015]] for a recent example of a new browser's struggles in this area).
+
+One approach which might be advisable could be for each user agent to lock the value of its
+`User-Agent` header, ensuring backwards compatibility by maintaining the crufty declarations of
+"like Gecko" and "AppleWebKit/537.36" on into eternity. This can ratchet over time, first freezing
+the version number, then shifting platform and model information to something reasonably generic in
+order to reduce the fingerprint the header provides.
+
+GREASE-like UA Strings {#grease}
+----------------------
+
+History has shown us that there are real incentives for user agents to lie about their branding
+in order to thread the needle of sites' sniffing scripts. While I'm optimistic that we can reset
+expectations around sniffing by freezing the thing that's sniffed-upon today, and creating a sane 
+set of options for developers, it's likely that this is hopelessly naive. It's reasonable to
+ponder what we should do to encourage sniffing in the right way, if we believe it's going to
+happen one way or another.
+
+User agents may choose to model `UA` as a set, rather than a single entry. This could encourage
+standardized processing of the `UA` string by 
+Randomly including additional, intentionally incorrect, comma-separated entries with arbitrary
+ordering (similar conceptually to [[I-D.ietf-tls-grease]]) could encourage standardized processing
+if the `UA` string by servers, and reduce the chance that we ossify on a few required strings.
+For example, Chrome 73's `Sec-CH-UA` header might be `"Chrome 73", "NotBrowser 12"`, or
+`"BrowsingIsFun Version 12b", "Chrome 73"`, or something completely different.
+
+The 'Sec-CH-' prefix {#sec-ch}
+--------------------
+
+Based on some discussion in https://github.com/w3ctag/design-reviews/issues/320, it seems
+reasonable to forbid access to these headers from JavaScript, and demarcate them as
+browser-controlled client hints so they can be documented and included in requests without
+triggering CORS preflights. A `Sec-CH-` prefix seems like a viable approach, but this bit might
+shift as the broader Client Hints discussions above coalesce into something more solid that lands
+in specs.
+
+IANA Considerations {#iana}
+===================
+
+This document intends to define the `Sec-CH-Arch`, `Sec-CH-Model`, `Sec-CH-Platform`, and
+`Sec-CH-UA` HTTP request header fields, and register them in the permanent message header
+field registry ([[RFC3864]]).
+
+It also intends to deprecate the `User-Agent` header field.
+
+'Sec-CH-Arch' Header Field {#iana-arch}
+--------------------------
+
+Header field name:
+: Sec-CH-Arch
+
+Applicable protocol:
+: http
+
+Status:
+: standard
+
+Author/Change controller:
+: IETF
+
+Specification document:
+: this specification ([[#sec-ch-arch]])
+
+'Sec-CH-Model' Header Field {#iana-model}
+---------------------------
+
+Header field name:
+: Sec-CH-Model
+
+Applicable protocol:
+: http
+
+Status:
+: standard
+
+Author/Change controller:
+: IETF
+
+Specification document:
+: this specification ([[#sec-ch-ua]])
+
+'Sec-CH-Platform' Header Field {#iana-platform}
+------------------------------
+
+Header field name:
+: Sec-CH-Platform
+
+Applicable protocol:
+: http
+
+Status:
+: standard
+
+Author/Change controller:
+: IETF
+
+Specification document:
+: this specification ([[#sec-ch-platform]])
+
+'Sec-CH-UA' Header Field {#iana-ua}
+------------------------
+
+Header field name:
+: Sec-CH-UA
+
+Applicable protocol:
+: http
+
+Status:
+: standard
+
+Author/Change controller:
+: IETF
+
+Specification document:
+: this specification ([[#sec-ch-ua]])
+
+'Sec-CH-Mobile' Header Field {#iana-mobile}
+----------------------------
+
+Header field name:
+: Sec-CH-Mobile
+
+Applicable protocol:
+: http
+
+Status:
+: standard
+
+Author/Change controller:
+: IETF
+
+Specification document:
+: this specification ([[#sec-ch-mobile]])
+
+'User-Agent' Header Field {#iana-user-agent}
+-------------------------
+
+Header field name:
+: User-Agent
+
+Applicable protocol:
+: http
+
+Status:
+: deprecated
+
+Author/Change controller:
+: IETF
+
+Specification document:
+: this specification ([[#user-agent]]), and Section 5.5.3 of [[RFC7231]]
+

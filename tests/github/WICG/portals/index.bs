@@ -247,7 +247,7 @@ spec:url; type:dfn; text:scheme
     Since the task to set the [=portal state=], and thus expose the
     {{PortalHost}} object, is queued first, and from the same [=task source=],
     it is exposed at the time the [=PortalActivateEvent/activation promise=] returned from
-    {{HTMLPortalElement/activate()}} is resolved.
+    {{HTMLPortalElement/activate(options)}} is resolved.
 
     <xmp highlight="javascript">
     // In the successor document.
@@ -864,7 +864,86 @@ spec:url; type:dfn; text:scheme
   ==================================================
 
   <div class="issue">
-    We should explicitly cover how this specification interacts with [[CSP]],
-    [[RFC7034]] and other specifications that confine the behavior of frames.
+    We should expand this section further.
   </div>
+
+  Overview {#security-overview}
+  -----------------------------
+
+  *This section is non-normative.*
+
+  In general, a [=portal browsing context=] should respect policies that would apply to
+  a [=nested browsing context=], e.g. that would restrict whether a document can be embedded
+  in a document from another [=origin=].
+
+  Integration with Content Security Policy {#csp}
+  -----------------------------------------------
+
+  This specification integrates with [[CSP]] as follows.
+
+  <section algorithm="csp-effective-directive-for-a-request">
+    The algorithm for determining the [[CSP#effective-directive-for-a-request|effective directive for a request]]
+    is modified by prepending the following:
+
+    1. If |request|'s [=initiator=] is "", its [=destination=] is "`document`", and
+        its [=target browsing context=] is a [=portal browsing context=], return `frame-src`.
+  </section>
+
+  <section algorithm="csp-frame-ancestors-navigation-response">
+    The [[CSP#frame-ancestors-navigation-response|frame-ancestors Navigation Response Check]]
+    is modified as follows:
+
+    1. Replace all references to "[=nested browsing context=]" with "[=nested browsing context=] or [=portal browsing context=]".
+
+    1. Replace all references to "[=parent browsing context=]" with "[=parent browsing context=] or [=host browsing context=]".
+  </section>
+
+  <div class="issue">
+    {{HTMLPortalElement/activate(options)}} should also respect the CSP [=navigate-to=] directive.
+  </div>
+
+  Integration with RFC 7034 {#rfc7034}
+  ------------------------------------
+
+  This specification integrates with [[RFC7034]], which defines the `X-Frame-Options` HTTP header, as follows.
+
+  If a browser receives content with this header field in response to a navigation request whose
+  [=target browsing context=] is a [=portal browsing context=], then the browser must apply the rules
+  in [[RFC7034]] as though it were to be displayed in a frame in the [=host browsing context=] instead
+  and as though the origin of the top-level browsing context |topLevelBrowsingContext| were the origin of
+  the result of the following algorithm:
+
+  1. While |topLevelBrowsingContext| is a [=portal browsing context=]:
+
+    1. Set |topLevelBrowsingContext| to its [=host browsing context=].
+
+  1. Return |topLevelBrowsingContext|.
+
+  Integration with Fetch Metadata Request Headers {#fetch-metadata}
+  -----------------------------------------------------------------
+
+  This specification integrates with [[FETCH-METADATA]] as follows.
+
+  <div class="note">
+    The effect of this is that the request for a document in a [=portal browsing context=]
+    will contain the following HTTP header, as though it were in a [=nested browsing context=].
+
+    ```
+    Sec-Fetch-Mode: nested-navigate
+    ```
+
+    Even though no spec patches are required to do so, implementations must also send
+    the appropriate fetch metadata headers as it would if the load were occurring in
+    an <{iframe}> element.
+  </div>
+
+  <section algorithm="fetch-metadata-set-mode">
+    The algorithm to [[FETCH-METADATA#abstract-opdef-set-mode|set the Sec-Fetch-Mode header]] for a request |r|
+    is modified as follows:
+
+    1. Where the algorithm checks whether |r|'s [=reserved client=]'s [=target browsing context=] is
+        a [=nested browsing context=], check instead whether it is a [=nested browsing context=] or
+        a [=portal browsing context=].
+  </section>
+
 </section>

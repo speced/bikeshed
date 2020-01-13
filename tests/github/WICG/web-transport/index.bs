@@ -61,6 +61,8 @@ Boilerplate: omit conformance
 <pre class="link-defaults">
 spec:streams; type:interface; text:ReadableStream
 spec:html; type:dfn; for:/; text:origin
+spec:url; type:dfn; text:scheme
+spec:url; type:dfn; text:fragment
 </pre>
 <pre class="anchors">
 urlPrefix: http://www.ecma-international.org/ecma-262/6.0/index.html; spec: ECMASCRIPT-6.0
@@ -70,7 +72,6 @@ urlPrefix: http://www.ecma-international.org/ecma-262/6.0/index.html; spec: ECMA
     text: pending; url: sec-promise-objects
     text: resolved; url: sec-promise-objects
     text: settled; url: sec-promise-objects
-    
 </pre>
 
 # Introduction #    {#introduction}
@@ -106,7 +107,7 @@ easy to follow, and not intended to be performant.)
 
 Implementations that use ECMAScript to implement the APIs defined in this
 specification MUST implement them in a manner consistent with the ECMAScript
-Bindings defined in the Web IDL specification [[!WEBIDL-1]], as this
+Bindings defined in the Web IDL specification [[!WEBIDL]], as this
 specification uses that specification and terminology.
 
 # Terminology #  {#terminology}
@@ -161,9 +162,6 @@ interface mixin UnidirectionalStreamsTransport {
      1. If |transport|'s {{WebTransport/state}} is `"closed"` or `"failed"`,
         immediately return a new [=rejected=] promise with a newly created
         {{InvalidStateError}} and abort these steps.
-     1. If |transport|'s {{WebTransport/state}} is `"connected"`, immediately
-        return a new [=resolved=] promise with a newly created {{SendStream}}
-        object, [=add the SendStream=] to the transport and abort these steps.
      1. Let |p| be a new promise.
      1. Return |p| and continue the following steps in background.
      1. [=Resolve=] |p| with a newly created {{SendStream}} object and [=add the
@@ -171,12 +169,11 @@ interface mixin UnidirectionalStreamsTransport {
          1. The |transport|'s {{WebTransport/state}} has transitioned to
             `"connected"`.
          1. Stream creation flow control is not being violated by exceeding the
-            max stream limit set by the remote endpoint, as specified in
-            [[!QUIC-TRANSPORT]].
+            max stream limit set by the remote endpoint.  For QUIC, this is
+            specified in [[!QUIC-TRANSPORT]].
          1. |p| has not been [=settled=].
      1. [=Reject=] |p| with a newly created {{InvalidStateError}} when all of
         the following conditions are met:
-     
          1. The |transport|'s state transitions to `"closed"` or `"failed"`.
          1. |p| has not been [=settled=].
 
@@ -219,16 +216,8 @@ relating to stream configuration.
 
 <pre class="idl">
 dictionary SendStreamParameters {
-  boolean disableRetransmissions = false;
 };
 </pre>
-
-The dictionary SHALL have the following fields:
-
-: <dfn for="SendStreamParameters" dict-member>disableRetransmissions</dfn>
-:: If true, the stream will be sent without retransmissions. If false, the
-   stream will be sent with retransmissions. If the WebTransport is unable to
-   send without retransmissions, it may ignore this value.
 
 # `BidirectionalStreamsTransport` Mixin #  {#bidirectional-streams-transport}
 
@@ -260,7 +249,7 @@ interface BidirectionalStreamsTransport {
       immediately return a new [=rejected=] promise with a newly created
       {{InvalidStateError}} and abort these steps.
    1. If |transport|'s {{WebTransport/state}} is `"connected"`, immediately
-      return a new [=resolved=] promise with a newly created
+      return a new [=fulfilled=] promise with a newly created
       {{BidirectionalStream}} object, [=add the BidirectionalStream=] to the
       transport and abort these steps.
    1. Let |p| be a new promise.
@@ -271,8 +260,8 @@ interface BidirectionalStreamsTransport {
        1. The |transport|'s {{WebTransport/state}} has transitioned to
           `"connected"`.
        1. Stream creation flow control is not being violated by exceeding the
-          max stream limit set by the remote endpoint, as specified in
-          [[!QUIC-TRANSPORT]].
+          max stream limit set by the remote endpoint. For QUIC, this is
+          specified in [[!QUIC-TRANSPORT]].
        1. |p| has not been [=settled=].
    1. [=Reject=] |p| with a newly created {{InvalidStateError}} when all of
       the following conditions are met:
@@ -289,11 +278,11 @@ interface BidirectionalStreamsTransport {
      1. Let |transport| be the `BidirectionalStreamsTransport` on which
         `receiveBidirectionalStreams` is invoked.
      1. Return the value of the {{[[ReceivedBidirectionalStreams]]}} internal slot.
-     1. For each unidirectional stream received, create a corresponding
-        {{IncomingStream}} and insert it into {{[[ReceivedStreams]]}}. As data
-        is received over the unidirectional stream, insert that data into the
-        corresponding `IncomingStream`.  When the remote side closes or aborts
-        the stream, close or abort the corresponding `IncomingStream`.
+     1. For each bidirectional stream received, create a corresponding
+        {{BidirectionalStream}} and insert it into {{[[ReceivedBidirectionalStreams]]}}.
+        As data is received over the bidirectional stream, insert that data into the
+        corresponding {{BidirectionalStream}}.  When the remote side closes or aborts
+        the stream, close or abort the corresponding {{BidirectionalStream}}.
 
 ## Procedures ##  {##bidirectional-streams-transport-procedures}
 
@@ -363,9 +352,9 @@ state, state changes, and the ability to close the transport.
 <pre class="idl">
 interface mixin WebTransport {
   readonly attribute WebTransportState state;
+  readonly attribute Promise&lt;WebTransportCloseInfo&gt; closed;
   void close(optional WebTransportCloseInfo closeInfo);
   attribute EventHandler onstatechange;
-  attribute EventHandler onerror;
 };
 </pre>
 
@@ -374,15 +363,14 @@ interface mixin WebTransport {
 : <dfn for="WebTransport" attribute>state</dfn>
 :: The current state of the transport. On getting, it MUST return the value of
    the {{[[WebTransportState]]}} internal slot.
+: <dfn for="WebTransport" attribute>closed</dfn>
+:: This promise MUST be [=resolved=] when the transport is closed; an
+   implementation SHOULD include error information in the `reason` and
+   `errorCode` fields of {{WebTransportCloseInfo}}.
 : <dfn for="WebTransport" attribute>onstatechange</dfn>
 :: This event handler, of event handler event type `statechange`, MUST be fired
    any time the {{[[WebTransportState]]}} slot changes, unless the state changes
    due to calling {{WebTransport/close}}.
-: <dfn for="WebTransport" attribute>onerror</dfn>
-:: This event handler, of event handler event type `error`, MUST be fired on
-   reception of an error; an implementation SHOULD include error information in
-   the `message` field of {{ErrorEvent}}. This event MUST be fired before the
-   {{WebTransport/onstatechange}} event.
 
 ## Methods ##  {#webtransport-methods}
 
@@ -392,8 +380,8 @@ interface mixin WebTransport {
 
    When close is called, the user agent MUST run the following steps:
      1. Let |transport| be the WebTransport on which `close` is invoked.
-     1. If |transport|'s {{[[WebTransportState]]}} is `"closed"`, then abort
-        these steps.
+     1. If |transport|'s {{[[WebTransportState]]}} is `"closed"` or `"failed"`,
+        then abort these steps.
      1. Set |transport|'s {{[[WebTransportState]]}} to `"closed"`.
      1. Let `closeInfo` be the first argument.
      1. For QUIC, start the [=Immediate Close=] procedure by sending an
@@ -407,7 +395,6 @@ interface mixin WebTransport {
 
 <pre class="idl">
 enum WebTransportState {
-  "new",
   "connecting",
   "connected",
   "closed",
@@ -415,8 +402,6 @@ enum WebTransportState {
 };
 </pre>
 
-: <dfn for="WebTransportState" enum-value>"new"</dfn>
-:: The {{WebTransport}} object has been created and has not started negotiating yet.
 : <dfn for="WebTransportState" enum-value>"connecting"</dfn>
 :: The transport is in the process of negotiating a secure connection. Once a
    secure connection is negotiated, incoming data can flow through.
@@ -476,51 +461,6 @@ The dictionary SHALL have the following attributes:
 : <dfn for="WebTransportCloseInfo" dict-member>reason</dfn>
 :: The reason for closing the {{WebTransport}}.
 
-# `QuicTransportBase` Interface #  {#quic-transport-base}
-
-The `QuicTransportBase` is the base for {{QuicTransport}}. Most of
-the functionality of a `QuicTransport` is in the base class to allow for other
-subclasses (such as a p2p variant) to share the same interface.
-
-## Overview ##  {#quic-transport-base-overview}
-
-A <dfn interface>QuicTransportBase</dfn> is a
-{{UnidirectionalStreamsTransport}}, a {{BidirectionalStreamsTransport}}, and a
-{{DatagramTransport}}.  {{SendStream}}s and {{ReceiveStream}}s are implemented
-with unidirectional QUIC streams as defined in [[!QUIC-TRANSPORT]].
-{{BidirectionalStream}}s are implemented with bidirectional QUIC streams as
-defined in [[!QUIC-TRANSPORT]]. Datagrams are implemented with QUIC datagrams as
-defined in [[!QUIC-DATAGRAM]].
-
-## Interface Definition ##  {#quic-transport-base-definition}
-
-<pre class="idl">
-interface QuicTransportBase {
-  Promise&lt;QuicTransportStats&gt; getStats();
-};
-
-QuicTransportBase includes UnidirectionalStreamsTransport;
-QuicTransportBase includes BidirectionalStreamsTransport;
-QuicTransportBase includes DatagramTransport;
-QuicTransportBase includes WebTransport;
-</pre>
-
-## Methods ##  {#quic-transport-base-methods}
-
-: <dfn for="QuicTransportBase" method>getStats()</dfn>
-:: Gathers stats for this <code><a>QuicTransportBase</a></code>'s QUIC
-   connection and reports the result asynchronously.</p>
-
-   When close is called, the user agent MUST run the following steps:
-     1. Let |transport| be the QuicTransportBase on which `getStats` is invoked.
-     1. If |transport|'s {{[[WebTransportState]]}} is `"new"`, then abort
-        these steps.
-     1. Let |p| be a new promise.
-     1. Return |p| and continue the following steps in background.
-         1. Gather the stats from the underlying QUIC connection.
-         1. Once stats have been gathered, resolve |p| with the
-            {{QuicTransportStats}} object, representing the gathered stats.
-
 ## `QuicTransportStats` Dictionary ##  {#quic-transport-stats}
 
 The <dfn dictionary>QuicTransportStats</dfn> dictionary includes information
@@ -544,10 +484,10 @@ The dictionary SHALL have the following attributes:
 
 : <dfn for="QuicTransportStats" dict-member>timestamp</dfn>
 :: The `timestamp` for when the stats are gathered, relative to the
-UNIX epoch (Jan 1, 1970, UTC).
+   UNIX epoch (Jan 1, 1970, UTC).
 : <dfn for="QuicTransportStats" dict-member>bytesSent</dfn>
 :: The number of bytes sent on the QUIC connection, including retransmissions.
-Does not include UDP or any other outer framing.
+   Does not include UDP or any other outer framing.
 : <dfn for="QuicTransportStats" dict-member>packetsSent</dfn>
 :: The number of packets sent on the QUIC connection, including retransmissions.
 : <dfn for="QuicTransportStats" dict-member>numOutgoingStreamsCreated</dfn>
@@ -556,33 +496,49 @@ Does not include UDP or any other outer framing.
 :: The number of incoming QUIC streams created on the QUIC connection.
 : <dfn for="QuicTransportStats" dict-member>bytesReceived</dfn>
 :: The number of total bytes received on the QUIC connection, including
-duplicate data for streams. Does not include UDP or any other outer framing.
+   duplicate data for streams. Does not include UDP or any other outer framing.
 : <dfn for="QuicTransportStats" dict-member>packetsReceived</dfn>
 :: The number of total packets received on the QUIC connection, including
-packets that were not processable.
+   packets that were not processable.
 : <dfn for="QuicTransportStats" dict-member>minRtt</dfn>
 :: The minimum RTT observed on the entire connection.
 : <dfn for="QuicTransportStats" dict-member>numReceivedDatagramsDropped</dfn>
 :: The number of datagrams that were dropped, due to too many datagrams buffered
-between calls to {{receiveDatagrams()}}.
+   between calls to {{receiveDatagrams()}}.
 
 # `QuicTransport` Interface #  {#quic-transport}
 
-The <dfn interface>QuicTransport</dfn> is a subclass of {{QuicTransportBase}}
-focused on client/server use cases.
+The <dfn interface>QuicTransport</dfn> is a
+{{UnidirectionalStreamsTransport}}, a {{BidirectionalStreamsTransport}}, and a
+{{DatagramTransport}}.  {{SendStream}}s and {{ReceiveStream}}s are implemented
+with unidirectional QUIC streams as defined in [[!QUIC-TRANSPORT]].
+{{BidirectionalStream}}s are implemented with bidirectional QUIC streams as
+defined in [[!QUIC-TRANSPORT]]. Datagrams are implemented with QUIC datagrams as
+defined in [[!QUIC-DATAGRAM]].
 
 ## Interface Definition ##  {#quic-transport-definition}
 
 <pre class="idl">
-[Constructor(DOMString host, unsigned short port), Exposed=Window]
-interface QuicTransport : QuicTransportBase {
+[Constructor(USVString url), Exposed=(Window,Worker)]
+interface QuicTransport {
+  Promise&lt;QuicTransportStats&gt; getStats();
 };
+
+QuicTransport includes UnidirectionalStreamsTransport;
+QuicTransport includes BidirectionalStreamsTransport;
+QuicTransport includes DatagramTransport;
+QuicTransport includes WebTransport;
 </pre>
+
 
 When the {{QuicTransport/QuicTransport()}} constructor is invoked, the user
 agent MUST run the following steps:
-1. If {{QuicTransport/QuicTransport(host, port)/port}} is 0, [=throw=] an
-   {{NotSupportedError}} and abort these steps.
+1. Let |parsedURL| be the [=URL record=] resulting from [=URL parser|parsing=]
+   of {{QuicTransport/QuicTransport(url)/url}}.
+1. If |parsedURL| is a failure, [=throw=] a {{SyntaxError}} exception.
+1. If |parsedURL| [=scheme=] is not `quic-transport`, [=throw=]
+   a {{SyntaxError}} exception.
+1. If |parsedURL| [=fragment=] is not null, [=throw=] a {{SyntaxError}} exception.
 1. Let |transport| be a newly constructed {{QuicTransport}} object.
 1. Let |transport| have a
    <dfn attribute for="QuicTransport">\[[OutgoingStreams]]</dfn> internal slot
@@ -609,16 +565,28 @@ agent MUST run the following steps:
     1. Let |clientOrigin| be |transport|'s [=relevant settings object=]'s
        [=origin=],
        [serialized](https://html.spec.whatwg.org/multipage/origin.html#ascii-serialisation-of-an-origin).
-    1. Establish a QUIC connection to the address identified by the given
-       {{QuicTransport/QuicTransport(host, port)/host}} and
-       {{QuicTransport/QuicTransport(host, port)/port}} following the
-       procedures in [[!WEB-TRANSPORT-QUIC]] section 3 and using |clientOrigin|
-       as the "origin of the client" referenced in section 3.2. 
+    1. Establish a QUIC connection to the address identified by |parsedURL|
+       following the procedures in [[!WEB-TRANSPORT-QUIC]] section 3 and using
+       |clientOrigin| as the "origin of the client" referenced in section 3.2.1.
     1. If the connection fails, set |transport|'s {{[[WebTransportState]]}}
        internal slot to `"failed"` and abort these steps.
     1. Set |transport|'s {{[[WebTransportState]]}} internal slot to
        `"connected"`.
 1. Return |transport|.
+
+## Methods ##  {#quic-transport-methods}
+
+: <dfn for="QuicTransport" method>getStats()</dfn>
+:: Gathers stats for this {{QuicTransport}}'s QUIC
+   connection and reports the result asynchronously.</p>
+
+   When close is called, the user agent MUST run the following steps:
+     1. Let |transport| be the QuicTransport on which `getStats` is invoked.
+     1. Let |p| be a new promise.
+     1. Return |p| and continue the following steps in background.
+         1. Gather the stats from the underlying QUIC connection.
+         1. Once stats have been gathered, resolve |p| with the
+            {{QuicTransportStats}} object, representing the gathered stats.
 
 # Interface Mixin `OutgoingStream` #  {#outgoing-stream}
 
@@ -626,7 +594,7 @@ An <dfn interface>OutgoingStream</dfn> is a stream that can be written to, as
 either a {{SendStream}} or a {{BidirectionalStream}}.
 
 <pre class="idl">
-[ Exposed=Window ]
+[ Exposed=(Window,Worker) ]
 interface mixin OutgoingStream {
   readonly attribute WritableStream writable;
   readonly attribute Promise&lt;StreamAbortInfo&gt; writingAborted;
@@ -649,7 +617,7 @@ The {{OutgoingStream}} will initialize with the following:
    be used to write to the {{OutgoingStream}}. On getting it MUST return the
    value of the {{[[Writable]]}} slot.
 : <dfn attribute for="OutgoingStream">writingAborted</dfn>
-:: The `writingAborted` attribute represents a promise that is [=resolved=]
+:: The `writingAborted` attribute represents a promise that is [=fulfilled=]
     when the a message from the remote side aborting the stream is received.
     For QUIC, that message is a STOP_SENDING frame. When the stream receives
     this mesage, the user agent MUST run the following:
@@ -702,7 +670,7 @@ An <dfn interface>IncomingStream</dfn> is a stream that can be read from, as
 either a {{ReceiveStream}} or a {{BidirectionalStream}}.
 
 <pre class="idl">
-[ Exposed=Window ]
+[ Exposed=(Window,Worker) ]
 interface mixin IncomingStream {
   readonly attribute ReadableStream readable;
   readonly attribute Promise&lt;StreamAbortInfo&gt; readingAborted;
@@ -726,7 +694,7 @@ The {{IncomingStream}} will initialize with the following:
    be used to read from the {{IncomingStream}}. On getting it MUST return the
    value of the {{IncomingStream}}'s {{[[Readable]]}} slot.
 : <dfn attribute for="IncomingStream">readingAborted</dfn>
-:: The `readingAborted` attribute represents a promise that is [=resolved=]
+:: The `readingAborted` attribute represents a promise that is [=fulfilled=]
     when the a message from the remote side aborting the stream is received.
     For QUIC, that message is a RST_STREAM frame. When the stream receives
     this mesage, the user agent MUST run the following:
@@ -761,31 +729,11 @@ The {{IncomingStream}} will initialize with the following:
    stream while reading, just as if |IncomingStream.readable.getReader()| were
    used.
 
-# Interface `WebTransportStream` #  {#web-transport-stream}
-
-A collection of common attributes and methods of all streams.
-
-<pre class="idl">
-[ Exposed=Window ]
-interface WebTransportStream {
-    readonly attribute unsigned long long streamId;
-    readonly attribute WebTransport transport;
-};
-</pre>
-
-## Attributes ##  {#web-transport-stream-attributes}
-
-: <dfn for="WebTransportStream" attribute>streamId</dfn>
-:: The readonly attribute referring to the ID of the {{WebTransportStream}}
-   object.
-: <dfn for="WebTransportStream" attribute>transport</dfn>
-:: The readonly attribute referring to the related {{WebTransport}} object.
-
 # Interface `BidirectionalStream` #  {#bidirectional-stream}
 
 <pre class="idl">
-[ Exposed=Window ]
-interface BidirectionalStream : WebTransportStream {
+[ Exposed=(Window,Worker) ]
+interface BidirectionalStream {
 };
 BidirectionalStream includes OutgoingStream;
 BidirectionalStream includes IncomingStream;
@@ -794,8 +742,8 @@ BidirectionalStream includes IncomingStream;
 # Interface `SendStream` #  {#send-stream}
 
 <pre class="idl">
-[ Exposed=Window ]
-interface SendStream : WebTransportStream {
+[ Exposed=(Window,Worker) ]
+interface SendStream {
 };
 SendStream includes OutgoingStream;
 </pre>
@@ -803,8 +751,8 @@ SendStream includes OutgoingStream;
 # Interface `ReceiveStream` #  {#receive-stream}
 
 <pre class="idl">
-[ Exposed=Window ]
-interface ReceiveStream : WebTransportStream {
+[ Exposed=(Window,Worker) ]
+interface ReceiveStream {
 };
 ReceiveStream includes IncomingStream;
 </pre>
@@ -823,7 +771,7 @@ Datagrams are implemented with QUIC datagrams as defined in
 ## Interface Definition ##  {#http3-transport-interface}
 
 <pre class="idl">
-[Constructor (DOMString url), Exposed=Window]
+[Constructor (DOMString url), Exposed=(Window,Worker)]
 interface Http3Transport {
 };
 
@@ -930,21 +878,6 @@ cannot distinguish between a non-existing endpoint and the endpoint that is not
 willing to accept connections from the Web.
 
 # Examples #  {#examples}
-
-## Unreliable delivery ##  {#example-unreliable-delivery}
-
-*This section is non-normative.*
-
-Unreliable delivery can be achieved by creating many streams with
-retransmissions disabled, each transporting a single small message.
-
-<pre class="example" highlight="js">
-let transport = getTransport();
-let messages = getMessages();
-for (msg in messages) {
-  transport.createSendStream({disableRetransmissions: true}).writable.getWriter().write({data: msg, finished: true});
-}
-</pre>
 
 ## Sending a buffer of datagrams ##  {#example-datagrams}
 

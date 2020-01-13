@@ -1,13 +1,14 @@
 <pre class='metadata'>
 Title: Fetch Metadata Request Headers
 Shortname: fetch-metadata
-Level: 1
-Status: ED
-TR: https://w3.org/TR/fetch-metadata/
-ED: https://github.com/w3c/webappsec-fetch-metadata/
-Editor: Mike West 56384, Google Inc., mkwst@google.com
+Level: None
 Group: webappsec
-!Explainer: https://github.com/w3c/webappsec-fetch-metadata
+Status: ED
+TR: https://www.w3.org/TR/fetch-metadata/
+ED: https://github.com/w3c/webappsec-fetch-metadata/
+Previous Version: https://www.w3.org/TR/2019/WD-fetch-metadata-20200110/
+Editor: Mike West 56384, Google Inc., mkwst@google.com
+!Explainer: <https://github.com/w3c/webappsec-fetch-metadata>
 Abstract:
     This document defines a set of Fetch metadata request headers that aim to provide servers with
     enough information to make <i lang="la">a priori</i> decisions about whether or not to service
@@ -16,8 +17,6 @@ Markup Shorthands: markdown yes
 !Participate: <a href="https://github.com/w3c/webappsec-fetch-metadata/issues/new">File an issue</a> (<a href="https://github.com/w3c/webappsec-fetch-metadata/issues">open issues</a>)
 !Tests: <a href=https://github.com/web-platform-tests/wpt/tree/master/fetch/sec-metadata>web-platform-tests fetch/sec-metadata/</a>
 Version History: https://github.com/w3c/webappsec-fetch-metadata/commits/master/index.bs
-Shortname: fetch-metadata
-Level: None
 </pre>
 <pre class="biblio">
 {
@@ -42,8 +41,8 @@ urlPrefix: https://tools.ietf.org/html/draft-ietf-httpbis-header-structure; spec
         text: structured header; url: #
     for: structured header
         type: dfn
-            text: token; url: #section-3.9
-            text: boolean; url: #section-3.11
+            text: token; url: #section-3.7
+            text: boolean; url: #section-3.9
     type: abstract-op
         text: serialize Structured Header; url: #section-4.1
 </pre>
@@ -113,10 +112,6 @@ exposes an interesting [=request=] attribute to a server.
 The `Sec-Fetch-Dest` HTTP Request Header {#sec-fetch-dest-header}
 -----------------------------------------------------------------
 
-ISSUE(mikewest/sec-metadata#16): There are some concerns about the value this header would
-provide, particularly in the face of a Service Worker's ability to use cached responses in
-unexpected ways. It might be worth punting it to a future iteration.
-
 The <dfn http-header export>`Sec-Fetch-Dest`</dfn> HTTP request header exposes a [=request=]'s
 [=request/destination=] to a server. It is a [=Structured Header=] whose value MUST be a
 [=structured header/token=]. [[!I-D.ietf-httpbis-header-structure]] Its ABNF is:
@@ -155,7 +150,7 @@ To <dfn abstract-op lt="set-dest">set the `Sec-Fetch-Dest` header</dfn> for a [=
 
 <ol class="algorithm">
     1.  Assert: |r|'s [=request/url=] is a [=potentially trustworthy URL=].
-    
+
     2.  Let |header| be a [=Structured Header=] whose value is a [=structured header/token=].
 
     3.  If |r|'s [=request/destination=] is the empty string, set |header|'s value to the string
@@ -164,11 +159,8 @@ To <dfn abstract-op lt="set-dest">set the `Sec-Fetch-Dest` header</dfn> for a [=
         Note: We map Fetch's empty string [=request/destination=] onto an explicit "`empty`"
         [=structured header/token=] in order to simplify processing.
 
-    4.  Let |value| be the result of [$serialize Structured Header|serializing$] |header|.
-
-    5.  [=header list/Set=] &#96;<a http-header>`Sec-Fetch-Dest`</a>&#96;/|value| in |r|'s
-        [=request/header list=].
-</ol>
+    4.  [=header list/Set a structured header=]
+        &#96;<a http-header>`Sec-Fetch-Dest`</a>&#96;/|header| in |r|'s [=request/header list=].
 </div>
 
 
@@ -193,7 +185,7 @@ To <dfn abstract-op lt="set-mode">set the `Sec-Fetch-Mode` header</dfn> for a [=
 
 <ol class="algorithm">
     1.  Assert: |r|'s [=request/url=] is a [=potentially trustworthy URL=].
-    
+
     2.  Let |header| be a [=Structured Header=] whose value is a [=structured header/token=].
 
     3.  Set |header|'s value to |r|'s [=request/mode=].
@@ -205,10 +197,8 @@ To <dfn abstract-op lt="set-mode">set the `Sec-Fetch-Mode` header</dfn> for a [=
         NOTE: We're doing this work because Fetch does not currently define `nested-navigate`.
         See [[#fetch-integration]].
 
-    4.  Let |value| be the result of [$serialize Structured Header|serializing$] |header|.
-
-    5.  [=header list/Set=] &#96;<a http-header>`Sec-Fetch-Mode`</a>&#96;/|value| in |r|'s
-        [=request/header list=].
+    4.  [=header list/Set a structured header=]
+        &#96;<a http-header>`Sec-Fetch-Mode`</a>&#96;/|header| in |r|'s [=request/header list=].
 </ol>
 </div>
 
@@ -233,7 +223,7 @@ To <dfn abstract-op lt="set-site">set the `Sec-Fetch-Site` header</dfn> for a [=
 
 <ol class="algorithm">
     1.  Assert: |r|'s [=request/url=] is a [=potentially trustworthy URL=].
-    
+
     2.  Let |header| be a [=Structured Header=] whose value is a [=structured header/token=].
 
     3.  Set |header|'s value to `same-origin`.
@@ -248,18 +238,14 @@ To <dfn abstract-op lt="set-site">set the `Sec-Fetch-Site` header</dfn> for a [=
 
         1.  If |url| is [=same origin=] with |r|'s [=request/origin=], [=iteration/continue=].
 
-        2.  Set |header|'s value to `cross-site` and break if any of the following are true:
+        2.  Set |header|'s value to `cross-site`.
+        
+        3.  If |r|'s [=request/origin=] is not [=same site=] with |url|'s [=url/origin=], then [=iteration/break=].
 
-            *  |r|'s [=request/origin=] is an [=opaque origin=]
-            *  |r|'s [=request/origin=]'s [=origin/scheme=] is not the same as |url|'s [=url/scheme=]
-            *  |r|'s [=request/origin=]'s [=origin/host=] is not [=same site=] with |url|'s [=url/host=]
+        4.  Set |header|'s value to `same-site`.
 
-        3.  Set |header|'s value to `same-site`.
-
-    6.  Let |value| be the result of [$serialize Structured Header|serializing$] |header|.
-
-    7.  [=header list/Set=] &#96;<a http-header>`Sec-Fetch-Site`</a>&#96;/|value| in |r|'s
-        [=request/header list=].
+    6.  [=header list/Set a structured header=]
+        &#96;<a http-header>`Sec-Fetch-Site`</a>&#96;/|header| in |r|'s [=request/header list=].
 </ol>
 </div>
 
@@ -293,15 +279,10 @@ To <dfn abstract-op lt="set-user">set the `Sec-Fetch-User` header</dfn> for a [=
 
     3.  Let |header| be a [=Structured Header=] whose value is a [=structured header/token=].
 
-    4.  Set |header|'s value to the value of |r|'s [=request/user activation flag=].
+    4.  Set |header|'s value to `true`.
 
-        ISSUE(whatwg/fetch#885): This flag is defined here, in [[#fetch-integration]]. Ideally,
-        we can move it to Fetch rather than monkey-patching.
-
-    4.  Let |value| be the result of [$serialize Structured Header|serializing$] |header|.
-
-    5.  [=header list/Set=] &#96;<a http-header>`Sec-Fetch-User`</a>&#96;/|value| in |r|'s
-        [=request/header list=].
+    5.  [=header list/Set a structured header=]
+        &#96;<a http-header>`Sec-Fetch-User`</a>&#96;/|header| in |r|'s [=request/header list=].
 </ol>
 </div>
 
@@ -320,6 +301,8 @@ To support `Sec-Fetch-User`, [=request=] needs to be taught about requests which
 >   Note: This is only used for [=navigation requests=], and reflects whether a given navigation
 >   was [=triggered by user activation=].
 
+ISSUE(whatwg/fetch#993): This should be defined in Fetch.
+
 This flag could be populated from HTML's [=process a navigate fetch=] algorithm, perhaps by
 inserting the following step after the current algorithm's step 2:
 
@@ -328,8 +311,7 @@ inserting the following step after the current algorithm's step 2:
 >   3.  If this algorithm was [=triggered by user activation=], set <var ignore>request</var>'s
 >       [=request/user activation flag=] to `true`.
 
-We'll also want to resolve [whatwg/fetch#755](https://github.com/whatwg/fetch/issues/755) to
-add a "`nested-navigate`" mode to support `Sec-Fetch-Mode`.
+ISSUE(whatwg/html#5203): This should be defined in HTML.
 
 <div algorithm="set fetch metadata headers">
 To <dfn abstract-op export>set the Fetch metadata headers for a request</dfn>, given [=request=] |r|:
@@ -350,7 +332,7 @@ To <dfn abstract-op export>set the Fetch metadata headers for a request</dfn>, g
 Fetch will call into the algorithm above from within its [=main fetch=] algorithm. Please consult
 that specification for integration details [[!FETCH]].
 
-ISSUE(whatwg/fetch#885): Monkey patching!
+ISSUE(whatwg/fetch#993): This should be called from in Fetch.
 
 Security and Privacy Considerations {#sec-priv-considerations}
 ==============================================================

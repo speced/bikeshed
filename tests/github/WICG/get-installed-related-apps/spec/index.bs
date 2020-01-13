@@ -1,0 +1,183 @@
+<pre class='metadata'>
+Title: Get Installed Related Apps API
+Shortname: get-installed-related-apps
+Level: 1
+Status: CG-DRAFT
+Group: wicg
+URL: https://wicg.github.io/get-installed-related-apps/spec/
+Editor: Rayan Kanso, Google, rayankans@google.com
+Abstract: The Get Installed Related Apps API allows web apps to detect if related native apps are installed on the current device.
+</pre>
+
+<pre class="link-defaults">
+spec:promises-guide-1; type:dfn; text:resolve
+</pre>
+
+<pre class="anchors">
+spec: appmanifest; urlPrefix: https://www.w3.org/TR/appmanifest/
+    type: dictionary; text: WebAppManifest; url: dom-webappmanifest
+    type: dictionary; text: Fingerprint; url: dom-fingerprint
+    type: dictionary; text: ExternalApplicationResource; url: dom-externalapplicationresource
+    type: dictionary; text: platform; for:ExternalApplicationResource; url: dom-externalapplicationresource-platform
+    type: dictionary; text: url; for:ExternalApplicationResource; url: dom-externalapplicationresource-url
+    type: dictionary; text: id; for:ExternalApplicationResource; url: dom-externalapplicationresource-id
+    type: dictionary; text: min_version; for:ExternalApplicationResource; url: dom-externalapplicationresource-min_version
+    type: dictionary; text: fingerprints; for:ExternalApplicationResource; url: dom-externalapplicationresource-fingerprints
+    type: dfn; text: obtaining the manifest; url: obtaining
+    type: dfn; text: processing the related_applications member; url: related_applications-member
+    type: dfn; text: platform; url: platform-member
+    type: dictionary; text: related_applications; for:WebAppManifest; url: dom-webappmanifest-related_applications
+</pre>
+
+Introduction {#intro}
+=====================
+
+As the capabilities of the web grow, the functionality of web apps begins to match that of corresponding native apps. The situation of users having a web app and the corresponding native app both installed on the same device will become more common, and the feature sets of these apps will converge.
+
+It is important to allow apps to detect this situation to allow them to disable functionality that should be provided by the other app.
+
+## Example ## {#example}
+
+<div class="example">
+  <pre class="lang-js">
+    const installedApps = await navigator.getInstalledRelatedApps();
+    const nativeApp = installedApps.find(app => app.id === 'com.example.myapp');
+
+    if (nativeApp && doesVersionSendPushMessages(nativeApp.version)) {
+      // There's an installed native app that handles sending push messages.
+      // No need to do anything.
+      return;
+    }
+
+    // Create a push subscription.
+  </pre>
+
+    In the above example, <i>doesVersionSendPushMessages</i> is a developer-defined function.
+</div>
+
+Privacy Considerations {#privacy-considerations}
+================================================
+
+This feature only works in secure contexts. This ensures that the website cannot be spoofed, and that the association between the site and application is valid.
+
+The association between the web app and its counterpart is bidirectional, meaning that the web app has to declare its association with the related app, and the related app has to declare its association with the web app. This prevents malicious websites from fingerprinting users and getting a list of their installed applications.
+
+The user agent MAY limit the number of related applications to be matched, to limit fingerprinting.
+
+The user agent MUST NOT return installed applications when running in a privacy preserving mode, for example Incognito in Chrome or Private Browsing in Firefox.
+
+Infrastructure {#infrastructure}
+==================================
+
+## Platform ## {#infra-platform}
+
+A [=platform=] is an OS-specific concept, which groups applications of the same class together. It is represented by a {{USVString}}.
+
+An OS has <dfn>installed apps</dfn>, a [=/map=] where the keys are [=platform=]s, and the values are [=/list=]s of [=installed app=]s.
+
+## Installed App ## {#infra-installed-app}
+
+An [=installed app=] represents an application that is installed on the user's device. 
+
+An <dfn>installed app</dfn> consists of:
+<div dfn-for="installed app">
+
+* An <dfn>id</dfn> (a {{DOMString}}). This a unique identifier for an application within the [=platform=] it belongs to.
+* A <dfn>version</dfn> (a {{USVString}}). This is the version of the application, as defined by the [=platform=].
+* <dfn>Fingerprints</dfn> (a [=/list=] of {{Fingerprint}}s). These are cryptographic values for identifying the application defined within the application metadata.
+* <dfn>relatedURLs</dfn> (a [=/set=] of {{/URL}}s). These are {{URL/origin}}s of related web applications declared within the application. 
+
+</div>
+
+An [=installed app=] also has an associated [=platform=].
+
+Algorithms {#algorithms}
+========================
+
+## Match an installed app ## {#match-installed-app}
+
+<div algorithm>
+    To <dfn>match an installed app</dfn> for |relatedApp| (an {{ExternalApplicationResource}}) and |manifestURL| (a {{/URL}}), run these steps:
+
+    1. Let |platform| be |relatedApp|'s {{ExternalApplicationResource/platform}}.
+    1. If [=installed apps=][|platform|] does not [=map/exist=], return null.
+    1. Let |installedApps| be [=installed apps=][|platform|].
+    1. [=list/For each=] |installedApp| in |installedApps|:
+        1. If |relatedApp|'s {{ExternalApplicationResource/id}} is not equal to |installedApp|'s [=installed app/id=], and |relatedApp|'s {{ExternalApplicationResource/url}} is not equal to |installedApp|'s [=installed app/id=], [=continue=].
+        1. Let |minVersion| be |relatedApp|'s {{ExternalApplicationResource/min_version}} if present, otherwise the empty string.
+        1. If |minVersion| is not the empty string and |minVersion| is greater than |installedApp|'s [=installed app/version=], return null.
+            
+            Note: `greater` is a platform-specific concept for ordering application versions. It does not have to be lexicographic order.
+        1. Let |fingerprints| be |relatedApp|'s {{ExternalApplicationResource/fingerprints}} if present, otherwise an empty [=/list=].
+        1. [=list/For each=] |fingerprint| of |fingerprints|:
+            1. If |installedApp|'s  [=installed app/fingerprints=] does not [=list/contain=] |fingerprint|, return null.
+        1. If |installedApp|'s [=installed app/relatedURLs=] does not [=set/contain=] |manifestURL|, return null.
+        1. Return |installedApp|.
+    1. Return null.
+</div>
+
+API {#api}
+==========
+
+## RelatedApplication ## {#related-application}
+
+<script type="idl">
+dictionary RelatedApplication {
+    required USVString platform;
+    USVString url;
+    DOMString id;
+    USVString version;
+};
+</script>
+
+Each {{RelatedApplication}} represents an [=installed app=] that was matched with the provided {{ExternalApplicationResource}}s from the {{WebAppManifest}}.
+
+## Extensions to {{Navigator}} ## {#extensions-to-navigator}
+
+<script type="idl">
+[Exposed=Window]
+partial interface Navigator {
+  [SecureContext] Promise<sequence<RelatedApplication>> getInstalledRelatedApps();
+};
+</script>
+
+<div dfn-for="Navigator">
+
+### {{Navigator/getInstalledRelatedApps()}} ### {#navigator-get-installed-related-apps}
+
+<div algorithm>
+  The <dfn method>getInstalledRelatedApps()</dfn> method, when invoked, runs these steps:
+
+  1. Let |relevantBrowsingContext| be the [=context object=]'s [=relevant settings object=]'s [=environment settings object/responsible browsing context=].
+  1. If |relevantBrowsingContext| is not a [=top-level browsing context=], then return [=a promise rejected with=] an {{InvalidStateError}} {{DOMException}}.
+
+        Issue: Should this restriction be removed? (<a href="https://github.com/WICG/get-installed-related-apps/issues/11">#11</a>)
+
+  1. Let |promise| be [=a new promise=].
+  1. Run the following steps [=in parallel=]:
+      1. Let |manifest| and |manifestURL| be the results of [=obtaining the manifest=]. If this fails, [=resolve=] promise with an empty [=/list=] and abort these steps.
+      1. Let |relatedApplications| be |manifest|'s {{WebAppManifest/related_applications}}.
+      1. Optionally:
+          1. Let |maxRelatedApps| be a user agent determined number.
+          1. If |relatedApplications|' [=list/size=] is greater than |maxRelatedApps|, truncate |relatedApplications| to a [=list/size=] of |maxRelatedApps|.
+
+          Note: This limits how many native applications a website can know are installed. The extra items need to be truncated so the same {{ExternalApplicationResource}}s are returned every time.
+      1. Let |installedApps| be an empty [=/list=].
+      1. [=list/For each=] |relatedApplication| in |relatedApplications|:
+          1. Let |matchedApp| be the result of running [=match an installed app=] with |relatedApplication| and |manifestURL|.
+          1. If |matchedApp| is null, [=continue=].
+          1. Let |installedApp| be a new {{RelatedApplication}} with:
+            : {{RelatedApplication/platform}}
+            :: |relatedApplication|'s {{ExternalApplicationResource/platform}}
+            : {{RelatedApplication/url}}
+            :: |relatedApplication|'s {{ExternalApplicationResource/url}}
+            : {{RelatedApplication/id}}
+            :: |relatedApplication|'s {{ExternalApplicationResource/id}}
+            : {{RelatedApplication/version}}
+            :: |matchedApp|'s [=installed app/version=]
+          1. [=list/Append=] |installedApp| to |installedApps|.
+      1. [=Resolve=] |promise| with |installedApps|.
+  1. Return |promise|.
+
+</div>
+

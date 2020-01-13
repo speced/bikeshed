@@ -1,10 +1,11 @@
 <pre class=metadata>
 Title: Largest Contentful Paint
-Status: ED
+Status: CG-DRAFT
 Shortname: largest-contentful-paint
 Group: WICG
 Level: 1
 Editor: Yoav Weiss, Google https://google.com, yoavweiss@chromium.org
+Editor: Nicolás Peña Moreno, Google https://google.com, npm@chromium.org
 URL: https://wicg.github.io/largest-contentful-paint
 Repository: https://github.com/WICG/largest-contentful-paint
 Test Suite: https://github.com/web-platform-tests/wpt/tree/master/largest-contentful-paint
@@ -35,6 +36,7 @@ urlPrefix: https://dom.spec.whatwg.org; spec: DOM;
     type: attribute; for: Element;
         text: element id; url: #dom-element-id;
     type: dfn; url: #concept-event-dispatch; text: event dispatch algorithm;
+    type: dfn; url: #concept-node-remove; text: node removal algorithm;
 urlPrefix: https://wicg.github.io/event-timing; spec: EVENT-TIMING;
     type: dfn; url: #has-dispatched-input-event; text: has dispatched input event;
 urlPrefix: https://fetch.spec.whatwg.org/; spec: FETCH;
@@ -69,7 +71,12 @@ The API relies heavily on [[ELEMENT-TIMING]], which can be thought of as the low
 Elements exposed {#sec-elements-exposed}
 ------------------------
 
-The Largest Contentful Paint API will only expose element types that are already <a>exposed</a> by the Element Timing API.
+The Largest Contentful Paint API will only expose element types that are already <a>exposed</a> by the Element Timing API. In this case, there is no need to annotate them with the <code>elementtiming</code> attribute.
+
+Largest content {#largest-content}
+------------------------
+
+The algorithm used for this API keeps track of the content seen so far. Whenever a new largest content is found, a new entry is created for it. Whenever content is removed, that content is no longer considered by the algorithm. In particular, if the content removed was the largest, then a new entry is created for the new largest. The algorithm terminates whenever scroll or input events occur, since those are likely to introduce new content into the website.
 
 Usage example {#sec-example}
 ------------------------
@@ -89,6 +96,15 @@ The following example shows an image and a large body of text. The developer the
     observer.observe({entryTypes: ['largest-contentful-paint']});
     </script>
 </xmp>
+
+Limitations {#limitations}
+------------------------
+
+The LargestContentfulPaint API is based on heuristics. As such, it is error prone. It has the following problems:
+
+* The algorithm halts when it detects certain types of user inputs. However, this means that the algorithm will not capture the main content if the user input occurs before the main content is displayed. In fact, the algorithm may produce meaningless results or no results at all if user input occurs very early.
+
+* To account for splash screens, content cannot be considered as the largest once it is removed. This presents problems for websites with large image carousels where images rotate automatically. If the image is removed when the next one is painted and the carousel is the largest content, the algorithm will continuously update based on carousel updates.
 
 Largest Contentful Paint {#sec-largest-contentful-paint}
 =======================================
@@ -141,16 +157,24 @@ The {{LargestContentfulPaint/element}} attribute's getter must return the value 
 
 Note: The above algorithm defines that an element that is no longer <a>descendant</a> of the {{Document}} will no longer be returned by {{LargestContentfulPaint/element}}'s attribute getter, including elements that are inside a shadow DOM.
 
-This specification also extends {{Document}} by adding it a <dfn>largestContentfulPaintSize</dfn> concept, initially set to 0.
+This specification also extends {{Document}} by adding to it a <dfn>largest contentful paint size</dfn> concept, initially set to 0, and a <dfn>largest content</dfn>, initially set to null.
+It also adds an associated <dfn>content map</dfn>, which is initially an empty <a>map</a>. The [=content map=] will be filled with entries with the following format:
+* The key will be a <a>pair</a> with an {{Element}} as the first item and a {{Request}} as the second item. This allows identifying the content. The second item will be null for text content.
+* The value will be a map which contains information that is required to fill up the {{LargestContentfulPaint}} entry. This allows exposing a new {{LargestContentfulPaint}} entry when content is removed from the page.
+
+Note: A user agent probably wants to implement the {{Document}}'s associated concepts using a priority queue or binary search tree to avoid the O(n) cost of finding the largest size within <a>content map</a> when <a>largest content</a> is removed.
 
 Processing model {#sec-processing-model}
 ========================================
+
+Potentially add LargestContentfulPaint entry {#sec-add-lcp-entry}
+--------------------------------------------------------
 
 Note: A user agent implementing the Largest Contentful Paint API would need to include <code>"largest-contentful-paint"</code> in {{PerformanceObserver/supportedEntryTypes}} for {{Window}} contexts.
 This allows developers to detect support for the API.
 
 In order to <dfn export>potentially add a {{LargestContentfulPaint}} entry</dfn>, the user agent must run the following steps:
-<div algorithm="LargestContentfulPaint add-image-entry">
+<div algorithm="LargestContentfulPaint potentially-add-entry">
     : Input
     ::  |intersectionRect|, a {{DOMRectReadOnly}}
     ::  |imageRequest|, a {{Request}}
@@ -160,10 +184,10 @@ In order to <dfn export>potentially add a {{LargestContentfulPaint}} entry</dfn>
     ::  |document|, a <a>Document</a>
     : Output
     ::  None
+        1. Let |contentIdentifier| be the <a>pair</a> (|element|, |imageRequest|).
+        1. If |document|'s [=content map=] <a data-link-for=map>contains</a> |contentIdentifier|, return.
         1. Let |window| be |document|’s [=relevant global object=].
         1. If either of |window|'s [=has dispatched scroll event=] or [=has dispatched input event=] is true, return.
-
-        1. Let |largest| be |document|'s [=largestContentfulPaintSize=].
         1. Let |url| be the empty string.
         1. If |imageRequest| is not null, set |url| to be |imageRequest|'s [=request URL=].
         1. Let |id| be |element|'s <a attribute for=Element>element id</a>.
@@ -177,15 +201,51 @@ In order to <dfn export>potentially add a {{LargestContentfulPaint}} entry</dfn>
             1. Let |displaySize| be <code>|displayWidth| * |displayHeight|</code>.
             1. Let |penaltyFactor| be <code>min(|displaySize|, |naturalSize|) / |displaySize|</code>.
             1. Multiply |size| by |penaltyFactor|.
-        1. If |size| is smaller or equals |largest|, return.
-        1. Set |document|'s [=largestContentfulPaintSize=] to |size|.
+        1. Let |contentInfo| be a map with |contentInfo|["size"] = |size|, |contentInfo|["url"] = |url|, |contentInfo|["id"] = |id|, |contentInfo|["renderTime"] = |renderTime|, and |contentInfo|["loadTime"] = |loadTime|.
+        1. Add a new entry with |contentIdentifier| as the key and |contentInfo| as the value to |document|'s [=content map=].
+        1. If |size| is smaller or equal to |document|'s [=largest contentful paint size=], return.
+        1. <a>Create a LargestContentfulPaint entry</a> with |element| and |contentInfo| as inputs.
+</div>
+
+Remove element content {#sec-remove-element-content}
+--------------------------------------------------------
+
+In order to <dfn>remove element content</dfn>, the user agent must run the following steps:
+<div algorithm="LargestContentfulPaint remove-element">
+    : Input
+    ::  |element|, an <a>Element</a>
+    ::  |document|, a <a>Document</a>
+    : Output
+    ::  None
+        1. For each |entry| of |document|'s [=content map=]:
+            1. If |entry|'s key is a <a>pair</a> whose first item is equal to |element|, <a for=map>remove</a> |entry| from |document|'s [=content map=].
+        1. If |document|'s [=largest content=] is a <a>pair</a> whose first item is not equal to |element|, then return.
+        1. Let |largestSize| be 0, let |largestContentIdentifier| be null, and let |largestContentInfo| be null.
+        1. For each |key| → |value| of |document|'s [=content map=]:
+            1. If |value|["size"] is greater than |largestSize|, set |largestSize| to |value|["size"], |largestContentIdentifier| to |key|, and |largestContentInfo| to |value|.
+        1. If |largestContentIdentifier| is not null, <a>create a LargestContentfulPaint entry</a> with |largestContentIdentifier| and |largestContentInfo| as inputs.
+</div>
+
+Create a LargestContentfulPaint entry {#sec-create-entry}
+--------------------------------------------------------
+
+In order to <dfn>create a {{LargestContentfulPaint}} entry</dfn>, the user agent must run the following steps:
+
+<div algorithm="LargestContentfulPaint create-entry">
+    : Input
+    ::  |contentIdentifier|, a <a>pair</a>
+    ::  |contentInfo|, a <a>map</a>
+    : Output
+    ::  None
+        1. Set |document|'s [=largest content=] to |contentIdentifier|.
+        1. Set |document|'s [=largest contentful paint size=] to |contentInfo|["size"].
         1. Let |entry| be a new {{LargestContentfulPaint}} entry, with it's
-               {{LargestContentfulPaint/size}} set to |size|,
-               {{LargestContentfulPaint/url}} set to |url|,
-               {{LargestContentfulPaint/id}} set to |id|,
-               {{LargestContentfulPaint/renderTime}} set to |renderTime|,
-               {{LargestContentfulPaint/loadTime}} set to |loadTime|,
-               and its {{LargestContentfulPaint/element}} set to |element|.
+               {{LargestContentfulPaint/size}} set to |contentInfo|["size"],
+               {{LargestContentfulPaint/url}} set to |contentInfo|["url"],
+               {{LargestContentfulPaint/id}} set to |contentInfo|["id"],
+               {{LargestContentfulPaint/renderTime}} set to |contentInfo|["renderTime"],
+               {{LargestContentfulPaint/loadTime}} set to |contentInfo|["loadTime"],
+               and its {{LargestContentfulPaint/element}} set to |contentIdentifier|'s first item.
         1. [=Queue the PerformanceEntry=] |entry|.
 </div>
 
@@ -201,6 +261,14 @@ Modifications to the DOM specification {#sec-modifications-DOM}
 
     * If |target|'s [=relevant global object=] is a {{Window}} object, <var ignore>event</var>'s {{Event/type}} is {{scroll}} and its {{Event/isTrusted}} is false, set |target|'s [=relevant global object=]'s [=has dispatched scroll event=] to true.
 </div>
+
+<div algorithm="addition to element removal">
+    Add the following step at the end of the <a>node removal algorithm</a>:
+
+    * Call the algorithm to <a>remove element content</a> passing in |node| and |node|'s <a>node document</a>.
+</div>
+
+Issue(41): background image changes or changes in image <code>src</code> should trigger removal from the {{Document}}'s <a>content map</a>.
 
 Modifications to the HTML specification {#sec-modifications-HTML}
 ----------------------------------------

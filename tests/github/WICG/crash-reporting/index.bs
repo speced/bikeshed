@@ -1,0 +1,176 @@
+<h1>Crash Reporting</h1>
+<pre class="metadata">
+Status: ED
+ED: https://wicg.github.io/crash-reporting/
+Shortname: crash-reporting
+Group: WICG
+Editor: Ian Clelland 76841, Google Inc., iclelland@google.com
+Abstract:
+  This document defines mechanism for reporing browser crashes to site owners
+  through the use of the Reporting API.
+Level: 1
+Indent: 2
+Version History: https://github.com/WICG/crash-reporting/commits/gh-pages
+Boilerplate: omit conformance, omit feedback-header
+!Participate: <a href="https://github.com/WICG/crash-reporting/issues/new">File an issue</a> (<a href="https://github.com/WICG/crash-reporting/issues">open issues</a>)
+Markup Shorthands: css off, markdown on
+</pre>
+<section>
+  <h2 id="intro">Introduction</h2>
+
+  [INTRODUCTION GOES HERE]
+
+  <h3 id="examples">Examples</h3>
+
+  <div class="example">
+    Unstable, Inc. wants to understand better how often its website is crashing
+    in the wild. It can do this by delivering the following header to define a
+    reporting endpoint, and direct crash reports to it:
+
+    <pre>
+      Report-To: { "group": "default",
+                   "max_age": 10886400,
+                   "endpoints": [
+                     { "url": "https://example.com/reports", "priority": 1 },
+                     { "url": "https://backup.com/reports", "priority": 2 }
+                   ] }
+    </pre>
+
+</section>
+
+<section>
+  <h2 id="concept">Concepts</h2>
+
+  <h3 id="concept-crash">Crash</h3>
+
+  <h3 id="concept-oom">Out-of-Memory</h3>
+
+  <h3 id="concept-unresponsive">Unresponsive</h3>
+
+</section>
+
+<section>
+  <h2 id="crash-report">Crash Reports</h3>
+
+  <dfn>Crash reports</dfn> indicate that the user was unable to continue using
+  the page because the browser (or one of its processes necessary for the page)
+  crashed. For security reasons, no details of the crash are communicated except
+  for a unique identifier (which can be interpreted by the browser vendor), and
+  optionally the reason for the crash (such as "oom").
+
+  <a>Crash reports</a> are a type of [=report=].
+
+  <a>Crash reports</a> have the <a>report type</a> "crash".
+
+  <pre class="idl">
+    [Exposed=(Window,Worker)]
+    interface CrashReportBody : ReportBody {
+      [Default] object toJSON();
+      readonly attribute DOMString? reason;
+    };
+  </pre>
+
+  A <a>crash report</a>'s [=report/body=], represented in JavaScript by
+  {{CrashReportBody}}, contains the following field:
+
+    - <dfn for="CrashReportBody">reason</dfn>: A more specific classification of
+      the type of crash that occured, if known, or omitted otherwise. The
+      valid <a>reason</a> strings are shown below.
+
+  <table border=1 cellpadding=5px style="border-collapse: collapse;">
+    <tbody>
+      <tr>
+        <th><a>Reason</a></th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td>oom</td>
+        <td>The page ran out of memory.</td>
+      </tr>
+      <tr>
+        <td>unresponsive</td>
+        <td>The page was killed due to being unresponsive.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  Note: Crash reports are always delivered to the <a>endpoint group</a> named
+  <code>default</code>; there is currently no way to override this.  If you want
+  to receive other kinds of reports, but not crash reports, make sure to use a
+  different name for the endpoint group that you choose for those reports.
+
+  Note: Crash reports are not observable to JavaScript, as the page which would
+  receive them is, by definition, not able to. The IDL description of
+  CrashReportBody exists in this spec to provide a JSON-seriaizable interface
+  whose serialization can be embedded in the out-of-band reports.
+</section>
+
+<section>
+  <h2 id="implementation">Implementation Considerations</h2>
+
+  <h3 id="delivery">Delivery</h3>
+
+  [[!REPORTING]], which defines the framework on which this specification
+  depends, provides at most a best-efforts delivery mechanism. This is
+  especially true when it comes to reporting crashes. There are probably always
+  going to be certain crash conditions which simply cannot be reported on (for
+  instance, if the crash occurs within the crash-monitoring code of the user
+  agent, or if the computer hosting the user agent were to suddenly cease to
+  exist). However, many crashes *can* be observed by modern browsers, and their
+  immediate causes can be deduced.
+
+  A user agent implementing crash reports SHOULD attempt to monitor documents
+  for crashes in a way that will continue to function even when the process
+  which is responsible for that document crashes, or is terminated by the
+  operating system.
+
+  There are multiple ways to implement such a monitor, with varying levels of
+  reliability and robustness to specific crash causes, and this specification
+  does not attempt to prescribe any particular such method.
+</section>
+
+<section>
+  <h2 id="sample-reports">Sample Reports</h2>
+
+  <div class="example">
+  <pre>
+      POST /reports HTTP/1.1
+      Host: example.com
+      ...
+      Content-Type: application/reports+json
+
+      [{
+        "type": "crash",
+        "age": 42,
+        "url": "https://example.com/",
+        "user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0",
+        "body": {
+          "reason": "oom"
+        }
+      }]
+  </pre>
+  </div>
+</section>
+
+<section>
+  <h2 id="security">Security Considerations</h2>
+
+  For a discussion of security considerations surrounding out-of-band reporting
+  in general, see [[REPORTING#security]].
+
+  The remainder of this section discusses security considerations for crash
+  reporting specifically.
+</section>
+
+<section>
+  <h2 id="privacy">Privacy Considerations</h2>
+
+  For a discussion of privacy considerations surrounding out-of-band reporting
+  in general, see [[REPORTING#privacy]].
+
+  The remainder of this section discusses privacy considerations for crash
+  reporting specifically.
+
+  <h3 id="cross-process-contamination">Cross-Process Contamination</h3>
+
+</section>
