@@ -46,7 +46,7 @@ def addMdnPanels(doc):
             for(var i = 0; i < annos.length; i++) {
                 var anno = annos[i];
                 id = anno.getAttribute("data-mdn-for");
-                var dfn = document.querySelector("#" + id);
+                var dfn = document.querySelector("[id='" + id +"']");
                 if (dfn !== null) {
                     var rect = dfn.getBoundingClientRect(id);
                     anno.style.top = (window.scrollY + rect.top) + "px";
@@ -127,7 +127,6 @@ def addMdnPanels(doc):
         .mdn-anno > .feature > .support > .webview_android::before { background-image: url(https://resources.whatwg.org/browser-logos/android-webview.png); }
         .name-slug-mismatch { color: red }
         '''  # noqa
-    charactersDisallowedInSelectors = "!\"#$%&'()*+,./:;<=>?@[\]^`{|}~"
 
     try:
         # TODO: If may turn out that for some specs, in order to make Bikeshed
@@ -145,30 +144,23 @@ def addMdnPanels(doc):
             data = json.loads(unicode(fh.read()), encoding="utf-8",
                               object_pairs_hook=OrderedDict)
             for elementID in data.keys():
-                # Some specs have IDs with characters not allowed in selectors;
-                # e.g., https://xhr.spec.whatwg.org/#the-abort()-method
-                escapedElementID = elementID
-                # FIXME: There must be a more efficient/idiomatic way to do this
-                for char in elementID:
-                    if char in charactersDisallowedInSelectors:
-                        escapedElementID = \
-                            escapedElementID.replace(char, "\\" + char)
-                # TODO: This find() is expensive, but if we add an anno to the
-                # document with a reference to an ID that doesn't actually exist
-                # in the document, the anno won't actually get displayed next to
-                # whatever feature in the spec it's intended to annotate...
                 features = data[elementID]
                 anno = E.aside({"class": "mdn-anno wrapped", "data-deco": ""})
                 mdnButton = E.button({"class": "mdn-anno-btn"})
                 mdnLogo = E.span("MDN")
                 appendChild(anno, mdnButton)
-                anno.set("data-mdn-for", escapedElementID)
+                anno.set("data-mdn-for", elementID)
                 appendChild(doc.body, anno)
                 lessThanTwoEngines = 0
                 onlyTwoEngines = 0
                 allEngines = 0
                 for feature in features:
-                    if find("#" + escapedElementID, doc) is None:
+                    # TODO: This find() is expensive, but if we add an anno to
+                    # the document with a reference to an ID that doesn't
+                    # actually exist in the document, the anno won't actually
+                    # get displayed next to whatever feature in the spec it's
+                    # intended to annotate...
+                    if find("[id='%s']" % elementID, doc) is None:
                         mdnSuggest = ""
                         if "slug" in feature:
                             mdnSuggest = " Update " + mdnBaseUrl \
