@@ -30,6 +30,7 @@ spec: html; urlPrefix: https://html.spec.whatwg.org/multipage/
 spec:infra; type:dfn; text:list
 spec:html; type:dfn; for:/; text:origin
 spec:html; type:dfn; for:/; text:browsing context
+spec:webidl; type:dfn; text:resolve
 </pre>
 
 <style>
@@ -130,7 +131,7 @@ For the purposes of this specification:
  * Separate user profiles within a browser are considered separate user agents.
  * Every [private mode](https://github.com/w3ctag/private-mode) browsing session is considered a separate user agent.
 
-A user agent has an associated <dfn>lock task queue</dfn> which is the result of [=starting a new parallel queue=].
+A user agent has a <dfn>lock task queue</dfn> which is the result of [=starting a new parallel queue=].
 
 The [=task source=] for [=enqueue steps|steps enqueued=] below is the <dfn export>web locks tasks source</dfn>.
 
@@ -193,19 +194,19 @@ A <dfn lt=lock-concept>lock</dfn> represents exclusive access to a shared resour
 
 <div dfn-for=lock-concept>
 
-A [=lock-concept|lock=] has an associated <dfn>agent</dfn> which is an [=/agent=].
+A [=lock-concept|lock=] has an <dfn>agent</dfn> which is an [=/agent=].
 
-A [=lock-concept|lock=] has an associated <dfn>clientId</dfn> which is an opaque string.
+A [=lock-concept|lock=] has a <dfn>clientId</dfn> which is an opaque string.
 
-A [=lock-concept|lock=] has an associated <dfn>origin</dfn> which is an [=/origin=].
+A [=lock-concept|lock=] has an <dfn>origin</dfn> which is an [=/origin=].
 
-A [=lock-concept|lock=] has an associated <dfn>name</dfn> which is a [=resource name=].
+A [=lock-concept|lock=] has a <dfn>name</dfn> which is a [=resource name=].
 
-A [=lock-concept|lock=] has an associated <dfn>mode</dfn> which is one of "{{exclusive}}" or "{{shared}}".
+A [=lock-concept|lock=] has a <dfn>mode</dfn> which is one of "{{exclusive}}" or "{{shared}}".
 
-A [=lock-concept|lock=] has an associated <dfn>waiting promise</dfn> which is a Promise.
+A [=lock-concept|lock=] has a <dfn>waiting promise</dfn> which is a Promise.
 
-A [=lock-concept|lock=] has an associated <dfn>released promise</dfn> which is a Promise.
+A [=lock-concept|lock=] has a <dfn>released promise</dfn> which is a Promise.
 
 <aside class=note>
 There are two promises associated with a lock's lifecycle:
@@ -235,12 +236,12 @@ The [=lock-concept/waiting promise=] is not named in the above code, but is stil
 Further note that if the callback is not `async` and returns a non-promise, the return value is wrapped in a promise that is immediately resolved; the lock will be released in an upcoming microtask, and the [=lock-concept/released promise=] will also resolve in a subsequent microtask.
 </aside>
 
-Each origin has an associated <dfn>held lock set</dfn> which is a [=/set=] of [=lock-concept|locks=].
+Each origin has a <dfn>held lock set</dfn> which is a [=/set=] of [=lock-concept|locks=].
 
 When [=lock-concept|lock=] |lock|'s [=lock-concept/waiting promise=] settles (fulfills or rejects), [=enqueue the following steps=] on the [=lock task queue=]:
 
 1. [=Release the lock=] |lock|.
-1. Resolve |lock|'s [=lock-concept/released promise=] with |lock|'s [=lock-concept/waiting promise=].
+1. [=Resolve=] |lock|'s [=lock-concept/released promise=] with |lock|'s [=lock-concept/waiting promise=].
 
 </div>
 
@@ -256,16 +257,16 @@ A [=lock request=] is a tuple of (<dfn>agent</dfn>, <dfn>clientId</dfn>, <dfn>or
 
 A <dfn>lock request queue</dfn> is a [=queue=] of [=lock requests=].
 
-Each origin has an associated <dfn>lock request queue map</dfn>, which is a [=map=] of [=resource names=] to [=lock request queues=].
+Each origin has a <dfn>lock request queue map</dfn>, which is a [=map=] of [=resource names=] to [=lock request queues=].
 
 A [=lock request=] |request| is said to be <dfn>grantable</dfn> if the following steps return true:
 
 1. Let |origin| be |request|'s [=lock request/origin=].
 1. Let |queueMap| be |origin|'s [=lock request queue map=].
-1. Let |name| be |request|'s associated [=lock request/name=].
+1. Let |name| be |request|'s [=lock request/name=].
 1. Let |queue| be |queueMap|[|name|].
 1. Let |held| be |origin|'s [=held lock set=]
-1. Let |mode| be |request|'s associated [=lock request/mode=]
+1. Let |mode| be |request|'s [=lock request/mode=]
 1. If |mode| is "{{exclusive}}", then return true if all of the following conditions are true, and false otherwise:
     * No [=lock-concept|lock=] in |held| has a [=lock-concept/name=] that equals |name|
     * No [=lock request=] in |queue| earlier than |request| exists.
@@ -311,7 +312,7 @@ Navigator includes NavigatorLocks;
 WorkerNavigator includes NavigatorLocks;
 </xmp>
 
-Each [=environment settings object=] has an associated {{LockManager}} object.
+Each [=environment settings object=] has a {{LockManager}} object.
 
 The {{NavigatorLocks/locks}} attribute's getter must return the [=context object=]'s [=relevant settings object=]'s {{LockManager}} object.
 
@@ -486,21 +487,20 @@ try {
 The <dfn method for=LockManager>request(|name|, |callback|)</dfn> and
 <dfn method for=LockManager>request(|name|, |options|, |callback|)</dfn> methods, when invoked, must run these steps:
 
-1. Let |promise| be a new promise.
 1. If |options| was not passed, then let |options| be a new {{LockOptions}} dictionary with default members.
 1. Let |environment| be [=context object=]'s [=relevant settings object=].
 1. Let |origin| be |environment|'s [=/origin=].
-1. If |origin| is an [=opaque origin=], then reject |promise| with a "{{SecurityError}}" {{DOMException}}.
-1. Otherwise, if |name| starts with U+002D HYPHEN-MINUS (-), then reject |promise| with a "{{NotSupportedError}}" {{DOMException}}.
-1. Otherwise, if both |options|' |steal| dictionary member and |option|'s |ifAvailable| dictionary member are true, then reject |promise| with a "{{NotSupportedError}}" {{DOMException}}.
-1. Otherwise, if |options|' |steal| dictionary member is true and |option|'s |mode| dictionary member is not "{{exclusive}}", then reject |promise| with a "{{NotSupportedError}}" {{DOMException}}.
-1. Otherwise, if |option|'s |signal| dictionary member is present, and either of |options|' |steal| dictionary member or |options|' |ifAvailable| dictionary member is true, then reject |promise| with a "{{NotSupportedError}}" {{DOMException}}.
-1. Otherwise, if |options|' |signal| dictionary member is present and its [=AbortSignal/aborted flag=] is set, then reject |promise| with an "{{AbortError}}" {{DOMException}.
-1. Otherwise, run these steps:
-    1. Let |request| be the result of running the steps to [=request a lock=] with |promise|, the current [=/agent=], |environment|'s [=environment/id=], |origin|, |callback|, |name|, |options|' |mode| dictionary member, |options|' |ifAvailable| dictionary member, and |options|' |steal| dictionary member.
-    1. If |options|' |signal| dictionary member is present, then <a for=AbortSignal lt=add>add the following abort steps</a> to |options|' |signal| dictionary member:
-        1. [=enqueue the following steps|Enqueue the steps=] to [=abort the request=] |request| to the [=lock task queue=].
-        1. Reject |promise| with an "{{AbortError}}" {{DOMException}}.
+1. If |origin| is an [=opaque origin=], then return [=a promise rejected with=] a "{{SecurityError}}" {{DOMException}}.
+1. If |name| starts with U+002D HYPHEN-MINUS (-), then return [=a promise rejected with=] a "{{NotSupportedError}}" {{DOMException}}.
+1. If both |options|' |steal| dictionary member and |options|' |ifAvailable| dictionary member are true, then return [=a promise rejected with=] a "{{NotSupportedError}}" {{DOMException}}.
+1. If |options|' |steal| dictionary member is true and |options|' |mode| dictionary member is not "{{exclusive}}", then return [=a promise rejected with=] a "{{NotSupportedError}}" {{DOMException}}.
+1. If |options|' |signal| dictionary member is present, and either of |options|' |steal| dictionary member or |options|' |ifAvailable| dictionary member is true, then return [=a promise rejected with=] a "{{NotSupportedError}}" {{DOMException}}.
+1. If |options|' |signal| dictionary member is present and its [=AbortSignal/aborted flag=] is set, then return [=a promise rejected with=] an "{{AbortError}}" {{DOMException}.
+1. Let |promise| be [=a new promise=].
+1. Let |request| be the result of running the steps to [=request a lock=] with |promise|, the current [=/agent=], |environment|'s [=environment/id=], |origin|, |callback|, |name|, |options|' |mode| dictionary member, |options|' |ifAvailable| dictionary member, and |options|' |steal| dictionary member.
+1. If |options|' |signal| dictionary member is present, then <a for=AbortSignal lt=add>add the following abort steps</a> to |options|' |signal| dictionary member:
+    1. [=enqueue the following steps|Enqueue the steps=] to [=abort the request=] |request| to the [=lock task queue=].
+    1. [=Reject=] |promise| with an "{{AbortError}}" {{DOMException}}.
 1. Return |promise|.
 
 </div>
@@ -553,10 +553,10 @@ The <dfn method for=LockManager>request(|name|, |callback|)</dfn> and
 
 The <dfn method for=LockManager>query()</dfn> method, when invoked, must run these steps:
 
-1. Let |promise| be a new promise.
 1. Let |origin| be [=context object=]'s [=relevant settings object=]'s [=/origin=].
-1. If |origin| is an [=opaque origin=], then reject |promise| with a "{{SecurityError}}" {{DOMException}} and abort these steps.
-1. Otherwise, [=enqueue the following steps|enqueue the steps=] to [=snapshot the lock state=] for |origin| with |promise| to the [=lock task queue=].
+1. If |origin| is an [=opaque origin=], then return [=a promise rejected with=] a "{{SecurityError}}" {{DOMException}}.
+1. Let |promise| be [=a new promise=].
+1. [=enqueue the following steps|Enqueue the steps=] to [=snapshot the lock state=] for |origin| with |promise| to the [=lock task queue=].
 1. Return |promise|.
 
 </div>
@@ -575,9 +575,9 @@ interface Lock {
 
 A {{Lock}} object has an associated [=lock-concept|lock=].
 
-The {{Lock/name}} attribute getter returns the associated [=lock-concept/name=] of the [=lock-concept|lock=].
+The {{Lock/name}} attribute getter returns the associated [=lock-concept|lock=]'s [=lock-concept/name=].
 
-The {{Lock/mode}} attribute getter returns the associated [=lock-concept/mode=] of the [=lock-concept|lock=].
+The {{Lock/mode}} attribute getter returns the associated [=lock-concept|lock=]'s [=lock-concept/mode=].
 
 <!-- ====================================================================== -->
 # Algorithms # {#algorithms}
@@ -599,13 +599,13 @@ To <dfn>request a lock</dfn> with |promise|, |agent|, |clientId|, |origin|, |cal
         1. [=list/For each=] |lock| of |held|:
             1. If |lock|'s [=lock-concept/name=] is |name|, then run these steps:
                 1. [=list/Remove=] [=lock-concept|lock=] from |held|.
-                1. Reject |lock|'s [=lock-concept/released promise=] with an "{{AbortError}}" {{DOMException}}.
+                1. [=Reject=] |lock|'s [=lock-concept/released promise=] with an "{{AbortError}}" {{DOMException}}.
         1. [=list/Prepend=] |request| in |queue|.
     1. Otherwise, run these steps:
         1. If |ifAvailable| is true and |request| is not [=grantable=],
              then [=enqueue the following steps=] on |callback|'s [=relevant settings object=]'s [=responsible event loop=]:
             1. Let |r| be the result of [=invoking=] |callback| with `null` as the only argument.
-            1. Resolve |promise| with |r| and abort these steps.
+            1. [=Resolve=] |promise| with |r| and abort these steps.
         1. [=queue/Enqueue=] |request| in |queue|.
     1. [=Process the lock request queue=] |queue|.
 1. Return |request|.
@@ -622,7 +622,7 @@ To <dfn>release the lock</dfn> |lock|:
 1. [=Assert=]: these steps are running on the [=lock task queue=].
 1. Let |origin| be |lock|'s [=lock-concept/origin=].
 1. Let |queueMap| be |origin|'s [=lock request queue map=].
-1. Let |name| be |lock|'s associated [=resource name=].
+1. Let |name| be |lock|'s [=resource name=].
 1. Let |queue| be |queueMap|[|name|].
 1. [=list/Remove=] [=lock-concept|lock=] from the |origin|'s [=held lock set=].
 1. [=Process the lock request queue=] |queue|.
@@ -638,7 +638,7 @@ To <dfn>abort the request</dfn> |request|:
 
 1. [=Assert=]: these steps are running on the [=lock task queue=].
 1. Let |origin| be |request|'s [=lock request/origin=].
-1. Let |name| be |lock|'s associated [=resource name=].
+1. Let |name| be |lock|'s [=resource name=].
 1. Let |queueMap| be |origin|'s [=lock request queue map=].
 1. Let |queue| be |queueMap|[|name|].
 1. [=list/Remove=] |request| from |queue|.
@@ -662,12 +662,12 @@ To <dfn>process the lock request queue</dfn> |queue|:
         1. Let |name| be |request|'s [=lock request/name=].
         1. Let |mode| be |request|'s [=lock request/mode=].
         1. Let |p| be |request|'s [=lock request/promise=].
-        1. Let |waiting| be a new Promise.
+        1. Let |waiting| be [=a new promise=].
         1. Let |lock| be a new [=lock-concept|lock=] with [=lock-concept/agent=] |agent|, [=lock-concept/clientId=] |clientId|, [=lock-concept/origin=] |origin|, [=lock-concept/mode=] |mode|, [=lock-concept/name=] |name|, [=lock-concept/released promise=] |p|, and [=lock-concept/waiting promise=] |waiting|.
         1. [=set/Append=] |lock| to |origin|'s [=held lock set=].
         1. [=Enqueue the following steps=] on |callback|'s [=relevant settings object=]'s [=responsible event loop=]:
             1. Let |r| be the result of [=invoking=] |callback| with a new {{Lock}} object associated with |lock| as the only argument.
-            1. Resolve |waiting| with |r|.
+            1. [=Resolve=] |waiting| with |r|.
 
 </div>
 
@@ -682,22 +682,11 @@ To <dfn>snapshot the lock state</dfn> for |origin| with |promise|:
 1. Let |pending| be a new [=list=].
 1. [=map/For each=] |name| &rarr; |queue| of |origin|'s [=lock request queue map=]:
     1. [=list/For each=] |request| of |queue|:
-        1. Let |info| be a new {{LockInfo}} dictionary.
-        1. Set |info|'s {{LockInfo/name}} dictionary member to |request|'s [=lock request/name=].
-        1. Set |info|'s {{LockInfo/mode}} dictionary member to |request|'s [=lock request/mode=].
-        1. Set |info|'s {{LockInfo/clientId}} dictionary member to |request|'s [=lock request/clientId=].
-        1. [=list/Append=] |info| to |pending|.
+        1. [=list/Append=] «[ "name" → |request|'s [=lock request/name=], "mode" → |request|'s [=lock request/mode=], "clientId" → |request|'s [=lock request/clientId=] ]» to |pending|.
 1. Let |held| be a new [=list=].
 1. [=list/For each=] |lock| of |origin|'s [=held lock set=]:
-    1. Let |info| be a new {{LockInfo}} dictionary.
-    1. Set |info|'s {{LockInfo/name}} dictionary member to |lock|'s [=lock-concept/name=].
-    1. Set |info|'s {{LockInfo/mode}} dictionary member to |lock|'s [=lock-concept/mode=].
-    1. Set |info|'s {{LockInfo/clientId}} dictionary member to |lock|'s [=lock-concept/clientId=].
-    1. [=list/Append=] |info| to |held|.
-1. Let |snapshot| be a new {{LockManagerSnapshot}} dictionary.
-1. Set |snapshot|'s {{LockManagerSnapshot/held}} dictionary member to |held|.
-1. Set |snapshot|'s {{LockManagerSnapshot/pending}} dictionary member to |pending|.
-1. Resolve |promise| with |snapshot|.
+    1. [=list/Append=] «[ "name" → |lock|'s [=lock-concept/name=], "mode" → |lock|'s [=lock-concept/mode=], "clientId" → |lock|'s [=lock-concept/clientId=] ]» to |held|.
+1. [=Resolve=] |promise| with «[ "held" → |held|, "pending" → |pending| ]».
 
 </div>
 
@@ -709,8 +698,8 @@ To <dfn>snapshot the lock state</dfn> for |origin| with |promise|:
     ordering of requests across different resources. For example, if
     pending lock requests A1 and A2 are made against resource A in
     that order, and pending lock requests B1 and B2 are made against
-    resource B in that order, than both {A1, A2, B1, B2} and {A1, B1,
-    A2, B2} would be possible orderings for a snapshot's pending list.
+    resource B in that order, than both «A1, A2, B1, B2» and «A1, B1,
+    A2, B2» would be possible orderings for a snapshot's pending list.
 </p>
 <p>
     No ordering guarantees exist for the snapshot of the held lock state.

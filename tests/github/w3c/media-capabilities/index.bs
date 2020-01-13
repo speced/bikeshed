@@ -101,6 +101,32 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
     type: interface; text: WorkerGlobalScope; url: the-workerglobalscope-common-interface
 </pre>
 
+<pre class='biblio'>
+{
+    "SMPTE-ST-2084": {
+        "href": "https://ieeexplore.ieee.org/document/7291452",
+        "title": "High Dynamic Range Electro-Optical Transfer Function of Mastering Reference Displays",
+        "publisher": "SMPTE",
+        "date": "2014",
+        "id": "SMPTE-ST-2084"
+    },
+    "SMPTE-ST-2086": {
+        "href": "https://ieeexplore.ieee.org/document/7291707",
+        "title": "Mastering Display Color Volume Metadata Supporting High Luminance and Wide Color Gamut Images",
+        "publisher": "SMPTE",
+        "date": "2014",
+        "id": "SMPTE-ST-2086"
+    },
+    "SMPTE-ST-2094": {
+        "href": "https://ieeexplore.ieee.org/document/7513361",
+        "title": "Dynamic Metadata for Color Volume Transform Core Components",
+        "publisher": "SMPTE",
+        "date": "2016",
+        "id": "SMPTE-ST-2094"
+    }
+}
+</pre>
+
 <section class='non-normative'>
   <h2 id='introduction'>Introduction</h2>
   <em>This section is non-normative</em>
@@ -209,11 +235,11 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
             If <code>keySystemConfiguration</code> is <a>present</a>:
             <ol>
               <li>
-                If <code>keySystemConfiguration.audioRobustness</code> is 
+                If <code>keySystemConfiguration.audio</code> is 
                 <a>present</a>, <code>audio</code> MUST also be <a>present</a>.
               </li>
               <li>
-                If <code>keySystemConfiguration.videoRobustness</code> is 
+                If <code>keySystemConfiguration.video</code> is 
                 <a>present</a>, <code>video</code> MUST also be <a>present</a>.
               </li>
             </ol>
@@ -307,8 +333,11 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
           required unsigned long width;
           required unsigned long height;
           required unsigned long long bitrate;
-          required DOMString framerate;
+          required double framerate;
           boolean hasAlphaChannel;
+          HdrMetadataType hdrMetadataType;
+          ColorGamut colorGamut;
+          TransferFunction transferFunction;
         };
       </pre>
 
@@ -327,23 +356,8 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
             abort these steps.
           </li>
           <li>
-            If none of the following is true, return <code>false</code> and
-            abort these steps:
-            <ul>
-              <li>
-                Applying the <a>rules for parsing floating-point number
-                values</a> to <var>configuration</var>'s
-                {{VideoConfiguration/framerate}} results in a number that is
-                finite and greater than 0.
-              </li>
-              <li>
-                <var>configuration</var>'s {{VideoConfiguration/framerate}}
-                contains one occurrence of U+002F SLASH character (/) and the
-                substrings before and after this character, when applying the
-                <a>rules for parsing floating-point number values</a> results in
-                a number that is finite and greater than 0.
-              </li>
-            </ul>
+            If {{VideoConfiguration/framerate}} is not finite or is not greater
+            than 0, return <code>false</code> and abort these steps.
           </li>
           <li>
             Return <code>true</code>.
@@ -372,8 +386,8 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
       <p>
         The <dfn for='VideoConfiguration' dict-member>framerate</dfn> member
         represents the framerate of the video track. The framerate is the number
-        of frames used in one second (frames per second). It is represented
-        either as a double or as a fraction.
+        of frames used in one second (frames per second). It is represented as a
+        double.
       </p>
 
       <p>
@@ -385,6 +399,143 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
         video stream encodes alpha channel information based on the indicated
         {{VideoConfiguration/contentType}}, if possible. Otherwise, the UA should
         presume that the video stream cannot produce alpha channel information.
+      </p>
+
+      <p>
+        If present, the <dfn for='VideoConfiguration' dict-member>hdrMetadataType</dfn>
+        member represents that the video track includes the specified HDR
+        metadata type, which the UA needs to be capable of interpreting for tone
+        mapping the HDR content to a color volume and luminance of the output
+        device. Valid inputs are defined by {{HdrMetadataType}}.
+      </p>
+
+      <p>
+        If present, the <dfn for='VideoConfiguration' dict-member>colorGamut</dfn>
+        member represents that the video track is delivered in the specified
+        color gamut, which describes a set of colors in which the content is
+        intended to be displayed. If the attached output device also supports
+        the specified color, the UA needs to be able to cause the output device
+        to render the appropriate color, or something close enough. If the
+        attached output device does not support the specified color, the UA
+        needs to be capable of mapping the specified color to a color supported
+        by the output device. Valid inputs are defined by {{ColorGamut}}.
+      </p>
+
+      <p>
+        If present, the <dfn for='VideoConfiguration' dict-member>transferFunction</dfn>
+        member represents that the video track requires the specified transfer
+        function to be understood by the UA. Transfer function describes the
+        electro-optical algorithm supported by the rendering capabilities of a
+        user agent, independent of the display, to map the source colors in the
+        decoded media into the colors to be displayed. Valid inputs are defined
+        by {{TransferFunction}}.
+      </p>
+    </section>
+
+    <section>
+      <h4 id='videoconfiguration'>HdrMetadataType</h4>
+
+      <p>
+        <pre class='idl'>
+          enum HdrMetadataType {
+            "smpteSt2086",
+            "smpteSt2094-10",
+            "smpteSt2094-40"
+          };
+        </pre>
+
+        <p>
+          If present, {{HdrMetadataType}} describes the capability to interpret HDR metadata
+          of the specified type.
+        </p>
+
+        <p>
+          The {{VideoConfiguration}} may contain one of the following types:
+          <ul>
+            <li>
+              <dfn for='HdrMetadataType' enum-value>smpteSt2086</dfn>,
+              representing the static metadata type defined by
+              [[!SMPTE-ST-2086]].
+            </li>
+            <li>
+              <dfn for='HdrMetadataType' enum-value>smpteSt2094-10</dfn>,
+              representing the dynamic metadata type defined by
+              [[!SMPTE-ST-2094]].
+            </li>
+            <li>
+              <dfn for='HdrMetadataType' enum-value>smpteSt2094-40</dfn>,
+              representing the dynamic metadata type defined by 
+              [[!SMPTE-ST-2094]].
+            </li>
+          </ul>
+        </p>
+      </p>
+    </section>
+
+    <section>
+      <h4 id='videoconfiguration'>ColorGamut</h4>
+
+      <p>
+        <pre class='idl'>
+          enum ColorGamut {
+            "srgb",
+            "p3",
+            "rec2020"
+          };
+        </pre>
+
+        <p>
+          The {{VideoConfiguration}} may contain one of the following types:
+          <ul>
+            <li>
+              <dfn for='ColorGamut' enum-value>srgb</dfn>, representing the
+              [[!sRGB]] color gamut.
+            </li>
+            <li>
+              <dfn for='ColorGamut' enum-value>p3</dfn>, representing the DCI
+              P3 Color Space color gamut. This color gamut includes the
+              {{ColorGamut/srgb}} gamut.
+            </li>
+            <li>
+              <dfn for='ColorGamut' enum-value>rec2020</dfn>, representing
+              the ITU-R Recommendation BT.2020 color gamut. This color gamut
+              includes the {{ColorGamut/p3}} gamut.
+            </li>
+          </ul>
+        </p>
+      </p>
+    </section>
+    
+    <section>
+      <h4 id='videoconfiguration'>TransferFunction</h4>
+
+      <p>
+        <pre class='idl'>
+          enum TransferFunction {
+            "srgb",
+            "pq",
+            "hlg"
+          };
+        </pre>
+
+        <p>
+          The {{VideoConfiguration}} may contain one of the following types:
+          <ul>
+            <li>
+              <dfn for='TransferFunction' enum-value>srgb</dfn>, representing
+              the transfer function defined by [[!sRGB]].
+            </li>
+            <li>
+              <dfn for='TransferFunction' enum-value>pq</dfn>, representing the
+              "Perceptual Quantizer" transfer function defined by 
+              [[!SMPTE-ST-2084]].
+            </li>
+            <li>
+              <dfn for='TransferFunction' enum-value>hlg</dfn>, representing the
+              "Hybrid Log Gamma" transfer function defined by BT.2100.
+            </li>
+          </ul>
+        </p>
       </p>
     </section>
 
@@ -477,11 +628,11 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
           dictionary MediaCapabilitiesKeySystemConfiguration {
             required DOMString keySystem;
             DOMString initDataType = "";
-            DOMString audioRobustness = "";
-            DOMString videoRobustness = "";
             MediaKeysRequirement distinctiveIdentifier = "optional";
             MediaKeysRequirement persistentState = "optional";
             sequence<DOMString> sessionTypes;
+            KeySystemTrackConfiguration audio;
+            KeySystemTrackConfiguration video;
           };
         </xmp>
       </pre>
@@ -506,16 +657,6 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
         described in [[!ENCRYPTED-MEDIA]].
       </p>
       <p>
-        The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>audioRobustness</dfn>
-        member represents an audio {{EME/robustness}} level as described in
-        [[!ENCRYPTED-MEDIA]].
-      </p>
-      <p>
-        The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>videoRobustness</dfn>
-        member represents a video {{EME/robustness}} level as described in
-        [[!ENCRYPTED-MEDIA]].
-      </p>
-      <p>
         The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>distinctiveIdentifier</dfn>
         member represents a {{EME/distinctiveIdentifier}} requirement as
         described in [[!ENCRYPTED-MEDIA]].
@@ -530,6 +671,33 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
         member represents a sequence of required {{EME/sessionTypes}} as
         described in [[!ENCRYPTED-MEDIA]].
       </p>
+      <p>
+        The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>audio</dfn> member
+        represents a {{KeySystemTrackConfiguration}} associated with the {{AudioConfiguration}}.
+      </p>
+      <p>
+        The <dfn for='MediaCapabilitiesKeySystemConfiguration' dict-member>video</dfn> member
+        represents a {{KeySystemTrackConfiguration}} associated with the {{VideoConfiguration}}.
+      </p>
+  </section>
+
+  <section>
+    <h4 id='keysystemtrackconfiguration'>
+      KeySystemTrackConfiguration
+    </h4>
+
+    <pre class='idl'>
+      <xmp>
+        dictionary KeySystemTrackConfiguration {
+          DOMString robustness = "";
+        };
+      </xmp>
+    </pre>
+
+    <p>
+      The <dfn for='KeySystemTrackConfiguration' dict-member>robustness</dfn>
+      member represents a {{EME/robustness}} level as described in [[!ENCRYPTED-MEDIA]].
+    </p>
   </section>
 
   <section>
@@ -540,21 +708,21 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
         required boolean supported;
         required boolean smooth;
         required boolean powerEfficient;
-        
       };
     </pre>
 
     <pre class='idl'>
       dictionary MediaCapabilitiesDecodingInfo : MediaCapabilitiesInfo {
         required MediaKeySystemAccess keySystemAccess;
+        MediaDecodingConfiguration configuration;
       };
     </pre>
 
-    <p>
-      The {{MediaCapabilitiesInfo}} has an associated <dfn
-      for='MediaCapabilitiesInfo'>configuration</dfn> which is a
-      {{MediaDecodingConfiguration}} or {{MediaEncodingConfiguration}}.
-    </p>
+    <pre class='idl'>
+      dictionary MediaCapabilitiesEncodingInfo : MediaCapabilitiesInfo {
+        MediaEncodingConfiguration configuration;
+      };
+    </pre>
 
     <p>
       A {{MediaCapabilitiesInfo}} has associated <dfn
@@ -579,6 +747,20 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
       {{EME/MediaKeySystemAccess}} or <code>null</code> as appropriate.
     </p>
 
+    <p>
+      A {{MediaCapabilitiesDecodingInfo}} has an associated <dfn
+      for='MediaCapabilitiesDecodingInfo'>configuration</dfn> which
+      is the decoding configuration properties used to generate the 
+      {{MediaCapabilitiesDecodingInfo}}.
+    </p>
+
+    <p>
+      A {{MediaCapabilitiesEncodingInfo}} has an associated <dfn
+      for='MediaCapabilitiesEncodingInfo'>configuration</dfn> which
+      is the encoding configuration properties used to generate the 
+      {{MediaCapabilitiesEncodingInfo}}.
+    </p>
+
     <p class='note'>
       If the encrypted decoding configuration is supported, the
       resulting {{MediaCapabilitiesInfo}} will include a
@@ -590,23 +772,24 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
       <h3 id='info-algorithms'>Algorithms</h3>
 
       <section>
-        <h4 id='create-media-capabilities-info'>
-          <dfn>Create a MediaCapabilitiesInfo</dfn>
+        <h4 id='create-media-capabilities-encoding-info'>
+          <dfn>Create a MediaCapabilitiesEncodingInfo</dfn>
         </h4>
         <p>
           Given a {{MediaEncodingConfiguration}} <var>configuration</var>, this
-          algorithm returns a {{MediaCapabilitiesInfo}}. The following steps are
+          algorithm returns a {{MediaCapabilitiesEncodingInfo}}. The following steps are
           run:
           <ol>
             <li>
-              Let <var>info</var> be a new {{MediaCapabilitiesInfo}} instance.
+              Let <var>info</var> be a new {{MediaCapabilitiesEncodingInfo}} instance.
               Unless stated otherwise, reading and writing apply to
               <var>info</var> for the next steps.
             </li>
             <li>
-              Set <a for=MediaCapabilitiesInfo>configuration</a> to
-              <var>configuration</var>.
-            </li>
+              Set <a for=MediaCapabilitiesEncodingInfo>configuration</a> to be a new
+              {{MediaEncodingConfiguration}}. For every property in <var>configuration</var>
+              create a new property with the same name and value in <a
+              for=MediaCapabilitiesEncodingInfo>configuration</a>. </li>
             <li>
               If the user agent is able to encode the media represented by
               <var>configuration</var>, set
@@ -647,6 +830,17 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
           algorithm returns a {{MediaCapabilitiesDecodingInfo}}. The following 
           steps are run:
           <ol>
+            <li>
+              Let <var>info</var> be a new {{MediaCapabilitiesDecodingInfo}} instance.
+              Unless stated otherwise, reading and writing apply to
+              <var>info</var> for the next steps.
+            </li>
+            <li>
+              Set <a for=MediaCapabilitiesDecodingInfo>configuration</a> to be a new
+              {{MediaDecodingConfiguration}}. For every property in <var>configuration</var>
+              create a new property with the same name and value in <a
+              for=MediaCapabilitiesDecodingInfo>configuration</a>.
+            </li>
             <li>
               If <code>configuration.keySystemConfiguration</code> is
               <a>present</a>:
@@ -749,7 +943,7 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
                 <code>config.keySystemConfiguration.sessionTypes</code>.
               </li>
               <li>
-                If an {{audio}} is <a>present</a> in <var>config</var>, set the
+                If {{MediaConfiguration/audio}} is <a>present</a> in <var>config</var>, set the
                 {{EME/audioCapabilities}} attribute to a sequence containing a
                 single {{EME/MediaKeySystemMediaCapability}}, initialized as
                 follows:
@@ -759,13 +953,13 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
                     <code>config.audio.contentType</code>.
                   </li>
                   <li>
-                    Set the {{EME/robustness}} attribute to
-                    <code>config.keySystemConfiguration.audioRobustness</code>.
+                    If <code>config.keySystemConfiguration.audio</code>
+                    is <a>present</a>, set the {{EME/robustness}} attribute to <code>config.keySystemConfiguration.audio.robustness</code>.
                   </li>
                 </ol>
               </li>
               <li>
-                If a {{video}} is <a>present</a> in <var>config</var>, set the
+                If {{MediaConfiguration/video}} is <a>present</a> in <var>config</var>, set the
                 videoCapabilities attribute to a sequence containing a single
                 {{EME/MediaKeySystemMediaCapability}}, initialized as follows:
                 <ol>
@@ -774,8 +968,9 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
                     <code>config.video.contentType</code>.
                   </li>
                   <li>
-                    Set the {{EME/robustness}} attribute to
-                    <code>config.keySystemConfiguration.videoRobustness</code>.
+                    If <code>config.keySystemConfiguration.video</code> is <a>present</a>, set the
+                    {{EME/robustness}} attribute to 
+                    <code>config.keySystemConfiguration.video.robustness</code>.
                   </li>
                 </ol>
               </li>
@@ -901,7 +1096,7 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
           Let <var>p</var> be a new promise.
         </li>
         <li>
-          <a>In parallel</a>, run the <a>Create a MediaCapabilitiesInfo</a>
+          <a>In parallel</a>, run the <a>Create a MediaCapabilitiesEncodingInfo</a>
           algorithm with <var>configuration</var> and resolve <var>p</var>
           with its result.
         </li>
@@ -911,149 +1106,6 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
       </ol>
     </p>
 
-  </section>
-</section>
-
-<section>
-  <h2 id='display-capabilities'>Display Capabilities</h2>
-
-  <p class='advisement'>
-    This section is still Work In Progress and has no shipping implementation.
-    Please look into it in details before implementing it.
-  </p>
-
-  <section>
-    <h3 id='screen-luminance'>Screen Luminance</h3>
-
-    <pre class='idl'>
-      [Exposed=Window]
-      interface ScreenLuminance {
-        readonly attribute double min;
-        readonly attribute double max;
-        readonly attribute double maxAverage;
-      };
-    </pre>
-
-    <p>
-      The {{ScreenLuminance}} object represents the known luminance
-      characteristics of the screen.
-    </p>
-
-    <p>
-      The <dfn for='ScreenLuminance' attribute>min</dfn> attribute MUST return
-      the minimal screen luminance that a pixel of the screen can emit in
-      candela per square metre. The minimal screen luminance is the luminance
-      used when showing the darkest color a pixel on the screen can display.
-    </p>
-
-    <p>
-      The <dfn for='ScreenLuminance' attribute>max</dfn> attribute MUST return
-      the maximal screen luminance that a pixel of the screen can emit in
-      candela per square metre. The maximal screen luminance is the luminance
-      used when showing the whitest color a pixel on the screen can display.
-    </p>
-
-    <p>
-      The <dfn for='ScreenLuminance' attribute>maxAverage</dfn> attribute MUST
-      return the maximal average screen luminance that the screen can emit in
-      candela per square metre. The maximal average screen luminance is the
-      maximal luminance value such as all the pixels of the screen emit the same
-      luminance. The value returned by {{ScreenLuminance/maxAverage}} is
-      expected to be different from {{ScreenLuminance/max}} as screens usually
-      can't apply the maximal screen luminance to the entire panel.
-    </p>
-  </section>
-
-  <section>
-    <h3 id='color-gamut'>Screen Color Gamut</h3>
-
-    <pre class='idl'>
-      enum ScreenColorGamut {
-        "srgb",
-        "p3",
-        "rec2020",
-      };
-    </pre>
-
-    <p>
-      The {{ScreenColorGamut}} represents the color gamut supported by a
-      {{Screen}}, that means the range of color that the screen can display.
-    </p>
-
-    <p>
-      The {{ScreenColorGamut}} values are:
-      <ul>
-        <li>
-          <dfn for='ScreenColorGamut' enum-value>srgb</dfn>, it represents the
-          [[sRGB]] color gamut.
-        </li>
-        <li>
-          <dfn for='ScreenColorGamut' enum-value>p3</dfn>, it represents the DCI
-          P3 Color Space color gamut. This color gamut includes the
-          {{ScreenColorGamut/srgb}} gamut.
-        </li>
-        <li>
-          <dfn for='ScreenColorGamut' enum-value>rec2020</dfn>, it represents
-          the ITU-R Recommendation BT.2020 color gamut. This color gamut
-          includes the {{ScreenColorGamut/p3}} gamut.
-        </li>
-    </p>
-  </section>
-
-  <section>
-    <h3 id='screen-extension'>Screen extension</h3>
-
-    <p class='issue'>
-      Part of this section is 🐵 patching of the CSSOM View Module. <a
-      href='https://github.com/w3c/media-capabilities/issues/4'>Issue #4</a>
-      is tracking merging the changes. This partial interface requires the
-      {{Screen}} interface to become an {{EventTarget}}.
-    </p>
-
-    <pre class='idl'>
-      partial interface Screen {
-        readonly attribute ScreenColorGamut colorGamut;
-        readonly attribute ScreenLuminance? luminance;
-
-        attribute EventHandler onchange;
-      };
-    </pre>
-
-    <p>
-      The <dfn for='Screen' attribute>colorGamut</dfn> attribute SHOULD return
-      the {{ScreenColorGamut}} approximately supported by the screen. In other
-      words, the screen does not need to fully support the given color gamut but
-      needs to be close enough. If the user agent does not know the color gamut
-      supported by the screen, if the supported color gamut is lower than
-      {{ScreenColorGamut/srgb}}, or if the user agent does not want to expose
-      this information for privacy consideration, it SHOULD return
-      {{ScreenColorGamut/srgb}} as a default value. The value returned by
-      {{Screen/colorGamut}} MUST match the value returned by the {{color-gamut}}
-      CSS media query.
-    </p>
-
-    <p>
-      The <dfn for='Screen' attribute>luminance</dfn> attribute SHOULD return
-      a {{ScreenLuminance}} object that will expose the luminance
-      characteristics of the screen. If the user agent has no access to the
-      luminance characteristics of the screen, it MUST return <code>null</code>.
-      The user agent MAY also return <code>null</code> if it does not want to
-      expose the luminance information for privacy reasons.
-    </p>
-
-    <p>
-      The <dfn for='Screen' attribute>onchange</dfn> attribute is an <a>event
-      handler</a> whose corresponding <a>event handler event type</a> is
-      <code>change</code>.
-    </p>
-
-    <p>
-      Whenever the user agent is aware that the state of the {{Screen}}
-      object has changed, that is if one the value exposed on the {{Screen}}
-      object or in an object exposed on the {{Screen}} object, it MUST
-      queue a task to <a>fire an event</a> named <code>change</code> on
-      {{Screen}}.
-    </p>
   </section>
 </section>
 
@@ -1088,11 +1140,24 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
       </p>
 
       <p>
+        HDR detection is more nuanced. Adding colorGamut, transferFunction, and
+        hdrMetadataType has the potential to add significant entropy. However,
+        for UAs whose decoders are implemented in software and therefore whose
+        capabilities are fixed across devices, this feature adds no effective
+        entropy. Additionally, for many cases, devices tend to fall into large
+        categories, within which capabilities are similar thus minimizing
+        effective entropy.
+      </p>
+
+      <p>
         If an implementation wishes to implement a fingerprint-proof version of
         this specification, it would be recommended to fake a given set of
         capabilities (ie. decode up to 1080p VP9, etc.) instead of returning
         always yes or always no as the latter approach could considerably 
-        degrade the user's experience.
+        degrade the user's experience. Another mitigation could be to limit
+        these Web APIs to top-level browsing contexts. Yet another is to use a
+        privacy budget that throttles and/or blocks calls to the API above a
+        threshold.
       </p>
     </section>
 
@@ -1131,7 +1196,7 @@ spec: workers; urlPrefix: https://www.w3.org/TR/workers/#
                   width : 640,
                   height : 480,
                   bitrate : 10000,
-                  framerate : '30'
+                  framerate : 29.97
               }
             };
             navigator.mediaCapabilities.encodingInfo(configuration)

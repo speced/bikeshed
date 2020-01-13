@@ -3,8 +3,9 @@ Shortname: webxr-gamepads-module
 Title: WebXR Gamepads Module - Level 1
 Group: immersivewebwg
 Status: ED
-TR: https://www.w3.org/TR/webxr-gamepads-module/
+TR: https://www.w3.org/TR/webxr-gamepads-module-1/
 ED: https://immersive-web.github.io/webxr-gamepads-module/
+Previous Version: https://www.w3.org/TR/2019/WD-webxr-gamepads-module-1-20191010/
 Repository: immersive-web/webxr-gamepads-module
 Level: 1
 Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web/
@@ -17,28 +18,28 @@ Editor: Brandon Jones 87824, Google http://google.com/, bajones@google.com
 Editor: Nell Waliczek 93109, Amazon [Microsoft until 2018] https://amazon.com/, nhw@amazon.com
 
 Abstract: This specification module describes support for accessing button, trigger, thumbstick, and touchpad data associated with virtual reality (VR) and augmented reality (AR) devices on the Web.
+
+Status Text: This WebXR Gamepads Module is designed as a module to be implemented in addition to <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a>, and was originally included in WebXR Device API which was divided into core and modules. 
 </pre>
 
 <pre class="link-defaults">
 spec:infra;
     type:dfn; text:string
+spec:webxr-1;
+    type: dfn; text: change input source; for: XRSession
+    type: dfn; text: list of active xr input sources
+    type: dfn; text: viewer
+    type: dfn; text: xr device; for: XRSession
+    type: dfn; text: sensitive information
+    type: dfn; text: primary action
+    type: dfn; text: xr animation frame
+    type: dfn; text: primary squeeze action
 </pre>
 
 <pre class="anchors">
 spec: WebXR Device API - Level 1; urlPrefix: https://www.w3.org/TR/webxr/#
-    type: interface; text: XRInputSource; url: xrinputsource-interface
-    type: interface; text: XRSession; url: xrsession-interface
-    type: attribute; text: inputSources; for: XRSession; url: dom-xrsession-inputsources
-    type: attribute; text: targetRayMode; for: XRInputSource; url: dom-xrinputsource-targetraymode
-    type: attribute; text: gripSpace; for: XRInputSource; url: dom-xrinputsource-gripspace
-    type: attribute; text: profiles; for: XRInputSource; url: dom-xrinputsource-profiles
-    type: enum-value; text: "tracked-pointer"; for: XRTargetRayMode; url: dom-xrtargetraymode-tracked-pointer
-    type: dfn; text: responding to input source attribute changes; url: on-input-source-change
-    type: dfn; text: list of active XR input sources; for: XRSession; url: list-of-active-xr-input-sources
-    type: dfn; text: viewer; url: viewer
-    type: dfn; text: XR device; for: XRSession; url: xrsession-xr-device
-    type: dfn; text: sensitive information; url: sensitive-information
-    type: dfn; text: WebXR security and privacy; url: security
+    type: dfn; text: list of frame updates; for: XRSession; url: xrsession-list-of-frame-updates
+    type: dfn; text: time; for: XRFrame; url: xrframe-time
 spec: Gamepad; urlPrefix: https://w3c.github.io/gamepad/#
     type: interface; text: Gamepad; url: dom-gamepad
     type: interface; text: GamepadButton; url: dom-gamepadbutton
@@ -145,7 +146,7 @@ WebXR Device API Integration {#webxr-device-api-integration}
 ============
 As defined in the <a href="https://www.w3.org/TR/webxr/">WebXR Device API API</a>, an {{XRInputSource}} represents an <dfn>XR input source</dfn>, which is any input mechanism which allows the user to perform targeted actions in the same virtual space as the [=viewer=]. Example [=XR input source=]s include, but are not limited to, handheld controllers, optically tracked hands, and gaze-based input methods that operate on the [=viewer=]'s pose.
 
-This document outlines the behavior of an {{XRInputSource}} when it has button, trigger, thumbstick, or touchpad data to report. This is commonly a motion controller, but may also be headset with buttons, triggers, thumbsticks, or touchpads on the [=XRSession/XR device=].  Input mechanisms which are not explicitly associated with the [=XRSession/XR Device=], such as traditional gamepads, mice, or keyboards MUST NOT be considered [=XR input source=]s.
+This document outlines the behavior of an {{XRInputSource}} when it has button, trigger, thumbstick, or touchpad data to report. This is commonly a motion controller, but may also be headset with buttons, triggers, thumbsticks, or touchpads on the [=XRSession/XR device=].  As stated in the WebXR device API, input mechanisms which are not explicitly associated with the [=XRSession/XR Device=], such as traditional gamepads, MUST NOT be considered [=XR input source=]s.
 
 XRInputSource {#xrinputsource-interface}
 -------------
@@ -164,12 +165,22 @@ The <dfn attribute for="XRInputSource">gamepad</dfn> attribute is a {{Gamepad}} 
  - More than one button
  - One or more axes
 
-Note: {{XRInputSource}}s in an {{XRSession}}'s {{XRSession/inputSources}} array are "live". As such values within them, such as the {{gamepad}} button and axis state, are updated in-place. This means that it doesn't work to save a reference to an {{XRInputSource}}'s {{gamepad}} on one frame and compare it to the same {{XRInputSource}}'s {{gamepad}} from a subsequent frame to test for state changes, because they will be the same object. Therefore developers that wish to compare input state from frame to frame should copy the state in question.
-
 XRSession {#xrsession-interface}
 ------------
 
-{{XRInputSource}}s are reported in the {{XRSession/inputSources}} array as they are connected and disconnected. When the presence of a {{XRInputSource/gamepad}} changes for any entry in the {{XRSession/inputSources}} array, the user agent MUST invoke the WebXR Device API's algorithm for [=responding to input source attribute changes=].
+{{XRInputSource}}s are reported in the {{XRSession/inputSources}} array as they are connected and disconnected. When the presence of a {{XRInputSource/gamepad}} changes for any entry in the {{XRSession/inputSources}} array, the user agent MUST invoke the WebXR Device API's algorithm for [=change input source|responding to input source attribute changes=].
+
+The [=XRSession/list of frame updates=] is updated to include [=apply gamepad frame updates=].
+
+To <dfn for=XRFrame>apply gamepad frame updates</dfn> for an {{XRFrame}} |frame|, the user agent MUST run the following steps:
+
+ 1. For each {{XRInputSource}} with a {{XRInputSource/gamepad}} |gamepad| associated with |frame|'s {{XRFrame/session}}, perform the following steps:
+    1. Update |gamepad| to reflect the gamepad data at |frame|'s [=XRFrame/time=].
+
+</div>
+
+NOTE: This means that the {{XRInputSource/gamepad}} object is "live", and any internal state is to be updated in-place every frame. Furthermore, it doesn't work to save a reference to an {{XRInputSource}}'s {{gamepad}} on one frame and compare it to the same {{XRInputSource}}'s {{gamepad}} from a subsequent frame to test for state changes, because they will be the same object. Therefore developers that wish to compare input state from frame to frame should cache the state in question.
+
 
 Gamepad API Integration {#gamepad-api-integration}
 ========================
@@ -206,7 +217,7 @@ This module extends the {{GamepadMappingType}} to describe the mapping of common
 
 The <dfn enum-value for="GamepadMappingType">xr-standard</dfn> mapping indicates that the layout of the buttons and axes of the {{XRInputSource/gamepad}} corresponds as closely as possible to the tables below.
 
-In order to report a {{Gamepad/mapping}} of {{GamepadMappingType/"xr-standard"}} the device MUST report a {{XRInputSource/targetRayMode}} of {{XRTargetRayMode/"tracked-pointer"}} and MUST have a non-<code>null</code> {{XRInputSource/gripSpace}}. It MUST have at least one primary button, often a trigger, separate from any touchpads or thumbsticks. If a device does not meet the requirements for the {{GamepadMappingType/"xr-standard"}} mapping it may still expose a {{XRInputSource/gamepad}} with a {{Gamepad/mapping}} of <code>""</code> (empty string). The {{GamepadMappingType/"xr-standard"}} mapping MUST only be used by {{Gamepad}} instances reported by an {{XRInputSource}}.
+In order to report a {{Gamepad/mapping}} of {{GamepadMappingType/"xr-standard"}} the device MUST report a {{XRInputSource/targetRayMode}} of {{XRTargetRayMode/"tracked-pointer"}} and MUST have a non-<code>null</code> {{XRInputSource/gripSpace}}. It MUST have at least one <dfn>primary trigger</dfn>, separate from any touchpads or thumbsticks. The [=primary trigger=] MUST trigger the [=primary action=] for the input source. The device MAY have a <dfn>primary squeeze button</dfn>, which, if present, MUST trigger the [=primary squeeze action=] for the input source. If a device does not meet the requirements for the {{GamepadMappingType/"xr-standard"}} mapping it may still expose a {{XRInputSource/gamepad}} with a {{Gamepad/mapping}} of <code>""</code> (empty string). The {{GamepadMappingType/"xr-standard"}} mapping MUST only be used by {{Gamepad}} instances reported by an {{XRInputSource}}.
 
 <table class="tg">
   <thead>
@@ -219,22 +230,22 @@ In order to report a {{Gamepad/mapping}} of {{GamepadMappingType/"xr-standard"}}
   <tbody>
     <tr>
       <td>buttons[0]</td>
-      <td>Primary Button/Trigger</td>
+      <td>[=Primary trigger=]</td>
       <td>Yes</td>
     </tr>
     <tr>
       <td>buttons[1]</td>
-      <td>Secondary Button/Grip Trigger</td>
+      <td>[=Primary squeeze button=]</td>
       <td>No</td>
     </tr>
     <tr>
       <td>buttons[2]</td>
-      <td>Touchpad Press</td>
+      <td>Primary touchpad</td>
       <td>No</td>
     </tr>
     <tr>
       <td>buttons[3]</td>
-      <td>Thumbstick Press</td>
+      <td>Primary thumbstick</td>
       <td>No</td>
     </tr>
   </tbody>
@@ -251,22 +262,22 @@ In order to report a {{Gamepad/mapping}} of {{GamepadMappingType/"xr-standard"}}
   <tbody>
     <tr>
       <td>axes[0]</td>
-      <td>Touchpad X</td>
+      <td>Primary touchpad X</td>
       <td>No</td>
     </tr>
     <tr>
       <td>axes[1]</td>
-      <td>Touchpad Y</td>
+      <td>Primary touchpad Y</td>
       <td>No</td>
     </tr>
     <tr>
       <td>axes[2]</td>
-      <td>Thumbstick X</td>
+      <td>Primary thumbstick X</td>
       <td>No</td>
     </tr>
     <tr>
       <td>axes[3]</td>
-      <td>Thumbstick Y</td>
+      <td>Primary thumbstick Y</td>
       <td>No</td>
     </tr>
   </tbody>
@@ -284,7 +295,7 @@ This diagram demonstrates how two example controllers would be exposed with the 
 Security and Privacy {#security}
 =============================================
 
-The WebXR Device API provides powerful new features which bring with them several unique privacy, security, and comfort risks that user agents must take steps to mitigate. This topic is covered in detail as part of the <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a>. This module adds additional considerations, but does not change the fundamental [=WebXR security and privacy=] principles.
+The WebXR Device API provides powerful new features which bring with them several unique privacy, security, and comfort risks that user agents must take steps to mitigate. This topic is covered in detail as part of the <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a>. This module adds additional considerations, but does not change the fundamental [[WEBXR-1#security|WebXR security and privacy]] principles.
 
 Fingerprinting {#fingerprinting-security}
 --------------

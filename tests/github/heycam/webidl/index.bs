@@ -423,7 +423,7 @@ urlPrefix: https://tc39.github.io/ecma262/; spec: ECMA-262
 
 <p>
     This document is governed by the
-    <a id="w3c_process_revision" href="https://www.w3.org/2017/Process-20170301/">1 March 2017
+    <a href="https://www.w3.org/2017/Process-20170301/">1 March 2017
     <abbr title="World Wide Web Consortium">W3C</abbr> Process Document</a>.
 
 <p>
@@ -695,8 +695,10 @@ underscore.
         "interface"
         "iterable"
         "maplike"
+        "mixin"
         "namespace"
         "partial"
+        "readonly"
         "required"
         "setlike"
         "setter"
@@ -1444,7 +1446,7 @@ Note: See also the similarly named [=callback function=] definition.
     unless required to describe the requirements of existing APIs.
     Instead, a [=callback function=] should be used.
 
-    The definition of <code class="idl">EventListener</code> as a
+    The definition of {{EventListener}} as a
     [=callback interface=]
     is an example of an existing API that needs to allow
     objects with a
@@ -2654,7 +2656,7 @@ See [[#interface-object]] for details on how a [=constructor operation=] is to b
     constructor will cause a {{TypeError}} to be thrown.
 
     <pre highlight="js">
-        var x = new Circle();      // The uses the zero-argument constructor to create a
+        var x = new Circle();      // This uses the zero-argument constructor to create a
                                    // reference to a platform object that implements the
                                    // Circle interface.
 
@@ -2910,8 +2912,9 @@ a [=static attribute=].
     <code class="idl">name</code> attribute:
 
     <pre highlight="webidl">
-        [Exposed=Window, Constructor]
+        [Exposed=Window]
         interface Student {
+          constructor();
           attribute unsigned long id;
           stringifier attribute DOMString name;
         };
@@ -2935,8 +2938,9 @@ a [=static attribute=].
     not specified in the IDL itself.
 
     <pre highlight="webidl">
-        [Exposed=Window, Constructor]
+        [Exposed=Window]
         interface Student {
+          constructor();
           attribute unsigned long id;
           attribute DOMString? familyName;
           attribute DOMString givenName;
@@ -3376,8 +3380,9 @@ The [=set/items=] of an [=effective overload set=] are [=tuples=] of the form
 whose [=tuple/items=] are described below:
 
 *   A <dfn for="effective overload set tuple">callable</dfn> is an [=operation=]
-    if the [=effective overload set=] is for [=regular operations=] or [=static operations=]; and
-    it is an [=extended attribute=] if the [=effective overload set=] is for constructors or [=named constructors=].
+    if the [=effective overload set=] is for [=regular operations=],
+    [=static operations=], or [=constructor operations=]; and it is an [=extended attribute=]
+    if the [=effective overload set=] is for [=named constructors=].
 *   A <dfn>type list</dfn> is a [=list=] of IDL types.
 *   An <dfn>optionality list</dfn> is a [=list=] of
     three possible <dfn id="dfn-optionality-value" export>optionality values</dfn>
@@ -4282,7 +4287,7 @@ An [=interface=] can be declared to be asynchronously iterable by using an
 (matching <emu-nt><a href="#prod-AsyncIterable">AsyncIterable</a></emu-nt>) in the body of the
 [=interface=].
 
-<pre class="syntax">
+<pre highlight="webidl" class="syntax">
     interface interface_identifier {
       async iterable&lt;key_type, value_type&gt;;
     };
@@ -4296,20 +4301,34 @@ Note: In the ECMAScript language binding, an interface that is asynchronously it
 and {{@@asyncIterator}} properties on its [=interface prototype object=].
 
 Prose accompanying an [=interface=] with an [=asynchronously iterable declaration=] must define a
-<dfn id="dfn-get-the-next-iteration-result">get the next iteration result</dfn> algorithm.
-This algorithm receives a <b>[=this=]</b> value, which is an instance of the [=interface=] that it
-is defined for, and the <dfn export>current state</dfn>.
-It must return a {{Promise}} that either resolves with undefined – to signal the end of the
-iteration – or a tuple with three elements:
+<dfn id="dfn-get-the-next-iteration-result" export>get the next iteration result</dfn> algorithm.
+This algorithm receives the instance of the [=interface=] that is being iterated, as well as the
+async iterator itself (which can be useful for storing state).
+It must return a {{Promise}} that either rejects, resolves with undefined to signal the end of the
+iteration, or resolves with a tuple containing two elements:
 
 1.  a value of the first type given in the declaration;
-1.  a value of the second type given in the declaration;
-1.  an opaque value that is passed back to the next invocation of the algorithm as the
-    <b>[=current state=]</b>.
+1.  a value of the second type given in the declaration.
 
-The prose may also define <dfn>asynchronous iterator initialization steps</dfn> for the
-[=interface=] with an [=asynchronously iterable declaration=], which would then be called with the
-newly created iterator object.
+The prose may also define an <dfn export>asynchronous iterator return</dfn> algorithm. This
+algorithm receives the instance of the [=interface=] that is being iterated, the async iterator
+itself, and a single argument value of type {{any}}. This algorithm is invoked in the case of
+premature termination of the async iterator. It must return a {{Promise}}; if that promise
+fulfills, its fulfillment value will be ignored, but if it rejects, that failure will be passed on
+to users of the async iterator API.
+
+<p class="note">In the ECMAScript binding, this algorithm allows customizing the behavior when the
+async iterator's <code>return()</code> method is invoked. This most commonly occurs when a
+<code>break</code> or <code>return</code> statement causes an exit from a
+<code>for</code>-<code>await</code>-<code>of</code> loop.
+
+<p class="note">We could add a similar hook for <code>throw()</code>. So far there has been no need,
+but if you are creating an API that needs such capabilities, please
+<a href="https://github.com/heycam/webidl/issues/new?title=Enhancement%20request%20for%20Async%20Iterables">file an issue</a>.
+
+The prose may also define <dfn export>asynchronous iterator initialization steps</dfn>. These
+receive the instance of the [=interface=] being iterated, as well as the newly-created
+iterator object.
 
 [=Interfaces=] with an [=asynchronously iterable declaration=] must not have any
 [=interface members=] named "<code>entries</code>", "<code>keys</code>", or "<code>values</code>",
@@ -4320,7 +4339,7 @@ or have any [=inherited interfaces=] that have [=interface members=] with these 
     Consider the following interface <code class="idl">SessionManager</code>, which allows access
     to a number of <code class="idl">Session</code> objects keyed by username:
 
-    <pre>
+    <pre highlight="webidl">
         [Exposed=Window]
         interface SessionManager {
           Session getSessionForUser(DOMString username);
@@ -4339,26 +4358,35 @@ or have any [=inherited interfaces=] that have [=interface members=] with these 
 
     <blockquote>
 
-        To [=get the next iteration result=] for <code class="idl">SessionManager</code>, run the
-        following steps:
+        The [=asynchronous iterator initialization steps=] for a <code class="idl">SessionManager</code>
+        async iterator |iterator| are:
+
+        1.  Set |iterator|'s <dfn for="SessionManager async iterator">current state</dfn> to "not
+            yet started".
+
+        To [=get the next iteration result=] for a <code class="idl">SessionManager</code>
+        |manager| and its async iterator |iterator|:
 
         1.  Let |promise| be a new promise.
         1.  Let |key| be the following value, if it exists, or null otherwise:
             <dl class="switch">
-                  :  If <b>current state</b> is "not yet started"
-                  :: the smallest username in <b>this</b>'s open sessions, in lexicographical order
+                  :  If |iterator|'s [=SessionManager async iterator/current state=] is "not yet
+                     started"
+                  :: the smallest username in |manager|'s open sessions, in lexicographical order
 
                   :  Otherwise
-                  :: the smallest username in <b>this</b>'s open sessions that is greater than
-                     <b>current state</b>, in lexicographical order
+                  :: the smallest username in |manager|'s open sessions that is greater than
+                     |iterator|'s current state, in lexicographical order
             </dl>
 
-            Note: <b>current state</b> might no longer be present in the open sessions.
+            Note: |iterator|'s [=SessionManager async iterator/current state=] might no longer be
+            present in the open sessions.
         1.  If |key| is null, then:
             1.  Resolve |promise| with undefined.
         1.  Otherwise:
             1.  Let |session| be the <code class="idl">Session</code> object corresponding to |key|.
-            1.  Resolve |promise| with (|username|, |session|, |username|).
+            1.  Resolve |promise| with (|username|, |session|).
+            1.  Set |iterator|'s [=SessionManager async iterator/current state=] to |username|.
         1.  Return |promise|.
 
     </blockquote>
@@ -5026,8 +5054,9 @@ No [=extended attributes=] are applicable to dictionaries.
     consider the following [=IDL fragment=]:
 
     <pre highlight="webidl">
-        [Exposed=Window, Constructor]
+        [Exposed=Window]
         interface Point {
+          constructor();
           attribute double x;
           attribute double y;
         };
@@ -5608,7 +5637,7 @@ will not be treated as platform objects that implement <code class="idl">Node</c
 [=Callback interfaces=], on the other hand, can be implemented by any ECMAScript object. This
 allows Web APIs to invoke author-defined operations. For example, the DOM Events implementation
 allows authors to register callbacks by providing objects that implement the
-<code class="idl">EventListener</code> interface.
+{{EventListener}} interface.
 
 
 <h3 id="idl-types">Types</h3>
@@ -6799,7 +6828,7 @@ which form (or forms) it is in:
             <dfn id="dfn-xattr-argument-list" for="extended attribute" export>takes an argument list</dfn>
         </td>
         <td>
-            <code>[Constructor(double x, double y)]</code>
+            Not currently used; previously used by <code>[Constructor(double x, double y)]</code>
         </td>
     </tr>
     <tr>
@@ -6901,6 +6930,7 @@ five forms are allowed.
         "FrozenArray"
         "Infinity"
         "NaN"
+        "Promise"
         "USVString"
         "any"
         "boolean"
@@ -6914,8 +6944,10 @@ five forms are allowed.
         "octet"
         "or"
         "optional"
+        "record"
         "sequence"
         "short"
+        "symbol"
         "true"
         "unsigned"
         "void"
@@ -9193,8 +9225,9 @@ for the specific requirements that the use of
         };
 
         // Dimensions is available for use in workers and on the main thread.
-        [Exposed=(Window,Worker), Constructor(double width, double height)]
+        [Exposed=(Window,Worker)]
         interface Dimensions {
+          constructor(double width, double height);
           readonly attribute double width;
           readonly attribute double height;
         };
@@ -9435,8 +9468,10 @@ See [[#namespace-object]] for details on how an interface is exposed on a namesp
     <pre highlight="webidl">
         namespace Foo { };
 
-        [LegacyNamespace=Foo, Constructor]
-        interface Bar { };
+        [LegacyNamespace=Foo]
+        interface Bar {
+          constructor();
+        };
     </pre>
 
     In an ECMAScript implementation of the above namespace and interface, the
@@ -9562,7 +9597,6 @@ are to be implemented.
 
     <pre highlight="webidl">
         [Exposed=Window,
-         Constructor,
          LegacyWindowAlias=WebKitCSSMatrix]
         interface DOMMatrix : DOMMatrixReadOnly {
           // ...
@@ -11054,10 +11088,14 @@ Note: The HTML Standard defines how a security check is performed. [[!HTML]]
     and there is an overload with an optional argument at this position, then
     we will choose that overload.  If there is no valid overload for the type of
     value passed in here, then we throw a {{ECMAScript/TypeError}}.
-    The inspection of the value at the distinguishing argument index does not have any side effects;
-    the only side effects that come from running the overload resolution
-    algorithm are those that come from converting the ECMAScript values
-    to IDL values.
+    Generally, the inspection of the value at the distinguishing argument index does not have any
+    side effects, and the only side effects in the overload resolution algorithm are the result of
+    converting the ECMAScript values to IDL values.
+    (An exception exists when one of the overloads has a [=sequence type=] or [=frozen array type=]
+    at the distinguishing argument index.
+    In this case, we attempt to get the {{@@iterator}} property to determine the appropriate
+    overload, and perform the conversion of the distinguishing argument separately before continuing
+    with the next step.)
 
     At this point, we have determined which overload to use.  We now
     convert the remaining arguments, from the distinguishing argument onwards,
@@ -11126,13 +11164,25 @@ and is described in more detail in [[#interface-prototype-object]].
 Note: Since an [=interface object=] is a [=function object=]
 the <code>typeof</code> operator will return "function" when applied to an interface object.
 
+An interface may have <dfn export>overridden constructor steps</dfn>, which can
+change the behavior of the [=interface object=] when called or constructed. By
+default interfaces do not have such steps.
+
+<p class="advisement">
+    In general, constructors are described by defining a [=constructor operation=] and its behavior.
+    The [=overridden constructor steps=] are used only for more complicated situations.
+    Editors who wish to use this feature are strongly advised to discuss this by
+    <a href="https://github.com/heycam/webidl/issues/new?title=Intent%20to%20use%20constructor%20steps">filing an issue</a> before proceeding.
+</p>
+
 <div algorithm>
 
     The [=interface object=] for a given [=interface=] |I|
     with [=identifier=] |id| and in [=Realm=] |realm|
     is <dfn lt="create an interface object">created</dfn> as follows:
 
-    1.  Let |steps| be the following steps:
+    1.  Let |steps| be |I|'s [=overridden constructor steps=] if they exist, or
+        the following steps otherwise:
         1.  If |I| was not declared with a [=constructor operation=],
             then [=ECMAScript/throw=] a {{ECMAScript/TypeError}}.
         1.  If {{NewTarget}} is <emu-val>undefined</emu-val>, then
@@ -12092,10 +12142,11 @@ The location of the property is determined as follows:
     1.  If |object| does not [=implement=] |interface|, then [=ECMAScript/throw=] a
         {{ECMAScript/TypeError}}.
     1.  Let |iterator| be a newly created [=default asynchronous iterator object=] for |interface|
-        with |object| as its [=default asynchronous iterator object/target=] and
-        "<code>key+value</code>" as its [=default asynchronous iterator object/kind=].
-    1.  Run the [=asynchronous iterator initialization steps=] for |interface| with |iterator|, if
-        any.
+        with |object| as its [=default asynchronous iterator object/target=],
+        "<code>key+value</code>" as its [=default asynchronous iterator object/kind=], and
+        [=default asynchronous iterator object/is finished=] set to false.
+    1.  Run the [=asynchronous iterator initialization steps=] for |interface| with |object| and
+        |iterator|, if any such steps exist.
     1.  Return |iterator|.
 </div>
 
@@ -12282,10 +12333,11 @@ then the [=function object=] is {{%ArrayProto_keys%}}.
     1.  If |object| does not [=implement=] |interface|, then [=ECMAScript/throw=] a
         {{ECMAScript/TypeError}}.
     1.  Let |iterator| be a newly created [=default asynchronous iterator object=] for |interface|
-        with |object| as its [=default asynchronous iterator object/target=] and
-        "<code>key</code>" as its [=default asynchronous iterator object/kind=].
-    1.  Run the [=asynchronous iterator initialization steps=] for |interface| with |iterator|, if
-        any.
+        with |object| as its [=default asynchronous iterator object/target=],
+        "<code>key</code>" as its [=default asynchronous iterator object/kind=], and
+        [=default asynchronous iterator object/is finished=] set to false.
+    1.  Run the [=asynchronous iterator initialization steps=] for |interface| with |object| and
+        |iterator|, if any such steps exist.
     1.  Return |iterator|.
 </div>
 
@@ -12346,10 +12398,11 @@ the value of the {{@@iterator}} property.
     1.  If |object| does not [=implement=] |interface|, then [=ECMAScript/throw=] a
         {{ECMAScript/TypeError}}.
     1.  Let |iterator| be a newly created [=default asynchronous iterator object=] for |interface|
-        with |object| as its [=default asynchronous iterator object/target=] and
-        "<code>value</code>" as its [=default asynchronous iterator object/kind=].
-    1.  Run the [=asynchronous iterator initialization steps=] for |interface| with |iterator|, if
-        any.
+        with |object| as its [=default asynchronous iterator object/target=],
+        "<code>value</code>" as its [=default asynchronous iterator object/kind=], and
+        [=default asynchronous iterator object/is finished=] set to false.
+    1.  Run the [=asynchronous iterator initialization steps=] for |interface| with |object| and
+        |iterator|, if any such steps exist.
     1.  Return |iterator|.
 </div>
 
@@ -12471,17 +12524,8 @@ A [=default asynchronous iterator object=] has internal values:
     values are to be iterated,
 *   its <dfn for="default asynchronous iterator object">kind</dfn>, which is the iteration kind,
 *   its <dfn for="default asynchronous iterator object">ongoing promise</dfn>, which is a
-    {{Promise}} or undefined,
-*   its <dfn for="default asynchronous iterator object">state</dfn>, which is one of
-    "not yet started" and "finished", or an opaque value used to store the position of the iterator
-    by the algorithm to [=get the next iteration result=].
-
-    Note: This value is associated with the iterator instance, rather than the [=interface=]
-    instance. It is explicitly handled here because the iterator instance is not exposed to the
-    prose that [=get the next iteration result|gets the next iteration result=].
-
-When a [=default asynchronous iterator object=] is first created, its
-[=default asynchronous iterator object/state=] is "not yet started".
+    {{Promise}} or null,
+*   its <dfn for="default asynchronous iterator object">is finished</dfn>, which is a boolean.
 
 Note: [=Default asynchronous iterator objects=] do not have [=class strings=]; when
 <code class="idl">Object.prototype.toString()</code> is called on a
@@ -12528,7 +12572,6 @@ The \[[Prototype]] [=internal slot=] of an [=asynchronous iterator prototype obj
         1.  Return |thisValidationPromiseCapability|.\[[Promise]].
 
     1.  If |object| is not a [=default asynchronous iterator object=] for |interface|, then:
-        1.  Issue: [=Realm=] check?
         1.  Let |error| be a new {{ECMAScript/TypeError}}.
         1.  Perform [=!=] [$Call$](|thisValidationPromiseCapability|.\[[Reject]],
             <emu-val>undefined</emu-val>, « |error| »).
@@ -12536,8 +12579,7 @@ The \[[Prototype]] [=internal slot=] of an [=asynchronous iterator prototype obj
 
     1.  Let |nextSteps| be the following steps:
         1.  Let |nextPromiseCapability| be [=!=] [$NewPromiseCapability$]({{%Promise%}}).
-        1.  Let |oldState| be |object|'s [=default asynchronous iterator object/state=].
-        1.  If |oldState| is "finished", then:
+        1.  If |object|'s [=default asynchronous iterator object/is finished=] is true, then:
             1.  Let |result| be [$CreateIterResultObject$](<emu-val>undefined</emu-val>,
                 <emu-val>true</emu-val>).
             1.  Perform [=!=] [$Call$](|nextPromiseCapability|.\[[Resolve]],
@@ -12546,31 +12588,24 @@ The \[[Prototype]] [=internal slot=] of an [=asynchronous iterator prototype obj
         1.  Let |kind| be |object|'s [=default asynchronous iterator object/kind=].
         1.  Let |nextPromise| be the result of
             [=get the next iteration result|getting the next iteration result=] with |object|'s
-            [=default asynchronous iterator object/target=] as <b>[=this=]</b> and |oldState| as
-            the <b>[=current state=]</b>.
-        1.  Let |resolveSteps| be the following steps, given |next|:
+            [=default asynchronous iterator object/target=] and |object|.
+        1.  Let |fulfillSteps| be the following steps, given |next|:
             1.  Set |object|'s [=default asynchronous iterator object/ongoing promise=] to
-                undefined.
-            1.  If |next| is undefined, then:
-                1.  Set |object|'s [=default asynchronous iterator object/state=] to null.
-                1.  Let |result| be [$CreateIterResultObject$](<emu-val>undefined</emu-val>,
+                null.
+            1.  If |next| is <emu-val>undefined</emu-val>, then:
+                1.  Set |object|'s [=default asynchronous iterator object/is finished=] to true.
+                1.  Return [=!=] [$CreateIterResultObject$](<emu-val>undefined</emu-val>,
                     <emu-val>true</emu-val>).
-                1.  Perform [=!=] [$Call$](|nextPromiseCapability|.\[[Resolve]],
-                    <emu-val>undefined</emu-val>, « |result| »).
             1.  Otherwise:
-                1.  Let (|key|, |value|, |newState|) be |next|.
-                1.  Set |object|'s [=default asynchronous iterator object/state=] to |newState|.
-                1.  Let |result| be the [=iterator result=] for (|key|, |value|) and |kind|.
-                1.  Perform [=!=] [$Call$](|nextPromiseCapability|.\[[Resolve]],
-                    <emu-val>undefined</emu-val>, « |result| »).
-        1.  Let |onFulfilled| be [=!=] [$CreateBuiltinFunction$](|resolveSteps|, « »).
+                1.  Return the [=iterator result=] for |next| and |kind|.
+        1.  Let |onFulfilled| be [=!=] [$CreateBuiltinFunction$](|fulfillSteps|, « »).
         1.  Perform [=!=] [$PerformPromiseThen$](|nextPromise|, |onFulfilled|,
             <emu-val>undefined</emu-val>, |nextPromiseCapability|).
         1.  Return |nextPromiseCapability|.\[[Promise]].
 
     1.  Let |promise| be |object|'s [=default asynchronous iterator object/ongoing promise=].
 
-    1.  If |promise| is not undefined, then:
+    1.  If |promise| is not null, then:
         1.  Let |afterOngoingPromiseCapability| be [=!=] [$NewPromiseCapability$]({{%Promise%}}).
         1.  Let |onFulfilled| be [=!=] [$CreateBuiltinFunction$](|nextSteps|, « »).
         1.  Perform [=!=] [$PerformPromiseThen$](|promise|, |onFulfilled|,
@@ -12585,7 +12620,70 @@ The \[[Prototype]] [=internal slot=] of an [=asynchronous iterator prototype obj
     1.  Return |object|'s [=default asynchronous iterator object/ongoing promise=].
 </div>
 
-Issue: <code>return</code>; <code>throw</code> methods?
+<div algorithm="to invoke the return property of asynchronous iterators">
+
+    If an [=asynchronous iterator return=] algorithm is defined for the [=interface=], then the
+    [=asynchronous iterator prototype object=] must have a <code class="idl">return</code> data
+    property with attributes { \[[Writable]]: <emu-val>true</emu-val>,
+    \[[Enumerable]]: <emu-val>true</emu-val>, \[[Configurable]]: <emu-val>true</emu-val> }
+    and whose value is a [=built-in function object=], taking one argument |value|, that behaves as
+    follows:
+
+    1.  Let |interface| be the [=interface=] for which the
+        [=asynchronous iterator prototype object=] exists.
+
+    1.  Let |returnPromiseCapability| be [=!=] [$NewPromiseCapability$]({{%Promise%}}).
+
+    1.  Let |object| be the result of calling [$ToObject$] on the
+        <emu-val>this</emu-val> value.
+
+    1.  [$IfAbruptRejectPromise$](|object|, |returnPromiseCapability|).
+
+    1.  If |object| [=is a platform object=], then [=perform a security check=], passing:
+        *   the platform object |object|,
+        *   the identifier "<code>return</code>", and
+        *   the type "<code>method</code>".
+
+        If this threw an exception |e|, then:
+        1.  Perform [=!=] [$Call$](|returnPromiseCapability|.\[[Reject]],
+            <emu-val>undefined</emu-val>, « |e| »).
+        1.  Return |returnPromiseCapability|.\[[Promise]].
+
+    1.  If |object| is not a [=default asynchronous iterator object=] for |interface|, then:
+        1.  Let |error| be a new {{ECMAScript/TypeError}}.
+        1.  Perform [=!=] [$Call$](|returnPromiseCapability|.\[[Reject]],
+            <emu-val>undefined</emu-val>, « |error| »).
+        1.  Return |returnPromiseCapability|.\[[Promise]].
+
+    1.  If |object|'s [=default asynchronous iterator object/ongoing promise=] is not null, then:
+        1.  Let |error| be a new {{ECMAScript/TypeError}}.
+        1.  Perform [=!=] [$Call$](|returnPromiseCapability|.\[[Reject]],
+            <emu-val>undefined</emu-val>, « |error| »).
+        1.  Return |returnPromiseCapability|.\[[Promise]].
+
+    1.  If |object|'s [=default asynchronous iterator object/is finished=] is true, then:
+        1.  Let |result| be [=!=] [$CreateIterResultObject$](|value|,
+            <emu-val>true</emu-val>).
+        1.  Perform [=!=] [$Call$](|returnPromiseCapability|.\[[Resolve]],
+            <emu-val>undefined</emu-val>, « |result| »).
+        1.  Return |returnPromiseCapability|.\[[Promise]].
+
+    1.  Set |object|'s [=default asynchronous iterator object/is finished=] to true.
+
+    1.  Let |returnPromise| be the result of running the [=asynchronous iterator return=] algorithm
+        for |interface|, given |object|'s [=default asynchronous iterator object/target=],
+        |object|, and |value|.
+
+    1.  Let |fulfillSteps| be the following steps:
+        1.  Return [=!=] [$CreateIterResultObject$](|value|, <emu-val>true</emu-val>).
+
+    1.  Let |onFulfilled| be [=!=] [$CreateBuiltinFunction$](|fulfillSteps|, « »).
+
+    1.  Perform [=!=] [$PerformPromiseThen$](|returnPromise|, |onFulfilled|,
+        <emu-val>undefined</emu-val>, |returnPromiseCapability|).
+
+    1.  Return |returnPromiseCapability|.\[[Promise]].
+</div>
 
 The [=class string=] of an [=asynchronous iterator prototype object=] for a given [=interface=] is
 the result of concatenating the [=identifier=] of the [=interface=] and the string
@@ -14149,9 +14247,9 @@ fragment:
 
 <pre class="idl">
 [Exposed=(Window,Worker),
- Constructor(optional DOMString message = "", optional DOMString name = "Error"),
  Serializable]
 interface DOMException { // but see below note about ECMAScript binding
+  constructor(optional DOMString message = "", optional DOMString name = "Error");
   readonly attribute DOMString name;
   readonly attribute DOMString message;
   readonly attribute unsigned short code;
@@ -14618,31 +14716,7 @@ The following conventions are used in the algorithms in this document:
 Everything in this specification is normative except for diagrams,
 examples, notes and sections marked as being informative.
 
-The keywords “must”,
-“must not”,
-“required”,
-“shall”,
-“shall not”,
-“should”,
-“should not”,
-“recommended”,
-“may” and
-“optional” in this document are to be
-interpreted as described in
-<cite><a href="http://tools.ietf.org/html/rfc2119">Key words for use in RFCs to
-Indicate Requirement Levels</a></cite>
-[[!RFC2119]].
-
-Requirements phrased in the imperative as part of algorithms (such as
-“strip any leading space characters” or “return false and abort these
-steps”) are to be interpreted with the meaning of the key word (“must”,
-“should”, “may”, etc) used in introducing the algorithm.
-
-Conformance requirements phrased as algorithms or specific steps can be
-implemented in any manner, so long as the end result is <dfn lt="processing equivalence" id="dfn-processing-equivalence">equivalent</dfn>. In
-particular, the algorithms defined in this specification are intended to
-be easy to understand and are not intended to be performant. Implementers
-are encouraged to optimize.
+This specification depends on the Infra Standard. [[!INFRA]]
 
 The following conformance classes are defined by this specification:
 

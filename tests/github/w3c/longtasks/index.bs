@@ -85,16 +85,15 @@ Usage Example {#example}
 ------------------------
 
 <pre class="example highlight">
-    var observer = new PerformanceObserver(function(list) {
-        var perfEntries = list.getEntries();
-        for (var i = 0; i < perfEntries.length; i++) {
+    const observer = new PerformanceObserver(function(list) {
+        for (const entry of list.getEntries()) {
             // Process long task notifications:
             // report back for analytics and monitoring
             // ...
         }
     });
-    // register observer for long task notifications
-    observer.observe({entryTypes: ["longtask"]});
+    // Register observer for previous and future long task notifications.
+    observer.observe({type: "longtask", buffered: true});
     // Long script execution after this will result in queueing
     // and receiving "longtask" entries in the observer.
 </pre>
@@ -185,13 +184,13 @@ The {{PerformanceEntry/startTime}} attribute's getter will always return 0.
 
 The {{PerformanceEntry/duration}} attribute's getter will always return 0.
 
-The <dfn attribute for=TaskAttributionTiming>containerType</dfn> attribute's getter will return the type of the <a>culprit browsing context container</a>, such as "<code>iframe</code>", "<code>embed</code>", or "<code>object</code>".
+The <dfn attribute for=TaskAttributionTiming>containerType</dfn> attribute's getter will return the type of the <a>culprit browsing context container</a>, such as "<code>iframe</code>", "<code>embed</code>", or "<code>object</code>". If no single <a>culprit browsing context container</a> is found, it will return "<code>window</code>".
 
-The <dfn attribute for=TaskAttributionTiming>containerName</dfn> attribute's getter will return the value of the <a lt="culprit browsing context container">container</a>'s <code>name</code> content attribute.
+The <dfn attribute for=TaskAttributionTiming>containerName</dfn> attribute's getter will return the value of the <a lt="culprit browsing context container">container</a>'s <code>name</code> content attribute. If no single <a>culprit browsing context container</a> is found, it will return the empty string.
 
-The <dfn attribute for=TaskAttributionTiming>containerId</dfn> attribute's getter will return the value of the <a lt="culprit browsing context container">container</a>'s <code>id</code> content attribute.
+The <dfn attribute for=TaskAttributionTiming>containerId</dfn> attribute's getter will return the value of the <a lt="culprit browsing context container">container</a>'s <code>id</code> content attribute. If no single <a>culprit browsing context container</a> is found, it will return the empty string.
 
-The <dfn attribute for=TaskAttributionTiming>containerSrc</dfn> attribute's getter will return the value of the <a lt="culprit browsing context container">container</a>'s <code>src</code> content attribute.
+The <dfn attribute for=TaskAttributionTiming>containerSrc</dfn> attribute's getter will return the value of the <a lt="culprit browsing context container">container</a>'s <code>src</code> content attribute. If no single <a>culprit browsing context container</a> is found, it will return the empty string.
 
 Pointing to the culprit {#sec-PointingToCulprit}
 ------------------------------------------------
@@ -309,13 +308,31 @@ Report long tasks {#report-long-tasks}
 
             1. Set |attribution|'s {{PerformanceEntry/entryType}} attribute to <code>"taskattribution"</code>.
             1. Set |attribution|'s {{PerformanceEntry/startTime}} and {{PerformanceEntry/duration}} to 0.
-            1. If |culpritSettings| is not <code>null</code>, and |culpritSettings|'s <a>responsible browsing context</a> has a <a>browsing context container</a> that is an <{iframe}> element, then let |iframe| be that element, and perform the following steps:
-                1. Set |attribution|'s {{containerType}} attribute to "<code>iframe</code>".
-                1. Set |attribution|'s {{containerName}} attribute to the value of  |iframe|'s <{iframe/name}> content attribute, or <code>null</code> if the attribute is absent.
-                1. Set |attribution|'s {{containerSrc}} attribute to the value of |iframe|'s <{iframe/src}> content attribute, or <code>null</code> if the attribute is absent.
+            1. Set |attribution|'s {{containerType}} attribute to <code>"window"</code>.
+            1. Set |attribution|'s {{containerName}} and {{containerSrc}} attributes to the empty string.
+            1. If |culpritSettings| is not <code>null</code>:
+                1. Let |container| be |culpritSettings|'s <a>responsible browsing context</a>'s <a>browsing context container</a>.
+                1. Assert: |container| is not <code>null</code>.
+                1. Set |attribution|'s {{containerId}} attribute to the value of |container|'s [=Element/ID=], or the empty string if the ID is unset.
+                1. If |container| is an <{iframe}> element:
+                    1. Set |attribution|'s {{containerType}} attribute to "<code>iframe</code>".
+                    1. Set |attribution|'s {{containerName}} attribute to the value of |container|'s <{iframe/name}> content attribute, or the empty string if the attribute is absent.
+                    1. Set |attribution|'s {{containerSrc}} attribute to the value of |container|'s <{iframe/src}> content attribute, or the empty string if the attribute is absent.
 
                     NOTE: it is intentional that we record the frame's <{iframe/src}> attribute here, and not its current URL, as this is meant primarily to help identify frames, and allowing discovery of the current URL of a cross-origin iframe is a security problem.
-                1. Set |attribution|'s {{containerId}} attribute to the value of |iframe|'s [=Element/ID=], or <code>null</code> if the ID is unset.
+
+                1. If |container| is a <{frame}> element:
+                    1. Set |attribution|'s {{containerType}} attribute to "<code>frame</code>".
+                    1. Set |attribution|'s {{containerName}} attribute to the value of |container|'s <code>name</code> content attribute, or the empty string if the attribute is absent.
+                    1. Set |attribution|'s {{containerSrc}} attribute to the value of |container|'s <code>src</code> content attribute, or the empty string if the attribute is absent.
+                1. If |container| is an <{object}> element:
+                    1. Set |attribution|'s {{containerType}} attribute to "<code>object</code>".
+                    1. Set |attribution|'s {{containerName}} attribute to the value of  |container|'s <{object/name}> content attribute, or the empty string if the attribute is absent.
+                    1. Set |attribution|'s {{containerSrc}} attribute to the value of |container|'s <{object/data}> content attribute, or the empty string if the attribute is absent.
+                1. If |container| is an <{embed}> element:
+                    1. Set |attribution|'s {{containerType}} attribute to "<code>embed</code>".
+                    1. Set |attribution|'s {{containerName}} attribute to the empty string.
+                    1. Set |attribution|'s {{containerSrc}} attribute to the value of |container|'s <{embed/src}> content attribute, or the empty string if the attribute is absent.
 
         1. Create a new {{PerformanceLongTaskTiming}} object |newEntry| and set its attributes as follows:
 
@@ -328,8 +345,6 @@ Report long tasks {#report-long-tasks}
                 NOTE: future iterations of this API will add more values to the {{PerformanceLongTaskTiming/attribution}} attribute, but for now it only contains a single value.
 
         1. <a>Queue the PerformanceEntry</a> |newEntry| on |destinationRealm|.
-
-            NOTE: the "queue a PerformanceEntry" algorithm will end up doing nothing if no observers are registered. Implementations likely will want to bail out from this algorithm earlier in that case, instead of assembling all the above information only to find out nobody is listening for it.
 </div>
 
 Security & privacy considerations {#priv-sec}

@@ -1,0 +1,278 @@
+<pre class=metadata>
+Title: Custom State Pseudo Class
+Shortname: custom-state-pseudo-class
+Level: 1
+Status: CG-DRAFT
+Group: WICG
+ED: https://wicg.github.io/custom-state-pseudo-class/
+Editor: Kent Tamura, Google https://www.google.com/, tkent@google.com
+Editor: Rakina Zata Amni, Google https://www.google.com/, rakina@google.com
+Editor: Domenic Denicola, Google https://www.google.com/, d@domenic.me, https://domenic.me/
+Repository: https://github.com/WICG/custom-state-pseudo-class/
+Abstract: This specification defines a way to expose custom element's internal
+    states, and defines the '':state()'' [=pseudo-class=] matching to a custom
+    element exposing a state. This specification is intended to be merged to
+    [[DOM]], [[HTML]], and [[selectors-4]] in the future.
+Markup Shorthands: markdown yes
+Default Biblio Status: current
+Complain About: accidental-2119 yes, missing-example-ids yes
+</pre>
+
+Introduction {#introduction}
+============================
+
+## Motivation ## {#motivation}
+
+Build-in elements provided by user agents have certain “states” that can change
+over time depending on user interaction and other factors, and are exposed to
+web authors through pseudo classes. For example, some form controls have the
+“invalid” state, which is exposed through the '':invalid'' [=pseudo-class=].
+
+Like built-in elements, [=custom elements=] can have various states to be in too,
+and [=custom element=] authors want to expose these states in a similar fashion
+as the built-in elements.
+
+## Solution ## {#solution}
+
+This specification defines an API to inform [=custom element=]'s states to the
+user agent, and a [=pseudo-class=] to select elements with specific states.
+The former is the {{ElementInternals/states}} IDL attribute of
+{{ElementInternals}}, and the latter is the '':state()'' [=pseudo-class=].
+
+
+<div class="example" id="ex-intro">
+
+Assume that <code>LabeledCheckbox</code> doesn't expose its "checked" state
+via a content attribute.
+
+<!-- <xmp> doesn't work well with backqoutes.-->
+<pre class="lang-html">
+&lt;!DOCTYPE html>
+&lt;body>
+&lt;!-- Basic usage: -->
+&lt;script>
+class LabeledCheckbox extends HTMLElement {
+  constructor() {
+    super();
+    this._internals = this.attachInternals();
+    this.addEventListener('click', this._onClick.bind(this));
+
+    const shadowRoot = this.attachShadow({mode: 'closed'});
+    shadowRoot.innerHTML =
+      &#96;&lt;style>
+       :host::before {
+         content: '[ ]';
+         white-space: pre;
+         font-family: monospace;
+       }
+       :host(:state(checked))::before { content: '[x]' }
+       &lt;/style>
+       &lt;slot>Label&lt;/slot>&#96;;
+  }
+
+  get checked() { return this._internals.states.contains('checked'); }
+
+  set checked(flag) {
+    this._internals.states.toggle('checked', !!flag);
+  }
+
+  _onClick(event) {
+    this.checked = !this.checked;
+  }
+}
+
+customElements.define('labeled-checkbox', LabeledCheckbox);
+&lt;/script>
+
+&lt;style>
+labeled-checkbox { border: dashed red; }
+labeled-checkbox:state(checked) { border: solid; }
+&lt;/style>
+
+&lt;labeled-checkbox>You need to check this&lt;/labeled-checkbox>
+
+<!-- Works even on ::part()s -->
+&lt;script>
+class QuestionBox extends HTMLElement {
+  constructor() {
+    super();
+    const shadowRoot = this.attachShadow({mode: 'closed'});
+    shadowRoot.innerHTML =
+      &#96;&lt;div>&lt;slot>Question&lt;/slot>&lt;/div>
+       &lt;labeled-checkbox part='checkbox'>Yes&lt;/labeled-checkbox>&#96;;
+  }
+}
+customElements.define('question-box', QuestionBox);
+&lt;/script>
+
+&lt;style>
+question-box::part(checkbox) { color: red; }
+question-box::part(checkbox):state(checked) { color: green; }
+&lt;/style>
+
+&lt;question-box>Continue?&lt;/question-box>
+&lt;/body>
+</pre>
+</div>
+
+
+Exposing custom element states {#exposing}
+============================
+
+Each <a>autonomous custom element</a> has <dfn>states token list</dfn>, a
+<a>non-attribute <code>DOMTokenList</code></a> object associated with the custom
+element, and initially associated with an empty [=/set=] of strings.
+
+<pre class=idl>
+partial interface ElementInternals {
+  [SameObject, PutForwards=value] readonly attribute DOMTokenList states;
+};
+</pre>
+
+The {{states}} IDL attribute returns the [=states token list=] of 
+this's
+<a href="http://html.spec.whatwg.org/C/#internals-target">target element</a>.
+
+<div class="example" id="ex-non-boolean-state">
+[=States token list=] can expose boolean states represented by
+existence/non-existence of string tokens. If an author wants to expose a state
+which can have three values, it can be converted to three exclusive boolean
+states. For example, a state called <code>readyState</code> with
+<code>"loading"</code>, <code>"interactive"</code>, and <code>"complete"</code>
+values can be mapped to three exclusive boolean states, <code>"loading"</code>,
+<code>"interactive"</code>, and <code>"complete"</code>.
+
+<pre class="lang-js">
+// Change the readyState from anything to "complete".
+this._readyState = "complete";
+this._internals.<l>{{states}}</l>.<l>{{DOMTokenList/remove}}</l>("loading", "interactive");
+this._internals.<l>{{states}}</l>.<l>{{DOMTokenList/add}}</l>("complete");
+// If this has no states other than _readyState, the following also works in
+// addition to remove() and add().
+// this._internals.<l>{{states}}</l> = "complete";
+</pre>
+</div>
+
+## Non-attribute <code>DOMTokenList</code> ## {#sec-non-attribute-domtokenlist}
+
+This section defines a variant of {{DOMTokenList}}, called
+<dfn>non-attribute <code>DOMTokenList</code></dfn>. It is defined by [[DOM]] as
+if following edits were applied to the definition of {{DOMTokenList}}.
+
+- <p>Replace this paragraph:</p>
+    <blockquote cite="https://dom.spec.whatwg.org/#domtokenlist">
+    <p>A {{DOMTokenList}} object also has an associated element and an
+    attribute’s local name.</p>
+    </blockquote>
+    <p>with:</p>
+    <blockquote>
+    <p>A {{DOMTokenList}} object also has an associated element and an optional
+    attribute’s local name. If the {{DOMTokenList}} object has an attribute's
+    local name, then it is known as an
+    <strong>attribute-associated <code>DOMTokenList</code></strong>; otherwise
+    it is a <a>non-attribute <code>DOMTokenList</code></a>.</p>
+    </blockquote>
+
+- <p>Replace this paragraph:</p>
+    <blockquote cite="https://dom.spec.whatwg.org/#domtokenlist">
+    <p>A {{DOMTokenList}} object’s
+    <a href="https://dom.spec.whatwg.org/#concept-dtl-update">update steps</a>
+    are:</p>
+    <ol>
+     <li>If the associated element does not have an associated attribute and
+     token set is empty, then return.</li>
+     <li>Set an attribute value for the associated element using associated
+     attribute’s local name and the result of running the ordered set serializer
+     for token set.</li>
+    </ol>
+    </blockquote>
+    <p>with:</p>
+    <blockquote>
+    <p>A {{DOMTokenList}} object’s update steps are:</p>
+    <ol>
+     <li>If the object has no attribute's local name, then return.</li>
+     <li>If the associated element does not have an associated attribute and
+     token set is empty, then return.</li>
+     <li>Set an attribute value for the associated element using associated
+     attribute’s local name and the result of running the ordered set serializer
+     for token set.</li>
+    </ol>
+    </blockquote>
+
+- <p>Replace this paragraph:</p>
+    <blockquote cite="https://dom.spec.whatwg.org/#domtokenlist">
+    <p>A {{DOMTokenList}} object’s
+    <a href="https://dom.spec.whatwg.org/#concept-dtl-serialize">serialize steps</a>
+    are to return the result of running get an attribute value given the
+    associated element and the associated attribute’s local name.</p>
+    </blockquote>
+    <p>with:</p>
+    <blockquote>
+    <p>A {{DOMTokenList}} object’s serialize steps
+    are to return the result of running get an attribute value given the
+    associated element and the associated attribute’s local name if the object
+    has attribute's local name. Otherwise, return the result of running the
+    <a>ordered set serializer</a> for <a>token set</a>.</p>
+    </blockquote>
+
+- <p>Replace this paragraph:</p>
+    <blockquote cite="https://dom.spec.whatwg.org/#domtokenlist">
+    <p>A {{DOMTokenList}} object has these attribute change steps for its
+    associated element:</p>
+    <ol>
+     <li>If localName is associated attribute’s local name, namespace is null,
+     and value is null, then empty token set.</li>
+     <li>Otherwise, if localName is associated attribute’s local name, namespace
+     is null, then set token set to value, parsed.</li>
+    </ol>
+    </blockquote>
+    <p>with:</p>
+    <blockquote>
+    <p>A {{DOMTokenList}} object has these attribute change steps for its
+    associated element:</p>
+    <ol>
+     <li>If the object has no attribute's local name, then return.</li>
+     <li>If localName is associated attribute’s local name, namespace is null,
+     and value is null, then empty token set.</li>
+     <li>Otherwise, if localName is associated attribute’s local name, namespace
+     is null, then set token set to value, parsed.</li>
+    </ol>
+    </blockquote>
+
+- <p>Replace this paragraph:</p>
+    <blockquote cite="https://dom.spec.whatwg.org/#domtokenlist">
+    <p>Setting the value attribute must set an attribute value for the
+    associated element using associated attribute’s local name and the given
+    value.</p>
+    </blockquote>
+    <p>with:</p>
+    <blockquote>
+    <p>Setting the value attribute must set an attribute value for the
+    associated element using associated attribute’s local name and the given
+    value if this has attribute's local name. Otherwise, it must set
+    <a>token set</a> to the given value, <a lt="ordered set parser">parsed</a>.
+    </p>
+    </blockquote>
+
+
+Selecting a custom element with a speicfic state {#selecting}
+============================
+
+The <dfn selector>:state()</dfn> [=pseudo-class=] applies while an element has a
+certain state. "State" is a per-element information which can change over time
+depending on user interaction and other extrinsic factors.
+The '':state()'' [=pseudo-classs=] must have one <<ident>> argument, otherwise
+the selector is invalid.
+<!-- The above paragraph is independent from document languages. -->
+
+The '':state()'' [=pseudo-class=] must match any element that is an
+<a>autonomous custom element</a> and whose [=states token list=]
+<a for="list">contains</a> the specified <<ident>>.
+<!-- The above paragraph depends on HTML as a document language. -->
+
+<div class="example" id="ex-selector-logic">
+'':state()'' takes just one argument, and an element can expose multiple states.
+Authors can use '':state()'' with logical [=pseudo-classes=] like
+''x-foo:is(:state(state1), :state(state2))'', ''x-foo:not(:state(state2))'',
+and ''x-foo:state(state1):state(state2)''.
+</div>

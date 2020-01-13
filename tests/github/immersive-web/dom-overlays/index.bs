@@ -1,0 +1,342 @@
+<pre class="metadata">
+Shortname: webxr-dom-overlays
+Title: WebXR DOM Overlays Module
+Group: immersivewebwg
+Status: CG-DRAFT
+ED: https://immersive-web.github.io/dom-overlays/
+Repository: immersive-web/dom-overlays
+Level: 1
+Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web/
+
+!Participate: <a href="https://github.com/immersive-web/dom-overlays/issues/new">File an issue</a> (<a href="https://github.com/immersive-web/dom-overlays/issues">open issues</a>)
+!Participate: <a href="https://lists.w3.org/Archives/Public/public-immersive-web/">Mailing list archive</a>
+!Participate: <a href="irc://irc.w3.org:6665/">W3C's #immersive-web IRC</a>
+
+Editor: Klaus Weidner 113597, Google http://google.com/, klausw@google.com
+
+Abstract: The WebXR Augmented Reality module expands the <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a> with the functionality available on AR hardware.
+
+Warning: custom
+Custom Warning Title: Unstable API
+Custom Warning Text:
+  <b>The API represented in this document is under development and may change at any time.</b>
+  <p>For additional context on the use of this API please reference the <a href="https://github.com/immersive-web/dom-overlays/blob/master/explainer.md">WebXR DOM Overlays Module Explainer</a>.</p>
+</pre>
+
+<pre class="link-defaults">
+spec:infra;
+    type:dfn; text:string
+spec: webxr-1;
+    type: dfn; text: add input source
+    type: dfn; text: capable of supporting
+    type: dfn; text: feature descriptor
+    type: dfn; text: fire an input source event
+    type: dfn; text: immersive session
+    type: dfn; text: list of active xr input sources
+    type: dfn; text: populate the pose
+    type: dfn; text: poses must be limited
+    type: dfn; text: primary action
+    type: dfn; text: screen
+    type: dfn; text: transient input source
+    type: dfn; text: transient action
+    type: dfn; text: auxiliary action
+    type: dfn; text: xr input source
+    type: event; text: select
+</pre>
+
+<pre class="anchors">
+spec: dom; urlPrefix: https://dom.spec.whatwg.org/#
+    type:dfn; text:fire an event; url: concept-event-fire
+spec: ui-events; urlPrefix: https://w3c.github.io/uievents/#
+    type:dfn; text:topmost event target; url: topmost-event-target
+spec:html; urlPrefix: https://html.spec.whatwg.org/multipage/
+    type:method; for:Window; text:requestAnimationFrame(callback); url: imagebitmap-and-animations.html#dom-animationframeprovider-requestanimationframe
+    type: dfn; text: rendering opportunity; url: webappapis.html#rendering-opportunity
+</pre>
+
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+
+<style>
+  .unstable::before {
+    content: "This section is not stable";
+    display: block;
+    font-weight: bold;
+    text-align: right;
+    color: red;
+  }
+  .unstable {
+    border: thin solid pink;
+    border-radius: .5em;
+    padding: .5em;
+    margin: .5em calc(-0.5em - 1px);
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
+    background-repeat: repeat;
+    background-color: #FFF4F4;
+  }
+  .unstable h3:first-of-type {
+    margin-top: 0.5rem;
+  }
+
+  .unstable.example:not(.no-marker)::before {
+    content: "Example " counter(example) " (Unstable)";
+    float: none;
+  }
+
+  .non-normative::before {
+    content: "This section is non-normative.";
+    font-style: italic;
+  }
+  .tg {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+  .tg th {
+    border-style: solid;
+    border-width: 1px;
+    background: #90b8de;
+    color: #fff;
+    font-family: sans-serif;
+    font-weight: bold;
+    border-color: grey;
+  }
+  .tg td {
+    padding: 4px 5px;
+    background-color: rgb(221, 238, 255);
+    font-family: monospace;
+    border-style: solid;
+    border-width: 1px;
+    border-color: grey;
+    overflow: hidden;
+    word-break: normal;
+  }
+</style>
+
+Introduction {#intro}
+============
+
+<section class="non-normative">
+
+This module describes a mechanism for showing interactive 2D web content during an immersive WebXR session. When the feature is enabled, the user agent will display the content of a single DOM element as a transparent-background 2D rectangle.
+
+</section>
+
+Overview {#overview}
+--------
+
+<section class="non-normative">
+
+While the DOM overlay is active, the UA enables user interactions with the DOM overlay's content using platform-appropriate mechanisms. For example, when using XR controllers, the [=primary action=] dispatches DOM pointer events and click events at the location where the controller's pointing ray intersects the DOM overlay.
+
+A new [=beforexrselect=] event provides a way to suppress XR input events for specific regions of the DOM overlay and helps applications distinguish DOM UI interactions from XR world interactions.
+
+</section>
+
+
+HTML API Integration {#html-api-integration}
+==============
+
+This module adds a new event type to the definition of {{GlobalEventHandlers}}.
+
+onbeforexrselect {#onbeforexrselect}
+-------------
+
+An {{XRSessionEvent}} of type <dfn>beforexrselect</dfn> is dispatched on the DOM overlay element before generating a WebXR {{XRSession/selectstart}} input event if the input source's {{XRInputSource/targetRaySpace}} intersects the DOM overlay element at the time the input device's [=primary action=] is triggered.
+
+<pre class="idl">
+partial interface mixin GlobalEventHandlers {
+  attribute EventHandler onbeforexrselect;
+};
+</pre>
+
+This event is an {{XRSessionEvent}} with type [=beforexrselect=] that bubbles, is cancelable, and is composed. Its {{Event/target}} element is the [=topmost event target=] being intersected by the {{XRInputSource/targetRaySpace}} and is either a descendant of the DOM overlay element or the DOM overlay element itself.
+
+Cancelling this event by calling {{Event/preventDefault()}} suppresses default WebXR input events that would normally be generated by the input source for this [=primary action=]. The {{XRSession/selectstart}}, {{XRSession/selectend}}, and {{XRSession/select}} events will not be fired for this interaction sequence.
+
+Note: Future WebXR modules MAY define additional events or WebXR input dependent data that are affected by cancelling this event, for example suppressing results from a transient input source's hit test subscription.
+
+This event and the actions taken by the event handler have no effect on DOM event processing, and are not synchronized with DOM event dispatch. The user's action will separately generate appropriate DOM events such as `"pointerdown"`, and those DOM events can happen before or after the corresponding [=beforexrselect=] event. This happens regardless of whether the [=beforexrselect=] event was cancelled or not, and is independent of any further actions taken in XR input event handlers.
+
+Note: This event provides a way for applications to suppress duplicate XR input events while the user is interacting with a DOM UI. Since this is a bubbling event, the application can register handlers on appropriate container elements, effectively marking regions of the DOM overlay as blocking XR input. This is independent of the visual opacity of DOM elements. It is possible to show noninteractive opaque or translucent DOM content such as text explanations that don't block XR input events.
+
+<div class="example">
+The following code installs an event handler on an interactive part of the DOM overlay to selectively suppress XR events for that region, while continuing to generate XR events for other parts of the DOM overlay that are treated as transparent for interaction purposes.
+
+<pre highlight="js">
+document.getElementById('button-container').addEventListener(
+  'beforexrselect', ev => ev.preventDefault());
+</pre>
+</div>
+
+WebXR Device API Integration {#webxr-device-api-integration}
+==============
+
+This module expands the definitions of {{XRSessionInit}} and {{XRSession}}, and modifies the behavior of {{XRInputSource}} events.
+
+XRSessionInit {#xrsessioninit}
+-------------
+
+This module introduces the string <dfn for="feature descriptor">dom-overlay</dfn> as a new valid [=feature descriptor=] for use in the {{XRSessionInit/requiredFeatures}} or {{XRSessionInit/optionalFeatures}} sequences for [=immersive sessions=].
+
+A device is [=capable of supporting=] the DOM overlay feature if it provides a way for the user to see and interact with DOM content for the duration of the immersive session.
+
+NOTE: Implementation choices include a fullscreen overlay on a handheld AR device, or a floating rectangle in space for a VR or AR headset.
+
+The DOM content MUST be composited as if it were the topmost content layer. It MUST NOT be occluded by content from the {{XRWebGLLayer}} or by images from a passthrough camera for an AR device.  Applications can use normal CSS rules to control transparency and 2D placement of content within the DOM overlay itself.
+
+The DOM overlay MUST be automatically visible to the user from the start of the session, without requiring the user to press buttons or take other manual actions to make it visible.
+
+NOTE: A device should not claim to support a DOM overlay if the content element is only indirectly visible, for example if the user would need to take off their headset or manually enable a passthrough camera to view content on a separate 2D monitor that's not normally visible during the session. However, an immersive CAVE system where a user is carrying a physical touchscreen device showing the DOM overlay content would be a valid implementation.
+ 
+The XRSessionInit dictionary is expanded by adding a new {{XRSessionInit/domOverlay}} member. This is an optional member of {{XRSessionInit}}, but it MUST be specified when using the DOM overlay feature since there is no default overlay element.
+
+<pre class="idl">
+partial dictionary XRSessionInit {
+  XRDOMOverlayInit? domOverlay;
+};
+</pre>
+
+If the DOM overlay feature is a required feature but the application did not supply a {{XRSessionInit/domOverlay}} member, the UA MUST treat this as an unresolved required feature and reject the {{XR/requestSession()}} promise with a {{NotSupportedError}}. If it was requested as an optional feature, the UA MUST ignore the feature request and not enable a DOM overlay.
+
+NOTE: The UA MAY emit local warnings such as developer console messages explaining why the DOM overlay was not enabled.
+
+XRSession {#xrsession}
+-------------
+
+This module extends the XRSession interface to add a new readonly attribute which reflects the current state of the active DOM overlay element.
+
+<pre class="idl">
+partial interface XRSession {
+  readonly attribute XRDOMOverlayState? domOverlayState;
+};
+</pre>
+
+The <dfn attribute for="XRSession">domOverlayState</dfn> attribute MUST be null if the [=dom-overlay=] feature is not supported or not enabled.
+
+If the feature is enabled, the attribute value MUST be present.
+
+NOTE: Applications can check the presence {{XRSession/domOverlayState}} to verify that the DOM overlay feature is enabled and working, for example if it was requested as an optional feature.
+
+NOTE: The DOM overlay may be temporarily invisible to the user, for example if the user agent places it at a fixed orientation or location where it may end up outside the user's field of view after user movement. The {{XRSession/domOverlayState}} attribute still remains set while this is happening.
+
+While the session is active with a visible DOM overlay, the UA MUST treat this as [=rendering opportunity=] and execute {{Window}} {{Window/requestAnimationFrame()}} callbacks at a rate suitable for animating DOM content. These MAY run at different times and frequencies than {{XRSession/requestAnimationFrame()}} callbacks as used for drawing {{XRWebGLLayer}} content.
+
+XRInputSource {#xrinputsource}
+----------------
+
+When an {{XRInputSource}} begins the platform-specific action corresponding as its [=primary action=] the UA MUST run the following steps before starting input processing to decide if this is treated as a [=primary action=]:
+
+<div class="algorithm" data-algorithm="on-before-input-start">
+
+  1. If the input source's {{XRInputSource/targetRaySpace}} intersects the DOM overlay at the time the input device's [=primary action=] is triggered:
+    1. [=Queue a task=] to [=fire an event|fire=] an {{XRSessionEvent}} named [=beforexrselect=] on the [=topmost event target=] within the DOM overlay {{XRDOMOverlayInit/root}} being intersected by the {{XRInputSource/targetRaySpace}}, setting {{Event/target}} to that element. This events bubbles, is cancelable, and is composed.
+    1. Check how XR input should be handled as follows:
+        <dl class="switch">
+          <dt>If the event was cancelled</dt>
+          <dd>
+            1. If the input source is a [=transient input source=], treat this as an [=auxiliary action=]. Otherwise, ignore this action for the purpose of generating XR input events.
+          </dd>
+          <dt>Otherwise</dt>
+          <dd>Treat the action as a [=primary action=] as usual for the input source.</dd>
+        </dl>
+
+</div>
+
+NOTE: Effectively, cancelling the [=beforexrselect=] event suppresses XR input select events, none of {{XRSession/selectstart}}, {{XRSession/selectend}}, or {{XRSession/select}} are generated for this action. For transient input sources, {{XRSession/inputsourceschange}} events are still generated, but cancelling the [=beforexrselect=] event causes the action to be treated as an [=auxiliary action=], similar to a secondary finger input.
+
+Initialization {#initialization}
+==============
+
+The application MUST provide configuration for the DOM overlay through the {{XRSessionInit/domOverlay}} dictionary.
+
+<pre class="idl">
+dictionary XRDOMOverlayInit {
+  required Element root;
+};
+</pre>
+
+The <dfn dict-member for="XRDOMOverlayInit">root</dfn> attribute specifies the DOM element that will be displayed to the user as the content of the DOM overlay. This is a required attribute, there is no default.
+
+<div class="example">
+The following code requests DOM overlay as an optional feature.
+
+<pre highlight="js">
+let uiElement = document.getElementById('ui');
+navigator.xr.requestSession('immersive-ar', {
+    optionalFeatures: ['dom-overlay'],
+    domOverlay: { root: uiElement } }).then((session) => {
+    // session.domOverlayState.type is now set if supported,
+    // or is null if the feature is not supported.
+  }
+}
+</pre>
+</div>
+
+While active, the DOM overlay element is automatically resized to fill the dimensions of the UA-provided DOM overlay rectangle. Its background color is automatically styled as transparent for the duration of the session.
+
+NOTE: A UA MAY use the [[FULLSCREEN#user-agent-level-style-sheet-defaults]] to style the DOM overlay element, with an additional rule containing <code>background-color: rgba(0,0,0,0) !important;</code> to set the background transparent.
+
+Once the session is active, the {{XRSession/domOverlayState}} attribute provides information about the DOM overlay.
+
+<pre class="idl">
+enum XRDOMOverlayType {
+  "screen",
+  "floating"
+};
+
+dictionary XRDOMOverlayState {
+  XRDOMOverlayType type; 
+};
+</pre>
+
+  - An overlay type of <dfn enum-value for="XRDOMOverlayType">screen</dfn> indicates that the DOM overlay element covers the entire physical screen for a screen-based device, for example handheld AR. Its visual extent MUST match the visual extent of the {{XRViewport}}(s) used for {{XRWebGLLayer}} rendering. For a monoscopic display, this is a single viewport. A steroscopic display screen would provide two viewports, in that case the DOM overlay MUST be rendered at the Z position matching the physical screen location, appearing identically in both eye views.
+
+  - An overlay type of <dfn enum-value for="XRDOMOverlayType">floating</dfn> indicates that the DOM overlay appears as a floating rectangle in space. The initial location of this rectangle in world space is up to the UA, and the UA MAY move it during the session to keep it in view, or support user-initiated manual placement.
+
+NOTE: Future versions of this spec may add additional attributes to the overlay state, for example the current location in world space for a floating overlay, or additional modes such as head-locked.
+
+
+Event handling for cross-origin content {#cross-origin-content-events}
+==============
+
+The user agent MUST NOT provide poses or gamepad input state for user interactions with cross-origin content such as an {{HTMLIFrameElement}} nested within the DOM overlay element.
+
+A user agent MAY meet this requirement by preventing user interactions with
+cross-origin content, for example by blocking DOM events that would normally be
+received by that content, or by not loading and displaying cross-origin content at
+all.
+
+If the user agent supports interactions with cross-origin content in the DOM overlay, and if an input source's {{XRInputSource/targetRaySpace}} intersects cross-origin content as the [=topmost event target=], the UA MUST enable [[WEBXR#limiting-header]] data adjustment, and [=populate the pose=] for {{XRSpace}}s associated with that input source accordingly treating the <code>limit</code> boolean as true. In addition, the UA MUST NOT update gamepad data for this input source while poses are limited.
+
+NOTE: The application does not receive pose updates for the controller or its targeting ray while poses are limited in this way. The UA is responsible for drawing a pointer ray or other appropriate visualization as needed to enable interactions.
+
+NOTE: the restriction on updating gamepad data is intended to avoid information leakage from interactions with the cross-origin content to the application. For example, if an input source's [=primary action=] uses an analog trigger where the primary action happens at a certain trigger threshold, the application could infer when the user started and ended a primary action from the trigger value even if the corresponding events are blocked. Another example would be a device that uses a trackpad or joystick for text input in DOM content, where reading the axis values would allow the application to infer what text was being entered.
+
+If a [=primary action=] ends inside cross-origin content, the UA MUST treat the [=primary action=] as cancelled, and MUST NOT send a {{select}} event. The UA MUST send the {{selectend}} event using the last available pose before entering the cross-origin content due to treating poses as limited.
+
+If the input is a [=transient input source=], and if the [=transient action=] begins inside cross-origin content, the user agent MUST delay [=add input source|adding the input source=] until the input location moves out of the cross-origin content. If the [=transient action=] ends while still inside the cross-origin content, the transient input source does not get added at all.
+
+NOTE: On a handheld AR device using {{screen}}-mode input, this means that touches that stay inside cross-origin content don't create an input source or associated XR input events. If a drag movement starts inside cross-origin content, the input source is created at the location where the touch location leaves the cross-origin content, emitting a cancelable [=beforexrselect=] event as usual.
+
+Security, Privacy, and Comfort Considerations {#security}
+=============================================
+
+Protected functionality {#protected-functionality}
+-----------------------
+
+The DOM overlay does not in itself introduce any new sensitive information. However, since it combines existing technologies, it's important to ensure that this combination does not lead to any unexpected interactions.
+
+A primary design goal for this module was that the DOM overlay should follow existing semantics for 2D content where possible. Specifically, the information flows related to cross-origin embedded content should be similar to using iframes on a 2D page. For example, a 2D page can embed cross-origin content in an iframe, and then cover this iframe with a transparent element. In that case, the page will continue to receive mouse movement information, but the cross-origin content does not receive any input events in the covered area. For a DOM overlay, XR input event data is treated as similar to mouse movement data. Poses remain available to the outer page if there is no cross-origin content, or if the cross-origin content is not receiving input, but are limited (blocked) when interacting with cross-origin content.
+
+Cross-origin content is potentially vulnerable to <a href="https://www.w3.org/Security/wiki/Clickjacking_Threats">clickjacking threats</a>. The UA MUST continue to apply mitigations such as [[CSP#directive-frame-src]] when iframes are used in a DOM overlay. The UA MAY implement additional restrictions specifically for cross-origin content in a DOM overlay if necessary to address specific threats.
+
+
+Acknowledgements {#ack}
+================
+
+The following individuals have contributed to the design of the WebXR DOM Overlay specification:
+
+  * <a href="mailto:bajones@google.com">Brandon Jones</a> (Google)
+  * <a href="mailto:nhw@amazon.com">Nell Waliczek</a> (Amazon [Microsoft until 2018])
+
+</section>

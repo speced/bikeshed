@@ -1143,10 +1143,11 @@ dictionary TextDecodeOptions {
   boolean stream = false;
 };
 
-[Constructor(optional DOMString label = "utf-8", optional TextDecoderOptions options = {}),
- Exposed=(Window,Worker)]
+[Exposed=(Window,Worker)]
 interface TextDecoder {
-  USVString decode(optional BufferSource input, optional TextDecodeOptions options = {});
+  constructor(optional DOMString label = "utf-8", optional TextDecoderOptions options = {});
+
+  USVString decode(optional [AllowShared] BufferSource input, optional TextDecodeOptions options = {});
 };
 TextDecoder includes TextDecoderCommon;
 </pre>
@@ -1239,6 +1240,11 @@ method, when invoked, must run these steps:
   avoids this copy. When doing so they will have to make sure that changes to <var>input</var> do
   not affect future calls to <a method><code>decode()</code></a>.
 
+  <p class=warning id=sharedarraybuffer-warning>The memory exposed by <code>SharedArrayBuffer</code>
+  objects does not adhere to data race freedom properties required by the memory model of
+  programming languages typically used for implementations. When implementing, take care to use the
+  appropriate facilities when accessing memory exposed by <code>SharedArrayBuffer</code> objects.
+
  <li><p>Let <var>output</var> be a new <a for=/>stream</a>.
 
  <li>
@@ -1297,11 +1303,12 @@ dictionary TextEncoderEncodeIntoResult {
   unsigned long long written;
 };
 
-[Constructor,
- Exposed=(Window,Worker)]
+[Exposed=(Window,Worker)]
 interface TextEncoder {
+  constructor();
+
   [NewObject] Uint8Array encode(optional USVString input = "");
-  TextEncoderEncodeIntoResult encodeInto(USVString source, Uint8Array destination);
+  TextEncoderEncodeIntoResult encodeInto(USVString source, [AllowShared] Uint8Array destination);
 };
 TextEncoder includes TextEncoderCommon;
 </pre>
@@ -1407,8 +1414,13 @@ method, when invoked, must run these steps:
 
        <li><p>Otherwise, increment <var>read</var> by 1.
 
-       <li><p>Write the bytes in <var>result</var> into <var>destinationBytes</var>, from byte
-       offset <var>written</var>.
+       <li>
+        <p>Write the bytes in <var>result</var> into <var>destinationBytes</var>, from byte offset
+        <var>written</var>.
+
+        <p class=warning>See the
+        <a href=#sharedarraybuffer-warning>warning for <code>SharedArrayBuffer</code> objects</a>
+        above.
 
        <li><p>Increment <var>written</var> by the number of bytes in <var>result</var>.
       </ol>
@@ -1477,9 +1489,9 @@ when invoked, must return this object's <a for=GenericTransformStream>transform<
 <h3 id=interface-textdecoderstream>Interface {{TextDecoderStream}}</h3>
 
 <pre class=idl>
-[Constructor(optional DOMString label = "utf-8", optional TextDecoderOptions options),
- Exposed=(Window,Worker)]
+[Exposed=(Window,Worker)]
 interface TextDecoderStream {
+  constructor(optional DOMString label = "utf-8", optional TextDecoderOptions options = {});
 };
 TextDecoderStream includes TextDecoderCommon;
 TextDecoderStream includes GenericTransformStream;
@@ -1516,9 +1528,10 @@ TextDecoderStream includes GenericTransformStream;
 
  <dt><code><var>decoder</var> . <a attribute for=GenericTransformStream>writable</a></code>
  <dd>
-  <p>Returns a <a>writable stream</a> which accepts {{BufferSource}} chunks and runs them through
-  <a for=TextDecoderCommon>encoding</a>'s <a for=/>decoder</a> before making them available to
-  {{GenericTransformStream/readable}}.
+  <p>Returns a <a>writable stream</a> which accepts
+  <code>[<a extended-attribute>AllowShared</a>] <a typedef>BufferSource</a></code> chunks and runs
+  them through <a for=TextDecoderCommon>encoding</a>'s <a for=/>decoder</a> before making them
+  available to {{GenericTransformStream/readable}}.
 
   <p>Typically this will be used via the {{ReadableStream/pipeThrough()}} method on a
   {{ReadableStream}} source.
@@ -1582,12 +1595,17 @@ byteReadable
 
 <ol>
  <li><p>Let <var>bufferSource</var> be the result of
- <a lt="converted to an IDL value">converting</a> <var>chunk</var> to a {{BufferSource}}. If this
- throws an exception, then return a promise rejected with that exception.
+ <a lt="converted to an IDL value">converting</a> <var>chunk</var> to an
+ <code>[<a extended-attribute>AllowShared</a>] <a typedef>BufferSource</a></code>. If this throws an
+ exception, then return a promise rejected with that exception.
 
- <li><p><a>Push</a> a <a lt="get a copy of the buffer source">copy of</a> <var>bufferSource</var> to
- <var>dec</var>'s <a for=TextDecoderStream>stream</a>. If this throws an exception, then return a
- promise rejected with that exception.
+ <li>
+  <p><a>Push</a> a <a lt="get a copy of the buffer source">copy of</a> <var>bufferSource</var> to
+  <var>dec</var>'s <a for=TextDecoderStream>stream</a>. If this throws an exception, then return a
+  promise rejected with that exception.
+
+  <p class=warning>See the
+  <a href=#sharedarraybuffer-warning>warning for <code>SharedArrayBuffer</code> objects</a> above.
 
  <li><p>Let <var>controller</var> be <var>dec</var>'s
  <a for=GenericTransformStream>transform</a>.\[[transformStreamController]].
@@ -1657,9 +1675,9 @@ byteReadable
 <h3 id=interface-textencoderstream>Interface {{TextEncoderStream}}</h3>
 
 <pre class=idl>
-[Constructor,
- Exposed=(Window,Worker)]
+[Exposed=(Window,Worker)]
 interface TextEncoderStream {
+  constructor();
 };
 TextEncoderStream includes TextEncoderCommon;
 TextEncoderStream includes GenericTransformStream;
@@ -3264,6 +3282,7 @@ Aneesh Agrawal,
 Arkadiusz Michalski,
 Asmus Freytag,
 Ben Noordhuis,
+Bnaya Peretz,
 Boris Zbarsky,
 Bruno Haible,
 Cameron McCormack,

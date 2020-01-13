@@ -11,7 +11,7 @@ Opaque Elements: emu-alg
 </pre>
 
 <pre class=link-defaults>
-spec:promises-guide; type:dfn;
+spec:webidl; type:dfn;
     text:resolve
 </pre>
 
@@ -172,8 +172,8 @@ properly entangled. It wraps a <dfn>transformer</dfn>, which defines algorithms 
 performed. For web developer–created streams, the implementation details of a transformer are provided by <a
 href="#transformer-api">an object with certain methods and properties</a> that is passed to the {{TransformStream()}} constructor.
 
-An <dfn>identity transform stream</dfn> is a type of transform stream which forwards all <a>chunks</a> written to its
-<a>writable side</a> to its <a>readable side</a>, without any changes. This can be useful in <a
+An <dfn export>identity transform stream</dfn> is a type of transform stream which forwards all <a>chunks</a> written
+to its <a>writable side</a> to its <a>readable side</a>, without any changes. This can be useful in <a
 href="#example-transform-identity">a variety of scenarios</a>. By default, the {{TransformStream}} constructor will
 create an identity transform stream, when no {{transformer/transform()}} method is present on the <a>transformer</a>
 object.
@@ -863,8 +863,8 @@ prototype, are created with the internal slots described in the following table:
   1. If ! IsReadableStreamAsyncIterator(*this*) is *false*, return <a>a promise rejected with</a> a *TypeError* exception.
   1. Let _reader_ be *this*.[[asyncIteratorReader]].
   1. If _reader_.[[ownerReadableStream]] is *undefined*, return <a>a promise rejected with</a> a *TypeError* exception.
-  1. Return the result of <a>transforming</a> ! ReadableStreamDefaultReaderRead(_reader_) with a fulfillment handler
-     which takes the argument _result_ and performs the following steps:
+  1. Return the result of <a>reacting</a> to ! ReadableStreamDefaultReaderRead(_reader_) with the following fulfillment
+     steps given the argument _result_:
     1. Assert: Type(_result_) is Object.
     1. Let _done_ be ! Get(_result_, `"done"`).
     1. Assert: Type(_done_) is Boolean.
@@ -884,7 +884,7 @@ for="ReadableStreamAsyncIteratorPrototype">return( <var>value</var> )</h4>
   1. If *this*.[[preventCancel]] is *false*, then:
     1. Let _result_ be ! ReadableStreamReaderGenericCancel(_reader_, _value_).
     1. Perform ! ReadableStreamReaderGenericRelease(_reader_).
-    1. Return the result of <a>transforming</a> _result_ by a fulfillment handler that returns !
+    1. Return the result of <a>reacting</a> to _result_ with a fulfillment step that returns !
     ReadableStreamCreateReadResult(_value_, *true*, *true*).
   1. Perform ! ReadableStreamReaderGenericRelease(_reader_).
   1. Return <a>a promise resolved with</a> ! ReadableStreamCreateReadResult(_value_, *true*, *true*).
@@ -1058,8 +1058,8 @@ noticeable asymmetry between the two branches, and limits the possible <a>chunks
   1. Let _pullAlgorithm_ be the following steps:
     1. If _reading_ is *true*, return <a>a promise resolved with</a> *undefined*.
     1. Set _reading_ to *true*.
-    1. Let _readPromise_ be the result of <a>transforming</a> ! ReadableStreamDefaultReaderRead(_reader_) with a
-       fulfillment handler which takes the argument _result_ and performs the following steps:
+    1. Let _readPromise_ be the result of <a>reacting</a> to ! ReadableStreamDefaultReaderRead(_reader_) with the
+       following fulfillment steps given the argument _result_:
       1. Set _reading_ to *false*.
       1. Assert: Type(_result_) is Object.
       1. Let _done_ be ! Get(_result_, `"done"`).
@@ -1122,6 +1122,7 @@ noticeable asymmetry between the two branches, and limits the possible <a>chunks
      discretion.
   1. Otherwise, let _reader_ be ! AcquireReadableStreamDefaultReader(_source_).
   1. Let _writer_ be ! AcquireWritableStreamDefaultWriter(_dest_).
+  1. Set _source_.[[disturbed]] to *true*.
   1. Let _shuttingDown_ be *false*.
   1. Let _promise_ be <a>a new promise</a>.
   1. If _signal_ is not *undefined*,
@@ -1129,13 +1130,13 @@ noticeable asymmetry between the two branches, and limits the possible <a>chunks
       1. Let _error_ be a new "`<a idl>AbortError</a>`" `<a idl>DOMException</a>`.
       1. Let _actions_ be an empty <a>ordered set</a>.
       1. If _preventAbort_ is *false*, <a for="set">append</a> the following action to _actions_:
-        1. If _dest_.[[_state_]] is `"writable"`, return ! WritableStreamAbort(_dest_, _error_).
+        1. If _dest_.[[state]] is `"writable"`, return ! WritableStreamAbort(_dest_, _error_).
         1. Otherwise, return <a>a promise resolved with</a> *undefined*.
       1. If _preventCancel_ is *false*, <a for="set">append</a> the following action action to _actions_:
-        1. If _source_.[[_state_]] is `"readable"`, return ! ReadableStreamCancel(_source_, _error_).
+        1. If _source_.[[state]] is `"readable"`, return ! ReadableStreamCancel(_source_, _error_).
         1. Otherwise, return <a>a promise resolved with</a> *undefined*.
-      1. <a href="#rs-pipeTo-shutdown-with-action">Shutdown with an action</a> consisting of <a>waiting for all</a>
-         of the actions in _actions_, and with _error_.
+      1. <a href="#rs-pipeTo-shutdown-with-action">Shutdown with an action</a> consisting of
+         <a>getting a promise to wait for all</a> of the actions in _actions_, and with _error_.
     1. If _signal_'s <a for=AbortSignal>aborted flag</a> is set, perform _abortAlgorithm_ and return _promise_.
     1. <a for="AbortSignal">Add</a> _abortAlgorithm_ to _signal_.
   1. <a>In parallel</a> <span class="XXX">but not really; see <a
@@ -1281,7 +1282,7 @@ nothrow>ReadableStreamAddReadIntoRequest ( <var>stream</var> )</h4>
   1. If _stream_.[[state]] is `"errored"`, return <a>a promise rejected with</a> _stream_.[[storedError]].
   1. Perform ! ReadableStreamClose(_stream_).
   1. Let _sourceCancelPromise_ be ! _stream_.[[readableStreamController]].<a abstract-op>[[CancelSteps]]</a>(_reason_).
-  1. Return the result of <a>transforming</a> _sourceCancelPromise_ with a fulfillment handler that returns *undefined*.
+  1. Return the result of <a>reacting</a> to _sourceCancelPromise_ with a fulfillment step that returns *undefined*.
 </emu-alg>
 
 <h4 id="readable-stream-close" aoid="ReadableStreamClose" nothrow>ReadableStreamClose ( <var>stream</var> )</h4>
@@ -3171,6 +3172,7 @@ like
     get <a href="#ws-locked">locked</a>()
 
     <a href="#ws-abort">abort</a>(reason)
+    <a href="#ws-close">close</a>()
     <a href="#ws-get-writer">getWriter</a>()
   }
 </code></pre>
@@ -3385,6 +3387,25 @@ bridging the gap with non-promise-based APIs, as seen for example in [[#example-
   1. Return ! WritableStreamAbort(*this*, _reason_).
 </emu-alg>
 
+<h5 id="ws-close" method for="WritableStream">close()</h5>
+
+<div class="note">
+  The <code>close</code> method closes the stream. The <a>underlying sink</a> will finish processing any
+  previously-written <a>chunks</a>, before invoking its close behavior. During this time any further attempts to write
+  will fail (without erroring the stream).
+
+  The method returns a promise that is fulfilled with <emu-val>undefined</emu-val> if all remaining <a>chunks</a> are
+  successfully written and the stream successfully closes, or rejects if an error is encountered during this process.
+</div>
+
+<emu-alg>
+  1. If ! IsWritableStream(*this*) is *false*, return <a>a promise rejected with</a> a *TypeError* exception.
+  1. If ! IsWritableStreamLocked(*this*) is *true*, return <a>a promise rejected with</a> a *TypeError* exception.
+  1. If ! WritableStreamCloseQueuedOrInFlight(*this*) is *true*, return <a>a promise rejected with</a> a *TypeError*
+  exception.
+  1. Return ! WritableStreamClose(*this*).
+</emu-alg>
+
 <h5 id="ws-get-writer" method for="WritableStream">getWriter()</h5>
 
 <div class="note">
@@ -3487,6 +3508,22 @@ writable stream is <a>locked to a writer</a>.
   1. Set _stream_.[[pendingAbortRequest]] to Record {[[promise]]: _promise_, [[reason]]: _reason_,
      [[wasAlreadyErroring]]: _wasAlreadyErroring_}.
   1. If _wasAlreadyErroring_ is *false*, perform ! WritableStreamStartErroring(_stream_, _reason_).
+  1. Return _promise_.
+</emu-alg>
+
+<h4 id="writable-stream-close" aoid="WritableStreamClose" nothrow>WritableStreamClose ( <var>stream</var> )</h4>
+
+<emu-alg>
+  1. Let _state_ be _stream_.[[state]].
+  1. If _state_ is `"closed"` or `"errored"`, return <a>a promise rejected with</a> a *TypeError* exception.
+  1. Assert: _state_ is `"writable"` or `"erroring"`.
+  1. Assert: ! WritableStreamCloseQueuedOrInFlight(_stream_) is *false*.
+  1. Let _promise_ be <a>a new promise</a>.
+  1. Set _stream_.[[closeRequest]] to _promise_.
+  1. Let _writer_ be _stream_.[[writer]].
+  1. If _writer_ is not *undefined*, and _stream_.[[backpressure]] is *true*, and _state_ is `"writable"`,
+     <a>resolve</a> _writer_.[[readyPromise]] with *undefined*.
+  1. Perform ! WritableStreamDefaultControllerClose(_stream_.[[writableStreamController]]).
   1. Return _promise_.
 </emu-alg>
 
@@ -3853,12 +3890,8 @@ lt="WritableStreamDefaultWriter(stream)">new WritableStreamDefaultWriter(<var>st
 <h5 id="default-writer-close" method for="WritableStreamDefaultWriter">close()</h5>
 
 <div class="note">
-  The <code>close</code> method will close the associated writable stream. The <a>underlying sink</a> will finish
-  processing any previously-written <a>chunks</a>, before invoking its close behavior. During this time any further
-  attempts to write will fail (without erroring the stream).
-
-  The method returns a promise that is fulfilled with <emu-val>undefined</emu-val> if all remaining <a>chunks</a> are
-  successfully written and the stream successfully closes, or rejects if an error is encountered during this process.
+  If the writer is <a lt="active writer">active</a>, the <code>close</code> method behaves the same as that for the
+  associated stream. (Otherwise, it returns a rejected promise.)
 </div>
 
 <emu-alg>
@@ -3936,16 +3969,7 @@ nothrow>WritableStreamDefaultWriterClose ( <var>writer</var> )</h4>
 <emu-alg>
   1. Let _stream_ be _writer_.[[ownerWritableStream]].
   1. Assert: _stream_ is not *undefined*.
-  1. Let _state_ be _stream_.[[state]].
-  1. If _state_ is `"closed"` or `"errored"`, return <a>a promise rejected with</a> a *TypeError* exception.
-  1. Assert: _state_ is `"writable"` or `"erroring"`.
-  1. Assert: ! WritableStreamCloseQueuedOrInFlight(_stream_) is *false*.
-  1. Let _promise_ be <a>a new promise</a>.
-  1. Set _stream_.[[closeRequest]] to _promise_.
-  1. If _stream_.[[backpressure]] is *true* and _state_ is `"writable"`, <a>resolve</a> _writer_.[[readyPromise]] with
-     *undefined*.
-  1. Perform ! WritableStreamDefaultControllerClose(_stream_.[[writableStreamController]]).
-  1. Return _promise_.
+  1. Return ! WritableStreamClose(_stream_).
 </emu-alg>
 
 <h4 id="writable-stream-default-writer-close-with-error-propagation" aoid="WritableStreamDefaultWriterCloseWithErrorPropagation"
@@ -4954,8 +4978,8 @@ nothrow>TransformStreamDefaultControllerPerformTransform ( <var>controller</var>
 
 <emu-alg>
   1. Let _transformPromise_ be the result of performing _controller_.[[transformAlgorithm]], passing _chunk_.
-  1. Return the result of <a>transforming</a> _transformPromise_ with a rejection handler that, when called with
-     argument _r_, performs the following steps:
+  1. Return the result of <a>reacting</a> to _transformPromise_ with the following rejection steps given the
+     argument _r_:
     1. Perform ! TransformStreamError(_controller_.[[controlledTransformStream]], _r_).
     1. Throw _r_.
 </emu-alg>
@@ -4987,8 +5011,7 @@ nothrow>TransformStreamDefaultSinkWriteAlgorithm ( <var>stream</var>, <var>chunk
   1. If _stream_.[[backpressure]] is *true*,
     1. Let _backpressureChangePromise_ be _stream_.[[backpressureChangePromise]].
     1. Assert: _backpressureChangePromise_ is not *undefined*.
-    1. Return the result of <a>transforming</a> _backpressureChangePromise_ with a fulfillment handler which performs
-       the following steps:
+    1. Return the result of <a>reacting</a> to _backpressureChangePromise_ with the following fulfillment steps:
       1. Let _writable_ be _stream_.[[writable]].
       1. Let _state_ be _writable_.[[state]].
       1. If _state_ is `"erroring"`, throw _writable_.[[storedError]].
@@ -5013,13 +5036,13 @@ nothrow>TransformStreamDefaultSinkCloseAlgorithm( <var>stream</var> )</h4>
   1. Let _controller_ be _stream_.[[transformStreamController]].
   1. Let _flushPromise_ be the result of performing _controller_.[[flushAlgorithm]].
   1. Perform ! TransformStreamDefaultControllerClearAlgorithms(_controller_).
-  1. Return the result of <a>transforming</a> _flushPromise_ with:
-    1. A fulfillment handler that performs the following steps:
+  1. Return the result of <a>reacting</a> to _flushPromise_:
+    1. If _flushPromise_ was fulfilled, then:
       1. If _readable_.[[state]] is `"errored"`, throw _readable_.[[storedError]].
       1. Let _readableController_ be _readable_.[[readableStreamController]].
       1. If ! ReadableStreamDefaultControllerCanCloseOrEnqueue(_readableController_) is *true*, perform !
          ReadableStreamDefaultControllerClose(_readableController_).
-    1. A rejection handler that, when called with argument _r_, performs the following steps:
+    1. If _flushPromise_ was rejected with reason _r_, then:
       1. Perform ! TransformStreamError(_stream_, _r_).
       1. Throw _readable_.[[storedError]].
 </emu-alg>
@@ -5365,7 +5388,8 @@ throws>CreateAlgorithmFromUnderlyingMethod ( <var ignore>underlyingObject</var>,
 <var>args</var> )</h4>
 
 <div class="note">
-  PromiseCall is a variant of <a>promise-calling</a> that works on methods.
+  This encapsulates the relevant promise-related parts of the Web IDL <a>call a user object's operation</a> algorithm
+  for use while we work on <a href="https://github.com/whatwg/streams/issues/963">moving to Web IDL</a>.
 </div>
 
 <emu-alg>
@@ -6091,8 +6115,6 @@ planned) that the conventions of ECMAScript itself will evolve in these ways.
   <li> We use destructuring notation in function and method declarations, and assume that <a
     abstract-op>DestructuringAssignmentEvaluation</a> was performed appropriately before the algorithm starts.
   <li> We use "<emu-val>this</emu-val>" instead of "<emu-val>this</emu-val> value".
-  <li> We use the shorthand phrases from the [[!PROMISES-GUIDE]] to operate on promises at a higher level than the
-    ECMAScript spec does.
 </ul>
 
 It's also worth noting that, as in [[!ECMASCRIPT]], all numbers are represented as double-precision floating point

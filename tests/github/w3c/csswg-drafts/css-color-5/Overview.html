@@ -14,6 +14,7 @@
   }
   </style>
   <link href="https://www.w3.org/TR/css-color-5/" rel="canonical">
+  <link href="style.css" rel="stylesheet">
 <style>/* style-md-lists */
 
 /* This is a weird hack for me not yet following the commonmark spec
@@ -271,8 +272,9 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <dd><a href="https://www.w3.org/TR/css-color-5/">https://www.w3.org/TR/css-color-5/</a>
       <dt class="editor">Editors:
       <dd class="editor p-author h-card vcard" data-editor-id="1438"><a class="p-name fn u-email email" href="mailto:chris@w3.org">Chris Lilley</a> (<span class="p-org org">W3C</span>)
-      <dd class="editor p-author h-card vcard" data-editor-id="115525"><span class="p-name fn">Una Kravets</span> (<span class="p-org org">Google</span>)
+      <dd class="editor p-author h-card vcard" data-editor-id="115525"><a class="p-name fn u-url url" href="https://una.im">Una Kravets</a> (<span class="p-org org">Google</span>)
       <dd class="editor p-author h-card vcard" data-editor-id="52258"><a class="p-name fn u-url url" href="http://lea.verou.me/about">Lea Verou</a> (<span class="p-org org">Invited Expert</span>)
+      <dd class="editor p-author h-card vcard" data-editor-id="112669"><a class="p-name fn u-url url" href="https://nerdy.dev">Adam Argyle</a> (<span class="p-org org">Google</span>)
       <dt>Suggest an Edit for this Spec:
       <dd><a href="https://github.com/w3c/csswg-drafts/blob/master/css-color-5/Overview.bs">GitHub Editor</a>
       <dt>Issue Tracking:
@@ -320,6 +322,21 @@ on screen, on paper, etc.
     <li><a href="#colormix"><span class="secno">2</span> <span class="content">Mixing colors: the <span class="css">color-mix</span> function</span></a>
     <li><a href="#colorcontrast"><span class="secno">3</span> <span class="content">Selecting the most contrasting color: the <span class="css">color-contrast()</span> function</span></a>
     <li>
+     <a href="#colormodify"><span class="secno">4</span> <span class="content">Modifying colors</span></a>
+     <ol class="toc">
+      <li><a href="#coloradjust"><span class="secno">4.1</span> <span class="content">Adjusting colors: the <span class="css">color-adjust</span> function</span></a>
+      <li>
+       <a href="#relative-colors"><span class="secno">4.2</span> <span class="content">Relative color syntax</span></a>
+       <ol class="toc">
+        <li><a href="#relative-rgb-colors"><span class="secno">4.2.1</span> <span class="content">Relative RGB colors</span></a>
+        <li><a href="#relative-hsl-colors"><span class="secno">4.2.2</span> <span class="content">Relative HSL colors</span></a>
+        <li><a href="#relative-hwb-colors"><span class="secno">4.2.3</span> <span class="content">Relative HWB colors</span></a>
+        <li><a href="#relative-lab-colors"><span class="secno">4.2.4</span> <span class="content">Relative Lab colors</span></a>
+        <li><a href="#relative-lch-colors"><span class="secno">4.2.5</span> <span class="content">Relative LCH colors</span></a>
+        <li><a href="#relative-grayscale-colors"><span class="secno">4.2.6</span> <span class="content">Relative grayscale colors</span></a>
+       </ol>
+     </ol>
+    <li>
      <a href="#conformance"><span class="secno"></span> <span class="content"> Conformance</span></a>
      <ol class="toc">
       <li><a href="#document-conventions"><span class="secno"></span> <span class="content"> Document conventions</span></a>
@@ -349,35 +366,65 @@ on screen, on paper, etc.
   <main>
    <h2 class="heading settled" data-level="1" id="intro"><span class="secno">1. </span><span class="content">Introduction</span><a class="self-link" href="#intro"></a></h2>
    <p><em>This section is not normative.</em></p>
-   <p>Web developers and design systems developers
-	often use functions to design components.
-	With the increasing usage of design systems that support multiple platforms,
-	and increased capability of Dark Mode in UI,
+   <p>Web developers, design tools and design system developers
+	often use color functions to assist in scaling the design
+	of their component color relations.
+	With the increasing usage of design systems that support multiple platforms
+	and multiple user preferences, like the increased capability of Dark Mode in UI,
 	this becomes even more useful to not need to manually set color,
-	and to instead have a single source from which layouts are calculated.</p>
+	and to instead have a single source from which schemes are calculated.</p>
    <p>Currently Sass, calc() on HSL values, or PostCSS is used to do this.
 	Preprocessors are unable to work on dynamically adjusted colors,
-	and all current solutions are restricted to the sRGB gamut
-	and to the perceptual limitations of HSL.</p>
-   <p>This module adds three functions: <span class="css">color-mix</span>, <span class="css">color-contrast</span> and a way to modify existing colors.</p>
-   <p class="issue" id="issue-e3aa6d4c"><a class="self-link" href="#issue-e3aa6d4c"></a> there are two proposals for color modification.
-	The CSS WG expects that the best aspects of each
-	will be chosen to produce a single eventual solution. <a href="https://github.com/w3c/csswg-drafts/issues/3187">&lt;https://github.com/w3c/csswg-drafts/issues/3187></a></p>
+	all current solutions are restricted to the sRGB gamut
+	and to the perceptual limitations of HSL
+	(colors are bunched up in the color wheel,
+	and two colors with visually different lightness,
+	like yellow and blue, can have the same HSL lightness).</p>
+   <p>This module adds three functions: <span class="css">color-mix</span>, <span class="css">color-contrast</span>,
+	and <a href="#colormodify">a way to modify colors</a>.</p>
+   <p>The perceptually uniform ``lch()`` colorspace
+	is used for mixing by default,
+	as this has no gamut restrictions
+	and colors are evenly distributed.
+	However, other colorspaces can be specified,
+	including ``hsl()`` or ``srgb`` if desired.</p>
    <h2 class="heading settled" data-level="2" id="colormix"><span class="secno">2. </span><span class="content">Mixing colors: the <span class="css">color-mix</span> function</span><a class="self-link" href="#colormix"></a></h2>
    <p>This function takes two <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color">&lt;color></a> specifications
 	and returns the result of mixing them,
-	in a given colorspace,
+	in a given <a data-link-type="dfn">colorspace</a>,
 	by a specified amount.</p>
    <p>Unless otherwise specified,
-	the mixing is done in the <a class="css" data-link-type="maybe" href="https://drafts.csswg.org/css-color-4/#funcdef-lch" id="ref-for-funcdef-lch">lch()</a> colorspace.</p>
+	the mixing is done in the <a class="css" data-link-type="maybe" href="#funcdef-lch" id="ref-for-funcdef-lch">lch()</a> colorspace.</p>
    <p>Multiple color functions can be specified.</p>
 <pre class="prod"><dfn data-dfn-type="function" data-export id="funcdef-color-mix">color-mix()<a class="self-link" href="#funcdef-color-mix"></a></dfn> = color-mix( <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color①">&lt;color></a>  <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color②">&lt;color></a> [ <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value">&lt;number></a> <a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#comb-one" id="ref-for-comb-one">|</a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value">&lt;percentage></a> <a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#comb-one" id="ref-for-comb-one①">|</a> [ <a class="production" data-link-type="type">&lt;color-function></a> <a class="production" data-link-type="type">&lt;colorspace></a><a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt">?</a> ]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt①">?</a>] )
 </pre>
-   <div class="example" id="example-5ebedabb">
-    <a class="self-link" href="#example-5ebedabb"></a> This example produces the mixture of red and yellow,
-	in <span class="css">lch</span> colorspace (the default),
+   <div class="example" id="example-a5dff7b2">
+    <a class="self-link" href="#example-a5dff7b2"></a> This example produces the mixture of red and white,
+	in <a class="css" data-link-type="maybe" href="#funcdef-lch" id="ref-for-funcdef-lch①">lch()</a> colorspace (the default),
+	with the lightness being 50% of the lightness of red
+	(and thus, 50% of the lightness of white).
+	The chroma and hue of red are left unchanged. 
+<pre class="lang-css highlight">mix-color(red, white, lightness(50%));</pre>
+    <p>The calculation is as follows:</p>
+    <ul>
+     <li data-md>
+      <p>sRGB red (#F00) is lch(54.2917 106.8390 40.8526)</p>
+     <li data-md>
+      <p>sRGB white (#FFF) is lch(100 0 0)</p>
+     <li data-md>
+      <p>mix lightness is 54.2917 * 0.5 + 100 * 0.5 = 77.14585</p>
+     <li data-md>
+      <p>mixed result is lch(77.14585 81.95 37.192)</p>
+     <li data-md>
+      <p>which results in a lighter red, like a Salmon color</p>
+    </ul>
+   </div>
+   <p><img alt="Result of mix-color(red, white, lightness(50%)" src="images/mix_red_white_lightness50.png"></p>
+   <div class="example" id="example-41ceb098">
+    <a class="self-link" href="#example-41ceb098"></a> This example produces the mixture of red and yellow,
+	in <a class="css" data-link-type="maybe" href="#funcdef-lch" id="ref-for-funcdef-lch②">lch()</a> colorspace (the default),
 	with the lightness being 30% of the lightness of red
-	and 70% of the lightness of yellow.
+	(and thus, 70% of the lightness of yellow).
 	The chroma and hue of red are left unchanged. 
 <pre class="lang-css highlight">mix-color(red, yellow, lightness(30%));</pre>
     <p>The calculation is as follows:</p>
@@ -394,6 +441,7 @@ on screen, on paper, etc.
       <p>which is a very light red (and outside the gamut of sRGB: rgb(140.4967% 51.2654% 32.6891%))</p>
     </ul>
    </div>
+   <p><img alt="Result of mix-color(red, yellow, lightness(30%)" src="images/mix_red_yellow_lightness30.png"></p>
    <p>Instead of a list of color functions,
 a plain number or percentage can be specified,
 which applies to all color channels.</p>
@@ -424,6 +472,7 @@ which applies to all color channels.</p>
       <p>which is a red-orange: rgb(75.3600% 65.6304% 16.9796%)</p>
     </ul>
    </div>
+   <p><img alt="Result of mix-color(red, yellow, 65%" src="images/mix_red_yellow_65.png"></p>
    <h2 class="heading settled" data-level="3" id="colorcontrast"><span class="secno">3. </span><span class="content">Selecting the most contrasting color: the <span class="css">color-contrast()</span> function</span><a class="self-link" href="#colorcontrast"></a></h2>
    <p>This function takes, firstly, a single color
 	(typically a background, but not necessarily),
@@ -431,15 +480,170 @@ which applies to all color channels.</p>
 	it selects from that list
 	the color with highest luminance contrast
 	to the single color.</p>
-   <div class="example" id="example-3d9bcd52">
-    <a class="self-link" href="#example-3d9bcd52"></a> 
+   <div class="example" id="example-1f86f74a">
+    <a class="self-link" href="#example-1f86f74a"></a> 
 <pre class="lang-css highlight">color-contrast(wheat tan, sienna, var(--myAccent), #d2691e)</pre>
     <p>The calculation is as follows:</p>
     <ul>
      <li data-md>
-      <p>wheat (#f5deb3) has relative luminance</p>
+      <p>wheat (#f5deb3), the background, has relative luminance 0.749</p>
+     <li data-md>
+      <p>tan (#d2b48c) has relative luminance 0.482 and contrast ratio 1.501</p>
+     <li data-md>
+      <p>sienna (#a0522d) has relative luminance 0.137 and contrast ratio 4.273</p>
+     <li data-md>
+      <p>suppose myAccent has the value #b22222</p>
+     <li data-md>
+      <p>#b22222 has relative luminance 0.107 and contrast ratio 5.081</p>
+     <li data-md>
+      <p>#d2691e has relative luminance 0.305 and contrast ratio 2.249</p>
+     <li data-md>
+      <p>The highest contrast ratio is 5.081 so var(--myAccent) wins</p>
     </ul>
    </div>
+   <h2 class="heading settled" data-level="4" id="colormodify"><span class="secno">4. </span><span class="content">Modifying colors</span><a class="self-link" href="#colormodify"></a></h2>
+   <p class="note" role="note"><span>Note:</span> There are currently two proposals for modifying colors: <span class="css">color-adjust</span> and <a href="#relative-colors">Relative color syntax</a>.</p>
+   <p class="issue" id="issue-f41f57aa"><a class="self-link" href="#issue-f41f57aa"></a> there are two proposals for color modification (<a href="https://github.com/w3c/csswg-drafts/issues/3187#issuecomment-499126198">proposal 1</a>, <a href="https://gist.github.com/una/edcfa0d3600e0b89b2ebf266bf549721">proposal 2</a>).
+The CSS WG expects that the best aspects of each
+will be chosen to produce a single eventual solution. <a href="https://github.com/w3c/csswg-drafts/issues/3187">&lt;https://github.com/w3c/csswg-drafts/issues/3187></a></p>
+   <h3 class="heading settled" data-level="4.1" id="coloradjust"><span class="secno">4.1. </span><span class="content">Adjusting colors: the <span class="css">color-adjust</span> function</span><a class="self-link" href="#coloradjust"></a></h3>
+   <p>This function takes one <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color③">&lt;color></a> specification
+	and returns the result of adjusting that color,
+	in a given colorspace,
+	by a specified transform function.</p>
+   <p>Unless otherwise specified,
+	the adjustment is done in the <a class="css" data-link-type="maybe" href="#funcdef-lch" id="ref-for-funcdef-lch③">lch()</a> colorspace.</p>
+   <p>Multiple color functions can be specified.</p>
+<pre class="prod"><dfn data-dfn-type="function" data-export id="funcdef-color-adjust">color-adjust()<a class="self-link" href="#funcdef-color-adjust"></a></dfn> = color-adjust( <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color④">&lt;color></a> [ <a class="production" data-link-type="type">&lt;color-function></a> <a class="production" data-link-type="type">&lt;colorspace></a><a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt②">?</a> ]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt③">?</a>] )
+</pre>
+   <div class="example" id="example-f3c5adaf">
+    <a class="self-link" href="#example-f3c5adaf"></a> This example produces the adjustment of peru (#CD853F),
+		in <a class="css" data-link-type="maybe" href="#funcdef-lch" id="ref-for-funcdef-lch④">lch()</a> colorspace (the default),
+		with the lightness being reduced by 20%.
+		The chroma and hue of red are left unchanged. 
+<pre class="lang-css highlight">adjust-color(peru, lightness(-20%));</pre>
+    <p>The calculation is as follows:</p>
+    <ul>
+     <li data-md>
+      <p><span class="swatch" style="--color: peru"></span> peru (#CD853F) is lch(62.2532% 54.0114 63.6769)</p>
+     <li data-md>
+      <p>adjusted lightness is 62.2532% - 20% = 42.2532%</p>
+     <li data-md>
+      <p>adjusted result is lch(42.2532% 54.0114 63.6769)</p>
+     <li data-md>
+      <p>which is <span class="swatch" style="--color: rgb(57.58%, 32.47%, 3.82%)"></span> rgb(57.58%, 32.47%, 3.82%)</p>
+    </ul>
+   </div>
+   <p><img alt="Result of adjust-color(red, lightness(30%)" src="images/adjust_red_lightness30.png"></p>
+   <h3 class="heading settled" data-level="4.2" id="relative-colors"><span class="secno">4.2. </span><span class="content">Relative color syntax</span><a class="self-link" href="#relative-colors"></a></h3>
+   <p>Besides specifying absolute coordinates, all color functions can also be used with a *relative syntax* to produce colors in the function’s target color space, based on an existing color (henceforth referred to as "origin color"). This syntax consists of the keyword <span class="css">from</span>, a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color⑤">&lt;color></a> value, and optionally numerical coordinates specific to the color function. To allow calculations on the original color’s coordinates, there are single-letter keywords for each coordinate and `alpha` that corresponds to the color’s alpha. If no coordinates are specified, the function merely converts the origin color to the target function’s color space.</p>
+   <p>The following sections outline the relative color syntax for each color function.</p>
+   <p class="issue" id="issue-5cce798c"><a class="self-link" href="#issue-5cce798c"></a> A future version of this specification may define a relative syntax for <a class="css" data-link-type="maybe" href="https://drafts.csswg.org/css-color-4/#funcdef-color" id="ref-for-funcdef-color">color()</a> as well.</p>
+   <h4 class="heading settled" data-level="4.2.1" id="relative-rgb-colors"><span class="secno">4.2.1. </span><span class="content">Relative RGB colors</span><a class="self-link" href="#relative-rgb-colors"></a></h4>
+   <p>The grammar of the <a class="css" data-link-type="maybe" href="#funcdef-rgb" id="ref-for-funcdef-rgb">rgb()</a> function is extended as follows:</p>
+<pre class="prod"><dfn class="dfn-paneled" data-dfn-type="function" data-export id="funcdef-rgb">rgb()</dfn> = rgb([from <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color⑥">&lt;color></a>]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt④">?</a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value①">&lt;percentage></a><a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-num" id="ref-for-mult-num">{3}</a> [ / <a class="production" data-link-type="type" href="#typedef-alpha-value" id="ref-for-typedef-alpha-value">&lt;alpha-value></a> ]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt⑤">?</a> ) <a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#comb-one" id="ref-for-comb-one②">|</a>
+    rgb([from <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color⑦">&lt;color></a>]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt⑥">?</a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value①">&lt;number></a><a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-num" id="ref-for-mult-num①">{3}</a> [ / <a class="production" data-link-type="type" href="#typedef-alpha-value" id="ref-for-typedef-alpha-value①">&lt;alpha-value></a> ]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt⑦">?</a> )
+<dfn class="dfn-paneled" data-dfn-type="type" data-export id="typedef-alpha-value">&lt;alpha-value></dfn> = <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value②">&lt;number></a> <a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#comb-one" id="ref-for-comb-one③">|</a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value②">&lt;percentage></a>
+</pre>
+   <p>When an origin color is present, the following keywords can also be used in this function (provided the end result conforms to the expected type for the parameter) and correspond to:</p>
+   <ul>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc" href="https://svgwg.org/svg2-draft/geometry.html#RProperty" id="ref-for-RProperty">r</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value③">&lt;percentage></a> that corresponds to the origin color’s red channel after its conversion to sRGB</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">g</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value④">&lt;percentage></a> that corresponds to the origin color’s green channel after its conversion to sRGB</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">b</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value⑤">&lt;percentage></a> that corresponds to the origin color’s blue channel after its conversion to sRGB</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">alpha</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value⑥">&lt;percentage></a> that corresponds to the origin color’s alpha transparency</p>
+   </ul>
+   <h4 class="heading settled" data-level="4.2.2" id="relative-hsl-colors"><span class="secno">4.2.2. </span><span class="content">Relative HSL colors</span><a class="self-link" href="#relative-hsl-colors"></a></h4>
+   <p>The grammar of the <a class="css" data-link-type="maybe" href="#funcdef-hsl" id="ref-for-funcdef-hsl">hsl()</a> function is extended as follows:</p>
+<pre class="prod"><dfn class="dfn-paneled" data-dfn-type="function" data-export id="funcdef-hsl">hsl()</dfn> = hsl([from <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color⑧">&lt;color></a>]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt⑧">?</a> <a class="production" data-link-type="type" href="#typedef-hue" id="ref-for-typedef-hue">&lt;hue></a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value⑦">&lt;percentage></a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value⑧">&lt;percentage></a> [ / <a class="production" data-link-type="type" href="#typedef-alpha-value" id="ref-for-typedef-alpha-value②">&lt;alpha-value></a> ]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt⑨">?</a> )
+<dfn class="dfn-paneled" data-dfn-type="type" data-export id="typedef-hue">&lt;hue></dfn> = <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value③">&lt;number></a> <a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#comb-one" id="ref-for-comb-one④">|</a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#angle-value" id="ref-for-angle-value" title="Expands to: turn | rad | grad | deg">&lt;angle></a>
+</pre>
+   <p>When an origin color is present, the following keywords can also be used in this function (provided the end result conforms to the expected type for the parameter) and correspond to:</p>
+   <ul>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">h</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value④">&lt;number></a> that corresponds to the origin color’s HSL hue after its conversion to sRGB, normalized to a [0, 360) range.</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">s</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value⑨">&lt;percentage></a> that corresponds to the origin color’s HSL saturation after its conversion to sRGB</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">l</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value①⓪">&lt;percentage></a> that corresponds to the origin color’s HSL lightness after its conversion to sRGB</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">alpha</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value①①">&lt;percentage></a> that corresponds to the origin color’s alpha transparency</p>
+   </ul>
+   <h4 class="heading settled" data-level="4.2.3" id="relative-hwb-colors"><span class="secno">4.2.3. </span><span class="content">Relative HWB colors</span><a class="self-link" href="#relative-hwb-colors"></a></h4>
+   <p>The grammar of the <a class="css" data-link-type="maybe" href="#funcdef-hwb" id="ref-for-funcdef-hwb">hwb()</a> function is extended as follows:</p>
+<pre class="prod"><dfn class="dfn-paneled" data-dfn-type="function" data-export id="funcdef-hwb">hwb()</dfn> = hwb([from <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color⑨">&lt;color></a>]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt①⓪">?</a> <a class="production" data-link-type="type" href="#typedef-hue" id="ref-for-typedef-hue①">&lt;hue></a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value①②">&lt;percentage></a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value①③">&lt;percentage></a> [ / <a class="production" data-link-type="type" href="#typedef-alpha-value" id="ref-for-typedef-alpha-value③">&lt;alpha-value></a> ]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt①①">?</a> )
+</pre>
+   <p>When an origin color is present, the following keywords can also be used in this function (provided the end result conforms to the expected type for the parameter) and correspond to:</p>
+   <ul>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">h</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value⑤">&lt;number></a> that corresponds to the origin color’s HWB hue after its conversion to sRGB</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">w</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value①④">&lt;percentage></a> that corresponds to the origin color’s HWB whiteness after its conversion to sRGB</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">b</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value①⑤">&lt;percentage></a> that corresponds to the origin color’s HWB blackness after its conversion to sRGB</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">alpha</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value①⑥">&lt;percentage></a> that corresponds to the origin color’s alpha transparency</p>
+   </ul>
+   <h4 class="heading settled" data-level="4.2.4" id="relative-lab-colors"><span class="secno">4.2.4. </span><span class="content">Relative Lab colors</span><a class="self-link" href="#relative-lab-colors"></a></h4>
+   <p>The grammar of the <a class="css" data-link-type="maybe" href="#funcdef-lab" id="ref-for-funcdef-lab">lab()</a> function is extended as follows:</p>
+<pre class="prod"><dfn class="dfn-paneled" data-dfn-type="function" data-export id="funcdef-lab">lab()</dfn> = lab([from <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color①⓪">&lt;color></a>]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt①②">?</a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value①⑦">&lt;percentage></a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value⑥">&lt;number></a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value⑦">&lt;number></a> [ / <a class="production" data-link-type="type" href="#typedef-alpha-value" id="ref-for-typedef-alpha-value④">&lt;alpha-value></a> ]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt①③">?</a> )
+</pre>
+   <p>When an origin color is present, the following keywords can also be used in this function (provided the end result conforms to the expected type for the parameter) and correspond to:</p>
+   <ul>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">l</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value①⑧">&lt;percentage></a> that corresponds to the origin color’s CIE Lightness</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">a</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value⑧">&lt;number></a> that corresponds to the origin color’s CIELab a axis</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">b</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value⑨">&lt;number></a> that corresponds to the origin color’s CIELab b axis</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">alpha</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value①⑨">&lt;percentage></a> that corresponds to the origin color’s alpha transparency</p>
+   </ul>
+   <div class="example" id="example-a68fb7a2">
+    <a class="self-link" href="#example-a68fb7a2"></a> Multiple ways to adjust the transparency of a base color: 
+    <ul>
+     <li data-md>
+      <p><span class="css">lab(from var(--mycolor) l a b / 100%)</span> sets the alpha of <span class="css">var(--mycolor)</span> to 100% regardless of what it originally was.</p>
+     <li data-md>
+      <p><span class="css">lab(from var(--mycolor) l a b / calc(alpha * 0.8))</span> reduces the alpha of <span class="css">var(--mycolor)</span> by 20% of its original value.</p>
+     <li data-md>
+      <p><span class="css">lab(from var(--mycolor) l a b / calc(alpha - 20%))</span> reduces the alpha of <span class="css">var(--mycolor)</span> by 20% of 100%.</p>
+    </ul>
+    <p>Note that all the adjustments are lossless in the sense that no gamut clipping occurs, since lab() encompasses all visible color.
+	This is not true for the alpha adjustments in the sRGB based functions (such as’rgb()', 'hsl()', or 'hwb()'), which would also convert to sRGB in addition to adjusting the alpha transparency.</p>
+   </div>
+   <h4 class="heading settled" data-level="4.2.5" id="relative-lch-colors"><span class="secno">4.2.5. </span><span class="content">Relative LCH colors</span><a class="self-link" href="#relative-lch-colors"></a></h4>
+   <p>The grammar of the <a class="css" data-link-type="maybe" href="#funcdef-lch" id="ref-for-funcdef-lch⑤">lch()</a> function is extended as follows:</p>
+<pre class="prod"><dfn class="dfn-paneled" data-dfn-type="function" data-export id="funcdef-lch">lch()</dfn> = lch([from <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color①①">&lt;color></a>]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt①④">?</a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value②⓪">&lt;percentage></a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value①⓪">&lt;number></a> <a class="production" data-link-type="type" href="#typedef-hue" id="ref-for-typedef-hue②">&lt;hue></a> [ / <a class="production" data-link-type="type" href="#typedef-alpha-value" id="ref-for-typedef-alpha-value⑤">&lt;alpha-value></a> ]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt①⑤">?</a> )
+</pre>
+   <p>When an origin color is present, the following keywords can also be used in this function (provided the end result conforms to the expected type for the parameter) and correspond to:</p>
+   <ul>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">l</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value②①">&lt;percentage></a> that corresponds to the origin color’s CIE Lightness</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">c</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value①①">&lt;number></a> that corresponds to the origin color’s LCH chroma</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">h</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value①②">&lt;number></a> that corresponds to the origin color’s LCH hue, normalized to a [0, 360) range.</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">alpha</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value②②">&lt;percentage></a> that corresponds to the origin color’s alpha transparency</p>
+   </ul>
+   <div class="example" id="example-f950a899"><a class="self-link" href="#example-f950a899"></a> <span class="css">lch(from peru calc(l * 0.8) c h)</span> produces a color that is 20% darker than <span class="swatch" style="--color: peru"></span> peru or lch(62.2532% 54.0114 63.6769), with its chroma and hue left unchanged.
+	The result is <span class="swatch" style="--color: rgb(57.58%, 32.47%, 3.82%)"> </span> lch(49.80256% 54.0114 63.6769) </div>
+   <h4 class="heading settled" data-level="4.2.6" id="relative-grayscale-colors"><span class="secno">4.2.6. </span><span class="content">Relative grayscale colors</span><a class="self-link" href="#relative-grayscale-colors"></a></h4>
+   <p>The grammar of the <a class="css" data-link-type="maybe" href="#funcdef-gray" id="ref-for-funcdef-gray">gray()</a> function is extended as follows:</p>
+<pre class="prod"><dfn class="dfn-paneled" data-dfn-type="function" data-export id="funcdef-gray">gray()</dfn> = gray([from <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-color-3/#valuea-def-color" id="ref-for-valuea-def-color①②">&lt;color></a>]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt①⑥">?</a> <a class="production" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#number-value" id="ref-for-number-value①③">&lt;number></a>  [ / <a class="production" data-link-type="type" href="#typedef-alpha-value" id="ref-for-typedef-alpha-value⑥">&lt;alpha-value></a> ]<a data-link-type="grammar" href="https://drafts.csswg.org/css-values-4/#mult-opt" id="ref-for-mult-opt①⑦">?</a> )
+</pre>
+   <p>When an origin color is present, the following keywords can also be used in this function (provided the end result conforms to the expected type for the parameter) and correspond to:</p>
+   <ul>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">l</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value②③">&lt;percentage></a> that corresponds to the origin color’s CIE Lightness</p>
+    <li data-md>
+     <p><a class="property" data-link-type="propdesc">alpha</a> is a <a class="production css" data-link-type="type" href="https://drafts.csswg.org/css-values-3/#percentage-value" id="ref-for-percentage-value②④">&lt;percentage></a> that corresponds to the origin color’s alpha transparency</p>
+   </ul>
+   <div class="example" id="example-129962b7"><a class="self-link" href="#example-129962b7"></a> <span class="css">gray(from var(--base-color) l)</span> produces a grayscale version of <span class="css">var(--base-color)</span> with the same lightness. </div>
   </main>
   <h2 class="no-ref no-num heading settled" id="conformance"><span class="content"> Conformance</span><a class="self-link" href="#conformance"></a></h2>
   <h3 class="heading settled" id="document-conventions"><span class="content"> Document conventions</span><a class="self-link" href="#document-conventions"></a></h3>
@@ -533,42 +737,98 @@ which applies to all color channels.</p>
   <h2 class="no-num no-ref heading settled" id="index"><span class="content">Index</span><a class="self-link" href="#index"></a></h2>
   <h3 class="no-num no-ref heading settled" id="index-defined-here"><span class="content">Terms defined by this specification</span><a class="self-link" href="#index-defined-here"></a></h3>
   <ul class="index">
+   <li><a href="#typedef-alpha-value">&lt;alpha-value></a><span>, in §4.2.1</span>
+   <li><a href="#funcdef-color-adjust">color-adjust()</a><span>, in §4.1</span>
    <li><a href="#funcdef-color-mix">color-mix()</a><span>, in §2</span>
+   <li><a href="#funcdef-gray">gray()</a><span>, in §4.2.6</span>
+   <li><a href="#funcdef-hsl">hsl()</a><span>, in §4.2.2</span>
+   <li><a href="#typedef-hue">&lt;hue></a><span>, in §4.2.2</span>
+   <li><a href="#funcdef-hwb">hwb()</a><span>, in §4.2.3</span>
+   <li><a href="#funcdef-lab">lab()</a><span>, in §4.2.4</span>
+   <li><a href="#funcdef-lch">lch()</a><span>, in §4.2.5</span>
+   <li><a href="#funcdef-rgb">rgb()</a><span>, in §4.2.1</span>
   </ul>
   <aside class="dfn-panel" data-for="term-for-valuea-def-color">
    <a href="https://drafts.csswg.org/css-color-3/#valuea-def-color">https://drafts.csswg.org/css-color-3/#valuea-def-color</a><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-valuea-def-color">2. Mixing colors: the color-mix function</a> <a href="#ref-for-valuea-def-color①">(2)</a> <a href="#ref-for-valuea-def-color②">(3)</a>
+    <li><a href="#ref-for-valuea-def-color③">4.1. Adjusting colors: the color-adjust function</a> <a href="#ref-for-valuea-def-color④">(2)</a>
+    <li><a href="#ref-for-valuea-def-color⑤">4.2. Relative color syntax</a>
+    <li><a href="#ref-for-valuea-def-color⑥">4.2.1. Relative RGB colors</a> <a href="#ref-for-valuea-def-color⑦">(2)</a>
+    <li><a href="#ref-for-valuea-def-color⑧">4.2.2. Relative HSL colors</a>
+    <li><a href="#ref-for-valuea-def-color⑨">4.2.3. Relative HWB colors</a>
+    <li><a href="#ref-for-valuea-def-color①⓪">4.2.4. Relative Lab colors</a>
+    <li><a href="#ref-for-valuea-def-color①①">4.2.5. Relative LCH colors</a>
+    <li><a href="#ref-for-valuea-def-color①②">4.2.6. Relative grayscale colors</a>
    </ul>
   </aside>
-  <aside class="dfn-panel" data-for="term-for-funcdef-lch">
-   <a href="https://drafts.csswg.org/css-color-4/#funcdef-lch">https://drafts.csswg.org/css-color-4/#funcdef-lch</a><b>Referenced in:</b>
+  <aside class="dfn-panel" data-for="term-for-funcdef-color">
+   <a href="https://drafts.csswg.org/css-color-4/#funcdef-color">https://drafts.csswg.org/css-color-4/#funcdef-color</a><b>Referenced in:</b>
    <ul>
-    <li><a href="#ref-for-funcdef-lch">2. Mixing colors: the color-mix function</a>
+    <li><a href="#ref-for-funcdef-color">4.2. Relative color syntax</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-angle-value">
+   <a href="https://drafts.csswg.org/css-values-3/#angle-value">https://drafts.csswg.org/css-values-3/#angle-value</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-angle-value">4.2.2. Relative HSL colors</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-number-value">
    <a href="https://drafts.csswg.org/css-values-3/#number-value">https://drafts.csswg.org/css-values-3/#number-value</a><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-number-value">2. Mixing colors: the color-mix function</a>
+    <li><a href="#ref-for-number-value①">4.2.1. Relative RGB colors</a> <a href="#ref-for-number-value②">(2)</a>
+    <li><a href="#ref-for-number-value③">4.2.2. Relative HSL colors</a> <a href="#ref-for-number-value④">(2)</a>
+    <li><a href="#ref-for-number-value⑤">4.2.3. Relative HWB colors</a>
+    <li><a href="#ref-for-number-value⑥">4.2.4. Relative Lab colors</a> <a href="#ref-for-number-value⑦">(2)</a> <a href="#ref-for-number-value⑧">(3)</a> <a href="#ref-for-number-value⑨">(4)</a>
+    <li><a href="#ref-for-number-value①⓪">4.2.5. Relative LCH colors</a> <a href="#ref-for-number-value①①">(2)</a> <a href="#ref-for-number-value①②">(3)</a>
+    <li><a href="#ref-for-number-value①③">4.2.6. Relative grayscale colors</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-percentage-value">
    <a href="https://drafts.csswg.org/css-values-3/#percentage-value">https://drafts.csswg.org/css-values-3/#percentage-value</a><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-percentage-value">2. Mixing colors: the color-mix function</a>
+    <li><a href="#ref-for-percentage-value①">4.2.1. Relative RGB colors</a> <a href="#ref-for-percentage-value②">(2)</a> <a href="#ref-for-percentage-value③">(3)</a> <a href="#ref-for-percentage-value④">(4)</a> <a href="#ref-for-percentage-value⑤">(5)</a> <a href="#ref-for-percentage-value⑥">(6)</a>
+    <li><a href="#ref-for-percentage-value⑦">4.2.2. Relative HSL colors</a> <a href="#ref-for-percentage-value⑧">(2)</a> <a href="#ref-for-percentage-value⑨">(3)</a> <a href="#ref-for-percentage-value①⓪">(4)</a> <a href="#ref-for-percentage-value①①">(5)</a>
+    <li><a href="#ref-for-percentage-value①②">4.2.3. Relative HWB colors</a> <a href="#ref-for-percentage-value①③">(2)</a> <a href="#ref-for-percentage-value①④">(3)</a> <a href="#ref-for-percentage-value①⑤">(4)</a> <a href="#ref-for-percentage-value①⑥">(5)</a>
+    <li><a href="#ref-for-percentage-value①⑦">4.2.4. Relative Lab colors</a> <a href="#ref-for-percentage-value①⑧">(2)</a> <a href="#ref-for-percentage-value①⑨">(3)</a>
+    <li><a href="#ref-for-percentage-value②⓪">4.2.5. Relative LCH colors</a> <a href="#ref-for-percentage-value②①">(2)</a> <a href="#ref-for-percentage-value②②">(3)</a>
+    <li><a href="#ref-for-percentage-value②③">4.2.6. Relative grayscale colors</a> <a href="#ref-for-percentage-value②④">(2)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-mult-opt">
    <a href="https://drafts.csswg.org/css-values-4/#mult-opt">https://drafts.csswg.org/css-values-4/#mult-opt</a><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-mult-opt">2. Mixing colors: the color-mix function</a> <a href="#ref-for-mult-opt①">(2)</a>
+    <li><a href="#ref-for-mult-opt②">4.1. Adjusting colors: the color-adjust function</a> <a href="#ref-for-mult-opt③">(2)</a>
+    <li><a href="#ref-for-mult-opt④">4.2.1. Relative RGB colors</a> <a href="#ref-for-mult-opt⑤">(2)</a> <a href="#ref-for-mult-opt⑥">(3)</a> <a href="#ref-for-mult-opt⑦">(4)</a>
+    <li><a href="#ref-for-mult-opt⑧">4.2.2. Relative HSL colors</a> <a href="#ref-for-mult-opt⑨">(2)</a>
+    <li><a href="#ref-for-mult-opt①⓪">4.2.3. Relative HWB colors</a> <a href="#ref-for-mult-opt①①">(2)</a>
+    <li><a href="#ref-for-mult-opt①②">4.2.4. Relative Lab colors</a> <a href="#ref-for-mult-opt①③">(2)</a>
+    <li><a href="#ref-for-mult-opt①④">4.2.5. Relative LCH colors</a> <a href="#ref-for-mult-opt①⑤">(2)</a>
+    <li><a href="#ref-for-mult-opt①⑥">4.2.6. Relative grayscale colors</a> <a href="#ref-for-mult-opt①⑦">(2)</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-mult-num">
+   <a href="https://drafts.csswg.org/css-values-4/#mult-num">https://drafts.csswg.org/css-values-4/#mult-num</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-mult-num">4.2.1. Relative RGB colors</a> <a href="#ref-for-mult-num①">(2)</a>
    </ul>
   </aside>
   <aside class="dfn-panel" data-for="term-for-comb-one">
    <a href="https://drafts.csswg.org/css-values-4/#comb-one">https://drafts.csswg.org/css-values-4/#comb-one</a><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-comb-one">2. Mixing colors: the color-mix function</a> <a href="#ref-for-comb-one①">(2)</a>
+    <li><a href="#ref-for-comb-one②">4.2.1. Relative RGB colors</a> <a href="#ref-for-comb-one③">(2)</a>
+    <li><a href="#ref-for-comb-one④">4.2.2. Relative HSL colors</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="term-for-RProperty">
+   <a href="https://svgwg.org/svg2-draft/geometry.html#RProperty">https://svgwg.org/svg2-draft/geometry.html#RProperty</a><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-RProperty">4.2.1. Relative RGB colors</a>
    </ul>
   </aside>
   <h3 class="no-num no-ref heading settled" id="index-defined-elsewhere"><span class="content">Terms defined by reference</span><a class="self-link" href="#index-defined-elsewhere"></a></h3>
@@ -581,11 +841,12 @@ which applies to all color channels.</p>
    <li>
     <a data-link-type="biblio">[css-color-4]</a> defines the following terms:
     <ul>
-     <li><span class="dfn-paneled" id="term-for-funcdef-lch" style="color:initial">lch()</span>
+     <li><span class="dfn-paneled" id="term-for-funcdef-color" style="color:initial">color()</span>
     </ul>
    <li>
     <a data-link-type="biblio">[css-values-3]</a> defines the following terms:
     <ul>
+     <li><span class="dfn-paneled" id="term-for-angle-value" style="color:initial">&lt;angle></span>
      <li><span class="dfn-paneled" id="term-for-number-value" style="color:initial">&lt;number></span>
      <li><span class="dfn-paneled" id="term-for-percentage-value" style="color:initial">&lt;percentage></span>
     </ul>
@@ -593,7 +854,13 @@ which applies to all color channels.</p>
     <a data-link-type="biblio">[css-values-4]</a> defines the following terms:
     <ul>
      <li><span class="dfn-paneled" id="term-for-mult-opt" style="color:initial">?</span>
+     <li><span class="dfn-paneled" id="term-for-mult-num" style="color:initial">{a}</span>
      <li><span class="dfn-paneled" id="term-for-comb-one" style="color:initial">|</span>
+    </ul>
+   <li>
+    <a data-link-type="biblio">[SVG2]</a> defines the following terms:
+    <ul>
+     <li><span class="dfn-paneled" id="term-for-RProperty" style="color:initial">r</span>
     </ul>
   </ul>
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
@@ -609,13 +876,73 @@ which applies to all color channels.</p>
    <dd>Tab Atkins Jr.; Elika Etemad. <a href="https://www.w3.org/TR/css-values-4/">CSS Values and Units Module Level 4</a>. 31 January 2019. WD. URL: <a href="https://www.w3.org/TR/css-values-4/">https://www.w3.org/TR/css-values-4/</a>
    <dt id="biblio-rfc2119">[RFC2119]
    <dd>S. Bradner. <a href="https://tools.ietf.org/html/rfc2119">Key words for use in RFCs to Indicate Requirement Levels</a>. March 1997. Best Current Practice. URL: <a href="https://tools.ietf.org/html/rfc2119">https://tools.ietf.org/html/rfc2119</a>
+   <dt id="biblio-svg2">[SVG2]
+   <dd>Amelia Bellamy-Royds; et al. <a href="https://www.w3.org/TR/SVG2/">Scalable Vector Graphics (SVG) 2</a>. 4 October 2018. CR. URL: <a href="https://www.w3.org/TR/SVG2/">https://www.w3.org/TR/SVG2/</a>
   </dl>
   <h2 class="no-num no-ref heading settled" id="issues-index"><span class="content">Issues Index</span><a class="self-link" href="#issues-index"></a></h2>
   <div style="counter-reset:issue">
-   <div class="issue"> there are two proposals for color modification.
-	The CSS WG expects that the best aspects of each
-	will be chosen to produce a single eventual solution. <a href="https://github.com/w3c/csswg-drafts/issues/3187">&lt;https://github.com/w3c/csswg-drafts/issues/3187></a><a href="#issue-e3aa6d4c"> ↵ </a></div>
+   <div class="issue"> there are two proposals for color modification (<a href="https://github.com/w3c/csswg-drafts/issues/3187#issuecomment-499126198">proposal 1</a>, <a href="https://gist.github.com/una/edcfa0d3600e0b89b2ebf266bf549721">proposal 2</a>).
+The CSS WG expects that the best aspects of each
+will be chosen to produce a single eventual solution. <a href="https://github.com/w3c/csswg-drafts/issues/3187">&lt;https://github.com/w3c/csswg-drafts/issues/3187></a><a href="#issue-f41f57aa"> ↵ </a></div>
+   <div class="issue"> A future version of this specification may define a relative syntax for <a class="css" data-link-type="maybe" href="https://drafts.csswg.org/css-color-4/#funcdef-color">color()</a> as well.<a href="#issue-5cce798c"> ↵ </a></div>
   </div>
+  <aside class="dfn-panel" data-for="funcdef-rgb">
+   <b><a href="#funcdef-rgb">#funcdef-rgb</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-funcdef-rgb">4.2.1. Relative RGB colors</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="typedef-alpha-value">
+   <b><a href="#typedef-alpha-value">#typedef-alpha-value</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-typedef-alpha-value">4.2.1. Relative RGB colors</a> <a href="#ref-for-typedef-alpha-value①">(2)</a>
+    <li><a href="#ref-for-typedef-alpha-value②">4.2.2. Relative HSL colors</a>
+    <li><a href="#ref-for-typedef-alpha-value③">4.2.3. Relative HWB colors</a>
+    <li><a href="#ref-for-typedef-alpha-value④">4.2.4. Relative Lab colors</a>
+    <li><a href="#ref-for-typedef-alpha-value⑤">4.2.5. Relative LCH colors</a>
+    <li><a href="#ref-for-typedef-alpha-value⑥">4.2.6. Relative grayscale colors</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="funcdef-hsl">
+   <b><a href="#funcdef-hsl">#funcdef-hsl</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-funcdef-hsl">4.2.2. Relative HSL colors</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="typedef-hue">
+   <b><a href="#typedef-hue">#typedef-hue</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-typedef-hue">4.2.2. Relative HSL colors</a>
+    <li><a href="#ref-for-typedef-hue①">4.2.3. Relative HWB colors</a>
+    <li><a href="#ref-for-typedef-hue②">4.2.5. Relative LCH colors</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="funcdef-hwb">
+   <b><a href="#funcdef-hwb">#funcdef-hwb</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-funcdef-hwb">4.2.3. Relative HWB colors</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="funcdef-lab">
+   <b><a href="#funcdef-lab">#funcdef-lab</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-funcdef-lab">4.2.4. Relative Lab colors</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="funcdef-lch">
+   <b><a href="#funcdef-lch">#funcdef-lch</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-funcdef-lch">2. Mixing colors: the color-mix function</a> <a href="#ref-for-funcdef-lch①">(2)</a> <a href="#ref-for-funcdef-lch②">(3)</a>
+    <li><a href="#ref-for-funcdef-lch③">4.1. Adjusting colors: the color-adjust function</a> <a href="#ref-for-funcdef-lch④">(2)</a>
+    <li><a href="#ref-for-funcdef-lch⑤">4.2.5. Relative LCH colors</a>
+   </ul>
+  </aside>
+  <aside class="dfn-panel" data-for="funcdef-gray">
+   <b><a href="#funcdef-gray">#funcdef-gray</a></b><b>Referenced in:</b>
+   <ul>
+    <li><a href="#ref-for-funcdef-gray">4.2.6. Relative grayscale colors</a>
+   </ul>
+  </aside>
 <script>/* script-dfn-panel */
 
 document.body.addEventListener("click", function(e) {

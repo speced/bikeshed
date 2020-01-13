@@ -18,6 +18,7 @@ url:https://tools.ietf.org/html/rfc7230#section-3.1.2;text:reason-phrase;type:df
 url:https://tools.ietf.org/html/rfc7234#section-1.2.1;text:delta-seconds;type:dfn;spec:http-caching
 url:https://tools.ietf.org/html/draft-ietf-httpbis-header-structure#section-2;text:structured header value;type:dfn;spec:header-structure
 url:https://tools.ietf.org/html/draft-ietf-httpbis-header-structure#section-4.1;text:serializing structured headers;type:dfn;spec:header-structure
+url:https://tools.ietf.org/html/draft-ietf-httpbis-header-structure#section-4.2;text:parsing structured headers;type:dfn;spec:header-structure
 </pre>
 
 <pre class=biblio>
@@ -380,6 +381,50 @@ for consistency.
 <p class="note no-backref">A <a for=/>header list</a> is essentially a
 specialized multimap. An ordered list of key-value pairs with potentially duplicate keys.
 
+<p>To
+<dfn export for="header list" id=concept-header-list-get-structured-header>get a structured header</dfn>
+given a <var>name</var> and a <var>type</var> from a <a for=/>header list</a> <var>list</var>, run
+these steps:
+
+<ol>
+ <li><p>Assert: <var>type</var> is one of "<code>dictionary</code>", "<code>list</code>", or
+ "<code>item</code>".
+
+ <li><p>Let <var>value</var> be the result of <a for="header list">getting</a> <var>name</var> from
+ <var>list</var>.
+
+ <li><p>If <var>value</var> is null, then return null.
+
+ <li><p>Let <var>result</var> be the result of executing the <a>parsing structured headers</a>
+ algorithm with <var ignore>input_string</var> set to <var>value</var>, and
+ <var ignore>header_type</var> set to <var>type</var>.
+
+ <li><p>If parsing failed, then return failure.
+
+ <li><p>Return <var>result</var>.
+</ol>
+
+<p>To
+<dfn export for="header list" id=concept-header-list-set-structured-header>set a structured header</dfn>
+<a for=header>name</a>/<a>structured header value</a> <var>name</var>/<var>structuredValue</var>
+pair in a <a for=/>header list</a> <var>list</var>, run these steps:
+
+<ol>
+ <li><p>Let <var>serializedValue</var> be the result of executing the
+ <a>serializing structured headers</a> algorithm on <var>structuredValue</var>.
+
+ <li><p><a for="header list">Set</a> <var>name</var>/<var>serializedValue</var> in <var>list</var>.
+</ol>
+
+<p class=note><a>Structured header values</a> are defined as objects which HTTP can (eventually)
+serialize in interesting and efficient ways. For the moment, Fetch only supports <a for=/>header</a>
+<a for=header>values</a> as <a for=/>byte sequences</a>, which means that these objects can be set
+in <a for=/>header lists</a> only via serialization, and they can be obtained from
+<a for=/>header lists</a> only by parsing. In the future the fact that they are objects might be
+preserved end-to-end. [[!HEADER-STRUCTURE]]
+
+<hr>
+
 <p>A <a for=/>header list</a> <var>list</var>
 <dfn export for="header list" lt="contains|does not contain">contains</dfn> a <a for=header>name</a>
 <var>name</var> if <var>list</var> <a for=list>contains</a> a <a for=/>header</a> whose
@@ -571,23 +616,6 @@ A: 3
  <li><p>Otherwise, <a for=list>append</a> a new <a for=/>header</a> whose <a for=header>name</a> is
  <var>name</var> and <a for=header>value</a> is <var>value</var> to <var>list</var>.
 </ol>
-
-<p>To
-<dfn export for="header list" id=concept-header-list-set-structured-header>set a structured header</dfn>
-<a for=header>name</a>/<a>structured header value</a> <var>name</var>/<var>structuredValue</var>
-pair in a <a for=/>header list</a> <var>list</var>, run these steps:
-
-<ol>
- <li><p>Let <var>serializedValue</var> be the result of executing the
- <a>serializing structured headers</a> algorithm on <var>structuredValue</var>.
-
- <li><p><a for="header list">Set</a> <var>name</var>/<var>serializedValue</var> in <var>list</var>.
-</ol>
-
-<p class="note"><a>Structured header values</a> are defined as objects which HTTP can (eventually)
-serialize in interesting and efficient ways. For the moment, Fetch only supports setting these
-objects in <a for=/>header lists</a> by serializing them. In the future the fact that they are
-objects might be preserved end-to-end. [[!HEADER-STRUCTURE]]
 
 <p>To <dfn export for="header list" id=concept-header-list-combine>combine</dfn> a
 <a for=header>name</a>/<a for=header>value</a> <var>name</var>/<var>value</var> pair in a
@@ -888,6 +916,16 @@ from APIs using <a for=/>fetch</a> that allow control over
 <ul class=brief>
  <li>`<code>Set-Cookie</code>`
  <li>`<code>Set-Cookie2</code>`
+</ul>
+
+<p>A <dfn export>request-body-header name</dfn> is a <a for=/>header</a> <a for=header>name</a> that
+is a <a>byte-case-insensitive</a> match for one of:
+
+<ul class=brief>
+ <li>`<code>Content-Encoding</code>`
+ <li>`<code>Content-Language</code>`
+ <li>`<code>Content-Location</code>`
+ <li>`<code>Content-Type</code>`
 </ul>
 
 <hr>
@@ -1548,10 +1586,15 @@ Unless stated otherwise, it is unset.
 <p>A <a for=/>request</a> has an associated <dfn export for=request id=done-flag>done flag</dfn>.
 Unless stated otherwise, it is unset.
 
+<p>A <a for=/>request</a> has an associated
+<dfn export for=request id=timing-allow-failed>timing allow failed flag</dfn>. Unless stated
+otherwise, it is unset.
+
 <p class="note no-backref">A <a for=/>request</a>'s <a for=request>tainted origin flag</a>,
 <a for=request>URL list</a>, <a for=request>current URL</a>, <a for=request>redirect count</a>,
-<a for=request>response tainting</a>, and <a for=request>done flag</a> are used as bookkeeping
-details by the <a for=/>fetch</a> algorithm.
+<a for=request>response tainting</a>, <a for=request>done flag</a>, and
+<a for=request>timing allow failed flag</a> are used as bookkeeping details by the
+<a for=/>fetch</a> algorithm.
 
 <hr>
 
@@ -1585,11 +1628,15 @@ run these steps:
 
 <ol>
  <li><p>If <var>request</var>'s <a for=request>tainted origin flag</a> is set, then return
- `<code>null</code>`.
+ "<code>null</code>".
 
  <li><p>Return <var>request</var>'s <a for=request>origin</a>,
- <a lt="ASCII serialization of an origin">serialized</a> and <a>isomorphic encoded</a>.
+ <a lt="ASCII serialization of an origin">serialized</a>.
 </ol>
+
+<p><dfn>Byte-serializing a request origin</dfn>, given a <a for=/>request</a> <var>request</var>,
+is to return the result of <a>serializing a request origin</a> with <var>request</var>,
+<a>isomorphic encoded</a>.
 
 <hr>
 
@@ -1756,14 +1803,6 @@ message as HTTP/2 does not support them.
 <a for=/>body</a>). Unless stated otherwise it is null.
 
 <p>A <a for=/>response</a> has an associated
-<dfn export for=response id=concept-response-trailer>trailer</dfn> (a
-<a for=/>header list</a>). Unless stated otherwise it is empty.
-
-<p>A <a for=/>response</a> has an associated
-<dfn export for=response id=concept-response-trailer-failed>trailer failed flag</dfn>, which is
-initially unset.
-
-<p>A <a for=/>response</a> has an associated
 <dfn export for=response id=concept-response-cache-state>cache state</dfn> (the empty string or
 "<code>local</code>"). Unlesss stated otherwise, it is the empty string.
 
@@ -1800,6 +1839,15 @@ initially unset.
 being provided to an API that didn't make a range request. See the flag's usage for a detailed
 description of the attack.
 
+<p>A <a for=/>response</a> has an associated
+<dfn for=response id=concept-response-timing-allow-passed>timing allow passed flag</dfn>, which is
+initially unset.
+
+<p class=note>This is used so that the caller to a fetch can determine if sensitive timing data is
+allowed on the resource fetched by looking at the flag of the response returned. Because the flag on
+the response of a redirect has to be set if it was set for previous responses in the redirect chain,
+this is also tracked internally using the request's <a for=request>timing allow failed flag</a>.
+
 <p>A <a for=/>response</a> can have an associated
 <dfn export for=response id=concept-response-location-url>location URL</dfn> (null, failure, or a
 <a for=/>URL</a>). Unless specified otherwise, <a for=/>response</a> has no
@@ -1824,9 +1872,8 @@ known as an <dfn export id=concept-aborted-network-error>aborted network error</
 <a for=/>response</a> whose
 <a for=response>status</a> is always <code>0</code>,
 <a for=response>status message</a> is always the empty byte sequence,
-<a for=response>header list</a> is always empty,
-<a for=response>body</a> is always null, and
-<a for=response>trailer</a> is always empty.
+<a for=response>header list</a> is always empty, and
+<a for=response>body</a> is always null.
 
 <hr>
 
@@ -1855,7 +1902,7 @@ which is only "accessible" to internal specification algorithms and is never a
 
 <p>A <dfn export id=concept-filtered-response-cors>CORS filtered response</dfn> is a
 <a>filtered response</a> whose
-<a for=response>type</a> is "<code>cors</code>",
+<a for=response>type</a> is "<code>cors</code>" and
 <a for=response>header list</a> excludes any
 <a for=/>headers</a> in
 <a for=internal>internal response</a>'s
@@ -1863,8 +1910,7 @@ which is only "accessible" to internal specification algorithms and is never a
 <a for=header>name</a> is <em>not</em> a
 <a>CORS-safelisted response-header name</a>, given
 <a for=internal>internal response</a>'s
-<a for=response>CORS-exposed header-name list</a>, and
-<a for=response>trailer</a> is empty.
+<a for=response>CORS-exposed header-name list</a>.
 
 <p>An <dfn export id=concept-filtered-response-opaque>opaque filtered response</dfn> is a
 <a>filtered response</a> whose
@@ -1872,9 +1918,8 @@ which is only "accessible" to internal specification algorithms and is never a
 <a for=response>URL list</a> is the empty list,
 <a for=response>status</a> is <code>0</code>,
 <a for=response>status message</a> is the empty byte sequence,
-<a for=response>header list</a> is empty,
-<a for=response>body</a> is null, and
-<a for=response>trailer</a> is empty.
+<a for=response>header list</a> is empty, and
+<a for=response>body</a> is null.
 
 <p>An
 <dfn export id=concept-filtered-response-opaque-redirect>opaque-redirect filtered response</dfn>
@@ -1882,9 +1927,8 @@ is a <a>filtered response</a> whose
 <a for=response>type</a> is "<code>opaqueredirect</code>",
 <a for=response>status</a> is <code>0</code>,
 <a for=response>status message</a> is the empty byte sequence,
-<a for=response>header list</a> is empty,
-<a for=response>body</a> is null, and
-<a for=response>trailer</a> is empty.
+<a for=response>header list</a> is empty, and
+<a for=response>body</a> is null.
 
 <div class="note no-backref">
  <p>Exposing the <a for=response>URL list</a> for
@@ -2387,13 +2431,12 @@ if the result of calling
 request <a for=/>header</a> indicates where a
 <a for=/>fetch</a> originates from.
 
-<p class="note no-backref">The `<a http-header><code>Origin</code></a>` header is a version
-of the `<code>Referer</code>` [sic] header that does not reveal a
-<a for=url>path</a>. It is used for
-all <a lt="HTTP fetch">HTTP fetches</a> whose <i>CORS flag</i> is
-set as well as those where <a for=/>request</a>'s
-<a for=request>method</a> is neither `<code>GET</code>` nor `<code>HEAD</code>`. Due to
-compatibility constraints it is not included in all
+<p class="note no-backref">The `<a http-header><code>Origin</code></a>` header is a version of the
+`<code>Referer</code>` [sic] header that does not reveal a <a for=url>path</a>. It is used for all
+<a lt="HTTP fetch">HTTP fetches</a> whose <a for=/>request</a>'s
+<a for=request>response tainting</a> is "<code>cors</code>", as well as those where
+<a for=/>request</a>'s <a for=request>method</a> is neither `<code>GET</code>` nor
+`<code>HEAD</code>`. Due to compatibility constraints it is not included in all
 <a lt=fetch for=/>fetches</a>.
 <!-- Ian Hickson told me Adam Barth researched that -->
 
@@ -2413,16 +2456,16 @@ origin                           = <a for=url>scheme</a> "://" <a for=url>host</
 <hr>
 
 <p>To <dfn id=append-a-request-origin-header>append a request `<code>Origin</code>` header</dfn>,
-given a <a for=/>request</a> <var>request</var> with an optional <i>CORS flag</i>, run these steps:
+given a <a for=/>request</a> <var>request</var>, run these steps:
 
 <ol>
- <li><p>Let <var>serializedOrigin</var> be the result of <a>serializing a request origin</a> with
- <var>request</var>.
+ <li><p>Let <var>serializedOrigin</var> be the result of <a>byte-serializing a request origin</a>
+ with <var>request</var>.
 
- <li><p>If the <i>CORS flag</i> is set or <var>request</var>'s <a for=request>mode</a> is
- "<code>websocket</code>", then <a for="header list">append</a>
- `<code>Origin</code>`/<var>serializedOrigin</var> to <var>request</var>'s
- <a for=request>header list</a>.
+ <li><p>If <var>request</var>'s <a for=request>response tainting</a> is "<code>cors</code>" or
+ <var>request</var>'s <a for=request>mode</a> is "<code>websocket</code>", then
+ <a for="header list">append</a> `<code>Origin</code>`/<var>serializedOrigin</var> to
+ <var>request</var>'s <a for=request>header list</a>.
 
  <li>
   <p>Otherwise, if <var>request</var>'s <a for=request>method</a> is neither `<code>GET</code>` nor
@@ -3094,8 +3137,9 @@ Cross-Origin-Resource-Policy     = %s"same-origin" / %s"same-site" ; case-sensit
 
   <p class="note no-backref">While redirects that carry  a
   `<a http-header><code>Cross-Origin-Resource-Policy</code></a>` header are checked, redirects
-  without such a header resulting in <var>response</var> do not contribute to this algorithm. I.e.,
-  <var>request</var>'s <a for=request>tainted origin flag</a> is not checked.
+  without such a header resulting in <var>response</var> do not affect the outcome as the default is
+  <b>allowed</b>.
+  <!-- This changes with COEP's cross-origin value. -->
 
  <li>
   <p>Let <var>policy</var> be the result of <a for="header list">getting</a>
@@ -3112,8 +3156,8 @@ Cross-Origin-Resource-Policy     = %s"same-origin" / %s"same-site" ; case-sensit
   <p>If the following are true
 
   <ul class=brief>
-   <li><var>request</var>'s <a for=request>origin</a>'s <a for=url>host</a> is <a>same site</a> with
-   <var>request</var>'s <a for=request>current URL</a>'s <a for=url>host</a>
+   <li><var>request</var>'s <a for=request>origin</a> is <a>schemelessly same site</a> with
+   <var>request</var>'s <a for=request>current URL</a>'s <a for=url>origin</a>
    <li><var>request</var>'s <a for=request>origin</a>'s <a for=url>scheme</a> is
    "<code>https</code>" or <var>response</var>'s <a for=response>HTTPS state</a> is
    "<code>none</code>"
@@ -3267,11 +3311,11 @@ the request.
 
 <h3 id=main-fetch>Main fetch</h3>
 
-<p>To perform a <dfn id=concept-main-fetch for=main>main fetch</dfn> using <var>request</var>, optionally
-with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
+<p>To perform a <dfn id=concept-main-fetch for=main>main fetch</dfn> using <var>request</var>,
+optionally with a <i>recursive flag</i>, run these steps:
 
 <p class=note>When <a for=main>main fetch</a> is invoked recursively
-<i>recursive flag</i> is set. <i>CORS flag</i> is a bookkeeping detail for handling redirects.
+<i>recursive flag</i> is set.
 
 <ol>
  <li><p>Let <var>response</var> be null.
@@ -3375,8 +3419,8 @@ with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
 
   <dl class=switch>
    <dt><var>request</var>'s <a for=request>current URL</a>'s <a for=url>origin</a> is
-   <a>same origin</a> with <var>request</var>'s <a for=request>origin</a>, <var>request</var>'s
-   <a for=request>tainted origin flag</a> is unset, and the <i>CORS flag</i> is unset
+   <a>same origin</a> with <var>request</var>'s <a for=request>origin</a>, and <var>request</var>'s
+   <a for=request>response tainting</a> is "<code>basic</code>"
    <dt><var>request</var>'s <a for=request>current URL</a>'s <a for=url>scheme</a> is
    "<code>data</code>"
    <dt><var>request</var>'s <a for=request>mode</a> is
@@ -3448,8 +3492,7 @@ with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
      "<code>cors</code>".
 
      <li><p>Let <var>corsWithPreflightResponse</var> be the result of performing an
-     <a>HTTP fetch</a> using <var>request</var> with <i>CORS flag</i>
-     and <i>CORS-preflight flag</i> set.
+     <a>HTTP fetch</a> using <var>request</var> with the <i>CORS-preflight flag</i> set.
 
      <li><p>If <var>corsWithPreflightResponse</var> is a <a>network error</a>, then
      <a>clear cache entries</a> using <var>request</var>.
@@ -3464,8 +3507,7 @@ with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
      <a for=request>response tainting</a> to
      "<code>cors</code>".
 
-     <li><p>Return the result of performing an <a>HTTP fetch</a>
-     using <var>request</var> with <i>CORS flag</i> set.
+     <li><p>Return the result of performing an <a>HTTP fetch</a> using <var>request</var>.
     </ol>
   </dl>
 
@@ -3528,6 +3570,9 @@ with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
  <!-- If you are ever tempted to move this around, carefully consider responses from about URLs,
       blob URLs, service workers, HTTP cache, HTTP network, etc. -->
 
+ <li><p>If <var>request</var>'s <a for=request>timing allow failed flag</a> is unset, then set
+ <var>internalResponse</var>'s <a for=response>timing allow passed flag</a>.
+
  <li><p><a href=https://w3c.github.io/webappsec-csp/#set-response-csp-list>Set <var>internalResponse</var>'s CSP list</a>.
  [[!CSP]]
 
@@ -3561,7 +3606,7 @@ with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
    <details>
     <summary>Further details</summary>
 
-    <p>The above steps prevent the following attack attack:
+    <p>The above steps prevent the following attack:
 
     <p>A media element is used to request a range of a cross-origin HTML resource. Although this is
     invalid media, a reference to a clone of the response can be retained in a service worker. This
@@ -3629,14 +3674,6 @@ with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
 
  <li><p><a>Queue a fetch task</a> on <var>request</var> to
  <a>process response end-of-body</a> for <var>response</var>.
-
- <li><p>Wait for either <var>internalResponse</var>'s <a for=response>trailer</a>,
- if any, or for the ongoing fetch to <a for=fetch lt=terminated>terminate</a>. <span class=note>See
- <a href=https://tools.ietf.org/html/rfc7230#section-4.1.2>section 4.1.2</a> of
- [[!HTTP]].</span>
-
- <li><p>If the ongoing fetch is <a for=fetch>terminated</a>, then set <var>internalResponse</var>'s
- <a for=response>trailer failed flag</a>.
 
  <li><p>Set <var>request</var>'s <a>done flag</a>.
 
@@ -3790,10 +3827,10 @@ with a <i>CORS flag</i> and <i>recursive flag</i>, run these steps:
 <h3 id=http-fetch>HTTP fetch</h3>
 
 <p>To perform an <dfn id=concept-http-fetch export>HTTP fetch</dfn> using <var>request</var> with an
-optional <i>CORS flag</i> and <i>CORS-preflight flag</i>, run these steps:
+optional <i>CORS-preflight flag</i>, run these steps:
 
-<p class="note no-backref"><i>CORS flag</i> is still a bookkeeping detail. As is
-<i>CORS-preflight flag</i>; it indicates a <a>CORS-preflight request</a> is needed.
+<p class="note no-backref">The <i>CORS-preflight flag</i> bookkeeping detail indicates a
+<a>CORS-preflight request</a> is needed.
 
 <ol>
  <li><p>Let <var>response</var> be null.
@@ -3884,16 +3921,19 @@ optional <i>CORS flag</i> and <i>CORS-preflight flag</i>, run these steps:
     worker) are not to be exposed to a service worker.
 
    <li><p>Set <var>response</var> and <var>actualResponse</var> to the result of performing an
-   <a>HTTP-network-or-cache fetch</a> using
-   <var>request</var> with <i>CORS flag</i> if set.
+   <a>HTTP-network-or-cache fetch</a> using <var>request</var>.
 
    <li>
-    <p>If <i>CORS flag</i> is set and a <a>CORS check</a> for <var>request</var> and
-    <var>response</var> returns failure, then return a <a>network error</a>.
+    <p>If <var>request</var>'s <a for=request>response tainting</a> is "<code>cors</code>" and a
+    <a>CORS check</a> for <var>request</var> and <var>response</var> returns failure, then return a
+    <a>network error</a>.
 
     <p class="note no-backref">As the <a>CORS check</a> is not to be applied to
     <a for=/>responses</a> whose <a for=response>status</a> is <code>304</code> or <code>407</code>,
     or <a for=/>responses</a> from a service worker for that matter, it is applied here.
+
+   <li><p>If the <a>TAO check</a> for <var>request</var> and <var>response</var> returns failure,
+   then set <var>request</var>'s <a for=request>timing allow failed flag</a>.
   </ol>
 
  <li>
@@ -3932,9 +3972,8 @@ optional <i>CORS flag</i> and <i>CORS-preflight flag</i>, run these steps:
      <var>actualResponse</var>.
 
      <dt>"<code>follow</code>"
-     <dd><p>Set <var>response</var> to the result of performing
-     <a>HTTP-redirect fetch</a> using <var>request</var> and
-     <var>response</var> with <i>CORS flag</i> if set.
+     <dd><p>Set <var>response</var> to the result of performing <a>HTTP-redirect fetch</a> using
+     <var>request</var> and <var>response</var>.
     </dl>
     <!-- not resetting actualResponse since it's no longer used anyway -->
   </ol>
@@ -3951,7 +3990,7 @@ optional <i>CORS flag</i> and <i>CORS-preflight flag</i>, run these steps:
 <a>HTTP fetch</a> above. [[!HTML]]
 
 <p>To perform an <dfn export id=concept-http-redirect-fetch>HTTP-redirect fetch</dfn> using
-<var>request</var> and <var>response</var>, with an optional <i>CORS flag</i>, run these steps:
+<var>request</var> and <var>response</var>, run these steps:
 
 <ol>
  <li><p>Let <var>actualResponse</var> be <var>response</var>, if <var>response</var> is not a
@@ -3979,16 +4018,14 @@ optional <i>CORS flag</i> and <i>CORS-preflight flag</i>, run these steps:
 
  <li><p>If <var>request</var>'s <a for=request>mode</a> is "<code>cors</code>",
  <var>actualResponse</var>'s <a for=response>location URL</a>
- <a lt="include credential">includes credentials</a>, and either <var>request</var>'s
- <a for=request>tainted origin flag</a> is set or <var>request</var>'s <a for=request>origin</a> is
- not <a>same origin</a> with <var>actualResponse</var>'s <a for=response>location URL</a>'s
- <a for=url>origin</a>, then return a <a>network error</a>.
+ <a lt="include credential">includes credentials</a>, and <var>request</var>'s
+ <a for=request>origin</a> is not <a>same origin</a> with <var>actualResponse</var>'s
+ <a for=response>location URL</a>'s <a for=url>origin</a>, then return a <a>network error</a>.
 
  <li>
-  <p>If <i>CORS flag</i> is set and <var>actualResponse</var>'s
-  <a for=response>location URL</a>
-  <a lt="include credential">includes credentials</a>, then return a
-  <a>network error</a>.
+  <p>If <var>request</var>'s <a for=request>response tainting</a> is "<code>cors</code>" and
+  <var>actualResponse</var>'s <a for=response>location URL</a>
+  <a lt="include credential">includes credentials</a>, then return a <a>network error</a>.
 
   <p class=note>This catches a cross-origin resource redirecting to a same-origin URL.
 
@@ -4009,11 +4046,19 @@ optional <i>CORS flag</i> and <i>CORS-preflight flag</i>, run these steps:
    <li><p><var>actualResponse</var>'s <a for=response>status</a> is <code>301</code> or
    <code>302</code> and <var>request</var>'s <a for=request>method</a> is `<code>POST</code>`
    <li><p><var>actualResponse</var>'s <a for=response>status</a> is <code>303</code> and
-   <var>request</var>'s <a for=request>method</a> is not `<code>HEAD</code>`
+   <var>request</var>'s <a for=request>method</a> is not `<code>GET</code>` or `<code>HEAD</code>`
   </ul>
 
-  <p>then set <var>request</var>'s <a for=request>method</a> to `<code>GET</code>` and
-  <var>request</var>'s <a for=request>body</a> to null.
+  <p>then:
+
+  <ol>
+   <li><p>Set <var>request</var>'s <a for=request>method</a> to `<code>GET</code>` and
+   <var>request</var>'s <a for=request>body</a> to null.
+
+   <li><p><a for="list">For each</a> <var>headerName</var> of <a>request-body-header name</a>,
+   <a for="header list">delete</a> <var>headerName</var> from <var>request</var>'s
+   <a for=request>header list</a>.
+  </ol>
 
  <li>
   <p>If <var>request</var>'s <a for=request>body</a> is non-null, then set <var>request</var>'s
@@ -4031,16 +4076,11 @@ optional <i>CORS flag</i> and <i>CORS-preflight flag</i>, run these steps:
 
  <li>
   <p>Return the result of performing a <a for=main>main fetch</a> using <var>request</var> with
+  <i>recursive flag</i> set if <var>request</var>'s <a for=request>redirect mode</a> is not
+  "<code>manual</code>".
 
-  <ul>
-   <li><p><i>CORS flag</i> if set and
-   <li>
-    <p><i>recursive flag</i> set if <var>request</var>'s <a for=request>redirect mode</a> is not
-    "<code>manual</code>".
-
-    <p class=note>It can only be "<code>manual</code>" when invoked directly from HTML's navigate
-    algorithm.
-  </ul>
+  <p class=note>It can only be "<code>manual</code>" when invoked directly from HTML's navigate
+  algorithm.
 
   <p class="note no-backref">This has to invoke <a for=main>main fetch</a> to
   get <a for=request>response tainting</a> correct.
@@ -4051,11 +4091,9 @@ optional <i>CORS flag</i> and <i>CORS-preflight flag</i>, run these steps:
 
 <p>To perform an
 <dfn id=concept-http-network-or-cache-fetch>HTTP-network-or-cache fetch</dfn> using
-<var>request</var> with an optional <i>CORS flag</i> and <i>authentication-fetch flag</i>, run these
-steps:
+<var>request</var> with an optional <i>authentication-fetch flag</i>, run these steps:
 
-<p class=note><i>CORS flag</i> is still a bookkeeping detail. As is
-<i>authentication-fetch flag</i>.
+<p class=note>The <i>authentication-fetch flag</i> is a bookkeeping detail.
 
 <p class=note>Some implementations might support caching of partial content, as per <cite>HTTP
 Range Requests</cite>. [[HTTP-RANGE]] However, this is not widely supported by browser caches.
@@ -4171,8 +4209,7 @@ Range Requests</cite>. [[HTTP-RANGE]] However, this is not widely supported by b
    <a for=request>referrer</a>, <a lt="url serializer">serialized</a> and <a>isomorphic encoded</a>,
    to <var>httpRequest</var>'s <a for=request>header list</a>.
 
-   <li><p><a>Append a request `<code>Origin</code>` header</a> for <var>httpRequest</var> with the
-   <i>CORS flag</i> if set.
+   <li><p><a>Append a request `<code>Origin</code>` header</a> for <var>httpRequest</var>.
 
    <li><p>If <var>httpRequest</var>'s <a for=request>header list</a>
    <a for="header list">does not contain</a> `<code>User-Agent</code>`, then user agents should
@@ -4454,13 +4491,14 @@ Range Requests</cite>. [[HTTP-RANGE]] However, this is not widely supported by b
  <li><p>If <var>httpRequest</var>'s <a for=request>header list</a> <a for="header list">contains</a>
  `<code>Range</code>`, then set <var>response</var>'s <a for=response>range-requested flag</a>.
 
- <li><p>If the <i>CORS flag</i> is unset and the <a>cross-origin resource policy check</a> with
- <var>request</var> and <var>response</var> returns <b>blocked</b>, then return a
- <a>network error</a>.
+ <li><p>If <var>httpRequest</var>'s <a for=request>response tainting</a> is not "<code>cors</code>"
+ and the <a>cross-origin resource policy check</a> with <var>request</var> and <var>response</var>
+ returns <b>blocked</b>, then return a <a>network error</a>.
 
  <li>
-  <p>If <var>response</var>'s <a for=response>status</a> is <code>401</code>, <i>CORS flag</i>
-  is unset, <i>credentials flag</i> is set, and <var>request</var>'s <a for=request>window</a> is an
+  <p>If <var>response</var>'s <a for=response>status</a> is <code>401</code>,
+  <var>httpRequest</var>'s <a for=request>response tainting</a> is not "<code>cors</code>", the
+  <i>credentials flag</i> is set, and <var>request</var>'s <a for=request>window</a> is an
   <a>environment settings object</a>, then:
 
   <ol>
@@ -4539,9 +4577,8 @@ Range Requests</cite>. [[HTTP-RANGE]] However, this is not widely supported by b
 
     <p class=note>Remaining details surrounding proxy authentication are defined by HTTP.
 
-   <li><p>Set <var>response</var> to the result of performing an
-   <a>HTTP-network-or-cache fetch</a> using
-   <var>request</var> with <i>CORS flag</i> if set.
+   <li><p>Set <var>response</var> to the result of performing an <a>HTTP-network-or-cache fetch</a>
+   using <var>request</var>.
   </ol>
 
  <li><p>If <i>authentication-fetch flag</i> is set, then create an <a>authentication entry</a>
@@ -4830,13 +4867,17 @@ run these steps:
   <a for=request>origin</a> is <var>request</var>'s <a for=request>origin</a>,
   <a for=request>referrer</a> is <var>request</var>'s <a for=request>referrer</a>,
   <a for=request>referrer policy</a> is <var>request</var>'s <a for=request>referrer policy</a>,
-  <a for=request>mode</a> is "<code>cors</code>", and
+  <a for=request>mode</a> is "<code>cors</code>",
   <a for=request>tainted origin flag</a> is <var>request</var>'s
-  <a for=request>tainted origin flag</a>.
+  <a for=request>tainted origin flag</a>, and
+  <a for=request>response tainting</a> is "<code>cors</code>".
 
   <p class="note no-backref">The <a for=request>service-workers mode</a> of <var>preflight</var>
   does not matter as this algorithm uses <a>HTTP-network-or-cache fetch</a> rather than
   <a>HTTP fetch</a>.
+
+ <li><p><a for="header list">Append</a> `<code>Accept</code>`/`<code>*/*</code>` to
+ <var>preflight</var>'s <a for=request>header list</a>.
 
  <li><p><a for="header list">Append</a> `<a http-header><code>Access-Control-Request-Method</code></a>`
  to <var>request</var>'s <a for=request>method</a> in <var>preflight</var>'s
@@ -4860,8 +4901,8 @@ run these steps:
   <p class=note>This intentionally does not use <a for="header list">combine</a>, as 0x20 following
   0x2C is not the way this was implemented, for better or worse.
 
- <li><p>Let <var>response</var> be the result of performing an
- <a>HTTP-network-or-cache fetch</a> using <var>preflight</var> with the <i>CORS flag</i> set.
+ <li><p>Let <var>response</var> be the result of performing an <a>HTTP-network-or-cache fetch</a>
+ using <var>preflight</var>.
 
  <li>
   <p>If a <a>CORS check</a> for <var>request</var> and <var>response</var> returns success and
@@ -4952,7 +4993,7 @@ run these steps:
 <p>A <dfn>cache entry</dfn> consists of:
 
 <ul class=brief>
- <li><dfn id=concept-cache-origin for="cache entry">serialized origin</dfn> (a
+ <li><dfn id=concept-cache-origin for="cache entry">byte-serialized origin</dfn> (a
  <a for=/>byte sequence</a>)
  <li><dfn id=concept-cache-url for="cache entry">URL</dfn> (a <a for=/>URL</a>)
  <li><dfn id=concept-cache-max-age for="cache entry">max-age</dfn> (a number of seconds)
@@ -4975,8 +5016,8 @@ be removed before that moment arrives.
   <p>Let <var>entry</var> be a <a>cache entry</a>, initialized as follows:
 
   <dl>
-   <dt><a for="cache entry">serialized origin</a>
-   <dd><p>The result of <a>serializing a request origin</a> with <var>request</var>
+   <dt><a for="cache entry">byte-serialized origin</a>
+   <dd><p>The result of <a>byte-serializing a request origin</a> with <var>request</var>
 
    <dt><a for="cache entry">URL</a>
    <dd><p><var>request</var>'s <a for=request>current URL</a>
@@ -5000,15 +5041,15 @@ be removed before that moment arrives.
 
 <p>To <dfn id=concept-cache-clear>clear cache entries</dfn>, given a <var>request</var>,
 <a for=list>remove</a> any <a>cache entries</a> in the user agent's <a>CORS-preflight cache</a>
-whose <a for="cache entry">serialized origin</a> is the result of
-<a>serializing a request origin</a> with <var>request</var> and whose <a for="cache entry">URL</a>
-is <var>request</var>'s <a for=request>current URL</a>.
+whose <a for="cache entry">byte-serialized origin</a> is the result of
+<a>byte-serializing a request origin</a> with <var>request</var> and whose
+<a for="cache entry">URL</a> is <var>request</var>'s <a for=request>current URL</a>.
 
 <p>There is a <dfn id=concept-cache-match>cache entry match</dfn> for a <a>cache entry</a>
 <var>entry</var> with <var>request</var> if <var>entry</var>'s
-<a for="cache entry">serialized origin</a> is the result of <a>serializing a request origin</a> with
-<var>request</var>, <var>entry</var>'s <a for="cache entry">URL</a> is <var>request</var>'s
-<a for=request>current URL</a>, and one of
+<a for="cache entry">byte-serialized origin</a> is the result of
+<a>byte-serializing a request origin</a> with <var>request</var>, <var>entry</var>'s
+<a for="cache entry">URL</a> is <var>request</var>'s <a for=request>current URL</a>, and one of
 
 <ul class=brief>
  <li><var>entry</var>'s <a for="cache entry">credentials</a> is true
@@ -5056,7 +5097,7 @@ agent's <a>CORS-preflight cache</a> for which there is a <a>cache entry match</a
  <li><p>If <var>request</var>'s <a for=request>credentials mode</a> is not "<code>include</code>"
  and <var>origin</var> is `<code>*</code>`, then return success.
 
- <li><p>If the result of <a>serializing a request origin</a> with <var>request</var> is not
+ <li><p>If the result of <a>byte-serializing a request origin</a> with <var>request</var> is not
  <var>origin</var>, then return failure.
 
  <li><p>If <var>request</var>'s <a for=request>credentials mode</a> is not "<code>include</code>",
@@ -5067,6 +5108,31 @@ agent's <a>CORS-preflight cache</a> for which there is a <a>cache entry match</a
  <a for=response>header list</a>.
 
  <li><p>If <var>credentials</var> is `<code>true</code>`, then return success.
+
+ <li><p>Return failure.
+</ol>
+
+
+<h3 id=tao-check>TAO check</h3>
+
+<p>To perform a <dfn id=concept-tao-check>TAO check</dfn> for a <var>request</var> and
+<var>response</var>, run these steps:
+
+<ol>
+ <li><p>If <var>request</var>'s <a for=request>timing allow failed flag</a> is set, then return
+ failure.
+
+ <li><p>If <var>request</var>'s <a for=request>response tainting</a> is "<code>basic</code>", then
+ return success.
+
+ <li><p>Let <var>values</var> be the result of
+ <a for="header list">getting, decoding, and splitting</a> `<code>Timing-Allow-Origin</code>` from
+ <var>response</var>'s <a for=response>header list</a>.
+
+ <li><p>If <var>values</var> <a for=list>contains</a> "<code>*</code>", then return success.
+
+ <li><p>If <var>values</var> <a for=list>contains</a> the result of
+ <a>serializing a request origin</a> with <var>request</var>, then return success.
 
  <li><p>Return failure.
 </ol>
@@ -5152,16 +5218,18 @@ fetch("/music/pk/altes-kamuffel.flac")
 <pre class=idl>
 typedef (sequence&lt;sequence&lt;ByteString>> or record&lt;ByteString, ByteString>) HeadersInit;
 
-[Constructor(optional HeadersInit init),
- Exposed=(Window,Worker)]
+[Exposed=(Window,Worker)]
 interface Headers {
+  constructor(optional HeadersInit init);
+
   void append(ByteString name, ByteString value);
   void delete(ByteString name);
   ByteString? get(ByteString name);
   boolean has(ByteString name);
   void set(ByteString name, ByteString value);
   iterable&lt;ByteString, ByteString>;
-};</pre>
+};
+</pre>
 
 <p class=note>Unlike a <a for=/>header list</a>, a {{Headers}} object cannot represent more than one
 `<code>Set-Cookie</code>` <a for=/>header</a>. In a way this is problematic as unlike all other
@@ -5588,9 +5656,10 @@ runs the associated steps:
 
     <p>Each part whose `<code>Content-Disposition</code>` header does not contain a
     `<code>filename</code>` parameter must be parsed into an <a for=FormData>entry</a> whose value
-    is the <a>UTF-8 decoded</a> content of the part. <span class=note>This is done regardless of the
-    presence or the value of a `<code>Content-Type</code>` header and regardless of the presence or
-    the value of a `<code>charset</code>` parameter.</span></p>
+    is the <a lt="UTF-8 decode without BOM">UTF-8 decoded without BOM</a> content of the part.
+    <span class=note>This is done regardless of the presence or the value of a
+    `<code>Content-Type</code>` header and regardless of the presence or the value of a
+    `<code>charset</code>` parameter.</span></p>
 
     <p class=note>A part whose `<code>Content-Disposition</code>` header contains a
     `<code>name</code>` parameter whose value is `<code>_charset_</code>` is parsed like any other
@@ -5689,9 +5758,10 @@ invoked, must return the result of running
 <pre class=idl>
 typedef (Request or USVString) RequestInfo;
 
-[Constructor(RequestInfo input, optional RequestInit init = {}),
- Exposed=(Window,Worker)]
+[Exposed=(Window,Worker)]
 interface Request {
+  constructor(RequestInfo input, optional RequestInit init = {});
+
   readonly attribute ByteString method;
   readonly attribute USVString url;
   [SameObject] readonly attribute Headers headers;
@@ -5733,7 +5803,8 @@ enum RequestDestination { "", "audio", "audioworklet", "document", "embed", "fon
 enum RequestMode { "navigate", "same-origin", "no-cors", "cors" };
 enum RequestCredentials { "omit", "same-origin", "include" };
 enum RequestCache { "default", "no-store", "reload", "no-cache", "force-cache", "only-if-cached" };
-enum RequestRedirect { "follow", "error", "manual" };</pre>
+enum RequestRedirect { "follow", "error", "manual" };
+</pre>
 
 <p class="note no-backref">"<code>serviceworker</code>" is omitted from
 <a enum><code>RequestDestination</code></a> as it cannot be observed from JavaScript. Implementations
@@ -6216,17 +6287,19 @@ constructor must run these steps:
   <p>If <var>inputBody</var> is <var>body</var> and <var>inputBody</var> is non-null, then:
 
   <ol>
-   <li>
-    <p>Let <var>rs</var> bs a {{ReadableStream}} object from which one can read the exactly
-    same data as one could read from <var>inputBody</var>'s <a for=body>stream</a>.
+   <li><p>Let <var>ws</var> and <var>rs</var> be the <a>writable side</a> and <a>readable side</a>
+   of an <a>identity transform stream</a>, respectively.</li>
 
-    <p class=XXX>This will be specified more precisely once
-    <a href=https://streams.spec.whatwg.org/#ts-model>transform stream</a> and
-    <a href=https://streams.spec.whatwg.org/#pipe-chains>piping</a> are precisely defined.
-    See <a href=https://github.com/whatwg/fetch/issues/463>issue #463</a>.
+   <li>
+    <p>Let <var>promise</var> be the result of calling
+    <a abstract-op>ReadableStreamPipeTo</a>(<var>inputBody</var>, <var>ws</var></var>, false,
+    false, false, undefined).
 
     <p class="note no-backref">This makes <var>inputBody</var>'s <a for=body>stream</a>
     <a for=ReadableStream>locked</a> and <a for=ReadableStream>disturbed</a> immediately.
+   </li>
+
+   <li><p>Set <var>promise</var>.\[[PromiseIsHandled]]</var> to true.
 
    <li><p>Set <var>body</var> to a new <a for=/>body</a> whose <a for=body>stream</a> is
    <var>rs</var>, whose <a for=body>source</a> is <var>inputBody</var>'s <a for=body>source</a>, and
@@ -6336,9 +6409,10 @@ run these steps:
 
 <h3 id=response-class>Response class</h3>
 
-<pre class=idl>[Constructor(optional BodyInit? body = null, optional ResponseInit init = {}),
- Exposed=(Window,Worker)]
+<pre class=idl>[Exposed=(Window,Worker)]
 interface Response {
+  constructor(optional BodyInit? body = null, optional ResponseInit init = {});
+
   [NewObject] static Response error();
   [NewObject] static Response redirect(USVString url, optional unsigned short status = 302);
 
@@ -6350,7 +6424,6 @@ interface Response {
   readonly attribute boolean ok;
   readonly attribute ByteString statusText;
   [SameObject] readonly attribute Headers headers;
-  readonly attribute Promise&lt;Headers> trailer;
 
   [NewObject] Response clone();
 };
@@ -6362,7 +6435,8 @@ dictionary ResponseInit {
   HeadersInit headers;
 };
 
-enum ResponseType { "basic", "cors", "default", "error", "opaque", "opaqueredirect" };</pre>
+enum ResponseType { "basic", "cors", "default", "error", "opaque", "opaqueredirect" };
+</pre>
 
 <p>A {{Response}} object has an associated
 <dfn id=concept-response-response for=Response export>response</dfn> (a
@@ -6370,10 +6444,6 @@ enum ResponseType { "basic", "cors", "default", "error", "opaque", "opaqueredire
 
 <p>A {{Response}} object also has an associated <dfn for=Response export>headers</dfn> (null or a
 {{Headers}} object), initially null.
-
-<p>A {{Response}} object also has an associated
-<dfn id=concept-response-trailer-promise for=Response>trailer promise</dfn> (a promise). <span class=note>Used
-for the {{Response/trailer}} attribute.</span>
 
 <p>A {{Response}} object's <a for=Body>body</a> is its
 <a for=Response>response</a>'s <a for=response>body</a>.
@@ -6436,10 +6506,6 @@ constructor, when invoked, must run these steps:
  <a for=response>HTTPS state</a> to
  <a>current settings object</a>'s
  <a for="environment settings object">HTTPS state</a>.
-
- <li><p>Resolve <var>r</var>'s <a for=Response>trailer promise</a>
- with a new {{Headers}} object whose <a for=Headers>guard</a> is
- "<code>immutable</code>".
 
  <li><p>Return <var>r</var>.
 </ol>
@@ -6519,9 +6585,6 @@ must return the <a>context object</a>'s <a for=Response>response</a>'s
 <p>The <dfn attribute for=Response><code>headers</code></dfn> attribute's getter, when invoked, must
 return the <a>context object</a>'s <a for=Response>headers</a>.
 
-<p>The <dfn attribute for=Response><code>trailer</code></dfn> attribute's getter, when invoked, must
-return the <a>context object</a>'s <a for=Response>trailer promise</a>.
-
 <hr>
 
 <p>The <dfn method for=Response><code>clone()</code></dfn> method, when invoked, must
@@ -6544,11 +6607,6 @@ run these steps:
  <a for=Headers>header list</a>, and <a for=Headers>guard</a> is the <a>context object</a>'s
  <a for=Response>headers</a>'s <a for=Headers>guard</a>.
 
- <li><p>Upon fulfillment of the <a>context object</a>'s <a for=Response>trailer promise</a>, resolve
- <var>clonedResponseObject</var>'s <a for=Response>trailer promise</a> with a new {{Headers}} object
- whose <a for=Headers>guard</a> is "<code>immutable</code>", and whose
- <a for="Headers">header list</a> is <var>clonedResponse</var>'s <a for=response>trailer</a>.
-
  <li><p>Return <var>clonedResponseObject</var>.
 
  <li><p>Return <var>clonedResponse</var>.
@@ -6559,8 +6617,9 @@ run these steps:
 
 <pre class=idl>
 partial interface mixin WindowOrWorkerGlobalScope {
-  [NewObject] Promise&lt;Response> fetch(RequestInfo input, optional RequestInit init);
-};</pre>
+  [NewObject] Promise&lt;Response> fetch(RequestInfo input, optional RequestInit init = {});
+};
+</pre>
 
 <p>The
 <dfn id=dom-global-fetch method for=WindowOrWorkerGlobalScope><code>fetch(<var>input</var>, <var>init</var>)</code></dfn>
@@ -6634,36 +6693,6 @@ method, must run these steps:
    <li><p>Resolve <var>p</var> with <var>responseObject</var>.
   </ol>
 
-  <p>To <a>process response done</a> for <var>response</var>, run these substeps:
-
-  <ol>
-   <li><p>If <var>locallyAborted</var> is true, terminate these substeps.
-
-   <li><p>Let <var>trailerObject</var> be a new {{Headers}} object whose
-   <a for=Headers>guard</a> is "<code>immutable</code>".
-
-   <li>
-    <p>If <var>response</var>'s <a for=response>trailer failed flag</a> is set, then:
-
-    <ol>
-     <li><p>If <var>response</var>'s <a for=response>aborted flag</a> is set, reject
-     <var>responseObject</var>'s <a for=Response>trailer promise</a> with an
-     "<code><a exception>AbortError</a></code>" {{DOMException}}.
-
-     <li><p>Otherwise, reject <var>responseObject</var>'s <a for=Response>trailer promise</a> with
-     a {{TypeError}}.
-
-     <li><p>Terminate these substeps.
-    </ol>
-
-   <li><p>Associate <var>trailerObject</var> with <var>response</var>'s
-   <a for=response>trailer</a>.
-
-   <li><p>Resolve <var>responseObject</var>'s
-   <a for=Response>trailer promise</a> with
-   <var>trailerObject</var>.
-  </ol>
-
  <li><p>Return <var>p</var>.
 </ol>
 
@@ -6683,12 +6712,6 @@ method, must run these steps:
  <a for=request>body</a> with <var>error</var>.
 
  <li><p>If <var>responseObject</var> is null, then return.
-
- <li>
-  <p>Reject <var>responseObject</var>'s <a for=Response>trailer promise</a> with <var>error</var>.
-
-  <p class=note>This is a no-op if <var>responseObject</var>'s <a for=Response>trailer promise</a>
-  has already fulfilled.
 
  <li><p>Let <var>response</var> be <var>responseObject</var>'s <a for=Response>response</a>.
 
@@ -7197,12 +7220,14 @@ Mohammed Zubair Ahmed<!-- M-ZubairAhmed; GitHub -->,
 Moritz Kneilmann,
 Ms2ger,
 Nico Schlömer,
+Nicolás Peña Moreno,
 Nikhil Marathe,
 Nikki Bee,
 Nikunj Mehta,
 Odin Hørthe Omdal,
 Ondřej Žára,
 O. Opsec,
+Perry Jiang<!-- perryjiang; Github -->,
 Philip Jägenstedt,
 R. Auburn,
 Raphael Kubo da Costa,

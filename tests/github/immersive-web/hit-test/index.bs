@@ -1,41 +1,52 @@
 <pre class="metadata">
 Shortname: webxr-hit-test
-Title: WebXR Hit Test Module - Level 1
-Group: immersivewebwg
-Status: ED
+Title: WebXR Hit Test Module
+Group: immersivewebcg
+Status: CG-DRAFT
+Level: 1
 ED: https://immersive-web.github.io/hit-test/
 Repository: immersive-web/hit-test
-Level: 1
 Mailing List Archives: https://lists.w3.org/Archives/Public/public-immersive-web/
 
 !Participate: <a href="https://github.com/immersive-web/hit-test/issues/new">File an issue</a> (<a href="https://github.com/immersive-web/hit-test/issues">open issues</a>)
 !Participate: <a href="https://lists.w3.org/Archives/Public/public-immersive-web/">Mailing list archive</a>
 !Participate: <a href="irc://irc.w3.org:6665/">W3C's #immersive-web IRC</a>
 
-Editor: Brandon Jones 87824, Google http://google.com/, bajones@google.com
-Editor: Nell Waliczek 93109, Amazon [Microsoft until 2018] https://amazon.com/, nhw@amazon.com
+Editor: Piotr Bialecki 114482, Google http://google.com/, bialpio@google.com
 
 Abstract: Describes a method for performing hit tests against real world geometry to be used with the WebXR Device API.
-
-Warning: custom
-Custom Warning Title: Unstable API
-Custom Warning Text:
-  <b>The API represented in this document is under development and may change at any time.</b>
-  <p>For additional context on the use of this API please reference the <a href="https://github.com/immersive-web/webxr-ar-module/blob/master/ar-module-explainer.md">WebXR Augmented Reality Module Explainer</a>.</p>
 </pre>
 
 <pre class="link-defaults">
-spec:infra;
-    type:dfn; text:string
+spec:webxr device api - level 1; type:dfn; for:/; text:xr device
 </pre>
 
 <pre class="anchors">
 spec: WebXR Device API - Level 1; urlPrefix: https://www.w3.org/TR/webxr/#
+    for: XRSpace;
+        type: dfn; text: session; url: xrspace-session
+        type: dfn; text: native origin; url: xrspace-native-origin
+        type: dfn; text: origin offset; url: xrspace-origin-offset
+        type: dfn; text: effective origin; url: xrspace-effective-origin
     type: interface; text: XRSession; url: xrsession-interface
+    for: XRSession;
+        type: dfn; text: list of frame updates; url: xrsession-list-of-frame-updates
+        type: dfn; text: XR device; url: xrsession-xr-device
+    type: interface; text: XRFrame; url: xrframe-interface
+    for: XRFrame;
+        type: dfn; text: session; url: dom-xrframe-session
+        type: dfn; text: active; url: xrframe-active
     type: interface; text: XRRigidTransform; url: xrrigidtransform-interface
-    type: attribute; text: matrix; for: XRRigidTransform; url: dom-xrrigidtransform-matrix
+    for: XRRigidTransform;
+        type: attribute; text: matrix; url: dom-xrrigidtransform-matrix
+    for: XRInputSource;
+        type: dfn; text: input profile name; url: xrinputsource-input-profile-name
+    type: dfn; text: list of active XR input sources; url: list-of-active-xr-input-sources
+    type: dfn; text: XR device; url: xr-device
     type: dfn; text: matrix; url: matrix
     type: dfn; text: normalize; url: normalize
+    type: dfn; text: populate the pose; url: populate-the-pose
+    type: dfn; text: identity transform; url: identity-transform
 spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/#
     type: method; text: IsDetachedBuffer; url: sec-isdetachedbuffer
 </pre>
@@ -44,31 +55,6 @@ spec: ECMAScript; urlPrefix: https://tc39.github.io/ecma262/#
 <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
 
 <style>
-  .unstable::before {
-    content: "This section is not stable";
-    display: block;
-    font-weight: bold;
-    text-align: right;
-    color: red;
-  }
-  .unstable {
-    border: thin solid pink;
-    border-radius: .5em;
-    padding: .5em;
-    margin: .5em calc(-0.5em - 1px);
-    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='290'><text transform='rotate(-45)' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='70' y='210' opacity='.1'>Unstable</text></svg>");
-    background-repeat: repeat;
-    background-color: #FFF4F4;
-  }
-  .unstable h3:first-of-type {
-    margin-top: 0.5rem;
-  }
-
-  .unstable.example:not(.no-marker)::before {
-    content: "Example " counter(example) " (Unstable)";
-    float: none;
-  }
-
   .non-normative::before {
     content: "This section is non-normative.";
     font-style: italic;
@@ -103,27 +89,398 @@ Introduction {#intro}
 
 <section class="non-normative">
 
-This potential module describes a mechanism for allowing WebXR applications to cast rays into the users real world environment and report back, to the best of the XR device's knowledge, the point at which the ray intersected with a physical object and the orientation of the intersected surface. This allows for virtual objects to be placed in alignment with those surfaces, such as placing objects realistically on the floor or attaching them to a wall.
+This module describes a mechanism for allowing WebXR applications to cast rays into the users' real world environment and report back, to the best of the XR device's knowledge, the point at which the ray intersected with a physical object along with the orientation of the intersected surface. This allows for virtual objects to be placed in alignment with those surfaces, such as placing objects realistically on the floor or attaching them to a wall. The hit test API is an extension to <a href="https://www.w3.org/TR/webxr/">WebXR Device API</a> and builds on top of <a href="https://github.com/immersive-web/webxr-ar-module/">WebXR Augmented Reality Module</a>.
 
 </section>
 
-WebXR Device API Integration {#webxr-device-api-integration}
-============================
-This module expands the definition of {{XRSession}}.
+Terminology {#terminology}
+-----------
 
-Geometric Primitives {#geometric-primitives}
+Hit testing, as understood by this document, is an act of checking if an idealised mathematical ray (half-line) intersects with real world as understood by the underlying Augmented Reality hardware & software. Ray intersections against virtual objects created by the application consuming the API are explicitly out of scope of the hit test API.
+
+Hit test options {#hit-test-options}
+================
+
+XRHitTestTrackableType {#hit-test-trackable-type-enum}
+----------------------
+
+An {{XRHitTestTrackableType}} enum specifies the type of entity that can be used for the purposes of hit test source creation.
+
+<script type="idl">
+enum XRHitTestTrackableType {
+  "point",
+  "plane",
+  "mesh"
+};
+</script>
+
+- A hit test trackable of type <dfn enum-value for="XRHitTestTrackableType">"point"</dfn> indicates that the hit test results will be computed based on the feature points detected by the underlying Augmented Reality system.
+- A hit test trackable of type <dfn enum-value for="XRHitTestTrackableType">"plane"</dfn> indicates that the hit test results will be computed based on the planes detected by the underlying Augmented Reality system.
+- A hit test trackable of type <dfn enum-value for="XRHitTestTrackableType">"mesh"</dfn> indicates that the hit test results will be computed based on the meshes detected by the underlying Augmented Reality system.
+
+XRHitTestOptionsInit {#hit-test-options-dictionary}
+--------------------
+
+An {{XRHitTestOptionsInit}} dictionary represents a set of configurable values that affect the behavior of the hit test being performed.
+
+<script type="idl">
+dictionary XRHitTestOptionsInit {
+  required XRSpace space;
+  FrozenArray<XRHitTestTrackableType> entityTypes;
+  XRRay offsetRay;
+};
+</script>
+
+The <dfn dict-member for="XRHitTestOptionsInit">space</dfn> dictionary member specifies {{XRSpace}} relative to which the {{XRHitTestOptionsInit/offsetRay}} is specified.
+
+The <dfn dict-member for="XRHitTestOptionsInit">entityTypes</dfn> dictionary member specifies array of <a enum lt="XRHitTestTrackableType">XRHitTestTrackableTypes</a> that will be used to compute results of the hit test.
+
+The <dfn dict-member for="XRHitTestOptionsInit">offsetRay</dfn> dictionary member specifies {{XRRay}} that will be used to perform hit test. The {{XRHitTestOptionsInit/offsetRay}} will be interpreted as if expressed in a coordinate system defined by {{XRHitTestOptionsInit/space}}.
+
+The {{XRHitTestOptionsInit}} dictionary has an associated <dfn for="XRHitTestOptionsInit">effective entityTypes</dfn> which is set to {{XRHitTestOptionsInit/entityTypes}} if it was provided at dictionary construction time. If the {{XRHitTestOptionsInit/entityTypes}} was not provided at construction time, the [=XRHitTestOptionsInit/effective entityTypes=] is set to an array containing single element, {{XRHitTestTrackableType/"plane"}}.
+
+The {{XRHitTestOptionsInit}} dictionary has an associated <dfn for="XRHitTestOptionsInit">effective offsetRay</dfn> which is set to {{XRHitTestOptionsInit/offsetRay}} if it was provided at dictionary construction time. If the {{XRHitTestOptionsInit/offsetRay}} was not provided at construction time, the [=XRHitTestOptionsInit/effective offsetRay=] is set to an {{XRRay}} constructed by invoking {{XRRay/XRRay()}} without any parameters.
+
+XRTransientInputHitTestOptionsInit {#transient-input-hit-test-options-dictionary}
+----------------------------------
+
+An {{XRTransientInputHitTestOptionsInit}} dictionary represents a set of configurable values that affect the behavior of the hit test for transient input that is being performed.
+
+<script type="idl">
+dictionary XRTransientInputHitTestOptionsInit {
+  required DOMString profile;
+  FrozenArray<XRHitTestTrackableType> entityTypes;
+  XRRay offsetRay;
+};
+</script>
+
+The <dfn dict-member for="XRTransientInputHitTestOptionsInit">profile</dfn> dictionary member specifies an [=XRInputSource/input profile name=] of the transient input source that will be used to compute hit test results.
+
+The <dfn dict-member for="XRTransientInputHitTestOptionsInit">entityTypes</dfn> dictionary member specifies array of <a enum lt="XRHitTestTrackableType">XRHitTestTrackableTypes</a> that will be used to compute results of the hit test.
+
+The <dfn dict-member for="XRTransientInputHitTestOptionsInit">offsetRay</dfn> dictionary member specifies {{XRRay}} that will be used to perform hit test. The {{XRTransientInputHitTestOptionsInit/offsetRay}} will be interpreted as if expressed in a coordinate system defined by {{XRInputSource}} whose profile matches the passed in {{XRTransientInputHitTestOptionsInit/profile}} when computing hit test results for transient input sources.
+
+The {{XRTransientInputHitTestOptionsInit}} dictionary has an associated <dfn for="XRTransientInputHitTestOptionsInit">effective entityTypes</dfn> which is set to {{XRTransientInputHitTestOptionsInit/entityTypes}} if it was provided at dictionary construction time. If the {{XRTransientInputHitTestOptionsInit/entityTypes}} was not provided at construction time, the [=XRTransientInputHitTestOptionsInit/effective entityTypes=] is set to an array containing single element, {{XRHitTestTrackableType/"plane"}}.
+
+The {{XRTransientInputHitTestOptionsInit}} dictionary has an associated <dfn for="XRTransientInputHitTestOptionsInit">effective offsetRay</dfn> which is set to {{XRTransientInputHitTestOptionsInit/offsetRay}} if it was provided at dictionary construction time. If the {{XRTransientInputHitTestOptionsInit/offsetRay}} was not provided at construction time, the [=XRTransientInputHitTestOptionsInit/effective offsetRay=] is set to an {{XRRay}} constructed by invoking {{XRRay/XRRay()}} without any parameters.
+
+Hit test source {#hit-test-source}
+===============
+
+XRHitTestSource {#hit-test-source-interface}
+---------------
+
+<script type="idl">
+[SecureContext, Exposed=Window]
+interface XRHitTestSource {
+  void cancel();
+};
+</script>
+
+The {{XRHitTestSource}} object serves as a handle to an active subscription to hit test.
+
+Each {{XRHitTestSource}} has an associated <dfn for="XRHitTestSource">session</dfn> which stores an {{XRSession}} that was used to create the hit test source.
+
+Each {{XRHitTestSource}} has an associated <dfn for="XRHitTestSource">native origin</dfn> which stores information sufficient to identify the [=XRSpace/native origin=] of an {{XRSpace}} that was used to [=request hit test=]. This information will be subsequently used when computing hit test results.
+
+Each {{XRHitTestSource}} has an associated <dfn for="XRHitTestSource">entity types</dfn>, which is an array of <a enum lt="XRHitTestTrackableType">XRHitTestTrackableTypes</a> describing which entity types will be considered when computing hit test results.
+
+Each {{XRHitTestSource}} has an associated <dfn for="XRHitTestSource">offset ray</dfn>, which is an {{XRRay}} that will be used when computing hit test results.
+
+{{XRHitTestSource}} is considered <dfn for="XRHitTestSource">active</dfn> for as long as it's present in [=XRHitTestSource/session=]'s [=XRSession/set of active hit test sources=].
+
+<div class="algorithm" data-algorithm="create-hit-test-source">
+
+In order to <dfn>create a hit test source</dfn> from |session|, |space|, |entityTypes| and |offsetRay|, the user agent MUST run the following steps:
+    1. Let |hitTestSource| be a new {{XRHitTestSource}}.
+    1. Initialize |hitTestSource|'s [=XRHitTestSource/session=] to |session|.
+    1. Initialize |hitTestSource|'s [=XRHitTestSource/native origin=] to |space|'s [=XRSpace/native origin=].
+    1. Initialize |hitTestSource|'s [=XRHitTestSource/entity types=] to |entityTypes|.
+    1. Compute |transformedOffsetRay| from |offsetRay| and |space| such that |transformedOffsetRay|, when interpreted in |space|'s [=XRSpace/native origin=] coordinate system, represents the same ray as |offsetRay| does when interpreted in |space|'s [=effective origin=] coordinate system.
+    1. Initialize |hitTestSource|'s [=XRHitTestSource/offset ray=] to |transformedOffsetRay|.
+    1. Return |hitTestSource|.
+
+</div>
+
+The <dfn method for="XRHitTestSource">cancel()</dfn> method, when invoked on {{XRHitTestSource}} |hitTestSource|, signals that the application is no longer interested in obtaining hit test results for the specified |hitTestSource|.
+
+<div class="algorithm" data-algorithm="cancel-hit-test-source">
+
+When {{XRHitTestSource/cancel()}} method is invoked, the user agent MUST <dfn>cancel a hit test source</dfn> by running the following steps:
+    1. If the |hitTestSource| is not [=XRHitTestSource/active=], throw an {{InvalidStateError}} and abort these steps.
+    1. Remove |hitTestSource| from [=XRHitTestSource/session=]'s [=XRSession/set of active hit test sources=].
+
+</div>
+
+When the application no longer retains any references to a particular {{XRHitTestSource}} <var>hitTestSource</var>, the user agent MAY [=cancel a hit test source=] if <var>hitTestSource</var> is still [=XRHitTestSource/active=]. The cancelation MAY happen at an unspecified time (or not at all) and the application SHOULD NOT rely on this behavior for cleanup.
+
+
+XRTransientInputHitTestSource {#transient-input-hit-test-source-interface}
+-----------------------------
+
+<script type="idl">
+[SecureContext, Exposed=Window]
+interface XRTransientInputHitTestSource {
+  void cancel();
+};
+</script>
+
+The {{XRTransientInputHitTestSource}} object serves as a handle to an active subscription to hit test for transient input sources.
+
+Each {{XRTransientInputHitTestSource}} has an associated <dfn for="XRTransientInputHitTestSource">session</dfn> which stores an {{XRSession}} that was used to create the hit test source.
+
+Each {{XRTransientInputHitTestSource}} has an associated <dfn for="XRTransientInputHitTestSource">profile</dfn> which stores [=XRInputSource/input profile name=] of an input source. This information will be subsequently used when computing hit test results for transient input sources.
+
+Each {{XRTransientInputHitTestSource}} has an associated <dfn for="XRTransientInputHitTestSource">entity types</dfn>, which is an array of <a enum lt="XRHitTestTrackableType">XRHitTestTrackableTypes</a> describing which entity types will be considered when computing hit test results.
+
+Each {{XRTransientInputHitTestSource}} has an associated <dfn for="XRTransientInputHitTestSource">offset ray</dfn>, which is an {{XRRay}} that will be used when computing hit test results.
+
+{{XRTransientInputHitTestSource}} is considered <dfn for="XRTransientInputHitTestSource">active</dfn> for as long as it's present in [=XRTransientInputHitTestSource/session=]'s [=XRSession/set of active hit test sources for transient input=].
+
+<div class="algorithm" data-algorithm="create-hit-test-source-transient">
+
+In order to <dfn>create a hit test source for transient input</dfn> from |session|, |profile|, |entityTypes| and |offsetRay|, the user agent MUST run the following steps:
+    1. Let |hitTestSource| be a new {{XRTransientInputHitTestSource}}.
+    1. Initialize |hitTestSource|'s [=XRTransientInputHitTestSource/session=] to |session|.
+    1. Initialize |hitTestSource|'s [=XRTransientInputHitTestSource/profile=] to |profile|.
+    1. Initialize |hitTestSource|'s [=XRTransientInputHitTestSource/entity types=] to |entityTypes|.
+    1. Initialize |hitTestSource|'s [=XRTransientInputHitTestSource/offset ray=] to |offsetRay|.
+    1. Return |hitTestSource|.
+
+</div>
+
+The <dfn method for="XRTransientInputHitTestSource">cancel()</dfn> method, when invoked on {{XRTransientInputHitTestSource}} |hitTestSource|, signals that the application is no longer interested in obtaining hit test results for the specified |hitTestSource|.
+
+<div class="algorithm" data-algorithm="cancel-hit-test-source-transient">
+
+When {{XRTransientInputHitTestSource/cancel()}} method is invoked, the user agent MUST <dfn>cancel a hit test source for transient input</dfn> by running the following steps:
+    1. If the |hitTestSource| is not [=XRTransientInputHitTestSource/active=], throw an {{InvalidStateError}} and abort these steps.
+    1. Remove |hitTestSource| from [=XRHitTestSource/session=]'s [=XRSession/set of active hit test sources for transient input=].
+
+</div>
+
+When the application no longer retains any references to a particular {{XRTransientInputHitTestSource}} <var>hitTestSource</var>, the user agent MAY [=cancel a hit test source for transient input=] if <var>hitTestSource</var> is still [=XRTransientInputHitTestSource/active=]. The cancelation MAY happen at an unspecified time (or not at all) and the application SHOULD NOT rely on this behavior for cleanup.
+
+Hit test result {#hit-test-result}
+===============
+
+XRHitTestResult {#xr-hit-test-result-interface}
+---------------
+
+<script type="idl">
+[SecureContext, Exposed=Window]
+interface XRHitTestResult {
+  XRPose? getPose(XRSpace baseSpace);
+};
+</script>
+
+A {{XRHitTestResult}} contains single result of a hit test. It encapsulates information about the intersection point of the ray used to perform the hit test with user's environment as understood by the underlying [=XR device=].
+
+Each {{XRHitTestResult}} has an associated <dfn for="XRHitTestResult">frame</dfn> which is an {{XRFrame}} for which the result was computed.
+
+Each {{XRHitTestResult}} has an associated <dfn for="XRHitTestResult">native origin</dfn>. This native origin defines new coordinate system whose Y axis represents the surface's normal vector at the intersection point.
+
+<div class="algorithm" data-algorithm="create-hit-test-result">
+
+In order to <dfn>create a hit test result</dfn> given {{XRFrame}} |frame|, array of {{XRHitTestTrackableType}} |entityTypes|, and [=native hit test result=] |nativeResult|, the user agent MUST run the following steps:
+    1. Let |hitTestResult| be a new {{XRHitTestResult}}.
+    1. Let |session| be |frame|'s [=XRFrame/session=].
+    1. Let |device| be |session|'s [=XRSession/XR device=].
+    1. Query |device| for [=native entity type=], |nativeEntityType|, of the |nativeResult|.
+    1. [=Convert from native entity type=] |nativeEntityType| to |entityType|.
+    1. If |entityType| is <code>null</code> or is not present in |entityTypes| array, return <code>null</code> and abort these steps.
+    1. Set |hitTestResult|'s [=XRHitTestResult/frame=] to |frame|.
+    1. Set |hitTestResult|'s [=XRHitTestResult/native origin=] to a native origin obtained from |nativeResult|.
+    1. Return |hitTestResult|.
+
+</div>
+
+The {{XRHitTestResult/getPose(baseSpace)}} method, when invoked on {{XRHitTestResult}} |hitTestResult| with |baseSpace| parameter, provides the pose of the |hitTestResult| relative to |baseSpace| as an {{XRPose}}, at the time represented by [=XRHitTestResult/frame=].
+
+<div class="algorithm" data-algorithm="populate-result-pose">
+
+When <dfn method for="XRHitTestResult">getPose(|baseSpace|)</dfn> method is invoked on |hitTestResult|, the user agent MUST run the following steps:
+  1. Let |frame| be the |hitTestResult|'s [=XRHitTestResult/frame=].
+  1. If |frame|'s [=XRFrame/active=] boolean is <code>false</code>, throw an {{InvalidStateError}} and abort these steps.
+  1. Let |pose| be a new {{XRPose}}.
+  1. Let |space| be a new {{XRSpace}}, with [=XRSpace/native origin=] set to [=XRHitTestResult/native origin=], [=XRSpace/origin offset=] set to [=/identity transform=], and [=XRSpace/session=] set to [=XRHitTestResult/frame=]'s session.
+  1. [=/Populate the pose=] of |space| in |baseSpace| at the time represented by |frame| into |pose|.
+  1. Return |pose|.
+
+</div>
+
+XRTransientInputHitTestResult {#xr-transient-input-hit-test-result-interface}
+---------------
+
+<script type="idl">
+[SecureContext, Exposed=Window]
+interface XRTransientInputHitTestResult {
+  [SameObject] readonly attribute XRInputSource inputSource;
+  readonly attribute FrozenArray<XRHitTestResult> results;
+};
+</script>
+
+A {{XRTransientInputHitTestResult}} contains array of result of a hit test for transient input, grouped by {{XRInputSource}} {{XRTransientInputHitTestResult/inputSource}}.
+
+The {{XRTransientInputHitTestResult/inputSource}} attribute contains an {{XRInputSource}} that was used to compute the {{XRTransientInputHitTestResult/results}} array.
+
+The {{XRTransientInputHitTestResult/results}} attribute contains an array of computed {{XRHitTestResult}}s.
+
+Each {{XRTransientInputHitTestResult}} has an associated <dfn for="XRTransientInputHitTestResult">frame</dfn> which is an {{XRFrame}} for which the results were computed.
+
+<div class="algorithm" data-algorithm="create-hit-test-result-for-transient-input">
+
+In order to <dfn>create a hit test result for transient input</dfn> given {{XRInputSource}} |inputSource|, {{XRFrame}} |frame|, array of {{XRHitTestTrackableType}} |entityTypes|, and array of [=native hit test results=] |nativeResults|, the user agent MUST run the following steps:
+    1. Let |hitTestResult| be a new {{XRTransientInputHitTestResult}}.
+    1. Set |hitTestResult|'s [=XRTransientInputHitTestResult/frame=] to |frame|.
+    1. Set |hitTestResult|'s {{XRTransientInputHitTestResult/inputSource}} to |inputSource|.
+    1. Let |results| be an empty array of {{XRHitTestResult}}s.
+    1. For each |nativeResult| in |nativeResults|:
+        1. [=Create a hit test result=] |result| from |frame|, |entityTypes|, and |nativeResult|.
+        1. If |result| is <code>null</code>, continue to the next entry in |nativeResults|.
+        1. Add |result| to |results| array.
+    1. Set |hitTestResult|'s {{XRTransientInputHitTestResult/results}} to |results|.
+    1. Return |hitTestResult|.
+
+</div>
+
+Requesting hit test {#requesting-hit-test}
+===================
+
+<script type="idl">
+partial interface XRSession {
+  Promise<XRHitTestSource> requestHitTestSource(XRHitTestOptionsInit options);
+  Promise<XRTransientInputHitTestSource> requestHitTestSourceForTransientInput(XRTransientInputHitTestOptionsInit options);
+};
+</script>
+
+The {{XRSession}} is extended to contain an associated <dfn for="XRSession">set of active hit test sources</dfn> that will be used when computing hit test results.
+
+The {{XRSession}} is extended to contain an associated <dfn for="XRSession">set of active hit test sources for transient input</dfn> that will be used when computing hit test results for transient input.
+
+The application can <dfn>request hit test</dfn> using {{XRSession}}'s {{XRSession/requestHitTestSource()}} method.
+
+<div class="algorithm" data-algorithm="request-hit-test-source">
+
+The <dfn method for="XRSession">requestHitTestSource(|options|)</dfn> method, when invoked on an {{XRSession}} |session|, MUST run the following steps:
+
+  1. Add [=compute all hit test results=] algorithm to |session|'s [=XRSession/list of frame updates=] if it is not already present there.
+  1. Let |promise| be [=a new Promise=].
+  1. [=Create a hit test source=], |hitTestSource|, with |session|, |options|' {{XRHitTestOptionsInit/space}}, |options|' [=XRHitTestOptionsInit/effective entityTypes=] and |options|' [=XRHitTestOptionsInit/effective offsetRay=].
+  1. If |hitTestSource| is <code>null</code>, [=/reject=] |promise| with an {{OperationError}} and abort these steps.
+  1. Store created |hitTestSource| in |session|'s [=set of active hit test sources=].
+  1. [=/Resolve=] |promise| with created |hitTestSource|.
+
+</div>
+
+<div class="algorithm" data-algorithm="request-hit-test-source-for-transient-input">
+
+The <dfn method for="XRSession">requestHitTestSourceForTransientInput(|options|)</dfn> method, when invoked on an {{XRSession}} |session|, MUST run the following steps:
+
+  1. Add [=compute all hit test results=] algorithm to |session|'s [=XRSession/list of frame updates=] if it is not already present there.
+  1. Let |promise| be [=a new Promise=].
+  1. [=Create a hit test source for transient input=], |hitTestSource|, with |session|, |options|' {{XRTransientInputHitTestOptionsInit/profile}}, |options|' [=XRHitTestOptionsInit/effective entityTypes=] and |options|' [=XRHitTestOptionsInit/effective offsetRay=].
+  1. If |hitTestSource| is <code>null</code>, [=/reject=] |promise| with an {{OperationError}} and abort these steps.
+  1. Store created |hitTestSource| in |session|'s [=set of active hit test sources for transient input=].
+  1. [=/Resolve=] |promise| with created |hitTestSource|.
+
+</div>
+
+Computing hit test results {#computing-hit-test-results}
+==========================
+
+<div class="algorithm" data-algorithm="compute-all-hit-test-results">
+
+In order to <dfn>compute all hit test results</dfn> for a given {{XRFrame}} |frame|, the user agent MUST perform the following steps:
+    1. Invoke [=compute hit test results=] algorithm with |frame|.
+    1. Invoke [=compute hit test results for transient input=] algorithm with |frame|.
+
+</div>
+
+<div class="algorithm" data-algorithm="compute-hit-test-results">
+
+In order to <dfn>compute hit test results</dfn> for a given {{XRFrame}} |frame|, for each hit test source, |hitTestSource|, that is present in {{XRFrame/session}}'s [=XRSession/set of active hit test sources=], the user agent MUST perform the following steps:
+    1. Let |entityTypes| be the |hitTestSource|'s [=XRHitTestSource/entity types=].
+    1. Let |session| be |frame|'s {{XRFrame/session}}.
+    1. Let |device| be the |session|'s  [=XRSession/XR device=].
+    1. Query the |device|'s tracking system for |hitTestSource|'s [=XRHitTestSource/native origin=]'s latest |coordinates|.
+    1. Interpret |hitTestSource|'s [=XRHitTestSource/offset ray=], |offsetRay|, as if expressed relative to |coordinates| and using that interpretation, perform [=native hit test=] obtaining [=native hit test results=] |nativeResults|.
+    1. Let |hitTestResults| be an empty [=/list=].
+    1. For each native hit test result |nativeResult| in |nativeResults|, perform the following steps:
+        1. [=Create a hit test result=], |hitTestResult| from |frame|, |entityTypes|, and |nativeResult|.
+        1. If |hitTestResult| is <code>null</code>, continue to the next entry in |nativeResults|.
+        1. Add |hitTestResult| to |hitTestResults| such that the list remains sorted by the [=distance along the ray=] from |offsetRay| to |nativeResult|.
+    1. Store |hitTestResults| in |frame|'s [=XRFrame/map of hit test sources to hit test results=] under the |hitTestSource| key.
+
+</div>
+
+<div class="algorithm" data-algorithm="compute-hit-test-results-for-transient-input">
+
+In order to <dfn>compute hit test results for transient input</dfn> for a given {{XRFrame}} |frame|, for each hit test source, |hitTestSource|, that is present in {{XRFrame/session}}'s [=XRSession/set of active hit test sources for transient input=], the user agent MUST perform the following steps:
+    1. Let |entityTypes| be the |hitTestSource|'s [=XRTransientInputHitTestSource/entity types=].
+    1. Let |session| be |frame|'s {{XRFrame/session}}.
+    1. Let |device| be the |session|'s  [=XRSession/XR device=].
+    1. Let |candidateInputSources| be a set of all |session|'s input sources contained in [=list of active XR input sources=] that are considered transient.
+    1. Let |matchingInputSources| be a set of all input sources contained in |candidateInputSources| whose {{XRInputSource/profiles}} array contain an entry equal to |hitTestSource|'s [=XRTransientInputHitTestSource/profile=].
+    1. Let |hitTestResults| be an empty array of XRTransientInputHitTestResults.
+    1. For each transient input source |inputSource| in |matchingInputSources|:
+        1. Query the |device|'s tracking system for |inputSource|'s {{XRInputSource/targetRaySpace}}'s [=XRSpace/native origin=]'s latest |coordinates|.
+        1. Interpret |hitTestSource|'s [=XRTransientInputHitTestSource/offset ray=], as if expressed relative to |coordinates| and using that interpretation, perform [=native hit test=] obtaining [=native hit test results=] |nativeResults|.
+        1. [=Create a hit test result for transient input=], |hitTestResult| from |frame|, |inputSource|, |entityTypes|, and |nativeResults|.
+        1. Add |hitTestResult| to |hitTestResults| array.
+    1. Store |hitTestResults| in |frame|'s [=XRFrame/map of hit test sources to hit test results for transient input=] under the |hitTestSource| key.
+
+</div>
+
+Obtaining hit test results {#obtaining-hit-test-results}
+==========================
+
+<script type="idl">
+partial interface XRFrame {
+  FrozenArray<XRHitTestResult> getHitTestResults(XRHitTestSource hitTestSource);
+  FrozenArray<XRTransientInputHitTestResult> getHitTestResultsForTransientInput(XRTransientInputHitTestSource hitTestSource);
+};
+</script>
+
+The {{XRFrame}} is extended to contain an associated <dfn for="XRFrame">map of hit test sources to hit test results</dfn> that stores a mapping from {{XRHitTestSource}} to an array of <a interface lt="XRHitTestResult">XRHitTestResults</a>.
+
+The {{XRFrame}} is extended to contain an associated <dfn for="XRFrame">map of hit test sources to hit test results for transient input</dfn> that stores a mapping from {{XRTransientInputHitTestSource}} to an array of <a interface lt="XRTransientInputHitTestResult">XRTransientInputHitTestResults</a>.
+
+The application can <dfn>obtain hit test results</dfn> from an {{XRHitTestSource}} by using {{XRFrame}}'s {{XRFrame/getHitTestResults()}} method.
+
+<div class="algorithm" data-algorithm="obtain-hit-test-results">
+
+When the <dfn method for="XRFrame">getHitTestResults(|hitTestSource|)</dfn> method, when invoked on an {{XRFrame}} |frame|, the user agent MUST run the following steps:
+    1. If |frame|'s [=XRFrame/active=] boolean is <code>false</code>, throw an {{InvalidStateError}} and abort these steps.
+    1. Check that the entry for |hitTestSource| is present in |frame|'s [=XRFrame/map of hit test sources to hit test results=]. If the entry is not present, throw an {{InvalidStateError}} and abort these steps.
+    1. Look up an entry for |hitTestSource| in |frame|'s [=XRFrame/map of hit test sources to hit test results=] and assign it to |results|.
+    1. Return |results|.
+
+</div>
+
+The application can <dfn>obtain hit test results for transient input</dfn> from an {{XRTransientInputHitTestSource}} by using {{XRFrame}}'s {{XRFrame/getHitTestResultsForTransientInput()}} method.
+
+<div class="algorithm" data-algorithm="obtain-hit-test-results-for-transient-input">
+
+When the <dfn method for="XRFrame">getHitTestResultsForTransientInput(|hitTestSource|)</dfn> method, when invoked on an {{XRFrame}} |frame|, the user agent MUST run the following steps:
+    1. If |frame|'s [=XRFrame/active=] boolean is <code>false</code>, throw an {{InvalidStateError}} and abort these steps.
+    1. Check that the entry for |hitTestSource| is present in |frame|'s [=XRFrame/map of hit test sources to hit test results for transient input=]. If the entry is not present, throw an {{InvalidStateError}} and abort these steps.
+    1. Look up an entry for |hitTestSource| in |frame|'s [=XRFrame/map of hit test sources to hit test results for transient input=] and assign it to |results|.
+    1. Return |results|.
+
+</div>
+
+Geometric primitives {#geometric-primitives}
 ====================
 
 XRRay {#xrray-interface}
 -----
 
-ISSUE: Find the correct spec home for this type
-
 An {{XRRay}} is a geometric ray described by an {{XRRay/origin}} point and {{XRRay/direction}} vector.
 
-An {{XRRay}} contains an <dfn for=XRRay>internal matrix</dfn> which is a [=/matrix=].
+An {{XRRay}} contains a <dfn for=XRRay>matrix</dfn> which is a [=/matrix=].
 
-<pre class="idl">
+<script type="idl">
 [SecureContext, Exposed=Window,
  Constructor(optional DOMPointInit origin, optional DOMPointInit direction),
  Constructor(XRRigidTransform transform)]
@@ -132,29 +489,19 @@ interface XRRay {
   [SameObject] readonly attribute DOMPointReadOnly direction;
   [SameObject] readonly attribute Float32Array matrix;
 };
-</pre>
+</script>
 
 <div class="algorithm" data-algorithm="construct-ray-origin-direction">
 
 The <dfn constructor for="XRRay">XRRay(|origin|, |direction|)</dfn> constructor MUST perform the following steps when invoked:
 
   1. Let |ray| be a new {{XRRay}}.
-  1. Initialize |ray|'s {{XRRay/origin}} based on the following:
-    <dl class="switch">
-      <dt> If |origin| is not a {{DOMPointInit}}
-      <dd> Initialize |ray|'s {{XRRay/origin}} to <code>{ x: 0.0, y: 0.0, z: 0.0, w: 1.0 }</code>.
-      <dt> Else
-      <dd> Initialize |ray|'s {{XRRay/origin}}’s {{DOMPointReadOnly/x}} value to |origin|'s x dictionary member, {{DOMPointReadOnly/y}} value to |origin|'s y dictionary member, {{DOMPointReadOnly/z}} value to |origin|'s z dictionary member and {{DOMPointReadOnly/w}} to <code>1.0</code>.
-    </dl>
-  1. Initialize |ray|'s {{XRRay/direction}} based on the following:
-    <dl class="switch">
-      <dt> If |direction| is not a {{DOMPointInit}}
-      <dd> Initialize |ray|'s {{XRRay/direction}} to <code>{ x: 0.0, y: 0.0, z: -1.0, w: 0.0 }</code>.
-      <dt> Else
-      <dd> Initialize |ray|'s {{XRRay/direction}}’s {{DOMPointReadOnly/x}} value to |direction|'s x dictionary member, {{DOMPointReadOnly/y}} value to |direction|'s y dictionary member, {{DOMPointReadOnly/z}} value to |direction|'s z dictionary member and {{DOMPointReadOnly/w}} value to to <code>0.0</code>.
-    </dl>
+  1. Initialize |ray|'s {{XRRay/origin}} to <code>{ x: 0.0, y: 0.0, z: 0.0, w: 1.0 }</code>.
+  1. Initialize |ray|'s {{XRRay/direction}} to <code>{ x: 0.0, y: 0.0, z: -1.0, w: 0.0 }</code>.
+  1. If |origin| was set, initialize |ray|'s {{XRRay/origin}}’s {{DOMPointReadOnly/x}} value to |origin|'s x dictionary member, {{DOMPointReadOnly/y}} value to |origin|'s y dictionary member, and {{DOMPointReadOnly/z}} value to |origin|'s z dictionary member.
+  1. If |direction| was set, initialize |ray|'s {{XRRay/direction}}’s {{DOMPointReadOnly/x}} value to |direction|'s x dictionary member, {{DOMPointReadOnly/y}} value to |direction|'s y dictionary member, and {{DOMPointReadOnly/z}} value to |direction|'s z dictionary member.
   1. [=Normalize=] the {{DOMPointReadOnly/x}}, {{DOMPointReadOnly/y}}, and {{DOMPointReadOnly/z}} components of |ray|'s {{XRRay/direction}}.
-  1. Initialize |ray|'s [=XRRay/internal matrix=] to <code>null</code>.
+  1. Initialize |ray|'s [=XRRay/matrix=] to <code>null</code>.
   1. Return |ray|.
 
 </div>
@@ -168,7 +515,7 @@ The <dfn constructor for="XRRay">XRRay(|transform|)</dfn> constructor MUST perfo
   1. Initialize |ray|'s {{XRRay/direction}} to <code>{ x: 0.0, y: 0.0, z: -1.0, w: 0.0 }</code>.
   1. Transform |ray|'s {{XRRay/origin}} by premultiplying the |transform|'s {{XRRigidTransform/matrix}} and set |ray| to the result.
   1. Transform |ray|'s {{XRRay/direction}} by premultiplying the |transform|'s {{XRRigidTransform/matrix}} and set |ray| to the result.
-  1. [=Normalize=] the {{DOMPointReadOnly/x}}, {{DOMPointReadOnly/y}}, and {{DOMPointReadOnly/z}} components of |ray|'s {{XRRay/direction}}
+  1. [=Normalize=] the {{DOMPointReadOnly/x}}, {{DOMPointReadOnly/y}}, and {{DOMPointReadOnly/z}} components of |ray|'s {{XRRay/direction}}.
   1. Return |ray|.
 
 </div>
@@ -177,19 +524,19 @@ The <dfn attribute for="XRRay">origin</dfn> attribute defines the 3-dimensional 
 
 The <dfn attribute for="XRRay">direction</dfn> attribute defines the ray's 3-dimensional directional vector. The {{XRRay/direction}}'s {{DOMPointReadOnly/w}} attribute MUST be <code>0.0</code> and the vector MUST be normalized to have a length of <code>1.0</code>.
 
-The <dfn attribute for="XRRay">matrix</dfn> attribute is a [=matrix=] which represents a transform that can be used to position objects along the {{XRRay}}. It is a transform from a ray originating at <code>[0, 0, 0]</code> and extending down the negative Z axis to the ray described by the {{XRRay}}'s {{XRRay/origin}} and {{XRRay/direction}}. Such a matrix MUST be one that has a rotation component which leaves any vector perpendicular to {{XRRay/direction}} and the <code>Z</code> axis unchanged. This attribute MUST be computed by [=XRRay/obtain the matrix|obtaining the matrix=] for the {{XRRay}}. This attribute SHOULD be lazily evaluated.
+The <dfn attribute for="XRRay">matrix</dfn> attribute is a [=/matrix=] which represents a transform that can be used to position objects along the {{XRRay}}. It is a transform from a ray originating at <code>[0, 0, 0]</code> and extending down the negative Z axis to the ray described by the {{XRRay}}'s {{XRRay/origin}} and {{XRRay/direction}}. Such a matrix MUST be one that has a rotation component which leaves any vector perpendicular to {{XRRay/direction}} and the <code>Z</code> axis unchanged. This attribute MUST be computed by [=XRRay/obtain the matrix|obtaining the matrix=] for the {{XRRay}}. This attribute SHOULD be lazily evaluated.
 
 Note: The {{XRRay}}'s {{XRRay/matrix}} can be used to easily position graphical representations of the ray when rendering.
 
-<div class=algorithm data-algorithm="obtain-ray-matrix">
+<div class="algorithm" data-algorithm="obtain-ray-matrix">
 
-To <dfn for=XRRay>obtain the matrix</dfn> for a given {{XRRay}} |ray|
+To <dfn for="XRRay">obtain the matrix</dfn> for a given {{XRRay}} |ray|
 
-  1. If |ray|'s [=XRRay/internal matrix=] is not <code>null</code>, perform the following steps:
-    1. If the operation {{IsDetachedBuffer}} on [=XRRay/internal matrix=] is <code>false</code>, return |ray|'s [=XRRay/internal matrix=].
-  1. Let |z| be the vector <code>[0, 0, -1]</code>
-  1. Let |axis| be the vector cross product of |z| and |ray|'s {{XRRay/direction}}, <code>z × direction</code>
-  1. Let |cos_angle| be the scalar dot product of |z| and |ray|'s {{XRRay/direction}}, <code>z · direction</code>
+  1. If |ray|'s [=XRRay/matrix=] is not <code>null</code>, perform the following steps:
+    1. If the operation {{IsDetachedBuffer}} on [=XRRay/matrix=] is <code>false</code>, return |ray|'s [=XRRay/matrix=].
+  1. Let |z| be the vector <code>[0, 0, -1]</code>.
+  1. Let |axis| be the vector cross product of |z| and |ray|'s {{XRRay/direction}}, <code>z × direction</code>.
+  1. Let |cos_angle| be the scalar dot product of |z| and |ray|'s {{XRRay/direction}}, <code>z · direction</code>.
   1. Set |rotation| based on the following:
     <dl class="switch">
       <dt> If |cos_angle| is greater than -1 and less than 1
@@ -199,12 +546,73 @@ To <dfn for=XRRay>obtain the matrix</dfn> for a given {{XRRay}} |ray|
       <dt> Else
       <dd> Set |rotation| to an identity matrix.
     </dl>
-  1. Let |translation| be the translation matrix with components corresponding to |ray|'s {{XRRay/origin}}
+  1. Let |translation| be the translation matrix with components corresponding to |ray|'s {{XRRay/origin}}.
   1. Let |matrix| be the result of premultiplying |rotation| from the left onto |translation| (i.e. <code>translation * rotation</code>) in column-vector notation.
-  1. Set |ray|'s [=XRRay/internal matrix=] to |matrix|
-  1. Return |matrix|
+  1. Set |ray|'s [=XRRay/matrix=] to |matrix|.
+  1. Return |matrix|.
 
 </div>
+
+<div class="algorithm" data-algorithm="distance-along-ray">
+
+The <dfn>distance along the ray</dfn>, |distance|, from {{XRRay}} |ray| to any entity |entity| is defined such that <code>|ray|.origin + |ray|.direction * |distance|</code> results in a point beloning to the entity |entity|, |distance| is non-negative, and there does not exist a smaller value of |distance| for the above predicate to still hold. It is up to the [=/XR device=] to define the meaning of "point belonging to an entity".
+
+</div>
+
+Native device concepts {#native-device-concepts} 
+======================
+
+<section class="non-normative">
+
+User agents implementing hit test API must have a way of obtaining information about user's environment from underlying XR device. This section attempts to describe requirements and concepts related to native capabilities of the device and is by neccesity sufficiently under-specified to leave ample room for different underlying frameworks / devices.
+
+</section>
+
+Native hit test {#native-hit-test-section}
+---------------
+
+In this specification it is assumed that [=/XR device=] exposes a way for the user agent to perform a <dfn>native hit test</dfn> that satisfies the following requirements:
+- Accepts a 3D ray that will be tested against user's environment.
+- Returns a collection of 3D poses representing intersection points of the passed in ray with user's environment. Each entry in the collection should also contain information about the type of the native entity that was used to obtain that native result and enough information to enable the user agent to compute surface normal to the user's environment at the intersection point.
+
+Note: For devices that do not expose the hit test functionality natively, it might still be possible for user agents to implement this specification by leveraging other ways of obtaining the information about user's environment that might be exposed by the XR device.
+
+Native entity type {#native-entity-type-section}
+------------------
+
+[=Native hit test results=] returned by [=XR device=] should contain information about the <dfn lt="native entity type">type of the entity</dfn> used to compute the result. Such native types might consist of, but not be limited to:
+- Point - signifies that hit test result was computed based on characteristic points found in user's environment.
+- Plane - signifies that hit test result was computed based on planes detected in user's environment.
+- Mesh - signifies that the hit test result was computed based on meshes detected in user's environment.
+
+<div class="algorithm" data-algorithm="convert-native-type-to-trackable-type">
+
+To <dfn>convert from native entity type</dfn> into {{XRHitTestTrackableType}}, the user agent MUST run the following steps:
+  1. Let |nativeEntityType| be the native entity type to be converted.
+  1. Let |entityType| be a new {{XRHitTestTrackableType}}.
+  1. Initialize |entityType| as follows:
+    <dl class="switch">
+      <dt>If |nativeEntityType| contains type that corresponds to {{XRHitTestTrackableType/"point"}}</dt>
+      <dd>Set |entityType| to {{XRHitTestTrackableType/"point"}}.</dd>
+      <dt>Else, if |nativeEntityType| contains type that corresponds to {{XRHitTestTrackableType/"plane"}}</dt>
+      <dd>Set |entityType| to {{XRHitTestTrackableType/"plane"}}.</dd>
+      <dt>Else, if |nativeEntityType| contains type that corresponds to {{XRHitTestTrackableType/"mesh"}}</dt>
+      <dd>Set |entityType| to {{XRHitTestTrackableType/"mesh"}}.</dd>
+      <dt>Else</dt>
+      <dd>Set |entityType| to <code>null</code></dd>
+    </dl>
+  1. Return |entityType|.
+
+</div>
+
+Native hit test result {#native-hit-test-result-section}
+----------------------
+
+<dfn lt="native hit test result|native hit test results">Native hit test results</dfn> returned from XR device should contain the position of the intersection point with user's environment. Depending on the native entity type and the information available to the XR device, the result should also contain orientation defined in such a way to allow the user agent to compute a surface normal to the user's environment at the intersection point.
+
+The information about position and orientation of the intersection point should be contained in [=native hit test result=]'s native origin. Native origin defines a new coordinate system in such a way that its Y axis represents the surface's normal vector at the intersection point. If the orientation is not returned from the XR device, the user agent SHOULD set the native origin in such a way that Y axis of the coordinate system it defines is pointing up (towards negative gravity vector).
+
+Issue: Decide if we need to specify other axes of the coordinate system defined by hit test result's native origin to maintain compatibility between different implementations & differrent AR frameworks.
 
 Acknowledgements {#ack}
 ================

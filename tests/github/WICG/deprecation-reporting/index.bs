@@ -1,0 +1,163 @@
+<h1>Deprecation Reporting</h1>
+<pre class="metadata">
+Status: ED
+ED: https://wicg.github.io/deprecation-reporting/
+Shortname: deprecation-reporting
+Group: WICG
+Editor: Ian Clelland 76841, Google Inc., iclelland@google.com
+Abstract:
+  This document defines mechanism for reporting use of deprecated features
+  to site owners through the use of the Reporting API.
+Level: 1
+Indent: 2
+Version History: https://github.com/WICG/deprecation-reporting/commits/gh-pages
+Boilerplate: omit conformance, omit feedback-header
+!Participate: <a href="https://github.com/WICG/deprecation-reporting/issues/new">File an issue</a> (<a href="https://github.com/wicg/deprecation-reporting/issues">open issues</a>)
+Markup Shorthands: css off, markdown on
+</pre>
+<pre class="anchors">
+spec: ECMASCRIPT; urlPrefix: https://tc39.github.io/ecma262/
+  type: dfn
+    text: Realm
+    text: Date object; url: sec-date-objects
+  type: interface
+    text: Date; url: sec-date-objects
+</pre>
+<section>
+  <h2 id="intro">Introduction</h2>
+
+  [INTRODUCTION GOES HERE]
+
+  <h3 id="examples">Examples</h3>
+
+  <div class="example">
+    Example, Inc. wants to keep track of when users are using Web APIs on its
+    site which are going to be removed in upcoming browser versions. It can do
+    this by delivering the following header to define a reporting endpoint, and
+    direct deprecation reports to it:
+
+    <pre>
+      Report-To: { "group": "default",
+                   "max_age": 10886400,
+                   "endpoints": [
+                     { "url": "https://example.com/reports", "priority": 1 },
+                     { "url": "https://backup.com/reports", "priority": 2 }
+                   ] }
+    </pre>
+
+</section>
+
+<section>
+  <h2 id="deprecation-report">Deprecation Reports</h3>
+
+  <dfn>Deprecation reports</dfn> indicate that a browser API or feature has been
+  used which is expected to stop working in a future update to the browser.
+
+  <a>Deprecation reports</a> are a type of [=report=].
+
+  <a>Deprecation reports</a> have the <a>report type</a> "deprecation".
+
+  <a>Deprecation reports</a> are <a>visible to
+  <code>ReportingObserver</code>s</a>.
+
+  <pre class="idl">
+    [Exposed=(Window,Worker)]
+    interface DeprecationReportBody : ReportBody {
+      [Default] object toJSON();
+      readonly attribute DOMString id;
+      readonly attribute Date? anticipatedRemoval;
+      readonly attribute DOMString message;
+      readonly attribute DOMString? sourceFile;
+      readonly attribute unsigned long? lineNumber;
+      readonly attribute unsigned long? columnNumber;
+    };
+  </pre>
+
+  A <a>deprecation report</a>'s [=report/body=], represented in JavaScript by
+  {{DeprecationReportBody}}, contains the following fields:
+
+    - <dfn for="DeprecationReportBody">id</dfn>: an implementation-defined
+      string identifying the feature or API that will be removed. This string
+      can be used for grouping and counting related reports.
+
+    - <dfn for="DeprecationReportBody">anticipatedRemoval</dfn>: A
+      JavaScript <a>Date object</a> (rendered as an ISO 8601 string) indicating
+      roughly when the browser version without the specified API will be
+      generally available (excluding "beta" or other pre-release channels). This
+      value should be used to sort or prioritize warnings. If unknown, this
+      field should be null, and the deprecation should be considered low
+      priority (removal may not actually occur).
+
+    - <dfn for="DeprecationReportBody">message</dfn>: A human-readable string
+      with details typically matching what would be displayed on the developer
+      console. The message is not guaranteed to be unique for a given
+      [=DeprecationReportBody/id=] (eg. it may contain additional context on how
+      the API was used).
+
+    - <dfn for="DeprecationReportBody">sourceFile</dfn>: If known, the file
+      which first used the indicated API, or null otherwise.
+
+    - <dfn for="DeprecationReportBody">lineNumber</dfn>: If known, the line
+      number in [=DeprecationReportBody/sourceFile=] where the indicated API
+      was first used, or null otherwise.
+
+    - <dfn for="DeprecationReportBody">columnNumber</dfn>: If known, the column
+      number in [=DeprecationReportBody/sourceFile=] where the indicated API
+      was first used, or null otherwise.
+
+
+  Note: Deprecation reports are always delivered to the <a>endpoint group</a>
+  named <code>default</code>; there is currently no way to override this.  If
+  you want to receive other kinds of reports, but not deprecation reports, make
+  sure to use a different name for the endpoint group that you choose for those
+  reports.
+</section>
+
+<section>
+  <h2 id="sample-reports">Sample Reports</h2>
+
+  <div class="example">
+  <pre>
+      POST /reports HTTP/1.1
+      Host: example.com
+      ...
+      Content-Type: application/reports+json
+
+      [{
+        "type": "deprecation",
+        "age": 32,
+        "url": "https://example.com/",
+        "user_agent": "Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0",
+        "body": {
+          "id": "websql",
+          "anticipatedRemoval": "2020-01-01",
+          "message": "WebSQL is deprecated and will be removed in Chrome 97 around January 2020",
+          "sourceFile": "https://example.com/index.js",
+          "lineNumber": 1234,
+          "columnNumber": 42
+        }
+      }]
+  }
+  </pre>
+  </div>
+</section>
+
+<section>
+  <h2 id="security">Security Considerations</h2>
+
+  For a discussion of security considerations surrounding out-of-band reporting
+  in general, see [[REPORTING#security]].
+
+  The remainder of this section discusses security considerations for
+  deprecation reporting specifically.
+</section>
+
+<section>
+  <h2 id="privacy">Privacy Considerations</h2>
+
+  For a discussion of privacy considerations surrounding out-of-band reporting
+  in general, see [[REPORTING#privacy]].
+
+  The remainder of this section discusses privacy considerations for
+  deprecation reporting specifically.
+</section>

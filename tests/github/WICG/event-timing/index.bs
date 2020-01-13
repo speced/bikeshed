@@ -54,10 +54,6 @@ urlPrefix: https://w3c.github.io/pointerevents/; spec: POINTEREVENTS;
     type: event; url: #the-pointerleave-event; text: pointerleave;
     type: event; url: #the-gotpointercapture-event; text: gotpointercapture;
     type: event; url: #the-lostpointercapture-event; text: lostpointercapture;
-<!-- TODO there does not seem to be a way to link to getCoalescedEvents properly -->
-urlPrefix: https://w3c.github.io/pointerevents/extension.html; spec: POINTEREVENTS-EXTENSION;
-    type: method; for: PointerEvent;
-        url: #dom-pointerevent-getcoalescedevents; text: getCoalescedEvents();
 urlPrefix: https://w3c.github.io/touch-events/; spec: TOUCH-EVENTS;
     type: interface; url: #touchevent-interface; text: TouchEvent;
     type: event; url: #the-touchstart-event; text: touchstart;
@@ -85,6 +81,15 @@ urlPrefix: https://w3c.github.io/uievents/; spec: UIEVENTS;
     type: event; url: #event-type-compositionstart; text: compositionstart;
     type: event; url: #event-type-compositionupdate; text: compositionupdate;
     type: event; url: #event-type-compositionend; text: compositionend;
+urlPrefix: https://html.spec.whatwg.org/multipage/; spec: HTML;
+    type: event; url: #event-dnd-drag; text: drag;
+    type: event; url: #event-dnd-dragstart; text: dragstart;
+    type: event; url: #event-dnd-dragenter; text: dragenter;
+    type: event; url: #event-dnd-dragexit; text: dragexit;
+    type: event; url: #event-dnd-dragleave; text: dragleave;
+    type: event; url: #event-dnd-dragover; text: dragover;
+    type: event; url: #event-dnd-drop; text: drop;
+    type: event; url: #event-dnd-dragend; text: dragend;
 </pre>
 
 Introduction {#sec-intro}
@@ -102,9 +107,10 @@ A common way to monitor event latency consists of registering an event listener.
 The timestamp at which the event was created can be obtained via the event's {{Event/timeStamp}}.
 In addition, {{Performance/now()|performance.now()}} could be called both at the beginning and at the end of the event handler logic.
 By subtracting the hardware timestamp from the timestamp obtained at the beginning of the event handler,
-the developer can compute the input delay: the time it takes for an input to start being processed.
+the developer can compute the <b>input delay</b>: the time it takes for an input to start being processed.
 By subtracting the timestamp obtained at the beginning of the event handler from the timestamp obtained at the end of the event handler,
 the developer can compute the amount of synchronous work performed in the event handler.
+Finally, when inputs are handled synchronously, the duration from event hardware timestamp to the next paint after the event is handled is a useful user experience metric.
 
 This approach has several fundamental flaws.
 First, requiring event listeners precludes measuring event latency very early in the page load because
@@ -127,6 +133,7 @@ It's slow because it's often blocked on JavaScript execution that is not properl
 The latency of the website's response to the first user interaction can be considered a key responsiveness and loading metric.
 To that effect, this API surfaces all the timing information about this interaction, even when this interaction is not handled slowly.
 This allows developers to measure percentiles and improvements without having to register event handlers.
+In particular, this API enables measuring the <b>first input delay (FID)</b>, the delay in processing for the first "discrete" input event.
 
 </div>
 
@@ -141,22 +148,27 @@ Certain types of events are considered, and timing information is exposed when t
     1. If <var>event</var>'s {{Event/isTrusted}} attribute value is set to false, return false.
     1. If <var>event</var>'s {{Event/type}} is one of the following:
     <!-- MouseEvents -->
-        {{auxclick}}, {{click}}, {{dblclick}}, {{mousedown}}, {{mouseenter}}, {{mouseleave}}, {{mousemove}}, {{mouseout}}, {{mouseover}}, {{mouseup}},
+        {{auxclick}}, {{click}}, {{dblclick}}, {{mousedown}}, {{mouseenter}}, {{mouseleave}}, {{mouseout}}, {{mouseover}}, {{mouseup}},
     <!-- PointerEvents -->
-        {{pointerover}}, {{pointerenter}}, {{pointerdown}}, {{pointermove}}, {{pointerup}}, {{pointercancel}}, {{pointerout}}, {{pointerleave}}, {{gotpointercapture}}, {{lostpointercapture}}
+        {{pointerover}}, {{pointerenter}}, {{pointerdown}}, {{pointerup}}, {{pointercancel}}, {{pointerout}}, {{pointerleave}}, {{gotpointercapture}}, {{lostpointercapture}}
     <!-- TouchEvents -->
-        {{touchstart}}, {{touchend}}, {{touchmove}}, {{touchcancel}},
+        {{touchstart}}, {{touchend}}, {{touchcancel}},
     <!-- KeyboardEvents -->
         {{keydown}}, {{keyup}},
-    <!-- WheelEvents -->
-        {{wheel}},
+    <!-- WheelEvents excluded for now since they can be continuous. -->
     <!-- InputEvents -->
         {{beforeinput}}, {{input}},
     <!-- CompositionEvents -->
         {{compositionstart}}, {{compositionupdate}}, {{compositionend}},
+    <!-- Drag and Drop -->
+         {{dragstart}}, {{dragend}}, {{dragenter}}, {{dragexit}}, {{dragleave}}, {{dragover}}, {{drop}},
         return true.
     1. Return false.
 </div>
+
+Note: {{mousemove}}, {{pointermove}}, {{touchmove}}, {{wheel}}, and {{drag}} are excluded because these are "continuous" events.
+The current API does not have enough guidance on how to count and aggregate these events to obtain meaningful performance metrics based on entries.
+Therefore, these event types are not exposed.
 
 The Event Timing API also exposes timing information about the first user interaction among the following:
 * {{keydown}}
@@ -170,26 +182,34 @@ Usage example {#sec-example}
 <pre class="example highlight">
     const observer = new PerformanceObserver(function(list) {
         const perfEntries = list.getEntries().forEach(entry => {
-            if (entry.processingStart !== 0) {
-                const inputDelay = entry.processingStart - entry.startTime;
-                // Report the input delay when the processing start was provided.
-            }
-            // Report full input duration via entry.duration.
+            const inputDelay = entry.processingStart - entry.startTime;
+            // Report the input delay when the processing start was provided.
+            // Also report the full input duration via entry.duration.
         });
     });
     // Register observer for event.
     observer.observe({entryTypes: ["event"]});
     ...
-    // Later on, we can also directly query the first input information.
-    const firstArray = performance.getEntriesByType('first-input');
-    if (firstArray.length !== 0) {
-        const firstInput = firstArray[0];
-        // Process the first input event and report back...
-    }
+    // We can also directly query the first input information.
+    new PerformanceObserver(function(list, obs) {
+        const firstInput = list.getEntries()[0];
+
+        // Measure the delay to begin processing the first input event.
+        const firstInputDelay = firstInput.processingStart - firstInput.startTime;
+        // Measure the duration of processing the first input event.
+        // Only use when the important event handling work is done synchronously in the handlers.
+        const firstInputDuration = firstInput.duration;
+        // Process the first input delay and perhaps its duration...
+
+        // Disconnect this observer since callback is only triggered once.
+        obs.disconnect();
+    }).observe({type: 'first-input', buffered: true});
+
 }
 </pre>
 
 The following are sample use cases that could be achieved by using this API:
+* Gather FID data (see <code>firstInputDelay</code> on the example above) on a website and track its performance over time.
 * Clicking a button changes the sorting order on a table. Measure how long it takes from the click until we display reordered content.
 * A user drags a slider to control volume. Measure the latency to drag the slider.
 * Hovering a menu item triggers a flyout menu. Measure the latency for the flyout to appear.
@@ -246,13 +266,11 @@ Each {{PerformanceEventTiming}} object reports timing information about an <dfn 
 <dl dfn-type=attribute dfn-for=PerformanceEventTiming link-for=PerformanceEventTiming>
     <dt>{{processingStart}}</dt>
     <dd>
-        The <dfn export>processingStart</dfn> attribute's getter returns the time when event handlers start to execute, or
-        0 if the event dispatching logic is skipped (this can happen when there are no event handlers).
+        The <dfn export>processingStart</dfn> attribute's getter returns a timestamp captured at the beginning of the <a link-for=''>event dispatch algorithm</a>. This is when event handlers are about to be executed.
     </dd>
     <dt>{{processingEnd}}</dt>
     <dd>
-        The <dfn export>processingEnd</dfn> attribute's getter returns the time when event handlers have finished executing, or
-        0 if the event dispatching logic is skipped (this can happen when there are no event handlers).
+        The <dfn export>processingEnd</dfn> attribute's getter returns a timestamp captured at the end of the <a link-for=''>event dispatch algorithm</a>. This is when event handlers have finished executing. It's equal to {{processingStart}} when there are no such event handlers.
     </dd>
     <dt>{{cancelable}}</dt>
     <dd>
@@ -308,7 +326,7 @@ Modifications to the DOM specification {#sec-modifications-DOM}
     * <a>Finalize event timing</a> passing <var>timingEntry</var>, <em>target</em>, and the <a>current high resolution time</a> as inputs.
 </div>
 
-Note: If the user agent skips the <a>event dispatch algorithm</a>, it can still choose to include an entry for that {{Event}}.
+Note: If a user agent skips the <a>event dispatch algorithm</a>, it can still choose to include an entry for that {{Event}}.
 In this case, it will estimate the value of {{PerformanceEventTiming/processingStart}} and set the {{PerformanceEventTiming/processingEnd}} to the same value.
 
 Modifications to the HTML specification {#sec-modifications-HTML}
@@ -336,9 +354,7 @@ Initialize event timing {#sec-init-event-timing}
     1. Let <var>timingEntry</var> be a new {{PerformanceEventTiming}} object.
     1. Set <var>timingEntry</var>'s {{PerformanceEntry/name}} to <var>event</var>'s {{Event/type}} attribute value.
     1. Set <var>timingEntry</var>'s {{PerformanceEntry/entryType}} to "<code>event</code>".
-    1. Set <var>timingEntry</var>'s {{PerformanceEntry/startTime}} as follows:
-        1. If <var>event</var>'s {{Event/type}} attribute value is equal to "<code>pointermove</code>", set <var>timingEntry</var>'s {{PerformanceEntry/startTime}} to the {{Event/timeStamp}} attribute value of the first entry of the list returned by the <a>getCoalescedEvents()</a> algorithm applied to <var>event</var>.
-        1. Otherwise, set <var>timingEntry</var>'s {{PerformanceEntry/startTime}} to <var>event</var>'s {{Event/timeStamp}} attribute value.
+    1. Set <var>timingEntry</var>'s {{PerformanceEntry/startTime}} to <var>event</var>'s {{Event/timeStamp}} attribute value.
     1. Set <var>timingEntry</var>'s {{processingStart}} to <var>processingStart</var>.
     1. Set <var>timingEntry</var>'s {{cancelable}} to <var>event</var>'s {{Event/cancelable}} attribute value.
     1. Return <var>timingEntry</var>.

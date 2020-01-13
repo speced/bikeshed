@@ -422,9 +422,10 @@ would have been {{Event/AT_TARGET}}.
 <h3 id=interface-event>Interface {{Event}}</h3>
 
 <pre class="idl">
-[Constructor(DOMString type, optional EventInit eventInitDict = {}),
- Exposed=(Window,Worker,AudioWorklet)]
+[Exposed=(Window,Worker,AudioWorklet)]
 interface Event {
+  constructor(DOMString type, optional EventInit eventInitDict = {});
+
   readonly attribute DOMString type;
   readonly attribute EventTarget? target;
   readonly attribute EventTarget? srcElement; // historical
@@ -840,9 +841,10 @@ workers or worklets, and is inaccurate for events dispatched in <a>shadow trees<
 <h3 id=interface-customevent>Interface {{CustomEvent}}</h3>
 
 <pre class=idl>
-[Constructor(DOMString type, optional CustomEventInit eventInitDict = {}),
- Exposed=(Window,Worker)]
+[Exposed=(Window,Worker)]
 interface CustomEvent : Event {
+  constructor(DOMString type, optional CustomEventInit eventInitDict = {});
+
   readonly attribute any detail;
 
   void initCustomEvent(DOMString type, optional boolean bubbles = false, optional boolean cancelable = false, optional any detail = null);
@@ -993,9 +995,10 @@ for historical reasons.
 <h3 id=interface-eventtarget>Interface {{EventTarget}}</h3>
 
 <pre class=idl>
-[Constructor,
- Exposed=(Window,Worker,AudioWorklet)]
+[Exposed=(Window,Worker,AudioWorklet)]
 interface EventTarget {
+  constructor();
+
   void addEventListener(DOMString type, EventListener? callback, optional (AddEventListenerOptions or boolean) options = {});
   void removeEventListener(DOMString type, EventListener? callback, optional (EventListenerOptions or boolean) options = {});
   boolean dispatchEvent(Event event);
@@ -1147,16 +1150,13 @@ participate in a tree structure.</p>
 and an <a>event listener</a> <var>listener</var>, run these steps:
 
 <ol>
- <li>
-  <p>If <var>eventTarget</var>'s <a>relevant global object</a> is a {{ServiceWorkerGlobalScope}}
-  object and its associated <a>service worker</a>'s <a for="service worker">script resource</a>'s
-  <a for="script resource">has ever been evaluated flag</a> is set, then <a>throw</a> a
-  <code>TypeError</code>.
-  [[!SERVICE-WORKERS]]
-
-  <p class="note no-backref">To optimize storing the event types allowed for the service worker and
-  to avoid non-deterministic changes to the event listeners, invocation of the method is allowed
-  only during the very first evaluation of the service worker script.
+ <li><p>If <var>eventTarget</var> is a {{ServiceWorkerGlobalScope}} object, its
+ <a for="ServiceWorkerGlobalScope">service worker</a>'s
+ <a for="service worker">script resource</a>'s
+ <a for="script resource">has ever been evaluated flag</a> is set, and <var>listener</var>'s
+ <a for="event listener">type</a> matches the {{Event/type}} attribute value of any of the
+ <a>service worker events</a>, then <a>report a warning to the console</a> that this might not give
+ the expected results. [[!SERVICE-WORKERS]]
 
  <li><p>If <var>listener</var>'s <a for="event listener">callback</a> is null, then return.
 
@@ -1186,30 +1186,35 @@ method, when invoked, must run these steps:
  <var>once</var>.
 </ol>
 
-<p>To <dfn>remove an event listener</dfn>, given an {{EventTarget}} object <var>eventTarget</var>
-and an <a>event listener</a> <var>listener</var>, set <var>listener</var>'s
-<a for="event listener">removed</a> to true and <a for=list>remove</a> <var>listener</var> from
-<var>eventTarget</var>'s <a for=EventTarget>event listener list</a>.
-<!-- Intentionally not exported. -->
+<p>To <dfn export>remove an event listener</dfn>, given an {{EventTarget}} object
+<var>eventTarget</var> and an <a>event listener</a> <var>listener</var>, run these steps:
+
+<ol>
+ <li><p>If the <a>context object</a> is a {{ServiceWorkerGlobalScope}} object and its
+ <a for="ServiceWorkerGlobalScope">service worker</a>'s
+ <a for="service worker">set of event types to handle</a> contains <var>type</var>, then
+ <a>report a warning to the console</a> that this might not give the expected results.
+ [[!SERVICE-WORKERS]]
+
+ <li><p>Set <var>listener</var>'s <a for="event listener">removed</a> to true and
+ <a for=list>remove</a> <var>listener</var> from <var>eventTarget</var>'s
+ <a for=EventTarget>event listener list</a>.
+</ol>
+
+<p class=note>HTML needs this to define event handlers. [[HTML]]
 
 <p>To <dfn export>remove all event listeners</dfn>, given an {{EventTarget}} object
 <var>eventTarget</var>, <a for=list>for each</a> <var>listener</var> of <var>eventTarget</var>'s
 <a for=EventTarget>event listener list</a>, <a>remove an event listener</a> with
 <var>eventTarget</var> and <var>listener</var>.
 
-<p class="note">HTML needs this to define <code>document.open()</code>. [[HTML]]
+<p class=note>HTML needs this to define <code>document.open()</code>. [[HTML]]
 
 <p>The
 <dfn method for=EventTarget><code>removeEventListener(<var>type</var>, <var>callback</var>, <var>options</var>)</code></dfn>
 method, when invoked, must run these steps:
 
 <ol>
- <li><p>If the <a>context object</a>'s <a>relevant global object</a> is a
- {{ServiceWorkerGlobalScope}} object and its associated <a>service worker</a>'s
- <a for="service worker">script resource</a>'s
- <a for="script resource">has ever been evaluated flag</a> is set, then <a>throw</a> a
- <code>TypeError</code>. [[!SERVICE-WORKERS]]
-
  <li><p>Let <var>capture</var> be the result of <a>flattening</a> <var>options</var>.
 
  <li><p>If the <a>context object</a>'s <a for=EventTarget>event listener list</a>
@@ -1746,13 +1751,15 @@ function doAmazingness({signal}) {
 <h3 id=interface-abortcontroller>Interface {{AbortController}}</h3>
 
 <pre class="idl">
-[Constructor,
- Exposed=(Window,Worker)]
+[Exposed=(Window,Worker)]
 interface AbortController {
+  constructor();
+
   [SameObject] readonly attribute AbortSignal signal;
 
   void abort();
-};</pre>
+};
+</pre>
 
 <dl class=domintro>
  <dt><code><var>controller</var> = new <a constructor lt=AbortController()>AbortController</a>()</code>
@@ -1835,6 +1842,11 @@ service worker.
 <p>The <dfn attribute for=AbortSignal>aborted</dfn> attribute's getter, when invoked, must return
 true if the <a>context object</a>'s [=AbortSignal/aborted flag=] is set, and false otherwise.
 
+<p>The <dfn attribute for=AbortSignal><code>onabort</code></dfn> attribute is an
+<a>event handler IDL attribute</a> for the <dfn export for=AbortSignal><code>onabort</code></dfn>
+<a>event handler</a>, whose <a>event handler event type</a> is
+<dfn event for=AbortSignal><code>abort</code></dfn>.
+
 <p class=note>Changes to an {{AbortSignal}} object represent the wishes of the corresponding
 {{AbortController}} object, but an API observing the {{AbortSignal}} object can chose to ignore
 them. For instance, if the operation has already completed.
@@ -1852,7 +1864,7 @@ them. For instance, if the operation has already completed.
 
  <li><p><a for=set>Empty</a> <var>signal</var>'s <a for=AbortSignal>abort algorithms</a>.
 
- <li><p>[=Fire an event=] named <code>abort</code> at <var>signal</var>.
+ <li><p>[=Fire an event=] named {{AbortSignal/abort}} at <var>signal</var>.
 </ol>
 
 <p>A <var>followingSignal</var> (an {{AbortSignal}}) is made to
@@ -2308,72 +2320,50 @@ steps:
 of a <var>node</var> into a <var>parent</var> before a <var>child</var>, run these steps:
 
 <ol>
- <li>If <var>parent</var> is not a {{Document}},
- {{DocumentFragment}}, or {{Element}}
- <a>node</a>,
- <a>throw</a> a
+ <li><p>If <var>parent</var> is not a {{Document}}, {{DocumentFragment}}, or {{Element}}
+ <a>node</a>, then <a>throw</a> a "{{HierarchyRequestError!!exception}}" {{DOMException}}.
+
+ <li><p>If <var>node</var> is a <a>host-including inclusive ancestor</a> of <var>parent</var>, then
+ <a>throw</a> a "{{HierarchyRequestError!!exception}}" {{DOMException}}.
+
+ <li><p>If <var>child</var> is non-null and its <a for=tree>parent</a> is not <var>parent</var>,
+ then <a>throw</a> a "{{NotFoundError!!exception}}" {{DOMException}}.
+
+ <li><p>If <var>node</var> is not a {{DocumentFragment}}, {{DocumentType}}, {{Element}}, {{Text}},
+ {{ProcessingInstruction}}, or {{Comment}} <a>node</a>, then <a>throw</a> a
  "{{HierarchyRequestError!!exception}}" {{DOMException}}.
 
- <li>If <var>node</var> is a
- <a>host-including inclusive ancestor</a>
- of <var>parent</var>, <a>throw</a> a
- "{{HierarchyRequestError!!exception}}" {{DOMException}}.
-
- <li>If <var>child</var> is not null and its <a for=tree>parent</a> is not <var>parent</var>, then
- <a>throw</a> a "{{NotFoundError!!exception}}" {{DOMException}}.
-
- <li>If <var>node</var> is not a
- {{DocumentFragment}}, {{DocumentType}},
- {{Element}}, {{Text}},
- {{ProcessingInstruction}}, or {{Comment}}
- <a>node</a>,
- <a>throw</a> a
- "{{HierarchyRequestError!!exception}}" {{DOMException}}.
-
- <li>If either <var>node</var> is a {{Text}}
- <a>node</a> and <var>parent</var> is a
- <a>document</a>, or <var>node</var> is a
- <a>doctype</a> and <var>parent</var> is
- not a <a>document</a>,
- <a>throw</a> a
- "{{HierarchyRequestError!!exception}}" {{DOMException}}.
+ <li><p>If either <var>node</var> is a {{Text}} <a>node</a> and <var>parent</var> is a
+ <a>document</a>, or <var>node</var> is a <a>doctype</a> and <var>parent</var> is not a
+ <a>document</a>, then <a>throw</a> a "{{HierarchyRequestError!!exception}}" {{DOMException}}.
 
  <li>
-  If <var>parent</var> is a
-  <a>document</a>, and any of the statements below, switched
-  on <var>node</var>, are true, <a>throw</a> a
+  <p>If <var>parent</var> is a <a>document</a>, and any of the statements below, switched on
+  <var>node</var>, are true, then <a>throw</a> a
   "{{HierarchyRequestError!!exception}}" {{DOMException}}.
 
   <dl class=switch>
    <dt>{{DocumentFragment}} <a>node</a>
    <dd>
-    If <var>node</var> has more than one
-    <a for="/">element</a> <a for=tree>child</a>
-    or has a {{Text}} <a>node</a>
-    <a for=tree>child</a>.
+    <p>If <var>node</var> has more than one <a for="/">element</a> <a for=tree>child</a> or has a
+    {{Text}} <a>node</a> <a for=tree>child</a>.
 
-    Otherwise, if <var>node</var> has one
-    <a for="/">element</a>
-    <a for=tree>child</a> and either <var>parent</var> has an
-    <a for="/">element</a>
-    <a for=tree>child</a>, <var>child</var> is a
-    <a>doctype</a>, or <var>child</var> is not null and
-    a <a>doctype</a> is
-    <a>following</a> <var>child</var>.
+    <p>Otherwise, if <var>node</var> has one <a for="/">element</a> <a for=tree>child</a> and either
+    <var>parent</var> has an <a for="/">element</a> <a for=tree>child</a>, <var>child</var> is a
+    <a>doctype</a>, or <var>child</var> is non-null and a <a>doctype</a> is <a>following</a>
+    <var>child</var>.
     <!--"inclusively following"-->
 
    <dt><a for="/">element</a>
-   <dd><var>parent</var> has an <a for="/">element</a>
-   <a for=tree>child</a>, <var>child</var> is a
-   <a>doctype</a>, or <var>child</var> is not null and a
-   <a>doctype</a> is
-   <a>following</a> <var>child</var>.
+   <dd><p><var>parent</var> has an <a for="/">element</a> <a for=tree>child</a>, <var>child</var> is
+   a <a>doctype</a>, or <var>child</var> is non-null and a <a>doctype</a> is <a>following</a>
+   <var>child</var>.
    <!--"inclusively following"-->
 
-   <dt><a>doctype</a> <dd><var>parent</var> has a <a>doctype</a> <a for=tree>child</a>,
-   <var>child</var> is non-null and an <a for="/">element</a> is <a>preceding</a> <var>child</var>,
-   or <var>child</var> is null and <var>parent</var> has an <a for="/">element</a>
-   <a for=tree>child</a>.
+   <dt><a>doctype</a>
+   <dd><p><var>parent</var> has a <a>doctype</a> <a for=tree>child</a>, <var>child</var> is non-null
+   and an <a for="/">element</a> is <a>preceding</a> <var>child</var>, or <var>child</var> is null
+   and <var>parent</var> has an <a for="/">element</a> <a for=tree>child</a>.
   </dl>
 </ol>
 
@@ -2381,24 +2371,18 @@ of a <var>node</var> into a <var>parent</var> before a <var>child</var>, run the
 <var>parent</var> before a <var>child</var>, run these steps:
 
 <ol>
- <li><a>Ensure pre-insertion validity</a>
- of <var>node</var> into <var>parent</var> before
+ <li><p><a>Ensure pre-insertion validity</a> of <var>node</var> into <var>parent</var> before
  <var>child</var>.
 
- <li>Let <var>reference child</var> be <var>child</var>.
+ <li><p>Let <var>referenceChild</var> be <var>child</var>.
 
- <li>If <var>reference child</var> is <var>node</var>, set it
- to <var>node</var>'s
- <a for=tree>next sibling</a>.
+ <li><p>If <var>referenceChild</var> is <var>node</var>, then set <var>referenceChild</var> to
+ <var>node</var>'s <a for=tree>next sibling</a>.
 
- <li><a>Adopt</a>
- <var>node</var> into <var>parent</var>'s
- <a for=Node>node document</a>.
+ <li><p><a for=/>Insert</a> <var>node</var> into <var>parent</var> before <var>referenceChild</var>.
 
- <li><a for=/>Insert</a> <var>node</var> into <var>parent</var> before <var>reference child</var>.
-
- <li>Return <var>node</var>.
- <!-- technically this is post-insert -->
+ <li><p>Return <var>node</var>.
+ <!-- Technically this is post-insert. -->
 </ol>
 
 <p><a lt="Other applicable specifications">Specifications</a> may define
@@ -2409,14 +2393,35 @@ algorithm below.
      adjust this further based on the requirements of the script element. There might be other ways
      to define that though as Olli suggests, so leaving that out for now. -->
 
+<p><a lt="other applicable specifications">Specifications</a> may define
+<dfn export id=concept-node-children-changed-ext>children changed steps</dfn> for all or some
+<a for=/>nodes</a>. The algorithm is passed no argument and is called from <a for=/>insert</a>,
+<a for=/>remove</a>, and <a for=/>replace data</a>.
+
 <p>To <dfn export id=concept-node-insert>insert</dfn> a <var>node</var> into a <var>parent</var>
 before a <var>child</var>, with an optional <i>suppress observers flag</i>, run these steps:
 
 <ol>
- <li>Let <var>count</var> be the number of
- <a>children</a> of <var>node</var> if
- it is a {{DocumentFragment}} <a>node</a>,
- and one otherwise.
+ <li><p>Let <var>nodes</var> be <var>node</var>'s <a>children</a>, if <var>node</var> is a
+ {{DocumentFragment}} <a>node</a>; otherwise « <var>node</var> ».
+
+ <li><p>Let <var>count</var> be <var>nodes</var>'s <a for=set>size</a>.
+
+ <li><p>If <var>count</var> is 0, then return.
+
+ <li>
+  <p>If <var>node</var> is a {{DocumentFragment}} <a>node</a>, then:
+
+  <ol>
+   <li><p><a for=/>Remove</a> its <a>children</a> with the <i>suppress observers flag</i> set.
+
+   <li>
+    <p><a>queue a tree mutation record</a> for <var>node</var> with « », <var>nodes</var>, null, and
+    null.
+
+    <p class="note no-backref">This step intentionally does not pay attention to the
+    <i>suppress observers flag</i>.
+  </ol>
 
  <li>
   <p>If <var>child</var> is non-null, then:
@@ -2431,23 +2436,6 @@ before a <var>child</var>, with an optional <i>suppress observers flag</i>, run 
    its <a for=range>end offset</a> by <var>count</var>.
   </ol>
 
- <li><p>Let <var>nodes</var> be <var>node</var>'s <a>children</a>, if <var>node</var> is a
- {{DocumentFragment}} <a>node</a>; otherwise « <var>node</var> ».
-
- <li>If <var>node</var> is a {{DocumentFragment}}
- <a>node</a>,
- <a for=/>remove</a> its
- <a>children</a> with the
- <i>suppress observers flag</i> set.
-
- <li>
-  <p>If <var>node</var> is a {{DocumentFragment}} <a for=/>node</a>, then
-  <a>queue a tree mutation record</a> for <var>node</var> with « », <var>nodes</var>, null, and
-  null.
-
-  <p class="note no-backref">This step intentionally does not pay attention to the
-  <i>suppress observers flag</i>.
-
  <li><p>Let <var>previousSibling</var> be <var>child</var>'s <a>previous sibling</a> or
  <var>parent</var>'s <a>last child</a> if <var>child</var> is null.
 
@@ -2455,6 +2443,8 @@ before a <var>child</var>, with an optional <i>suppress observers flag</i>, run 
   <p>For each <var>node</var> in <var>nodes</var>, in <a>tree order</a>:
 
   <ol>
+   <li><p><a>Adopt</a> <var>node</var> into <var>parent</var>'s <a for=Node>node document</a>.
+
    <li><p>If <var>child</var> is null, then <a for=set>append</a> <var>node</var> to
    <var>parent</var>'s <a for=tree>children</a>.
 
@@ -2463,9 +2453,6 @@ before a <var>child</var>, with an optional <i>suppress observers flag</i>, run 
 
    <li><p>If <var>parent</var> is a <a for=Element>shadow host</a> and <var>node</var> is a
    <a>slotable</a>, then <a>assign a slot</a> for <var>node</var>.
-
-   <li>If <var>node</var> is a {{Text}} node, run the <a>child text content change steps</a> for
-   <var>parent</var>.
 
    <li><p>If <var>parent</var>'s <a for=tree>root</a> is a <a for=/>shadow root</a>, and
    <var>parent</var> is a <a>slot</a> whose <a for=slot>assigned nodes</a> is the empty list,
@@ -2503,6 +2490,8 @@ before a <var>child</var>, with an optional <i>suppress observers flag</i>, run 
 
  <li><p>If <i>suppress observers flag</i> is unset, then <a>queue a tree mutation record</a> for
  <var>parent</var> with <var>nodes</var>, « », <var>previousSibling</var>, and <var>child</var>.
+
+ <li><p>Run the <a>children changed steps</a> for <var>parent</var>.
 </ol>
 
 
@@ -2518,96 +2507,65 @@ within a <var>parent</var>, run these steps:
      shared. -->
 
 <ol>
- <li>If <var>parent</var> is not a {{Document}},
- {{DocumentFragment}}, or {{Element}}
- <a>node</a>,
- <a>throw</a> a
- "{{HierarchyRequestError!!exception}}" {{DOMException}}.
+ <li><p>If <var>parent</var> is not a {{Document}}, {{DocumentFragment}}, or {{Element}}
+ <a>node</a>, then <a>throw</a> a "{{HierarchyRequestError!!exception}}" {{DOMException}}.
 
- <li>If <var>node</var> is a
- <a>host-including inclusive ancestor</a>
- of <var>parent</var>, <a>throw</a> a
- "{{HierarchyRequestError!!exception}}" {{DOMException}}.
+ <li><p>If <var>node</var> is a <a>host-including inclusive ancestor</a> of <var>parent</var>, then
+ <a>throw</a> a "{{HierarchyRequestError!!exception}}" {{DOMException}}.
 
- <li>If <var>child</var>'s <a for=tree>parent</a> is not <var>parent</var>, then <a>throw</a> a
+ <li><p>If <var>child</var>'s <a for=tree>parent</a> is not <var>parent</var>, then <a>throw</a> a
  "{{NotFoundError!!exception}}" {{DOMException}}.
 
- <li>If <var>node</var> is not a
- {{DocumentFragment}}, {{DocumentType}},
- {{Element}}, {{Text}},
- {{ProcessingInstruction}}, or {{Comment}}
- <a>node</a>,
- <a>throw</a> a
+ <li><p>If <var>node</var> is not a {{DocumentFragment}}, {{DocumentType}}, {{Element}}, {{Text}},
+ {{ProcessingInstruction}}, or {{Comment}} <a>node</a>, then <a>throw</a> a
  "{{HierarchyRequestError!!exception}}" {{DOMException}}.
 
- <li>If either <var>node</var> is a {{Text}}
- <a>node</a> and <var>parent</var> is a
- <a>document</a>, or <var>node</var> is a
- <a>doctype</a> and <var>parent</var> is
- not a <a>document</a>,
- <a>throw</a> a
- "{{HierarchyRequestError!!exception}}" {{DOMException}}.
+ <li><p>If either <var>node</var> is a {{Text}} <a>node</a> and <var>parent</var> is a
+ <a>document</a>, or <var>node</var> is a <a>doctype</a> and <var>parent</var> is not a
+ <a>document</a>, then <a>throw</a> a "{{HierarchyRequestError!!exception}}" {{DOMException}}.
 
  <li>
-  If <var>parent</var> is a
-  <a>document</a>, and any of the statements below, switched
-  on <var>node</var>, are true, <a>throw</a> a
+  <p>If <var>parent</var> is a <a>document</a>, and any of the statements below, switched on
+  <var>node</var>, are true, then <a>throw</a> a
   "{{HierarchyRequestError!!exception}}" {{DOMException}}.
 
   <dl class=switch>
    <dt>{{DocumentFragment}} <a>node</a>
    <dd>
-    If <var>node</var> has more than one
-    <a for="/">element</a> <a for=tree>child</a>
-    or has a {{Text}} <a>node</a>
-    <a for=tree>child</a>.
+    <p>If <var>node</var> has more than one <a for="/">element</a> <a for=tree>child</a> or has a
+    {{Text}} <a>node</a> <a for=tree>child</a>.
 
-    Otherwise, if <var>node</var> has one
-    <a for="/">element</a> <a for=tree>child</a>
-    and either <var>parent</var> has an <a for="/">element</a>
-    <a for=tree>child</a> that is not <var>child</var> or a
-    <a>doctype</a> is
-    <a>following</a> <var>child</var>.
+    <p>Otherwise, if <var>node</var> has one <a for="/">element</a> <a for=tree>child</a> and either
+    <var>parent</var> has an <a for="/">element</a> <a for=tree>child</a> that is not
+    <var>child</var> or a <a>doctype</a> is <a>following</a> <var>child</var>.
 
    <dt><a for="/">element</a>
-   <dd><var>parent</var> has an <a for="/">element</a>
-   <a for=tree>child</a> that is not <var>child</var> or a
-   <a>doctype</a> is
-   <a>following</a> <var>child</var>.
+   <dd><p><var>parent</var> has an <a for="/">element</a> <a for=tree>child</a> that is not
+   <var>child</var> or a <a>doctype</a> is <a>following</a> <var>child</var>.
 
    <dt><a>doctype</a>
-   <dd><var>parent</var> has a <a>doctype</a>
-   <a for=tree>child</a> that is not <var>child</var>, or an
-   <a for="/">element</a> is
-   <a>preceding</a> <var>child</var>.
+   <dd><p><var>parent</var> has a <a>doctype</a> <a for=tree>child</a> that is not <var>child</var>,
+   or an <a for="/">element</a> is <a>preceding</a> <var>child</var>.
   </dl>
 
-  <p class="note no-backref">The above statements differ from the
-  <a>pre-insert</a> algorithm.
+  <p class="note no-backref">The above statements differ from the <a>pre-insert</a> algorithm.
 
- <li>Let <var>reference child</var> be <var>child</var>'s
- <a for=tree>next sibling</a>.
+ <li><p>Let <var>referenceChild</var> be <var>child</var>'s <a for=tree>next sibling</a>.
 
- <li>If <var>reference child</var> is <var>node</var>, set it
- to <var>node</var>'s
- <a for=tree>next sibling</a>.
+ <li><p>If <var>referenceChild</var> is <var>node</var>, then set <var>referenceChild</var> to
+ <var>node</var>'s <a for=tree>next sibling</a>.
 
  <li><p>Let <var>previousSibling</var> be <var>child</var>'s <a>previous sibling</a>.
 
- <li><a>Adopt</a>
- <var>node</var> into <var>parent</var>'s
- <a for=Node>node document</a>.
-
- <li>Let <var>removedNodes</var> be the empty list.
+ <li><p>Let <var>removedNodes</var> be the empty list.
 
  <li>
-  <p>If <var>child</var>'s <a for=tree>parent</a> is not null, then:
+  <p>If <var>child</var>'s <a for=tree>parent</a> is non-null, then:
 
   <ol>
    <li><p>Set <var>removedNodes</var> to « <var>child</var> ».
 
-   <li><p><a for=/>Remove</a> <var>child</var> from its <var>parent</var> with the
-   <i>suppress observers flag</i> set.
+   <li><p><a for=/>Remove</a> <var>child</var> with the <i>suppress observers flag</i> set.
   </ol>
 
   <p class="note no-backref">The above can only be false if <var>child</var> is <var>node</var>.
@@ -2617,27 +2575,21 @@ within a <var>parent</var>, run these steps:
  <!-- This needs to come before insert as that removes the children of a
       DocumentFragment node. -->
 
- <li><p><a for=/>Insert</a> <var>node</var> into <var>parent</var> before <var>reference child</var>
+ <li><p><a for=/>Insert</a> <var>node</var> into <var>parent</var> before <var>referenceChild</var>
  with the <i>suppress observers flag</i> set.
 
  <li><p><a>Queue a tree mutation record</a> for <var>parent</var> with <var>nodes</var>,
- <var>removedNodes</var>, <var>previousSibling</var>, and <var>reference child</var>.
+ <var>removedNodes</var>, <var>previousSibling</var>, and <var>referenceChild</var>.
 
  <li><p>Return <var>child</var>.
 </ol>
 
 
-To <dfn export for=Node id=concept-node-replace-all>replace all</dfn> with a
-<var>node</var> within a <var>parent</var>, run these steps:
+<p>To <dfn export for=Node id=concept-node-replace-all>replace all</dfn> with a <var>node</var>
+within a <var>parent</var>, run these steps:
 
 <ol>
- <li>If <var>node</var> is not null,
- <a>adopt</a> <var>node</var> into
- <var>parent</var>'s
- <a for=Node>node document</a>.
-
- <li>Let <var>removedNodes</var> be <var>parent</var>'s
- <a>children</a>.
+ <li><p>Let <var>removedNodes</var> be <var>parent</var>'s <a>children</a>.
 
  <li><p>Let <var>addedNodes</var> be the empty list.
 
@@ -2646,12 +2598,10 @@ To <dfn export for=Node id=concept-node-replace-all>replace all</dfn> with a
 
  <li><p>Otherwise, if <var>node</var> is non-null, set <var>addedNodes</var> to « <var>node</var> ».
 
- <li><a for=/>Remove</a> all
- <var>parent</var>'s <a>children</a>, in
- <a>tree order</a>, with the
+ <li><p><a for=/>Remove</a> all <var>parent</var>'s <a>children</a>, in <a>tree order</a>, with the
  <i>suppress observers flag</i> set.
 
- <li><p>If <var>node</var> is not null, then <a for=/>insert</a> <var>node</var> into
+ <li><p>If <var>node</var> is non-null, then <a for=/>insert</a> <var>node</var> into
  <var>parent</var> before null with the <i>suppress observers flag</i> set.
 
  <li><p><a>Queue a tree mutation record</a> for <var>parent</var> with <var>addedNodes</var>,
@@ -2662,17 +2612,17 @@ To <dfn export for=Node id=concept-node-replace-all>replace all</dfn> with a
 <a>node tree</a> constraints. Specification authors need to use it wisely.
 
 
-To <dfn export id=concept-node-pre-remove>pre-remove</dfn> a <var>child</var> from a
+<p>To <dfn export id=concept-node-pre-remove>pre-remove</dfn> a <var>child</var> from a
 <var>parent</var>, run these steps:
 
 <ol>
- <li>If <var>child</var>'s <a for=tree>parent</a> is not <var>parent</var>, then <a>throw</a> a
+ <li><p>If <var>child</var>'s <a for=tree>parent</a> is not <var>parent</var>, then <a>throw</a> a
  "{{NotFoundError!!exception}}" {{DOMException}}.
 
- <li><a for=/>Remove</a> <var>child</var> from <var>parent</var>.
+ <li><p><a for=/>Remove</a> <var>child</var>.
 
- <li>Return <var>child</var>.
- <!-- technically this is post-remove -->
+ <li><p>Return <var>child</var>.
+ <!-- Technically this is post-remove. -->
 </ol>
 
 
@@ -2681,12 +2631,15 @@ To <dfn export id=concept-node-pre-remove>pre-remove</dfn> a <var>child</var> fr
 algorithm is passed <var ignore>removedNode</var>, and optionally <var ignore>oldParent</var>, as
 indicated in the <a for=/>remove</a> algorithm below.
 
-<p>To <dfn export id=concept-node-remove>remove</dfn> a <var>node</var> from a <var>parent</var>,
-with an optional <i>suppress observers flag</i>, run these steps:
+<p>To <dfn export id=concept-node-remove>remove</dfn> a <var>node</var>, with an optional
+<i>suppress observers flag</i>, run these steps:
 
 <ol>
- <li>Let <var>index</var> be <var>node</var>'s
- <a for=tree>index</a>.
+ <li><p>Let <var>parent</var> be <var>node</var>'s <a for=tree>parent</a>
+
+ <li><p>Assert: <var>parent</var> is non-null.
+
+ <li><p>Let <var>index</var> be <var>node</var>'s <a for=tree>index</a>.
 
  <li><p>For each <a>live range</a> whose <a for=range>start node</a> is an
  <a>inclusive descendant</a> of <var>node</var>, set its <a for=range>start</a> to
@@ -2708,11 +2661,11 @@ with an optional <i>suppress observers flag</i>, run these steps:
  <a for=Node>node document</a>, run the <a><code>NodeIterator</code> pre-removing steps</a> given
  <var>node</var> and <var>iterator</var>.
 
- <li>Let <var>oldPreviousSibling</var> be <var>node</var>'s <a>previous sibling</a>.
+ <li><p>Let <var>oldPreviousSibling</var> be <var>node</var>'s <a>previous sibling</a>.
 
- <li>Let <var>oldNextSibling</var> be <var>node</var>'s <a for=tree>next sibling</a>.
+ <li><p>Let <var>oldNextSibling</var> be <var>node</var>'s <a for=tree>next sibling</a>.
 
- <li><a for=set>Remove</a> <var>node</var> from its <var>parent</var>'s <a for=tree>children</a>.
+ <li><p><a for=set>Remove</a> <var>node</var> from its <var>parent</var>'s <a for=tree>children</a>.
 
  <li><p>If <var>node</var> is <a for=slotable>assigned</a>, then run <a>assign slotables</a> for
  <var>node</var>'s <a>assigned slot</a>.
@@ -2721,7 +2674,8 @@ with an optional <i>suppress observers flag</i>, run these steps:
  <var>parent</var> is a <a>slot</a> whose <a for=slot>assigned nodes</a> is the empty list,
  then run <a>signal a slot change</a> for <var>parent</var>.
 
- <li><p>If <var>node</var> has an <a>inclusive descendant</a> that is a <a>slot</a>, then:
+ <li>
+  <p>If <var>node</var> has an <a>inclusive descendant</a> that is a <a>slot</a>, then:
 
   <ol>
    <li><p>Run <a>assign slotables for a tree</a> with <var>parent</var>'s <a for=tree>root</a>.
@@ -2767,8 +2721,7 @@ with an optional <i>suppress observers flag</i>, run these steps:
  <var>parent</var> with « », « <var>node</var> », <var>oldPreviousSibling</var>, and
  <var>oldNextSibling</var>.
 
- <li><p>If <var>node</var> is a {{Text}} node, then run the <a>child text content change steps</a>
- for <var>parent</var>.
+ <li><p>Run the <a>children changed steps</a> for <var>parent</var>.
 </ol>
 
 
@@ -2813,7 +2766,7 @@ standards that want to define APIs shared between <a for=/>documents</a> and
 
 <h4 id=interface-parentnode>Mixin {{ParentNode}}</h4>
 
-To <dfn export lt="converting nodes into a node">convert nodes into a node</dfn>, given
+<p>To <dfn export lt="converting nodes into a node">convert nodes into a node</dfn>, given
 <var>nodes</var> and <var>document</var>, run these steps:
 
 <ol>
@@ -3089,8 +3042,7 @@ steps:
 <ol>
  <li><p>If <a>context object</a>'s <a for=tree>parent</a> is null, then return.
 
- <li><p><a for=/>Remove</a> the <a>context object</a> from <a>context object</a>'s
- <a for=tree>parent</a>.
+ <li><p><a for=/>Remove</a> the <a>context object</a>.
 </ol>
 
 
@@ -3155,18 +3107,17 @@ interface NodeList {
 
 <div class=impl>
 
-The object's <a>supported property indices</a>
-are the numbers in the range zero to one less than the number of nodes
-<a for=collection>represented by the collection</a>. If there are no such elements, then
-there are no <a>supported property indices</a>.
+<p>The object's <a>supported property indices</a> are the numbers in the range zero to one less than
+the number of nodes <a for=collection>represented by the collection</a>. If there are no such
+elements, then there are no <a>supported property indices</a>.
 
-The <dfn attribute for=NodeList>length</dfn> attribute must
-return the number of nodes <a for=collection>represented by the collection</a>.
+<p>The <dfn attribute for=NodeList>length</dfn> attribute must return the number of nodes
+<a for=collection>represented by the collection</a>.
 
-The <dfn method for=NodeList><code>item(<var>index</var>)</code></dfn> method must return
-the <var>index</var><sup>th</sup> <a>node</a> in the <a>collection</a>. If there is no
-<var>index</var><sup>th</sup> <a>node</a> in the <a>collection</a>, then the method must
-return null.
+<p>The <dfn method for=NodeList><code>item(<var>index</var>)</code></dfn> method must return the
+<var>index</var><sup>th</sup> <a>node</a> in the <a>collection</a>. If there is no
+<var>index</var><sup>th</sup> <a>node</a> in the <a>collection</a>, then the method must return
+null.
 
 </div>
 
@@ -3322,7 +3273,7 @@ run these steps:
   </ol>
 
  <li><p><a for=set>For each</a> <var>slot</var> of <var>signalSet</var>, <a>fire an event</a>
- named <code>slotchange</code>, with its {{Event/bubbles}} attribute set to true, at
+ named {{HTMLSlotElement/slotchange}}, with its {{Event/bubbles}} attribute set to true, at
  <var>slot</var>.
 </ol>
 
@@ -3348,9 +3299,10 @@ they do not get lost when {{MutationObserverInit/subtree}} is set to true on <a 
 <h4 id=interface-mutationobserver>Interface {{MutationObserver}}</h4>
 
 <pre class="idl">
-[Constructor(MutationCallback callback),
- Exposed=Window]
+[Exposed=Window]
 interface MutationObserver {
+  constructor(MutationCallback callback);
+
   void observe(Node target, optional MutationObserverInit options = {});
   void disconnect();
   sequence&lt;MutationRecord> takeRecords();
@@ -3638,11 +3590,6 @@ run these steps:
 <var>nextSibling</var>, <a>queue a mutation record</a> of "<code>childList</code>" for
 <var>target</var> with null, null, null, <var>addedNodes</var>, <var>removedNodes</var>,
 <var>previousSibling</var>, and <var>nextSibling</var>.
-
-<p>To <dfn noexport>queue an attribute mutation record</dfn> for <var>target</var> with
-<var>name</var>, <var>namespace</var>, and <var>oldValue</var>, <a>queue a mutation record</a> of
-"<code>attributes</code>" for <var>target</var> with <var>name</var>, <var>namespace</var>,
-<var>oldValue</var>, « », « », null, and null.
 
 
 <h4 id=interface-mutationrecord>Interface {{MutationRecord}}</h4>
@@ -4230,10 +4177,6 @@ steps for each <a>descendant</a> <a>exclusive <code>Text</code> node</a> <var>no
  (excluding itself), in <a>tree order</a>.
 </ol>
 
-<p class="note">{{Node/normalize()}} does not need to run any
-<a>child text content change steps</a>, since although it messes with {{Text}} nodes extensively, it
-does so specifically in a way that preserves the <a>child text content</a>.
-
 <hr>
 
 <dl class=domintro>
@@ -4546,7 +4489,7 @@ for an <var>element</var> using <var>namespace</var>, run these steps:
 
 <ol>
  <li><p>If <var>element</var>'s <a for=Element>namespace</a> is <var>namespace</var> and its
- <a for=Element>namespace prefix</a> is not null, then return its
+ <a for=Element>namespace prefix</a> is non-null, then return its
  <a for=Element>namespace prefix</a>.
 
  <li><p>If <var>element</var> <a lt="has an attribute">has</a> an <a>attribute</a> whose
@@ -4567,7 +4510,7 @@ for an <var>element</var> using <var>namespace</var>, run these steps:
  <dt>{{Element}}
  <dd>
   <ol>
-   <li><p>If its <a for=Element>namespace</a> is not null and its
+   <li><p>If its <a for=Element>namespace</a> is non-null and its
    <a for=Element>namespace prefix</a> is <var>prefix</var>, then return
    <a for=Element>namespace</a>.
 
@@ -4797,13 +4740,13 @@ object may be returned as returned by an earlier call.
 <h3 id=interface-document>Interface {{Document}}</h3>
 
 <pre class=idl force="Document">
-[Constructor,
- Exposed=Window]
+[Exposed=Window]
 interface Document : Node {
+  constructor();
+
   [SameObject] readonly attribute DOMImplementation implementation;
   readonly attribute USVString URL;
   readonly attribute USVString documentURI;
-  readonly attribute USVString origin;
   readonly attribute DOMString compatMode;
   readonly attribute DOMString characterSet;
   readonly attribute DOMString charset; // historical alias of .characterSet
@@ -4910,9 +4853,6 @@ null if <var>event</var>'s {{Event/type}} attribute value is "<code>load</code>"
  <dt><code><var>document</var> . {{Document/documentURI}}</code>
  <dd>Returns <var>document</var>'s <a for=Document>URL</a>.
 
- <dt><code><var>document</var> . {{Document/origin}}</code>
- <dd>Returns <var>document</var>'s <a for=Document>origin</a>.
-
  <dt><code><var>document</var> . {{Document/compatMode}}</code>
  <dd>
   Returns the string "<code>BackCompat</code>" if <var>document</var>'s
@@ -4942,10 +4882,6 @@ The
 The <dfn attribute for=Document><code>URL</code></dfn> attribute's getter and
 <dfn attribute for=Document><code>documentURI</code></dfn> attribute's getter must return the
 <a for=Document>URL</a>, <a lt="URL serializer" spec=url>serialized</a>.
-
-The <dfn attribute for=Document><code>origin</code></dfn> attribute's getter must return the
-<a lt="serialization of an origin">serialization</a> of <a>context object</a>'s
-<a for=Document>origin</a>.
 
 The <dfn attribute for=Document><code>compatMode</code></dfn> attribute's getter must
 return "<code>BackCompat</code>" if <a>context object</a>'s <a for=Document>mode</a> is
@@ -5308,20 +5244,19 @@ when invoked, must run these steps:
  the <i>clone children flag</i> set if <var>deep</var> is true.
 </ol>
 
-<a lt="Other applicable specifications">Specifications</a> may define
-<dfn export id=concept-node-adopt-ext>adopting steps</dfn> for all or some
-<a for=/>nodes</a>. The algorithm is passed <var>node</var> and
-<var>oldDocument</var>, as indicated in the
-<a>adopt</a> algorithm.
+<p><a lt="Other applicable specifications">Specifications</a> may define
+<dfn export id=concept-node-adopt-ext>adopting steps</dfn> for all or some <a for=/>nodes</a>. The
+algorithm is passed <var>node</var> and <var>oldDocument</var>, as indicated in the <a>adopt</a>
+algorithm.
 
-To <dfn export id=concept-node-adopt>adopt</dfn> a <var>node</var> into a <var>document</var>, run
+<p>To <dfn export id=concept-node-adopt>adopt</dfn> a <var>node</var> into a <var>document</var>, run
 these steps:
 
 <ol>
  <li><p>Let <var>oldDocument</var> be <var>node</var>'s <a for=Node>node document</a>.
 
- <li><p>If <var>node</var>'s <a for=tree>parent</a> is not null, <a for=/>remove</a> <var>node</var>
- from its <a for=tree>parent</a>.
+ <li><p>If <var>node</var>'s <a for=tree>parent</a> is non-null, then <a for=/>remove</a>
+ <var>node</var>.
 
  <li>
   <p>If <var>document</var> is not <var>oldDocument</var>, then:
@@ -5355,16 +5290,18 @@ The <dfn method for=Document><code>adoptNode(<var>node</var>)</code></dfn> metho
 must run these steps:
 
 <ol>
- <li>If <var>node</var> is a <a>document</a>, then <a>throw</a> a
+ <li><p>If <var>node</var> is a <a>document</a>, then <a>throw</a> a
  "{{NotSupportedError!!exception}}" {{DOMException}}.
 
- <li>If <var>node</var> is a <a for=/>shadow root</a>, then <a>throw</a> a
+ <li><p>If <var>node</var> is a <a for=/>shadow root</a>, then <a>throw</a> a
  "{{HierarchyRequestError!!exception}}" {{DOMException}}.
 
- <li><a>Adopt</a> <var>node</var>
- into the <a>context object</a>.
+ <li><p>If <var>node</var> is a {{DocumentFragment}} <a for=/>node</a> whose
+ <a for=DocumentFragment>host</a> is non-null, then return.
 
- <li>Return <var>node</var>.
+ <li><p><a>Adopt</a> <var>node</var> into the <a>context object</a>.
+
+ <li><p>Return <var>node</var>.
 </ol>
 
 <hr>
@@ -5709,9 +5646,9 @@ the <a>context object</a>'s <a>system ID</a>.
 <h3 id=interface-documentfragment>Interface {{DocumentFragment}}</h3>
 
 <pre class=idl>
-[Constructor,
- Exposed=Window]
+[Exposed=Window]
 interface DocumentFragment : Node {
+  constructor();
 };
 </pre>
 
@@ -5747,6 +5684,7 @@ invoked, must return a new {{DocumentFragment}} <a>node</a> whose <a for=Node>no
 interface ShadowRoot : DocumentFragment {
   readonly attribute ShadowRootMode mode;
   readonly attribute Element host;
+  attribute EventHandler onslotchange;
 };
 
 enum ShadowRootMode { "open", "closed" };
@@ -5757,6 +5695,9 @@ enum ShadowRootMode { "open", "closed" };
 
 <p><a for=/>Shadow roots</a> have an associated <dfn for=ShadowRoot>mode</dfn> ("<code>open</code>"
 or "<code>closed</code>").</p>
+
+<p><a for=/>Shadow roots</a> have an associated <dfn export for=ShadowRoot>delegates focus</dfn>.
+It is initially set to false.</p>
 
 <p><a for=/>Shadow roots</a>'s associated <a for=DocumentFragment>host</a> is never null.</p>
 <!-- If we ever change this, e.g., add a ShadowRoot object constructor, that would have serious
@@ -5774,11 +5715,16 @@ null if <var>event</var>'s <a>composed flag</a> is unset and <a for=/>shadow roo
 <p>The <dfn attribute for=ShadowRoot><code>host</code></dfn> attribute's getter must return the
 <a>context object</a>'s <a for=DocumentFragment>host</a>.
 
+<p>The <dfn attribute for=ShadowRoot><code>onslotchange</code></dfn> attribute is an
+<a>event handler IDL attribute</a> for the
+<dfn for=ShadowRoot export><code>onslotchange</code></dfn> <a>event handler</a>, whose
+<a>event handler event type</a> is {{HTMLSlotElement/slotchange}}.
+
 <hr>
 
-<p>In <dfn export id=concept-shadow-including-tree-order>shadow-including tree order</dfn>, is
+<p>In <dfn export id=concept-shadow-including-tree-order>shadow-including tree order</dfn> is
 <a>shadow-including preorder, depth-first traversal</a> of a <a>node tree</a>.
-<dfn noexport>shadow-including preorder, depth-first traversal</dfn> of a <a>node tree</a>
+<dfn noexport>Shadow-including preorder, depth-first traversal</dfn> of a <a>node tree</a>
 <var>tree</var> is preorder, depth-first traversal of <var>tree</var>, with for each
 <a for=Element>shadow host</a> encountered in <var>tree</var>,
 <a>shadow-including preorder, depth-first traversal</a> of that <a for=/>element</a>'s
@@ -5896,6 +5842,7 @@ interface Element : Node {
 
 dictionary ShadowRootInit {
   required ShadowRootMode mode;
+  boolean delegatesFocus = false;
 };
 </pre>
 
@@ -6141,118 +6088,87 @@ its <a for=Element>attribute list</a> <a for=list>is empty</a>.
 <dfn export id=concept-element-attribute-has lt="has an attribute">has</dfn> an <a>attribute</a>
 <var>A</var> if its <a for=Element>attribute list</a> <a for=list>contains</a> <var>A</var>.
 
-This and <a lt="other applicable specifications">other specifications</a> may define
+<p>This and <a lt="other applicable specifications">other specifications</a> may define
 <dfn export id=concept-element-attributes-change-ext>attribute change steps</dfn> for
 <a for=/>elements</a>. The algorithm is passed <var>element</var>, <var>localName</var>,
 <var>oldValue</var>, <var>value</var>, and <var>namespace</var>.
 
-To <dfn export id=concept-element-attributes-change lt="change an attribute">change</dfn> an
-<a>attribute</a> <var>attribute</var>
-from an <a for="/">element</a> <var>element</var>
-to <var>value</var>, run these steps:
+<p>To <dfn noexport>handle attribute changes</dfn> for an <a>attribute</a> <var>attribute</var> with
+<var>element</var>, <var>oldValue</var>, and <var>newValue</var>, run these steps:
 
 <ol>
- <li><p><a>Queue an attribute mutation record</a> for <var>element</var> with <var>attribute</var>'s
- <a for=Attr>local name</a>, <var>attribute</var>'s <a for=Attr>namespace</a>, and
+ <li><p><a>Queue a mutation record</a> of "<code>attributes</code>" for <var>element</var> with
+ <var>attribute</var>'s <a for=Attr>local name</a>, <var>attribute</var>'s
+ <a for=Attr>namespace</a>, <var>oldValue</var>, « », « », null, and null.
+
+ <li><p>If <var>element</var> is <a for=Element>custom</a>, then
+ <a>enqueue a custom element callback reaction</a> with <var>element</var>, callback name
+ "<code>attributeChangedCallback</code>", and an argument list containing <var>attribute</var>'s
+ <a for=Attr>local name</a>, <var>oldValue</var>, <var>newValue</var>, and <var>attribute</var>'s
+ <a for=Attr>namespace</a>.
+
+ <li><p>Run the <a>attribute change steps</a> with <var>element</var>, <var>attribute</var>'s
+ <a for=Attr>local name</a>, <var>oldValue</var>, <var>newValue</var>, and <var>attribute</var>'s
+ <a for=Attr>namespace</a>.
+</ol>
+
+<p>To <dfn export id=concept-element-attributes-change lt="change an attribute">change</dfn> an
+<a>attribute</a> <var>attribute</var> to <var>value</var>, run these steps:
+
+<ol>
+ <li><p><a>Handle attribute changes</a> for <var>attribute</var> with <var>attribute</var>'s
+ <a for=Attr>element</a>, <var>attribute</var>'s <a for=Attr>value</a>, and <var>value</var>.
+
+ <li><p>Set <var>attribute</var>'s <a for=Attr>value</a> to <var>value</var>.
+</ol>
+
+<p>To <dfn export id=concept-element-attributes-append lt="append an attribute">append</dfn> an
+<a>attribute</a> <var>attribute</var> to an <a for="/">element</a> <var>element</var>, run these
+steps:
+
+<ol>
+ <li><p><a>Handle attribute changes</a> for <var>attribute</var> with <var>element</var>, null, and
  <var>attribute</var>'s <a for=Attr>value</a>.
 
- <li>If <var>element</var> is <a for=Element>custom</a>, then
- <a>enqueue a custom element callback reaction</a> with <var>element</var>, callback name
- "<code>attributeChangedCallback</code>", and an argument list containing <var>attribute</var>'s
- <a for=Attr>local name</a>, <var>attribute</var>'s <a for=Attr>value</a>, <var>value</var>, and
- <var>attribute</var>'s <a for=Attr>namespace</a>.
-
- <li><p>Run the <a>attribute change steps</a> with <var>element</var>, <var>attribute</var>'s
- <a for=Attr>local name</a>, <var>attribute</var>'s <a for=Attr>value</a>, <var>value</var>, and
- <var>attribute</var>'s <a for=Attr>namespace</a>.
-
- <li>Set <var>attribute</var>'s
- <a for=Attr>value</a> to <var>value</var>.
-</ol>
-
-To <dfn export id=concept-element-attributes-append lt="append an attribute">append</dfn> an
-<a>attribute</a> <var>attribute</var> to
-an <a for="/">element</a> <var>element</var>,
-run these steps:
-
-<ol>
- <li><p><a>Queue an attribute mutation record</a> for <var>element</var> with <var>attribute</var>'s
- <a for=Attr>local name</a>, <var>attribute</var>'s <a for=Attr>namespace</a>, and null.
-
- <li>If <var>element</var> is <a for=Element>custom</a>, then
- <a>enqueue a custom element callback reaction</a> with <var>element</var>, callback name
- "<code>attributeChangedCallback</code>", and an argument list containing <var>attribute</var>'s
- <a for=Attr>local name</a>, null, <var>attribute</var>'s <a for=Attr>value</a>, and
- <var>attribute</var>'s <a for=Attr>namespace</a>.
-
- <li><p>Run the <a>attribute change steps</a> with <var>element</var>, <var>attribute</var>'s
- <a for=Attr>local name</a>, null, <var>attribute</var>'s <a for=Attr>value</a>, and
- <var>attribute</var>'s <a for=Attr>namespace</a>.
-
- <li><a for=list>Append</a> <var>attribute</var> to <var>element</var>'s
+ <li><p><a for=list>Append</a> <var>attribute</var> to <var>element</var>'s
  <a for=Element>attribute list</a>.
 
- <li>Set <var>attribute</var>'s
- <a for=Attr>element</a> to <var>element</var>.
+ <li><p>Set <var>attribute</var>'s <a for=Attr>element</a> to <var>element</var>.
 </ol>
 
-To <dfn export id=concept-element-attributes-remove lt="remove an attribute">remove</dfn> an
-<a>attribute</a> <var>attribute</var>
-from an <a for="/">element</a> <var>element</var>,
-run these steps:
+<p>To <dfn export id=concept-element-attributes-remove lt="remove an attribute">remove</dfn> an
+<a>attribute</a> <var>attribute</var>, run these steps:
 
 <ol>
- <li><p><a>Queue an attribute mutation record</a> for <var>element</var> with <var>attribute</var>'s
- <a for=Attr>local name</a>, <var>attribute</var>'s <a for=Attr>namespace</a>, and
- <var>attribute</var>'s <a for=Attr>value</a>.
+ <li><p><a>Handle attribute changes</a> for <var>attribute</var> with <var>attribute</var>'s
+ <a for=Attr>element</a>, <var>attribute</var>'s <a for=Attr>value</a>, and null.
 
- <li>If <var>element</var> is <a for=Element>custom</a>, then
- <a>enqueue a custom element callback reaction</a> with <var>element</var>, callback name
- "<code>attributeChangedCallback</code>", and an argument list containing <var>attribute</var>'s
- <a for=Attr>local name</a>, <var>attribute</var>'s <a for=Attr>value</a>, null, and
- <var>attribute</var>'s <a for=Attr>namespace</a>.
+ <li><a for=list>Remove</a> <var>attribute</var> from <var>attribute</var>'s
+ <a for=Attr>element</a>'s <a for=Element>attribute list</a>.
 
- <li><p>Run the <a>attribute change steps</a> with <var>element</var>, <var>attribute</var>'s
- <a for=Attr>local name</a>, <var>attribute</var>'s <a for=Attr>value</a>, null, and
- <var>attribute</var>'s <a for=Attr>namespace</a>.
-
- <li><a for=list>Remove</a> <var>attribute</var> from <var>element</var>'s
- <a for=Element>attribute list</a>.
-
- <li>Set <var>attribute</var>'s
- <a for=Attr>element</a> to null.
+ <li><p>Set <var>attribute</var>'s <a for=Attr>element</a> to null.
 </ol>
 
-To <dfn export id=concept-element-attributes-replace lt="replace an attribute">replace</dfn> an
-<a>attribute</a> <var>oldAttr</var> by an <a>attribute</a> <var>newAttr</var>
-in an <a for="/">element</a> <var>element</var>, run these steps:
+<p>To <dfn export id=concept-element-attributes-replace lt="replace an attribute">replace</dfn> an
+<a>attribute</a> <var>oldAttr</var> with an <a>attribute</a> <var>newAttr</var>, run these steps:
 
 <ol>
- <li><p><a>Queue an attribute mutation record</a> for <var>element</var> with <var>oldAttr</var>'s
- <a for=Attr>local name</a>, <var>oldAttr</var>'s <a for=Attr>namespace</a>, and
- <var>oldAttr</var>'s <a for=Attr>value</a>.
+ <li><p><a>Handle attribute changes</a> for <var>oldAttr</var> with <var>oldAttr</var>'s
+ <a for=Attr>element</a>, <var>oldAttr</var>'s <a for=Attr>value</a>, and <var>newAttr</var>'s
+ <a for=Attr>value</a>.
 
- <li>If <var>element</var> is <a for=Element>custom</a>, then
- <a>enqueue a custom element callback reaction</a> with <var>element</var>, callback name
- "<code>attributeChangedCallback</code>", and an argument list containing <var>oldAttr</var>'s
- <a for=Attr>local name</a>, <var>oldAttr</var>'s <a for=Attr>value</a>, <var>newAttr</var>'s
- <a for=Attr>value</a>, and <var>oldAttr</var>'s <a for=Attr>namespace</a>.
+ <li><p><a for=list>Replace</a> <var>oldAttr</var> by <var>newAttr</var> in <var>oldAttr</var>'s
+ <a for=Attr>element</a>'s <a for=Element>attribute list</a>.
 
- <li><p>Run the <a>attribute change steps</a> with <var>element</var>, <var>oldAttr</var>'s
- <a for=Attr>local name</a>, <var>oldAttr</var>'s <a for=Attr>value</a>, <var>newAttr</var>'s
- <a for=Attr>value</a>, and <var>oldAttr</var>'s <a for=Attr>namespace</a>.
-
- <li><p><a for=list>Replace</a> <var>oldAttr</var> by <var>newAttr</var> in <var>element</var>'s
- <a for=Element>attribute list</a>.
+ <li><p>Set <var>newAttr</var>'s <a for=Attr>element</a> to <var>oldAttr</var>'s
+ <a for=Attr>element</a>.
 
  <li><p>Set <var>oldAttr</var>'s <a for=Attr>element</a> to null.
-
- <li><p>Set <var>newAttr</var>'s <a for=Attr>element</a> to <var>element</var>.
 </ol>
 
 <hr>
 
-To <dfn export id=concept-element-attributes-get-by-name>get an attribute by name</dfn> given a
+<p>To <dfn export id=concept-element-attributes-get-by-name>get an attribute by name</dfn> given a
 <var>qualifiedName</var> and <a for="/">element</a> <var>element</var>, run these steps:
 
 <ol>
@@ -6264,7 +6180,7 @@ To <dfn export id=concept-element-attributes-get-by-name>get an attribute by nam
  whose <a for=Attr>qualified name</a> is <var>qualifiedName</var>, and null otherwise.
 </ol>
 
-To
+<p>To
 <dfn export id=concept-element-attributes-get-by-namespace>get an attribute by namespace and local name</dfn>
 given a <var>namespace</var>, <var>localName</var>, and <a for="/">element</a> <var>element</var>,
 run these steps:
@@ -6294,7 +6210,7 @@ run these steps:
  <li><p>Return <var>attr</var>'s <a for=Attr>value</a>.</p></li>
 </ol>
 
-To <dfn export id=concept-element-attributes-set>set an attribute</dfn> given an
+<p>To <dfn export id=concept-element-attributes-set>set an attribute</dfn> given an
 <var>attr</var> and <var>element</var>, run these steps:
 
 <ol>
@@ -6308,18 +6224,17 @@ To <dfn export id=concept-element-attributes-set>set an attribute</dfn> given an
 
  <li><p>If <var>oldAttr</var> is <var>attr</var>, return <var>attr</var>.
 
- <li><p>If <var>oldAttr</var> is non-null, <a lt="replace an attribute">replace</a> it
-  by <var>attr</var> in <var>element</var>.
+ <li><p>If <var>oldAttr</var> is non-null, then <a lt="replace an attribute">replace</a>
+ <var>oldAttr</var> with <var>attr</var>.
 
  <li><p>Otherwise, <a lt="append an attribute">append</a> <var>attr</var> to <var>element</var>.
 
  <li><p>Return <var>oldAttr</var>.
 </ol>
 
-To <dfn export id=concept-element-attributes-set-value>set an attribute value</dfn> for
-an <a for="/">element</a> <var>element</var>
-using a <var>localName</var> and <var>value</var>, and an optional <var>prefix</var>, and
-<var>namespace</var>, run these steps:
+<p>To <dfn export id=concept-element-attributes-set-value>set an attribute value</dfn> for an
+<a for="/">element</a> <var>element</var>, using a <var>localName</var> and <var>value</var>, and an
+optional <var>prefix</var>, and <var>namespace</var>, run these steps:
 
 <ol>
  <li>If <var>prefix</var> is not given, set it to null.
@@ -6337,46 +6252,40 @@ using a <var>localName</var> and <var>value</var>, and an optional <var>prefix</
  <a lt="append an attribute">append</a> this <a>attribute</a> to <var>element</var>, and then
  return.
 
- <li><a lt="change an attribute">Change</a>
- <var>attribute</var> from <var>element</var> to
- <var>value</var>.
+ <li><p><a lt="change an attribute">Change</a> <var>attribute</var> to <var>value</var>.
 </ol>
 
-To
-<dfn export id=concept-element-attributes-remove-by-name>remove an attribute by name</dfn>
+<p>To <dfn export id=concept-element-attributes-remove-by-name>remove an attribute by name</dfn>
 given a <var>qualifiedName</var> and <a for="/">element</a> <var>element</var>, run these steps:
 
 <ol>
  <li><p>Let <var>attr</var> be the result of
- <a lt="get an attribute by name">getting an attribute</a> given
- <var>qualifiedName</var> and <var>element</var>.
-
- <li><p>If <var>attr</var> is non-null, <a lt="remove an attribute">remove</a> it from
+ <a lt="get an attribute by name">getting an attribute</a> given <var>qualifiedName</var> and
  <var>element</var>.
+
+ <li><p>If <var>attr</var> is non-null, then <a lt="remove an attribute">remove</a> <var>attr</var>.
 
  <li><p>Return <var>attr</var>.
 </ol>
 
-To
+<p>To
 <dfn export id=concept-element-attributes-remove-by-namespace>remove an attribute by namespace and local name</dfn>
-given a <var>namespace</var>, <var>localName</var>, and
-<a for="/">element</a> <var>element</var>, run these steps:
+given a <var>namespace</var>, <var>localName</var>, and <a for="/">element</a> <var>element</var>,
+run these steps:
 
 <ol>
- <li>Let <var>attr</var> be the result of
+ <li><p>Let <var>attr</var> be the result of
  <a lt="get an attribute by namespace and local name">getting an attribute</a> given
  <var>namespace</var>, <var>localName</var>, and <var>element</var>.
 
- <li>If <var>attr</var> is non-null,
- <a lt="remove an attribute">remove</a> it from
- <var>element</var>.
+ <li><p>If <var>attr</var> is non-null, then <a lt="remove an attribute">remove</a> <var>attr</var>.
 
- <li>Return <var>attr</var>.
+ <li><p>Return <var>attr</var>.
 </ol>
 
 <hr>
 
-An <a for=/>element</a> can have an associated
+<p>An <a for=/>element</a> can have an associated
 <dfn export for=Element id=concept-id lt="ID">unique identifier (ID)</dfn>
 
 <p class=note>Historically <a for="/">elements</a> could have multiple identifiers e.g., by using
@@ -6609,8 +6518,7 @@ method, when invoked, must run these steps:
  <a for=Node>node document</a>, then <a lt="append an attribute">append</a> this <a>attribute</a> to
  <a>context object</a>, and then return.
 
- <li><p><a lt="change an attribute">Change</a> <var>attribute</var> from <a>context object</a> to
- <var>value</var>.
+ <li><p><a lt="change an attribute">Change</a> <var>attribute</var> to <var>value</var>.
 </ol>
 
 <p>The
@@ -6726,7 +6634,7 @@ when invoked, must run these steps:
  <a for=list>contain</a> <var>attr</var>, then <a>throw</a> a "{{NotFoundError!!exception}}"
  {{DOMException}}.
 
- <li><p><a lt="remove an attribute">Remove</a> <var>attr</var> from <a>context object</a>.
+ <li><p><a lt="remove an attribute">Remove</a> <var>attr</var>.
 
  <li><p>Return <var>attr</var>.
 </ol>
@@ -6764,7 +6672,7 @@ invoked, must run these steps:
  "<code>h5</code>",
  "<code>h6</code>",
  "<code>header</code>",
- "<code>main</code>"
+ "<code>main</code>",
  "<code>nav</code>",
  "<code>p</code>",
  "<code>section</code>", or
@@ -6793,6 +6701,9 @@ invoked, must run these steps:
  <li><p>Let <var>shadow</var> be a new <a for=/>shadow root</a> whose <a for=Node>node document</a>
  is <a>context object</a>'s <a for=Node>node document</a>, <a for=DocumentFragment>host</a> is
  <a>context object</a>, and <a for=ShadowRoot>mode</a> is <var>init</var>'s {{ShadowRootInit/mode}}.
+
+ <li><p>Set <var>shadow</var>'s <a for=ShadowRoot>delegates focus</a> to <var>init</var>'s
+ {{ShadowRootInit/delegatesFocus}}.
 
  <li><p>Set <a>context object</a>'s <a for=Element>shadow root</a> to <var>shadow</var>.
 
@@ -7135,11 +7046,10 @@ null.
 string <var>value</var>, run these steps:
 
 <ol>
- <li>If <var>attribute</var>'s <a for=Attr>element</a> is null, then set <var>attribute</var>'s
+ <li><p>If <var>attribute</var>'s <a for=Attr>element</a> is null, then set <var>attribute</var>'s
  <a for=Attr>value</a> to <var>value</var>.
 
- <li>Otherwise, <a lt="change an attribute">change</a> <var>attribute</var> from
- <var>attribute</var>'s <a for=Attr>element</a> to <var>value</var>.
+ <li><p>Otherwise, <a lt="change an attribute">change</a> <var>attribute</var> to <var>value</var>.
 </ol>
 
 <p>The {{Attr/value}} attribute's setter must <a>set an existing attribute value</a> with
@@ -7225,8 +7135,8 @@ To <dfn export id=concept-cd-replace>replace data</dfn> of node <var>node</var> 
  <a for=range>end offset</a> by <var>data</var>'s <a for="JavaScript string">length</a> and decrease
  it by <var>count</var>.
 
- <li>If <var>node</var> is a {{Text}} node and its <a>parent</a> is not null, run the
- <a>child text content change steps</a> for <var>node</var>'s <a>parent</a>.
+ <li>If <var>node</var>'s <a>parent</a> is non-null, then run the <a>children changed steps</a> for
+ <var>node</var>'s <a>parent</a>.
 </ol>
 <!-- delete happens after insert for better cursor positioning with editing
 https://www.w3.org/Bugs/Public/show_bug.cgi?id=13153 -->
@@ -7318,12 +7228,14 @@ method, when invoked, must <a>replace data</a> with node <a>context object</a>, 
 <h3 id=interface-text>Interface {{Text}}</h3>
 
 <pre class=idl>
-[Constructor(optional DOMString data = ""),
- Exposed=Window]
+[Exposed=Window]
 interface Text : CharacterData {
+  constructor(optional DOMString data = "");
+
   [NewObject] Text splitText(unsigned long offset);
   readonly attribute DOMString wholeText;
-};</pre>
+};
+</pre>
 
 <dl class=domintro>
  <dt><code><var>text</var> = new <a constructor lt=Text()>Text([<var>data</var> = ""])</a></code>
@@ -7360,10 +7272,6 @@ if any, and its <a>contiguous exclusive <code>Text</code> nodes</a>, and <var>no
 <p>The <dfn export id=concept-child-text-content>child text content</dfn> of a <a for=/>node</a>
 <var>node</var> is the <a for=string>concatenation</a> of the <a for=CharacterData>data</a> of all
 the {{Text}} <a for=/>node</a> <a>children</a> of <var>node</var>, in <a>tree order</a>.
-
-<p>This and <a lt="other applicable specifications">other specifications</a> may define
-<dfn export id=concept-node-text-change-ext>child text content change steps</dfn> for
-<a for=/>nodes</a>.
 
 <p>The <dfn export id=concept-descendant-text-content>descendant text content</dfn> of a
 <a for=/>node</a> <var>node</var> is the <a for=string>concatenation</a> of the
@@ -7476,9 +7384,9 @@ attribute must return the <a for=ProcessingInstruction>target</a>.
 <h3 id=interface-comment>Interface {{Comment}}</h3>
 
 <pre class=idl>
-[Constructor(optional DOMString data = ""),
- Exposed=Window]
+[Exposed=Window]
 interface Comment : CharacterData {
+  constructor(optional DOMString data = "");
 };
 </pre>
 
@@ -7551,7 +7459,7 @@ Necessarily, a <a>live range</a> might itself be modified as part of the mutatio
 
 <p class="note no-backref">See the <a for=/>insert</a> and <a for=/>remove</a> algorithms, the
 {{Node/normalize()}} method, and the <a>replace data</a> and <a lt="split a Text node">split</a>
-algorithms for the hairy details.
+algorithms for details.
 
 <p>Updating <a>live ranges</a> in response to <a>node tree</a> mutations can be expensive. For every
 <a>node tree</a> change, all affected {{Range}} objects need to be updated. Even if the application
@@ -7689,9 +7597,9 @@ dictionary StaticRangeInit {
   required unsigned long endOffset;
 };
 
-[Constructor(StaticRangeInit init),
- Exposed=Window]
+[Exposed=Window]
 interface StaticRange : AbstractRange {
+  constructor(StaticRangeInit init);
 };
 </pre>
 
@@ -7722,9 +7630,10 @@ when invoked, must run these steps:
 <h3 id=interface-range>Interface {{Range}}</h3>
 
 <pre class=idl>
-[Constructor,
- Exposed=Window]
+[Exposed=Window]
 interface Range : AbstractRange {
+  constructor();
+
   readonly attribute Node commonAncestorContainer;
 
   void setStart(Node node, unsigned long offset);
@@ -8207,10 +8116,8 @@ run these steps:
  <a>length</a> minus
  <var>original start offset</var>, data the empty string.
 
- <li>For each <var>node</var> in <var>nodes to remove</var>,
- in <a>tree order</a>,
- <a for=/>remove</a> <var>node</var> from
- its <a for=tree>parent</a>.
+ <li><p>For each <var>node</var> in <var>nodes to remove</var>, in <a>tree order</a>,
+ <a for=/>remove</a> <var>node</var>.
 
  <li>If <var>original end node</var> is a {{Text}},
  {{ProcessingInstruction}}, or {{Comment}}
@@ -8770,9 +8677,8 @@ the result of <a for="live range">cloning the contents</a> of the <a>context obj
  <a for=tree>next sibling</a>.
  <!-- Because we're about to remove node from its parent. -->
 
- <li>If <var>node</var>'s <a for=tree>parent</a> is not
- null, <a for=/>remove</a> <var>node</var> from its
- <a for=tree>parent</a>.
+ <li><p>If <var>node</var>'s <a for=tree>parent</a> is non-null, then <a for=/>remove</a>
+ <var>node</var>.
 
  <!-- Browsers disagree on how to handle the case where the range is
  collapsed: do you increment the end offset so the node is now included, or
@@ -9489,7 +9395,8 @@ steps:
 
      <li><p>Set <var>sibling</var> to <var>temporary</var>'s <a for=tree>next sibling</a>.
 
-     <li><p>If <var>sibling</var> is non-null, then <a for=iteration>break</a>.
+     <li><p>If <var>sibling</var> is non-null, then set <var>node</var> to <var>sibling</var> and
+     <a for=iteration>break</a>.
 
      <li><p>Set <var>temporary</var> to <var>temporary</var>'s <a for=tree>parent</a>.
     </ol>
@@ -9926,8 +9833,10 @@ Document includes XPathEvaluatorBase;
 <h3 id=interface-xpathevaluator>Interface {{XPathEvaluator}}</h3>
 
 <pre class=idl>
-[Exposed=Window, Constructor]
-interface XPathEvaluator {};
+[Exposed=Window]
+interface XPathEvaluator {
+  constructor();
+};
 
 XPathEvaluator includes XPathEvaluatorBase;
 </pre>
@@ -10202,10 +10111,12 @@ Ondřej Žára,
 Peter Sharpe,
 Philip Jägenstedt,
 Philippe Le Hégaret,
-prosody—Gab<!-- riel --> Vereable<!-- Gaston --> <!-- Croft -->Context(,
+Piers Wombwell,
 Pierre-Marie Dartus,
+prosody—Gab<!-- riel --> Vereable<!-- Gaston --> <!-- Croft -->Context(,
 Ra'Shaun Stovall (Snuggs),
 Rafael Weinstein,
+Rakina Zata Amni,
 Richard Bradshaw,
 Rick Byers,
 Rick Waldron,
