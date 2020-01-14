@@ -1,6 +1,6 @@
 #!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import io
 import re
 from itertools import *
@@ -162,7 +162,7 @@ def grouper(iterable, n, fillvalue=None):
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n
-    return (list(x) for x in izip_longest(fillvalue=fillvalue, *args))
+    return (list(x) for x in zip_longest(fillvalue=fillvalue, *args))
 
 
 def getInputLines(inputFilename):
@@ -179,7 +179,7 @@ def getInputLines(inputFilename):
             inputFilename = "-"
     try:
         if inputFilename == "-":
-            lines = [unicode(line, encoding="utf-8") for line in sys.stdin.readlines()]
+            lines = list(sys.stdin.readlines())
         else:
             lines = io.open(inputFilename, 'r', encoding="utf-8").readlines()
     except OSError:
@@ -213,4 +213,4 @@ if __name__ == "__main__":
     options = argparser.parse_args()
     font = Font(options.fontPath)
     for line in font.write(options.text):
-        print line,
+        print(line, end='')
