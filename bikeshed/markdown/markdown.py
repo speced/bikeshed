@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import re
 from itertools import *
 
@@ -10,7 +10,7 @@ from ..messages import *
 
 def parse(lines, numSpacesForIndentation, features=None, opaqueElements=None, blockElements=None):
     fromStrings = False
-    if any(isinstance(l, unicode) for l in lines):
+    if any(isinstance(l, str) for l in lines):
         fromStrings = True
         lines = [Line.Line(-1, l) for l in lines]
     lines = Line.rectify(lines)
@@ -28,11 +28,11 @@ def tokenizeLines(lines, numSpacesForIndentation, features=None, opaqueElements=
     # Every token *must* have 'type', 'raw', and 'prefix' keys.
 
     if features is None:
-        features = set(["headings"])
+        features = {"headings"}
 
     # Inline elements that are allowed to start a "normal" line of text.
     # Any other element will instead be an HTML line and will close paragraphs, etc.
-    inlineElements = set(["a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "css", "l"])
+    inlineElements = {"a", "em", "strong", "small", "s", "cite", "q", "dfn", "abbr", "data", "time", "code", "var", "samp", "kbd", "sub", "sup", "i", "b", "u", "mark", "ruby", "bdi", "bdo", "span", "br", "wbr", "img", "meter", "progress", "css", "l"}
     if blockElements is None:
         blockElements = []
 
