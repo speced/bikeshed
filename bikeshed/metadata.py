@@ -71,7 +71,7 @@ class MetadataManager:
         self.trackingVectorImage = None
         self.trackingVectorImageWidth = "46"
         self.trackingVectorImageHeight = "64"
-        self.trackingVectorAltText = "(This is a tracking vector.) " # The space is to separate from the following text.
+        self.trackingVectorAltText = "(This is a tracking vector.)"
         self.trackingVectorTitle = "There is a tracking vector here."
         self.forceCrossorigin = False
         self.group = None
