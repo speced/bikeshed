@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import division, unicode_literals
+
 import logging
 import os
 import tarfile
@@ -25,14 +25,14 @@ def publishEchidna(doc, username, password, decision, additionalDirectories=None
     os.remove(tar.name)
 
     if r.status_code == 202:
-        print "Successfully pushed to Echidna!"
-        print "Check the URL in a few seconds to see if it was published successfully:"
-        print "https://labs.w3.org/echidna/api/status?id=" + r.text
+        print("Successfully pushed to Echidna!")
+        print("Check the URL in a few seconds to see if it was published successfully:")
+        print("https://labs.w3.org/echidna/api/status?id=" + r.text)
     else:
-        print "There was an error publishing your spec. Here's some information that might help?"
-        print r.status_code
-        print r.text
-        print r.headers
+        print("There was an error publishing your spec. Here's some information that might help?")
+        print(r.status_code)
+        print(r.text)
+        print(r.headers)
 
 
 def prepareTar(doc, visibleTar=False, additionalDirectories=None):
@@ -51,7 +51,7 @@ def prepareTar(doc, visibleTar=False, additionalDirectories=None):
     additionalFiles = extensions.BSPublishAdditionalFiles(additionalDirectories)
     for fname in additionalFiles:
         try:
-            if isinstance(fname, basestring):
+            if isinstance(fname, str):
                 tar.add(fname)
             elif isinstance(fname, list):
                 tar.add(fname[0], arcname=fname[1])
