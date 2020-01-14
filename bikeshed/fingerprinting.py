@@ -28,15 +28,17 @@ def addTrackingVector(doc):
 					        "d":"M2 23Q17 -16 40 12M1 35Q17 -20 43 20M2 40Q18 -19 44 25M3 43Q19 -16 45 29M5 46Q20 -12 45 32M5 49Q11 40 15 27T27 16T45 37M5 49Q15 38 19 25T34 27T44 41M6 52Q17 40 21 28T32 29T43 44M6 52Q21 42 23 31T30 32T42 47M7 54Q23 47 24 36T28 34T41 50M8 56Q26 50 26 35Q28 48 40 53M10 58Q24 54 27 45Q30 52 38 55M27 50Q28 53 36 57M25 52Q28 56 31 57M22 55L26 57M10 58L37 57M13 60L32 60M16 62L28 63"}))))
 
 	for el in els:
+		prependChild(el, " ") # The space is to separate from the following text.
 		prependChild(el,
-			trackingVectorImage(doc.md.trackingVectorImage, doc.md.trackingVectorImageWidth, doc.md.trackingVectorImageHeight, doc.md.trackingVectorAltText, doc.md.trackingVectorTitle, doc.md.trackingVectorClass))
+			E.a({"class": doc.md.trackingVectorClass, "href": "https://infra.spec.whatwg.org/#tracking-vector"},
+			  trackingVectorImage(doc.md.trackingVectorImage, doc.md.trackingVectorImageWidth, doc.md.trackingVectorImageHeight, doc.md.trackingVectorAltText, doc.md.trackingVectorTitle)))
 		removeAttr(el, "tracking-vector")
 
-def trackingVectorImage(imageURL, imageWidth, imageHeight, altText, title, cls):
+def trackingVectorImage(imageURL, imageWidth, imageHeight, altText, title):
 	if imageURL is None:
 
-		return E.svg({"width":"46", "height":"64", "role":"img", "aria-label":altText, "class":cls},
+		return E.svg({"width":"46", "height":"64", "role":"img", "aria-label":altText},
 			E.title({}, title),
 			E.use({"href":"#"+trackingVectorId}))
 	else:
-		return E.img({"title":title, "alt":altText, "src":imageURL, "class":cls, "width":imageWidth, "height":imageHeight})
+		return E.img({"title":title, "alt":altText, "src":imageURL, "width":imageWidth, "height":imageHeight})
