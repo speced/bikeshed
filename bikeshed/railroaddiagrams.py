@@ -13,7 +13,7 @@ CHARACTER_ADVANCE = 8
 
 def e(text):
     import re
-    return re.sub(r"[*_\`\[\]<&]", lambda c: "&#{0};".format(ord(c.group(0))), unicode(text))
+    return re.sub(r"[*_\`\[\]<&]", lambda c: "&#{0};".format(ord(c.group(0))), str(text))
 
 def determineGaps(outer, inner):
     diff = outer - inner
@@ -50,18 +50,18 @@ class DiagramItem(object):
         return self
 
     def writeSvg(self, write):
-        write(u'<{0}'.format(self.name))
+        write('<{0}'.format(self.name))
         for name, value in sorted(self.attrs.items()):
-            write(u' {0}="{1}"'.format(name, e(value)))
-        write(u'>')
+            write(' {0}="{1}"'.format(name, e(value)))
+        write('>')
         if self.name in ["g", "svg"]:
-            write(u'\n')
+            write('\n')
         for child in self.children:
             if isinstance(child, DiagramItem):
                 child.writeSvg(write)
             else:
                 write(e(child))
-        write(u'</{0}>'.format(self.name))
+        write('</{0}>'.format(self.name))
 
 
 class Path(DiagramItem):
@@ -589,7 +589,7 @@ class MultipleChoice(DiagramItem):
             "d": "M {x} {y} h 16 a 4 4 0 0 1 4 4 v 12 a 4 4 0 0 1 -4 4 h -16 z".format(x=x+self.width-20, y=y-10),
             "class": "diagram-text"
             }).addTo(text)
-        DiagramItem('text', text=u"↺", attrs={
+        DiagramItem('text', text="↺", attrs={
             "x": x + self.width - 10,
             "y": y + 4,
             "class": "diagram-arrow"
