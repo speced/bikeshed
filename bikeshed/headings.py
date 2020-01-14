@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 from .config import simplifyText
 from .htmlhelpers import *
 from .messages import *
@@ -90,7 +90,7 @@ def determineHeadingLevels(doc, headings):
             headerLevel[i] = 0
 
     def printLevel():
-        return '.'.join(unicode(x) for x in headerLevel if x > 0)
+        return '.'.join(str(x) for x in headerLevel if x > 0)
 
     skipLevel = float('inf')
     for header in headings:
