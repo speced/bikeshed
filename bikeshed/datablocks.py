@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 import re
 from collections import OrderedDict, defaultdict
 
@@ -9,6 +9,7 @@ from . import config
 from . import Line
 from .htmlhelpers import *
 from .messages import *
+from functools import reduce
 
 # This function does a single pass through the doc,
 # finding all the "data blocks" and processing them.
@@ -28,7 +29,7 @@ from .messages import *
 
 def transformDataBlocks(doc, lines):
     fromStrings = False
-    if any(isinstance(l, unicode) for l in lines):
+    if any(isinstance(l, str) for l in lines):
         fromStrings = True
         lines = [Line.Line(-1, l) for l in lines]
     inBlock = False
@@ -325,7 +326,7 @@ def transformDescdef(lines, doc, firstLine, lineNum=None, **kwargs):
         else:
             die("The descdef for '{0}' is missing a '{1}' line.", vals.get("Name", "???"), key, lineNum=lineNum)
             continue
-    for key in vals.viewkeys() - requiredKeys:
+    for key in vals.keys() - requiredKeys:
         ret.append("<tr><th>{0}:<td>{1}".format(key, vals[key]))
     ret.append("</table>")
 
@@ -474,14 +475,14 @@ def parseDefBlock(lines, type, capitalizeKeys=True, lineNum=None):
 
 
 def transformRailroad(lines, doc, firstLine, **kwargs):
-    import StringIO
-    import railroadparser
+    import io
+    from . import railroadparser
     ret = ["<div class='railroad'>"]
     doc.extraStyles['style-railroad'] = "svg.railroad-diagram{background-color:hsl(30,20%,95%);}svg.railroad-diagram path{stroke-width:3px;stroke:black;fill:rgba(0,0,0,0);}svg.railroad-diagram text{font:bold 14px monospace;text-anchor:middle;}svg.railroad-diagram text.label{text-anchor:start;}svg.railroad-diagram text.comment{font:italic 12px monospace;}svg.railroad-diagram rect{stroke-width:3px;stroke:black;fill:hsl(120,100%,90%);}"
     code = ''.join(lines)
     diagram = railroadparser.parse(code)
     if diagram:
-        temp = StringIO.StringIO()
+        temp = io.StringIO()
         diagram.writeSvg(temp.write)
         ret.append(temp.getvalue())
         temp.close()
