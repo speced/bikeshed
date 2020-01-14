@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, unicode_literals
+
 
 import hashlib
 import itertools
@@ -108,7 +108,7 @@ def handleCodeInclude(el, doc):
                 if not el.get("line-start"):
                     # If manually overridden, leave it alone,
                     # but otherwise DWIM.
-                    el.set("line-start", unicode(start))
+                    el.set("line-start", str(start))
     appendChild(el, *lines)
 
 
@@ -130,7 +130,7 @@ def handleRawInclude(el, doc):
 
 def parseRangeString(rangeStr):
     rangeStr = re.sub(r"\s*", "", rangeStr)
-    return filter(None, (parseSingleRange(x) for x in rangeStr.split(",")))
+    return [_f for _f in (parseSingleRange(x) for x in rangeStr.split(",")) if _f]
 
 def parseSingleRange(item):
     if "-" in item:
